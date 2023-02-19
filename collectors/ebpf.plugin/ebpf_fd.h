@@ -6,8 +6,6 @@
 // Module name
 #define NETDATA_EBPF_MODULE_NAME_FD "filedescriptor"
 
-#define NETDATA_FD_SLEEP_MS 850000ULL
-
 // Menu group
 #define NETDATA_FILE_GROUP "file_access"
 
@@ -36,9 +34,6 @@
 #define NETDATA_SYSTEMD_FD_CLOSE_ERR_CONTEXT "services.fd_close_error"
 
 typedef struct netdata_fd_stat {
-    uint64_t pid_tgid;                     // Unique identifier
-    uint32_t pid;                          // Process ID
-
     uint32_t open_call;                    // Open syscalls (open and openat)
     uint32_t close_call;                   // Close syscall (close)
 
@@ -74,6 +69,14 @@ enum fd_syscalls {
     NETDATA_FD_SYSCALL_END
 };
 
+enum fd_close_syscall {
+    NETDATA_FD_CLOSE_FD,
+    NETDATA_FD___CLOSE_FD,
+
+    NETDATA_FD_CLOSE_END
+};
+
+#define NETDATA_EBPF_MAX_FD_TARGETS 2
 
 void *ebpf_fd_thread(void *ptr);
 void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr);

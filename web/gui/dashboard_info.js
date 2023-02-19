@@ -321,12 +321,6 @@ netdataDashboard.menu = {
         info: 'Docker containers state and disk usage.'
     },
 
-    'fping': {
-        title: 'fping',
-        icon: '<i class="fas fa-exchange-alt"></i>',
-        info: 'Network latency statistics, via <b>fping</b>. <b>fping</b> is a program to send ICMP echo probes to network hosts, similar to <code>ping</code>, but much better performing when pinging multiple hosts. fping versions after 3.15 can be directly used as netdata plugins.'
-    },
-
     'ping': {
         title: 'Ping',
         icon: '<i class="fas fa-exchange-alt"></i>',
@@ -367,6 +361,12 @@ netdataDashboard.menu = {
         title: 'MySQL',
         icon: '<i class="fas fa-database"></i>',
         info: 'Performance metrics for <b>mysql</b>, the open-source relational database management system (RDBMS).'
+    },
+
+    'nvme': {
+        title: 'NVMe',
+        icon: '<i class="fas fa-hdd"></i>',
+        info: 'NVMe devices SMART and health metrics. Additional information on metrics can be found in the <a href="https://nvmexpress.org/developers/nvme-specification/" target="_blank">NVM Express Base Specification</a>.'
     },
 
     'postgres': {
@@ -456,6 +456,12 @@ netdataDashboard.menu = {
 
     'nginx': {
         title: 'nginx',
+        icon: '<i class="fas fa-eye"></i>',
+        info: undefined
+    },
+
+    'nginxplus': {
+        title: 'Nginx Plus',
         icon: '<i class="fas fa-eye"></i>',
         info: undefined
     },
@@ -594,6 +600,36 @@ netdataDashboard.menu = {
     'wmi': {
         title: 'wmi',
         icon: '<i class="fas fa-server"></i>',
+        info: undefined
+    },
+
+    'iis': {
+        title: 'IIS',
+        icon: '<i class="fas fa-eye"></i>',
+        info: undefined
+    },
+
+    'mssql': {
+        title: 'MS SQL Server',
+        icon: '<i class="fas fa-database"></i>',
+        info: undefined
+    },
+
+    'ad': {
+        title: 'Active Directory',
+        icon: '<i class="fab fa-windows"></i>',
+        info: undefined
+    },
+
+    'adcs': {
+        title: 'AD Certification Service',
+        icon: '<i class="fab fa-windows"></i>',
+        info: undefined
+    },
+
+    'adfs': {
+        title: 'AD Federation Service',
+        icon: '<i class="fab fa-windows"></i>',
         info: undefined
     },
 
@@ -745,6 +781,18 @@ netdataDashboard.menu = {
     'pandas': {
         icon: '<i class="fas fa-teddy-bear"></i>'
     },
+
+    'cassandra': {
+        title: 'Cassandra',
+        icon: '<i class="fas fa-database"></i>',
+        info: 'Performance metrics for Cassandra, the open source distributed NoSQL database management system'
+    },
+
+    'consul': {
+        title: 'Consul',
+        icon: '<i class="fas fa-circle-notch"></i>',
+        info: 'Consul performance and health metrics. For details, see <a href="https://developer.hashicorp.com/consul/docs/agent/telemetry#key-metrics" target="_blank">Key Metrics</a>.'
+    }
 };
 
 
@@ -4249,7 +4297,143 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
-    // WMI
+    // Consul
+    'consul.node_health_check_status': {
+        info: 'The current status of the <a href="https://developer.hashicorp.com/consul/tutorials/developer-discovery/service-registration-health-checks#monitor-a-node" target="_blank">node health check</a>. A node health check monitors the health of the entire node. If the node health check fails, Consul marks the node as unhealthy.'
+    },
+    'consul.service_health_check_status': {
+        info: 'The current status of the <a href="https://developer.hashicorp.com/consul/tutorials/developer-discovery/service-registration-health-checks#monitor-a-service" target="_blank">service health check</a>. A service check only affects the health of the service it is associated with. If the service health check fails, the DNS interface stops returning that service.'
+    },
+    'consul.client_rpc_requests_rate': {
+        info: 'The number of RPC requests to a Consul server.'
+    },
+    'consul.client_rpc_requests_exceeded_rate': {
+        info: 'The number of rate-limited RPC requests to a Consul server. An Increase of this metric either indicates the load is getting high enough to limit the rate or a <a href="https://developer.hashicorp.com/consul/docs/agent/config/config-files#limits" target="_blank">incorrectly configured</a> Consul agent.'
+    },
+    'consul.client_rpc_requests_failed_rate': {
+        info: 'The number of failed RPC requests to a Consul server.'
+    },
+    'consul.memory_allocated': {
+        info: 'The amount of memory allocated by the Consul process.'
+    },
+    'consul.memory_sys': {
+        info: 'The amount of memory obtained from the OS.'
+    },
+    'consul.gc_pause_time': {
+        info: 'The amount of time spent in garbage collection (GC) pauses. GC pause is a "stop-the-world" event, meaning that all runtime threads are blocked until GC completes. If memory usage is high, the Go runtime may GC so frequently that it starts to slow down Consul.'
+    },
+    'consul.kvs_apply_time': {
+        info: 'The time it takes to complete an update to the KV store.'
+    },
+    'consul.kvs_apply_operations_rate': {
+        info: 'The number of KV store updates.'
+    },
+    'consul.txn_apply_time': {
+        info: 'The time spent applying a transaction operation.'
+    },
+    'consul.txn_apply_operations_rate': {
+        info: 'The number of applied transaction operations.'
+    },
+    'consul.raft_commit_time': {
+        info: 'The time it takes to commit a new entry to the Raft log on the leader.'
+    },
+    'consul.raft_commits_rate': {
+        info: 'The number of applied Raft transactions.'
+    },
+    'consul.autopilot_health_status': {
+        info: 'The overall health of the local server cluster. The status is healthy if <b>all servers</b> are considered healthy by Autopilot.'
+    },
+    'consul.autopilot_server_health_status': {
+        info: 'Whether the server is healthy according to the current <a href="https://developer.hashicorp.com/consul/tutorials/datacenter-operations/autopilot-datacenter-operations#server-health-checking", target="_blank">Autopilot configuration</a>.'
+    },
+    'consul.autopilot_server_stable_time': {
+        info: 'The time this server has been in its current state.'
+    },
+    'consul.autopilot_server_serf_status': {
+        info: 'The SerfHealth check status for the server.'
+    },
+    'consul.autopilot_server_voter_status': {
+        info: 'Whether the server is a voting member of the Raft cluster.'
+    },
+    'consul.autopilot_failure_tolerance': {
+        info: 'The number of voting servers that the cluster can lose while continuing to function.'
+    },
+    'consul.network_lan_rtt': {
+        info: '<a href="https://developer.hashicorp.com/consul/docs/architecture/coordinates#working-with-coordinates" target="_blank">Estimated</a> network round-trip time between this node and other nodes of the cluster.'
+    },
+    'consul.raft_leader_last_contact_time': {
+        info: 'The time since the leader was last able to contact the follower nodes when checking its leader lease.'
+    },
+    'consul.raft_follower_last_contact_leader_time': {
+        info: 'The time elapsed since this server last contacted the leader.'
+    },
+    'consul.raft_leader_elections_rate': {
+        info: 'The number of leadership elections. Increments whenever a Consul server starts an election.'
+    },
+    'consul.raft_leadership_transitions_rate': {
+        info: 'The number of leadership elections. Increments whenever a Consul server becomes a leader.'
+    },
+    'consul.server_leadership_status': {
+        info: 'The Consul server leadership status.'
+    },
+    'consul.raft_thread_main_saturation_perc': {
+        info: 'An approximate measurement of the proportion of time the main Raft goroutine is busy and unavailable to accept new work.'
+    },
+    'consul.raft_thread_fsm_saturation_perc': {
+        info: 'An approximate measurement of the proportion of time the Raft FSM goroutine is busy and unavailable to accept new work.'
+    },
+    'consul.raft_fsm_last_restore_duration': {
+        info: 'The time taken to restore the FSM from a snapshot on an agent restart or from the leader calling <i>installSnapshot</i>.'
+    },
+    'consul.raft_leader_oldest_log_age': {
+        info: 'The time elapsed since the oldest journal was written to the leader\'s journal storage. This can be important for the health of replication when the write rate is high and the snapshot is large, because followers may not be able to recover from a restart if recovery takes longer than the minimum for the current leader.'
+    },
+    'consul.raft_rpc_install_snapshot_time': {
+        info: 'The time it takes to process the <i>installSnapshot</i> RPC call.'
+    },
+    'consul.raft_boltdb_freelist_bytes': {
+        info: 'The number of bytes necessary to encode the freelist metadata. When <a href="https://developer.hashicorp.com/consul/docs/agent/config/config-files#NoFreelistSync" target="_blank">raft_boltdb.NoFreelistSync</a> is set to <i>false</i> these metadata bytes must also be written to disk for each committed log.'
+    },
+    'consul.raft_boltdb_logs_per_batch_rate': {
+        info: 'The number of logs written per batch to the database.'
+    },
+    'consul.raft_boltdb_store_logs_time': {
+        info: 'The amount of time spent writing logs to the database.'
+    },
+    'consul.license_expiration_time': {
+        info: 'The amount of time remaining before Consul Enterprise license expires. When the license expires, some Consul Enterprise features will stop working.'
+    },
+
+    // ------------------------------------------------------------------------
+    // WMI (Process)
+
+    'wmi.processes_cpu_time': {
+        info: 'Total CPU utilization. The amount of time spent by the process in <a href="https://en.wikipedia.org/wiki/CPU_modes#Mode_types" target="_blank">user and privileged</a> modes.'
+    },
+    'wmi.processes_handles': {
+        info: 'Total number of <a href="https://learn.microsoft.com/en-us/windows/win32/sysinfo/handles-and-objects" target="_blank">handles</a> the process has open. This number is the sum of the handles currently open by each thread in the process.'
+    },
+    'wmi.processes_io_bytes': {
+        info: 'Bytes issued to I/O operations in different modes (read, write, other). This property counts all I/O activity generated by the process to include file, network, and device I/Os. Read and write mode includes data operations; other mode includes those that do not involve data, such as control operations.'
+    },
+    'wmi.processes_io_operations': {
+        info: 'I/O operations issued in different modes (read, write, other). This property counts all I/O activity generated by the process to include file, network, and device I/Os. Read and write mode includes data operations; other mode includes those that do not involve data, such as control operations.'
+    },
+    'wmi.processes_page_faults': {
+        info: 'Page faults by the threads executing in this process. A page fault occurs when a thread refers to a virtual memory page that is not in its working set in main memory. This can cause the page not to be fetched from disk if it is on the standby list and hence already in main memory, or if it is in use by another process with which the page is shared.'
+    },
+    'wmi.processes_file_bytes': {
+        info: 'Current number of bytes this process has used in the paging file(s). Paging files are used to store pages of memory used by the process that are not contained in other files. Paging files are shared by all processes, and lack of space in paging files can prevent other processes from allocating memory.'
+    },
+    'wmi.processes_pool_bytes': {
+        info: 'Pool Bytes is the last observed number of bytes in the paged or nonpaged pool. The nonpaged pool is an area of system memory (physical memory used by the operating system) for objects that cannot be written to disk, but must remain in physical memory as long as they are allocated. The paged pool is an area of system memory (physical memory used by the operating system) for objects that can be written to disk when they are not being used.'
+    },
+    'wmi.processes_threads': {
+        info: 'Number of threads currently active in this process. An instruction is the basic unit of execution in a processor, and a thread is the object that executes instructions. Every running process has at least one thread.'
+    },
+
+    // ------------------------------------------------------------------------
+    // WMI (TCP)
 
     'wmi.tcp_conns_active': {
         info: 'Number of times TCP connections have made a direct transition from the CLOSED state to the SYN-SENT state.'
@@ -4274,6 +4458,93 @@ netdataDashboard.context = {
     },
     'wmi.tcp_segments_sent': {
         info: 'Rate at which segments are sent, including those on current connections, but excluding those containing only retransmitted bytes.'
+    },
+
+    // ------------------------------------------------------------------------
+    // WMI (IIS)
+
+    'iis.website_isapi_extension_requests_count': {
+        info: 'The number of <a href="https://learn.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525282(v=vs.90)" target="_blank">ISAPI extension</a> requests that are processed concurrently by the web service.'
+    },
+    'iis.website_errors_rate': {
+        info: '<p>The number of requests that cannot be satisfied by the server.</p><p><b>DocumentLocked</b> - the requested document was locked. Usually reported as HTTP error 423. <b>DocumentNotFound</b> - the requested document was not found. Usually reported as HTTP error 404.</p>'
+    },
+
+    // ------------------------------------------------------------------------
+    // WMI (Service)
+
+    'wmi.service_status': {
+        info: 'The current <a href="https://learn.microsoft.com/en-us/windows/win32/services/service-status-transitions" target="_blank">status</a> of the service.'
+    },
+
+    // ------------------------------------------------------------------------
+    // WMI (MSSQL)
+
+    'mssql.instance_accessmethods_page_splits': {
+        info : 'Page split happens when the page does not have more space. This chart shows the number of page splits per second that occur as the result of overflowing index pages.'
+    },
+
+    'mssql.instance_cache_hit_ratio': {
+        info : 'Indicates the percentage of pages found in the buffer cache without having to read from disk. The ratio is the total number of cache hits divided by the total number of cache lookups over the last few thousand page accesses. After a long period of time, the ratio moves very little. Because reading from the cache is much less expensive than reading from disk, you want this ratio to be high.'
+    },
+
+    'mssql.instance_bufman_checkpoint_pages': {
+        info : 'Indicates the number of pages flushed to disk per second by a checkpoint or other operation that require all dirty pages to be flushed.'
+    },
+
+    'mssql.instance_bufman_page_life_expectancy': {
+        info : 'Indicates the number of seconds a page will stay in the buffer pool without references.'
+    },
+
+    'mssql.instance_memmgr_external_benefit_of_memory': {
+        info : 'It is used by the engine to balance memory usage between cache and is useful to support when troubleshooting cases with unexpected cache growth. The value is presented as an integer based on an internal calculation.'
+    },
+
+    'mssql.instance_sql_errors': {
+        info: 'Errors in Microsoft SQL Server.</p><p><b>Db_offline</b> - Tracks severe errors that cause SQL Server to take the current database offline. <b>Info</b> - Information related to error messages that provide information to users but do not cause errors. <b>Kill_connection</b> - Tracks severe errors that cause SQL Server to kill the current connection. <b>User</b> - User errors.</p>'
+    },
+
+    'mssql.instance_sqlstats_auto_parameterization_attempts': {
+        info: 'Auto-parameterization occurs when an instance of SQL Server tries to parameterize a Transact-SQL request by replacing some literals with parameters so that reuse of the resulting cached execution plan across multiple similar-looking requests is possible. Note that auto-parameterizations are also known as simple parameterizations in newer versions of SQL Server. This counter does not include forced parameterizations.'
+    },
+
+    'mssql.instance_sqlstats_batch_requests': {
+        info: 'This statistic is affected by all constraints (such as I/O, number of users, cache size, complexity of requests, and so on). High batch requests mean good throughput.'
+    },
+
+    'mssql.instance_sqlstats_safe_auto_parameterization_attempts': {
+        info: 'Note that auto-parameterizations are also known as simple parameterizations in later versions of SQL Server.'
+    },
+
+    'mssql.instance_sqlstats_sql_compilations': {
+        info: 'Indicates the number of times the compile code path is entered. Includes compiles caused by statement-level recompilations in SQL Server. After SQL Server user activity is stable, this value reaches a steady state.'
+    },
+
+    // ------------------------------------------------------------------------
+    // WMI (AD)
+
+    'ad.dra_replication_intersite_compressed_traffic': {
+        info: 'The compressed size, in bytes, of inbound and outbound compressed replication data (size after compression, from DSAs in other sites).'
+    },
+
+    'ad.dra_replication_intrasite_compressed_traffic': {
+        info: 'The number of bytes replicated that were not compressed (that is., from DSAs in the same site).'
+    },
+
+    'ad.dra_replication_properties_updated': {
+        info: 'The number of properties that are updated due to incoming property winning the reconciliation logic that determines the final value to be replicated.'
+    },
+
+    'ad.dra_replication_objects_filtered': {
+        info: 'The number of objects received from inbound replication partners that contained no updates that needed to be applied.'
+    },
+
+    'ad.dra_replication_pending_syncs': {
+        info: 'The number of directory synchronizations that are queued for this server but not yet processed.'
+    },
+
+    'ad.dra_replication_sync_requests': {
+        info: 'The number of directory synchronizations that are queued for this server but not yet processed.'
     },
 
     // ------------------------------------------------------------------------
@@ -4415,6 +4686,150 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // NGINX Plus
+    'nginxplus.client_connections_rate': {
+        info: 'Accepted and dropped (not handled) connections. A connection is considered <b>dropped</b> if the worker process is unable to get a connection for the request by establishing a new connection or reusing an open one.'
+    },
+    'nginxplus.client_connections_count': {
+        info: 'The current number of client connections. A connection is considered <b>idle</b> if there are currently no active requests.'
+    },
+    'nginxplus.ssl_handshakes_rate': {
+        info: 'Successful and failed SSL handshakes.'
+    },
+    'nginxplus.ssl_session_reuses_rate': {
+        info: 'The number of session reuses during SSL handshake.'
+    },
+    'nginxplus.ssl_handshakes_failures_rate': {
+        info: '<p>SSL handshake failures.</p><p><b>NoCommonProtocol</b> - failed because of no common protocol. <b>NoCommonCipher</b> - failed because of no shared cipher. <b>Timeout</b> - failed because of a timeout. <b>PeerRejectedCert</b> - failed because a client rejected the certificate.</p>'
+    },
+    'nginxplus.ssl_verification_errors_rate': {
+        info: '<p>SSL verification errors.</p><p><b>NoCert</b> - a client did not provide the required certificate. <b>ExpiredCert</b> - an expired or not yet valid certificate was presented by a client. <b>RevokedCert</b> - a revoked certificate was presented by a client. <b>HostnameMismatch</b> - server\'s certificate does not match the hostname. <b>Other</b> - other SSL certificate verification errors.</p>'
+    },
+    'nginxplus.http_requests_rate': {
+        info: 'The number of HTTP requests received from clients.'
+    },
+    'nginxplus.http_requests_count': {
+        info: 'The current number of client requests.'
+    },
+    'nginxplus.uptime': {
+        info: 'The time elapsed since the NGINX process was started.'
+    },
+    'nginxplus.http_server_zone_requests_rate': {
+        info: 'The number of requests to the HTTP Server Zone.'
+    },
+    'nginxplus.http_server_zone_responses_per_code_class_rate': {
+        info: 'The number of responses from the HTTP Server Zone. Responses grouped by HTTP status code class.'
+    },
+    'nginxplus.http_server_zone_traffic_rate': {
+        info: 'The amount of data transferred to and from the HTTP Server Zone.'
+    },
+    'nginxplus.http_server_zone_requests_processing_count': {
+        info: 'The number of client requests that are currently being processed by the HTTP Server Zone.'
+    },
+    'nginxplus.http_server_zone_requests_discarded_rate': {
+        info: 'The number of requests to the HTTP Server Zone completed without sending a response.'
+    },
+    'nginxplus.http_location_zone_requests_rate': {
+        info: 'The number of requests to the HTTP Location Zone.'
+    },
+    'nginxplus.http_location_zone_responses_per_code_class_rate': {
+        info: 'The number of responses from the HTTP Location Zone. Responses grouped by HTTP status code class.'
+    },
+    'nginxplus.http_location_zone_traffic_rate': {
+        info: 'The amount of data transferred to and from the HTTP Location Zone.'
+    },
+    'nginxplus.http_location_zone_requests_discarded_rate': {
+        info: 'The number of requests to the HTTP Location Zone completed without sending a response.'
+    },
+    'nginxplus.http_upstream_peers_count': {
+        info: 'The number of HTTP Upstream servers.'
+    },
+    'nginxplus.http_upstream_zombies_count': {
+        info: 'The current number of HTTP Upstream servers removed from the group but still processing active client requests.'
+    },
+    'nginxplus.http_upstream_keepalive_count': {
+        info: 'The current number of idle keepalive connections to the HTTP Upstream.'
+    },
+    'nginxplus.http_upstream_server_requests_rate': {
+        info: 'The number of client requests forwarded to the HTTP Upstream Server.'
+    },
+    'nginxplus.http_upstream_server_responses_per_code_class_rate': {
+        info: 'The number of responses received from the HTTP Upstream Server. Responses grouped by HTTP status code class.'
+    },
+    'nginxplus.http_upstream_server_response_time': {
+        info: 'The average time to get a complete response from the HTTP Upstream Server.'
+    },
+    'nginxplus.http_upstream_server_response_header_time': {
+        info: 'The average time to get a response header from the HTTP Upstream Server.'
+    },
+    'nginxplus.http_upstream_server_traffic_rate': {
+        info: 'The amount of traffic transferred to and from the HTTP Upstream Server.'
+    },
+    'nginxplus.http_upstream_server_state': {
+        info: 'The current state of the HTTP Upstream Server. Status active if set to 1.'
+    },
+    'nginxplus.http_upstream_server_connections_count': {
+        info: 'The current number of active connections to the HTTP Upstream Server.'
+    },
+    'nginxplus.http_upstream_server_downtime': {
+        info: 'The time the HTTP Upstream Server has spent in the <b>unavail</b>, <b>checking</b>, and <b>unhealthy</b> states.'
+    },
+    'nginxplus.http_cache_state': {
+        info: 'HTTP cache current state. <b>Cold</b> means that the cache loader process is still loading data from disk into the cache.'
+    },
+    'nginxplus.http_cache_iops': {
+        info: '<p>HTTP cache IOPS.</p><p><b>Served</b> - valid, expired, and revalidated responses read from the cache. <b>Written</b> - miss, expired, and bypassed responses written to the cache. <b>Bypassed</b> - miss, expired, and bypass responses.</p>'
+    },
+    'nginxplus.http_cache_io': {
+        info: '<p>HTTP cache IO.</p><p><b>Served</b> - valid, expired, and revalidated responses read from the cache. <b>Written</b> - miss, expired, and bypassed responses written to the cache. <b>Bypassed</b> - miss, expired, and bypass responses.</p>'
+    },
+    'nginxplus.http_cache_size': {
+        info: 'The current size of the cache.'
+    },
+    'nginxplus.stream_server_zone_connections_rate': {
+        info: 'The number of accepted connections to the Stream Server Zone.'
+    },
+    'nginxplus.stream_server_zone_sessions_per_code_class_rate': {
+        info: 'The number of completed sessions for the Stream Server Zone. Sessions grouped by status code class.'
+    },
+    'nginxplus.stream_server_zone_traffic_rate': {
+        info: 'The amount of data transferred to and from the Stream Server Zone.'
+    },
+    'nginxplus.stream_server_zone_connections_processing_count': {
+        info: 'The number of client connections to the Stream Server Zone that are currently being processed.'
+    },
+    'nginxplus.stream_server_zone_connections_discarded_rate': {
+        info: 'The number of connections to the Stream Server Zone completed without creating a session.'
+    },
+    'nginxplus.stream_upstream_peers_count': {
+        info: 'The number of Stream Upstream servers.'
+    },
+    'nginxplus.stream_upstream_zombies_count': {
+        info: 'The current number of HTTP Upstream servers removed from the group but still processing active client connections.'
+    },
+    'nginxplus.stream_upstream_server_connections_rate': {
+        info: 'The number of connections forwarded to the Stream Upstream Server.'
+    },
+    'nginxplus.stream_upstream_server_traffic_rate': {
+        info: 'The amount of traffic transferred to and from the Stream Upstream Server.'
+    },
+    'nginxplus.stream_upstream_server_state': {
+        info: 'The current state of the Stream Upstream Server. Status active if set to 1.'
+    },
+    'nginxplus.stream_upstream_server_downtime': {
+        info: 'The time the Stream Upstream Server has spent in the <b>unavail</b>, <b>checking</b>, and <b>unhealthy</b> states.'
+    },
+    'nginxplus.stream_upstream_server_connections_count': {
+        info: 'The current number of connections to the Stream Upstream Server.'
+    },
+    'nginxplus.resolver_zone_requests_rate': {
+        info: '<p>Resolver zone DNS requests.</p><p><b>Name</b> - requests to resolve names to addresses. <b>Srv</b> - requests to resolve SRV records. <b>Addr</b> - requests to resolve addresses to names.</p>'
+    },
+    'nginxplus.resolver_zone_responses_rate': {
+        info: '<p>Resolver zone DNS responses.</p><p><b>NoError</b> - successful responses. <b>FormErr</b> - format error responses. <b>ServFail</b> - server failure responses. <b>NXDomain</b> - host not found responses. <b>NotImp</b> - unimplemented responses. <b>Refused</b> - operation refused responses. <b>TimedOut</b> - timed out requests. <b>Unknown</b> - requests completed with an unknown error.</p>'
+    },
+
+    // ------------------------------------------------------------------------
     // HTTP check
 
     'httpcheck.responsetime': {
@@ -4482,19 +4897,6 @@ netdataDashboard.context = {
     'retroshare.dht': {
         info: 'Statistics about RetroShare\'s DHT. These values are estimated!'
     },
-
-    // ------------------------------------------------------------------------
-    // fping
-
-    'fping.quality': {
-        colors: NETDATA.colors[10],
-        height: 0.5
-    },
-
-    'fping.packets': {
-        height: 0.5
-    },
-
 
     // ------------------------------------------------------------------------
     // containers
@@ -7627,6 +8029,56 @@ netdataDashboard.context = {
         info: 'Number of ICMP messages sent and received. These counters should be equal if there is no packet loss.'
     },
 
+    // NVMe
+
+    'nvme.device_estimated_endurance_perc': {
+        info: 'NVM subsystem lifetime used based on the actual usage and the manufacturer\'s prediction of NVM life. A value of 100 indicates that the estimated endurance of the device has been consumed, but may not indicate a device failure. The value can be greater than 100 if you use the storage beyond its planned lifetime.'
+    },
+    'nvme.device_available_spare_perc': {
+        info: 'Remaining spare capacity that is available. SSDs provide a set of internal spare capacity, called spare blocks, that can be used to replace blocks that have reached their write operation limit. After all of the spare blocks have been used, the next block that reaches its limit causes the disk to fail.'
+    },
+    'nvme.device_composite_temperature': {
+        info: 'The current composite temperature of the controller and namespace(s) associated with that controller. The manner in which this value is computed is implementation specific and may not represent the actual temperature of any physical point in the NVM subsystem.'
+    },
+    'nvme.device_io_transferred_count': {
+        info: 'The total amount of data read and written by the host.'
+    },
+    'nvme.device_power_cycles_count': {
+        info: 'Power cycles reflect the number of times this host has been rebooted or the device has been woken up after sleep. A high number of power cycles does not affect the device\'s life expectancy.'
+    },
+    'nvme.device_power_on_time': {
+        info: '<a href="https://en.wikipedia.org/wiki/Power-on_hours" target="_blank">Power-on time</a> is the length of time the device is supplied with power.'
+    },
+    'nvme.device_unsafe_shutdowns_count': {
+        info: 'The number of times a power outage occurred without a shutdown notification being sent. Depending on the NVMe device you are using, an unsafe shutdown can corrupt user data.'
+    },
+    'nvme.device_critical_warnings_state': {
+        info: '<p>Critical warnings for the status of the controller. Status active if set to 1.</p><p><b>AvailableSpare</b> - the available spare capacity is below the threshold. <b>TempThreshold</b> - the composite temperature is greater than or equal to an over temperature threshold or less than or equal to an under temperature threshold. <b>NvmSubsystemReliability</b> - the NVM subsystem reliability is degraded due to excessive media or internal errors. <b>ReadOnly</b> - media is placed in read-only mode. <b>VolatileMemBackupFailed</b> - the volatile memory backup device has failed. <b>PersistentMemoryReadOnly</b> - the Persistent Memory Region has become read-only or unreliable.</p>'
+    },
+    'nvme.device_media_errors_rate': {
+        info: 'The number of occurrences where the controller detected an unrecovered data integrity error. Errors such as uncorrectable ECC, CRC checksum failure, or LBA tag mismatch are included in this counter.'
+    },
+    'nvme.device_error_log_entries_rate': {
+        info: 'The number of entries in the Error Information Log. By itself, an increase in the number of records is not an indicator of any failure condition.'
+    },
+    'nvme.device_warning_composite_temperature_time': {
+        info: 'The time the device has been operating above the Warning Composite Temperature Threshold (WCTEMP) and below Critical Composite Temperature Threshold (CCTEMP).'
+    },
+    'nvme.device_critical_composite_temperature_time': {
+        info: 'The time the device has been operating above the Critical Composite Temperature Threshold (CCTEMP).'
+    },
+    'nvme.device_thermal_mgmt_temp1_transitions_rate': {
+        info: 'The number of times the controller has entered lower active power states or performed vendor-specific thermal management actions, <b>minimizing performance impact</b>, to attempt to lower the Composite Temperature due to the host-managed thermal management feature.'
+    },
+    'nvme.device_thermal_mgmt_temp2_transitions_rate': {
+        info: 'The number of times the controller has entered lower active power states or performed vendor-specific thermal management actions, <b>regardless of the impact on performance (e.g., heavy throttling)</b>, to attempt to lower the Combined Temperature due to the host-managed thermal management feature.'
+    },
+    'nvme.device_thermal_mgmt_temp1_time': {
+        info: 'The amount of time the controller has entered lower active power states or performed vendor-specific thermal management actions, <b>minimizing performance impact</b>, to attempt to lower the Composite Temperature due to the host-managed thermal management feature.'
+    },
+    'nvme.device_thermal_mgmt_temp2_time': {
+        info: 'The amount of time the controller has entered lower active power states or performed vendor-specific thermal management actions, <b>regardless of the impact on performance (e.g., heavy throttling)</b>, to attempt to lower the Combined Temperature due to the host-managed thermal management feature.'
+    },
     // ------------------------------------------------------------------------
 
 };

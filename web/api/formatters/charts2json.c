@@ -10,7 +10,7 @@ const char* get_release_channel() {
     if (use_stable == -1) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/.environment", netdata_configured_user_config_dir);
-        procfile *ff = procfile_open(filename, "=", PROCFILE_FLAG_DEFAULT);
+        procfile *ff = procfile_open(filename, "=", PROCFILE_FLAG_ERROR_ON_ERROR_LOG);
         if (ff) {
             procfile_set_quotes(ff, "'\"");
             ff = procfile_readall(ff);
@@ -78,7 +78,7 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
             rrdset2json(st, wb, &dimensions, &memory, skip_volatile);
 
             c++;
-            st->last_accessed_time = now;
+            st->last_accessed_time_s = now;
         }
     }
     rrdset_foreach_done(st);
@@ -102,10 +102,10 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
                    , dimensions
                    , alarms
                    , memory
-                   , rrd_hosts_available
+                   , rrdhost_hosts_available()
     );
 
-    if(unlikely(rrd_hosts_available > 1)) {
+    if(unlikely(rrdhost_hosts_available() > 1)) {
         rrd_rdlock();
 
         size_t found = 0;
@@ -178,7 +178,7 @@ void chartcollectors2json(RRDHOST *host, BUFFER *wb) {
             };
             sprintf(name, "%s:%s", col.plugin, col.module);
             dictionary_set(dict, name, &col, sizeof(struct collector));
-            st->last_accessed_time = now;
+            st->last_accessed_time_s = now;
         }
     }
     rrdset_foreach_done(st);

@@ -61,8 +61,12 @@ void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("HEALTH [%s]: Failed to prepare statement for SQL_UPDATE_HEALTH_LOG", rrdhost_hostname(host));
-        return;
+        sql_create_health_log_table(host);
+        rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("HEALTH [%s]: Failed to prepare statement for SQL_INSERT_HEALTH_LOG", rrdhost_hostname(host));
+            return;
+        }
     }
 
     rc = sqlite3_bind_int64(res, 1, (sqlite3_int64) ae->updated_by_id);
@@ -103,8 +107,6 @@ void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
     failed:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("HEALTH [%s]: Failed to finalize the prepared statement for updating health log.", rrdhost_hostname(host));
-
-    return;
 }
 
 /* Health related SQL queries
@@ -134,8 +136,12 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("HEALTH [%s]: Failed to prepare statement for SQL_INSERT_HEALTH_LOG", rrdhost_hostname(host));
-        return;
+        sql_create_health_log_table(host);
+        rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("HEALTH [%s]: Failed to prepare statement for SQL_INSERT_HEALTH_LOG", rrdhost_hostname(host));
+            return;
+        }
     }
 
     rc = sqlite3_bind_text(res, 1, rrdhost_hostname(host), -1, SQLITE_STATIC);
@@ -337,13 +343,11 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
     }
 
     ae->flags |= HEALTH_ENTRY_FLAG_SAVED;
-    host->health_log_entries_written++;
+    host->health.health_log_entries_written++;
 
     failed:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("HEALTH [%s]: Failed to finalize the prepared statement for inserting to health log.", rrdhost_hostname(host));
-
-    return;
 }
 
 void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
@@ -369,7 +373,7 @@ void sql_health_alarm_log_cleanup(RRDHOST *host) {
         if(rotate_every < 100) rotate_every = 100;
     }
 
-    if(likely(host->health_log_entries_written < rotate_every)) {
+    if(likely(host->health.health_log_entries_written < rotate_every)) {
         return;
     }
 
@@ -382,7 +386,7 @@ void sql_health_alarm_log_cleanup(RRDHOST *host) {
     char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG(uuid_str, uuid_str, (unsigned long int) (host->health_log_entries_written - rotate_every)));
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG(uuid_str, uuid_str, (unsigned long int) (host->health.health_log_entries_written - rotate_every)));
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
@@ -398,7 +402,7 @@ void sql_health_alarm_log_cleanup(RRDHOST *host) {
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize the prepared statement to cleanup health log table");
 
-    host->health_log_entries_written = rotate_every;
+    host->health.health_log_entries_written = rotate_every;
 
     sql_aclk_alert_clean_dead_entries(host);
 }
@@ -431,13 +435,13 @@ void sql_health_alarm_log_count(RRDHOST *host) {
 
     rc = sqlite3_step_monitored(res);
     if (likely(rc == SQLITE_ROW))
-        host->health_log_entries_written = (size_t) sqlite3_column_int64(res, 0);
+        host->health.health_log_entries_written = (size_t) sqlite3_column_int64(res, 0);
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize the prepared statement to count health log entries from db");
 
-    info("HEALTH [%s]: Table health_log_%s, contains %lu entries.", rrdhost_hostname(host), uuid_str, (unsigned long int) host->health_log_entries_written);
+    info("HEALTH [%s]: Table health_log_%s, contains %lu entries.", rrdhost_hostname(host), uuid_str, (unsigned long int) host->health.health_log_entries_written);
 }
 
 #define SQL_INJECT_REMOVED(guid, guid2) "insert into health_log_%s (hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, " \
@@ -537,8 +541,6 @@ void sql_inject_removed_status(char *uuid_str, uint32_t alarm_id, uint32_t alarm
 failed:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("HEALTH [N/A]: Failed to finalize the prepared statement for injecting removed event.");
-    return;
-
 }
 
 #define SQL_SELECT_MAX_UNIQUE_ID(guid) "SELECT MAX(unique_id) from health_log_%s", guid
@@ -612,7 +614,7 @@ void sql_health_alarm_log_load(RRDHOST *host) {
     ssize_t errored = 0, loaded = 0;
     char command[MAX_HEALTH_SQL_SIZE + 1];
 
-    host->health_log_entries_written = 0;
+    host->health.health_log_entries_written = 0;
 
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)

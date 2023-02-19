@@ -34,7 +34,7 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
     // make sure we have 3 lines
     size_t lines = procfile_lines(ff), l;
     if(unlikely(lines < 2)) {
-        error("/proc/net/stat/synproxy has %zu lines, expected no less than 2. Disabling it.", lines);
+        collector_error("/proc/net/stat/synproxy has %zu lines, expected no less than 2. Disabling it.", lines);
         return 1;
     }
 
@@ -80,7 +80,6 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
 
             rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set(st, "received", syn_received);
         rrdset_done(st);
@@ -111,7 +110,6 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
 
             rrddim_add(st, "reopened", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set(st, "reopened", conn_reopened);
         rrdset_done(st);
@@ -144,7 +142,6 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
             rrddim_add(st, "invalid", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st, "retransmits", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set(st, "valid", cookie_valid);
         rrddim_set(st, "invalid", cookie_invalid);

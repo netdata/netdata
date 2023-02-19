@@ -126,7 +126,6 @@ system/netdata-updater.service
 !system/netdata.service.*.in
 system/netdata.plist
 system/netdata-freebsd
-system/edit-config
 system/netdata.crontab
 system/install-service.sh
 
@@ -138,7 +137,6 @@ claim/netdata-claim.sh
 collectors/tc.plugin/tc-qos-helper.sh
 collectors/charts.d.plugin/charts.d.plugin
 collectors/python.d.plugin/python.d.plugin
-collectors/fping.plugin/fping.plugin
 collectors/ioping.plugin/ioping.plugin
 collectors/go.d.plugin
 web/netdata-switch-dashboard.sh
@@ -233,3 +231,7 @@ Session.*.vim
 # Judy stuff
 JudyLTables.c
 judyltablesgen
+
+# m4 generated ksys
+database/engine/journalfile_v2.ksy
+database/engine/journalfile_v2_virtmemb.ksy

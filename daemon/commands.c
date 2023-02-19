@@ -46,6 +46,7 @@ static cmd_status_t cmd_read_config_execute(char *args, char **message);
 static cmd_status_t cmd_write_config_execute(char *args, char **message);
 static cmd_status_t cmd_ping_execute(char *args, char **message);
 static cmd_status_t cmd_aclk_state(char *args, char **message);
+static cmd_status_t cmd_version(char *args, char **message);
 
 static command_info_t command_info_array[] = {
         {"help", cmd_help_execute, CMD_TYPE_HIGH_PRIORITY},                  // show help menu
@@ -59,7 +60,8 @@ static command_info_t command_info_array[] = {
         {"read-config", cmd_read_config_execute, CMD_TYPE_CONCURRENT},
         {"write-config", cmd_write_config_execute, CMD_TYPE_ORTHOGONAL},
         {"ping", cmd_ping_execute, CMD_TYPE_ORTHOGONAL},
-        {"aclk-state", cmd_aclk_state, CMD_TYPE_ORTHOGONAL}
+        {"aclk-state", cmd_aclk_state, CMD_TYPE_ORTHOGONAL},
+        {"version", cmd_version, CMD_TYPE_ORTHOGONAL}
 };
 
 /* Mutexes for commands of type CMD_TYPE_ORTHOGONAL */
@@ -124,7 +126,9 @@ static cmd_status_t cmd_help_execute(char *args, char **message)
              "ping\n"
              "    Return with 'pong' if agent is alive.\n"
              "aclk-state [json]\n"
-             "    Returns current state of ACLK and Cloud connection. (optionally in json)\n",
+             "    Returns current state of ACLK and Cloud connection. (optionally in json).\n"
+             "version\n"
+             "    Returns the netdata version.\n",
              MAX_COMMAND_LENGTH - 1);
     return CMD_STATUS_SUCCESS;
 }
@@ -216,7 +220,7 @@ static cmd_status_t cmd_reload_labels_execute(char *args, char **message)
     info("COMMAND: reloading host labels.");
     reload_host_labels();
 
-    BUFFER *wb = buffer_create(10);
+    BUFFER *wb = buffer_create(10, NULL);
     rrdlabels_log_to_buffer(localhost->rrdlabels, wb);
     (*message)=strdupz(buffer_tostring(wb));
     buffer_free(wb);
@@ -310,6 +314,18 @@ static cmd_status_t cmd_aclk_state(char *args, char **message)
         *message = aclk_state_json();
     else
         *message = aclk_state();
+
+    return CMD_STATUS_SUCCESS;
+}
+
+static cmd_status_t cmd_version(char *args, char **message)
+{
+    (void)args;
+
+    char version[MAX_COMMAND_LENGTH];
+    snprintfz(version, MAX_COMMAND_LENGTH -1, "%s %s", program_name, program_version);
+
+    *message = strdupz(version);
 
     return CMD_STATUS_SUCCESS;
 }
@@ -454,9 +470,13 @@ static void after_schedule_command(uv_work_t *req, int status)
 
 static void schedule_command(uv_work_t *req)
 {
-    struct command_context *cmd_ctx = req->data;
+    register_libuv_worker_jobs();
+    worker_is_busy(UV_EVENT_SCHEDULE_CMD);
 
+    struct command_context *cmd_ctx = req->data;
     cmd_ctx->status = execute_command(cmd_ctx->idx, cmd_ctx->args, &cmd_ctx->message);
+
+    worker_is_idle();
 }
 
 /* This will alter the state of the command_info_array.cmd_str

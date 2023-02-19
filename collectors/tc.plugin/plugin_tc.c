@@ -89,7 +89,7 @@ static bool tc_class_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
     struct tc_class *c = old_value; (void)c;
     struct tc_class *new_c = new_value; (void)new_c;
 
-    error("TC: class '%s' is already in device '%s'. Ignoring duplicate.", dictionary_acquired_item_name(item), string2str(d->id));
+    collector_error("TC: class '%s' is already in device '%s'. Ignoring duplicate.", dictionary_acquired_item_name(item), string2str(d->id));
 
     tc_class_free_callback(item, new_value, data);
 
@@ -98,7 +98,7 @@ static bool tc_class_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
 
 static void tc_class_index_init(struct tc_device *d) {
     if(!d->classes) {
-        d->classes = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_SINGLE_THREADED);
+        d->classes = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_SINGLE_THREADED, &dictionary_stats_category_collectors, 0);
 
         dictionary_register_delete_callback(d->classes, tc_class_free_callback, d);
         dictionary_register_conflict_callback(d->classes, tc_class_conflict_callback, d);
@@ -144,8 +144,9 @@ static void tc_device_free_callback(const DICTIONARY_ITEM *item __maybe_unused, 
 
 static void tc_device_index_init() {
     if(!tc_device_root_index) {
-        tc_device_root_index = dictionary_create(
-            DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_SINGLE_THREADED | DICT_OPTION_ADD_IN_FRONT);
+        tc_device_root_index = dictionary_create_advanced(
+            DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_SINGLE_THREADED | DICT_OPTION_ADD_IN_FRONT,
+            &dictionary_stats_category_collectors, 0);
 
         dictionary_register_insert_callback(tc_device_root_index, tc_device_add_callback, NULL);
         dictionary_register_delete_callback(tc_device_root_index, tc_device_free_callback, NULL);
@@ -276,7 +277,7 @@ static inline void tc_device_commit(struct tc_device *d) {
     }
 
     if(unlikely(updated_classes && updated_qdiscs)) {
-        error("TC: device '%s' has active both classes (%d) and qdiscs (%d). Will render only qdiscs.", string2str(d->id), updated_classes, updated_qdiscs);
+        collector_error("TC: device '%s' has active both classes (%d) and qdiscs (%d). Will render only qdiscs.", string2str(d->id), updated_classes, updated_qdiscs);
 
         // set all classes to !updated
         dfe_start_read(d->classes, c) {
@@ -352,7 +353,7 @@ static inline void tc_device_commit(struct tc_device *d) {
         }
 
         //if(unlikely(!c->hasparent)) {
-        //    if(root) error("TC: multiple root class/qdisc for device '%s' (old: '%s', new: '%s')", d->id, root->id, c->id);
+        //    if(root) collector_error("TC: multiple root class/qdisc for device '%s' (old: '%s', new: '%s')", d->id, root->id, c->id);
         //    root = c;
         //    debug(D_TC_LOOP, "TC: found root class/qdisc '%s'", root->id);
         //}
@@ -421,7 +422,6 @@ static inline void tc_device_commit(struct tc_device *d) {
             rrdlabels_add(d->st_bytes->rrdlabels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
-            rrdset_next(d->st_bytes);
             if(unlikely(d->name_updated))
                 rrdset_reset_name(d->st_bytes, string2str(d->name));
 
@@ -483,8 +483,6 @@ static inline void tc_device_commit(struct tc_device *d) {
             rrdlabels_add(d->st_bytes->rrdlabels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
-            rrdset_next(d->st_packets);
-
             if(unlikely(d->name_updated)) {
                 char name[RRD_ID_LENGTH_MAX + 1];
                 snprintfz(name, RRD_ID_LENGTH_MAX, "%s_packets", string2str(d->name?d->name:d->id));
@@ -549,8 +547,6 @@ static inline void tc_device_commit(struct tc_device *d) {
             rrdlabels_add(d->st_bytes->rrdlabels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
-            rrdset_next(d->st_dropped);
-
             if(unlikely(d->name_updated)) {
                 char name[RRD_ID_LENGTH_MAX + 1];
                 snprintfz(name, RRD_ID_LENGTH_MAX, "%s_dropped", string2str(d->name?d->name:d->id));
@@ -615,8 +611,6 @@ static inline void tc_device_commit(struct tc_device *d) {
             rrdlabels_add(d->st_bytes->rrdlabels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
-            rrdset_next(d->st_tokens);
-
             if(unlikely(d->name_updated)) {
                 char name[RRD_ID_LENGTH_MAX + 1];
                 snprintfz(name, RRD_ID_LENGTH_MAX, "%s_tokens", string2str(d->name?d->name:d->id));
@@ -683,7 +677,6 @@ static inline void tc_device_commit(struct tc_device *d) {
         }
         else {
             debug(D_TC_LOOP, "TC: Updating _ctokens chart for device '%s'", string2str(d->name?d->name:d->id));
-            rrdset_next(d->st_ctokens);
 
             if(unlikely(d->name_updated)) {
                 char name[RRD_ID_LENGTH_MAX + 1];
@@ -863,14 +856,14 @@ static void tc_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    info("cleaning up...");
+    collector_info("cleaning up...");
 
     if(tc_child_pid) {
-        info("TC: killing with SIGTERM tc-qos-helper process %d", tc_child_pid);
+        collector_info("TC: killing with SIGTERM tc-qos-helper process %d", tc_child_pid);
         if(killpid(tc_child_pid) != -1) {
             siginfo_t info;
 
-            info("TC: waiting for tc plugin child process pid %d to exit...", tc_child_pid);
+            collector_info("TC: waiting for tc plugin child process pid %d to exit...", tc_child_pid);
             waitid(P_PID, (id_t) tc_child_pid, &info, WEXITED);
         }
 
@@ -937,7 +930,7 @@ void *tc_main(void *ptr) {
     snprintfz(command, TC_LINE_MAX, "%s/tc-qos-helper.sh", netdata_configured_primary_plugins_dir);
     char *tc_script = config_get("plugin:tc", "script to run to get tc values", command);
 
-    while(!netdata_exit) {
+    while(service_running(SERVICE_COLLECTORS)) {
         FILE *fp_child_input, *fp_child_output;
         struct tc_device *device = NULL;
         struct tc_class *class = NULL;
@@ -947,13 +940,13 @@ void *tc_main(void *ptr) {
 
         fp_child_output = netdata_popen(command, (pid_t *)&tc_child_pid, &fp_child_input);
         if(unlikely(!fp_child_output)) {
-            error("TC: Cannot popen(\"%s\", \"r\").", command);
+            collector_error("TC: Cannot popen(\"%s\", \"r\").", command);
             goto cleanup;
         }
 
         char buffer[TC_LINE_MAX+1] = "";
         while(fgets(buffer, TC_LINE_MAX, fp_child_output) != NULL) {
-            if(unlikely(netdata_exit)) break;
+            if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
 
             buffer[TC_LINE_MAX] = '\0';
             // debug(D_TC_LOOP, "TC: read '%s'", buffer);
@@ -1170,13 +1163,13 @@ void *tc_main(void *ptr) {
             class = NULL;
         }
 
-        if(unlikely(netdata_exit))
+        if(unlikely(!service_running(SERVICE_COLLECTORS)))
             goto cleanup;
 
         if(code == 1 || code == 127) {
             // 1 = DISABLE
             // 127 = cannot even run it
-            error("TC: tc-qos-helper.sh exited with code %d. Disabling it.", code);
+            collector_error("TC: tc-qos-helper.sh exited with code %d. Disabling it.", code);
             goto cleanup;
         }
 

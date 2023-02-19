@@ -1,6 +1,10 @@
 <!--
 title: "Atlassian Confluence dashboards"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/gui/confluence/README.md
+sidebar_label: "Atlassian Confluence dashboards"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Developers/Web"
 -->
 
 # Atlassian Confluence dashboards
@@ -85,7 +89,7 @@ This badge is now auto-refreshing. It will update itself based on the update fre
 
 > Keep in mind you can add badges with custom Netdata queries too. Netdata automatically creates badges for all the
 > alarms, but every chart, every dimension on every chart, can be used for a badge. And Netdata badges are quite
-> powerful! Check [Creating Badges](/web/api/badges/README.md) for more information on badges.
+> powerful! Check [Creating Badges](https://github.com/netdata/netdata/blob/master/web/api/badges/README.md) for more information on badges.
 
 So, let's create a table and add this badge for both our web servers:
 

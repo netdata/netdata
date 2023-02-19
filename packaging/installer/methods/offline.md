@@ -1,7 +1,11 @@
 <!--
 title: "Install Netdata on offline systems"
 description: "Install the Netdata Agent on offline/air gapped systems to benefit from real-time, per-second monitoring without connecting to the internet."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/offline.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/offline.md"
+sidebar_label: "Install Netdata on offline systems"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Installation"
 -->
 
 # Install Netdata on offline systems
@@ -41,7 +45,7 @@ curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/n
 This will create a directory called `netdata-offline` in the current directory and place all the files required for an offline install in it.
 
 If you want to use a specific release channel (nightly or stable), it _must_ be specified on this step using the
-apporpriate option for the kickstart script.
+appropriate option for the kickstart script.
 
 ## Installing on the target system
 
@@ -50,16 +54,16 @@ target system. This can be done in any manner you like, as long as filenames are
 
 After copying the files, simply run the `install.sh` script located in the
 offline install source directory. It accepts all the [same options as the kickstart
-script](/packaging/installer/methods/kickstart.md#optional-parameters-to-alter-your-installation) for further
+script](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md#optional-parameters-to-alter-your-installation) for further
 customization of the installation, though it will default to not enabling automatic updates (as they are not
 supported on offline installs).
 
 ## What's next?
 
-When you're finished with installation, check out our [single-node](/docs/quickstart/single-node.md) or
-[infrastructure](/docs/quickstart/infrastructure.md) monitoring quickstart guides based on your use case.
+When you're finished with installation, check out our [single-node](https://github.com/netdata/netdata/blob/master/docs/quickstart/single-node.md) or
+[infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md) monitoring quickstart guides based on your use case.
 
-Or, skip straight to [configuring the Netdata Agent](/docs/configure/nodes.md).
+Or, skip straight to [configuring the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md).
 
 Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
 solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to

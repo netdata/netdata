@@ -222,6 +222,7 @@ void reset_metrics() {
 }
 
 int main(int argc, char **argv) {
+    stderror = stderr;
     clocks_init();
 
     // ------------------------------------------------------------------------

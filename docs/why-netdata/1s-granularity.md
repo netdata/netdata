@@ -1,6 +1,10 @@
 <!--
 title: "1s granularity"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/why-netdata/1s-granularity.md
+sidebar_label: "1s granularity"
+learn_status: "Published"
+learn_topic_type: "Concepts"
+learn_rel_path: "Concepts/Why Netdata"
 -->
 
 # 1s granularity

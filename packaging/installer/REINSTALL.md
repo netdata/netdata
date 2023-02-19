@@ -1,7 +1,11 @@
 <!--
 title: "Reinstall the Netdata Agent"
 description: "Troubleshooting installation issues or force an update of the Netdata Agent by reinstalling it using the same method you used during installation."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/REINSTALL.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/REINSTALL.md"
+sidebar_label: "Reinstall the Netdata Agent"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Installation"
 -->
 
 # Reinstall the Netdata Agent
@@ -14,11 +18,11 @@ Netdata Agent on your node.
 ### Reinstalling with the same install type
 
 Run the one-line installer script with the `--reinstall` parameter to reinstall the Netdata Agent. This will preserve
-any [user configuration](/docs/configure/nodes.md) in `netdata.conf` or other files, and will keep the same install
+any [user configuration](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) in `netdata.conf` or other files, and will keep the same install
 type that was used for the original install.
 
 If you used any [optional
-parameters](/packaging/installer/methods/kickstart.md#optional-parameters-to-alter-your-installation) during initial
+parameters](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md#optional-parameters-to-alter-your-installation) during initial
 installation, you need to pass them to the script again during reinstallation. If you cannot remember which options you
 used, read the contents of the `.environment` file and look for a `REINSTALL_OPTIONS` line. This line contains a list of
 optional parameters.
@@ -35,7 +39,7 @@ getting a badly broken installation working again. Unlike the regular `--reinsta
 different install type than the original install used.
 
 If you used any [optional
-parameters](/packaging/installer/methods/kickstart.md#optional-parameters-to-alter-your-installation) during initial
+parameters](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md#optional-parameters-to-alter-your-installation) during initial
 installation, you need to pass them to the script again during reinstallation. If you cannot remember which options you
 used, read the contents of the `.environment` file and look for a `REINSTALL_OPTIONS` line. This line contains a list of
 optional parameters.
@@ -65,8 +69,8 @@ When copying these directories back after the reinstall, you may need to update 
 ## Troubleshooting
 
 If you still experience problems with your Netdata Agent installation after following one of these processes, the next
-best route is to [uninstall](/packaging/installer/UNINSTALL.md) and then try a fresh installation using the [one-line
-installer](/packaging/installer/methods/kickstart.md).
+best route is to [uninstall](https://github.com/netdata/netdata/blob/master/packaging/installer/UNINSTALL.md) and then try a fresh installation using the [one-line
+installer](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md).
 
 You can also post to our [community forums](https://community.netdata.cloud/c/support/13) or create a new [bug
 report](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml).

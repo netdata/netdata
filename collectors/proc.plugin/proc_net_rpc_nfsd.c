@@ -282,7 +282,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
         if(do_rc == 1 && strcmp(type, "rc") == 0) {
             if(unlikely(words < 4)) {
-                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 4);
+                collector_error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 4);
                 continue;
             }
 
@@ -296,7 +296,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         }
         else if(do_fh == 1 && strcmp(type, "fh") == 0) {
             if(unlikely(words < 6)) {
-                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 6);
+                collector_error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 6);
                 continue;
             }
 
@@ -309,7 +309,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         }
         else if(do_io == 1 && strcmp(type, "io") == 0) {
             if(unlikely(words < 3)) {
-                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 3);
+                collector_error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 3);
                 continue;
             }
 
@@ -322,7 +322,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         }
         else if(do_th == 1 && strcmp(type, "th") == 0) {
             if(unlikely(words < 13)) {
-                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 13);
+                collector_error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 13);
                 continue;
             }
 
@@ -335,7 +335,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         }
         else if(do_net == 1 && strcmp(type, "net") == 0) {
             if(unlikely(words < 5)) {
-                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 5);
+                collector_error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 5);
                 continue;
             }
 
@@ -350,7 +350,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         }
         else if(do_rpc == 1 && strcmp(type, "rpc") == 0) {
             if(unlikely(words < 6)) {
-                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 6);
+                collector_error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 6);
                 continue;
             }
 
@@ -377,7 +377,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
             if(sum == 0ULL) {
                 if(!proc2_warning) {
-                    error("Disabling /proc/net/rpc/nfsd v2 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
+                    collector_error("Disabling /proc/net/rpc/nfsd v2 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
                     proc2_warning = 1;
                 }
                 do_proc2 = 0;
@@ -398,7 +398,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
             if(sum == 0ULL) {
                 if(!proc3_warning) {
-                    info("Disabling /proc/net/rpc/nfsd v3 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
+                    collector_info("Disabling /proc/net/rpc/nfsd v3 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
                     proc3_warning = 1;
                 }
                 do_proc3 = 0;
@@ -419,7 +419,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
             if(sum == 0ULL) {
                 if(!proc4_warning) {
-                    info("Disabling /proc/net/rpc/nfsd v4 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
+                    collector_info("Disabling /proc/net/rpc/nfsd v4 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
                     proc4_warning = 1;
                 }
                 do_proc4 = 0;
@@ -440,7 +440,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
             if(sum == 0ULL) {
                 if(!proc4ops_warning) {
-                    info("Disabling /proc/net/rpc/nfsd v4 operations chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
+                    collector_info("Disabling /proc/net/rpc/nfsd v4 operations chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
                     proc4ops_warning = 1;
                 }
                 do_proc4ops = 0;
@@ -448,8 +448,6 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             else do_proc4ops = 2;
         }
     }
-
-    // --------------------------------------------------------------------
 
     if(do_rc == 2) {
         static RRDSET *st = NULL;
@@ -477,15 +475,12 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             rd_misses  = rrddim_add(st, "misses",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_nocache = rrddim_add(st, "nocache", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_hits,    rc_hits);
         rrddim_set_by_pointer(st, rd_misses,  rc_misses);
         rrddim_set_by_pointer(st, rd_nocache, rc_nocache);
         rrdset_done(st);
     }
-
-    // --------------------------------------------------------------------
 
     if(do_fh == 2) {
         static RRDSET *st = NULL;
@@ -510,13 +505,10 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
             rd_stale                 = rrddim_add(st, "stale",                 NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_stale,                 fh_stale);
         rrdset_done(st);
     }
-
-    // --------------------------------------------------------------------
 
     if(do_io == 2) {
         static RRDSET *st = NULL;
@@ -542,14 +534,11 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             rd_read  = rrddim_add(st, "read",  NULL,  1, 1000, RRD_ALGORITHM_INCREMENTAL);
             rd_write = rrddim_add(st, "write", NULL, -1, 1000, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_read,  io_read);
         rrddim_set_by_pointer(st, rd_write, io_write);
         rrdset_done(st);
     }
-
-    // --------------------------------------------------------------------
 
     if(do_th == 2) {
         static RRDSET *st = NULL;
@@ -573,14 +562,10 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
             rd_threads = rrddim_add(st, "threads", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_threads, th_threads);
         rrdset_done(st);
-
     }
-
-    // --------------------------------------------------------------------
 
     if(do_net == 2) {
         static RRDSET *st = NULL;
@@ -607,7 +592,6 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             rd_udp = rrddim_add(st, "udp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_tcp = rrddim_add(st, "tcp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         // ignore net_count, net_tcp_connections
         (void)net_count;
@@ -617,8 +601,6 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         rrddim_set_by_pointer(st, rd_tcp, net_tcp_count);
         rrdset_done(st);
     }
-
-    // --------------------------------------------------------------------
 
     if(do_rpc == 2) {
         static RRDSET *st = NULL;
@@ -647,7 +629,6 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             rd_bad_format = rrddim_add(st, "bad_format", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_bad_auth   = rrddim_add(st, "bad_auth",   NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         // ignore rpc_bad_client
         (void)rpc_bad_client;
@@ -657,8 +638,6 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         rrddim_set_by_pointer(st, rd_bad_auth, rpc_bad_auth);
         rrdset_done(st);
     }
-
-    // --------------------------------------------------------------------
 
     if(do_proc2 == 2) {
         static RRDSET *st = NULL;
@@ -678,7 +657,6 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , RRDSET_TYPE_STACKED
             );
         }
-        else rrdset_next(st);
 
         size_t i;
         for(i = 0; nfsd_proc2_values[i].present ; i++) {
@@ -690,8 +668,6 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
         rrdset_done(st);
     }
-
-    // --------------------------------------------------------------------
 
     if(do_proc3 == 2) {
         static RRDSET *st = NULL;
@@ -711,7 +687,6 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , RRDSET_TYPE_STACKED
             );
         }
-        else rrdset_next(st);
 
         size_t i;
         for(i = 0; nfsd_proc3_values[i].present ; i++) {
@@ -723,8 +698,6 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
         rrdset_done(st);
     }
-
-    // --------------------------------------------------------------------
 
     if(do_proc4 == 2) {
         static RRDSET *st = NULL;
@@ -744,7 +717,6 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , RRDSET_TYPE_STACKED
             );
         }
-        else rrdset_next(st);
 
         size_t i;
         for(i = 0; nfsd_proc4_values[i].present ; i++) {
@@ -756,8 +728,6 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
         rrdset_done(st);
     }
-
-    // --------------------------------------------------------------------
 
     if(do_proc4ops == 2) {
         static RRDSET *st = NULL;
@@ -777,7 +747,6 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , RRDSET_TYPE_STACKED
             );
         }
-        else rrdset_next(st);
 
         size_t i;
         for(i = 0; nfsd4_ops_values[i].present ; i++) {

@@ -45,7 +45,7 @@ int init_opentsdb_telnet_instance(struct instance *instance)
     instance->prepare_header = NULL;
     instance->check_response = exporting_discard_response;
 
-    instance->buffer = (void *)buffer_create(0);
+    instance->buffer = (void *)buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
     if (!instance->buffer) {
         error("EXPORTING: cannot create buffer for opentsdb telnet exporting connector instance %s", instance->config.name);
         return 1;
@@ -102,7 +102,7 @@ int init_opentsdb_http_instance(struct instance *instance)
     instance->prepare_header = opentsdb_http_prepare_header;
     instance->check_response = exporting_discard_response;
 
-    instance->buffer = (void *)buffer_create(0);
+    instance->buffer = (void *)buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
     if (!instance->buffer) {
         error("EXPORTING: cannot create buffer for opentsdb HTTP exporting connector instance %s", instance->config.name);
         return 1;
@@ -150,7 +150,7 @@ void sanitize_opentsdb_label_value(char *dst, const char *src, size_t len)
 
 int format_host_labels_opentsdb_telnet(struct instance *instance, RRDHOST *host) {
     if(!instance->labels_buffer)
-        instance->labels_buffer = buffer_create(1024);
+        instance->labels_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_exporters);
 
     if (unlikely(!sending_labels_configured(instance)))
         return 0;
@@ -283,7 +283,7 @@ void opentsdb_http_prepare_header(struct instance *instance)
 
 int format_host_labels_opentsdb_http(struct instance *instance, RRDHOST *host) {
     if (!instance->labels_buffer)
-        instance->labels_buffer = buffer_create(1024);
+        instance->labels_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_exporters);
 
     if (unlikely(!sending_labels_configured(instance)))
         return 0;

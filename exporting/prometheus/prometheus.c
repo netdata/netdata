@@ -28,10 +28,6 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN
     RRDHOST *host = st->rrdhost;
 #endif
 
-    // Do not send anomaly rates charts.
-    if (rrdset_is_ar_chart(st))
-        return 0;
-
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_IGNORE)))
         return 0;
 
@@ -321,7 +317,7 @@ void format_host_labels_prometheus(struct instance *instance, RRDHOST *host)
         return;
 
     if (!instance->labels_buffer)
-        instance->labels_buffer = buffer_create(1024);
+        instance->labels_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_exporters);
 
     struct format_prometheus_label_callback tmp = {
         .instance = instance,

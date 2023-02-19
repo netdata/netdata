@@ -19,13 +19,16 @@ extern int web_enable_gzip, web_gzip_level, web_gzip_strategy;
 
 // HTTP_CODES 4XX Client Errors
 #define HTTP_RESP_BAD_REQUEST 400
+#define HTTP_RESP_UNAUTHORIZED 401
 #define HTTP_RESP_FORBIDDEN 403
 #define HTTP_RESP_NOT_FOUND 404
+#define HTTP_RESP_CONFLICT 409
 #define HTTP_RESP_PRECOND_FAIL 412
 
 // HTTP_CODES 5XX Server Errors
 #define HTTP_RESP_INTERNAL_SERVER_ERROR 500
-#define HTTP_RESP_BACKEND_FETCH_FAILED 503
+#define HTTP_RESP_BACKEND_FETCH_FAILED 503  // 503 is right
+#define HTTP_RESP_SERVICE_UNAVAILABLE 503   // 503 is right
 #define HTTP_RESP_GATEWAY_TIMEOUT 504
 #define HTTP_RESP_BACKEND_RESPONSE_INVALID 591
 
@@ -205,6 +208,8 @@ int mysendfile(struct web_client *w, char *filename);
 
 void web_client_build_http_header(struct web_client *w);
 char *strip_control_characters(char *url);
+
+int web_client_socket_is_now_used_for_streaming(struct web_client *w);
 
 #include "daemon/common.h"
 

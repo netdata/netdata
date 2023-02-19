@@ -164,10 +164,12 @@ void registry_update_cloud_base_url()
 int registry_request_hello_json(RRDHOST *host, struct web_client *w) {
     registry_json_header(host, w, "hello", REGISTRY_STATUS_OK);
 
+    const char *cloud_ui_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud ui url", DEFAULT_CLOUD_UI_URL);
+
     buffer_sprintf(w->response.data,
             ",\n\t\"registry\": \"%s\",\n\t\"cloud_base_url\": \"%s\",\n\t\"anonymous_statistics\": %s",
             registry.registry_to_announce,
-            registry.cloud_base_url, netdata_anonymous_statistics_enabled?"true":"false");
+            cloud_ui_url, netdata_anonymous_statistics_enabled?"true":"false");
 
     registry_json_footer(w);
     return 200;
@@ -377,7 +379,6 @@ void registry_statistics(void) {
 
         rrddim_add(sts, "sessions",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
-    else rrdset_next(sts);
 
     rrddim_set(sts, "sessions", registry.usages_count);
     rrdset_done(sts);
@@ -406,7 +407,6 @@ void registry_statistics(void) {
         rrddim_add(stc, "persons_urls",   NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(stc, "machines_urls",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
-    else rrdset_next(stc);
 
     rrddim_set(stc, "persons",       registry.persons_count);
     rrddim_set(stc, "machines",      registry.machines_count);
@@ -439,7 +439,6 @@ void registry_statistics(void) {
         rrddim_add(stm, "persons_urls",   NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(stm, "machines_urls",  NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
     }
-    else rrdset_next(stm);
 
     rrddim_set(stm, "persons",       registry.persons_memory + dictionary_stats_for_registry(registry.persons));
     rrddim_set(stm, "machines",      registry.machines_memory + dictionary_stats_for_registry(registry.machines));

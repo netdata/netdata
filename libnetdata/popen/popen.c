@@ -43,7 +43,7 @@ static void netdata_popen_tracking_add_pid_unsafe(pid_t pid) {
     mp = mallocz(sizeof(struct netdata_popen));
     mp->pid = pid;
 
-    DOUBLE_LINKED_LIST_PREPEND_UNSAFE(netdata_popen_root, mp, prev, next);
+    DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(netdata_popen_root, mp, prev, next);
 }
 
 // myp_del deletes pid if we're tracking.
@@ -61,7 +61,7 @@ static void netdata_popen_tracking_del_pid(pid_t pid) {
     }
 
     if(mp) {
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(netdata_popen_root, mp, prev, next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(netdata_popen_root, mp, prev, next);
         freez(mp);
     }
     else
@@ -96,7 +96,7 @@ void netdata_popen_tracking_cleanup(void) {
 
     while(netdata_popen_root) {
         struct netdata_popen *mp = netdata_popen_root;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(netdata_popen_root, mp, prev, next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(netdata_popen_root, mp, prev, next);
         freez(mp);
     }
 
@@ -163,12 +163,12 @@ static int popene_internal(volatile pid_t *pidptr, char **env, uint8_t flags, FI
     posix_spawnattr_t attr;
     posix_spawn_file_actions_t fa;
 
-    int stdin_fd_to_exclude_from_closing = -1;
-    int stdout_fd_to_exclude_from_closing = -1;
+    unsigned int fds_to_exclude_from_closing = OPEN_FD_EXCLUDE_STDERR;
 
     if(posix_spawn_file_actions_init(&fa)) {
         error("POPEN: posix_spawn_file_actions_init() failed.");
-        return -1;
+        ret = -1;
+        goto set_return_values_and_return;
     }
 
     if(fpp_child_stdin) {
@@ -194,7 +194,7 @@ static int popene_internal(volatile pid_t *pidptr, char **env, uint8_t flags, FI
         if (posix_spawn_file_actions_addopen(&fa, STDIN_FILENO, "/dev/null", O_RDONLY, 0)) {
             error("POPEN: posix_spawn_file_actions_addopen() on stdin to /dev/null failed.");
             // this is not a fatal error
-            stdin_fd_to_exclude_from_closing = STDIN_FILENO;
+            fds_to_exclude_from_closing |= OPEN_FD_EXCLUDE_STDIN;
         }
     }
 
@@ -221,16 +221,13 @@ static int popene_internal(volatile pid_t *pidptr, char **env, uint8_t flags, FI
         if (posix_spawn_file_actions_addopen(&fa, STDOUT_FILENO, "/dev/null", O_WRONLY, 0)) {
             error("POPEN: posix_spawn_file_actions_addopen() on stdout to /dev/null failed.");
             // this is not a fatal error
-            stdout_fd_to_exclude_from_closing = STDOUT_FILENO;
+            fds_to_exclude_from_closing |= OPEN_FD_EXCLUDE_STDOUT;
         }
     }
 
     if(flags & POPEN_FLAG_CLOSE_FD) {
         // Mark all files to be closed by the exec() stage of posix_spawn()
-        for(int i = (int)(sysconf(_SC_OPEN_MAX) - 1); i >= 0; i--) {
-            if(likely(i != STDERR_FILENO && i != stdin_fd_to_exclude_from_closing && i != stdout_fd_to_exclude_from_closing))
-                (void)fcntl(i, F_SETFD, FD_CLOEXEC);
-        }
+        for_each_open_fd(OPEN_FD_ACTION_FD_CLOEXEC, fds_to_exclude_from_closing);
     }
 
     attr_rc = posix_spawnattr_init(&attr);
@@ -292,9 +289,8 @@ cleanup_and_return:
             fclose(fp_child_stdin);
         else if (pipefd_stdin[PIPE_WRITE] != -1)
             close(pipefd_stdin[PIPE_WRITE]);
-    }
-    else {
-        *fpp_child_stdin  = fp_child_stdin;
+
+        fp_child_stdin = NULL;
     }
 
     // the child end - close it
@@ -307,10 +303,16 @@ cleanup_and_return:
             fclose(fp_child_stdout);
         else if (pipefd_stdout[PIPE_READ] != -1)
             close(pipefd_stdout[PIPE_READ]);
+
+        fp_child_stdout = NULL;
     }
-    else {
+
+set_return_values_and_return:
+    if(fpp_child_stdin)
+        *fpp_child_stdin = fp_child_stdin;
+
+    if(fpp_child_stdout)
         *fpp_child_stdout = fp_child_stdout;
-    }
 
     return ret;
 }

@@ -34,10 +34,11 @@ typedef struct {
 // ----------------------------------------------------------------------------
 // The procfile
 
-#define PROCFILE_FLAG_DEFAULT             0x00000000
-#define PROCFILE_FLAG_NO_ERROR_ON_FILE_IO 0x00000001
+#define PROCFILE_FLAG_DEFAULT             0x00000000 // To store inside `collector.log`
+#define PROCFILE_FLAG_NO_ERROR_ON_FILE_IO 0x00000001 // Do not store nothing
+#define PROCFILE_FLAG_ERROR_ON_ERROR_LOG  0x00000002 // Store inside `error.log`
 
-typedef enum procfile_separator {
+typedef enum __attribute__ ((__packed__)) procfile_separator {
     PF_CHAR_IS_SEPARATOR,
     PF_CHAR_IS_NEWLINE,
     PF_CHAR_IS_WORD,
@@ -46,17 +47,16 @@ typedef enum procfile_separator {
     PF_CHAR_IS_CLOSE
 } PF_CHAR_TYPE;
 
-typedef struct {
-    char filename[FILENAME_MAX + 1]; // not populated until profile_filename() is called
-
+typedef struct procfile {
+    char *filename;                 // not populated until procfile_filename() is called
     uint32_t flags;
-    int fd;               // the file descriptor
-    size_t len;           // the bytes we have placed into data
-    size_t size;          // the bytes we have allocated for data
+    int fd;                         // the file descriptor
+    size_t len;                     // the bytes we have placed into data
+    size_t size;                    // the bytes we have allocated for data
     pflines *lines;
     pfwords *words;
     PF_CHAR_TYPE separators[256];
-    char data[];          // allocated buffer to keep file contents
+    char data[];                    // allocated buffer to keep file contents
 } procfile;
 
 // close the proc file and free all related memory

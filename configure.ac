@@ -47,8 +47,8 @@ AC_LANG_PUSH([C])
 AX_COMPILER_VENDOR
 AC_LANG_POP([C])
 if test "$ax_cv_c_compiler_vendor" = "clang"; then
-  AC_CHECK_TOOL([AR], [llvm-ar])
-  AC_CHECK_TOOL([RANLIB], [llvm-ranlib])
+  AC_CHECK_PROG([AR], [llvm-ar], [llvm-ar], [ar])
+  AC_CHECK_PROG([RANLIB], [llvm-ranlib], [llvm-ranlib], [ranlib])
 else
   AC_CHECK_TOOL([RANLIB], [ranlib])
   AC_CHECK_TOOL([AR], [ar])
@@ -208,10 +208,10 @@ AC_ARG_ENABLE(
     [enable_ml="detect"]
 )
 AC_ARG_ENABLE(
-    [ml_tests],
-    [AS_HELP_STRING([--enable-ml-tests], [Enable anomaly detection tests @<:@no@:>@])],
-    [enable_ml_tests="yes"],
-    [enable_ml_tests="no"]
+    [aclk_ssl_debug],
+    [AS_HELP_STRING([--enable-aclk-ssl-debug], [Enables possibility for SSL key logging @<:@default no@:>@])],
+    [aclk_ssl_debug="yes"],
+    [aclk_ssl_debug="no"]
 )
 
 # -----------------------------------------------------------------------------
@@ -251,6 +251,7 @@ AC_SEARCH_LIBS([clock_gettime], [rt posix4])
 AC_CHECK_FUNCS([clock_gettime])
 AC_CHECK_FUNCS([sched_setscheduler sched_getscheduler sched_getparam sched_get_priority_min sched_get_priority_max getpriority setpriority nice])
 AC_CHECK_FUNCS([recvmmsg])
+AC_CHECK_FUNCS([close_range])
 
 AC_TYPE_INT8_T
 AC_TYPE_INT16_T
@@ -713,6 +714,11 @@ if test "${with_bundled_protobuf}" != "no"; then
     fi
 fi
 
+AM_CONDITIONAL([MQTT_WSS_DEBUG], [test "${aclk_ssl_debug}" = "yes"])
+if test "${aclk_ssl_debug}" = "yes"; then
+    AC_DEFINE([MQTT_WSS_DEBUG], [1], [ACLK SSL allow debugging])
+fi
+
 if test "${with_bundled_protobuf}" != "yes"; then
 PKG_CHECK_MODULES(
     [PROTOBUF],
@@ -807,7 +813,7 @@ if test "$enable_cloud" != "no"; then
     if test "$can_enable_ng" = "yes"; then
         enable_aclk="yes"
         AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
-        OPTIONAL_ACLK_CFLAGS="-I \$(abs_top_srcdir)/mqtt_websockets/src/include -I \$(abs_top_srcdir)/mqtt_websockets/c-rbuf/include -I \$(abs_top_srcdir)/mqtt_websockets/MQTT-C/include -I \$(abs_top_srcdir)/aclk/aclk-schemas"
+        OPTIONAL_ACLK_CFLAGS="-I \$(abs_top_srcdir)/mqtt_websockets/src/include -I \$(abs_top_srcdir)/mqtt_websockets/c-rbuf/include -I \$(abs_top_srcdir)/aclk/aclk-schemas"
         OPTIONAL_PROTOBUF_CFLAGS="${PROTOBUF_CFLAGS}"
         CXX11FLAG="-std=c++11"
         OPTIONAL_PROTOBUF_LIBS="${PROTOBUF_LIBS}"
@@ -1169,19 +1175,6 @@ if test "${build_ml}" = "yes"; then
     OPTIONAL_ML_LIBS=""
 fi
 
-# Decide if we should build ML tests.
-if test "${build_ml}" = "yes" -a "${enable_ml_tests}" = "yes" -a "${have_gtest}" = "yes"; then
-    build_ml_tests="yes"
-else
-    build_ml_tests="no"
-fi
-
-AM_CONDITIONAL([ENABLE_ML_TESTS], [test "${build_ml_tests}" = "yes"])
-if test "${build_ml_tests}" = "yes"; then
-    AC_DEFINE([ENABLE_ML_TESTS], [1], [anomaly detection tests])
-    OPTIONAL_ML_TESTS_CFLAGS="${OPTIONAL_GTEST_CFLAGS}"
-    OPTIONAL_ML_TESTS_LIBS="${OPTIONAL_GTEST_LIBS}"
-fi
 
 # -----------------------------------------------------------------------------
 # ebpf.plugin
@@ -1601,7 +1594,7 @@ CFLAGS="${originalCFLAGS} ${OPTIONAL_LTO_CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${O
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
     ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PUBSUB_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} \
     ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${JUDY_CFLAGS} \
-    ${OPTIONAL_ACLK_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_ML_TESTS_CFLAGS} ${OPTIONAL_OS_DEP_CFLAGS}"
+    ${OPTIONAL_ACLK_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_OS_DEP_CFLAGS}"
 
 CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
 
@@ -1655,8 +1648,6 @@ AC_SUBST([OPTIONAL_GTEST_CFLAGS])
 AC_SUBST([OPTIONAL_GTEST_LIBS])
 AC_SUBST([OPTIONAL_ML_CFLAGS])
 AC_SUBST([OPTIONAL_ML_LIBS])
-AC_SUBST([OPTIONAL_ML_TESTS_CFLAGS])
-AC_SUBST([OPTIONAL_ML_TESTS_LIBS])
 
 # -----------------------------------------------------------------------------
 # Check if cmocka is available - needed for unit testing
@@ -1700,10 +1691,8 @@ AC_CONFIG_FILES([
     collectors/apps.plugin/Makefile
     collectors/cgroups.plugin/Makefile
     collectors/charts.d.plugin/Makefile
-    collectors/checks.plugin/Makefile
     collectors/diskspace.plugin/Makefile
     collectors/timex.plugin/Makefile
-    collectors/fping.plugin/Makefile
     collectors/ioping.plugin/Makefile
     collectors/freebsd.plugin/Makefile
     collectors/freeipmi.plugin/Makefile
@@ -1741,7 +1730,7 @@ AC_CONFIG_FILES([
     libnetdata/Makefile
     libnetdata/tests/Makefile
     libnetdata/adaptive_resortable_list/Makefile
-    libnetdata/arrayalloc/Makefile
+    libnetdata/aral/Makefile
     libnetdata/avl/Makefile
     libnetdata/buffer/Makefile
     libnetdata/clocks/Makefile
@@ -1750,6 +1739,7 @@ AC_CONFIG_FILES([
     libnetdata/dictionary/Makefile
     libnetdata/ebpf/Makefile
     libnetdata/eval/Makefile
+    libnetdata/july/Makefile
     libnetdata/locks/Makefile
     libnetdata/log/Makefile
     libnetdata/onewayalloc/Makefile

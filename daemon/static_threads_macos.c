@@ -6,7 +6,7 @@ extern void *macos_main(void *ptr);
 
 const struct netdata_static_thread static_threads_macos[] = {
     {
-        .name = "PLUGIN[macos]",
+        .name = "P[macos]",
         .config_section = CONFIG_SECTION_PLUGINS,
         .config_name = "macos",
         .enabled = 1,

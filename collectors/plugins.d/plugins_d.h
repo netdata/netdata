@@ -34,6 +34,10 @@
 #define PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE    "RSSTATE"
 #define PLUGINSD_KEYWORD_REPLAY_END             "REND"
 
+#define PLUGINSD_KEYWORD_BEGIN_V2               "BEGIN2"
+#define PLUGINSD_KEYWORD_SET_V2                 "SET2"
+#define PLUGINSD_KEYWORD_END_V2                 "END2"
+
 #define PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT 10 // seconds
 
 #define PLUGINSD_LINE_MAX_SSL_READ 512
@@ -50,9 +54,6 @@ struct plugind {
     char fullfilename[FILENAME_MAX+1];  // with path
     char cmd[PLUGINSD_CMD_MAX+1];       // the command that it executes
 
-    volatile pid_t pid;
-    netdata_thread_t thread;
-
     size_t successful_collections;      // the number of times we have seen
                                         // values collected from this plugin
 
@@ -60,8 +61,14 @@ struct plugind {
                                         // without collecting values
 
     int update_every;                   // the plugin default data collection frequency
-    volatile sig_atomic_t obsolete;     // do not touch this structure after setting this to 1
-    volatile sig_atomic_t enabled;      // if this is enabled or not
+
+    struct {
+        SPINLOCK spinlock;
+        bool running;                  // do not touch this structure after setting this to 1
+        bool enabled;                   // if this is enabled or not
+        netdata_thread_t thread;
+        pid_t pid;
+    } unsafe;
 
     time_t started_t;
     uint32_t capabilities;              // follows the same principles as streaming capabilities

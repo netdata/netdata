@@ -65,7 +65,7 @@ static inline void rrddimvar_free_variables_unsafe(RRDDIMVAR *rs) {
 
     // HOST VARIABLES FOR THIS DIMENSION
 
-    if(host->rrdvars && host->health_enabled) {
+    if(host->rrdvars && host->health.health_enabled) {
         rrdvar_release_and_del(host->rrdvars, rs->rrdvar_host_chart_id_dim_id);
         rs->rrdvar_host_chart_id_dim_id = NULL;
 
@@ -152,7 +152,7 @@ static inline void rrddimvar_update_variables_unsafe(RRDDIMVAR *rs) {
     // - $chart-name.id
     // - $chart-name.name
 
-    if(host->rrdvars && host->health_enabled) {
+    if(host->rrdvars && host->health.health_enabled) {
         rs->rrdvar_host_chart_id_dim_id = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_id_dim_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
         rs->rrdvar_host_chart_id_dim_name = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_id_dim_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
         rs->rrdvar_host_chart_name_dim_id = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_name_dim_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
@@ -214,7 +214,8 @@ static void rrddimvar_delete_callback(const DICTIONARY_ITEM *item __maybe_unused
 
 void rrddimvar_index_init(RRDSET *st) {
     if(!st->rrddimvar_root_index) {
-        st->rrddimvar_root_index = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+        st->rrddimvar_root_index = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                                                              &dictionary_stats_category_rrdhealth, sizeof(RRDDIMVAR));
 
         dictionary_register_insert_callback(st->rrddimvar_root_index, rrddimvar_insert_callback, NULL);
         dictionary_register_conflict_callback(st->rrddimvar_root_index, rrddimvar_conflict_callback, NULL);

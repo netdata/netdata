@@ -775,7 +775,7 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
     int rv = -1;
 
     if (!(ctx = ipmi_monitoring_ctx_create ())) {
-        error("ipmi_monitoring_ctx_create()");
+        collector_error("ipmi_monitoring_ctx_create()");
         goto cleanup;
     }
 
@@ -784,8 +784,8 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
         if (ipmi_monitoring_ctx_sdr_cache_directory (ctx,
                 sdr_cache_directory) < 0)
         {
-            error("ipmi_monitoring_ctx_sdr_cache_directory(): %s\n",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error("ipmi_monitoring_ctx_sdr_cache_directory(): %s\n",
+                            ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
     }
@@ -796,8 +796,8 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
         if (ipmi_monitoring_ctx_sensor_config_file (ctx,
                 sensor_config_file) < 0)
         {
-            error( "ipmi_monitoring_ctx_sensor_config_file(): %s\n",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_ctx_sensor_config_file(): %s\n",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
     }
@@ -805,8 +805,8 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
     {
         if (ipmi_monitoring_ctx_sensor_config_file (ctx, NULL) < 0)
         {
-            error( "ipmi_monitoring_ctx_sensor_config_file(): %s\n",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_ctx_sensor_config_file(): %s\n",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
     }
@@ -851,8 +851,8 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
                 NULL,
                 NULL)) < 0)
         {
-            error( "ipmi_monitoring_sensor_readings_by_record_id(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_sensor_readings_by_record_id(): %s",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
     }
@@ -867,8 +867,8 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
                 NULL,
                 NULL)) < 0)
         {
-            error( "ipmi_monitoring_sensor_readings_by_record_id(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_sensor_readings_by_record_id(): %s",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
     }
@@ -883,8 +883,8 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
                 NULL,
                 NULL)) < 0)
         {
-            error( "ipmi_monitoring_sensor_readings_by_sensor_type(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_sensor_readings_by_sensor_type(): %s",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
     }
@@ -920,58 +920,57 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
 
         if ((record_id = ipmi_monitoring_sensor_read_record_id (ctx)) < 0)
         {
-            error( "ipmi_monitoring_sensor_read_record_id(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_sensor_read_record_id(): %s",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
 
         if ((sensor_number = ipmi_monitoring_sensor_read_sensor_number (ctx)) < 0)
         {
-            error( "ipmi_monitoring_sensor_read_sensor_number(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_sensor_read_sensor_number(): %s",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
 
         if ((sensor_type = ipmi_monitoring_sensor_read_sensor_type (ctx)) < 0)
         {
-            error( "ipmi_monitoring_sensor_read_sensor_type(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_sensor_read_sensor_type(): %s",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
 
         if (!(sensor_name = ipmi_monitoring_sensor_read_sensor_name (ctx)))
         {
-            error( "ipmi_monitoring_sensor_read_sensor_name(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_sensor_read_sensor_name(): %s",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
 
         if ((sensor_state = ipmi_monitoring_sensor_read_sensor_state (ctx)) < 0)
         {
-            error( "ipmi_monitoring_sensor_read_sensor_state(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_sensor_read_sensor_state(): %s",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
 
         if ((sensor_units = ipmi_monitoring_sensor_read_sensor_units (ctx)) < 0)
         {
-            error( "ipmi_monitoring_sensor_read_sensor_units(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_sensor_read_sensor_units(): %s",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
 
 #ifdef NETDATA_COMMENTED
         if ((sensor_bitmask_type = ipmi_monitoring_sensor_read_sensor_bitmask_type (ctx)) < 0)
         {
-            error( "ipmi_monitoring_sensor_read_sensor_bitmask_type(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_sensor_read_sensor_bitmask_type(): %s",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
         if ((sensor_bitmask = ipmi_monitoring_sensor_read_sensor_bitmask (ctx)) < 0)
         {
-            error(
-                   "ipmi_monitoring_sensor_read_sensor_bitmask(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error("ipmi_monitoring_sensor_read_sensor_bitmask(): %s",
+                            ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
 
@@ -986,8 +985,8 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
 
         if ((sensor_reading_type = ipmi_monitoring_sensor_read_sensor_reading_type (ctx)) < 0)
         {
-            error( "ipmi_monitoring_sensor_read_sensor_reading_type(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_sensor_read_sensor_reading_type(): %s",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
 
@@ -996,8 +995,8 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
 #ifdef NETDATA_COMMENTED
         if ((event_reading_type_code = ipmi_monitoring_sensor_read_event_reading_type_code (ctx)) < 0)
         {
-            error( "ipmi_monitoring_sensor_read_event_reading_type_code(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_sensor_read_event_reading_type_code(): %s",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
 #endif // NETDATA_COMMENTED
@@ -1131,7 +1130,7 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
 
     if (!(ctx = ipmi_monitoring_ctx_create ()))
     {
-        error("ipmi_monitoring_ctx_create()");
+        collector_error("ipmi_monitoring_ctx_create()");
         goto cleanup;
     }
 
@@ -1140,8 +1139,8 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
         if (ipmi_monitoring_ctx_sdr_cache_directory (ctx,
                 sdr_cache_directory) < 0)
         {
-            error( "ipmi_monitoring_ctx_sdr_cache_directory(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_ctx_sdr_cache_directory(): %s",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
     }
@@ -1152,8 +1151,8 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
         if (ipmi_monitoring_ctx_sel_config_file (ctx,
                 sel_config_file) < 0)
         {
-            error( "ipmi_monitoring_ctx_sel_config_file(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_ctx_sel_config_file(): %s",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
     }
@@ -1161,8 +1160,8 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
     {
         if (ipmi_monitoring_ctx_sel_config_file (ctx, NULL) < 0)
         {
-            error( "ipmi_monitoring_ctx_sel_config_file(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_ctx_sel_config_file(): %s",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
     }
@@ -1192,8 +1191,8 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
                 NULL,
                 NULL)) < 0)
         {
-            error( "ipmi_monitoring_sel_by_record_id(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_sel_by_record_id(): %s",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
     }
@@ -1208,8 +1207,8 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
                 NULL,
                 NULL)) < 0)
         {
-            error( "ipmi_monitoring_sel_by_sensor_type(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_sel_by_sensor_type(): %s",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
     }
@@ -1225,8 +1224,8 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
                 NULL,
                 NULL)) < 0)
         {
-            error( "ipmi_monitoring_sel_by_sensor_type(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_sel_by_sensor_type(): %s",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
     }
@@ -1241,8 +1240,8 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
                 NULL,
                 NULL)) < 0)
         {
-            error( "ipmi_monitoring_sel_by_record_id(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_sel_by_record_id(): %s",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
     }
@@ -1281,29 +1280,29 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
 
         if ((record_id = ipmi_monitoring_sel_read_record_id (ctx)) < 0)
         {
-            error( "ipmi_monitoring_sel_read_record_id(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_sel_read_record_id(): %s",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
 
         if ((record_type = ipmi_monitoring_sel_read_record_type (ctx)) < 0)
         {
-            error( "ipmi_monitoring_sel_read_record_type(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_sel_read_record_type(): %s",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
 
         if ((record_type_class = ipmi_monitoring_sel_read_record_type_class (ctx)) < 0)
         {
-            error( "ipmi_monitoring_sel_read_record_type_class(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_sel_read_record_type_class(): %s",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
 
         if ((sel_state = ipmi_monitoring_sel_read_sel_state (ctx)) < 0)
         {
-            error( "ipmi_monitoring_sel_read_sel_state(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_sel_read_sel_state(): %s",
+                             ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
 
@@ -1334,8 +1333,8 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
 
             if (ipmi_monitoring_sel_read_timestamp (ctx, &timestamp) < 0)
             {
-                error( "ipmi_monitoring_sel_read_timestamp(): %s",
-                        ipmi_monitoring_ctx_errormsg (ctx));
+                collector_error( "ipmi_monitoring_sel_read_timestamp(): %s",
+                                 ipmi_monitoring_ctx_errormsg (ctx));
                 goto cleanup;
             }
 
@@ -1363,36 +1362,36 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
 
             if (!(sensor_name = ipmi_monitoring_sel_read_sensor_name (ctx)))
             {
-                error( "ipmi_monitoring_sel_read_sensor_name(): %s",
-                        ipmi_monitoring_ctx_errormsg (ctx));
+                collector_error( "ipmi_monitoring_sel_read_sensor_name(): %s",
+                                 ipmi_monitoring_ctx_errormsg (ctx));
                 goto cleanup;
             }
 
             if ((sensor_type = ipmi_monitoring_sel_read_sensor_type (ctx)) < 0)
             {
-                error( "ipmi_monitoring_sel_read_sensor_type(): %s",
-                        ipmi_monitoring_ctx_errormsg (ctx));
+                collector_error( "ipmi_monitoring_sel_read_sensor_type(): %s",
+                                 ipmi_monitoring_ctx_errormsg (ctx));
                 goto cleanup;
             }
 
             if ((sensor_number = ipmi_monitoring_sel_read_sensor_number (ctx)) < 0)
             {
-                error( "ipmi_monitoring_sel_read_sensor_number(): %s",
-                        ipmi_monitoring_ctx_errormsg (ctx));
+                collector_error( "ipmi_monitoring_sel_read_sensor_number(): %s",
+                                 ipmi_monitoring_ctx_errormsg (ctx));
                 goto cleanup;
             }
 
             if ((event_direction = ipmi_monitoring_sel_read_event_direction (ctx)) < 0)
             {
-                error( "ipmi_monitoring_sel_read_event_direction(): %s",
-                        ipmi_monitoring_ctx_errormsg (ctx));
+                collector_error( "ipmi_monitoring_sel_read_event_direction(): %s",
+                                 ipmi_monitoring_ctx_errormsg (ctx));
                 goto cleanup;
             }
 
             if ((event_type_code = ipmi_monitoring_sel_read_event_type_code (ctx)) < 0)
             {
-                error( "ipmi_monitoring_sel_read_event_type_code(): %s",
-                        ipmi_monitoring_ctx_errormsg (ctx));
+                collector_error( "ipmi_monitoring_sel_read_event_type_code(): %s",
+                                 ipmi_monitoring_ctx_errormsg (ctx));
                 goto cleanup;
             }
 
@@ -1401,29 +1400,29 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
                     &event_data2,
                     &event_data3) < 0)
             {
-                error( "ipmi_monitoring_sel_read_event_data(): %s",
-                        ipmi_monitoring_ctx_errormsg (ctx));
+                collector_error( "ipmi_monitoring_sel_read_event_data(): %s",
+                                 ipmi_monitoring_ctx_errormsg (ctx));
                 goto cleanup;
             }
 
             if ((event_offset_type = ipmi_monitoring_sel_read_event_offset_type (ctx)) < 0)
             {
-                error( "ipmi_monitoring_sel_read_event_offset_type(): %s",
-                        ipmi_monitoring_ctx_errormsg (ctx));
+                collector_error( "ipmi_monitoring_sel_read_event_offset_type(): %s",
+                                 ipmi_monitoring_ctx_errormsg (ctx));
                 goto cleanup;
             }
 
             if ((event_offset = ipmi_monitoring_sel_read_event_offset (ctx)) < 0)
             {
-                error( "ipmi_monitoring_sel_read_event_offset(): %s",
-                        ipmi_monitoring_ctx_errormsg (ctx));
+                collector_error( "ipmi_monitoring_sel_read_event_offset(): %s",
+                                 ipmi_monitoring_ctx_errormsg (ctx));
                 goto cleanup;
             }
 
             if (!(event_offset_string = ipmi_monitoring_sel_read_event_offset_string (ctx)))
             {
-                error( "ipmi_monitoring_sel_read_event_offset_string(): %s",
-                        ipmi_monitoring_ctx_errormsg (ctx));
+                collector_error( "ipmi_monitoring_sel_read_event_offset_string(): %s",
+                                 ipmi_monitoring_ctx_errormsg (ctx));
                 goto cleanup;
             }
 
@@ -1464,8 +1463,8 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
             {
                 if ((manufacturer_id = ipmi_monitoring_sel_read_manufacturer_id (ctx)) < 0)
                 {
-                    error( "ipmi_monitoring_sel_read_manufacturer_id(): %s",
-                            ipmi_monitoring_ctx_errormsg (ctx));
+                    collector_error( "ipmi_monitoring_sel_read_manufacturer_id(): %s",
+                                     ipmi_monitoring_ctx_errormsg (ctx));
                     goto cleanup;
                 }
 
@@ -1474,8 +1473,8 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
 
             if ((oem_data_len = ipmi_monitoring_sel_read_oem_data (ctx, oem_data, 1024)) < 0)
             {
-                error( "ipmi_monitoring_sel_read_oem_data(): %s",
-                        ipmi_monitoring_ctx_errormsg (ctx));
+                collector_error( "ipmi_monitoring_sel_read_oem_data(): %s",
+                                 ipmi_monitoring_ctx_errormsg (ctx));
                 goto cleanup;
             }
 
@@ -1596,6 +1595,7 @@ int host_is_local(const char *host)
 }
 
 int main (int argc, char **argv) {
+    stderror = stderr;
     clocks_init();
 
     // ------------------------------------------------------------------------
@@ -1779,7 +1779,7 @@ int main (int argc, char **argv) {
             continue;
         }
 
-        error("freeipmi.plugin: ignoring parameter '%s'", argv[i]);
+        collector_error("freeipmi.plugin: ignoring parameter '%s'", argv[i]);
     }
 
     errno = 0;
@@ -1788,7 +1788,7 @@ int main (int argc, char **argv) {
         netdata_update_every = freq;
 
     else if(freq)
-        error("update frequency %d seconds is too small for IPMI. Using %d.", freq, netdata_update_every);
+        collector_error("update frequency %d seconds is too small for IPMI. Using %d.", freq, netdata_update_every);
 
 
     // ------------------------------------------------------------------------
@@ -1813,7 +1813,7 @@ int main (int argc, char **argv) {
     if(debug) fprintf(stderr, "freeipmi.plugin: IPMI minimum update frequency was calculated to %d seconds.\n", freq);
 
     if(freq > netdata_update_every) {
-        info("enforcing minimum data collection frequency, calculated to %d seconds.", freq);
+        collector_info("enforcing minimum data collection frequency, calculated to %d seconds.", freq);
         netdata_update_every = freq;
     }
 

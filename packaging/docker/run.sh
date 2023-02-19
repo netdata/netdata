@@ -49,6 +49,14 @@ if mountpoint -q /etc/netdata && [ -z "$(ls -A /etc/netdata)" ]; then
   cp -a /etc/netdata.stock/. /etc/netdata
 fi
 
+if [ -w "/etc/netdata" ]; then
+  if mountpoint -q /etc/netdata; then
+    hostname >/etc/netdata/.container-hostname
+  else
+    rm -f /etc/netdata/.container-hostname
+  fi
+fi
+
 if [ -n "${NETDATA_CLAIM_URL}" ] && [ -n "${NETDATA_CLAIM_TOKEN}" ] && [ ! -f /var/lib/netdata/cloud.d/claimed_id ]; then
   # shellcheck disable=SC2086
   /usr/sbin/netdata-claim.sh -token="${NETDATA_CLAIM_TOKEN}" \

@@ -518,7 +518,9 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
             .options = options,
             .group_method = group_method,
             .group_options = group_options,
-            .tier = tier
+            .tier = tier,
+            .query_source = QUERY_SOURCE_API_WEIGHTS,
+            .priority = STORAGE_PRIORITY_NORMAL,
     };
 
     RRDR *r = rrd2rrdr(owa, query_target_create(&qtr));
@@ -537,6 +539,9 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
     }
 
     if(unlikely(r->od[0] & RRDR_DIMENSION_HIDDEN))
+        goto cleanup;
+
+    if(unlikely(!(r->od[0] & RRDR_DIMENSION_QUERIED)))
         goto cleanup;
 
     if(unlikely(!(r->od[0] & RRDR_DIMENSION_NONZERO)))
@@ -637,7 +642,9 @@ static void rrdset_metric_correlations_volume(
 
     options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ABSOLUTE | RRDR_OPTION_NATURAL_POINTS;
 
-    QUERY_VALUE baseline_average = rrdmetric2value(host, rca, ria, rma, baseline_after, baseline_before, options, group_method, group_options, tier, 0);
+    QUERY_VALUE baseline_average = rrdmetric2value(host, rca, ria, rma, baseline_after, baseline_before,
+                                                   options, group_method, group_options, tier, 0,
+                                                   QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_NORMAL);
     merge_query_value_to_stats(&baseline_average, stats);
 
     if(!netdata_double_isnumber(baseline_average.value)) {
@@ -645,7 +652,9 @@ static void rrdset_metric_correlations_volume(
         baseline_average.value = 0.0;
     }
 
-    QUERY_VALUE highlight_average = rrdmetric2value(host, rca, ria, rma, after, before, options, group_method, group_options, tier, 0);
+    QUERY_VALUE highlight_average = rrdmetric2value(host, rca, ria, rma, after, before,
+                                                    options, group_method, group_options, tier, 0,
+                                                    QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_NORMAL);
     merge_query_value_to_stats(&highlight_average, stats);
 
     if(!netdata_double_isnumber(highlight_average.value))
@@ -658,7 +667,9 @@ static void rrdset_metric_correlations_volume(
 
     char highlight_countif_options[50 + 1];
     snprintfz(highlight_countif_options, 50, "%s" NETDATA_DOUBLE_FORMAT, highlight_average.value < baseline_average.value ? "<" : ">", baseline_average.value);
-    QUERY_VALUE highlight_countif = rrdmetric2value(host, rca, ria, rma, after, before, options, RRDR_GROUPING_COUNTIF, highlight_countif_options, tier, 0);
+    QUERY_VALUE highlight_countif = rrdmetric2value(host, rca, ria, rma, after, before,
+                                                    options, RRDR_GROUPING_COUNTIF, highlight_countif_options, tier, 0,
+                                                    QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_NORMAL);
     merge_query_value_to_stats(&highlight_countif, stats);
 
     if(!netdata_double_isnumber(highlight_countif.value)) {
@@ -699,7 +710,10 @@ static void rrdset_weights_anomaly_rate(
 
     options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ANOMALY_BIT | RRDR_OPTION_NATURAL_POINTS;
 
-    QUERY_VALUE qv = rrdmetric2value(host, rca, ria, rma, after, before, options, group_method, group_options, tier, 0);
+    QUERY_VALUE qv = rrdmetric2value(host, rca, ria, rma, after, before,
+                                     options, group_method, group_options, tier, 0,
+                                     QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_NORMAL);
+
     merge_query_value_to_stats(&qv, stats);
 
     if(netdata_double_isnumber(qv.value))

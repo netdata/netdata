@@ -171,8 +171,8 @@ void load_claiming_state(void)
 
     invalidate_node_instances(&localhost->host_uuid, claimed_id ? &uuid : NULL);
     metaqueue_store_claim_id(&localhost->host_uuid, claimed_id ? &uuid : NULL);
-
     rrdhost_aclk_state_unlock(localhost);
+
     if (!claimed_id) {
         info("Unable to load '%s', setting state to AGENT_UNCLAIMED", filename);
         return;

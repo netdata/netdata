@@ -15,15 +15,6 @@ netdata_cachestat_pid_t *cachestat_vector = NULL;
 static netdata_idx_t cachestat_hash_values[NETDATA_CACHESTAT_END];
 static netdata_idx_t *cachestat_values = NULL;
 
-struct netdata_static_thread cachestat_threads = {.name = "CACHESTAT KERNEL",
-                                                  .config_section = NULL,
-                                                  .config_name = NULL,
-                                                  .env_name = NULL,
-                                                  .enabled = 1,
-                                                  .thread = NULL,
-                                                  .init_routine = NULL,
-                                                  .start_routine = NULL};
-
 ebpf_local_maps_t cachestat_maps[] = {{.name = "cstat_global", .internal_input = NETDATA_CACHESTAT_END,
                                               .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
                                               .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
@@ -44,13 +35,15 @@ struct config cachestat_config = { .first_section = NULL,
     .mutex = NETDATA_MUTEX_INITIALIZER,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
-static enum ebpf_threads_status ebpf_cachestat_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 netdata_ebpf_targets_t cachestat_targets[] = { {.name = "add_to_page_cache_lru", .mode = EBPF_LOAD_TRAMPOLINE},
                                                {.name = "mark_page_accessed", .mode = EBPF_LOAD_TRAMPOLINE},
                                                {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE},
                                                {.name = "mark_buffer_dirty", .mode = EBPF_LOAD_TRAMPOLINE},
                                                {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
+
+static char *account_page[NETDATA_CACHESTAT_ACCOUNT_DIRTY_END] ={ "account_page_dirtied",
+                                                                  "__set_page_dirty", "__folio_mark_dirty"  };
 
 #ifdef LIBBPF_MAJOR_VERSION
 #include "includes/cachestat.skel.h" // BTF code
@@ -84,10 +77,12 @@ static void ebpf_cachestat_disable_probe(struct cachestat_bpf *obj)
  */
 static void ebpf_cachestat_disable_specific_probe(struct cachestat_bpf *obj)
 {
-    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_16) {
+    if (!strcmp(cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
+                account_page[NETDATA_CACHESTAT_FOLIO_DIRTY])) {
         bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_kprobe, false);
         bpf_program__set_autoload(obj->progs.netdata_set_page_dirty_kprobe, false);
-    } else if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_15) {
+    } else if (!strcmp(cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
+                       account_page[NETDATA_CACHESTAT_SET_PAGE_DIRTY])) {
         bpf_program__set_autoload(obj->progs.netdata_folio_mark_dirty_kprobe, false);
         bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_kprobe, false);
     } else {
@@ -123,10 +118,12 @@ static void ebpf_cachestat_disable_trampoline(struct cachestat_bpf *obj)
  */
 static void ebpf_cachestat_disable_specific_trampoline(struct cachestat_bpf *obj)
 {
-    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_16) {
+    if (!strcmp(cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
+                account_page[NETDATA_CACHESTAT_FOLIO_DIRTY])) {
         bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_fentry, false);
         bpf_program__set_autoload(obj->progs.netdata_set_page_dirty_fentry, false);
-    } else if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_15) {
+    } else if (!strcmp(cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
+                       account_page[NETDATA_CACHESTAT_SET_PAGE_DIRTY])) {
         bpf_program__set_autoload(obj->progs.netdata_folio_mark_dirty_fentry, false);
         bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_fentry, false);
     } else {
@@ -150,10 +147,12 @@ static inline void netdata_set_trampoline_target(struct cachestat_bpf *obj)
     bpf_program__set_attach_target(obj->progs.netdata_mark_page_accessed_fentry, 0,
                                    cachestat_targets[NETDATA_KEY_CALLS_MARK_PAGE_ACCESSED].name);
 
-    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_16) {
+    if (!strcmp(cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
+                account_page[NETDATA_CACHESTAT_FOLIO_DIRTY])) {
         bpf_program__set_attach_target(obj->progs.netdata_folio_mark_dirty_fentry, 0,
                                        cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
-    } else if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_15) {
+    } else if (!strcmp(cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
+                       account_page[NETDATA_CACHESTAT_SET_PAGE_DIRTY])) {
         bpf_program__set_attach_target(obj->progs.netdata_set_page_dirty_fentry, 0,
                                        cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
     } else {
@@ -193,12 +192,14 @@ static int ebpf_cachestat_attach_probe(struct cachestat_bpf *obj)
     if (ret)
         return -1;
 
-    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_16) {
+    if (!strcmp(cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
+                account_page[NETDATA_CACHESTAT_FOLIO_DIRTY])) {
         obj->links.netdata_folio_mark_dirty_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_folio_mark_dirty_kprobe,
                                                                                 false,
                                                                                 cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
         ret = libbpf_get_error(obj->links.netdata_folio_mark_dirty_kprobe);
-    } else if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_15) {
+    } else if (!strcmp(cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
+                       account_page[NETDATA_CACHESTAT_SET_PAGE_DIRTY])) {
         obj->links.netdata_set_page_dirty_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_set_page_dirty_kprobe,
                                                                               false,
                                                                               cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
@@ -279,7 +280,7 @@ static void ebpf_cachestat_disable_release_task(struct cachestat_bpf *obj)
  * @param obj is the main structure for bpf objects.
  * @param em  structure with configuration
  *
- * @return it returns 0 on succes and -1 otherwise
+ * @return it returns 0 on success and -1 otherwise
  */
 static inline int ebpf_cachestat_load_and_attach(struct cachestat_bpf *obj, ebpf_module_t *em)
 {
@@ -323,6 +324,33 @@ static inline int ebpf_cachestat_load_and_attach(struct cachestat_bpf *obj, ebpf
  *****************************************************************/
 
 /**
+ * Cachestat Free
+ *
+ * Cleanup variables after child threads to stop
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_cachestat_free(ebpf_module_t *em)
+{
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+    ebpf_cleanup_publish_syscall(cachestat_counter_publish_aggregated);
+
+    freez(cachestat_vector);
+    freez(cachestat_values);
+
+#ifdef LIBBPF_MAJOR_VERSION
+    if (bpf_obj)
+        cachestat_bpf__destroy(bpf_obj);
+#endif
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+}
+
+/**
  * Cachestat exit.
  *
  * Cancel child and exit.
@@ -332,39 +360,8 @@ static inline int ebpf_cachestat_load_and_attach(struct cachestat_bpf *obj, ebpf
 static void ebpf_cachestat_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled) {
-        em->enabled = NETDATA_MAIN_THREAD_EXITED;
-        return;
-    }
 
-    ebpf_cachestat_exited = NETDATA_THREAD_EBPF_STOPPING;
-}
-
-/**
- * Cachestat cleanup
- *
- * Clean up allocated addresses.
- *
- * @param ptr thread data.
- */
-static void ebpf_cachestat_cleanup(void *ptr)
-{
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (ebpf_cachestat_exited != NETDATA_THREAD_EBPF_STOPPED)
-        return;
-
-    ebpf_cleanup_publish_syscall(cachestat_counter_publish_aggregated);
-
-    freez(cachestat_vector);
-    freez(cachestat_values);
-    freez(cachestat_threads.thread);
-
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        cachestat_bpf__destroy(bpf_obj);
-#endif
-    cachestat_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
-    em->enabled = NETDATA_MAIN_THREAD_EXITED;
+    ebpf_cachestat_free(em);
 }
 
 /*****************************************************************
@@ -643,7 +640,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
  *
  * Read the table with number of calls for all functions
  */
-static void read_global_table()
+static void ebpf_cachestat_read_global_table()
 {
     uint32_t idx;
     netdata_idx_t *val = cachestat_hash_values;
@@ -661,40 +658,6 @@ static void read_global_table()
             val[idx] = total;
         }
     }
-}
-
-/**
- * Socket read hash
- *
- * This is the thread callback.
- * This thread is necessary, because we cannot freeze the whole plugin to read the data on very busy socket.
- *
- * @param ptr It is a NULL value for this thread.
- *
- * @return It always returns NULL.
- */
-void *ebpf_cachestat_read_hash(void *ptr)
-{
-    netdata_thread_cleanup_push(ebpf_cachestat_cleanup, ptr);
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-
-    usec_t step = NETDATA_LATENCY_CACHESTAT_SLEEP_MS * em->update_every;
-    while (ebpf_cachestat_exited == NETDATA_THREAD_EBPF_RUNNING) {
-        usec_t dt = heartbeat_next(&hb, step);
-        (void)dt;
-        if (ebpf_cachestat_exited == NETDATA_THREAD_EBPF_STOPPING)
-            break;
-
-        read_global_table();
-    }
-
-    ebpf_cachestat_exited = NETDATA_THREAD_EBPF_STOPPED;
-
-    netdata_thread_cleanup_pop(1);
-    return NULL;
 }
 
 /**
@@ -1098,26 +1061,23 @@ void ebpf_cachestat_send_cgroup_data(int update_every)
 */
 static void cachestat_collector(ebpf_module_t *em)
 {
-    cachestat_threads.thread = callocz(1, sizeof(netdata_thread_t));
-    cachestat_threads.start_routine = ebpf_cachestat_read_hash;
-
-    netdata_thread_create(cachestat_threads.thread, cachestat_threads.name, NETDATA_THREAD_OPTION_DEFAULT,
-                          ebpf_cachestat_read_hash, em);
-
     netdata_publish_cachestat_t publish;
     memset(&publish, 0, sizeof(publish));
     int cgroups = em->cgroup_charts;
     int update_every = em->update_every;
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = update_every * USEC_PER_SEC;
+    int counter = update_every - 1;
     //This will be cancelled by its parent
     while (!ebpf_exit_plugin) {
-        (void)heartbeat_next(&hb, step);
-        if (ebpf_exit_plugin)
-            break;
+        (void)heartbeat_next(&hb, USEC_PER_SEC);
 
+        if (ebpf_exit_plugin || ++counter != update_every)
+            continue;
+
+        counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
+        ebpf_cachestat_read_global_table();
         pthread_mutex_lock(&collect_data_mutex);
         if (apps)
             read_apps_table();
@@ -1229,16 +1189,28 @@ static void ebpf_cachestat_allocate_global_vectors(int apps)
  * Update Internal value
  *
  * Update values used during runtime.
+ *
+ * @return It returns 0 when one of the functions is present and -1 otherwise.
  */
-static void ebpf_cachestat_set_internal_value()
+static int ebpf_cachestat_set_internal_value()
 {
-    static char *account_page[] = { "account_page_dirtied", "__set_page_dirty", "__folio_mark_dirty"  };
-    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_16)
-        cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name = account_page[NETDATA_CACHESTAT_FOLIO_DIRTY];
-    else if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_15)
-        cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name = account_page[NETDATA_CACHESTAT_SET_PAGE_DIRTY];
-    else
-        cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name = account_page[NETDATA_CACHESTAT_ACCOUNT_PAGE_DIRTY];
+    ebpf_addresses_t address = {.function = NULL, .hash = 0, .addr = 0};
+    int i;
+    for (i = 0; i < NETDATA_CACHESTAT_ACCOUNT_DIRTY_END ; i++) {
+        address.function = account_page[i];
+        ebpf_load_addresses(&address, -1);
+        if (address.addr)
+            break;
+    }
+
+    if (!address.addr) {
+        error("%s cachestat.", NETDATA_EBPF_DEFAULT_FNT_NOT_FOUND);
+        return -1;
+    }
+
+    cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name = address.function;
+
+    return 0;
 }
 
 /*
@@ -1292,16 +1264,16 @@ void *ebpf_cachestat_thread(void *ptr)
 
     ebpf_update_pid_table(&cachestat_maps[NETDATA_CACHESTAT_PID_STATS], em);
 
-    if (!em->enabled)
+    if (ebpf_cachestat_set_internal_value()) {
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endcachestat;
-
-    ebpf_cachestat_set_internal_value();
+    }
 
 #ifdef LIBBPF_MAJOR_VERSION
     ebpf_adjust_thread_load(em, default_btf);
 #endif
     if (ebpf_cachestat_load_bpf(em)) {
-        em->enabled = CONFIG_BOOLEAN_NO;
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endcachestat;
     }
 
@@ -1323,8 +1295,7 @@ void *ebpf_cachestat_thread(void *ptr)
     cachestat_collector(em);
 
 endcachestat:
-    if (!em->enabled)
-        ebpf_update_disabled_plugin_stats(em);
+    ebpf_update_disabled_plugin_stats(em);
 
     netdata_thread_cleanup_pop(1);
     return NULL;

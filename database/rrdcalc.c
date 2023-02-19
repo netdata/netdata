@@ -74,18 +74,16 @@ static STRING *rrdcalc_replace_variables_with_rrdset_labels(const char *line, RR
     char var[RRDCALC_VAR_MAX];
     char *m, *lbl_value = NULL;
 
-    while ((m = strchr(temp + pos, '$'))) {
+    while ((m = strchr(temp + pos, '$')) && *(m+1) == '{') {
         int i = 0;
         char *e = m;
         while (*e) {
+            var[i++] = *e;
 
-            if (*e == ' ' || i == RRDCALC_VAR_MAX - 1)
+            if (*e == '}' || i == RRDCALC_VAR_MAX - 1)
                 break;
-            else
-                var[i] = *e;
 
             e++;
-            i++;
         }
 
         var[i] = '\0';
@@ -97,8 +95,12 @@ static STRING *rrdcalc_replace_variables_with_rrdset_labels(const char *line, RR
             temp = buf;
         }
         else if (!strncmp(var, RRDCALC_VAR_LABEL, RRDCALC_VAR_LABEL_LEN)) {
+            char label_val[RRDCALC_VAR_MAX + 1] = { 0 };
+            strcpy(label_val, var+RRDCALC_VAR_LABEL_LEN);
+            label_val[i - RRDCALC_VAR_LABEL_LEN - 1] = '\0';
+
             if(likely(rc->rrdset && rc->rrdset->rrdlabels)) {
-                rrdlabels_get_value_to_char_or_null(rc->rrdset->rrdlabels, &lbl_value, var+RRDCALC_VAR_LABEL_LEN);
+                rrdlabels_get_value_to_char_or_null(rc->rrdset->rrdlabels, &lbl_value, label_val);
                 if (lbl_value) {
                     char *buf = find_and_replace(temp, var, lbl_value, m);
                     freez(temp);
@@ -179,7 +181,7 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
     rc->rrdset = st;
 
     netdata_rwlock_wrlock(&st->alerts.rwlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(st->alerts.base, rc, prev, next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(st->alerts.base, rc, prev, next);
     netdata_rwlock_unlock(&st->alerts.rwlock);
 
     if(rc->update_every < rc->rrdset->update_every) {
@@ -242,6 +244,8 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
 
     if(!rc->units)
         rc->units = string_dup(st->units);
+
+    rrdvar_store_for_chart(host, st);
 
     rrdcalc_update_info_using_rrdset_labels(rc);
 
@@ -326,7 +330,7 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
     if(!having_ll_wrlock)
         netdata_rwlock_wrlock(&st->alerts.rwlock);
 
-    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(st->alerts.base, rc, prev, next);
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(st->alerts.base, rc, prev, next);
 
     if(!having_ll_wrlock)
         netdata_rwlock_unlock(&st->alerts.rwlock);
@@ -408,6 +412,8 @@ struct rrdcalc_constructor {
         RRDCALC_REACT_NONE,
         RRDCALC_REACT_NEW,
     } react_action;
+
+    bool existing_from_template;
 };
 
 static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdcalc, void *constructor_data) {
@@ -543,6 +549,20 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
     ctr->react_action = RRDCALC_REACT_NEW;
 }
 
+static bool rrdcalc_rrdhost_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdcalc, void *rrdcalc_new __maybe_unused, void *constructor_data ) {
+    RRDCALC *rc = rrdcalc;
+    struct rrdcalc_constructor *ctr = constructor_data;
+
+    if(rc->run_flags & RRDCALC_FLAG_FROM_TEMPLATE)
+        ctr->existing_from_template = true;
+    else
+        ctr->existing_from_template = false;
+
+    ctr->react_action = RRDCALC_REACT_NONE;
+
+    return false;
+}
+
 static void rrdcalc_rrdhost_react_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdcalc, void *constructor_data) {
     RRDCALC *rc = rrdcalc;
     struct rrdcalc_constructor *ctr = constructor_data;
@@ -609,9 +629,11 @@ static void rrdcalc_rrdhost_delete_callback(const DICTIONARY_ITEM *item __maybe_
 
 void rrdcalc_rrdhost_index_init(RRDHOST *host) {
     if(!host->rrdcalc_root_index) {
-        host->rrdcalc_root_index = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+        host->rrdcalc_root_index = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                                                              &dictionary_stats_category_rrdhealth, sizeof(RRDCALC));
 
         dictionary_register_insert_callback(host->rrdcalc_root_index, rrdcalc_rrdhost_insert_callback, NULL);
+        dictionary_register_conflict_callback(host->rrdcalc_root_index, rrdcalc_rrdhost_conflict_callback, NULL);
         dictionary_register_react_callback(host->rrdcalc_root_index, rrdcalc_rrdhost_react_callback, NULL);
         dictionary_register_delete_callback(host->rrdcalc_root_index, rrdcalc_rrdhost_delete_callback, host);
     }
@@ -635,11 +657,12 @@ void rrdcalc_add_from_rrdcalctemplate(RRDHOST *host, RRDCALCTEMPLATE *rt, RRDSET
         .overwrite_alert_name = overwrite_alert_name,
         .overwrite_dimensions = overwrite_dimensions,
         .react_action = RRDCALC_REACT_NONE,
+        .existing_from_template = false,
     };
 
     dictionary_set_advanced(host->rrdcalc_root_index, key, (ssize_t)(key_len + 1), NULL, sizeof(RRDCALC), &tmp);
-    if(tmp.react_action != RRDCALC_REACT_NEW)
-        error("RRDCALC: from template '%s' on chart '%s' with key '%s', failed to be added to host '%s'. It already exists.",
+    if(tmp.react_action != RRDCALC_REACT_NEW && tmp.existing_from_template == false)
+        error("RRDCALC: from template '%s' on chart '%s' with key '%s', failed to be added to host '%s'. It is manually configured.",
               string2str(rt->name), rrdset_id(st), key, rrdhost_hostname(host));
 }
 
@@ -719,7 +742,7 @@ void rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(RRDHOST *host
             continue;
 
         if(!rrdlabels_match_simple_pattern_parsed(host->rrdlabels, rc->host_labels_pattern, '=')) {
-            info("Health configuration for alarm '%s' cannot be applied, because the host %s does not have the label(s) '%s'",
+            log_health("Health configuration for alarm '%s' cannot be applied, because the host %s does not have the label(s) '%s'",
                  rrdcalc_name(rc),
                  rrdhost_hostname(host),
                  rrdcalc_host_labels(rc));
@@ -735,7 +758,7 @@ void rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts() {
 
     RRDHOST *host;
     rrdhost_foreach_read(host) {
-        if (unlikely(!host->health_enabled))
+        if (unlikely(!host->health.health_enabled))
             continue;
 
         if (host->rrdlabels)

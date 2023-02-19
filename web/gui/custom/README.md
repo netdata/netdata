@@ -1,7 +1,11 @@
 <!--
 title: "Custom dashboards"
 description: "Build custom dashboards with key metrics from one or more nodes running the Netdata Agent and host them anywhere."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/web/gui/custom/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/web/gui/custom/README.md"
+sidebar_label: "Custom dashboards"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Operations"
 -->
 
 # Custom dashboards
@@ -28,7 +32,7 @@ monitoring two servers on the same page:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/14252187/d8d5f78e-fa8e-11e5-990d-99821d38c874.png)
 
---
+
 
 ## Web directory
 
@@ -72,7 +76,6 @@ header:
 </html>
 ```
 
----
 
 ## dashboard.js
 
@@ -163,7 +166,7 @@ that do not specify a Netdata server, add this before loading `dashboard.js`:
 <script type="text/javascript">var netdataServer = "http://your.netdata.server:19999";</script>
 ```
 
----
+
 
 ## Adding charts
 
@@ -242,7 +245,7 @@ Each chart can get data from a different Netdata server. You can specify the Net
  ></div>
 ```
 
-If you have ephemeral monitoring setup ([More info here](/streaming/README.md#monitoring-ephemeral-nodes)) and have no
+If you have ephemeral monitoring setup ([More info here](https://github.com/netdata/netdata/blob/master/streaming/README.md#monitoring-ephemeral-nodes)) and have no
 direct access to the nodes dashboards, you can use the following:
 
 ```html
@@ -366,7 +369,7 @@ select specific dimensions using this:
 ```
 
 Netdata supports coma (`,`) or pipe (`|`) separated [simple
-patterns](/libnetdata/simple_pattern/README.md) for dimensions. By default it
+patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) for dimensions. By default it
 searches for both dimension IDs and dimension NAMEs. You can control the target
 of the match with: `data-append-options="match-ids"` or
 `data-append-options="match-names"`. Spaces in `data-dimensions=""` are matched
@@ -434,7 +437,7 @@ it, using this:
 
 ### API options
 
-You can append Netdata **[REST API v1](/web/api/README.md)** data options, using this:
+You can append Netdata **[REST API v1](https://github.com/netdata/netdata/blob/master/web/api/README.md)** data options, using this:
 
 ```html
 <div data-netdata="unique.id"

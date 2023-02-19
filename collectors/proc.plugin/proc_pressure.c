@@ -91,9 +91,8 @@ static void proc_pressure_do_resource(procfile *ff, int res_idx, int some) {
             rrddim_add(pcs->share_time.st, some ? "some 60" : "full 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
         pcs->share_time.rd300 =
             rrddim_add(pcs->share_time.st, some ? "some 300" : "full 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
-    } else {
-        rrdset_next(pcs->share_time.st);
     }
+
     pcs->share_time.value10 = strtod(procfile_lineword(ff, some ? 0 : 1, 2), NULL);
     pcs->share_time.value60 = strtod(procfile_lineword(ff, some ? 0 : 1, 4), NULL);
     pcs->share_time.value300 = strtod(procfile_lineword(ff, some ? 0 : 1, 6), NULL);
@@ -113,9 +112,8 @@ static void proc_pressure_do_resource(procfile *ff, int res_idx, int some) {
             pressure_update_every,
             RRDSET_TYPE_LINE);
         pcs->total_time.rdtotal = rrddim_add(pcs->total_time.st, "time", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    } else {
-        rrdset_next(pcs->total_time.st);
     }
+
     pcs->total_time.value_total = str2ull(procfile_lineword(ff, some ? 0 : 1, 8)) / 1000;
 }
 
@@ -173,7 +171,7 @@ int do_proc_pressure(int update_every, usec_t dt) {
 
             ff = procfile_open(filename, " =", PROCFILE_FLAG_DEFAULT);
             if (unlikely(!ff)) {
-                error("Cannot read pressure information from %s.", filename);
+                collector_error("Cannot read pressure information from %s.", filename);
                 fail_count++;
                 continue;
             }
@@ -188,7 +186,7 @@ int do_proc_pressure(int update_every, usec_t dt) {
 
         size_t lines = procfile_lines(ff);
         if (unlikely(lines < 1)) {
-            error("%s has no lines.", procfile_filename(ff));
+            collector_error("%s has no lines.", procfile_filename(ff));
             fail_count++;
             continue;
         }

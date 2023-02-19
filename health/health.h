@@ -31,6 +31,8 @@ extern unsigned int default_health_enabled;
 #define HEALTH_SILENCERS_MAX_FILE_LEN 10000
 
 extern char *silencers_filename;
+extern SIMPLE_PATTERN *conf_enabled_alarms;
+extern DICTIONARY *health_rrdvars;
 
 void health_init(void);
 
@@ -47,9 +49,6 @@ void health_api_v1_chart_custom_variables2json(RRDSET *st, BUFFER *buf);
 int health_alarm_log_open(RRDHOST *host);
 void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae);
 void health_alarm_log_load(RRDHOST *host);
-
-void health_thread_spawn(RRDHOST *host);
-void health_thread_stop(RRDHOST *host);
 
 ALARM_ENTRY* health_create_alarm_entry(
     RRDHOST *host,
@@ -78,11 +77,6 @@ ALARM_ENTRY* health_create_alarm_entry(
     uint32_t flags);
 
 void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae);
-
-struct health_state {
-    RRDHOST *host;
-    netdata_thread_t thread;
-};
 
 void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath);
 char *health_user_config_dir(void);

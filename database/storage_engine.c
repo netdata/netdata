@@ -6,23 +6,24 @@
 #include "engine/rrdengineapi.h"
 #endif
 
-#define im_collect_ops { \
-    .init = rrddim_collect_init,\
-    .store_metric = rrddim_collect_store_metric,\
-    .flush = rrddim_store_metric_flush,\
-    .finalize = rrddim_collect_finalize, \
+#define im_collect_ops {                                                            \
+    .init = rrddim_collect_init,                                                    \
+    .store_metric = rrddim_collect_store_metric,                                    \
+    .flush = rrddim_store_metric_flush,                                             \
+    .finalize = rrddim_collect_finalize,                                            \
     .change_collection_frequency = rrddim_store_metric_change_collection_frequency, \
-    .metrics_group_get = rrddim_metrics_group_get, \
-    .metrics_group_release = rrddim_metrics_group_release, \
+    .metrics_group_get = rrddim_metrics_group_get,                                  \
+    .metrics_group_release = rrddim_metrics_group_release,                          \
 }
 
-#define im_query_ops { \
-    .init = rrddim_query_init, \
-    .next_metric = rrddim_query_next_metric, \
-    .is_finished = rrddim_query_is_finished, \
-    .finalize = rrddim_query_finalize, \
-    .latest_time = rrddim_query_latest_time, \
-    .oldest_time = rrddim_query_oldest_time \
+#define im_query_ops {                                                              \
+    .init = rrddim_query_init,                                                      \
+    .next_metric = rrddim_query_next_metric,                                        \
+    .is_finished = rrddim_query_is_finished,                                        \
+    .finalize = rrddim_query_finalize,                                              \
+    .latest_time_s = rrddim_query_latest_time_s,                                    \
+    .oldest_time_s = rrddim_query_oldest_time_s,                                    \
+    .align_to_optimal_before = rrddim_query_align_to_optimal_before,                \
 }
 
 static STORAGE_ENGINE engines[] = {
@@ -34,8 +35,9 @@ static STORAGE_ENGINE engines[] = {
             .metric_get_or_create = rrddim_metric_get_or_create,
             .metric_dup = rrddim_metric_dup,
             .metric_release = rrddim_metric_release,
+            .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
             .collect_ops = im_collect_ops,
-            .query_ops = im_query_ops
+            .query_ops = im_query_ops,
         }
     },
     {
@@ -46,8 +48,9 @@ static STORAGE_ENGINE engines[] = {
             .metric_get_or_create = rrddim_metric_get_or_create,
             .metric_dup = rrddim_metric_dup,
             .metric_release = rrddim_metric_release,
+            .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
             .collect_ops = im_collect_ops,
-            .query_ops = im_query_ops
+            .query_ops = im_query_ops,
         }
     },
     {
@@ -58,8 +61,9 @@ static STORAGE_ENGINE engines[] = {
             .metric_get_or_create = rrddim_metric_get_or_create,
             .metric_dup = rrddim_metric_dup,
             .metric_release = rrddim_metric_release,
+            .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
             .collect_ops = im_collect_ops,
-            .query_ops = im_query_ops
+            .query_ops = im_query_ops,
         }
     },
     {
@@ -70,8 +74,9 @@ static STORAGE_ENGINE engines[] = {
             .metric_get_or_create = rrddim_metric_get_or_create,
             .metric_dup = rrddim_metric_dup,
             .metric_release = rrddim_metric_release,
+            .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
             .collect_ops = im_collect_ops,
-            .query_ops = im_query_ops
+            .query_ops = im_query_ops,
         }
     },
     {
@@ -82,8 +87,9 @@ static STORAGE_ENGINE engines[] = {
             .metric_get_or_create = rrddim_metric_get_or_create,
             .metric_dup = rrddim_metric_dup,
             .metric_release = rrddim_metric_release,
+            .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
             .collect_ops = im_collect_ops,
-            .query_ops = im_query_ops
+            .query_ops = im_query_ops,
         }
     },
 #ifdef ENABLE_DBENGINE
@@ -95,6 +101,7 @@ static STORAGE_ENGINE engines[] = {
             .metric_get_or_create = rrdeng_metric_get_or_create,
             .metric_dup = rrdeng_metric_dup,
             .metric_release = rrdeng_metric_release,
+            .metric_retention_by_uuid = rrdeng_metric_retention_by_uuid,
             .collect_ops = {
                 .init = rrdeng_store_metric_init,
                 .store_metric = rrdeng_store_metric_next,
@@ -109,8 +116,9 @@ static STORAGE_ENGINE engines[] = {
                 .next_metric = rrdeng_load_metric_next,
                 .is_finished = rrdeng_load_metric_is_finished,
                 .finalize = rrdeng_load_metric_finalize,
-                .latest_time = rrdeng_metric_latest_time,
-                .oldest_time = rrdeng_metric_oldest_time
+                .latest_time_s = rrdeng_metric_latest_time,
+                .oldest_time_s = rrdeng_metric_oldest_time,
+                .align_to_optimal_before = rrdeng_load_align_to_optimal_before,
             }
         }
     },

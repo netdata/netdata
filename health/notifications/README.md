@@ -1,7 +1,11 @@
 <!--
 title: "Alarm notifications"
 description: "Reference documentation for Netdata's alarm notification feature, which supports dozens of endpoints, user roles, and more."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/README.md"
+sidebar_label: "Notifications Reference"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Operations/Alerts"
 -->
 
 # Alarm notifications
@@ -73,6 +77,8 @@ export NETDATA_ALARM_NOTIFY_DEBUG=1
 # send test alarms to any role
 /usr/libexec/netdata/plugins.d/alarm-notify.sh test "ROLE"
 ```
+
+If you are [running your own registry](https://github.com/netdata/netdata/blob/master/registry/README.md#run-your-own-registry), add `export NETDATA_REGISTRY_URL=[YOUR_URL]` before calling `alarm-notify.sh`.
 
 Note that in versions before 1.16, the plugins.d directory may be installed in a different location in certain OSs (e.g. under `/usr/lib/netdata`). You can always find the location of the alarm-notify.sh script in `netdata.conf`.
 

@@ -1,7 +1,10 @@
 <!--
 title: "Dovecot monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/dovecot/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/dovecot/README.md"
 sidebar_label: "Dovecot"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/Webapps"
 -->
 
 # Dovecot monitoring with Netdata
@@ -78,7 +81,7 @@ Module gives information with following charts:
 ## Configuration
 
 Edit the `python.d/dovecot.conf` configuration file using `edit-config` from the Netdata [config
-directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

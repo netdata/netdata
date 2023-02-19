@@ -86,9 +86,12 @@ public:
         DiffN(DiffN), SmoothN(SmoothN), LagN(LagN),
         SamplingRatio(SamplingRatio), RandNums(RandNums),
         BytesPerSample(NumDimsPerSample * sizeof(CalculatedNumber)),
-        Preprocessed(false) {};
+        Preprocessed(false) {
+        assert(NumDimsPerSample == 1 && "SamplesBuffer supports only one dimension per sample");
+    };
 
-    std::vector<DSample> preprocess();
+    void preprocess(std::vector<DSample> &Samples);
+    void preprocess(DSample &Feature);
     std::vector<Sample> getPreprocessedSamples() const;
 
     size_t capacity() const { return NumSamples; }

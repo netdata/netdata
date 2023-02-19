@@ -43,7 +43,7 @@ static inline void rrdsetvar_free_rrdvars_unsafe(RRDSET *st, RRDSETVAR *rs) {
     // ------------------------------------------------------------------------
     // HOST
 
-    if(host->rrdvars && host->health_enabled) {
+    if(host->rrdvars && host->health.health_enabled) {
         rrdvar_release_and_del(host->rrdvars, rs->rrdvar_host_chart_id);
         rs->rrdvar_host_chart_id = NULL;
 
@@ -93,7 +93,7 @@ static inline void rrdsetvar_update_rrdvars_unsafe(RRDSET *st, RRDSETVAR *rs) {
     // ------------------------------------------------------------------------
     // HOST
 
-    if(host->rrdvars && host->health_enabled) {
+    if(host->rrdvars && host->health.health_enabled) {
         rs->rrdvar_host_chart_id = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_id, rs->type, options, rs->value);
         rs->rrdvar_host_chart_name = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_name, rs->type, options, rs->value);
     }
@@ -189,7 +189,8 @@ static void rrdsetvar_delete_callback(const DICTIONARY_ITEM *item __maybe_unused
 
 void rrdsetvar_index_init(RRDSET *st) {
     if(!st->rrdsetvar_root_index) {
-        st->rrdsetvar_root_index = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+        st->rrdsetvar_root_index = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                                                              &dictionary_stats_category_rrdhealth, sizeof(RRDSETVAR));
 
         dictionary_register_insert_callback(st->rrdsetvar_root_index, rrdsetvar_insert_callback, NULL);
         dictionary_register_conflict_callback(st->rrdsetvar_root_index, rrdsetvar_conflict_callback, NULL);
@@ -268,14 +269,14 @@ void rrdsetvar_custom_chart_variable_set(RRDSET *st, const RRDSETVAR_ACQUIRED *r
         NETDATA_DOUBLE *v = rs->value;
         if(*v != value) {
             *v = value;
-
-            // mark the chart to be sent upstream
-            rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+            rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_SEND_VARIABLES);
         }
     }
 }
 
 void rrdsetvar_print_to_streaming_custom_chart_variables(RRDSET *st, BUFFER *wb) {
+    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_SEND_VARIABLES);
+
     // send the chart local custom variables
     RRDSETVAR *rs;
     dfe_start_read(st->rrdsetvar_root_index, rs) {

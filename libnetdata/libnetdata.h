@@ -11,8 +11,16 @@ extern "C" {
 #include <config.h>
 #endif
 
+#define JUDYHS_INDEX_SIZE_ESTIMATE(key_bytes) (((key_bytes) + sizeof(Word_t) - 1) / sizeof(Word_t) * 4)
+
 #if defined(NETDATA_DEV_MODE) && !defined(NETDATA_INTERNAL_CHECKS)
 #define NETDATA_INTERNAL_CHECKS 1
+#endif
+
+#if SIZEOF_VOID_P == 4
+#define ENV32BIT 1
+#else
+#define ENV64BIT 1
 #endif
 
 // NETDATA_TRACE_ALLOCATIONS does not work under musl libc, so don't enable it
@@ -217,6 +225,10 @@ extern "C" {
 #define WARNUNUSED
 #endif
 
+void aral_judy_init(void);
+size_t judy_aral_overhead(void);
+size_t judy_aral_structures(void);
+
 #define ABS(x) (((x) < 0)? (-(x)) : (x))
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
@@ -225,8 +237,9 @@ extern "C" {
 
 // ---------------------------------------------------------------------------------------------
 // double linked list management
+// inspired by https://github.com/troydhanson/uthash/blob/master/src/utlist.h
 
-#define DOUBLE_LINKED_LIST_PREPEND_UNSAFE(head, item, prev, next)                              \
+#define DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(head, item, prev, next)                         \
     do {                                                                                       \
         (item)->next = (head);                                                                 \
                                                                                                \
@@ -240,7 +253,7 @@ extern "C" {
         (head) = (item);                                                                       \
     } while (0)
 
-#define DOUBLE_LINKED_LIST_APPEND_UNSAFE(head, item, prev, next)                               \
+#define DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(head, item, prev, next)                          \
     do {                                                                                       \
         if(likely(head)) {                                                                     \
             (item)->prev = (head)->prev;                                                       \
@@ -256,39 +269,97 @@ extern "C" {
                                                                                                \
     } while (0)
 
-#define DOUBLE_LINKED_LIST_REMOVE_UNSAFE(head, item, prev, next)                               \
+#define DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(head, item, prev, next)                          \
     do {                                                                                       \
         fatal_assert((head) != NULL);                                                          \
         fatal_assert((item)->prev != NULL);                                                    \
                                                                                                \
-        if((item)->prev == (item)) {                                                           \
+        if((item)->prev == (item))                                                             \
             /* it is the only item in the list */                                              \
             (head) = NULL;                                                                     \
-        }                                                                                      \
+                                                                                               \
         else if((item) == (head)) {                                                            \
             /* it is the first item */                                                         \
+            fatal_assert((item)->next != NULL);                                                \
             (item)->next->prev = (item)->prev;                                                 \
             (head) = (item)->next;                                                             \
         }                                                                                      \
         else {                                                                                 \
+            /* it is any other item */                                                         \
             (item)->prev->next = (item)->next;                                                 \
-            if ((item)->next) {                                                                \
+                                                                                               \
+            if ((item)->next)                                                                  \
                 (item)->next->prev = (item)->prev;                                             \
-            }                                                                                  \
-            else {                                                                             \
+            else                                                                               \
                 (head)->prev = (item)->prev;                                                   \
-            }                                                                                  \
         }                                                                                      \
                                                                                                \
         (item)->next = NULL;                                                                   \
         (item)->prev = NULL;                                                                   \
     } while (0)
 
+#define DOUBLE_LINKED_LIST_INSERT_ITEM_BEFORE_UNSAFE(head, existing, item, prev, next)         \
+    do {                                                                                       \
+        if (existing) {                                                                        \
+            fatal_assert((head) != NULL);                                                      \
+            fatal_assert((item) != NULL);                                                      \
+                                                                                               \
+            (item)->next = (existing);                                                         \
+            (item)->prev = (existing)->prev;                                                   \
+            (existing)->prev = (item);                                                         \
+                                                                                               \
+            if ((head) == (existing))                                                          \
+                (head) = (item);                                                               \
+            else                                                                               \
+                (item)->prev->next = (item);                                                   \
+                                                                                               \
+        }                                                                                      \
+        else                                                                                   \
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(head, item, prev, next);                     \
+                                                                                               \
+    } while (0)
+
+#define DOUBLE_LINKED_LIST_INSERT_ITEM_AFTER_UNSAFE(head, existing, item, prev, next)          \
+    do {                                                                                       \
+        if (existing) {                                                                        \
+            fatal_assert((head) != NULL);                                                      \
+            fatal_assert((item) != NULL);                                                      \
+                                                                                               \
+            (item)->next = (existing)->next;                                                   \
+            (item)->prev = (existing);                                                         \
+            (existing)->next = (item);                                                         \
+                                                                                               \
+            if ((item)->next)                                                                  \
+                (item)->next->prev = (item);                                                   \
+            else                                                                               \
+                (head)->prev = (item);                                                         \
+        }                                                                                      \
+        else                                                                                   \
+            DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(head, item, prev, next);                    \
+                                                                                               \
+    } while (0)
+
+#define DOUBLE_LINKED_LIST_APPEND_LIST_UNSAFE(head, head2, prev, next)                         \
+    do {                                                                                       \
+        if (head2) {                                                                           \
+            if (head) {                                                                        \
+                __typeof(head2) _head2_last_item = (head2)->prev;                              \
+                                                                                               \
+                (head2)->prev = (head)->prev;                                                  \
+                (head)->prev->next = (head2);                                                  \
+                                                                                               \
+                (head)->prev = _head2_last_item;                                               \
+            }                                                                                  \
+            else                                                                               \
+                (head) = (head2);                                                              \
+        }                                                                                      \
+    } while (0)
+
 #define DOUBLE_LINKED_LIST_FOREACH_FORWARD(head, var, prev, next)                              \
     for ((var) = (head); (var) ; (var) = (var)->next)
 
 #define DOUBLE_LINKED_LIST_FOREACH_BACKWARD(head, var, prev, next)                             \
-    for ((var) = (head)?(head)->prev:NULL; (var) && (var) != (head)->prev ; (var) = (var)->prev)
+    for ((var) = (head) ? (head)->prev : NULL ; (var) ; (var) = ((var) == (head)) ? NULL : (var)->prev)
 
 // ---------------------------------------------------------------------------------------------
 
@@ -300,6 +371,14 @@ void strreverse(char* begin, char* end);
 char *mystrsep(char **ptr, char *s);
 char *trim(char *s); // remove leading and trailing spaces; may return NULL
 char *trim_all(char *buffer); // like trim(), but also remove duplicate spaces inside the string; may return NULL
+
+int madvise_sequential(void *mem, size_t len);
+int madvise_random(void *mem, size_t len);
+int madvise_dontfork(void *mem, size_t len);
+int madvise_willneed(void *mem, size_t len);
+int madvise_dontneed(void *mem, size_t len);
+int madvise_dontdump(void *mem, size_t len);
+int madvise_mergeable(void *mem, size_t len);
 
 int  vsnprintfz(char *dst, size_t n, const char *fmt, va_list args);
 int  snprintfz(char *dst, size_t n, const char *fmt, ...) PRINTFLIKE(3, 4);
@@ -335,7 +414,7 @@ void posix_memfree(void *ptr);
 void json_escape_string(char *dst, const char *src, size_t size);
 void json_fix_string(char *s);
 
-void *netdata_mmap(const char *filename, size_t size, int flags, int ksm);
+void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool read_only, int *open_fd);
 int netdata_munmap(void *ptr, size_t size);
 int memory_file_save(const char *filename, void *mem, size_t size);
 
@@ -418,9 +497,22 @@ static inline char *get_word(char **words, size_t num_words, size_t index) {
 
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length);
 
+typedef enum {
+    OPEN_FD_ACTION_CLOSE,
+    OPEN_FD_ACTION_FD_CLOEXEC
+} OPEN_FD_ACTION;
+typedef enum {
+    OPEN_FD_EXCLUDE_STDIN   = 0x01,
+    OPEN_FD_EXCLUDE_STDOUT  = 0x02,
+    OPEN_FD_EXCLUDE_STDERR  = 0x04
+} OPEN_FD_EXCLUDE;
+void for_each_open_fd(OPEN_FD_ACTION action, OPEN_FD_EXCLUDE excluded_fds);
+
 void netdata_cleanup_and_exit(int ret) NORETURN;
 void send_statistics(const char *action, const char *action_result, const char *action_data);
 extern char *netdata_configured_host_prefix;
+#include "libjudy/src/Judy.h"
+#include "july/july.h"
 #include "os.h"
 #include "storage_number/storage_number.h"
 #include "threads/threads.h"
@@ -452,12 +544,13 @@ extern char *netdata_configured_host_prefix;
 #include "json/json.h"
 #include "health/health.h"
 #include "string/utf8.h"
-#include "arrayalloc/arrayalloc.h"
+#include "libnetdata/aral/aral.h"
 #include "onewayalloc/onewayalloc.h"
 #include "worker_utilization/worker_utilization.h"
 
 // BEWARE: Outside of the C code this also exists in alarm-notify.sh
 #define DEFAULT_CLOUD_BASE_URL "https://api.netdata.cloud"
+#define DEFAULT_CLOUD_UI_URL "https://app.netdata.cloud"
 
 #define RRD_STORAGE_TIERS 5
 
@@ -497,6 +590,130 @@ struct malloc_trace {
     struct rrddim *rd_ops;
 };
 #endif // NETDATA_TRACE_ALLOCATIONS
+
+static inline PPvoid_t JudyLFirstThenNext(Pcvoid_t PArray, Word_t * PIndex, bool *first) {
+    if(unlikely(*first)) {
+        *first = false;
+        return JudyLFirst(PArray, PIndex, PJE0);
+    }
+
+    return JudyLNext(PArray, PIndex, PJE0);
+}
+
+static inline PPvoid_t JudyLLastThenPrev(Pcvoid_t PArray, Word_t * PIndex, bool *first) {
+    if(unlikely(*first)) {
+        *first = false;
+        return JudyLLast(PArray, PIndex, PJE0);
+    }
+
+    return JudyLPrev(PArray, PIndex, PJE0);
+}
+
+static inline size_t indexing_partition_old(Word_t ptr, Word_t modulo) {
+    size_t total = 0;
+
+    total += (ptr & 0xff) >> 0;
+    total += (ptr & 0xff00) >> 8;
+    total += (ptr & 0xff0000) >> 16;
+    total += (ptr & 0xff000000) >> 24;
+
+    if(sizeof(Word_t) > 4) {
+        total += (ptr & 0xff00000000) >> 32;
+        total += (ptr & 0xff0000000000) >> 40;
+        total += (ptr & 0xff000000000000) >> 48;
+        total += (ptr & 0xff00000000000000) >> 56;
+    }
+
+    return (total % modulo);
+}
+
+static uint32_t murmur32(uint32_t h) __attribute__((const));
+static inline uint32_t murmur32(uint32_t h) {
+    h ^= h >> 16;
+    h *= 0x85ebca6b;
+    h ^= h >> 13;
+    h *= 0xc2b2ae35;
+    h ^= h >> 16;
+
+    return h;
+}
+
+static uint64_t murmur64(uint64_t h) __attribute__((const));
+static inline uint64_t murmur64(uint64_t k) {
+    k ^= k >> 33;
+    k *= 0xff51afd7ed558ccdUL;
+    k ^= k >> 33;
+    k *= 0xc4ceb9fe1a85ec53UL;
+    k ^= k >> 33;
+
+    return k;
+}
+
+static inline size_t indexing_partition(Word_t ptr, Word_t modulo) __attribute__((const));
+static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
+    if(sizeof(Word_t) == 8) {
+        uint64_t hash = murmur64(ptr);
+        return hash % modulo;
+    }
+    else {
+        uint32_t hash = murmur32(ptr);
+        return hash % modulo;
+    }
+}
+
+typedef enum {
+    TIMING_STEP_INTERNAL = 0,
+
+    TIMING_STEP_BEGIN2_PREPARE,
+    TIMING_STEP_BEGIN2_FIND_CHART,
+    TIMING_STEP_BEGIN2_PARSE,
+    TIMING_STEP_BEGIN2_ML,
+    TIMING_STEP_BEGIN2_PROPAGATE,
+    TIMING_STEP_BEGIN2_STORE,
+
+    TIMING_STEP_SET2_PREPARE,
+    TIMING_STEP_SET2_LOOKUP_DIMENSION,
+    TIMING_STEP_SET2_PARSE,
+    TIMING_STEP_SET2_ML,
+    TIMING_STEP_SET2_PROPAGATE,
+    TIMING_STEP_RRDSET_STORE_METRIC,
+    TIMING_STEP_DBENGINE_FIRST_CHECK,
+    TIMING_STEP_DBENGINE_CHECK_DATA,
+    TIMING_STEP_DBENGINE_PACK,
+    TIMING_STEP_DBENGINE_PAGE_FIN,
+    TIMING_STEP_DBENGINE_MRG_UPDATE,
+    TIMING_STEP_DBENGINE_PAGE_ALLOC,
+    TIMING_STEP_DBENGINE_CREATE_NEW_PAGE,
+    TIMING_STEP_DBENGINE_FLUSH_PAGE,
+    TIMING_STEP_SET2_STORE,
+
+    TIMING_STEP_END2_PREPARE,
+    TIMING_STEP_END2_PUSH_V1,
+    TIMING_STEP_END2_ML,
+    TIMING_STEP_END2_RRDSET,
+    TIMING_STEP_END2_PROPAGATE,
+    TIMING_STEP_END2_STORE,
+
+    // terminator
+    TIMING_STEP_MAX,
+} TIMING_STEP;
+
+typedef enum {
+    TIMING_ACTION_INIT,
+    TIMING_ACTION_STEP,
+    TIMING_ACTION_FINISH,
+} TIMING_ACTION;
+
+#ifdef NETDATA_TIMING_REPORT
+#define timing_init() timing_action(TIMING_ACTION_INIT, TIMING_STEP_INTERNAL)
+#define timing_step(step) timing_action(TIMING_ACTION_STEP, step)
+#define timing_report() timing_action(TIMING_ACTION_FINISH, TIMING_STEP_INTERNAL)
+#else
+#define timing_init() debug_dummy()
+#define timing_step(step) debug_dummy()
+#define timing_report() debug_dummy()
+#endif
+void timing_action(TIMING_ACTION action, TIMING_STEP step);
 
 # ifdef __cplusplus
 }

@@ -533,7 +533,9 @@ static bool rrdlabel_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
 }
 
 DICTIONARY *rrdlabels_create(void) {
-    DICTIONARY *dict = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+    DICTIONARY *dict = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                                                  &dictionary_stats_category_rrdlabels, sizeof(RRDLABEL));
+
     dictionary_register_insert_callback(dict, rrdlabel_insert_callback, dict);
     dictionary_register_delete_callback(dict, rrdlabel_delete_callback, dict);
     dictionary_register_conflict_callback(dict, rrdlabel_conflict_callback, dict);
@@ -964,7 +966,8 @@ void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels) {
     if (new_rrdlabels)
         rrdlabels_migrate_to_these(st->rrdlabels, new_rrdlabels);
 
-    metaqueue_chart_labels(st);
+    rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
+    rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
 }
 
 

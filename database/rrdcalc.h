@@ -251,8 +251,8 @@ void rrdcalc_rrdhost_index_init(RRDHOST *host);
 void rrdcalc_rrdhost_index_destroy(RRDHOST *host);
 
 #define RRDCALC_VAR_MAX 100
-#define RRDCALC_VAR_FAMILY "$family"
-#define RRDCALC_VAR_LABEL "$label:"
+#define RRDCALC_VAR_FAMILY "${family}"
+#define RRDCALC_VAR_LABEL "${label:"
 #define RRDCALC_VAR_LABEL_LEN (sizeof(RRDCALC_VAR_LABEL)-1)
 
 #endif //NETDATA_RRDCALC_H

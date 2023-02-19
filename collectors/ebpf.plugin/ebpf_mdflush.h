@@ -6,8 +6,6 @@
 // Module name
 #define NETDATA_EBPF_MODULE_NAME_MDFLUSH "mdflush"
 
-#define NETDATA_MDFLUSH_SLEEP_MS 850000ULL
-
 // charts
 #define NETDATA_MDFLUSH_GLOBAL_CHART "mdflush"
 

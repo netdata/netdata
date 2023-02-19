@@ -22,6 +22,7 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
     if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
         total = 0;
         for (c = 0; c < used; c++) {
+            if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
             NETDATA_DOUBLE n = cn[c];
 
             if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
@@ -37,6 +38,7 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
     // for each dimension
     for (c = 0; c < used; c++) {
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
+        if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
         if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
         NETDATA_DOUBLE n = cn[c];
@@ -106,7 +108,7 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
                             struct rrdcontext_acquired *rca, struct rrdinstance_acquired *ria, struct rrdmetric_acquired *rma,
                             time_t after, time_t before,
                             RRDR_OPTIONS options, RRDR_GROUPING group_method, const char *group_options,
-                            size_t tier, time_t timeout
+                            size_t tier, time_t timeout, QUERY_SOURCE query_source, STORAGE_PRIORITY priority
 ) {
     QUERY_TARGET_REQUEST qtr = {
             .host = host,
@@ -121,6 +123,8 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
             .group_options = group_options,
             .tier = tier,
             .timeout = timeout,
+            .query_source = query_source,
+            .priority = priority,
     };
 
     ONEWAYALLOC *owa = onewayalloc_create(16 * 1024);

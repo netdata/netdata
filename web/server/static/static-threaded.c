@@ -307,7 +307,7 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
         web_client_send(w);
     }
 
-    if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
+    else if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
         if(w->pollinfo_filecopy_slot == 0) {
             debug(D_WEB_CLIENT, "%llu: FILECOPY DETECTED ON FD %d", w->id, pi->fd);
 
@@ -408,6 +408,10 @@ static void socket_listen_main_static_threaded_worker_cleanup(void *ptr) {
     worker_unregister();
 }
 
+static bool web_server_should_stop(void) {
+    return !service_running(SERVICE_WEB_SERVER);
+}
+
 void *socket_listen_main_static_threaded_worker(void *ptr) {
     worker_private = (struct web_server_static_threaded_worker *)ptr;
     worker_private->running = 1;
@@ -430,6 +434,7 @@ void *socket_listen_main_static_threaded_worker(void *ptr) {
                         , web_server_rcv_callback
                         , web_server_snd_callback
                         , NULL
+                        , web_server_should_stop
                         , web_allow_connections_from
                         , web_allow_connections_dns
                         , NULL
@@ -452,35 +457,35 @@ static void socket_listen_main_static_threaded_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    int i, found = 0;
-    usec_t max = 2 * USEC_PER_SEC, step = 50000;
-
-    // we start from 1, - 0 is self
-    for(i = 1; i < static_threaded_workers_count; i++) {
-        if(static_workers_private_data[i].running) {
-            found++;
-            info("stopping worker %d", i + 1);
-            netdata_thread_cancel(static_workers_private_data[i].thread);
-        }
-        else
-            info("found stopped worker %d", i + 1);
-    }
-
-    while(found && max > 0) {
-        max -= step;
-        info("Waiting %d static web threads to finish...", found);
-        sleep_usec(step);
-        found = 0;
-
-        // we start from 1, - 0 is self
-        for(i = 1; i < static_threaded_workers_count; i++) {
-            if (static_workers_private_data[i].running)
-                found++;
-        }
-    }
-
-    if(found)
-        error("%d static web threads are taking too long to finish. Giving up.", found);
+//    int i, found = 0;
+//    usec_t max = 2 * USEC_PER_SEC, step = 50000;
+//
+//    // we start from 1, - 0 is self
+//    for(i = 1; i < static_threaded_workers_count; i++) {
+//        if(static_workers_private_data[i].running) {
+//            found++;
+//            info("stopping worker %d", i + 1);
+//            netdata_thread_cancel(static_workers_private_data[i].thread);
+//        }
+//        else
+//            info("found stopped worker %d", i + 1);
+//    }
+//
+//    while(found && max > 0) {
+//        max -= step;
+//        info("Waiting %d static web threads to finish...", found);
+//        sleep_usec(step);
+//        found = 0;
+//
+//        // we start from 1, - 0 is self
+//        for(i = 1; i < static_threaded_workers_count; i++) {
+//            if (static_workers_private_data[i].running)
+//                found++;
+//        }
+//    }
+//
+//    if(found)
+//        error("%d static web threads are taking too long to finish. Giving up.", found);
 
     info("closing all web server sockets...");
     listen_sockets_close(&api_sockets);
@@ -502,7 +507,7 @@ void *socket_listen_main_static_threaded(void *ptr) {
     // 6 threads is the optimal value
     // since 6 are the parallel connections browsers will do
     // so, if the machine has more CPUs, avoid using resources unnecessarily
-    int def_thread_count = (processors > 6) ? 6 : processors;
+    int def_thread_count = MIN(get_netdata_cpus(), 6);
 
     if (!strcmp(config_get(CONFIG_SECTION_WEB, "mode", ""),"single-threaded")) {
                 info("Running web server with one thread, because mode is single-threaded");
@@ -534,7 +539,7 @@ void *socket_listen_main_static_threaded(void *ptr) {
         static_workers_private_data[i].max_sockets = max_sockets / static_threaded_workers_count;
 
         char tag[50 + 1];
-        snprintfz(tag, 50, "WEB_SERVER[static%d]", i+1);
+        snprintfz(tag, 50, "WEB[%d]", i+1);
 
         info("starting worker %d", i+1);
         netdata_thread_create(&static_workers_private_data[i].thread, tag, NETDATA_THREAD_OPTION_DEFAULT,

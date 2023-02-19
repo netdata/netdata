@@ -53,6 +53,7 @@ typedef enum dictionary_options {
     DICT_OPTION_NAME_LINK_DONT_CLONE    = (1 << 2), // don't copy the name, just point to the one provided (default: copy)
     DICT_OPTION_DONT_OVERWRITE_VALUE    = (1 << 3), // don't overwrite values of dictionary items (default: overwrite)
     DICT_OPTION_ADD_IN_FRONT            = (1 << 4), // add dictionary items at the front of the linked list (default: at the end)
+    DICT_OPTION_FIXED_SIZE              = (1 << 5), // the items of the dictionary have a fixed size
 } DICT_OPTIONS;
 
 struct dictionary_stats {
@@ -91,27 +92,28 @@ struct dictionary_stats {
 
     // memory
     struct {
-        long indexed;               // bytes of keys indexed (indication of the index size)
+        long index;               // bytes of keys indexed (indication of the index size)
         long values;                // bytes of caller structures
         long dict;                  // bytes of the structures dictionary needs
     } memory;
 
     // spin locks
     struct {
-        size_t use;                 // number of times a reference to item had to spin to acquire it or ignore it
-        size_t search;              // number of times a successful search result had to be thrown away
-        size_t insert;              // number of times an insertion to the hash table had to be repeated
+        size_t use_spins;           // number of times a reference to item had to spin to acquire it or ignore it
+        size_t search_spins;        // number of times a successful search result had to be thrown away
+        size_t insert_spins;        // number of times an insertion to the hash table had to be repeated
+        size_t delete_spins;        // number of times a deletion had to spin to get a decision
     } spin_locks;
 };
 
 // Create a dictionary
 #ifdef NETDATA_INTERNAL_CHECKS
-#define dictionary_create(options) dictionary_create_advanced_with_trace(options, NULL, __FUNCTION__, __LINE__, __FILE__)
-#define dictionary_create_advanced(options, stats) dictionary_create_advanced_with_trace(options, stats, __FUNCTION__, __LINE__, __FILE__)
-DICTIONARY *dictionary_create_advanced_with_trace(DICT_OPTIONS options, struct dictionary_stats *stats, const char *function, size_t line, const char *file);
+#define dictionary_create(options) dictionary_create_advanced_with_trace(options, NULL, 0, __FUNCTION__, __LINE__, __FILE__)
+#define dictionary_create_advanced(options, stats, fixed_size) dictionary_create_advanced_with_trace(options, stats, fixed_size, __FUNCTION__, __LINE__, __FILE__)
+DICTIONARY *dictionary_create_advanced_with_trace(DICT_OPTIONS options, struct dictionary_stats *stats, size_t fixed_size, const char *function, size_t line, const char *file);
 #else
-#define dictionary_create(options) dictionary_create_advanced(options, NULL);
-DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_stats *stats);
+#define dictionary_create(options) dictionary_create_advanced(options, NULL, 0);
+DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_stats *stats, size_t fixed_size);
 #endif
 
 // Create a view on a dictionary
@@ -230,9 +232,11 @@ size_t dictionary_acquired_item_references(DICT_ITEM_CONST DICTIONARY_ITEM *item
 #define dictionary_walkthrough_write(dict, callback, data) dictionary_walkthrough_rw(dict, 'w', callback, data)
 int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data);
 
-#define dictionary_sorted_walkthrough_read(dict, callback, data) dictionary_sorted_walkthrough_rw(dict, 'r', callback, data)
-#define dictionary_sorted_walkthrough_write(dict, callback, data) dictionary_sorted_walkthrough_rw(dict, 'w', callback, data)
-int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const DICTIONARY_ITEM *item, void *entry, void *data), void *data);
+typedef int (*dictionary_sorted_compar)(const DICTIONARY_ITEM **item1, const DICTIONARY_ITEM **item2);
+
+#define dictionary_sorted_walkthrough_read(dict, callback, data) dictionary_sorted_walkthrough_rw(dict, 'r', callback, data, NULL)
+#define dictionary_sorted_walkthrough_write(dict, callback, data) dictionary_sorted_walkthrough_rw(dict, 'w', callback, data, NULL)
+int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const DICTIONARY_ITEM *item, void *entry, void *data), void *data, dictionary_sorted_compar compar);
 
 // ----------------------------------------------------------------------------
 // Traverse with foreach

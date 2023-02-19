@@ -180,6 +180,10 @@ static inline NETDATA_DOUBLE str2ndd(const char *s, char **endptr) {
                 if(endptr) *endptr = (char *)&s[3];
                 return NAN;
             }
+            if(s[1] == 'u' && s[2] == 'l' && s[3] == 'l') {
+                if(endptr) *endptr = (char *)&s[3];
+                return NAN;
+            }
             break;
 
         case 'i':

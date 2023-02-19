@@ -34,18 +34,6 @@ static ebpf_local_maps_t swap_maps[] = {{.name = "tbl_pid_swap", .internal_input
                                          .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
                                         {.name = NULL, .internal_input = 0, .user_input = 0}};
 
-struct netdata_static_thread swap_threads = {
-    .name = "SWAP KERNEL",
-    .config_section = NULL,
-    .config_name = NULL,
-    .env_name = NULL,
-    .enabled = 1,
-    .thread = NULL,
-    .init_routine = NULL,
-    .start_routine = NULL
-};
-static enum ebpf_threads_status ebpf_swap_exited = NETDATA_THREAD_EBPF_RUNNING;
-
 netdata_ebpf_targets_t swap_targets[] = { {.name = "swap_readpage", .mode = EBPF_LOAD_TRAMPOLINE},
                                            {.name = "swap_writepage", .mode = EBPF_LOAD_TRAMPOLINE},
                                            {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
@@ -185,7 +173,7 @@ static void ebpf_swap_disable_release_task(struct swap_bpf *obj)
  * @param obj is the main structure for bpf objects.
  * @param em  structure with configuration
  *
- * @return it returns 0 on succes and -1 otherwise
+ * @return it returns 0 on success and -1 otherwise
  */
 static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t *em)
 {
@@ -228,6 +216,33 @@ static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t 
  *****************************************************************/
 
 /**
+ * Cachestat Free
+ *
+ * Cleanup variables after child threads to stop
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_swap_free(ebpf_module_t *em)
+{
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+    ebpf_cleanup_publish_syscall(swap_publish_aggregated);
+
+    freez(swap_vector);
+    freez(swap_values);
+
+#ifdef LIBBPF_MAJOR_VERSION
+    if (bpf_obj)
+        swap_bpf__destroy(bpf_obj);
+#endif
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+}
+
+/**
  * Swap exit
  *
  * Cancel thread and exit.
@@ -237,39 +252,7 @@ static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t 
 static void ebpf_swap_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled) {
-        em->enabled = NETDATA_MAIN_THREAD_EXITED;
-        return;
-    }
-
-    ebpf_swap_exited = NETDATA_THREAD_EBPF_STOPPING;
-}
-
-/**
- * Swap cleanup
- *
- * Clean up allocated memory.
- *
- * @param ptr thread data.
- */
-static void ebpf_swap_cleanup(void *ptr)
-{
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (ebpf_swap_exited != NETDATA_THREAD_EBPF_STOPPED)
-        return;
-
-    ebpf_cleanup_publish_syscall(swap_publish_aggregated);
-
-    freez(swap_vector);
-    freez(swap_values);
-    freez(swap_threads.thread);
-
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        swap_bpf__destroy(bpf_obj);
-#endif
-    swap_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
-    em->enabled = NETDATA_MAIN_THREAD_EXITED;
+    ebpf_swap_free(em);
 }
 
 /*****************************************************************
@@ -399,7 +382,7 @@ static void swap_send_global()
  *
  * Read the table with number of calls to all functions
  */
-static void read_global_table()
+static void ebpf_swap_read_global_table()
 {
     netdata_idx_t *stored = swap_values;
     netdata_idx_t *val = swap_hash_values;
@@ -417,38 +400,6 @@ static void read_global_table()
             val[i] = total;
         }
     }
-}
-
-/**
- * Swap read hash
- *
- * This is the thread callback.
- *
- * @param ptr It is a NULL value for this thread.
- *
- * @return It always returns NULL.
- */
-void *ebpf_swap_read_hash(void *ptr)
-{
-    netdata_thread_cleanup_push(ebpf_swap_cleanup, ptr);
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    usec_t step = NETDATA_SWAP_SLEEP_MS * em->update_every;
-    while (ebpf_swap_exited == NETDATA_THREAD_EBPF_RUNNING) {
-        usec_t dt = heartbeat_next(&hb, step);
-        (void)dt;
-        if (ebpf_swap_exited == NETDATA_THREAD_EBPF_STOPPING)
-            break;
-
-        read_global_table();
-    }
-
-    ebpf_swap_exited = NETDATA_THREAD_EBPF_STOPPED;
-
-    netdata_thread_cleanup_pop(1);
-    return NULL;
 }
 
 /**
@@ -706,23 +657,19 @@ void ebpf_swap_send_cgroup_data(int update_every)
 */
 static void swap_collector(ebpf_module_t *em)
 {
-    swap_threads.thread = mallocz(sizeof(netdata_thread_t));
-    swap_threads.start_routine = ebpf_swap_read_hash;
-
-    netdata_thread_create(swap_threads.thread, swap_threads.name, NETDATA_THREAD_OPTION_DEFAULT,
-                          ebpf_swap_read_hash, em);
-
     int cgroup = em->cgroup_charts;
     int update_every = em->update_every;
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = update_every * USEC_PER_SEC;
+    int counter = update_every - 1;
     while (!ebpf_exit_plugin) {
-        (void)heartbeat_next(&hb, step);
-        if (ebpf_exit_plugin)
-            break;
+        (void)heartbeat_next(&hb, USEC_PER_SEC);
+        if (ebpf_exit_plugin || ++counter != update_every)
+            continue;
 
+        counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
+        ebpf_swap_read_global_table();
         pthread_mutex_lock(&collect_data_mutex);
         if (apps)
             read_apps_table();
@@ -878,14 +825,11 @@ void *ebpf_swap_thread(void *ptr)
 
     ebpf_update_pid_table(&swap_maps[NETDATA_PID_SWAP_TABLE], em);
 
-    if (!em->enabled)
-        goto endswap;
-
 #ifdef LIBBPF_MAJOR_VERSION
     ebpf_adjust_thread_load(em, default_btf);
 #endif
    if (ebpf_swap_load_bpf(em)) {
-        em->enabled = CONFIG_BOOLEAN_NO;
+       em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endswap;
     }
 
@@ -903,8 +847,7 @@ void *ebpf_swap_thread(void *ptr)
     swap_collector(em);
 
 endswap:
-    if (!em->enabled)
-        ebpf_update_disabled_plugin_stats(em);
+    ebpf_update_disabled_plugin_stats(em);
 
     netdata_thread_cleanup_pop(1);
     return NULL;

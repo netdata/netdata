@@ -54,34 +54,27 @@ static softirq_val_t softirq_vals[] = {
 // tmp store for soft IRQ values we get from a per-CPU eBPF map.
 static softirq_ebpf_val_t *softirq_ebpf_vals = NULL;
 
-static struct netdata_static_thread softirq_threads = {
-    .name = "SOFTIRQ KERNEL",
-    .config_section = NULL,
-    .config_name = NULL,
-    .env_name = NULL,
-    .enabled = 1,
-    .thread = NULL,
-    .init_routine = NULL,
-    .start_routine = NULL
-};
-static enum ebpf_threads_status ebpf_softirq_exited = NETDATA_THREAD_EBPF_RUNNING;
-
 /**
- * Exit
+ * Cachestat Free
  *
- * Cancel thread.
+ * Cleanup variables after child threads to stop
  *
  * @param ptr thread data.
  */
-static void softirq_exit(void *ptr)
+static void ebpf_softirq_free(ebpf_module_t *em)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled) {
-        em->enabled = NETDATA_MAIN_THREAD_EXITED;
-        return;
-    }
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-    ebpf_softirq_exited = NETDATA_THREAD_EBPF_STOPPING;
+    for (int i = 0; softirq_tracepoints[i].class != NULL; i++) {
+        ebpf_disable_tracepoint(&softirq_tracepoints[i]);
+    }
+    freez(softirq_ebpf_vals);
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /**
@@ -94,18 +87,7 @@ static void softirq_exit(void *ptr)
 static void softirq_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (ebpf_softirq_exited != NETDATA_THREAD_EBPF_STOPPED)
-        return;
-
-    freez(softirq_threads.thread);
-
-    for (int i = 0; softirq_tracepoints[i].class != NULL; i++) {
-        ebpf_disable_tracepoint(&softirq_tracepoints[i]);
-    }
-    freez(softirq_ebpf_vals);
-
-    softirq_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
-    em->enabled = NETDATA_MAIN_THREAD_EXITED;
+    ebpf_softirq_free(em);
 }
 
 /*****************************************************************
@@ -131,32 +113,6 @@ static void softirq_read_latency_map()
 
         softirq_vals[i].latency = total_latency;
     }
-}
-
-/**
- * Read eBPF maps for soft IRQ.
- */
-static void *softirq_reader(void *ptr)
-{
-    netdata_thread_cleanup_push(softirq_exit, ptr);
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-
-    usec_t step = NETDATA_SOFTIRQ_SLEEP_MS * em->update_every;
-    while (ebpf_softirq_exited == NETDATA_THREAD_EBPF_RUNNING) {
-        usec_t dt = heartbeat_next(&hb, step);
-        UNUSED(dt);
-        if (ebpf_softirq_exited == NETDATA_THREAD_EBPF_STOPPING)
-            break;
-
-        softirq_read_latency_map();
-    }
-    ebpf_softirq_exited = NETDATA_THREAD_EBPF_STOPPED;
-
-    netdata_thread_cleanup_pop(1);
-    return NULL;
 }
 
 static void softirq_create_charts(int update_every)
@@ -203,17 +159,6 @@ static void softirq_collector(ebpf_module_t *em)
 {
     softirq_ebpf_vals = callocz(ebpf_nprocs, sizeof(softirq_ebpf_val_t));
 
-    // create reader thread.
-    softirq_threads.thread = mallocz(sizeof(netdata_thread_t));
-    softirq_threads.start_routine = softirq_reader;
-    netdata_thread_create(
-        softirq_threads.thread,
-        softirq_threads.name,
-        NETDATA_THREAD_OPTION_DEFAULT,
-        softirq_reader,
-        em
-    );
-
     // create chart and static dims.
     pthread_mutex_lock(&lock);
     softirq_create_charts(em->update_every);
@@ -224,13 +169,16 @@ static void softirq_collector(ebpf_module_t *em)
     // loop and read from published data until ebpf plugin is closed.
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = em->update_every * USEC_PER_SEC;
+    int update_every = em->update_every;
+    int counter = update_every - 1;
     //This will be cancelled by its parent
     while (!ebpf_exit_plugin) {
-        (void)heartbeat_next(&hb, step);
-        if (ebpf_exit_plugin)
-            break;
+        (void)heartbeat_next(&hb, USEC_PER_SEC);
+        if (ebpf_exit_plugin || ++counter != update_every)
+            continue;
 
+        counter = 0;
+        softirq_read_latency_map();
         pthread_mutex_lock(&lock);
 
         // write dims now for all hitherto discovered IRQs.
@@ -259,26 +207,21 @@ void *ebpf_softirq_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = softirq_maps;
 
-    if (!em->enabled) {
-        goto endsoftirq;
-    }
-
     if (ebpf_enable_tracepoints(softirq_tracepoints) == 0) {
-        em->enabled = CONFIG_BOOLEAN_NO;
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endsoftirq;
     }
 
     em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
     if (!em->probe_links) {
-        em->enabled = CONFIG_BOOLEAN_NO;
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endsoftirq;
     }
 
     softirq_collector(em);
 
 endsoftirq:
-    if (!em->enabled)
-        ebpf_update_disabled_plugin_stats(em);
+    ebpf_update_disabled_plugin_stats(em);
 
     netdata_thread_cleanup_pop(1);
 

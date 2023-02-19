@@ -41,6 +41,7 @@ static struct {
         , {"natural-points"    , 0    , RRDR_OPTION_NATURAL_POINTS}
         , {"virtual-points"    , 0    , RRDR_OPTION_VIRTUAL_POINTS}
         , {"all-dimensions"    , 0    , RRDR_OPTION_ALL_DIMENSIONS}
+        , {"plan"              , 0    , RRDR_OPTION_SHOW_PLAN}
         , {NULL                , 0    , 0}
 };
 
@@ -311,7 +312,7 @@ inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_clien
             else if (!strcmp("CLEAR", value)) status = RRDCALC_STATUS_CLEAR;
         }
         else if(!strcmp(name, "context") || !strcmp(name, "ctx")) {
-            if(!contexts) contexts = buffer_create(255);
+            if(!contexts) contexts = buffer_create(255, &netdata_buffers_statistics.buffers_api);
             buffer_strcat(contexts, "|");
             buffer_strcat(contexts, value);
         }
@@ -388,7 +389,7 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
     }
 
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    st->last_accessed_time = now_realtime_sec();
+    st->last_accessed_time_s = now_realtime_sec();
     callback(st, w->response.data);
     return HTTP_RESP_OK;
 
@@ -459,7 +460,7 @@ static int web_client_api_request_v1_context(RRDHOST *host, struct web_client *w
         else if(!strcmp(name, "chart_label_key")) chart_label_key = value;
         else if(!strcmp(name, "chart_labels_filter")) chart_labels_filter = value;
         else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
-            if(!dimensions) dimensions = buffer_create(100);
+            if(!dimensions) dimensions = buffer_create(100, &netdata_buffers_statistics.buffers_api);
             buffer_strcat(dimensions, "|");
             buffer_strcat(dimensions, value);
         }
@@ -520,7 +521,7 @@ static int web_client_api_request_v1_contexts(RRDHOST *host, struct web_client *
         else if(!strcmp(name, "chart_label_key")) chart_label_key = value;
         else if(!strcmp(name, "chart_labels_filter")) chart_labels_filter = value;
         else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
-            if(!dimensions) dimensions = buffer_create(100);
+            if(!dimensions) dimensions = buffer_create(100, &netdata_buffers_statistics.buffers_api);
             buffer_strcat(dimensions, "|");
             buffer_strcat(dimensions, value);
         }
@@ -557,18 +558,6 @@ inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w,
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
     charts2json(host, w->response.data, 0, 0);
-    return HTTP_RESP_OK;
-}
-
-inline int web_client_api_request_v1_archivedcharts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    (void)url;
-
-    buffer_flush(w->response.data);
-    w->response.data->contenttype = CT_APPLICATION_JSON;
-#ifdef ENABLE_DBENGINE
-    if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-        sql_rrdset2json(host, w->response.data);
-#endif
     return HTTP_RESP_OK;
 }
 
@@ -610,7 +599,6 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     char *group_time_str = NULL;
     char *points_str = NULL;
     char *timeout_str = NULL;
-    char *max_anomaly_rates_str = NULL;
     char *context = NULL;
     char *chart_label_key = NULL;
     char *chart_labels_filter = NULL;
@@ -638,7 +626,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         else if(!strcmp(name, "chart_labels_filter")) chart_labels_filter = value;
         else if(!strcmp(name, "chart")) chart = value;
         else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
-            if(!dimensions) dimensions = buffer_create(100);
+            if(!dimensions) dimensions = buffer_create(100, &netdata_buffers_statistics.buffers_api);
             buffer_strcat(dimensions, "|");
             buffer_strcat(dimensions, value);
         }
@@ -695,9 +683,6 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
                     outFileName = tqx_value;
             }
         }
-        else if(!strcmp(name, "max_anomaly_rates")) {
-            max_anomaly_rates_str = value;
-        }
         else if(!strcmp(name, "tier")) {
             tier = str2ul(value);
             if(tier < storage_tiers)
@@ -717,6 +702,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
 
     RRDSET *st = NULL;
     ONEWAYALLOC *owa = onewayalloc_create(0);
+    QUERY_TARGET *qt = NULL;
 
     if(!is_valid_sp(chart) && !is_valid_sp(context)) {
         buffer_sprintf(w->response.data, "No chart or context is given.");
@@ -734,7 +720,6 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     int       points = (points_str && *points_str)?str2i(points_str):0;
     int       timeout = (timeout_str && *timeout_str)?str2i(timeout_str): 0;
     long      group_time = (group_time_str && *group_time_str)?str2l(group_time_str):0;
-    int       max_anomaly_rates = (max_anomaly_rates_str && *max_anomaly_rates_str) ? str2i(max_anomaly_rates_str) : 0;
 
     QUERY_TARGET_REQUEST qtr = {
             .after = after,
@@ -746,7 +731,6 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             .charts = chart,
             .dimensions = (dimensions)?buffer_tostring(dimensions):NULL,
             .timeout = timeout,
-            .max_anomaly_rates = max_anomaly_rates,
             .points = points,
             .format = format,
             .options = options,
@@ -756,8 +740,10 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             .tier = tier,
             .chart_label_key = chart_label_key,
             .charts_labels_filter = chart_labels_filter,
+            .query_source = QUERY_SOURCE_API_DATA,
+            .priority = STORAGE_PRIORITY_NORMAL,
     };
-    QUERY_TARGET *qt = query_target_create(&qtr);
+    qt = query_target_create(&qtr);
 
     if(!qt || !qt->query.used) {
         buffer_sprintf(w->response.data, "No metrics where matched to query.");
@@ -828,6 +814,10 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         buffer_strcat(w->response.data, ");");
 
 cleanup:
+    if(qt && qt->used) {
+        internal_error(true, "QUERY_TARGET: left non-released on query '%s'", qt->id);
+        query_target_release(qt);
+    }
     onewayalloc_destroy(owa);
     buffer_free(dimensions);
     return ret;
@@ -1068,15 +1058,13 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
         if (count > 0)
             buffer_strcat(wb, ",\n");
 
-        netdata_mutex_lock(&host->receiver_lock);
         buffer_sprintf(
             wb, "\t\t{ \"guid\": \"%s\", \"hostname\": \"%s\", \"reachable\": %s, \"hops\": %d"
             , host->machine_guid
             , rrdhost_hostname(host)
-            , (host->receiver || host == localhost) ? "true" : "false"
+            , (host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)) ? "true" : "false"
             , host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1
             );
-        netdata_mutex_unlock(&host->receiver_lock);
 
         rrdhost_aclk_state_lock(host);
         if (host->aclk_state.claimed_id)
@@ -1227,7 +1215,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 #ifdef  ENABLE_COMPRESSION
     if(host->sender){
         buffer_strcat(wb, "\t\"stream-compression\": ");
-        buffer_strcat(wb, (host->sender->flags & SENDER_FLAG_COMPRESSION) ? "true" : "false");
+        buffer_strcat(wb, stream_has_capability(host->sender, STREAM_CAP_COMPRESSION) ? "true" : "false");
         buffer_strcat(wb, ",\n");
     }else{
         buffer_strcat(wb, "\t\"stream-compression\": null,\n");
@@ -1510,7 +1498,7 @@ int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, cha
 }
 
 #ifndef ENABLE_DBENGINE
-int web_client_api_request_v1_dbengine_stats(RRDHOST *host, struct web_client *w, char *url) {
+int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struct web_client *w __maybe_unused, char *url __maybe_unused) {
     return HTTP_RESP_NOT_FOUND;
 }
 #else
@@ -1519,12 +1507,6 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
 
     buffer_sprintf(wb,
                    "\n\t\t\"default_granularity_secs\":%zu"
-                   ",\n\t\t\"sizeof_metric\":%zu"
-                   ",\n\t\t\"sizeof_metric_in_index\":%zu"
-                   ",\n\t\t\"sizeof_page\":%zu"
-                   ",\n\t\t\"sizeof_page_in_index\":%zu"
-                   ",\n\t\t\"sizeof_extent\":%zu"
-                   ",\n\t\t\"sizeof_page_in_extent\":%zu"
                    ",\n\t\t\"sizeof_datafile\":%zu"
                    ",\n\t\t\"sizeof_page_in_cache\":%zu"
                    ",\n\t\t\"sizeof_point_data\":%zu"
@@ -1540,8 +1522,8 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
                    ",\n\t\t\"pages_uncompressed_bytes\":%zu"
                    ",\n\t\t\"pages_duration_secs\":%lld"
                    ",\n\t\t\"single_point_pages\":%zu"
-                   ",\n\t\t\"first_t\":%llu"
-                   ",\n\t\t\"last_t\":%llu"
+                   ",\n\t\t\"first_t\":%ld"
+                   ",\n\t\t\"last_t\":%ld"
                    ",\n\t\t\"database_retention_secs\":%lld"
                    ",\n\t\t\"average_compression_savings\":%0.2f"
                    ",\n\t\t\"average_point_duration_secs\":%0.2f"
@@ -1550,16 +1532,9 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
                    ",\n\t\t\"average_page_size_bytes\":%0.2f"
                    ",\n\t\t\"estimated_concurrently_collected_metrics\":%zu"
                    ",\n\t\t\"currently_collected_metrics\":%zu"
-                   ",\n\t\t\"max_concurrently_collected_metrics\":%zu"
                    ",\n\t\t\"disk_space\":%zu"
                    ",\n\t\t\"max_disk_space\":%zu"
                    , stats.default_granularity_secs
-                   , stats.sizeof_metric
-                   , stats.sizeof_metric_in_index
-                   , stats.sizeof_page
-                   , stats.sizeof_page_in_index
-                   , stats.sizeof_extent
-                   , stats.sizeof_page_in_extent
                    , stats.sizeof_datafile
                    , stats.sizeof_page_in_cache
                    , stats.sizeof_point_data
@@ -1575,8 +1550,8 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
                    , stats.pages_uncompressed_bytes
                    , (long long)stats.pages_duration_secs
                    , stats.single_point_pages
-                   , stats.first_t
-                   , stats.last_t
+                   , stats.first_time_s
+                   , stats.last_time_s
                    , (long long)stats.database_retention_secs
                    , stats.average_compression_savings
                    , stats.average_point_duration_secs
@@ -1585,7 +1560,6 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
                    , stats.average_page_size_bytes
                    , stats.estimated_concurrently_collected_metrics
                    , stats.currently_collected_metrics
-                   , stats.max_concurrently_collected_metrics
                    , stats.disk_space
                    , stats.max_disk_space
                    );
@@ -1634,7 +1608,6 @@ static struct api_command {
         { "charts",          0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_charts                     },
         { "context",         0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_context                    },
         { "contexts",        0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_contexts                   },
-        { "archivedcharts",  0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_archivedcharts             },
 
         // registry checks the ACL by itself, so we allow everything
         { "registry",        0, WEB_CLIENT_ACL_NOCHECK,                         web_client_api_request_v1_registry                   },

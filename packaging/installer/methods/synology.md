@@ -2,6 +2,10 @@
 title: "Install Netdata on Synology"
 description: "The Netdata Agent can be installed on AMD64-compatible NAS systems using the 64-bit pre-compiled static binary."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/synology.md
+sidebar_label: "Install Netdata on Synology"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Installation"
 -->
 
 # Install Netdata on Synology
@@ -26,7 +30,7 @@ installations run it as the `netdata` user, you might wish to do the same. This 
 2.  Create a user `netdata` via the Synology user interface. Give it no access to anything and a random password. Assign
     the user to the `netdata` group. Netdata will chuid to this user when running.
 3.  Change ownership of the following directories, as defined in [Netdata
-    Security](/docs/netdata-security.md#security-design):
+    Security](https://github.com/netdata/netdata/blob/master/docs/netdata-security.md#security-design):
 
 ```sh
 chown -R root:netdata /opt/netdata/usr/share/netdata

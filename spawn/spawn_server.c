@@ -317,10 +317,7 @@ void spawn_server(void)
 
     // close all open file descriptors, except the standard ones
     // the caller may have left open files (lxc-attach has this issue)
-    int fd;
-    for(fd = (int)(sysconf(_SC_OPEN_MAX) - 1) ; fd > 2 ; --fd)
-        if(fd_is_valid(fd))
-            close(fd);
+    for_each_open_fd(OPEN_FD_ACTION_CLOSE, OPEN_FD_EXCLUDE_STDIN | OPEN_FD_EXCLUDE_STDOUT | OPEN_FD_EXCLUDE_STDERR);
 
     // Have the libuv IPC pipe be closed when forking child processes
     (void) fcntl(0, F_SETFD, FD_CLOEXEC);

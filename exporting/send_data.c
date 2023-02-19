@@ -64,7 +64,7 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
 {
     static BUFFER *response = NULL;
     if (!response)
-        response = buffer_create(4096);
+        response = buffer_create(4096, &netdata_buffers_statistics.buffers_exporters);
 
     struct stats *stats = &instance->stats;
 #ifdef ENABLE_HTTPS

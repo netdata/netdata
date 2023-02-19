@@ -86,7 +86,7 @@ static void proc_main_cleanup(void *ptr)
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    info("cleaning up...");
+    collector_info("cleaning up...");
 
     if (netdev_thread) {
         netdata_thread_join(*netdev_thread, NULL);
@@ -96,6 +96,41 @@ static void proc_main_cleanup(void *ptr)
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 
     worker_unregister();
+}
+
+bool inside_lxc_container = false;
+
+static bool is_lxcfs_proc_mounted() {
+    procfile *ff = NULL;
+
+    if (unlikely(!ff)) {
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "/proc/self/mounts");
+        ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
+        if (unlikely(!ff))
+            return false;
+    }
+
+    ff = procfile_readall(ff);
+    if (unlikely(!ff))
+        return false;
+
+    unsigned long l, lines = procfile_lines(ff);
+
+    for (l = 0; l < lines; l++) {
+        size_t words = procfile_linewords(ff, l);
+        if (words < 2) {
+            continue;
+        }
+        if (!strcmp(procfile_lineword(ff, l, 0), "lxcfs") && !strncmp(procfile_lineword(ff, l, 1), "/proc", 5)) {
+            procfile_close(ff);
+            return true;   
+        }            
+    }
+
+    procfile_close(ff);
+
+    return false;
 }
 
 void *proc_main(void *ptr)
@@ -128,15 +163,17 @@ void *proc_main(void *ptr)
     heartbeat_t hb;
     heartbeat_init(&hb);
 
-    while (!netdata_exit) {
+    inside_lxc_container = is_lxcfs_proc_mounted();
+
+    while (service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
         usec_t hb_dt = heartbeat_next(&hb, step);
 
-        if (unlikely(netdata_exit))
+        if (unlikely(!service_running(SERVICE_COLLECTORS)))
             break;
 
         for (i = 0; proc_modules[i].name; i++) {
-            if (unlikely(netdata_exit))
+            if (unlikely(!service_running(SERVICE_COLLECTORS)))
                 break;
 
             struct proc_module *pm = &proc_modules[i];

@@ -453,8 +453,8 @@ set(LIBNETDATA_FILES
         libnetdata/adaptive_resortable_list/adaptive_resortable_list.h
         libnetdata/config/appconfig.c
         libnetdata/config/appconfig.h
-        libnetdata/arrayalloc/arrayalloc.c
-        libnetdata/arrayalloc/arrayalloc.h
+        libnetdata/aral/aral.c
+        libnetdata/aral/aral.h
         libnetdata/avl/avl.c
         libnetdata/avl/avl.h
         libnetdata/buffer/buffer.c
@@ -471,6 +471,8 @@ set(LIBNETDATA_FILES
         libnetdata/eval/eval.h
         libnetdata/health/health.c
         libnetdata/health/health.h
+        libnetdata/july/july.c
+        libnetdata/july/july.h
         libnetdata/inlined.h
         libnetdata/json/json.c
         libnetdata/json/json.h
@@ -524,10 +526,6 @@ target_include_directories(libnetdata BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
 
 set(APPS_PLUGIN_FILES
         collectors/apps.plugin/apps_plugin.c)
-
-set(CHECKS_PLUGIN_FILES
-        collectors/checks.plugin/plugin_checks.c
-        )
 
 set(FREEBSD_PLUGIN_FILES
         collectors/freebsd.plugin/plugin_freebsd.c
@@ -779,8 +777,12 @@ set(RRD_PLUGIN_FILES
         database/engine/rrdengineapi.h
         database/engine/pagecache.c
         database/engine/pagecache.h
-        database/engine/rrdenglocking.c
-        database/engine/rrdenglocking.h
+        database/engine/cache.c
+        database/engine/cache.h
+        database/engine/metric.c
+        database/engine/metric.h
+        database/engine/pdc.c
+        database/engine/pdc.h
         database/KolmogorovSmirnovDist.c
         database/KolmogorovSmirnovDist.h
         )
@@ -898,6 +900,8 @@ set(ACLK_FILES
         aclk/aclk_alarm_api.h
         aclk/aclk_contexts_api.c
         aclk/aclk_contexts_api.h
+        aclk/aclk_capas.c
+        aclk/aclk_capas.h
         aclk/schema-wrappers/connection.cc
         aclk/schema-wrappers/connection.h
         aclk/schema-wrappers/node_connection.cc
@@ -940,8 +944,6 @@ set(MQTT_WEBSOCKETS_FILES
         mqtt_websockets/c-rbuf/src/ringbuffer.c
         mqtt_websockets/c-rbuf/include/ringbuffer.h
         mqtt_websockets/c-rbuf/src/ringbuffer_internal.h
-        mqtt_websockets/MQTT-C/src/mqtt.c
-        mqtt_websockets/MQTT-C/include/mqtt.h
         )
 
 set(SPAWN_PLUGIN_FILES
@@ -1004,6 +1006,8 @@ set(DAEMON_FILES
         daemon/common.h
         daemon/daemon.c
         daemon/daemon.h
+        daemon/event_loop.c
+        daemon/event_loop.h
         daemon/global_statistics.c
         daemon/global_statistics.h
         daemon/analytics.c
@@ -1032,12 +1036,17 @@ set(ML_FILES
 IF(ENABLE_ML)
     message(STATUS "ML: enabled")
     list(APPEND ML_FILES
+            ml/ADCharts.h
+            ml/ADCharts.cc
+            ml/Chart.h
+            ml/Chart.cc
             ml/Config.h
             ml/Config.cc
-            ml/Dimension.cc
             ml/Dimension.h
+            ml/Dimension.cc
             ml/Host.h
             ml/Host.cc
+            ml/Mutex.h
             ml/Query.h
             ml/KMeans.h
             ml/KMeans.cc
@@ -1057,7 +1066,6 @@ set(NETDATA_FILES
         ${DAEMON_FILES}
         ${API_PLUGIN_FILES}
         ${EXPORTING_ENGINE_FILES}
-        ${CHECKS_PLUGIN_FILES}
         ${HEALTH_PLUGIN_FILES}
         ${IDLEJITTER_PLUGIN_FILES}
         ${ML_FILES}
@@ -1263,7 +1271,6 @@ list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIRS})
 list(APPEND NETDATA_COMMON_CFLAGS ${PROTOBUF_CFLAGS_OTHER})
 list(APPEND NETDATA_FILES ${ACLK_FILES} ${ACLK_PROTO_BUILT_SRCS} ${ACLK_PROTO_BUILT_HDRS})
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/aclk/aclk-schemas)
-include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/MQTT-C/include)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/src/include)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include)
 
@@ -1272,7 +1279,8 @@ ADD_LIBRARY(mqttwebsockets STATIC
 
 target_compile_options(mqttwebsockets PUBLIC
                         -DMQTT_WSS_CUSTOM_ALLOC
-                        -DRBUF_CUSTOM_MALLOC)
+                        -DRBUF_CUSTOM_MALLOC
+                        -DMQTT_WSS_CPUSTATS)
 
 target_include_directories(mqttwebsockets PUBLIC
              ${CMAKE_SOURCE_DIR}/aclk/helpers)

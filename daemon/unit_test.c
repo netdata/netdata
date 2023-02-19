@@ -2,6 +2,61 @@
 
 #include "common.h"
 
+static bool cmd_arg_sanitization_test(const char *expected, const char *src, char *dst, size_t dst_size) {
+    bool ok = sanitize_command_argument_string(dst, src, dst_size);
+
+    if (!expected)
+        return ok == false;
+
+    return strcmp(expected, dst) == 0;
+}
+
+bool command_argument_sanitization_tests() {
+    char dst[1024];
+
+    for (size_t i = 0; i != 5; i++)  {
+        const char *expected = i == 4 ? "'\\''" : NULL;
+        if (cmd_arg_sanitization_test(expected, "'", dst, i) == false) {
+            fprintf(stderr, "expected: >>>%s<<<, got: >>>%s<<<\n", expected, dst);
+            return 1;
+        }
+    }
+
+    for (size_t i = 0; i != 9; i++)  {
+        const char *expected = i == 8 ? "'\\'''\\''" : NULL;
+        if (cmd_arg_sanitization_test(expected, "''", dst, i) == false) {
+            fprintf(stderr, "expected: >>>%s<<<, got: >>>%s<<<\n", expected, dst);
+            return 1;
+        }
+    }
+
+    for (size_t i = 0; i != 7; i++)  {
+        const char *expected = i == 6 ? "'\\''a" : NULL;
+        if (cmd_arg_sanitization_test(expected, "'a", dst, i) == false) {
+            fprintf(stderr, "expected: >>>%s<<<, got: >>>%s<<<\n", expected, dst);
+            return 1;
+        }
+    }
+
+    for (size_t i = 0; i != 7; i++)  {
+        const char *expected = i == 6 ? "a'\\''" : NULL;
+        if (cmd_arg_sanitization_test(expected, "a'", dst, i) == false) {
+            fprintf(stderr, "expected: >>>%s<<<, got: >>>%s<<<\n", expected, dst);
+            return 1;
+        }
+    }
+
+    for (size_t i = 0; i != 22; i++)  {
+        const char *expected = i == 21 ? "foo'\\''a'\\'''\\'''\\''b" : NULL;
+        if (cmd_arg_sanitization_test(expected, "--foo'a'''b", dst, i) == false) {
+            fprintf(stderr, "expected: >>>%s<<<, got: >>>%s<<<\n length: %zu\n", expected, dst, strlen(dst));
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 static int check_number_printing(void) {
     struct {
         NETDATA_DOUBLE n;
@@ -384,7 +439,7 @@ int unit_test_str2ld() {
 }
 
 int unit_test_buffer() {
-    BUFFER *wb = buffer_create(1);
+    BUFFER *wb = buffer_create(1, NULL);
     char string[2048 + 1];
     char final[9000 + 1];
     int i;
@@ -1206,7 +1261,9 @@ int run_test(struct test *test)
             rrddim_set(st, "dim2", test->feed2[c]);
         }
 
-        rrdset_done(st);
+        struct timeval now;
+        now_realtime_timeval(&now);
+        rrdset_timed_done(st, now, false);
 
         // align the first entry to second boundary
         if(!c) {
@@ -1232,7 +1289,7 @@ int run_test(struct test *test)
         fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " NETDATA_DOUBLE_FORMAT
             ", found " NETDATA_DOUBLE_FORMAT ", %s\n",
             test->name, rrddim_name(rd), c+1,
-            (int64_t)((rrdset_first_entry_t(st) + c * st->update_every) - time_start),
+            (int64_t)((rrdset_first_entry_s(st) + c * st->update_every) - time_start),
             n, v, (same)?"OK":"### E R R O R ###");
 
         if(!same) errors++;
@@ -1244,7 +1301,7 @@ int run_test(struct test *test)
             fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " NETDATA_DOUBLE_FORMAT
                 ", found " NETDATA_DOUBLE_FORMAT ", %s\n",
                 test->name, rrddim_name(rd2), c+1,
-                (int64_t)((rrdset_first_entry_t(st) + c * st->update_every) - time_start),
+                (int64_t)((rrdset_first_entry_s(st) + c * st->update_every) - time_start),
                 n, v, (same)?"OK":"### E R R O R ###");
             if(!same) errors++;
         }
@@ -1292,7 +1349,7 @@ static int test_variable_renames(void) {
     rrddim_reset_name(st, rd2, "DIM2NAME2");
     fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rrddim_id(rd2), rrddim_name(rd2));
 
-    BUFFER *buf = buffer_create(1);
+    BUFFER *buf = buffer_create(1, NULL);
     health_api_v1_chart_variables2json(st, buf);
     fprintf(stderr, "%s", buffer_tostring(buf));
     buffer_free(buf);
@@ -1547,7 +1604,7 @@ int test_sqlite(void) {
         return 1;
     }
 
-    BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE);
+    BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE, NULL);
     char *uuid_str = "0000_000";
 
     buffer_sprintf(sql, TABLE_ACLK_ALERT, uuid_str);
@@ -1718,7 +1775,6 @@ static inline void rrddim_set_by_pointer_fake_time(RRDDIM *rd, collected_number 
 static RRDHOST *dbengine_rrdhost_find_or_create(char *name)
 {
     /* We don't want to drop metrics when generating load, we prefer to block data generation itself */
-    rrdeng_drop_metrics_under_page_cache_pressure = 0;
 
     return rrdhost_find_or_create(
             name
@@ -1797,12 +1853,15 @@ static void test_dbengine_create_charts(RRDHOST *host, RRDSET *st[CHARTS], RRDDI
         for (j = 0; j < DIMS; ++j) {
             rrddim_set_by_pointer_fake_time(rd[i][j], 69, 2 * API_RELATIVE_TIME_MAX); // set first value to 69
         }
-        rrdset_done(st[i]);
+
+        struct timeval now;
+        now_realtime_timeval(&now);
+        rrdset_timed_done(st[i], now, false);
     }
-    // Fluh pages for subsequent real values
+    // Flush pages for subsequent real values
     for (i = 0 ; i < CHARTS ; ++i) {
         for (j = 0; j < DIMS; ++j) {
-            rrdeng_store_metric_flush_current_page((rd[i][j])->tiers[0]->db_collection_handle);
+            rrdeng_store_metric_flush_current_page((rd[i][j])->tiers[0].db_collection_handle);
         }
     }
 }
@@ -1821,7 +1880,7 @@ static time_t test_dbengine_create_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS
     // feed it with the test data
     for (i = 0 ; i < CHARTS ; ++i) {
         for (j = 0 ; j < DIMS ; ++j) {
-            rd[i][j]->tiers[0]->collect_ops->change_collection_frequency(rd[i][j]->tiers[0]->db_collection_handle, update_every);
+            rd[i][j]->tiers[0].collect_ops->change_collection_frequency(rd[i][j]->tiers[0].db_collection_handle, update_every);
 
             rd[i][j]->last_collected_time.tv_sec =
             st[i]->last_collected_time.tv_sec = st[i]->last_updated.tv_sec = time_now;
@@ -1831,7 +1890,8 @@ static time_t test_dbengine_create_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS
     }
     for (c = 0; c < REGION_POINTS[current_region] ; ++c) {
         time_now += update_every; // time_now = start + (c + 1) * update_every
-        for (i = 0 ; i < CHARTS ; ++i) {
+
+         for (i = 0 ; i < CHARTS ; ++i) {
             st[i]->usec_since_last_update = USEC_PER_SEC * update_every;
 
             for (j = 0; j < DIMS; ++j) {
@@ -1839,7 +1899,12 @@ static time_t test_dbengine_create_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS
                        j * REGION_POINTS[current_region] + c;
                 rrddim_set_by_pointer_fake_time(rd[i][j], next, time_now);
             }
-            rrdset_done(st[i]);
+
+            struct timeval now;
+            now.tv_sec = time_now;
+            now.tv_usec = 0;
+
+            rrdset_timed_done(st[i], now, false);
         }
     }
     return time_now; //time_end
@@ -1866,16 +1931,16 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
         time_now = time_start + (c + 1) * update_every;
         for (i = 0 ; i < CHARTS ; ++i) {
             for (j = 0; j < DIMS; ++j) {
-                rd[i][j]->tiers[0]->query_ops->init(rd[i][j]->tiers[0]->db_metric_handle, &handle, time_now, time_now + QUERY_BATCH * update_every);
+                rd[i][j]->tiers[0].query_ops->init(rd[i][j]->tiers[0].db_metric_handle, &handle, time_now, time_now + QUERY_BATCH * update_every, STORAGE_PRIORITY_NORMAL);
                 for (k = 0; k < QUERY_BATCH; ++k) {
                     last = ((collected_number)i * DIMS) * REGION_POINTS[current_region] +
                            j * REGION_POINTS[current_region] + c + k;
                     expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE)last, SN_DEFAULT_FLAGS));
 
-                    STORAGE_POINT sp = rd[i][j]->tiers[0]->query_ops->next_metric(&handle);
+                    STORAGE_POINT sp = rd[i][j]->tiers[0].query_ops->next_metric(&handle);
                     value = sp.sum;
-                    time_retrieved = sp.start_time;
-                    end_time = sp.end_time;
+                    time_retrieved = sp.start_time_s;
+                    end_time = sp.end_time_s;
 
                     same = (roundndd(value) == roundndd(expected)) ? 1 : 0;
                     if(!same) {
@@ -1894,7 +1959,7 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
                         errors++;
                     }
                 }
-                rd[i][j]->tiers[0]->query_ops->finalize(&handle);
+                rd[i][j]->tiers[0].query_ops->finalize(&handle);
             }
         }
     }
@@ -1913,10 +1978,11 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
                                     int current_region, time_t time_start, time_t time_end)
 {
     int update_every = REGION_UPDATE_EVERY[current_region];
-    fprintf(stderr, "%s() running on region %d, start time %lld, end time %lld, update every %d...\n", __FUNCTION__, current_region, (long long)time_start, (long long)time_end, update_every);
+    fprintf(stderr, "%s() running on region %d, start time %lld, end time %lld, update every %d, on %d dimensions...\n",
+            __FUNCTION__, current_region, (long long)time_start, (long long)time_end, update_every, CHARTS * DIMS);
     uint8_t same;
     time_t time_now, time_retrieved;
-    int i, j, errors, value_errors = 0, time_errors = 0;
+    int i, j, errors, value_errors = 0, time_errors = 0, value_right = 0, time_right = 0;
     long c;
     collected_number last;
     NETDATA_DOUBLE value, expected;
@@ -1927,7 +1993,8 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
         ONEWAYALLOC *owa = onewayalloc_create(0);
         RRDR *r = rrd2rrdr_legacy(owa, st[i], points, time_start, time_end,
                                   RRDR_GROUPING_AVERAGE, 0, RRDR_OPTION_NATURAL_POINTS,
-                                  NULL, NULL, 0, 0);
+                                  NULL, NULL, 0, 0,
+                                  QUERY_SOURCE_UNITTEST, STORAGE_PRIORITY_NORMAL);
         if (!r) {
             fprintf(stderr, "    DB-engine unittest %s: empty RRDR on region %d ### E R R O R ###\n", rrdset_name(st[i]), current_region);
             return ++errors;
@@ -1954,17 +2021,22 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
                     same = (roundndd(value) == roundndd(expected)) ? 1 : 0;
                     if(!same) {
                         if(value_errors < 20)
-                            fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
+                            fprintf(stderr, "    DB-engine unittest %s/%s: point #%ld, at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
                                 ", RRDR found " NETDATA_DOUBLE_FORMAT ", ### E R R O R ###\n",
-                                    rrdset_name(st[i]), rrddim_name(rd[i][j]), (unsigned long)time_now, expected, value);
+                                    rrdset_name(st[i]), rrddim_name(rd[i][j]), (long) c+1, (unsigned long)time_now, expected, value);
                         value_errors++;
                     }
+                    else
+                        value_right++;
+
                     if(time_retrieved != time_now) {
                         if(time_errors < 20)
-                            fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, found RRDR timestamp %lu ### E R R O R ###\n",
-                                    rrdset_name(st[i]), rrddim_name(rd[i][j]), (unsigned long)time_now, (unsigned long)time_retrieved);
+                            fprintf(stderr, "    DB-engine unittest %s/%s: point #%ld at %lu secs, found RRDR timestamp %lu ### E R R O R ###\n",
+                                    rrdset_name(st[i]), rrddim_name(rd[i][j]), (long)c+1, (unsigned long)time_now, (unsigned long)time_retrieved);
                         time_errors++;
                     }
+                    else
+                        time_right++;
                 }
                 rrddim_foreach_done(d);
             }
@@ -1974,10 +2046,10 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
     }
 
     if(value_errors)
-        fprintf(stderr, "%d value errors encountered\n", value_errors);
+        fprintf(stderr, "%d value errors encountered (%d were ok)\n", value_errors, value_right);
 
     if(time_errors)
-        fprintf(stderr, "%d time errors encountered\n", time_errors);
+        fprintf(stderr, "%d time errors encountered (%d were ok)\n", time_errors, value_right);
 
     return errors + value_errors + time_errors;
 }
@@ -1985,7 +2057,7 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
 int test_dbengine(void)
 {
     fprintf(stderr, "%s() running...\n", __FUNCTION__ );
-    int i, j, errors, value_errors = 0, time_errors = 0, update_every, current_region;
+    int i, j, errors = 0, value_errors = 0, time_errors = 0, update_every, current_region;
     RRDHOST *host = NULL;
     RRDSET *st[CHARTS];
     RRDDIM *rd[CHARTS][DIMS];
@@ -2008,9 +2080,7 @@ int test_dbengine(void)
     time_start[current_region] = 2 * API_RELATIVE_TIME_MAX;
     time_end[current_region] = test_dbengine_create_metrics(st,rd, current_region, time_start[current_region]);
 
-    errors = test_dbengine_check_metrics(st, rd, current_region, time_start[current_region]);
-    if (errors)
-        goto error_out;
+    errors += test_dbengine_check_metrics(st, rd, current_region, time_start[current_region]);
 
     current_region = 1; //this is the second region of data
     update_every = REGION_UPDATE_EVERY[current_region]; // set data collection frequency to 3 seconds
@@ -2018,7 +2088,7 @@ int test_dbengine(void)
     for (i = 0 ; i < CHARTS ; ++i) {
         st[i]->update_every = update_every;
         for (j = 0; j < DIMS; ++j) {
-            rrdeng_store_metric_flush_current_page((rd[i][j])->tiers[0]->db_collection_handle);
+            rrdeng_store_metric_flush_current_page((rd[i][j])->tiers[0].db_collection_handle);
         }
     }
 
@@ -2027,9 +2097,7 @@ int test_dbengine(void)
         time_start[current_region] += update_every - time_start[current_region] % update_every;
     time_end[current_region] = test_dbengine_create_metrics(st,rd, current_region, time_start[current_region]);
 
-    errors = test_dbengine_check_metrics(st, rd, current_region, time_start[current_region]);
-    if (errors)
-        goto error_out;
+    errors += test_dbengine_check_metrics(st, rd, current_region, time_start[current_region]);
 
     current_region = 2; //this is the third region of data
     update_every = REGION_UPDATE_EVERY[current_region]; // set data collection frequency to 1 seconds
@@ -2037,7 +2105,7 @@ int test_dbengine(void)
     for (i = 0 ; i < CHARTS ; ++i) {
         st[i]->update_every = update_every;
         for (j = 0; j < DIMS; ++j) {
-            rrdeng_store_metric_flush_current_page((rd[i][j])->tiers[0]->db_collection_handle);
+            rrdeng_store_metric_flush_current_page((rd[i][j])->tiers[0].db_collection_handle);
         }
     }
 
@@ -2046,26 +2114,22 @@ int test_dbengine(void)
         time_start[current_region] += update_every - time_start[current_region] % update_every;
     time_end[current_region] = test_dbengine_create_metrics(st,rd, current_region, time_start[current_region]);
 
-    errors = test_dbengine_check_metrics(st, rd, current_region, time_start[current_region]);
-    if (errors)
-        goto error_out;
+    errors += test_dbengine_check_metrics(st, rd, current_region, time_start[current_region]);
 
     for (current_region = 0 ; current_region < REGIONS ; ++current_region) {
-        errors = test_dbengine_check_rrdr(st, rd, current_region, time_start[current_region], time_end[current_region]);
-        if (errors)
-            goto error_out;
+        errors += test_dbengine_check_rrdr(st, rd, current_region, time_start[current_region], time_end[current_region]);
     }
 
     current_region = 1;
     update_every = REGION_UPDATE_EVERY[current_region]; // use the maximum update_every = 3
-    errors = 0;
     long points = (time_end[REGIONS - 1] - time_start[0]) / update_every; // cover all time regions with RRDR
     long point_offset = (time_start[current_region] - time_start[0]) / update_every;
     for (i = 0 ; i < CHARTS ; ++i) {
         ONEWAYALLOC *owa = onewayalloc_create(0);
         RRDR *r = rrd2rrdr_legacy(owa, st[i], points, time_start[0] + update_every,
                                   time_end[REGIONS - 1], RRDR_GROUPING_AVERAGE, 0,
-                                  RRDR_OPTION_NATURAL_POINTS, NULL, NULL, 0, 0);
+                                  RRDR_OPTION_NATURAL_POINTS, NULL, NULL, 0, 0,
+                                  QUERY_SOURCE_UNITTEST, STORAGE_PRIORITY_NORMAL);
 
         if (!r) {
             fprintf(stderr, "    DB-engine unittest %s: empty RRDR ### E R R O R ###\n", rrdset_name(st[i]));
@@ -2114,7 +2178,7 @@ int test_dbengine(void)
         }
         onewayalloc_destroy(owa);
     }
-error_out:
+
     rrd_wrlock();
     rrdeng_prepare_exit((struct rrdengine_instance *)host->db[0].instance);
     rrdhost_delete_charts(host);
@@ -2203,7 +2267,7 @@ static void generate_dbengine_chart(void *arg)
         thread_info->time_max = time_current;
     }
     for (j = 0; j < DSET_DIMS; ++j) {
-        rrdeng_store_metric_finalize((rd[j])->tiers[0]->db_collection_handle);
+        rrdeng_store_metric_finalize((rd[j])->tiers[0].db_collection_handle);
     }
 }
 
@@ -2263,7 +2327,7 @@ void generate_dbengine_dataset(unsigned history_seconds)
     }
     freez(thread_info);
     rrd_wrlock();
-    rrdhost_free(host, 1);
+    rrdhost_free___while_having_rrd_wrlock(host, true);
     rrd_unlock();
 }
 
@@ -2323,13 +2387,13 @@ static void query_dbengine_chart(void *arg)
             time_before = MIN(time_after + duration, time_max); /* up to 1 hour queries */
         }
 
-        rd->tiers[0]->query_ops->init(rd->tiers[0]->db_metric_handle, &handle, time_after, time_before);
+        rd->tiers[0].query_ops->init(rd->tiers[0].db_metric_handle, &handle, time_after, time_before, STORAGE_PRIORITY_NORMAL);
         ++thread_info->queries_nr;
         for (time_now = time_after ; time_now <= time_before ; time_now += update_every) {
             generatedv = generate_dbengine_chart_value(i, j, time_now);
             expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE) generatedv, SN_DEFAULT_FLAGS));
 
-            if (unlikely(rd->tiers[0]->query_ops->is_finished(&handle))) {
+            if (unlikely(rd->tiers[0].query_ops->is_finished(&handle))) {
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
                     fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
                         ", found data gap, ### E R R O R ###\n",
@@ -2339,10 +2403,10 @@ static void query_dbengine_chart(void *arg)
                 break;
             }
 
-            STORAGE_POINT sp = rd->tiers[0]->query_ops->next_metric(&handle);
+            STORAGE_POINT sp = rd->tiers[0].query_ops->next_metric(&handle);
             value = sp.sum;
-            time_retrieved = sp.start_time;
-            end_time = sp.end_time;
+            time_retrieved = sp.start_time_s;
+            end_time = sp.end_time_s;
 
             if (!netdata_double_isnumber(value)) {
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
@@ -2377,7 +2441,7 @@ static void query_dbengine_chart(void *arg)
                 }
             }
         }
-        rd->tiers[0]->query_ops->finalize(&handle);
+        rd->tiers[0].query_ops->finalize(&handle);
     } while(!thread_info->done);
 
     if(value_errors)

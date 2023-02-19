@@ -14,15 +14,19 @@ static int aclk_https_request(https_req_t *request, https_req_response_t *respon
     // wrapper for ACLK only which loads ACLK specific proxy settings
     // then only calls https_request
     struct mqtt_wss_proxy proxy_conf = { .host = NULL, .port = 0, .username = NULL, .password = NULL, .type = MQTT_WSS_DIRECT };
-    aclk_set_proxy((char**)&proxy_conf.host, &proxy_conf.port, &proxy_conf.type);
+    aclk_set_proxy((char**)&proxy_conf.host, &proxy_conf.port, (char**)&proxy_conf.username, (char**)&proxy_conf.password, &proxy_conf.type);
 
     if (proxy_conf.type == MQTT_WSS_PROXY_HTTP) {
         request->proxy_host = (char*)proxy_conf.host; // TODO make it const as well
         request->proxy_port = proxy_conf.port;
+        request->proxy_username = proxy_conf.username;
+        request->proxy_password = proxy_conf.password;
     }
 
     rc = https_request(request, response);
     freez((char*)proxy_conf.host);
+    freez((char*)proxy_conf.username);
+    freez((char*)proxy_conf.password);
     return rc;
 }
 
@@ -303,25 +307,6 @@ inline static int base64_decode_helper(unsigned char *out, int *outl, const unsi
     return 0;
 }
 
-inline static int base64_encode_helper(unsigned char *out, int *outl, const unsigned char *in, int in_len)
-{
-    int len;
-    unsigned char *str = out;
-    EVP_ENCODE_CTX *ctx = EVP_ENCODE_CTX_new();
-    EVP_EncodeInit(ctx);
-    EVP_EncodeUpdate(ctx, str, outl, in, in_len);
-    str += *outl;
-    EVP_EncodeFinal(ctx, str, &len);
-    *outl += len;
-    // if we ever expect longer output than what OpenSSL would pack into single line
-    // we would have to skip the endlines, until then we can just cut the string short
-    str = (unsigned char*)strchr((char*)out, '\n');
-    if (str)
-        *str = 0;
-    EVP_ENCODE_CTX_free(ctx);
-    return 0;
-}
-
 #define OTP_URL_PREFIX "/api/v1/auth/node/"
 int aclk_get_otp_challenge(url_t *target, const char *agent_id, unsigned char **challenge, int *challenge_bytes)
 {
@@ -329,7 +314,7 @@ int aclk_get_otp_challenge(url_t *target, const char *agent_id, unsigned char **
     https_req_t req = HTTPS_REQ_T_INITIALIZER;
     https_req_response_t resp = HTTPS_REQ_RESPONSE_T_INITIALIZER;
 
-    BUFFER *url = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20);
+    BUFFER *url = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20, &netdata_buffers_statistics.buffers_aclk);
 
     req.host = target->host;
     req.port = target->port;
@@ -409,8 +394,8 @@ int aclk_send_otp_response(const char *agent_id, const unsigned char *response, 
 
     base64_encode_helper(base64, &len, response, response_bytes);
 
-    BUFFER *url = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20);
-    BUFFER *resp_json = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20);
+    BUFFER *url = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20, &netdata_buffers_statistics.buffers_aclk);
+    BUFFER *resp_json = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20, &netdata_buffers_statistics.buffers_aclk);
 
     buffer_sprintf(url, "%s/node/%s/password", target->path, agent_id);
     buffer_sprintf(resp_json, "{\"response\":\"%s\"}", base64);
@@ -829,7 +814,7 @@ exit:
 }
 
 int aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int aclk_port) {
-    BUFFER *buf = buffer_create(1024);
+    BUFFER *buf = buffer_create(1024, &netdata_buffers_statistics.buffers_aclk);
 
     https_req_t req = HTTPS_REQ_T_INITIALIZER;
     https_req_response_t resp = HTTPS_REQ_RESPONSE_T_INITIALIZER;

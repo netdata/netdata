@@ -1,7 +1,11 @@
 <!--
 title: "Step 4. The basics of configuring Netdata"
+sidebar_label: "Step 4. The basics of configuring Netdata"
 date: 2020-03-31
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-04.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides/Step by step"
 -->
 
 # Step 4. The basics of configuring Netdata
@@ -17,10 +21,13 @@ Next up: configuration.
 
 We'll talk about Netdata's default configuration, and then you'll learn how to do the following:
 
--   [Find your `netdata.conf` file](#find-your-netdataconf-file)
--   [Use edit-config to open `netdata.conf`](#use-edit-config-to-open-netdataconf)
--   [Navigate the structure of `netdata.conf`](#the-structure-of-netdataconf)
--   [Edit your `netdata.conf` file](#edit-your-netdataconf-file)
+- [Step 4. The basics of configuring Netdata](#step-4-the-basics-of-configuring-netdata)
+  - [What you'll learn in this step](#what-youll-learn-in-this-step)
+  - [Find your `netdata.conf` file](#find-your-netdataconf-file)
+  - [Use edit-config to open `netdata.conf`](#use-edit-config-to-open-netdataconf)
+  - [The structure of `netdata.conf`](#the-structure-of-netdataconf)
+    - [Edit your `netdata.conf` file](#edit-your-netdataconf-file)
+  - [What's next?](#whats-next)
 
 ## Find your `netdata.conf` file
 
@@ -43,7 +50,7 @@ In the system represented by the screenshot, the line reads: `config directory =
 `netdata.conf`, and all the other configuration files, can be found at `/etc/netdata`.
 
 > For more details on where your Netdata config directory is, take a look at our [installation
-> instructions](/packaging/installer/README.md).
+> instructions](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md).
 
 For the rest of this guide, we'll assume you're editing files or running scripts from _within_ your **Netdata
 configuration directory**.
@@ -96,7 +103,7 @@ section and give it the value of `1`.
 ```
 
 Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
-method](/docs/configure/start-stop-restart.md) for your system.
+method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your system.
 
 Now, open up your browser and navigate to `http://HOST:19999/netdata.conf`. You'll see that Netdata has recognized
 that our fake option isn't valid and added a notice that Netdata will ignore it.
@@ -124,8 +131,8 @@ Once you're done, restart Netdata and refresh the dashboard. Say hello to your r
 netdata.conf](https://user-images.githubusercontent.com/1153921/80994808-1c065300-8df2-11ea-81af-d28dc3ba27c8.gif)
 
 Netdata has dozens upon dozens of options you can change. To see them all, read our [daemon
-configuration](/daemon/config/README.md), or hop into our popular guide on [increasing long-term metrics
-storage](/docs/guides/longer-metrics-storage.md).
+configuration](https://github.com/netdata/netdata/blob/master/daemon/config/README.md), or hop into our popular guide on [increasing long-term metrics
+storage](https://github.com/netdata/netdata/blob/master/docs/guides/longer-metrics-storage.md).
 
 ## What's next?
 

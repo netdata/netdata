@@ -4,68 +4,68 @@
 #define BUFSIZE (512)
 
 /* Caller must hold descriptor lock */
-void print_page_cache_descr(struct rrdeng_page_descr *descr, const char *msg, bool log_debug)
-{
-    if(log_debug && !(debug_flags & D_RRDENGINE))
-        return;
-
-    BUFFER *wb = buffer_create(512);
-
-    if(!descr) {
-        buffer_sprintf(wb, "DBENGINE: %s : descr is NULL", msg);
-    }
-    else {
-        struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
-        char uuid_str[UUID_STR_LEN];
-
-        uuid_unparse_lower(*descr->id, uuid_str);
-        buffer_sprintf(wb, "DBENGINE: %s : page(%p) metric:%s, len:%"PRIu32", time:%"PRIu64"->%"PRIu64", update_every:%u, type:%u, xt_offset:",
-                       msg,
-                       pg_cache_descr->page, uuid_str,
-                       descr->page_length,
-                       (uint64_t)descr->start_time_ut,
-                       (uint64_t)descr->end_time_ut,
-                       (uint32_t)descr->update_every_s,
-                       (uint32_t)descr->type
-                       );
-        if (!descr->extent) {
-            buffer_strcat(wb, "N/A");
-        } else {
-            buffer_sprintf(wb, "%"PRIu64, descr->extent->offset);
-        }
-
-        buffer_sprintf(wb, ", flags:0x%2.2lX refcnt:%u", pg_cache_descr->flags, pg_cache_descr->refcnt);
-    }
-
-    if(log_debug)
-        debug(D_RRDENGINE, "%s", buffer_tostring(wb));
-    else
-        internal_error(true, "%s", buffer_tostring(wb));
-
-    buffer_free(wb);
-}
-
-void print_page_descr(struct rrdeng_page_descr *descr)
-{
-    char uuid_str[UUID_STR_LEN];
-    char str[BUFSIZE + 1];
-    int pos = 0;
-
-    uuid_unparse_lower(*descr->id, uuid_str);
-    pos += snprintfz(str, BUFSIZE - pos, "id=%s\n"
-                                     "--->len:%"PRIu32" time:%"PRIu64"->%"PRIu64" xt_offset:",
-                     uuid_str,
-                     descr->page_length,
-                     (uint64_t)descr->start_time_ut,
-                     (uint64_t)descr->end_time_ut);
-    if (!descr->extent) {
-        pos += snprintfz(str + pos, BUFSIZE - pos, "N/A");
-    } else {
-        pos += snprintfz(str + pos, BUFSIZE - pos, "%"PRIu64, descr->extent->offset);
-    }
-    snprintfz(str + pos, BUFSIZE - pos, "\n\n");
-    fputs(str, stderr);
-}
+//void print_page_cache_descr(struct rrdeng_page_descr *descr, const char *msg, bool log_debug)
+//{
+//    if(log_debug && !(debug_flags & D_RRDENGINE))
+//        return;
+//
+//    BUFFER *wb = buffer_create(512);
+//
+//    if(!descr) {
+//        buffer_sprintf(wb, "DBENGINE: %s : descr is NULL", msg);
+//    }
+//    else {
+//        struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
+//        char uuid_str[UUID_STR_LEN];
+//
+//        uuid_unparse_lower(*descr->id, uuid_str);
+//        buffer_sprintf(wb, "DBENGINE: %s : page(%p) metric:%s, len:%"PRIu32", time:%"PRIu64"->%"PRIu64", update_every:%u, type:%u, xt_offset:",
+//                       msg,
+//                       pg_cache_descr->page, uuid_str,
+//                       descr->page_length,
+//                       (uint64_t)descr->start_time_ut,
+//                       (uint64_t)descr->end_time_ut,
+//                       (uint32_t)descr->update_every_s,
+//                       (uint32_t)descr->type
+//                       );
+//        if (!descr->extent) {
+//            buffer_strcat(wb, "N/A");
+//        } else {
+//            buffer_sprintf(wb, "%"PRIu64, descr->extent->offset);
+//        }
+//
+//        buffer_sprintf(wb, ", flags:0x%2.2lX refcnt:%u", pg_cache_descr->flags, pg_cache_descr->refcnt);
+//    }
+//
+//    if(log_debug)
+//        debug(D_RRDENGINE, "%s", buffer_tostring(wb));
+//    else
+//        internal_error(true, "%s", buffer_tostring(wb));
+//
+//    buffer_free(wb);
+//}
+//
+//void print_page_descr(struct rrdeng_page_descr *descr)
+//{
+//    char uuid_str[UUID_STR_LEN];
+//    char str[BUFSIZE + 1];
+//    int pos = 0;
+//
+//    uuid_unparse_lower(*descr->id, uuid_str);
+//    pos += snprintfz(str, BUFSIZE - pos, "id=%s\n"
+//                                     "--->len:%"PRIu32" time:%"PRIu64"->%"PRIu64" xt_offset:",
+//                     uuid_str,
+//                     descr->page_length,
+//                     (uint64_t)descr->start_time_ut,
+//                     (uint64_t)descr->end_time_ut);
+//    if (!descr->extent) {
+//        pos += snprintfz(str + pos, BUFSIZE - pos, "N/A");
+//    } else {
+//        pos += snprintfz(str + pos, BUFSIZE - pos, "%"PRIu64, descr->extent->offset);
+//    }
+//    snprintfz(str + pos, BUFSIZE - pos, "\n\n");
+//    fputs(str, stderr);
+//}
 
 int check_file_properties(uv_file file, uint64_t *file_size, size_t min_size)
 {
@@ -140,90 +140,6 @@ int open_file_for_io(char *path, int flags, uv_file *file, int direct)
     }
 
     return fd;
-}
-
-char *get_rrdeng_statistics(struct rrdengine_instance *ctx, char *str, size_t size)
-{
-    struct page_cache *pg_cache;
-
-    pg_cache = &ctx->pg_cache;
-    snprintfz(str, size,
-              "metric_API_producers: %ld\n"
-              "metric_API_consumers: %ld\n"
-              "page_cache_total_pages: %ld\n"
-              "page_cache_descriptors: %ld\n"
-              "page_cache_populated_pages: %ld\n"
-              "page_cache_committed_pages: %ld\n"
-              "page_cache_insertions: %ld\n"
-              "page_cache_deletions: %ld\n"
-              "page_cache_hits: %ld\n"
-              "page_cache_misses: %ld\n"
-              "page_cache_backfills: %ld\n"
-              "page_cache_evictions: %ld\n"
-              "compress_before_bytes: %ld\n"
-              "compress_after_bytes: %ld\n"
-              "decompress_before_bytes: %ld\n"
-              "decompress_after_bytes: %ld\n"
-              "io_write_bytes: %ld\n"
-              "io_write_requests: %ld\n"
-              "io_read_bytes: %ld\n"
-              "io_read_requests: %ld\n"
-              "io_write_extent_bytes: %ld\n"
-              "io_write_extents: %ld\n"
-              "io_read_extent_bytes: %ld\n"
-              "io_read_extents: %ld\n"
-              "datafile_creations: %ld\n"
-              "datafile_deletions: %ld\n"
-              "journalfile_creations: %ld\n"
-              "journalfile_deletions: %ld\n"
-              "io_errors: %ld\n"
-              "fs_errors: %ld\n"
-              "global_io_errors: %ld\n"
-              "global_fs_errors: %ld\n"
-              "rrdeng_reserved_file_descriptors: %ld\n"
-              "pg_cache_over_half_dirty_events: %ld\n"
-              "global_pg_cache_over_half_dirty_events: %ld\n"
-              "flushing_pressure_page_deletions: %ld\n"
-              "global_flushing_pressure_page_deletions: %ld\n",
-              (long)ctx->stats.metric_API_producers,
-              (long)ctx->stats.metric_API_consumers,
-              (long)pg_cache->page_descriptors,
-              (long)ctx->stats.page_cache_descriptors,
-              (long)pg_cache->populated_pages,
-              (long)pg_cache->committed_page_index.nr_committed_pages,
-              (long)ctx->stats.pg_cache_insertions,
-              (long)ctx->stats.pg_cache_deletions,
-              (long)ctx->stats.pg_cache_hits,
-              (long)ctx->stats.pg_cache_misses,
-              (long)ctx->stats.pg_cache_backfills,
-              (long)ctx->stats.pg_cache_evictions,
-              (long)ctx->stats.before_compress_bytes,
-              (long)ctx->stats.after_compress_bytes,
-              (long)ctx->stats.before_decompress_bytes,
-              (long)ctx->stats.after_decompress_bytes,
-              (long)ctx->stats.io_write_bytes,
-              (long)ctx->stats.io_write_requests,
-              (long)ctx->stats.io_read_bytes,
-              (long)ctx->stats.io_read_requests,
-              (long)ctx->stats.io_write_extent_bytes,
-              (long)ctx->stats.io_write_extents,
-              (long)ctx->stats.io_read_extent_bytes,
-              (long)ctx->stats.io_read_extents,
-              (long)ctx->stats.datafile_creations,
-              (long)ctx->stats.datafile_deletions,
-              (long)ctx->stats.journalfile_creations,
-              (long)ctx->stats.journalfile_deletions,
-              (long)ctx->stats.io_errors,
-              (long)ctx->stats.fs_errors,
-              (long)global_io_errors,
-              (long)global_fs_errors,
-              (long)rrdeng_reserved_file_descriptors,
-              (long)ctx->stats.pg_cache_over_half_dirty_events,
-              (long)global_pg_cache_over_half_dirty_events,
-              (long)ctx->stats.flushing_pressure_page_deletions,
-              (long)global_flushing_pressure_page_deletions
-    );
-    return str;
 }
 
 int is_legacy_child(const char *machine_guid)

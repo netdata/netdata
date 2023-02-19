@@ -45,7 +45,7 @@ static inline uint32_t simple_uhash(const char *name) {
 static inline int str2i(const char *s) {
     int n = 0;
     char c, negative = (char)(*s == '-');
-    const char *e = &s[30]; // max number of character to iterate
+    const char *e = s + 30; // max number of character to iterate
 
     for(c = (char)((negative)?*(++s):*s); c >= '0' && c <= '9' && s < e ; c = *(++s)) {
         n *= 10;
@@ -122,6 +122,37 @@ static inline unsigned long long str2ull(const char *s) {
     return n;
 }
 
+static inline unsigned long long str2ull_hex_or_dec(const char *s) {
+    unsigned long long n = 0;
+    char c;
+
+    if(likely(s[0] == '0' && s[1] == 'x')) {
+        const char *e = &s[sizeof(unsigned long long) * 2 + 2 + 1]; // max number of character to iterate: 8 bytes * 2 + '0x' + '\0'
+
+        // skip 0x
+        s += 2;
+
+        for (c = *s; ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F')) && s < e; c = *(++s)) {
+            n = n << 4;
+
+            if (c <= '9')
+                n += c - '0';
+            else
+                n += c - 'A' + 10;
+        }
+        return n;
+    }
+    else
+        return str2ull(s);
+}
+
+static inline long long str2ll_hex_or_dec(const char *s) {
+    if(*s == '-')
+        return -(long long)str2ull_hex_or_dec(&s[1]);
+    else
+        return (long long)str2ull_hex_or_dec(s);
+}
+
 static inline long long str2ll(const char *s, char **endptr) {
     int negative = 0;
 
@@ -179,6 +210,42 @@ static inline void sanitize_json_string(char *dst, const char *src, size_t dst_s
         }
     }
     *dst = '\0';
+}
+
+static inline bool sanitize_command_argument_string(char *dst, const char *src, size_t dst_size) {
+    // skip leading dashes
+    while (src[0] == '-')
+        src++;
+
+    // escape single quotes
+    while (src[0] != '\0') {
+        if (src[0] == '\'') {
+            if (dst_size < 4)
+                return false;
+
+            dst[0] = '\''; dst[1] = '\\'; dst[2] = '\''; dst[3] = '\'';
+
+            dst += 4;
+            dst_size -= 4;
+        } else {
+            if (dst_size < 1)
+                return false;
+
+            dst[0] = src[0];
+
+            dst += 1;
+            dst_size -= 1;
+        }
+
+        src++;
+    }
+
+    // make sure we have space to terminate the string
+    if (dst_size == 0)
+        return false;
+    *dst = '\0';
+
+    return true;
 }
 
 static inline int read_file(const char *filename, char *buffer, size_t size) {

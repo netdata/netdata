@@ -77,8 +77,8 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
     time_t before = instance->before;
 
     // find the edges of the rrd database for this chart
-    time_t first_t = rd->tiers[0]->query_ops->oldest_time(rd->tiers[0]->db_metric_handle);
-    time_t last_t = rd->tiers[0]->query_ops->latest_time(rd->tiers[0]->db_metric_handle);
+    time_t first_t = rd->tiers[0].query_ops->oldest_time_s(rd->tiers[0].db_metric_handle);
+    time_t last_t = rd->tiers[0].query_ops->latest_time_s(rd->tiers[0].db_metric_handle);
     time_t update_every = st->update_every;
     struct storage_engine_query_handle handle;
 
@@ -122,13 +122,15 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
 
     *last_timestamp = before;
 
+    size_t points_read = 0;
     size_t counter = 0;
     NETDATA_DOUBLE sum = 0;
 
-    for (rd->tiers[0]->query_ops->init(rd->tiers[0]->db_metric_handle, &handle, after, before); !rd->tiers[0]->query_ops->is_finished(&handle);) {
-        STORAGE_POINT sp = rd->tiers[0]->query_ops->next_metric(&handle);
+    for (rd->tiers[0].query_ops->init(rd->tiers[0].db_metric_handle, &handle, after, before, STORAGE_PRIORITY_LOW); !rd->tiers[0].query_ops->is_finished(&handle);) {
+        STORAGE_POINT sp = rd->tiers[0].query_ops->next_metric(&handle);
+        points_read++;
 
-        if (unlikely(storage_point_is_empty(sp))) {
+        if (unlikely(storage_point_is_gap(sp))) {
             // not collected
             continue;
         }
@@ -136,7 +138,8 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
         sum += sp.sum;
         counter += sp.count;
     }
-    rd->tiers[0]->query_ops->finalize(&handle);
+    rd->tiers[0].query_ops->finalize(&handle);
+    global_statistics_exporters_query_completed(points_read);
 
     if (unlikely(!counter)) {
         debug(
@@ -394,7 +397,7 @@ int simple_connector_end_batch(struct instance *instance)
     struct simple_connector_buffer *last_buffer = simple_connector_data->last_buffer;
 
     if (!last_buffer->buffer) {
-        last_buffer->buffer = buffer_create(0);
+        last_buffer->buffer = buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
     }
 
     if (last_buffer->used) {
@@ -416,7 +419,7 @@ int simple_connector_end_batch(struct instance *instance)
     if (last_buffer->header)
         buffer_flush(last_buffer->header);
     else
-        last_buffer->header = buffer_create(0);
+        last_buffer->header = buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
 
     if (instance->prepare_header)
         instance->prepare_header(instance);

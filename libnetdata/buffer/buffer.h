@@ -15,6 +15,7 @@ typedef struct web_buffer {
     uint8_t options;		// options related to the content
     time_t date;    		// the timestamp this content has been generated
     time_t expires;			// the timestamp this content expires
+    size_t *statistics;
 } BUFFER;
 
 // options
@@ -61,7 +62,7 @@ void buffer_rrd_value(BUFFER *wb, NETDATA_DOUBLE value);
 void buffer_date(BUFFER *wb, int year, int month, int day, int hours, int minutes, int seconds);
 void buffer_jsdate(BUFFER *wb, int year, int month, int day, int hours, int minutes, int seconds);
 
-BUFFER *buffer_create(size_t size);
+BUFFER *buffer_create(size_t size, size_t *statistics);
 void buffer_free(BUFFER *b);
 void buffer_increase(BUFFER *b, size_t free_size_required);
 
@@ -73,6 +74,8 @@ void buffer_strcat_htmlescape(BUFFER *wb, const char *txt);
 
 void buffer_char_replace(BUFFER *wb, char from, char to);
 
+void buffer_print_sn_flags(BUFFER *wb, SN_FLAGS flags, bool send_anomaly_bit);
+
 char *print_number_lu_r(char *str, unsigned long uvalue);
 char *print_number_llu_r(char *str, unsigned long long uvalue);
 char *print_number_llu_r_smart(char *str, unsigned long long uvalue);
@@ -80,6 +83,7 @@ char *print_number_llu_r_smart(char *str, unsigned long long uvalue);
 void buffer_print_llu(BUFFER *wb, unsigned long long uvalue);
 void buffer_print_ll(BUFFER *wb, long long value);
 void buffer_print_llu_hex(BUFFER *wb, unsigned long long value);
+void buffer_print_ll_hex(BUFFER *wb, long long value);
 
 static inline void buffer_need_bytes(BUFFER *buffer, size_t needed_free_size) {
     if(unlikely(buffer->size - buffer->len < needed_free_size))

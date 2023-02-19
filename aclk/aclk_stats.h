@@ -8,15 +8,13 @@
 #include "aclk_query_queue.h"
 #include "mqtt_wss_client.h"
 
-#define ACLK_STATS_THREAD_NAME "ACLK_Stats"
-
 extern netdata_mutex_t aclk_stats_mutex;
 
 #define ACLK_STATS_LOCK netdata_mutex_lock(&aclk_stats_mutex)
 #define ACLK_STATS_UNLOCK netdata_mutex_unlock(&aclk_stats_mutex)
 
 // if you change update `cloud_req_http_type_names`.
-#define ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT 7
+#define ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT 9
 
 int aclk_cloud_req_http_type_to_idx(const char *name);
 

@@ -7,11 +7,9 @@ SUBDIRS = \
     apps.plugin \
     cgroups.plugin \
     charts.d.plugin \
-    checks.plugin \
     cups.plugin \
     diskspace.plugin \
     timex.plugin \
-    fping.plugin \
     ioping.plugin \
     freebsd.plugin \
     freeipmi.plugin \

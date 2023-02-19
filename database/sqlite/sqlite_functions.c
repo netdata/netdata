@@ -3,7 +3,7 @@
 #include "sqlite_functions.h"
 #include "sqlite_db_migration.h"
 
-#define DB_METADATA_VERSION 6
+#define DB_METADATA_VERSION 7
 
 const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS host(host_id BLOB PRIMARY KEY, hostname TEXT NOT NULL, "
@@ -22,9 +22,8 @@ const char *database_config[] = {
     "multiplier int, divisor int , algorithm int, options text);",
 
     "CREATE TABLE IF NOT EXISTS metadata_migration(filename text, file_size, date_created int);",
-    "CREATE INDEX IF NOT EXISTS ind_d1 on dimension (chart_id, id, name);",
-    "CREATE INDEX IF NOT EXISTS ind_c1 on chart (host_id, id, type, name);",
-    "CREATE INDEX IF NOT EXISTS ind_c2 on chart (host_id, context);",
+    "CREATE INDEX IF NOT EXISTS ind_d2 on dimension (chart_id);",
+    "CREATE INDEX IF NOT EXISTS ind_c3 on chart (host_id);",
     "CREATE TABLE IF NOT EXISTS chart_label(chart_id blob, source_type int, label_key text, "
     "label_value text, date_created int, PRIMARY KEY (chart_id, label_key));",
     "CREATE TABLE IF NOT EXISTS node_instance (host_id blob PRIMARY KEY, claim_id, node_id, date_created);",
@@ -55,6 +54,9 @@ const char *database_cleanup[] = {
     "DELETE FROM host_info WHERE host_id NOT IN (SELECT host_id FROM host);",
     "DELETE FROM host_label WHERE host_id NOT IN (SELECT host_id FROM host);",
     "DROP TRIGGER IF EXISTS tr_dim_del;",
+    "DROP INDEX IF EXISTS ind_d1;",
+    "DROP INDEX IF EXISTS ind_c1;",
+    "DROP INDEX IF EXISTS ind_c2;",
     NULL
 };
 
@@ -71,7 +73,7 @@ SQLITE_API int sqlite3_exec_monitored(
     char **errmsg                              /* Error msg written here */
 ) {
     int rc = sqlite3_exec(db, sql, callback, data, errmsg);
-    sqlite3_query_completed(rc == SQLITE_OK, rc == SQLITE_BUSY, rc == SQLITE_LOCKED);
+    global_statistics_sqlite3_query_completed(rc == SQLITE_OK, rc == SQLITE_BUSY, rc == SQLITE_LOCKED);
     return rc;
 }
 
@@ -83,14 +85,14 @@ SQLITE_API int sqlite3_step_monitored(sqlite3_stmt *stmt) {
         rc = sqlite3_step(stmt);
         switch (rc) {
             case SQLITE_DONE:
-                sqlite3_query_completed(1, 0, 0);
+                global_statistics_sqlite3_query_completed(1, 0, 0);
                 break;
             case SQLITE_ROW:
-                sqlite3_row_completed();
+                global_statistics_sqlite3_row_completed();
                 break;
             case SQLITE_BUSY:
             case SQLITE_LOCKED:
-                sqlite3_query_completed(rc == SQLITE_DONE, rc == SQLITE_BUSY, rc == SQLITE_LOCKED);
+                global_statistics_sqlite3_query_completed(rc == SQLITE_DONE, rc == SQLITE_BUSY, rc == SQLITE_LOCKED);
                 usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
                 continue;
             default:
@@ -504,211 +506,6 @@ skip:
     return result;
 }
 
-
-
-//
-// Support for archived charts (TO BE REMOVED)
-//
-#define SELECT_DIMENSION "select d.id, d.name from dimension d where d.chart_id = @chart_uuid;"
-
-static void sql_rrdim2json(sqlite3_stmt *res_dim, uuid_t *chart_uuid, BUFFER *wb, size_t *dimensions_count)
-{
-    int rc;
-
-    rc = sqlite3_bind_blob(res_dim, 1, chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC);
-    if (rc != SQLITE_OK)
-        return;
-
-    int dimensions = 0;
-    buffer_sprintf(wb, "\t\t\t\"dimensions\": {\n");
-
-    while (sqlite3_step_monitored(res_dim) == SQLITE_ROW) {
-        if (dimensions)
-            buffer_strcat(wb, ",\n\t\t\t\t\"");
-        else
-            buffer_strcat(wb, "\t\t\t\t\"");
-        buffer_strcat_jsonescape(wb, (const char *) sqlite3_column_text(res_dim, 0));
-        buffer_strcat(wb, "\": { \"name\": \"");
-        buffer_strcat_jsonescape(wb, (const char *) sqlite3_column_text(res_dim, 1));
-        buffer_strcat(wb, "\" }");
-        dimensions++;
-    }
-    *dimensions_count += dimensions;
-    buffer_sprintf(wb, "\n\t\t\t}");
-}
-
-#define SELECT_CHART "select chart_id, id, name, type, family, context, title, priority, plugin, " \
-    "module, unit, chart_type, update_every from chart " \
-    "where host_id = @host_uuid and chart_id not in (select chart_id from chart_active) order by chart_id asc;"
-
-void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
-{
-    //    time_t first_entry_t = 0; //= rrdset_first_entry_t(st);
-    //   time_t last_entry_t = 0; //rrdset_last_entry_t(st);
-    static char *custom_dashboard_info_js_filename = NULL;
-    int rc;
-
-    sqlite3_stmt *res_chart = NULL;
-    sqlite3_stmt *res_dim = NULL;
-    time_t now = now_realtime_sec();
-
-    rc = sqlite3_prepare_v2(db_meta, SELECT_CHART, -1, &res_chart, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to fetch host archived charts");
-        return;
-    }
-
-    rc = sqlite3_bind_blob(res_chart, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host parameter to fetch archived charts");
-        goto failed;
-    }
-
-    rc = sqlite3_prepare_v2(db_meta, SELECT_DIMENSION, -1, &res_dim, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to fetch chart archived dimensions");
-        goto failed;
-    };
-
-    if(unlikely(!custom_dashboard_info_js_filename))
-        custom_dashboard_info_js_filename = config_get(CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
-
-    buffer_sprintf(wb, "{\n"
-                       "\t\"hostname\": \"%s\""
-                       ",\n\t\"version\": \"%s\""
-                       ",\n\t\"release_channel\": \"%s\""
-                       ",\n\t\"os\": \"%s\""
-                       ",\n\t\"timezone\": \"%s\""
-                       ",\n\t\"update_every\": %d"
-                       ",\n\t\"history\": %ld"
-                       ",\n\t\"memory_mode\": \"%s\""
-                       ",\n\t\"custom_info\": \"%s\""
-                       ",\n\t\"charts\": {"
-        , rrdhost_hostname(host)
-        , rrdhost_program_version(host)
-        , get_release_channel()
-        , rrdhost_os(host)
-        , rrdhost_timezone(host)
-        , host->rrd_update_every
-        , host->rrd_history_entries
-        , rrd_memory_mode_name(host->rrd_memory_mode)
-        , custom_dashboard_info_js_filename
-    );
-
-    size_t c = 0;
-    size_t dimensions = 0;
-
-    while (sqlite3_step_monitored(res_chart) == SQLITE_ROW) {
-        char id[512];
-        sprintf(id, "%s.%s", sqlite3_column_text(res_chart, 3), sqlite3_column_text(res_chart, 1));
-        RRDSET *st = rrdset_find(host, id);
-        if (st && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))
-            continue;
-
-        if (c)
-            buffer_strcat(wb, ",\n\t\t\"");
-        else
-            buffer_strcat(wb, "\n\t\t\"");
-        c++;
-
-        buffer_strcat(wb, id);
-        buffer_strcat(wb, "\": ");
-
-        buffer_sprintf(
-            wb,
-            "\t\t{\n"
-            "\t\t\t\"id\": \"%s\",\n"
-            "\t\t\t\"name\": \"%s\",\n"
-            "\t\t\t\"type\": \"%s\",\n"
-            "\t\t\t\"family\": \"%s\",\n"
-            "\t\t\t\"context\": \"%s\",\n"
-            "\t\t\t\"title\": \"%s (%s)\",\n"
-            "\t\t\t\"priority\": %ld,\n"
-            "\t\t\t\"plugin\": \"%s\",\n"
-            "\t\t\t\"module\": \"%s\",\n"
-            "\t\t\t\"enabled\": %s,\n"
-            "\t\t\t\"units\": \"%s\",\n"
-            "\t\t\t\"data_url\": \"/api/v1/data?chart=%s\",\n"
-            "\t\t\t\"chart_type\": \"%s\",\n",
-            id //sqlite3_column_text(res_chart, 1)
-            ,
-            id // sqlite3_column_text(res_chart, 2)
-            ,
-            sqlite3_column_text(res_chart, 3), sqlite3_column_text(res_chart, 4), sqlite3_column_text(res_chart, 5),
-            sqlite3_column_text(res_chart, 6), id //sqlite3_column_text(res_chart, 2)
-            ,
-            (long ) sqlite3_column_int(res_chart, 7),
-            (const char *) sqlite3_column_text(res_chart, 8) ? (const char *) sqlite3_column_text(res_chart, 8) : (char *) "",
-            (const char *) sqlite3_column_text(res_chart, 9) ? (const char *) sqlite3_column_text(res_chart, 9) : (char *) "", (char *) "false",
-            (const char *) sqlite3_column_text(res_chart, 10), id //sqlite3_column_text(res_chart, 2)
-            ,
-            rrdset_type_name(sqlite3_column_int(res_chart, 11)));
-
-        sql_rrdim2json(res_dim, (uuid_t *) sqlite3_column_blob(res_chart, 0), wb, &dimensions);
-
-        rc = sqlite3_reset(res_dim);
-        if (unlikely(rc != SQLITE_OK))
-            error_report("Failed to reset the prepared statement when reading archived chart dimensions");
-        buffer_strcat(wb, "\n\t\t}");
-    }
-
-    buffer_sprintf(wb
-        , "\n\t}"
-          ",\n\t\"charts_count\": %zu"
-          ",\n\t\"dimensions_count\": %zu"
-          ",\n\t\"alarms_count\": %zu"
-          ",\n\t\"rrd_memory_bytes\": %zu"
-          ",\n\t\"hosts_count\": %zu"
-          ",\n\t\"hosts\": ["
-        , c
-        , dimensions
-        , (size_t) 0
-        , (size_t) 0
-        , rrd_hosts_available
-    );
-
-    if(unlikely(rrd_hosts_available > 1)) {
-        rrd_rdlock();
-
-        size_t found = 0;
-        RRDHOST *h;
-        rrdhost_foreach_read(h) {
-            if(!rrdhost_should_be_removed(h, host, now) && !rrdhost_flag_check(h, RRDHOST_FLAG_ARCHIVED)) {
-                buffer_sprintf(wb
-                    , "%s\n\t\t{"
-                      "\n\t\t\t\"hostname\": \"%s\""
-                      "\n\t\t}"
-                    , (found > 0) ? "," : ""
-                    , rrdhost_hostname(h)
-                );
-
-                found++;
-            }
-        }
-
-        rrd_unlock();
-    }
-    else {
-        buffer_sprintf(wb
-            , "\n\t\t{"
-              "\n\t\t\t\"hostname\": \"%s\""
-              "\n\t\t}"
-            , rrdhost_hostname(host)
-        );
-    }
-
-    buffer_sprintf(wb, "\n\t]\n}\n");
-
-    rc = sqlite3_finalize(res_dim);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when reading archived chart dimensions");
-
-failed:
-    rc = sqlite3_finalize(res_chart);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when reading archived charts");
-}
-
 void db_execute(const char *cmd)
 {
     int rc;
@@ -730,116 +527,6 @@ void db_execute(const char *cmd)
 
         ++cnt;
     }
-}
-
-#define SELECT_MIGRATED_FILE    "select 1 from metadata_migration where filename = @path;"
-
-int file_is_migrated(char *path)
-{
-    sqlite3_stmt *res = NULL;
-    int rc;
-
-    rc = sqlite3_prepare_v2(db_meta, SELECT_MIGRATED_FILE, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to fetch host");
-        return 0;
-    }
-
-    rc = sqlite3_bind_text(res, 1, path, -1, SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind filename parameter to check migration");
-        return 0;
-    }
-
-    rc = sqlite3_step_monitored(res);
-
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when checking if metadata file is migrated");
-
-    return (rc == SQLITE_ROW);
-}
-
-#define STORE_MIGRATED_FILE    "insert or replace into metadata_migration (filename, file_size, date_created) " \
-                                "values (@file, @size, unixepoch());"
-
-void add_migrated_file(char *path, uint64_t file_size)
-{
-    sqlite3_stmt *res = NULL;
-    int rc;
-
-    rc = sqlite3_prepare_v2(db_meta, STORE_MIGRATED_FILE, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to fetch host");
-        return;
-    }
-
-    rc = sqlite3_bind_text(res, 1, path, -1, SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind filename parameter to store migration information");
-        return;
-    }
-
-    rc = sqlite3_bind_int64(res, 2, (sqlite_int64) file_size);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind size parameter to store migration information");
-        return;
-    }
-
-    rc = execute_insert(res);
-    if (unlikely(rc != SQLITE_DONE))
-        error_report("Failed to store migrated file, rc = %d", rc);
-
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when checking if metadata file is migrated");
-}
-
-
-
-#define SQL_STORE_CLAIM_ID  "insert into node_instance " \
-    "(host_id, claim_id, date_created) values (@host_id, @claim_id, unixepoch()) " \
-    "on conflict(host_id) do update set claim_id = excluded.claim_id;"
-
-void store_claim_id(uuid_t *host_id, uuid_t *claim_id)
-{
-    sqlite3_stmt *res = NULL;
-    int rc;
-
-    if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            error_report("Database has not been initialized");
-        return;
-    }
-
-    rc = sqlite3_prepare_v2(db_meta, SQL_STORE_CLAIM_ID, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement store chart labels");
-        return;
-    }
-
-    rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id parameter to store node instance information");
-        goto failed;
-    }
-
-    if (claim_id)
-        rc = sqlite3_bind_blob(res, 2, claim_id, sizeof(*claim_id), SQLITE_STATIC);
-    else
-        rc = sqlite3_bind_null(res, 2);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind claim_id parameter to store node instance information");
-        goto failed;
-    }
-
-    rc = execute_insert(res);
-    if (unlikely(rc != SQLITE_DONE))
-        error_report("Failed to store node instance information, rc = %d", rc);
-
-failed:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when storing node instance information");
-
-    return;
 }
 
 static inline void set_host_node_id(RRDHOST *host, uuid_t *node_id)
@@ -1263,6 +950,8 @@ int bind_text_null(sqlite3_stmt *res, int position, const char *text, bool can_b
 int sql_metadata_cache_stats(int op)
 {
     int count, dummy;
+    netdata_thread_disable_cancelability();
     sqlite3_db_status(db_meta, op, &count, &dummy, 0);
+    netdata_thread_enable_cancelability();
     return count;
 }

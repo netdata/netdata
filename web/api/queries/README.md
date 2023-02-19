@@ -1,6 +1,10 @@
 <!--
 title: "Database Queries"
+sidebar_label: "Database Queries"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/queries/README.md
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Developers/Web/Api/Queries"
 -->
 
 # Database Queries
@@ -88,7 +92,7 @@ To disable alignment, pass `&options=unaligned` to the query.
 
 To execute the query, the engine evaluates all dimensions of the chart, one after another.
 
-The engine does not evaluate dimensions that do not match the [simple pattern](/libnetdata/simple_pattern/README.md)
+The engine does not evaluate dimensions that do not match the [simple pattern](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md)
 given at the `dimensions` parameter, except when `options=percentage` is given (this option
 requires all the dimensions to be evaluated to find the percentage of each dimension vs to chart
 total).

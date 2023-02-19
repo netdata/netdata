@@ -76,6 +76,8 @@ int rrdset2value_api_v1(
         , NETDATA_DOUBLE *anomaly_rate
         , time_t timeout
         , size_t tier
+        , QUERY_SOURCE query_source
+        , STORAGE_PRIORITY priority
 ) {
     int ret = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
@@ -92,7 +94,9 @@ int rrdset2value_api_v1(
             dimensions,
             group_options,
             timeout,
-            tier);
+            tier,
+            query_source,
+            priority);
 
     if(!r) {
         if(value_is_null) *value_is_null = 1;
@@ -152,9 +156,6 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         rrdr_free(owa, r);
         return HTTP_RESP_BACKEND_FETCH_FAILED;
     }
-
-    if (qt->request.st && rrdset_is_ar_chart(qt->request.st))
-        ml_process_rrdr(r, qt->request.max_anomaly_rates);
 
     if(r->result_options & RRDR_RESULT_OPTION_RELATIVE)
         buffer_no_cacheable(wb);

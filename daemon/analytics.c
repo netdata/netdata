@@ -223,9 +223,7 @@ void analytics_mirrored_hosts(void)
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))
             continue;
 
-        netdata_mutex_lock(&host->receiver_lock);
-        ((host->receiver || host == localhost) ? reachable++ : unreachable++);
-        netdata_mutex_unlock(&host->receiver_lock);
+        ((host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)) ? reachable++ : unreachable++);
 
         count++;
     }
@@ -243,7 +241,7 @@ void analytics_exporters(void)
 {
     //when no exporters are available, an empty string will be sent
     //decide if something else is more suitable (but probably not null)
-    BUFFER *bi = buffer_create(1000);
+    BUFFER *bi = buffer_create(1000, NULL);
     analytics_exporting_connectors(bi);
     analytics_set_data_str(&analytics_data.netdata_exporting_connectors, (char *)buffer_tostring(bi));
     buffer_free(bi);
@@ -280,7 +278,7 @@ void analytics_collectors(void)
     RRDSET *st;
     DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     char name[500];
-    BUFFER *bt = buffer_create(1000);
+    BUFFER *bt = buffer_create(1000, NULL);
 
     rrdset_foreach_read(st, localhost) {
         if(!rrdset_is_available_for_viewers(st))
@@ -335,7 +333,7 @@ void analytics_alarms_notifications(void)
 
     debug(D_ANALYTICS, "Executing %s", script);
 
-    BUFFER *b = buffer_create(1000);
+    BUFFER *b = buffer_create(1000, NULL);
     int cnt = 0;
     FILE *fp_child_input;
     FILE *fp_child_output = netdata_popen(script, &command_pid, &fp_child_input);
@@ -382,7 +380,7 @@ void analytics_get_install_type(void)
  */
 void analytics_https(void)
 {
-    BUFFER *b = buffer_create(30);
+    BUFFER *b = buffer_create(30, NULL);
 #ifdef ENABLE_HTTPS
     analytics_exporting_connectors_ssl(b);
     buffer_strcat(b, netdata_ssl_client_ctx && rrdhost_flag_check(localhost, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED) && localhost->sender->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE ? "streaming|" : "|");
@@ -554,7 +552,7 @@ void analytics_gather_mutable_meta_data(void)
         snprintfz(b, 6, "%d", analytics_data.dashboard_hits);
         analytics_set_data(&analytics_data.netdata_dashboard_used, b);
 
-        snprintfz(b, 6, "%zu", rrd_hosts_available);
+        snprintfz(b, 6, "%zu", rrdhost_hosts_available());
         analytics_set_data(&analytics_data.netdata_config_hosts_available, b);
     }
 }
@@ -587,12 +585,12 @@ void *analytics_main(void *ptr)
     debug(D_ANALYTICS, "Analytics thread starts");
 
     //first delay after agent start
-    while (!netdata_exit && likely(sec <= ANALYTICS_INIT_SLEEP_SEC)) {
+    while (service_running(SERVICE_ANALYTICS) && likely(sec <= ANALYTICS_INIT_SLEEP_SEC)) {
         heartbeat_next(&hb, step_ut);
         sec++;
     }
 
-    if (unlikely(netdata_exit))
+    if (unlikely(!service_running(SERVICE_ANALYTICS)))
         goto cleanup;
 
     analytics_gather_immutable_meta_data();
@@ -605,7 +603,7 @@ void *analytics_main(void *ptr)
         heartbeat_next(&hb, step_ut * 2);
         sec += 2;
 
-        if (unlikely(netdata_exit))
+        if (unlikely(!service_running(SERVICE_ANALYTICS)))
             break;
 
         if (likely(sec < ANALYTICS_HEARTBEAT))
@@ -677,7 +675,7 @@ void set_late_global_environment()
     analytics_set_data_str(&analytics_data.netdata_config_release_channel, (char *)get_release_channel());
 
     {
-        BUFFER *bi = buffer_create(1000);
+        BUFFER *bi = buffer_create(1000, NULL);
         analytics_build_info(bi);
         analytics_set_data_str(&analytics_data.netdata_buildinfo, (char *)buffer_tostring(bi));
         buffer_free(bi);
@@ -838,7 +836,7 @@ void set_global_environment()
     setenv("NETDATA_HOST_PREFIX", netdata_configured_host_prefix, 1);
 
     {
-        BUFFER *user_plugins_dirs = buffer_create(FILENAME_MAX);
+        BUFFER *user_plugins_dirs = buffer_create(FILENAME_MAX, NULL);
 
         for (size_t i = 1; i < PLUGINSD_MAX_DIRECTORIES && plugin_directories[i]; i++) {
             if (i > 1)
