@@ -894,7 +894,7 @@ static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after
 
         // find the db time-range for this tier for all metrics
         for(size_t i = 0, used = qt->query.used; i < used ; i++) {
-            QUERY_METRIC *qm = &qt->query.array[i];
+            QUERY_METRIC *qm = query_metric(qt, i);
 
             time_t first_time_s = qm->tiers[tier].db_first_time_s;
             time_t last_time_s  = qm->tiers[tier].db_last_time_s;
@@ -944,7 +944,7 @@ static time_t rrdset_find_natural_update_every_for_timeframe(QUERY_TARGET *qt, t
     // find the db minimum update every for this tier for all metrics
     time_t common_update_every_s = default_rrd_update_every;
     for(size_t i = 0, used = qt->query.used; i < used ; i++) {
-        QUERY_METRIC *qm = &qt->query.array[i];
+        QUERY_METRIC *qm = query_metric(qt, i);
 
         time_t update_every_s = qm->tiers[best_tier].db_update_every_s;
 
@@ -1352,7 +1352,7 @@ static QUERY_ENGINE_OPS *rrd2rrdr_query_prep(RRDR *r, size_t dim_id_in_rrdr) {
     QUERY_ENGINE_OPS *ops = onewayalloc_mallocz(r->internal.owa, sizeof(QUERY_ENGINE_OPS));
     *ops = (QUERY_ENGINE_OPS) {
             .r = r,
-            .qm = &qt->query.array[dim_id_in_rrdr],
+            .qm = query_metric(qt, dim_id_in_rrdr),
             .grouping_add = r->grouping.add,
             .grouping_flush = r->grouping.flush,
             .tier_query_fetch = r->grouping.tier_query_fetch,
@@ -1369,7 +1369,7 @@ static QUERY_ENGINE_OPS *rrd2rrdr_query_prep(RRDR *r, size_t dim_id_in_rrdr) {
 
 static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_OPS *ops) {
     QUERY_TARGET *qt = r->internal.qt;
-    QUERY_METRIC *qm = &qt->query.array[dim_id_in_rrdr]; (void)qm;
+    QUERY_METRIC *qm = query_metric(qt, dim_id_in_rrdr); (void)qm;
     size_t points_wanted = qt->window.points;
     time_t after_wanted = qt->window.after;
     time_t before_wanted = qt->window.before; (void)before_wanted;
@@ -2332,6 +2332,8 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     }
 
     for(size_t c = 0, max = qt->query.used; c < max ; c++) {
+        QUERY_METRIC *qm = query_metric(qt, c);
+        QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
 
         if(queries_prepared < max) {
             // preload another query
@@ -2340,16 +2342,17 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         }
 
         // set the query target dimension options to rrdr
-        r->od[c] = qt->query.array[c].dimension.options;
+        r->od[c] = qm->dimension.options;
 
         // reset the grouping for the new dimension
         r->grouping.reset(r);
 
         if(ops[c]) {
             r->od[c] |= RRDR_DIMENSION_QUERIED;
-            r->di[c] = string_dup(qt->query.array[c].dimension.id);
-            r->dn[c] = string_dup(qt->query.array[c].dimension.name);
-            qt->query.array[c].link.qi->queried++;
+            r->di[c] = string_dup(qm->dimension.id);
+            r->dn[c] = string_dup(qm->dimension.name);
+            qi->queried++;
+
             rrd2rrdr_query_execute(r, c, ops[c]);
         }
         else
@@ -2379,21 +2382,21 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         else {
             if(r->view.after != max_after) {
                 internal_error(true, "QUERY: 'after' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                               string2str(qt->query.array[c].dimension.id), (size_t)max_after, string2str(qt->query.array[c].dimension.name), (size_t)r->view.after);
+                               string2str(qm->dimension.id), (size_t)max_after, string2str(qm->dimension.name), (size_t)r->view.after);
 
                 r->view.after = (r->view.after > max_after) ? r->view.after : max_after;
             }
 
             if(r->view.before != min_before) {
                 internal_error(true, "QUERY: 'before' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                               string2str(qt->query.array[c].dimension.id), (size_t)min_before, string2str(qt->query.array[c].dimension.name), (size_t)r->view.before);
+                               string2str(qm->dimension.id), (size_t)min_before, string2str(qm->dimension.name), (size_t)r->view.before);
 
                 r->view.before = (r->view.before < min_before) ? r->view.before : min_before;
             }
 
             if(r->rows != max_rows) {
                 internal_error(true, "QUERY: 'rows' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                               string2str(qt->query.array[c].dimension.id), (size_t)max_rows, string2str(qt->query.array[c].dimension.name), (size_t)r->rows);
+                               string2str(qm->dimension.id), (size_t)max_rows, string2str(qm->dimension.name), (size_t)r->rows);
 
                 r->rows = (r->rows > max_rows) ? r->rows : max_rows;
             }
@@ -2459,6 +2462,12 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
     }
 #endif
+
+    // free the query pipelining ops
+    for(size_t c = 0; c < qt->query.used ;c++)
+        onewayalloc_freez(owa, ops[c]);
+
+    onewayalloc_freez(owa, ops);
 
     // free all resources used by the grouping method
     r->grouping.free(r);

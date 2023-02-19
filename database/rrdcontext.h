@@ -168,8 +168,8 @@ typedef struct query_metric {
     struct {
         RRDHOST *host;
         RRDCONTEXT_ACQUIRED *rca;
-        QUERY_INSTANCE *qi;
         RRDMETRIC_ACQUIRED *rma;
+        size_t query_instance_id;
     } link;
 
     struct {
@@ -296,6 +296,16 @@ typedef struct query_target {
     } hosts;
 
 } QUERY_TARGET;
+
+static inline NEVERNULL QUERY_METRIC *query_metric(QUERY_TARGET *qt, size_t id) {
+    internal_fatal(id >= qt->query.used, "QUERY: invalid query metric id");
+    return &qt->query.array[id];
+}
+
+static inline NEVERNULL QUERY_INSTANCE *query_instance(QUERY_TARGET *qt, size_t query_instance_id) {
+    internal_fatal(query_instance_id >= qt->instances.used, "QUERY: invalid query instance id");
+    return &qt->instances.array[query_instance_id];
+}
 
 void query_target_free(void);
 void query_target_release(QUERY_TARGET *qt);

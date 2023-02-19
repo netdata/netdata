@@ -32,7 +32,7 @@ void jsonwrap_query_plan(RRDR *r, BUFFER *wb) {
 
     buffer_json_member_add_object(wb, "query_plan");
     for(size_t m = 0; m < qt->query.used; m++) {
-        QUERY_METRIC *qm = &qt->query.array[m];
+        QUERY_METRIC *qm = query_metric(qt, m);
         buffer_json_member_add_object(wb, string2str(qm->dimension.id));
         jsonwrap_query_metric_plan(wb, qm);
         buffer_json_object_close(wb);
@@ -84,8 +84,9 @@ static inline long jsonwrap_v1_chart_ids(BUFFER *wb, const char *key, RRDR *r, R
         if(!rrdr_dimension_should_be_exposed(r->od[c], options))
             continue;
 
-        QUERY_METRIC *qm = &qt->query.array[c];
-        buffer_json_add_array_item_string(wb, string2str(qm->link.qi->id_fqdn));
+        QUERY_METRIC *qm = query_metric(qt, c);
+        QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
+        buffer_json_add_array_item_string(wb, string2str(qi->id_fqdn));
         i++;
     }
     buffer_json_array_close(wb);
@@ -245,11 +246,12 @@ static inline void query_target_functions(BUFFER *wb, const char *key, RRDR *r) 
     DICTIONARY *funcs = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE);
     RRDINSTANCE_ACQUIRED *ria = NULL;
     for (long c = 0; c < query_used ; c++) {
-        QUERY_METRIC *qm = &qt->query.array[c];
-        if(qm->link.qi->ria == ria)
+        QUERY_METRIC *qm = query_metric(qt, c);
+        QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
+        if(qi->ria == ria)
             continue;
 
-        ria = qm->link.qi->ria;
+        ria = qi->ria;
         chart_functions_to_dict(rrdinstance_acquired_functions(ria), funcs);
     }
 
@@ -278,8 +280,9 @@ static inline long query_target_chart_labels_filter(BUFFER *wb, const char *key,
             if(!rrdr_dimension_should_be_exposed(r->od[c], options))
                 continue;
 
-            QUERY_METRIC *qm = &qt->query.array[c];
-            rrdlabels_value_to_buffer_array_item_or_null(rrdinstance_acquired_labels(qm->link.qi->ria), wb, label_key);
+            QUERY_METRIC *qm = query_metric(qt, c);
+            QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
+            rrdlabels_value_to_buffer_array_item_or_null(rrdinstance_acquired_labels(qi->ria), wb, label_key);
             i++;
         }
         buffer_json_array_close(wb);
@@ -301,7 +304,7 @@ static inline long query_target_metrics_latest_values(BUFFER *wb, const char *ke
         if(!rrdr_dimension_should_be_exposed(r->od[c], options))
             continue;
 
-        QUERY_METRIC *qm = &qt->query.array[c];
+        QUERY_METRIC *qm = query_metric(qt, c);
         buffer_json_add_array_item_double(wb, rrdmetric_acquired_last_stored_value(qm->link.rma));
         i++;
     }
@@ -545,7 +548,7 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
                         QUERY_METRIC *qm = NULL;
                         bool queried = false;
                         for( ; q < qt->query.used ;q++) {
-                            QUERY_METRIC *tqm = &qt->query.array[q];
+                            QUERY_METRIC *tqm = query_metric(qt, c);
                             if(tqm->link.rma != rma) break;
 
                             queried = tqm->dimension.options & RRDR_DIMENSION_QUERIED;

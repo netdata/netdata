@@ -167,7 +167,8 @@ RRDR *data_query_group_by(RRDR *r) {
             continue;
 
         int pos = -1, *set;
-        QUERY_METRIC *qm = &qt->query.array[c];
+        QUERY_METRIC *qm = query_metric(qt, c);
+        QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
 
         switch(qt->request.group_by) {
             default:
@@ -183,11 +184,11 @@ RRDR *data_query_group_by(RRDR *r) {
                 break;
 
             case RRDR_GROUP_BY_INSTANCE:
-                set = dictionary_set(groups, string2str(qm->link.qi->id_fqdn), &pos, sizeof(int));
+                set = dictionary_set(groups, string2str(qi->id_fqdn), &pos, sizeof(int));
                 if(*set == -1) {
                     *set = pos = added++;
-                    entries[pos].id = string_dup(qm->link.qi->id_fqdn);
-                    entries[pos].name = string_dup(qm->link.qi->name_fqdn);
+                    entries[pos].id = string_dup(qi->id_fqdn);
+                    entries[pos].name = string_dup(qi->name_fqdn);
                 }
                 else
                     pos = *set;
@@ -205,7 +206,7 @@ RRDR *data_query_group_by(RRDR *r) {
                 break;
 
             case RRDR_GROUP_BY_LABEL: {
-                DICTIONARY *labels = rrdinstance_acquired_labels(qm->link.qi->ria);
+                DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
                 STRING *s = rrdlabels_get_value_string_dup(labels, qt->request.group_by_key);
                 if(!s)
                     s = string_dup(unset);
@@ -295,7 +296,7 @@ RRDR *data_query_group_by(RRDR *r) {
             if(unlikely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
                 n = -n;
 
-            QUERY_METRIC *qm = &qt->query.array[c];
+            QUERY_METRIC *qm = query_metric(qt, c);
             size_t c2 = qm->grouped_as.slot;
 
             switch(qt->request.group_by_function) {
@@ -389,6 +390,7 @@ cleanup:
         }
     }
     onewayalloc_freez(r->internal.owa, entries);
+    dictionary_destroy(groups);
 
     return r2;
 }

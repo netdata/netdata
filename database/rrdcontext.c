@@ -2318,7 +2318,7 @@ void query_target_release(QUERY_TARGET *qt) {
         qm->link.host = NULL;
         qm->link.rca = NULL;
         qm->link.rma = NULL;
-        qm->link.qi = NULL;
+        qm->link.query_instance_id = 0;
     }
 
     // release the metrics
@@ -2538,8 +2538,8 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
 
             qm->link.host = qtl->host;
             qm->link.rca = qtl->rca;
-            qm->link.qi = qi;
             qm->link.rma = rma;
+            qm->link.query_instance_id = qi->slot;
 
             qm->dimension.id = string_dup(rm->id);
             qm->dimension.name = string_dup(rm->name);
@@ -2626,7 +2626,8 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, RRDINSTANCE_ACQU
     }
 
     QUERY_INSTANCE *qi = &qt->instances.array[qt->instances.used];
-    qi->slot = qt->instances.used++;
+    qi->slot = qt->instances.used;
+    qt->instances.used++;
     qi->ria = rrdinstance_acquired_dup(ria);
     qi->queried = 0;
 
