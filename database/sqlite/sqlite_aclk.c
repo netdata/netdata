@@ -368,7 +368,7 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
         , (const char *) argv[IDX_OS]
         , (const char *) argv[IDX_TIMEZONE]
         , (const char *) argv[IDX_ABBREV_TIMEZONE]
-        , argv[IDX_UTC_OFFSET] ? str2uint32_t(argv[IDX_UTC_OFFSET]) : 0
+        , argv[IDX_UTC_OFFSET] ? str2uint32_t(argv[IDX_UTC_OFFSET], NULL) : 0
         , (const char *) argv[IDX_TAGS]
         , (const char *) (argv[IDX_PROGRAM_NAME] ? argv[IDX_PROGRAM_NAME] : "unknown")
         , (const char *) (argv[IDX_PROGRAM_VERSION] ? argv[IDX_PROGRAM_VERSION] : "unknown")

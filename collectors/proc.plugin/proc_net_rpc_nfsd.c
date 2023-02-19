@@ -286,9 +286,9 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                 continue;
             }
 
-            rc_hits = str2ull(procfile_lineword(ff, l, 1));
-            rc_misses = str2ull(procfile_lineword(ff, l, 2));
-            rc_nocache = str2ull(procfile_lineword(ff, l, 3));
+            rc_hits = str2ull(procfile_lineword(ff, l, 1), NULL);
+            rc_misses = str2ull(procfile_lineword(ff, l, 2), NULL);
+            rc_nocache = str2ull(procfile_lineword(ff, l, 3), NULL);
 
             unsigned long long sum = rc_hits + rc_misses + rc_nocache;
             if(sum == 0ULL) do_rc = -1;
@@ -300,7 +300,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                 continue;
             }
 
-            fh_stale = str2ull(procfile_lineword(ff, l, 1));
+            fh_stale = str2ull(procfile_lineword(ff, l, 1), NULL);
             
             // other file handler metrics were never used and are always zero
 
@@ -313,8 +313,8 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                 continue;
             }
 
-            io_read = str2ull(procfile_lineword(ff, l, 1));
-            io_write = str2ull(procfile_lineword(ff, l, 2));
+            io_read = str2ull(procfile_lineword(ff, l, 1), NULL);
+            io_write = str2ull(procfile_lineword(ff, l, 2), NULL);
 
             unsigned long long sum = io_read + io_write;
             if(sum == 0ULL) do_io = -1;
@@ -326,7 +326,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                 continue;
             }
 
-            th_threads = str2ull(procfile_lineword(ff, l, 1));
+            th_threads = str2ull(procfile_lineword(ff, l, 1), NULL);
 
             // thread histogram has been disabled since 2009 (kernel 2.6.30)
             // https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/?id=8bbfa9f3889b643fc7de82c0c761ef17097f8faf
@@ -339,10 +339,10 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                 continue;
             }
 
-            net_count = str2ull(procfile_lineword(ff, l, 1));
-            net_udp_count = str2ull(procfile_lineword(ff, l, 2));
-            net_tcp_count = str2ull(procfile_lineword(ff, l, 3));
-            net_tcp_connections = str2ull(procfile_lineword(ff, l, 4));
+            net_count = str2ull(procfile_lineword(ff, l, 1), NULL);
+            net_udp_count = str2ull(procfile_lineword(ff, l, 2), NULL);
+            net_tcp_count = str2ull(procfile_lineword(ff, l, 3), NULL);
+            net_tcp_connections = str2ull(procfile_lineword(ff, l, 4), NULL);
 
             unsigned long long sum = net_count + net_udp_count + net_tcp_count + net_tcp_connections;
             if(sum == 0ULL) do_net = -1;
@@ -354,10 +354,10 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                 continue;
             }
 
-            rpc_calls = str2ull(procfile_lineword(ff, l, 1));
-            rpc_bad_format = str2ull(procfile_lineword(ff, l, 3));
-            rpc_bad_auth = str2ull(procfile_lineword(ff, l, 4));
-            rpc_bad_client = str2ull(procfile_lineword(ff, l, 5));
+            rpc_calls = str2ull(procfile_lineword(ff, l, 1), NULL);
+            rpc_bad_format = str2ull(procfile_lineword(ff, l, 3), NULL);
+            rpc_bad_auth = str2ull(procfile_lineword(ff, l, 4), NULL);
+            rpc_bad_client = str2ull(procfile_lineword(ff, l, 5), NULL);
 
             unsigned long long sum = rpc_calls + rpc_bad_format + rpc_bad_auth + rpc_bad_client;
             if(sum == 0ULL) do_rpc = -1;
@@ -370,7 +370,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             unsigned long long sum = 0;
             unsigned int i, j;
             for(i = 0, j = 2; j < words && nfsd_proc2_values[i].name[0] ; i++, j++) {
-                nfsd_proc2_values[i].value = str2ull(procfile_lineword(ff, l, j));
+                nfsd_proc2_values[i].value = str2ull(procfile_lineword(ff, l, j), NULL);
                 nfsd_proc2_values[i].present = 1;
                 sum += nfsd_proc2_values[i].value;
             }
@@ -391,7 +391,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             unsigned long long sum = 0;
             unsigned int i, j;
             for(i = 0, j = 2; j < words && nfsd_proc3_values[i].name[0] ; i++, j++) {
-                nfsd_proc3_values[i].value = str2ull(procfile_lineword(ff, l, j));
+                nfsd_proc3_values[i].value = str2ull(procfile_lineword(ff, l, j), NULL);
                 nfsd_proc3_values[i].present = 1;
                 sum += nfsd_proc3_values[i].value;
             }
@@ -412,7 +412,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             unsigned long long sum = 0;
             unsigned int i, j;
             for(i = 0, j = 2; j < words && nfsd_proc4_values[i].name[0] ; i++, j++) {
-                nfsd_proc4_values[i].value = str2ull(procfile_lineword(ff, l, j));
+                nfsd_proc4_values[i].value = str2ull(procfile_lineword(ff, l, j), NULL);
                 nfsd_proc4_values[i].present = 1;
                 sum += nfsd_proc4_values[i].value;
             }
@@ -433,7 +433,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             unsigned long long sum = 0;
             unsigned int i, j;
             for(i = 0, j = 2; j < words && nfsd4_ops_values[i].name[0] ; i++, j++) {
-                nfsd4_ops_values[i].value = str2ull(procfile_lineword(ff, l, j));
+                nfsd4_ops_values[i].value = str2ull(procfile_lineword(ff, l, j), NULL);
                 nfsd4_ops_values[i].present = 1;
                 sum += nfsd4_ops_values[i].value;
             }

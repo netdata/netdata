@@ -692,8 +692,9 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
         vd.page_length > RRDENG_BLOCK_SIZE                      ||
         vd.start_time_s > vd.end_time_s                         ||
         (now_s && vd.end_time_s > now_s)                        ||
-        vd.start_time_s == 0                                    ||
-        vd.end_time_s == 0                                      ||
+        vd.start_time_s <= 0                                    ||
+        vd.end_time_s <= 0                                      ||
+        vd.update_every_s < 0                                   ||
         (vd.start_time_s == vd.end_time_s && vd.entries > 1)    ||
         (vd.update_every_s == 0 && vd.entries > 1)
         )
@@ -835,7 +836,7 @@ static void epdl_extent_loading_error_log(struct rrdengine_instance *ctx, EPDL *
         uuid_unparse_lower(descr->uuid, uuid);
         used_descr = true;
     }
-    else if (epdl) {
+    else {
         struct page_details *pd = NULL;
 
         Word_t start = 0;
@@ -855,7 +856,7 @@ static void epdl_extent_loading_error_log(struct rrdengine_instance *ctx, EPDL *
         }
     }
 
-    if(!used_epdl && !used_descr && epdl && epdl->pdc) {
+    if(!used_epdl && !used_descr && epdl->pdc) {
         start_time_s = epdl->pdc->start_time_s;
         end_time_s = epdl->pdc->end_time_s;
     }
@@ -1059,7 +1060,7 @@ static bool epdl_populate_pages_from_extent_data(
                 .metric_id = metric_id,
                 .start_time_s = vd.start_time_s,
                 .end_time_s = vd.end_time_s,
-                .update_every_s = vd.update_every_s,
+                .update_every_s = (uint32_t) vd.update_every_s,
                 .size = (size_t) ((page_data == DBENGINE_EMPTY_PAGE) ? 0 : vd.page_length),
                 .data = page_data
         };

@@ -20,6 +20,7 @@ SUBDIRS = \
     locks \
     log \
     onewayalloc \
+    parser \
     popen \
     procfile \
     simple_pattern \

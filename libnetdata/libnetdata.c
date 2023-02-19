@@ -1883,16 +1883,19 @@ inline int config_isspace(char c)
 }
 
 // split a text into words, respecting quotes
-inline size_t quoted_strings_splitter(char *str, char **words, size_t max_words, int (*custom_isspace)(char), char *recover_input, char **recover_location, int max_recover)
+inline size_t quoted_strings_splitter(char *str, char **words, size_t max_words, int (*custom_isspace)(char))
 {
     char *s = str, quote = 0;
     size_t i = 0;
-    int rec = 0;
-    char *recover = recover_input;
 
     // skip all white space
     while (unlikely(custom_isspace(*s)))
         s++;
+
+    if(unlikely(!*s)) {
+        words[i] = NULL;
+        return 0;
+    }
 
     // check for quote
     if (unlikely(*s == '\'' || *s == '"')) {
@@ -1905,19 +1908,15 @@ inline size_t quoted_strings_splitter(char *str, char **words, size_t max_words,
 
     // while we have something
     while (likely(*s)) {
-        // if it is escape
+        // if it is an escape
         if (unlikely(*s == '\\' && s[1])) {
             s += 2;
             continue;
         }
 
-        // if it is quote
+        // if it is a quote
         else if (unlikely(*s == quote)) {
             quote = 0;
-            if (recover && rec < max_recover) {
-                recover_location[rec++] = s;
-                *recover++ = *s;
-            }
             *s = ' ';
             continue;
         }
@@ -1925,19 +1924,13 @@ inline size_t quoted_strings_splitter(char *str, char **words, size_t max_words,
         // if it is a space
         else if (unlikely(quote == 0 && custom_isspace(*s))) {
             // terminate the word
-            if (recover && rec < max_recover) {
-                if (!rec || recover_location[rec-1] != s) {
-                    recover_location[rec++] = s;
-                    *recover++ = *s;
-                }
-            }
             *s++ = '\0';
 
             // skip all white space
             while (likely(custom_isspace(*s)))
                 s++;
 
-            // check for quote
+            // check for a quote
             if (unlikely(*s == '\'' || *s == '"')) {
                 quote = *s; // remember the quote
                 s++;        // skip the quote
@@ -1965,9 +1958,9 @@ inline size_t quoted_strings_splitter(char *str, char **words, size_t max_words,
     return i;
 }
 
-inline size_t pluginsd_split_words(char *str, char **words, size_t max_words, char *recover_input, char **recover_location, int max_recover)
+inline size_t pluginsd_split_words(char *str, char **words, size_t max_words)
 {
-    return quoted_strings_splitter(str, words, max_words, pluginsd_space, recover_input, recover_location, max_recover);
+    return quoted_strings_splitter(str, words, max_words, pluginsd_space);
 }
 
 bool bitmap256_get_bit(BITMAP256 *ptr, uint8_t idx) {
@@ -2011,20 +2004,23 @@ void for_each_open_fd(OPEN_FD_ACTION action, OPEN_FD_EXCLUDE excluded_fds){
             if(!(excluded_fds & OPEN_FD_EXCLUDE_STDIN))  (void)close(STDIN_FILENO);
             if(!(excluded_fds & OPEN_FD_EXCLUDE_STDOUT)) (void)close(STDOUT_FILENO);
             if(!(excluded_fds & OPEN_FD_EXCLUDE_STDERR)) (void)close(STDERR_FILENO);
+#if defined(HAVE_CLOSE_RANGE)
+            if(close_range(STDERR_FILENO + 1, ~0U, 0) == 0) return;
+            error("close_range() failed, will try to close fds one by one");
+#endif
             break;
         case OPEN_FD_ACTION_FD_CLOEXEC:
             if(!(excluded_fds & OPEN_FD_EXCLUDE_STDIN))  (void)fcntl(STDIN_FILENO, F_SETFD, FD_CLOEXEC);
             if(!(excluded_fds & OPEN_FD_EXCLUDE_STDOUT)) (void)fcntl(STDOUT_FILENO, F_SETFD, FD_CLOEXEC);
             if(!(excluded_fds & OPEN_FD_EXCLUDE_STDERR)) (void)fcntl(STDERR_FILENO, F_SETFD, FD_CLOEXEC);
+#if defined(HAVE_CLOSE_RANGE) && defined(CLOSE_RANGE_CLOEXEC) // Linux >= 5.11, FreeBSD >= 13.1
+            if(close_range(STDERR_FILENO + 1, ~0U, CLOSE_RANGE_CLOEXEC) == 0) return;
+            error("close_range() failed, will try to mark fds for closing one by one");
+#endif
             break;
         default:
             break; // do nothing
     }
-
-#if defined(HAVE_CLOSE_RANGE)
-    if(close_range(STDERR_FILENO + 1, ~0U, (action == OPEN_FD_ACTION_FD_CLOEXEC ? CLOSE_RANGE_CLOEXEC : 0)) == 0) return;
-    error("close_range() failed, will try to close fds manually");
-#endif
 
     DIR *dir = opendir("/proc/self/fd");
     if (dir == NULL) {

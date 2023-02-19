@@ -10,7 +10,7 @@
 #include "web/api/queries/weights.h"
 
 RRDR_OPTIONS web_client_api_request_v1_data_options(char *o);
-void web_client_api_request_v1_data_options_to_buffer(BUFFER *wb, RRDR_OPTIONS options);
+void web_client_api_request_v1_data_options_to_buffer_json_array(BUFFER *wb, const char *key, RRDR_OPTIONS options);
 void web_client_api_request_v1_data_options_to_string(char *buf, size_t size, RRDR_OPTIONS options);
 
 uint32_t web_client_api_request_v1_data_format(char *name);
@@ -29,7 +29,6 @@ int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *w, char
 int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url);
 int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url);
 int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb);
-void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation);
 
 void web_client_api_v1_init(void);
 void web_client_api_v1_management_init(void);

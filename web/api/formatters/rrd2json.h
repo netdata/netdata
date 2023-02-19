@@ -53,19 +53,19 @@ typedef enum {
 #define DATASOURCE_FORMAT_CSV_MARKDOWN "markdown"
 
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
-void rrdr_buffer_print_format(BUFFER *wb, uint32_t format);
+const char *rrdr_format_to_string(uint32_t format);
 
 int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, struct query_target *qt, time_t *latest_timestamp);
 
 int rrdset2value_api_v1(
-          RRDSET *st
+        RRDSET *st
         , BUFFER *wb
         , NETDATA_DOUBLE *n
         , const char *dimensions
         , size_t points
         , time_t after
         , time_t before
-        , RRDR_GROUPING group_method
+        , RRDR_TIME_GROUPING group_method
         , const char *group_options
         , time_t resampling_time
         , uint32_t options
@@ -81,5 +81,12 @@ int rrdset2value_api_v1(
         , QUERY_SOURCE query_source
         , STORAGE_PRIORITY priority
 );
+
+static inline bool rrdr_dimension_should_be_exposed(RRDR_DIMENSION_FLAGS rrdr_dim_flags, RRDR_OPTIONS options) {
+    if(unlikely(rrdr_dim_flags & RRDR_DIMENSION_HIDDEN)) return false;
+    if(unlikely(!(rrdr_dim_flags & RRDR_DIMENSION_QUERIED))) return false;
+    if(unlikely((options & RRDR_OPTION_NONZERO) && !(rrdr_dim_flags & RRDR_DIMENSION_NONZERO))) return false;
+    return true;
+}
 
 #endif /* NETDATA_RRD2JSON_H */

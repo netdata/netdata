@@ -88,7 +88,7 @@ Learn more about [securing the Netdata Agent](https://github.com/netdata/netdata
 
 You can also use the restart/reload methods described above to enable new features:
 
-- [Enable new collectors](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md) or tweak their behavior.
+- [Enable new collectors](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md) or tweak their behavior.
 - [Configure existing health alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) or create new ones.
 - [Enable notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to receive updates about the health of your
   infrastructure.

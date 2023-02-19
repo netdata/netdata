@@ -97,6 +97,10 @@ ONEWAYALLOC *onewayalloc_create(size_t size_hint) {
 }
 
 void *onewayalloc_mallocz(ONEWAYALLOC *owa, size_t size) {
+#ifdef FSANITIZE_ADDRESS
+    return mallocz(size);
+#endif
+
     OWA_PAGE *head = (OWA_PAGE *)owa;
     OWA_PAGE *page = head->last;
 
@@ -142,6 +146,11 @@ void *onewayalloc_memdupz(ONEWAYALLOC *owa, const void *src, size_t size) {
 }
 
 void onewayalloc_freez(ONEWAYALLOC *owa __maybe_unused, const void *ptr __maybe_unused) {
+#ifdef FSANITIZE_ADDRESS
+    freez((void *)ptr);
+    return;
+#endif
+
 #ifdef NETDATA_INTERNAL_CHECKS
     // allow the caller to call us for a mallocz() allocation
     // so try to find it in our memory and if it is not there

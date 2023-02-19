@@ -1065,7 +1065,7 @@ void *tc_main(void *ptr) {
 
                 // debug(D_TC_LOOP, "SENT line '%s'", words[1]);
                 if(likely(words[1] && *words[1])) {
-                    class->bytes = str2ull(words[1]);
+                    class->bytes = str2ull(words[1], NULL);
                     class->updated = true;
                 }
                 else {
@@ -1073,10 +1073,10 @@ void *tc_main(void *ptr) {
                 }
 
                 if(likely(words[3] && *words[3]))
-                    class->packets = str2ull(words[3]);
+                    class->packets = str2ull(words[3], NULL);
 
                 if(likely(words[6] && *words[6]))
-                    class->dropped = str2ull(words[6]);
+                    class->dropped = str2ull(words[6], NULL);
 
                 //if(likely(words[8] && *words[8]))
                 //    class->overlimits = str2ull(words[8]);
@@ -1102,10 +1102,10 @@ void *tc_main(void *ptr) {
 
                 // debug(D_TC_LOOP, "TOKENS line '%s'", words[1]);
                 if(likely(words[1] && *words[1]))
-                    class->tokens = str2ull(words[1]);
+                    class->tokens = str2ull(words[1], NULL);
 
                 if(likely(words[3] && *words[3]))
-                    class->ctokens = str2ull(words[3]);
+                    class->ctokens = str2ull(words[3], NULL);
             }
             else if(unlikely(device && first_hash == SETDEVICENAME_HASH && strcmp(words[0], "SETDEVICENAME") == 0)) {
                 worker_is_busy(WORKER_TC_SETDEVICENAME);

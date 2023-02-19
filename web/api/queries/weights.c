@@ -114,112 +114,91 @@ static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *w
                                    time_t after, time_t before,
                                    time_t baseline_after, time_t baseline_before,
                                    size_t points, WEIGHTS_METHOD method,
-                                   RRDR_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
+                                   RRDR_TIME_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
                                    size_t examined_dimensions __maybe_unused, usec_t duration,
                                    WEIGHTS_STATS *stats) {
 
-    buffer_sprintf(wb, "{\n"
-                       "\t\"after\": %lld,\n"
-                       "\t\"before\": %lld,\n"
-                       "\t\"duration\": %lld,\n"
-                       "\t\"points\": %zu,\n",
-                       (long long)after,
-                       (long long)before,
-                       (long long)(before - after),
-                       points
-                       );
+    buffer_json_initialize(wb, "\"", "\"", 0, true);
+    buffer_json_member_add_time_t(wb, "after", after);
+    buffer_json_member_add_time_t(wb, "before", before);
+    buffer_json_member_add_time_t(wb, "duration", before - after);
+    buffer_json_member_add_uint64(wb, "points", points);
 
-    if(method == WEIGHTS_METHOD_MC_KS2 || method == WEIGHTS_METHOD_MC_VOLUME)
-        buffer_sprintf(wb, ""
-                           "\t\"baseline_after\": %lld,\n"
-                           "\t\"baseline_before\": %lld,\n"
-                           "\t\"baseline_duration\": %lld,\n"
-                           "\t\"baseline_points\": %zu,\n",
-                           (long long)baseline_after,
-                           (long long)baseline_before,
-                           (long long)(baseline_before - baseline_after),
-                           points << shifts
-                       );
+    if(method == WEIGHTS_METHOD_MC_KS2 || method == WEIGHTS_METHOD_MC_VOLUME) {
+        buffer_json_member_add_time_t(wb, "baseline_after", baseline_after);
+        buffer_json_member_add_time_t(wb, "baseline_before", baseline_before);
+        buffer_json_member_add_time_t(wb, "baseline_duration", baseline_before - baseline_after);
+        buffer_json_member_add_uint64(wb, "baseline_points", points << shifts);
+    }
 
-    buffer_sprintf(wb, ""
-                       "\t\"statistics\": {\n"
-                       "\t\t\"query_time_ms\": %f,\n"
-                       "\t\t\"db_queries\": %zu,\n"
-                       "\t\t\"query_result_points\": %zu,\n"
-                       "\t\t\"binary_searches\": %zu,\n"
-                       "\t\t\"db_points_read\": %zu,\n"
-                       "\t\t\"db_points_per_tier\": [ ",
-                       (double)duration / (double)USEC_PER_MS,
-                       stats->db_queries,
-                       stats->result_points,
-                       stats->binary_searches,
-                       stats->db_points
-                   );
+    buffer_json_member_add_object(wb, "statistics");
+    {
+        buffer_json_member_add_double(wb, "query_time_ms", (double) duration / (double) USEC_PER_MS);
+        buffer_json_member_add_uint64(wb, "db_queries", stats->db_queries);
+        buffer_json_member_add_uint64(wb, "query_result_points", stats->result_points);
+        buffer_json_member_add_uint64(wb, "binary_searches", stats->binary_searches);
+        buffer_json_member_add_uint64(wb, "db_points_read", stats->db_points);
 
-    for(size_t tier = 0; tier < storage_tiers ;tier++)
-        buffer_sprintf(wb, "%s%zu", tier?", ":"", stats->db_points_per_tier[tier]);
+        buffer_json_member_add_array(wb, "db_points_per_tier");
+        {
+            for (size_t tier = 0; tier < storage_tiers; tier++)
+                buffer_json_add_array_item_uint64(wb, stats->db_points_per_tier[tier]);
+        }
+        buffer_json_array_close(wb);
+    }
+    buffer_json_object_close(wb);
 
-    buffer_sprintf(wb, " ]\n"
-                       "\t},\n"
-                       "\t\"group\": \"%s\",\n"
-                       "\t\"method\": \"%s\",\n"
-                       "\t\"options\": \"",
-                       web_client_api_request_v1_data_group_to_string(group),
-                       weights_method_to_string(method)
-                   );
-
-    web_client_api_request_v1_data_options_to_buffer(wb, options);
+    buffer_json_member_add_string(wb, "group", time_grouping_tostring(group));
+    buffer_json_member_add_string(wb, "method", weights_method_to_string(method));
+    web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", options);
 }
 
 static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
                                                 time_t after, time_t before,
                                                 time_t baseline_after, time_t baseline_before,
                                                 size_t points, WEIGHTS_METHOD method,
-                                                RRDR_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
+                                                RRDR_TIME_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
                                                 size_t examined_dimensions, usec_t duration,
                                                 WEIGHTS_STATS *stats) {
 
     results_header_to_json(results, wb, after, before, baseline_after, baseline_before,
                            points, method, group, options, shifts, examined_dimensions, duration, stats);
 
-    buffer_strcat(wb, "\",\n\t\"correlated_charts\": {\n");
+    buffer_json_member_add_object(wb, "correlated_charts");
 
-    size_t charts = 0, chart_dims = 0, total_dimensions = 0;
+    size_t charts = 0, total_dimensions = 0;
     struct register_result *t;
     RRDINSTANCE_ACQUIRED *last_ria = NULL; // never access this - we use it only for comparison
     dfe_start_read(results, t) {
         if(t->ria != last_ria) {
             last_ria = t->ria;
 
-            if(charts) buffer_strcat(wb, "\n\t\t\t}\n\t\t},\n");
-            buffer_strcat(wb, "\t\t\"");
-            buffer_strcat(wb, rrdinstance_acquired_id(t->ria));
-            buffer_strcat(wb, "\": {\n");
-            buffer_strcat(wb, "\t\t\t\"context\": \"");
-            buffer_strcat(wb, rrdcontext_acquired_id(t->rca));
-            buffer_strcat(wb, "\",\n\t\t\t\"dimensions\": {\n");
+            if(charts) {
+                buffer_json_object_close(wb); // dimensions
+                buffer_json_object_close(wb); // chart:id
+            }
+
+            buffer_json_member_add_object(wb, rrdinstance_acquired_id(t->ria));
+            buffer_json_member_add_string(wb, "context", rrdcontext_acquired_id(t->rca));
+            buffer_json_member_add_object(wb, "dimensions");
             charts++;
-            chart_dims = 0;
         }
-        if (chart_dims) buffer_sprintf(wb, ",\n");
-        buffer_sprintf(wb, "\t\t\t\t\"%s\": " NETDATA_DOUBLE_FORMAT, rrdmetric_acquired_name(t->rma), t->value);
-        chart_dims++;
+        buffer_json_member_add_double(wb, rrdmetric_acquired_name(t->rma), t->value);
         total_dimensions++;
     }
     dfe_done(t);
 
     // close dimensions and chart
-    if (total_dimensions)
-        buffer_strcat(wb, "\n\t\t\t}\n\t\t}\n");
+    if (total_dimensions) {
+        buffer_json_object_close(wb); // dimensions
+        buffer_json_object_close(wb); // chart:id
+    }
 
-    // close correlated_charts
-    buffer_sprintf(wb, "\t},\n"
-                       "\t\"correlated_dimensions\": %zu,\n"
-                       "\t\"total_dimensions_count\": %zu\n"
-                       "}\n",
-                   total_dimensions,
-                   examined_dimensions
-                   );
+    buffer_json_object_close(wb);
+
+    buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
+    buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
+    buffer_json_finalize(wb);
 
     return total_dimensions;
 }
@@ -228,14 +207,14 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
                                                   time_t after, time_t before,
                                                   time_t baseline_after, time_t baseline_before,
                                                   size_t points, WEIGHTS_METHOD method,
-                                                  RRDR_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
+                                                  RRDR_TIME_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
                                                   size_t examined_dimensions, usec_t duration,
                                                   WEIGHTS_STATS *stats) {
 
     results_header_to_json(results, wb, after, before, baseline_after, baseline_before,
                            points, method, group, options, shifts, examined_dimensions, duration, stats);
 
-    buffer_strcat(wb, "\",\n\t\"contexts\": {\n");
+    buffer_json_member_add_object(wb, "contexts");
 
     size_t contexts = 0, charts = 0, total_dimensions = 0, context_dims = 0, chart_dims = 0;
     NETDATA_DOUBLE contexts_total_weight = 0.0, charts_total_weight = 0.0;
@@ -247,18 +226,17 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
         if(t->rca != last_rca) {
             last_rca = t->rca;
 
-            if(contexts)
-                buffer_sprintf(wb, "\n"
-                                   "\t\t\t\t\t},\n"
-                                   "\t\t\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n"
-                                   "\t\t\t\t}\n\t\t\t},\n"
-                                   "\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n\t\t},\n"
-                        , charts_total_weight / (double)chart_dims
-                        , contexts_total_weight / (double)context_dims);
+            if(contexts) {
+                buffer_json_object_close(wb); // dimensions
+                buffer_json_member_add_double(wb, "weight", charts_total_weight / (double) chart_dims);
+                buffer_json_object_close(wb); // chart:id
+                buffer_json_object_close(wb); // charts
+                buffer_json_member_add_double(wb, "weight", contexts_total_weight / (double) context_dims);
+                buffer_json_object_close(wb); // context
+            }
 
-            buffer_strcat(wb, "\t\t\"");
-            buffer_strcat(wb, rrdcontext_acquired_id(t->rca));
-            buffer_strcat(wb, "\": {\n\t\t\t\"charts\":{\n");
+            buffer_json_member_add_object(wb, rrdcontext_acquired_id(t->rca));
+            buffer_json_member_add_object(wb, "charts");
 
             contexts++;
             charts = 0;
@@ -271,25 +249,21 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
         if(t->ria != last_ria) {
             last_ria = t->ria;
 
-            if(charts)
-                buffer_sprintf(wb, "\n"
-                                   "\t\t\t\t\t},\n"
-                                   "\t\t\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n"
-                                   "\t\t\t\t},\n"
-                                   , charts_total_weight / (double)chart_dims);
+            if(charts) {
+                buffer_json_object_close(wb); // dimensions
+                buffer_json_member_add_double(wb, "weight", charts_total_weight / (double) chart_dims);
+                buffer_json_object_close(wb); // chart:id
+            }
 
-            buffer_strcat(wb, "\t\t\t\t\"");
-            buffer_strcat(wb, rrdinstance_acquired_id(t->ria));
-            buffer_strcat(wb, "\": {\n");
-            buffer_strcat(wb, "\t\t\t\t\t\"dimensions\": {\n");
+            buffer_json_member_add_object(wb, rrdinstance_acquired_id(t->ria));
+            buffer_json_member_add_object(wb, "dimensions");
 
             charts++;
             chart_dims = 0;
             charts_total_weight = 0.0;
         }
 
-        if (chart_dims) buffer_sprintf(wb, ",\n");
-        buffer_sprintf(wb, "\t\t\t\t\t\t\"%s\": " NETDATA_DOUBLE_FORMAT, rrdmetric_acquired_name(t->rma), t->value);
+        buffer_json_member_add_double(wb, rrdmetric_acquired_name(t->rma), t->value);
         charts_total_weight += t->value;
         contexts_total_weight += t->value;
         chart_dims++;
@@ -299,25 +273,20 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
     dfe_done(t);
 
     // close dimensions and chart
-    if (total_dimensions)
-        buffer_sprintf(wb, "\n"
-                           "\t\t\t\t\t},\n"
-                           "\t\t\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n"
-                           "\t\t\t\t}\n"
-                           "\t\t\t},\n"
-                           "\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n"
-                           "\t\t}\n"
-                           , charts_total_weight / (double)chart_dims
-                           , contexts_total_weight / (double)context_dims);
+    if (total_dimensions) {
+        buffer_json_object_close(wb); // dimensions
+        buffer_json_member_add_double(wb, "weight", charts_total_weight / (double) chart_dims);
+        buffer_json_object_close(wb); // chart:id
+        buffer_json_object_close(wb); // charts
+        buffer_json_member_add_double(wb, "weight", contexts_total_weight / (double) context_dims);
+        buffer_json_object_close(wb); // context
+    }
 
-    // close correlated_charts
-    buffer_sprintf(wb, "\t},\n"
-                       "\t\"weighted_dimensions\": %zu,\n"
-                       "\t\"total_dimensions_count\": %zu\n"
-                       "}\n",
-                   total_dimensions,
-                   examined_dimensions
-    );
+    buffer_json_object_close(wb);
+
+    buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
+    buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
+    buffer_json_finalize(wb);
 
     return total_dimensions;
 }
@@ -500,7 +469,7 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
         ONEWAYALLOC *owa, RRDHOST *host,
         RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma,
         time_t after, time_t before, size_t points, RRDR_OPTIONS options,
-        RRDR_GROUPING group_method, const char *group_options, size_t tier,
+        RRDR_TIME_GROUPING group_method, const char *group_options, size_t tier,
         WEIGHTS_STATS *stats,
         size_t *entries
         ) {
@@ -516,11 +485,11 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
             .before = before,
             .points = points,
             .options = options,
-            .group_method = group_method,
-            .group_options = group_options,
+            .time_group_method = group_method,
+            .time_group_options = group_options,
             .tier = tier,
             .query_source = QUERY_SOURCE_API_WEIGHTS,
-            .priority = STORAGE_PRIORITY_NORMAL,
+            .priority = STORAGE_PRIORITY_SYNCHRONOUS,
     };
 
     RRDR *r = rrd2rrdr(owa, query_target_create(&qtr));
@@ -570,7 +539,7 @@ static void rrdset_metric_correlations_ks2(
         time_t baseline_after, time_t baseline_before,
         time_t after, time_t before,
         size_t points, RRDR_OPTIONS options,
-        RRDR_GROUPING group_method, const char *group_options, size_t tier,
+        RRDR_TIME_GROUPING group_method, const char *group_options, size_t tier,
         uint32_t shifts,
         WEIGHTS_STATS *stats, bool register_zero
         ) {
@@ -636,7 +605,7 @@ static void rrdset_metric_correlations_volume(
         DICTIONARY *results,
         time_t baseline_after, time_t baseline_before,
         time_t after, time_t before,
-        RRDR_OPTIONS options, RRDR_GROUPING group_method, const char *group_options,
+        RRDR_OPTIONS options, RRDR_TIME_GROUPING group_method, const char *group_options,
         size_t tier,
         WEIGHTS_STATS *stats, bool register_zero) {
 
@@ -644,7 +613,7 @@ static void rrdset_metric_correlations_volume(
 
     QUERY_VALUE baseline_average = rrdmetric2value(host, rca, ria, rma, baseline_after, baseline_before,
                                                    options, group_method, group_options, tier, 0,
-                                                   QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_NORMAL);
+                                                   QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS);
     merge_query_value_to_stats(&baseline_average, stats);
 
     if(!netdata_double_isnumber(baseline_average.value)) {
@@ -654,7 +623,7 @@ static void rrdset_metric_correlations_volume(
 
     QUERY_VALUE highlight_average = rrdmetric2value(host, rca, ria, rma, after, before,
                                                     options, group_method, group_options, tier, 0,
-                                                    QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_NORMAL);
+                                                    QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS);
     merge_query_value_to_stats(&highlight_average, stats);
 
     if(!netdata_double_isnumber(highlight_average.value))
@@ -669,7 +638,7 @@ static void rrdset_metric_correlations_volume(
     snprintfz(highlight_countif_options, 50, "%s" NETDATA_DOUBLE_FORMAT, highlight_average.value < baseline_average.value ? "<" : ">", baseline_average.value);
     QUERY_VALUE highlight_countif = rrdmetric2value(host, rca, ria, rma, after, before,
                                                     options, RRDR_GROUPING_COUNTIF, highlight_countif_options, tier, 0,
-                                                    QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_NORMAL);
+                                                    QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS);
     merge_query_value_to_stats(&highlight_countif, stats);
 
     if(!netdata_double_isnumber(highlight_countif.value)) {
@@ -704,7 +673,7 @@ static void rrdset_weights_anomaly_rate(
         RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma,
         DICTIONARY *results,
         time_t after, time_t before,
-        RRDR_OPTIONS options, RRDR_GROUPING group_method, const char *group_options,
+        RRDR_OPTIONS options, RRDR_TIME_GROUPING group_method, const char *group_options,
         size_t tier,
         WEIGHTS_STATS *stats, bool register_zero) {
 
@@ -712,7 +681,7 @@ static void rrdset_weights_anomaly_rate(
 
     QUERY_VALUE qv = rrdmetric2value(host, rca, ria, rma, after, before,
                                      options, group_method, group_options, tier, 0,
-                                     QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_NORMAL);
+                                     QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS);
 
     merge_query_value_to_stats(&qv, stats);
 
@@ -807,7 +776,7 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
 
 int web_api_v1_weights(
         RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS_FORMAT format,
-        RRDR_GROUPING group, const char *group_options,
+        RRDR_TIME_GROUPING group, const char *group_options,
         time_t baseline_after, time_t baseline_before,
         time_t after, time_t before,
         size_t points, RRDR_OPTIONS options, SIMPLE_PATTERN *contexts, size_t tier, size_t timeout) {

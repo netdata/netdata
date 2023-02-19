@@ -91,7 +91,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.data.kernel_name = host->system_info->kernel_name;
     node_info.data.kernel_version = host->system_info->kernel_version;
     node_info.data.architecture = host->system_info->architecture;
-    node_info.data.cpus = host->system_info->host_cores ? str2uint32_t(host->system_info->host_cores) : 0;
+    node_info.data.cpus = host->system_info->host_cores ? str2uint32_t(host->system_info->host_cores, NULL) : 0;
     node_info.data.cpu_frequency = host->system_info->host_cpu_freq ? host->system_info->host_cpu_freq : "0";
     node_info.data.memory = host->system_info->host_ram_total ? host->system_info->host_ram_total : "0";
     node_info.data.disk_space = host->system_info->host_disk_space ? host->system_info->host_disk_space : "0";

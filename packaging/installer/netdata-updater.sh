@@ -341,11 +341,20 @@ create_tmp_directory() {
   fi
 }
 
+check_for_curl() {
+  if [ -z "${curl}" ]; then
+    curl="$(PATH="${PATH}:/opt/netdata/bin" command -v curl 2>/dev/null && true)"
+  fi
+}
+
 _safe_download() {
   url="${1}"
   dest="${2}"
-  if command -v curl > /dev/null 2>&1; then
-    curl -sSL --connect-timeout 10 --retry 3 "${url}" > "${dest}"
+
+  check_for_curl
+
+  if [ -n "${curl}" ]; then
+    "${curl}" -sSL --connect-timeout 10 --retry 3 "${url}" > "${dest}"
     return $?
   elif command -v wget > /dev/null 2>&1; then
     wget -T 15 -O - "${url}" > "${dest}"
@@ -375,8 +384,10 @@ get_netdata_latest_tag() {
   url="${1}/latest"
   dest="${2}"
 
-  if command -v curl >/dev/null 2>&1; then
-    tag=$(curl "${url}" -s -L -I -o /dev/null -w '%{url_effective}' | grep -m 1 -o '[^/]*$')
+  check_for_curl
+
+  if [ -n "${curl}" ]; then
+    tag=$("${curl}" "${url}" -s -L -I -o /dev/null -w '%{url_effective}' | grep -m 1 -o '[^/]*$')
   elif command -v wget >/dev/null 2>&1; then
     tag=$(wget -S -O /dev/null "${url}" 2>&1 | grep -m 1 Location | grep -o '[^/]*$')
   else

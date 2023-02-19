@@ -29,7 +29,7 @@ public:
     double DimensionAnomalyScoreThreshold;
 
     double HostAnomalyRateThreshold;
-    RRDR_GROUPING AnomalyDetectionGroupingMethod;
+    RRDR_TIME_GROUPING AnomalyDetectionGroupingMethod;
     time_t AnomalyDetectionQueryDuration;
 
     bool StreamADCharts;

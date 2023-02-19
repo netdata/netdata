@@ -4,7 +4,7 @@ sidebar_label: "Monitor Nginx or Apache web server log files with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/collect-apache-nginx-web-logs.md
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "Guides"
+learn_rel_path: "Miscellaneous"
 -->
 
 # Monitor Nginx or Apache web server log files with Netdata
@@ -120,12 +120,5 @@ You can also edit this file directly with `edit-config`:
 ./edit-config health.d/weblog.conf
 ```
 
-For more information about editing the defaults or writing new alarm entities, see our [health monitoring
-documentation](https://github.com/netdata/netdata/blob/master/health/README.md).
-
-## What's next?
-
-Now that you have web log collection up and running, we recommend you take a look at the collector's [documentation](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md) for some ideas of how you can turn these rather "boring" logs into powerful real-time tools for keeping your servers happy.
-
-Don't forget to give GitHub user [Wing924](https://github.com/Wing924) a big 👍 for his hard work in starting up the Go
-refactoring effort.
+For more information about editing the defaults or writing new alarm entities, see our 
+[health monitoring documentation](https://github.com/netdata/netdata/blob/master/health/README.md).

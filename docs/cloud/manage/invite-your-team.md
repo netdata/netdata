@@ -22,7 +22,7 @@ Next, choose the War Rooms you want to invite these users to. Once logged in, th
 these War Rooms. They can be invited to others, or join any that are public.
 
 Click the **Send** button to send an email invitation, which will prompt them
-to [sign up](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.mdx) and join your Space.
+to [sign up](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.md) and join your Space.
 
 ![The invitation panel in Netdata Cloud](https://user-images.githubusercontent.com/1153921/97762959-53b33680-1ac7-11eb-8e9d-f3f4a14c0028.png)
 
@@ -32,6 +32,6 @@ time by clicking the trash can icon.
 ## What's next?
 
 If your team members have trouble signing in, direct them to
-the [sign in guide](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.mdx). Once your
+the [sign in guide](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.md). Once your
 team is onboarded to Netdata Cloud, they can view shared assets, such
 as [new dashboards](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md).

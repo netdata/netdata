@@ -17,7 +17,7 @@ for i, v in enumerate(data['include']):
     }
 
     if 'base_image' in v:
-        e['distro'] = ':'.join([v['base_image'], str(v['version'])])
+        e['distro'] = v['base_image']
     else:
         e['distro'] = ':'.join([v['distro'], str(v['version'])])
 

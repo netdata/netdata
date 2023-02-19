@@ -19,30 +19,30 @@ void Host::removeChart(Chart *C) {
     Charts.erase(C->getRS());
 }
 
-void Host::getConfigAsJson(nlohmann::json &Json) const {
-    Json["version"] = 1;
+void Host::getConfigAsJson(BUFFER *wb) const {
+    buffer_json_member_add_uint64(wb, "version", 1);
 
-    Json["enabled"] = Cfg.EnableAnomalyDetection;
+    buffer_json_member_add_boolean(wb, "enabled", Cfg.EnableAnomalyDetection);
 
-    Json["min-train-samples"] = Cfg.MinTrainSamples;
-    Json["max-train-samples"] = Cfg.MaxTrainSamples;
-    Json["train-every"] = Cfg.TrainEvery;
+    buffer_json_member_add_uint64(wb, "min-train-samples", Cfg.MinTrainSamples);
+    buffer_json_member_add_uint64(wb, "max-train-samples", Cfg.MaxTrainSamples);
+    buffer_json_member_add_uint64(wb, "train-every", Cfg.TrainEvery);
 
-    Json["diff-n"] = Cfg.DiffN;
-    Json["smooth-n"] = Cfg.SmoothN;
-    Json["lag-n"] = Cfg.LagN;
+    buffer_json_member_add_uint64(wb, "diff-n", Cfg.DiffN);
+    buffer_json_member_add_uint64(wb, "smooth-n", Cfg.SmoothN);
+    buffer_json_member_add_uint64(wb, "lag-n", Cfg.LagN);
 
-    Json["random-sampling-ratio"] = Cfg.RandomSamplingRatio;
-    Json["max-kmeans-iters"] = Cfg.MaxKMeansIters;
+    buffer_json_member_add_double(wb, "random-sampling-ratio", Cfg.RandomSamplingRatio);
+    buffer_json_member_add_uint64(wb, "max-kmeans-iters", Cfg.MaxKMeansIters);
 
-    Json["dimension-anomaly-score-threshold"] = Cfg.DimensionAnomalyScoreThreshold;
+    buffer_json_member_add_double(wb, "dimension-anomaly-score-threshold", Cfg.DimensionAnomalyScoreThreshold);
 
-    Json["host-anomaly-rate-threshold"] = Cfg.HostAnomalyRateThreshold;
-    Json["anomaly-detection-grouping-method"] = group_method2string(Cfg.AnomalyDetectionGroupingMethod);
-    Json["anomaly-detection-query-duration"] = Cfg.AnomalyDetectionQueryDuration;
+    buffer_json_member_add_double(wb, "host-anomaly-rate-threshold", Cfg.HostAnomalyRateThreshold);
+    buffer_json_member_add_string(wb, "anomaly-detection-grouping-method", time_grouping_method2string(Cfg.AnomalyDetectionGroupingMethod));
+    buffer_json_member_add_time_t(wb, "anomaly-detection-query-duration", Cfg.AnomalyDetectionQueryDuration);
 
-    Json["hosts-to-skip"] = Cfg.HostsToSkip;
-    Json["charts-to-skip"] = Cfg.ChartsToSkip;
+    buffer_json_member_add_string(wb, "hosts-to-skip", Cfg.HostsToSkip.c_str());
+    buffer_json_member_add_string(wb, "charts-to-skip", Cfg.ChartsToSkip.c_str());
 }
 
 void Host::getModelsAsJson(nlohmann::json &Json) {

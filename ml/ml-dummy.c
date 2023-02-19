@@ -47,9 +47,9 @@ void ml_stop_anomaly_detection_threads(RRDHOST *RH) {
     UNUSED(RH);
 }
 
-char *ml_get_host_info(RRDHOST *RH) {
+void ml_get_host_info(RRDHOST *RH, BUFFER *wb) {
     (void) RH;
-    return NULL;
+    (void) wb;
 }
 
 char *ml_get_host_runtime_info(RRDHOST *RH) {

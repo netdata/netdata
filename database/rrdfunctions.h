@@ -26,10 +26,10 @@ void rrd_functions_expose_rrdpush(RRDSET *st, BUFFER *wb);
 
 void chart_functions2json(RRDSET *st, BUFFER *wb, int tabs, const char *kq, const char *sq);
 void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst);
-void host_functions2json(RRDHOST *host, BUFFER *wb, int tabs, const char *kq, const char *sq);
+void host_functions2json(RRDHOST *host, BUFFER *wb);
 
 uint8_t functions_format_to_content_type(const char *format);
-const char *functions_content_type_to_format(uint8_t content_type);
+const char *functions_content_type_to_format(HTTP_CONTENT_TYPE content_type);
 int rrd_call_function_error(BUFFER *wb, const char *msg, int code);
 
 #endif // NETDATA_RRDFUNCTIONS_H

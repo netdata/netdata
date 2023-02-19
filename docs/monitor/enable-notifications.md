@@ -1,51 +1,50 @@
 <!--
-title: "Enable alarm notifications"
+title: "Alert notifications"
 description: "Send Netdata alarms from a centralized place with Netdata Cloud, or configure nodes individually, to enable incident response and faster resolution."
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/monitor/enable-notifications.md"
-sidebar_label: "Enable alarm notifications"
+sidebar_label: "Notify"
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Setup"
+learn_rel_path: "Integrations/Notify"
 -->
 
-# Enable alarm notifications
+# Enable alert notifications
 
-Netdata offers two ways to receive alarm notifications on external platforms. These methods work independently _or_ in
-parallel, which means you can enable both at the same time to send alarm notifications to any number of endpoints.
+Netdata offers two ways to receive alert notifications on external platforms. These methods work independently _or_ in
+parallel, which means you can enable both at the same time to send alert notifications to any number of endpoints.
 
-Both methods use a node's health alarms to generate the content of alarm notifications. Read the doc on [configuring
-alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) to change the preconfigured thresholds or to create tailored alarms for your
+Both methods use a node's health alerts to generate the content of alert notifications. Read the doc on [configuring
+alerts](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) to change the preconfigured thresholds or to create tailored alerts for your
 infrastructure.
 
-Netdata Cloud offers [centralized alarm notifications](#netdata-cloud) via email, which leverages the health status
+Netdata Cloud offers [centralized alert notifications](#netdata-cloud) via email, which leverages the health status
 information already streamed to Netdata Cloud from connected nodes to send notifications to those who have enabled them.
 
 The Netdata Agent has a [notification system](#netdata-agent) that supports more than a dozen services, such as email,
 Slack, PagerDuty, Twilio, Amazon SNS, Discord, and much more.
 
-For example, use centralized alarm notifications in Netdata Cloud for immediate, zero-configuration alarm notifications
+For example, use centralized alert notifications in Netdata Cloud for immediate, zero-configuration alert notifications
 for your team, then configure individual nodes send notifications to a PagerDuty endpoint for an automated incident
 response process.
 
 ## Netdata Cloud
 
-Netdata Cloud's [centralized alarm
-notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.mdx) is a zero-configuration way to
+Netdata Cloud's [centralized alert
+notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md) is a zero-configuration way to
 get notified when an anomaly or incident strikes any node or application in your infrastructure. The advantage of using
-centralized alarm notifications from Netdata Cloud is that you don't have to worry about configuring each node in your
+centralized alert notifications from Netdata Cloud is that you don't have to worry about configuring each node in your
 infrastructure.
 
-To enable centralized alarm notifications for a Space, click on **Manage Space** in the left-hand menu, then click on
+To enable centralized alert notifications for a Space, click on **Manage Space** in the left-hand menu, then click on
 the **Notifications** tab. Click the toggle switch next to **E-mail** to enable this notification method.
 
 Next, enable notifications on a user level by clicking on your profile icon, then **Profile** in the dropdown. The
 **Notifications** tab reveals rich management settings, including the ability to enable/disable methods entirely or
 choose what types of notifications to receive from each War Room.
 
-![Enabling and configuring alarm notifications in Netdata
+![Enabling and configuring alert notifications in Netdata
 Cloud](https://user-images.githubusercontent.com/1153921/101936280-93c50900-3b9d-11eb-9ba0-d6927fa872b7.gif)
 
-See the [centralized alarm notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.mdx)
+See the [centralized alert notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md)
 reference doc for further details about what information is conveyed in an email notification, flood protection, and
 more.
 
@@ -53,7 +52,7 @@ more.
 
 The Netdata Agent's [notification system](https://github.com/netdata/netdata/blob/master/health/notifications/README.md) runs on every node and dispatches
 notifications based on configured endpoints and roles. You can enable multiple endpoints on any one node _and_ use Agent
-notifications in parallel with centralized alarm notifications in Netdata Cloud.
+notifications in parallel with centralized alert notifications in Netdata Cloud.
 
 > ❗ If you want to enable notifications from multiple nodes in your infrastructure, each running the Netdata Agent, you
 > must configure each node individually.
@@ -94,7 +93,7 @@ notification platform.
 ### Enable Slack notifications
 
 First, [Add an incoming webhook](https://slack.com/apps/A0F7XDUAZ-incoming-webhooks) in Slack for the channel where you
-want to see alarm notifications from Netdata. Click the green **Add to Slack** button, choose the channel, and click the
+want to see alert notifications from Netdata. Click the green **Add to Slack** button, choose the channel, and click the
 **Add Incoming WebHooks Integration** button.
 
 On the following page, you'll receive a **Webhook URL**. That's what you'll need to configure Netdata, so keep it handy.
@@ -135,17 +134,4 @@ You should receive three notifications in your Slack channel for each health sta
 `CLEAR`.
 
 See the [Agent Slack notifications](https://github.com/netdata/netdata/blob/master/health/notifications/slack/README.md) doc for more options and information.
-
-## What's next?
-
-Now that you have health entities configured to your infrastructure's needs and notifications to inform you of anomalies
-or incidents, your health monitoring setup is complete.
-
-To make your dashboards most useful during root cause analysis, use Netdata's [distributed data
-architecture](https://github.com/netdata/netdata/blob/master/docs/store/distributed-data-architecture.md) for the best-in-class performance and scalability.
-
-### Related reference documentation
-
-- [Netdata Cloud · Alarm notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.mdx)
-- [Netdata Agent · Notifications](https://github.com/netdata/netdata/blob/master/health/notifications/README.md)
 

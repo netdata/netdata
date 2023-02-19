@@ -3,13 +3,9 @@ title: "LAMP stack monitoring (Linux, Apache, MySQL, PHP) with Netdata"
 sidebar_label: "LAMP stack monitoring (Linux, Apache, MySQL, PHP) with Netdata"
 description: "Set up robust LAMP stack monitoring (Linux, Apache, MySQL, PHP) in just a few minutes using a free, open-source monitoring tool that collects metrics every second."
 image: /img/seo/guides/monitor/lamp-stack.png
-author: "Joel Hans"
-author_title: "Editorial Director, Technical & Educational Resources"
-author_img: "/img/authors/joel-hans.jpg"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/lamp-stack.md
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Guides/Monitor"
+learn_rel_path: "Miscellaneous"
 -->
 import { OneLineInstallWget } from '@site/src/components/OneLineInstall/'
 
@@ -62,7 +58,7 @@ To follow this tutorial, you need:
 ## Install the Netdata Agent
 
 If you don't have the free, open-source Netdata monitoring agent installed on your node yet, get started with a [single
-kickstart command](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx):
+kickstart command](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md):
 
 <OneLineInstallWget/>
 
@@ -242,7 +238,7 @@ source of issues faster with [Metric Correlations](https://github.com/netdata/ne
 
 ### Related reference documentation
 
-- [Netdata Agent · Get started](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx)
+- [Netdata Agent · Get started](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md)
 - [Netdata Agent · Apache data collector](https://github.com/netdata/go.d.plugin/blob/master/modules/apache/README.md)
 - [Netdata Agent · Web log collector](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md)
 - [Netdata Agent · MySQL data collector](https://github.com/netdata/go.d.plugin/blob/master/modules/mysql/README.md)

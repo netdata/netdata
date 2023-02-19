@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-typedef enum rrdr_grouping {
+typedef enum rrdr_time_grouping {
     RRDR_GROUPING_UNDEFINED = 0,
     RRDR_GROUPING_AVERAGE,
     RRDR_GROUPING_MIN,
@@ -45,12 +45,27 @@ typedef enum rrdr_grouping {
     RRDR_GROUPING_SES,
     RRDR_GROUPING_DES,
     RRDR_GROUPING_COUNTIF,
-} RRDR_GROUPING;
+} RRDR_TIME_GROUPING;
 
-const char *group_method2string(RRDR_GROUPING group);
-void web_client_api_v1_init_grouping(void);
-RRDR_GROUPING web_client_api_request_v1_data_group(const char *name, RRDR_GROUPING def);
-const char *web_client_api_request_v1_data_group_to_string(RRDR_GROUPING group);
+const char *time_grouping_method2string(RRDR_TIME_GROUPING group);
+void time_grouping_init(void);
+RRDR_TIME_GROUPING time_grouping_parse(const char *name, RRDR_TIME_GROUPING def);
+const char *time_grouping_tostring(RRDR_TIME_GROUPING group);
+
+typedef enum rrdr_group_by {
+    RRDR_GROUP_BY_UNDEFINED = 0,
+    RRDR_GROUP_BY_NODE,
+    RRDR_GROUP_BY_INSTANCE,
+    RRDR_GROUP_BY_LABEL,
+} RRDR_GROUP_BY;
+
+typedef enum rrdr_group_by_function {
+    RRDR_GROUP_BY_FUNCTION_AVERAGE,
+    RRDR_GROUP_BY_FUNCTION_MIN,
+    RRDR_GROUP_BY_FUNCTION_MAX,
+    RRDR_GROUP_BY_FUNCTION_SUM,
+    RRDR_GROUP_BY_FUNCTION_SUM_COUNT,
+} RRDR_GROUP_BY_FUNCTION;
 
 #ifdef __cplusplus
 }

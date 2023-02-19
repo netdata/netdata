@@ -18,7 +18,9 @@ learn_rel_path: "Installation"
 > with your recommended improvements or changes. Thank you!
 
 
-The good news is that our [one-line installation script](kickstart.md) works fine if your NAS is one that uses the amd64 architecture. It
+The good news is that our 
+[one-line installation script](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md) 
+works fine if your NAS is one that uses the amd64 architecture. It
 will install the content into `/opt/netdata`, making future removal safe and simple.
 
 ## Run as netdata user
@@ -29,8 +31,8 @@ installations run it as the `netdata` user, you might wish to do the same. This 
 1.  Create a group `netdata` via the Synology group interface. Give it no access to anything.
 2.  Create a user `netdata` via the Synology user interface. Give it no access to anything and a random password. Assign
     the user to the `netdata` group. Netdata will chuid to this user when running.
-3.  Change ownership of the following directories, as defined in [Netdata
-    Security](https://github.com/netdata/netdata/blob/master/docs/netdata-security.md#security-design):
+3.  Change ownership of the following directories, as defined in 
+    [Netdata Security](https://github.com/netdata/netdata/blob/master/docs/netdata-security.md#security-design):
 
 ```sh
 chown -R root:netdata /opt/netdata/usr/share/netdata

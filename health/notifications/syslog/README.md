@@ -1,14 +1,14 @@
 <!--
-title: "Syslog"
+title: "Syslog agent alert notifications"
 sidebar_label: "Syslog"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/syslog/README.md"
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "Setup/Notification/Agent"
+learn_rel_path: "Integrations/Notify/Agent alert notifications"
 learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
-# Syslog
+# Syslog agent alert notifications
 
 You need a working `logger` command for this to work.  This is the case on pretty much every Linux system in existence, and most BSD systems.
 

@@ -34,7 +34,7 @@ public:
     void addChart(Chart *C);
     void removeChart(Chart *C);
 
-    void getConfigAsJson(nlohmann::json &Json) const;
+    void getConfigAsJson(BUFFER *wb) const;
     void getModelsAsJson(nlohmann::json &Json);
     void getDetectionInfoAsJson(nlohmann::json &Json) const;
 

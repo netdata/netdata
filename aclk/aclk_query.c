@@ -192,7 +192,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
     w->response.data->date = w->tv_ready.tv_sec;
     web_client_build_http_header(w);
     local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, &netdata_buffers_statistics.buffers_aclk);
-    local_buffer->contenttype = CT_APPLICATION_JSON;
+    local_buffer->content_type = CT_APPLICATION_JSON;
 
     buffer_strcat(local_buffer, w->response.header_output->buffer);
 
