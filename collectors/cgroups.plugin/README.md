@@ -26,7 +26,7 @@ and **virtual machines** spawn by managers that register them with cgroups (qemu
 In general, no additional settings are required. Netdata discovers all available cgroups on the host system and
 collects their metrics.
 
-### how Netdata finds the available cgroups
+### How Netdata finds the available cgroups
 
 Linux exposes resource usage reporting and provides dynamic configuration for cgroups, using virtual files (usually)
 under `/sys/fs/cgroup`. Netdata reads `/proc/self/mountinfo` to detect the exact mount point of cgroups. Netdata also
@@ -43,7 +43,7 @@ allows manual configuration of this mount point, using these settings:
 
 Netdata rescans these directories for added or removed cgroups every `check for new cgroups every` seconds.
 
-### hierarchical search for cgroups
+### Hierarchical search for cgroups
 
 Since cgroups are hierarchical, for each of the directories shown above, Netdata walks through the subdirectories
 recursively searching for cgroups (each subdirectory is another cgroup).
@@ -61,7 +61,7 @@ cgroups ([systemd services are monitored by Netdata](#monitoring-systemd-service
 desktop and remote user sessions), qemu virtual machines (child cgroups of virtual machines) and `init.scope`. All
 others are enabled.
 
-### unified cgroups (cgroups v2) support
+### Unified cgroups (cgroups v2) support
 
 Netdata automatically detects cgroups version. If detection fails Netdata assumes v1.
 To switch to v2 manually add:
@@ -75,19 +75,19 @@ To switch to v2 manually add:
 Unified cgroups use same name pattern matching as v1 cgroups. `cgroup_enable_systemd_services_detailed_memory` is
 currently unsupported when using unified cgroups.
 
-### enabled cgroups
+### Enabled cgroups
 
 To provide a sane default, Netdata uses the
 following [pattern list](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md):
 
-- checks the pattern against the path of the cgroup
+- Checks the pattern against the path of the cgroup
 
   ```text
   [plugin:cgroups]
   	enable by default cgroups matching =  !*/init.scope  *.scope  !*/vcpu*  !*/emulator  !*.mount  !*.partition  !*.service  !*.slice  !*.swap  !*.user  !/  !/docker  !/libvirt  !/lxc  !/lxc/*/ns  !/lxc/*/ns/*  !/machine  !/qemu  !/system  !/systemd  !/user  *
   ```
 
-- checks the pattern against the name of the cgroup (as you see it on the dashboard)
+- Checks the pattern against the name of the cgroup (as you see it on the dashboard)
 
   ```text
   [plugin:cgroups]
@@ -123,7 +123,7 @@ will have to adjust the configuration).
 [docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy) can also be used to give Netdata restricted
 access to the socket. Note that `PODMAN_HOST` in Netdata's environment should be set to the proxy's URL in this case.
 
-### charts with zero metrics
+### Charts with zero metrics
 
 By default, Netdata will enable monitoring metrics only when they are not zero. If they are constantly zero they are
 ignored. Metrics that will start having values, after Netdata is started, will be detected and charts will be
@@ -138,7 +138,7 @@ chart instead of `auto` to enable it permanently. For example:
 You can also set the `enable zero metrics` option to `yes` in the `[global]` section which enables charts with zero
 metrics for all internal Netdata plugins.
 
-### alarms
+### Alarms
 
 CPU and memory limits are watched and used to rise alarms. Memory usage for every cgroup is checked against `ram`
 and `ram+swap` limits. CPU usage for every cgroup is checked against `cpuset.cpus` and `cpu.cfs_period_us` + `cpu.cfs_quota_us` pair assigned for the cgroup. Configuration for the alarms is available in `health.d/cgroups.conf`
@@ -190,7 +190,7 @@ Support per distribution:
 - Merged disk read operations
 - Merged disk write operations
 
-### how to enable cgroup accounting on systemd systems that is by default disabled
+### How to enable cgroup accounting on systemd systems that is by default disabled
 
 You can verify there is no accounting enabled, by running `systemd-cgtop`. The program will show only resources for
 cgroup `/`, but all services will show nothing.
@@ -259,28 +259,17 @@ Which systemd services are monitored by Netdata is determined by the following p
 Netdata monitors containers automatically when it is installed at the host, or when it is installed in a container that
 has access to the `/proc` and `/sys` filesystems of the host.
 
-Netdata prior to v1.6 had 2 issues when such containers were monitored:
+Network interfaces and cgroups (containers) are self-cleaned. When a network interface or container stops, Netdata might log 
+a few errors in error.log complaining about files it cannot find, but immediately:
 
-1. network interface alarms where triggering when containers were stopped
-
-2. charts were never cleaned up, so after some time dozens of containers were showing up on the dashboard, and they were
-   occupying memory.
-
-### the current Netdata
-
-network interfaces and cgroups (containers) are now self-cleaned.
-
-So, when a network interface or container stops, Netdata might log a few errors in error.log complaining about files it
-cannot find, but immediately:
-
-1. it will detect this is a removed container or network interface
-2. it will freeze/pause all alarms for them
-3. it will mark their charts as obsolete
-4. obsolete charts are not be offered on new dashboard sessions (so hit F5 and the charts are gone)
-5. existing dashboard sessions will continue to see them, but of course they will not refresh
-6. obsolete charts will be removed from memory, 1 hour after the last user viewed them (configurable
+1. It will detect this is a removed container or network interface
+2. It will freeze/pause all alarms for them
+3. It will mark their charts as obsolete
+4. Obsolete charts are not be offered on new dashboard sessions (so hit F5 and the charts are gone)
+5. Existing dashboard sessions will continue to see them, but of course they will not refresh
+6. Obsolete charts will be removed from memory, 1 hour after the last user viewed them (configurable
    with `[global].cleanup obsolete charts after seconds = 3600` (at `netdata.conf`).
-7. when obsolete charts are removed from memory they are also deleted from disk (configurable
+7. When obsolete charts are removed from memory they are also deleted from disk (configurable
    with `[global].delete obsolete charts files = yes`)
 
 ### Monitored container metrics
