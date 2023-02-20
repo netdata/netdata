@@ -43,7 +43,7 @@ To see your plan and billing setting you need:
    1. At the bottom, you will find your Usage chart that displays:
       * Daily count - The weighted 90th percentile of the live node count during the day, taking time as the weight. If you have 30 live nodes throughout the day
       except for a two hour peak of 44 live nodes, the daily value is 31.
-      * Period count: The 90th percentile of the daily counts for this period up to the date. The last value for the period is used as the number of nodes for the bill for that period. See more details at [Running nodes and billing](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md#running-nodes-and-billing) (only applicable if you are on a paid plan subscription)
+      * Period count: The 90th percentile of the daily counts for this period up to the date. The last value for the period is used as the number of nodes for the bill for that period. See more details in [running nodes and billing](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md#running-nodes-and-billing) (only applicable if you are on a paid plan subscription)
       * Committed nodes: The number of nodes committed to in the yearly plan. In case the period count is higher than the number of committed nodes, the difference is billed as overage.
 
 > ⚠️ At the moment, any changes to an active paid plan, upgrades, change billing frequency or committed nodes, will be a manual two-setup flow:
