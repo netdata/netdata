@@ -1,13 +1,12 @@
 <!--
-title: "Anonymous statistics"
+title: "Anonymous telemetry events"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/anonymous-statistics.md
-sidebar_label: "Anonymous statistics"
+sidebar_label: "Anonymous telemetry events"
 learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "References"
+learn_rel_path: "Configuration"
 -->
 
-# Anonymous statistics
+# Anonymous telemetry events
 
 By default, Netdata collects anonymous usage information from the open-source monitoring agent using the open-source
 product analytics platform [PostHog](https://github.com/PostHog/posthog). We use their [cloud enterprise platform](https://posthog.com/product).
@@ -101,9 +100,4 @@ Each of these opt-out processes does the following:
 -   Forces the anonymous statistics script to exit immediately.
 -   Stops the PostHog JavaScript snippet, which remains on the dashboard, from firing and sending any data to the Netdata PostHog.
 
-## Migration from Google Analytics and Google Tag Manager.
-
-Prior to v1.29.4 we used Google Analytics to capture this information. This led to discomfort with some of our users in sending any product usage data to a third party like Google. It was also not even that useful in terms of generating the insights we needed to help catch bugs early and find opportunities for product improvement as Google Analytics does not allow its users access to the raw underlying data without paying a significant amount of money which would be infeasible for a project like Netdata.
-
-While we migrate fully away from Google Analytics to PostHog there maybe be a small period of time where we run both in parallel before we remove all Google Analytics related code. This is to ensure we can fully test and validate the Netdata PostHog implementation before fully defaulting to it.
 

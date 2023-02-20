@@ -4,8 +4,7 @@ description: "The Netdata Agent's local static-threaded web server serves dashbo
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/web/server/README.md"
 sidebar_label: "Web server"
 learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "References/Configuration"
+learn_rel_path: "Configuration"
 -->
 
 # Web server

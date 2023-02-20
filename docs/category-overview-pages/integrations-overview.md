@@ -5,6 +5,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/category-o
 description: "Available integrations in Netdata"
 learn_status: "Published"
 learn_rel_path: "Integrations"
+sidebar_position: 60
 -->
 
 # Netdata Integrations
