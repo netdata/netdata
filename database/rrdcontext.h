@@ -25,6 +25,10 @@ typedef struct rrdcontext_acquired RRDCONTEXT_ACQUIRED;
 
 const char *rrdmetric_acquired_id(RRDMETRIC_ACQUIRED *rma);
 const char *rrdmetric_acquired_name(RRDMETRIC_ACQUIRED *rma);
+
+STRING *rrdmetric_acquired_id_dup(RRDMETRIC_ACQUIRED *rma);
+STRING *rrdmetric_acquired_name_dup(RRDMETRIC_ACQUIRED *rma);
+
 NETDATA_DOUBLE rrdmetric_acquired_last_stored_value(RRDMETRIC_ACQUIRED *rma);
 time_t rrdmetric_acquired_first_entry(RRDMETRIC_ACQUIRED *rma);
 time_t rrdmetric_acquired_last_entry(RRDMETRIC_ACQUIRED *rma);
@@ -126,6 +130,15 @@ DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contex
 // ----------------------------------------------------------------------------
 // public API for queries
 
+typedef enum __attribute__ ((__packed__)) {
+    QUERY_STATUS_NONE             = 0,
+    QUERY_STATUS_QUERIED          = (1 << 0),
+    QUERY_STATUS_DIMENSION_NODATA = (1 << 1),
+    QUERY_STATUS_DIMENSION_HIDDEN = (1 << 2),
+    QUERY_STATUS_EXCLUDED         = (1 << 3),
+    QUERY_STATUS_FAILED           = (1 << 4),
+} QUERY_STATUS;
+
 typedef struct query_plan_entry {
     size_t tier;
     time_t after;
@@ -146,7 +159,19 @@ typedef struct query_host {
     size_t slot;
     RRDHOST *host;
     size_t queried;
+    size_t selected;
+    size_t excluded;
+    size_t failed;
 } QUERY_HOST;
+
+typedef struct query_context {
+    size_t slot;
+    RRDCONTEXT_ACQUIRED *rca;
+    size_t queried;
+    size_t selected;
+    size_t excluded;
+    size_t failed;
+} QUERY_CONTEXT;
 
 typedef struct query_instance {
     size_t slot;
@@ -154,7 +179,16 @@ typedef struct query_instance {
     STRING *id_fqdn;
     STRING *name_fqdn;
     size_t queried;             // number of dimensions queried
+    size_t selected;
+    size_t excluded;
+    size_t failed;
 } QUERY_INSTANCE;
+
+typedef struct query_dimension {
+    size_t slot;
+    RRDMETRIC_ACQUIRED *rma;
+    QUERY_STATUS status;
+} QUERY_DIMENSION;
 
 typedef struct query_metric {
     struct query_metric_tier {
@@ -172,17 +206,15 @@ typedef struct query_metric {
     } plan;
 
     struct {
-        size_t query_host_id;
-        RRDCONTEXT_ACQUIRED *rca;
-        RRDMETRIC_ACQUIRED *rma;
-        size_t query_instance_id;
+        uint32_t query_host_id;
+        uint32_t query_context_id;
+        uint32_t query_instance_id;
+        uint32_t query_dimension_id;
     } link;
 
     struct {
-        STRING *id;
-        STRING *name;
         RRDR_DIMENSION_FLAGS options;
-    } dimension;
+    } query;
 
     struct {
         size_t slot;
@@ -273,10 +305,10 @@ typedef struct query_target {
     } query;
 
     struct {
-        RRDMETRIC_ACQUIRED **array;
+        QUERY_DIMENSION *array;
         uint32_t used;                      // how many items of the array are used
         uint32_t size;                      // the size of the array
-    } metrics;
+    } dimensions;
 
     struct {
         QUERY_INSTANCE *array;
@@ -288,7 +320,7 @@ typedef struct query_target {
     } instances;
 
     struct {
-        RRDCONTEXT_ACQUIRED **array;
+        QUERY_CONTEXT *array;
         uint32_t used;                      // how many items of the array are used
         uint32_t size;                      // the size of the array
         SIMPLE_PATTERN *pattern;
@@ -308,14 +340,34 @@ static inline NEVERNULL QUERY_HOST *query_host(QUERY_TARGET *qt, size_t id) {
     return &qt->hosts.array[id];
 }
 
-static inline NEVERNULL QUERY_METRIC *query_metric(QUERY_TARGET *qt, size_t id) {
-    internal_fatal(id >= qt->query.used, "QUERY: invalid query metric id");
-    return &qt->query.array[id];
+static inline NEVERNULL QUERY_CONTEXT *query_context(QUERY_TARGET *qt, size_t query_context_id) {
+    internal_fatal(query_context_id >= qt->contexts.used, "QUERY: invalid query context id");
+    return &qt->contexts.array[query_context_id];
 }
 
 static inline NEVERNULL QUERY_INSTANCE *query_instance(QUERY_TARGET *qt, size_t query_instance_id) {
     internal_fatal(query_instance_id >= qt->instances.used, "QUERY: invalid query instance id");
     return &qt->instances.array[query_instance_id];
+}
+
+static inline NEVERNULL QUERY_DIMENSION *query_dimension(QUERY_TARGET *qt, size_t query_dimension_id) {
+    internal_fatal(query_dimension_id >= qt->dimensions.used, "QUERY: invalid query dimension id");
+    return &qt->dimensions.array[query_dimension_id];
+}
+
+static inline NEVERNULL QUERY_METRIC *query_metric(QUERY_TARGET *qt, size_t id) {
+    internal_fatal(id >= qt->query.used, "QUERY: invalid query metric id");
+    return &qt->query.array[id];
+}
+
+static inline const char *query_metric_id(QUERY_TARGET *qt, QUERY_METRIC *qm) {
+    QUERY_DIMENSION *qd = query_dimension(qt, qm->link.query_dimension_id);
+    return rrdmetric_acquired_id(qd->rma);
+}
+
+static inline const char *query_metric_name(QUERY_TARGET *qt, QUERY_METRIC *qm) {
+    QUERY_DIMENSION *qd = query_dimension(qt, qm->link.query_dimension_id);
+    return rrdmetric_acquired_name(qd->rma);
 }
 
 void query_target_free(void);

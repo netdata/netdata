@@ -168,17 +168,18 @@ RRDR *data_query_group_by(RRDR *r) {
 
         int pos = -1, *set;
         QUERY_METRIC *qm = query_metric(qt, c);
+        QUERY_DIMENSION *qd = query_dimension(qt, qm->link.query_dimension_id);
         QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
         QUERY_HOST *qh = query_host(qt, qm->link.query_host_id);
 
         switch(qt->request.group_by) {
             default:
             case RRDR_GROUP_BY_DIMENSION:
-                set = dictionary_set(groups, string2str(qm->dimension.id), &pos, sizeof(int));
+                set = dictionary_set(groups, query_metric_id(qt, qm), &pos, sizeof(int));
                 if(*set == -1) {
                     *set = pos = added++;
-                    entries[pos].id = string_dup(qm->dimension.id);
-                    entries[pos].name = string_dup(qm->dimension.name);
+                    entries[pos].id = rrdmetric_acquired_id_dup(qd->rma);
+                    entries[pos].name = rrdmetric_acquired_name_dup(qd->rma);
                 }
                 else
                     pos = *set;
@@ -228,7 +229,7 @@ RRDR *data_query_group_by(RRDR *r) {
         qm->grouped_as.slot = pos;
         qm->grouped_as.id = entries[pos].id;
         qm->grouped_as.name = entries[pos].name;
-        qm->dimension.options |= RRDR_DIMENSION_GROUPED;
+        qm->query.options |= RRDR_DIMENSION_GROUPED;
     }
 
     RRDR *r2 = rrdr_create(r->internal.owa, qt, added, rows);

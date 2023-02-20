@@ -1522,7 +1522,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
 
                 internal_error(true, "QUERY: '%s', dimension '%s' next_metric() returned "
                                      "point %zu from %ld to %ld, that are both equal",
-                                     qt->id, string2str(qm->dimension.id),
+                                     qt->id, query_metric_id(qt, qm),
                                      new_point.id, new_point.start_time, new_point.end_time);
 
                 new_point.start_time = new_point.end_time - ops->tier_ptr->db_update_every_s;
@@ -1537,7 +1537,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                                "point %zu from %ld to %ld, before the "
                                "last point %zu from %ld to %ld, "
                                "now is %ld to %ld",
-                               qt->id, string2str(qm->dimension.id),
+                               qt->id, query_metric_id(qt, qm),
                                new_point.id, new_point.start_time, new_point.end_time,
                                last1_point.id, last1_point.start_time, last1_point.end_time,
                                now_start_time, now_end_time);
@@ -1571,7 +1571,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                                    "returned point %zu from %ld time %ld, "
                                    "which is entirely before our current timeframe %ld to %ld "
                                    "(and before the entire query, after %ld, before %ld)",
-                                   qt->id, string2str(qm->dimension.id),
+                                   qt->id, query_metric_id(qt, qm),
                                    new_point.id, new_point.start_time, new_point.end_time,
                                    now_start_time, now_end_time,
                                    ops->plan_expanded_after, ops->plan_expanded_before);
@@ -1590,7 +1590,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                            "QUERY: '%s', dimension '%s', the database does not advance the query,"
                            " it returned an end time less or equal to the end time of the last "
                            "point we got %ld, %zu times",
-                           qt->id, string2str(qm->dimension.id),
+                           qt->id, query_metric_id(qt, qm),
                            last1_point.end_time, count_same_end_time);
 
             if(unlikely(new_point.end_time <= last1_point.end_time))
@@ -1725,7 +1725,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
 
     internal_error(points_added != points_wanted,
                    "QUERY: '%s', dimension '%s', requested %zu points, but RRDR added %zu (%zu db points read).",
-                   qt->id, string2str(qm->dimension.id),
+                   qt->id, query_metric_id(qt, qm),
                    (size_t)points_wanted, (size_t)points_added, ops->db_total_points_read);
 }
 
@@ -2333,7 +2333,9 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
     for(size_t c = 0, max = qt->query.used; c < max ; c++) {
         QUERY_METRIC *qm = query_metric(qt, c);
+        QUERY_DIMENSION *qd = query_dimension(qt, qm->link.query_dimension_id);
         QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
+        QUERY_CONTEXT *qc = query_context(qt, qm->link.query_context_id);
         QUERY_HOST *qh = query_host(qt, qm->link.query_host_id);
 
         if(queries_prepared < max) {
@@ -2343,23 +2345,35 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         }
 
         // set the query target dimension options to rrdr
-        r->od[c] = qm->dimension.options;
+        r->od[c] = qm->query.options;
 
         // reset the grouping for the new dimension
         r->grouping.reset(r);
 
         if(ops[c]) {
             r->od[c] |= RRDR_DIMENSION_QUERIED;
-            r->di[c] = string_dup(qm->dimension.id);
-            r->dn[c] = string_dup(qm->dimension.name);
+            r->di[c] = rrdmetric_acquired_id_dup(qd->rma);
+            r->dn[c] = rrdmetric_acquired_name_dup(qd->rma);
 
             qi->queried++;
+            qc->queried++;
             qh->queried++;
+
+            qd->status |= QUERY_STATUS_QUERIED;
+            qm->query.options |= RRDR_DIMENSION_QUERIED;
 
             rrd2rrdr_query_execute(r, c, ops[c]);
         }
-        else
+        else {
+            qi->failed++;
+            qc->failed++;
+            qh->failed++;
+
+            qd->status |= QUERY_STATUS_FAILED;
+            qm->query.options |= RRDR_DIMENSION_FAILED;
+
             continue;
+        }
 
         global_statistics_rrdr_query_completed(
                 1,
@@ -2383,23 +2397,26 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             max_rows = r->rows;
         }
         else {
+            const char *dim_id = rrdmetric_acquired_id(qd->rma);
+            const char *dim_name = rrdmetric_acquired_name(qd->rma);
+
             if(r->view.after != max_after) {
                 internal_error(true, "QUERY: 'after' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                               string2str(qm->dimension.id), (size_t)max_after, string2str(qm->dimension.name), (size_t)r->view.after);
+                               dim_id, (size_t)max_after, dim_name, (size_t)r->view.after);
 
                 r->view.after = (r->view.after > max_after) ? r->view.after : max_after;
             }
 
             if(r->view.before != min_before) {
                 internal_error(true, "QUERY: 'before' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                               string2str(qm->dimension.id), (size_t)min_before, string2str(qm->dimension.name), (size_t)r->view.before);
+                               dim_id, (size_t)min_before, dim_name, (size_t)r->view.before);
 
                 r->view.before = (r->view.before < min_before) ? r->view.before : min_before;
             }
 
             if(r->rows != max_rows) {
                 internal_error(true, "QUERY: 'rows' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                               string2str(qm->dimension.id), (size_t)max_rows, string2str(qm->dimension.name), (size_t)r->rows);
+                               dim_id, (size_t)max_rows, dim_name, (size_t)r->rows);
 
                 r->rows = (r->rows > max_rows) ? r->rows : max_rows;
             }

@@ -59,8 +59,10 @@ typedef enum __attribute__ ((__packed__)) rrdr_dimension_flag {
     RRDR_DIMENSION_DEFAULT  = 0,
     RRDR_DIMENSION_HIDDEN   = (1 << 0), // the dimension is hidden (not to be presented to callers)
     RRDR_DIMENSION_NONZERO  = (1 << 1), // the dimension is non zero (contains non-zero values)
-    RRDR_DIMENSION_QUERIED  = (1 << 2), // the dimension is selected for evaluation in this RRDR
-    RRDR_DIMENSION_GROUPED  = (1 << 3), // the dimension has been grouped in this RRDR
+    RRDR_DIMENSION_SELECTED = (1 << 2), // the dimension has been selected for query
+    RRDR_DIMENSION_QUERIED  = (1 << 3), // the dimension has been queried
+    RRDR_DIMENSION_FAILED   = (1 << 4), // the dimension failed to be queried
+    RRDR_DIMENSION_GROUPED  = (1 << 5), // the dimension has been grouped in this RRDR
 } RRDR_DIMENSION_FLAGS;
 
 // RRDR result options

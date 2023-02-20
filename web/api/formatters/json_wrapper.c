@@ -33,7 +33,7 @@ void jsonwrap_query_plan(RRDR *r, BUFFER *wb) {
     buffer_json_member_add_object(wb, "query_plan");
     for(size_t m = 0; m < qt->query.used; m++) {
         QUERY_METRIC *qm = query_metric(qt, m);
-        buffer_json_member_add_object(wb, string2str(qm->dimension.id));
+        buffer_json_member_add_object(wb, query_metric_id(qt, qm));
         jsonwrap_query_metric_plan(wb, qm);
         buffer_json_object_close(wb);
     }
@@ -102,7 +102,10 @@ struct rrdlabels_formatting_v2 {
 struct rrdlabels_dict_entry {
     const char *name;
     const char *value;
+    size_t selected;
+    size_t excluded;
     size_t queried;
+    size_t failed;
 };
 
 static int rrdlabels_formatting_v2(const char *name, const char *value, RRDLABEL_SRC ls __maybe_unused, void *data) {
@@ -115,12 +118,27 @@ static int rrdlabels_formatting_v2(const char *name, const char *value, RRDLABEL
     struct rrdlabels_dict_entry x = {
         .name = name,
         .value = value,
+        .selected = 0,
+        .excluded = 0,
         .queried = 0,
+        .failed = 0,
     };
     struct rrdlabels_dict_entry *z = dictionary_set(dict, n, &x, sizeof(x));
+    z->selected += t->qi->selected;
+    z->excluded += t->qi->excluded;
     z->queried += t->qi->queried;
+    z->failed += t->qi->failed;
 
     return 1;
+}
+
+static inline void query_target_metric_count(BUFFER *wb, size_t selected, size_t excluded, size_t queried, size_t failed) {
+    buffer_json_member_add_object(wb, "ds");
+    buffer_json_member_add_uint64(wb, "sl", selected);
+    buffer_json_member_add_uint64(wb, "ex", excluded);
+    buffer_json_member_add_uint64(wb, "qr", queried);
+    buffer_json_member_add_uint64(wb, "fl", failed);
+    buffer_json_object_close(wb);
 }
 
 static inline void query_target_hosts_instances_labels_dimensions(BUFFER *wb, RRDR *r, const char *key_hosts, const char *key_dimensions, const char *key_instances, const char *key_labels, bool v2) {
@@ -135,10 +153,10 @@ static inline void query_target_hosts_instances_labels_dimensions(BUFFER *wb, RR
             RRDHOST *host = qh->host;
             if(v2) {
                 buffer_json_add_array_item_object(wb);
-                buffer_json_member_add_string(wb, "machine_guid", host->machine_guid);
-                buffer_json_member_add_uuid(wb, "node_id", host->node_id);
-                buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
-                buffer_json_member_add_uint64(wb, "queried", qh->queried);
+                buffer_json_member_add_string(wb, "mg", host->machine_guid);
+                buffer_json_member_add_uuid(wb, "nd", host->node_id);
+                buffer_json_member_add_string(wb, "hn", rrdhost_hostname(host));
+                query_target_metric_count(wb, qh->selected, qh->excluded, qh->queried, qh->failed);
                 buffer_json_object_close(wb);
             }
             else {
@@ -168,9 +186,9 @@ static inline void query_target_hosts_instances_labels_dimensions(BUFFER *wb, RR
                 if(v2) {
                     buffer_json_add_array_item_object(wb);
                     buffer_json_member_add_string(wb, "id", string2str(qi->id_fqdn));
-                    buffer_json_member_add_string(wb, "name", string2str(qi->name_fqdn));
-                    buffer_json_member_add_string(wb, "local", rrdinstance_acquired_name(qi->ria));
-                    buffer_json_member_add_uint64(wb, "queried", qi->queried);
+                    buffer_json_member_add_string(wb, "nm", string2str(qi->name_fqdn));
+                    buffer_json_member_add_string(wb, "lc", rrdinstance_acquired_name(qi->ria));
+                    query_target_metric_count(wb, qi->selected, qi->excluded, qi->queried, qi->failed);
                     buffer_json_object_close(wb);
                 }
                 else {
@@ -191,17 +209,24 @@ static inline void query_target_hosts_instances_labels_dimensions(BUFFER *wb, RR
         struct {
             const char *id;
             const char *name;
+            size_t selected;
             size_t queried;
+            size_t excluded;
+            size_t failed;
         } x, *z;
         size_t q = 0;
-        for (long c = 0; c < (long) qt->metrics.used; c++) {
-            RRDMETRIC_ACQUIRED *rma = qt->metrics.array[c];
+        for (long c = 0; c < (long) qt->dimensions.used; c++) {
+            QUERY_DIMENSION * qd = query_dimension(qt, c);
+            RRDMETRIC_ACQUIRED *rma = qd->rma;
 
-            bool queried = false;
+            RRDR_DIMENSION_FLAGS options = RRDR_DIMENSION_DEFAULT;
+            bool found = false;
             for( ; q < qt->query.used ;q++) {
                 QUERY_METRIC *tqm = query_metric(qt, q);
-                if(tqm->link.rma != rma) break;
-                queried = tqm->dimension.options & RRDR_DIMENSION_QUERIED;
+                QUERY_DIMENSION *tqd = query_dimension(qt, tqm->link.query_dimension_id);
+                if(tqd->rma != rma) break;
+                options = tqm->query.options;
+                found = true;
             }
 
             snprintfz(name, RRD_ID_LENGTH_MAX * 2 + 1, "%s:%s",
@@ -210,17 +235,23 @@ static inline void query_target_hosts_instances_labels_dimensions(BUFFER *wb, RR
 
             x.id = rrdmetric_acquired_id(rma);
             x.name = rrdmetric_acquired_name(rma);
+            x.selected = 0;
+            x.excluded = 0;
             x.queried = 0;
+            x.failed = 0;
 
             z = dictionary_set(dict, name, &x, sizeof(x));
-            z->queried += (queried) ? 1 : 0;
+            z->selected += (options & RRDR_DIMENSION_SELECTED) ? 1 : 0;
+            z->excluded += (!found) ? 1 : 0;
+            z->queried += (options & RRDR_DIMENSION_QUERIED) ? 1 : 0;
+            z->failed += (options & RRDR_DIMENSION_FAILED) ? 1 : 0;
         }
         dfe_start_read(dict, z) {
                     if(v2) {
                         buffer_json_add_array_item_object(wb);
                         buffer_json_member_add_string(wb, "id", z->id);
-                        buffer_json_member_add_string(wb, "name", z->name);
-                        buffer_json_member_add_uint64(wb, "queried", z->queried);
+                        buffer_json_member_add_string(wb, "nm", z->name);
+                        query_target_metric_count(wb, z->selected, z->excluded, z->queried, z->failed);
                         buffer_json_object_close(wb);
                     }
                     else {
@@ -250,9 +281,9 @@ static inline void query_target_hosts_instances_labels_dimensions(BUFFER *wb, RR
         dfe_start_read(t.dict, z) {
                     if(v2) {
                         buffer_json_add_array_item_object(wb);
-                        buffer_json_member_add_string(wb, "name", z->name);
-                        buffer_json_member_add_string(wb, "value", z->value);
-                        buffer_json_member_add_uint64(wb, "queried", z->queried);
+                        buffer_json_member_add_string(wb, "nm", z->name);
+                        buffer_json_member_add_string(wb, "vl", z->value);
+                        query_target_metric_count(wb, z->selected, z->excluded, z->queried, z->failed);
                         buffer_json_object_close(wb);
                     }
                     else {
@@ -334,7 +365,8 @@ static inline long query_target_metrics_latest_values(BUFFER *wb, const char *ke
             continue;
 
         QUERY_METRIC *qm = query_metric(qt, c);
-        buffer_json_add_array_item_double(wb, rrdmetric_acquired_last_stored_value(qm->link.rma));
+        QUERY_DIMENSION *qd = query_dimension(qt, qm->link.query_dimension_id);
+        buffer_json_add_array_item_double(wb, rrdmetric_acquired_last_stored_value(qd->rma));
         i++;
     }
 
@@ -564,7 +596,8 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
             RRDHOST *host = qh->host;
 
             for( ;c < qt->contexts.used ;c++) {
-                RRDCONTEXT_ACQUIRED *rca = qt->contexts.array[c];
+                QUERY_CONTEXT *qc = query_context(qt, c);
+                RRDCONTEXT_ACQUIRED *rca = qc->rca;
                 if(!rrdcontext_acquired_belongs_to_host(rca, host)) break;
 
                 for( ;i < qt->instances.used ;i++) {
@@ -572,17 +605,19 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
                     RRDINSTANCE_ACQUIRED *ria = qi->ria;
                     if(!rrdinstance_acquired_belongs_to_context(ria, rca)) break;
 
-                    for( ; m < qt->metrics.used ;m++) {
-                        RRDMETRIC_ACQUIRED *rma =qt->metrics.array[m];
+                    for( ; m < qt->dimensions.used ; m++) {
+                        QUERY_DIMENSION *qd = query_dimension(qt, m);
+                        RRDMETRIC_ACQUIRED *rma = qd->rma;
                         if(!rrdmetric_acquired_belongs_to_instance(rma, ria)) break;
 
                         QUERY_METRIC *qm = NULL;
                         bool queried = false;
                         for( ; q < qt->query.used ;q++) {
                             QUERY_METRIC *tqm = query_metric(qt, q);
-                            if(tqm->link.rma != rma) break;
+                            QUERY_DIMENSION *tqd = query_dimension(qt, tqm->link.query_dimension_id);
+                            if(tqd->rma != rma) break;
 
-                            queried = tqm->dimension.options & RRDR_DIMENSION_QUERIED;
+                            queried = tqm->query.options & RRDR_DIMENSION_QUERIED;
                             qm = tqm;
                         }
 
@@ -664,7 +699,7 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
                             buffer_json_member_add_time_t(wb, "last_entry", last_entry_s ? last_entry_s : now_s);
 
                             if(qm) {
-                                if(qm->dimension.options & RRDR_DIMENSION_GROUPED) {
+                                if(qm->query.options & RRDR_DIMENSION_GROUPED) {
                                     // buffer_json_member_add_string(wb, "grouped_as_id", string2str(qm->grouped_as.id));
                                     buffer_json_member_add_string(wb, "grouped_as", string2str(qm->grouped_as.name));
                                 }
