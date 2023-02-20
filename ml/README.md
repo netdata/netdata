@@ -114,7 +114,9 @@ To enable or disable anomaly detection:
 2. In the `[ml]` section, set `enabled = yes` to enable or `enabled = no` to disable.
 3. Restart netdata (typically `sudo systemctl restart netdata`).
 
-**Note**: If you would like to learn more about configuring Netdata please see [the configuration guide](https://github.com/netdata/netdata/blob/master/docs/guides/step-by-step/step-04.md).
+> 📑 Note
+> 
+> If you would like to learn more about configuring Netdata please see the [Configuration section](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) of our documentation.
 
 Below is a list of all the available configuration params and their default values.
 
