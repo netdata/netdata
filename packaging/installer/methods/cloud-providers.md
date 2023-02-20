@@ -19,7 +19,7 @@ aims to document some of those steps for popular cloud providers.
 
 > This document is a work-in-progress! If you find new issues specific to a cloud provider, or would like to help
 > clarify the correct workaround, please [create an
-> issue](https://github.com/netdata/netdata/issues/new?labels=feature+request,+needs+triage&template=feature_request.md)
+> issue](https://github.com/netdata/netdata/issues/new?labels=feature+request,+needs+triage&template=feature_request)
 > with your process and instructions on using the provider's interface to complete the workaround.
 
 - [Install Netdata on cloud providers](#install-netdata-on-cloud-providers)
