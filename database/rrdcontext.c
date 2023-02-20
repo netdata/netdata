@@ -2532,7 +2532,14 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, QU
             qm->grouped_as.name = NULL;
 
             qm->plan.used = 0;
+
             qm->query.options = options;
+            qm->query.min = 0;
+            qm->query.max = 0;
+            qm->query.sum = 0;
+            qm->query.average = 0;
+            qm->query.volume = 0;
+            qm->query.count = 0;
 
             qm->link.query_host_id = qh->slot;
             qm->link.query_context_id = qc->slot;

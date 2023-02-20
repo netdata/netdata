@@ -141,6 +141,16 @@ static inline void query_target_metric_count(BUFFER *wb, size_t selected, size_t
     buffer_json_object_close(wb);
 }
 
+static inline void query_target_value_stats(BUFFER *wb, NETDATA_DOUBLE min, NETDATA_DOUBLE max, NETDATA_DOUBLE sum, NETDATA_DOUBLE avg, NETDATA_DOUBLE vol) {
+    buffer_json_member_add_object(wb, "sts");
+    buffer_json_member_add_double(wb, "min", min);
+    buffer_json_member_add_double(wb, "max", max);
+    buffer_json_member_add_double(wb, "sum", sum);
+    buffer_json_member_add_double(wb, "avg", avg);
+    buffer_json_member_add_double(wb, "vol", vol);
+    buffer_json_object_close(wb);
+}
+
 static inline void query_target_hosts_instances_labels_dimensions(BUFFER *wb, RRDR *r, const char *key_hosts, const char *key_dimensions, const char *key_instances, const char *key_labels, bool v2) {
     QUERY_TARGET *qt = r->internal.qt;
 
@@ -699,6 +709,8 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
                             buffer_json_member_add_time_t(wb, "last_entry", last_entry_s ? last_entry_s : now_s);
 
                             if(qm) {
+                                query_target_value_stats(wb, qm->query.min, qm->query.max, qm->query.sum, qm->query.average, qm->query.volume);
+
                                 if(qm->query.options & RRDR_DIMENSION_GROUPED) {
                                     // buffer_json_member_add_string(wb, "grouped_as_id", string2str(qm->grouped_as.id));
                                     buffer_json_member_add_string(wb, "grouped_as", string2str(qm->grouped_as.name));

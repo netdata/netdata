@@ -1369,7 +1369,8 @@ static QUERY_ENGINE_OPS *rrd2rrdr_query_prep(RRDR *r, size_t dim_id_in_rrdr) {
 
 static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_OPS *ops) {
     QUERY_TARGET *qt = r->internal.qt;
-    QUERY_METRIC *qm = query_metric(qt, dim_id_in_rrdr); (void)qm;
+    QUERY_METRIC *qm = query_metric(qt, dim_id_in_rrdr);
+
     size_t points_wanted = qt->window.points;
     time_t after_wanted = qt->window.after;
     time_t before_wanted = qt->window.before; (void)before_wanted;
@@ -1698,6 +1699,24 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                 min = max = group_value;
             }
 
+            NETDATA_DOUBLE stats_value = group_value < 0 ? -group_value : group_value;
+
+            if(unlikely(!points_added)) {
+                qm->query.min = stats_value;
+                qm->query.max = stats_value;
+            }
+            else {
+                if(stats_value < qm->query.min)
+                    qm->query.min = stats_value;
+
+                if(stats_value > qm->query.max)
+                    qm->query.max = stats_value;
+            }
+
+            qm->query.sum += stats_value;
+            qm->query.volume += stats_value * (NETDATA_DOUBLE)ops->view_update_every;
+            qm->query.count++;
+
             points_added++;
             ops->group_points_added = 0;
             ops->group_value_flags = RRDR_VALUE_NOTHING;
@@ -1722,6 +1741,11 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
     r->view.before = max_date;
     r->view.after = min_date - ops->view_update_every + ops->query_granularity;
     rrdr_done(r, rrdr_line);
+
+    if(qm->query.count)
+        qm->query.average = qm->query.sum / (NETDATA_DOUBLE)qm->query.count;
+    else
+        qm->query.average = 0.0;
 
     internal_error(points_added != points_wanted,
                    "QUERY: '%s', dimension '%s', requested %zu points, but RRDR added %zu (%zu db points read).",

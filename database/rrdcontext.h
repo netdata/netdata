@@ -213,6 +213,12 @@ typedef struct query_metric {
     } link;
 
     struct {
+        size_t count;
+        NETDATA_DOUBLE min;
+        NETDATA_DOUBLE max;
+        NETDATA_DOUBLE sum;
+        NETDATA_DOUBLE average;
+        NETDATA_DOUBLE volume;
         RRDR_DIMENSION_FLAGS options;
     } query;
 

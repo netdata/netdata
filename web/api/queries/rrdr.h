@@ -95,8 +95,8 @@ typedef struct rrdresult {
         time_t after;
         time_t before;
         time_t update_every;  // what is the suggested update frequency in seconds
-        NETDATA_DOUBLE min;   // updated by the formatters
-        NETDATA_DOUBLE max;   // updated by the formatters
+        NETDATA_DOUBLE min;
+        NETDATA_DOUBLE max;
         RRDR_RESULT_FLAGS flags; // RRDR_RESULT_FLAG_*
         RRDR_OPTIONS options; // RRDR_OPTION_* (as run by the query)
     } view;
