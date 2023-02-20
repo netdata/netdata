@@ -18,7 +18,7 @@ To not disrupt current users space's access rights we will be keeping their curr
 keep using the legacy **Member** role with the exact same permissions as it has currently.
 
 If you move from the **Early Bird** plan to a paid plan, you will not be able to return to the **Early Bird** plan again. The **Community** free plan will always be available to you, but it does not allow
-you to invite or change users using the Member role. See more details on our [roles and plans](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access-model.md#what-roles-are-available) documentation.
+you to invite or change users using the Member role. See more details on our [roles and plans](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md#what-roles-are-available) documentation.
 
 :::
 

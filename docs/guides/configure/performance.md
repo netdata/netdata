@@ -262,19 +262,3 @@ On the child nodes you should add to `netdata.conf` the following:
 [health]
    enabled = no
 ```
-
-## What's next?
-
-We hope this guide helped you better understand how to optimize the performance of the Netdata Agent.
-
-Now that your Agent is running smoothly, we recommend you [secure your nodes](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) if you haven't
-already.
-
-Next, dive into some of Netdata's more complex features, such as configuring its health watchdog or exporting metrics to
-an external time-series database.
-
--   [Interact with dashboards and charts](https://github.com/netdata/netdata/blob/master/docs/visualize/interact-dashboards-charts.md)
--   [Configure health alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md)
--   [Export metrics to external time-series databases](https://github.com/netdata/netdata/blob/master/docs/export/external-databases.md)
-
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fconfigure%2Fperformance.md&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

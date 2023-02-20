@@ -93,7 +93,7 @@ sudo ./edit-config health.d/example-alarm.conf
 
 Or, append your new alarm to an existing file by editing a relevant existing file in the `health.d/` directory.
 
-Read more about [configuring alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) to
+Read more about [configuring alarms](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) to
 get started, and see
 the [health monitoring reference](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) for a full listing
 of options available in health entities.
@@ -229,7 +229,7 @@ You can also take what you've learned about node configuration to tweak the Agen
 
 - [Enable new collectors](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md#enable-and-disable-a-specific-collection-module) or tweak
   their behavior.
-- [Configure existing health alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) or
+- [Configure existing health alarms](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) or
   create new ones.
 - [Enable notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to receive
   updates about the health of your
