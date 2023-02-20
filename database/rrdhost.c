@@ -104,20 +104,6 @@ inline RRDHOST *rrdhost_find_by_hostname(const char *hostname) {
     return dictionary_get(rrdhost_root_index_hostname, hostname);
 }
 
-static inline RRDHOST *rrdhost_index_add_hostname(RRDHOST *host) {
-    if(!host->hostname) return host;
-
-    RRDHOST *ret_hostname = dictionary_set(rrdhost_root_index_hostname, rrdhost_hostname(host), host, sizeof(RRDHOST));
-    if(ret_hostname == host)
-        rrdhost_option_set(host, RRDHOST_OPTION_INDEXED_HOSTNAME);
-    else {
-        rrdhost_option_clear(host, RRDHOST_OPTION_INDEXED_HOSTNAME);
-        error("RRDHOST: %s() host with hostname '%s' is already indexed", __FUNCTION__, rrdhost_hostname(host));
-    }
-
-    return host;
-}
-
 static inline void rrdhost_index_del_hostname(RRDHOST *host) {
     if(unlikely(!host->hostname)) return;
 
@@ -127,6 +113,24 @@ static inline void rrdhost_index_del_hostname(RRDHOST *host) {
 
         rrdhost_option_clear(host, RRDHOST_OPTION_INDEXED_HOSTNAME);
     }
+}
+
+static inline RRDHOST *rrdhost_index_add_hostname(RRDHOST *host) {
+    if(!host->hostname) return host;
+
+    RRDHOST *ret_hostname = dictionary_set(rrdhost_root_index_hostname, rrdhost_hostname(host), host, sizeof(RRDHOST));
+    if(ret_hostname == host)
+        rrdhost_option_set(host, RRDHOST_OPTION_INDEXED_HOSTNAME);
+    else {
+        //have the same hostname but it's not the same host
+        //keep the new one only if the old one is orphan or archived
+        if (rrdhost_flag_check(ret_hostname, RRDHOST_FLAG_ORPHAN) || rrdhost_flag_check(ret_hostname, RRDHOST_FLAG_ARCHIVED)) {
+            rrdhost_index_del_hostname(ret_hostname);
+            rrdhost_index_add_hostname(host);
+        }
+    }
+
+    return host;
 }
 
 // ----------------------------------------------------------------------------
@@ -582,6 +586,8 @@ static void rrdhost_update(RRDHOST *host
     if(strcmp(rrdhost_hostname(host), hostname) != 0) {
         info("Host '%s' has been renamed to '%s'. If this is not intentional it may mean multiple hosts are using the same machine_guid.", rrdhost_hostname(host), hostname);
         rrdhost_init_hostname(host, hostname, true);
+    } else {
+        rrdhost_index_add_hostname(host);
     }
 
     if(strcmp(rrdhost_program_name(host), program_name) != 0) {

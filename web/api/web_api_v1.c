@@ -1042,6 +1042,22 @@ static inline void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST
     buffer_json_object_close(wb);
 }
 
+static inline void web_client_api_request_v1_info_mirrored_hosts_status(BUFFER *wb, RRDHOST *host) {
+    buffer_json_add_array_item_object(wb);
+
+    buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
+    buffer_json_member_add_uint64(wb, "hops", host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
+    buffer_json_member_add_boolean(wb, "reachable", (host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)));
+
+    buffer_json_member_add_string(wb, "guid", host->machine_guid);
+    buffer_json_member_add_uuid(wb, "node_id", host->node_id);
+    rrdhost_aclk_state_lock(host);
+    buffer_json_member_add_string(wb, "claim_id", host->aclk_state.claimed_id);
+    rrdhost_aclk_state_unlock(host);
+
+    buffer_json_object_close(wb);
+}
+
 static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
     RRDHOST *host;
 
@@ -1054,19 +1070,14 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
 
     buffer_json_member_add_array(wb, "mirrored_hosts_status");
     rrdhost_foreach_read(host) {
-        buffer_json_add_array_item_object(wb);
-
-        buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
-        buffer_json_member_add_uint64(wb, "hops", host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
-        buffer_json_member_add_boolean(wb, "reachable", (host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)));
-
-        buffer_json_member_add_string(wb, "guid", host->machine_guid);
-        buffer_json_member_add_uuid(wb, "node_id", host->node_id);
-        rrdhost_aclk_state_lock(host);
-        buffer_json_member_add_string(wb, "claim_id", host->aclk_state.claimed_id);
-        rrdhost_aclk_state_unlock(host);
-
-        buffer_json_object_close(wb);
+        if ((host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) {
+            web_client_api_request_v1_info_mirrored_hosts_status(wb, host);
+        }
+    }
+    rrdhost_foreach_read(host) {
+        if ((host != localhost && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) {
+            web_client_api_request_v1_info_mirrored_hosts_status(wb, host);
+        }
     }
     buffer_json_array_close(wb);
 
