@@ -34,7 +34,7 @@ Centralized alert notifications from Netdata Cloud is a independent process from
 Netdata](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md). You can enable one or the other, or both, based on your needs. However,
 the alerts you see in Netdata Cloud are based on those streamed from your Netdata-monitoring nodes. If you want to tweak
 or add new alert that you see in Netdata Cloud, and receive via centralized alert notifications, you must
-[configure](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) each node's alert watchdog.
+[configure](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) each node's alert watchdog.
 
 </Callout>
 
@@ -130,8 +130,8 @@ Here's an example email notification for the `ram_available` chart, which is in 
 ## What's next?
 
 Netdata Cloud's alarm notifications feature leverages the alarms configuration on each node in your infrastructure. If
-you'd like to tweak any of these alarms, or even add new ones based on your needs, read our [health
-quickstart](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md).
+you'd like to tweak any of these alarms, or even add new ones based on your needs, read our [Health
+configuration documentation](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md).
 
 You can also [view active alarms](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.md) in Netdata Cloud for an instant
 visualization of the health of your infrastructure.

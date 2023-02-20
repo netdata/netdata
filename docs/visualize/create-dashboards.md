@@ -66,7 +66,7 @@ faster.
 
 While it's useful to see real-time metrics on flexible dashboards, you need ways to know precisely when an anomaly
 strikes. Every Netdata Agent comes with a health watchdog that
-uses [alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) and
+uses [alarms](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) and
 [notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to notify you of
 issues seconds after they strike.
 

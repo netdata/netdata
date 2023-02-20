@@ -81,22 +81,3 @@ ps aux| grep netdata
 
 The output of `ps aux` should show no `netdata` or associated processes running. You can now start the Netdata Agent
 again with `service netdata start`, or the appropriate method for your system.
-
-## What's next?
-
-Learn more about [securing the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/secure-nodes.md).
-
-You can also use the restart/reload methods described above to enable new features:
-
-- [Enable new collectors](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md) or tweak their behavior.
-- [Configure existing health alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) or create new ones.
-- [Enable notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to receive updates about the health of your
-  infrastructure.
-- Change [the long-term metrics retention period](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md) using the database engine.
-
-### Related reference documentation
-
-- [Netdata Agent · Daemon](https://github.com/netdata/netdata/blob/master/daemon/README.md)
-- [Netdata Agent · Netdata CLI](https://github.com/netdata/netdata/blob/master/cli/README.md)
-
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fconfigure%2Fstart-stop-restart&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

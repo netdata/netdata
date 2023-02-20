@@ -28,8 +28,7 @@ this is not an option in your case always verify the current domain resolution (
 
 :::
 
-For a guide to connecting a node using the ACLK, plus additional troubleshooting and reference information, read our [get
-started with Cloud](https://github.com/netdata/netdata/blob/master/docs/cloud/get-started.md) guide or the full [connect to Cloud
+For a guide to connecting a node using the ACLK, plus additional troubleshooting and reference information, read our [connect to Cloud
 documentation](https://github.com/netdata/netdata/blob/master/claim/README.md).
 
 ## Data privacy

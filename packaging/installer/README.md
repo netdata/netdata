@@ -63,7 +63,7 @@ or read about its requirements to configure your endpoint to publish metrics in 
 #### Alarms & notifications
 
 Netdata comes with hundreds of preconfigured alarms, designed by our monitoring gurus in parallel with our open-source
-community, but you may want to [edit alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) or 
+community, but you may want to [edit alarms](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) or 
 [enable notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to customize your Netdata experience.
 
 #### Make your deployment production ready

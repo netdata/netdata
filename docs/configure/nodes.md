@@ -24,7 +24,7 @@ anomaly, or change in infrastructure affects how their Agents should perform.
 ## The Netdata config directory
 
 On most Linux systems, using our [recommended one-line
-installation](https://github.com/netdata/netdata/blob/master/docs/get-started.md#install-on-linux-with-one-line-installer), the **Netdata config
+installation](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#install-on-linux-with-one-line-installer), the **Netdata config
 directory** is `/etc/netdata/`. The config directory contains several configuration files with the `.conf` extension, a
 few directories, and a shell script named `edit-config`.
 
@@ -52,7 +52,7 @@ exist.
 - `apps_groups.conf` is a configuration file for changing how applications/processes are grouped when viewing the
   **Application** charts from [`apps.plugin`](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md) or
   [`ebpf.plugin`](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/README.md).
-- `health.d/` is a directory that contains [health configuration files](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md).
+- `health.d/` is a directory that contains [health configuration files](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md).
 - `health_alarm_notify.conf` enables and configures [alarm notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md).
 - `statsd.d/` is a directory for configuring Netdata's [statsd collector](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/README.md).
 - `stream.conf` configures [parent-child streaming](https://github.com/netdata/netdata/blob/master/streaming/README.md) between separate nodes running the Agent.
@@ -161,7 +161,7 @@ and `edit-config`. We put together a few security best practices based on how yo
 You can also take what you've learned about node configuration to enable or enhance features:
 
 -   [Enable new collectors](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md) or tweak their behavior.
--   [Configure existing health alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) or create new ones.
+-   [Configure existing health alarms](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) or create new ones.
 -   [Enable notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to receive updates about the health of your
     infrastructure.
 -   Change [the long-term metrics retention period](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md) using the database engine.

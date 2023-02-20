@@ -52,7 +52,10 @@ If you don't see the app/service you'd like to monitor in this list:
 
 ## Available Collectors
 
-- [Service and application collectors](#service-and-application-collectors)
+- [Supported collectors list](#supported-collectors-list)
+  - [Add your application to Netdata](#add-your-application-to-netdata)
+  - [Available Collectors](#available-collectors)
+  - [Service and application collectors](#service-and-application-collectors)
     - [Generic](#generic)
     - [APM (application performance monitoring)](#apm-application-performance-monitoring)
     - [Containers and VMs](#containers-and-vms)
@@ -68,7 +71,7 @@ If you don't see the app/service you'd like to monitor in this list:
     - [Search](#search)
     - [Storage](#storage)
     - [Web](#web)
-- [System collectors](#system-collectors)
+  - [System collectors](#system-collectors)
     - [Applications](#applications)
     - [Disks and filesystems](#disks-and-filesystems)
     - [eBPF](#ebpf)
@@ -79,10 +82,10 @@ If you don't see the app/service you'd like to monitor in this list:
     - [Processes](#processes)
     - [Resources](#resources)
     - [Users](#users)
-- [Netdata collectors](#netdata-collectors)
-- [Orchestrators](#orchestrators)
-- [Third-party collectors](#third-party-collectors)
-- [Etc](#etc)
+  - [Netdata collectors](#netdata-collectors)
+  - [Orchestrators](#orchestrators)
+  - [Third-party collectors](#third-party-collectors)
+  - [Etc](#etc)
 
 ## Service and application collectors
 
@@ -218,8 +221,7 @@ configure any of these collectors according to your setup and infrastructure.
   server log files and provide summary (client, traffic) metrics.
 - [Squid web server logs](https://github.com/netdata/go.d.plugin/blob/master/modules/squidlog/README.md): Tail Squid
   access logs to return the volume of requests, types of requests, bandwidth, and much more.
-- [Web server logs (Go version for Apache,
-  NGINX)](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md/): Tail access logs and provide
+- [Web server logs (Go version for Apache, NGINX)](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md): Tail access logs and provide
   very detailed web server performance statistics. This module is able to parse 200k+ rows in less than half a second.
 - [Web server logs (Apache, NGINX)](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md): Tail
   access log
@@ -398,7 +400,7 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
   of targets (service-checks) using the XML
   stats interface.
 - [WMI (Windows Management Instrumentation)
-  exporter](https://github.com/netdata/go.d.plugin/blob/master/modules/wmi/README.md): Collect CPU, memory,
+  exporter](https://github.com/netdata/go.d.plugin/blob/master/modules/windows/README.md): Collect CPU, memory,
   network, disk, OS, system, and log-in metrics scraping `wmi_exporter`.
 
 ### Disks and filesystems

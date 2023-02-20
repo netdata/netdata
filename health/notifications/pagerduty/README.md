@@ -63,5 +63,5 @@ sudo su -s /bin/bash netdata
 Aside from the three values set in `health_alarm_notify.conf`, there is no further configuration required to send alert
 notifications to PagerDuty.
 
-To configure individual alarms, read our [alert configuration](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) doc or
+To configure individual alarms, read our [alert configuration](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) doc or
 the [health entity reference](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) doc.
