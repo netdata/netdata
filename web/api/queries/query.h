@@ -71,8 +71,8 @@ typedef enum rrdr_group_by_function {
     RRDR_GROUP_BY_FUNCTION_SUM_COUNT,
 } RRDR_GROUP_BY_FUNCTION;
 
-RRDR_GROUP_BY_FUNCTION group_by_function_parse(const char *s);
-const char *group_by_function_to_string(RRDR_GROUP_BY_FUNCTION group_by_function);
+RRDR_GROUP_BY_FUNCTION group_by_aggregate_function_parse(const char *s);
+const char *group_by_aggregate_function_to_string(RRDR_GROUP_BY_FUNCTION group_by_function);
 
 #ifdef __cplusplus
 }

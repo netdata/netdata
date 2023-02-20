@@ -692,7 +692,7 @@ const char *group_by_to_string(RRDR_GROUP_BY group_by) {
     }
 }
 
-RRDR_GROUP_BY_FUNCTION group_by_function_parse(const char *s) {
+RRDR_GROUP_BY_FUNCTION group_by_aggregate_function_parse(const char *s) {
     if(strcmp(s, "sum-count") == 0)
         return RRDR_GROUP_BY_FUNCTION_SUM_COUNT;
 
@@ -711,7 +711,7 @@ RRDR_GROUP_BY_FUNCTION group_by_function_parse(const char *s) {
     return RRDR_GROUP_BY_FUNCTION_AVERAGE;
 }
 
-const char *group_by_function_to_string(RRDR_GROUP_BY_FUNCTION group_by_function) {
+const char *group_by_aggregate_function_to_string(RRDR_GROUP_BY_FUNCTION group_by_function) {
     switch(group_by_function) {
         default:
         case RRDR_GROUP_BY_FUNCTION_AVERAGE:

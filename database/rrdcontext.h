@@ -270,7 +270,7 @@ typedef struct query_target_request {
     // group by across multiple time-series
     RRDR_GROUP_BY group_by;
     const char *group_by_key;
-    RRDR_GROUP_BY_FUNCTION group_by_function;
+    RRDR_GROUP_BY_FUNCTION group_by_aggregate_function;
 
     usec_t received_ut;
 } QUERY_TARGET_REQUEST;

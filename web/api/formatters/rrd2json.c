@@ -301,7 +301,7 @@ RRDR *data_query_group_by(RRDR *r) {
             QUERY_METRIC *qm = query_metric(qt, c);
             size_t c2 = qm->grouped_as.slot;
 
-            switch(qt->request.group_by_function) {
+            switch(qt->request.group_by_aggregate_function) {
                 default:
                 case RRDR_GROUP_BY_FUNCTION_AVERAGE:
                 case RRDR_GROUP_BY_FUNCTION_SUM:
@@ -349,10 +349,10 @@ RRDR *data_query_group_by(RRDR *r) {
 
                 NETDATA_DOUBLE n;
 
-                if(qt->request.group_by_function == RRDR_GROUP_BY_FUNCTION_SUM_COUNT) {
+                if(qt->request.group_by_aggregate_function == RRDR_GROUP_BY_FUNCTION_SUM_COUNT) {
                     n = *cn2 / *gbc2;
                 }
-                else if(qt->request.group_by_function == RRDR_GROUP_BY_FUNCTION_AVERAGE) {
+                else if(qt->request.group_by_aggregate_function == RRDR_GROUP_BY_FUNCTION_AVERAGE) {
                     n = *cn2 / *gbc2;
                     *cn2 = n;
                 }
@@ -590,7 +590,7 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         rrdr2json(r, wb, options, 0);
 
         if(options & RRDR_OPTION_JSON_WRAP) {
-            if(qt->request.group_by_function == RRDR_GROUP_BY_FUNCTION_SUM_COUNT) {
+            if(qt->request.group_by_aggregate_function == RRDR_GROUP_BY_FUNCTION_SUM_COUNT) {
                 rrdr_json_wrapper_group_by_count(r, wb, format, options, 0);
                 rrdr2json(r, wb, options | RRDR_OPTION_INTERNAL_GBC, 0);
             }

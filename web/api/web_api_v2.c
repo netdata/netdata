@@ -38,7 +38,7 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
     size_t tier = 0;
     RRDR_TIME_GROUPING time_group = RRDR_GROUPING_AVERAGE;
     RRDR_GROUP_BY group_by = RRDR_GROUP_BY_DIMENSION;
-    RRDR_GROUP_BY_FUNCTION group_by_function = RRDR_GROUP_BY_FUNCTION_AVERAGE;
+    RRDR_GROUP_BY_FUNCTION group_by_aggregate = RRDR_GROUP_BY_FUNCTION_AVERAGE;
     DATASOURCE_FORMAT format = DATASOURCE_JSON;
     RRDR_OPTIONS options = RRDR_OPTION_JSON_WRAP | RRDR_OPTION_RETURN_JWAR | RRDR_OPTION_VIRTUAL_POINTS;
 
@@ -65,7 +65,7 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
         else if(!strcmp(name, "timeout")) timeout_str = value;
         else if(!strcmp(name, "group_by")) group_by = group_by_parse(value);
         else if(!strcmp(name, "group_by_key")) group_by_key = value;
-        else if(!strcmp(name, "group_by_function")) group_by_function = group_by_function_parse(value);
+        else if(!strcmp(name, "group_by_aggregate")) group_by_aggregate = group_by_aggregate_function_parse(value);
         else if(!strcmp(name, "format")) format = web_client_api_request_v1_data_format(value);
         else if(!strcmp(name, "options")) options |= web_client_api_request_v1_data_options(value);
         else if(!strcmp(name, "time_group")) time_group = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
@@ -152,7 +152,7 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
             .options = options,
             .group_by = group_by,
             .group_by_key = group_by_key,
-            .group_by_function = group_by_function,
+            .group_by_aggregate_function = group_by_aggregate,
             .time_group_method = time_group,
             .time_group_options = time_group_options,
             .resampling_time = group_time,

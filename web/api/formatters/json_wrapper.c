@@ -565,15 +565,19 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
         buffer_json_member_add_object(wb, "aggregations");
         {
             buffer_json_member_add_object(wb, "time");
-            buffer_json_member_add_string(wb, "group", time_grouping_tostring(qt->request.time_group_method));
-            buffer_json_member_add_string(wb, "group_options", qt->request.time_group_options);
-            buffer_json_member_add_time_t(wb, "resampling", qt->request.resampling_time);
+            buffer_json_member_add_string(wb, "time_group", time_grouping_tostring(qt->request.time_group_method));
+            buffer_json_member_add_string(wb, "time_group_options", qt->request.time_group_options);
+            if(qt->request.resampling_time > 0)
+                buffer_json_member_add_time_t(wb, "time_resampling", qt->request.resampling_time);
+            else
+                buffer_json_member_add_string(wb, "time_resampling", NULL);
             buffer_json_object_close(wb); // time
 
-            buffer_json_member_add_object(wb, "group_by");
-            buffer_json_member_add_string(wb, "group", group_by_to_string(qt->request.group_by));
-            buffer_json_member_add_string(wb, "key", qt->request.group_by_key);
-            buffer_json_member_add_string(wb, "function", group_by_function_to_string(qt->request.group_by_function));
+            buffer_json_member_add_object(wb, "metrics");
+            buffer_json_member_add_string(wb, "group_by", group_by_to_string(qt->request.group_by));
+            buffer_json_member_add_string(wb, "group_by_key", qt->request.group_by_key);
+            buffer_json_member_add_string(wb, "group_by_aggregate",
+                                          group_by_aggregate_function_to_string(qt->request.group_by_aggregate_function));
             buffer_json_object_close(wb); // dimensions
         }
         buffer_json_object_close(wb); // aggregations
