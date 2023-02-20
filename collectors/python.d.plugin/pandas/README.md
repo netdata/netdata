@@ -28,6 +28,12 @@ This collector depends on some Python (Python 3 only) packages that can usually 
 sudo pip install pandas requests
 ```
 
+Note: If you would like to use [`pandas.read_sql`](https://pandas.pydata.org/docs/reference/api/pandas.read_sql.html) to query a database, you will need to install the below packages as well.
+
+```bash
+sudo pip install 'sqlalchemy<2.0' psycopg2-binary
+```
+
 ## Configuration
 
 Below is an example configuration to query some json weather data from [Open-Meteo](https://open-meteo.com), 
