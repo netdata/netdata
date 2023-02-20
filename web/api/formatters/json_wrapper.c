@@ -808,6 +808,7 @@ void rrdr_json_wrapper_group_by_count(RRDR *r __maybe_unused, BUFFER *wb, DATASO
 }
 
 void rrdr_json_wrapper_end(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format __maybe_unused, RRDR_OPTIONS options, bool string_value) {
+    QUERY_TARGET *qt = r->internal.qt;
 
     char sq[2] = "";                     // string quote
 
@@ -822,5 +823,15 @@ void rrdr_json_wrapper_end(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format __maybe
 
     buffer_json_member_add_double(wb, "min", r->view.min);
     buffer_json_member_add_double(wb, "max", r->view.max);
+
+    qt->timings.finished_ut = now_monotonic_usec();
+    buffer_json_member_add_object(wb, "timings");
+    buffer_json_member_add_double(wb, "prep_ms", (NETDATA_DOUBLE)(qt->timings.preprocessed_ut - qt->timings.received_ut) / USEC_PER_MS);
+    buffer_json_member_add_double(wb, "query_ms", (NETDATA_DOUBLE)(qt->timings.executed_ut - qt->timings.preprocessed_ut) / USEC_PER_MS);
+    buffer_json_member_add_double(wb, "group_by_ms", (NETDATA_DOUBLE)(qt->timings.group_by_ut - qt->timings.executed_ut) / USEC_PER_MS);
+    buffer_json_member_add_double(wb, "output_ms", (NETDATA_DOUBLE)(qt->timings.finished_ut - qt->timings.group_by_ut) / USEC_PER_MS);
+    buffer_json_member_add_double(wb, "total_ms", (NETDATA_DOUBLE)(qt->timings.finished_ut - qt->timings.received_ut) / USEC_PER_MS);
+    buffer_json_object_close(wb);
+
     buffer_json_finalize(wb);
 }

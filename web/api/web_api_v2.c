@@ -6,6 +6,8 @@
 static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_client *w, char *url) {
     debug(D_WEB_CLIENT, "%llu: API v1 data with URL '%s'", w->id, url);
 
+    usec_t received_ut = now_monotonic_usec();
+
     int ret = HTTP_RESP_BAD_REQUEST;
 
     buffer_flush(w->response.data);
@@ -159,6 +161,7 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
             .charts_labels_filter = chart_labels_filter,
             .query_source = QUERY_SOURCE_API_DATA,
             .priority = STORAGE_PRIORITY_NORMAL,
+            .received_ut = received_ut,
     };
     qt = query_target_create(&qtr);
 

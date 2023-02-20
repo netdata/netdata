@@ -2921,6 +2921,11 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     qt->used = true;
     qt->queries++;
 
+    if(!qtr->received_ut)
+        qtr->received_ut = now_monotonic_usec();
+
+    qt->timings.received_ut = qtr->received_ut;
+
     // copy the request into query_thread_target
     qt->request = *qtr;
 
@@ -3024,6 +3029,8 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
         query_target_release(qt);
         return NULL;
     }
+
+    qt->timings.preprocessed_ut = now_monotonic_usec();
 
     return qt;
 }

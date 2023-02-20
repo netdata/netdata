@@ -405,6 +405,8 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         wrapper_begin = rrdr_json_wrapper_begin2;
 
     RRDR *r1 = rrd2rrdr(owa, qt);
+    qt->timings.executed_ut = now_monotonic_usec();
+
     if(!r1) {
         buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
@@ -428,6 +430,7 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
     RRDR_TIME_GROUPING group_method = qt->request.time_group_method;
 
     RRDR *r = data_query_group_by(r1);
+    qt->timings.group_by_ut = now_monotonic_usec();
 
     switch(format) {
     case DATASOURCE_SSV:

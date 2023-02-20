@@ -266,6 +266,7 @@ typedef struct query_target_request {
     const char *group_by_key;
     RRDR_GROUP_BY_FUNCTION group_by_function;
 
+    usec_t received_ut;
 } QUERY_TARGET_REQUEST;
 
 typedef struct query_target {
@@ -333,6 +334,13 @@ typedef struct query_target {
         SIMPLE_PATTERN *pattern;
     } hosts;
 
+    struct {
+        usec_t received_ut;
+        usec_t preprocessed_ut;
+        usec_t executed_ut;
+        usec_t group_by_ut;
+        usec_t finished_ut;
+    } timings;
 } QUERY_TARGET;
 
 static inline NEVERNULL QUERY_HOST *query_host(QUERY_TARGET *qt, size_t id) {
