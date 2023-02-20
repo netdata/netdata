@@ -97,7 +97,7 @@ dist_healthconfig_DATA = \
     health.d/vsphere.conf \
     health.d/web_log.conf \
     health.d/whoisquery.conf \
-    health.d/wmi.conf \
+    health.d/windows.conf \
     health.d/x509check.conf \
     health.d/zfs.conf \
     health.d/dbengine.conf \
