@@ -405,12 +405,12 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
 ### Disks and filesystems
 
 - [BCACHE](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Monitor BCACHE statistics
-  with the the `proc.plugin` collector.
+  with the `proc.plugin` collector.
 - [Block devices](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Gather metrics about
   the health and performance of block
-  devices using the the `proc.plugin` collector.
+  devices using the `proc.plugin` collector.
 - [Btrfs](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Monitors Btrfs filesystems
-  with the the `proc.plugin` collector.
+  with the `proc.plugin` collector.
 - [Device mapper](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Gather metrics about
   the Linux device mapper with the proc
   collector.
@@ -424,10 +424,9 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
   read/write latency.
 - [NFS file servers and clients](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md):
   Gather operations, utilization, and space usage
-  using the the `proc.plugin` collector.
+  using the `proc.plugin` collector.
 - [RAID arrays](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Collect health, disk
-  status, operation status, and more with the
-  the `proc.plugin` collector.
+  status, operation status, and more with the `proc.plugin` collector.
 - [Veritas Volume Manager](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Gather
   metrics about the Veritas Volume Manager (VVM).
 - [ZFS](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Monitor bandwidth and
@@ -475,8 +474,7 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
 ### Memory
 
 - [Available memory](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Tracks changes in
-  available RAM using the the `proc.plugin`
-  collector.
+  available RAM using the `proc.plugin` collector.
 - [Committed memory](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Monitor committed
   memory using the `proc.plugin` collector.
 - [Huge pages](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Gather metrics about
