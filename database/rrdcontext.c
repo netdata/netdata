@@ -2651,7 +2651,8 @@ static inline STRING *rrdinstance_name_fqdn_v2(RRDINSTANCE_ACQUIRED *ria) {
     return string_strdupz(buffer);
 }
 
-static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, QUERY_CONTEXT *qc, RRDINSTANCE_ACQUIRED *ria, bool queryable_instance) {
+static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, QUERY_CONTEXT *qc,
+                                      RRDINSTANCE_ACQUIRED *ria, bool queryable_instance, bool match_id_name) {
     QUERY_TARGET *qt = qtl->qt;
 
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
@@ -2687,6 +2688,17 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, 
 
     if(qt->db.minimum_latest_update_every_s == 0 || ri->update_every_s < qt->db.minimum_latest_update_every_s)
         qt->db.minimum_latest_update_every_s = ri->update_every_s;
+
+    if(match_id_name) {
+        queryable_instance = false;
+        if(!qt->instances.pattern
+           || (qtl->match_ids   && simple_pattern_matches(qt->instances.pattern, string2str(ri->id)))
+           || (qtl->match_ids   && simple_pattern_matches(qt->instances.pattern, string2str(qi->id_fqdn)))
+           || (qtl->match_names && simple_pattern_matches(qt->instances.pattern, string2str(ri->name)))
+           || (qtl->match_names && simple_pattern_matches(qt->instances.pattern, string2str(qi->name_fqdn)))
+                )
+            queryable_instance = true;
+    }
 
     if(queryable_instance) {
         if ((qt->instances.chart_label_key_pattern && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, qt->instances.chart_label_key_pattern, ':')) ||
@@ -2748,24 +2760,17 @@ static void query_target_add_context(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, R
 
     size_t added = 0;
     if(unlikely(qt->request.ria)) {
-         query_target_add_instance(qtl, qh, qc, qt->request.ria, true);
+         query_target_add_instance(qtl, qh, qc, qt->request.ria, true, false);
         added++;
     }
     else if(unlikely(qtl->st && qtl->st->rrdcontext == rca && qtl->st->rrdinstance)) {
-        query_target_add_instance(qtl, qh, qc, qtl->st->rrdinstance, true);
+        query_target_add_instance(qtl, qh, qc, qtl->st->rrdinstance, true, false);
         added++;
     }
     else {
         RRDINSTANCE *ri;
         dfe_start_read(rc->rrdinstances, ri) {
-            bool queryable_instance = false;
-            if(!qt->instances.pattern
-                || (qtl->match_ids   && simple_pattern_matches(qt->instances.pattern, string2str(ri->id)))
-                || (qtl->match_names && simple_pattern_matches(qt->instances.pattern, string2str(ri->name)))
-                )
-                queryable_instance = true;
-
-            query_target_add_instance(qtl, qh, qc, (RRDINSTANCE_ACQUIRED *)ri_dfe.item, queryable_instance);
+            query_target_add_instance(qtl, qh, qc, (RRDINSTANCE_ACQUIRED *)ri_dfe.item, false, true);
             added++;
         }
         dfe_done(ri);
