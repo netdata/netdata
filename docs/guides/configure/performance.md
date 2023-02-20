@@ -142,40 +142,7 @@ modules:
 
 ## Lower memory usage for metrics retention
 
-Reduce the disk space that the [database engine](https://github.com/netdata/netdata/blob/master/database/engine/README.md) uses to retain metrics by editing
-the `dbengine multihost disk space` option in `netdata.conf`. The default value is `256`, but can be set to a minimum of
-`64`. By reducing the disk space allocation, Netdata also needs to store less metadata in the node's memory.
-
-The `page cache size` option also directly impacts Netdata's memory usage, but has a minimum value of `32`.
-
-Reducing the value of `dbengine multihost disk space` does slim down Netdata's resource usage, but it also reduces how
-long Netdata retains metrics. Find the right balance of performance and metrics retention by using the [dbengine
-calculator](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics).
-
-All the settings are found in the `[global]` section of `netdata.conf`:
-
-```conf
-[db]
-    memory mode = dbengine
-    page cache size = 32
-    dbengine multihost disk space = 256
-```
-
-To save even more memory, you can disable the dbengine and reduce retention to just 30 minutes, as shown below:
-
-```conf
-[db]
-   storage tiers = 1
-   mode = alloc
-   retention = 1800
-```
-
-Metric retention is not important in certain use cases, such as:
- - Data collection nodes stream collected metrics collected to a centralization point.
- - Data collection nodes export their metrics to another time series DB, or are scraped by Prometheus
- - Netdata installed only during incidents, to get richer information.
-In such cases, you may not want to use the dbengine at all and instead opt for memory mode 
-`memory mode = alloc` or `memory mode = none`.
+See how to [change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md).
 
 ## Disable machine learning
 
