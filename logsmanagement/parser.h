@@ -8,6 +8,8 @@
 #define PARSER_H_
 
 #include <regex.h> 
+#include "daemon/common.h"
+#include "libnetdata/libnetdata.h"
 
 // Forward decleration
 typedef struct log_parser_metrics Log_parser_metrics_t;
@@ -40,8 +42,12 @@ typedef enum{
     CHART_SYSLOG_SEVER = 1 << 15,
     CHART_SYSLOG_FACIL = 1 << 16,
 
+    /* FLB_KMSG */
+    CHART_KMSG_SUBSYSTEM = 1 << 17,
+    CHART_KMSG_DEVICE = 1 << 18,
+
     /* FLB_DOCKER_EV charts */
-    CHART_DOCKER_EV_TYPE = 1 << 17
+    CHART_DOCKER_EV_TYPE = 1 << 19
 
 } chart_type_t;
 
@@ -200,14 +206,21 @@ int parse_web_log_buf(  char *text, size_t text_size,
 
 
 /* -------------------------------------------------------------------------- */
-/*                        Systemd and Syslog metrics                          */
+/*                       Kernel logs (kmsg) metrics                           */
 /* -------------------------------------------------------------------------- */
 
 #define SYSLOG_SEVER_ARR_SIZE 9         /**< Number of severity levels plus 1 for 'unknown' **/
 
+typedef struct kernel_metrics_dict_item{
+    RRDDIM *dim;
+    int num;
+} Kernel_metrics_dict_item_t;
+
 typedef struct kernel_metrics{
     unsigned int num_lines;				            /**< Number of parsed lines **/
     unsigned int sever[SYSLOG_SEVER_ARR_SIZE];      /**< Syslog severity, 0-7 plus 1 space for 'unknown' **/
+    DICTIONARY *subsystem;
+    DICTIONARY *device;
 } Kernel_metrics_t;
 
 /* -------------------------------------------------------------------------- */

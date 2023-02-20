@@ -27,6 +27,14 @@ struct Chart_data_kernel {
     RRDSET *st_sever;
     RRDDIM *dim_sever[9];
     collected_number num_sever[9];
+
+    /* Kernel metrics - Subsystem */
+    RRDSET *st_subsys;
+    // Special case: Subsystem dimension and number are part of Kernel_metrics_t
+
+    /* Kernel metrics - Device */
+    RRDSET *st_device;
+    // Special case: Device dimension and number are part of Kernel_metrics_t
 };
 
 void kernel_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_meta);

@@ -32,7 +32,7 @@ void kernel_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_m
                 (char *) p_file_info->chart_name
                 , "severity levels"
                 , NULL
-                , "priority"
+                , "severity"
                 , NULL
                 , "Severity Levels"
                 , "severity levels"
@@ -52,6 +52,42 @@ void kernel_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_m
         chart_data->dim_sever[7] = rrddim_add(chart_data->st_sever, "7:Debug",     NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);     
         chart_data->dim_sever[8] = rrddim_add(chart_data->st_sever, "Unknown",     NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);  
     }
+
+    /* Subsystem - initialise */
+    if(p_file_info->parser_config->chart_config & CHART_KMSG_SUBSYSTEM){
+        chart_data->st_subsys = rrdset_create_localhost(
+                (char *) p_file_info->chart_name
+                , "subsystems"
+                , NULL
+                , "subsystem"
+                , NULL
+                , "Subsystems"
+                , "subsystems"
+                , "logsmanagement.plugin"
+                , NULL
+                , ++chart_prio
+                , p_file_info->update_every
+                , RRDSET_TYPE_AREA
+        ); 
+    }
+
+    /* Device - initialise */
+    if(p_file_info->parser_config->chart_config & CHART_KMSG_DEVICE){
+        chart_data->st_device = rrdset_create_localhost(
+                (char *) p_file_info->chart_name
+                , "devices"
+                , NULL
+                , "device"
+                , NULL
+                , "Devices"
+                , "devices"
+                , "logsmanagement.plugin"
+                , NULL
+                , ++chart_prio
+                , p_file_info->update_every
+                , RRDSET_TYPE_AREA
+        ); 
+    }
 }
 
 void kernel_chart_collect(struct File_info *p_file_info, struct Chart_meta *chart_meta){
@@ -69,6 +105,14 @@ void kernel_chart_collect(struct File_info *p_file_info, struct Chart_meta *char
             p_file_info->parser_metrics->kernel->sever[j] = 0;
         }
     }
+
+    /* Subsystem - collect */
+    /* No collection step for subsystem as dictionaries use r/w locks that 
+     * allow update direct update of values. */
+
+    /* Device - collect */
+    /* No collection step for device as dictionaries use r/w locks that 
+     * allow update direct update of values. */
 }
 
 void kernel_chart_update(struct File_info *p_file_info, struct Chart_meta *chart_meta){
@@ -92,4 +136,27 @@ void kernel_chart_update(struct File_info *p_file_info, struct Chart_meta *chart
         }
         rrdset_done(chart_data->st_sever);
     }
+
+    /* Subsystem - update chart */
+    if(p_file_info->parser_config->chart_config & CHART_KMSG_SUBSYSTEM){
+        Kernel_metrics_dict_item_t *it;
+        dfe_start_read(p_file_info->parser_metrics->kernel->subsystem, it){
+            if(!it->dim) it->dim = rrddim_add(chart_data->st_subsys, it_dfe.name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_set_by_pointer(chart_data->st_subsys, it->dim, (collected_number) it->num);
+        }
+        dfe_done(it);
+    }
+    rrdset_done(chart_data->st_subsys);
+
+    /* Device - update chart */
+    if(p_file_info->parser_config->chart_config & CHART_KMSG_DEVICE){
+        Kernel_metrics_dict_item_t *it;
+        dfe_start_read(p_file_info->parser_metrics->kernel->device, it){
+            if(!it->dim) it->dim = rrddim_add(chart_data->st_device, it_dfe.name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_set_by_pointer(chart_data->st_device, it->dim, (collected_number) it->num);
+        }
+        dfe_done(it);
+    }
+    rrdset_done(chart_data->st_device);
+
 }

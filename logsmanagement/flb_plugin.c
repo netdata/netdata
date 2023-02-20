@@ -9,6 +9,7 @@
 #include "helper.h"
 #include "circular_buffer.h"
 #include "daemon/common.h"
+#include "libnetdata/libnetdata.h"
 #include "../fluent-bit/lib/msgpack-c/include/msgpack/unpack.h"
 #include "../fluent-bit/lib/monkey/include/monkey/mk_core/mk_list.h"
 #include "../fluent-bit/include/fluent-bit/flb_macros.h"
@@ -308,11 +309,13 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
     struct flb_time tmp_time;
     msgpack_object *x;
 
+    
+
     /* FLB_KMSG case */
-    char *subsystem = NULL;
-    size_t subsystem_size = 0;
-    char *device = NULL;
-    size_t device_size = 0;
+    const char  subsys_str[] = " SUBSYSTEM=",
+                device_str[] = " DEVICE=";
+    const size_t subsys_str_len = sizeof(subsys_str) - 1,
+                 device_str_len = sizeof(device_str) - 1;
     /* FLB_KMSG case end */
 
     /* FLB_SYSTEMD or FLB_SYSLOG case */
@@ -433,7 +436,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
                                 message_size = c - message;
                                 bytes_remain -= message_size;
 
-                                error("msg init:%.*s sz:%zu br:%zu", (int) message_size, message, message_size, bytes_remain);
+                                // error("msg init:%.*s sz:%zu br:%zu", (int) message_size, message, message_size, bytes_remain);
 
                                 /* Extract machine-readable info for charts, 
                                  * such as subsystem and device. */
@@ -442,16 +445,30 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
                                     while(--bytes_remain && c[++sz] != '\n');
                                     if(bytes_remain) --sz;
                                     c++; // skip new line and space chars
-                                    error("msg:%.*s", sz, c);
-                                    const char  subsys_str[] = " SUBSYSTEM=",
-                                                device_str[] = " DEVICE=";
-                                    const size_t    subsys_str_len = sizeof(subsys_str) - 1,
-                                                    device_str_sz = sizeof(device_str) - 1;
+                                    // error("msg:%.*s", (int) sz, c);
+
+                                    DICTIONARY *dict;
+                                    char *str = NULL;
+                                    size_t str_len;
                                     if(!strncmp(c, subsys_str, subsys_str_len)){
-                                        error("msg subsys:%.*s", (int) (sz - subsys_str_len), &c[subsys_str_len]);
+                                        dict = p_file_info->parser_metrics->kernel->subsystem;
+                                        str = &c[subsys_str_len];
+                                        str_len = (sz - subsys_str_len);
                                     }
-                                    else if (!strncmp(c, " DEVICE=", device_str_sz)){
-                                        error("msg device:%.*s", (int) (sz - device_str_sz), &c[device_str_sz]);
+                                    else if (!strncmp(c, device_str, device_str_len)){
+                                        dict = p_file_info->parser_metrics->kernel->device;
+                                        str = &c[device_str_len];
+                                        str_len = (sz - device_str_len);
+                                    }
+
+                                    if(likely(str)){
+                                        // error("msg subsys/device:%.*s", (int) str_len, str);
+                                        char * const key = mallocz(str_len + 1);
+                                        memcpy(key, str, str_len);
+                                        key[str_len] = '\0';
+                                        // error("msg cpy:%s", key);
+                                        Kernel_metrics_dict_item_t item = {.dim = NULL, .num = 1};
+                                        dictionary_set_advanced(dict, key, str_len, &item, sizeof(item), NULL);
                                     }
                                     c = &c[sz];
                                 }

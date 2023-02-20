@@ -51,6 +51,11 @@ volatile sig_atomic_t p_file_infos_arr_ready = 0;
 int g_logs_manag_update_every = 1;
 
 
+static bool metrics_dict_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused){
+    ((Kernel_metrics_dict_item_t *)old_value)->num += ((Kernel_metrics_dict_item_t *)new_value)->num;
+    return true;
+}
+
 static void p_file_info_destroy(struct File_info *p_file_info){
 
     info("[%s]: p_file_info_destroy() cleanup", p_file_info->chart_name ? p_file_info->chart_name : "Unknown");
@@ -449,6 +454,12 @@ static void logs_management_init(struct section *config_section){
         if(appconfig_get_boolean(&log_management_config, config_section->name, "severity chart", 0)) {
             p_file_info->parser_config->chart_config |= CHART_SYSLOG_SEVER;
         }
+        if(appconfig_get_boolean(&log_management_config, config_section->name, "subsystem chart", 0)) {
+            p_file_info->parser_config->chart_config |= CHART_KMSG_SUBSYSTEM;
+        }
+        if(appconfig_get_boolean(&log_management_config, config_section->name, "device chart", 0)) {
+            p_file_info->parser_config->chart_config |= CHART_KMSG_DEVICE;
+        }
     }
     else if(p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_SYSLOG){
         if(p_file_info->log_type == FLB_SYSLOG){
@@ -534,6 +545,10 @@ static void logs_management_init(struct section *config_section){
         }
         case FLB_KMSG: {
             p_file_info->parser_metrics->kernel = callocz(1, sizeof(Kernel_metrics_t));
+            p_file_info->parser_metrics->kernel->subsystem = dictionary_create(DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
+            dictionary_register_conflict_callback(p_file_info->parser_metrics->kernel->subsystem, metrics_dict_conflict_cb, NULL);
+            p_file_info->parser_metrics->kernel->device = dictionary_create(DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
+            dictionary_register_conflict_callback(p_file_info->parser_metrics->kernel->device, metrics_dict_conflict_cb, NULL);
             break;
         }
         case FLB_SYSTEMD: 
