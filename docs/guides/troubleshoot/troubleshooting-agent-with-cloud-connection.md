@@ -5,7 +5,7 @@ description: "A simple guide to troubleshoot occurrences where the Agent is show
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/troubleshoot/troubleshooting-agent-with-cloud-connection.md
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "Guides/Troubleshoot"
+learn_rel_path: "Operations"
 -->
 
 # Troubleshoot Agent-Cloud connectivity issues

@@ -1,5 +1,5 @@
 <!--
-title: "Send notifications to Gotify"
+title: "Gotify agent alert notifications"
 description: "Send alerts to your Gotify instance when an alert gets triggered in Netdata."
 sidebar_label: "Gotify"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/gotify/README.md
@@ -9,7 +9,7 @@ learn_rel_path: "Integrations/Notify/Agent alert notifications"
 learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
-# Send notifications to Gotify
+# Gotify agent alert notifications
 
 [Gotify](https://gotify.net/) is a self-hosted push notification service created for sending and receiving messages in real time.
 

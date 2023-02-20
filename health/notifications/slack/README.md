@@ -1,5 +1,5 @@
 <!--
-title: "Slack"
+title: "Slack agent alert notifications"
 sidebar_label: "Slack"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/slack/README.md"
 learn_status: "Published"
@@ -8,7 +8,7 @@ learn_rel_path: "Integrations/Notify/Agent alert notifications"
 learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
-# Slack
+# Slack agent alert notifications
 
 This is what you will get:
 ![image](https://cloud.githubusercontent.com/assets/2662304/18407116/bbd0fee6-7710-11e6-81cf-58c0defaee2b.png)

@@ -6,7 +6,7 @@ image: /img/seo/guides/configure/performance.png
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/configure/performance.md
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "Guides"
+learn_rel_path: "Configuration"
 -->
 
 # How to optimize the Netdata Agent's performance

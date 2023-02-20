@@ -5,8 +5,7 @@ description: "Monitor Pi-hole metrics, plus Raspberry Pi system metrics, in minu
 image: /img/seo/guides/monitor/netdata-pi-hole-raspberry-pi.png
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/pi-hole-raspberry-pi.md
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Guides/Monitor"
+learn_rel_path: "Miscellaneous"
 -->
 import { OneLineInstallWget } from '@site/src/components/OneLineInstall/'
 

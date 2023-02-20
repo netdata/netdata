@@ -1,5 +1,5 @@
 <!--
-title: "Rocket.Chat"
+title: "Rocket.Chat agent alert notifications"
 sidebar_label: "Rocket Chat"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/rocketchat/README.md"
 learn_status: "Published"
@@ -8,7 +8,7 @@ learn_rel_path: "Integrations/Notify/Agent alert notifications"
 learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
-# Rocket.Chat
+# Rocket.Chat agent alert notifications
 
 This is what you will get:
 ![Netdata on RocketChat](https://i.imgur.com/Zu4t3j3.png)
