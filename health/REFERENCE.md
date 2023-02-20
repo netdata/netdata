@@ -301,31 +301,31 @@ type: Database
 <details>
 <summary>Netdata's stock alarms use the following `type` attributes by default, but feel free to adjust for your own requirements.</summary>
 
-| Type                     | Description                                                                                      |
-| ------------------------ | ------------------------------------------------------------------------------------------------ |
-| Ad Filtering             | Services related to Ad Filtering (like pi-hole)                                                  |
-| Certificates             | Certificates monitoring related                                                                  |
-| Cgroups                  | Alerts for cpu and memory usage of control groups                                                |
-| Computing                | Alerts for shared computing applications (e.g. boinc)                                            |
-| Containers               | Container related alerts (e.g. docker instances)                                                 |
-| Database                 | Database systems (e.g. MySQL, PostgreSQL, etc)                                                    |
-| Data Sharing             | Used to group together alerts for data sharing applications                                      |
-| DHCP                     | Alerts for dhcp related services                                                                 |
-| DNS                      | Alerts for dns related services                                                                  |
-| Kubernetes               | Alerts for kubernetes nodes monitoring                                                           |
-| KV Storage               | Key-Value pairs services alerts (e.g. memcached)                                                 |
-| Linux                    | Services specific to Linux (e.g. systemd)                                                        |
-| Messaging                | Alerts for message passing services (e.g. vernemq)                                               |
-| Netdata                  | Internal Netdata components monitoring                                                           |
-| Other                    | When an alert doesn't fit in other types.                                                        |
-| Power Supply             | Alerts from power supply related services (e.g. apcupsd)                                         |
-| Search engine            | Alerts for search services (e.g. elasticsearch)                                                  |
-| Storage                  | Class for alerts dealing with storage services (storage devices typically live under `System`)   |
-| System                   | General system alarms (e.g. cpu, network, etc.)                                                  |
-| Virtual Machine          | Virtual Machine software                                                                         |
-| Web Proxy                | Web proxy software (e.g. squid)                                                                  |
-| Web Server               | Web server software (e.g. Apache, ngnix, etc.)                                                   |
-| Windows                  | Alerts for monitor of wmi services                                                               |
+| Type            | Description                                                                                    |
+|-----------------|------------------------------------------------------------------------------------------------|
+| Ad Filtering    | Services related to Ad Filtering (like pi-hole)                                                |
+| Certificates    | Certificates monitoring related                                                                |
+| Cgroups         | Alerts for cpu and memory usage of control groups                                              |
+| Computing       | Alerts for shared computing applications (e.g. boinc)                                          |
+| Containers      | Container related alerts (e.g. docker instances)                                               |
+| Database        | Database systems (e.g. MySQL, PostgreSQL, etc)                                                 |
+| Data Sharing    | Used to group together alerts for data sharing applications                                    |
+| DHCP            | Alerts for dhcp related services                                                               |
+| DNS             | Alerts for dns related services                                                                |
+| Kubernetes      | Alerts for kubernetes nodes monitoring                                                         |
+| KV Storage      | Key-Value pairs services alerts (e.g. memcached)                                               |
+| Linux           | Services specific to Linux (e.g. systemd)                                                      |
+| Messaging       | Alerts for message passing services (e.g. vernemq)                                             |
+| Netdata         | Internal Netdata components monitoring                                                         |
+| Other           | When an alert doesn't fit in other types.                                                      |
+| Power Supply    | Alerts from power supply related services (e.g. apcupsd)                                       |
+| Search engine   | Alerts for search services (e.g. elasticsearch)                                                |
+| Storage         | Class for alerts dealing with storage services (storage devices typically live under `System`) |
+| System          | General system alarms (e.g. cpu, network, etc.)                                                |
+| Virtual Machine | Virtual Machine software                                                                       |
+| Web Proxy       | Web proxy software (e.g. squid)                                                                |
+| Web Server      | Web server software (e.g. Apache, ngnix, etc.)                                                 |
+| Windows         | Alerts for monitor of windows services                                                         |
 
 </details>
 
