@@ -141,7 +141,7 @@ void kernel_chart_update(struct File_info *p_file_info, struct Chart_meta *chart
     if(p_file_info->parser_config->chart_config & CHART_KMSG_SUBSYSTEM){
         Kernel_metrics_dict_item_t *it;
         dfe_start_read(p_file_info->parser_metrics->kernel->subsystem, it){
-            if(!it->dim) it->dim = rrddim_add(chart_data->st_subsys, it_dfe.name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            if(!it->dim) it->dim = rrddim_add(chart_data->st_subsys, it_dfe.name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rrddim_set_by_pointer(chart_data->st_subsys, it->dim, (collected_number) it->num);
         }
         dfe_done(it);
@@ -152,7 +152,7 @@ void kernel_chart_update(struct File_info *p_file_info, struct Chart_meta *chart
     if(p_file_info->parser_config->chart_config & CHART_KMSG_DEVICE){
         Kernel_metrics_dict_item_t *it;
         dfe_start_read(p_file_info->parser_metrics->kernel->device, it){
-            if(!it->dim) it->dim = rrddim_add(chart_data->st_device, it_dfe.name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            if(!it->dim) it->dim = rrddim_add(chart_data->st_device, it_dfe.name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rrddim_set_by_pointer(chart_data->st_device, it->dim, (collected_number) it->num);
         }
         dfe_done(it);

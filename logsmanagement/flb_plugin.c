@@ -7,6 +7,7 @@
 #include "flb_plugin.h"
 #include <lz4.h>
 #include "helper.h"
+#include "logsmanagement_conf.h"
 #include "circular_buffer.h"
 #include "daemon/common.h"
 #include "libnetdata/libnetdata.h"
@@ -312,6 +313,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
     
 
     /* FLB_KMSG case */
+    static int skip_kmsg_log_buffering = 1;
     const char  subsys_str[] = " SUBSYSTEM=",
                 device_str[] = " DEVICE=";
     const size_t subsys_str_len = sizeof(subsys_str) - 1,
@@ -420,7 +422,8 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
                             /* set new_tmp_text_size to previous size of buffer, do only once */
                             new_tmp_text_size = buff->in->text_size; 
                         }
-                        if(!strncmp(p->key.via.str.ptr, LOG_REC_KEY, (size_t) p->key.via.str.size)){
+                        if( !strncmp(p->key.via.str.ptr, LOG_REC_KEY, (size_t) p->key.via.str.size) && 
+                            !skip_kmsg_log_buffering){
                             message = (char *) p->val.via.str.ptr;
                             message_size = p->val.via.str.size;
 
@@ -476,7 +479,8 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
 
                             new_tmp_text_size += message_size + 1; // +1 for '\n'
                         }
-                        else if(!strncmp(p->key.via.str.ptr, "priority", (size_t) p->key.via.str.size)){
+                        else if(!strncmp(p->key.via.str.ptr, "priority", (size_t) p->key.via.str.size) && 
+                                !skip_kmsg_log_buffering){
                             p_file_info->flb_tmp_kernel_metrics.sever[p->val.via.u64]++;
                         }
                         ++p;
@@ -673,24 +677,31 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
     /* FLB_KMSG case */
     if(p_file_info->log_type == FLB_KMSG){
 
-        /* Parse number of log lines */
-        p_file_info->flb_tmp_kernel_metrics.num_lines++;
-
-        /* Metrics extracted, now prepare circular buffer for write */
-        // TODO: Fix: Metrics will still be collected if circ_buff_prepare_write() returns 0.
-        if(unlikely(!circ_buff_prepare_write(buff, new_tmp_text_size))) goto skip_collect_and_drop_logs;
-
-        size_t tmp_item_off = buff->in->text_size;
-
-        if(likely(message)){
-            memcpy(&buff->in->data[tmp_item_off], message, message_size);
-            tmp_item_off += message_size;  
+        if(unlikely(skip_kmsg_log_buffering)){
+            static time_t netdata_start_time = 0;
+            if (!netdata_start_time) netdata_start_time = now_boottime_sec();
+            if(now_boottime_sec() - netdata_start_time >= KERNEL_LOGS_COLLECT_INIT_WAIT) skip_kmsg_log_buffering = 0;
         }
+        else{
+            
+            /* Parse number of log lines */
+            p_file_info->flb_tmp_kernel_metrics.num_lines++;
 
-        buff->in->data[tmp_item_off++] = '\n';
-        m_assert(tmp_item_off == new_tmp_text_size, "tmp_item_off should be == new_tmp_text_size");
-        buff->in->text_size = new_tmp_text_size;
+            /* Metrics extracted, now prepare circular buffer for write */
+            // TODO: Fix: Metrics will still be collected if circ_buff_prepare_write() returns 0.
+            if(unlikely(!circ_buff_prepare_write(buff, new_tmp_text_size))) goto skip_collect_and_drop_logs;
 
+            size_t tmp_item_off = buff->in->text_size;
+
+            if(likely(message)){
+                memcpy(&buff->in->data[tmp_item_off], message, message_size);
+                tmp_item_off += message_size;  
+            }
+
+            buff->in->data[tmp_item_off++] = '\n';
+            m_assert(tmp_item_off == new_tmp_text_size, "tmp_item_off should be == new_tmp_text_size");
+            buff->in->text_size = new_tmp_text_size;
+        }
     } /* FLB_KMSG case end */
     
     /* FLB_SYSTEMD or FLB_SYSLOG case */
