@@ -107,7 +107,7 @@ update_every: 10
 ## Disable unneeded plugins or collectors
 
 If you know that you don't need an [entire plugin or a specific
-collector](https://github.com/netdata/netdata/blob/master/docs/collect/how-collectors-work.md#collector-architecture-and-terminology), you can disable any of them.
+collector](https://github.com/netdata/netdata/blob/master/collectors/README.md#collector-architecture-and-terminology), you can disable any of them.
 Keep in mind that if a plugin/collector has nothing to do, it simply shuts down and does not consume system resources.
 You will only improve the Agent's performance by disabling plugins/collectors that are actively collecting metrics.
 

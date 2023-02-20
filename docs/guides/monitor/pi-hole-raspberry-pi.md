@@ -101,8 +101,7 @@ part of your system might affect another.
 ![The Netdata dashboard in
 action](https://user-images.githubusercontent.com/1153921/80827388-b9fee100-8b98-11ea-8f60-0d7824667cd3.gif)
 
-If you're completely new to Netdata, look at our [step-by-step guide](https://github.com/netdata/netdata/blob/master/docs/guides/step-by-step/step-00.md) for a
-walkthrough of all its features. For a more expedited tour, see the [get started documentation](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md).
+If you're completely new to Netdata, look at the [Introduction](https://github.com/netdata/netdata/blob/master/docs/getting-started/introduction.md) section for a walkthrough of all its features. For a more expedited tour, see the [get started documentation](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md).
 
 ### Enable temperature sensor monitoring
 
