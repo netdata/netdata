@@ -12,8 +12,7 @@ learn_rel_path: "Integrations/Notify"
 Netdata offers two ways to receive alert notifications on external platforms. These methods work independently _or_ in
 parallel, which means you can enable both at the same time to send alert notifications to any number of endpoints.
 
-Both methods use a node's health alerts to generate the content of alert notifications. Read the doc on [configuring
-alerts](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) to change the preconfigured thresholds or to create tailored alerts for your
+Both methods use a node's health alerts to generate the content of alert notifications. Read our documentation on [configuring alerts](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) to change the preconfigured thresholds or to create tailored alerts for your
 infrastructure.
 
 Netdata Cloud offers [centralized alert notifications](#netdata-cloud) via email, which leverages the health status

@@ -120,8 +120,7 @@ Netdata Cloud users can [build new dashboards](https://github.com/netdata/netdat
 aggregating relevant metrics from any number of nodes onto a single interface, you can respond faster to anomalies,
 perform more targeted troubleshooting, or keep tabs on a bird's eye view of your infrastructure.
 
-If you're finished with dashboards for now, skip to Netdata's health watchdog for information on [creating or
-configuring](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) alarms, and [send notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md)
+If you're finished with dashboards for now, skip to Netdata's health watchdog for information on [creating or configuring](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) alarms, and [send notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md)
 to get informed when something goes wrong in your infrastructure.
 
 ### Related reference documentation
