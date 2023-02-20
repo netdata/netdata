@@ -1,14 +1,15 @@
 <!--
-title: "Netdata CLI"
+title: "Netdata Agent CLI"
 description: "The Netdata Agent includes a command-line experience for reloading health configuration, reopening log files, halting the daemon, and more."
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/cli/README.md"
 sidebar_label: "Agent CLI"
 learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "References"
+learn_rel_path: "Operations"
 -->
 
 # Netdata CLI
+
+The `netdatacli` executable provides a simple way to control the Netdata agent's operation. 
 
 You can see the commands `netdatacli` supports by executing it with `netdatacli` and entering `help` in
 standard input. All commands are given as standard input to `netdatacli`.
@@ -39,6 +40,6 @@ aclk-state [json]
     Returns current state of ACLK and Cloud connection. (optionally in json)
 ```
 
-Those commands are the same that can be sent to netdata via [signals](https://github.com/netdata/netdata/blob/master/daemon/README.md#command-line-options).
+See also the Netdata daemon [command line options](https://github.com/netdata/netdata/blob/master/daemon/README.md#command-line-options).
 
 

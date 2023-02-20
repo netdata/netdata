@@ -4,8 +4,7 @@ description: "Netdata utilizes a central registry of machines/person GUIDs, URLs
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/registry/README.md"
 sidebar_label: "Registry"
 learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "References/Configuration"
+learn_rel_path: "Configuration"
 -->
 
 # Registry

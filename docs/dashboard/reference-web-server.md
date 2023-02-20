@@ -5,8 +5,7 @@ type: reference
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboard/reference-web-server.md
 sidebar_label: "Web server reference"
 learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "References"
+learn_rel_path: "Configuration"
 -->
 
 # Web server reference

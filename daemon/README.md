@@ -4,8 +4,7 @@ date: "2020-04-29"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/daemon/README.md"
 sidebar_label: "Netdata daemon"
 learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "References/Configuration"
+learn_rel_path: "Operations"
 -->
 
 # Netdata daemon
