@@ -397,9 +397,8 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
 - [Monit](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/monit/README.md): Monitor statuses
   of targets (service-checks) using the XML
   stats interface.
-- [WMI (Windows Management Instrumentation)
-  exporter](https://github.com/netdata/go.d.plugin/blob/master/modules/wmi/README.md): Collect CPU, memory,
-  network, disk, OS, system, and log-in metrics scraping `wmi_exporter`.
+- [Windows](https://github.com/netdata/go.d.plugin/blob/master/modules/windows/README.md): Collect CPU, memory,
+  network, disk, OS, system, and log-in metrics scraping `windows_exporter`.
 
 ### Disks and filesystems
 
