@@ -2803,12 +2803,18 @@ static void query_target_add_host(QUERY_TARGET_LOCALS *qtl, RRDHOST *host) {
 
     // is the chart given valid?
     if(unlikely(qtl->st && (!qtl->st->rrdinstance || !qtl->st->rrdcontext))) {
-        error("QUERY TARGET: RRDSET '%s' given, because it is not linked to rrdcontext structures. Switching to context query.", rrdset_name(qtl->st));
+        error("QUERY TARGET: RRDSET '%s' given, but it is not linked to rrdcontext structures. Linking it now.", rrdset_name(qtl->st));
+        rrdinstance_from_rrdset(qtl->st);
 
-        if(!is_valid_sp(qtl->charts))
-            qtl->charts = rrdset_name(qtl->st);
+        if(unlikely(qtl->st && (!qtl->st->rrdinstance || !qtl->st->rrdcontext))) {
+            error("QUERY TARGET: RRDSET '%s' given, but failed to be linked to rrdcontext structures. Switching to context query.",
+                  rrdset_name(qtl->st));
 
-        qtl->st = NULL;
+            if (!is_valid_sp(qtl->charts))
+                qtl->charts = rrdset_name(qtl->st);
+
+            qtl->st = NULL;
+        }
     }
 
     size_t added = 0;
