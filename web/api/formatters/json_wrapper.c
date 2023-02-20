@@ -151,7 +151,14 @@ static inline void query_target_value_stats(BUFFER *wb, NETDATA_DOUBLE min, NETD
     buffer_json_object_close(wb);
 }
 
-static inline void query_target_hosts_instances_labels_dimensions(BUFFER *wb, RRDR *r, const char *key_hosts, const char *key_dimensions, const char *key_instances, const char *key_labels, bool v2) {
+static inline void query_target_hosts_instances_labels_dimensions(
+        BUFFER *wb, RRDR *r,
+        const char *key_hosts,
+        const char *key_dimensions,
+        const char *key_instances,
+        const char *key_labels,
+        const char *key_alerts,
+        bool v2) {
     QUERY_TARGET *qt = r->internal.qt;
 
     char name[RRD_ID_LENGTH_MAX * 2 + 2];
@@ -305,6 +312,36 @@ static inline void query_target_hosts_instances_labels_dimensions(BUFFER *wb, RR
         }
         dfe_done(z);
         dictionary_destroy(t.dict);
+        buffer_json_array_close(wb);
+    }
+
+    if(key_alerts) {
+        buffer_json_member_add_array(wb, key_alerts);
+        for (long c = 0; c < (long) qt->instances.used; c++) {
+            QUERY_INSTANCE *qi = query_instance(qt, c);
+            RRDSET *st = rrdinstance_acquired_rrdset(qi->ria);
+            if (st) {
+                netdata_rwlock_rdlock(&st->alerts.rwlock);
+                if (st->alerts.base) {
+                    char id[RRD_ID_LENGTH_MAX + 1];
+                    for (RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
+//                        if(rc->status < RRDCALC_STATUS_CLEAR)
+//                            continue;
+
+                        snprintfz(id, RRD_ID_LENGTH_MAX, "%s:%s", string2str(rc->name), string2str(qi->id_fqdn));
+                        snprintfz(name, RRD_ID_LENGTH_MAX, "%s:%s", string2str(rc->name), string2str(qi->name_fqdn));
+                        buffer_json_add_array_item_object(wb);
+                        buffer_json_member_add_string(wb, "id", id);
+                        buffer_json_member_add_string(wb, "nm", name);
+                        buffer_json_member_add_string(wb, "lc", string2str(rc->name));
+                        buffer_json_member_add_string(wb, "st", rrdcalc_status2string(rc->status));
+                        buffer_json_member_add_double(wb, "vl", rc->value);
+                        buffer_json_object_close(wb);
+                    }
+                }
+                netdata_rwlock_unlock(&st->alerts.rwlock);
+            }
+        }
         buffer_json_array_close(wb);
     }
 }
@@ -483,7 +520,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR
     if (r->view.options & RRDR_OPTION_ALL_DIMENSIONS)
         query_target_hosts_instances_labels_dimensions(
                 wb, r, NULL, "full_dimension_list", "full_chart_list",
-                "full_chart_labels", false);
+                "full_chart_labels", NULL, false);
 
     query_target_functions(wb, "functions", r);
 
@@ -514,6 +551,47 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR
 
     buffer_sprintf(wb, ",\n    %sresult%s:", kq, kq);
     if(string_value) buffer_strcat(wb, sq);
+}
+
+static void rrdset_rrdcalc_entries(BUFFER *wb, RRDINSTANCE_ACQUIRED *ria) {
+    RRDSET *st = rrdinstance_acquired_rrdset(ria);
+    if(st) {
+        netdata_rwlock_rdlock(&st->alerts.rwlock);
+        if(st->alerts.base) {
+            buffer_json_member_add_object(wb, "alerts");
+            for(RRDCALC *rc = st->alerts.base; rc ;rc = rc->next) {
+                buffer_json_member_add_object(wb, string2str(rc->name));
+                buffer_json_member_add_string(wb, "status", rrdcalc_status2string(rc->status));
+                buffer_json_member_add_double(wb, "value", rc->value);
+                buffer_json_object_close(wb);
+            }
+            buffer_json_object_close(wb);
+        }
+        netdata_rwlock_unlock(&st->alerts.rwlock);
+    }
+}
+
+static void query_target_units(BUFFER *wb, QUERY_TARGET *qt) {
+    if(qt->contexts.used == 1) {
+        buffer_json_member_add_string(wb, "units", rrdcontext_acquired_units(qt->contexts.array[0].rca));
+    }
+    else if(qt->contexts.used > 1) {
+        DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
+        for(size_t c = 0; c < qt->contexts.used ;c++)
+            dictionary_set(dict, rrdcontext_acquired_units(qt->contexts.array[c].rca), NULL, 0);
+
+        if(dictionary_entries(dict) == 1)
+            buffer_json_member_add_string(wb, "units", rrdcontext_acquired_units(qt->contexts.array[0].rca));
+        else {
+            buffer_json_member_add_array(wb, "units");
+            const char *s;
+            dfe_start_read(dict, s)
+                    buffer_json_add_array_item_string(wb, s_dfe.name);
+            dfe_done(s);
+            buffer_json_array_close(wb);
+        }
+        dictionary_destroy(dict);
+    }
 }
 
 void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR_OPTIONS options, bool string_value,
@@ -592,8 +670,7 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
 
         buffer_json_member_add_object(wb, "summary");
         query_target_hosts_instances_labels_dimensions(
-                wb, r, "hosts", "dimensions", "instances",
-                "labels", true);
+                wb, r, "hosts", "dimensions", "instances", "labels", "alerts", true);
         buffer_json_object_close(wb); // aggregated
 
         buffer_json_member_add_object(wb, "detailed");
@@ -698,6 +775,7 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
                                 rrdlabels_to_buffer_json_members(labels, wb);
                                 buffer_json_object_close(wb);
                             }
+                            rrdset_rrdcalc_entries(wb, ria);
                             buffer_json_member_add_object(wb, "dimensions");
 
                             last_ria = ria;
@@ -772,14 +850,18 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
         buffer_json_member_add_time_t(wb, "after", r->view.after);
         buffer_json_member_add_time_t(wb, "before", r->view.before);
         buffer_json_member_add_uint64(wb, "points", rows);
+        query_target_units(wb, qt);
     }
     buffer_json_object_close(wb);
 
-    rrdr_dimension_names(wb, "dimension_names", r, options);
-    rrdr_dimension_ids(wb, "dimension_ids", r, options);
-    size_t dimensions = rrdr_latest_values(wb, "view_latest_values", r, options);
-
-    buffer_json_member_add_uint64(wb, "dimensions", dimensions);
+    buffer_json_member_add_object(wb, "dimensions");
+    {
+        rrdr_dimension_ids(wb, "ids", r, options);
+        rrdr_dimension_names(wb, "names", r, options);
+        size_t dims = rrdr_latest_values(wb, "view_latest_values", r, options);
+        buffer_json_member_add_uint64(wb, "count", dims);
+    }
+    buffer_json_object_close(wb);
 
     buffer_sprintf(wb, ",\n    %sresult%s:", kq, kq);
     if(string_value) buffer_strcat(wb, sq);

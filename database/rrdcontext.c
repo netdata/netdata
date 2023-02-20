@@ -382,7 +382,7 @@ DICTIONARY *rrdinstance_acquired_functions(RRDINSTANCE_ACQUIRED *ria) {
     return ri->rrdset->functions_view;
 }
 
-RRDHOST *rrdinstance_acquired_host(RRDINSTANCE_ACQUIRED *ria) {
+RRDHOST *rrdinstance_acquired_rrdhost(RRDINSTANCE_ACQUIRED *ria) {
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
     return ri->rc->rrdhost;
 }
@@ -2642,7 +2642,7 @@ static inline STRING *rrdinstance_id_fqdn_v2(RRDINSTANCE_ACQUIRED *ria) {
 
     char buffer[RRD_ID_LENGTH_MAX + 1];
 
-    RRDHOST *host = rrdinstance_acquired_host(ria);
+    RRDHOST *host = rrdinstance_acquired_rrdhost(ria);
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s", rrdinstance_acquired_id(ria), host->machine_guid);
     return string_strdupz(buffer);
 }
@@ -2653,9 +2653,19 @@ static inline STRING *rrdinstance_name_fqdn_v2(RRDINSTANCE_ACQUIRED *ria) {
 
     char buffer[RRD_ID_LENGTH_MAX + 1];
 
-    RRDHOST *host = rrdinstance_acquired_host(ria);
+    RRDHOST *host = rrdinstance_acquired_rrdhost(ria);
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s", rrdinstance_acquired_name(ria), rrdhost_hostname(host));
     return string_strdupz(buffer);
+}
+
+RRDSET *rrdinstance_acquired_rrdset(RRDINSTANCE_ACQUIRED *ria) {
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    return ri->rrdset;
+}
+
+const char *rrdcontext_acquired_units(RRDCONTEXT_ACQUIRED *rca) {
+    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+    return string2str(rc->units);
 }
 
 static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, QUERY_CONTEXT *qc,
