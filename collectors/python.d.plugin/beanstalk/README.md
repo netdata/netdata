@@ -131,6 +131,26 @@ port         : 11300
 
 If no configuration is given, module will attempt to connect to beanstalkd on `127.0.0.1:11300` address
 
----
 
+
+
+### Troubleshooting
+
+To troubleshoot issues with the `beanstalk` module, run the `python.d.plugin` with the debug option enabled. The 
+output will give you the output of the data collection job or error messages on why the collector isn't working.
+
+First, navigate to your plugins directory, usually they are located under `/usr/libexec/netdata/plugins.d/`. If that's 
+not the case on your system, open `netdata.conf` and look for the setting `plugins directory`. Once you're in the 
+plugin's directory, switch to the `netdata` user.
+
+```bash
+cd /usr/libexec/netdata/plugins.d/
+sudo su -s /bin/bash netdata
+```
+
+Now you can manually run the `beanstalk` module in debug mode:
+
+```bash
+./python.d.plugin beanstalk debug trace
+```
 

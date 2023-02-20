@@ -320,3 +320,23 @@ The images below show how do the final charts in Netdata look.
 ![Custom charts](https://cloud.githubusercontent.com/assets/15180106/26762051/62ae915e-493b-11e7-8518-bd25a3886650.png)
 
 
+### Troubleshooting
+
+To troubleshoot issues with the `go_expvar` module, run the `python.d.plugin` with the debug option enabled. The 
+output will give you the output of the data collection job or error messages on why the collector isn't working.
+
+First, navigate to your plugins directory, usually they are located under `/usr/libexec/netdata/plugins.d/`. If that's 
+not the case on your system, open `netdata.conf` and look for the setting `plugins directory`. Once you're in the 
+plugin's directory, switch to the `netdata` user.
+
+```bash
+cd /usr/libexec/netdata/plugins.d/
+sudo su -s /bin/bash netdata
+```
+
+Now you can manually run the `go_expvar` module in debug mode:
+
+```bash
+./python.d.plugin go_expvar debug trace
+```
+
