@@ -47,6 +47,7 @@ bool rrdinstance_acquired_belongs_to_context(RRDINSTANCE_ACQUIRED *ria, RRDCONTE
 time_t rrdinstance_acquired_update_every(RRDINSTANCE_ACQUIRED *ria);
 
 const char *rrdcontext_acquired_units(RRDCONTEXT_ACQUIRED *rca);
+const char *rrdcontext_acquired_title(RRDCONTEXT_ACQUIRED *rca);
 
 // ----------------------------------------------------------------------------
 // public API for rrdhost

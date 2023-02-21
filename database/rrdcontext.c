@@ -2668,6 +2668,11 @@ const char *rrdcontext_acquired_units(RRDCONTEXT_ACQUIRED *rca) {
     return string2str(rc->units);
 }
 
+const char *rrdcontext_acquired_title(RRDCONTEXT_ACQUIRED *rca) {
+    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+    return string2str(rc->title);
+}
+
 static void query_target_eval_instance_rrdcalc(QUERY_TARGET_LOCALS *qtl __maybe_unused,
                                                QUERY_HOST *qh, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi) {
     RRDSET *st = rrdinstance_acquired_rrdset(qi->ria);
