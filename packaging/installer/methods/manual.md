@@ -5,7 +5,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/insta
 sidebar_label: "From a Git checkout"
 learn_status: "Published"
 learn_rel_path: "Installation/Installation methods"
-sidebar_label: 30
+sidebar_position: 30
 -->
 
 # Install Netdata on Linux from a Git checkout
