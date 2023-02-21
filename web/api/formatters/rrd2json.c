@@ -152,6 +152,13 @@ struct group_by_entry {
     STRING *units;
 };
 
+static int group_by_label_is_space(char c) {
+    if(c == ',' || c == '|')
+        return 1;
+
+    return 0;
+}
+
 RRDR *data_query_group_by(RRDR *r) {
     QUERY_TARGET *qt = r->internal.qt;
     RRDR_OPTIONS options = qt->request.options;
@@ -163,18 +170,24 @@ RRDR *data_query_group_by(RRDR *r) {
     struct group_by_entry *entries = onewayalloc_callocz(r->internal.owa, qt->query.used, sizeof(struct group_by_entry));
     DICTIONARY *groups = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
 
+    if(qt->request.group_by & RRDR_GROUP_BY_LABEL && qt->request.group_by_label && *qt->request.group_by_label)
+        qt->group_by.used = quoted_strings_splitter(qt->request.group_by_label, qt->group_by.label_keys, GROUP_BY_MAX_LABEL_KEYS, group_by_label_is_space);
+
+    if(!qt->group_by.used)
+        qt->request.group_by &= ~RRDR_GROUP_BY_LABEL;
+
+    if(!(qt->request.group_by & (RRDR_GROUP_BY_NODE | RRDR_GROUP_BY_INSTANCE | RRDR_GROUP_BY_DIMENSION | RRDR_GROUP_BY_LABEL)))
+        qt->request.group_by = RRDR_GROUP_BY_DIMENSION;
+
     int added = 0;
-    STRING *unset = string_strdupz("[unset]");
-    char key[RRD_ID_LENGTH_MAX + 1];
+    BUFFER *key = buffer_create(0, NULL);
     QUERY_INSTANCE *last_qi = NULL;
     size_t priority = 0;
     for(size_t c = 0; c < qt->query.used ;c++) {
         if(!rrdr_dimension_should_be_exposed(r->od[c], options))
             continue;
 
-        int pos = -1, *set;
         QUERY_METRIC *qm = query_metric(qt, c);
-        QUERY_DIMENSION *qd = query_dimension(qt, qm->link.query_dimension_id);
         QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
         QUERY_HOST *qh = query_host(qt, qm->link.query_host_id);
 
@@ -185,80 +198,112 @@ RRDR *data_query_group_by(RRDR *r) {
         else
             priority++;
 
-        switch(qt->request.group_by) {
-            default:
-            case RRDR_GROUP_BY_DIMENSION:
-                snprintfz(key, RRD_ID_LENGTH_MAX, "%s,%s", query_metric_id(qt, qm), rrdinstance_acquired_units(qi->ria));
-                set = dictionary_set(groups, key, &pos, sizeof(pos));
-                if(*set == -1) {
-                    *set = pos = added++;
-                    entries[pos].id = rrdmetric_acquired_id_dup(qd->rma);
-                    entries[pos].name = rrdmetric_acquired_name_dup(qd->rma);
-                    entries[pos].units = rrdinstance_acquired_units_dup(qi->ria);
-                    entries[pos].priority = priority;
-                }
-                else
-                    pos = *set;
+        // generate the group by key
 
-                entries[pos].count++;
-                break;
-
-            case RRDR_GROUP_BY_INSTANCE:
-                snprintfz(key, RRD_ID_LENGTH_MAX, "%s,%s", string2str(qi->id_fqdn), rrdinstance_acquired_units(qi->ria));
-                set = dictionary_set(groups, key, &pos, sizeof(pos));
-                if(*set == -1) {
-                    *set = pos = added++;
-                    entries[pos].id = string_dup(qi->id_fqdn);
-                    entries[pos].name = string_dup(qi->name_fqdn);
-                    entries[pos].units = rrdinstance_acquired_units_dup(qi->ria);
-                    entries[pos].priority = priority;
-                }
-                else
-                    pos = *set;
-
-                entries[pos].count++;
-                break;
-
-            case RRDR_GROUP_BY_NODE:
-                snprintfz(key, RRD_ID_LENGTH_MAX, "%s,%s", qh->host->machine_guid, rrdinstance_acquired_units(qi->ria));
-                set = dictionary_set(groups, key, &pos, sizeof(pos));
-                if(*set == -1) {
-                    *set = pos = added++;
-                    entries[pos].id = string_strdupz(qh->host->machine_guid);
-                    entries[pos].name = string_dup(qh->host->hostname);
-                    entries[pos].units = rrdinstance_acquired_units_dup(qi->ria);
-                    entries[pos].priority = priority;
-                }
-                else
-                    pos = *set;
-
-                entries[pos].count++;
-                break;
-
-            case RRDR_GROUP_BY_LABEL: {
-                DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
-                STRING *s = rrdlabels_get_value_string_dup(labels, qt->request.group_by_key);
-                if(!s)
-                    s = string_dup(unset);
-
-                snprintfz(key, RRD_ID_LENGTH_MAX, "%s,%s", string2str(s), rrdinstance_acquired_units(qi->ria));
-                set = dictionary_set(groups, key, &pos, sizeof(pos));
-                if(*set == -1) {
-                    *set = pos = added++;
-                    entries[pos].id = s;
-                    entries[pos].name = string_dup(entries[pos].id);
-                    entries[pos].units = rrdinstance_acquired_units_dup(qi->ria);
-                    entries[pos].priority = priority;
-                }
-                else {
-                    pos = *set;
-                    string_freez(s);
-                }
-
-                entries[pos].count++;
-                break;
+        buffer_flush(key);
+        if(qt->request.group_by & RRDR_GROUP_BY_DIMENSION) {
+            buffer_fast_strcat(key, "|", 1);
+            buffer_strcat(key, query_metric_id(qt, qm));
+        }
+        if(qt->request.group_by & RRDR_GROUP_BY_INSTANCE) {
+            buffer_fast_strcat(key, "|", 1);
+            buffer_strcat(key, string2str(qi->id_fqdn));
+        }
+        if(qt->request.group_by & RRDR_GROUP_BY_LABEL) {
+            DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
+            for(size_t l = 0; l < qt->group_by.used ;l++) {
+                buffer_fast_strcat(key, "|", 1);
+                rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by.label_keys[l], "[unset]");
             }
         }
+        if(qt->request.group_by & RRDR_GROUP_BY_NODE) {
+            buffer_fast_strcat(key, "|", 1);
+            buffer_strcat(key, qh->host->machine_guid);
+        }
+        buffer_fast_strcat(key, "|", 1);
+        buffer_strcat(key, rrdinstance_acquired_units(qi->ria));
+
+        // lookup the key in the dictionary
+
+        int pos = -1;
+        int *set = dictionary_set(groups, buffer_tostring(key), &pos, sizeof(pos));
+        if(*set == -1) {
+            // the key just added to the dictionary
+
+            *set = pos = added++;
+
+            // generate the dimension id
+
+            buffer_flush(key);
+            if(qt->request.group_by & RRDR_GROUP_BY_DIMENSION) {
+                buffer_strcat(key, query_metric_id(qt, qm));
+            }
+            if(qt->request.group_by & RRDR_GROUP_BY_INSTANCE) {
+                if(buffer_strlen(key) != 0)
+                    buffer_fast_strcat(key, ",", 1);
+
+                if(qt->request.group_by & RRDR_GROUP_BY_NODE)
+                    buffer_strcat(key, rrdinstance_acquired_id(qi->ria));
+                else
+                    buffer_strcat(key, string2str(qi->id_fqdn));
+            }
+            if(qt->request.group_by & RRDR_GROUP_BY_LABEL) {
+                DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
+                for(size_t l = 0; l < qt->group_by.used ;l++) {
+                    if(buffer_strlen(key) != 0)
+                        buffer_fast_strcat(key, ",", 1);
+                    rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by.label_keys[l], "[unset]");
+                }
+            }
+            if(qt->request.group_by & RRDR_GROUP_BY_NODE) {
+                if(buffer_strlen(key) != 0)
+                    buffer_fast_strcat(key, ",", 1);
+
+                buffer_strcat(key, qh->host->machine_guid);
+            }
+            entries[pos].id = string_strdupz(buffer_tostring(key));
+
+            // generate the dimension name
+
+            buffer_flush(key);
+            if(qt->request.group_by & RRDR_GROUP_BY_DIMENSION) {
+                buffer_strcat(key, query_metric_name(qt, qm));
+            }
+            if(qt->request.group_by & RRDR_GROUP_BY_INSTANCE) {
+                if(buffer_strlen(key) != 0)
+                    buffer_fast_strcat(key, ",", 1);
+
+                if(qt->request.group_by & RRDR_GROUP_BY_NODE)
+                    buffer_strcat(key, rrdinstance_acquired_name(qi->ria));
+                else
+                    buffer_strcat(key, string2str(qi->name_fqdn));
+            }
+            if(qt->request.group_by & RRDR_GROUP_BY_LABEL) {
+                DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
+                for(size_t l = 0; l < qt->group_by.used ;l++) {
+                    if(buffer_strlen(key) != 0)
+                        buffer_fast_strcat(key, ",", 1);
+                    rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by.label_keys[l], "[unset]");
+                }
+            }
+            if(qt->request.group_by & RRDR_GROUP_BY_NODE) {
+                if(buffer_strlen(key) != 0)
+                    buffer_fast_strcat(key, ",", 1);
+
+                buffer_strcat(key, rrdhost_hostname(qh->host));
+            }
+            entries[pos].name = string_strdupz(buffer_tostring(key));
+
+            // add the rest of the info
+            entries[pos].units = rrdinstance_acquired_units_dup(qi->ria);
+            entries[pos].priority = priority;
+        }
+        else {
+            // the key found in the dictionary
+            pos = *set;
+        }
+
+        entries[pos].count++;
 
         if(unlikely(priority < entries[pos].priority))
             entries[pos].priority = priority;
@@ -282,8 +327,11 @@ RRDR *data_query_group_by(RRDR *r) {
     if(multiple_units) {
         // include the units into the id and name of the dimensions
         for(int i = 0; i < added ; i++) {
-            snprintfz(key, RRD_ID_LENGTH_MAX, "%s,%s", string2str(entries[i].id), string2str(entries[i].units));
-            STRING *u = string_strdupz(key);
+            buffer_flush(key);
+            buffer_strcat(key, string2str(entries[i].id));
+            buffer_fast_strcat(key, "|", 1);
+            buffer_strcat(key, string2str(entries[i].units));
+            STRING *u = string_strdupz(buffer_tostring(key));
             string_freez(entries[i].id);
             entries[i].id = u;
         }
@@ -446,7 +494,8 @@ RRDR *data_query_group_by(RRDR *r) {
     r2->view.max = max;
 
 cleanup:
-    string_freez(unset);
+    buffer_free(key);
+
     if(!r2 && entries && added) {
         for(long c = 0; c < added ;c++) {
             string_freez(entries[c].id);

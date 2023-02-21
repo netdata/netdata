@@ -702,6 +702,21 @@ STRING *rrdlabels_get_value_string_dup(DICTIONARY *labels, const char *key) {
     return ret;
 }
 
+STRING *rrdlabels_get_value_to_buffer_or_unset(DICTIONARY *labels, BUFFER *wb, const char *key, const char *unset) {
+    const DICTIONARY_ITEM *acquired_item = dictionary_get_and_acquire_item(labels, key);
+    RRDLABEL *lb = dictionary_acquired_item_value(acquired_item);
+
+    STRING *ret = NULL;
+    if(lb && lb->label_value)
+        buffer_strcat(wb, string2str(lb->label_value));
+    else
+        buffer_strcat(wb, unset);
+
+    dictionary_acquired_item_release(labels, acquired_item);
+
+    return ret;
+}
+
 // ----------------------------------------------------------------------------
 // rrdlabels_unmark_all()
 // remove labels RRDLABEL_FLAG_OLD and RRDLABEL_FLAG_NEW from all dictionary items

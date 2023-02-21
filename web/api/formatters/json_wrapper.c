@@ -936,8 +936,16 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
                 buffer_json_object_close(wb); // time
 
                 buffer_json_member_add_object(wb, "metrics");
-                buffer_json_member_add_string(wb, "group_by", group_by_to_string(qt->request.group_by));
-                buffer_json_member_add_string(wb, "group_by_key", qt->request.group_by_key);
+
+                buffer_json_member_add_array(wb, "group_by");
+                buffer_json_group_by_to_array(wb, qt->request.group_by);
+                buffer_json_array_close(wb);
+
+                buffer_json_member_add_array(wb, "group_by_label");
+                for(size_t l = 0; l < qt->group_by.used ;l++)
+                    buffer_json_add_array_item_string(wb, qt->group_by.label_keys[l]);
+                buffer_json_array_close(wb);
+
                 buffer_json_member_add_string(wb, "group_by_aggregate",
                                               group_by_aggregate_function_to_string(
                                                       qt->request.group_by_aggregate_function));

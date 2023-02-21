@@ -53,15 +53,17 @@ RRDR_TIME_GROUPING time_grouping_parse(const char *name, RRDR_TIME_GROUPING def)
 const char *time_grouping_tostring(RRDR_TIME_GROUPING group);
 
 typedef enum rrdr_group_by {
-    RRDR_GROUP_BY_NONE = 0,
-    RRDR_GROUP_BY_DIMENSION,
-    RRDR_GROUP_BY_NODE,
-    RRDR_GROUP_BY_INSTANCE,
-    RRDR_GROUP_BY_LABEL,
+    RRDR_GROUP_BY_NONE      = 0,
+    RRDR_GROUP_BY_DIMENSION = (1 << 0),
+    RRDR_GROUP_BY_NODE      = (1 << 1),
+    RRDR_GROUP_BY_INSTANCE  = (1 << 2),
+    RRDR_GROUP_BY_LABEL     = (1 << 3),
 } RRDR_GROUP_BY;
 
-RRDR_GROUP_BY group_by_parse(const char *s);
-const char *group_by_to_string(RRDR_GROUP_BY group_by);
+struct web_buffer;
+
+RRDR_GROUP_BY group_by_parse(char *s);
+void buffer_json_group_by_to_array(struct web_buffer *wb, RRDR_GROUP_BY group_by);
 
 typedef enum rrdr_group_by_function {
     RRDR_GROUP_BY_FUNCTION_AVERAGE,

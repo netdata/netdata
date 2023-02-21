@@ -34,7 +34,7 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
     char *chart_labels_filter = NULL;
     char *time_group_options = NULL;
     char *tier_str = NULL;
-    char *group_by_key = NULL;
+    char *group_by_label = NULL;
     size_t tier = 0;
     RRDR_TIME_GROUPING time_group = RRDR_GROUPING_AVERAGE;
     RRDR_GROUP_BY group_by = RRDR_GROUP_BY_DIMENSION;
@@ -64,7 +64,7 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
         else if(!strcmp(name, "points")) points_str = value;
         else if(!strcmp(name, "timeout")) timeout_str = value;
         else if(!strcmp(name, "group_by")) group_by = group_by_parse(value);
-        else if(!strcmp(name, "group_by_key")) group_by_key = value;
+        else if(!strcmp(name, "group_by_label")) group_by_label = value;
         else if(!strcmp(name, "group_by_aggregate")) group_by_aggregate = group_by_aggregate_function_parse(value);
         else if(!strcmp(name, "format")) format = web_client_api_request_v1_data_format(value);
         else if(!strcmp(name, "options")) options |= web_client_api_request_v1_data_options(value);
@@ -121,6 +121,9 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
     if(options & RRDR_OPTION_SHOW_PLAN)
         options |= RRDR_OPTION_DEBUG;
 
+    if(group_by_label && *group_by_label)
+        group_by |= RRDR_GROUP_BY_LABEL;
+
     if(tier_str && *tier_str) {
         tier = str2ul(tier_str);
         if(tier < storage_tiers)
@@ -154,7 +157,7 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
             .format = format,
             .options = options,
             .group_by = group_by,
-            .group_by_key = group_by_key,
+            .group_by_label = group_by_label,
             .group_by_aggregate_function = group_by_aggregate,
             .time_group_method = time_group,
             .time_group_options = time_group_options,

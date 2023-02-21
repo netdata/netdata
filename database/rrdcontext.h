@@ -288,11 +288,13 @@ typedef struct query_target_request {
 
     // group by across multiple time-series
     RRDR_GROUP_BY group_by;
-    const char *group_by_key;
+    char *group_by_label;
     RRDR_GROUP_BY_FUNCTION group_by_aggregate_function;
 
     usec_t received_ut;
 } QUERY_TARGET_REQUEST;
+
+#define GROUP_BY_MAX_LABEL_KEYS 10
 
 typedef struct query_target {
     char id[MAX_QUERY_TARGET_ID_LENGTH + 1]; // query identifier (for logging)
@@ -358,6 +360,11 @@ typedef struct query_target {
         uint32_t size;                      // the size of the array
         SIMPLE_PATTERN *pattern;
     } hosts;
+
+    struct {
+        size_t used;
+        char *label_keys[GROUP_BY_MAX_LABEL_KEYS];
+    } group_by;
 
     struct {
         usec_t received_ut;

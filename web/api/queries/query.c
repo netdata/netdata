@@ -659,37 +659,44 @@ static void rrdr_set_grouping_function(RRDR *r, RRDR_TIME_GROUPING group_method)
     }
 }
 
-RRDR_GROUP_BY group_by_parse(const char *s) {
-    if(strcmp(s, "dimension") == 0)
-        return RRDR_GROUP_BY_DIMENSION;
+RRDR_GROUP_BY group_by_parse(char *s) {
+    RRDR_GROUP_BY group_by = RRDR_GROUP_BY_NONE;
 
-    if(strcmp(s, "node") == 0)
-        return RRDR_GROUP_BY_NODE;
+    while(s) {
+        char *key = mystrsep(&s, ",| ");
+        if (!key || !*key) continue;
 
-    if(strcmp(s, "instance") == 0)
-        return RRDR_GROUP_BY_INSTANCE;
+        if (strcmp(key, "dimension") == 0)
+            group_by |= RRDR_GROUP_BY_DIMENSION;
 
-    if(strcmp(s, "label") == 0)
-        return RRDR_GROUP_BY_LABEL;
+        if (strcmp(key, "node") == 0)
+            group_by |= RRDR_GROUP_BY_NODE;
 
-    return RRDR_GROUP_BY_DIMENSION;
+        if (strcmp(key, "instance") == 0)
+            group_by |= RRDR_GROUP_BY_INSTANCE;
+
+        if (strcmp(key, "label") == 0)
+            group_by |= RRDR_GROUP_BY_LABEL;
+    }
+
+    if(group_by == RRDR_GROUP_BY_NONE)
+        group_by = RRDR_GROUP_BY_DIMENSION;
+
+    return group_by;
 }
 
-const char *group_by_to_string(RRDR_GROUP_BY group_by) {
-    switch(group_by) {
-        default:
-        case RRDR_GROUP_BY_DIMENSION:
-            return "dimension";
+void buffer_json_group_by_to_array(BUFFER *wb, RRDR_GROUP_BY group_by) {
+    if(group_by & RRDR_GROUP_BY_DIMENSION)
+        buffer_json_add_array_item_string(wb, "dimension");
 
-        case RRDR_GROUP_BY_NODE:
-            return "node";
+    if(group_by & RRDR_GROUP_BY_NODE)
+        buffer_json_add_array_item_string(wb, "node");
 
-        case RRDR_GROUP_BY_INSTANCE:
-            return "instance";
+    if(group_by & RRDR_GROUP_BY_INSTANCE)
+        buffer_json_add_array_item_string(wb, "instance");
 
-        case RRDR_GROUP_BY_LABEL:
-            return "label";
-    }
+    if(group_by & RRDR_GROUP_BY_LABEL)
+        buffer_json_add_array_item_string(wb, "label");
 }
 
 RRDR_GROUP_BY_FUNCTION group_by_aggregate_function_parse(const char *s) {

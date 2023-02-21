@@ -286,6 +286,7 @@ void rrdlabels_value_to_buffer_array_item_or_null(DICTIONARY *labels, BUFFER *wb
 void rrdlabels_get_value_strdup_or_null(DICTIONARY *labels, char **value, const char *key);
 void rrdlabels_get_value_strcpyz(DICTIONARY *labels, char *dst, size_t dst_len, const char *key);
 STRING *rrdlabels_get_value_string_dup(DICTIONARY *labels, const char *key);
+STRING *rrdlabels_get_value_to_buffer_or_unset(DICTIONARY *labels, BUFFER *wb, const char *key, const char *unset);
 void rrdlabels_flush(DICTIONARY *labels_dict);
 
 void rrdlabels_unmark_all(DICTIONARY *labels);
