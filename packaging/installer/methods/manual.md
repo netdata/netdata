@@ -2,10 +2,10 @@
 title: "Install Netdata on Linux from a Git checkout"
 description: "Use the Netdata Agent source code from GitHub, plus helper scripts to set up your system, to install Netdata without packages or binaries."
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/manual.md"
-sidebar_label: "Install Netdata on Linux from a Git checkout"
+sidebar_label: "From a Git checkout"
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Installation"
+learn_rel_path: "Installation/Installation methods"
+sidebar_label: 30
 -->
 
 # Install Netdata on Linux from a Git checkout
