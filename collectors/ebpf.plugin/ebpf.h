@@ -235,7 +235,7 @@ void ebpf_create_charts_on_apps(char *name,
                                        char *charttype,
                                        int order,
                                        char *algorithm,
-                                       struct target *root,
+                                       struct ebpf_target *root,
                                        int update_every,
                                        char *module);
 
@@ -264,16 +264,15 @@ void ebpf_pid_file(char *filename, size_t length);
 
 // Common variables
 extern int debug_enabled;
-extern struct pid_stat *root_of_pids;
+extern struct ebpf_pid_stat *ebpf_root_of_pids;
 extern ebpf_cgroup_target_t *ebpf_cgroup_pids;
 extern char *ebpf_algorithms[];
 extern struct config collector_config;
-extern ebpf_process_stat_t *global_process_stat;
 extern netdata_ebpf_cgroup_shm_t shm_ebpf_cgroup;
 extern int shm_fd_ebpf_cgroup;
 extern sem_t *shm_sem_ebpf_cgroup;
 extern pthread_mutex_t mutex_cgroup_shm;
-extern size_t all_pids_count;
+extern size_t ebpf_all_pids_count;
 extern ebpf_plugin_stats_t plugin_statistics;
 #ifdef LIBBPF_MAJOR_VERSION
 extern struct btf *default_btf;

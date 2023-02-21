@@ -521,7 +521,7 @@ static void read_apps_table()
 {
     netdata_cachestat_pid_t *cv = cachestat_vector;
     uint32_t key;
-    struct pid_stat *pids = root_of_pids;
+    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     int fd = cachestat_maps[NETDATA_CACHESTAT_PID_STATS].map_fd;
     size_t length = sizeof(netdata_cachestat_pid_t)*ebpf_nprocs;
     while (pids) {
@@ -589,7 +589,7 @@ static void ebpf_update_cachestat_cgroup()
  */
 void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    struct target *root = ptr;
+    struct ebpf_target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_CACHESTAT_HIT_RATIO_CHART,
                                "Hit ratio",
                                EBPF_COMMON_DIMENSION_PERCENTAGE,
@@ -694,7 +694,7 @@ static void cachestat_send_global(netdata_publish_cachestat_t *publish)
  * @param publish  output structure.
  * @param root     structure with listed IPs
  */
-void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct pid_on_target *root)
+void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_pid_on_target *root)
 {
     memcpy(&publish->prev, &publish->current,sizeof(publish->current));
     memset(&publish->current, 0, sizeof(publish->current));
@@ -720,9 +720,9 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct pid_on
  *
  * @param root the target list.
 */
-void ebpf_cache_send_apps_data(struct target *root)
+void ebpf_cache_send_apps_data(struct ebpf_target *root)
 {
-    struct target *w;
+    struct ebpf_target *w;
     collected_number value;
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_CACHESTAT_HIT_RATIO_CHART);

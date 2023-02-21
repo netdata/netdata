@@ -435,9 +435,6 @@ ebpf_sync_syscalls_t local_syscalls[] = {
 };
 
 
-// Link with apps.plugin
-ebpf_process_stat_t *global_process_stat = NULL;
-
 // Link with cgroup.plugin
 netdata_ebpf_cgroup_shm_t shm_ebpf_cgroup = {NULL, NULL};
 int shm_fd_ebpf_cgroup = -1;
@@ -876,9 +873,9 @@ void ebpf_create_chart(char *type,
  * @param module    chart module name, this is the eBPF thread.
  */
 void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family, char *charttype, int order,
-                                char *algorithm, struct target *root, int update_every, char *module)
+                                char *algorithm, struct ebpf_target *root, int update_every, char *module)
 {
-    struct target *w;
+    struct ebpf_target *w;
     ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, title, units, family, charttype, NULL, order,
                          update_every, module);
 
@@ -1386,8 +1383,8 @@ static void ebpf_allocate_common_vectors()
         return;
     }
 
-    all_pids = callocz((size_t)pid_max, sizeof(struct pid_stat *));
-    global_process_stat = callocz((size_t)ebpf_nprocs, sizeof(ebpf_process_stat_t));
+    ebpf_all_pids = callocz((size_t)pid_max, sizeof(struct ebpf_pid_stat *));
+    ebpf_aral_init();
 }
 
 /**

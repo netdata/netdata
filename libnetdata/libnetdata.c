@@ -225,10 +225,6 @@ void posix_memfree(void *ptr) {
     libc_free(ptr);
 }
 
-#define MALLOC_ALIGNMENT (sizeof(uintptr_t) * 2)
-#define size_t_atomic_count(op, var, size) __atomic_## op ##_fetch(&(var), size, __ATOMIC_RELAXED)
-#define size_t_atomic_bytes(op, var, size) __atomic_## op ##_fetch(&(var), ((size) % MALLOC_ALIGNMENT)?((size) + MALLOC_ALIGNMENT - ((size) % MALLOC_ALIGNMENT)):(size), __ATOMIC_RELAXED)
-
 struct malloc_header_signature {
     uint32_t magic;
     uint32_t size;

@@ -5,6 +5,84 @@
 #include "ebpf_apps.h"
 
 // ----------------------------------------------------------------------------
+// ARAL vectors used to speed up processing
+ARAL *ebpf_aral_apps_pid_stat;
+ARAL *ebpf_aral_process_stat;
+
+/**
+ * eBPF ARAL Init
+ *
+ * Initiallize array allocator that will be used when integration with apps and ebpf is created.
+ */
+void ebpf_aral_init(void)
+{
+    size_t max_elements = NETDATA_EBPF_ALLOC_MAX_PID;
+    if (max_elements < NETDATA_EBPF_ALLOC_MIN_ELEMENTS) {
+        error("Number of elements given is too small, adjusting it for %d", NETDATA_EBPF_ALLOC_MIN_ELEMENTS);
+        max_elements = NETDATA_EBPF_ALLOC_MIN_ELEMENTS;
+    }
+
+    ebpf_aral_apps_pid_stat = aral_create("ebpf-pid_stat", sizeof(struct ebpf_pid_stat),
+                                          0, max_elements,
+                                          NULL, NULL, NULL, false, false);
+
+    ebpf_aral_process_stat = aral_create("ebpf-proc_stat", sizeof(ebpf_process_stat_t),
+                                          0, max_elements,
+                                          NULL, NULL, NULL, false, false);
+#ifdef NETDATA_DEV_MODE
+    info("Plugin is using ARAL with values %d", NETDATA_EBPF_ALLOC_MAX_PID);
+#endif
+}
+
+/**
+ * eBPF pid stat get
+ *
+ * Get a ebpf_pid_stat entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+struct ebpf_pid_stat *ebpf_pid_stat_get(void)
+{
+    struct ebpf_pid_stat *target = aral_mallocz(ebpf_aral_apps_pid_stat);
+    memset(target, 0, sizeof(struct ebpf_pid_stat));
+    return target;
+}
+
+/**
+ * eBPF target release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_pid_stat_release(struct ebpf_pid_stat *stat)
+{
+    aral_freez(ebpf_aral_apps_pid_stat, stat);
+}
+
+/**
+ * eBPF process stat get
+ *
+ * Get a ebpf_pid_stat entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+ebpf_process_stat_t *ebpf_process_stat_get(void)
+{
+    ebpf_process_stat_t *target = aral_mallocz(ebpf_aral_process_stat);
+    memset(target, 0, sizeof(ebpf_process_stat_t));
+    return target;
+}
+
+/**
+ * eBPF process release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_process_stat_release(ebpf_process_stat_t *stat)
+{
+    aral_freez(ebpf_aral_process_stat, stat);
+}
+
+// ----------------------------------------------------------------------------
 // internal flags
 // handled in code (automatically set)
 
@@ -49,7 +127,7 @@ int ebpf_read_hash_table(void *ep, int fd, uint32_t pid)
  *
  * @return
  */
-size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int fd, struct pid_on_target *pids)
+size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int fd, struct ebpf_pid_on_target *pids)
 {
     size_t count = 0;
     while (pids) {
@@ -120,19 +198,19 @@ int am_i_running_as_root()
  *
  * @return it returns the number of structures that was reset.
  */
-size_t zero_all_targets(struct target *root)
+size_t zero_all_targets(struct ebpf_target *root)
 {
-    struct target *w;
+    struct ebpf_target *w;
     size_t count = 0;
 
     for (w = root; w; w = w->next) {
         count++;
 
         if (unlikely(w->root_pid)) {
-            struct pid_on_target *pid_on_target = w->root_pid;
+            struct ebpf_pid_on_target *pid_on_target = w->root_pid;
 
             while (pid_on_target) {
-                struct pid_on_target *pid_on_target_to_free = pid_on_target;
+                struct ebpf_pid_on_target *pid_on_target_to_free = pid_on_target;
                 pid_on_target = pid_on_target->next;
                 freez(pid_on_target_to_free);
             }
@@ -149,9 +227,9 @@ size_t zero_all_targets(struct target *root)
  *
  * @param agrt the pointer to be cleaned.
  */
-void clean_apps_groups_target(struct target *agrt)
+void clean_apps_groups_target(struct ebpf_target *agrt)
 {
-    struct target *current_target;
+    struct ebpf_target *current_target;
     while (agrt) {
         current_target = agrt;
         agrt = current_target->target;
@@ -170,7 +248,7 @@ void clean_apps_groups_target(struct target *agrt)
  *
  * @return It returns the target on success and NULL otherwise
  */
-struct target *get_apps_groups_target(struct target **agrt, const char *id, struct target *target, const char *name)
+struct ebpf_target *get_apps_groups_target(struct ebpf_target **agrt, const char *id, struct ebpf_target *target, const char *name)
 {
     int tdebug = 0, thidden = target ? target->hidden : 0, ends_with = 0;
     const char *nid = id;
@@ -188,9 +266,9 @@ struct target *get_apps_groups_target(struct target **agrt, const char *id, stru
     uint32_t hash = simple_hash(id);
 
     // find if it already exists
-    struct target *w, *last = *agrt;
+    struct ebpf_target *w, *last = *agrt;
     for (w = *agrt; w; w = w->next) {
-        if (w->idhash == hash && strncmp(nid, w->id, MAX_NAME) == 0)
+        if (w->idhash == hash && strncmp(nid, w->id, EBPF_MAX_NAME) == 0)
             return w;
 
         last = w;
@@ -215,18 +293,18 @@ struct target *get_apps_groups_target(struct target **agrt, const char *id, stru
             "Internal Error: request to link process '%s' to target '%s' which is linked to target '%s'", id,
             target->id, target->target->id);
 
-    w = callocz(1, sizeof(struct target));
-    strncpyz(w->id, nid, MAX_NAME);
+    w = callocz(1, sizeof(struct ebpf_target));
+    strncpyz(w->id, nid, EBPF_MAX_NAME);
     w->idhash = simple_hash(w->id);
 
     if (unlikely(!target))
         // copy the name
-        strncpyz(w->name, name, MAX_NAME);
+        strncpyz(w->name, name, EBPF_MAX_NAME);
     else
         // copy the id
-        strncpyz(w->name, nid, MAX_NAME);
+        strncpyz(w->name, nid, EBPF_MAX_NAME);
 
-    strncpyz(w->compare, nid, MAX_COMPARE_NAME);
+    strncpyz(w->compare, nid, EBPF_MAX_COMPARE_NAME);
     size_t len = strlen(w->compare);
     if (w->compare[len - 1] == '*') {
         w->compare[len - 1] = '\0';
@@ -267,7 +345,7 @@ struct target *get_apps_groups_target(struct target **agrt, const char *id, stru
  *
  * @return It returns 0 on success and -1 otherwise
  */
-int ebpf_read_apps_groups_conf(struct target **agdt, struct target **agrt, const char *path, const char *file)
+int ebpf_read_apps_groups_conf(struct ebpf_target **agdt, struct ebpf_target **agrt, const char *path, const char *file)
 {
     char filename[FILENAME_MAX + 1];
 
@@ -297,7 +375,7 @@ int ebpf_read_apps_groups_conf(struct target **agdt, struct target **agrt, const
             continue;
 
         // find a possibly existing target
-        struct target *w = NULL;
+        struct ebpf_target *w = NULL;
 
         // loop through all words, skipping the first one (the name)
         for (word = 0; word < words; word++) {
@@ -312,7 +390,7 @@ int ebpf_read_apps_groups_conf(struct target **agdt, struct target **agrt, const
                 continue;
 
             // add this target
-            struct target *n = get_apps_groups_target(agrt, s, w, name);
+            struct ebpf_target *n = get_apps_groups_target(agrt, s, w, name);
             if (!n) {
                 error("Cannot create target '%s' (line %zu, word %zu)", s, line, word);
                 continue;
@@ -331,7 +409,7 @@ int ebpf_read_apps_groups_conf(struct target **agdt, struct target **agrt, const
     if (!*agdt)
         fatal("Cannot create default target");
 
-    struct target *ptr = *agdt;
+    struct ebpf_target *ptr = *agdt;
     if (ptr->target)
         *agdt = ptr->target;
 
@@ -345,17 +423,15 @@ int ebpf_read_apps_groups_conf(struct target **agdt, struct target **agrt, const
 // ----------------------------------------------------------------------------
 // string lengths
 
-#define MAX_COMPARE_NAME 100
-#define MAX_NAME 100
 #define MAX_CMDLINE 16384
 
-struct pid_stat **all_pids = NULL;    // to avoid allocations, we pre-allocate the
+struct ebpf_pid_stat **ebpf_all_pids = NULL;    // to avoid allocations, we pre-allocate the
                                       // the entire pid space.
-struct pid_stat *root_of_pids = NULL; // global list of all processes running
+struct ebpf_pid_stat *ebpf_root_of_pids = NULL; // global list of all processes running
 
-size_t all_pids_count = 0; // the number of processes running
+size_t ebpf_all_pids_count = 0; // the number of processes running
 
-struct target
+struct ebpf_target
     *apps_groups_default_target = NULL, // the default target
     *apps_groups_root_target = NULL,    // apps_groups.conf defined
     *users_root_target = NULL,          // users
@@ -416,7 +492,7 @@ static inline void debug_log_dummy(void)
  *
  * @return It returns the status value.
  */
-static inline int managed_log(struct pid_stat *p, uint32_t log, int status)
+static inline int managed_log(struct ebpf_pid_stat *p, uint32_t log, int status)
 {
     if (unlikely(!status)) {
         // error("command failed log %u, errno %d", log, errno);
@@ -476,23 +552,23 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status)
  *
  * @return It returns the pid entry structure
  */
-static inline struct pid_stat *get_pid_entry(pid_t pid)
+static inline struct ebpf_pid_stat *get_pid_entry(pid_t pid)
 {
-    if (unlikely(all_pids[pid]))
-        return all_pids[pid];
+    if (unlikely(ebpf_all_pids[pid]))
+        return ebpf_all_pids[pid];
 
-    struct pid_stat *p = callocz(1, sizeof(struct pid_stat));
+    struct ebpf_pid_stat *p = ebpf_pid_stat_get();
 
-    if (likely(root_of_pids))
-        root_of_pids->prev = p;
+    if (likely(ebpf_root_of_pids))
+        ebpf_root_of_pids->prev = p;
 
-    p->next = root_of_pids;
-    root_of_pids = p;
+    p->next = ebpf_root_of_pids;
+    ebpf_root_of_pids = p;
 
     p->pid = pid;
 
-    all_pids[pid] = p;
-    all_pids_count++;
+    ebpf_all_pids[pid] = p;
+    ebpf_all_pids_count++;
 
     return p;
 }
@@ -502,14 +578,14 @@ static inline struct pid_stat *get_pid_entry(pid_t pid)
  *
  * @param p the pid_stat structure to assign for a target.
  */
-static inline void assign_target_to_pid(struct pid_stat *p)
+static inline void assign_target_to_pid(struct ebpf_pid_stat *p)
 {
     targets_assignment_counter++;
 
     uint32_t hash = simple_hash(p->comm);
     size_t pclen = strlen(p->comm);
 
-    struct target *w;
+    struct ebpf_target *w;
     for (w = apps_groups_root_target; w; w = w->next) {
         // if(debug_enabled || (p->target && p->target->debug_enabled)) debug_log_int("\t\tcomparing '%s' with '%s'", w->compare, p->comm);
 
@@ -543,11 +619,11 @@ static inline void assign_target_to_pid(struct pid_stat *p)
 /**
  * Read cmd line from /proc/PID/cmdline
  *
- * @param p  the pid_stat_structure.
+ * @param p  the ebpf_pid_stat_structure.
  *
  * @return It returns 1 on success and 0 otherwise.
  */
-static inline int read_proc_pid_cmdline(struct pid_stat *p)
+static inline int read_proc_pid_cmdline(struct ebpf_pid_stat *p)
 {
     static char cmdline[MAX_CMDLINE + 1];
 
@@ -596,7 +672,7 @@ cleanup:
  * @param p the pid stat structure to store the data.
  * @param ptr an useless argument.
  */
-static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr)
+static inline int read_proc_pid_stat(struct ebpf_pid_stat *p, void *ptr)
 {
     UNUSED(ptr);
 
@@ -640,7 +716,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr)
                 debug_log("\tJust added %d (%s)", p->pid, comm);
         }
 
-        strncpyz(p->comm, comm, MAX_COMPARE_NAME);
+        strncpyz(p->comm, comm, EBPF_MAX_COMPARE_NAME);
 
         // /proc/<pid>/cmdline
         if (likely(proc_pid_cmdline_is_needed))
@@ -673,7 +749,7 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr)
         return 0;
     }
 
-    struct pid_stat *p = get_pid_entry(pid);
+    struct ebpf_pid_stat *p = get_pid_entry(pid);
     if (unlikely(!p || p->read))
         return 0;
     p->read = 1;
@@ -701,11 +777,11 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr)
  */
 static inline void link_all_processes_to_their_parents(void)
 {
-    struct pid_stat *p, *pp;
+    struct ebpf_pid_stat *p, *pp;
 
     // link all children to their parents
     // and update children count on parents
-    for (p = root_of_pids; p; p = p->next) {
+    for (p = ebpf_root_of_pids; p; p = p->next) {
         // for each process found
 
         p->sortlist = 0;
@@ -716,7 +792,7 @@ static inline void link_all_processes_to_their_parents(void)
             continue;
         }
 
-        pp = all_pids[p->ppid];
+        pp = ebpf_all_pids[p->ppid];
         if (likely(pp)) {
             p->parent = pp;
             pp->children_count++;
@@ -738,7 +814,7 @@ static inline void link_all_processes_to_their_parents(void)
  */
 static void apply_apps_groups_targets_inheritance(void)
 {
-    struct pid_stat *p = NULL;
+    struct ebpf_pid_stat *p = NULL;
 
     // children that do not have a target
     // inherit their target from their parent
@@ -747,7 +823,7 @@ static void apply_apps_groups_targets_inheritance(void)
         if (unlikely(debug_enabled))
             loops++;
         found = 0;
-        for (p = root_of_pids; p; p = p->next) {
+        for (p = ebpf_root_of_pids; p; p = p->next) {
             // if this process does not have a target
             // and it has a parent
             // and its parent has a target
@@ -773,7 +849,7 @@ static void apply_apps_groups_targets_inheritance(void)
             loops++;
         found = 0;
 
-        for (p = root_of_pids; p; p = p->next) {
+        for (p = ebpf_root_of_pids; p; p = p->next) {
             if (unlikely(!p->sortlist && !p->children_count))
                 p->sortlist = sortlist++;
 
@@ -809,17 +885,17 @@ static void apply_apps_groups_targets_inheritance(void)
     }
 
     // init goes always to default target
-    if (all_pids[INIT_PID])
-        all_pids[INIT_PID]->target = apps_groups_default_target;
+    if (ebpf_all_pids[INIT_PID])
+        ebpf_all_pids[INIT_PID]->target = apps_groups_default_target;
 
     // pid 0 goes always to default target
-    if (all_pids[0])
-        all_pids[0]->target = apps_groups_default_target;
+    if (ebpf_all_pids[0])
+        ebpf_all_pids[0]->target = apps_groups_default_target;
 
     // give a default target on all top level processes
     if (unlikely(debug_enabled))
         loops++;
-    for (p = root_of_pids; p; p = p->next) {
+    for (p = ebpf_root_of_pids; p; p = p->next) {
         // if the process is not merged itself
         // then is is a top level process
         if (unlikely(!p->merged && !p->target))
@@ -830,8 +906,8 @@ static void apply_apps_groups_targets_inheritance(void)
             p->sortlist = sortlist++;
     }
 
-    if (all_pids[1])
-        all_pids[1]->sortlist = sortlist++;
+    if (ebpf_all_pids[1])
+        ebpf_all_pids[1]->sortlist = sortlist++;
 
     // give a target to all merged child processes
     found = 1;
@@ -839,7 +915,7 @@ static void apply_apps_groups_targets_inheritance(void)
         if (unlikely(debug_enabled))
             loops++;
         found = 0;
-        for (p = root_of_pids; p; p = p->next) {
+        for (p = ebpf_root_of_pids; p; p = p->next) {
             if (unlikely(!p->target && p->merged && p->parent && p->parent->target)) {
                 p->target = p->parent->target;
                 found++;
@@ -860,9 +936,9 @@ static void apply_apps_groups_targets_inheritance(void)
  *
  * @param root the targets that will be updated.
  */
-static inline void post_aggregate_targets(struct target *root)
+static inline void post_aggregate_targets(struct ebpf_target *root)
 {
-    struct target *w;
+    struct ebpf_target *w;
     for (w = root; w; w = w->next) {
         if (w->collected_starttime) {
             if (!w->starttime || w->collected_starttime < w->starttime) {
@@ -881,7 +957,7 @@ static inline void post_aggregate_targets(struct target *root)
  */
 static inline void del_pid_entry(pid_t pid)
 {
-    struct pid_stat *p = all_pids[pid];
+    struct ebpf_pid_stat *p = ebpf_all_pids[pid];
 
     if (unlikely(!p)) {
         error("attempted to free pid %d that is not allocated.", pid);
@@ -890,8 +966,8 @@ static inline void del_pid_entry(pid_t pid)
 
     debug_log("process %d %s exited, deleting it.", pid, p->comm);
 
-    if (root_of_pids == p)
-        root_of_pids = p->next;
+    if (ebpf_root_of_pids == p)
+        ebpf_root_of_pids = p->next;
 
     if (p->next)
         p->next->prev = p->prev;
@@ -903,10 +979,10 @@ static inline void del_pid_entry(pid_t pid)
     freez(p->io_filename);
     freez(p->cmdline_filename);
     freez(p->cmdline);
-    freez(p);
+    ebpf_pid_stat_release(p);
 
-    all_pids[pid] = NULL;
-    all_pids_count--;
+    ebpf_all_pids[pid] = NULL;
+    ebpf_all_pids_count--;
 }
 
 /**
@@ -921,9 +997,9 @@ static inline void del_pid_entry(pid_t pid)
  */
 int get_pid_comm(pid_t pid, size_t n, char *dest)
 {
-    struct pid_stat *stat;
+    struct ebpf_pid_stat *stat;
 
-    stat = all_pids[pid];
+    stat = ebpf_all_pids[pid];
     if (unlikely(stat == NULL)) {
         return -1;
     }
@@ -991,9 +1067,9 @@ void cleanup_variables_from_other_threads(uint32_t pid)
  */
 void cleanup_exited_pids()
 {
-    struct pid_stat *p = NULL;
+    struct ebpf_pid_stat *p = NULL;
 
-    for (p = root_of_pids; p;) {
+    for (p = ebpf_root_of_pids; p;) {
         if (!p->updated && (!p->keep || p->keeploops > 0)) {
             if (unlikely(debug_enabled && (p->keep || p->keeploops)))
                 debug_log(" > CLEANUP cannot keep exited process %d (%s) anymore - removing it.", p->pid, p->comm);
@@ -1002,11 +1078,8 @@ void cleanup_exited_pids()
             p = p->next;
 
             // Clean process structure
-            freez(global_process_stats[r]);
+            ebpf_process_stat_release(global_process_stats[r]);
             global_process_stats[r] = NULL;
-
-            freez(current_apps_data[r]);
-            current_apps_data[r] = NULL;
 
             cleanup_variables_from_other_threads(r);
 
@@ -1060,7 +1133,7 @@ static inline void read_proc_filesystem()
  * @param p the pid with information to update
  * @param o never used
  */
-static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o)
+static inline void aggregate_pid_on_target(struct ebpf_target *w, struct ebpf_pid_stat *p, struct ebpf_target *o)
 {
     UNUSED(o);
 
@@ -1075,7 +1148,7 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
     }
 
     w->processes++;
-    struct pid_on_target *pid_on_target = mallocz(sizeof(struct pid_on_target));
+    struct ebpf_pid_on_target *pid_on_target = mallocz(sizeof(struct ebpf_pid_on_target));
     pid_on_target->pid = p->pid;
     pid_on_target->next = w->root_pid;
     w->root_pid = pid_on_target;
@@ -1091,10 +1164,10 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
  */
 void collect_data_for_all_processes(int tbl_pid_stats_fd)
 {
-    if (unlikely(!all_pids))
+    if (unlikely(!ebpf_all_pids))
         return;
 
-    struct pid_stat *pids = root_of_pids; // global list of all processes running
+    struct ebpf_pid_stat *pids = ebpf_root_of_pids; // global list of all processes running
     while (pids) {
         if (pids->updated_twice) {
             pids->read = 0; // mark it as not read, so that collect_data_for_pid() will read it
@@ -1113,23 +1186,20 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd)
     read_proc_filesystem();
 
     uint32_t key;
-    pids = root_of_pids; // global list of all processes running
+    pids = ebpf_root_of_pids; // global list of all processes running
     // while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
     while (pids) {
         key = pids->pid;
         ebpf_process_stat_t *w = global_process_stats[key];
         if (!w) {
-            w = callocz(1, sizeof(ebpf_process_stat_t));
+            w = ebpf_process_stat_get();
             global_process_stats[key] = w;
         }
 
         if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, w)) {
             // Clean Process structures
-            freez(w);
+            ebpf_process_stat_release(w);
             global_process_stats[key] = NULL;
-
-            freez(current_apps_data[key]);
-            current_apps_data[key] = NULL;
 
             cleanup_variables_from_other_threads(key);
 
@@ -1148,7 +1218,7 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd)
 
     // this has to be done, before the cleanup
     // // concentrate everything on the targets
-    for (pids = root_of_pids; pids; pids = pids->next)
+    for (pids = ebpf_root_of_pids; pids; pids = pids->next)
         aggregate_pid_on_target(pids->target, pids, NULL);
 
     post_aggregate_targets(apps_groups_root_target);
