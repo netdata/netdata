@@ -36,6 +36,8 @@ bool rrdmetric_acquired_belongs_to_instance(RRDMETRIC_ACQUIRED *rma, RRDINSTANCE
 
 const char *rrdinstance_acquired_id(RRDINSTANCE_ACQUIRED *ria);
 const char *rrdinstance_acquired_name(RRDINSTANCE_ACQUIRED *ria);
+const char *rrdinstance_acquired_units(RRDINSTANCE_ACQUIRED *ria);
+STRING *rrdinstance_acquired_units_dup(RRDINSTANCE_ACQUIRED *ria);
 DICTIONARY *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria);
 DICTIONARY *rrdinstance_acquired_functions(RRDINSTANCE_ACQUIRED *ria);
 RRDHOST *rrdinstance_acquired_rrdhost(RRDINSTANCE_ACQUIRED *ria);
@@ -231,6 +233,7 @@ typedef struct query_metric {
         size_t slot;
         STRING *id;
         STRING *name;
+        STRING *units;
     } grouped_as;
 
 } QUERY_METRIC;

@@ -371,6 +371,16 @@ const char *rrdinstance_acquired_name(RRDINSTANCE_ACQUIRED *ria) {
     return string2str(ri->name);
 }
 
+const char *rrdinstance_acquired_units(RRDINSTANCE_ACQUIRED *ria) {
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    return string2str(ri->units);
+}
+
+STRING *rrdinstance_acquired_units_dup(RRDINSTANCE_ACQUIRED *ria) {
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    return string_dup(ri->units);
+}
+
 DICTIONARY *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria) {
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
     return ri->rrdlabels;

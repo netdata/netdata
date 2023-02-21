@@ -147,6 +147,7 @@ cleanup:
 struct group_by_entry {
     STRING *id;
     STRING *name;
+    STRING *units;
 };
 
 RRDR *data_query_group_by(RRDR *r) {
@@ -162,6 +163,7 @@ RRDR *data_query_group_by(RRDR *r) {
 
     int added = 0;
     STRING *unset = string_strdupz("[unset]");
+    char key[RRD_ID_LENGTH_MAX + 1];
     for(size_t c = 0; c < qt->query.used ;c++) {
         if(!rrdr_dimension_should_be_exposed(r->od[c], options))
             continue;
@@ -175,33 +177,39 @@ RRDR *data_query_group_by(RRDR *r) {
         switch(qt->request.group_by) {
             default:
             case RRDR_GROUP_BY_DIMENSION:
-                set = dictionary_set(groups, query_metric_id(qt, qm), &pos, sizeof(int));
+                snprintfz(key, RRD_ID_LENGTH_MAX, "%s,%s", query_metric_id(qt, qm), rrdinstance_acquired_units(qi->ria));
+                set = dictionary_set(groups, key, &pos, sizeof(int));
                 if(*set == -1) {
                     *set = pos = added++;
                     entries[pos].id = rrdmetric_acquired_id_dup(qd->rma);
                     entries[pos].name = rrdmetric_acquired_name_dup(qd->rma);
+                    entries[pos].units = rrdinstance_acquired_units_dup(qi->ria);
                 }
                 else
                     pos = *set;
                 break;
 
             case RRDR_GROUP_BY_INSTANCE:
-                set = dictionary_set(groups, string2str(qi->id_fqdn), &pos, sizeof(int));
+                snprintfz(key, RRD_ID_LENGTH_MAX, "%s,%s", string2str(qi->id_fqdn), rrdinstance_acquired_units(qi->ria));
+                set = dictionary_set(groups, key, &pos, sizeof(int));
                 if(*set == -1) {
                     *set = pos = added++;
                     entries[pos].id = string_dup(qi->id_fqdn);
                     entries[pos].name = string_dup(qi->name_fqdn);
+                    entries[pos].units = rrdinstance_acquired_units_dup(qi->ria);
                 }
                 else
                     pos = *set;
                 break;
 
             case RRDR_GROUP_BY_NODE:
-                set = dictionary_set(groups, qh->host->machine_guid, &pos, sizeof(int));
+                snprintfz(key, RRD_ID_LENGTH_MAX, "%s,%s", qh->host->machine_guid, rrdinstance_acquired_units(qi->ria));
+                set = dictionary_set(groups, key, &pos, sizeof(int));
                 if(*set == -1) {
                     *set = pos = added++;
                     entries[pos].id = string_strdupz(qh->host->machine_guid);
                     entries[pos].name = string_dup(qh->host->hostname);
+                    entries[pos].units = rrdinstance_acquired_units_dup(qi->ria);
                 }
                 else
                     pos = *set;
@@ -213,11 +221,13 @@ RRDR *data_query_group_by(RRDR *r) {
                 if(!s)
                     s = string_dup(unset);
 
-                set = dictionary_set(groups, string2str(s), &pos, sizeof(int));
+                snprintfz(key, RRD_ID_LENGTH_MAX, "%s,%s", string2str(s), rrdinstance_acquired_units(qi->ria));
+                set = dictionary_set(groups, key, &pos, sizeof(int));
                 if(*set == -1) {
                     *set = pos = added++;
                     entries[pos].id = s;
                     entries[pos].name = string_dup(entries[pos].id);
+                    entries[pos].units = rrdinstance_acquired_units_dup(qi->ria);
                 }
                 else {
                     pos = *set;
@@ -229,7 +239,27 @@ RRDR *data_query_group_by(RRDR *r) {
         qm->grouped_as.slot = pos;
         qm->grouped_as.id = entries[pos].id;
         qm->grouped_as.name = entries[pos].name;
+        qm->grouped_as.units = entries[pos].units;
         qm->query.options |= RRDR_DIMENSION_GROUPED;
+    }
+
+    // check if we have multiple units
+    bool multiple_units = false;
+    for(int i = 1; i < added ; i++) {
+        if(entries[i].units != entries[0].units) {
+            multiple_units = true;
+            break;
+        }
+    }
+
+    if(multiple_units) {
+        // include the units into the id and name of the dimensions
+        for(int i = 0; i < added ; i++) {
+            snprintfz(key, RRD_ID_LENGTH_MAX, "%s,%s", string2str(entries[i].id), string2str(entries[i].units));
+            STRING *u = string_strdupz(key);
+            string_freez(entries[i].id);
+            entries[i].id = u;
+        }
     }
 
     RRDR *r2 = rrdr_create(r->internal.owa, qt, added, rows);
@@ -249,6 +279,7 @@ RRDR *data_query_group_by(RRDR *r) {
         r2->od[c2] = RRDR_DIMENSION_QUERIED;
         r2->di[c2] = entries[c2].id;
         r2->dn[c2] = entries[c2].name;
+        r2->du[c2] = entries[c2].units;
     }
 
     // initialize r2 (timestamps and value flags)

@@ -585,7 +585,7 @@ static void rrdset_rrdcalc_entries(BUFFER *wb, RRDINSTANCE_ACQUIRED *ria) {
     }
 }
 
-static void query_target_units(BUFFER *wb, QUERY_TARGET *qt) {
+static void query_target_combined_units(BUFFER *wb, QUERY_TARGET *qt) {
     if(qt->contexts.used == 1) {
         buffer_json_member_add_string(wb, "units", rrdcontext_acquired_units(qt->contexts.array[0].rca));
     }
@@ -606,6 +606,13 @@ static void query_target_units(BUFFER *wb, QUERY_TARGET *qt) {
         }
         dictionary_destroy(dict);
     }
+}
+
+static void rrdr_dimension_units_array(BUFFER *wb, RRDR *r) {
+    buffer_json_member_add_array(wb, "units");
+    for(size_t c = 0; c < r->d ; c++)
+        buffer_json_add_array_item_string(wb, string2str(r->du[c]));
+    buffer_json_array_close(wb);
 }
 
 void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR_OPTIONS options, bool string_value,
@@ -865,16 +872,16 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
         buffer_json_member_add_time_t(wb, "after", r->view.after);
         buffer_json_member_add_time_t(wb, "before", r->view.before);
         buffer_json_member_add_uint64(wb, "points", rows);
-        query_target_units(wb, qt);
-    }
-    buffer_json_object_close(wb);
-
-    buffer_json_member_add_object(wb, "dimensions");
-    {
-        rrdr_dimension_ids(wb, "ids", r, options);
-        rrdr_dimension_names(wb, "names", r, options);
-        size_t dims = rrdr_latest_values(wb, "view_latest_values", r, options);
-        buffer_json_member_add_uint64(wb, "count", dims);
+        query_target_combined_units(wb, qt);
+        buffer_json_member_add_object(wb, "dimensions");
+        {
+            rrdr_dimension_ids(wb, "ids", r, options);
+            rrdr_dimension_names(wb, "names", r, options);
+            rrdr_dimension_units_array(wb, r);
+            size_t dims = rrdr_latest_values(wb, "view_latest_values", r, options);
+            buffer_json_member_add_uint64(wb, "count", dims);
+        }
+        buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb);
 

@@ -64,6 +64,7 @@ inline void rrdr_free(ONEWAYALLOC *owa, RRDR *r) {
     for(size_t d = 0; d < r->d ;d++) {
         string_freez(r->di[d]);
         string_freez(r->dn[d]);
+        string_freez(r->du[d]);
     }
 
     query_target_release(r->internal.qt);
@@ -73,6 +74,7 @@ inline void rrdr_free(ONEWAYALLOC *owa, RRDR *r) {
     onewayalloc_freez(owa, r->od);
     onewayalloc_freez(owa, r->di);
     onewayalloc_freez(owa, r->dn);
+    onewayalloc_freez(owa, r->du);
     onewayalloc_freez(owa, r->ar);
     onewayalloc_freez(owa, r->gbc);
     onewayalloc_freez(owa, r);
@@ -100,6 +102,7 @@ RRDR *rrdr_create(ONEWAYALLOC *owa, QUERY_TARGET *qt, size_t dimensions, size_t 
     r->ar = onewayalloc_mallocz(owa, points * dimensions * sizeof(NETDATA_DOUBLE));
     r->di = onewayalloc_callocz(owa, dimensions, sizeof(STRING *));
     r->dn = onewayalloc_callocz(owa, dimensions, sizeof(STRING *));
+    r->du = onewayalloc_callocz(owa, dimensions, sizeof(STRING *));
 
     r->view.group = 1;
     r->view.update_every = 1;

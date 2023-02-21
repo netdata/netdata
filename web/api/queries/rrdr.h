@@ -83,6 +83,7 @@ typedef struct rrdresult {
 
     STRING **di;              // array of d dimension ids
     STRING **dn;              // array of d dimension names
+    STRING **du;              // array of d dimension units
 
     time_t *t;                // array of n timestamps
     NETDATA_DOUBLE *v;        // array n x d values
