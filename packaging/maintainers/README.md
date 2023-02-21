@@ -4,8 +4,7 @@ date: 2020-03-31
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/maintainers/README.md
 sidebar_label: "Package Maintainers"
 learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Developers"
+learn_rel_path: "Installation/Package maintainers"
 -->
 
 # Package Maintainers

@@ -5,6 +5,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/makese
 sidebar_label: "Static binary packages"
 learn_status: "Published"
 learn_rel_path: "Installation/Installation methods"
+sidebar_position: 30
 -->
 
 # Netdata static binary packages

@@ -5,6 +5,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/instal
 sidebar_label: "Installation methods"
 learn_status: "Published"
 learn_rel_path: "Installation/Installation methods"
+sidebar_position: 30
 -->
 
 # Installation methods
