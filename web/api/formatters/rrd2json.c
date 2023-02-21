@@ -145,6 +145,7 @@ cleanup:
 }
 
 struct group_by_entry {
+    size_t count;
     STRING *id;
     STRING *name;
     STRING *units;
@@ -187,6 +188,8 @@ RRDR *data_query_group_by(RRDR *r) {
                 }
                 else
                     pos = *set;
+
+                entries[pos].count++;
                 break;
 
             case RRDR_GROUP_BY_INSTANCE:
@@ -200,6 +203,8 @@ RRDR *data_query_group_by(RRDR *r) {
                 }
                 else
                     pos = *set;
+
+                entries[pos].count++;
                 break;
 
             case RRDR_GROUP_BY_NODE:
@@ -213,6 +218,8 @@ RRDR *data_query_group_by(RRDR *r) {
                 }
                 else
                     pos = *set;
+
+                entries[pos].count++;
                 break;
 
             case RRDR_GROUP_BY_LABEL: {
@@ -233,6 +240,9 @@ RRDR *data_query_group_by(RRDR *r) {
                     pos = *set;
                     string_freez(s);
                 }
+
+                entries[pos].count++;
+                break;
             }
         }
 
@@ -266,6 +276,7 @@ RRDR *data_query_group_by(RRDR *r) {
     if(!r2)
         goto cleanup;
 
+    r2->dgbc = onewayalloc_callocz(r2->internal.owa, r2->d, sizeof(*r2->dgbc));
     r2->gbc = onewayalloc_callocz(r2->internal.owa, r2->n * r2->d, sizeof(*r2->gbc));
 
     // copy from previous rrdr
@@ -280,6 +291,7 @@ RRDR *data_query_group_by(RRDR *r) {
         r2->di[c2] = entries[c2].id;
         r2->dn[c2] = entries[c2].name;
         r2->du[c2] = entries[c2].units;
+        r2->dgbc[c2] = entries[c2].count;
     }
 
     // initialize r2 (timestamps and value flags)

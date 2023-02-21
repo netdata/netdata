@@ -900,6 +900,12 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
             rrdr_dimension_ids(wb, "ids", r, options);
             rrdr_dimension_names(wb, "names", r, options);
             rrdr_dimension_units_array(wb, r);
+            if(r->dgbc) {
+                buffer_json_member_add_array(wb, "grouped");
+                for(size_t c = 0; c < r->d ;c++)
+                    buffer_json_add_array_item_uint64(wb, r->dgbc[c]);
+                buffer_json_array_close(wb);
+            }
             size_t dims = rrdr_latest_values(wb, "view_latest_values", r, options);
             buffer_json_member_add_uint64(wb, "count", dims);
         }
