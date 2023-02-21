@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- bump go.d to v0.51.0 [\#14572](https://github.com/netdata/netdata/pull/14572) ([ilyam8](https://github.com/ilyam8))
+- Remove References category from learn [\#14571](https://github.com/netdata/netdata/pull/14571) ([cakrit](https://github.com/cakrit))
+- Fix doc capitalization and remove obsolete section [\#14569](https://github.com/netdata/netdata/pull/14569) ([cakrit](https://github.com/cakrit))
+- Remove obsolete instruction to lower memory usage [\#14568](https://github.com/netdata/netdata/pull/14568) ([cakrit](https://github.com/cakrit))
+- Fix broken links in our documentation [\#14565](https://github.com/netdata/netdata/pull/14565) ([Ancairon](https://github.com/Ancairon))
+- pandas collector add `read_sql()` support [\#14563](https://github.com/netdata/netdata/pull/14563) ([andrewm4894](https://github.com/andrewm4894))
+- reviewed plans page to be according to latest updates [\#14560](https://github.com/netdata/netdata/pull/14560) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Fix kickstart link [\#14559](https://github.com/netdata/netdata/pull/14559) ([cakrit](https://github.com/cakrit))
 - Make secure nodes a category landing page [\#14558](https://github.com/netdata/netdata/pull/14558) ([cakrit](https://github.com/cakrit))
 - Add misc landing page and move proxy guides [\#14557](https://github.com/netdata/netdata/pull/14557) ([cakrit](https://github.com/cakrit))
@@ -22,6 +29,7 @@
 - Reorganize learn documents under Integrations part 2 [\#14538](https://github.com/netdata/netdata/pull/14538) ([cakrit](https://github.com/cakrit))
 - Roles docs: Add Early Bird and Member role [\#14537](https://github.com/netdata/netdata/pull/14537) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Fix broken Alma Linux entries in build matrix generation. [\#14536](https://github.com/netdata/netdata/pull/14536) ([Ferroin](https://github.com/Ferroin))
+- Re-index when machine guid changes [\#14535](https://github.com/netdata/netdata/pull/14535) ([MrZammler](https://github.com/MrZammler))
 - Use BoxListItemRegexLink component in docs/quickstart/insfrastructure.md [\#14533](https://github.com/netdata/netdata/pull/14533) ([Ancairon](https://github.com/Ancairon))
 - Update main metric retention docs [\#14530](https://github.com/netdata/netdata/pull/14530) ([cakrit](https://github.com/cakrit))
 - Add Debian 12 to our CI and platform support document. [\#14529](https://github.com/netdata/netdata/pull/14529) ([Ferroin](https://github.com/Ferroin))
@@ -297,7 +305,6 @@
 - add clickhouse third party collector and install instructions [\#14021](https://github.com/netdata/netdata/pull/14021) ([andrewm4894](https://github.com/andrewm4894))
 - Switch nightlies to GitHub releases. [\#14020](https://github.com/netdata/netdata/pull/14020) ([Ferroin](https://github.com/Ferroin))
 - Wmi descriptions [\#14001](https://github.com/netdata/netdata/pull/14001) ([thiagoftsm](https://github.com/thiagoftsm))
-- Introduce the new Structure of the documentation [\#13915](https://github.com/netdata/netdata/pull/13915) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
@@ -378,13 +385,6 @@
 - Remove pluginsd action param & dead code. [\#13928](https://github.com/netdata/netdata/pull/13928) ([vkalintiris](https://github.com/vkalintiris))
 - Do not force internal collectors to call rrdset\_next. [\#13926](https://github.com/netdata/netdata/pull/13926) ([vkalintiris](https://github.com/vkalintiris))
 - Return accidentaly removed 32bit RPi keep alive fix [\#13925](https://github.com/netdata/netdata/pull/13925) ([underhood](https://github.com/underhood))
-- error\_limit\(\) function to limit number of error lines per instance [\#13924](https://github.com/netdata/netdata/pull/13924) ([ktsaou](https://github.com/ktsaou))
-- fix crash on query plan switch [\#13920](https://github.com/netdata/netdata/pull/13920) ([ktsaou](https://github.com/ktsaou))
-- Enable aclk conversation log even without NETDATA\_INTERNAL CHECKS [\#13917](https://github.com/netdata/netdata/pull/13917) ([MrZammler](https://github.com/MrZammler))
-- add ping dashboard info and alarms [\#13916](https://github.com/netdata/netdata/pull/13916) ([ilyam8](https://github.com/ilyam8))
-- enable dbengine tiering by default [\#13914](https://github.com/netdata/netdata/pull/13914) ([ktsaou](https://github.com/ktsaou))
-- bump go.d.plugin to v0.42.0 [\#13913](https://github.com/netdata/netdata/pull/13913) ([ilyam8](https://github.com/ilyam8))
-- do not free hosts if a change on db mode is not needed [\#13912](https://github.com/netdata/netdata/pull/13912) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
