@@ -329,7 +329,7 @@ RRDR *data_query_group_by(RRDR *r) {
         for(int i = 0; i < added ; i++) {
             buffer_flush(key);
             buffer_strcat(key, string2str(entries[i].id));
-            buffer_fast_strcat(key, "|", 1);
+            buffer_fast_strcat(key, ",", 1);
             buffer_strcat(key, string2str(entries[i].units));
             STRING *u = string_strdupz(buffer_tostring(key));
             string_freez(entries[i].id);

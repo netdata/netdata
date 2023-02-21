@@ -2369,6 +2369,8 @@ void query_target_release(QUERY_TARGET *qt) {
     qt->db.first_time_s = 0;
     qt->db.last_time_s = 0;
 
+    qt->group_by.used = 0;
+
     qt->id[0] = '\0';
 
     qt->used = false;
