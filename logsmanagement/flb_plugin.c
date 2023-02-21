@@ -439,8 +439,6 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
                                 message_size = c - message;
                                 bytes_remain -= message_size;
 
-                                // error("msg init:%.*s sz:%zu br:%zu", (int) message_size, message, message_size, bytes_remain);
-
                                 /* Extract machine-readable info for charts, 
                                  * such as subsystem and device. */
                                 while(bytes_remain){
@@ -448,7 +446,6 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
                                     while(--bytes_remain && c[++sz] != '\n');
                                     if(bytes_remain) --sz;
                                     c++; // skip new line and space chars
-                                    // error("msg:%.*s", (int) sz, c);
 
                                     DICTIONARY *dict;
                                     char *str = NULL;
@@ -465,11 +462,9 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
                                     }
 
                                     if(likely(str)){
-                                        // error("msg subsys/device:%.*s", (int) str_len, str);
                                         char * const key = mallocz(str_len + 1);
                                         memcpy(key, str, str_len);
                                         key[str_len] = '\0';
-                                        // error("msg cpy:%s", key);
                                         Kernel_metrics_dict_item_t item = {.dim = NULL, .num = 1};
                                         dictionary_set_advanced(dict, key, str_len, &item, sizeof(item), NULL);
                                     }
