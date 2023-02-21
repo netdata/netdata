@@ -8,9 +8,9 @@ static void jsonwrap_query_metric_plan(BUFFER *wb, QUERY_METRIC *qm) {
         QUERY_PLAN_ENTRY *qp = &qm->plan.array[p];
 
         buffer_json_add_array_item_object(wb);
-        buffer_json_member_add_uint64(wb, "tier", qp->tier);
-        buffer_json_member_add_time_t(wb, "after", qp->after);
-        buffer_json_member_add_time_t(wb, "before", qp->before);
+        buffer_json_member_add_uint64(wb, "tr", qp->tier);
+        buffer_json_member_add_time_t(wb, "af", qp->after);
+        buffer_json_member_add_time_t(wb, "bf", qp->before);
         buffer_json_object_close(wb);
     }
     buffer_json_array_close(wb);
@@ -18,10 +18,10 @@ static void jsonwrap_query_metric_plan(BUFFER *wb, QUERY_METRIC *qm) {
     buffer_json_member_add_array(wb, "tiers");
     for (size_t tier = 0; tier < storage_tiers; tier++) {
         buffer_json_add_array_item_object(wb);
-        buffer_json_member_add_uint64(wb, "tier", tier);
-        buffer_json_member_add_time_t(wb, "first_entry", qm->tiers[tier].db_first_time_s);
-        buffer_json_member_add_time_t(wb, "last_entry", qm->tiers[tier].db_last_time_s);
-        buffer_json_member_add_int64(wb, "weight", qm->tiers[tier].weight);
+        buffer_json_member_add_uint64(wb, "tr", tier);
+        buffer_json_member_add_time_t(wb, "fe", qm->tiers[tier].db_first_time_s);
+        buffer_json_member_add_time_t(wb, "le", qm->tiers[tier].db_last_time_s);
+        buffer_json_member_add_int64(wb, "wg", qm->tiers[tier].weight);
         buffer_json_object_close(wb);
     }
     buffer_json_array_close(wb);
@@ -331,8 +331,8 @@ static inline void query_target_hosts_instances_labels_dimensions(
                 if (st->alerts.base) {
                     char id[RRD_ID_LENGTH_MAX + 1];
                     for (RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
-//                        if(rc->status < RRDCALC_STATUS_CLEAR)
-//                            continue;
+                        if(rc->status < RRDCALC_STATUS_CLEAR)
+                            continue;
 
                         snprintfz(id, RRD_ID_LENGTH_MAX, "%s:%s", string2str(rc->name), string2str(qi->id_fqdn));
                         snprintfz(name, RRD_ID_LENGTH_MAX, "%s:%s", string2str(rc->name), string2str(qi->name_fqdn));
@@ -342,6 +342,7 @@ static inline void query_target_hosts_instances_labels_dimensions(
                         buffer_json_member_add_string(wb, "lc", string2str(rc->name));
                         buffer_json_member_add_string(wb, "st", rrdcalc_status2string(rc->status));
                         buffer_json_member_add_double(wb, "vl", rc->value);
+                        buffer_json_member_add_string(wb, "un", string2str(rc->units));
                         buffer_json_member_add_string(wb, "mg", st->rrdhost->machine_guid);
                         if(qh->node_id[0])
                             buffer_json_member_add_string(wb, "nd", qh->node_id);
@@ -569,9 +570,13 @@ static void rrdset_rrdcalc_entries(BUFFER *wb, RRDINSTANCE_ACQUIRED *ria) {
         if(st->alerts.base) {
             buffer_json_member_add_object(wb, "alerts");
             for(RRDCALC *rc = st->alerts.base; rc ;rc = rc->next) {
+                if(rc->status < RRDCALC_STATUS_CLEAR)
+                    continue;
+
                 buffer_json_member_add_object(wb, string2str(rc->name));
-                buffer_json_member_add_string(wb, "status", rrdcalc_status2string(rc->status));
-                buffer_json_member_add_double(wb, "value", rc->value);
+                buffer_json_member_add_string(wb, "st", rrdcalc_status2string(rc->status));
+                buffer_json_member_add_double(wb, "vl", rc->value);
+                buffer_json_member_add_string(wb, "un", string2str(rc->units));
                 buffer_json_object_close(wb);
             }
             buffer_json_object_close(wb);
@@ -745,7 +750,7 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
                             if(qh->node_id[0])
                                 buffer_json_member_add_string(wb, "nd", qh->node_id);
                             buffer_json_member_add_uint64(wb, "idx", qh->slot);
-                            buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
+                            buffer_json_member_add_string(wb, "hn", rrdhost_hostname(host));
                             buffer_json_member_add_object(wb, "contexts");
 
                             last_host = host;
@@ -778,8 +783,8 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
 
                             buffer_json_member_add_object(wb, rrdinstance_acquired_id(ria));
                             buffer_json_member_add_uint64(wb, "idx", qi->slot);
-                            buffer_json_member_add_string(wb, "name", rrdinstance_acquired_name(ria));
-                            buffer_json_member_add_time_t(wb, "update_every", rrdinstance_acquired_update_every(ria));
+                            buffer_json_member_add_string(wb, "nm", rrdinstance_acquired_name(ria));
+                            buffer_json_member_add_time_t(wb, "ue", rrdinstance_acquired_update_every(ria));
                             DICTIONARY *labels = rrdinstance_acquired_labels(ria);
                             if(labels) {
                                 buffer_json_member_add_object(wb, "labels");
@@ -794,20 +799,20 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
 
                         buffer_json_member_add_object(wb, rrdmetric_acquired_id(rma));
                         {
-                            buffer_json_member_add_string(wb, "name", rrdmetric_acquired_name(rma));
-                            buffer_json_member_add_boolean(wb, "queried", queried);
+                            buffer_json_member_add_string(wb, "nm", rrdmetric_acquired_name(rma));
+                            buffer_json_member_add_uint64(wb, "qr", queried ? 1 : 0);
                             time_t first_entry_s = rrdmetric_acquired_first_entry(rma);
                             time_t last_entry_s = rrdmetric_acquired_last_entry(rma);
-                            buffer_json_member_add_time_t(wb, "first_entry", first_entry_s);
-                            buffer_json_member_add_time_t(wb, "last_entry", last_entry_s ? last_entry_s : now_s);
+                            buffer_json_member_add_time_t(wb, "fe", first_entry_s);
+                            buffer_json_member_add_time_t(wb, "le", last_entry_s ? last_entry_s : now_s);
 
                             if(qm) {
-                                query_target_value_stats(wb, qm->query.min, qm->query.max, qm->query.sum, qm->query.average, qm->query.volume);
-
                                 if(qm->query.options & RRDR_DIMENSION_GROUPED) {
                                     // buffer_json_member_add_string(wb, "grouped_as_id", string2str(qm->grouped_as.id));
-                                    buffer_json_member_add_string(wb, "grouped_as", string2str(qm->grouped_as.name));
+                                    buffer_json_member_add_string(wb, "as", string2str(qm->grouped_as.name));
                                 }
+
+                                query_target_value_stats(wb, qm->query.min, qm->query.max, qm->query.sum, qm->query.average, qm->query.volume);
 
                                 if(options & RRDR_OPTION_SHOW_PLAN)
                                     jsonwrap_query_metric_plan(wb, qm);
@@ -848,7 +853,6 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
         for(size_t tier = 0; tier < storage_tiers ; tier++)
             buffer_json_add_array_item_uint64(wb, r->stats.tier_points_read[tier]);
         buffer_json_array_close(wb);
-
     }
     buffer_json_object_close(wb);
 
