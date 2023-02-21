@@ -1,10 +1,8 @@
 <!--
 title: "Install Netdata with Docker"
-date: "2020-04-23"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/docker/README.md"
-sidebar_label: "Install Netdata with Docker"
+sidebar_label: "Docker"
 learn_status: "Published"
-learn_topic_type: "Tasks"
 learn_rel_path: "Installation/Installation methods"
 sidebar_position: 40
 -->
