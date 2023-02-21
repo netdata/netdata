@@ -1065,15 +1065,6 @@ int flb_add_input(struct File_info *const p_file_info){
 #endif
                 NULL) != 0) return FLB_INPUT_SET_ERROR;
 
-            /* Set up output */
-            callback->cb = flb_write_to_buff_cb;
-            callback->data = p_file_info;
-            p_file_info->flb_output = flb_output(ctx, "lib", callback);
-            if(p_file_info->flb_output < 0 ) return FLB_OUTPUT_ERROR;
-            if(flb_output_set(ctx, p_file_info->flb_output, 
-                "Match", tag_s,
-                NULL) != 0) return FLB_OUTPUT_SET_ERROR;
-
             break;
         }
         case FLB_KMSG: {
@@ -1086,16 +1077,6 @@ int flb_add_input(struct File_info *const p_file_info){
                 "Tag", tag_s,
                 NULL) != 0) return FLB_INPUT_SET_ERROR;
             
-
-            /* Set up output */
-            callback->cb = flb_write_to_buff_cb;
-            callback->data = p_file_info;
-            p_file_info->flb_output = flb_output(ctx, "lib", callback);
-            if(p_file_info->flb_output < 0 ) return FLB_OUTPUT_ERROR;
-            if(flb_output_set(ctx, p_file_info->flb_output, 
-                "Match", tag_s,
-                NULL) != 0) return FLB_OUTPUT_SET_ERROR;
-
             break;
         }
         case FLB_SYSTEMD: {
@@ -1118,16 +1099,6 @@ int flb_add_input(struct File_info *const p_file_info){
                     "Path", p_file_info->filename,
                     NULL) != 0) return FLB_INPUT_SET_ERROR;
             }
-            
-
-            /* Set up output */
-            callback->cb = flb_write_to_buff_cb;
-            callback->data = p_file_info;
-            p_file_info->flb_output = flb_output(ctx, "lib", callback);
-            if(p_file_info->flb_output < 0 ) return FLB_OUTPUT_ERROR;
-            if(flb_output_set(ctx, p_file_info->flb_output, 
-                "Match", tag_s,
-                NULL) != 0) return FLB_OUTPUT_SET_ERROR;
 
             break;
         }
@@ -1147,16 +1118,6 @@ int flb_add_input(struct File_info *const p_file_info){
                 "Parser", "docker_events_parser",
                 "Unix_Path", p_file_info->filename,
                 NULL) != 0) return FLB_INPUT_SET_ERROR;
-            
-            
-            /* Set up output */
-            callback->cb = flb_write_to_buff_cb;
-            callback->data = p_file_info;
-            p_file_info->flb_output = flb_output(ctx, "lib", callback);
-            if(p_file_info->flb_output < 0 ) return FLB_OUTPUT_ERROR;
-            if(flb_output_set(ctx, p_file_info->flb_output, 
-                "Match", tag_s,
-                NULL) != 0) return FLB_OUTPUT_SET_ERROR;
             
             break;
         }
@@ -1199,16 +1160,6 @@ int flb_add_input(struct File_info *const p_file_info){
                     NULL) != 0) return FLB_INPUT_SET_ERROR;
             } else 
             return FLB_INPUT_SET_ERROR; // should never reach this line
-            
-            
-            /* Set up output */
-            callback->cb = flb_write_to_buff_cb;
-            callback->data = p_file_info;
-            p_file_info->flb_output = flb_output(ctx, "lib", callback);
-            if(p_file_info->flb_output < 0 ) return FLB_OUTPUT_ERROR;
-            if(flb_output_set(ctx, p_file_info->flb_output, 
-                "Match", tag_s,
-                NULL) != 0) return FLB_OUTPUT_SET_ERROR;
 
             break;
         }
@@ -1229,17 +1180,7 @@ int flb_add_input(struct File_info *const p_file_info){
                 "Separator", serial_config->separator,
                 "Format", serial_config->format,
                 NULL) != 0) return FLB_INPUT_SET_ERROR;
-
-
-            /* Set up output */
-            callback->cb = flb_write_to_buff_cb;
-            callback->data = p_file_info;
-            p_file_info->flb_output = flb_output(ctx, "lib", callback);
-            if(p_file_info->flb_output < 0 ) return FLB_OUTPUT_ERROR;
-            if(flb_output_set(ctx, p_file_info->flb_output, 
-                "Match", tag_s,
-                NULL) != 0) return FLB_OUTPUT_SET_ERROR;
-
+            
             break;
         }
         default: {
@@ -1247,7 +1188,16 @@ int flb_add_input(struct File_info *const p_file_info){
             return DEFAULT_ERROR; // Shouldn't reach here
             break;
         }
-    }    
+    }
+
+    /* Set up output */
+    callback->cb = flb_write_to_buff_cb;
+    callback->data = p_file_info;
+    p_file_info->flb_output = flb_output(ctx, "lib", callback);
+    if(p_file_info->flb_output < 0 ) return FLB_OUTPUT_ERROR;
+    if(flb_output_set(ctx, p_file_info->flb_output, 
+        "Match", tag_s,
+        NULL) != 0) return FLB_OUTPUT_SET_ERROR; 
 
     return SUCCESS;
 }
