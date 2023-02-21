@@ -138,6 +138,9 @@ troubleshooting with Netdata.
 - [Linux from source](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/source.md)
 - [Linux for offline nodes](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/offline.md)
 
+The full list of all installation methods for various systems is available in [Netdata Learn](https://learn.netdata.cloud), 
+under [Installation](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/installation-overview.md).
+
 ## Advanced installation options and troubleshooting
 
 ### Automatic updates
