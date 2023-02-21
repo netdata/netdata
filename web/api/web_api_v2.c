@@ -118,6 +118,9 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
     if(group_by != RRDR_GROUP_BY_DIMENSION)
         options |= RRDR_OPTION_ABSOLUTE;
 
+    if(options & RRDR_OPTION_SHOW_PLAN)
+        options |= RRDR_OPTION_DEBUG;
+
     if(tier_str && *tier_str) {
         tier = str2ul(tier_str);
         if(tier < storage_tiers)
