@@ -160,9 +160,10 @@ static inline void query_target_value_stats(BUFFER *wb, NETDATA_DOUBLE min, NETD
     buffer_json_object_close(wb);
 }
 
-static inline void query_target_hosts_instances_labels_dimensions(
+static inline void query_target_hosts_contexts_instances_labels_dimensions(
         BUFFER *wb, RRDR *r,
         const char *key_hosts,
+        const char *key_contexts,
         const char *key_dimensions,
         const char *key_instances,
         const char *key_labels,
@@ -172,29 +173,58 @@ static inline void query_target_hosts_instances_labels_dimensions(
 
     char name[RRD_ID_LENGTH_MAX * 2 + 2];
 
-    if(key_hosts) {
+    if(key_hosts && v2) {
         buffer_json_member_add_array(wb, key_hosts);
         for (long c = 0; c < (long) qt->hosts.used; c++) {
             QUERY_HOST *qh = query_host(qt, c);
             RRDHOST *host = qh->host;
-            if(v2) {
-                buffer_json_add_array_item_object(wb);
-                buffer_json_member_add_string(wb, "mg", host->machine_guid);
-                if(qh->node_id[0])
-                    buffer_json_member_add_string(wb, "nd", qh->node_id);
-                buffer_json_member_add_string(wb, "hn", rrdhost_hostname(host));
-                query_target_metric_counts(wb, &qh->metrics);
-                query_target_alerts_counts(wb, &qh->alerts, NULL, false);
-                buffer_json_object_close(wb);
-            }
-            else {
-                buffer_json_add_array_item_array(wb);
-                buffer_json_add_array_item_string(wb, host->machine_guid);
-                buffer_json_add_array_item_string(wb, rrdhost_hostname(host));
-                buffer_json_array_close(wb);
-            }
+            buffer_json_add_array_item_object(wb);
+            buffer_json_member_add_string(wb, "mg", host->machine_guid);
+            if(qh->node_id[0])
+                buffer_json_member_add_string(wb, "nd", qh->node_id);
+            buffer_json_member_add_string(wb, "hn", rrdhost_hostname(host));
+            query_target_metric_counts(wb, &qh->metrics);
+            query_target_alerts_counts(wb, &qh->alerts, NULL, false);
+            buffer_json_object_close(wb);
         }
         buffer_json_array_close(wb);
+    }
+
+    if(key_contexts && v2) {
+        buffer_json_member_add_array(wb, key_contexts);
+        DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
+
+        struct {
+            struct query_metrics_counts metrics;
+            struct query_alerts_counts alerts;
+        } x = {
+                .metrics = (struct query_metrics_counts){ 0 },
+                .alerts = (struct query_alerts_counts){ 0 },
+        }, *z;
+
+        for (long c = 0; c < (long) qt->contexts.used; c++) {
+            QUERY_CONTEXT *qc = query_context(qt, c);
+
+            z = dictionary_set(dict, rrdcontext_acquired_id(qc->rca), &x, sizeof(x));
+            z->metrics.selected += qc->metrics.selected;
+            z->metrics.excluded += qc->metrics.excluded;
+            z->metrics.queried += qc->metrics.queried;
+            z->metrics.failed += qc->metrics.failed;
+
+            z->alerts.clear += qc->alerts.clear;
+            z->alerts.warning += qc->alerts.warning;
+            z->alerts.critical += qc->alerts.critical;
+        }
+        dfe_start_read(dict, z) {
+            buffer_json_add_array_item_object(wb);
+            buffer_json_member_add_string(wb, "nm", z_dfe.name);
+            query_target_metric_counts(wb, &z->metrics);
+            query_target_alerts_counts(wb, &z->alerts, NULL, false);
+            buffer_json_object_close(wb);
+        }
+        dfe_done(z);
+        buffer_json_array_close(wb);
+        dictionary_destroy(dict);
     }
 
     if(key_instances) {
@@ -325,7 +355,7 @@ static inline void query_target_hosts_instances_labels_dimensions(
         buffer_json_array_close(wb);
     }
 
-    if(key_alerts) {
+    if(key_alerts && v2) {
         buffer_json_member_add_array(wb, key_alerts);
         struct query_alerts_counts x = { 0 }, *z;
 
@@ -544,8 +574,8 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR
         rows = 0;
 
     if (r->view.options & RRDR_OPTION_ALL_DIMENSIONS)
-        query_target_hosts_instances_labels_dimensions(
-                wb, r, NULL, "full_dimension_list", "full_chart_list",
+        query_target_hosts_contexts_instances_labels_dimensions(
+                wb, r, NULL, NULL, "full_dimension_list", "full_chart_list",
                 "full_chart_labels", NULL, false);
 
     query_target_functions(wb, "functions", r);
@@ -861,8 +891,8 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
     }
 
     buffer_json_member_add_object(wb, "summary");
-    query_target_hosts_instances_labels_dimensions(
-            wb, r, "hosts", "dimensions", "instances", "labels", "alerts", true);
+    query_target_hosts_contexts_instances_labels_dimensions(
+            wb, r, "hosts", "contexts", "dimensions", "instances", "labels", "alerts", true);
     buffer_json_object_close(wb); // aggregated
 
     if(options & RRDR_OPTION_SHOW_DETAILS) {
