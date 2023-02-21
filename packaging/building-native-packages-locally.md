@@ -5,7 +5,7 @@ description: Instructions for developers who need to build native packages local
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/building-native-packages-locally.md
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "Installation"
+learn_rel_path: "Installation/Package maintainers"
 -->
 
 # How to build native (DEB/RPM) packages locally for testing

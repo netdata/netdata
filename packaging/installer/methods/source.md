@@ -4,8 +4,8 @@ description: "Package maintainers and power users may be interested in manually 
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/source.md"
 sidebar_label: "Manually build Netdata from source"
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Installation"
+learn_rel_path: "Installation/Installation methods"
+sidebar_position: 100
 -->
 
 # Manually build Netdata from source
