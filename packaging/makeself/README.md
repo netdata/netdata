@@ -2,13 +2,23 @@
 title: "Netdata static binary build"
 description: "Users can build the static 64-bit binary package that we ship with every release of the open-source Netdata Agent for debugging or specialize purposes."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/makeself/README.md
-sidebar_label: "Netdata static binary build"
+sidebar_label: "Static binary packages"
 learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Installation"
+learn_rel_path: "Installation/Installation methods"
 -->
 
-# Netdata static binary build
+# Netdata static binary packages
+
+We publish pre-built static builds of Netdata for Linux systems. Currently, these are published for 64-bit x86, ARMv7,
+AArch64, and POWER8+ hardware. These static builds are able to operate in a mostly self-contained manner and only
+require a POSIX compliant shell and a supported init system. These static builds install under `/opt/netdata`. If
+you are on a platform which we provide static builds for but do not provide native packages for, a static build
+will be used by default for installation.
+
+If you want to enforce the usage of a static build and have the installer return a failure if one is not available,
+you can do so by adding `--static-only` to the options you pass to the installer.
+
+## Building a static binary package
 
 To build the static binary 64-bit distribution package, run:
 
@@ -26,9 +36,7 @@ The program will:
 
 Once finished, a file named `netdata-vX.X.X-gGITHASH-x86_64-DATE-TIME.run` will be created in the current directory. This is the Netdata binary package that can be run to install Netdata on any other computer.
 
----
-
-## building binaries with debug info
+## Building binaries with debug info
 
 To build Netdata binaries with debugging / tracing information in them, use:
 
@@ -39,7 +47,7 @@ cd /path/to/netdata.git
 
 These binaries are not optimized (they are a bit slower), they have certain features disables (like log flood protection), other features enables (like `debug flags`) and are not stripped (the binary files are bigger, since they now include source code tracing information).
 
-### debugging Netdata binaries
+## Debugging Netdata binaries
 
 Once you have installed a binary package with debugging info, you will need to install `valgrind` and run this command to start Netdata:
 
@@ -54,5 +62,4 @@ If Netdata crashes, `valgrind` will print a stack trace of the issue. Open a git
 To stop Netdata while it runs under `valgrind`, press Control-C on the console.
 
 > If you omit the parameter `--undef-value-errors=no` to valgrind, you will get hundreds of errors about conditional jumps that depend on uninitialized values. This is normal. Valgrind has heuristics to prevent it from printing such errors for system libraries, but for the static Netdata binary, all the required libraries are built into Netdata. So, valgrind cannot apply its heuristics and prints them.
-
-
+> 
