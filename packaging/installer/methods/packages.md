@@ -2,10 +2,9 @@
 title: "Install Netdata using native DEB/RPM packages."
 description: "Instructions for how to install Netdata using native DEB or RPM packages."
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/packages.md"
-sidebar_label: "Install Netdata using native DEB/RPM packages."
+sidebar_label: "Native DEB/RPM packages"
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Installation"
+learn_rel_path: "Installation/Installation methods"
 sidebar_position: 20
 -->
 
