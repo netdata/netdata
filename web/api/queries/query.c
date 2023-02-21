@@ -2379,9 +2379,9 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             r->di[c] = rrdmetric_acquired_id_dup(qd->rma);
             r->dn[c] = rrdmetric_acquired_name_dup(qd->rma);
 
-            qi->queried++;
-            qc->queried++;
-            qh->queried++;
+            qi->metrics.queried++;
+            qc->metrics.queried++;
+            qh->metrics.queried++;
 
             qd->status |= QUERY_STATUS_QUERIED;
             qm->query.options |= RRDR_DIMENSION_QUERIED;
@@ -2389,9 +2389,9 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             rrd2rrdr_query_execute(r, c, ops[c]);
         }
         else {
-            qi->failed++;
-            qc->failed++;
-            qh->failed++;
+            qi->metrics.failed++;
+            qc->metrics.failed++;
+            qh->metrics.failed++;
 
             qd->status |= QUERY_STATUS_FAILED;
             qm->query.options |= RRDR_DIMENSION_FAILED;

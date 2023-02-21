@@ -2555,22 +2555,26 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, QU
                 qm->tiers[tier].db_last_time_s = tier_retention[tier].db_last_time_s;
                 qm->tiers[tier].db_update_every_s = tier_retention[tier].db_update_every_s;
             }
+
             release_retention = false;
-            qh->selected++;
-            qc->selected++;
-            qi->selected++;
+
+            qi->metrics.selected++;
+            qc->metrics.selected++;
+            qh->metrics.selected++;
         }
         else {
-            qh->excluded++;
-            qc->excluded++;
-            qi->excluded++;
+            qi->metrics.excluded++;
+            qc->metrics.excluded++;
+            qh->metrics.excluded++;
+
             qd->status |= QUERY_STATUS_DIMENSION_HIDDEN;
         }
     }
     else {
-        qh->excluded++;
-        qc->excluded++;
-        qi->excluded++;
+        qi->metrics.excluded++;
+        qc->metrics.excluded++;
+        qh->metrics.excluded++;
+
         qd->status |= QUERY_STATUS_DIMENSION_NODATA;
         qtl->metrics_skipped_due_to_not_matching_timeframe++;
     }
@@ -2606,9 +2610,9 @@ static void query_target_add_dimension(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh,
     qd->status = QUERY_STATUS_NONE;
 
     if(!queryable_instance) {
-        qh->excluded++;
-        qc->excluded++;
-        qi->excluded++;
+        qi->metrics.excluded++;
+        qc->metrics.excluded++;
+        qh->metrics.excluded++;
         qd->status |= QUERY_STATUS_EXCLUDED;
         return;
     }
@@ -2664,6 +2668,47 @@ const char *rrdcontext_acquired_units(RRDCONTEXT_ACQUIRED *rca) {
     return string2str(rc->units);
 }
 
+static void query_target_eval_instance_rrdcalc(QUERY_TARGET_LOCALS *qtl __maybe_unused,
+                                               QUERY_HOST *qh, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi) {
+    RRDSET *st = rrdinstance_acquired_rrdset(qi->ria);
+    if (st) {
+        netdata_rwlock_rdlock(&st->alerts.rwlock);
+        if (st->alerts.base) {
+            for (RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
+                switch(rc->status) {
+                    case RRDCALC_STATUS_CLEAR:
+                        qi->alerts.clear++;
+                        qc->alerts.clear++;
+                        qh->alerts.clear++;
+                        break;
+
+                    case RRDCALC_STATUS_WARNING:
+                        qi->alerts.warning++;
+                        qc->alerts.warning++;
+                        qh->alerts.warning++;
+                        break;
+
+                    case RRDCALC_STATUS_CRITICAL:
+                        qi->alerts.critical++;
+                        qc->alerts.critical++;
+                        qh->alerts.critical++;
+                        break;
+
+                    default:
+                    case RRDCALC_STATUS_UNINITIALIZED:
+                    case RRDCALC_STATUS_UNDEFINED:
+                    case RRDCALC_STATUS_REMOVED:
+                        qi->alerts.other++;
+                        qc->alerts.other++;
+                        qh->alerts.other++;
+                        break;
+                }
+            }
+        }
+        netdata_rwlock_unlock(&st->alerts.rwlock);
+    }
+}
+
 static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, QUERY_CONTEXT *qc,
                                       RRDINSTANCE_ACQUIRED *ria, bool queryable_instance, bool match_id_name) {
     QUERY_TARGET *qt = qtl->qt;
@@ -2686,10 +2731,8 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, 
     qt->instances.used++;
     qi->ria = rrdinstance_acquired_dup(ria);
     qi->query_host_id = qh->slot;
-    qi->selected = 0;
-    qi->excluded = 0;
-    qi->queried = 0;
-    qi->failed = 0;
+    qi->metrics = (struct query_metrics_counts){ 0 };
+    qi->alerts = (struct query_alerts_counts){ 0 };
 
     if(qt->request.version <= 1) {
         qi->id_fqdn = rrdinstance_id_fqdn_v1(ria);
@@ -2719,6 +2762,9 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, 
             (qt->instances.charts_labels_filter_pattern && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, qt->instances.charts_labels_filter_pattern, ':')))
             queryable_instance = false;
     }
+
+    if(queryable_instance && qt->request.version >= 2)
+        query_target_eval_instance_rrdcalc(qtl, qh, qc, qi);
 
     size_t added = 0;
 
@@ -2767,10 +2813,8 @@ static void query_target_add_context(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, R
     QUERY_CONTEXT *qc = &qt->contexts.array[qt->contexts.used];
     qc->slot = qt->contexts.used++;
     qc->rca =  rrdcontext_acquired_dup(rca);
-    qc->selected = 0;
-    qc->excluded = 0;
-    qc->queried = 0;
-    qc->failed = 0;
+    qc->metrics = (struct query_metrics_counts){ 0 };
+    qc->alerts = (struct query_alerts_counts){ 0 };
 
     size_t added = 0;
     if(unlikely(qt->request.ria)) {
@@ -2810,10 +2854,8 @@ static void query_target_add_host(QUERY_TARGET_LOCALS *qtl, RRDHOST *host) {
     QUERY_HOST *qh = &qt->hosts.array[qt->hosts.used];
     qh->slot = qt->hosts.used++;
     qh->host = host;
-    qh->selected = 0;
-    qh->excluded = 0;
-    qh->queried = 0;
-    qh->failed = 0;
+    qh->metrics = (struct query_metrics_counts){ 0 };
+    qh->alerts = (struct query_alerts_counts){ 0 };
 
     if(host->node_id)
         uuid_unparse_lower(*host->node_id, qh->node_id);

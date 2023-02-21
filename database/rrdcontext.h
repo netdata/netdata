@@ -160,23 +160,33 @@ typedef struct query_plan_entry {
 
 #define QUERY_PLANS_MAX (RRD_STORAGE_TIERS * 2)
 
+struct query_metrics_counts {
+    size_t selected;
+    size_t excluded;
+    size_t queried;
+    size_t failed;
+};
+
+struct query_alerts_counts {
+    size_t clear;
+    size_t warning;
+    size_t critical;
+    size_t other;
+};
+
 typedef struct query_host {
     uint32_t slot;
     RRDHOST *host;
-    size_t queried;
-    size_t selected;
-    size_t excluded;
-    size_t failed;
     char node_id[UUID_STR_LEN];
+    struct query_metrics_counts metrics;
+    struct query_alerts_counts alerts;
 } QUERY_HOST;
 
 typedef struct query_context {
     uint32_t slot;
     RRDCONTEXT_ACQUIRED *rca;
-    size_t queried;
-    size_t selected;
-    size_t excluded;
-    size_t failed;
+    struct query_metrics_counts metrics;
+    struct query_alerts_counts alerts;
 } QUERY_CONTEXT;
 
 typedef struct query_instance {
@@ -185,10 +195,9 @@ typedef struct query_instance {
     RRDINSTANCE_ACQUIRED *ria;
     STRING *id_fqdn;
     STRING *name_fqdn;
-    size_t queried;             // number of dimensions queried
-    size_t selected;
-    size_t excluded;
-    size_t failed;
+
+    struct query_metrics_counts metrics;
+    struct query_alerts_counts alerts;
 } QUERY_INSTANCE;
 
 typedef struct query_dimension {
