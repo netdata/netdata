@@ -1,36 +1,20 @@
 <!--
-title: "Install Netdata on cloud providers"
+title: "Install Netdata on GCP"
 description: "The Netdata Agent runs on all popular cloud providers, but often requires additional steps and configuration for full functionality."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/cloud-providers.md
-sidebar_label: "Install Netdata on cloud providers"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/gcp.md
+sidebar_label: "GCP"
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "Installation"
+learn_rel_path: "Installation/Install on specific environments"
 -->
 
-# Install Netdata on cloud providers
+# Install Netdata on GCP
 
-Netdata is fully compatible with popular cloud providers like Google Cloud Platform (GCP), Amazon Web Services (AWS),
-Azure, and others. You can install Netdata on cloud instances to monitor the apps/services running there, or use
+Netdata is fully compatible with the Google Cloud Platform (GCP).
+You can install Netdata on cloud instances to monitor the apps/services running there, or use
 multiple instances in a [parent-child streaming](https://github.com/netdata/netdata/blob/master/streaming/README.md) configuration.
 
-In some cases, using Netdata on these cloud providers requires unique installation or configuration steps. This page
-aims to document some of those steps for popular cloud providers.
-
-> This document is a work-in-progress! If you find new issues specific to a cloud provider, or would like to help
-> clarify the correct workaround, please [create an
-> issue](https://github.com/netdata/netdata/issues/new?labels=feature+request,+needs+triage&template=feature_request)
-> with your process and instructions on using the provider's interface to complete the workaround.
-
-- [Install Netdata on cloud providers](#install-netdata-on-cloud-providers)
-  - [Recommended installation methods for cloud providers](#recommended-installation-methods-for-cloud-providers)
-  - [Post-installation configuration](#post-installation-configuration)
-    - [Add a firewall rule to access Netdata's dashboard](#add-a-firewall-rule-to-access-netdatas-dashboard)
-      - [Google Cloud Platform (GCP)](#google-cloud-platform-gcp)
-      - [Amazon Web Services (AWS) / EC2](#amazon-web-services-aws--ec2)
-      - [Azure](#azure)
-
-## Recommended installation methods for cloud providers
+## Recommended installation method
 
 The best installation method depends on the instance's operating system, distribution, and version. For Linux instances,
 we recommend the [`kickstart.sh` automatic installation script](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md).
@@ -39,9 +23,6 @@ If you have issues with Netdata after installation, look to the sections below t
 followed by the solution for your provider.
 
 ## Post-installation configuration
-
-Some cloud providers require you take additional steps to properly configure your instance or its networking to access
-all of Netdata's features.
 
 ### Add a firewall rule to access Netdata's dashboard
 
@@ -67,9 +48,6 @@ Another option is to put Netdata behind web server, which will proxy requests th
 -   [HAProxy](https://github.com/netdata/netdata/blob/master/docs/Running-behind-haproxy.md)
 -   [lighttpd](https://github.com/netdata/netdata/blob/master/docs/Running-behind-lighttpd.md)
 
-The next few sections outline how to add firewall rules to GCP, AWS, and Azure instances.
-
-#### Google Cloud Platform (GCP)
 
 To add a firewall rule, go to the [Firewall rules page](https://console.cloud.google.com/networking/firewalls/list) and
 click **Create firewall rule**.
@@ -89,46 +67,4 @@ Priority: 1000
 
 Read GCP's [firewall documentation](https://cloud.google.com/vpc/docs/using-firewalls) for specific instructions on how
 to create a new firewall rule.
-
-#### Amazon Web Services (AWS) / EC2
-
-Sign in to the [AWS console](https://console.aws.amazon.com/) and navigate to the EC2 dashboard. Click on the **Security
-Groups** link in the navigation, beneath the **Network & Security** heading. Find the Security Group your instance
-belongs to, and either right-click on it or click the **Actions** button above to see a dropdown menu with **Edit
-inbound rules**.
-
-Add a new rule with the following options:
-
-```conf
-Type: Custom TCP
-Protocol: TCP
-Port Range: 19999
-Source: Anywhere
-Description: Netdata
-```
-
-You can also choose **My IP** as the source if you prefer.
-
-Click **Save** to apply your new inbound firewall rule.
-
-#### Azure
-
-Sign in to the [Azure portal](https://portal.azure.com) and open the virtual machine running Netdata. Click on the
-**Networking** link beneath the **Settings** header, then click on the **Add inbound security rule** button.
-
-Add a new rule with the following options:
-
-```conf
-Source: Any
-Source port ranges: 19999
-Destination: Any
-Destination port ranges: 19999
-Protocol: TCP
-Action: Allow
-Priority: 310
-Name: Netdata
-```
-
-Click **Add** to apply your new inbound security rule.
-
 

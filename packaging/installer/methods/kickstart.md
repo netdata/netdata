@@ -2,10 +2,9 @@
 title: "Install Netdata with kickstart.sh"
 description: "The kickstart.sh script installs Netdata from source, including all dependencies required to connect to Netdata Cloud, with a single command."
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/kickstart.md"
-sidebar_label: "Install Netdata with kickstart.sh"
+sidebar_label: "One line installer (kickstart.sh)"
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Installation"
+learn_rel_path: "Installation/Installation methods"
 sidebar_position: 10
 -->
 
