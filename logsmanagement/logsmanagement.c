@@ -287,7 +287,10 @@ static void logs_management_init(struct section *config_section){
                 p_file_info->filename = strdupz(SYSTEMD_DEFAULT_PATH);
                 break;
             case FLB_DOCKER_EV:
-                p_file_info->filename = strdupz(DOCKER_EV_DEFAULT_PATH);
+                if(access(DOCKER_EV_DEFAULT_PATH, R_OK)){
+                    error("[%s]: Docker socket Unix path invalid, unknown or needs permissions", p_file_info->chart_name);
+                    return p_file_info_destroy(p_file_info);
+                } else p_file_info->filename = strdupz(DOCKER_EV_DEFAULT_PATH);
                 break;
             default:
                 error("[%s]: log path invalid or unknown", p_file_info->chart_name);

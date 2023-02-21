@@ -1142,18 +1142,11 @@ int flb_add_input(struct File_info *const p_file_info){
             /* Set up Docker Events input */
             p_file_info->flb_input = flb_input(ctx, "docker_events", NULL);
             if(p_file_info->flb_input < 0 ) return FLB_INPUT_ERROR;
-            if(!strcmp(p_file_info->filename, DOCKER_EV_DEFAULT_PATH)){
-                if(flb_input_set(ctx, p_file_info->flb_input, 
-                    "Tag", tag_s,
-                    "Parser", "docker_events_parser",
-                    NULL) != 0) return FLB_INPUT_SET_ERROR;
-            } else {
-                if(flb_input_set(ctx, p_file_info->flb_input, 
-                    "Tag", tag_s,
-                    "Parser", "docker_events_parser",
-                    "Unix_Path", p_file_info->filename,
-                    NULL) != 0) return FLB_INPUT_SET_ERROR;
-            }
+            if(flb_input_set(ctx, p_file_info->flb_input, 
+                "Tag", tag_s,
+                "Parser", "docker_events_parser",
+                "Unix_Path", p_file_info->filename,
+                NULL) != 0) return FLB_INPUT_SET_ERROR;
             
             
             /* Set up output */
