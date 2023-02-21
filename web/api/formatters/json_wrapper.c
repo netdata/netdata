@@ -322,37 +322,58 @@ static inline void query_target_hosts_instances_labels_dimensions(
 
     if(key_alerts) {
         buffer_json_member_add_array(wb, key_alerts);
+        struct {
+            size_t instances;
+            size_t clear;
+            size_t warning;
+            size_t critical;
+        } x = {
+                .instances = 0,
+                .clear = 0,
+                .warning = 0,
+                .critical = 0,
+        }, *z;
+
+        DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
         for (long c = 0; c < (long) qt->instances.used; c++) {
             QUERY_INSTANCE *qi = query_instance(qt, c);
-            QUERY_HOST *qh = query_host(qt, qi->query_host_id);
             RRDSET *st = rrdinstance_acquired_rrdset(qi->ria);
             if (st) {
                 netdata_rwlock_rdlock(&st->alerts.rwlock);
                 if (st->alerts.base) {
-                    char id[RRD_ID_LENGTH_MAX + 1];
                     for (RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
                         if(rc->status < RRDCALC_STATUS_CLEAR)
                             continue;
 
-                        snprintfz(id, RRD_ID_LENGTH_MAX, "%s:%s", string2str(rc->name), string2str(qi->id_fqdn));
-                        snprintfz(name, RRD_ID_LENGTH_MAX, "%s:%s", string2str(rc->name), string2str(qi->name_fqdn));
-                        buffer_json_add_array_item_object(wb);
-                        buffer_json_member_add_string(wb, "id", id);
-                        buffer_json_member_add_string(wb, "nm", name);
-                        buffer_json_member_add_string(wb, "lc", string2str(rc->name));
-                        buffer_json_member_add_string(wb, "st", rrdcalc_status2string(rc->status));
-                        buffer_json_member_add_double(wb, "vl", rc->value);
-                        buffer_json_member_add_string(wb, "un", string2str(rc->units));
-                        buffer_json_member_add_string(wb, "mg", st->rrdhost->machine_guid);
-                        if(qh->node_id[0])
-                            buffer_json_member_add_string(wb, "nd", qh->node_id);
-                        buffer_json_object_close(wb);
+                        z = dictionary_set(dict, string2str(rc->name), &x, sizeof(x));
+                        if(rc->status == RRDCALC_STATUS_CLEAR) {
+                            z->instances++;
+                            z->clear++;
+                        }
+                        else if(rc->status == RRDCALC_STATUS_WARNING) {
+                            z->instances++;
+                            z->warning++;
+                        }
+                        else if(rc->status == RRDCALC_STATUS_CRITICAL) {
+                            z->instances++;
+                            z->critical++;
+                        }
                     }
                 }
                 netdata_rwlock_unlock(&st->alerts.rwlock);
             }
         }
-        buffer_json_array_close(wb);
+        dfe_start_read(dict, z) {
+                    buffer_json_add_array_item_object(wb);
+                    buffer_json_member_add_string(wb, "nm", z_dfe.name);
+                    buffer_json_member_add_uint64(wb, "cl", z->clear);
+                    buffer_json_member_add_uint64(wb, "wr", z->warning);
+                    buffer_json_member_add_uint64(wb, "cr", z->critical);
+                    buffer_json_object_close(wb);
+        }
+        dfe_done(z);
+        dictionary_destroy(dict);
+        buffer_json_array_close(wb); // alerts
     }
 }
 
