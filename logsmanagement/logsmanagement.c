@@ -49,6 +49,7 @@ uv_loop_t *main_loop = NULL;
 
 volatile sig_atomic_t p_file_infos_arr_ready = 0;
 int g_logs_manag_update_every = 1;
+int g_logs_manag_circ_buff_spare_items = CIRCULAR_BUFF_SPARE_ITEMS_DEFAULT;
 
 
 static bool metrics_dict_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused){
@@ -133,6 +134,8 @@ static int logs_manag_config_load(void){
     g_logs_manag_update_every = (int)config_get_number(CONFIG_SECTION_LOGS_MANAGEMENT, "update every", localhost->rrd_update_every);
     if(g_logs_manag_update_every < localhost->rrd_update_every) g_logs_manag_update_every = localhost->rrd_update_every;
     info("CONFIG: global logs management update every: %d", g_logs_manag_update_every);
+
+    g_logs_manag_circ_buff_spare_items = (int)config_get_number(CONFIG_SECTION_LOGS_MANAGEMENT, "circular buffer spare items", CIRCULAR_BUFF_SPARE_ITEMS_DEFAULT);
 
     char db_default_dir[FILENAME_MAX + 1];
     snprintfz(db_default_dir, FILENAME_MAX, "%s" LOGS_MANAG_DB_SUBPATH, netdata_configured_cache_dir);
@@ -689,7 +692,7 @@ static void logs_management_init(struct section *config_section){
                                                                     "circular buffer drop logs if full", 0);
     info("[%s]: circular buffer drop logs if full = %d", p_file_info->chart_name, circular_buffer_allow_dropped_logs);
 
-    p_file_info->circ_buff = circ_buff_init(p_file_info->buff_flush_to_db_interval + CIRCULAR_BUFF_SPARE_ITEMS,
+    p_file_info->circ_buff = circ_buff_init(p_file_info->buff_flush_to_db_interval + g_logs_manag_circ_buff_spare_items,
                                             circular_buffer_max_size, circular_buffer_allow_dropped_logs);
 
 
