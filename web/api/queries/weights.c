@@ -741,6 +741,8 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
     }
     dfe_done(t);
 
+    if(!dimensions) return 0;   // Coverity fix
+
     // sort the array with the values of all dimensions
     qsort(slots, dimensions, sizeof(NETDATA_DOUBLE), compare_netdata_doubles);
 
