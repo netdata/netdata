@@ -810,7 +810,10 @@ void *logsmanagement_main(void *ptr) {
 
     tail_plugin_init(p_file_infos_arr);
 
-    if(flb_init()) goto cleanup;
+    if(flb_init()){
+        error("flb_init() failed - logs management will be disabled");
+        goto cleanup;
+    }
 
     /* Initialize logs management for each configuration section  */
     struct section *config_section = log_management_config.first_section;
@@ -825,9 +828,13 @@ void *logsmanagement_main(void *ptr) {
      * a db_init() failure, it is easier to call flb_stop_and_cleanup() rather 
      * than the other way round (i.e. cleaning up after db_init(), if flb_run() 
      * fails). */
-    if(flb_run()) goto cleanup;
+    if(flb_run()){
+        error("flb_run() failed - logs management will be disabled");
+        goto cleanup;
+    }
 
     if(db_init()){
+        error("db_init() failed - logs management will be disabled");
         flb_stop_and_cleanup();
         goto cleanup;
     }
