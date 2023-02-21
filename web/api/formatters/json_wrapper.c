@@ -657,10 +657,38 @@ static void query_target_combined_units(BUFFER *wb, QUERY_TARGET *qt, size_t con
     }
 }
 
+static void query_target_combined_chart_type(BUFFER *wb, QUERY_TARGET *qt, size_t contexts) {
+    if(contexts >= 1)
+        buffer_json_member_add_string(wb, "chart_type", rrdset_type_name(rrdcontext_acquired_chart_type(qt->contexts.array[0].rca)));
+}
+
 static void rrdr_dimension_units_array(BUFFER *wb, RRDR *r) {
+    if(!r->du)
+        return;
+
     buffer_json_member_add_array(wb, "units");
     for(size_t c = 0; c < r->d ; c++)
         buffer_json_add_array_item_string(wb, string2str(r->du[c]));
+    buffer_json_array_close(wb);
+}
+
+static void rrdr_dimension_priority_array(BUFFER *wb, RRDR *r) {
+    if(!r->dp)
+        return;
+
+    buffer_json_member_add_array(wb, "priorities");
+    for(size_t c = 0; c < r->d ; c++)
+        buffer_json_add_array_item_uint64(wb, r->dp[c]);
+    buffer_json_array_close(wb);
+}
+
+static void rrdr_dimension_grouped_array(BUFFER *wb, RRDR *r) {
+    if(!r->dgbc)
+        return;
+
+    buffer_json_member_add_array(wb, "grouped");
+    for(size_t c = 0; c < r->d ;c++)
+        buffer_json_add_array_item_uint64(wb, r->dgbc[c]);
     buffer_json_array_close(wb);
 }
 
@@ -958,17 +986,14 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
         buffer_json_member_add_time_t(wb, "before", r->view.before);
         buffer_json_member_add_uint64(wb, "points", rows);
         query_target_combined_units(wb, qt, contexts);
+        query_target_combined_chart_type(wb, qt, contexts);
         buffer_json_member_add_object(wb, "dimensions");
         {
             rrdr_dimension_ids(wb, "ids", r, options);
             rrdr_dimension_names(wb, "names", r, options);
             rrdr_dimension_units_array(wb, r);
-            if(r->dgbc) {
-                buffer_json_member_add_array(wb, "grouped");
-                for(size_t c = 0; c < r->d ;c++)
-                    buffer_json_add_array_item_uint64(wb, r->dgbc[c]);
-                buffer_json_array_close(wb);
-            }
+            rrdr_dimension_priority_array(wb, r);
+            rrdr_dimension_grouped_array(wb, r);
             size_t dims = rrdr_latest_values(wb, "view_latest_values", r, options);
             buffer_json_member_add_uint64(wb, "count", dims);
         }

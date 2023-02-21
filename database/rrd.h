@@ -132,6 +132,22 @@ typedef struct storage_point {
     SN_FLAGS flags;         // flags stored with the point
 } STORAGE_POINT;
 
+// ----------------------------------------------------------------------------
+// chart types
+
+typedef enum __attribute__ ((__packed__)) rrdset_type {
+    RRDSET_TYPE_LINE    = 0,
+    RRDSET_TYPE_AREA    = 1,
+    RRDSET_TYPE_STACKED = 2,
+} RRDSET_TYPE;
+
+#define RRDSET_TYPE_LINE_NAME "line"
+#define RRDSET_TYPE_AREA_NAME "area"
+#define RRDSET_TYPE_STACKED_NAME "stacked"
+
+RRDSET_TYPE rrdset_type_id(const char *name);
+const char *rrdset_type_name(RRDSET_TYPE chart_type);
+
 #include "rrdcontext.h"
 
 extern bool unittest_running;
@@ -176,23 +192,6 @@ extern bool ieee754_doubles;
 
 typedef long long total_number;
 #define TOTAL_NUMBER_FORMAT "%lld"
-
-// ----------------------------------------------------------------------------
-// chart types
-
-typedef enum __attribute__ ((__packed__)) rrdset_type {
-    RRDSET_TYPE_LINE    = 0,
-    RRDSET_TYPE_AREA    = 1,
-    RRDSET_TYPE_STACKED = 2,
-} RRDSET_TYPE;
-
-#define RRDSET_TYPE_LINE_NAME "line"
-#define RRDSET_TYPE_AREA_NAME "area"
-#define RRDSET_TYPE_STACKED_NAME "stacked"
-
-RRDSET_TYPE rrdset_type_id(const char *name);
-const char *rrdset_type_name(RRDSET_TYPE chart_type);
-
 
 // ----------------------------------------------------------------------------
 // algorithms types

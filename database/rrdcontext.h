@@ -48,6 +48,7 @@ time_t rrdinstance_acquired_update_every(RRDINSTANCE_ACQUIRED *ria);
 
 const char *rrdcontext_acquired_units(RRDCONTEXT_ACQUIRED *rca);
 const char *rrdcontext_acquired_title(RRDCONTEXT_ACQUIRED *rca);
+RRDSET_TYPE rrdcontext_acquired_chart_type(RRDCONTEXT_ACQUIRED *rca);
 
 // ----------------------------------------------------------------------------
 // public API for rrdhost

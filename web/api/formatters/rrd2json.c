@@ -145,6 +145,7 @@ cleanup:
 }
 
 struct group_by_entry {
+    size_t priority;
     size_t count;
     STRING *id;
     STRING *name;
@@ -165,6 +166,8 @@ RRDR *data_query_group_by(RRDR *r) {
     int added = 0;
     STRING *unset = string_strdupz("[unset]");
     char key[RRD_ID_LENGTH_MAX + 1];
+    QUERY_INSTANCE *last_qi = NULL;
+    size_t priority = 0;
     for(size_t c = 0; c < qt->query.used ;c++) {
         if(!rrdr_dimension_should_be_exposed(r->od[c], options))
             continue;
@@ -175,16 +178,24 @@ RRDR *data_query_group_by(RRDR *r) {
         QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
         QUERY_HOST *qh = query_host(qt, qm->link.query_host_id);
 
+        if(qi != last_qi) {
+            priority = 0;
+            last_qi = qi;
+        }
+        else
+            priority++;
+
         switch(qt->request.group_by) {
             default:
             case RRDR_GROUP_BY_DIMENSION:
                 snprintfz(key, RRD_ID_LENGTH_MAX, "%s,%s", query_metric_id(qt, qm), rrdinstance_acquired_units(qi->ria));
-                set = dictionary_set(groups, key, &pos, sizeof(int));
+                set = dictionary_set(groups, key, &pos, sizeof(pos));
                 if(*set == -1) {
                     *set = pos = added++;
                     entries[pos].id = rrdmetric_acquired_id_dup(qd->rma);
                     entries[pos].name = rrdmetric_acquired_name_dup(qd->rma);
                     entries[pos].units = rrdinstance_acquired_units_dup(qi->ria);
+                    entries[pos].priority = priority;
                 }
                 else
                     pos = *set;
@@ -194,12 +205,13 @@ RRDR *data_query_group_by(RRDR *r) {
 
             case RRDR_GROUP_BY_INSTANCE:
                 snprintfz(key, RRD_ID_LENGTH_MAX, "%s,%s", string2str(qi->id_fqdn), rrdinstance_acquired_units(qi->ria));
-                set = dictionary_set(groups, key, &pos, sizeof(int));
+                set = dictionary_set(groups, key, &pos, sizeof(pos));
                 if(*set == -1) {
                     *set = pos = added++;
                     entries[pos].id = string_dup(qi->id_fqdn);
                     entries[pos].name = string_dup(qi->name_fqdn);
                     entries[pos].units = rrdinstance_acquired_units_dup(qi->ria);
+                    entries[pos].priority = priority;
                 }
                 else
                     pos = *set;
@@ -209,12 +221,13 @@ RRDR *data_query_group_by(RRDR *r) {
 
             case RRDR_GROUP_BY_NODE:
                 snprintfz(key, RRD_ID_LENGTH_MAX, "%s,%s", qh->host->machine_guid, rrdinstance_acquired_units(qi->ria));
-                set = dictionary_set(groups, key, &pos, sizeof(int));
+                set = dictionary_set(groups, key, &pos, sizeof(pos));
                 if(*set == -1) {
                     *set = pos = added++;
                     entries[pos].id = string_strdupz(qh->host->machine_guid);
                     entries[pos].name = string_dup(qh->host->hostname);
                     entries[pos].units = rrdinstance_acquired_units_dup(qi->ria);
+                    entries[pos].priority = priority;
                 }
                 else
                     pos = *set;
@@ -229,12 +242,13 @@ RRDR *data_query_group_by(RRDR *r) {
                     s = string_dup(unset);
 
                 snprintfz(key, RRD_ID_LENGTH_MAX, "%s,%s", string2str(s), rrdinstance_acquired_units(qi->ria));
-                set = dictionary_set(groups, key, &pos, sizeof(int));
+                set = dictionary_set(groups, key, &pos, sizeof(pos));
                 if(*set == -1) {
                     *set = pos = added++;
                     entries[pos].id = s;
                     entries[pos].name = string_dup(entries[pos].id);
                     entries[pos].units = rrdinstance_acquired_units_dup(qi->ria);
+                    entries[pos].priority = priority;
                 }
                 else {
                     pos = *set;
@@ -245,6 +259,9 @@ RRDR *data_query_group_by(RRDR *r) {
                 break;
             }
         }
+
+        if(unlikely(priority < entries[pos].priority))
+            entries[pos].priority = priority;
 
         qm->grouped_as.slot = pos;
         qm->grouped_as.id = entries[pos].id;
@@ -276,6 +293,7 @@ RRDR *data_query_group_by(RRDR *r) {
     if(!r2)
         goto cleanup;
 
+    r2->dp = onewayalloc_callocz(r2->internal.owa, r2->d, sizeof(*r2->dp));
     r2->dgbc = onewayalloc_callocz(r2->internal.owa, r2->d, sizeof(*r2->dgbc));
     r2->gbc = onewayalloc_callocz(r2->internal.owa, r2->n * r2->d, sizeof(*r2->gbc));
 
@@ -291,6 +309,7 @@ RRDR *data_query_group_by(RRDR *r) {
         r2->di[c2] = entries[c2].id;
         r2->dn[c2] = entries[c2].name;
         r2->du[c2] = entries[c2].units;
+        r2->dp[c2] = entries[c2].priority;
         r2->dgbc[c2] = entries[c2].count;
     }
 

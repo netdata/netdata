@@ -2668,6 +2668,11 @@ const char *rrdcontext_acquired_units(RRDCONTEXT_ACQUIRED *rca) {
     return string2str(rc->units);
 }
 
+RRDSET_TYPE rrdcontext_acquired_chart_type(RRDCONTEXT_ACQUIRED *rca) {
+    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+    return rc->chart_type;
+}
+
 const char *rrdcontext_acquired_title(RRDCONTEXT_ACQUIRED *rca) {
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
     return string2str(rc->title);
