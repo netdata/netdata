@@ -5,7 +5,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/docke
 sidebar_label: "Install Netdata with Docker"
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "Installation"
+learn_rel_path: "Installation/Installation methods"
 sidebar_position: 40
 -->
 
