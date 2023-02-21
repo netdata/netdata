@@ -34,10 +34,20 @@ error() {
 }
 
 abspath() {
-  if [ -d "${1}" ]; then
+  if [ -d "${1}/" ]; then
     echo "$(cd "${1}" && /usr/bin/env PWD= pwd -P)/"
-  else
+  elif [ -f "${1}" ]; then
     echo "$(cd "$(dirname "${1}")" && /usr/bin/env PWD= pwd -P)/$(basename "${1}")"
+  elif echo "${1}" | grep -q '/'; then
+    if echo "${1}" | grep -q '^/'; then
+      mkdir -p "$(dirname "${1}")"
+      echo "$(cd "$(dirname "${1}")" && /usr/bin/env PWD= pwd -P)/$(basename "${1}")"
+    else
+      mkdir -p "${script_dir}/$(dirname "${1}")"
+      echo "${script_dir}/${1}"
+    fi
+  else
+    echo "${script_dir}/${1}"
   fi
 }
 
