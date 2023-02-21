@@ -171,7 +171,8 @@ static inline void query_target_hosts_instances_labels_dimensions(
             if(v2) {
                 buffer_json_add_array_item_object(wb);
                 buffer_json_member_add_string(wb, "mg", host->machine_guid);
-                buffer_json_member_add_uuid(wb, "nd", host->node_id);
+                if(qh->node_id[0])
+                    buffer_json_member_add_string(wb, "nd", qh->node_id);
                 buffer_json_member_add_string(wb, "hn", rrdhost_hostname(host));
                 query_target_metric_count(wb, qh->selected, qh->excluded, qh->queried, qh->failed);
                 buffer_json_object_close(wb);
@@ -191,6 +192,7 @@ static inline void query_target_hosts_instances_labels_dimensions(
         DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
         for (long c = 0; c < (long) qt->instances.used; c++) {
             QUERY_INSTANCE *qi = query_instance(qt, c);
+            QUERY_HOST *qh = query_host(qt, qi->query_host_id);
 
             snprintfz(name, RRD_ID_LENGTH_MAX * 2 + 1, "%s:%s",
                       string2str(qi->id_fqdn),
@@ -205,6 +207,9 @@ static inline void query_target_hosts_instances_labels_dimensions(
                     buffer_json_member_add_string(wb, "id", string2str(qi->id_fqdn));
                     buffer_json_member_add_string(wb, "nm", string2str(qi->name_fqdn));
                     buffer_json_member_add_string(wb, "lc", rrdinstance_acquired_name(qi->ria));
+                    buffer_json_member_add_string(wb, "mg", qh->host->machine_guid);
+                    if(qh->node_id[0])
+                        buffer_json_member_add_string(wb, "nd", qh->node_id);
                     query_target_metric_count(wb, qi->selected, qi->excluded, qi->queried, qi->failed);
                     buffer_json_object_close(wb);
                 }
@@ -319,6 +324,7 @@ static inline void query_target_hosts_instances_labels_dimensions(
         buffer_json_member_add_array(wb, key_alerts);
         for (long c = 0; c < (long) qt->instances.used; c++) {
             QUERY_INSTANCE *qi = query_instance(qt, c);
+            QUERY_HOST *qh = query_host(qt, qi->query_host_id);
             RRDSET *st = rrdinstance_acquired_rrdset(qi->ria);
             if (st) {
                 netdata_rwlock_rdlock(&st->alerts.rwlock);
@@ -336,6 +342,9 @@ static inline void query_target_hosts_instances_labels_dimensions(
                         buffer_json_member_add_string(wb, "lc", string2str(rc->name));
                         buffer_json_member_add_string(wb, "st", rrdcalc_status2string(rc->status));
                         buffer_json_member_add_double(wb, "vl", rc->value);
+                        buffer_json_member_add_string(wb, "mg", st->rrdhost->machine_guid);
+                        if(qh->node_id[0])
+                            buffer_json_member_add_string(wb, "nd", qh->node_id);
                         buffer_json_object_close(wb);
                     }
                 }
@@ -733,6 +742,8 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
                             }
 
                             buffer_json_member_add_object(wb, host->machine_guid);
+                            if(qh->node_id[0])
+                                buffer_json_member_add_string(wb, "nd", qh->node_id);
                             buffer_json_member_add_uint64(wb, "idx", qh->slot);
                             buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
                             buffer_json_member_add_object(wb, "contexts");

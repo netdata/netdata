@@ -2311,31 +2311,23 @@ void query_target_release(QUERY_TARGET *qt) {
                 STORAGE_ENGINE *eng = qm->tiers[tier].eng;
                 eng->api.metric_release(qm->tiers[tier].db_metric_handle);
                 qm->tiers[tier].db_metric_handle = NULL;
-                qm->tiers[tier].weight = 0;
                 qm->tiers[tier].eng = NULL;
             }
         }
-
-        qm->link.query_host_id = 0;
-        qm->link.query_context_id = 0;
-        qm->link.query_instance_id = 0;
-        qm->link.query_dimension_id = 0;
     }
+    qt->query.used = 0;
 
     // release the dimensions
     for(size_t i = 0, used = qt->dimensions.used; i < used ; i++) {
         QUERY_DIMENSION *qd = query_dimension(qt, i);
         rrdmetric_release(qd->rma);
         qd->rma = NULL;
-        qd->slot = 0;
-        qd->status = QUERY_STATUS_NONE;
     }
+    qt->dimensions.used = 0;
 
     // release the instances
     for(size_t i = 0, used = qt->instances.used; i < used ;i++) {
         QUERY_INSTANCE *qi = &qt->instances.array[i];
-        qi->slot = 0;
-        qi->queried = 0;
 
         rrdinstance_release(qi->ria);
         qi->ria = NULL;
@@ -2346,27 +2338,21 @@ void query_target_release(QUERY_TARGET *qt) {
         string_freez(qi->name_fqdn);
         qi->name_fqdn = NULL;
     }
+    qt->instances.used = 0;
 
     // release the contexts
     for(size_t i = 0, used = qt->contexts.used; i < used ;i++) {
         QUERY_CONTEXT *qc = query_context(qt, i);
         rrdcontext_release(qc->rca);
-        qc->slot = 0;
         qc->rca = NULL;
     }
+    qt->contexts.used = 0;
 
     // release the hosts
     for(size_t i = 0, used = qt->hosts.used; i < used ;i++) {
         QUERY_HOST *qh = query_host(qt, i);
-        qh->slot = 0;
         qh->host = NULL;
-        qh->queried = 0;
     }
-
-    qt->query.used = 0;
-    qt->dimensions.used = 0;
-    qt->instances.used = 0;
-    qt->contexts.used = 0;
     qt->hosts.used = 0;
 
     qt->db.minimum_latest_update_every_s = 0;
@@ -2689,6 +2675,7 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, 
     qi->slot = qt->instances.used;
     qt->instances.used++;
     qi->ria = rrdinstance_acquired_dup(ria);
+    qi->query_host_id = qh->slot;
     qi->selected = 0;
     qi->excluded = 0;
     qi->queried = 0;
@@ -2817,6 +2804,11 @@ static void query_target_add_host(QUERY_TARGET_LOCALS *qtl, RRDHOST *host) {
     qh->excluded = 0;
     qh->queried = 0;
     qh->failed = 0;
+
+    if(host->node_id)
+        uuid_unparse_lower(*host->node_id, qh->node_id);
+    else
+        qh->node_id[0] = '\0';
 
     // is the chart given valid?
     if(unlikely(qtl->st && (!qtl->st->rrdinstance || !qtl->st->rrdcontext))) {
