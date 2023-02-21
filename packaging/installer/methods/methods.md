@@ -14,7 +14,7 @@ Netdata can be installed:
 
 - [As a DEB/RPM package](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/packages.md)
 - [As a static binary](https://github.com/netdata/netdata/blob/master/packaging/makeself/README.md)
-- [From source](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/source.md)
+- [From a git checkout](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md)
 - [As a docker container](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md)
 
 The [one line installer kickstart.sh](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md)
