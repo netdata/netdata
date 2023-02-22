@@ -1501,7 +1501,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                         switch (ops->tier_query_fetch) {
                             default:
                             case TIER_QUERY_FETCH_AVERAGE:
-                                new_point.value = sp.sum / sp.count;
+                                new_point.value = sp.sum / (NETDATA_DOUBLE)sp.count;
                                 break;
 
                             case TIER_QUERY_FETCH_MIN:
@@ -2443,26 +2443,23 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             max_rows = r->rows;
         }
         else {
-            const char *dim_id = rrdmetric_acquired_id(qd->rma);
-            const char *dim_name = rrdmetric_acquired_name(qd->rma);
-
             if(r->view.after != max_after) {
                 internal_error(true, "QUERY: 'after' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                               dim_id, (size_t)max_after, dim_name, (size_t)r->view.after);
+                               rrdmetric_acquired_id(qd->rma), (size_t)max_after, rrdmetric_acquired_name(qd->rma), (size_t)r->view.after);
 
                 r->view.after = (r->view.after > max_after) ? r->view.after : max_after;
             }
 
             if(r->view.before != min_before) {
                 internal_error(true, "QUERY: 'before' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                               dim_id, (size_t)min_before, dim_name, (size_t)r->view.before);
+                               rrdmetric_acquired_id(qd->rma), (size_t)min_before, rrdmetric_acquired_name(qd->rma), (size_t)r->view.before);
 
                 r->view.before = (r->view.before < min_before) ? r->view.before : min_before;
             }
 
             if(r->rows != max_rows) {
                 internal_error(true, "QUERY: 'rows' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                               dim_id, (size_t)max_rows, dim_name, (size_t)r->rows);
+                               rrdmetric_acquired_id(qd->rma), (size_t)max_rows, rrdmetric_acquired_name(qd->rma), (size_t)r->rows);
 
                 r->rows = (r->rows > max_rows) ? r->rows : max_rows;
             }
