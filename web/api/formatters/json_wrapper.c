@@ -201,7 +201,7 @@ static size_t query_target_hosts_contexts_instances_labels_dimensions(
             buffer_json_member_add_string(wb, "mg", host->machine_guid);
             if(qh->node_id[0])
                 buffer_json_member_add_string(wb, "nd", qh->node_id);
-            buffer_json_member_add_string(wb, "hn", rrdhost_hostname(host));
+            buffer_json_member_add_string(wb, "nm", rrdhost_hostname(host));
             query_target_metric_counts(wb, &qh->metrics);
             query_target_alerts_counts(wb, &qh->alerts, NULL, false);
             buffer_json_object_close(wb);
@@ -237,7 +237,7 @@ static size_t query_target_hosts_contexts_instances_labels_dimensions(
         contexts = dictionary_entries(dict);
         dfe_start_read(dict, z) {
             buffer_json_add_array_item_object(wb);
-            buffer_json_member_add_string(wb, "nm", z_dfe.name);
+            buffer_json_member_add_string(wb, "id", z_dfe.name);
             query_target_metric_counts(wb, &z->metrics);
             query_target_alerts_counts(wb, &z->alerts, NULL, false);
             buffer_json_object_close(wb);
@@ -817,7 +817,7 @@ static void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS
                         if(qh->node_id[0])
                             buffer_json_member_add_string(wb, "nd", qh->node_id);
                         buffer_json_member_add_uint64(wb, "idx", qh->slot);
-                        buffer_json_member_add_string(wb, "hn", rrdhost_hostname(host));
+                        buffer_json_member_add_string(wb, "nm", rrdhost_hostname(host));
                         buffer_json_member_add_object(wb, "contexts");
 
                         last_host = host;
