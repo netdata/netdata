@@ -95,33 +95,52 @@ static inline long jsonwrap_v1_chart_ids(BUFFER *wb, const char *key, RRDR *r, R
 }
 
 struct rrdlabels_formatting_v2 {
-    DICTIONARY *dict;
+    DICTIONARY *keys;
     QUERY_INSTANCE *qi;
 };
 
-struct rrdlabels_dict_entry {
+struct rrdlabels_keys_dict_entry {
     const char *name;
+    DICTIONARY *values;
+    struct query_metrics_counts metrics;
+};
+
+struct rrdlabels_key_value_dict_entry {
+    const char *key;
     const char *value;
     struct query_metrics_counts metrics;
 };
 
 static int rrdlabels_formatting_v2(const char *name, const char *value, RRDLABEL_SRC ls __maybe_unused, void *data) {
     struct rrdlabels_formatting_v2 *t = data;
-    DICTIONARY *dict = t->dict;
+
+    struct rrdlabels_keys_dict_entry k = {
+            .name = name,
+            .values = NULL,
+            .metrics = (struct query_metrics_counts){ 0 },
+    }, *d = dictionary_set(t->keys, name, &k, sizeof(k));
+
+    if(!d->values)
+        d->values = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
 
     char n[RRD_ID_LENGTH_MAX * 2 + 2];
     snprintfz(n, RRD_ID_LENGTH_MAX * 2, "%s:%s", name, value);
 
-    struct rrdlabels_dict_entry x = {
-        .name = name,
+    struct rrdlabels_key_value_dict_entry x = {
+        .key = name,
         .value = value,
         .metrics = (struct query_metrics_counts){ 0 },
-    };
-    struct rrdlabels_dict_entry *z = dictionary_set(dict, n, &x, sizeof(x));
+    }, *z = dictionary_set(d->values, n, &x, sizeof(x));
+
     z->metrics.selected += t->qi->metrics.selected;
     z->metrics.excluded += t->qi->metrics.excluded;
     z->metrics.queried += t->qi->metrics.queried;
     z->metrics.failed += t->qi->metrics.failed;
+
+    d->metrics.selected += t->qi->metrics.selected;
+    d->metrics.excluded += t->qi->metrics.excluded;
+    d->metrics.queried += t->qi->metrics.queried;
+    d->metrics.failed += t->qi->metrics.failed;
 
     return 1;
 }
@@ -327,7 +346,7 @@ static size_t query_target_hosts_contexts_instances_labels_dimensions(
     if(key_labels) {
         buffer_json_member_add_array(wb, key_labels);
         struct rrdlabels_formatting_v2 t = {
-                .dict = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE),
+                .keys = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE),
         };
         for (long c = 0; c < (long) qt->instances.used; c++) {
             QUERY_INSTANCE *qi = query_instance(qt, c);
@@ -335,24 +354,37 @@ static size_t query_target_hosts_contexts_instances_labels_dimensions(
             t.qi = qi;
             rrdlabels_walkthrough_read(rrdinstance_acquired_labels(ria), rrdlabels_formatting_v2, &t);
         }
-        struct rrdlabels_dict_entry *z;
-        dfe_start_read(t.dict, z) {
-                    if(v2) {
-                        buffer_json_add_array_item_object(wb);
-                        buffer_json_member_add_string(wb, "nm", z->name);
-                        buffer_json_member_add_string(wb, "vl", z->value);
-                        query_target_metric_counts(wb, &z->metrics);
-                        buffer_json_object_close(wb);
+        struct rrdlabels_keys_dict_entry *d;
+        dfe_start_read(t.keys, d) {
+            if(v2) {
+                buffer_json_add_array_item_object(wb);
+                buffer_json_member_add_string(wb, "id", d_dfe.name);
+                query_target_metric_counts(wb, &d->metrics);
+                buffer_json_member_add_array(wb, "vl");
+            }
+            struct rrdlabels_key_value_dict_entry *z;
+            dfe_start_read(d->values, z){
+                        if (v2) {
+                            buffer_json_add_array_item_object(wb);
+                            buffer_json_member_add_string(wb, "id", z->value);
+                            query_target_metric_counts(wb, &z->metrics);
+                            buffer_json_object_close(wb);
+                        } else {
+                            buffer_json_add_array_item_array(wb);
+                            buffer_json_add_array_item_string(wb, z->key);
+                            buffer_json_add_array_item_string(wb, z->value);
+                            buffer_json_array_close(wb);
+                        }
                     }
-                    else {
-                        buffer_json_add_array_item_array(wb);
-                        buffer_json_add_array_item_string(wb, z->name);
-                        buffer_json_add_array_item_string(wb, z->value);
-                        buffer_json_array_close(wb);
-                    }
+            dfe_done(z);
+            dictionary_destroy(d->values);
+            if(v2) {
+                buffer_json_array_close(wb);
+                buffer_json_object_close(wb);
+            }
         }
-        dfe_done(z);
-        dictionary_destroy(t.dict);
+        dfe_done(d);
+        dictionary_destroy(t.keys);
         buffer_json_array_close(wb);
     }
 
