@@ -22,13 +22,10 @@ void ebpf_aral_init(void)
         max_elements = NETDATA_EBPF_ALLOC_MIN_ELEMENTS;
     }
 
-    ebpf_aral_apps_pid_stat = aral_create("ebpf-pid_stat", sizeof(struct ebpf_pid_stat),
-                                          0, max_elements,
-                                          NULL, NULL, NULL, false, false);
+    ebpf_aral_apps_pid_stat = ebpf_allocate_pid_aral("ebpf-pid_stat", sizeof(struct ebpf_pid_stat));
 
-    ebpf_aral_process_stat = aral_create("ebpf-proc_stat", sizeof(ebpf_process_stat_t),
-                                          0, max_elements,
-                                          NULL, NULL, NULL, false, false);
+    ebpf_aral_process_stat = ebpf_allocate_pid_aral("ebpf-proc_stat", sizeof(ebpf_process_stat_t));
+
 #ifdef NETDATA_DEV_MODE
     info("Plugin is using ARAL with values %d", NETDATA_EBPF_ALLOC_MAX_PID);
 #endif
