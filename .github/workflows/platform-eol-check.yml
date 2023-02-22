@@ -89,7 +89,7 @@ jobs:
       # If the platform is near EOL and there is no existing issue, create one.
       - name: Create EOL Issue
         id: create-issue
-        if: steps.check.outputs.pending == 'true' && steps.existing.outputs.exists == 'true'
+        if: steps.check.outputs.pending == 'true' && steps.existing.outputs.exists == 'false'
         uses: imjohnbo/issue-bot@v3
         with:
           assignees: Ferroin, tkatsoulas
