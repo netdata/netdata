@@ -545,7 +545,9 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url)
     char *tok = mystrsep(&url, "/");
     if(tok && *tok) {
         debug(D_WEB_CLIENT, "%llu: Searching for API version '%s'.", w->id, tok);
-        if(strcmp(tok, "v1") == 0)
+        if(strcmp(tok, "v2") == 0)
+            return web_client_api_request_v2(host, w, url);
+        else if(strcmp(tok, "v1") == 0)
             return web_client_api_request_v1(host, w, url);
         else {
             buffer_flush(w->response.data);

@@ -677,6 +677,46 @@ void rrdlabels_get_value_strdup_or_null(DICTIONARY *labels, char **value, const 
     dictionary_acquired_item_release(labels, acquired_item);
 }
 
+void rrdlabels_get_value_strcpyz(DICTIONARY *labels, char *dst, size_t dst_len, const char *key) {
+    const DICTIONARY_ITEM *acquired_item = dictionary_get_and_acquire_item(labels, key);
+    RRDLABEL *lb = dictionary_acquired_item_value(acquired_item);
+
+    if(lb && lb->label_value)
+        strncpyz(dst, string2str(lb->label_value), dst_len);
+    else
+        dst[0] = '\0';
+
+    dictionary_acquired_item_release(labels, acquired_item);
+}
+
+STRING *rrdlabels_get_value_string_dup(DICTIONARY *labels, const char *key) {
+    const DICTIONARY_ITEM *acquired_item = dictionary_get_and_acquire_item(labels, key);
+    RRDLABEL *lb = dictionary_acquired_item_value(acquired_item);
+
+    STRING *ret = NULL;
+    if(lb && lb->label_value)
+        ret = string_dup(lb->label_value);
+
+    dictionary_acquired_item_release(labels, acquired_item);
+
+    return ret;
+}
+
+STRING *rrdlabels_get_value_to_buffer_or_unset(DICTIONARY *labels, BUFFER *wb, const char *key, const char *unset) {
+    const DICTIONARY_ITEM *acquired_item = dictionary_get_and_acquire_item(labels, key);
+    RRDLABEL *lb = dictionary_acquired_item_value(acquired_item);
+
+    STRING *ret = NULL;
+    if(lb && lb->label_value)
+        buffer_strcat(wb, string2str(lb->label_value));
+    else
+        buffer_strcat(wb, unset);
+
+    dictionary_acquired_item_release(labels, acquired_item);
+
+    return ret;
+}
+
 // ----------------------------------------------------------------------------
 // rrdlabels_unmark_all()
 // remove labels RRDLABEL_FLAG_OLD and RRDLABEL_FLAG_NEW from all dictionary items

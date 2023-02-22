@@ -132,6 +132,22 @@ typedef struct storage_point {
     SN_FLAGS flags;         // flags stored with the point
 } STORAGE_POINT;
 
+// ----------------------------------------------------------------------------
+// chart types
+
+typedef enum __attribute__ ((__packed__)) rrdset_type {
+    RRDSET_TYPE_LINE    = 0,
+    RRDSET_TYPE_AREA    = 1,
+    RRDSET_TYPE_STACKED = 2,
+} RRDSET_TYPE;
+
+#define RRDSET_TYPE_LINE_NAME "line"
+#define RRDSET_TYPE_AREA_NAME "area"
+#define RRDSET_TYPE_STACKED_NAME "stacked"
+
+RRDSET_TYPE rrdset_type_id(const char *name);
+const char *rrdset_type_name(RRDSET_TYPE chart_type);
+
 #include "rrdcontext.h"
 
 extern bool unittest_running;
@@ -176,23 +192,6 @@ extern bool ieee754_doubles;
 
 typedef long long total_number;
 #define TOTAL_NUMBER_FORMAT "%lld"
-
-// ----------------------------------------------------------------------------
-// chart types
-
-typedef enum __attribute__ ((__packed__)) rrdset_type {
-    RRDSET_TYPE_LINE    = 0,
-    RRDSET_TYPE_AREA    = 1,
-    RRDSET_TYPE_STACKED = 2,
-} RRDSET_TYPE;
-
-#define RRDSET_TYPE_LINE_NAME "line"
-#define RRDSET_TYPE_AREA_NAME "area"
-#define RRDSET_TYPE_STACKED_NAME "stacked"
-
-RRDSET_TYPE rrdset_type_id(const char *name);
-const char *rrdset_type_name(RRDSET_TYPE chart_type);
-
 
 // ----------------------------------------------------------------------------
 // algorithms types
@@ -285,6 +284,9 @@ void rrdlabels_add_pair(DICTIONARY *dict, const char *string, RRDLABEL_SRC ls);
 void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const char *key, const char *quote, const char *null);
 void rrdlabels_value_to_buffer_array_item_or_null(DICTIONARY *labels, BUFFER *wb, const char *key);
 void rrdlabels_get_value_strdup_or_null(DICTIONARY *labels, char **value, const char *key);
+void rrdlabels_get_value_strcpyz(DICTIONARY *labels, char *dst, size_t dst_len, const char *key);
+STRING *rrdlabels_get_value_string_dup(DICTIONARY *labels, const char *key);
+STRING *rrdlabels_get_value_to_buffer_or_unset(DICTIONARY *labels, BUFFER *wb, const char *key, const char *unset);
 void rrdlabels_flush(DICTIONARY *labels_dict);
 
 void rrdlabels_unmark_all(DICTIONARY *labels);

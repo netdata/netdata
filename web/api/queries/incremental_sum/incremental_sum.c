@@ -12,25 +12,25 @@ struct grouping_incremental_sum {
 };
 
 void grouping_create_incremental_sum(RRDR *r, const char *options __maybe_unused) {
-    r->internal.grouping_data = onewayalloc_callocz(r->internal.owa, 1, sizeof(struct grouping_incremental_sum));
+    r->grouping.data = onewayalloc_callocz(r->internal.owa, 1, sizeof(struct grouping_incremental_sum));
 }
 
 // resets when switches dimensions
 // so, clear everything to restart
 void grouping_reset_incremental_sum(RRDR *r) {
-    struct grouping_incremental_sum *g = (struct grouping_incremental_sum *)r->internal.grouping_data;
+    struct grouping_incremental_sum *g = (struct grouping_incremental_sum *)r->grouping.data;
     g->first = 0;
     g->last = 0;
     g->count = 0;
 }
 
 void grouping_free_incremental_sum(RRDR *r) {
-    onewayalloc_freez(r->internal.owa, r->internal.grouping_data);
-    r->internal.grouping_data = NULL;
+    onewayalloc_freez(r->internal.owa, r->grouping.data);
+    r->grouping.data = NULL;
 }
 
 void grouping_add_incremental_sum(RRDR *r, NETDATA_DOUBLE value) {
-    struct grouping_incremental_sum *g = (struct grouping_incremental_sum *)r->internal.grouping_data;
+    struct grouping_incremental_sum *g = (struct grouping_incremental_sum *)r->grouping.data;
 
     if(unlikely(!g->count)) {
         g->first = value;
@@ -43,7 +43,7 @@ void grouping_add_incremental_sum(RRDR *r, NETDATA_DOUBLE value) {
 }
 
 NETDATA_DOUBLE grouping_flush_incremental_sum(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_incremental_sum *g = (struct grouping_incremental_sum *)r->internal.grouping_data;
+    struct grouping_incremental_sum *g = (struct grouping_incremental_sum *)r->grouping.data;
 
     NETDATA_DOUBLE value;
 

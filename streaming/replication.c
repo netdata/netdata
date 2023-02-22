@@ -1626,67 +1626,85 @@ static void replication_initialize_workers(bool master) {
 #define REQUEST_QUEUE_EMPTY (-1)
 #define REQUEST_CHART_NOT_FOUND (-2)
 
-static int replication_execute_next_pending_request(bool cancel) {
-    static __thread int max_requests_ahead = 0;
-    static __thread struct replication_request *rqs = NULL;
-    static __thread int rqs_last_executed = 0, rqs_last_prepared = 0;
-    static __thread size_t queue_rounds = 0; (void)queue_rounds;
+static __thread struct replication_thread_pipeline {
+    int max_requests_ahead;
+    struct replication_request *rqs;
+    int rqs_last_executed, rqs_last_prepared;
+    size_t queue_rounds;
+} rtp = {
+        .max_requests_ahead = 0,
+        .rqs = NULL,
+        .rqs_last_executed = 0,
+        .rqs_last_prepared = 0,
+        .queue_rounds = 0,
+};
+
+static void replication_pipeline_cancel_and_cleanup(void) {
+    if(!rtp.rqs)
+        return;
+
+    struct replication_request *rq;
+    size_t cancelled = 0;
+
+    do {
+        if (++rtp.rqs_last_executed >= rtp.max_requests_ahead)
+            rtp.rqs_last_executed = 0;
+
+        rq = &rtp.rqs[rtp.rqs_last_executed];
+
+        if (rq->q) {
+            internal_fatal(rq->executed, "REPLAY FATAL: query has already been executed!");
+            internal_fatal(!rq->found, "REPLAY FATAL: orphan q in rq");
+
+            replication_response_cancel_and_finalize(rq->q);
+            rq->q = NULL;
+            cancelled++;
+        }
+
+        rq->executed = true;
+        rq->found = false;
+
+    } while (rtp.rqs_last_executed != rtp.rqs_last_prepared);
+
+    internal_error(true, "REPLICATION: cancelled %zu inflight queries", cancelled);
+
+    freez(rtp.rqs);
+    rtp.rqs = NULL;
+    rtp.max_requests_ahead = 0;
+    rtp.rqs_last_executed = 0;
+    rtp.rqs_last_prepared = 0;
+    rtp.queue_rounds = 0;
+}
+
+static int replication_pipeline_execute_next(void) {
     struct replication_request *rq;
 
-    if(unlikely(cancel)) {
-        if(rqs) {
-            size_t cancelled = 0;
-            do {
-                if (++rqs_last_executed >= max_requests_ahead)
-                    rqs_last_executed = 0;
+    if(unlikely(!rtp.rqs)) {
+        rtp.max_requests_ahead = (int)get_netdata_cpus() / 2;
 
-                rq = &rqs[rqs_last_executed];
+        if(rtp.max_requests_ahead > libuv_worker_threads * 2)
+            rtp.max_requests_ahead = libuv_worker_threads * 2;
 
-                if (rq->q) {
-                    internal_fatal(rq->executed, "REPLAY FATAL: query has already been executed!");
-                    internal_fatal(!rq->found, "REPLAY FATAL: orphan q in rq");
+        if(rtp.max_requests_ahead < 2)
+            rtp.max_requests_ahead = 2;
 
-                    replication_response_cancel_and_finalize(rq->q);
-                    rq->q = NULL;
-                    cancelled++;
-                }
-
-                rq->executed = true;
-                rq->found = false;
-
-            } while (rqs_last_executed != rqs_last_prepared);
-
-            internal_error(true, "REPLICATION: cancelled %zu inflight queries", cancelled);
-        }
-        return REQUEST_QUEUE_EMPTY;
-    }
-
-    if(unlikely(!rqs)) {
-        max_requests_ahead = get_netdata_cpus() / 2;
-
-        if(max_requests_ahead > libuv_worker_threads * 2)
-            max_requests_ahead = libuv_worker_threads * 2;
-
-        if(max_requests_ahead < 2)
-            max_requests_ahead = 2;
-
-        rqs = callocz(max_requests_ahead, sizeof(struct replication_request));
-        __atomic_add_fetch(&replication_buffers_allocated, max_requests_ahead * sizeof(struct replication_request), __ATOMIC_RELAXED);
+        rtp.rqs = callocz(rtp.max_requests_ahead, sizeof(struct replication_request));
+        __atomic_add_fetch(&replication_buffers_allocated, rtp.max_requests_ahead * sizeof(struct replication_request), __ATOMIC_RELAXED);
     }
 
     // fill the queue
     do {
-        if(++rqs_last_prepared >= max_requests_ahead) {
-            rqs_last_prepared = 0;
-            queue_rounds++;
+        if(++rtp.rqs_last_prepared >= rtp.max_requests_ahead) {
+            rtp.rqs_last_prepared = 0;
+            rtp.queue_rounds++;
         }
 
-        internal_fatal(rqs[rqs_last_prepared].q,
+        internal_fatal(rtp.rqs[rtp.rqs_last_prepared].q,
                        "REPLAY FATAL: slot is used by query that has not been executed!");
 
         worker_is_busy(WORKER_JOB_FIND_NEXT);
-        rqs[rqs_last_prepared] = replication_request_get_first_available();
-        rq = &rqs[rqs_last_prepared];
+        rtp.rqs[rtp.rqs_last_prepared] = replication_request_get_first_available();
+        rq = &rtp.rqs[rtp.rqs_last_prepared];
 
         if(rq->found) {
             if (!rq->st) {
@@ -1707,14 +1725,14 @@ static int replication_execute_next_pending_request(bool cancel) {
             rq->executed = false;
         }
 
-    } while(rq->found && rqs_last_prepared != rqs_last_executed);
+    } while(rq->found && rtp.rqs_last_prepared != rtp.rqs_last_executed);
 
     // pick the first usable
     do {
-        if (++rqs_last_executed >= max_requests_ahead)
-            rqs_last_executed = 0;
+        if (++rtp.rqs_last_executed >= rtp.max_requests_ahead)
+            rtp.rqs_last_executed = 0;
 
-        rq = &rqs[rqs_last_executed];
+        rq = &rtp.rqs[rtp.rqs_last_executed];
 
         if(rq->found) {
             internal_fatal(rq->executed, "REPLAY FATAL: query has already been executed!");
@@ -1747,7 +1765,7 @@ static int replication_execute_next_pending_request(bool cancel) {
         else
             internal_fatal(rq->q, "REPLAY FATAL: slot status says slot is empty, but it has a pending query!");
 
-    } while(!rq->found && rqs_last_executed != rqs_last_prepared);
+    } while(!rq->found && rtp.rqs_last_executed != rtp.rqs_last_prepared);
 
     if(unlikely(!rq->found)) {
         worker_is_idle();
@@ -1771,7 +1789,7 @@ static int replication_execute_next_pending_request(bool cancel) {
 }
 
 static void replication_worker_cleanup(void *ptr __maybe_unused) {
-    replication_execute_next_pending_request(true);
+    replication_pipeline_cancel_and_cleanup();
     worker_unregister();
 }
 
@@ -1781,7 +1799,7 @@ static void *replication_worker_thread(void *ptr) {
     netdata_thread_cleanup_push(replication_worker_cleanup, ptr);
 
     while(service_running(SERVICE_REPLICATION)) {
-        if(unlikely(replication_execute_next_pending_request(false) == REQUEST_QUEUE_EMPTY)) {
+        if(unlikely(replication_pipeline_execute_next() == REQUEST_QUEUE_EMPTY)) {
             sender_thread_buffer_free();
             worker_is_busy(WORKER_JOB_WAIT);
             worker_is_idle();
@@ -1797,7 +1815,7 @@ static void replication_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    replication_execute_next_pending_request(true);
+    replication_pipeline_cancel_and_cleanup();
 
     int threads = (int)replication_globals.main_thread.threads;
     for(int i = 0; i < threads ;i++) {
@@ -1914,7 +1932,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
             worker_is_idle();
         }
 
-        if(unlikely(replication_execute_next_pending_request(false) == REQUEST_QUEUE_EMPTY)) {
+        if(unlikely(replication_pipeline_execute_next() == REQUEST_QUEUE_EMPTY)) {
 
             worker_is_busy(WORKER_JOB_WAIT);
             replication_recursive_lock();

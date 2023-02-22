@@ -42,6 +42,8 @@ static struct {
         , {"virtual-points"    , 0    , RRDR_OPTION_VIRTUAL_POINTS}
         , {"all-dimensions"    , 0    , RRDR_OPTION_ALL_DIMENSIONS}
         , {"plan"              , 0    , RRDR_OPTION_SHOW_PLAN}
+        , {"details"           , 0    , RRDR_OPTION_SHOW_DETAILS}
+        , {"debug"             , 0    , RRDR_OPTION_DEBUG}
         , {NULL                , 0    , 0}
 };
 
@@ -565,18 +567,8 @@ inline int web_client_api_request_v1_chart(RRDHOST *host, struct web_client *w, 
     return web_client_api_request_single_chart(host, w, url, rrd_stats_api_v1_chart);
 }
 
-void fix_google_param(char *s) {
-    if(unlikely(!s)) return;
-
-    for( ; *s ;s++) {
-        if(!isalnum(*s) && *s != '.' && *s != '_' && *s != '-')
-            *s = '_';
-    }
-}
-
-
 // returns the HTTP code
-inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *url) {
+static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *url) {
     debug(D_WEB_CLIENT, "%llu: API v1 data with URL '%s'", w->id, url);
 
     int ret = HTTP_RESP_BAD_REQUEST;
@@ -722,6 +714,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     long      group_time = (group_time_str && *group_time_str)?str2l(group_time_str):0;
 
     QUERY_TARGET_REQUEST qtr = {
+            .version = 1,
             .after = after,
             .before = before,
             .host = host,
@@ -739,7 +732,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             .resampling_time = group_time,
             .tier = tier,
             .chart_label_key = chart_label_key,
-            .charts_labels_filter = chart_labels_filter,
+            .labels = chart_labels_filter,
             .query_source = QUERY_SOURCE_API_DATA,
             .priority = STORAGE_PRIORITY_NORMAL,
     };
@@ -814,10 +807,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         buffer_strcat(w->response.data, ");");
 
 cleanup:
-    if(qt && qt->used) {
-        internal_error(true, "QUERY_TARGET: left non-released on query '%s'", qt->id);
-        query_target_release(qt);
-    }
+    query_target_release(qt);
     onewayalloc_destroy(owa);
     buffer_free(dimensions);
     return ret;
@@ -1193,8 +1183,10 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 #endif
 
     buffer_json_member_add_string(wb, "memory-mode", rrd_memory_mode_name(host->rrd_memory_mode));
+#ifdef ENABLE_DBENGINE
     buffer_json_member_add_uint64(wb, "multidb-disk-quota", default_multidb_disk_quota_mb);
     buffer_json_member_add_uint64(wb, "page-cache-size", default_rrdeng_page_cache_mb);
+#endif // ENABLE_DBENGINE
     buffer_json_member_add_boolean(wb, "web-enabled", web_server_mode != WEB_SERVER_MODE_NONE);
     buffer_json_member_add_boolean(wb, "stream-enabled", default_rrdpush_enabled);
 
@@ -1539,12 +1531,7 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
 #define ACL_DEV_OPEN_ACCESS 0
 #endif
 
-static struct api_command {
-    const char *command;
-    uint32_t hash;
-    WEB_CLIENT_ACL acl;
-    int (*callback)(RRDHOST *host, struct web_client *w, char *url);
-} api_commands[] = {
+static struct web_api_command api_commands_v1[] = {
         { "info",            0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_info                       },
         { "data",            0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_data                       },
         { "chart",           0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_chart                      },
@@ -1566,8 +1553,8 @@ static struct api_command {
         { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_allmetrics                },
 
 #if defined(ENABLE_ML)
-      { "ml_info",         0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_ml_info            },
-      { "ml_models",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_models          },
+        { "ml_info",         0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_ml_info            },
+        { "ml_models",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_models          },
 #endif
 
         { "manage/health",       0, WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_ACLK,      web_client_api_request_v1_mgmt_health           },
@@ -1586,38 +1573,13 @@ static struct api_command {
 
 inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url) {
     static int initialized = 0;
-    int i;
 
     if(unlikely(initialized == 0)) {
         initialized = 1;
 
-        for(i = 0; api_commands[i].command ; i++)
-            api_commands[i].hash = simple_hash(api_commands[i].command);
+        for(int i = 0; api_commands_v1[i].command ; i++)
+            api_commands_v1[i].hash = simple_hash(api_commands_v1[i].command);
     }
 
-    // get the command
-    if(url) {
-        debug(D_WEB_CLIENT, "%llu: Searching for API v1 command '%s'.", w->id, url);
-        uint32_t hash = simple_hash(url);
-
-        for(i = 0; api_commands[i].command ;i++) {
-            if(unlikely(hash == api_commands[i].hash && !strcmp(url, api_commands[i].command))) {
-                if(unlikely(api_commands[i].acl != WEB_CLIENT_ACL_NOCHECK) &&  !(w->acl & api_commands[i].acl))
-                    return web_client_permission_denied(w);
-
-                //return api_commands[i].callback(host, w, url);
-                return api_commands[i].callback(host, w, (w->decoded_query_string + 1));
-            }
-        }
-
-        buffer_flush(w->response.data);
-        buffer_strcat(w->response.data, "Unsupported v1 API command: ");
-        buffer_strcat_htmlescape(w->response.data, url);
-        return HTTP_RESP_NOT_FOUND;
-    }
-    else {
-        buffer_flush(w->response.data);
-        buffer_sprintf(w->response.data, "Which API v1 command?");
-        return HTTP_RESP_BAD_REQUEST;
-    }
+    return web_client_api_request_vX(host, w, url, api_commands_v1);
 }
