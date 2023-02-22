@@ -753,7 +753,8 @@ static void health_main_cleanup(void *ptr) {
     log_health("Health thread ended.");
 }
 
-static void initialize_health(RRDHOST *host, int is_localhost) {
+static void initialize_health(RRDHOST *host)
+{
     if(!host->health.health_enabled ||
         rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH) ||
         !service_running(SERVICE_HEALTH))
@@ -1026,7 +1027,7 @@ void *health_main(void *ptr) {
 
             if (unlikely(!rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH))) {
                 rrd_unlock();
-                initialize_health(host, host == localhost);
+                initialize_health(host);
                 rrd_rdlock();
             }
 
