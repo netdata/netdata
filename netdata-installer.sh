@@ -643,6 +643,19 @@ bundle_protobuf() {
 
 bundle_protobuf
 
+build_h2o() {
+  if ! run mkdir -p httpd/h2o/build && cd httpd/h2o/build && cmake -DWITHOUT_LIBS=OFF -DBUILD_SHARED_LIBS=OFF -DWITH_MRUBY=OFF .. && make; then
+    run cd - > /dev/null || return 1
+  fi
+  run cd - > /dev/null || return 1
+}
+
+if build_h2o; then
+  run_ok "libh2o ready"
+else
+  run_failed "Unable to build libh2o webserver library"
+fi
+
 # -----------------------------------------------------------------------------
 build_jsonc() {
   env_cmd=''
