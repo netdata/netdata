@@ -546,7 +546,7 @@ static void cachestat_fill_pid(uint32_t current_pid, netdata_cachestat_pid_t *pu
 {
     netdata_publish_cachestat_t *curr = cachestat_pid[current_pid];
     if (!curr) {
-        curr = callocz(1, sizeof(netdata_publish_cachestat_t));
+        curr = ebpf_publish_cachestat_get();
         cachestat_pid[current_pid] = curr;
 
         cachestat_save_pid_values(curr, publish);

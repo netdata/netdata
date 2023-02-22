@@ -1024,7 +1024,7 @@ void cleanup_variables_from_other_threads(uint32_t pid)
 
     // Clean cachestat structure
     if (cachestat_pid) {
-        freez(cachestat_pid[pid]);
+        ebpf_cachestat_release(cachestat_pid[pid]);
         cachestat_pid[pid] = NULL;
     }
 
