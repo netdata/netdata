@@ -142,56 +142,7 @@ click on the link to your preferred notification method to find documentation fo
 While the Netdata Agent is both [open and secure by design](https://www.netdata.cloud/blog/netdata-agent-dashboard/), we
 recommend every user take some action to administer and secure their nodes.
 
-Learn more about a few of the following changes in
-the [node security doc](https://github.com/netdata/netdata/blob/master/docs/configure/secure-nodes.md).
-
-### Disable the local Agent dashboard (`http://NODE:19999`)
-
-If you use Netdata Cloud to visualize metrics, stream metrics to a parent node, or otherwise don't need the local Agent
-dashboard, disabling it reduces the Agent's resource utilization and improves security.
-
-Change the `mode` setting to `none` in
-the [`[web]` section](https://github.com/netdata/netdata/blob/master/web/server/README.md#configuration)
-of `netdata.conf`.
-
-```conf
-[web]
-    mode = none
-```
-
-### Use access lists to restrict access to specific assets
-
-Allow access from only specific IP addresses, ranges of IP addresses, or hostnames
-using [access lists](https://github.com/netdata/netdata/blob/master/web/server/README.md#access-lists)
-and [simple patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md).
-
-See a quickstart to access lists in the [node security
-doc](https://github.com/netdata/netdata/blob/master/docs/configure/secure-nodes.md#restrict-access-to-the-local-dashboard).
-
-### Stop sending anonymous statistics to Google Analytics
-
-Create a file called `.opt-out-from-anonymous-statistics` inside of your Netdata config directory to immediately stop
-the statistics script.
-
-```bash
-sudo touch .opt-out-from-anonymous-statistics
-```
-
-Learn more
-about [why we collect anonymous statistics](https://github.com/netdata/netdata/blob/master/docs/anonymous-statistics.md).
-
-### Change the IP address/port Netdata listens to
-
-Change the `default port` setting in the `[web]` section to a port other than `19999`.
-
-```conf
-[web]
-   default port = 39999
-```
-
-Use the `bind to` setting to the ports other assets, such as
-the [running `netdata.conf` configuration](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#see-an-agents-running-configuration),
-API, or streaming requests listen to.
+Learn more about the available options in the [security design documentation](https://github.com/netdata/netdata/blob/master/docs/netdata-security.md).
 
 ## Reduce resource usage
 
