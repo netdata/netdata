@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F050F
+# Next unused error code: F0512
 
 # ======================================================================
 # Constants
@@ -632,71 +632,78 @@ safe_sha256sum() {
 }
 
 get_system_info() {
+  SYSARCH="$(uname -m)"
+
   case "$(uname -s)" in
     Linux)
       SYSTYPE="Linux"
 
-      os_release_file=
-      if [ -s "/etc/os-release" ] && [ -r "/etc/os-release" ]; then
-        os_release_file="/etc/os-release"
-      elif [ -s "/usr/lib/os-release" ] && [ -r "/usr/lib/os-release" ]; then
-        os_release_file="/usr/lib/os-release"
-      else
-        warning "Cannot find usable OS release information. Native packages will not be available for this install."
-      fi
-
-      if [ -n "${os_release_file}" ]; then
-        # shellcheck disable=SC1090
-        . "${os_release_file}"
-
-        DISTRO="${ID}"
-        SYSVERSION="${VERSION_ID}"
-        SYSCODENAME="${VERSION_CODENAME}"
-        SYSARCH="$(uname -m)"
-
-        supported_compat_names="debian ubuntu centos fedora opensuse ol arch"
-
-        if str_in_list "${DISTRO}" "${supported_compat_names}"; then
-            DISTRO_COMPAT_NAME="${DISTRO}"
+      if [ -z "${SKIP_DISTRO_DETECTION}" ]; then
+        os_release_file=
+        if [ -s "/etc/os-release" ] && [ -r "/etc/os-release" ]; then
+          os_release_file="/etc/os-release"
+        elif [ -s "/usr/lib/os-release" ] && [ -r "/usr/lib/os-release" ]; then
+          os_release_file="/usr/lib/os-release"
         else
-            case "${DISTRO}" in
-            opensuse-leap)
-                DISTRO_COMPAT_NAME="opensuse"
-                ;;
-            cloudlinux|almalinux|rocky|rhel)
-                DISTRO_COMPAT_NAME="centos"
-                ;;
-            artix|manjaro|obarun)
-                DISTRO_COMPAT_NAME="arch"
-                ;;
-            *)
-                DISTRO_COMPAT_NAME="unknown"
-                ;;
-            esac
+          warning "Cannot find usable OS release information. Native packages will not be available for this install."
         fi
 
-        case "${DISTRO_COMPAT_NAME}" in
-          centos|ol)
-            SYSVERSION=$(echo "$SYSVERSION" | cut -d'.' -f1)
-            ;;
-        esac
+        if [ -n "${os_release_file}" ]; then
+          # shellcheck disable=SC1090
+          . "${os_release_file}"
+
+          DISTRO="${ID}"
+          SYSVERSION="${VERSION_ID}"
+          SYSCODENAME="${VERSION_CODENAME}"
+        else
+          DISTRO="unknown"
+          DISTRO_COMPAT_NAME="unknown"
+          SYSVERSION="unknown"
+          SYSCODENAME="unknown"
+        fi
       else
-        DISTRO="unknown"
-        DISTRO_COMPAT_NAME="unknown"
-        SYSVERSION="unknown"
-        SYSCODENAME="unknown"
-        SYSARCH="$(uname -m)"
+        warning "Distribution auto-detection overridden by user. This is not guaranteed to work, and is not officially supported."
       fi
+
+      supported_compat_names="debian ubuntu centos fedora opensuse ol arch"
+
+      if str_in_list "${DISTRO}" "${supported_compat_names}"; then
+          DISTRO_COMPAT_NAME="${DISTRO}"
+      else
+          case "${DISTRO}" in
+          opensuse-leap)
+              DISTRO_COMPAT_NAME="opensuse"
+              ;;
+          cloudlinux|almalinux|rocky|rhel)
+              DISTRO_COMPAT_NAME="centos"
+              ;;
+          artix|manjaro|obarun)
+              DISTRO_COMPAT_NAME="arch"
+              ;;
+          *)
+              DISTRO_COMPAT_NAME="unknown"
+              ;;
+          esac
+      fi
+
+      case "${DISTRO_COMPAT_NAME}" in
+        centos|ol)
+          SYSVERSION=$(echo "$SYSVERSION" | cut -d'.' -f1)
+          ;;
+        ubuntu|debian)
+          if [ -z "${SYSCODENAME}" ]; then
+            fatal "Could not determine ${DISTRO} release code name. This is required information on these systems." F0511
+          fi
+          ;;
+      esac
       ;;
     Darwin)
       SYSTYPE="Darwin"
       SYSVERSION="$(sw_vers -buildVersion)"
-      SYSARCH="$(uname -m)"
       ;;
     FreeBSD)
       SYSTYPE="FreeBSD"
       SYSVERSION="$(uname -K)"
-      SYSARCH="$(uname -m)"
       ;;
     *)
       fatal "Unsupported system type detected. Netdata cannot be installed on this system using this script." F0200
@@ -1477,6 +1484,10 @@ try_package_install() {
       ;;
   esac
 
+  if [ -n "${SKIP_DISTRO_DETECTION}" ]; then
+    warning "Attempting to use native packages with a distro override. This is not officially supported, but may work in some cases. If your system requires a distro override to use native packages, please open an feature request at ${AGENT_BUG_REPORT_URL} about it so that we can update the installer to auto-detect this."
+  fi
+
   if [ -n "${INSTALL_VERSION}" ]; then
     if echo "${INSTALL_VERSION}" | grep -q "nightly"; then
       new_release="-edge"
@@ -2190,6 +2201,22 @@ parse_args() {
         INSTALL_VERSION="${2}"
         AUTO_UPDATE=0
         shift 1
+        ;;
+      "--distro-override")
+        if [ -n "${2}" ]; then
+          SKIP_DISTRO_DETECTION=1
+          DISTRO="$(echo "${2}" | cut -f 1 -d ':' | tr '[:upper:]' '[:lower:]')"
+          SYSVERSION="$(echo "${2}" | cut -f 2 -d ':')"
+          SYSCODENAME="$(echo "${2}" | cut -f 3 -d ':' | tr '[:upper:]' '[:lower:]')"
+
+          if [ -z "${SYSVERSION}" ]; then
+            fatal "You must specify a release as well as a distribution name." F0510
+          fi
+
+          shift 1
+        else
+          fatal "A distribution name and release must be specified for the --distro-override option." F050F
+        fi
         ;;
       "--uninstall")
         ACTION="uninstall"
