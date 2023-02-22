@@ -997,7 +997,6 @@ struct rrdhost {
                                                     // the actual per tier is at .db[tier].mode
 
     char *cache_dir;                                // the directory to save RRD cache files
-    char *varlib_dir;                               // the directory to save health log
 
     struct {
         RRD_MEMORY_MODE mode;                       // the db mode for this tier

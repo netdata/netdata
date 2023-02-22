@@ -786,19 +786,6 @@ static void initialize_health(RRDHOST *host, int is_localhost) {
 
     char filename[FILENAME_MAX + 1];
 
-    if(!is_localhost) {
-        int r = mkdir(host->varlib_dir, 0775);
-        if (r != 0 && errno != EEXIST)
-            error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), host->varlib_dir);
-    }
-
-    {
-        snprintfz(filename, FILENAME_MAX, "%s/health", host->varlib_dir);
-        int r = mkdir(filename, 0775);
-        if(r != 0 && errno != EEXIST)
-            error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), filename);
-    }
-
     snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
     host->health.health_default_exec = string_strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
     host->health.health_default_recipient = string_strdupz("root");
