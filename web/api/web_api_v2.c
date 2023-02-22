@@ -178,8 +178,8 @@ static inline int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, s
     qt = query_target_create(&qtr);
 
     if(!qt) {
-        buffer_sprintf(w->response.data, "No metrics where matched to query.");
-        ret = HTTP_RESP_NOT_FOUND;
+        buffer_sprintf(w->response.data, "Failed to prepare the query.");
+        ret = HTTP_RESP_INTERNAL_SERVER_ERROR;
         goto cleanup;
     }
 
@@ -243,10 +243,7 @@ static inline int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, s
         buffer_strcat(w->response.data, ");");
 
     cleanup:
-    if(qt && qt->used) {
-        internal_error(true, "QUERY_TARGET: left non-released on query '%s'", qt->id);
-        query_target_release(qt);
-    }
+    query_target_release(qt);
     onewayalloc_destroy(owa);
     return ret;
 }

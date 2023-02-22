@@ -807,10 +807,7 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
         buffer_strcat(w->response.data, ");");
 
 cleanup:
-    if(qt && qt->used) {
-        internal_error(true, "QUERY_TARGET: left non-released on query '%s'", qt->id);
-        query_target_release(qt);
-    }
+    query_target_release(qt);
     onewayalloc_destroy(owa);
     buffer_free(dimensions);
     return ret;

@@ -2283,8 +2283,7 @@ typedef struct query_target_locals {
 
 static __thread QUERY_TARGET thread_query_target = {};
 void query_target_release(QUERY_TARGET *qt) {
-    if(unlikely(!qt)) return;
-    if(unlikely(!qt->used)) return;
+    if(unlikely(!qt || !qt->used)) return;
 
     simple_pattern_free(qt->hosts.scope_pattern);
     qt->hosts.scope_pattern = NULL;
@@ -3175,31 +3174,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
         rrd_unlock();
     }
 
-    // make sure everything is good
-    if(!qt->query.used || !qt->dimensions.used || !qt->instances.used || !qt->contexts.used || !qt->hosts.used) {
-        internal_error(
-                true
-                , "QUERY TARGET: query '%s' does not have all the data required. "
-                  "Matched %u hosts, %u contexts, %u instances, %u dimensions, %u metrics to query, "
-                  "%zu metrics skipped because they don't have data in the desired time-frame. "
-                  "Aborting it."
-                , qt->id
-                , qt->hosts.used
-                , qt->contexts.used
-                , qt->instances.used
-                , qt->dimensions.used
-                , qt->query.used
-                , qtl.metrics_skipped_due_to_not_matching_timeframe
-                );
-
-        query_target_release(qt);
-        return NULL;
-    }
-
-    if(!query_target_calculate_window(qt)) {
-        query_target_release(qt);
-        return NULL;
-    }
+    query_target_calculate_window(qt);
 
     qt->timings.preprocessed_ut = now_monotonic_usec();
 

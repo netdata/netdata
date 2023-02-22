@@ -2303,13 +2303,8 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     if(unlikely(!r)) {
         internal_error(true, "QUERY: cannot create RRDR for %s, after=%ld, before=%ld, points=%zu",
                        qt->id, qt->window.after, qt->window.before, qt->window.points);
+        query_target_release(qt);
         return NULL;
-    }
-
-    if(unlikely(!r->d || !qt->window.points)) {
-        internal_error(true, "QUERY: returning empty RRDR (no dimensions in RRDSET) for %s, after=%ld, before=%ld, points=%zu",
-                       qt->id, qt->window.after, qt->window.before, qt->window.points);
-        return r;
     }
 
     if(qt->window.relative)
@@ -2351,7 +2346,9 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     size_t last_db_points_read = 0;
     size_t last_result_points_generated = 0;
 
-    QUERY_ENGINE_OPS **ops = onewayalloc_callocz(r->internal.owa, qt->query.used, sizeof(QUERY_ENGINE_OPS *));
+    QUERY_ENGINE_OPS **ops = NULL;
+    if(qt->query.used)
+        ops = onewayalloc_callocz(r->internal.owa, qt->query.used, sizeof(QUERY_ENGINE_OPS *));
 
     size_t capacity = libuv_worker_threads * 2;
     size_t max_queries_to_prepare = (qt->query.used > (capacity - 1)) ? (capacity - 1) : qt->query.used;
@@ -2535,11 +2532,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                 r->od[c] |= RRDR_DIMENSION_NONZERO;
             }
         }
-
-        return r;
     }
 
-    // we couldn't query any dimension
-    rrdr_free(owa, r);
-    return NULL;
+    return r;
 }

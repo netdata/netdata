@@ -68,6 +68,7 @@ inline void rrdr_free(ONEWAYALLOC *owa, RRDR *r) {
     }
 
     query_target_release(r->internal.qt);
+
     onewayalloc_freez(owa, r->t);
     onewayalloc_freez(owa, r->v);
     onewayalloc_freez(owa, r->o);
@@ -83,7 +84,7 @@ inline void rrdr_free(ONEWAYALLOC *owa, RRDR *r) {
 }
 
 RRDR *rrdr_create(ONEWAYALLOC *owa, QUERY_TARGET *qt, size_t dimensions, size_t points) {
-    if(unlikely(!qt || !qt->query.used || !qt->window.points))
+    if(unlikely(!qt))
         return NULL;
 
     // create the rrdr
@@ -97,14 +98,22 @@ RRDR *rrdr_create(ONEWAYALLOC *owa, QUERY_TARGET *qt, size_t dimensions, size_t 
     r->d = (int)dimensions;
     r->n = (int)points;
 
-    r->t = onewayalloc_callocz(owa, points, sizeof(time_t));
-    r->v = onewayalloc_mallocz(owa, points * dimensions * sizeof(NETDATA_DOUBLE));
-    r->o = onewayalloc_mallocz(owa, points * dimensions * sizeof(RRDR_VALUE_FLAGS));
-    r->od = onewayalloc_mallocz(owa, dimensions * sizeof(RRDR_DIMENSION_FLAGS));
-    r->ar = onewayalloc_mallocz(owa, points * dimensions * sizeof(NETDATA_DOUBLE));
-    r->di = onewayalloc_callocz(owa, dimensions, sizeof(STRING *));
-    r->dn = onewayalloc_callocz(owa, dimensions, sizeof(STRING *));
-    r->du = onewayalloc_callocz(owa, dimensions, sizeof(STRING *));
+    if(points && dimensions) {
+        r->v = onewayalloc_mallocz(owa, points * dimensions * sizeof(NETDATA_DOUBLE));
+        r->o = onewayalloc_mallocz(owa, points * dimensions * sizeof(RRDR_VALUE_FLAGS));
+        r->ar = onewayalloc_mallocz(owa, points * dimensions * sizeof(NETDATA_DOUBLE));
+    }
+
+    if(points) {
+        r->t = onewayalloc_callocz(owa, points, sizeof(time_t));
+    }
+
+    if(dimensions) {
+        r->od = onewayalloc_mallocz(owa, dimensions * sizeof(RRDR_DIMENSION_FLAGS));
+        r->di = onewayalloc_callocz(owa, dimensions, sizeof(STRING *));
+        r->dn = onewayalloc_callocz(owa, dimensions, sizeof(STRING *));
+        r->du = onewayalloc_callocz(owa, dimensions, sizeof(STRING *));
+    }
 
     r->view.group = 1;
     r->view.update_every = 1;
