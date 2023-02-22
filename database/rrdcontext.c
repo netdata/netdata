@@ -2535,19 +2535,7 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, QU
             QUERY_METRIC *qm = &qt->query.array[qt->query.used++];
             memset(qm, 0, sizeof(*qm));
 
-            qm->grouped_as.slot = 0;
-            qm->grouped_as.id = NULL;
-            qm->grouped_as.name = NULL;
-
-            qm->plan.used = 0;
-
-            qm->query.options = options;
-            qm->query.min = 0;
-            qm->query.max = 0;
-            qm->query.sum = 0;
-            qm->query.average = 0;
-            qm->query.volume = 0;
-            qm->query.count = 0;
+            qm->status = options;
 
             qm->link.query_host_id = qh->slot;
             qm->link.query_context_id = qc->slot;
@@ -3078,6 +3066,8 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
 
     if(qtr->contexts && !qtr->scope_contexts)
         qtr->scope_contexts = qtr->contexts;
+
+    memset(&qt->query_stats, 0, sizeof(qt->query_stats));
 
     // copy the request into query_thread_target
     qt->request = *qtr;

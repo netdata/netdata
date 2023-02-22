@@ -181,10 +181,20 @@ struct query_alerts_counts {
     size_t other;
 };
 
+struct query_data_statistics {
+    size_t count;
+    NETDATA_DOUBLE min;
+    NETDATA_DOUBLE max;
+    NETDATA_DOUBLE sum;
+    NETDATA_DOUBLE volume;
+};
+
 typedef struct query_host {
     uint32_t slot;
     RRDHOST *host;
     char node_id[UUID_STR_LEN];
+
+    struct query_data_statistics query_stats;
     struct query_instances_counts instances;
     struct query_metrics_counts metrics;
     struct query_alerts_counts alerts;
@@ -193,6 +203,8 @@ typedef struct query_host {
 typedef struct query_context {
     uint32_t slot;
     RRDCONTEXT_ACQUIRED *rca;
+
+    struct query_data_statistics query_stats;
     struct query_instances_counts instances;
     struct query_metrics_counts metrics;
     struct query_alerts_counts alerts;
@@ -205,6 +217,7 @@ typedef struct query_instance {
     STRING *id_fqdn;
     STRING *name_fqdn;
 
+    struct query_data_statistics query_stats;
     struct query_metrics_counts metrics;
     struct query_alerts_counts alerts;
 } QUERY_INSTANCE;
@@ -216,6 +229,8 @@ typedef struct query_dimension {
 } QUERY_DIMENSION;
 
 typedef struct query_metric {
+    RRDR_DIMENSION_FLAGS status;
+
     struct query_metric_tier {
         struct storage_engine *eng;
         STORAGE_METRIC_HANDLE *db_metric_handle;
@@ -237,15 +252,7 @@ typedef struct query_metric {
         uint32_t query_dimension_id;
     } link;
 
-    struct {
-        size_t count;
-        NETDATA_DOUBLE min;
-        NETDATA_DOUBLE max;
-        NETDATA_DOUBLE sum;
-        NETDATA_DOUBLE average;
-        NETDATA_DOUBLE volume;
-        RRDR_DIMENSION_FLAGS options;
-    } query;
+    struct query_data_statistics query_stats;
 
     struct {
         size_t slot;
@@ -379,6 +386,8 @@ typedef struct query_target {
         size_t used;
         char *label_keys[GROUP_BY_MAX_LABEL_KEYS];
     } group_by;
+
+    struct query_data_statistics query_stats;
 
     struct {
         usec_t received_ut;

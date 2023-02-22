@@ -1709,20 +1709,20 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
             NETDATA_DOUBLE stats_value = group_value < 0 ? -group_value : group_value;
 
             if(unlikely(!points_added)) {
-                qm->query.min = stats_value;
-                qm->query.max = stats_value;
+                qm->query_stats.min = stats_value;
+                qm->query_stats.max = stats_value;
             }
             else {
-                if(stats_value < qm->query.min)
-                    qm->query.min = stats_value;
+                if(stats_value < qm->query_stats.min)
+                    qm->query_stats.min = stats_value;
 
-                if(stats_value > qm->query.max)
-                    qm->query.max = stats_value;
+                if(stats_value > qm->query_stats.max)
+                    qm->query_stats.max = stats_value;
             }
 
-            qm->query.sum += stats_value;
-            qm->query.volume += stats_value * (NETDATA_DOUBLE)ops->view_update_every;
-            qm->query.count++;
+            qm->query_stats.sum += stats_value;
+            qm->query_stats.volume += stats_value * (NETDATA_DOUBLE)ops->view_update_every;
+            qm->query_stats.count++;
 
             points_added++;
             ops->group_points_added = 0;
@@ -1748,11 +1748,6 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
     r->view.before = max_date;
     r->view.after = min_date - ops->view_update_every + ops->query_granularity;
     rrdr_done(r, rrdr_line);
-
-    if(qm->query.count)
-        qm->query.average = qm->query.sum / (NETDATA_DOUBLE)qm->query.count;
-    else
-        qm->query.average = 0.0;
 
     internal_error(points_added != points_wanted,
                    "QUERY: '%s', dimension '%s', requested %zu points, but RRDR added %zu (%zu db points read).",
@@ -2287,6 +2282,22 @@ RRDR *rrd2rrdr_legacy(
     return rrd2rrdr(owa, query_target_create(&qtr));
 }
 
+void query_target_merge_data_statistics(struct query_data_statistics *d, struct query_data_statistics *s) {
+    if(!d->count)
+        *d = *s;
+    else {
+        d->count += s->count;
+        d->sum += s->sum;
+        d->volume += s->volume;
+
+        if(s->min < d->min)
+            d->min = s->min;
+
+        if(s->max > d->max)
+            d->max = s->max;
+    }
+}
+
 RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     if(!qt)
         return NULL;
@@ -2373,7 +2384,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         }
 
         // set the query target dimension options to rrdr
-        r->od[c] = qm->query.options;
+        r->od[c] = qm->status;
 
         // reset the grouping for the new dimension
         r->grouping.reset(r);
@@ -2388,9 +2399,16 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             qh->metrics.queried++;
 
             qd->status |= QUERY_STATUS_QUERIED;
-            qm->query.options |= RRDR_DIMENSION_QUERIED;
+            qm->status |= RRDR_DIMENSION_QUERIED;
 
             rrd2rrdr_query_execute(r, c, ops[c]);
+
+            if(qt->request.version >= 2) {
+                query_target_merge_data_statistics(&qi->query_stats, &qm->query_stats);
+                query_target_merge_data_statistics(&qc->query_stats, &qm->query_stats);
+                query_target_merge_data_statistics(&qh->query_stats, &qm->query_stats);
+                query_target_merge_data_statistics(&qt->query_stats, &qm->query_stats);
+            }
         }
         else {
             qi->metrics.failed++;
@@ -2398,7 +2416,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             qh->metrics.failed++;
 
             qd->status |= QUERY_STATUS_FAILED;
-            qm->query.options |= RRDR_DIMENSION_FAILED;
+            qm->status |= RRDR_DIMENSION_FAILED;
 
             continue;
         }

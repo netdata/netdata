@@ -312,7 +312,7 @@ RRDR *data_query_group_by(RRDR *r) {
         qm->grouped_as.id = entries[pos].id;
         qm->grouped_as.name = entries[pos].name;
         qm->grouped_as.units = entries[pos].units;
-        qm->query.options |= RRDR_DIMENSION_GROUPED;
+        qm->status |= RRDR_DIMENSION_GROUPED;
     }
 
     // check if we have multiple units
