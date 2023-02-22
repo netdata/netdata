@@ -926,6 +926,8 @@ DAEMON_FILES = \
     $(NULL)
 
 HTTPD_FILES = \
+    httpd/http_server.c \
+    httpd/http_server.h \
     httpd/h2o_utils.c \
     httpd/h2o_utils.h \
     $(NULL)
