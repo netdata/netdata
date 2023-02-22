@@ -2445,21 +2445,21 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         else {
             if(r->view.after != max_after) {
                 internal_error(true, "QUERY: 'after' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                               rrdmetric_acquired_id(qd->rma), (size_t)max_after, rrdmetric_acquired_name(qd->rma), (size_t)r->view.after);
+                               rrdinstance_acquired_id(qi->ria), (size_t)max_after, rrdmetric_acquired_id(qd->rma), (size_t)r->view.after);
 
                 r->view.after = (r->view.after > max_after) ? r->view.after : max_after;
             }
 
             if(r->view.before != min_before) {
                 internal_error(true, "QUERY: 'before' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                               rrdmetric_acquired_id(qd->rma), (size_t)min_before, rrdmetric_acquired_name(qd->rma), (size_t)r->view.before);
+                               rrdinstance_acquired_id(qi->ria), (size_t)min_before, rrdmetric_acquired_id(qd->rma), (size_t)r->view.before);
 
                 r->view.before = (r->view.before < min_before) ? r->view.before : min_before;
             }
 
             if(r->rows != max_rows) {
                 internal_error(true, "QUERY: 'rows' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                               rrdmetric_acquired_id(qd->rma), (size_t)max_rows, rrdmetric_acquired_name(qd->rma), (size_t)r->rows);
+                               rrdinstance_acquired_id(qi->ria), (size_t)max_rows, rrdmetric_acquired_id(qd->rma), (size_t)r->rows);
 
                 r->rows = (r->rows > max_rows) ? r->rows : max_rows;
             }

@@ -42,7 +42,7 @@ static inline int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, s
     RRDR_GROUP_BY group_by = RRDR_GROUP_BY_DIMENSION;
     RRDR_GROUP_BY_FUNCTION group_by_aggregate = RRDR_GROUP_BY_FUNCTION_AVERAGE;
     DATASOURCE_FORMAT format = DATASOURCE_JSON;
-    RRDR_OPTIONS options = RRDR_OPTION_JSON_WRAP | RRDR_OPTION_RETURN_JWAR | RRDR_OPTION_VIRTUAL_POINTS;
+    RRDR_OPTIONS options = 0;
 
     while(url) {
         char *value = mystrsep(&url, "&");
@@ -136,9 +136,6 @@ static inline int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, s
             tier = 0;
     }
 
-    ONEWAYALLOC *owa = onewayalloc_create(0);
-    QUERY_TARGET *qt = NULL;
-
     long long before = (before_str && *before_str)?str2l(before_str):0;
     long long after  = (after_str  && *after_str) ?str2l(after_str):-600;
     int       points = (points_str && *points_str)?str2i(points_str):0;
@@ -175,7 +172,8 @@ static inline int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, s
             .priority = STORAGE_PRIORITY_NORMAL,
             .received_ut = received_ut,
     };
-    qt = query_target_create(&qtr);
+    QUERY_TARGET *qt = query_target_create(&qtr);
+    ONEWAYALLOC *owa = NULL;
 
     if(!qt) {
         buffer_sprintf(w->response.data, "Failed to prepare the query.");
@@ -225,6 +223,7 @@ static inline int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, s
         buffer_strcat(w->response.data, "(");
     }
 
+    owa = onewayalloc_create(0);
     ret = data_query_execute(owa, w->response.data, qt, &last_timestamp_in_data);
 
     if(format == DATASOURCE_DATATABLE_JSONP) {
@@ -242,7 +241,7 @@ static inline int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, s
     else if(format == DATASOURCE_JSONP)
         buffer_strcat(w->response.data, ");");
 
-    cleanup:
+cleanup:
     query_target_release(qt);
     onewayalloc_destroy(owa);
     return ret;

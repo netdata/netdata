@@ -1172,8 +1172,10 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 #endif
 
     buffer_json_member_add_string(wb, "memory-mode", rrd_memory_mode_name(host->rrd_memory_mode));
+#ifdef ENABLE_DBENGINE
     buffer_json_member_add_uint64(wb, "multidb-disk-quota", default_multidb_disk_quota_mb);
     buffer_json_member_add_uint64(wb, "page-cache-size", default_rrdeng_page_cache_mb);
+#endif // ENABLE_DBENGINE
     buffer_json_member_add_boolean(wb, "web-enabled", web_server_mode != WEB_SERVER_MODE_NONE);
     buffer_json_member_add_boolean(wb, "stream-enabled", default_rrdpush_enabled);
 
