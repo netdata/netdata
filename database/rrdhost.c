@@ -333,10 +333,8 @@ int is_legacy = 1;
         rrdhost_option_set(host, RRDHOST_OPTION_DELETE_ORPHAN_HOST);
 
     char filename[FILENAME_MAX + 1];
-    if(is_localhost) {
+    if(is_localhost)
         host->cache_dir  = strdupz(netdata_configured_cache_dir);
-        host->varlib_dir = strdupz(netdata_configured_varlib_dir);
-    }
     else {
         // this is not localhost - append our GUID to localhost path
         if (is_in_multihost) { // don't append to cache dir in multihost
@@ -353,9 +351,6 @@ int is_legacy = 1;
             if(r != 0 && errno != EEXIST)
                 error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), host->cache_dir);
         }
-
-        snprintfz(filename, FILENAME_MAX, "%s/%s", netdata_configured_varlib_dir, host->machine_guid);
-        host->varlib_dir = strdupz(filename);
     }
 
     // this is also needed for custom host variables - not only health
@@ -502,7 +497,6 @@ int is_legacy = 1;
                  " (to '%s' with api key '%s')"
                  ", health %s"
                  ", cache_dir '%s'"
-                 ", varlib_dir '%s'"
                  ", alarms default handler '%s'"
                  ", alarms default recipient '%s'"
          , rrdhost_hostname(host)
@@ -521,7 +515,6 @@ int is_legacy = 1;
          , host->rrdpush_send_api_key?host->rrdpush_send_api_key:""
          , host->health.health_enabled?"enabled":"disabled"
          , host->cache_dir
-         , host->varlib_dir
          , string2str(host->health.health_default_exec)
          , string2str(host->health.health_default_recipient)
     );
@@ -1204,7 +1197,6 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     string_freez(host->program_version);
     rrdhost_system_info_free(host->system_info);
     freez(host->cache_dir);
-    freez(host->varlib_dir);
     freez(host->rrdpush_send_api_key);
     freez(host->rrdpush_send_destination);
     rrdpush_destinations_free(host);
