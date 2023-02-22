@@ -182,6 +182,26 @@ static int netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req)
     return 0;
 }
 
+static int hdl_netdata_conf(h2o_handler_t *self, h2o_req_t *req)
+{
+    if (!h2o_memis(req->method.base, req->method.len, H2O_STRLIT("GET")))
+        return -1;
+
+    BUFFER *buf = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
+    config_generate(buf, 0);
+
+    void *managed = h2o_mem_alloc_shared(&req->pool, buf->len, NULL);
+    memcpy(managed, buf->buffer, buf->len);
+
+    req->res.status = 200;
+    req->res.reason = "OK";
+    h2o_add_header(&req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL, CONTENT_TEXT_UTF8);
+    h2o_send_inline(req, managed, buf->len);
+    buffer_free(buf);
+
+    return 0;
+}
+
 void *httpd_main(void *ptr) {
     h2o_pathconf_t *pathconf;
     h2o_hostconf_t *hostconf;
@@ -192,8 +212,12 @@ void *httpd_main(void *ptr) {
     h2o_config_init(&config);
     hostconf = h2o_config_register_host(&config, h2o_iovec_init(H2O_STRLIT("default")), bind_port);
 
-    pathconf = h2o_config_register_path(hostconf, "/", 0);
+    pathconf = h2o_config_register_path(hostconf, "/netdata.conf", 0);
     h2o_handler_t *handler = h2o_create_handler(pathconf, sizeof(*handler));
+    handler->on_req = hdl_netdata_conf;
+
+    pathconf = h2o_config_register_path(hostconf, "/", 0);
+    handler = h2o_create_handler(pathconf, sizeof(*handler));
     handler->on_req = netdata_uberhandler;
     h2o_file_register(pathconf, netdata_configured_web_dir, NULL, NULL, H2O_FILE_FLAG_SEND_COMPRESSED);
 
