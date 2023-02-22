@@ -254,6 +254,9 @@ typedef struct query_metric {
 typedef struct query_target_request {
     size_t version;
 
+    const char *scope_hosts;
+    const char *scope_contexts;
+
     // selecting / filtering metrics to be queried
     RRDHOST *host;                      // the host to be queried (can be NULL, hosts will be used)
     RRDCONTEXT_ACQUIRED *rca;           // the context to be queried (can be NULL)
@@ -354,6 +357,7 @@ typedef struct query_target {
         uint32_t used;                      // how many items of the array are used
         uint32_t size;                      // the size of the array
         SIMPLE_PATTERN *pattern;
+        SIMPLE_PATTERN *scope_pattern;
     } contexts;
 
     struct {
@@ -361,6 +365,7 @@ typedef struct query_target {
         uint32_t used;                      // how many items of the array are used
         uint32_t size;                      // the size of the array
         SIMPLE_PATTERN *pattern;
+        SIMPLE_PATTERN *scope_pattern;
     } hosts;
 
     struct {

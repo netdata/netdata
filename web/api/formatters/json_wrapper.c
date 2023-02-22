@@ -935,6 +935,11 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
             buffer_json_member_add_string(wb, "format", rrdr_format_to_string(qt->request.format));
             web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", qt->request.options);
 
+            buffer_json_member_add_object(wb, "scope");
+            buffer_json_member_add_string(wb, "scope_hosts", qt->request.scope_hosts);
+            buffer_json_member_add_string(wb, "scope_contexts", qt->request.scope_contexts);
+            buffer_json_object_close(wb); // scope
+
             buffer_json_member_add_object(wb, "selectors");
             if (qt->request.host)
                 buffer_json_member_add_string(wb, "host", rrdhost_hostname(qt->request.host));

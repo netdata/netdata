@@ -3,7 +3,7 @@
 #include "web_api_v2.h"
 
 
-static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_client *w, char *url) {
+static inline int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     debug(D_WEB_CLIENT, "%llu: API v1 data with URL '%s'", w->id, url);
 
     usec_t received_ut = now_monotonic_usec();
@@ -21,6 +21,8 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
 
     time_t last_timestamp_in_data = 0, google_timestamp = 0;
 
+    char *scope_hosts = NULL;
+    char *scope_contexts = NULL;
     char *hosts = NULL;
     char *contexts = NULL;
     char *instances = NULL;
@@ -53,7 +55,9 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
         // name and value are now the parameters
         // they are not null and not empty
 
-        if(!strcmp(name, "hosts")) hosts = value;
+        if(!strcmp(name, "scope_hosts")) scope_hosts = value;
+        else if(!strcmp(name, "scope_contexts")) scope_contexts = value;
+        else if(!strcmp(name, "hosts")) hosts = value;
         else if(!strcmp(name, "contexts")) contexts = value;
         else if(!strcmp(name, "instances")) instances = value;
         else if(!strcmp(name, "dimensions")) dimensions = value;
@@ -115,7 +119,7 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
     fix_google_param(responseHandler);
     fix_google_param(outFileName);
 
-    if(group_by != RRDR_GROUP_BY_DIMENSION)
+    if(group_by & ~(RRDR_GROUP_BY_DIMENSION))
         options |= RRDR_OPTION_ABSOLUTE;
 
     if(options & RRDR_OPTION_SHOW_PLAN)
@@ -132,7 +136,6 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
             tier = 0;
     }
 
-    RRDSET *st = NULL;
     ONEWAYALLOC *owa = onewayalloc_create(0);
     QUERY_TARGET *qt = NULL;
 
@@ -144,10 +147,12 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
 
     QUERY_TARGET_REQUEST qtr = {
             .version = 2,
+            .scope_hosts = scope_hosts,
+            .scope_contexts = scope_contexts,
             .after = after,
             .before = before,
-            .host = (hosts && *hosts) ? NULL : host,
-            .st = st,
+            .host = NULL,
+            .st = NULL,
             .hosts = hosts,
             .contexts = contexts,
             .charts = instances,
@@ -172,7 +177,7 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
     };
     qt = query_target_create(&qtr);
 
-    if(!qt || !qt->query.used) {
+    if(!qt) {
         buffer_sprintf(w->response.data, "No metrics where matched to query.");
         ret = HTTP_RESP_NOT_FOUND;
         goto cleanup;
@@ -210,7 +215,7 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
                 responseHandler,
                 google_version,
                 google_reqId,
-                (int64_t)st->last_updated.tv_sec);
+                (int64_t)now_realtime_sec());
     }
     else if(format == DATASOURCE_JSONP) {
         if(responseHandler == NULL)
