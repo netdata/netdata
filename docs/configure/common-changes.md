@@ -29,16 +29,6 @@ changes reflected in those visualizations due to the way Netdata Cloud proxies m
 
 ### Increase the long-term metrics retention period
 
-Increase the values for the `page cache size` and `dbengine multihost disk space` settings in
-the [`[global]`section](https://github.com/netdata/netdata/blob/master/daemon/config/README.md#global-section-options)
-of `netdata.conf`.
-
-```conf
-[global]
-    page cache size = 128   # 128 MiB of memory for metrics storage
-    dbengine multihost disk space = 4096   # 4GiB of disk space for metrics storage
-```
-
 Read our doc
 on [increasing long-term metrics storage](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md)
 for details, including a
@@ -142,56 +132,7 @@ click on the link to your preferred notification method to find documentation fo
 While the Netdata Agent is both [open and secure by design](https://www.netdata.cloud/blog/netdata-agent-dashboard/), we
 recommend every user take some action to administer and secure their nodes.
 
-Learn more about a few of the following changes in
-the [node security doc](https://github.com/netdata/netdata/blob/master/docs/configure/secure-nodes.md).
-
-### Disable the local Agent dashboard (`http://NODE:19999`)
-
-If you use Netdata Cloud to visualize metrics, stream metrics to a parent node, or otherwise don't need the local Agent
-dashboard, disabling it reduces the Agent's resource utilization and improves security.
-
-Change the `mode` setting to `none` in
-the [`[web]` section](https://github.com/netdata/netdata/blob/master/web/server/README.md#configuration)
-of `netdata.conf`.
-
-```conf
-[web]
-    mode = none
-```
-
-### Use access lists to restrict access to specific assets
-
-Allow access from only specific IP addresses, ranges of IP addresses, or hostnames
-using [access lists](https://github.com/netdata/netdata/blob/master/web/server/README.md#access-lists)
-and [simple patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md).
-
-See a quickstart to access lists in the [node security
-doc](https://github.com/netdata/netdata/blob/master/docs/configure/secure-nodes.md#restrict-access-to-the-local-dashboard).
-
-### Stop sending anonymous statistics to Google Analytics
-
-Create a file called `.opt-out-from-anonymous-statistics` inside of your Netdata config directory to immediately stop
-the statistics script.
-
-```bash
-sudo touch .opt-out-from-anonymous-statistics
-```
-
-Learn more
-about [why we collect anonymous statistics](https://github.com/netdata/netdata/blob/master/docs/anonymous-statistics.md).
-
-### Change the IP address/port Netdata listens to
-
-Change the `default port` setting in the `[web]` section to a port other than `19999`.
-
-```conf
-[web]
-   default port = 39999
-```
-
-Use the `bind to` setting to the ports other assets, such as
-the [running `netdata.conf` configuration](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#see-an-agents-running-configuration),
-API, or streaming requests listen to.
+Learn more about the available options in the [security design documentation](https://github.com/netdata/netdata/blob/master/docs/netdata-security.md).
 
 ## Reduce resource usage
 
@@ -217,36 +158,3 @@ The following restrictions apply to host label names:
 The policy for values is more flexible, but you can not use exclamation marks (`!`), whitespaces (` `), single quotes
 (`'`), double quotes (`"`), or asterisks (`*`), because they are used to compare label values in health alarms and
 templates.
-
-## What's next?
-
-If you haven't already, learn how
-to [secure your nodes](https://github.com/netdata/netdata/blob/master/docs/configure/secure-nodes.md).
-
-As mentioned at the top, there are plenty of other
-
-You can also take what you've learned about node configuration to tweak the Agent's behavior or enable new features:
-
-- [Enable new collectors](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md#enable-and-disable-a-specific-collection-module) or tweak
-  their behavior.
-- [Configure existing health alarms](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) or
-  create new ones.
-- [Enable notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to receive
-  updates about the health of your
-  infrastructure.
--
-
-Change [the long-term metrics retention period](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md)
-using the database engine.
-
-### Related reference documentation
-
-- [Netdata Agent · Daemon](https://github.com/netdata/netdata/blob/master/health/README.md)
-- [Netdata Agent · Daemon configuration](https://github.com/netdata/netdata/blob/master/daemon/config/README.md)
-- [Netdata Agent · Web server](https://github.com/netdata/netdata/blob/master/web/server/README.md)
-- [Netdata Agent · Local Agent dashboard](https://github.com/netdata/netdata/blob/master/web/gui/README.md)
-- [Netdata Agent · Health monitoring](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md)
-- [Netdata Agent · Notifications](https://github.com/netdata/netdata/blob/master/health/notifications/README.md)
-- [Netdata Agent · Simple patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md)
-
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fconfigure%2Fcommon-changes&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
