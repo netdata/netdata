@@ -21,7 +21,7 @@ h2o_iovec_pair_vector_t *parse_URL_params(h2o_mem_pool_t *pool, h2o_iovec_t para
     memset(params_vec, 0, sizeof(h2o_iovec_pair_vector_t));
 
     h2o_iovec_pair_t param;
-    while ((param.name.base = (char*)h2o_next_token(&params_string, '&', '&', &param.name.len, &param.value)) != NULL) {
+    while ((param.name.base = (char*)h2o_next_token(&params_string, '&', &param.name.len, &param.value)) != NULL) {
         if (params_vec->capacity == params_vec->size)
             h2o_vector_reserve(pool, params_vec, params_vec->capacity + KEY_VAL_BUFFER_GROWTH_STEP);
 
