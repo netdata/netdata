@@ -265,7 +265,8 @@ typedef struct query_target_request {
     const char *charts;                 // charts simple pattern (for context queries)
     const char *dimensions;             // dimensions simple pattern
     const char *chart_label_key;        // select only the chart having this label key
-    const char *charts_labels_filter;   // select only the charts having this combo of label key:value
+    const char *labels;                 // select only the charts having this combo of label key:value
+    const char *alerts;                 // select only the charts having this combo of alert name:status
 
     time_t after;                       // the requested timeframe
     time_t before;                      // the requested timeframe
@@ -343,8 +344,9 @@ typedef struct query_target {
         uint32_t used;                      // how many items of the array are used
         uint32_t size;                      // the size of the array
         SIMPLE_PATTERN *pattern;
+        SIMPLE_PATTERN *labels_pattern;
+        SIMPLE_PATTERN *alerts_pattern;
         SIMPLE_PATTERN *chart_label_key_pattern;
-        SIMPLE_PATTERN *charts_labels_filter_pattern;
     } instances;
 
     struct {

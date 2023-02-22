@@ -732,7 +732,7 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
             .resampling_time = group_time,
             .tier = tier,
             .chart_label_key = chart_label_key,
-            .charts_labels_filter = chart_labels_filter,
+            .labels = chart_labels_filter,
             .query_source = QUERY_SOURCE_API_DATA,
             .priority = STORAGE_PRIORITY_NORMAL,
     };

@@ -30,8 +30,8 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
     char *resampling_time_str = NULL;
     char *points_str = NULL;
     char *timeout_str = NULL;
-    char *chart_label_key = NULL;
-    char *chart_labels_filter = NULL;
+    char *labels = NULL;
+    char *alerts = NULL;
     char *time_group_options = NULL;
     char *tier_str = NULL;
     char *group_by_label = NULL;
@@ -57,8 +57,8 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
         else if(!strcmp(name, "contexts")) contexts = value;
         else if(!strcmp(name, "instances")) instances = value;
         else if(!strcmp(name, "dimensions")) dimensions = value;
-            // else if(!strcmp(name, "chart_label_key")) chart_label_key = value;
-        else if(!strcmp(name, "labels")) chart_labels_filter = value;
+        else if(!strcmp(name, "labels")) labels = value;
+        else if(!strcmp(name, "alerts")) alerts = value;
         else if(!strcmp(name, "after")) after_str = value;
         else if(!strcmp(name, "before")) before_str = value;
         else if(!strcmp(name, "points")) points_str = value;
@@ -152,6 +152,7 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
             .contexts = contexts,
             .charts = instances,
             .dimensions = dimensions,
+            .alerts = alerts,
             .timeout = timeout,
             .points = points,
             .format = format,
@@ -163,8 +164,8 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
             .time_group_options = time_group_options,
             .resampling_time = group_time,
             .tier = tier,
-            .chart_label_key = chart_label_key,
-            .charts_labels_filter = chart_labels_filter,
+            .chart_label_key = NULL,
+            .labels = labels,
             .query_source = QUERY_SOURCE_API_DATA,
             .priority = STORAGE_PRIORITY_NORMAL,
             .received_ut = received_ut,

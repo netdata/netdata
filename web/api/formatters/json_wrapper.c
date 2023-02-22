@@ -943,7 +943,8 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
             buffer_json_member_add_string(wb, "contexts", qt->request.contexts);
             buffer_json_member_add_string(wb, "instances", qt->request.charts);
             buffer_json_member_add_string(wb, "dimensions", qt->request.dimensions);
-            buffer_json_member_add_string(wb, "labels", qt->request.charts_labels_filter);
+            buffer_json_member_add_string(wb, "labels", qt->request.labels);
+            buffer_json_member_add_string(wb, "alerts", qt->request.alerts);
             buffer_json_object_close(wb); // selectors
 
             buffer_json_member_add_object(wb, "window");

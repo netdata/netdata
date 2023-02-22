@@ -2267,7 +2267,8 @@ typedef struct query_target_locals {
     const char *charts;
     const char *dimensions;
     const char *chart_label_key;
-    const char *charts_labels_filter;
+    const char *labels;
+    const char *alerts;
 
     long long after;
     long long before;
@@ -2294,8 +2295,8 @@ void query_target_release(QUERY_TARGET *qt) {
     simple_pattern_free(qt->instances.chart_label_key_pattern);
     qt->instances.chart_label_key_pattern = NULL;
 
-    simple_pattern_free(qt->instances.charts_labels_filter_pattern);
-    qt->instances.charts_labels_filter_pattern = NULL;
+    simple_pattern_free(qt->instances.labels_pattern);
+    qt->instances.labels_pattern = NULL;
 
     simple_pattern_free(qt->query.pattern);
     qt->query.pattern = NULL;
@@ -2721,6 +2722,45 @@ static void query_target_eval_instance_rrdcalc(QUERY_TARGET_LOCALS *qtl __maybe_
     }
 }
 
+static bool query_target_match_alert_pattern(QUERY_INSTANCE *qi, SIMPLE_PATTERN *pattern) {
+    if(!pattern)
+        return true;
+
+    RRDSET *st = rrdinstance_acquired_rrdset(qi->ria);
+    if (!st)
+        return false;
+
+    BUFFER *wb = NULL;
+    bool matched = false;
+    netdata_rwlock_rdlock(&st->alerts.rwlock);
+    if (st->alerts.base) {
+        for (RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
+            if(simple_pattern_matches(pattern, string2str(rc->name))) {
+                matched = true;
+                break;
+            }
+
+            if(!wb)
+                wb = buffer_create(0, NULL);
+            else
+                buffer_flush(wb);
+
+            buffer_fast_strcat(wb, string2str(rc->name), string_strlen(rc->name));
+            buffer_fast_strcat(wb, ":", 1);
+            buffer_strcat(wb, rrdcalc_status2string(rc->status));
+
+            if(simple_pattern_matches(pattern, buffer_tostring(wb))) {
+                matched = true;
+                break;
+            }
+        }
+    }
+    netdata_rwlock_unlock(&st->alerts.rwlock);
+
+    buffer_free(wb);
+    return matched;
+}
+
 static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, QUERY_CONTEXT *qc,
                                       RRDINSTANCE_ACQUIRED *ria, bool queryable_instance, bool match_id_name) {
     QUERY_TARGET *qt = qtl->qt;
@@ -2771,7 +2811,12 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, 
 
     if(queryable_instance) {
         if ((qt->instances.chart_label_key_pattern && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, qt->instances.chart_label_key_pattern, ':')) ||
-            (qt->instances.charts_labels_filter_pattern && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, qt->instances.charts_labels_filter_pattern, ':')))
+            (qt->instances.labels_pattern && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, qt->instances.labels_pattern, ':')))
+            queryable_instance = false;
+    }
+
+    if(queryable_instance) {
+        if(qt->instances.alerts_pattern && !query_target_match_alert_pattern(qi, qt->instances.alerts_pattern))
             queryable_instance = false;
     }
 
@@ -3023,7 +3068,8 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
         .charts = qt->request.charts,
         .dimensions = qt->request.dimensions,
         .chart_label_key = qt->request.chart_label_key,
-        .charts_labels_filter = qt->request.charts_labels_filter,
+        .labels = qt->request.labels,
+        .alerts = qt->request.alerts,
     };
 
     RRDHOST *host = qt->request.host;
@@ -3036,7 +3082,8 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     qt->instances.pattern = is_valid_sp(qtl.charts) ? simple_pattern_create(qtl.charts, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
     qt->query.pattern = is_valid_sp(qtl.dimensions) ? simple_pattern_create(qtl.dimensions, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
     qt->instances.chart_label_key_pattern = is_valid_sp(qtl.chart_label_key) ? simple_pattern_create(qtl.chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
-    qt->instances.charts_labels_filter_pattern = is_valid_sp(qtl.charts_labels_filter) ? simple_pattern_create(qtl.charts_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
+    qt->instances.labels_pattern = is_valid_sp(qtl.labels) ? simple_pattern_create(qtl.labels, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
+    qt->instances.alerts_pattern = is_valid_sp(qtl.alerts) ? simple_pattern_create(qtl.alerts, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
 
     qtl.match_ids = qt->request.options & RRDR_OPTION_MATCH_IDS;
     qtl.match_names = qt->request.options & RRDR_OPTION_MATCH_NAMES;
