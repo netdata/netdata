@@ -2286,8 +2286,14 @@ void query_target_release(QUERY_TARGET *qt) {
     if(unlikely(!qt)) return;
     if(unlikely(!qt->used)) return;
 
+    simple_pattern_free(qt->hosts.scope_pattern);
+    qt->hosts.scope_pattern = NULL;
+
     simple_pattern_free(qt->hosts.pattern);
     qt->hosts.pattern = NULL;
+
+    simple_pattern_free(qt->contexts.scope_pattern);
+    qt->contexts.scope_pattern = NULL;
 
     simple_pattern_free(qt->contexts.pattern);
     qt->contexts.pattern = NULL;
@@ -2528,6 +2534,7 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, QU
                 __atomic_add_fetch(&netdata_buffers_statistics.query_targets_size, new_mem - old_mem, __ATOMIC_RELAXED);
             }
             QUERY_METRIC *qm = &qt->query.array[qt->query.used++];
+            memset(qm, 0, sizeof(*qm));
 
             qm->grouped_as.slot = 0;
             qm->grouped_as.id = NULL;
@@ -2611,6 +2618,8 @@ static void query_target_add_dimension(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh,
         __atomic_add_fetch(&netdata_buffers_statistics.query_targets_size, new_mem - old_mem, __ATOMIC_RELAXED);
     }
     QUERY_DIMENSION *qd = &qt->dimensions.array[qt->dimensions.used];
+    memset(qd, 0, sizeof(*qd));
+
     qd->slot = qt->dimensions.used++;
     qd->rma = rrdmetric_acquired_dup(rma);
     qd->status = QUERY_STATUS_NONE;
@@ -2780,14 +2789,13 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, 
 
         __atomic_add_fetch(&netdata_buffers_statistics.query_targets_size, new_mem - old_mem, __ATOMIC_RELAXED);
     }
-
     QUERY_INSTANCE *qi = &qt->instances.array[qt->instances.used];
+    memset(qi, 0, sizeof(*qi));
+
     qi->slot = qt->instances.used;
     qt->instances.used++;
     qi->ria = rrdinstance_acquired_dup(ria);
     qi->query_host_id = qh->slot;
-    qi->metrics = (struct query_metrics_counts){ 0 };
-    qi->alerts = (struct query_alerts_counts){ 0 };
 
     if(qt->request.version <= 1) {
         qi->id_fqdn = rrdinstance_id_fqdn_v1(ria);
@@ -2842,6 +2850,9 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, 
     }
 
     if(!added) {
+        qc->instances.excluded++;
+        qh->instances.excluded++;
+
         qt->instances.used--;
         rrdinstance_release(ria);
         qi->ria = NULL;
@@ -2851,6 +2862,10 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, 
 
         string_freez(qi->name_fqdn);
         qi->name_fqdn = NULL;
+    }
+    else {
+        qc->instances.selected++;
+        qh->instances.selected++;
     }
 }
 
@@ -2869,12 +2884,10 @@ static void query_target_add_context(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, R
 
         __atomic_add_fetch(&netdata_buffers_statistics.query_targets_size, new_mem - old_mem, __ATOMIC_RELAXED);
     }
-
     QUERY_CONTEXT *qc = &qt->contexts.array[qt->contexts.used];
+    memset(qc, 0, sizeof(*qc));
     qc->slot = qt->contexts.used++;
     qc->rca =  rrdcontext_acquired_dup(rca);
-    qc->metrics = (struct query_metrics_counts){ 0 };
-    qc->alerts = (struct query_alerts_counts){ 0 };
 
     size_t added = 0;
     if(unlikely(qt->request.ria)) {
@@ -2912,10 +2925,9 @@ static void query_target_add_host(QUERY_TARGET_LOCALS *qtl, RRDHOST *host, bool 
         __atomic_add_fetch(&netdata_buffers_statistics.query_targets_size, new_mem - old_mem, __ATOMIC_RELAXED);
     }
     QUERY_HOST *qh = &qt->hosts.array[qt->hosts.used];
+    memset(qh, 0, sizeof(*qh));
     qh->slot = qt->hosts.used++;
     qh->host = host;
-    qh->metrics = (struct query_metrics_counts){ 0 };
-    qh->alerts = (struct query_alerts_counts){ 0 };
 
     if(host->node_id)
         uuid_unparse_lower(*host->node_id, qh->node_id);

@@ -154,6 +154,13 @@ static inline void query_target_metric_counts(BUFFER *wb, struct query_metrics_c
     buffer_json_object_close(wb);
 }
 
+static inline void query_target_instance_counts(BUFFER *wb, struct query_instances_counts *instances) {
+    buffer_json_member_add_object(wb, "is");
+    buffer_json_member_add_uint64(wb, "sl", instances->selected);
+    buffer_json_member_add_uint64(wb, "ex", instances->excluded);
+    buffer_json_object_close(wb);
+}
+
 static inline void query_target_alerts_counts(BUFFER *wb, struct query_alerts_counts *alerts, const char *name, bool array) {
     if(array)
         buffer_json_add_array_item_object(wb);
@@ -202,6 +209,7 @@ static size_t query_target_hosts_contexts_instances_labels_dimensions(
             if(qh->node_id[0])
                 buffer_json_member_add_string(wb, "nd", qh->node_id);
             buffer_json_member_add_string(wb, "nm", rrdhost_hostname(host));
+            query_target_instance_counts(wb, &qh->instances);
             query_target_metric_counts(wb, &qh->metrics);
             query_target_alerts_counts(wb, &qh->alerts, NULL, false);
             buffer_json_object_close(wb);
@@ -214,9 +222,11 @@ static size_t query_target_hosts_contexts_instances_labels_dimensions(
         DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
 
         struct {
+            struct query_instances_counts instances;
             struct query_metrics_counts metrics;
             struct query_alerts_counts alerts;
         } x = {
+                .instances = (struct query_instances_counts){ 0 },
                 .metrics = (struct query_metrics_counts){ 0 },
                 .alerts = (struct query_alerts_counts){ 0 },
         }, *z;
@@ -225,6 +235,10 @@ static size_t query_target_hosts_contexts_instances_labels_dimensions(
             QUERY_CONTEXT *qc = query_context(qt, c);
 
             z = dictionary_set(dict, rrdcontext_acquired_id(qc->rca), &x, sizeof(x));
+
+            z->instances.selected += qc->instances.selected;
+            z->instances.excluded += qc->instances.selected;
+
             z->metrics.selected += qc->metrics.selected;
             z->metrics.excluded += qc->metrics.excluded;
             z->metrics.queried += qc->metrics.queried;
@@ -238,6 +252,7 @@ static size_t query_target_hosts_contexts_instances_labels_dimensions(
         dfe_start_read(dict, z) {
             buffer_json_add_array_item_object(wb);
             buffer_json_member_add_string(wb, "id", z_dfe.name);
+            query_target_instance_counts(wb, &z->instances);
             query_target_metric_counts(wb, &z->metrics);
             query_target_alerts_counts(wb, &z->alerts, NULL, false);
             buffer_json_object_close(wb);
