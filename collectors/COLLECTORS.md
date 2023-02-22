@@ -1,5 +1,5 @@
 <!--
-title: "Supported collectors list"
+title: "Monitor anything with Netdata"
 description: "Netdata gathers real-time metrics from hundreds of data sources using collectors. Most require zero configuration and are pre-configured out of the box."
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/COLLECTORS.md"
 sidebar_label: "Monitor"
@@ -7,7 +7,7 @@ learn_status: "Published"
 learn_rel_path: "Integrations/Monitor"
 -->
 
-# Supported collectors list
+# Monitor anything with Netdata
 
 Netdata uses collectors to help you gather metrics from your favorite applications and services and view them in
 real-time, interactive charts. The following list includes collectors for both external services/applications and
