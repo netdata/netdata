@@ -925,6 +925,11 @@ DAEMON_FILES = \
     daemon/unit_test.h \
     $(NULL)
 
+HTTPD_FILES = \
+    httpd/h2o_utils.c \
+    httpd/h2o_utils.h \
+    $(NULL)
+
 NETDATA_FILES = \
     collectors/all.h \
     $(DAEMON_FILES) \
@@ -945,6 +950,7 @@ NETDATA_FILES = \
     $(ACLK_FILES) \
     $(SPAWN_PLUGIN_FILES) \
     $(TIMEX_PLUGIN_FILES) \
+    $(HTTPD_FILES) \
     $(NULL)
 
 if FREEBSD
@@ -986,6 +992,7 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_YAML_LIBS) \
     $(OPTIONAL_ATOMIC_LIBS) \
     $(OPTIONAL_DL_LIBS) \
+    httpd/h2o/build/libh2o.a \
     $(NULL)
 
 if ENABLE_ACLK
