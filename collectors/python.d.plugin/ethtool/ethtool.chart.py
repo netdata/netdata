@@ -60,25 +60,13 @@ def device_charts(devs):
     charts = dict()
 
     for d in devs:
-        order.append('dev_{0}_bytes_received'.format(d.id))
-        charts.update(
-            {
-                'dev_{0}_bytes_received'.format(d.id): {
-                    'options': [None, 'Bytes received', 'absolute', 'network_device',
-                                'ethtool.dev_bytes_received', 'line'],
-                    'lines': [
-                        ['dev_{0}_bytes_received'.format(d.id), 'device {0}'.format(d.id)],
-                    ]
-                }
-            }
-        )
+        fam = d.id
 
-    for d in devs:
         order.append('dev_{0}_rx_bw'.format(d.id))
         charts.update(
             {
                 'dev_{0}_rx_bw'.format(d.id): {
-                    'options': [None, 'Rx Bandwidth Bytes/sec', 'absolute', 'network_device',
+                    'options': [None, 'Rx Bandwidth Bytes/sec', 'absolute', fam,
                                 'ethtool.dev_rx_bandwidth', 'line'],
                     'lines': [
                         ['dev_{0}_rx_bw'.format(d.id), 'device {0}'.format(d.id)],
@@ -88,12 +76,11 @@ def device_charts(devs):
         )
 
 
-    for d in devs:
         order.append('dev_{0}_packets_lost'.format(d.id))
         charts.update(
             {
                 'dev_{0}_packets_lost'.format(d.id): {
-                    'options': [None, 'Lost packets', 'Lost packets', 'network_device', 'ethtool.packets_lost', 'line'],
+                    'options': [None, 'Lost packets', 'Lost packets', fam, 'ethtool.packets_lost', 'line'],
                     'lines': [
                         ['dev_{0}_packets_lost'.format(d.id), 'adapter {0}'.format(d.id)],
                     ]
@@ -105,15 +92,13 @@ def device_charts(devs):
 
 
 class Metrics:
-    def __init__(self, device_id, bytes_received, rx_bw, rx_discards_phy):
+    def __init__(self, device_id, rx_bw, rx_discards_phy):
         self.id = device_id
-        self.bytes_received = bytes_received
         self.rx_discards_phy = rx_discards_phy
         self.rx_bw = rx_bw
 
     def data(self):
         return {
-            'dev_{0}_bytes_received'.format(self.id): self.bytes_received,
             'dev_{0}_rx_bw'.format(self.id): self.rx_bw,
             'dev_{0}_packets_lost'.format(self.id): self.rx_discards_phy,
         }
@@ -154,7 +139,7 @@ class Service(ExecutableService):
             rx_bw = int((rx_bytes_received - self.last_rx_bytes_received) / nb_sec)
         self.last_rx_bytes_received = rx_bytes_received
         self.last_update = last_update
-        toto = Metrics(name, self.last_rx_bytes_received, rx_bw, rx_discards_phy)
+        toto = Metrics(name, rx_bw, rx_discards_phy)
         self.debug('last_rx_bytes_received {}'.format(self.last_rx_bytes_received))
         self.debug('toto {}'.format(toto.data()))
         return toto
