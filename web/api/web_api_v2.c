@@ -98,7 +98,7 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
         else if(!strcmp(name, "timeout")) timeout_str = value;
         else if(!strcmp(name, "group_by")) group_by = group_by_parse(value);
         else if(!strcmp(name, "group_by_label")) group_by_label = value;
-        else if(!strcmp(name, "group_by_aggregate")) group_by_aggregate = group_by_aggregate_function_parse(value);
+        else if(!strcmp(name, "aggregation")) group_by_aggregate = group_by_aggregate_function_parse(value);
         else if(!strcmp(name, "format")) format = web_client_api_request_v1_data_format(value);
         else if(!strcmp(name, "options")) options |= web_client_api_request_v1_data_options(value);
         else if(!strcmp(name, "time_group")) time_group = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);

@@ -186,6 +186,7 @@ struct query_data_statistics {
     NETDATA_DOUBLE max;
     NETDATA_DOUBLE sum;
     NETDATA_DOUBLE volume;
+    NETDATA_DOUBLE anomaly_sum;
 };
 
 typedef struct query_host {

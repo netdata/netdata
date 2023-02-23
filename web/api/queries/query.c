@@ -1691,7 +1691,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
             // we only store uint8_t anomaly rates,
             // so let's get double precision by storing
             // anomaly rates in the range 0 - 200
-            r->ar[rrdr_o_v_index] = ops->group_anomaly_rate / (NETDATA_DOUBLE)ops->group_points_added;
+            NETDATA_DOUBLE group_ar = r->ar[rrdr_o_v_index] = ops->group_anomaly_rate / (NETDATA_DOUBLE)ops->group_points_added;
 
             if(likely(points_added || dim_id_in_rrdr)) {
                 // find the min/max across all dimensions
@@ -1720,6 +1720,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                     qm->query_stats.max = stats_value;
             }
 
+            qm->query_stats.anomaly_sum += group_ar;
             qm->query_stats.sum += stats_value;
             qm->query_stats.volume += stats_value * (NETDATA_DOUBLE)ops->view_update_every;
             qm->query_stats.count++;
@@ -2288,6 +2289,7 @@ void query_target_merge_data_statistics(struct query_data_statistics *d, struct 
     else {
         d->count += s->count;
         d->sum += s->sum;
+        d->anomaly_sum += s->anomaly_sum;
         d->volume += s->volume;
 
         if(s->min < d->min)
