@@ -379,8 +379,8 @@ static int scan_data_files_cmp(const void *a, const void *b)
 /* Returns number of datafiles that were loaded or < 0 on error */
 static int scan_data_files(struct rrdengine_instance *ctx)
 {
-    int ret, matched_files, failed_to_load;
-    unsigned tier, no, i;
+    int ret, matched_files, failed_to_load, i;
+    unsigned tier, no;
     uv_fs_t req;
     uv_dirent_t dent;
     struct rrdengine_datafile **datafiles, *datafile;
