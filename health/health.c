@@ -839,11 +839,11 @@ static SILENCE_TYPE check_silenced(RRDCALC *rc, const char *host, SILENCERS *sil
 
     for (s = silencers->silencers; s!=NULL; s=s->next){
         if (
-                (!s->alarms_pattern || (rc->name && s->alarms_pattern && simple_pattern_matches(s->alarms_pattern, rrdcalc_name(rc)))) &&
-                (!s->contexts_pattern || (rc->rrdset && rc->rrdset->context && s->contexts_pattern && simple_pattern_matches(s->contexts_pattern, rrdset_context(rc->rrdset)))) &&
-                (!s->hosts_pattern || (host && s->hosts_pattern && simple_pattern_matches(s->hosts_pattern,host))) &&
-                (!s->charts_pattern || (rc->chart && s->charts_pattern && simple_pattern_matches(s->charts_pattern, rrdcalc_chart_name(rc)))) &&
-                (!s->families_pattern || (rc->rrdset && rc->rrdset->family && s->families_pattern && simple_pattern_matches(s->families_pattern, rrdset_family(rc->rrdset))))
+                (!s->alarms_pattern || (rc->name && s->alarms_pattern && simple_pattern_matches_string(s->alarms_pattern, rc->name))) &&
+                (!s->contexts_pattern || (rc->rrdset && rc->rrdset->context && s->contexts_pattern && simple_pattern_matches_string(s->contexts_pattern, rc->rrdset->context))) &&
+                (!s->hosts_pattern || (host && s->hosts_pattern && simple_pattern_matches(s->hosts_pattern, host))) &&
+                (!s->charts_pattern || (rc->chart && s->charts_pattern && simple_pattern_matches_string(s->charts_pattern, rc->chart))) &&
+                (!s->families_pattern || (rc->rrdset && rc->rrdset->family && s->families_pattern && simple_pattern_matches_string(s->families_pattern, rc->rrdset->family)))
                 ) {
             debug(D_HEALTH, "Alarm matches command API silence entry %s:%s:%s:%s:%s", s->alarms,s->charts, s->contexts, s->hosts, s->families);
             if (unlikely(silencers->stype == STYPE_NONE)) {

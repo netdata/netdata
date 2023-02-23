@@ -190,8 +190,8 @@ static inline bool should_send_chart_matching(RRDSET *st, RRDSET_FLAGS flags) {
             else
                 rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_IGNORE);
         }
-        else if(simple_pattern_matches(host->rrdpush_send_charts_matching, rrdset_id(st)) ||
-            simple_pattern_matches(host->rrdpush_send_charts_matching, rrdset_name(st)))
+        else if(simple_pattern_matches_string(host->rrdpush_send_charts_matching, st->id) ||
+            simple_pattern_matches_string(host->rrdpush_send_charts_matching, st->name))
 
             rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_SEND);
         else

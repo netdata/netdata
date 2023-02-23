@@ -9,9 +9,9 @@
 
 static int is_matches_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN *filter) {
     if (instance->config.options & EXPORTING_OPTION_SEND_NAMES) {
-        return simple_pattern_matches(filter, rrdset_name(st));
+        return simple_pattern_matches_string(filter, st->name);
     }
-    return simple_pattern_matches(filter, rrdset_id(st));
+    return simple_pattern_matches_string(filter, st->id);
 }
 
 /**

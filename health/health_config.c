@@ -681,7 +681,7 @@ static int health_readfile(const char *filename, void *data) {
             if (alert_cfg) alert_cfg->os = string_strdupz(value);
             SIMPLE_PATTERN *os_pattern = simple_pattern_create(os_match, NULL, SIMPLE_PATTERN_EXACT, true);
 
-            if(!simple_pattern_matches(os_pattern, rrdhost_os(host))) {
+            if(!simple_pattern_matches_string(os_pattern, host->os)) {
                 if(rc)
                     debug(D_HEALTH, "HEALTH on '%s' ignoring alarm '%s' defined at %zu@%s: host O/S does not match '%s'", rrdhost_hostname(host), rrdcalc_name(rc), line, filename, os_match);
 
@@ -698,7 +698,7 @@ static int health_readfile(const char *filename, void *data) {
             if (alert_cfg) alert_cfg->host = string_strdupz(value);
             SIMPLE_PATTERN *host_pattern = simple_pattern_create(host_match, NULL, SIMPLE_PATTERN_EXACT, true);
 
-            if(!simple_pattern_matches(host_pattern, rrdhost_hostname(host))) {
+            if(!simple_pattern_matches_string(host_pattern, host->hostname)) {
                 if(rc)
                     debug(D_HEALTH, "HEALTH on '%s' ignoring alarm '%s' defined at %zu@%s: hostname does not match '%s'", rrdhost_hostname(host), rrdcalc_name(rc), line, filename, host_match);
 

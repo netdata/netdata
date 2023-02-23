@@ -359,10 +359,10 @@ static inline bool rrdcalc_check_if_it_matches_rrdset(RRDCALC *rc, RRDSET *st) {
         && (rc->chart != st->name))
         return false;
 
-    if (rc->module_pattern && !simple_pattern_matches(rc->module_pattern, rrdset_module_name(st)))
+    if (rc->module_pattern && !simple_pattern_matches_string(rc->module_pattern, st->module_name))
         return false;
 
-    if (rc->plugin_pattern && !simple_pattern_matches(rc->plugin_pattern, rrdset_plugin_name(st)))
+    if (rc->plugin_pattern && !simple_pattern_matches_string(rc->plugin_pattern, st->module_name))
         return false;
 
     if (st->rrdhost->rrdlabels && rc->host_labels_pattern && !rrdlabels_match_simple_pattern_parsed(st->rrdhost->rrdlabels, rc->host_labels_pattern, '='))

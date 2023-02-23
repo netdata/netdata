@@ -1822,9 +1822,9 @@ static inline int rrdmetric_to_json_callback(const DICTIONARY_ITEM *item, void *
         return 0;
 
     if(t->chart_dimensions
-        && !simple_pattern_matches(t->chart_dimensions, string2str(rm->id))
+        && !simple_pattern_matches_string(t->chart_dimensions, rm->id)
         && rm->name != rm->id
-        && !simple_pattern_matches(t->chart_dimensions, string2str(rm->name)))
+        && !simple_pattern_matches_string(t->chart_dimensions, rm->name))
         return 0;
 
     if(t->written) {
@@ -2222,7 +2222,7 @@ DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contex
         if(rrd_flag_is_deleted(rc))
             continue;
 
-        if(contexts && !simple_pattern_matches(contexts, string2str(rc->id)))
+        if(contexts && !simple_pattern_matches_string(contexts, rc->id))
             continue;
 
         RRDINSTANCE *ri;
@@ -2274,13 +2274,13 @@ static uint64_t rrdcontext_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_P
                     uuid_unparse_lower(*host->node_id, host_uuid_buffer);
 
                 if(!scope_hosts_sp ||
-                   simple_pattern_matches(scope_hosts_sp, rrdhost_hostname(host)) ||
+                   simple_pattern_matches_string(scope_hosts_sp, host->hostname) ||
                    simple_pattern_matches(scope_hosts_sp, host->machine_guid) ||
                    (*host_uuid_buffer && simple_pattern_matches(scope_hosts_sp, host_uuid_buffer))) {
 
                     bool queryable_host = false;
                     if(!hosts_sp ||
-                       simple_pattern_matches(hosts_sp, rrdhost_hostname(host)) ||
+                       simple_pattern_matches_string(hosts_sp, host->hostname) ||
                        simple_pattern_matches(hosts_sp, host->machine_guid) ||
                        (*host_uuid_buffer && simple_pattern_matches(hosts_sp, host_uuid_buffer)))
                         queryable_host = true;
@@ -2312,7 +2312,8 @@ static size_t rrdcontext_foreach_context(RRDHOST *host, const char *scope_contex
         // we found it!
 
         bool queryable_context = queryable_host;
-        if(queryable_context && contexts_sp && !simple_pattern_matches(contexts_sp, rrdcontext_acquired_id(rca)))
+        RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+        if(queryable_context && contexts_sp && !simple_pattern_matches_string(contexts_sp, rc->id))
             queryable_context = false;
 
         if(cb(data, rca, queryable_context))
@@ -2324,16 +2325,16 @@ static size_t rrdcontext_foreach_context(RRDHOST *host, const char *scope_contex
         // Probably it is a pattern, we need to search for it...
         RRDCONTEXT *rc;
         dfe_start_read(host->rrdctx.contexts, rc) {
-                    if(scope_contexts_sp && !simple_pattern_matches(scope_contexts_sp, rc_dfe.name))
-                        continue;
+            if(scope_contexts_sp && !simple_pattern_matches_string(scope_contexts_sp, rc->id))
+                continue;
 
-                    bool queryable_context = queryable_host;
-                    if(queryable_context && contexts_sp && !simple_pattern_matches(contexts_sp, rc_dfe.name))
-                        queryable_context = false;
+            bool queryable_context = queryable_host;
+            if(queryable_context && contexts_sp && !simple_pattern_matches_string(contexts_sp, rc->id))
+                queryable_context = false;
 
-                    if(cb(data, (RRDCONTEXT_ACQUIRED *)rc_dfe.item, queryable_context))
-                        added++;
-                }
+            if(cb(data, (RRDCONTEXT_ACQUIRED *)rc_dfe.item, queryable_context))
+                added++;
+        }
         dfe_done(rc);
     }
 
@@ -2432,14 +2433,14 @@ struct rrdcontext_to_json_v2_data {
 };
 
 static FTS_MATCH rrdcontext_to_json_v2_full_text_search(RRDCONTEXT *rc, SIMPLE_PATTERN *q) {
-    if(unlikely(simple_pattern_matches(q, string2str(rc->id)) ||
-       simple_pattern_matches(q, string2str(rc->family))))
+    if(unlikely(simple_pattern_matches_string(q, rc->id) ||
+       simple_pattern_matches_string(q, rc->family)))
         return FTS_MATCHED_CONTEXT;
 
-    if(unlikely(simple_pattern_matches(q, string2str(rc->title))))
+    if(unlikely(simple_pattern_matches_string(q, rc->title)))
         return FTS_MATCHED_TITLE;
 
-    if(unlikely(simple_pattern_matches(q, string2str(rc->units))))
+    if(unlikely(simple_pattern_matches_string(q, rc->units)))
         return FTS_MATCHED_UNITS;
 
     FTS_MATCH matched = FTS_MATCHED_NONE;
@@ -2447,16 +2448,16 @@ static FTS_MATCH rrdcontext_to_json_v2_full_text_search(RRDCONTEXT *rc, SIMPLE_P
     dfe_start_read(rc->rrdinstances, ri) {
                 if(matched) break;
 
-                if(unlikely(simple_pattern_matches(q, string2str(ri->id))) ||
-                   (ri->name != ri->id && simple_pattern_matches(q, string2str(ri->name)))) {
+                if(unlikely(simple_pattern_matches_string(q, ri->id)) ||
+                   (ri->name != ri->id && simple_pattern_matches_string(q, ri->name))) {
                     matched = FTS_MATCHED_INSTANCE;
                     break;
                 }
 
                 RRDMETRIC *rm;
                 dfe_start_read(ri->rrdmetrics, rm) {
-                    if(unlikely(simple_pattern_matches(q, string2str(rm->id))) ||
-                       (rm->name != rm->id && simple_pattern_matches(q, string2str(rm->name)))) {
+                    if(unlikely(simple_pattern_matches_string(q, rm->id)) ||
+                       (rm->name != rm->id && simple_pattern_matches_string(q, rm->name))) {
                         matched = FTS_MATCHED_DIMENSION;
                         break;
                     }
@@ -2473,12 +2474,12 @@ static FTS_MATCH rrdcontext_to_json_v2_full_text_search(RRDCONTEXT *rc, SIMPLE_P
                     RRDSET *st = ri->rrdset;
                     netdata_rwlock_rdlock(&st->alerts.rwlock);
                     for (RRDCALC *rcl = st->alerts.base; rcl; rcl = rcl->next) {
-                        if(unlikely(simple_pattern_matches(q, string2str(rcl->name)))) {
+                        if(unlikely(simple_pattern_matches_string(q, rcl->name))) {
                             matched = FTS_MATCHED_ALERT;
                             break;
                         }
 
-                        if(unlikely(simple_pattern_matches(q, string2str(rcl->info)))) {
+                        if(unlikely(simple_pattern_matches_string(q, rcl->info))) {
                             matched = FTS_MATCHED_ALERT_INFO;
                             break;
                         }
@@ -2547,7 +2548,7 @@ static bool rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool query
     SIMPLE_PATTERN *old_q = ctl->q.pattern;
 
     if(ctl->q.pattern && (
-            simple_pattern_matches(ctl->q.pattern, rrdhost_hostname(host)) ||
+            simple_pattern_matches_string(ctl->q.pattern, host->hostname) ||
             simple_pattern_matches(ctl->q.pattern, host->machine_guid) ||
             (ctl->q.pattern && simple_pattern_matches(ctl->q.pattern, ctl->q.host_uuid_buffer)))) {
         ctl->q.pattern = NULL;
@@ -2898,8 +2899,8 @@ static bool query_target_add_metric(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, QU
             // we have a dimensions pattern
             // lets see if this dimension is selected
 
-            if ((qtl->match_ids   && simple_pattern_matches(qt->query.pattern, string2str(rm->id)))
-                || (qtl->match_names && rm->name != rm->id && simple_pattern_matches(qt->query.pattern, string2str(rm->name)))
+            if ((qtl->match_ids   && simple_pattern_matches_string(qt->query.pattern, rm->id))
+                || (qtl->match_names && rm->name != rm->id && simple_pattern_matches_string(qt->query.pattern, rm->name))
                     ) {
                 // it matches the pattern
                 options |= (RRDR_DIMENSION_SELECTED | RRDR_DIMENSION_NONZERO);
@@ -3142,7 +3143,7 @@ static bool query_target_match_alert_pattern(QUERY_INSTANCE *qi, SIMPLE_PATTERN 
     netdata_rwlock_rdlock(&st->alerts.rwlock);
     if (st->alerts.base) {
         for (RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
-            if(simple_pattern_matches(pattern, string2str(rc->name))) {
+            if(simple_pattern_matches_string(pattern, rc->name)) {
                 matched = true;
                 break;
             }
@@ -3156,7 +3157,7 @@ static bool query_target_match_alert_pattern(QUERY_INSTANCE *qi, SIMPLE_PATTERN 
             buffer_fast_strcat(wb, ":", 1);
             buffer_strcat(wb, rrdcalc_status2string(rc->status));
 
-            if(simple_pattern_matches(pattern, buffer_tostring(wb))) {
+            if(simple_pattern_matches_buffer(pattern, wb)) {
                 matched = true;
                 break;
             }
@@ -3207,16 +3208,16 @@ static bool query_target_add_instance(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, 
     if(queryable_instance && filter_instances) {
         queryable_instance = false;
         if(!qt->instances.pattern
-           || (qtl->match_ids   && simple_pattern_matches(qt->instances.pattern, string2str(ri->id)))
-           || (qtl->match_names && ri->name != ri->id && simple_pattern_matches(qt->instances.pattern, string2str(ri->name)))
-           || (qtl->match_ids   && simple_pattern_matches(qt->instances.pattern, string2str(qi->id_fqdn)))
-           || (qtl->match_names && qi->name_fqdn != qi->id_fqdn && simple_pattern_matches(qt->instances.pattern, string2str(qi->name_fqdn)))
+           || (qtl->match_ids   && simple_pattern_matches_string(qt->instances.pattern, ri->id))
+           || (qtl->match_names && ri->name != ri->id && simple_pattern_matches_string(qt->instances.pattern, ri->name))
+           || (qtl->match_ids   && simple_pattern_matches_string(qt->instances.pattern, qi->id_fqdn))
+           || (qtl->match_names && qi->name_fqdn != qi->id_fqdn && simple_pattern_matches_string(qt->instances.pattern, qi->name_fqdn))
                 )
             queryable_instance = true;
     }
 
     if(queryable_instance) {
-        if ((qt->instances.chart_label_key_pattern && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, qt->instances.chart_label_key_pattern, ':')) ||
+        if ((qt->instances.chart_label_key_pattern && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, qt->instances.chart_label_key_pattern, '\0')) ||
             (qt->instances.labels_pattern && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, qt->instances.labels_pattern, ':')))
             queryable_instance = false;
     }
