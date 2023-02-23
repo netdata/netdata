@@ -156,6 +156,12 @@ static void release_statement(void *statement)
         error_report("Failed to finalize statement, rc = %d", rc);
 }
 
+void initialize_thread_key_pool(void)
+{
+    for (int i = 0; i < MAX_PREPARED_STATEMENTS; i++)
+        (void)pthread_key_create(&key_pool[i], release_statement);
+}
+
 int prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **statement)
 {
     static __thread uint32_t keys_used = 0;
@@ -448,8 +454,7 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
 
     info("SQLite database initialization completed");
 
-    for (int i = 0; i < MAX_PREPARED_STATEMENTS; i++)
-        (void)pthread_key_create(&key_pool[i], release_statement);
+    initialize_thread_key_pool();
 
     rc = sqlite3_create_function(db_meta, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC, 0, sqlite_uuid_parse, 0, 0);
     if (unlikely(rc != SQLITE_OK))

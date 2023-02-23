@@ -117,7 +117,6 @@ void sql_close_context_database(void)
     rc = sqlite3_close_v2(db_context_meta);
     if (unlikely(rc != SQLITE_OK))
         error_report("Error %d while closing the context SQLite database, %s", rc, sqlite3_errstr(rc));
-    return;
 }
 
 //
@@ -243,8 +242,6 @@ failed:
     rc = sqlite3_reset(res);
     if (rc != SQLITE_OK)
         error_report("Failed to reset statement that fetches chart label data, rc = %d", rc);
-
-    return;
 }
 
 // CONTEXT LIST
@@ -431,11 +428,11 @@ int ctx_delete_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
     if (rc_stored != SQLITE_DONE)
         error_report("Failed to delete context %s, rc = %d", context_data->id, rc_stored);
 #ifdef NETDATA_INTERNAL_CHECKS
-     else {
-         char host_uuid_str[UUID_STR_LEN];
-         uuid_unparse_lower(*host_uuid, host_uuid_str);
-         info("%s: Deleted context %s under host %s", __FUNCTION__ , context_data->id, host_uuid_str);
-     }
+    else {
+        char host_uuid_str[UUID_STR_LEN];
+        uuid_unparse_lower(*host_uuid, host_uuid_str);
+        info("%s: Deleted context %s under host %s", __FUNCTION__, context_data->id, host_uuid_str);
+    }
 #endif
 
 skip_delete:
@@ -488,6 +485,8 @@ int ctx_unittest(void)
 {
     uuid_t host_uuid;
     uuid_generate(host_uuid);
+
+    initialize_thread_key_pool();
 
     int rc = sql_init_context_database(1);
 
@@ -556,6 +555,7 @@ int ctx_unittest(void)
     freez((void *)context_data.title);
     freez((void *)context_data.chart_type);
     freez((void *)context_data.family);
+    freez((void *)context_data.units);
 
     // The list should be empty
     info("List context start after delete");
