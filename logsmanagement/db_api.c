@@ -23,7 +23,6 @@
 
 #define LOGS_MANAG_DB_VERSION 1
 
-static uv_loop_t *db_loop = NULL; /**< uv_loop_t to run certain callbacks of this source file in **/
 static sqlite3 *main_db = NULL;   /**< SQLite DB handler for MAIN_DB **/
 static char *main_db_dir = NULL;  /**< Directory where all the log management databases and log blobs are stored in **/
 static char *main_db_path = NULL; /**< Path of MAIN_DB **/
@@ -362,14 +361,6 @@ static void db_writer(void *arg){
     }
 }
 
-/**
- * @brief Process the events of the uv_loop_t related to the DB API
- */
-static inline void db_loop_run(void *arg){
-    UNUSED(arg);
-    uv_run(db_loop, UV_RUN_DEFAULT);
-}
-
 inline void db_set_main_dir(char *dir){
     main_db_dir = dir;
 }
@@ -379,16 +370,12 @@ int db_init() {
     char *err_msg = 0;
     uv_fs_t mkdir_req;
     
-    db_loop = mallocz(sizeof(uv_loop_t));
-    rc = uv_loop_init(db_loop);
-    if (unlikely(rc)) goto return_error;
-
     size_t main_db_path_len = strlen(main_db_dir) + sizeof(MAIN_DB) + 1;
     main_db_path = mallocz(main_db_path_len);
     snprintfz(main_db_path, main_db_path_len, "%s/" MAIN_DB, main_db_dir);
 
     /* Create databases directory if it doesn't exist. */
-    rc = uv_fs_mkdir(db_loop, &mkdir_req, main_db_dir, 0775, NULL);
+    rc = uv_fs_mkdir(NULL, &mkdir_req, main_db_dir, 0775, NULL);
     uv_fs_req_cleanup(&mkdir_req);
     if(rc == 0) info("DB directory created: %s", main_db_dir);
     else if (rc == UV_EEXIST) info("DB directory %s found", main_db_dir);
@@ -505,7 +492,7 @@ int db_init() {
                 char *db_dir = mallocz(snprintf(NULL, 0, "%s/%s/", main_db_dir, uuid_str) + 1);
                 sprintf(db_dir, "%s/%s/", main_db_dir, uuid_str);
                 
-                rc = uv_fs_mkdir(db_loop, &mkdir_req, db_dir, 0775, NULL);
+                rc = uv_fs_mkdir(NULL, &mkdir_req, db_dir, 0775, NULL);
                 if (unlikely(rc)) {
                     if(errno == EEXIST) fatal("DB directory %s exists but not found in %s.\n", db_dir, MAIN_DB);
                     fatal_libuv_err(rc, __LINE__);
@@ -716,7 +703,7 @@ int db_init() {
                     char blob_delete_path[FILENAME_MAX + 1];
                     snprintfz(blob_delete_path, FILENAME_MAX, "%s" BLOB_STORE_FILENAME ".%d", p_file_info->db_dir, last_digits);
                     uv_fs_t unlink_req;
-                    rc = uv_fs_unlink(db_loop, &unlink_req, blob_delete_path, NULL);
+                    rc = uv_fs_unlink(NULL, &unlink_req, blob_delete_path, NULL);
                     if (unlikely(rc)) fatal("Delete %s error: %s\n", blob_delete_path, uv_strerror(rc));
                     uv_fs_req_cleanup(&unlink_req);
                    
@@ -794,7 +781,7 @@ int db_init() {
                                                 sqlite3_column_text(stmt_retrieve_metadata_from_id, 0)) + 1);
             sprintf(filename, "%s%s", p_file_info->db_dir, 
                 sqlite3_column_text(stmt_retrieve_metadata_from_id, 0));
-            rc = uv_fs_open(db_loop, &open_req, filename, 
+            rc = uv_fs_open(NULL, &open_req, filename, 
                 UV_FS_O_RDWR | UV_FS_O_CREAT | UV_FS_O_APPEND | UV_FS_O_RANDOM , 0644, NULL);
             if (unlikely(rc < 0)) fatal_libuv_err(rc, __LINE__);
             // debug(D_LOGS_MANAG, "Opened file: %s\n", filename);
@@ -816,7 +803,7 @@ int db_init() {
             
             /* Get filesize of BLOB file. */ 
             uv_fs_t stat_req;
-            rc = uv_fs_stat(db_loop, &stat_req, filename, NULL);
+            rc = uv_fs_stat(NULL, &stat_req, filename, NULL);
             if (unlikely(rc)) fatal_libuv_err(rc, __LINE__);
             uv_stat_t *statbuf = uv_fs_get_statbuf(&stat_req);
             const int64_t blob_filesize = (int64_t) statbuf->st_size;
@@ -840,7 +827,7 @@ int db_init() {
                 if(unlikely(blob_filesize > metadata_filesize)){
                     infoerr("blob_filesize > metadata_filesize for '%s'. Will attempt to fix it.", filename);
                     uv_fs_t trunc_req;
-                    rc = uv_fs_ftruncate(db_loop, &trunc_req, p_file_info->blob_handles[id], 
+                    rc = uv_fs_ftruncate(NULL, &trunc_req, p_file_info->blob_handles[id], 
                         metadata_filesize, NULL);
                     if(unlikely(rc)) fatal_libuv_err(rc, __LINE__);
                     uv_fs_req_cleanup(&trunc_req);
@@ -887,14 +874,9 @@ int db_init() {
     rc = sqlite3_finalize(stmt_insert_log_collection_metadata);
     if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(NULL, rc, __LINE__);
 
-    uv_thread_t *db_loop_run_thread = mallocz(sizeof(uv_thread_t));
-    if(unlikely(uv_thread_create(db_loop_run_thread, db_loop_run, NULL))) fatal("uv_thread_create() error");
-
     return 0;
 
 return_error:
-    freez(db_loop);
-    db_loop = NULL;
     
     freez(main_db_path);
     main_db_path = NULL;
@@ -952,8 +934,7 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
         temp_msg.text_compressed = mallocz(temp_msg.text_compressed_size);
         uv_buf_t uv_buf = uv_buf_init(temp_msg.text_compressed, temp_msg.text_compressed_size);
         uv_fs_t read_req;
-        // TODO: Using db_loop here in separate thread (although synchronously) - thread-safe ?
-        rc = uv_fs_read(db_loop, &read_req, p_file_info->blob_handles[blob_handles_offset], &uv_buf, 1, blob_offset, NULL);
+        rc = uv_fs_read(NULL, &read_req, p_file_info->blob_handles[blob_handles_offset], &uv_buf, 1, blob_offset, NULL);
         if (unlikely(rc < 0)) fatal_libuv_err(rc, __LINE__);
         uv_fs_req_cleanup(&read_req);
 
@@ -1113,8 +1094,7 @@ void db_search_compound(logs_query_params_t *const p_query_params, struct File_i
         temp_msg.text_compressed = mallocz(temp_msg.text_compressed_size);
         uv_buf_t uv_buf = uv_buf_init(temp_msg.text_compressed, temp_msg.text_compressed_size);
         uv_fs_t read_req;
-        // TODO: Using db_loop here in separate thread (although synchronously) - thread-safe ?
-        rc = uv_fs_read(db_loop, &read_req, p_file_infos[db_name]->blob_handles[blob_handles_offset], &uv_buf, 1, blob_offset, NULL);
+        rc = uv_fs_read(NULL, &read_req, p_file_infos[db_name]->blob_handles[blob_handles_offset], &uv_buf, 1, blob_offset, NULL);
         if (unlikely(rc < 0)) fatal_libuv_err(rc, __LINE__);
         uv_fs_req_cleanup(&read_req);
 
