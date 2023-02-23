@@ -43,7 +43,7 @@ Have a look at the can see the overall look and feel of the charts for both with
 the [Overview tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md) and a simple chart
 from the single node view:
 
-![NRve6zr325.gif](https://images.zenhubusercontent.com/60b4ebb03f4163193ec31819/5ecaf5ec-1229-480e-b122-62f63e9df227)
+<img width="678" alt="image" src="https://user-images.githubusercontent.com/43294513/220913360-f3f2ac06-b715-4e99-a933-f3bcb776636f.png"/>
 
 With a quick glance you have immediate information available at your disposal:
 
@@ -58,14 +58,12 @@ Your charts are controlled using the
 available [Time controls](https://github.com/netdata/netdata/blob/master/docs/dashboard/visualization-date-and-time-controls.md#time-controls).
 Besides these, when interacting with the chart you can also activate these controls by:
 
-- hovering over any chart to temporarily pause it - this momentarily switches time control to Pause, so that you can
+- Hovering over any chart to temporarily pause it - this momentarily switches time control to Pause, so that you can
   hover over a specific timeframe. When moving out of the chart time control will go back to Play (if it was it's
   previous state)
-- clicking on the chart to lock it - this enables the Pause option on the time controls, to the current timeframe. This
+- Clicking on the chart to lock it - this enables the Pause option on the time controls, to the current timeframe. This
   is if you want to jump to a different chart to look for possible correlations.
-- double clicking to release a previously locked chart - move the time control back to Play
-
-  ![23CHKCPnnJ.gif](https://images.zenhubusercontent.com/60b4ebb03f4163193ec31819/0b1e111e-df44-4d92-b2e3-be5cfd9db8df)
+- Double clicking to release a previously locked chart - move the time control back to Play
 
 | Interaction       | Keyboard/mouse | Touchpad/touchscreen | Time control          |
 |:------------------|:---------------|:---------------------|:----------------------|
@@ -201,22 +199,3 @@ original height,
 double-click the same icon.
 
 ![AjqnkIHB9H.gif](https://images.zenhubusercontent.com/60b4ebb03f4163193ec31819/1bcc6a0a-a58e-457b-8a0c-e5d361a3083c)
-
-## What's next?
-
-We recommend you read up on the differences
-between [chart dimensions, contexts, and families](https://github.com/netdata/netdata/blob/master/docs/dashboard/dimensions-contexts-families.md)
-to strengthen your understanding of how Netdata organizes its dashboards. Another valuable way to interact with charts
-is to use
-the [date and time controls](https://github.com/netdata/netdata/blob/master/docs/dashboard/visualization-date-and-time-controls.md),
-which helps you visualize specific moments of historical metrics.
-
-### Further reading & related information
-
-- Dashboard
-    - [How the dashboard works](https://github.com/netdata/netdata/blob/master/docs/dashboard/how-dashboard-works.md)
-    - [Chart dimensions, contexts, and families](https://github.com/netdata/netdata/blob/master/docs/dashboard/dimensions-contexts-families.md)
-    - [Date and Time controls](https://github.com/netdata/netdata/blob/master/docs/dashboard/visualization-date-and-time-controls.md)
-    - [Customize the standard dashboard](https://github.com/netdata/netdata/blob/master/docs/dashboard/customize.md)
-    - [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md)
-    - [Netdata Agent - Interact with charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.md)
