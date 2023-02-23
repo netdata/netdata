@@ -88,13 +88,14 @@ platforms that we officially support ourselves to the intermediate tier. Our [st
 expected to work on these platforms if available. Source-based installs are expected to work on these platforms
 with minimal user effort.
 
-| Platform      | Version | Official Native Packages | Notes                                                                   |
-|---------------|---------|--------------------------|-------------------------------------------------------------------------|
-| Alpine Linux  | 3.16    | No                       |                                                                         |
-| Alpine Linux  | 3.15    | No                       |                                                                         |
-| Alpine Linux  | 3.14    | No                       |                                                                         |
-| Arch Linux    | Latest  | No                       | We officially recommend the community packages available for Arch Linux |
-| Manjaro Linux | Latest  | No                       | We officially recommend the community packages available for Arch Linux |
+| Platform      | Version | Official Native Packages | Notes                                                                                                |
+|---------------|---------|--------------------------|------------------------------------------------------------------------------------------------------|
+| Alpine Linux  | 3.16    | No                       |                                                                                                      |
+| Alpine Linux  | 3.15    | No                       |                                                                                                      |
+| Alpine Linux  | 3.14    | No                       |                                                                                                      |
+| Amazon Linux  | 2       | x86\_64, AArch64         | Scheduled for promotion to Core tier at some point after the release of v1.39.0 of the Netdata Agent |
+| Arch Linux    | Latest  | No                       | We officially recommend the community packages available for Arch Linux                              |
+| Manjaro Linux | Latest  | No                       | We officially recommend the community packages available for Arch Linux                              |
 
 ### Community
 
