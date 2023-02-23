@@ -1048,7 +1048,7 @@ void cleanup_variables_from_other_threads(uint32_t pid)
 
     // Clean fd structure
     if (fd_pid) {
-        freez(fd_pid[pid]);
+        ebpf_fd_release(fd_pid[pid]);
         fd_pid[pid] = NULL;
     }
 
