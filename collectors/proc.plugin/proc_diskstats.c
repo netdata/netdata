@@ -934,16 +934,12 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         name_disks_by_id = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "name disks by id", name_disks_by_id);
 
         preferred_ids = simple_pattern_create(
-                config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "preferred disk ids", DEFAULT_PREFERRED_IDS)
-                , NULL
-                , SIMPLE_PATTERN_EXACT
-        );
+                config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "preferred disk ids", DEFAULT_PREFERRED_IDS), NULL,
+                SIMPLE_PATTERN_EXACT, true);
 
         excluded_disks = simple_pattern_create(
-                config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "exclude disks", DEFAULT_EXCLUDED_DISKS)
-                , NULL
-                , SIMPLE_PATTERN_EXACT
-        );
+                config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "exclude disks", DEFAULT_EXCLUDED_DISKS), NULL,
+                SIMPLE_PATTERN_EXACT, true);
     }
 
     // --------------------------------------------------------------------------

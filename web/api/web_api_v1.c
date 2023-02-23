@@ -446,13 +446,15 @@ static int web_client_api_request_v1_context(RRDHOST *host, struct web_client *w
     SIMPLE_PATTERN *chart_dimensions_pattern = NULL;
 
     if(chart_label_key)
-        chart_label_key_pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+        chart_label_key_pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT, true);
 
     if(chart_labels_filter)
-        chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+        chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT,
+                                                            true);
 
     if(dimensions) {
-        chart_dimensions_pattern = simple_pattern_create(buffer_tostring(dimensions), ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+        chart_dimensions_pattern = simple_pattern_create(buffer_tostring(dimensions), ",|\t\r\n\f\v",
+                                                         SIMPLE_PATTERN_EXACT, true);
         buffer_free(dimensions);
     }
 
@@ -502,13 +504,15 @@ static int web_client_api_request_v1_contexts(RRDHOST *host, struct web_client *
     SIMPLE_PATTERN *chart_dimensions_pattern = NULL;
 
     if(chart_label_key)
-        chart_label_key_pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+        chart_label_key_pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT, true);
 
     if(chart_labels_filter)
-        chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+        chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT,
+                                                            true);
 
     if(dimensions) {
-        chart_dimensions_pattern = simple_pattern_create(buffer_tostring(dimensions), ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+        chart_dimensions_pattern = simple_pattern_create(buffer_tostring(dimensions), ",|\t\r\n\f\v",
+                                                         SIMPLE_PATTERN_EXACT, true);
         buffer_free(dimensions);
     }
 
@@ -1337,7 +1341,8 @@ static int web_client_api_request_v1_weights_internal(RRDHOST *host, struct web_
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
 
-    SIMPLE_PATTERN *contexts = (contexts_str) ? simple_pattern_create(contexts_str, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
+    SIMPLE_PATTERN *contexts = (contexts_str) ? simple_pattern_create(contexts_str, ",|\t\r\n\f\v",
+                                                                      SIMPLE_PATTERN_EXACT, true) : NULL;
 
     int ret = web_api_v1_weights(host, wb, method, format, group, group_options, baseline_after, baseline_before, after, before, points, options, contexts, tier, timeout);
 

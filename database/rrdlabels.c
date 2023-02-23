@@ -892,7 +892,7 @@ bool rrdlabels_match_simple_pattern_parsed(DICTIONARY *labels, SIMPLE_PATTERN *p
 bool rrdlabels_match_simple_pattern(DICTIONARY *labels, const char *simple_pattern_txt) {
     if (!labels) return false;
 
-    SIMPLE_PATTERN *pattern = simple_pattern_create(simple_pattern_txt, " ,|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+    SIMPLE_PATTERN *pattern = simple_pattern_create(simple_pattern_txt, " ,|\t\r\n\f\v", SIMPLE_PATTERN_EXACT, true);
     char equal = '\0';
 
     const char *s;

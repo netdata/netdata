@@ -514,7 +514,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     int allhosts,
     PROMETHEUS_OUTPUT_OPTIONS output_options)
 {
-    SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT);
+    SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT, true);
 
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
     prometheus_label_copy(hostname, rrdhost_hostname(host), PROMETHEUS_ELEMENT_MAX);

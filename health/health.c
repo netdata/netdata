@@ -781,7 +781,8 @@ static void initialize_health(RRDHOST *host)
     else
         host->health_log.max = (unsigned int)n;
 
-    conf_enabled_alarms = simple_pattern_create(config_get(CONFIG_SECTION_HEALTH, "enabled alarms", "*"), NULL, SIMPLE_PATTERN_EXACT);
+    conf_enabled_alarms = simple_pattern_create(config_get(CONFIG_SECTION_HEALTH, "enabled alarms", "*"), NULL,
+                                                SIMPLE_PATTERN_EXACT, true);
 
     netdata_rwlock_init(&host->health_log.alarm_log_rwlock);
 

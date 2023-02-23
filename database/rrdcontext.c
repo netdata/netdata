@@ -2559,7 +2559,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req) {
             .hosts.pattern = string_to_simple_pattern(req->hosts),
             .contexts.pattern = string_to_simple_pattern(req->contexts),
             .contexts.scope_pattern = string_to_simple_pattern(req->scope_contexts),
-            .q.pattern = string_to_simple_pattern(req->q),
+            .q.pattern = string_to_simple_pattern_nocase(req->q),
     };
 
     time_t now_s = now_realtime_sec();

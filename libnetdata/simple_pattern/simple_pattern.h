@@ -18,7 +18,7 @@ typedef void SIMPLE_PATTERN;
 // create a simple_pattern from the string given
 // default_mode is used in cases where EXACT matches, without an asterisk,
 // should be considered PREFIX matches.
-SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, SIMPLE_PREFIX_MODE default_mode);
+SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, SIMPLE_PREFIX_MODE default_mode, bool case_sensitive);
 
 // test if string str is matched from the pattern and fill 'wildcarded' with the parts matched by '*'
 int simple_pattern_matches_extract(SIMPLE_PATTERN *list, const char *str, char *wildcarded, size_t wildcarded_size);
@@ -41,6 +41,7 @@ char *simple_pattern_trim_around_equal(char *src);
 
 #define is_valid_sp(x) ((x) && *(x) && !((x)[0] == '*' && (x)[1] == '\0'))
 
-#define string_to_simple_pattern(str) (is_valid_sp(str) ? simple_pattern_create(str, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_EXACT) : NULL)
+#define string_to_simple_pattern(str) (is_valid_sp(str) ? simple_pattern_create(str, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_EXACT, true) : NULL)
+#define string_to_simple_pattern_nocase(str) (is_valid_sp(str) ? simple_pattern_create(str, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_EXACT, false) : NULL)
 
 #endif //NETDATA_SIMPLE_PATTERN_H
