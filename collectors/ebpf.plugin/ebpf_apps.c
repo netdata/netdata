@@ -1030,7 +1030,7 @@ void cleanup_variables_from_other_threads(uint32_t pid)
 
     // Clean directory cache structure
     if (dcstat_pid) {
-        freez(dcstat_pid[pid]);
+        ebpf_dcstat_release(dcstat_pid[pid]);
         dcstat_pid[pid] = NULL;
     }
 

@@ -476,7 +476,7 @@ static void dcstat_fill_pid(uint32_t current_pid, netdata_dcstat_pid_t *publish)
 {
     netdata_publish_dcstat_t *curr = dcstat_pid[current_pid];
     if (!curr) {
-        curr = callocz(1, sizeof(netdata_publish_dcstat_t));
+        curr = ebpf_publish_dcstat_get();
         dcstat_pid[current_pid] = curr;
     }
 
@@ -1108,8 +1108,10 @@ static void ebpf_create_filesystem_charts(int update_every)
  */
 static void ebpf_dcstat_allocate_global_vectors(int apps)
 {
-    if (apps)
+    if (apps) {
+        ebpf_dcstat_aral_init();
         dcstat_pid = callocz((size_t)pid_max, sizeof(netdata_publish_dcstat_t *));
+    }
 
     dcstat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_dcstat_pid_t));
     dcstat_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
