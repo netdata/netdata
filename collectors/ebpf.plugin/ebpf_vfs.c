@@ -5,6 +5,10 @@
 #include "ebpf.h"
 #include "ebpf_vfs.h"
 
+// ----------------------------------------------------------------------------
+// ARAL vectors used to speed up processing
+ARAL *ebpf_aral_vfs_pid;
+
 static char *vfs_dimension_names[NETDATA_KEY_PUBLISH_VFS_END] = { "delete",  "read",  "write",
                                                                   "fsync", "open", "create" };
 static char *vfs_id_names[NETDATA_KEY_PUBLISH_VFS_END] = { "vfs_unlink", "vfs_read", "vfs_write",
@@ -381,6 +385,46 @@ static inline int ebpf_vfs_load_and_attach(struct vfs_bpf *obj, ebpf_module_t *e
     return ret;
 }
 #endif
+
+/*****************************************************************
+ *
+ *  ARAL FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * eBPF VFS Aral init
+ *
+ * Initiallize array allocator that will be used when integration with apps is enabled.
+ */
+static inline void ebpf_vfs_aral_init()
+{
+    ebpf_aral_vfs_pid = ebpf_allocate_pid_aral("ebpf-vfs", sizeof(netdata_publish_vfs_t));
+}
+
+/**
+ * eBPF publish VFS get
+ *
+ * Get a netdata_publish_vfs_t entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+netdata_publish_vfs_t *ebpf_vfs_get(void)
+{
+    netdata_publish_vfs_t *target = aral_mallocz(ebpf_aral_vfs_pid);
+    memset(target, 0, sizeof(netdata_publish_vfs_t));
+    return target;
+}
+
+/**
+ * eBPF VFS release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_vfs_release(netdata_publish_vfs_t *stat)
+{
+    aral_freez(ebpf_aral_vfs_pid, stat);
+}
 
 /*****************************************************************
  *
