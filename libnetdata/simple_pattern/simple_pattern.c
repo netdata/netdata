@@ -4,13 +4,13 @@
 
 struct simple_pattern {
     const char *match;
-    size_t len;
+    uint32_t len;
 
     SIMPLE_PREFIX_MODE mode;
-    char negative;
+    bool negative;
+    bool case_insensitive;
 
     struct simple_pattern *child;
-
     struct simple_pattern *next;
 };
 
@@ -96,14 +96,14 @@ SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, 
         buf[0] = '\0';
         char *c = buf;
 
-        char negative = 0;
+        bool negative = false;
 
         // skip all spaces
         while(isseparator[(unsigned char)*s])
             s++;
 
         if(*s == '!') {
-            negative = 1;
+            negative = true;
             s++;
         }
 
@@ -179,6 +179,14 @@ static inline int match_pattern(struct simple_pattern *m, const char *str, size_
 
     if(m->len <= len) {
         switch(m->mode) {
+            default:
+            case SIMPLE_PATTERN_EXACT:
+                if(unlikely(strcmp(str, m->match) == 0)) {
+                    if(!m->child) return 1;
+                    return 0;
+                }
+                break;
+
             case SIMPLE_PATTERN_SUBSTRING:
                 if(!m->len) return 1;
                 if((s = strstr(str, m->match))) {
@@ -204,14 +212,6 @@ static inline int match_pattern(struct simple_pattern *m, const char *str, size_
             case SIMPLE_PATTERN_SUFFIX:
                 if(unlikely(strcmp(&str[len - m->len], m->match) == 0)) {
                     wildcarded = add_wildcarded(str, len - m->len, wildcarded, wildcarded_size);
-                    if(!m->child) return 1;
-                    return 0;
-                }
-                break;
-
-            case SIMPLE_PATTERN_EXACT:
-            default:
-                if(unlikely(strcmp(str, m->match) == 0)) {
                     if(!m->child) return 1;
                     return 0;
                 }

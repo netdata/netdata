@@ -448,6 +448,7 @@ struct api_v2_contexts_request {
     char *scope_contexts;
     char *hosts;
     char *contexts;
+    char *q;
 
     struct {
         usec_t received_ut;

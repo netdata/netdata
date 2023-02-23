@@ -6,7 +6,7 @@
 #include "../libnetdata.h"
 
 
-typedef enum {
+typedef enum __attribute__ ((__packed__)) {
     SIMPLE_PATTERN_EXACT,
     SIMPLE_PATTERN_PREFIX,
     SIMPLE_PATTERN_SUFFIX,
@@ -42,6 +42,5 @@ char *simple_pattern_trim_around_equal(char *src);
 #define is_valid_sp(x) ((x) && *(x) && !((x)[0] == '*' && (x)[1] == '\0'))
 
 #define string_to_simple_pattern(str) (is_valid_sp(str) ? simple_pattern_create(str, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_EXACT) : NULL)
-#define simple_pattern_matches_or_accept(sp, str) (!(sp) || simple_pattern_matches(sp, str))
 
 #endif //NETDATA_SIMPLE_PATTERN_H

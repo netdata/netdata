@@ -1823,6 +1823,7 @@ static inline int rrdmetric_to_json_callback(const DICTIONARY_ITEM *item, void *
 
     if(t->chart_dimensions
         && !simple_pattern_matches(t->chart_dimensions, string2str(rm->id))
+        && rm->name != rm->id
         && !simple_pattern_matches(t->chart_dimensions, string2str(rm->name)))
         return 0;
 
@@ -2269,19 +2270,19 @@ static uint64_t rrdcontext_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_P
     uint64_t h_hash = 0;
 
     dfe_start_reentrant(rrdhost_root_index, host) {
-                if(!host->node_id)
+                if(host->node_id)
                     uuid_unparse_lower(*host->node_id, host_uuid_buffer);
 
                 if(!scope_hosts_sp ||
                    simple_pattern_matches(scope_hosts_sp, rrdhost_hostname(host)) ||
                    simple_pattern_matches(scope_hosts_sp, host->machine_guid) ||
-                   (*uuid && simple_pattern_matches(scope_hosts_sp, host_uuid_buffer))) {
+                   (*host_uuid_buffer && simple_pattern_matches(scope_hosts_sp, host_uuid_buffer))) {
 
                     bool queryable_host = false;
                     if(!hosts_sp ||
                        simple_pattern_matches(hosts_sp, rrdhost_hostname(host)) ||
                        simple_pattern_matches(hosts_sp, host->machine_guid) ||
-                       simple_pattern_matches(hosts_sp, host_uuid_buffer))
+                       (*host_uuid_buffer && simple_pattern_matches(hosts_sp, host_uuid_buffer)))
                         queryable_host = true;
 
                     count++;
@@ -2342,6 +2343,41 @@ static size_t rrdcontext_foreach_context(RRDHOST *host, const char *scope_contex
 // ----------------------------------------------------------------------------
 // /api/v2/contexts API
 
+typedef enum {
+    FTS_MATCHED_NONE = 0,
+    FTS_MATCHED_HOST,
+    FTS_MATCHED_CONTEXT,
+    FTS_MATCHED_INSTANCE,
+    FTS_MATCHED_DIMENSION,
+    FTS_MATCHED_LABEL,
+    FTS_MATCHED_ALERT,
+} FTS_MATCH;
+
+static const char *fts_match_to_string(FTS_MATCH match) {
+    switch(match) {
+        case FTS_MATCHED_HOST:
+            return "HOST";
+
+        case FTS_MATCHED_CONTEXT:
+            return "CONTEXT";
+
+        case FTS_MATCHED_INSTANCE:
+            return "INSTANCE";
+
+        case FTS_MATCHED_DIMENSION:
+            return "DIMENSION";
+
+        case FTS_MATCHED_ALERT:
+            return "ALERT";
+
+        case FTS_MATCHED_LABEL:
+            return "LABEL";
+
+        default:
+            return "NONE";
+    }
+}
+
 struct rrdcontext_to_json_v2_entry {
     size_t count;
     STRING *id;
@@ -2350,6 +2386,7 @@ struct rrdcontext_to_json_v2_entry {
     time_t first_time_s;
     time_t last_time_s;
     RRD_FLAGS flags;
+    FTS_MATCH match;
 };
 
 struct rrdcontext_to_json_v2_data {
@@ -2370,12 +2407,70 @@ struct rrdcontext_to_json_v2_data {
         SIMPLE_PATTERN *scope_pattern;
         SIMPLE_PATTERN *pattern;
     } contexts;
+
+    struct {
+        FTS_MATCH host_match;
+        char host_uuid_buffer[UUID_STR_LEN];
+        SIMPLE_PATTERN *pattern;
+    } q;
 };
+
+static FTS_MATCH rrdcontext_to_json_v2_full_text_search(RRDCONTEXT *rc, SIMPLE_PATTERN *q) {
+    if(simple_pattern_matches(q, string2str(rc->id)) ||
+       simple_pattern_matches(q, string2str(rc->family)) ||
+       simple_pattern_matches(q, string2str(rc->title)) ||
+       simple_pattern_matches(q, string2str(rc->units)))
+        return FTS_MATCHED_CONTEXT;
+
+    FTS_MATCH matched = FTS_MATCHED_NONE;
+    RRDINSTANCE *ri;
+    dfe_start_read(rc->rrdinstances, ri) {
+                if(matched) break;
+
+                if(simple_pattern_matches(q, string2str(ri->id)) ||
+                   (ri->name != ri->id && simple_pattern_matches(q, string2str(ri->name)))) {
+                    matched = FTS_MATCHED_INSTANCE;
+                    break;
+                }
+
+                RRDMETRIC *rm;
+                dfe_start_read(ri->rrdmetrics, rm) {
+                            if(simple_pattern_matches(q, string2str(rm->id)) ||
+                               (rm->name != rm->id && simple_pattern_matches(q, string2str(rm->name)))) {
+                                matched = FTS_MATCHED_DIMENSION;
+                                break;
+                            }
+                        }
+                dfe_done(rm);
+
+                if(ri->rrdset) {
+                    RRDSET *st = ri->rrdset;
+                    netdata_rwlock_rdlock(&st->alerts.rwlock);
+                    for (RRDCALC *rcl = st->alerts.base; rcl; rcl = rcl->next) {
+                        if(simple_pattern_matches(q, string2str(rcl->name))) {
+                            matched = FTS_MATCHED_ALERT;
+                            break;
+                        }
+                    }
+                    netdata_rwlock_unlock(&st->alerts.rwlock);
+                }
+            }
+    dfe_done(ri);
+    return matched;
+}
 
 static bool rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context __maybe_unused) {
     struct rrdcontext_to_json_v2_data *ctl = data;
 
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+
+    FTS_MATCH match = ctl->q.host_match;
+    if(ctl->q.pattern) {
+        match = rrdcontext_to_json_v2_full_text_search(rc, ctl->q.pattern);
+
+        if(match == FTS_MATCHED_NONE)
+            return false;
+    }
 
     struct rrdcontext_to_json_v2_entry t = {
             .count = 0,
@@ -2385,6 +2480,7 @@ static bool rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED *r
             .first_time_s = rc->first_time_s,
             .last_time_s = rc->last_time_s,
             .flags = rc->flags,
+            .match = match,
     }, *z = dictionary_set(ctl->ctx, string2str(rc->id), &t, sizeof(t));
 
     if(!z->count) {
@@ -2416,18 +2512,37 @@ static bool rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool query
     if(!host->rrdctx.contexts)
         return false;
 
-    buffer_json_add_array_item_object(wb);
-    buffer_json_member_add_string(wb, "mg", host->machine_guid);
-    buffer_json_member_add_uuid(wb, "nd", host->node_id);
-    buffer_json_member_add_string(wb, "nm", rrdhost_hostname(host));
-    buffer_json_object_close(wb);
+    // save it
+    SIMPLE_PATTERN *old_q = ctl->q.pattern;
+
+    if(ctl->q.pattern && (
+            simple_pattern_matches(ctl->q.pattern, rrdhost_hostname(host)) ||
+            simple_pattern_matches(ctl->q.pattern, host->machine_guid) ||
+            (ctl->q.pattern && simple_pattern_matches(ctl->q.pattern, ctl->q.host_uuid_buffer)))) {
+        ctl->q.pattern = NULL;
+        ctl->q.host_match = FTS_MATCHED_HOST;
+    }
+    else
+        ctl->q.host_match = FTS_MATCHED_NONE;
 
     size_t added = rrdcontext_foreach_context(
             host, ctl->request->scope_contexts,
             ctl->contexts.scope_pattern, ctl->contexts.pattern,
             rrdcontext_to_json_v2_add_context, queryable_host, ctl);
 
-    return added > 0;
+    // restore it
+    ctl->q.pattern = old_q;
+
+    if(added) {
+        buffer_json_add_array_item_object(wb);
+        buffer_json_member_add_string(wb, "mg", host->machine_guid);
+        buffer_json_member_add_uuid(wb, "nd", host->node_id);
+        buffer_json_member_add_string(wb, "nm", rrdhost_hostname(host));
+        buffer_json_object_close(wb);
+        return true;
+    }
+
+    return false;
 }
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req) {
@@ -2444,6 +2559,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req) {
             .hosts.pattern = string_to_simple_pattern(req->hosts),
             .contexts.pattern = string_to_simple_pattern(req->contexts),
             .contexts.scope_pattern = string_to_simple_pattern(req->scope_contexts),
+            .q.pattern = string_to_simple_pattern(req->q),
     };
 
     time_t now_s = now_realtime_sec();
@@ -2453,12 +2569,13 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req) {
     buffer_json_member_add_string(wb, "mg", localhost->machine_guid);
     buffer_json_member_add_uuid(wb, "nd", localhost->node_id);
     buffer_json_member_add_string(wb, "nm", rrdhost_hostname(localhost));
+    buffer_json_member_add_string(wb, "q", req->q);
     buffer_json_member_add_time_t(wb, "now", now_s);
     buffer_json_object_close(wb);
 
     buffer_json_member_add_array(wb, "hosts");
     ctl.host_count = rrdcontext_foreach_host(ctl.hosts.scope_pattern, ctl.hosts.pattern,
-                                             rrdcontext_to_json_v2_add_host, &ctl, &ctl.hard_hash, &ctl.soft_hash, NULL);
+                                             rrdcontext_to_json_v2_add_host, &ctl, &ctl.hard_hash, &ctl.soft_hash, ctl.q.host_uuid_buffer);
     buffer_json_array_close(wb);
 
     req->timings.output_ut = now_monotonic_usec();
@@ -2479,6 +2596,8 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req) {
                     buffer_json_member_add_time_t(wb, "first_entry", z->first_time_s);
                     buffer_json_member_add_time_t(wb, "last_entry", collected ? now_s : z->last_time_s);
                     buffer_json_member_add_boolean(wb, "live", collected);
+                    if(req->q)
+                        buffer_json_member_add_string(wb, "match", fts_match_to_string(z->match));
                 }
                 buffer_json_object_close(wb);
     }
@@ -2499,6 +2618,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req) {
     simple_pattern_free(ctl.hosts.pattern);
     simple_pattern_free(ctl.contexts.pattern);
     simple_pattern_free(ctl.contexts.scope_pattern);
+    simple_pattern_free(ctl.q.pattern);
 
     return HTTP_RESP_OK;
 }
@@ -2748,7 +2868,7 @@ static bool query_target_add_metric(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, QU
             // lets see if this dimension is selected
 
             if ((qtl->match_ids   && simple_pattern_matches(qt->query.pattern, string2str(rm->id)))
-                || (qtl->match_names && simple_pattern_matches(qt->query.pattern, string2str(rm->name)))
+                || (qtl->match_names && rm->name != rm->id && simple_pattern_matches(qt->query.pattern, string2str(rm->name)))
                     ) {
                 // it matches the pattern
                 options |= (RRDR_DIMENSION_SELECTED | RRDR_DIMENSION_NONZERO);
@@ -2944,36 +3064,34 @@ static void query_target_eval_instance_rrdcalc(QUERY_TARGET_LOCALS *qtl __maybe_
     RRDSET *st = rrdinstance_acquired_rrdset(qi->ria);
     if (st) {
         netdata_rwlock_rdlock(&st->alerts.rwlock);
-        if (st->alerts.base) {
-            for (RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
-                switch(rc->status) {
-                    case RRDCALC_STATUS_CLEAR:
-                        qi->alerts.clear++;
-                        qc->alerts.clear++;
-                        qh->alerts.clear++;
-                        break;
+        for (RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
+            switch(rc->status) {
+                case RRDCALC_STATUS_CLEAR:
+                    qi->alerts.clear++;
+                    qc->alerts.clear++;
+                    qh->alerts.clear++;
+                    break;
 
-                    case RRDCALC_STATUS_WARNING:
-                        qi->alerts.warning++;
-                        qc->alerts.warning++;
-                        qh->alerts.warning++;
-                        break;
+                case RRDCALC_STATUS_WARNING:
+                    qi->alerts.warning++;
+                    qc->alerts.warning++;
+                    qh->alerts.warning++;
+                    break;
 
-                    case RRDCALC_STATUS_CRITICAL:
-                        qi->alerts.critical++;
-                        qc->alerts.critical++;
-                        qh->alerts.critical++;
-                        break;
+                case RRDCALC_STATUS_CRITICAL:
+                    qi->alerts.critical++;
+                    qc->alerts.critical++;
+                    qh->alerts.critical++;
+                    break;
 
-                    default:
-                    case RRDCALC_STATUS_UNINITIALIZED:
-                    case RRDCALC_STATUS_UNDEFINED:
-                    case RRDCALC_STATUS_REMOVED:
-                        qi->alerts.other++;
-                        qc->alerts.other++;
-                        qh->alerts.other++;
-                        break;
-                }
+                default:
+                case RRDCALC_STATUS_UNINITIALIZED:
+                case RRDCALC_STATUS_UNDEFINED:
+                case RRDCALC_STATUS_REMOVED:
+                    qi->alerts.other++;
+                    qc->alerts.other++;
+                    qh->alerts.other++;
+                    break;
             }
         }
         netdata_rwlock_unlock(&st->alerts.rwlock);
@@ -3059,9 +3177,9 @@ static bool query_target_add_instance(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, 
         queryable_instance = false;
         if(!qt->instances.pattern
            || (qtl->match_ids   && simple_pattern_matches(qt->instances.pattern, string2str(ri->id)))
+           || (qtl->match_names && ri->name != ri->id && simple_pattern_matches(qt->instances.pattern, string2str(ri->name)))
            || (qtl->match_ids   && simple_pattern_matches(qt->instances.pattern, string2str(qi->id_fqdn)))
-           || (qtl->match_names && simple_pattern_matches(qt->instances.pattern, string2str(ri->name)))
-           || (qtl->match_names && simple_pattern_matches(qt->instances.pattern, string2str(qi->name_fqdn)))
+           || (qtl->match_names && qi->name_fqdn != qi->id_fqdn && simple_pattern_matches(qt->instances.pattern, string2str(qi->name_fqdn)))
                 )
             queryable_instance = true;
     }

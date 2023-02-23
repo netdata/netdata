@@ -679,9 +679,6 @@ RRDR_GROUP_BY group_by_parse(char *s) {
             group_by |= RRDR_GROUP_BY_LABEL;
     }
 
-    if(group_by == RRDR_GROUP_BY_NONE)
-        group_by = RRDR_GROUP_BY_DIMENSION;
-
     return group_by;
 }
 

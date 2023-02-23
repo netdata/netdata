@@ -21,6 +21,7 @@ static int web_client_api_request_v2_contexts(RRDHOST *host __maybe_unused, stru
         else if(!strcmp(name, "scope_contexts")) req.scope_contexts = value;
         else if(!strcmp(name, "hosts")) req.hosts = value;
         else if(!strcmp(name, "contexts")) req.contexts = value;
+        else if(!strcmp(name, "q")) req.q = value;
     }
 
     buffer_flush(w->response.data);
@@ -141,14 +142,17 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
     fix_google_param(responseHandler);
     fix_google_param(outFileName);
 
+    if(group_by_label && *group_by_label)
+        group_by |= RRDR_GROUP_BY_LABEL;
+
+    if(group_by == RRDR_GROUP_BY_NONE)
+        group_by = RRDR_GROUP_BY_DIMENSION;
+
     if(group_by & ~(RRDR_GROUP_BY_DIMENSION))
         options |= RRDR_OPTION_ABSOLUTE;
 
     if(options & RRDR_OPTION_SHOW_PLAN)
         options |= RRDR_OPTION_DEBUG;
-
-    if(group_by_label && *group_by_label)
-        group_by |= RRDR_GROUP_BY_LABEL;
 
     if(tier_str && *tier_str) {
         tier = str2ul(tier_str);
