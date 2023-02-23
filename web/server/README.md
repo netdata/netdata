@@ -1,7 +1,8 @@
 <!--
 title: "Web server"
 description: "The Netdata Agent's local static-threaded web server serves dashboards and real-time visualizations with security and DDoS protection."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/web/server/README.md"
+type: reference
+custom_edit_url: https://github.com/netdata/netdata/edit/master/web/server/README.md
 sidebar_label: "Web server"
 learn_status: "Published"
 learn_rel_path: "Configuration"
@@ -9,10 +10,66 @@ learn_rel_path: "Configuration"
 
 # Web server
 
-The Netdata web server runs as `static-threaded`, i.e. with a fixed, configurable number of threads.
-It uses non-blocking I/O and respects the `keep-alive` HTTP header to serve multiple HTTP requests via the same connection.
+The Netdata web server is `static-threaded`, with a fixed, configurable number of threads. 
+
+All the threads are concurrently listening for web requests on the same sockets, and the kernel distributes the incoming
+requests to them. Each thread uses non-blocking I/O so it can serve any number of web requests in parallel.
+
+This web server respects the `keep-alive` HTTP header to serve multiple HTTP requests via the same connection.
 
 ## Configuration
+
+From within your Netdata config directory (typically `/etc/netdata`), [use `edit-config`](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) to
+open `netdata.conf`.
+
+```
+sudo ./edit-config netdata.conf
+```
+
+Scroll down to the `[web]` section to find the following settings.
+
+## Settings
+
+| Setting                                    | Default                                                                                                                                                                                | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+|:-------------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `ssl key`                                  | `/etc/netdata/ssl/key.pem`                                                                                                                                                             | Declare the location of an SSL key to [enable HTTPS](#enable-httpstls-support).                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `ssl certificate`                          | `/etc/netdata/ssl/cert.pem`                                                                                                                                                            | Declare the location of an SSL certificate to [enable HTTPS](#enable-httpstls-support).                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `tls version`                              | `1.3`                                                                                                                                                                                  | Choose which TLS version to use. While all versions are allowed (`1` or `1.0`, `1.1`, `1.2` and `1.3`), we recommend `1.3` for the most secure encryption. If left blank, Netdata uses the highest available protocol version on your system.                                                                                                                                                                                                                                                     |
+| `tls ciphers`                              | `none`                                                                                                                                                                                 | Choose which TLS cipher to use. Options include `TLS_AES_256_GCM_SHA384`, `TLS_CHACHA20_POLY1305_SHA256`, and `TLS_AES_128_GCM_SHA256`. If left blank, Netdata uses the default cipher list for that protocol provided by your TLS implementation.                                                                                                                                                                                                                                                |
+| `ses max window`                           | `15`                                                                                                                                                                                   | See [single exponential smoothing](https://github.com/netdata/netdata/blob/master/web/api/queries/ses/README.md).                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `des max window`                           | `15`                                                                                                                                                                                   | See [double exponential smoothing](https://github.com/netdata/netdata/blob/master/web/api/queries/des/README.md).                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `mode`                                     | `static-threaded`                                                                                                                                                                      | Turns on (`static-threaded` or off (`none`) the static-threaded web server. See the [example](#disable-the-web-server) to turn off the web server and disable the dashboard.                                                                                                                                                                                                                                                                                                                      |
+| `listen backlog`                           | `4096`                                                                                                                                                                                 | The port backlog. Check `man 2 listen`.                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `default port`                             | `19999`                                                                                                                                                                                | The listen port for the static web server.                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `web files owner`                          | `netdata`                                                                                                                                                                              | The user that owns the web static files. Netdata will refuse to serve a file that is not owned by this user, even if it has read access to that file. If the user given is not found, Netdata will only serve files owned by user given in `run as user`.                                                                                                                                                                                                                                         |
+| `web files group`                          | `netdata`                                                                                                                                                                              | If this is set, Netdata will check if the file is owned by this group and refuse to serve the file if it's not.                                                                                                                                                                                                                                                                                                                                                                                   |
+| `disconnect idle clients after seconds`    | `60`                                                                                                                                                                                   | The time in seconds to disconnect web clients after being totally idle.                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `timeout for first request`                | `60`                                                                                                                                                                                   | How long to wait for a client to send a request before closing the socket. Prevents slow request attacks.                                                                                                                                                                                                                                                                                                                                                                                         |
+| `accept a streaming request every seconds` | `0`                                                                                                                                                                                    | Can be used to set a limit on how often a parent node will accept streaming requests from child nodes in a [streaming and replication setup](https://github.com/netdata/netdata/blob/master/streaming/README.md).                                                                                                                                                                                                                                                                                                                               |
+| `respect do not track policy`              | `no`                                                                                                                                                                                   | If set to `yes`, Netdata will respect the user's browser preferences for [Do Not Track](https://www.eff.org/issues/do-not-track) (DNT) and storing cookies. If DNT is _enabled_ in the browser, and this option is set to `yes`, users will not be able to sign in to Netdata Cloud via their local Agent dashboard, and their node will not connect to any [registry](https://github.com/netdata/netdata/blob/master/registry/README.md). For certain browsers, users must disable DNT and change this option to `yes` for full functionality. |
+| `x-frame-options response header`          | ` `                                                                                                                                                                                    | Avoid [clickjacking attacks](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options), by ensuring that the content is not embedded into other sites.                                                                                                                                                                                                                                                                                                                           |
+| `allow connections from`                   | `localhost *`                                                                                                                                                                          | Declare which IP addresses or full-qualified domain names (FQDNs) are allowed to connect to the web server, including the [dashboard](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.md) or [HTTP API](https://github.com/netdata/netdata/blob/master/web/api/README.md). This is a global setting with higher priority to any of the ones below.                                                                                                                                                                                                             |
+| `allow connections by dns`                 | `heuristic`                                                                                                                                                                            | See the [access list examples](#access-lists) for details on using `allow` settings.                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `allow dashboard from`                     | `localhost *`                                                                                                                                                                          |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `allow dashboard by dns`                   | `heuristic`                                                                                                                                                                            |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `allow badges from`                        | `*`                                                                                                                                                                                    |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `allow badges by dns`                      | `heuristic`                                                                                                                                                                            |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `allow streaming from`                     | `*`                                                                                                                                                                                    |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `allow streaming by dns`                   | `heuristic`                                                                                                                                                                            |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `allow netdata.conf`                       | `localhost fd* 10.* 192.168.* 172.16.* 172.17.* 172.18.* 172.19.* 172.20.* 172.21.* 172.22.* 172.23.* 172.24.* 172.25.* 172.26.* 172.27.* 172.28.* 172.29.* 172.30.* 172.31.* UNKNOWN` |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `allow netdata.conf by dns`                | `no`                                                                                                                                                                                   |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `allow management from`                    | `localhost`                                                                                                                                                                            |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `allow management by dns`                  | `heuristic`                                                                                                                                                                            |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `enable gzip compression`                  | `yes`                                                                                                                                                                                  | When set to `yes`, Netdata web responses will be GZIP compressed, if the web client accepts such responses.                                                                                                                                                                                                                                                                                                                                                                                       |
+| `gzip compression strategy`                | `default`                                                                                                                                                                              | Valid settings are `default`, `filtered`, `huffman only`, `rle` and `fixed`.                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `gzip compression level`                   | `3`                                                                                                                                                                                    | Valid settings are 1 (fastest) to 9 (best ratio).                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `web server threads`                       | ` `                                                                                                                                                                                    | How many processor threads the web server is allowed. The default is system-specific, the minimum of `6` or the number of CPU cores.                                                                                                                                                                                                                                                                                                                                                              |
+| `web server max sockets`                   | ` `                                                                                                                                                                                    | Available sockets. The default is system-specific, automatically adjusted to 50% of the max number of open files Netdata is allowed to use (via `/etc/security/limits.conf` or systemd), to allow enough file descriptors to be available for data collection.                                                                                                                                                                                                                                    |
+| `custom dashboard_info.js`                 | ` `                                                                                                                                                                                    | Specifies the location of a custom `dashboard.js` file. See [customizing the standard dashboard](https://github.com/netdata/netdata/blob/master/docs/dashboard/customize.md#customize-the-standard-dashboard) for details.                                                                                                                                                                                                                                                                                                                     |
+
+## Examples
+
+### Disable the web server
 
 Disable the web server by editing `netdata.conf` and setting:
 
@@ -21,17 +78,15 @@ Disable the web server by editing `netdata.conf` and setting:
     mode = none
 ```
 
-With the web server enabled, control the number of threads and sockets with the following settings:
+### Change the number of threads
+
+Control the number of threads and sockets with the following settings:
 
 ```
 [web]
     web server threads = 4
     web server max sockets = 512
 ```
-
-The default number of processor threads is `min(cpu cores, 6)`.
-
-The `web server max sockets` setting is automatically adjusted to 50% of the max number of open files Netdata is allowed to use (via `/etc/security/limits.conf` or systemd), to allow enough file descriptors to be available for data collection.
 
 ### Binding Netdata to multiple ports
 
@@ -67,7 +122,7 @@ The API requests are serviced as follows:
 -   `badges` gives access only to the badges API calls.
 -   `management` gives access only to the management API calls.
 
-### Enabling TLS support
+### Enable HTTPS/TLS support
 
 Since v1.16.0, Netdata supports encrypted HTTP connections to the web server, plus encryption of streaming data to a
 parent from its child nodes, via the TLS protocol.
@@ -105,7 +160,7 @@ openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout key.pem -out
 
 ### Select TLS version
 
-Beginning with version 1.21, specify the TLS version and the ciphers that you want to use:
+Beginning with version `v1.21.0`, specify the TLS version and the ciphers that you want to use:
 
 ```conf
 [web]
@@ -114,8 +169,6 @@ Beginning with version 1.21, specify the TLS version and the ciphers that you wa
 ```
 
 If you do not specify these options, Netdata will use the highest available protocol version on your system and the default cipher list for that protocol provided by your TLS implementation.
-
-While Netdata accepts all the TLS version as arguments (`1` or `1.0`, `1.1`, `1.2` and `1.3`), we recommend you use `1.3` for the most secure encryption.
 
 #### TLS/SSL enforcement
 
@@ -181,7 +234,7 @@ Netdata supports access lists in `netdata.conf`:
 
 -   `allow connections from` matches anyone that connects on the Netdata port(s).
      So, if someone is not allowed, it will be connected and disconnected immediately, without reading even
-     a single byte from its connection. This is a global settings with higher priority to any of the ones below.
+     a single byte from its connection. This is a global setting with higher priority to any of the ones below.
 
 -   `allow dashboard from` receives the request and examines if it is a static dashboard file or an API call the
      dashboards do.
@@ -217,30 +270,12 @@ The three possible values for each of these options are `yes`, `no` and `heurist
 the check when the pattern only contains IPv4/IPv6 addresses or `localhost`, and enables it when wildcards are
 present that may match DNS FQDNs.
 
-### Other netdata.conf [web] section options
-
-|setting|default|info|
-|:-----:|:-----:|:---|
-|ses max window|`15`|See [single exponential smoothing](https://github.com/netdata/netdata/blob/master/web/api/queries/des/README.md)|
-|des max window|`15`|See [double exponential smoothing](https://github.com/netdata/netdata/blob/master/web/api/queries/des/README.md)|
-|listen backlog|`4096`|The port backlog. Check `man 2 listen`.|
-|disconnect idle clients after seconds|`60`|The time in seconds to disconnect web clients after being totally idle.|
-|timeout for first request|`60`|How long to wait for a client to send a request before closing the socket. Prevents slow request attacks.|
-|accept a streaming request every seconds|`0`|Can be used to set a limit on how often a parent node will accept streaming requests from child nodes in a [streaming and replication setup](https://github.com/netdata/netdata/blob/master/streaming/README.md)|
-|respect do not track policy|`no`|If set to `yes`, Netdata will respect the user's browser preferences for [Do Not Track](https://www.eff.org/issues/do-not-track) (DNT) and storing cookies. If DNT is _enabled_ in the browser, and this option is set to `yes`, users will not be able to sign in to Netdata Cloud via their local Agent dashboard, and their node will not connect to any [registry](https://github.com/netdata/netdata/blob/master/registry/README.md). For certain browsers, users must disable DNT and change this option to `yes` for full functionality.|
-|x-frame-options response header||[Avoid clickjacking attacks, by ensuring that the content is not embedded into other sites](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options).|
-|enable gzip compression|`yes`|When set to `yes`, Netdata web responses will be GZIP compressed, if the web client accepts such responses.|
-|gzip compression strategy|`default`|Valid strategies are `default`, `filtered`, `huffman only`, `rle` and `fixed`|
-|gzip compression level|`3`|Valid levels are 1 (fastest) to 9 (best ratio)|
-
 ## DDoS protection
 
-If you publish your Netdata to the internet, you may want to apply some protection against DDoS:
+If you publish your Netdata web server to the internet, you may want to apply some protection against DDoS:
 
 1.  Use the `static-threaded` web server (it is the default)
 2.  Use reasonable `[web].web server max sockets` (the default is)
 3.  Don't use all your CPU cores for Netdata (lower `[web].web server threads`)
 4.  Run the `netdata` process with a low process scheduling priority (the default is the lowest)
-5.  If possible, proxy Netdata via a full featured web server (nginx, apache, etc)
-
-
+5.  If possible, proxy Netdata via a full featured web server (Nginx, Apache, etc)
