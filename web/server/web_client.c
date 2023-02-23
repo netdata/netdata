@@ -1528,7 +1528,8 @@ void web_client_process_request(struct web_client *w) {
                 // wait for more data
                 // set to normal to prevent web_server_rcv_callback
                 // from going into stream mode
-                w->mode = WEB_CLIENT_MODE_NORMAL;
+                if (w->mode == WEB_CLIENT_MODE_STREAM)
+                    w->mode = WEB_CLIENT_MODE_NORMAL;
                 return;
             }
             break;
