@@ -1117,9 +1117,8 @@ static void ebpf_fd_allocate_global_vectors(int apps)
     if (apps) {
         ebpf_fd_aral_init();
         fd_pid = callocz((size_t)pid_max, sizeof(netdata_fd_stat_t *));
+        fd_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_fd_stat_t));
     }
-
-    fd_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_fd_stat_t));
 
     fd_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 }

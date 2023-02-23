@@ -1111,9 +1111,9 @@ static void ebpf_dcstat_allocate_global_vectors(int apps)
     if (apps) {
         ebpf_dcstat_aral_init();
         dcstat_pid = callocz((size_t)pid_max, sizeof(netdata_publish_dcstat_t *));
+        dcstat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_dcstat_pid_t));
     }
 
-    dcstat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_dcstat_pid_t));
     dcstat_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
     memset(dcstat_counter_aggregated_data, 0, NETDATA_DCSTAT_IDX_END * sizeof(netdata_syscall_stat_t));

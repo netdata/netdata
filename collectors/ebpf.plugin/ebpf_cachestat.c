@@ -1214,9 +1214,8 @@ static void ebpf_cachestat_allocate_global_vectors(int apps)
     if (apps) {
         cachestat_pid = callocz((size_t)pid_max, sizeof(netdata_publish_cachestat_t *));
         ebpf_cachestat_aral_init();
+        cachestat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_cachestat_pid_t));
     }
-
-    cachestat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_cachestat_pid_t));
 
     cachestat_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
