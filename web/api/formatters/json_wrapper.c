@@ -267,7 +267,7 @@ static void query_target_summary_dimensions_v12(BUFFER *wb, QUERY_TARGET *qt, co
         const char *name;
         struct query_data_statistics query_stats;
         struct query_metrics_counts metrics;
-    } x, *z;
+    } *z;
     size_t q = 0;
     for (long c = 0; c < (long) qt->dimensions.used; c++) {
         QUERY_DIMENSION * qd = query_dimension(qt, c);
@@ -285,11 +285,11 @@ static void query_target_summary_dimensions_v12(BUFFER *wb, QUERY_TARGET *qt, co
                   rrdmetric_acquired_id(rma),
                   rrdmetric_acquired_name(rma));
 
-        memset(&x, 0, sizeof(x));
-        x.id = rrdmetric_acquired_id(rma);
-        x.name = rrdmetric_acquired_name(rma);
-
-        z = dictionary_set(dict, name, &x, sizeof(x));
+        z = dictionary_set(dict, name, NULL, sizeof(*z));
+        if(!z->id)
+            z->id = rrdmetric_acquired_id(rma);
+        if(!z->name)
+            z->name = rrdmetric_acquired_name(rma);
 
         if(qm) {
             z->metrics.selected += (qm->status & RRDR_DIMENSION_SELECTED) ? 1 : 0;
