@@ -489,6 +489,8 @@ int ctx_unittest(void)
     uuid_t host_uuid;
     uuid_generate(host_uuid);
 
+    initialize_thread_key_pool();
+
     int rc = sql_init_context_database(1);
 
     if (rc != SQLITE_OK)
