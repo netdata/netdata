@@ -2601,7 +2601,8 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req) {
     buffer_json_member_add_string(wb, "mg", localhost->machine_guid);
     buffer_json_member_add_uuid(wb, "nd", localhost->node_id);
     buffer_json_member_add_string(wb, "nm", rrdhost_hostname(localhost));
-    buffer_json_member_add_string(wb, "q", req->q);
+    if(req->q)
+        buffer_json_member_add_string(wb, "q", req->q);
     buffer_json_member_add_time_t(wb, "now", now_s);
     buffer_json_object_close(wb);
 
