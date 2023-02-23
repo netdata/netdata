@@ -387,7 +387,7 @@ static inline void ebpf_cachestat_aral_init()
 /**
  * eBPF publish cachestat get
  *
- * Get an netdata_publish_cachestat_t entry to be used with a specific PID.
+ * Get a netdata_publish_cachestat_t entry to be used with a specific PID.
  *
  * @return it returns the address on success.
  */

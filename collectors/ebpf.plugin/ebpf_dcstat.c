@@ -338,7 +338,7 @@ static void ebpf_dcstat_exit(void *ptr)
  *****************************************************************/
 
 /**
- * eBPF Cachestat Aral init
+ * eBPF directory cache Aral init
  *
  * Initiallize array allocator that will be used when integration with apps is enabled.
  */
