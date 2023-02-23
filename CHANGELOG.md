@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Change link text to collectors.md [\#14590](https://github.com/netdata/netdata/pull/14590) ([cakrit](https://github.com/cakrit))
+- Merge security documents [\#14588](https://github.com/netdata/netdata/pull/14588) ([cakrit](https://github.com/cakrit))
+- Clean host structure [\#14584](https://github.com/netdata/netdata/pull/14584) ([stelfrag](https://github.com/stelfrag))
 - Correct the sidebar position label metdata for learn [\#14583](https://github.com/netdata/netdata/pull/14583) ([cakrit](https://github.com/cakrit))
 - final install reorg for learn [\#14580](https://github.com/netdata/netdata/pull/14580) ([cakrit](https://github.com/cakrit))
 - Learn installation reorg part 2 [\#14579](https://github.com/netdata/netdata/pull/14579) ([cakrit](https://github.com/cakrit))
@@ -14,11 +17,13 @@
 - Update README.md [\#14576](https://github.com/netdata/netdata/pull/14576) ([cakrit](https://github.com/cakrit))
 - Reorg learn [\#14575](https://github.com/netdata/netdata/pull/14575) ([cakrit](https://github.com/cakrit))
 - Update static binary readme [\#14574](https://github.com/netdata/netdata/pull/14574) ([cakrit](https://github.com/cakrit))
+- Get update every from page [\#14573](https://github.com/netdata/netdata/pull/14573) ([stelfrag](https://github.com/stelfrag))
 - bump go.d to v0.51.0 [\#14572](https://github.com/netdata/netdata/pull/14572) ([ilyam8](https://github.com/ilyam8))
 - Remove References category from learn [\#14571](https://github.com/netdata/netdata/pull/14571) ([cakrit](https://github.com/cakrit))
 - Fix doc capitalization and remove obsolete section [\#14569](https://github.com/netdata/netdata/pull/14569) ([cakrit](https://github.com/cakrit))
 - Remove obsolete instruction to lower memory usage [\#14568](https://github.com/netdata/netdata/pull/14568) ([cakrit](https://github.com/cakrit))
 - Fix broken links in our documentation [\#14565](https://github.com/netdata/netdata/pull/14565) ([Ancairon](https://github.com/Ancairon))
+- /api/v2/data - multi-host/context/instance/dimension/label queries [\#14564](https://github.com/netdata/netdata/pull/14564) ([ktsaou](https://github.com/ktsaou))
 - pandas collector add `read_sql()` support [\#14563](https://github.com/netdata/netdata/pull/14563) ([andrewm4894](https://github.com/andrewm4894))
 - reviewed plans page to be according to latest updates [\#14560](https://github.com/netdata/netdata/pull/14560) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Fix kickstart link [\#14559](https://github.com/netdata/netdata/pull/14559) ([cakrit](https://github.com/cakrit))
@@ -114,6 +119,7 @@
 - Update the "Deploy Kubernetes monitoring with Netdata" doc [\#14345](https://github.com/netdata/netdata/pull/14345) ([Ancairon](https://github.com/Ancairon))
 - Events docs [\#14341](https://github.com/netdata/netdata/pull/14341) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Update the "Install Netdata with kickstart.sh" doc [\#14338](https://github.com/netdata/netdata/pull/14338) ([Ancairon](https://github.com/Ancairon))
+- Misc SSL improvements 2 [\#14334](https://github.com/netdata/netdata/pull/14334) ([MrZammler](https://github.com/MrZammler))
 - Indicate what root privileges are needed for in kickstart.sh. [\#14314](https://github.com/netdata/netdata/pull/14314) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
@@ -381,10 +387,6 @@
 - health/ping: use 'host' label in alerts info [\#13955](https://github.com/netdata/netdata/pull/13955) ([ilyam8](https://github.com/ilyam8))
 - bump go.d.plugin to v0.43.0 [\#13954](https://github.com/netdata/netdata/pull/13954) ([ilyam8](https://github.com/ilyam8))
 - Fix local dashboard cloud links [\#13953](https://github.com/netdata/netdata/pull/13953) ([underhood](https://github.com/underhood))
-- Remove health\_thread\_stop [\#13948](https://github.com/netdata/netdata/pull/13948) ([MrZammler](https://github.com/MrZammler))
-- Provide improved messaging in the kickstart script for existing installs managed by the system package manager. [\#13947](https://github.com/netdata/netdata/pull/13947) ([Ferroin](https://github.com/Ferroin))
-- do not resend charts upstream when chart variables are being updated [\#13946](https://github.com/netdata/netdata/pull/13946) ([ktsaou](https://github.com/ktsaou))
-- recalculate last\_collected\_total [\#13945](https://github.com/netdata/netdata/pull/13945) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
