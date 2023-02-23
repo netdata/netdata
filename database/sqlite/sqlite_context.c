@@ -556,6 +556,7 @@ int ctx_unittest(void)
     freez((void *)context_data.title);
     freez((void *)context_data.chart_type);
     freez((void *)context_data.family);
+    freez((void *)context_data.units);
 
     // The list should be empty
     info("List context start after delete");
