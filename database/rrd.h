@@ -1086,9 +1086,11 @@ struct rrdhost {
     DICTIONARY *rrdvars;                            // the host's chart variables index
                                                     // this includes custom host variables
 
-    RRDCONTEXTS *rrdctx_hub_queue;
-    RRDCONTEXTS *rrdctx_post_processing_queue;
-    RRDCONTEXTS *rrdctx;
+    struct {
+        DICTIONARY *contexts;
+        DICTIONARY *hub_queue;
+        DICTIONARY *pp_queue;
+    } rrdctx;
 
     uuid_t  host_uuid;                              // Global GUID for this host
     uuid_t  *node_id;                               // Cloud node_id

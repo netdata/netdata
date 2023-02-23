@@ -1036,6 +1036,11 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
         buffer_json_object_close(wb); // request
     }
 
+    buffer_json_member_add_object(wb, "versions");
+    buffer_json_member_add_uint64(wb, "contexts_hard_hash", qt->versions.contexts_hard_hash);
+    buffer_json_member_add_uint64(wb, "contexts_soft_hash", qt->versions.contexts_soft_hash);
+    buffer_json_object_close(wb);
+
     size_t contexts;
     buffer_json_member_add_object(wb, "summary");
     {

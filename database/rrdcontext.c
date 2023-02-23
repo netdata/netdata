@@ -445,12 +445,12 @@ time_t rrdmetric_acquired_last_entry(RRDMETRIC_ACQUIRED *rma) {
 
 static inline RRDCONTEXT_ACQUIRED *rrdcontext_acquired_dup(RRDCONTEXT_ACQUIRED *rca) {
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
-    return (RRDCONTEXT_ACQUIRED *)dictionary_acquired_item_dup((DICTIONARY *)rc->rrdhost->rrdctx, (DICTIONARY_ITEM *)rca);
+    return (RRDCONTEXT_ACQUIRED *)dictionary_acquired_item_dup(rc->rrdhost->rrdctx.contexts, (DICTIONARY_ITEM *)rca);
 }
 
 static inline void rrdcontext_release(RRDCONTEXT_ACQUIRED *rca) {
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
-    dictionary_acquired_item_release((DICTIONARY *)rc->rrdhost->rrdctx, (DICTIONARY_ITEM *)rca);
+    dictionary_acquired_item_release(rc->rrdhost->rrdctx.contexts, (DICTIONARY_ITEM *)rca);
 }
 
 static void rrdcontext_recalculate_context_retention(RRDCONTEXT *rc, RRD_FLAGS reason, bool worker_jobs);
@@ -1030,7 +1030,7 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
         .rrdhost = st->rrdhost,
     };
 
-    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_set_and_acquire_item((DICTIONARY *)st->rrdhost->rrdctx, string2str(trc.id), &trc, sizeof(trc));
+    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_set_and_acquire_item(st->rrdhost->rrdctx.contexts, string2str(trc.id), &trc, sizeof(trc));
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
 
     RRDINSTANCE tri = {
@@ -1451,36 +1451,37 @@ static bool rrdcontext_post_processing_queue_conflict_callback(const DICTIONARY_
 
 void rrdhost_create_rrdcontexts(RRDHOST *host) {
     if(unlikely(!host)) return;
-    if(likely(host->rrdctx)) return;
+    if(likely(host->rrdctx.contexts)) return;
 
-    host->rrdctx = (RRDCONTEXTS *)dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-                                                             &dictionary_stats_category_rrdcontext, sizeof(RRDCONTEXT));
+    host->rrdctx.contexts = dictionary_create_advanced(
+            DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+            &dictionary_stats_category_rrdcontext, sizeof(RRDCONTEXT));
 
-    dictionary_register_insert_callback((DICTIONARY *)host->rrdctx, rrdcontext_insert_callback, host);
-    dictionary_register_delete_callback((DICTIONARY *)host->rrdctx, rrdcontext_delete_callback, host);
-    dictionary_register_conflict_callback((DICTIONARY *)host->rrdctx, rrdcontext_conflict_callback, host);
-    dictionary_register_react_callback((DICTIONARY *)host->rrdctx, rrdcontext_react_callback, host);
+    dictionary_register_insert_callback(host->rrdctx.contexts, rrdcontext_insert_callback, host);
+    dictionary_register_delete_callback(host->rrdctx.contexts, rrdcontext_delete_callback, host);
+    dictionary_register_conflict_callback(host->rrdctx.contexts, rrdcontext_conflict_callback, host);
+    dictionary_register_react_callback(host->rrdctx.contexts, rrdcontext_react_callback, host);
 
-    host->rrdctx_hub_queue = (RRDCONTEXTS *)dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_VALUE_LINK_DONT_CLONE, &dictionary_stats_category_rrdcontext, 0);
-    dictionary_register_insert_callback((DICTIONARY *)host->rrdctx_hub_queue, rrdcontext_hub_queue_insert_callback, NULL);
-    dictionary_register_delete_callback((DICTIONARY *)host->rrdctx_hub_queue, rrdcontext_hub_queue_delete_callback, NULL);
-    dictionary_register_conflict_callback((DICTIONARY *)host->rrdctx_hub_queue, rrdcontext_hub_queue_conflict_callback, NULL);
+    host->rrdctx.hub_queue = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_VALUE_LINK_DONT_CLONE, &dictionary_stats_category_rrdcontext, 0);
+    dictionary_register_insert_callback(host->rrdctx.hub_queue, rrdcontext_hub_queue_insert_callback, NULL);
+    dictionary_register_delete_callback(host->rrdctx.hub_queue, rrdcontext_hub_queue_delete_callback, NULL);
+    dictionary_register_conflict_callback(host->rrdctx.hub_queue, rrdcontext_hub_queue_conflict_callback, NULL);
 
-    host->rrdctx_post_processing_queue = (RRDCONTEXTS *)dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_VALUE_LINK_DONT_CLONE, &dictionary_stats_category_rrdcontext, 0);
-    dictionary_register_insert_callback((DICTIONARY *)host->rrdctx_post_processing_queue, rrdcontext_post_processing_queue_insert_callback, NULL);
-    dictionary_register_delete_callback((DICTIONARY *)host->rrdctx_post_processing_queue, rrdcontext_post_processing_queue_delete_callback, NULL);
-    dictionary_register_conflict_callback((DICTIONARY *)host->rrdctx_post_processing_queue, rrdcontext_post_processing_queue_conflict_callback, NULL);
+    host->rrdctx.pp_queue = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_VALUE_LINK_DONT_CLONE, &dictionary_stats_category_rrdcontext, 0);
+    dictionary_register_insert_callback(host->rrdctx.pp_queue, rrdcontext_post_processing_queue_insert_callback, NULL);
+    dictionary_register_delete_callback(host->rrdctx.pp_queue, rrdcontext_post_processing_queue_delete_callback, NULL);
+    dictionary_register_conflict_callback(host->rrdctx.pp_queue, rrdcontext_post_processing_queue_conflict_callback, NULL);
 }
 
 void rrdhost_destroy_rrdcontexts(RRDHOST *host) {
     if(unlikely(!host)) return;
-    if(unlikely(!host->rrdctx)) return;
+    if(unlikely(!host->rrdctx.contexts)) return;
 
     DICTIONARY *old;
 
-    if(host->rrdctx_hub_queue) {
-        old = (DICTIONARY *)host->rrdctx_hub_queue;
-        host->rrdctx_hub_queue = NULL;
+    if(host->rrdctx.hub_queue) {
+        old = host->rrdctx.hub_queue;
+        host->rrdctx.hub_queue = NULL;
 
         RRDCONTEXT *rc;
         dfe_start_write(old, rc) {
@@ -1490,9 +1491,9 @@ void rrdhost_destroy_rrdcontexts(RRDHOST *host) {
         dictionary_destroy(old);
     }
 
-    if(host->rrdctx_post_processing_queue) {
-        old = (DICTIONARY *)host->rrdctx_post_processing_queue;
-        host->rrdctx_post_processing_queue = NULL;
+    if(host->rrdctx.pp_queue) {
+        old = host->rrdctx.pp_queue;
+        host->rrdctx.pp_queue = NULL;
 
         RRDCONTEXT *rc;
         dfe_start_write(old, rc) {
@@ -1502,8 +1503,8 @@ void rrdhost_destroy_rrdcontexts(RRDHOST *host) {
         dictionary_destroy(old);
     }
 
-    old = (DICTIONARY *)host->rrdctx;
-    host->rrdctx = NULL;
+    old = host->rrdctx.contexts;
+    host->rrdctx.contexts = NULL;
     dictionary_destroy(old);
 }
 
@@ -1573,7 +1574,7 @@ int rrdcontext_find_dimension_uuid(RRDSET *st, const char *id, uuid_t *store_uui
     if(!st->rrdhost) return 1;
     if(!st->context) return 2;
 
-    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item((DICTIONARY *)st->rrdhost->rrdctx, string2str(st->context));
+    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item(st->rrdhost->rrdctx.contexts, string2str(st->context));
     if(!rca) return 3;
 
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
@@ -1607,7 +1608,7 @@ int rrdcontext_find_chart_uuid(RRDSET *st, uuid_t *store_uuid) {
     if(!st->rrdhost) return 1;
     if(!st->context) return 2;
 
-    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item((DICTIONARY *)st->rrdhost->rrdctx, string2str(st->context));
+    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item(st->rrdhost->rrdctx.contexts, string2str(st->context));
     if(!rca) return 3;
 
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
@@ -1640,7 +1641,7 @@ int rrdcontext_foreach_instance_with_rrdset_in_context(RRDHOST *host, const char
     if(unlikely(!host || !context || !*context || !callback))
         return -1;
 
-    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item((DICTIONARY *)host->rrdctx, context);
+    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdctx.contexts, context);
     if(unlikely(!rca)) return -1;
 
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
@@ -2104,12 +2105,12 @@ static inline int rrdcontext_to_json_callback(const DICTIONARY_ITEM *item, void 
 }
 
 int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, RRDCONTEXT_TO_JSON_OPTIONS options, const char *context, SIMPLE_PATTERN *chart_label_key, SIMPLE_PATTERN *chart_labels_filter, SIMPLE_PATTERN *chart_dimensions) {
-    if(!host->rrdctx) {
+    if(!host->rrdctx.contexts) {
         error("%s(): request for host '%s' that does not have rrdcontexts initialized.", __FUNCTION__, rrdhost_hostname(host));
         return HTTP_RESP_NOT_FOUND;
     }
 
-    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item((DICTIONARY *)host->rrdctx, context);
+    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdctx.contexts, context);
     if(!rca) return HTTP_RESP_NOT_FOUND;
 
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
@@ -2141,7 +2142,7 @@ int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, R
 }
 
 int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, RRDCONTEXT_TO_JSON_OPTIONS options, SIMPLE_PATTERN *chart_label_key, SIMPLE_PATTERN *chart_labels_filter, SIMPLE_PATTERN *chart_dimensions) {
-    if(!host->rrdctx) {
+    if(!host->rrdctx.contexts) {
         error("%s(): request for host '%s' that does not have rrdcontexts initialized.", __FUNCTION__, rrdhost_hostname(host));
         return HTTP_RESP_NOT_FOUND;
     }
@@ -2178,7 +2179,7 @@ int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, 
         .written = 0,
         .now = now_realtime_sec(),
     };
-    dictionary_walkthrough_read((DICTIONARY *)host->rrdctx, rrdcontext_to_json_callback, &t_contexts);
+    dictionary_walkthrough_read(host->rrdctx.contexts, rrdcontext_to_json_callback, &t_contexts);
     buffer_json_object_close(wb);
 
     buffer_json_finalize(wb);
@@ -2207,7 +2208,7 @@ static bool metric_entry_conflict_callback(const DICTIONARY_ITEM *item __maybe_u
 }
 
 DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contexts) {
-    if(!host || !host->rrdctx)
+    if(!host || !host->rrdctx.contexts)
         return NULL;
 
     DICTIONARY *dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_rrdcontext, 0);
@@ -2216,7 +2217,7 @@ DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contex
     dictionary_register_conflict_callback(dict, metric_entry_conflict_callback, NULL);
 
     RRDCONTEXT *rc;
-    dfe_start_reentrant((DICTIONARY *)host->rrdctx, rc) {
+    dfe_start_reentrant(host->rrdctx.contexts, rc) {
         if(rrd_flag_is_deleted(rc))
             continue;
 
@@ -2257,11 +2258,14 @@ DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contex
 
 typedef void (*foreach_host_cb_t)(void *data, RRDHOST *host, bool queryable);
 
-static void rrdcontext_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hosts_sp, foreach_host_cb_t cb, void *data) {
+static uint64_t rrdcontext_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hosts_sp, foreach_host_cb_t cb, void *data, uint64_t *hard_hash, uint64_t *soft_hash) {
     char uuid[UUID_STR_LEN];
     RRDHOST *host;
+    size_t count = 0;
+    uint64_t v_hash = 0;
+    uint64_t h_hash = 0;
 
-    dfe_start_read(rrdhost_root_index, host) {
+    dfe_start_reentrant(rrdhost_root_index, host) {
                 if(!host->node_id)
                     uuid_unparse_lower(*host->node_id, uuid);
                 else
@@ -2279,13 +2283,21 @@ static void rrdcontext_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTE
                        simple_pattern_matches(hosts_sp, uuid))
                         queryable_host = true;
 
+                    count++;
+                    v_hash += dictionary_version(host->rrdctx.contexts);
+                    h_hash += dictionary_version(host->rrdctx.hub_queue);
                     cb(data, host, queryable_host);
                 }
             }
     dfe_done(host);
 
-    simple_pattern_free(scope_hosts_sp);
-    simple_pattern_free(hosts_sp);
+    if(hard_hash)
+        *hard_hash = v_hash;
+
+    if(soft_hash)
+        *soft_hash = h_hash;
+
+    return count;
 }
 
 typedef void (*foreach_context_cb_t)(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context);
@@ -2293,7 +2305,7 @@ typedef void (*foreach_context_cb_t)(void *data, RRDCONTEXT_ACQUIRED *rca, bool 
 static size_t rrdcontext_foreach_context(RRDHOST *host, const char *scope_contexts, SIMPLE_PATTERN *scope_contexts_sp, SIMPLE_PATTERN *contexts_sp, foreach_context_cb_t cb, bool queryable_host, void *data) {
     size_t added = 0;
 
-    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item((DICTIONARY *)host->rrdctx, scope_contexts);
+    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdctx.contexts, scope_contexts);
     if(likely(rca)) {
         // we found it!
 
@@ -2308,7 +2320,7 @@ static size_t rrdcontext_foreach_context(RRDHOST *host, const char *scope_contex
     else {
         // Probably it is a pattern, we need to search for it...
         RRDCONTEXT *rc;
-        dfe_start_read((DICTIONARY *)host->rrdctx, rc) {
+        dfe_start_read(host->rrdctx.contexts, rc) {
                     if(scope_contexts_sp && !simple_pattern_matches(scope_contexts_sp, rc_dfe.name))
                         continue;
 
@@ -2342,6 +2354,10 @@ struct rrdcontext_to_json_v2_data {
     BUFFER *wb;
     struct api_v2_contexts_request *request;
     DICTIONARY *ctx;
+
+    size_t host_count;
+    uint64_t hard_hash;
+    uint64_t soft_hash;
 
     struct {
         SIMPLE_PATTERN *scope_pattern;
@@ -2391,9 +2407,16 @@ static void rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED *r
 
 static void rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool queryable_host) {
     struct rrdcontext_to_json_v2_data *ctl = data;
+    BUFFER *wb = ctl->wb;
 
-    if(!host->rrdctx)
+    if(!host->rrdctx.contexts)
         return;
+
+    buffer_json_add_array_item_object(wb);
+    buffer_json_member_add_string(wb, "mg", host->machine_guid);
+    buffer_json_member_add_uuid(wb, "nd", host->node_id);
+    buffer_json_member_add_string(wb, "nm", rrdhost_hostname(host));
+    buffer_json_object_close(wb);
 
     rrdcontext_foreach_context(
             host, ctl->request->scope_contexts,
@@ -2403,17 +2426,68 @@ static void rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool query
 }
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req) {
+    req->timings.processing_ut = now_monotonic_usec();
+
     struct rrdcontext_to_json_v2_data ctl = {
             .wb = wb,
             .request = req,
             .ctx = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct rrdcontext_to_json_v2_entry)),
+            .host_count = 0,
+            .hard_hash = 0,
+            .soft_hash = 0,
             .hosts.scope_pattern = string_to_simple_pattern(req->scope_hosts),
             .hosts.pattern = string_to_simple_pattern(req->hosts),
             .contexts.pattern = string_to_simple_pattern(req->contexts),
             .contexts.scope_pattern = string_to_simple_pattern(req->scope_contexts),
     };
 
-    rrdcontext_foreach_host(req->scope_hosts, req->hosts, rrdcontext_to_json_v2_add_host, &ctl);
+    time_t now_s = now_realtime_sec();
+    buffer_json_initialize(wb, "\"", "\"", 0, true);
+
+    buffer_json_member_add_object(wb, "agent");
+    buffer_json_member_add_string(wb, "mg", localhost->machine_guid);
+    buffer_json_member_add_uuid(wb, "nd", localhost->node_id);
+    buffer_json_member_add_string(wb, "nm", rrdhost_hostname(localhost));
+    buffer_json_member_add_time_t(wb, "now", now_s);
+    buffer_json_object_close(wb);
+
+    buffer_json_member_add_array(wb, "hosts");
+    ctl.host_count = rrdcontext_foreach_host(ctl.hosts.scope_pattern, ctl.hosts.pattern,
+                                             rrdcontext_to_json_v2_add_host, &ctl, &ctl.hard_hash, &ctl.soft_hash);
+    buffer_json_array_close(wb);
+
+    req->timings.output_ut = now_monotonic_usec();
+    buffer_json_member_add_object(wb, "versions");
+    buffer_json_member_add_uint64(wb, "contexts_hard_hash", ctl.hard_hash);
+    buffer_json_member_add_uint64(wb, "contexts_soft_hash", ctl.soft_hash);
+    buffer_json_object_close(wb);
+
+    buffer_json_member_add_object(wb, "contexts");
+    struct rrdcontext_to_json_v2_entry *z;
+    dfe_start_read(ctl.ctx, z) {
+                bool collected = z->flags & RRD_FLAG_COLLECTED;
+
+                buffer_json_member_add_object(wb, string2str(z->id));
+                {
+                    buffer_json_member_add_string(wb, "family", string2str(z->family));
+                    buffer_json_member_add_uint64(wb, "priority", z->priority);
+                    buffer_json_member_add_time_t(wb, "first_entry", z->first_time_s);
+                    buffer_json_member_add_time_t(wb, "last_entry", collected ? now_s : z->last_time_s);
+                    buffer_json_member_add_boolean(wb, "live", collected);
+                }
+                buffer_json_object_close(wb);
+    }
+    dfe_done(z);
+    buffer_json_object_close(wb); // contexts
+
+    req->timings.finished_ut = now_monotonic_usec();
+    buffer_json_member_add_object(wb, "timings");
+    buffer_json_member_add_double(wb, "prep_ms", (NETDATA_DOUBLE)(req->timings.processing_ut - req->timings.received_ut) / USEC_PER_MS);
+    buffer_json_member_add_double(wb, "query_ms", (NETDATA_DOUBLE)(req->timings.output_ut - req->timings.processing_ut) / USEC_PER_MS);
+    buffer_json_member_add_double(wb, "output_ms", (NETDATA_DOUBLE)(req->timings.finished_ut - req->timings.output_ut) / USEC_PER_MS);
+    buffer_json_member_add_double(wb, "total_ms", (NETDATA_DOUBLE)(req->timings.finished_ut - req->timings.received_ut) / USEC_PER_MS);
+    buffer_json_object_close(wb);
+    buffer_json_finalize(wb);
 
     dictionary_destroy(ctl.ctx);
     simple_pattern_free(ctl.hosts.scope_pattern);
@@ -3286,11 +3360,14 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
 
     if(host) {
         // single host query
+        qt->versions.contexts_hard_hash = dictionary_version(host->rrdctx.contexts);
+        qt->versions.contexts_soft_hash = dictionary_version(host->rrdctx.hub_queue);
         query_target_add_host(&qtl, host, true);
         qtl.hosts = rrdhost_hostname(host);
     }
     else
-        rrdcontext_foreach_host(qt->hosts.scope_pattern, qt->hosts.pattern, query_target_add_host, &qtl);
+        rrdcontext_foreach_host(qt->hosts.scope_pattern, qt->hosts.pattern, query_target_add_host, &qtl,
+                                &qt->versions.contexts_hard_hash, &qt->versions.contexts_soft_hash);
 
     query_target_calculate_window(qt);
 
@@ -3337,7 +3414,7 @@ static void rrdinstance_load_chart_callback(SQL_CHART_DATA *sc, void *data) {
         .rrdhost = host,
     };
 
-    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_set_and_acquire_item((DICTIONARY *)host->rrdctx, string2str(tc.id), &tc, sizeof(tc));
+    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_set_and_acquire_item(host->rrdctx.contexts, string2str(tc.id), &tc, sizeof(tc));
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
 
     RRDINSTANCE tri = {
@@ -3376,18 +3453,18 @@ static void rrdcontext_load_context_callback(VERSIONED_CONTEXT_DATA *ctx_data, v
 
         .hub = *ctx_data,
     };
-    dictionary_set((DICTIONARY *)host->rrdctx, string2str(trc.id), &trc, sizeof(trc));
+    dictionary_set(host->rrdctx.contexts, string2str(trc.id), &trc, sizeof(trc));
 }
 
 void rrdhost_load_rrdcontext_data(RRDHOST *host) {
-    if(host->rrdctx) return;
+    if(host->rrdctx.contexts) return;
 
     rrdhost_create_rrdcontexts(host);
     ctx_get_context_list(&host->host_uuid, rrdcontext_load_context_callback, host);
     ctx_get_chart_list(&host->host_uuid, rrdinstance_load_chart_callback, host);
 
     RRDCONTEXT *rc;
-    dfe_start_read((DICTIONARY *)host->rrdctx, rc) {
+    dfe_start_read(host->rrdctx.contexts, rc) {
         rrdcontext_trigger_updates(rc, __FUNCTION__ );
     }
     dfe_done(rc);
@@ -3404,13 +3481,13 @@ static uint64_t rrdcontext_version_hash_with_callback(
     bool snapshot,
     void *bundle) {
 
-    if(unlikely(!host || !host->rrdctx)) return 0;
+    if(unlikely(!host || !host->rrdctx.contexts)) return 0;
 
     RRDCONTEXT *rc;
     uint64_t hash = 0;
 
     // loop through all contexts of the host
-    dfe_start_read((DICTIONARY *)host->rrdctx, rc) {
+    dfe_start_read(host->rrdctx.contexts, rc) {
 
         rrdcontext_lock(rc);
 
@@ -3456,10 +3533,10 @@ static void rrdcontext_recalculate_context_retention(RRDCONTEXT *rc, RRD_FLAGS r
 }
 
 static void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reason, bool worker_jobs) {
-    if(unlikely(!host || !host->rrdctx)) return;
+    if(unlikely(!host || !host->rrdctx.contexts)) return;
 
     RRDCONTEXT *rc;
-    dfe_start_read((DICTIONARY *)host->rrdctx, rc) {
+    dfe_start_read(host->rrdctx.contexts, rc) {
         rrdcontext_recalculate_context_retention(rc, reason, worker_jobs);
     }
     dfe_done(rc);
@@ -3611,7 +3688,7 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jo
     internal_error(true, "RRDCONTEXT: garbage collecting context structures of host '%s'", rrdhost_hostname(host));
 
     RRDCONTEXT *rc;
-    dfe_start_reentrant((DICTIONARY *)host->rrdctx, rc) {
+    dfe_start_reentrant(host->rrdctx.contexts, rc) {
         if(unlikely(!service_running(SERVICE_CONTEXT))) break;
 
         if(worker_jobs) worker_is_busy(WORKER_JOB_CLEANUP);
@@ -3667,7 +3744,7 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jo
             rrdcontext_dequeue_from_post_processing(rc);
             rrdcontext_delete_from_sql_unsafe(rc);
 
-            if(!dictionary_del((DICTIONARY *)host->rrdctx, string2str(rc->id)))
+            if(!dictionary_del(host->rrdctx.contexts, string2str(rc->id)))
                 error("RRDCONTEXT: context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
                       string2str(rc->id),
                       rrdhost_hostname(host));
@@ -3981,10 +4058,10 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
         }
     }
 
-    if(unlikely(rrd_flag_is_updated(rc) && rc->rrdhost->rrdctx_hub_queue)) {
+    if(unlikely(rrd_flag_is_updated(rc) && rc->rrdhost->rrdctx.hub_queue)) {
         if(check_if_cloud_version_changed_unsafe(rc, false)) {
             rc->version = rrdcontext_get_next_version(rc);
-            dictionary_set((DICTIONARY *)rc->rrdhost->rrdctx_hub_queue,
+            dictionary_set((DICTIONARY *)rc->rrdhost->rrdctx.hub_queue,
                            string2str(rc->id), rc, sizeof(*rc));
         }
     }
@@ -3994,10 +4071,10 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
 }
 
 static void rrdcontext_queue_for_post_processing(RRDCONTEXT *rc, const char *function __maybe_unused, RRD_FLAGS flags __maybe_unused) {
-    if(unlikely(!rc->rrdhost->rrdctx_post_processing_queue)) return;
+    if(unlikely(!rc->rrdhost->rrdctx.pp_queue)) return;
 
     if(!rrd_flag_check(rc, RRD_FLAG_QUEUED_FOR_PP)) {
-        dictionary_set((DICTIONARY *)rc->rrdhost->rrdctx_post_processing_queue,
+        dictionary_set((DICTIONARY *)rc->rrdhost->rrdctx.pp_queue,
                        string2str(rc->id),
                        rc,
                        sizeof(*rc));
@@ -4023,15 +4100,15 @@ static void rrdcontext_queue_for_post_processing(RRDCONTEXT *rc, const char *fun
 }
 
 static void rrdcontext_dequeue_from_post_processing(RRDCONTEXT *rc) {
-    if(unlikely(!rc->rrdhost->rrdctx_post_processing_queue)) return;
-    dictionary_del((DICTIONARY *)rc->rrdhost->rrdctx_post_processing_queue, string2str(rc->id));
+    if(unlikely(!rc->rrdhost->rrdctx.pp_queue)) return;
+    dictionary_del(rc->rrdhost->rrdctx.pp_queue, string2str(rc->id));
 }
 
 static void rrdcontext_post_process_queued_contexts(RRDHOST *host) {
-    if(unlikely(!host->rrdctx_post_processing_queue)) return;
+    if(unlikely(!host->rrdctx.pp_queue)) return;
 
     RRDCONTEXT *rc;
-    dfe_start_reentrant((DICTIONARY *)host->rrdctx_post_processing_queue, rc) {
+    dfe_start_reentrant(host->rrdctx.pp_queue, rc) {
         if(unlikely(!service_running(SERVICE_CONTEXT))) break;
 
         rrdcontext_dequeue_from_post_processing(rc);
@@ -4192,17 +4269,17 @@ static inline usec_t rrdcontext_calculate_queued_dispatch_time_ut(RRDCONTEXT *rc
 }
 
 static void rrdcontext_dequeue_from_hub_queue(RRDCONTEXT *rc) {
-    dictionary_del((DICTIONARY *)rc->rrdhost->rrdctx_hub_queue, string2str(rc->id));
+    dictionary_del(rc->rrdhost->rrdctx.hub_queue, string2str(rc->id));
 }
 
 static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now_ut) {
 
     // check if we have received a streaming command for this host
-    if(!rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS) || !aclk_connected || !host->rrdctx_hub_queue)
+    if(!rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS) || !aclk_connected || !host->rrdctx.hub_queue)
         return;
 
     // check if there are queued items to send
-    if(!dictionary_entries((DICTIONARY *)host->rrdctx_hub_queue))
+    if(!dictionary_entries(host->rrdctx.hub_queue))
         return;
 
     if(!host->node_id)
@@ -4212,7 +4289,7 @@ static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now
     contexts_updated_t bundle = NULL;
 
     RRDCONTEXT *rc;
-    dfe_start_reentrant((DICTIONARY *)host->rrdctx_hub_queue, rc) {
+    dfe_start_reentrant(host->rrdctx.hub_queue, rc) {
         if(unlikely(!service_running(SERVICE_CONTEXT))) break;
 
         if(unlikely(messages_added >= MESSAGES_PER_BUNDLE_TO_SEND_TO_HUB_PER_HOST))
@@ -4266,7 +4343,7 @@ static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now
                 rrdcontext_unlock(rc);
 
                 // delete it from the master dictionary
-                if(!dictionary_del((DICTIONARY *)host->rrdctx, string2str(rc->id)))
+                if(!dictionary_del(host->rrdctx.contexts, string2str(rc->id)))
                     error("RRDCONTEXT: '%s' of host '%s' failed to be deleted from rrdcontext dictionary.",
                           string2str(id), rrdhost_hostname(host));
 
@@ -4355,14 +4432,14 @@ void *rrdcontext_main(void *ptr) {
 
             worker_is_busy(WORKER_JOB_HOSTS);
 
-            if(host->rrdctx_post_processing_queue) {
+            if(host->rrdctx.pp_queue) {
                 pp_queued_contexts_for_all_hosts +=
-                    dictionary_entries((DICTIONARY *)host->rrdctx_post_processing_queue);
+                    dictionary_entries(host->rrdctx.pp_queue);
                 rrdcontext_post_process_queued_contexts(host);
             }
 
-            if(host->rrdctx_hub_queue) {
-                hub_queued_contexts_for_all_hosts += dictionary_entries((DICTIONARY *)host->rrdctx_hub_queue);
+            if(host->rrdctx.hub_queue) {
+                hub_queued_contexts_for_all_hosts += dictionary_entries(host->rrdctx.hub_queue);
                 rrdcontext_dispatch_queued_contexts_to_hub(host, now_ut);
             }
         }

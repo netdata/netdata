@@ -16,7 +16,6 @@ typedef struct rrdinstance_acquired RRDINSTANCE_ACQUIRED;
 // ----------------------------------------------------------------------------
 // RRDCONTEXT
 
-typedef struct rrdcontexts_dictionary RRDCONTEXTS;
 typedef struct rrdcontext_acquired RRDCONTEXT_ACQUIRED;
 
 // ----------------------------------------------------------------------------
@@ -390,6 +389,11 @@ typedef struct query_target {
     struct query_data_statistics query_stats;
 
     struct {
+        uint64_t contexts_hard_hash;
+        uint64_t contexts_soft_hash;
+    } versions;
+
+    struct {
         usec_t received_ut;
         usec_t preprocessed_ut;
         usec_t executed_ut;
@@ -451,6 +455,13 @@ struct api_v2_contexts_request {
     time_t before;
 
     RRDCONTEXT_TO_JSON_OPTIONS options;
+
+    struct {
+        usec_t received_ut;
+        usec_t processing_ut;
+        usec_t output_ut;
+        usec_t finished_ut;
+    } timings;
 };
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req);
