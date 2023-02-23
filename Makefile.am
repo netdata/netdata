@@ -275,10 +275,6 @@ TIMEX_PLUGIN_FILES = \
     collectors/timex.plugin/plugin_timex.c \
     $(NULL)
 
-PROFILE_PLUGIN_FILES = \
-    collectors/profile.plugin/plugin_profile.cc \
-    $(NULL)
-
 FREEIPMI_PLUGIN_FILES = \
     collectors/freeipmi.plugin/freeipmi_plugin.c \
     $(LIBNETDATA_FILES) \
@@ -940,7 +936,6 @@ NETDATA_FILES = \
     $(ACLK_FILES) \
     $(SPAWN_PLUGIN_FILES) \
     $(TIMEX_PLUGIN_FILES) \
-    $(PROFILE_PLUGIN_FILES) \
     $(NULL)
 
 if FREEBSD
