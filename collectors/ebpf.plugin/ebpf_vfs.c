@@ -819,7 +819,7 @@ static void vfs_fill_pid(uint32_t current_pid, netdata_publish_vfs_t *publish)
 {
     netdata_publish_vfs_t *curr = vfs_pid[current_pid];
     if (!curr) {
-        curr = callocz(1, sizeof(netdata_publish_vfs_t));
+        curr = ebpf_vfs_get();
         vfs_pid[current_pid] = curr;
     }
 
@@ -1869,14 +1869,16 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
  */
 static void ebpf_vfs_allocate_global_vectors(int apps)
 {
+    if (apps) {
+        ebpf_vfs_aral_init();
+        vfs_pid = callocz((size_t)pid_max, sizeof(netdata_publish_vfs_t *));
+        vfs_vector = callocz(ebpf_nprocs, sizeof(netdata_publish_vfs_t));
+    }
+
     memset(vfs_aggregated_data, 0, sizeof(vfs_aggregated_data));
     memset(vfs_publish_aggregated, 0, sizeof(vfs_publish_aggregated));
 
     vfs_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
-    vfs_vector = callocz(ebpf_nprocs, sizeof(netdata_publish_vfs_t));
-
-    if (apps)
-        vfs_pid = callocz((size_t)pid_max, sizeof(netdata_publish_vfs_t *));
 }
 
 /*****************************************************************

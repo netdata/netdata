@@ -1042,7 +1042,7 @@ void cleanup_variables_from_other_threads(uint32_t pid)
 
     // Clean vfs structure
     if (vfs_pid) {
-        freez(vfs_pid[pid]);
+        ebpf_vfs_release(vfs_pid[pid]);
         vfs_pid[pid] = NULL;
     }
 
