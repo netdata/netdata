@@ -660,8 +660,10 @@ void cancel_main_threads() {
             if (static_threads[i].thread) {
                 info("EXIT: Stopping main thread: %s", static_threads[i].name);
                 netdata_thread_cancel(*static_threads[i].thread);
-            } else
-                info("EXIT: No thread running: %s", static_threads[i].name);
+            } else {
+                info("EXIT: No thread running (marking as EXITED): %s", static_threads[i].name);
+                static_threads[i].enabled = NETDATA_MAIN_THREAD_EXITED;
+            }
             found++;
         }
     }
