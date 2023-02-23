@@ -1054,7 +1054,7 @@ void cleanup_variables_from_other_threads(uint32_t pid)
 
     // Clean shm structure
     if (shm_pid) {
-        freez(shm_pid[pid]);
+        ebpf_shm_release(shm_pid[pid]);
         shm_pid[pid] = NULL;
     }
 }
