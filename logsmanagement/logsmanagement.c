@@ -323,7 +323,18 @@ static void logs_management_init(struct section *config_section){
     p_file_info->compression_accel = appconfig_get_number(  &log_management_config, config_section->name, 
                                                             "compression acceleration", 1);
     info("[%s]: compression acceleration = %d", p_file_info->chart_name, p_file_info->compression_accel);
-    
+
+
+    /* -------------------------------------------------------------------------
+     * Read DB mode.
+     * ------------------------------------------------------------------------- */
+    char *db_mode = appconfig_get(&log_management_config, config_section->name, "DB mode", "full");
+    if(!db_mode || !*db_mode || !strcasecmp(db_mode, "full")) p_file_info->db_mode = LOGS_MANAG_DB_MODE_FULL;
+    else if(!strcasecmp(db_mode, "none")) p_file_info->db_mode = LOGS_MANAG_DB_MODE_NONE;
+    else p_file_info->db_mode = LOGS_MANAG_DB_MODE_FULL;
+    info("[%s]: DB mode = %s", p_file_info->chart_name, db_mode);
+    freez(db_mode);
+
 
     /* -------------------------------------------------------------------------
      * Read BLOB max size configuration.

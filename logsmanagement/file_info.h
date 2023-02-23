@@ -27,6 +27,11 @@ static const char * const log_source_t_str[] = {LOG_SRC_TYPES};
 struct Circ_buff;
 struct Circ_buff_item_ptrs;
 
+typedef enum {
+    LOGS_MANAG_DB_MODE_FULL = 0,
+    LOGS_MANAG_DB_MODE_NONE
+} logs_manag_db_mode_t;
+
 typedef struct flb_serial_config {
     char *bitrate;
     char *min_bytes;
@@ -52,7 +57,8 @@ struct File_info {
     const char *db_dir;                             /**< Path to metadata DB and compressed log BLOBs directory **/
     const char *db_metadata;                        /**< Path to metadata DB file **/
     uv_mutex_t *db_mut;                             /**< DB access mutex **/
-    uv_file blob_handles[BLOB_MAX_FILES + 1];       /**< FIle handles for BLOB files. Item 0 not used - just for matching 1-1 with DB ids **/
+    uv_file blob_handles[BLOB_MAX_FILES + 1];       /**< File handles for BLOB files. Item 0 not used - just for matching 1-1 with DB ids **/
+    logs_manag_db_mode_t db_mode;                   /**< DB mode. **/
     int blob_write_handle_offset;                   /**< File offset denoting HEAD of currently open database BLOB file **/
     int buff_flush_to_db_interval;                  /**< Frequency at which RAM buffers of this log source will be flushed to the database **/
     int64_t blob_max_size;                          /**< When the size of a BLOB exceeds this value, the BLOB gets rotated. **/
