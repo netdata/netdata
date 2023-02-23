@@ -21,13 +21,6 @@ static int web_client_api_request_v2_contexts(RRDHOST *host __maybe_unused, stru
         else if(!strcmp(name, "scope_contexts")) req.scope_contexts = value;
         else if(!strcmp(name, "hosts")) req.hosts = value;
         else if(!strcmp(name, "contexts")) req.contexts = value;
-        else if(!strcmp(name, "instances")) req.instances = value;
-        else if(!strcmp(name, "dimensions")) req.dimensions = value;
-        else if(!strcmp(name, "labels")) req.labels = value;
-        else if(!strcmp(name, "alerts")) req.alerts = value;
-        else if(!strcmp(name, "after")) req.after = str2ll(value, NULL);
-        else if(!strcmp(name, "before")) req.before = str2ll(value, NULL);
-        else if(!strcmp(name, "options")) req.options = rrdcontext_to_json_parse_options(value);
     }
 
     buffer_flush(w->response.data);

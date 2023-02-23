@@ -448,14 +448,6 @@ struct api_v2_contexts_request {
     char *scope_contexts;
     char *hosts;
     char *contexts;
-    char *instances;
-    char *dimensions;
-    char *labels;
-    char *alerts;
-    time_t after;
-    time_t before;
-
-    RRDCONTEXT_TO_JSON_OPTIONS options;
 
     struct {
         usec_t received_ut;
