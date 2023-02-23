@@ -2,10 +2,37 @@
 
 #include "web_api_v2.h"
 
+static int web_client_api_request_v2_contexts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    struct api_v2_contexts_request req = { 0 };
 
-static inline int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    debug(D_WEB_CLIENT, "%llu: API v1 data with URL '%s'", w->id, url);
+    while(url) {
+        char *value = mystrsep(&url, "&");
+        if(!value || !*value) continue;
 
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        // name and value are now the parameters
+        // they are not null and not empty
+
+        if(!strcmp(name, "scope_hosts")) req.scope_hosts = value;
+        else if(!strcmp(name, "scope_contexts")) req.scope_contexts = value;
+        else if(!strcmp(name, "hosts")) req.hosts = value;
+        else if(!strcmp(name, "contexts")) req.contexts = value;
+        else if(!strcmp(name, "instances")) req.instances = value;
+        else if(!strcmp(name, "dimensions")) req.dimensions = value;
+        else if(!strcmp(name, "labels")) req.labels = value;
+        else if(!strcmp(name, "alerts")) req.alerts = value;
+        else if(!strcmp(name, "after")) req.after = str2ll(value, NULL);
+        else if(!strcmp(name, "before")) req.before = str2ll(value, NULL);
+        else if(!strcmp(name, "options")) req.options = rrdcontext_to_json_parse_options(value);
+    }
+
+    return rrdcontext_to_json_v2(w->response.data, &req);
+}
+
+static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     usec_t received_ut = now_monotonic_usec();
 
     int ret = HTTP_RESP_BAD_REQUEST;
@@ -251,6 +278,7 @@ cleanup:
 
 static struct web_api_command api_commands_v2[] = {
         {"data", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_data},
+        {"contexts", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_contexts},
 
         // terminator
         {NULL, 0, WEB_CLIENT_ACL_NONE, NULL},

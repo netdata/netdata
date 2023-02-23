@@ -1785,7 +1785,7 @@ void rrdcontext_hub_stop_streaming_command(void *ptr) {
 }
 
 // ----------------------------------------------------------------------------
-// web API
+// /api/v1/context(s) API
 
 struct rrdcontext_to_json {
     BUFFER *wb;
@@ -2253,6 +2253,178 @@ DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contex
 }
 
 // ----------------------------------------------------------------------------
+// web API helpers
+
+typedef void (*foreach_host_cb_t)(void *data, RRDHOST *host, bool queryable);
+
+static void rrdcontext_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hosts_sp, foreach_host_cb_t cb, void *data) {
+    char uuid[UUID_STR_LEN];
+    RRDHOST *host;
+
+    dfe_start_read(rrdhost_root_index, host) {
+                if(!host->node_id)
+                    uuid_unparse_lower(*host->node_id, uuid);
+                else
+                    uuid[0] = '\0';
+
+                if(!scope_hosts_sp ||
+                   simple_pattern_matches(scope_hosts_sp, rrdhost_hostname(host)) ||
+                   simple_pattern_matches(scope_hosts_sp, host->machine_guid) ||
+                   (*uuid && simple_pattern_matches(scope_hosts_sp, uuid))) {
+
+                    bool queryable_host = false;
+                    if(!hosts_sp ||
+                       simple_pattern_matches(hosts_sp, rrdhost_hostname(host)) ||
+                       simple_pattern_matches(hosts_sp, host->machine_guid) ||
+                       simple_pattern_matches(hosts_sp, uuid))
+                        queryable_host = true;
+
+                    cb(data, host, queryable_host);
+                }
+            }
+    dfe_done(host);
+
+    simple_pattern_free(scope_hosts_sp);
+    simple_pattern_free(hosts_sp);
+}
+
+typedef void (*foreach_context_cb_t)(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context);
+
+static size_t rrdcontext_foreach_context(RRDHOST *host, const char *scope_contexts, SIMPLE_PATTERN *scope_contexts_sp, SIMPLE_PATTERN *contexts_sp, foreach_context_cb_t cb, bool queryable_host, void *data) {
+    size_t added = 0;
+
+    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item((DICTIONARY *)host->rrdctx, scope_contexts);
+    if(likely(rca)) {
+        // we found it!
+
+        bool queryable_context = queryable_host;
+        if(queryable_context && contexts_sp && !simple_pattern_matches(contexts_sp, rrdcontext_acquired_id(rca)))
+            queryable_context = false;
+
+        cb(data, rca, queryable_context);
+        rrdcontext_release(rca);
+        added++;
+    }
+    else {
+        // Probably it is a pattern, we need to search for it...
+        RRDCONTEXT *rc;
+        dfe_start_read((DICTIONARY *)host->rrdctx, rc) {
+                    if(scope_contexts_sp && !simple_pattern_matches(scope_contexts_sp, rc_dfe.name))
+                        continue;
+
+                    bool queryable_context = queryable_host;
+                    if(queryable_context && contexts_sp && !simple_pattern_matches(contexts_sp, rc_dfe.name))
+                        queryable_context = false;
+
+                    cb(data, (RRDCONTEXT_ACQUIRED *)rc_dfe.item, queryable_context);
+                    added++;
+                }
+        dfe_done(rc);
+    }
+
+    return added;
+}
+
+// ----------------------------------------------------------------------------
+// /api/v2/contexts API
+
+struct rrdcontext_to_json_v2_entry {
+    size_t count;
+    STRING *id;
+    STRING *family;
+    uint32_t priority;
+    time_t first_time_s;
+    time_t last_time_s;
+    RRD_FLAGS flags;
+};
+
+struct rrdcontext_to_json_v2_data {
+    BUFFER *wb;
+    struct api_v2_contexts_request *request;
+    DICTIONARY *ctx;
+
+    struct {
+        SIMPLE_PATTERN *scope_pattern;
+        SIMPLE_PATTERN *pattern;
+    } hosts;
+
+    struct {
+        SIMPLE_PATTERN *scope_pattern;
+        SIMPLE_PATTERN *pattern;
+    } contexts;
+};
+
+static void rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context __maybe_unused) {
+    struct rrdcontext_to_json_v2_data *ctl = data;
+
+    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+
+    struct rrdcontext_to_json_v2_entry t = {
+            .count = 0,
+            .id = rc->id,
+            .family = rc->family,
+            .priority = rc->priority,
+            .first_time_s = rc->first_time_s,
+            .last_time_s = rc->last_time_s,
+            .flags = rc->flags,
+    }, *z = dictionary_set(ctl->ctx, string2str(rc->id), &t, sizeof(t));
+
+    if(!z->count) {
+        // we just added this
+        z->count = 1;
+    }
+    else {
+        // it is already in there
+        z->count++;
+        z->flags |= rc->flags;
+
+        if(z->priority > rc->priority)
+            z->priority = rc->priority;
+
+        if(z->first_time_s > rc->first_time_s)
+            z->first_time_s = rc->first_time_s;
+
+        if(z->last_time_s < rc->last_time_s)
+            z->last_time_s = rc->last_time_s;
+    }
+}
+
+static void rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool queryable_host) {
+    struct rrdcontext_to_json_v2_data *ctl = data;
+
+    if(!host->rrdctx)
+        return;
+
+    rrdcontext_foreach_context(
+            host, ctl->request->scope_contexts,
+            ctl->contexts.scope_pattern, ctl->contexts.pattern,
+            rrdcontext_to_json_v2_add_context, queryable_host, ctl);
+
+}
+
+int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req) {
+    struct rrdcontext_to_json_v2_data ctl = {
+            .wb = wb,
+            .request = req,
+            .ctx = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct rrdcontext_to_json_v2_entry)),
+            .hosts.scope_pattern = string_to_simple_pattern(req->scope_hosts),
+            .hosts.pattern = string_to_simple_pattern(req->hosts),
+            .contexts.pattern = string_to_simple_pattern(req->contexts),
+            .contexts.scope_pattern = string_to_simple_pattern(req->scope_contexts),
+    };
+
+    rrdcontext_foreach_host(req->scope_hosts, req->hosts, rrdcontext_to_json_v2_add_host, &ctl);
+
+    dictionary_destroy(ctl.ctx);
+    simple_pattern_free(ctl.hosts.scope_pattern);
+    simple_pattern_free(ctl.hosts.pattern);
+    simple_pattern_free(ctl.contexts.pattern);
+    simple_pattern_free(ctl.contexts.scope_pattern);
+
+    return HTTP_RESP_OK;
+}
+
+// ----------------------------------------------------------------------------
 // query API
 
 typedef struct query_target_locals {
@@ -2279,6 +2451,8 @@ typedef struct query_target_locals {
     bool match_names;
 
     size_t metrics_skipped_due_to_not_matching_timeframe;
+
+    QUERY_HOST *qh; // temp to pass on callbacks, ignore otherwise - no need to free
 } QUERY_TARGET_LOCALS;
 
 static __thread QUERY_TARGET thread_query_target = {};
@@ -2856,7 +3030,9 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, 
     }
 }
 
-static void query_target_add_context(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, RRDCONTEXT_ACQUIRED *rca, bool queryable_context) {
+static void query_target_add_context(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context) {
+    QUERY_TARGET_LOCALS *qtl = data;
+    QUERY_HOST *qh = qtl->qh;
     QUERY_TARGET *qt = qtl->qt;
 
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
@@ -2900,7 +3076,8 @@ static void query_target_add_context(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, R
     }
 }
 
-static void query_target_add_host(QUERY_TARGET_LOCALS *qtl, RRDHOST *host, bool queryable_host) {
+static void query_target_add_host(void *data, RRDHOST *host, bool queryable_host) {
+    QUERY_TARGET_LOCALS *qtl = data;
     QUERY_TARGET *qt = qtl->qt;
 
     if(qt->hosts.used == qt->hosts.size) {
@@ -2937,46 +3114,24 @@ static void query_target_add_host(QUERY_TARGET_LOCALS *qtl, RRDHOST *host, bool 
         }
     }
 
+    qtl->qh = qh;
+
     size_t added = 0;
     if(unlikely(qt->request.rca)) {
-        query_target_add_context(qtl, qh, qt->request.rca, true);
+        query_target_add_context(qtl, qt->request.rca, true);
         added++;
     }
     else if(unlikely(qtl->st)) {
         // single chart data queries
-        query_target_add_context(qtl, qh, qtl->st->rrdcontext, true);
+        query_target_add_context(qtl, qtl->st->rrdcontext, true);
         added++;
     }
     else {
         // context pattern queries
-        RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item((DICTIONARY *)host->rrdctx, qtl->scope_contexts);
-        if(likely(rca)) {
-            // we found it!
-
-            bool queryable_context = queryable_host;
-            if(queryable_context && qt->contexts.pattern && !simple_pattern_matches(qt->contexts.pattern, rrdcontext_acquired_id(rca)))
-                queryable_context = false;
-
-            query_target_add_context(qtl, qh, rca, queryable_context);
-            rrdcontext_release(rca);
-            added++;
-        }
-        else {
-            // Probably it is a pattern, we need to search for it...
-            RRDCONTEXT *rc;
-            dfe_start_read((DICTIONARY *)host->rrdctx, rc) {
-                if(qt->contexts.scope_pattern && !simple_pattern_matches(qt->contexts.scope_pattern, string2str(rc->id)))
-                    continue;
-
-                bool queryable_context = queryable_host;
-                if(queryable_context && qt->contexts.pattern && !simple_pattern_matches(qt->contexts.pattern, string2str(rc->id)))
-                    queryable_context = false;
-
-                query_target_add_context(qtl, qh, (RRDCONTEXT_ACQUIRED *)rc_dfe.item, queryable_context);
-                added++;
-            }
-            dfe_done(rc);
-        }
+        added = rrdcontext_foreach_context(
+                host, qtl->scope_contexts,
+                qt->contexts.scope_pattern, qt->contexts.pattern,
+                query_target_add_context, queryable_host, qtl);
     }
 
     if(!added) {
@@ -3098,17 +3253,17 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     qt->db.minimum_latest_update_every_s = 0; // it will be updated by query_target_add_query()
 
     // prepare all the patterns
-    qt->hosts.pattern = is_valid_sp(qtl.hosts) ? simple_pattern_create(qtl.hosts, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
-    qt->hosts.scope_pattern = is_valid_sp(qtl.scope_hosts) ? simple_pattern_create(qtl.scope_hosts, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
+    qt->hosts.scope_pattern = string_to_simple_pattern(qtl.scope_hosts);
+    qt->hosts.pattern = string_to_simple_pattern(qtl.hosts);
 
-    qt->contexts.pattern = is_valid_sp(qtl.contexts) ? simple_pattern_create(qtl.contexts, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
-    qt->contexts.scope_pattern = is_valid_sp(qtl.scope_contexts) ? simple_pattern_create(qtl.scope_contexts, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
+    qt->contexts.pattern = string_to_simple_pattern(qtl.contexts);
+    qt->contexts.scope_pattern = string_to_simple_pattern(qtl.scope_contexts);
 
-    qt->instances.pattern = is_valid_sp(qtl.charts) ? simple_pattern_create(qtl.charts, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
-    qt->query.pattern = is_valid_sp(qtl.dimensions) ? simple_pattern_create(qtl.dimensions, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
-    qt->instances.chart_label_key_pattern = is_valid_sp(qtl.chart_label_key) ? simple_pattern_create(qtl.chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
-    qt->instances.labels_pattern = is_valid_sp(qtl.labels) ? simple_pattern_create(qtl.labels, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
-    qt->instances.alerts_pattern = is_valid_sp(qtl.alerts) ? simple_pattern_create(qtl.alerts, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
+    qt->instances.pattern = string_to_simple_pattern(qtl.charts);
+    qt->query.pattern = string_to_simple_pattern(qtl.dimensions);
+    qt->instances.chart_label_key_pattern = string_to_simple_pattern(qtl.chart_label_key);
+    qt->instances.labels_pattern = string_to_simple_pattern(qtl.labels);
+    qt->instances.alerts_pattern = string_to_simple_pattern(qtl.alerts);
 
     qtl.match_ids = qt->request.options & RRDR_OPTION_MATCH_IDS;
     qtl.match_names = qt->request.options & RRDR_OPTION_MATCH_NAMES;
@@ -3134,35 +3289,8 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
         query_target_add_host(&qtl, host, true);
         qtl.hosts = rrdhost_hostname(host);
     }
-    else {
-        char uuid[UUID_STR_LEN];
-
-        // multi host query
-        rrd_rdlock();
-        rrdhost_foreach_read(host) {
-
-            if(!host->node_id)
-                uuid_unparse_lower(*host->node_id, uuid);
-            else
-                uuid[0] = '\0';
-
-            if(!qt->hosts.scope_pattern ||
-                simple_pattern_matches(qt->hosts.scope_pattern, rrdhost_hostname(host)) ||
-                simple_pattern_matches(qt->hosts.scope_pattern, host->machine_guid) ||
-                (*uuid && simple_pattern_matches(qt->hosts.scope_pattern, uuid))) {
-
-                bool queryable_host = false;
-                if(!qt->hosts.pattern ||
-                    simple_pattern_matches(qt->hosts.pattern, rrdhost_hostname(host)) ||
-                    simple_pattern_matches(qt->hosts.pattern, host->machine_guid) ||
-                    simple_pattern_matches(qt->hosts.pattern, uuid))
-                    queryable_host = true;
-
-                query_target_add_host(&qtl, host, queryable_host);
-            }
-        }
-        rrd_unlock();
-    }
+    else
+        rrdcontext_foreach_host(qt->hosts.scope_pattern, qt->hosts.pattern, query_target_add_host, &qtl);
 
     query_target_calculate_window(qt);
 

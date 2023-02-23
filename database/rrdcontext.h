@@ -438,5 +438,24 @@ void query_target_release(QUERY_TARGET *qt);
 
 QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr);
 
+struct api_v2_contexts_request {
+    char *scope_hosts;
+    char *scope_contexts;
+    char *hosts;
+    char *contexts;
+    char *instances;
+    char *dimensions;
+    char *labels;
+    char *alerts;
+    time_t after;
+    time_t before;
+
+    RRDCONTEXT_TO_JSON_OPTIONS options;
+};
+
+int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req);
+
+RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o);
+
 #endif // NETDATA_RRDCONTEXT_H
 
