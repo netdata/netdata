@@ -56,6 +56,18 @@ install_centos() {
   "$PKGMGR" install -y ${opts} curl nc jq || exit 1
 }
 
+install_amazon_linux() {
+  PKGMGR="$( (command -v dnf > /dev/null && echo "dnf") || echo "yum")"
+
+  pkg_version="$(echo "${VERSION}" | tr - .)"
+
+  # Install Netdata
+  "$PKGMGR" install -y /netdata/artifacts/netdata-"${pkg_version}"-*.rpm
+
+  # Install testing tools
+  "$PKGMGR" install -y ${opts} curl nc jq || exit 1
+}
+
 install_suse_like() {
   # Using a glob pattern here because I can't reliably determine what the
   # resulting package name will be (TODO: There must be a better way!)
@@ -113,6 +125,9 @@ case "${DISTRO}" in
     ;;
   centos | rockylinux | almalinux)
     install_centos
+    ;;
+  amazonlinux)
+    install_amazon
     ;;
   opensuse)
     install_suse_like
