@@ -80,6 +80,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -e
           count=$(gh issue list -R netdata/netdata -s all -S '${{ steps.title.outputs.title }} in:title' --json 'id' -q '. | length')
           if [ "${count}" -ge 1 ]; then
             echo 'exists=true' >> "${GITHUB_OUTPUT}"
