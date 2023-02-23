@@ -2256,10 +2256,13 @@ DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contex
 // ----------------------------------------------------------------------------
 // web API helpers
 
-typedef void (*foreach_host_cb_t)(void *data, RRDHOST *host, bool queryable);
+typedef bool (*foreach_host_cb_t)(void *data, RRDHOST *host, bool queryable);
 
-static uint64_t rrdcontext_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hosts_sp, foreach_host_cb_t cb, void *data, uint64_t *hard_hash, uint64_t *soft_hash) {
+static uint64_t rrdcontext_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hosts_sp, foreach_host_cb_t cb, void *data, uint64_t *hard_hash, uint64_t *soft_hash, char *host_uuid_buffer) {
     char uuid[UUID_STR_LEN];
+    if(!host_uuid_buffer) host_uuid_buffer = uuid;
+    host_uuid_buffer[0] = '\0';
+
     RRDHOST *host;
     size_t count = 0;
     uint64_t v_hash = 0;
@@ -2267,20 +2270,18 @@ static uint64_t rrdcontext_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_P
 
     dfe_start_reentrant(rrdhost_root_index, host) {
                 if(!host->node_id)
-                    uuid_unparse_lower(*host->node_id, uuid);
-                else
-                    uuid[0] = '\0';
+                    uuid_unparse_lower(*host->node_id, host_uuid_buffer);
 
                 if(!scope_hosts_sp ||
                    simple_pattern_matches(scope_hosts_sp, rrdhost_hostname(host)) ||
                    simple_pattern_matches(scope_hosts_sp, host->machine_guid) ||
-                   (*uuid && simple_pattern_matches(scope_hosts_sp, uuid))) {
+                   (*uuid && simple_pattern_matches(scope_hosts_sp, host_uuid_buffer))) {
 
                     bool queryable_host = false;
                     if(!hosts_sp ||
                        simple_pattern_matches(hosts_sp, rrdhost_hostname(host)) ||
                        simple_pattern_matches(hosts_sp, host->machine_guid) ||
-                       simple_pattern_matches(hosts_sp, uuid))
+                       simple_pattern_matches(hosts_sp, host_uuid_buffer))
                         queryable_host = true;
 
                     count++;
@@ -2300,7 +2301,7 @@ static uint64_t rrdcontext_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_P
     return count;
 }
 
-typedef void (*foreach_context_cb_t)(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context);
+typedef bool (*foreach_context_cb_t)(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context);
 
 static size_t rrdcontext_foreach_context(RRDHOST *host, const char *scope_contexts, SIMPLE_PATTERN *scope_contexts_sp, SIMPLE_PATTERN *contexts_sp, foreach_context_cb_t cb, bool queryable_host, void *data) {
     size_t added = 0;
@@ -2313,9 +2314,10 @@ static size_t rrdcontext_foreach_context(RRDHOST *host, const char *scope_contex
         if(queryable_context && contexts_sp && !simple_pattern_matches(contexts_sp, rrdcontext_acquired_id(rca)))
             queryable_context = false;
 
-        cb(data, rca, queryable_context);
+        if(cb(data, rca, queryable_context))
+            added++;
+
         rrdcontext_release(rca);
-        added++;
     }
     else {
         // Probably it is a pattern, we need to search for it...
@@ -2328,8 +2330,8 @@ static size_t rrdcontext_foreach_context(RRDHOST *host, const char *scope_contex
                     if(queryable_context && contexts_sp && !simple_pattern_matches(contexts_sp, rc_dfe.name))
                         queryable_context = false;
 
-                    cb(data, (RRDCONTEXT_ACQUIRED *)rc_dfe.item, queryable_context);
-                    added++;
+                    if(cb(data, (RRDCONTEXT_ACQUIRED *)rc_dfe.item, queryable_context))
+                        added++;
                 }
         dfe_done(rc);
     }
@@ -2370,7 +2372,7 @@ struct rrdcontext_to_json_v2_data {
     } contexts;
 };
 
-static void rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context __maybe_unused) {
+static bool rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context __maybe_unused) {
     struct rrdcontext_to_json_v2_data *ctl = data;
 
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
@@ -2403,14 +2405,16 @@ static void rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED *r
         if(z->last_time_s < rc->last_time_s)
             z->last_time_s = rc->last_time_s;
     }
+
+    return true;
 }
 
-static void rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool queryable_host) {
+static bool rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool queryable_host) {
     struct rrdcontext_to_json_v2_data *ctl = data;
     BUFFER *wb = ctl->wb;
 
     if(!host->rrdctx.contexts)
-        return;
+        return false;
 
     buffer_json_add_array_item_object(wb);
     buffer_json_member_add_string(wb, "mg", host->machine_guid);
@@ -2418,11 +2422,12 @@ static void rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool query
     buffer_json_member_add_string(wb, "nm", rrdhost_hostname(host));
     buffer_json_object_close(wb);
 
-    rrdcontext_foreach_context(
+    size_t added = rrdcontext_foreach_context(
             host, ctl->request->scope_contexts,
             ctl->contexts.scope_pattern, ctl->contexts.pattern,
             rrdcontext_to_json_v2_add_context, queryable_host, ctl);
 
+    return added > 0;
 }
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req) {
@@ -2453,7 +2458,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req) {
 
     buffer_json_member_add_array(wb, "hosts");
     ctl.host_count = rrdcontext_foreach_host(ctl.hosts.scope_pattern, ctl.hosts.pattern,
-                                             rrdcontext_to_json_v2_add_host, &ctl, &ctl.hard_hash, &ctl.soft_hash);
+                                             rrdcontext_to_json_v2_add_host, &ctl, &ctl.hard_hash, &ctl.soft_hash, NULL);
     buffer_json_array_close(wb);
 
     req->timings.output_ut = now_monotonic_usec();
@@ -2526,6 +2531,7 @@ typedef struct query_target_locals {
 
     size_t metrics_skipped_due_to_not_matching_timeframe;
 
+    char host_uuid_buffer[UUID_STR_LEN];
     QUERY_HOST *qh; // temp to pass on callbacks, ignore otherwise - no need to free
 } QUERY_TARGET_LOCALS;
 
@@ -2664,7 +2670,7 @@ void query_target_free(void) {
     qt->hosts.size = 0;
 }
 
-static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, QUERY_CONTEXT *qc,
+static bool query_target_add_metric(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, QUERY_CONTEXT *qc,
                                     QUERY_INSTANCE *qi, QUERY_DIMENSION *qd) {
     QUERY_TARGET *qt = qtl->qt;
     RRDMETRIC *rm = rrdmetric_acquired_value(qd->rma);
@@ -2833,16 +2839,20 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, QU
             if (tier_retention[tier].db_metric_handle)
                 tier_retention[tier].eng->api.metric_release(tier_retention[tier].db_metric_handle);
         }
+
+        return false;
     }
+
+    return true;
 }
 
-static void query_target_add_dimension(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi,
+static bool query_target_add_dimension(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi,
                                        RRDMETRIC_ACQUIRED *rma, bool queryable_instance) {
     QUERY_TARGET *qt = qtl->qt;
 
     RRDMETRIC *rm = rrdmetric_acquired_value(rma);
     if(rrd_flag_is_deleted(rm))
-        return;
+        return false;
 
     if(qt->dimensions.used == qt->dimensions.size) {
         size_t old_mem = qt->dimensions.size * sizeof(*qt->dimensions.array);
@@ -2864,10 +2874,11 @@ static void query_target_add_dimension(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh,
         qc->metrics.excluded++;
         qh->metrics.excluded++;
         qd->status |= QUERY_STATUS_EXCLUDED;
-        return;
     }
+    else
+        query_target_add_metric(qtl, qh, qc, qi, qd);
 
-    query_target_add_metric(qtl, qh, qc, qi, qd);
+    return true;
 }
 
 static inline STRING *rrdinstance_id_fqdn_v1(RRDINSTANCE_ACQUIRED *ria) {
@@ -3008,13 +3019,13 @@ static bool query_target_match_alert_pattern(QUERY_INSTANCE *qi, SIMPLE_PATTERN 
     return matched;
 }
 
-static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, QUERY_CONTEXT *qc,
+static bool query_target_add_instance(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, QUERY_CONTEXT *qc,
                                       RRDINSTANCE_ACQUIRED *ria, bool queryable_instance, bool filter_instances) {
     QUERY_TARGET *qt = qtl->qt;
 
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
     if(rrd_flag_is_deleted(ri))
-        return;
+        return false;
 
     if(qt->instances.used == qt->instances.size) {
         size_t old_mem = qt->instances.size * sizeof(*qt->instances.array);
@@ -3072,14 +3083,14 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, 
     size_t added = 0;
 
     if(unlikely(qt->request.rma)) {
-        query_target_add_dimension(qtl, qh, qc, qi, qt->request.rma, queryable_instance);
-        added++;
+        if(query_target_add_dimension(qtl, qh, qc, qi, qt->request.rma, queryable_instance))
+            added++;
     }
     else {
         RRDMETRIC *rm;
         dfe_start_read(ri->rrdmetrics, rm) {
-            query_target_add_dimension(qtl, qh, qc, qi, (RRDMETRIC_ACQUIRED *) rm_dfe.item, queryable_instance);
-            added++;
+            if(query_target_add_dimension(qtl, qh, qc, qi, (RRDMETRIC_ACQUIRED *) rm_dfe.item, queryable_instance))
+                added++;
         }
         dfe_done(rm);
     }
@@ -3102,16 +3113,18 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, 
         qc->instances.selected++;
         qh->instances.selected++;
     }
+
+    return true;
 }
 
-static void query_target_add_context(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context) {
+static bool query_target_add_context(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context) {
     QUERY_TARGET_LOCALS *qtl = data;
     QUERY_HOST *qh = qtl->qh;
     QUERY_TARGET *qt = qtl->qt;
 
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
     if(rrd_flag_is_deleted(rc))
-        return;
+        return false;
 
     if(qt->contexts.used == qt->contexts.size) {
         size_t old_mem = qt->contexts.size * sizeof(*qt->contexts.array);
@@ -3128,18 +3141,18 @@ static void query_target_add_context(void *data, RRDCONTEXT_ACQUIRED *rca, bool 
 
     size_t added = 0;
     if(unlikely(qt->request.ria)) {
-         query_target_add_instance(qtl, qh, qc, qt->request.ria, queryable_context, false);
-        added++;
+         if(query_target_add_instance(qtl, qh, qc, qt->request.ria, queryable_context, false))
+            added++;
     }
     else if(unlikely(qtl->st && qtl->st->rrdcontext == rca && qtl->st->rrdinstance)) {
-        query_target_add_instance(qtl, qh, qc, qtl->st->rrdinstance, queryable_context, false);
-        added++;
+        if(query_target_add_instance(qtl, qh, qc, qtl->st->rrdinstance, queryable_context, false))
+            added++;
     }
     else {
         RRDINSTANCE *ri;
         dfe_start_read(rc->rrdinstances, ri) {
-            query_target_add_instance(qtl, qh, qc, (RRDINSTANCE_ACQUIRED *)ri_dfe.item, queryable_context, true);
-            added++;
+            if(query_target_add_instance(qtl, qh, qc, (RRDINSTANCE_ACQUIRED *)ri_dfe.item, queryable_context, true))
+                added++;
         }
         dfe_done(ri);
     }
@@ -3148,9 +3161,11 @@ static void query_target_add_context(void *data, RRDCONTEXT_ACQUIRED *rca, bool 
         qt->contexts.used--;
         rrdcontext_release(rca);
     }
+
+    return true;
 }
 
-static void query_target_add_host(void *data, RRDHOST *host, bool queryable_host) {
+static bool query_target_add_host(void *data, RRDHOST *host, bool queryable_host) {
     QUERY_TARGET_LOCALS *qtl = data;
     QUERY_TARGET *qt = qtl->qt;
 
@@ -3167,8 +3182,12 @@ static void query_target_add_host(void *data, RRDHOST *host, bool queryable_host
     qh->slot = qt->hosts.used++;
     qh->host = host;
 
-    if(host->node_id)
-        uuid_unparse_lower(*host->node_id, qh->node_id);
+    if(host->node_id) {
+        if(!qtl->host_uuid_buffer[0])
+            uuid_unparse_lower(*host->node_id, qh->node_id);
+        else
+            memcpy(qh->node_id, qtl->host_uuid_buffer, sizeof(qh->node_id));
+    }
     else
         qh->node_id[0] = '\0';
 
@@ -3192,13 +3211,13 @@ static void query_target_add_host(void *data, RRDHOST *host, bool queryable_host
 
     size_t added = 0;
     if(unlikely(qt->request.rca)) {
-        query_target_add_context(qtl, qt->request.rca, true);
-        added++;
+        if(query_target_add_context(qtl, qt->request.rca, true))
+            added++;
     }
     else if(unlikely(qtl->st)) {
         // single chart data queries
-        query_target_add_context(qtl, qtl->st->rrdcontext, true);
-        added++;
+        if(query_target_add_context(qtl, qtl->st->rrdcontext, true))
+            added++;
     }
     else {
         // context pattern queries
@@ -3210,7 +3229,9 @@ static void query_target_add_host(void *data, RRDHOST *host, bool queryable_host
 
     if(!added) {
         qt->hosts.used--;
+        return false;
     }
+    return true;
 }
 
 void query_target_generate_name(QUERY_TARGET *qt) {
@@ -3367,7 +3388,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     }
     else
         rrdcontext_foreach_host(qt->hosts.scope_pattern, qt->hosts.pattern, query_target_add_host, &qtl,
-                                &qt->versions.contexts_hard_hash, &qt->versions.contexts_soft_hash);
+                                &qt->versions.contexts_hard_hash, &qt->versions.contexts_soft_hash, qtl.host_uuid_buffer);
 
     query_target_calculate_window(qt);
 
