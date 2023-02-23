@@ -45,7 +45,8 @@ install -pm 644 %{SOURCE3} ./netdata-edge.repo
 %endif
 
 %if 0%{?centos_ver}
-%if 0%{?amzn2} # Amazon Linux 2 looks like CentOS, but with extra macros.
+# Amazon Linux 2 looks like CentOS, but with extra macros.
+%if 0%{?amzn2}
 install -pm 644 %{SOURCE8} ./netdata.repo
 install -pm 644 %{SOURCE9} ./netdata-edge.repo
 %else
