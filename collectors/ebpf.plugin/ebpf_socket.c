@@ -5,6 +5,10 @@
 #include "ebpf.h"
 #include "ebpf_socket.h"
 
+// ----------------------------------------------------------------------------
+// ARAL vectors used to speed up processing
+ARAL *ebpf_aral_socket_pid;
+
 /*****************************************************************
  *
  *  GLOBAL VARIABLES
@@ -428,6 +432,46 @@ static inline int ebpf_socket_load_and_attach(struct socket_bpf *obj, ebpf_modul
     return ret;
 }
 #endif
+
+/*****************************************************************
+ *
+ *  ARAL FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * eBPF socket Aral init
+ *
+ * Initiallize array allocator that will be used when integration with apps is enabled.
+ */
+static inline void ebpf_socket_aral_init()
+{
+    ebpf_aral_socket_pid = ebpf_allocate_pid_aral("ebpf-socket", sizeof(ebpf_socket_publish_apps_t));
+}
+
+/**
+ * eBPF socket get
+ *
+ * Get a ebpf_socket_publish_apps_t entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+ebpf_socket_publish_apps_t *ebpf_socket_stat_get(void)
+{
+    ebpf_socket_publish_apps_t *target = aral_mallocz(ebpf_aral_socket_pid);
+    memset(target, 0, sizeof(ebpf_socket_publish_apps_t));
+    return target;
+}
+
+/**
+ * eBPF socket release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_socket_release(ebpf_socket_publish_apps_t *stat)
+{
+    aral_freez(ebpf_aral_socket_pid, stat);
+}
 
 /*****************************************************************
  *
