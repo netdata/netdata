@@ -336,7 +336,7 @@ static void ebpf_shm_exit(void *ptr)
  */
 static inline void ebpf_shm_aral_init()
 {
-    ebpf_aral_shm_pid = ebpf_allocate_pid_aral("ebpf-fd", sizeof(netdata_publish_shm_t));
+    ebpf_aral_shm_pid = ebpf_allocate_pid_aral("ebpf-shm", sizeof(netdata_publish_shm_t));
 }
 
 /**
