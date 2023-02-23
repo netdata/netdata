@@ -2271,7 +2271,7 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
 {
     ebpf_socket_publish_apps_t *curr = socket_bandwidth_curr[current_pid];
     if (!curr) {
-        curr = callocz(1, sizeof(ebpf_socket_publish_apps_t));
+        curr = ebpf_socket_stat_get();
         socket_bandwidth_curr[current_pid] = curr;
     }
 
@@ -2991,10 +2991,11 @@ static void ebpf_socket_allocate_global_vectors(int apps)
     memset(socket_publish_aggregated, 0 ,NETDATA_MAX_SOCKET_VECTOR * sizeof(netdata_publish_syscall_t));
     socket_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
 
-    if (apps)
+    if (apps) {
+        ebpf_socket_aral_init();
         socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
-
-    bandwidth_vector = callocz((size_t)ebpf_nprocs, sizeof(ebpf_bandwidth_t));
+        bandwidth_vector = callocz((size_t)ebpf_nprocs, sizeof(ebpf_bandwidth_t));
+    }
 
     socket_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_socket_t));
     if (network_viewer_opt.enabled) {

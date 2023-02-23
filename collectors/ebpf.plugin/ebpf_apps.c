@@ -1018,7 +1018,7 @@ void cleanup_variables_from_other_threads(uint32_t pid)
 {
     // Clean socket structures
     if (socket_bandwidth_curr) {
-        freez(socket_bandwidth_curr[pid]);
+        ebpf_socket_release(socket_bandwidth_curr[pid]);
         socket_bandwidth_curr[pid] = NULL;
     }
 
