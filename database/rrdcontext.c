@@ -2343,7 +2343,7 @@ static size_t rrdcontext_foreach_context(RRDHOST *host, const char *scope_contex
 // ----------------------------------------------------------------------------
 // /api/v2/contexts API
 
-typedef enum {
+typedef enum __attribute__ ((__packed__)) {
     FTS_MATCHED_NONE = 0,
     FTS_MATCHED_HOST,
     FTS_MATCHED_CONTEXT,
@@ -2351,6 +2351,10 @@ typedef enum {
     FTS_MATCHED_DIMENSION,
     FTS_MATCHED_LABEL,
     FTS_MATCHED_ALERT,
+    FTS_MATCHED_ALERT_INFO,
+    FTS_MATCHED_FAMILY,
+    FTS_MATCHED_TITLE,
+    FTS_MATCHED_UNITS,
 } FTS_MATCH;
 
 static const char *fts_match_to_string(FTS_MATCH match) {
@@ -2370,8 +2374,20 @@ static const char *fts_match_to_string(FTS_MATCH match) {
         case FTS_MATCHED_ALERT:
             return "ALERT";
 
+        case FTS_MATCHED_ALERT_INFO:
+            return "ALERT_INFO";
+
         case FTS_MATCHED_LABEL:
             return "LABEL";
+
+        case FTS_MATCHED_FAMILY:
+            return "FAMILY";
+
+        case FTS_MATCHED_TITLE:
+            return "TITLE";
+
+        case FTS_MATCHED_UNITS:
+            return "UNITS";
 
         default:
             return "NONE";
@@ -2416,18 +2432,22 @@ struct rrdcontext_to_json_v2_data {
 };
 
 static FTS_MATCH rrdcontext_to_json_v2_full_text_search(RRDCONTEXT *rc, SIMPLE_PATTERN *q) {
-    if(simple_pattern_matches(q, string2str(rc->id)) ||
-       simple_pattern_matches(q, string2str(rc->family)) ||
-       simple_pattern_matches(q, string2str(rc->title)) ||
-       simple_pattern_matches(q, string2str(rc->units)))
+    if(unlikely(simple_pattern_matches(q, string2str(rc->id)) ||
+       simple_pattern_matches(q, string2str(rc->family))))
         return FTS_MATCHED_CONTEXT;
+
+    if(unlikely(simple_pattern_matches(q, string2str(rc->title))))
+        return FTS_MATCHED_TITLE;
+
+    if(unlikely(simple_pattern_matches(q, string2str(rc->units))))
+        return FTS_MATCHED_UNITS;
 
     FTS_MATCH matched = FTS_MATCHED_NONE;
     RRDINSTANCE *ri;
     dfe_start_read(rc->rrdinstances, ri) {
                 if(matched) break;
 
-                if(simple_pattern_matches(q, string2str(ri->id)) ||
+                if(unlikely(simple_pattern_matches(q, string2str(ri->id))) ||
                    (ri->name != ri->id && simple_pattern_matches(q, string2str(ri->name)))) {
                     matched = FTS_MATCHED_INSTANCE;
                     break;
@@ -2435,20 +2455,31 @@ static FTS_MATCH rrdcontext_to_json_v2_full_text_search(RRDCONTEXT *rc, SIMPLE_P
 
                 RRDMETRIC *rm;
                 dfe_start_read(ri->rrdmetrics, rm) {
-                            if(simple_pattern_matches(q, string2str(rm->id)) ||
-                               (rm->name != rm->id && simple_pattern_matches(q, string2str(rm->name)))) {
-                                matched = FTS_MATCHED_DIMENSION;
-                                break;
-                            }
-                        }
+                    if(unlikely(simple_pattern_matches(q, string2str(rm->id))) ||
+                       (rm->name != rm->id && simple_pattern_matches(q, string2str(rm->name)))) {
+                        matched = FTS_MATCHED_DIMENSION;
+                        break;
+                    }
+                }
                 dfe_done(rm);
+
+                if(unlikely(ri->rrdlabels && dictionary_entries(ri->rrdlabels) &&
+                    rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, q, ':'))) {
+                    matched = FTS_MATCHED_LABEL;
+                    break;
+                }
 
                 if(ri->rrdset) {
                     RRDSET *st = ri->rrdset;
                     netdata_rwlock_rdlock(&st->alerts.rwlock);
                     for (RRDCALC *rcl = st->alerts.base; rcl; rcl = rcl->next) {
-                        if(simple_pattern_matches(q, string2str(rcl->name))) {
+                        if(unlikely(simple_pattern_matches(q, string2str(rcl->name)))) {
                             matched = FTS_MATCHED_ALERT;
+                            break;
+                        }
+
+                        if(unlikely(simple_pattern_matches(q, string2str(rcl->info)))) {
+                            matched = FTS_MATCHED_ALERT_INFO;
                             break;
                         }
                     }

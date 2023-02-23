@@ -2,7 +2,7 @@
 
 #include "web_api_v2.h"
 
-static int web_client_api_request_v2_contexts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unused, struct web_client *w, char *url, bool enable_search) {
     struct api_v2_contexts_request req = { 0 };
     req.timings.received_ut = now_monotonic_usec();
 
@@ -21,11 +21,19 @@ static int web_client_api_request_v2_contexts(RRDHOST *host __maybe_unused, stru
         else if(!strcmp(name, "scope_contexts")) req.scope_contexts = value;
         else if(!strcmp(name, "hosts")) req.hosts = value;
         else if(!strcmp(name, "contexts")) req.contexts = value;
-        else if(!strcmp(name, "q")) req.q = value;
+        else if(enable_search && !strcmp(name, "q")) req.q = value;
     }
 
     buffer_flush(w->response.data);
     return rrdcontext_to_json_v2(w->response.data, &req);
+}
+
+static int web_client_api_request_v2_q(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_v2_contexts_internal(host, w, url, true);
+}
+
+static int web_client_api_request_v2_contexts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_v2_contexts_internal(host, w, url, false);
 }
 
 static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
@@ -278,6 +286,7 @@ cleanup:
 static struct web_api_command api_commands_v2[] = {
         {"data", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_data},
         {"contexts", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_contexts},
+        {"q", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_q},
 
         // terminator
         {NULL, 0, WEB_CLIENT_ACL_NONE, NULL},
