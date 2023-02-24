@@ -351,9 +351,8 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
         ret = -1;
         goto cleanup;
     } else if (unlikely(bytes == 0)) {
-        if(unlikely(w->ifd == fd && web_client_has_ssl_wait_receive(w))) {
+        if(unlikely(w->ifd == fd && web_client_has_ssl_wait_receive(w)))
             *events |= POLLIN;
-        }
 
         if(unlikely(w->ofd == fd && web_client_has_ssl_wait_send(w)))
             *events |= POLLOUT;
