@@ -788,7 +788,7 @@ copy_libbpf() {
 }
 
 bundle_libbpf() {
-  if { [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 1 ]; } || [ "$(uname -s)" != Linux ]; then
+  if { [ -n "${NETDATA_DISABLE_EBPF}" ] && [ "${NETDATA_DISABLE_EBPF}" = 1 ]; } || [ "$(uname -s)" != Linux ]; then
     return 0
   fi
 
@@ -822,14 +822,14 @@ bundle_libbpf() {
       rm -rf "${tmp}"; then
       run_ok "libbpf built and prepared."
     else
-      if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 0 ]; then
+      if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ "${NETDATA_DISABLE_EBPF}" = 0 ]; then
         fatal "failed to build libbpf." I0005
       else
         run_failed "Failed to build libbpf. eBPF support will be disabled"
       fi
     fi
   else
-    if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 0 ]; then
+    if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ "${NETDATA_DISABLE_EBPF}" = 0 ]; then
       fatal "Failed to fetch sources for libbpf." I0006
     else
       run_failed "Unable to fetch sources for libbpf. eBPF support will be disabled"
@@ -846,7 +846,7 @@ copy_co_re() {
 }
 
 bundle_ebpf_co_re() {
-  if { [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 1 ]; } || [ "$(uname -s)" != Linux ]; then
+  if { [ -n "${NETDATA_DISABLE_EBPF}" ] && [ "${NETDATA_DISABLE_EBPF}" = 1 ]; } || [ "$(uname -s)" != Linux ]; then
     return 0
   fi
 
@@ -869,7 +869,7 @@ bundle_ebpf_co_re() {
       rm -rf "${tmp}"; then
       run_ok "libbpf built and prepared."
     else
-      if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 0 ]; then
+      if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ "${NETDATA_DISABLE_EBPF}" = 0 ]; then
         fatal "Failed to get eBPF CO-RE files." I0007
       else
         run_failed "Failed to get eBPF CO-RE files. eBPF support will be disabled"
@@ -878,7 +878,7 @@ bundle_ebpf_co_re() {
       fi
     fi
   else
-    if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 0 ]; then
+    if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ "${NETDATA_DISABLE_EBPF}" = 0 ]; then
       fatal "Failed to fetch eBPF CO-RE files." I0008
     else
       run_failed "Failed to fetch eBPF CO-RE files. eBPF support will be disabled"

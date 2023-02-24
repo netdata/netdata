@@ -1,11 +1,11 @@
 <!--
-title: "Netdata platform support policy"
-sidebar_label: "Supported platforms"
+title: "Platform support policy"
+sidebar_label: "Platform support policy"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/PLATFORM_SUPPORT.md"
 learn_status: "Published"
-sidebar_position: "30"
-learn_topic_type: "Getting started"
-learn_rel_path: "Getting started"
+sidebar_position: "1"
+learn_topic_type: "Tasks"
+learn_rel_path: "Installation"
 learn_docs_purpose: "Present all the supported platform in the Netdata solution"
 -->
 
@@ -63,6 +63,7 @@ to work on these platforms with minimal user effort.
 | Alma Linux               | 8.x            | x86\_64, AArch64                       | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                                                    |
 | CentOS                   | 7.x            | x86\_64                                |                                                                                                                                                    |
 | Docker                   | 19.03 or newer | x86\_64, i386, ARMv7, AArch64, POWER8+ | See our [Docker documentation](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md) for more info on using Netdata on Docker |
+| Debian                   | 12.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                                                    |
 | Debian                   | 11.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                                                    |
 | Debian                   | 10.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                                                    |
 | Fedora                   | 37             | x86\_64, AArch64                       |                                                                                                                                                    |

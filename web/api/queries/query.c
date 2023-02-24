@@ -24,7 +24,7 @@
 static struct {
     const char *name;
     uint32_t hash;
-    RRDR_GROUPING value;
+    RRDR_TIME_GROUPING value;
 
     // One time initialization for the module.
     // This is called once, when netdata starts.
@@ -590,7 +590,7 @@ static struct {
         }
 };
 
-void web_client_api_v1_init_grouping(void) {
+void time_grouping_init(void) {
     int i;
 
     for(i = 0; api_v1_data_groups[i].name ; i++) {
@@ -601,7 +601,7 @@ void web_client_api_v1_init_grouping(void) {
     }
 }
 
-const char *group_method2string(RRDR_GROUPING group) {
+const char *time_grouping_method2string(RRDR_TIME_GROUPING group) {
     int i;
 
     for(i = 0; api_v1_data_groups[i].name ; i++) {
@@ -613,7 +613,7 @@ const char *group_method2string(RRDR_GROUPING group) {
     return "unknown-group-method";
 }
 
-RRDR_GROUPING web_client_api_request_v1_data_group(const char *name, RRDR_GROUPING def) {
+RRDR_TIME_GROUPING time_grouping_parse(const char *name, RRDR_TIME_GROUPING def) {
     int i;
 
     uint32_t hash = simple_hash(name);
@@ -624,7 +624,7 @@ RRDR_GROUPING web_client_api_request_v1_data_group(const char *name, RRDR_GROUPI
     return def;
 }
 
-const char *web_client_api_request_v1_data_group_to_string(RRDR_GROUPING group) {
+const char *time_grouping_tostring(RRDR_TIME_GROUPING group) {
     int i;
 
     for(i = 0; api_v1_data_groups[i].name ; i++)
@@ -634,7 +634,7 @@ const char *web_client_api_request_v1_data_group_to_string(RRDR_GROUPING group) 
     return "unknown";
 }
 
-static void rrdr_set_grouping_function(RRDR *r, RRDR_GROUPING group_method) {
+static void rrdr_set_grouping_function(RRDR *r, RRDR_TIME_GROUPING group_method) {
     int i, found = 0;
     for(i = 0; !found && api_v1_data_groups[i].name ;i++) {
         if(api_v1_data_groups[i].value == group_method) {
@@ -1721,7 +1721,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s
 #ifdef NETDATA_INTERNAL_CHECKS
 static void rrd2rrdr_log_request_response_metadata(RRDR *r
         , RRDR_OPTIONS options __maybe_unused
-        , RRDR_GROUPING group_method
+        , RRDR_TIME_GROUPING group_method
         , bool aligned
         , size_t group
         , time_t resampling_time
@@ -1753,7 +1753,7 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
 
          // grouping
          , (aligned) ? "aligned" : "unaligned"
-         , group_method2string(group_method)
+         , time_grouping_method2string(group_method)
          , group
          , resampling_time
          , resampling_group
@@ -1890,7 +1890,7 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     size_t points_requested = (long)qt->request.points;
     time_t after_requested = qt->request.after;
     time_t before_requested = qt->request.before;
-    RRDR_GROUPING group_method = qt->request.group_method;
+    RRDR_TIME_GROUPING group_method = qt->request.time_group_method;
     time_t resampling_time_requested = qt->request.resampling_time;
     RRDR_OPTIONS options = qt->request.options;
     size_t tier = qt->request.tier;
@@ -2146,7 +2146,7 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     qt->window.points = points_wanted;
     qt->window.group = group;
     qt->window.group_method = group_method;
-    qt->window.group_options = qt->request.group_options;
+    qt->window.group_options = qt->request.time_group_options;
     qt->window.query_granularity = query_granularity;
     qt->window.resampling_group = resampling_group;
     qt->window.resampling_divisor = resampling_divisor;
@@ -2160,7 +2160,7 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
 RRDR *rrd2rrdr_legacy(
         ONEWAYALLOC *owa,
         RRDSET *st, size_t points, time_t after, time_t before,
-        RRDR_GROUPING group_method, time_t resampling_time, RRDR_OPTIONS options, const char *dimensions,
+        RRDR_TIME_GROUPING group_method, time_t resampling_time, RRDR_OPTIONS options, const char *dimensions,
         const char *group_options, time_t timeout, size_t tier, QUERY_SOURCE query_source,
         STORAGE_PRIORITY priority) {
 
@@ -2169,11 +2169,11 @@ RRDR *rrd2rrdr_legacy(
             .points = points,
             .after = after,
             .before = before,
-            .group_method = group_method,
+            .time_group_method = group_method,
             .resampling_time = resampling_time,
             .options = options,
             .dimensions = dimensions,
-            .group_options = group_options,
+            .time_group_options = group_options,
             .timeout = timeout,
             .tier = tier,
             .query_source = query_source,

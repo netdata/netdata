@@ -16,7 +16,10 @@ struct circular_buffer *cbuffer_new(size_t initial, size_t max, size_t *statisti
 }
 
 void cbuffer_free(struct circular_buffer *buf) {
-    if(buf && buf->statistics)
+    if (unlikely(!buf))
+        return;
+
+    if(buf->statistics)
         __atomic_sub_fetch(buf->statistics, sizeof(struct circular_buffer) + buf->size, __ATOMIC_RELAXED);
 
     freez(buf->data);

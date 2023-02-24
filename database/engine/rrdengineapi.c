@@ -35,8 +35,6 @@ __attribute__((constructor)) void initialize_multidb_ctx(void) {
     multidb_ctx[4] = &multidb_ctx_storage_tier4;
 }
 
-int default_rrdeng_page_fetch_timeout = 3;
-int default_rrdeng_page_fetch_retries = 3;
 int db_engine_journal_check = 0;
 int default_rrdeng_disk_quota_mb = 256;
 int default_multidb_disk_quota_mb = 256;
@@ -371,7 +369,7 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
             .end_time_s = point_in_time_s,
             .size = data_size,
             .data = data,
-            .update_every_s = update_every_s,
+            .update_every_s = (uint32_t) update_every_s,
             .hot = true
     };
 
@@ -741,10 +739,10 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle,
     handle = rrdeng_query_handle_get();
     register_query_handle(handle);
 
-    if(unlikely(priority < STORAGE_PRIORITY_HIGH))
+    if (unlikely(priority < STORAGE_PRIORITY_HIGH))
         priority = STORAGE_PRIORITY_HIGH;
-    else if(unlikely(priority > STORAGE_PRIORITY_BEST_EFFORT))
-        priority = STORAGE_PRIORITY_BEST_EFFORT;
+    else if (unlikely(priority >= STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE))
+        priority = STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE - 1;
 
     handle->ctx = ctx;
     handle->metric = metric;
@@ -871,6 +869,7 @@ STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim
         // We need to get a new page
 
         if (!rrdeng_load_page_next(rrddim_handle, false)) {
+            handle->now_s = rrddim_handle->end_time_s;
             storage_point_empty(sp, handle->now_s - handle->dt_s, handle->now_s);
             goto prepare_for_next_iteration;
         }

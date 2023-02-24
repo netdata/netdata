@@ -9,7 +9,7 @@ inline void arl_callback_str2ull(const char *name, uint32_t hash, const char *va
     (void)hash;
 
     register unsigned long long *d = dst;
-    *d = str2ull(value);
+    *d = str2ull(value, NULL);
     // fprintf(stderr, "name '%s' with hash %u and value '%s' is %llu\n", name, hash, value, *d);
 }
 

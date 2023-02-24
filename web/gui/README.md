@@ -107,9 +107,6 @@ a War Room's name to jump to the Netdata Cloud web interface.
 ![A screenshot of the Cloud
 menus](https://user-images.githubusercontent.com/1153921/80837210-3f8b8c80-8bab-11ea-9c75-128c2d823ef8.png)
 
-If you want to know more about how Cloud populates this menu, and the Agent-Cloud integration at a high level, see our
-document on [using the Agent with Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/agent-cloud.md).
-
 ## Customizing the local dashboard
 
 Netdata stores information about individual charts in the `dashboard_info.js`

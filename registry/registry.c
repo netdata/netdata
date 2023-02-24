@@ -59,7 +59,7 @@ static inline void registry_set_person_cookie(struct web_client *w, REGISTRY_PER
 
 static inline void registry_json_header(RRDHOST *host, struct web_client *w, const char *action, const char *status) {
     buffer_flush(w->response.data);
-    w->response.data->contenttype = CT_APPLICATION_JSON;
+    w->response.data->content_type = CT_APPLICATION_JSON;
     buffer_sprintf(w->response.data, "{\n\t\"action\": \"%s\",\n\t\"status\": \"%s\",\n\t\"hostname\": \"%s\",\n\t\"machine_guid\": \"%s\"",
             action, status, rrdhost_registry_hostname(host), host->machine_guid);
 }
@@ -191,7 +191,7 @@ int registry_request_access_json(RRDHOST *host, struct web_client *w, char *pers
     if(registry.verify_cookies_redirects > 0 && !person_guid[0]) {
         buffer_flush(w->response.data);
         registry_set_cookie(w, REGISTRY_VERIFY_COOKIES_GUID);
-        w->response.data->contenttype = CT_APPLICATION_JSON;
+        w->response.data->content_type = CT_APPLICATION_JSON;
         buffer_sprintf(w->response.data, "{ \"status\": \"redirect\", \"registry\": \"%s\" }", registry.registry_to_announce);
         return 200;
     }

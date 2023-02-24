@@ -191,13 +191,13 @@ static inline int read_mm_stat(procfile *ff, MM_STAT *stats) {
         return -1;
     }
 
-    stats->orig_data_size = str2ull(procfile_word(ff, 0));
-    stats->compr_data_size = str2ull(procfile_word(ff, 1));
-    stats->mem_used_total = str2ull(procfile_word(ff, 2));
-    stats->mem_limit = str2ull(procfile_word(ff, 3));
-    stats->mem_used_max = str2ull(procfile_word(ff, 4));
-    stats->same_pages = str2ull(procfile_word(ff, 5));
-    stats->pages_compacted = str2ull(procfile_word(ff, 6));
+    stats->orig_data_size = str2ull(procfile_word(ff, 0), NULL);
+    stats->compr_data_size = str2ull(procfile_word(ff, 1), NULL);
+    stats->mem_used_total = str2ull(procfile_word(ff, 2), NULL);
+    stats->mem_limit = str2ull(procfile_word(ff, 3), NULL);
+    stats->mem_used_max = str2ull(procfile_word(ff, 4), NULL);
+    stats->same_pages = str2ull(procfile_word(ff, 5), NULL);
+    stats->pages_compacted = str2ull(procfile_word(ff, 6), NULL);
     return 0;
 }
 

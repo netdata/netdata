@@ -475,8 +475,8 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                     char *buffer_width = strstr(buffer_rate, "(");
                     buffer_width++;
                     // str2ull will stop on first non-decimal value
-                    p->speed = str2ull(buffer_rate);
-                    p->width = str2ull(buffer_width);
+                    p->speed = str2ull(buffer_rate, NULL);
+                    p->width = str2ull(buffer_width, NULL);
                 }
 
                 if (!p->discovered)

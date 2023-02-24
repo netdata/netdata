@@ -1,11 +1,12 @@
 <!--
-title: "Deploy Kubernetes monitoring with Netdata"
+title: "Install Netdata on Kubernetes"
 description: "Deploy Netdata to monitor a Kubernetes cluster to monitor the health, performance, resource utilization, and application metrics of a Kubernetes cluster in real time."
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/kubernetes.md"
-sidebar_label: "Deploy Kubernetes monitoring with Netdata"
+sidebar_label: "Install Netdata on Kubernetes"
 learn_status: "Published"
 learn_topic_type: "Tasks"
 learn_rel_path: "Installation"
+sidebar_position: 60
 -->
 
 import Tabs from '@theme/Tabs';

@@ -7,7 +7,7 @@ static int return_int_cb(void *data, int argc, char **argv, char **column)
     int *status = data;
     UNUSED(argc);
     UNUSED(column);
-    *status = str2uint32_t(argv[0]);
+    *status = str2uint32_t(argv[0], NULL);
     return 0;
 }
 

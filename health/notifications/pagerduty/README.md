@@ -5,7 +5,7 @@ sidebar_label: "PagerDuty"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/pagerduty/README.md"
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "Setup/Notification/Agent"
+learn_rel_path: "Integrations/Notify/Agent alert notifications"
 learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
@@ -18,7 +18,7 @@ resolution times.
 
 ## What you need to get started
 
-- An installation of the open-source [Netdata](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx) monitoring agent.
+- An installation of the open-source [Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md) monitoring agent.
 - An installation of the [PagerDuty agent](https://www.pagerduty.com/docs/guides/agent-install-guide/) on the node
   running Netdata.
 - A PagerDuty `Generic API` service using either the `Events API v2` or `Events API v1`.

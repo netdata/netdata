@@ -54,7 +54,7 @@ specific/targeted interfaces for your infrastructure using any number of charts 
   you can also see alla the alerts that are configured to be triggered in any given moment.
 
 - The **Anomalies tab** is dedicated to
-  the [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.mdx) tool
+  the [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.md) tool
 
 ### Non static tabs
 
@@ -69,7 +69,7 @@ can always come right back to your preferred setup.
 
 A War Room has three different states: playing, paused, and force playing. The default playing state refreshes charts
 every second as long as the browser tab is in
-focus. [Interacting with a chart](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.mdx)
+focus. [Interacting with a chart](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.md)
 pauses
 the War Room. Once the tab loses focus, charts pause automatically.
 

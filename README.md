@@ -22,7 +22,7 @@ It gives you the ability to automatically identify processes, collect and store 
 
 [Netdata Cloud](https://www.netdata.cloud) is a hosted web interface that gives you **Free**, real-time visibility into your **Entire Infrastructure** with secure access to your Netdata Agents. It provides an ability to automatically route your requests to the most relevant agents to display your metrics, based on the stored metadata (Agents topology, what metrics are collected on specific Agents as well as the retention information for each metric).
 
-It gives you some extra features, like [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md), [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.mdx), [anomaly rates on every chart](https://blog.netdata.cloud/anomaly-rate-in-every-chart/) and much more. 
+It gives you some extra features, like [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md), [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.md), [anomaly rates on every chart](https://blog.netdata.cloud/anomaly-rate-in-every-chart/) and much more. 
 
 Try it for yourself right now by checking out the Netdata Cloud [demo space](https://app.netdata.cloud/spaces/netdata-demo/rooms/all-nodes/overview) (No sign up or login needed).
 
@@ -77,7 +77,7 @@ Here's what you can expect from Netdata:
     synchronize charts as you pan through time, zoom in on anomalies, and more.
 -   **Visual anomaly detection**: Our UI/UX emphasizes the relationships between charts to help you detect the root
     cause of anomalies.
--   **Machine learning (ML) features out of the box**: Unsupervised ML-based [anomaly detection](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.mdx), every second, every metric, zero-config! [Metric correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md) to help with short-term change detection. And other [additional](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/anomaly-detection.md) ML-based features to help make your life easier.
+-   **Machine learning (ML) features out of the box**: Unsupervised ML-based [anomaly detection](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.md), every second, every metric, zero-config! [Metric correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md) to help with short-term change detection. And other [additional](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/anomaly-detection.md) ML-based features to help make your life easier.
 -   **Scales to infinity**: You can install it on all your servers, containers, VMs, and IoT devices. Metrics are not
     centralized by default, so there is no limit.
 -   **Several operating modes**: Autonomous host monitoring (the default), headless data collector, forwarding proxy,

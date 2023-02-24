@@ -182,8 +182,8 @@ static int read_per_core_time_in_state_files(struct cpu_chart *all_cpu_charts, s
                     collector_error("Cannot read time_in_state line. Expected 2 params, read %zu.", words);
                     continue;
                 }
-                frequency = str2ull(procfile_lineword(tsf->ff, l, 0));
-                ticks     = str2ull(procfile_lineword(tsf->ff, l, 1));
+                frequency = str2ull(procfile_lineword(tsf->ff, l, 0), NULL);
+                ticks     = str2ull(procfile_lineword(tsf->ff, l, 1), NULL);
 
                 // It is assumed that frequencies are static and sorted
                 ticks_since_last = ticks - tsf->last_ticks[l].ticks;
@@ -330,7 +330,7 @@ static int read_schedstat(char *schedstat_filename, struct per_core_cpuidle_char
                 cpuidle_charts_len = cores_found;
             }
 
-            cpuidle_charts[core].active_time = str2ull(procfile_lineword(ff, l, 7)) / 1000;
+            cpuidle_charts[core].active_time = str2ull(procfile_lineword(ff, l, 7), NULL) / 1000;
         }
     }
 
@@ -597,19 +597,19 @@ int do_proc_stat(int update_every, usec_t dt) {
                 unsigned long long user = 0, nice = 0, system = 0, idle = 0, iowait = 0, irq = 0, softirq = 0, steal = 0, guest = 0, guest_nice = 0;
 
                 id          = row_key;
-                user        = str2ull(procfile_lineword(ff, l, 1));
-                nice        = str2ull(procfile_lineword(ff, l, 2));
-                system      = str2ull(procfile_lineword(ff, l, 3));
-                idle        = str2ull(procfile_lineword(ff, l, 4));
-                iowait      = str2ull(procfile_lineword(ff, l, 5));
-                irq         = str2ull(procfile_lineword(ff, l, 6));
-                softirq     = str2ull(procfile_lineword(ff, l, 7));
-                steal       = str2ull(procfile_lineword(ff, l, 8));
+                user        = str2ull(procfile_lineword(ff, l, 1), NULL);
+                nice        = str2ull(procfile_lineword(ff, l, 2), NULL);
+                system      = str2ull(procfile_lineword(ff, l, 3), NULL);
+                idle        = str2ull(procfile_lineword(ff, l, 4), NULL);
+                iowait      = str2ull(procfile_lineword(ff, l, 5), NULL);
+                irq         = str2ull(procfile_lineword(ff, l, 6), NULL);
+                softirq     = str2ull(procfile_lineword(ff, l, 7), NULL);
+                steal       = str2ull(procfile_lineword(ff, l, 8), NULL);
 
-                guest       = str2ull(procfile_lineword(ff, l, 9));
+                guest       = str2ull(procfile_lineword(ff, l, 9), NULL);
                 user -= guest;
 
-                guest_nice  = str2ull(procfile_lineword(ff, l, 10));
+                guest_nice  = str2ull(procfile_lineword(ff, l, 10), NULL);
                 nice -= guest_nice;
 
                 char *title, *type, *context, *family;
@@ -739,7 +739,7 @@ int do_proc_stat(int update_every, usec_t dt) {
             if(likely(do_interrupts)) {
                 static RRDSET *st_intr = NULL;
                 static RRDDIM *rd_interrupts = NULL;
-                unsigned long long value = str2ull(procfile_lineword(ff, l, 1));
+                unsigned long long value = str2ull(procfile_lineword(ff, l, 1), NULL);
 
                 if(unlikely(!st_intr)) {
                     st_intr = rrdset_create_localhost(
@@ -770,7 +770,7 @@ int do_proc_stat(int update_every, usec_t dt) {
             if(likely(do_context)) {
                 static RRDSET *st_ctxt = NULL;
                 static RRDDIM *rd_switches = NULL;
-                unsigned long long value = str2ull(procfile_lineword(ff, l, 1));
+                unsigned long long value = str2ull(procfile_lineword(ff, l, 1), NULL);
 
                 if(unlikely(!st_ctxt)) {
                     st_ctxt = rrdset_create_localhost(
@@ -796,13 +796,13 @@ int do_proc_stat(int update_every, usec_t dt) {
             }
         }
         else if(unlikely(hash == hash_processes && !processes && strcmp(row_key, "processes") == 0)) {
-            processes = str2ull(procfile_lineword(ff, l, 1));
+            processes = str2ull(procfile_lineword(ff, l, 1), NULL);
         }
         else if(unlikely(hash == hash_procs_running && !running && strcmp(row_key, "procs_running") == 0)) {
-            running = str2ull(procfile_lineword(ff, l, 1));
+            running = str2ull(procfile_lineword(ff, l, 1), NULL);
         }
         else if(unlikely(hash == hash_procs_blocked && !blocked && strcmp(row_key, "procs_blocked") == 0)) {
-            blocked = str2ull(procfile_lineword(ff, l, 1));
+            blocked = str2ull(procfile_lineword(ff, l, 1), NULL);
         }
     }
 

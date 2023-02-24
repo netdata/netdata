@@ -6,6 +6,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/insta
 learn_status: "Published"
 learn_topic_type: "Tasks"
 learn_rel_path: "Getting started"
+sidebar_position: "1"
 -->
 
 import { OneLineInstallWget, OneLineInstallCurl } from '@site/src/components/OneLineInstall/'
@@ -18,7 +19,7 @@ import TabItem from '@theme/TabItem';
 Netdata is a free and open-source (FOSS) monitoring agent that collects thousands of hardware and software metrics from
 any physical or virtual system (we call them _nodes_). These metrics are organized in an easy-to-use and -navigate interface.
 
-Together with [Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/cloud/cloud.mdx), you can monitor your entire infrastructure in
+Together with [Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md), you can monitor your entire infrastructure in
 real time and troubleshoot problems that threaten the health of your nodes.
 
 Netdata runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices. It
@@ -31,7 +32,7 @@ To install Netdata in minutes on your platform:
 2. You will be presented with an empty space, and a prompt to "Connect Nodes" with the install command for each platform
 3. Select the platform you want to install Netdata to, copy and paste the script into your node's terminal, and run it
 
-Upon installation completing successfully, you should be able to see the node live in your Netdata Space and live charts in the Overview tab. [Read more about the cloud features](https://github.com/netdata/netdata/blob/master/docs/cloud/cloud.mdx).
+Upon installation completing successfully, you should be able to see the node live in your Netdata Space and live charts in the Overview tab. [Read more about the cloud features](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md).
 
 Where you go from here is based on your use case, immediate needs, and experience with monitoring and troubleshooting, 
 but we have some hints on what you might want to do next.
@@ -43,8 +44,8 @@ Explore our [general advanced installation options and troubleshooting](#advance
 #### Agent user interface
 
 To access the UI provided by the locally installed agent, open a browser and navigate to `http://NODE:19999`, replacing `NODE` with either `localhost` or
-the hostname/IP address of the remote node. You can also read more about [how the agent dashboard works](https://github.com/netdata/netdata/blob/master/docs/dashboard/how-dashboard-works.mdx), or dive directly into the many ways
-to [interact with charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.mdx).
+the hostname/IP address of the remote node. You can also read more about [how the agent dashboard works](https://github.com/netdata/netdata/blob/master/docs/dashboard/how-dashboard-works.md), or dive directly into the many ways
+to [interact with charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.md).
 
 #### Configuration
 
@@ -55,8 +56,8 @@ metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metric
 #### Data collection
 
 If Netdata didn't autodetect all the hardware, containers, services, or applications running on your node, you should
-learn more about [how data collectors work](https://github.com/netdata/netdata/blob/master/docs/collect/how-collectors-work.md). If there's a [supported
-collector](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md) for metrics you need, [configure the collector](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md)
+learn more about [how data collectors work](https://github.com/netdata/netdata/blob/master/collectors/README.md). If there's a [supported
+collector](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md) for metrics you need, [configure the collector](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md)
 or read about its requirements to configure your endpoint to publish metrics in the correct format and endpoint.
 
 #### Alarms & notifications

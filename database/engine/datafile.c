@@ -34,17 +34,6 @@ static struct rrdengine_datafile *datafile_alloc_and_init(struct rrdengine_insta
     return datafile;
 }
 
-void datafile_acquire_dup(struct rrdengine_datafile *df) {
-    netdata_spinlock_lock(&df->users.spinlock);
-
-    if(!df->users.lockers)
-        fatal("DBENGINE: datafile is not acquired to duplicate");
-
-    df->users.lockers++;
-
-    netdata_spinlock_unlock(&df->users.spinlock);
-}
-
 bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason) {
     bool ret;
 

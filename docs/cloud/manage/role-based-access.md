@@ -1,7 +1,7 @@
 <!--
 title: "Role-Based Access model"
 sidebar_label: "Role-Based Access model"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access-model.md)"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access-model.md"
 sidebar_position: "1"
 learn_status: "Published"
 learn_topic_type: "Concepts"
@@ -9,7 +9,7 @@ learn_rel_path: "Concepts"
 learn_docs_purpose: "Explanation of Netdata roles and permissions linked to them"
 -->
 
-Netdata Cloud already provides a role-based-access mechanism, that allows you to control what functionalities in the app users can access. Each user can be assigned only one role, which fully specifies all the capabilities they are afforded.
+Netdata Cloud's role-based-access mechanism allows you to control what functionalities in the app users can access. Each user can be assigned only one role, which fully specifies all the capabilities they are afforded.
 
 #### What roles are available?
 
@@ -23,6 +23,10 @@ being able to join any room. We also aligned the offered roles to the target aud
 | **Troubleshooters**<p>This role is for users that will be just focused on using Netdata to troubleshoot, not manage entities.</p><p>Provides access to all War Rooms and Nodes in the space.</p> | - | :heavy_check_mark: | :heavy_check_mark: |
 | **Observers**<p>This role is for read-only access with restricted access to explicit War Rooms and only the Nodes that appear in those War Rooms.</p>💡 Ideal for restricting your customer's access to their own dedicated rooms.<p></p> | - | - | :heavy_check_mark: |
 | **Billing**<p>This role is for users that need to manage billing options and see invoices, with no further access to the system.</p> | - | - | :heavy_check_mark: |
+
+#### What happens to the previous Member role?
+
+We will maintain a Legacy Community plan for existing users, which will continue to provide access to the Member role.
 
 #### Which functionalities are available for each role?
 
@@ -88,7 +92,7 @@ In more detail, you can find on the following tables which functionalities are a
 | Edit personal level notification settings | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | [Manage user notification settings](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md#manage-user-notification-settings) |
 
 Notes:
-* Enable, Edit and Add actions over specific notification methods will only be allowed if your plan has access to those ([service classification](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.mdx#service-classification))
+* Enable, Edit and Add actions over specific notification methods will only be allowed if your plan has access to those ([service classification](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md#service-classification))
 
 ##### Dashboards
 

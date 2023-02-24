@@ -512,6 +512,8 @@ set(LIBNETDATA_FILES
         libnetdata/string/utf8.h
         libnetdata/worker_utilization/worker_utilization.c
         libnetdata/worker_utilization/worker_utilization.h
+		libnetdata/parser/parser.h
+		libnetdata/parser/parser.c
         )
 
 IF(ENABLE_PLUGIN_EBPF)
@@ -693,11 +695,6 @@ set(PLUGINSD_PLUGIN_FILES
         collectors/plugins.d/plugins_d.h
         collectors/plugins.d/pluginsd_parser.c
         collectors/plugins.d/pluginsd_parser.h
-        )
-
-set(PARSER_PLUGIN_FILES
-        parser/parser.c
-        parser/parser.h
         )
 
 set(REGISTRY_PLUGIN_FILES
@@ -1077,7 +1074,6 @@ set(NETDATA_FILES
         ${WEB_PLUGIN_FILES}
         ${CLAIM_PLUGIN_FILES}
         ${SPAWN_PLUGIN_FILES}
-        ${PARSER_PLUGIN_FILES}
 )
 
 set(NETDATACLI_FILES

@@ -61,7 +61,7 @@ of 5 seconds.
 Every collector and plugin has its own `update every` setting, which you can also change in the `go.d.conf`,
 `python.d.conf` or `charts.d.conf` files, or in individual collector configuration files. If the `update
 every` for an individual collector is less than the global, the Netdata Agent uses the global setting. See
-the [enable or configure a collector](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md)
+the [enable or configure a collector](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md#enable-and-disable-a-specific-collection-module)
 doc for details.
 
 ### Disable a collector or plugin
@@ -227,7 +227,7 @@ As mentioned at the top, there are plenty of other
 
 You can also take what you've learned about node configuration to tweak the Agent's behavior or enable new features:
 
-- [Enable new collectors](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md) or tweak
+- [Enable new collectors](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md#enable-and-disable-a-specific-collection-module) or tweak
   their behavior.
 - [Configure existing health alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) or
   create new ones.

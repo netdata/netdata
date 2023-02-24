@@ -188,7 +188,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
             pgl->type = typename;
             pgl->zone = zonename;
             for (o = 0; o < pageorders_cnt; o++)
-                pgl->free_pages_size[o] = str2uint64_t(procfile_lineword(ff, l, o+6)) * 1 << o;
+                pgl->free_pages_size[o] = str2uint64_t(procfile_lineword(ff, l, o + 6), NULL) * 1 << o;
 
             p++;
         }
@@ -302,7 +302,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
                 systemorders[o].size = 0;
 
             // Update orders of the current line
-            pagelines[p].free_pages_size[o] = str2uint64_t(procfile_lineword(ff, l, o+6)) * 1 << o;
+            pagelines[p].free_pages_size[o] = str2uint64_t(procfile_lineword(ff, l, o + 6), NULL) * 1 << o;
 
             // Update sum by order
             systemorders[o].size += pagelines[p].free_pages_size[o];

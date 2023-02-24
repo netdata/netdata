@@ -1,15 +1,14 @@
 <!--
-title: "Database Queries"
-sidebar_label: "Database Queries"
+title: "REST API for Database Queries"
+sidebar_label: "REST API for Database Queries"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/queries/README.md
 learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Developers/Web/Api/Queries"
+learn_rel_path: "Integrations/Export"
 -->
 
 # Database Queries
 
-Netdata database can be queried with `/api/v1/data` and `/api/v1/badge.svg` REST API methods.
+The Netdata database can be queried with the `/api/v1/data` and `/api/v1/badge.svg` REST API methods.
 
 Every data query accepts the following parameters:
 
@@ -108,18 +107,24 @@ For each value it calls the **grouping method** given with the `&group=` query p
 The following grouping methods are supported. These are given all the values in the time-frame
 and they group the values every `group points`.
 
--   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=min&after=-60&label=min&value_color=blue) finds the minimum value
--   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=max&after=-60&label=max&value_color=lightblue) finds the maximum value
--   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=average&after=-60&label=average&value_color=yellow) finds the average value
--   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=sum&after=-60&label=sum&units=requests&value_color=orange) adds all the values and returns the sum
--   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=median&after=-60&label=median&value_color=red) sorts the values and returns the value in the middle of the list
--   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=stddev&after=-60&label=stddev&value_color=green) finds the standard deviation of the values
--   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=cv&after=-60&label=cv&units=pcent&value_color=yellow) finds the relative standard deviation (coefficient of variation) of the values
--   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=ses&after=-60&label=ses&value_color=brown) finds the exponential weighted moving average of the values
--   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=des&after=-60&label=des&value_color=blue) applies Holt-Winters double exponential smoothing
--   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=incremental_sum&after=-60&label=incremental_sum&value_color=red) finds the difference of the last vs the first value
+-   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=min&after=-60&label=min&value_color=blue) finds the minimum value
+-   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=max&after=-60&label=max&value_color=lightblue) finds the maximum value
+-   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=average&after=-60&label=average&value_color=yellow) finds the average value
+-   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=sum&units=kilobits&after=-60&label=sum&value_color=orange) adds all the values and returns the sum
+-   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=median&after=-60&label=median&value_color=red) sorts the values and returns the value in the middle of the list
+-   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=stddev&after=-60&label=stddev&value_color=green) finds the standard deviation of the values
+-   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=cv&after=-60&label=cv&units=pcent&value_color=yellow) finds the relative standard deviation (coefficient of variation) of the values
+-   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=ses&after=-60&label=ses&value_color=brown) finds the exponential weighted moving average of the values
+-   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=des&after=-60&label=des&value_color=blue) applies Holt-Winters double exponential smoothing
+-   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=incremental_sum&after=-60&label=incremental_sum&value_color=red) finds the difference of the last vs the first value
 
-The examples shown above, are live information from the `successful` web requests of the global Netdata registry.
+The examples shown above show live information from the `received` traffic on the `eth0` interface of the global Netdata registry. 
+Inspect any of the badges to see the parameters provided. You can directly issue the request to the registry server's API yourself, e.g. by 
+passing the following to get the value shown on the badge for the sum of the values within the period:
+
+```
+https://registry.my-netdata.io/api/v1/data?chart=net.eth0&options=unaligned&dimensions=received&group=sum&units=kilobits&after=-60&label=sum&points=1
+```
 
 ## Further processing
 

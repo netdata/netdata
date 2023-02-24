@@ -70,7 +70,6 @@ struct rrdengine_datafile {
     } extent_queries;
 };
 
-void datafile_acquire_dup(struct rrdengine_datafile *df);
 bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason);
 void datafile_release(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason);
 bool datafile_acquire_for_deletion(struct rrdengine_datafile *df);

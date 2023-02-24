@@ -38,7 +38,7 @@ void rrdr2ssv(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, const char *prefix, con
                 buffer_strcat(wb, "null");
         }
         else
-            buffer_rrd_value(wb, v);
+            buffer_print_netdata_double(wb, v);
     }
     buffer_strcat(wb, suffix);
     //info("RRD2SSV(): %s: END", r->st->id);

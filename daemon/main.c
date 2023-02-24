@@ -13,6 +13,7 @@ int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
 
 int libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
+bool ieee754_doubles = false;
 
 struct netdata_static_thread *static_threads;
 
@@ -1314,9 +1315,11 @@ void post_conf_load(char **user)
         prev_msg = msg;                                 \
     }
 
+int buffer_unittest(void);
 int pgc_unittest(void);
 int mrg_unittest(void);
 int julytest(void);
+int pluginsd_parser_unittest(void);
 
 int main(int argc, char **argv) {
     // initialize the system clocks
@@ -1437,11 +1440,16 @@ int main(int argc, char **argv) {
                         if(strcmp(optarg, "unittest") == 0) {
                             unittest_running = true;
 
+                            if (pluginsd_parser_unittest())
+                                return 1;
+
                             if (unit_test_static_threads())
                                 return 1;
                             if (unit_test_buffer())
                                 return 1;
                             if (unit_test_str2ld())
+                                return 1;
+                            if (buffer_unittest())
                                 return 1;
                             if (unit_test_bitmap256())
                                 return 1;
@@ -1479,15 +1487,6 @@ int main(int argc, char **argv) {
                         else if(strcmp(optarg, "escapetest") == 0) {
                             return command_argument_sanitization_tests();
                         }
-#ifdef ENABLE_DBENGINE
-                        else if(strcmp(optarg, "mctest") == 0) {
-                            unittest_running = true;
-                            return mc_unittest();
-                        }
-                        else if(strcmp(optarg, "ctxtest") == 0) {
-                            unittest_running = true;
-                            return ctx_unittest();
-                        }
                         else if(strcmp(optarg, "dicttest") == 0) {
                             unittest_running = true;
                             return dictionary_unittest(10000);
@@ -1503,6 +1502,19 @@ int main(int argc, char **argv) {
                         else if(strcmp(optarg, "rrdlabelstest") == 0) {
                             unittest_running = true;
                             return rrdlabels_unittest();
+                        }
+                        else if(strcmp(optarg, "buffertest") == 0) {
+                            unittest_running = true;
+                            return buffer_unittest();
+                        }
+#ifdef ENABLE_DBENGINE
+                        else if(strcmp(optarg, "mctest") == 0) {
+                            unittest_running = true;
+                            return mc_unittest();
+                        }
+                        else if(strcmp(optarg, "ctxtest") == 0) {
+                            unittest_running = true;
+                            return ctx_unittest();
                         }
                         else if(strcmp(optarg, "metatest") == 0) {
                             unittest_running = true;
@@ -1523,6 +1535,14 @@ int main(int argc, char **argv) {
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
                             unsigned history_seconds = strtoul(optarg, NULL, 0);
+                            post_conf_load(&user);
+                            get_netdata_configured_variables();
+                            default_rrd_update_every = 1;
+                            registry_init();
+                            if(rrd_init("dbengine-dataset", NULL, true)) {
+                                fprintf(stderr, "rrd_init failed for unittest\n");
+                                return 1;
+                            }
                             generate_dbengine_dataset(history_seconds);
                             return 0;
                         }
@@ -1865,6 +1885,8 @@ int main(int argc, char **argv) {
 
         // initialize the log files
         open_all_log_files();
+
+        ieee754_doubles = is_system_ieee754_double();
 
         aral_judy_init();
 

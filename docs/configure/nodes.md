@@ -2,10 +2,11 @@
 title: "Configure the Netdata Agent"
 description: "Netdata is zero-configuration for most users, but complex infrastructures may require you to tweak some of the Agent's granular settings."
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/configure/nodes.md"
-sidebar_label: "Configure the Netdata Agent"
+sidebar_label: "Setup"
 learn_status: "Published"
-learn_topic_type: "Concepts"
-learn_rel_path: "Concepts"
+learn_topic_type: "Tasks"
+learn_rel_path: "Setup"
+sidebar_position: 30
 -->
 
 # Configure the Netdata Agent
@@ -23,7 +24,7 @@ anomaly, or change in infrastructure affects how their Agents should perform.
 ## The Netdata config directory
 
 On most Linux systems, using our [recommended one-line
-installation](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx#install-on-linux-with-one-line-installer), the **Netdata config
+installation](https://github.com/netdata/netdata/blob/master/docs/get-started.md#install-on-linux-with-one-line-installer), the **Netdata config
 directory** is `/etc/netdata/`. The config directory contains several configuration files with the `.conf` extension, a
 few directories, and a shell script named `edit-config`.
 
@@ -44,10 +45,10 @@ exist.
   for each in the [daemon config](https://github.com/netdata/netdata/blob/master/daemon/config/README.md) doc.
 - `edit-config` is a shell script used for [editing configuration files](#use-edit-config-to-edit-configuration-files).
 - Various configuration files ending in `.conf` for [configuring plugins or
-  collectors](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md#enable-a-collector-or-its-orchestrator) behave. Examples: `go.d.conf`,
+  collectors](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md) behave. Examples: `go.d.conf`,
   `python.d.conf`, and `ebpf.d.conf`.
 - Various directories ending in `.d`, which contain other configuration files, each ending in `.conf`, for [configuring
-  specific collectors](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md#configure-a-collector).
+  specific collectors](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md).
 - `apps_groups.conf` is a configuration file for changing how applications/processes are grouped when viewing the
   **Application** charts from [`apps.plugin`](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md) or
   [`ebpf.plugin`](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/README.md).
@@ -159,7 +160,7 @@ and `edit-config`. We put together a few security best practices based on how yo
 
 You can also take what you've learned about node configuration to enable or enhance features:
 
--   [Enable new collectors](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md) or tweak their behavior.
+-   [Enable new collectors](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md) or tweak their behavior.
 -   [Configure existing health alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) or create new ones.
 -   [Enable notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to receive updates about the health of your
     infrastructure.

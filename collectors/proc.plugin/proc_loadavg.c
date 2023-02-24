@@ -45,7 +45,7 @@ int do_proc_loadavg(int update_every, usec_t dt) {
     double load15 = strtod(procfile_lineword(ff, 0, 2), NULL);
 
     //unsigned long long running_processes  = str2ull(procfile_lineword(ff, 0, 3));
-    unsigned long long active_processes     = str2ull(procfile_lineword(ff, 0, 4));
+    unsigned long long active_processes     = str2ull(procfile_lineword(ff, 0, 4), NULL);
     
     //get system pid_max
     unsigned long long max_processes        = get_system_pid_max();

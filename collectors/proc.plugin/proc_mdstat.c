@@ -231,8 +231,8 @@ int do_proc_mdstat(int update_every, usec_t dt)
                 continue;
             }
 
-            raid->inuse_disks = str2ull(str_inuse);
-            raid->total_disks = str2ull(str_total);
+            raid->inuse_disks = str2ull(str_inuse, NULL);
+            raid->total_disks = str2ull(str_total, NULL);
             raid->failed_disks = raid->total_disks - raid->inuse_disks;
         }
 
@@ -300,7 +300,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
             word += 6; // skip leading "speed="
 
             if (likely(s > word))
-                raid->speed = str2ull(word);
+                raid->speed = str2ull(word, NULL);
         }
     }
 
