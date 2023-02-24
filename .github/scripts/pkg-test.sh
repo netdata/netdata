@@ -127,7 +127,7 @@ case "${DISTRO}" in
     install_centos
     ;;
   amazonlinux)
-    install_amazon
+    install_amazon_linux
     ;;
   opensuse)
     install_suse_like
