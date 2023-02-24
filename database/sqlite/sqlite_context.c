@@ -446,6 +446,10 @@ skip_delete:
 int sql_context_cache_stats(int op)
 {
     int count, dummy;
+
+    if (unlikely(!db_context_meta))
+        return 0;
+
     netdata_thread_disable_cancelability();
     sqlite3_db_status(db_context_meta, op, &count, &dummy, 0);
     netdata_thread_enable_cancelability();

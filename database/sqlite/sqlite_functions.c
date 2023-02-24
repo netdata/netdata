@@ -955,6 +955,10 @@ int bind_text_null(sqlite3_stmt *res, int position, const char *text, bool can_b
 int sql_metadata_cache_stats(int op)
 {
     int count, dummy;
+
+    if (unlikely(!db_meta))
+        return 0;
+
     netdata_thread_disable_cancelability();
     sqlite3_db_status(db_meta, op, &count, &dummy, 0);
     netdata_thread_enable_cancelability();
