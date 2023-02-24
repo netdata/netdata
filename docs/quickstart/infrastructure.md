@@ -91,7 +91,7 @@ historical data, and see like metrics presented meaningfully to help you trouble
 
 Read about the process in the [infrastructure
 overview](https://github.com/netdata/netdata/blob/master/docs/visualize/overview-infrastructure.md#drill-down-with-single-node-dashboards) doc, then learn about [interacting with
-dashboards and charts](https://github.com/netdata/netdata/blob/master/docs/visualize/interact-dashboards-charts.md) to get the most from all of Netdata's real-time
+dashboards and charts](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md) to get the most from all of Netdata's real-time
 metrics.
 
 ### Create new dashboards

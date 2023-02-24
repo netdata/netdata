@@ -19,7 +19,7 @@ replicate metrics data across multiple nodes, or centralize all your metrics dat
 (TSDB).
 
 When one node streams metrics to another, the node receiving metrics can visualize them on the
-[dashboard](https://github.com/netdata/netdata/blob/master/docs/visualize/interact-dashboards-charts.md), run health checks to [trigger
+[dashboard](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.md), run health checks to [trigger
 alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alarms.md) and [send notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md), and
 [export](https://github.com/netdata/netdata/blob/master/docs/export/external-databases.md) all metrics to an external TSDB. When Netdata streams metrics to another
 Netdata, the receiving one is able to perform everything a Netdata instance is capable of.

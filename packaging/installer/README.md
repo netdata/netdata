@@ -68,7 +68,7 @@ community, but you may want to [edit alarms](https://github.com/netdata/netdata/
 
 #### Make your deployment production ready
 
-Both [securing Netdata](https://github.com/netdata/netdata/blob/master/docs/configure/secure-nodes.md) and [setting up replication](https://github.com/netdata/netdata/blob/master/streaming/README.md) are strongly recommended.
+Both [securing Netdata](https://github.com/netdata/netdata/blob/master/docs/netdata-security.md) and [setting up replication](https://github.com/netdata/netdata/blob/master/streaming/README.md) are strongly recommended.
 
 
 ## Install on Linux with one-line installer 

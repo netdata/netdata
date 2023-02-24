@@ -171,7 +171,7 @@ If the Netdata Agent isn't already open in your browser, open a new tab and navi
 Netdata automatically organizes all metrics and charts onto a single page for easy navigation. Peek at gauges to see
 overall system performance, then scroll down to see more. Click-and-drag with your mouse to pan _all_ charts back and
 forth through different time intervals, or hold `SHIFT` and use the scrollwheel (or two-finger scroll) to zoom in and
-out. Check out our doc on [interacting with charts](https://github.com/netdata/netdata/blob/master/docs/visualize/interact-dashboards-charts.md) for all the details.
+out. Check out our doc on [interacting with charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.md) for all the details.
 
 ![The Netdata
 dashboard](https://user-images.githubusercontent.com/1153921/109520555-98e17800-7a69-11eb-86ec-16f689da4527.png)
