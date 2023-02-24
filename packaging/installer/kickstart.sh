@@ -1352,6 +1352,26 @@ check_special_native_deps() {
   fi
 }
 
+common_rpm_opts() {
+  pkg_type="rpm"
+  pkg_suffix=".noarch"
+  pkg_vsep="-"
+  INSTALL_TYPE="binpkg-rpm"
+  NATIVE_VERSION="${INSTALL_VERSION:+"-${INSTALL_VERSION}.${SYSARCH}"}"
+}
+
+common_dnf_opts() {
+  if command -v dnf > /dev/null; then
+    pm_cmd="dnf"
+    repo_subcmd="makecache"
+  else
+    pm_cmd="yum"
+  fi
+  pkg_install_opts="${interactive_opts}"
+  repo_update_opts="${interactive_opts}"
+  uninstall_subcmd="remove"
+}
+
 try_package_install() {
   failed_refresh_msg="Failed to refresh repository metadata. ${BADNET_MSG} or by misconfiguration of one or more rpackage repositories in the system package manager configuration."
 
@@ -1390,97 +1410,38 @@ try_package_install() {
   fi
 
   case "${DISTRO_COMPAT_NAME}" in
-    debian)
+    debian|ubuntu)
       needs_early_refresh=1
       pm_cmd="apt-get"
       repo_subcmd="update"
-      repo_prefix="debian/${SYSCODENAME}"
       pkg_type="deb"
-      pkg_suffix="+debian${SYSVERSION}_all"
       pkg_vsep="_"
       pkg_install_opts="${interactive_opts}"
       repo_update_opts="${interactive_opts}"
       uninstall_subcmd="purge"
-      INSTALL_TYPE="binpkg-deb"
-      NATIVE_VERSION="${INSTALL_VERSION:+"=${INSTALL_VERSION}"}"
-      ;;
-    ubuntu)
-      needs_early_refresh=1
-      pm_cmd="apt-get"
-      repo_subcmd="update"
-      repo_prefix="ubuntu/${SYSCODENAME}"
-      pkg_type="deb"
-      pkg_suffix="+ubuntu${SYSVERSION}_all"
-      pkg_vsep="_"
-      pkg_install_opts="${interactive_opts}"
-      repo_update_opts="${interactive_opts}"
-      uninstall_subcmd="purge"
+      repo_prefix="${DISTRO_COMPAT_NAME}/${SYSCODENAME}"
+      pkg_suffix="+${DISTRO_COMPAT_NAME}${SYSVERSION}_all"
       INSTALL_TYPE="binpkg-deb"
       NATIVE_VERSION="${INSTALL_VERSION:+"=${INSTALL_VERSION}"}"
       ;;
     centos)
-      if command -v dnf > /dev/null; then
-        pm_cmd="dnf"
-        repo_subcmd="makecache"
-      else
-        pm_cmd="yum"
-      fi
+      common_rpm_opts
+      common_dnf_opts
       repo_prefix="el/${SYSVERSION}"
-      pkg_type="rpm"
-      pkg_suffix=".noarch"
-      pkg_vsep="-"
-      pkg_install_opts="${interactive_opts}"
-      repo_update_opts="${interactive_opts}"
-      uninstall_subcmd="remove"
-      INSTALL_TYPE="binpkg-rpm"
-      NATIVE_VERSION="${INSTALL_VERSION:+"-${INSTALL_VERSION}.${SYSARCH}"}"
       ;;
-    fedora)
-      if command -v dnf > /dev/null; then
-        pm_cmd="dnf"
-        repo_subcmd="makecache"
-      else
-        pm_cmd="yum"
-      fi
-      repo_prefix="fedora/${SYSVERSION}"
-      pkg_type="rpm"
-      pkg_suffix=".noarch"
-      pkg_vsep="-"
-      pkg_install_opts="${interactive_opts}"
-      repo_update_opts="${interactive_opts}"
-      uninstall_subcmd="remove"
-      INSTALL_TYPE="binpkg-rpm"
-      NATIVE_VERSION="${INSTALL_VERSION:+"-${INSTALL_VERSION}.${SYSARCH}"}"
+    fedora|ol)
+      common_rpm_opts
+      common_dnf_opts
+      repo_prefix="${DISTRO_COMPAT_NAME}/${SYSVERSION}"
       ;;
     opensuse)
+      common_rpm_opts
       pm_cmd="zypper"
       repo_subcmd="--gpg-auto-import-keys refresh"
       repo_prefix="opensuse/${SYSVERSION}"
-      pkg_type="rpm"
-      pkg_suffix=".noarch"
-      pkg_vsep="-"
       pkg_install_opts="${interactive_opts} --allow-unsigned-rpm"
       repo_update_opts=""
       uninstall_subcmd="remove"
-      INSTALL_TYPE="binpkg-rpm"
-      NATIVE_VERSION="${INSTALL_VERSION:+"-${INSTALL_VERSION}.${SYSARCH}"}"
-      ;;
-    ol)
-      if command -v dnf > /dev/null; then
-        pm_cmd="dnf"
-        repo_subcmd="makecache"
-      else
-        pm_cmd="yum"
-      fi
-      repo_prefix="ol/${SYSVERSION}"
-      pkg_type="rpm"
-      pkg_suffix=".noarch"
-      pkg_vsep="-"
-      pkg_install_opts="${interactive_opts}"
-      repo_update_opts="${interactive_opts}"
-      uninstall_subcmd="remove"
-      INSTALL_TYPE="binpkg-rpm"
-      NATIVE_VERSION="${INSTALL_VERSION:+"-${INSTALL_VERSION}.${SYSARCH}"}"
       ;;
     amzn)
       if command -v dnf > /dev/null; then
