@@ -5,10 +5,13 @@
 
 set -e
 
-if [ -f /etc/centos-release ] || [ -f /etc/redhat-release ] || [ -f /etc/fedora-release ] || [ -f /etc/almalinux-release ]; then
-    # Alma, Fedora, CentOS, Redhat
-    dnf install -y procps-ng cronie cronie-anacron || yum install -y procps-ng cronie cronie-anacron
-elif [ -f /etc/arch-release ]; then
-    # Arch
-    pacman -S --noconfirm cronie
-fi
+. /etc/os-release
+
+case "${ID}" in
+    amzn|almalinux|centos|fedora)
+        dnf install -y procps-ng cronie cronie-anacron || yum install -y procps-ng cronie cronie-anacron
+        ;;
+    arch)
+        pacman -S --noconfirm cronie
+        ;;
+esac
