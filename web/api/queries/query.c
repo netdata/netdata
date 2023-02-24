@@ -2389,6 +2389,8 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         r->grouping.reset(r);
 
         if(ops[c]) {
+            rrd2rrdr_query_execute(r, c, ops[c]);
+
             r->od[c] |= RRDR_DIMENSION_QUERIED;
             r->di[c] = rrdmetric_acquired_id_dup(qd->rma);
             r->dn[c] = rrdmetric_acquired_name_dup(qd->rma);
@@ -2399,8 +2401,6 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
             qd->status |= QUERY_STATUS_QUERIED;
             qm->status |= RRDR_DIMENSION_QUERIED;
-
-            rrd2rrdr_query_execute(r, c, ops[c]);
 
             if(qt->request.version >= 2) {
                 query_target_merge_data_statistics(&qi->query_stats, &qm->query_stats);
@@ -2476,6 +2476,37 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             }
 
             break;
+        }
+    }
+
+    // update query instance counts in query host and query context
+    if(qt->request.version >= 2) {
+        size_t h = 0, c = 0, i = 0;
+        for(; h < qt->hosts.used ;h++) {
+            QUERY_HOST *qh = &qt->hosts.array[h];
+
+            for(; c < qt->contexts.used ;c++) {
+                QUERY_CONTEXT *qc = &qt->contexts.array[c];
+
+                if(!rrdcontext_acquired_belongs_to_host(qc->rca, qh->host))
+                    break;
+
+                for(; i < qt->instances.used ;i++) {
+                    QUERY_INSTANCE *qi = &qt->instances.array[i];
+
+                    if(!rrdinstance_acquired_belongs_to_context(qi->ria, qc->rca))
+                        break;
+
+                    if(qi->metrics.queried) {
+                        qc->instances.queried++;
+                        qh->instances.queried++;
+                    }
+                    else if(qi->metrics.failed) {
+                        qc->instances.failed++;
+                        qh->instances.failed++;
+                    }
+                }
+            }
         }
     }
 

@@ -161,12 +161,14 @@ typedef struct query_plan_entry {
 
 #define QUERY_PLANS_MAX (RRD_STORAGE_TIERS * 2)
 
-struct query_instances_counts {
+struct query_metrics_counts {
     size_t selected;
     size_t excluded;
+    size_t queried;
+    size_t failed;
 };
 
-struct query_metrics_counts {
+struct query_instances_counts {
     size_t selected;
     size_t excluded;
     size_t queried;

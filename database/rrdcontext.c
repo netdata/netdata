@@ -3098,7 +3098,7 @@ static bool query_target_add_metric(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, QU
 }
 
 static bool query_target_add_dimension(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi,
-                                       RRDMETRIC_ACQUIRED *rma, bool queryable_instance) {
+                                       RRDMETRIC_ACQUIRED *rma, bool queryable_instance, size_t *metrics_added) {
     QUERY_TARGET *qt = qtl->qt;
 
     RRDMETRIC *rm = rrdmetric_acquired_value(rma);
@@ -3126,8 +3126,10 @@ static bool query_target_add_dimension(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh,
         qh->metrics.excluded++;
         qd->status |= QUERY_STATUS_EXCLUDED;
     }
-    else
-        query_target_add_metric(qtl, qh, qc, qi, qd);
+    else {
+        if(query_target_add_metric(qtl, qh, qc, qi, qd))
+            (*metrics_added)++;
+    }
 
     return true;
 }
@@ -3333,25 +3335,22 @@ static bool query_target_add_instance(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, 
     if(queryable_instance && qt->request.version >= 2)
         query_target_eval_instance_rrdcalc(qtl, qh, qc, qi);
 
-    size_t added = 0;
+    size_t dimensions_added = 0, metrics_added = 0;
 
     if(unlikely(qt->request.rma)) {
-        if(query_target_add_dimension(qtl, qh, qc, qi, qt->request.rma, queryable_instance))
-            added++;
+        if(query_target_add_dimension(qtl, qh, qc, qi, qt->request.rma, queryable_instance, &metrics_added))
+            dimensions_added++;
     }
     else {
         RRDMETRIC *rm;
         dfe_start_read(ri->rrdmetrics, rm) {
-            if(query_target_add_dimension(qtl, qh, qc, qi, (RRDMETRIC_ACQUIRED *) rm_dfe.item, queryable_instance))
-                added++;
+            if(query_target_add_dimension(qtl, qh, qc, qi, (RRDMETRIC_ACQUIRED *) rm_dfe.item, queryable_instance, &metrics_added))
+                dimensions_added++;
         }
         dfe_done(rm);
     }
 
-    if(!added) {
-        qc->instances.excluded++;
-        qh->instances.excluded++;
-
+    if(!dimensions_added) {
         qt->instances.used--;
         rrdinstance_release(ria);
         qi->ria = NULL;
@@ -3363,8 +3362,14 @@ static bool query_target_add_instance(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, 
         qi->name_fqdn = NULL;
     }
     else {
-        qc->instances.selected++;
-        qh->instances.selected++;
+        if(metrics_added) {
+            qc->instances.selected++;
+            qh->instances.selected++;
+        }
+        else {
+            qc->instances.excluded++;
+            qh->instances.excluded++;
+        }
     }
 
     return true;

@@ -107,6 +107,8 @@ static inline void query_target_instance_counts(BUFFER *wb, struct query_instanc
     buffer_json_member_add_object(wb, "is");
     buffer_json_member_add_uint64(wb, "sl", instances->selected);
     buffer_json_member_add_uint64(wb, "ex", instances->excluded);
+    buffer_json_member_add_uint64(wb, "qr", instances->queried);
+    buffer_json_member_add_uint64(wb, "fl", instances->failed);
     buffer_json_object_close(wb);
 }
 
@@ -180,6 +182,8 @@ static size_t query_target_summary_contexts_v2(BUFFER *wb, QUERY_TARGET *qt, con
 
         z->instances.selected += qc->instances.selected;
         z->instances.excluded += qc->instances.selected;
+        z->instances.queried += qc->instances.queried;
+        z->instances.failed += qc->instances.failed;
 
         z->metrics.selected += qc->metrics.selected;
         z->metrics.excluded += qc->metrics.excluded;
