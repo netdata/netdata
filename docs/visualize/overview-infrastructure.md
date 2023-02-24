@@ -84,7 +84,7 @@ given node to quickly _jump to the same chart in that node's single-node dashboa
 
 You can use single-node dashboards in Netdata Cloud to drill down on specific issues, scrub backward in time to
 investigate historical data, and see like metrics presented meaningfully to help you troubleshoot performance problems.
-All of the familiar [interactions](https://github.com/netdata/netdata/blob/master/docs/visualize/interact-dashboards-charts.md) are available, as is adding any chart
+All of the familiar [interactions](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md) are available, as is adding any chart
 to a [new dashboard](https://github.com/netdata/netdata/blob/master/docs/visualize/create-dashboards.md).
 
 ## Nodes view
@@ -93,23 +93,3 @@ You can also use the **Nodes view** to monitor the health status and user-config
 in a War Room. Read the [Nodes view doc](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md) for details.
 
 ![The Nodes view](https://user-images.githubusercontent.com/1153921/108733066-5fe65800-74eb-11eb-98e0-abaccd36deaf.png)
-
-## What's next?
-
-To troubleshoot complex performance issues using Netdata, you need to understand how to interact with its meaningful
-visualizations. Learn more about [interaction](https://github.com/netdata/netdata/blob/master/docs/visualize/interact-dashboards-charts.md) to see historical metrics,
-highlight timeframes for targeted analysis, and more.
-
-If you're a Kubernetes user, read about Netdata's [Kubernetes
-visualizations](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md) for details about the health map and
-time-series k8s charts, and our tutorial, [_Kubernetes monitoring with Netdata: Overview and
-visualizations_](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/kubernetes-k8s-netdata.md), for a full walkthrough.
-
-### Related reference documentation
-
-- [Netdata Cloud · War Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md)
-- [Netdata Cloud · Overview](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md)
-- [Netdata Cloud · Nodes view](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md)
-- [Netdata Cloud · Kubernetes visualizations](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md)
-
-

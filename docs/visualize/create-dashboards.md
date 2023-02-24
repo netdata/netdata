@@ -28,7 +28,7 @@ respond
 node](https://user-images.githubusercontent.com/1153921/102650776-a654ba80-4128-11eb-9a65-4f9801b03d4b.png)
 
 Charts in dashboards
-are [fully interactive](https://github.com/netdata/netdata/blob/master/docs/visualize/interact-dashboards-charts.md) and
+are [fully interactive](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md) and
 synchronized. You can
 pan through time, zoom, highlight specific timeframes, and more.
 
@@ -44,7 +44,7 @@ more detail when troubleshooting an issue. Quickly jump to any node's dashboard 
 of any card to open a menu. Hit the **Go to Chart** item.
 
 Netdata Cloud takes you to the same chart on that node's dashboard. You can now navigate all that node's metrics and
-[interact with charts](https://github.com/netdata/netdata/blob/master/docs/visualize/interact-dashboards-charts.md) to
+[interact with charts](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md) to
 further investigate anomalies or troubleshoot
 complex performance problems.
 
