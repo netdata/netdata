@@ -296,7 +296,7 @@ void nml_host_delete(nml_host_t *host);
 void nml_host_start_training_thread(nml_host_t *host);
 void nml_host_stop_training_thread(nml_host_t *host, bool join);
 
-void nml_host_get_config_as_json(nml_host_t *host, nlohmann::json &j);
+void nml_host_get_config_as_json(nml_host_t *host, BUFFER *wb);
 void nml_host_get_models_as_json(nml_host_t *host, nlohmann::json &j);
 void nml_host_get_detection_info_as_json(nml_host_t *host, nlohmann::json &j);
 

@@ -103,17 +103,13 @@ void ml_dimension_delete(RRDDIM *rd) {
     rd->ml_dimension = NULL;
 }
 
-char *ml_get_host_info(RRDHOST *rh, BUFFER *wb) {
-    nlohmann::json config_json;
-
+void ml_get_host_info(RRDHOST *rh, BUFFER *wb) {
     if (rh && rh->ml_host) {
         nml_host_t *host = reinterpret_cast<nml_host_t *>(rh->ml_host);
-        nml_host_get_config_as_json(host, config_json);
+        nml_host_get_config_as_json(host, wb);
     } else {
         buffer_json_member_add_boolean(wb, "enabled", false);
     }
-
-    return strdupz(config_json.dump(2, '\t').c_str());
 }
 
 char *ml_get_host_runtime_info(RRDHOST *rh) {

@@ -750,33 +750,34 @@ void nml_host_delete(nml_host_t *host) {
     delete host;
 }
 
-void nml_host_get_config_as_json(nml_host_t *host, nlohmann::json &j) {
+void nml_host_get_config_as_json(nml_host_t *host, BUFFER *wb) {
     // Unused for now, until we add support for per-host configs
     (void) host;
 
-    j["version"] = 1;
+    buffer_json_member_add_uint64(wb, "version", 1);
 
-    j["enabled"] = Cfg.enable_anomaly_detection;
+    buffer_json_member_add_boolean(wb, "enabled", Cfg.enable_anomaly_detection);
 
-    j["min-train-samples"] = Cfg.min_train_samples;
-    j["max-train-samples"] = Cfg.max_train_samples;
-    j["train-every"] = Cfg.train_every;
+    buffer_json_member_add_uint64(wb, "min-train-samples", Cfg.min_train_samples);
+    buffer_json_member_add_uint64(wb, "max-train-samples", Cfg.max_train_samples);
+    buffer_json_member_add_uint64(wb, "train-every", Cfg.train_every);
 
-    j["diff-n"] = Cfg.diff_n;
-    j["smooth-n"] = Cfg.smooth_n;
-    j["lag-n"] = Cfg.lag_n;
+    buffer_json_member_add_uint64(wb, "diff-n", Cfg.diff_n);
+    buffer_json_member_add_uint64(wb, "smooth-n", Cfg.smooth_n);
+    buffer_json_member_add_uint64(wb, "lag-n", Cfg.lag_n);
 
-    j["random-sampling-ratio"] = Cfg.random_sampling_ratio;
-    j["max-kmeans-iters"] = Cfg.max_kmeans_iters;
+    buffer_json_member_add_double(wb, "random-sampling-ratio", Cfg.random_sampling_ratio);
+    buffer_json_member_add_uint64(wb, "max-kmeans-iters", Cfg.random_sampling_ratio);
 
-    j["dimension-anomaly-score-threshold"] = Cfg.dimension_anomaly_score_threshold;
+    buffer_json_member_add_double(wb, "dimension-anomaly-score-threshold", Cfg.dimension_anomaly_score_threshold);
 
-    j["host-anomaly-rate-threshold"] = Cfg.host_anomaly_rate_threshold;
-    j["anomaly-detection-grouping-method"] = time_grouping_method2string(Cfg.anomaly_detection_grouping_method);
-    j["anomaly-detection-query-duration"] = Cfg.anomaly_detection_query_duration;
+    buffer_json_member_add_string(wb, "anomaly-detection-grouping-method",
+                                  time_grouping_method2string(Cfg.anomaly_detection_grouping_method));
 
-    j["hosts-to-skip"] = Cfg.hosts_to_skip;
-    j["charts-to-skip"] = Cfg.charts_to_skip;
+    buffer_json_member_add_int64(wb, "anomaly-detection-query-duration", Cfg.anomaly_detection_query_duration);
+
+    buffer_json_member_add_string(wb, "hosts-to-skip", Cfg.hosts_to_skip.c_str());
+    buffer_json_member_add_string(wb, "charts-to-skip", Cfg.charts_to_skip.c_str());
 }
 
 void nml_host_get_models_as_json(nml_host_t *host, nlohmann::json &j) {

@@ -29,7 +29,7 @@ void ml_chart_delete(RRDSET *rs);
 void ml_dimension_new(RRDDIM *rd);
 void ml_dimension_delete(RRDDIM *rd);
 
-char *ml_get_host_info(RRDHOST *RH, BUFFER *wb);
+void ml_get_host_info(RRDHOST *RH, BUFFER *wb);
 char *ml_get_host_runtime_info(RRDHOST *RH);
 char *ml_get_host_models(RRDHOST *RH);
 
