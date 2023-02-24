@@ -929,10 +929,11 @@ static nml_acquired_dimension_t nml_acquired_dimension_get(RRDHOST *rh, STRING *
         }
     }
 
-    return nml_acquired_dimension_t{
-        .acq_rd = acq_rd,
-        .dim = dim
+    nml_acquired_dimension_t acq_dim = {
+        acq_rd, dim
     };
+
+    return acq_dim;
 }
 
 static void nml_acquired_dimension_release(nml_acquired_dimension_t acq_dim) {
