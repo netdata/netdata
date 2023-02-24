@@ -621,7 +621,7 @@ install_netdata_service() {
           fi
 
           echo >&2 "Installing systemd service..."
-          run cp system/netdata.service "${SYSTEMD_DIRECTORY}/netdata.service" &&
+          run cp system/systemd/netdata.service "${SYSTEMD_DIRECTORY}/netdata.service" &&
             run systemctl daemon-reload &&
             ${ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED} &&
             return 0
