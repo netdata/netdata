@@ -715,7 +715,7 @@ update_binpkg() {
 
   DISTRO="${ID}"
 
-  supported_compat_names="debian ubuntu centos fedora opensuse"
+  supported_compat_names="debian ubuntu centos fedora opensuse ol"
 
   if str_in_list "${DISTRO}" "${supported_compat_names}"; then
     DISTRO_COMPAT_NAME="${DISTRO}"
@@ -742,7 +742,7 @@ update_binpkg() {
   fi
 
   case "${DISTRO_COMPAT_NAME}" in
-    debian)
+    debian|ubuntu)
       pm_cmd="apt-get"
       repo_subcmd="update"
       upgrade_cmd="--only-upgrade install"
@@ -751,29 +751,7 @@ update_binpkg() {
       pkg_installed_check="dpkg -s"
       INSTALL_TYPE="binpkg-deb"
       ;;
-    ubuntu)
-      pm_cmd="apt-get"
-      repo_subcmd="update"
-      upgrade_cmd="--only-upgrade install"
-      pkg_install_opts="${interactive_opts}"
-      repo_update_opts="${interactive_opts}"
-      pkg_installed_check="dpkg -s"
-      INSTALL_TYPE="binpkg-deb"
-      ;;
-    centos)
-      if command -v dnf > /dev/null; then
-        pm_cmd="dnf"
-        repo_subcmd="makecache"
-      else
-        pm_cmd="yum"
-      fi
-      upgrade_cmd="upgrade"
-      pkg_install_opts="${interactive_opts}"
-      repo_update_opts="${interactive_opts}"
-      pkg_installed_check="rpm -q"
-      INSTALL_TYPE="binpkg-rpm"
-      ;;
-    fedora)
+    centos|fedora|ol)
       if command -v dnf > /dev/null; then
         pm_cmd="dnf"
         repo_subcmd="makecache"
