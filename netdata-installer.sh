@@ -1018,13 +1018,14 @@ if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-don
   (find -L "${NETDATA_PREFIX}/etc/netdata" -type f -not -path '*/\.*' -not -path "${NETDATA_PREFIX}/etc/netdata/orig/*" \( -name '*.conf.old' -o -name '*.conf' -o -name '*.conf.orig' -o -name '*.conf.installer_backup.*' \)) | while IFS= read -r  x; do
     if [ -f "${x}" ]; then
       # find it relative filename
-      f=$("$x" | sed "${NETDATA_PREFIX}/etc/netdata/")
+      p="$(echo "${NETDATA_PREFIX}/etc/netdata" | sed -e 's/\//\\\//')"
+      f="$(echo "${x}" | sed -e "s/${p}//")"
 
       # find the stock filename
-      t=$("${f}" | sed ".conf.installer_backup.*/.conf")
-      t=$("${t}" | sed ".conf.old/.conf")
-      t=$("${t}" | sed ".conf.orig/.conf")
-      t=$("${t}" | sed "orig//")
+      t="$(echo "${f}" | sed -e 's/\.conf\.installer_backup\..*/\.conf/')"
+      t="$(echo "${t}" | sed -e 's/\.conf\.old/\.conf/')"
+      t="$(echo "${t}" | sed -e 's/\.conf\.orig/\.conf/')"
+      t="$(echo "${t}" | sed -e 's/orig//')"
 
       if [ -z "${md5sum}" ] || [ ! -x "${md5sum}" ]; then
         # we don't have md5sum - keep it
