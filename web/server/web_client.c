@@ -41,12 +41,12 @@ static inline int web_client_crock_socket(struct web_client *w) {
 static inline void web_client_enable_wait_from_ssl(struct web_client *w, int bytes) {
     int ssl_err = SSL_get_error(w->ssl.conn, bytes);
     if (ssl_err == SSL_ERROR_WANT_READ)
-        web_client_enable_wait_receive(w);
+        web_client_enable_ssl_wait_receive(w);
     else if (ssl_err == SSL_ERROR_WANT_WRITE)
-        web_client_enable_wait_send(w);
-    else if (ssl_err) {
-        web_client_disable_wait_receive(w);
-        web_client_disable_wait_send(w);
+        web_client_enable_ssl_wait_send(w);
+    else {
+        web_client_disable_ssl_wait_receive(w);
+        web_client_disable_ssl_wait_send(w);
     }
 }
 
@@ -955,7 +955,6 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 return HTTP_VALIDATION_NOT_SUPPORTED;
             }
         }
-
         web_client_enable_wait_receive(w);
         return HTTP_VALIDATION_INCOMPLETE;
     }
