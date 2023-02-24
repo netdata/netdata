@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- Update deployment-strategies.md [\#14601](https://github.com/netdata/netdata/pull/14601) ([cakrit](https://github.com/cakrit))
+- Add deployment strategies [\#14600](https://github.com/netdata/netdata/pull/14600) ([cakrit](https://github.com/cakrit))
+- Replace web server readme with its improved replica [\#14598](https://github.com/netdata/netdata/pull/14598) ([cakrit](https://github.com/cakrit))
+- Update interact-new-charts.md [\#14596](https://github.com/netdata/netdata/pull/14596) ([cakrit](https://github.com/cakrit))
+- Fix context unittest coredump [\#14595](https://github.com/netdata/netdata/pull/14595) ([stelfrag](https://github.com/stelfrag))
+- Delete interact-dashboard-charts [\#14594](https://github.com/netdata/netdata/pull/14594) ([cakrit](https://github.com/cakrit))
 - Change link text to collectors.md [\#14590](https://github.com/netdata/netdata/pull/14590) ([cakrit](https://github.com/cakrit))
 - Merge security documents [\#14588](https://github.com/netdata/netdata/pull/14588) ([cakrit](https://github.com/cakrit))
 - Clean host structure [\#14584](https://github.com/netdata/netdata/pull/14584) ([stelfrag](https://github.com/stelfrag))
@@ -382,11 +388,6 @@
 - enable collecting ECC memory errors by default [\#13970](https://github.com/netdata/netdata/pull/13970) ([ilyam8](https://github.com/ilyam8))
 - break active-active loop from replicating non-existing child to each other [\#13968](https://github.com/netdata/netdata/pull/13968) ([ktsaou](https://github.com/ktsaou))
 - document password param for tor collector [\#13966](https://github.com/netdata/netdata/pull/13966) ([andrewm4894](https://github.com/andrewm4894))
-- Fallback to ar and ranlib if llvm-ar and llvm-ranlib are not there [\#13959](https://github.com/netdata/netdata/pull/13959) ([MrZammler](https://github.com/MrZammler))
-- require -DENABLE\_DLSYM=1 to use dlsym\(\) [\#13958](https://github.com/netdata/netdata/pull/13958) ([ktsaou](https://github.com/ktsaou))
-- health/ping: use 'host' label in alerts info [\#13955](https://github.com/netdata/netdata/pull/13955) ([ilyam8](https://github.com/ilyam8))
-- bump go.d.plugin to v0.43.0 [\#13954](https://github.com/netdata/netdata/pull/13954) ([ilyam8](https://github.com/ilyam8))
-- Fix local dashboard cloud links [\#13953](https://github.com/netdata/netdata/pull/13953) ([underhood](https://github.com/underhood))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
