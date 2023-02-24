@@ -86,12 +86,14 @@ LOGS_QUERY_RESULT_TYPE execute_logs_manag_query(logs_query_params_t *p_query_par
         return INVALID_REQUEST_ERROR;
     }
 
-    /* Find p_file_info for this query according to chart_name or filename if the former is not valid. */
+    /* Find p_file_infos for this query according to chart_names or filenames if the former is not valid. Only one of 
+     * the two will be used, not both charts_names and filenames can be mixed. */
     if(p_query_params->chart_name[0]){
         int pfi_off = 0;
         for(int cn_off = 0; p_query_params->chart_name[cn_off]; cn_off++) {
-            for (int pfia_dat_off = 0; pfia_dat_off < p_file_infos_arr->count; pfia_dat_off++) {
-                if (!strcmp(p_file_infos_arr->data[pfia_dat_off]->chart_name, p_query_params->chart_name[cn_off])) {
+            for(int pfia_dat_off = 0; pfia_dat_off < p_file_infos_arr->count; pfia_dat_off++) {
+                if( !strcmp(p_file_infos_arr->data[pfia_dat_off]->chart_name, p_query_params->chart_name[cn_off]) && 
+                    p_file_infos_arr->data[pfia_dat_off]->db_mode != LOGS_MANAG_DB_MODE_NONE) {
                     p_file_infos[pfi_off++] = p_file_infos_arr->data[pfia_dat_off];
                     break;
                 }
@@ -101,8 +103,9 @@ LOGS_QUERY_RESULT_TYPE execute_logs_manag_query(logs_query_params_t *p_query_par
     else if(p_query_params->filename[0]){
         int pfi_off = 0;
         for(int fn_off = 0; p_query_params->filename[fn_off]; fn_off++) {
-            for (int pfia_dat_off = 0; pfia_dat_off < p_file_infos_arr->count; pfia_dat_off++) {
-                if (!strcmp(p_file_infos_arr->data[pfia_dat_off]->filename, p_query_params->filename[fn_off])) {
+            for(int pfia_dat_off = 0; pfia_dat_off < p_file_infos_arr->count; pfia_dat_off++) {
+                if( !strcmp(p_file_infos_arr->data[pfia_dat_off]->filename, p_query_params->filename[fn_off]) && 
+                    p_file_infos_arr->data[pfia_dat_off]->db_mode != LOGS_MANAG_DB_MODE_NONE) {
                     p_file_infos[pfi_off++] = p_file_infos_arr->data[pfia_dat_off];
                     break;
                 }
@@ -133,8 +136,7 @@ LOGS_QUERY_RESULT_TYPE execute_logs_manag_query(logs_query_params_t *p_query_par
 #endif // MEASURE_QUERY_TIME
 
     /* Search DB(s) first */
-    if(!p_file_infos[1]) db_search(p_query_params, p_file_infos[0]);
-    else db_search_compound(p_query_params, p_file_infos);
+    db_search_compound(p_query_params, p_file_infos);
 
 #if MEASURE_QUERY_TIME
     const msec_t db_search_time = now_realtime_msec();
