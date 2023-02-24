@@ -2432,6 +2432,7 @@ struct rrdcontext_to_json_v2_data {
     struct api_v2_contexts_request *request;
     DICTIONARY *ctx;
 
+    CONTEXTS_V2_OPTIONS options;
     size_t host_count;
     uint64_t hard_hash;
     uint64_t soft_hash;
@@ -2439,7 +2440,7 @@ struct rrdcontext_to_json_v2_data {
     struct {
         SIMPLE_PATTERN *scope_pattern;
         SIMPLE_PATTERN *pattern;
-    } hosts;
+    } nodes;
 
     struct {
         SIMPLE_PATTERN *scope_pattern;
@@ -2489,10 +2490,12 @@ static FTS_MATCH rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_jso
                 size_t label_searches = 0;
                 if(unlikely(ri->rrdlabels && dictionary_entries(ri->rrdlabels) &&
                     rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, q, ':', &label_searches))) {
+                    ctl->q.fts.searches += label_searches;
                     ctl->q.fts.char_searches += label_searches;
                     matched = FTS_MATCHED_LABEL;
                     break;
                 }
+                ctl->q.fts.searches += label_searches;
                 ctl->q.fts.char_searches += label_searches;
 
                 if(ri->rrdset) {
@@ -2522,7 +2525,7 @@ static bool rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED *r
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
 
     FTS_MATCH match = ctl->q.host_match;
-    if(ctl->q.pattern) {
+    if((ctl->options & CONTEXTS_V2_SEARCH) && ctl->q.pattern) {
         match = rrdcontext_to_json_v2_full_text_search(ctl, rc, ctl->q.pattern);
 
         if(match == FTS_MATCHED_NONE)
@@ -2563,78 +2566,138 @@ static bool rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED *r
 }
 
 static bool rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool queryable_host) {
+    if(!queryable_host || !host->rrdctx.contexts)
+        // the host matches the 'scope_host' but does not match the 'host' patterns
+        // or the host does not have any contexts
+        return false;
+
     struct rrdcontext_to_json_v2_data *ctl = data;
     BUFFER *wb = ctl->wb;
 
-    if(!host->rrdctx.contexts)
-        return false;
+    bool host_matched = (ctl->options & CONTEXTS_V2_NODES);
+    bool do_contexts = (ctl->options & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH));
 
-    // save it
-    SIMPLE_PATTERN *old_q = ctl->q.pattern;
-
-    if(ctl->q.pattern && (
-            full_text_search_string(&ctl->q.fts, ctl->q.pattern, host->hostname) ||
-            full_text_search_char(&ctl->q.fts, ctl->q.pattern, host->machine_guid) ||
-            (ctl->q.pattern && full_text_search_char(&ctl->q.fts, ctl->q.pattern, ctl->q.host_uuid_buffer)))) {
-        ctl->q.pattern = NULL;
-        ctl->q.host_match = FTS_MATCHED_HOST;
+    ctl->q.host_match = FTS_MATCHED_NONE;
+    if((ctl->options & CONTEXTS_V2_SEARCH)) {
+        // check if we match the host itself
+        if(ctl->q.pattern && (
+                full_text_search_string(&ctl->q.fts, ctl->q.pattern, host->hostname) ||
+                full_text_search_char(&ctl->q.fts, ctl->q.pattern, host->machine_guid) ||
+                (ctl->q.pattern && full_text_search_char(&ctl->q.fts, ctl->q.pattern, ctl->q.host_uuid_buffer)))) {
+            ctl->q.host_match = FTS_MATCHED_HOST;
+            do_contexts = true;
+        }
     }
-    else
-        ctl->q.host_match = FTS_MATCHED_NONE;
 
-    size_t added = rrdcontext_foreach_context(
-            host, ctl->request->scope_contexts,
-            ctl->contexts.scope_pattern, ctl->contexts.pattern,
-            rrdcontext_to_json_v2_add_context, queryable_host, ctl);
+    if(do_contexts) {
+        // save it
+        SIMPLE_PATTERN *old_q = ctl->q.pattern;
 
-    // restore it
-    ctl->q.pattern = old_q;
+        if(ctl->q.host_match == FTS_MATCHED_HOST)
+            // do not do pattern matching on contexts - we matched the host itself
+            ctl->q.pattern = NULL;
 
-    if(added) {
+        size_t added = rrdcontext_foreach_context(
+                host, ctl->request->scope_contexts,
+                ctl->contexts.scope_pattern, ctl->contexts.pattern,
+                rrdcontext_to_json_v2_add_context, queryable_host, ctl);
+
+        // restore it
+        ctl->q.pattern = old_q;
+
+        if(added)
+            host_matched = true;
+    }
+
+    if(host_matched && (ctl->options & (CONTEXTS_V2_NODES | CONTEXTS_V2_DEBUG))) {
         buffer_json_add_array_item_object(wb);
         buffer_json_member_add_string(wb, "mg", host->machine_guid);
         buffer_json_member_add_uuid(wb, "nd", host->node_id);
         buffer_json_member_add_string(wb, "nm", rrdhost_hostname(host));
         buffer_json_object_close(wb);
-        return true;
     }
 
-    return false;
+    return host_matched;
 }
 
-int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req) {
+static void buffer_json_contexts_v2_options_to_array(BUFFER *wb, CONTEXTS_V2_OPTIONS options) {
+    if(options & CONTEXTS_V2_DEBUG)
+        buffer_json_add_array_item_string(wb, "debug");
+
+    if(options & CONTEXTS_V2_NODES)
+        buffer_json_add_array_item_string(wb, "nodes");
+
+    if(options & CONTEXTS_V2_CONTEXTS)
+        buffer_json_add_array_item_string(wb, "contexts");
+
+    if(options & CONTEXTS_V2_SEARCH)
+        buffer_json_add_array_item_string(wb, "search");
+}
+
+int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_OPTIONS options) {
     req->timings.processing_ut = now_monotonic_usec();
+
+    if(options & CONTEXTS_V2_SEARCH)
+        options |= CONTEXTS_V2_CONTEXTS;
 
     struct rrdcontext_to_json_v2_data ctl = {
             .wb = wb,
             .request = req,
-            .ctx = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct rrdcontext_to_json_v2_entry)),
+            .ctx = NULL,
+            .options = options,
             .host_count = 0,
             .hard_hash = 0,
             .soft_hash = 0,
-            .hosts.scope_pattern = string_to_simple_pattern(req->scope_hosts),
-            .hosts.pattern = string_to_simple_pattern(req->hosts),
+            .nodes.scope_pattern = string_to_simple_pattern(req->scope_nodes),
+            .nodes.pattern = string_to_simple_pattern(req->nodes),
             .contexts.pattern = string_to_simple_pattern(req->contexts),
             .contexts.scope_pattern = string_to_simple_pattern(req->scope_contexts),
             .q.pattern = string_to_simple_pattern_nocase(req->q),
     };
 
+    if(options & CONTEXTS_V2_CONTEXTS)
+        ctl.ctx = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct rrdcontext_to_json_v2_entry));
+
     time_t now_s = now_realtime_sec();
     buffer_json_initialize(wb, "\"", "\"", 0, true);
 
-    buffer_json_member_add_object(wb, "agent");
-    buffer_json_member_add_string(wb, "mg", localhost->machine_guid);
-    buffer_json_member_add_uuid(wb, "nd", localhost->node_id);
-    buffer_json_member_add_string(wb, "nm", rrdhost_hostname(localhost));
-    if(req->q)
-        buffer_json_member_add_string(wb, "q", req->q);
-    buffer_json_member_add_time_t(wb, "now", now_s);
-    buffer_json_object_close(wb);
+    if(options & CONTEXTS_V2_DEBUG) {
+        buffer_json_member_add_object(wb, "agent");
+        buffer_json_member_add_string(wb, "mg", localhost->machine_guid);
+        buffer_json_member_add_uuid(wb, "nd", localhost->node_id);
+        buffer_json_member_add_string(wb, "nm", rrdhost_hostname(localhost));
+        if (req->q)
+            buffer_json_member_add_string(wb, "q", req->q);
+        buffer_json_member_add_time_t(wb, "now", now_s);
+        buffer_json_object_close(wb);
 
-    buffer_json_member_add_array(wb, "hosts");
-    ctl.host_count = rrdcontext_foreach_host(ctl.hosts.scope_pattern, ctl.hosts.pattern,
+        buffer_json_member_add_object(wb, "request");
+
+        buffer_json_member_add_object(wb, "scope");
+        buffer_json_member_add_string(wb, "scope_nodes", req->scope_nodes);
+        buffer_json_member_add_string(wb, "scope_contexts", req->scope_contexts);
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "selectors");
+        buffer_json_member_add_string(wb, "nodes", req->nodes);
+        buffer_json_member_add_string(wb, "contexts", req->contexts);
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_string(wb, "q", req->q);
+        buffer_json_member_add_array(wb, "options");
+        buffer_json_contexts_v2_options_to_array(wb, options);
+        buffer_json_array_close(wb);
+
+        buffer_json_object_close(wb);
+    }
+
+    if(options & (CONTEXTS_V2_NODES | CONTEXTS_V2_DEBUG))
+        buffer_json_member_add_array(wb, "nodes");
+
+    ctl.host_count = rrdcontext_foreach_host(ctl.nodes.scope_pattern, ctl.nodes.pattern,
                                              rrdcontext_to_json_v2_add_host, &ctl, &ctl.hard_hash, &ctl.soft_hash, ctl.q.host_uuid_buffer);
-    buffer_json_array_close(wb);
+    if(options & (CONTEXTS_V2_NODES | CONTEXTS_V2_DEBUG))
+        buffer_json_array_close(wb);
 
     req->timings.output_ut = now_monotonic_usec();
     buffer_json_member_add_object(wb, "versions");
@@ -2642,27 +2705,29 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req) {
     buffer_json_member_add_uint64(wb, "contexts_soft_hash", ctl.soft_hash);
     buffer_json_object_close(wb);
 
-    buffer_json_member_add_object(wb, "contexts");
-    struct rrdcontext_to_json_v2_entry *z;
-    dfe_start_read(ctl.ctx, z) {
-                bool collected = z->flags & RRD_FLAG_COLLECTED;
+    if(options & CONTEXTS_V2_CONTEXTS) {
+        buffer_json_member_add_object(wb, "contexts");
+        struct rrdcontext_to_json_v2_entry *z;
+        dfe_start_read(ctl.ctx, z){
+                    bool collected = z->flags & RRD_FLAG_COLLECTED;
 
-                buffer_json_member_add_object(wb, string2str(z->id));
-                {
-                    buffer_json_member_add_string(wb, "family", string2str(z->family));
-                    buffer_json_member_add_uint64(wb, "priority", z->priority);
-                    buffer_json_member_add_time_t(wb, "first_entry", z->first_time_s);
-                    buffer_json_member_add_time_t(wb, "last_entry", collected ? now_s : z->last_time_s);
-                    buffer_json_member_add_boolean(wb, "live", collected);
-                    if(req->q)
-                        buffer_json_member_add_string(wb, "match", fts_match_to_string(z->match));
+                    buffer_json_member_add_object(wb, string2str(z->id));
+                    {
+                        buffer_json_member_add_string(wb, "family", string2str(z->family));
+                        buffer_json_member_add_uint64(wb, "priority", z->priority);
+                        buffer_json_member_add_time_t(wb, "first_entry", z->first_time_s);
+                        buffer_json_member_add_time_t(wb, "last_entry", collected ? now_s : z->last_time_s);
+                        buffer_json_member_add_boolean(wb, "live", collected);
+                        if (options & CONTEXTS_V2_SEARCH)
+                            buffer_json_member_add_string(wb, "match", fts_match_to_string(z->match));
+                    }
+                    buffer_json_object_close(wb);
                 }
-                buffer_json_object_close(wb);
+        dfe_done(z);
+        buffer_json_object_close(wb); // contexts
     }
-    dfe_done(z);
-    buffer_json_object_close(wb); // contexts
 
-    if(ctl.q.pattern) {
+    if(options & CONTEXTS_V2_SEARCH) {
         buffer_json_member_add_object(wb, "searches");
         buffer_json_member_add_uint64(wb, "strings", ctl.q.fts.string_searches);
         buffer_json_member_add_uint64(wb, "char", ctl.q.fts.char_searches);
@@ -2680,8 +2745,8 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req) {
     buffer_json_finalize(wb);
 
     dictionary_destroy(ctl.ctx);
-    simple_pattern_free(ctl.hosts.scope_pattern);
-    simple_pattern_free(ctl.hosts.pattern);
+    simple_pattern_free(ctl.nodes.scope_pattern);
+    simple_pattern_free(ctl.nodes.pattern);
     simple_pattern_free(ctl.contexts.pattern);
     simple_pattern_free(ctl.contexts.scope_pattern);
     simple_pattern_free(ctl.q.pattern);
@@ -3465,9 +3530,9 @@ void query_target_generate_name(QUERY_TARGET *qt) {
                 );
     else
         snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "context://hosts:%s/contexts:%s/instances:%s/dimensions:%s/after:%lld/before:%lld/points:%zu/group:%s%s/options:%s%s%s"
-                , (qt->request.host) ? rrdhost_hostname(qt->request.host) : ((qt->request.hosts) ? qt->request.hosts : "*")
+                , (qt->request.host) ? rrdhost_hostname(qt->request.host) : ((qt->request.nodes) ? qt->request.nodes : "*")
                 , (qt->request.contexts) ? qt->request.contexts : "*"
-                , (qt->request.charts) ? qt->request.charts : "*"
+                , (qt->request.instances) ? qt->request.instances : "*"
                 , (qt->request.dimensions) ? qt->request.dimensions : "*"
                 , (long long)qt->request.after
                 , (long long)qt->request.before
@@ -3499,8 +3564,8 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
 
     qt->timings.received_ut = qtr->received_ut;
 
-    if(qtr->hosts && !qtr->scope_hosts)
-        qtr->scope_hosts = qtr->hosts;
+    if(qtr->nodes && !qtr->scope_nodes)
+        qtr->scope_nodes = qtr->nodes;
 
     if(qtr->contexts && !qtr->scope_contexts)
         qtr->scope_contexts = qtr->contexts;
@@ -3520,11 +3585,11 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
         .qt = qt,
         .start_s = now_realtime_sec(),
         .st = qt->request.st,
-        .scope_hosts = qt->request.scope_hosts,
+        .scope_hosts = qt->request.scope_nodes,
         .scope_contexts = qt->request.scope_contexts,
-        .hosts = qt->request.hosts,
+        .hosts = qt->request.nodes,
         .contexts = qt->request.contexts,
-        .charts = qt->request.charts,
+        .charts = qt->request.instances,
         .dimensions = qt->request.dimensions,
         .chart_label_key = qt->request.chart_label_key,
         .labels = qt->request.labels,

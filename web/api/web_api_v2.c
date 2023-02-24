@@ -2,7 +2,7 @@
 
 #include "web_api_v2.h"
 
-static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unused, struct web_client *w, char *url, bool enable_search) {
+static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unused, struct web_client *w, char *url, CONTEXTS_V2_OPTIONS options) {
     struct api_v2_contexts_request req = { 0 };
     req.timings.received_ut = now_monotonic_usec();
 
@@ -17,23 +17,29 @@ static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unu
         // name and value are now the parameters
         // they are not null and not empty
 
-        if(!strcmp(name, "scope_hosts")) req.scope_hosts = value;
-        else if(!strcmp(name, "scope_contexts")) req.scope_contexts = value;
-        else if(!strcmp(name, "hosts")) req.hosts = value;
-        else if(!strcmp(name, "contexts")) req.contexts = value;
-        else if(enable_search && !strcmp(name, "q")) req.q = value;
+        if(!strcmp(name, "scope_nodes")) req.scope_nodes = value;
+        else if((options & (CONTEXTS_V2_NODES | CONTEXTS_V2_CONTEXTS)) && !strcmp(name, "nodes")) req.nodes = value;
+        else if((options & CONTEXTS_V2_CONTEXTS) && !strcmp(name, "scope_contexts")) req.scope_contexts = value;
+        else if((options & CONTEXTS_V2_CONTEXTS) && !strcmp(name, "contexts")) req.contexts = value;
+        else if((options & CONTEXTS_V2_SEARCH) && !strcmp(name, "q")) req.q = value;
     }
 
+    options |= CONTEXTS_V2_DEBUG;
+
     buffer_flush(w->response.data);
-    return rrdcontext_to_json_v2(w->response.data, &req);
+    return rrdcontext_to_json_v2(w->response.data, &req, options);
 }
 
 static int web_client_api_request_v2_q(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v2_contexts_internal(host, w, url, true);
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_SEARCH | CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_NODES);
 }
 
 static int web_client_api_request_v2_contexts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v2_contexts_internal(host, w, url, false);
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_CONTEXTS);
+}
+
+static int web_client_api_request_v2_nodes(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_NODES);
 }
 
 static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
@@ -52,9 +58,9 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
 
     time_t last_timestamp_in_data = 0, google_timestamp = 0;
 
-    char *scope_hosts = NULL;
+    char *scope_nodes = NULL;
     char *scope_contexts = NULL;
-    char *hosts = NULL;
+    char *nodes = NULL;
     char *contexts = NULL;
     char *instances = NULL;
     char *dimensions = NULL;
@@ -86,9 +92,9 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
         // name and value are now the parameters
         // they are not null and not empty
 
-        if(!strcmp(name, "scope_hosts")) scope_hosts = value;
+        if(!strcmp(name, "scope_nodes")) scope_nodes = value;
         else if(!strcmp(name, "scope_contexts")) scope_contexts = value;
-        else if(!strcmp(name, "hosts")) hosts = value;
+        else if(!strcmp(name, "nodes")) nodes = value;
         else if(!strcmp(name, "contexts")) contexts = value;
         else if(!strcmp(name, "instances")) instances = value;
         else if(!strcmp(name, "dimensions")) dimensions = value;
@@ -178,15 +184,15 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
 
     QUERY_TARGET_REQUEST qtr = {
             .version = 2,
-            .scope_hosts = scope_hosts,
+            .scope_nodes = scope_nodes,
             .scope_contexts = scope_contexts,
             .after = after,
             .before = before,
             .host = NULL,
             .st = NULL,
-            .hosts = hosts,
+            .nodes = nodes,
             .contexts = contexts,
-            .charts = instances,
+            .instances = instances,
             .dimensions = dimensions,
             .alerts = alerts,
             .timeout = timeout,
@@ -285,6 +291,7 @@ cleanup:
 
 static struct web_api_command api_commands_v2[] = {
         {"data", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_data},
+        {"nodes", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_nodes},
         {"contexts", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_contexts},
         {"q", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_q},
 

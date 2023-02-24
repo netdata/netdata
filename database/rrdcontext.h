@@ -268,7 +268,7 @@ typedef struct query_metric {
 typedef struct query_target_request {
     size_t version;
 
-    const char *scope_hosts;
+    const char *scope_nodes;
     const char *scope_contexts;
 
     // selecting / filtering metrics to be queried
@@ -277,9 +277,9 @@ typedef struct query_target_request {
     RRDINSTANCE_ACQUIRED *ria;          // the instance to be queried (can be NULL)
     RRDMETRIC_ACQUIRED *rma;            // the metric to be queried (can be NULL)
     RRDSET *st;                         // the chart to be queried (NULL, for context queries)
-    const char *hosts;                  // hosts simple pattern
+    const char *nodes;                  // hosts simple pattern
     const char *contexts;               // contexts simple pattern (context queries)
-    const char *charts;                 // charts simple pattern (for context queries)
+    const char *instances;                 // charts simple pattern (for context queries)
     const char *dimensions;             // dimensions simple pattern
     const char *chart_label_key;        // select only the chart having this label key
     const char *labels;                 // select only the charts having this combo of label key:value
@@ -444,9 +444,9 @@ void query_target_release(QUERY_TARGET *qt);
 QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr);
 
 struct api_v2_contexts_request {
-    char *scope_hosts;
+    char *scope_nodes;
     char *scope_contexts;
-    char *hosts;
+    char *nodes;
     char *contexts;
     char *q;
 
@@ -458,7 +458,14 @@ struct api_v2_contexts_request {
     } timings;
 };
 
-int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req);
+typedef enum __attribute__ ((__packed__)) {
+    CONTEXTS_V2_DEBUG    = (1 << 0),
+    CONTEXTS_V2_SEARCH   = (1 << 1),
+    CONTEXTS_V2_NODES    = (1 << 2),
+    CONTEXTS_V2_CONTEXTS = (1 << 3),
+} CONTEXTS_V2_OPTIONS;
+
+int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_OPTIONS options);
 
 RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o);
 

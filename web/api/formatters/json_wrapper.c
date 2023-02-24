@@ -799,7 +799,7 @@ static void query_target_title(BUFFER *wb, QUERY_TARGET *qt, size_t contexts) {
 
 static void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS options) {
     QUERY_TARGET *qt = r->internal.qt;
-    buffer_json_member_add_object(wb, "hosts");
+    buffer_json_member_add_object(wb, "nodes");
 
     time_t now_s = now_realtime_sec();
     RRDHOST *last_host = NULL;
@@ -980,17 +980,17 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
             web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", qt->request.options);
 
             buffer_json_member_add_object(wb, "scope");
-            buffer_json_member_add_string(wb, "scope_hosts", qt->request.scope_hosts);
+            buffer_json_member_add_string(wb, "scope_nodes", qt->request.scope_nodes);
             buffer_json_member_add_string(wb, "scope_contexts", qt->request.scope_contexts);
             buffer_json_object_close(wb); // scope
 
             buffer_json_member_add_object(wb, "selectors");
             if (qt->request.host)
-                buffer_json_member_add_string(wb, "host", rrdhost_hostname(qt->request.host));
+                buffer_json_member_add_string(wb, "nodes", rrdhost_hostname(qt->request.host));
             else
-                buffer_json_member_add_string(wb, "hosts", qt->request.hosts);
+                buffer_json_member_add_string(wb, "nodes", qt->request.nodes);
             buffer_json_member_add_string(wb, "contexts", qt->request.contexts);
-            buffer_json_member_add_string(wb, "instances", qt->request.charts);
+            buffer_json_member_add_string(wb, "instances", qt->request.instances);
             buffer_json_member_add_string(wb, "dimensions", qt->request.dimensions);
             buffer_json_member_add_string(wb, "labels", qt->request.labels);
             buffer_json_member_add_string(wb, "alerts", qt->request.alerts);
@@ -1048,7 +1048,7 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
     size_t contexts;
     buffer_json_member_add_object(wb, "summary");
     {
-        query_target_summary_hosts_v2(wb, qt, "hosts");
+        query_target_summary_hosts_v2(wb, qt, "nodes");
         contexts = query_target_summary_contexts_v2(wb, qt, "contexts");
         query_target_summary_instances_v2(wb, qt, "instances");
         query_target_summary_dimensions_v12(wb, qt, "dimensions", true);
