@@ -1885,10 +1885,13 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
     if(before && (!ri->first_time_s || before < ri->first_time_s))
         return 0;
 
-    if(t_parent->chart_label_key && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, t_parent->chart_label_key, '\0'))
+    if(t_parent->chart_label_key && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, t_parent->chart_label_key,
+                                                                           '\0', NULL))
         return 0;
 
-    if(t_parent->chart_labels_filter && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, t_parent->chart_labels_filter, ':'))
+    if(t_parent->chart_labels_filter && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels,
+                                                                               t_parent->chart_labels_filter, ':',
+                                                                               NULL))
         return 0;
 
     time_t first_time_s = ri->first_time_s;
@@ -2406,6 +2409,24 @@ struct rrdcontext_to_json_v2_entry {
     FTS_MATCH match;
 };
 
+typedef struct full_text_search_index {
+    size_t searches;
+    size_t string_searches;
+    size_t char_searches;
+} FTS_INDEX;
+
+static inline bool full_text_search_string(FTS_INDEX *fts, SIMPLE_PATTERN *q, STRING *ptr) {
+    fts->searches++;
+    fts->string_searches++;
+    return simple_pattern_matches_string(q, ptr);
+}
+
+static inline bool full_text_search_char(FTS_INDEX *fts, SIMPLE_PATTERN *q, char *ptr) {
+    fts->searches++;
+    fts->char_searches++;
+    return simple_pattern_matches(q, ptr);
+}
+
 struct rrdcontext_to_json_v2_data {
     BUFFER *wb;
     struct api_v2_contexts_request *request;
@@ -2429,18 +2450,19 @@ struct rrdcontext_to_json_v2_data {
         FTS_MATCH host_match;
         char host_uuid_buffer[UUID_STR_LEN];
         SIMPLE_PATTERN *pattern;
+        FTS_INDEX fts;
     } q;
 };
 
-static FTS_MATCH rrdcontext_to_json_v2_full_text_search(RRDCONTEXT *rc, SIMPLE_PATTERN *q) {
-    if(unlikely(simple_pattern_matches_string(q, rc->id) ||
-       simple_pattern_matches_string(q, rc->family)))
+static FTS_MATCH rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_json_v2_data *ctl, RRDCONTEXT *rc, SIMPLE_PATTERN *q) {
+    if(unlikely(full_text_search_string(&ctl->q.fts, q, rc->id) ||
+                full_text_search_string(&ctl->q.fts, q, rc->family)))
         return FTS_MATCHED_CONTEXT;
 
-    if(unlikely(simple_pattern_matches_string(q, rc->title)))
+    if(unlikely(full_text_search_string(&ctl->q.fts, q, rc->title)))
         return FTS_MATCHED_TITLE;
 
-    if(unlikely(simple_pattern_matches_string(q, rc->units)))
+    if(unlikely(full_text_search_string(&ctl->q.fts, q, rc->units)))
         return FTS_MATCHED_UNITS;
 
     FTS_MATCH matched = FTS_MATCHED_NONE;
@@ -2448,38 +2470,41 @@ static FTS_MATCH rrdcontext_to_json_v2_full_text_search(RRDCONTEXT *rc, SIMPLE_P
     dfe_start_read(rc->rrdinstances, ri) {
                 if(matched) break;
 
-                if(unlikely(simple_pattern_matches_string(q, ri->id)) ||
-                   (ri->name != ri->id && simple_pattern_matches_string(q, ri->name))) {
+                if(unlikely(full_text_search_string(&ctl->q.fts, q, ri->id)) ||
+                   (ri->name != ri->id && full_text_search_string(&ctl->q.fts, q, ri->name))) {
                     matched = FTS_MATCHED_INSTANCE;
                     break;
                 }
 
                 RRDMETRIC *rm;
                 dfe_start_read(ri->rrdmetrics, rm) {
-                    if(unlikely(simple_pattern_matches_string(q, rm->id)) ||
-                       (rm->name != rm->id && simple_pattern_matches_string(q, rm->name))) {
+                    if(unlikely(full_text_search_string(&ctl->q.fts, q, rm->id)) ||
+                       (rm->name != rm->id && full_text_search_string(&ctl->q.fts, q, rm->name))) {
                         matched = FTS_MATCHED_DIMENSION;
                         break;
                     }
                 }
                 dfe_done(rm);
 
+                size_t label_searches = 0;
                 if(unlikely(ri->rrdlabels && dictionary_entries(ri->rrdlabels) &&
-                    rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, q, ':'))) {
+                    rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, q, ':', &label_searches))) {
+                    ctl->q.fts.char_searches += label_searches;
                     matched = FTS_MATCHED_LABEL;
                     break;
                 }
+                ctl->q.fts.char_searches += label_searches;
 
                 if(ri->rrdset) {
                     RRDSET *st = ri->rrdset;
                     netdata_rwlock_rdlock(&st->alerts.rwlock);
                     for (RRDCALC *rcl = st->alerts.base; rcl; rcl = rcl->next) {
-                        if(unlikely(simple_pattern_matches_string(q, rcl->name))) {
+                        if(unlikely(full_text_search_string(&ctl->q.fts, q, rcl->name))) {
                             matched = FTS_MATCHED_ALERT;
                             break;
                         }
 
-                        if(unlikely(simple_pattern_matches_string(q, rcl->info))) {
+                        if(unlikely(full_text_search_string(&ctl->q.fts, q, rcl->info))) {
                             matched = FTS_MATCHED_ALERT_INFO;
                             break;
                         }
@@ -2498,7 +2523,7 @@ static bool rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED *r
 
     FTS_MATCH match = ctl->q.host_match;
     if(ctl->q.pattern) {
-        match = rrdcontext_to_json_v2_full_text_search(rc, ctl->q.pattern);
+        match = rrdcontext_to_json_v2_full_text_search(ctl, rc, ctl->q.pattern);
 
         if(match == FTS_MATCHED_NONE)
             return false;
@@ -2548,9 +2573,9 @@ static bool rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool query
     SIMPLE_PATTERN *old_q = ctl->q.pattern;
 
     if(ctl->q.pattern && (
-            simple_pattern_matches_string(ctl->q.pattern, host->hostname) ||
-            simple_pattern_matches(ctl->q.pattern, host->machine_guid) ||
-            (ctl->q.pattern && simple_pattern_matches(ctl->q.pattern, ctl->q.host_uuid_buffer)))) {
+            full_text_search_string(&ctl->q.fts, ctl->q.pattern, host->hostname) ||
+            full_text_search_char(&ctl->q.fts, ctl->q.pattern, host->machine_guid) ||
+            (ctl->q.pattern && full_text_search_char(&ctl->q.fts, ctl->q.pattern, ctl->q.host_uuid_buffer)))) {
         ctl->q.pattern = NULL;
         ctl->q.host_match = FTS_MATCHED_HOST;
     }
@@ -2636,6 +2661,14 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req) {
     }
     dfe_done(z);
     buffer_json_object_close(wb); // contexts
+
+    if(ctl.q.pattern) {
+        buffer_json_member_add_object(wb, "searches");
+        buffer_json_member_add_uint64(wb, "strings", ctl.q.fts.string_searches);
+        buffer_json_member_add_uint64(wb, "char", ctl.q.fts.char_searches);
+        buffer_json_member_add_uint64(wb, "total", ctl.q.fts.searches);
+        buffer_json_object_close(wb);
+    }
 
     req->timings.finished_ut = now_monotonic_usec();
     buffer_json_member_add_object(wb, "timings");
@@ -3218,8 +3251,12 @@ static bool query_target_add_instance(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, 
     }
 
     if(queryable_instance) {
-        if ((qt->instances.chart_label_key_pattern && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, qt->instances.chart_label_key_pattern, '\0')) ||
-            (qt->instances.labels_pattern && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, qt->instances.labels_pattern, ':')))
+        if ((qt->instances.chart_label_key_pattern && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels,
+                                                                                             qt->instances.chart_label_key_pattern,
+                                                                                             '\0', NULL)) ||
+            (qt->instances.labels_pattern && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels,
+                                                                                    qt->instances.labels_pattern, ':',
+                                                                                    NULL)))
             queryable_instance = false;
     }
 

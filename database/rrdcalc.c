@@ -365,7 +365,8 @@ static inline bool rrdcalc_check_if_it_matches_rrdset(RRDCALC *rc, RRDSET *st) {
     if (rc->plugin_pattern && !simple_pattern_matches_string(rc->plugin_pattern, st->module_name))
         return false;
 
-    if (st->rrdhost->rrdlabels && rc->host_labels_pattern && !rrdlabels_match_simple_pattern_parsed(st->rrdhost->rrdlabels, rc->host_labels_pattern, '='))
+    if (st->rrdhost->rrdlabels && rc->host_labels_pattern && !rrdlabels_match_simple_pattern_parsed(
+            st->rrdhost->rrdlabels, rc->host_labels_pattern, '=', NULL))
         return false;
 
     return true;
@@ -741,7 +742,7 @@ void rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(RRDHOST *host
         if (!rc->host_labels)
             continue;
 
-        if(!rrdlabels_match_simple_pattern_parsed(host->rrdlabels, rc->host_labels_pattern, '=')) {
+        if(!rrdlabels_match_simple_pattern_parsed(host->rrdlabels, rc->host_labels_pattern, '=', NULL)) {
             log_health("Health configuration for alarm '%s' cannot be applied, because the host %s does not have the label(s) '%s'",
                  rrdcalc_name(rc),
                  rrdhost_hostname(host),

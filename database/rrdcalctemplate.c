@@ -46,7 +46,9 @@ bool rrdcalctemplate_check_rrdset_conditions(RRDCALCTEMPLATE *rt, RRDSET *st, RR
     if (rt->plugin_pattern && !simple_pattern_matches_string(rt->plugin_pattern, st->plugin_name))
         return false;
 
-    if(host->rrdlabels && rt->host_labels_pattern && !rrdlabels_match_simple_pattern_parsed(host->rrdlabels, rt->host_labels_pattern, '='))
+    if(host->rrdlabels && rt->host_labels_pattern && !rrdlabels_match_simple_pattern_parsed(host->rrdlabels,
+                                                                                            rt->host_labels_pattern,
+                                                                                            '=', NULL))
         return false;
 
     return true;
