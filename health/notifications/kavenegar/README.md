@@ -1,5 +1,5 @@
 <!--
-title: "Kavenegar"
+title: "Kavenegar agent alert notifications"
 sidebar_label: "Kavenegar"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/kavenegar/README.md"
 learn_status: "Published"
@@ -8,7 +8,7 @@ learn_rel_path: "Integrations/Notify/Agent alert notifications"
 learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
-# Kavenegar
+# Kavenegar agent alert notifications
 
 [Kavenegar](https://kavenegar.com/) as service for software developers, based in Iran, provides send and receive SMS, calling voice by using its APIs.
 

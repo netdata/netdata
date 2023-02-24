@@ -269,14 +269,38 @@ netdataDashboard.menu = {
         info: 'Performance metrics for the operation of netdata itself and its plugins.'
     },
 
-    'aclk_test': {
-        title: 'ACLK Test Generator',
-        info: 'For internal use to perform integration testing.'
+    'anomalies': {
+        title: 'Anomalies',
+        icon: '<i class="fas fa-flask"></i>',
+        info: 'Anomaly scores relating to key system metrics.'
+    },
+
+    'zscores': {
+        title: 'Z-Scores',
+        icon: '<i class="fas fa-exclamation"></i>',
+        info: 'Z scores scores relating to key system metrics.'
+    },
+    
+    'correlations': {
+        title: 'Correlations',
+        icon: '<i class="fas fa-random"></i>',
+        info: 'Cross correlations relating to key system metrics.'
+    },
+    
+    'smoothing': {
+        title: 'Smoothing',
+        icon: '<i class="fas fa-flask"></i>',
+        info: 'Smoothing'
     },
 
     'example': {
         title: 'Example Charts',
         info: 'Example charts, demonstrating the external plugin architecture.'
+    },
+
+    'example2': {
+        title: 'Example Charts 2',
+        info: 'Example charts 2, demonstrating the external plugin architecture.'
     },
 
     'cgroup': {
@@ -1416,7 +1440,7 @@ netdataDashboard.context = {
     'system.cpu': {
         info: function (os) {
             void (os);
-            return 'Total CPU utilization (all cores). 100% here means there is no CPU idle time at all. You can get per core usage at the <a href="#menu_cpu">CPUs</a> section and per application usage at the <a href="#menu_apps">Applications Monitoring</a> section.'
+            return 'Total CPU utilization (all cores).. 100% here means there is no CPU idle time at all. You can get per core usage at the <a href="#menu_cpu">CPUs</a> section and per application usage at the <a href="#menu_apps">Applications Monitoring</a> section.'
                 + netdataDashboard.sparkline('<br/>Keep an eye on <b>iowait</b> ', 'system.cpu', 'iowait', '%', '. If it is constantly high, your disks are a bottleneck and they slow your system down.')
                 + netdataDashboard.sparkline(
                 '<br/>An important metric worth monitoring, is <b>softirq</b> ',
@@ -1430,8 +1454,26 @@ netdataDashboard.context = {
         valueRange: "[0, 100]"
     },
 
+    'anomalies.score': {
+        info: 'This is the raw anomaly score from the trained <a href="https://pyod.readthedocs.io/en/latest/index.html">PyOD</a> model. ' +
+            'It can be on different scales depending on the type of model used ' +
+            '(<a href="https://pyod.readthedocs.io/en/latest/api_cc.html#pyod.models.base.BaseDetector.decision_function">PyOD docs</a>).'
+    },
+
+    'anomalies.prob': {
+        info: 'This is the anomaly probability from the trained <a href="https://pyod.readthedocs.io/en/latest/index.html">PyOD</a> model. ' +
+            'This represents a post processing of the raw scores into a [0,1] range so as to behave more like a probability ' +
+            '(<a href="https://pyod.readthedocs.io/en/latest/api_cc.html#pyod.models.base.BaseDetector.predict_proba">PyOD docs</a>).'
+    },
+
+    'anomalies.flag': {
+        info: 'This is the anomaly flag from the trained <a href="https://pyod.readthedocs.io/en/latest/index.html">PyOD</a> model,' +
+            'it predicts a 1 if the model judges a particular observation to be an outlier ' +
+            '(<a href="https://pyod.readthedocs.io/en/latest/api_cc.html#pyod.models.base.BaseDetector.predict">PyOD docs</a>).'
+    },
+
     'system.load': {
-        info: 'Current system load, i.e. the number of processes using CPU or waiting for system resources (usually CPU and disk). The 3 metrics refer to 1, 5 and 15 minute averages. The system calculates this once every 5 seconds. For more information check <a href="https://en.wikipedia.org/wiki/Load_(computing)" target="_blank">this wikipedia article</a>.',
+        info: 'Current system load, i.e.. the number of processes using CPU or waiting for system resources (usually CPU and disk). The 3 metrics refer to 1, 5 and 15 minute averages. The system calculates this once every 5 seconds. For more information check <a href="https://en.wikipedia.org/wiki/Load_(computing)" target="_blank">this wikipedia article</a>',
         height: 0.7
     },
 

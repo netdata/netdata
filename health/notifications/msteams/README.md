@@ -1,5 +1,5 @@
 <!--
-title: "Microsoft Teams"
+title: "Microsoft Teams agent alert notifications"
 sidebar_label: "Microsoft Teams"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/msteams/README.md"
 learn_status: "Published"
@@ -8,7 +8,7 @@ learn_rel_path: "Integrations/Notify/Agent alert notifications"
 learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
-# Microsoft Teams
+# Microsoft Teams agent alert notifications
 
 This is what you will get:
 ![image](https://user-images.githubusercontent.com/1122372/92710359-0385e680-f358-11ea-8c52-f366a4fb57dd.png)

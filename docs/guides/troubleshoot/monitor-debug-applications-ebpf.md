@@ -5,8 +5,7 @@ description: "Use Netdata's built-in eBPF metrics collector to monitor, troubles
 image: /img/seo/guides/troubleshoot/monitor-debug-applications-ebpf.png
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/troubleshoot/monitor-debug-applications-ebpf.md
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Guides/Troubleshoot"
+learn_rel_path: "Operations"
 -->
 
 # Monitor, troubleshoot, and debug applications with eBPF metrics
@@ -251,23 +250,5 @@ systems.
 Now that you can see eBPF metrics in Netdata Cloud, you can [invite your
 team](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/invite-your-team.md) and share your findings with others.
 
-## What's next?
-
-Debugging and troubleshooting an application takes a special combination of practice, experience, and sheer luck. With
-Netdata's eBPF metrics to back you up, you can rest assured that you see every minute detail of how your application
-interacts with the Linux kernel.
-
-If you're still trying to wrap your head around what we offer, be sure to read up on our accompanying documentation and
-other resources on eBPF monitoring with Netdata:
-
--   [eBPF collector](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/README.md)
--   [eBPF's integration with `apps.plugin`](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md#integration-with-ebpf)
--   [Linux eBPF monitoring with Netdata](https://www.netdata.cloud/blog/linux-ebpf-monitoring-with-netdata/)
-
-The scenarios described above are just the beginning when it comes to troubleshooting with eBPF metrics. We're excited
-to explore others and see what our community dreams up. If you have other use cases, whether simulated or real-world,
-we'd love to hear them: [info@netdata.cloud](mailto:info@netdata.cloud).
-
-Happy troubleshooting!
 
 

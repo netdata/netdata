@@ -1,5 +1,5 @@
 <!--
-title: "Prowl"
+title: "Prowl agent alert notifications"
 sidebar_label: "Prowl"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/prowl/README.md"
 learn_status: "Published"
@@ -8,7 +8,7 @@ learn_rel_path: "Integrations/Notify/Agent alert notifications"
 learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
-# Prowl
+# Prowl agent alert notifications
 
 [Prowl](https://www.prowlapp.com/) is a push notification service for iOS devices.  Netdata
 supports delivering notifications to iOS devices through Prowl.
