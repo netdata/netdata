@@ -21,7 +21,7 @@
 #  - TMPDIR (set to a usable temporary directory)
 #  - NETDATA_NIGHTLIES_BASEURL (set the base url for downloading the dist tarball)
 #
-# Copyright: 2018-2020 Netdata Inc.
+# Copyright: 2018-2023 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Author: Paweł Krupa <paulfantom@gmail.com>
@@ -804,11 +804,10 @@ update_binpkg() {
 # Simple function to encapsulate original updater behavior.
 update_legacy() {
   set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
-  if [ "${IS_NETDATA_STATIC_BINARY}" = "yes" ]; then
-    update_static && exit 0
-  else
-    update_build && exit 0
-  fi
+  case "${IS_NETDATA_STATIC_BINARY}" in
+    yes) update_static && exit 0 ;;
+    *) update_build && exit 0 ;;
+  esac
 }
 
 logfile=
@@ -879,9 +878,7 @@ while [ -n "${1}" ]; do
         disable_netdata_updater
         exit $?
         ;;
-    *)
-        fatal "Unrecognized option ${1}" U001A
-        ;;
+    *) fatal "Unrecognized option ${1}" U001A ;;
   esac
 
   shift 1
@@ -923,9 +920,7 @@ case "${INSTALL_TYPE}" in
       set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
       update_static && exit 0
       ;;
-    *binpkg*)
-      update_binpkg && exit 0
-      ;;
+    *binpkg*) update_binpkg && exit 0 ;;
     "") # Fallback case for no `.install-type` file. This just works like the old install type detection.
       validate_environment_file
       update_legacy
@@ -939,10 +934,6 @@ case "${INSTALL_TYPE}" in
         fatal "This script does not support updating custom installations without valid environment files." U0012
       fi
       ;;
-    oci)
-      fatal "This script does not support updating Netdata inside our official Docker containers, please instead update the container itself." U0013
-      ;;
-    *)
-      fatal "Unrecognized installation type (${INSTALL_TYPE}), unable to update." U0014
-      ;;
+    oci) fatal "This script does not support updating Netdata inside our official Docker containers, please instead update the container itself." U0013 ;;
+    *) fatal "Unrecognized installation type (${INSTALL_TYPE}), unable to update." U0014 ;;
 esac
