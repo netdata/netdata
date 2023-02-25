@@ -968,7 +968,8 @@ typedef struct query_point {
     time_t end_time;
     time_t start_time;
     NETDATA_DOUBLE value;
-    NETDATA_DOUBLE anomaly;
+    size_t anomaly_outlier_points;
+    size_t anomaly_all_points;
     SN_FLAGS flags;
 #ifdef NETDATA_INTERNAL_CHECKS
     size_t id;
@@ -979,7 +980,8 @@ QUERY_POINT QUERY_POINT_EMPTY = {
     .end_time = 0,
     .start_time = 0,
     .value = NAN,
-    .anomaly = 0,
+    .anomaly_outlier_points = 0,
+    .anomaly_all_points = 0,
     .flags = SN_FLAG_NONE,
 #ifdef NETDATA_INTERNAL_CHECKS
     .id = 0,
@@ -1019,7 +1021,8 @@ typedef struct query_engine_ops {
     NETDATA_DOUBLE (*grouping_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
     size_t group_points_non_zero;
     size_t group_points_added;
-    NETDATA_DOUBLE group_anomaly_rate;
+    size_t group_anomaly_outlier_points;
+    size_t group_anomaly_all_points;
     RRDR_VALUE_FLAGS group_value_flags;
 
     // statistics
@@ -1347,7 +1350,8 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
     }                                                                   \
                                                                         \
     (ops)->group_points_added++;                                        \
-    (ops)->group_anomaly_rate += (point).anomaly;                       \
+    (ops)->group_anomaly_outlier_points = (point).anomaly_outlier_points; \
+    (ops)->group_anomaly_all_points = (point).anomaly_all_points;       \
 } while(0)
 
 static QUERY_ENGINE_OPS *rrd2rrdr_query_prep(RRDR *r, size_t dim_id_in_rrdr) {
@@ -1481,7 +1485,8 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
 
                 new_point.start_time = sp.start_time_s;
                 new_point.end_time   = sp.end_time_s;
-                new_point.anomaly    = sp.count ? (NETDATA_DOUBLE)sp.anomaly_count * 100.0 / (NETDATA_DOUBLE)sp.count : 0.0;
+                new_point.anomaly_outlier_points = sp.anomaly_count;
+                new_point.anomaly_all_points = sp.count;
                 query_point_set_id(new_point, ops->db_total_points_read);
 
 //                if(debug_this)
@@ -1492,7 +1497,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                 if(likely(!storage_point_is_unset(sp) && !storage_point_is_gap(sp))) {
 
                     if(unlikely(use_anomaly_bit_as_value))
-                        new_point.value =  new_point.anomaly;
+                        new_point.value = new_point.anomaly_all_points ? (NETDATA_DOUBLE)new_point.anomaly_outlier_points * 100.0 / (NETDATA_DOUBLE)new_point.anomaly_all_points : 0.0;
 
                     else {
                         switch (ops->tier_query_fetch) {
@@ -1685,10 +1690,9 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
             NETDATA_DOUBLE group_value = ops->grouping_flush(r, rrdr_value_options_ptr);
             r->v[rrdr_o_v_index] = group_value;
 
-            // we only store uint8_t anomaly rates,
-            // so let's get double precision by storing
-            // anomaly rates in the range 0 - 200
-            NETDATA_DOUBLE group_ar = r->ar[rrdr_o_v_index] = ops->group_anomaly_rate / (NETDATA_DOUBLE)ops->group_points_added;
+            NETDATA_DOUBLE group_ar = r->ar[rrdr_o_v_index] = ops->group_anomaly_all_points ?
+                    (NETDATA_DOUBLE)ops->group_anomaly_outlier_points * 100.0 / (NETDATA_DOUBLE)ops->group_anomaly_all_points
+                    : 0.0;
 
             if(likely(points_added || dim_id_in_rrdr)) {
                 // find the min/max across all dimensions
@@ -1726,7 +1730,8 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
             ops->group_points_added = 0;
             ops->group_value_flags = RRDR_VALUE_NOTHING;
             ops->group_points_non_zero = 0;
-            ops->group_anomaly_rate = 0;
+            ops->group_anomaly_outlier_points = 0;
+            ops->group_anomaly_all_points = 0;
         }
         // the loop above increased "now" by query_granularity,
         // but the main loop will increase it too,
