@@ -119,33 +119,72 @@ static inline void aggregate_into_summary_totals(struct summary_total_counts *to
 }
 
 static inline void query_target_total_counts(BUFFER *wb, const char *key, struct summary_total_counts *totals) {
+    if(!totals->selected && !totals->queried && !totals->failed && !totals->excluded)
+        return;
+
     buffer_json_member_add_object(wb, key);
-    buffer_json_member_add_uint64(wb, "sl", totals->selected);
-    buffer_json_member_add_uint64(wb, "ex", totals->excluded);
-    buffer_json_member_add_uint64(wb, "qr", totals->queried);
-    buffer_json_member_add_uint64(wb, "fl", totals->failed);
+
+    if(totals->selected)
+        buffer_json_member_add_uint64(wb, "sl", totals->selected);
+
+    if(totals->excluded)
+        buffer_json_member_add_uint64(wb, "ex", totals->excluded);
+
+    if(totals->queried)
+        buffer_json_member_add_uint64(wb, "qr", totals->queried);
+
+    if(totals->failed)
+        buffer_json_member_add_uint64(wb, "fl", totals->failed);
+
     buffer_json_object_close(wb);
 }
 
 static inline void query_target_metric_counts(BUFFER *wb, struct query_metrics_counts *metrics) {
+    if(!metrics->selected && !metrics->queried && !metrics->failed && !metrics->excluded)
+        return;
+
     buffer_json_member_add_object(wb, "ds");
-    buffer_json_member_add_uint64(wb, "sl", metrics->selected);
-    buffer_json_member_add_uint64(wb, "ex", metrics->excluded);
-    buffer_json_member_add_uint64(wb, "qr", metrics->queried);
-    buffer_json_member_add_uint64(wb, "fl", metrics->failed);
+
+    if(metrics->selected)
+        buffer_json_member_add_uint64(wb, "sl", metrics->selected);
+
+    if(metrics->excluded)
+        buffer_json_member_add_uint64(wb, "ex", metrics->excluded);
+
+    if(metrics->queried)
+        buffer_json_member_add_uint64(wb, "qr", metrics->queried);
+
+    if(metrics->failed)
+        buffer_json_member_add_uint64(wb, "fl", metrics->failed);
+
     buffer_json_object_close(wb);
 }
 
 static inline void query_target_instance_counts(BUFFER *wb, struct query_instances_counts *instances) {
+    if(!instances->selected && !instances->queried && !instances->failed && !instances->excluded)
+        return;
+
     buffer_json_member_add_object(wb, "is");
-    buffer_json_member_add_uint64(wb, "sl", instances->selected);
-    buffer_json_member_add_uint64(wb, "ex", instances->excluded);
-    buffer_json_member_add_uint64(wb, "qr", instances->queried);
-    buffer_json_member_add_uint64(wb, "fl", instances->failed);
+
+    if(instances->selected)
+        buffer_json_member_add_uint64(wb, "sl", instances->selected);
+
+    if(instances->excluded)
+        buffer_json_member_add_uint64(wb, "ex", instances->excluded);
+
+    if(instances->queried)
+        buffer_json_member_add_uint64(wb, "qr", instances->queried);
+
+    if(instances->failed)
+        buffer_json_member_add_uint64(wb, "fl", instances->failed);
+
     buffer_json_object_close(wb);
 }
 
 static inline void query_target_alerts_counts(BUFFER *wb, struct query_alerts_counts *alerts, const char *name, bool array) {
+    if(!alerts->clear && !alerts->other && !alerts->critical && !alerts->warning)
+        return;
+
     if(array)
         buffer_json_add_array_item_object(wb);
     else
@@ -153,27 +192,54 @@ static inline void query_target_alerts_counts(BUFFER *wb, struct query_alerts_co
 
     if(name)
         buffer_json_member_add_string(wb, "nm", name);
-    buffer_json_member_add_uint64(wb, "cl", alerts->clear);
-    buffer_json_member_add_uint64(wb, "wr", alerts->warning);
-    buffer_json_member_add_uint64(wb, "cr", alerts->critical);
-    buffer_json_member_add_uint64(wb, "ot", alerts->other);
+
+    if(alerts->clear)
+        buffer_json_member_add_uint64(wb, "cl", alerts->clear);
+
+    if(alerts->warning)
+        buffer_json_member_add_uint64(wb, "wr", alerts->warning);
+
+    if(alerts->critical)
+        buffer_json_member_add_uint64(wb, "cr", alerts->critical);
+
+    if(alerts->other)
+        buffer_json_member_add_uint64(wb, "ot", alerts->other);
+
     buffer_json_object_close(wb);
 }
 
 static inline void query_target_data_statistics(BUFFER *wb, QUERY_TARGET *qt, struct query_data_statistics *d) {
+    if(!d->count)
+        return;
+
     buffer_json_member_add_object(wb, "sts");
     if(qt->request.group_by_aggregate_function == RRDR_GROUP_BY_FUNCTION_SUM_COUNT) {
         buffer_json_member_add_uint64(wb, "cnt", d->count);
-        buffer_json_member_add_double(wb, "sum", d->sum);
-        buffer_json_member_add_double(wb, "vol", d->volume);
-        buffer_json_member_add_double(wb, "ars", d->anomaly_sum);
+
+        if(d->sum != 0.0)
+            buffer_json_member_add_double(wb, "sum", d->sum);
+
+        if(d->volume != 0.0)
+            buffer_json_member_add_double(wb, "vol", d->volume);
+
+        if(d->anomaly_sum != 0.0)
+            buffer_json_member_add_double(wb, "ars", d->anomaly_sum);
     }
     else {
 //        buffer_json_member_add_double(wb, "min", d->min);
 //        buffer_json_member_add_double(wb, "max", d->max);
-        buffer_json_member_add_double(wb, "avg", (d->count) ? d->sum / (NETDATA_DOUBLE)d->count : 0.0);
-        buffer_json_member_add_double(wb, "arp", (d->count) ? d->anomaly_sum / (NETDATA_DOUBLE)d->count : 0.0);
-        buffer_json_member_add_double(wb, "con", (qt->query_stats.volume > 0) ? d->volume * 100.0 / qt->query_stats.volume : 0.0);
+
+        NETDATA_DOUBLE avg = (d->count) ? d->sum / (NETDATA_DOUBLE)d->count : 0.0;
+        if(avg != 0.0)
+            buffer_json_member_add_double(wb, "avg", avg);
+
+        NETDATA_DOUBLE arp = (d->count) ? d->anomaly_sum / (NETDATA_DOUBLE)d->count : 0.0;
+        if(arp != 0.0)
+            buffer_json_member_add_double(wb, "arp", arp);
+
+        NETDATA_DOUBLE con = (qt->query_stats.volume > 0) ? d->volume * 100.0 / qt->query_stats.volume : 0.0;
+        if(con != 0.0)
+            buffer_json_member_add_double(wb, "con", con);
     }
     buffer_json_object_close(wb);
 }
@@ -282,16 +348,17 @@ static void query_target_summary_instances_v2(BUFFER *wb, QUERY_TARGET *qt, cons
     buffer_json_member_add_array(wb, key);
     for (long c = 0; c < (long) qt->instances.used; c++) {
         QUERY_INSTANCE *qi = query_instance(qt, c);
-        QUERY_HOST *qh = query_host(qt, qi->query_host_id);
+//        QUERY_HOST *qh = query_host(qt, qi->query_host_id);
 
         buffer_json_add_array_item_object(wb);
-        buffer_json_member_add_string(wb, "id", string2str(qi->id_fqdn));
+        buffer_json_member_add_string(wb, "id", rrdinstance_acquired_name(qi->ria));
         buffer_json_member_add_uint64(wb, "ni", qi->query_host_id);
-        buffer_json_member_add_string(wb, "nm", string2str(qi->name_fqdn));
-        buffer_json_member_add_string(wb, "lc", rrdinstance_acquired_name(qi->ria));
-        buffer_json_member_add_string(wb, "mg", qh->host->machine_guid);
-        if(qh->node_id[0])
-            buffer_json_member_add_string(wb, "nd", qh->node_id);
+//        buffer_json_member_add_string(wb, "id", string2str(qi->id_fqdn));
+//        buffer_json_member_add_string(wb, "nm", string2str(qi->name_fqdn));
+//        buffer_json_member_add_string(wb, "lc", rrdinstance_acquired_name(qi->ria));
+//        buffer_json_member_add_string(wb, "mg", qh->host->machine_guid);
+//        if(qh->node_id[0])
+//            buffer_json_member_add_string(wb, "nd", qh->node_id);
         query_target_metric_counts(wb, &qi->metrics);
         query_target_alerts_counts(wb, &qi->alerts, NULL, false);
         query_target_data_statistics(wb, qt, &qi->query_stats);
