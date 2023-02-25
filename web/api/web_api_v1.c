@@ -44,6 +44,7 @@ static struct {
         , {"plan"              , 0    , RRDR_OPTION_SHOW_PLAN}
         , {"details"           , 0    , RRDR_OPTION_SHOW_DETAILS}
         , {"debug"             , 0    , RRDR_OPTION_DEBUG}
+        , {"minify"            , 0    , RRDR_OPTION_MINIFY}
         , {NULL                , 0    , 0}
 };
 
@@ -1086,7 +1087,7 @@ static void host_collectors(RRDHOST *host, BUFFER *wb) {
 
 extern int aclk_connected;
 inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb) {
-    buffer_json_initialize(wb, "\"", "\"", 0, true);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
 
     buffer_json_member_add_string(wb, "version", rrdhost_program_version(host));
     buffer_json_member_add_string(wb, "uid", host->machine_guid);
@@ -1398,7 +1399,7 @@ int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, cha
     wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
 
-    buffer_json_initialize(wb, "\"", "\"", 0, true);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
     host_functions2json(host, wb);
     buffer_json_finalize(wb);
 

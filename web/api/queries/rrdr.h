@@ -44,6 +44,7 @@ typedef enum rrdr_options {
     RRDR_OPTION_SHOW_PLAN       = 0x01000000, // Return the query plan in jsonwrap
     RRDR_OPTION_SHOW_DETAILS    = 0x02000000, // v2 returns detailed object tree
     RRDR_OPTION_DEBUG           = 0x04000000, // v2 returns request description
+    RRDR_OPTION_MINIFY          = 0x08000000, // remove JSON spaces and newlines from JSON output
 
     // internal ones - not to be exposed to the API
     RRDR_OPTION_INTERNAL_AR     = 0x10000000, // internal use only, to let the formatters we want to render the anomaly rate

@@ -316,7 +316,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         ctl.ctx = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct rrdcontext_to_json_v2_entry));
 
     time_t now_s = now_realtime_sec();
-    buffer_json_initialize(wb, "\"", "\"", 0, true);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
 
     if(options & CONTEXTS_V2_DEBUG) {
         buffer_json_member_add_object(wb, "agent");

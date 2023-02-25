@@ -747,7 +747,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR
         sq[0] = '"';
     }
 
-    buffer_json_initialize(wb, kq, sq, 0, true);
+    buffer_json_initialize(wb, kq, sq, 0, true, options & RRDR_OPTION_MINIFY);
 
     buffer_json_member_add_uint64(wb, "api", 1);
     buffer_json_member_add_string(wb, "id", qt->id);
@@ -1083,7 +1083,7 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
         sq[0] = '\'';
     }
 
-    buffer_json_initialize(wb, kq, sq, 0, true);
+    buffer_json_initialize(wb, kq, sq, 0, true, options & RRDR_OPTION_MINIFY);
 
     buffer_json_member_add_uint64(wb, "api", 2);
 

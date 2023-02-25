@@ -118,7 +118,7 @@ static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *w
                                    size_t examined_dimensions __maybe_unused, usec_t duration,
                                    WEIGHTS_STATS *stats) {
 
-    buffer_json_initialize(wb, "\"", "\"", 0, true);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
     buffer_json_member_add_time_t(wb, "after", after);
     buffer_json_member_add_time_t(wb, "before", before);
     buffer_json_member_add_time_t(wb, "duration", before - after);
