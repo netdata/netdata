@@ -172,7 +172,7 @@ static inline void query_target_data_statistics(BUFFER *wb, QUERY_TARGET *qt, st
 //        buffer_json_member_add_double(wb, "min", d->min);
 //        buffer_json_member_add_double(wb, "max", d->max);
         buffer_json_member_add_double(wb, "avg", (d->count) ? d->sum / (NETDATA_DOUBLE)d->count : 0.0);
-        buffer_json_member_add_double(wb, "arp", (d->count) ? d->anomaly_sum * 100.0 / (NETDATA_DOUBLE)d->count : 0.0);
+        buffer_json_member_add_double(wb, "arp", (d->count) ? d->anomaly_sum / (NETDATA_DOUBLE)d->count : 0.0);
         buffer_json_member_add_double(wb, "con", (qt->query_stats.volume > 0) ? d->volume * 100.0 / qt->query_stats.volume : 0.0);
     }
     buffer_json_object_close(wb);
@@ -180,10 +180,11 @@ static inline void query_target_data_statistics(BUFFER *wb, QUERY_TARGET *qt, st
 
 static void query_target_summary_nodes_v2(BUFFER *wb, QUERY_TARGET *qt, const char *key, struct summary_total_counts *totals) {
     buffer_json_member_add_array(wb, key);
-    for (long c = 0; c < (long) qt->hosts.used; c++) {
+    for (size_t c = 0; c < qt->hosts.used; c++) {
         QUERY_HOST *qh = query_host(qt, c);
         RRDHOST *host = qh->host;
         buffer_json_add_array_item_object(wb);
+        buffer_json_member_add_uint64(wb, "ni", qh->slot);
         buffer_json_member_add_string(wb, "mg", host->machine_guid);
         if(qh->node_id[0])
             buffer_json_member_add_string(wb, "nd", qh->node_id);
@@ -285,6 +286,7 @@ static void query_target_summary_instances_v2(BUFFER *wb, QUERY_TARGET *qt, cons
 
         buffer_json_add_array_item_object(wb);
         buffer_json_member_add_string(wb, "id", string2str(qi->id_fqdn));
+        buffer_json_member_add_uint64(wb, "ni", qi->query_host_id);
         buffer_json_member_add_string(wb, "nm", string2str(qi->name_fqdn));
         buffer_json_member_add_string(wb, "lc", rrdinstance_acquired_name(qi->ria));
         buffer_json_member_add_string(wb, "mg", qh->host->machine_guid);
@@ -907,7 +909,7 @@ static void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS
                         buffer_json_member_add_object(wb, host->machine_guid);
                         if(qh->node_id[0])
                             buffer_json_member_add_string(wb, "nd", qh->node_id);
-                        buffer_json_member_add_uint64(wb, "idx", qh->slot);
+                        buffer_json_member_add_uint64(wb, "ni", qh->slot);
                         buffer_json_member_add_string(wb, "nm", rrdhost_hostname(host));
                         buffer_json_member_add_object(wb, "contexts");
 
@@ -940,7 +942,6 @@ static void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS
                         }
 
                         buffer_json_member_add_object(wb, rrdinstance_acquired_id(ria));
-                        buffer_json_member_add_uint64(wb, "idx", qi->slot);
                         buffer_json_member_add_string(wb, "nm", rrdinstance_acquired_name(ria));
                         buffer_json_member_add_time_t(wb, "ue", rrdinstance_acquired_update_every(ria));
                         DICTIONARY *labels = rrdinstance_acquired_labels(ria);
