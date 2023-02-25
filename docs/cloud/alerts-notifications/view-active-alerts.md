@@ -1,15 +1,4 @@
-<!--
-title: "View active alerts"
-description: >- 
-    "Track the health of your infrastructure in one place by taking advantage of the powerful health monitoring
-    watchdog running on every node."
-type: "how-to"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.md"
-sidebar_label: "View active alerts"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Integrations/Notify/Cloud alert notifications"
--->
+# View active alerts
 
 Netdata Cloud receives information about active alerts on individual nodes in your infrastructure and updates the
 interface based on those status changes.
@@ -50,7 +39,7 @@ moment your node triggered this alert.
 ![An alert in context with charts and dimensions](https://user-images.githubusercontent.com/1153921/119039593-4a0cf580-b969-11eb-840c-4ecb123df9f5.png)
 
 You can
-then [select this area](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.md#select)
+then [highlight this area](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#highlight)
 with `Alt/⌘ + mouse selection` to highlight the alerted timeframe while you explore other charts for root cause
 analysis.
 
@@ -58,19 +47,3 @@ Or, select the area and
 run [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md) to
 filter the single-node
 dashboard to only those charts most likely to be connected to the alert.
-
-## What's next?
-
-Learn more about the features of the Smartboard in
-its [reference](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/smartboard.md)
-doc. To stay notified of active alerts,
-enable [centralized alert notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md)
-from Netdata Cloud.
-
-If you're through with setting up alerts, it might be time
-to [invite your team](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/invite-your-team.md).
-
-Check out our recommendations on organizing and
-using [Spaces](https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md) and
-[War Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md) to streamline your processes once
-you find an alert in Netdata Cloud.

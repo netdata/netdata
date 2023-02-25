@@ -15,7 +15,7 @@ learn_rel_path: "Concepts"
 
 ### Pick timeframes to visualize
 
-While [panning through time and zooming in/out](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.md) from charts it is helpful when
+While [panning through time and zooming in/out](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md) from charts it is helpful when
 you're looking a recent history, or want to do granular troubleshooting, what if you want to see metrics from 6 hours
 ago? Or 6 days?
 
@@ -119,7 +119,7 @@ the theme to editing the text that accompanies every section of charts.
 
 - Dashboard
   - [How the dashboard works](https://github.com/netdata/netdata/blob/master/docs/dashboard/how-dashboard-works.md)
-  - [Interact with charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.md)
+  - [Interact with charts](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md)
   - [Chart dimensions, contexts, and families](https://github.com/netdata/netdata/blob/master/docs/dashboard/dimensions-contexts-families.md)
   - [Import, export, and print a snapshot](https://github.com/netdata/netdata/blob/master/docs/dashboard/import-export-print-snapshot.md)
   - [Customize the standard dashboard](https://github.com/netdata/netdata/blob/master/docs/dashboard/customize.md)

@@ -69,7 +69,7 @@ can always come right back to your preferred setup.
 
 A War Room has three different states: playing, paused, and force playing. The default playing state refreshes charts
 every second as long as the browser tab is in
-focus. [Interacting with a chart](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.md)
+focus. [Interacting with a chart](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md)
 pauses
 the War Room. Once the tab loses focus, charts pause automatically.
 

@@ -54,7 +54,7 @@ submenus](https://user-images.githubusercontent.com/1153921/80832425-7c528600-8b
 
 ## Charts
 
-Every **chart** in the Netdata dashboard is [fully interactive](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.md). Netdata
+Every **chart** in the Netdata dashboard is fully interactive. Netdata
 synchronizes your interactions to help you understand exactly how a node behaved in any timeframe, whether that's
 seconds or days.
 
@@ -76,7 +76,7 @@ like pushing the current timeframe off the screen to see what came before or aft
 
 To zoom, press and hold `Shift`, then use your mouse's scroll wheel, or a two-finger pinch if you're using a touchpad.
 
-See [interact with charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.md) for all the possible ways to interact with the charts on
+See [interact with charts](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md) for all the possible ways to interact with the charts on
 your dashboard.
 
 ## Alarms
