@@ -169,6 +169,10 @@ void query_target_free(void) {
     qt->hosts.size = 0;
 }
 
+#define query_target_retention_matches_query(qt, first_entry_s, last_entry_s, update_every_s) \
+    (((first_entry_s) - ((update_every_s) * 2) <= (qt)->window.before) &&                     \
+     ((last_entry_s)  + ((update_every_s) * 2) >= (qt)->window.after))
+
 static bool query_target_add_metric(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, QUERY_CONTEXT *qc,
                                     QUERY_INSTANCE *qi, QUERY_DIMENSION *qd) {
     QUERY_TARGET *qt = qtl->qt;
@@ -228,10 +232,9 @@ static bool query_target_add_metric(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, QU
 
     bool release_retention = true;
     bool timeframe_matches =
-            (tiers_added
-             && (common_first_time_s - common_update_every_s * 2) <= qt->window.before
-             && (common_last_time_s + common_update_every_s * 2) >= qt->window.after
-            ) ? true : false;
+            (tiers_added &&
+            query_target_retention_matches_query(qt, common_first_time_s, common_last_time_s, common_update_every_s))
+            ? true : false;
 
     if(timeframe_matches) {
         RRDR_DIMENSION_FLAGS options = RRDR_DIMENSION_DEFAULT;
@@ -368,15 +371,31 @@ static bool query_target_add_dimension(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh,
     qd->rma = rrdmetric_acquired_dup(rma);
     qd->status = QUERY_STATUS_NONE;
 
+    bool undo = false;
     if(!queryable_instance) {
         qi->metrics.excluded++;
         qc->metrics.excluded++;
         qh->metrics.excluded++;
         qd->status |= QUERY_STATUS_EXCLUDED;
+
+        time_t first_time_s = rm->first_time_s;
+        time_t last_time_s = rrd_flag_is_collected(rm) ? qtl->start_s : rm->last_time_s;
+        time_t update_every_s = rm->ri->update_every_s;
+        if(!query_target_retention_matches_query(qt, first_time_s, last_time_s, update_every_s))
+            undo = true;
     }
     else {
         if(query_target_add_metric(qtl, qh, qc, qi, qd))
             (*metrics_added)++;
+        else
+            undo = true;
+    }
+
+    if(undo) {
+        rrdmetric_release(qd->rma);
+        qd->rma = NULL;
+        qt->dimensions.used--;
+        return false;
     }
 
     return true;
@@ -665,7 +684,7 @@ static bool query_target_add_context(void *data, RRDCONTEXT_ACQUIRED *rca, bool 
 
     if(!added) {
         qt->contexts.used--;
-        rrdcontext_release(rca);
+        rrdcontext_release(qc->rca);
     }
 
     return true;
@@ -737,6 +756,7 @@ static bool query_target_add_host(void *data, RRDHOST *host, bool queryable_host
         qt->hosts.used--;
         return false;
     }
+
     return true;
 }
 
@@ -897,6 +917,8 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
                                  &qt->versions.contexts_hard_hash, &qt->versions.contexts_soft_hash,
                                  qtl.host_uuid_buffer);
 
+    // we need the available db retention for this call
+    // so it has to be done last
     query_target_calculate_window(qt);
 
     qt->timings.preprocessed_ut = now_monotonic_usec();
