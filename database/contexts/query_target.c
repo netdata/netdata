@@ -248,21 +248,10 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
         }
 
         if (qt->query.pattern) {
-            // we have a dimensions pattern
-            // lets see if this dimension is selected
-
-            if ((qtl->match_ids   && simple_pattern_matches_string(qt->query.pattern, rm->id))
-                || (qtl->match_names && rm->name != rm->id && simple_pattern_matches_string(qt->query.pattern, rm->name))
-                    ) {
-                // it matches the pattern
-                options |= (RRDR_DIMENSION_SELECTED | RRDR_DIMENSION_NONZERO);
-                options &= ~RRDR_DIMENSION_HIDDEN;
-            }
-            else {
-                // it does not match the pattern
-                options |= RRDR_DIMENSION_HIDDEN;
-                options &= ~RRDR_DIMENSION_SELECTED;
-            }
+            // we have a dimensions pattern, and it matched this metric at query_dimension_add()
+            // so, we need to remove the hidden flag
+            options |= (RRDR_DIMENSION_SELECTED | RRDR_DIMENSION_NONZERO);
+            options &= ~RRDR_DIMENSION_HIDDEN;
         }
         else {
             // we don't have a dimensions pattern
@@ -350,6 +339,13 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
     return true;
 }
 
+static inline bool rrdmetric_retention_matches_query(QUERY_TARGET *qt, RRDMETRIC *rm, time_t now_s) {
+    time_t first_time_s = rm->first_time_s;
+    time_t last_time_s = rrd_flag_is_collected(rm) ? now_s : rm->last_time_s;
+    time_t update_every_s = rm->ri->update_every_s;
+    return query_target_retention_matches_query(qt, first_time_s, last_time_s, update_every_s);
+}
+
 static inline void query_dimension_release(QUERY_DIMENSION *qd) {
     rrdmetric_release(qd->rma);
     qd->rma = NULL;
@@ -380,21 +376,31 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
 
     bool undo = false;
     if(!queryable_instance) {
-        time_t first_time_s = rm->first_time_s;
-        time_t last_time_s = rrd_flag_is_collected(rm) ? qtl->start_s : rm->last_time_s;
-        time_t update_every_s = rm->ri->update_every_s;
-        if(!query_target_retention_matches_query(qt, first_time_s, last_time_s, update_every_s))
-            undo = true;
-        else {
+        if(rrdmetric_retention_matches_query(qt, rm, qtl->start_s)) {
             qi->metrics.excluded++;
             qc->metrics.excluded++;
             qn->metrics.excluded++;
             qd->status |= QUERY_STATUS_EXCLUDED;
         }
+        else
+            undo = true;
     }
     else {
-        if(query_metric_add(qtl, qn, qc, qi, qd))
-            (*metrics_added)++;
+        if (!qt->query.pattern ||
+           (qtl->match_ids && simple_pattern_matches_string(qt->query.pattern, rm->id)) ||
+           (qtl->match_names && rm->name != rm->id && simple_pattern_matches_string(qt->query.pattern, rm->name))
+           ) {
+            if(query_metric_add(qtl, qn, qc, qi, qd))
+                (*metrics_added)++;
+            else
+                undo = true;
+        }
+        else if(rrdmetric_retention_matches_query(qt, rm, qtl->start_s)) {
+            qi->metrics.excluded++;
+            qc->metrics.excluded++;
+            qn->metrics.excluded++;
+            qd->status |= QUERY_STATUS_EXCLUDED;
+        }
         else
             undo = true;
     }
