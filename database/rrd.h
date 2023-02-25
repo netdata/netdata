@@ -148,7 +148,7 @@ typedef enum __attribute__ ((__packed__)) rrdset_type {
 RRDSET_TYPE rrdset_type_id(const char *name);
 const char *rrdset_type_name(RRDSET_TYPE chart_type);
 
-#include "rrdcontext.h"
+#include "contexts/rrdcontext.h"
 
 extern bool unittest_running;
 extern bool dbengine_enabled;

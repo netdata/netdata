@@ -20,7 +20,7 @@ typedef struct rrdcontext_acquired RRDCONTEXT_ACQUIRED;
 
 // ----------------------------------------------------------------------------
 
-#include "rrd.h"
+#include "../rrd.h"
 
 const char *rrdmetric_acquired_id(RRDMETRIC_ACQUIRED *rma);
 const char *rrdmetric_acquired_name(RRDMETRIC_ACQUIRED *rma);

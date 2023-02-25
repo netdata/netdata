@@ -4,10 +4,6 @@ AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 SUBDIRS = \
-    engine \
-    ram \
-    sqlite \
-    contexts \
     $(NULL)
 
 dist_noinst_DATA = \
