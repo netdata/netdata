@@ -1,15 +1,4 @@
-<!--
-title: "Netdata management and configuration cheatsheet"
-description: "'Connecting an Agent to the Cloud allows a Netdata Agent, running on a distributed node, to securely connect to Netdata Cloud via the encrypted Agent-Cloud link (ACLK).'"
-image: "/cheatsheet/cheatsheet-meta.png"
-sidebar_label: "Cheatsheet"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/cheatsheet.md"
-part_of_learn: "True"
-learn_status: "Published"
-learn_topic_type: "Getting started"
-learn_rel_path: "Getting started"
-sidebar_position: "100"
--->
+# Management and configuration cheatsheet
 
 import {
 	OneLineInstallWget,

@@ -1,13 +1,4 @@
-<!--
-title: "Monitor your infrastructure"
-description: "Real-time infrastructure monitoring with Netdata Cloud. View key metrics, insightful charts, and active alarms from all your nodes."
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md"
-sidebar_label: "Monitor your infrastructure"
-learn_status: "Published"
-learn_topic_type: "Concepts"
-learn_rel_path: "Getting Started"
-sidebar_position: "50"
--->
+# Monitor your infrastructure
 
 import { Grid, Box, BoxList, BoxListItemRegexLink } from '@site/src/components/Grid/'
 import { RiExternalLinkLine } from 'react-icons/ri'

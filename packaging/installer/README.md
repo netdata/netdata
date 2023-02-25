@@ -1,13 +1,4 @@
-<!--
-title: "Install Netdata"
-description: "Download and install the open-source Netdata monitoring agent on physical/virtual servers, Linux (Ubuntu/Debian/CentOS/etc), Docker, Kubernetes, and many others, often with one command."
-sidebar_label: "Install Netdata"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/README.md"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Getting started"
-sidebar_position: "1"
--->
+# Install Netdata
 
 import { OneLineInstallWget, OneLineInstallCurl } from '@site/src/components/OneLineInstall/'
 import { InstallRegexLink, InstallBoxRegexLink } from '@site/src/components/InstallRegexLink/'

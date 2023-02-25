@@ -1,13 +1,3 @@
-<!--
-title: "Distributed data architecture"
-description: "Netdata's distributed data architecture stores metrics on individual nodes for high performance and scalability using all your granular metrics."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/store/distributed-data-architecture.md"
-sidebar_label: "Distributed data architecture"
-learn_status: "Published"
-learn_topic_type: "Concepts"
-learn_rel_path: "Concepts"
--->
-
 # Distributed data architecture
 
 Netdata uses a distributed data architecture to help you collect and store per-second metrics from any number of nodes.
@@ -82,11 +72,5 @@ store configured alarms, their status, and a list of active collectors.
 
 Netdata does not and never will sell your personal data or data about your deployment.
 
-## What's next?
-
-You can configure the Netdata Agent to store days, weeks, or months worth of distributed, per-second data by
-[configuring the database engine](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md). Use our calculator to determine the system
-resources required to retain your desired amount of metrics, and expand or contract the database by editing a single
-setting.
 
 
