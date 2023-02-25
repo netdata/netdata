@@ -5,6 +5,11 @@
 // ----------------------------------------------------------------------------
 // helper one-liners for RRDINSTANCE
 
+bool rrdinstance_acquired_id_and_name_are_same(RRDINSTANCE_ACQUIRED *ria) {
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    return ri->id == ri->name;
+}
+
 inline const char *rrdinstance_acquired_id(RRDINSTANCE_ACQUIRED *ria) {
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
     return string2str(ri->id);

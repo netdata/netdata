@@ -22,6 +22,7 @@ typedef struct rrdcontext_acquired RRDCONTEXT_ACQUIRED;
 
 #include "../rrd.h"
 
+bool rrdinstance_acquired_id_and_name_are_same(RRDINSTANCE_ACQUIRED *ria);
 const char *rrdmetric_acquired_id(RRDMETRIC_ACQUIRED *rma);
 const char *rrdmetric_acquired_name(RRDMETRIC_ACQUIRED *rma);
 

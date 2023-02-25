@@ -351,7 +351,11 @@ static void query_target_summary_instances_v2(BUFFER *wb, QUERY_TARGET *qt, cons
 //        QUERY_HOST *qh = query_host(qt, qi->query_host_id);
 
         buffer_json_add_array_item_object(wb);
-        buffer_json_member_add_string(wb, "id", rrdinstance_acquired_name(qi->ria));
+        buffer_json_member_add_string(wb, "id", rrdinstance_acquired_id(qi->ria));
+
+        if(!rrdinstance_acquired_id_and_name_are_same(qi->ria))
+            buffer_json_member_add_string(wb, "nm", rrdinstance_acquired_name(qi->ria));
+
         buffer_json_member_add_uint64(wb, "ni", qi->query_host_id);
 //        buffer_json_member_add_string(wb, "id", string2str(qi->id_fqdn));
 //        buffer_json_member_add_string(wb, "nm", string2str(qi->name_fqdn));
