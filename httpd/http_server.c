@@ -14,6 +14,7 @@ static h2o_accept_ctx_t accept_ctx;
 #define CONTENT_TEXT_UTF8 H2O_STRLIT("text/plain; charset=utf-8")
 #define NBUF_INITIAL_SIZE_RESP (4096)
 #define API_V1_PREFIX "/api/v1/"
+#define HOST_SELECT_PREFIX "/host/"
 
 #define HTTPD_CONFIG_SECTION "httpd"
 #define HTTPD_ENABLED_DEFAULT false
@@ -102,11 +103,11 @@ static h2o_pathconf_t *register_handler(h2o_hostconf_t *hostconf, const char *pa
 
 // I did not find a way to do wildcard paths to make common handler for urls like:
 // /api/v1/info
-// /child/api/v1/info
-// /uuid/api/v1/info
-// basically we sould need something like "/*/api/v1/info" subscription
-// so we do it manually with uberhandler here
-static int netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req)
+// /host/child/api/v1/info
+// /host/uuid/api/v1/info
+// ideally we could do something like "/*/api/v1/info" subscription
+// so we do it "manually" here with uberhandler
+static inline int _netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req, RRDHOST **host)
 {
     if (!h2o_memis(req->method.base, req->method.len, H2O_STRLIT("GET")))
         return -1;
@@ -114,6 +115,53 @@ static int netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req)
     static h2o_generator_t generator = { NULL, NULL };
 
     h2o_iovec_t norm_path = req->path_normalized;
+
+    if (norm_path.len > strlen(HOST_SELECT_PREFIX) && !memcmp(norm_path.base, HOST_SELECT_PREFIX, strlen(HOST_SELECT_PREFIX))) {
+        h2o_iovec_t host_id; // host_id can be either and UUID or a hostname of the child
+
+        norm_path.base += strlen(HOST_SELECT_PREFIX);
+        norm_path.len -= strlen(HOST_SELECT_PREFIX);
+
+        host_id = norm_path;
+
+        size_t end_loc = h2o_strstr(host_id.base, host_id.len, "/", 1);
+        if (end_loc != SIZE_MAX) {
+            host_id.len = end_loc;
+            norm_path.base += end_loc;
+            norm_path.len -= end_loc;
+        }
+
+        char *c_host_id = iovec_to_cstr(&host_id);
+        *host = rrdhost_find_by_hostname(c_host_id);
+        if (!*host)
+            *host = rrdhost_find_by_guid(c_host_id);
+        if (!*host) {
+            req->res.status = 400;
+            req->res.reason = "Wrong host id";
+            h2o_send_inline(req, H2O_STRLIT("Host id provided was not found!\n"));
+            freez(c_host_id);
+            return 0;
+        }
+        freez(c_host_id);
+
+        // we have to rewrite URL here in case this is not an api call
+        // so that the subsequent file upload handler can send the correct
+        // files to the client
+        // if this is not an API call we will abort this handler later
+        // and let the internal serve file handler of h2o care for things
+
+        if (end_loc == SIZE_MAX) {
+            req->path.len = 1;
+            req->path_normalized.len = 1;
+        } else {
+            size_t offset = norm_path.base - req->path_normalized.base;
+            req->path.len -= offset;
+            req->path.base += offset;
+            req->query_at -= offset;
+            req->path_normalized.len -= offset;
+            req->path_normalized.base += offset;
+        }
+    }
 
     // workaround for a dashboard bug which causes sometimes urls like
     // "//api/v1/info" to be caled instead of "/api/v1/info"
@@ -135,8 +183,12 @@ static int netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req)
     if (!api_command.len)
         return 1;
 
-    // this is a hack and will be removed in future PR
-    // but needs bigger changes in old http_api_v1
+    // this (emulating struct web_client) is a hack and will be removed
+    // in future PRs but needs bigger changes in old http_api_v1
+    // we need to make the web_client_api_request_v1 to be web server
+    // agnostic and remove the old webservers dependency creep into the
+    // individual response generators and thus remove the need to "emulate"
+    // the old webserver calling this function here and in ACLK
     struct web_client w;
     w.response.data = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
     w.response.header = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
@@ -156,7 +208,7 @@ static int netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req)
         freez(query_unescaped);
     }
 
-    web_client_api_request_v1(localhost, &w, path_unescaped);
+    web_client_api_request_v1(*host, &w, path_unescaped);
     freez(path_unescaped);
 
     h2o_iovec_t body = buffer_to_h2o_iovec(w.response.data);
@@ -180,6 +232,38 @@ static int netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req)
     h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
 
     return 0;
+}
+
+static int netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req)
+{
+    RRDHOST *host = localhost;
+
+    int ret = _netdata_uberhandler(self, req, &host);
+
+    char host_uuid_str[GUID_LEN + 1];
+    uuid_unparse_lower(host->host_uuid, host_uuid_str);
+
+    if (!ret) {
+        log_access("HTTPD OK method: " PRINTF_H2O_IOVEC_FMT
+                   ", path: " PRINTF_H2O_IOVEC_FMT
+                   ", as host: %s"
+                   ", response: %d",
+                   PRINTF_H2O_IOVEC(&req->method),
+                   PRINTF_H2O_IOVEC(&req->input.path),
+                   host == localhost ? "localhost" : host_uuid_str,
+                   req->res.status);
+    } else {
+        log_access("HTTPD %d"
+                   " method: " PRINTF_H2O_IOVEC_FMT
+                   ", path: " PRINTF_H2O_IOVEC_FMT
+                   ", forwarding to file handler as path: " PRINTF_H2O_IOVEC_FMT,
+                   ret,
+                   PRINTF_H2O_IOVEC(&req->method),
+                   PRINTF_H2O_IOVEC(&req->input.path),
+                   PRINTF_H2O_IOVEC(&req->path));
+    }
+
+    return ret;
 }
 
 static int hdl_netdata_conf(h2o_handler_t *self, h2o_req_t *req)
