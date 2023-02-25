@@ -1183,7 +1183,7 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
     query_target_total_counts(wb, "nodes", &nodes_totals);
     query_target_total_counts(wb, "contexts", &contexts_totals);
     query_target_total_counts(wb, "instances", &instances_totals);
-    query_target_total_counts(wb, "dimensions", &instances_totals);
+    query_target_total_counts(wb, "dimensions", &metrics_totals);
     query_target_total_counts(wb, "label_keys", &label_key_totals);
     query_target_total_counts(wb, "label_key_values", &label_key_value_totals);
     buffer_json_object_close(wb); // totals
