@@ -1,20 +1,4 @@
-<!--
-title: "Interact with charts"
-description: >-
-    "Learn how to get the most out of Netdata's charts. These charts will help you make sense of all the
-    metrics at your disposal, helping you troubleshoot with real-time, per-second metric data"
-type: "how-to"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md"
-sidebar_label: "Interact with charts"
-learn_status: "Published"
-learn_topic_type: "Concepts"
-learn_rel_path: "Operations/Visualizations"
--->
-
-> ⚠️ This new version of charts is currently **only** available on Netdata Cloud. We didn't want to keep this valuable
-> feature from you, so after we get this into your hands on the Cloud, we will collect and implement your feedback.
-> Together, we will be able to provide the best possible version of charts on the Netdata Agent dashboard, as quickly as
-> possible.
+# Interact with charts
 
 Netdata excels in collecting, storing, and organizing metrics in out-of-the-box dashboards.
 To make sense of all the metrics, Netdata offers an enhanced version of charts that update every second.
@@ -33,9 +17,11 @@ These charts provide a lot of useful information, so that you can:
 - View information about the chart, its plugin, context, and type
 - Get the chart status and possible errors. On top, reload functionality
 
-These charts will available
-on [Overview tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md), Single Node view and
+These charts are available on Netdata Cloud's 
+[Overview tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md), Single Node view and
 on your [Custom Dashboards](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md).
+
+Some of the features listed below are also available on the simpler charts that are available on each agent's user interface.
 
 ## Overview
 
@@ -48,14 +34,15 @@ from the single node view:
 With a quick glance you have immediate information available at your disposal:
 
 - Chart title and units
+- Definition bar
 - Action bars
 - Chart area
 - Legend with dimensions
 
 ## Play, Pause and Reset
 
-Your charts are controlled using the
-available [Time controls](https://github.com/netdata/netdata/blob/master/docs/dashboard/visualization-date-and-time-controls.md#time-controls).
+Your charts are controlled using the available 
+[Time controls](https://github.com/netdata/netdata/blob/master/docs/dashboard/visualization-date-and-time-controls.md#time-controls).
 Besides these, when interacting with the chart you can also activate these controls by:
 
 - Hovering over any chart to temporarily pause it - this momentarily switches time control to Pause, so that you can
@@ -92,7 +79,148 @@ The elements that you can find on this top bar are:
 
 ![image.png](https://images.zenhubusercontent.com/60b4ebb03f4163193ec31819/c8f5f0bd-5f84-4812-970b-0e4340f4773b)
 
-### Chart action bar
+## Definition bar
+
+Each composite chart has a definition bar to provide information about the following:
+
+* Grouping option
+* Aggregate function to be applied in case multiple data sources exist
+* Instances
+* Nodes
+* Dimensions, and
+* Aggregate function over time to be applied if one point in the chart consists of multiple data points aggregated
+
+### Group by dimension, node, or chart
+
+Click on the **dimension** dropdown to change how a composite chart groups metrics.
+
+The default option is by _dimension_, so that each line/area in the visualization is the aggregation of a single
+dimension.
+This provides a per dimension view of the data from all the nodes in the War Room, taking into account filtering
+criteria if defined.
+
+A composite chart grouped by _node_ visualizes a single metric across contributing nodes. If the composite chart has
+five
+contributing nodes, there will be five lines/areas. This is typically an absolute value of the sum of the dimensions
+over each node but there
+are some opinionated-but-valuable exceptions where a specific dimension is selected.
+Grouping by nodes allows you to quickly understand which nodes in your infrastructure are experiencing anomalous
+behavior.
+
+A composite chart grouped by _instance_ visualizes each instance of one software or hardware on a node and displays
+these as a separate dimension. By grouping the
+`disk.io` chart by _instance_, you can visualize the activity of each disk on each node that contributes to the
+composite
+chart.
+
+Another very pertinent example is composite charts over contexts related to cgroups (VMs and containers). You have the
+means to change the default group by or apply filtering to
+get a better view into what data your are trying to analyze. For example, if you change the group by to _instance_ you
+get a view with the data of all the instances (cgroups) that
+contribute to that chart. Then you can use further filtering tools to focus the data that is important to you and even
+save the result to your own dashboards.
+
+![image](https://user-images.githubusercontent.com/82235632/201902017-04b76701-0ff9-4498-aa9b-6d507b567bea.png)
+
+### Aggregate functions over data sources
+
+Each chart uses an opinionated-but-valuable default aggregate function over the data sources. For example,
+the `system.cpu` chart shows the
+average for each dimension from every contributing chart, while the `net.net` chart shows the sum for each dimension
+from every contributing chart, which can also come from multiple networking interfaces.
+
+The following aggregate functions are available for each selected dimension:
+
+- **Average**: Displays the average value from contributing nodes. If a composite chart has 5 nodes with the following
+  values for the `out` dimension&mdash;`-2.1`, `-5.5`, `-10.2`, `-15`, `-0.1`&mdash;the composite chart displays a
+  value of `−6.58`.
+- **Sum**: Displays the sum of contributed values. Using the same nodes, dimension, and values as above, the composite
+  chart displays a metric value of `-32.9`.
+- **Min**: Displays a minimum value. For dimensions with positive values, the min is the value closest to zero. For
+  charts with negative values, the min is the value with the largest magnitude.
+- **Max**: Displays a maximum value. For dimensions with positive values, the max is the value with the largest
+  magnitude. For charts with negative values, the max is the value closet to zero.
+
+### Dimensions
+
+Select which dimensions to display on the composite chart. You can choose **All dimensions**, a single dimension, or any
+number of dimensions available on that context.
+
+### Instances
+
+Click on **X Instances** to display a dropdown of instances and nodes contributing to that composite chart. Each line in
+the dropdown displays an instance name and the associated node's hostname.
+
+### Nodes
+
+Click on **X Nodes** to display a dropdown of nodes contributing to that composite chart. Each line displays a hostname
+to help you identify which nodes contribute to a chart. You can also use this component to filter nodes directly on the
+chart.
+
+If one or more nodes can't contribute to a given chart, the definition bar shows a warning symbol plus the number of
+affected nodes, then lists them in the dropdown along with the associated error. Nodes might return errors because of
+networking issues, a stopped `netdata` service, or because that node does not have any metrics for that context.
+
+### Aggregate functions over time
+
+When the granularity of the data collected is higher than the plotted points on the chart an aggregation function over
+time
+is applied. By default the aggregation applied is _average_ but the user can choose different options from the
+following:
+
+* Min
+* Max
+* Average
+* Sum
+* Incremental sum (Delta)
+* Standard deviation
+* Median
+* Single exponential smoothing
+* Double exponential smoothing
+* Coefficient variation
+* Trimmed Median `*`
+* Trimmed Mean `*`
+* Percentile `**`
+
+:::info
+
+- `*` For **Trimmed Median and Mean** you can choose the percentage of data tha you want to focus on: 1%, 2%, 3%, 5%,
+  10%, 15%, 20% and 25%.
+- `**` For **Percentile** you can specify the percentile you want to focus on: 25th, 50th, 75th, 80th, 90th, 95th, 97th,
+  98th and 99th.
+
+:::
+
+For more details on each, you can refer to our Agent's HTTP API details
+on [Data Queries - Data Grouping](/docs/agent/web/api/queries#data-grouping).
+
+### Reset to defaults
+
+Click on the 3-dot icon (**⋮**) on any chart, then **Reset to Defaults**, to reset the definition bar to its initial
+state.
+
+## Jump to single-node dashboards
+
+Click on **X Charts**/**X Nodes** to display one of the two dropdowns that list the charts and nodes contributing to a
+given composite chart. For example, the nodes dropdown.
+
+![The nodes dropdown in a composite chart](https://user-images.githubusercontent.com/1153921/99305049-7c019b80-2810-11eb-942a-8ebfcf236b7f.png)
+
+To jump to a single-node dashboard, click on the link icon 
+<img class="img__inline img__inline--link" src="https://user-images.githubusercontent.com/1153921/95762109-1d219300-0c62-11eb-8daa-9ba509a8e71c.png" /> next to the
+node you're interested in.
+
+The single-node dashboard opens in a new tab. From there, you can continue to troubleshoot or run 
+[Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md) for faster root
+cause analysis.
+
+## Add composite charts to a dashboard
+
+Click on the 3-dot icon (**⋮**) on any chart, then click on **Add to Dashboard**. Click the **+** button for any
+dashboard you'd like to add this composite chart to, or create a new dashboard an initiate it with your chosen chart by
+entering the name and clicking **New Dashboard**.
+
+## Chart action bar
 
 On this bar you have access to immediate actions over the chart, the available actions are:
 
@@ -127,24 +255,13 @@ it like pushing the current timeframe off the screen to see what came before or 
 
 ### Highlight
 
-Selecting timeframes is useful when you see an interesting spike or change in a chart and want to investigate further,
-from looking at the same period of time on other charts/sections or triggering actions to help you troubleshoot with an
-in-context action bar to help you troubleshoot (currently only available on
-Single Node view). The available actions:
+Selecting timeframes is useful when you see an interesting spike or change in a chart and want to investigate further by:
 
--
+- Looking at the same period of time on other charts/sections
+- Running [metric correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md)
+  to filter metrics that also show something different in the selected period, vs the previous one 
 
-run [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md)
-
-- zoom in on the selected timeframe
-
-[Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md)
-will only be available if you respect the timeframe selection limitations. The selected duration pill together with the
-button state helps visualize this.
-
-<img src="https://images.zenhubusercontent.com/60b4ebb03f4163193ec31819/2ffc157d-0f0f-402e-80bb-5ffa8a2091d5" width="50%" height="50%" />
-
-<p/>
+<img alt="image" src="https://user-images.githubusercontent.com/43294513/221365853-1142944a-ace5-484a-a108-a205d050c594.png" />
 
 | Interaction                        | Keyboard/mouse                                           | Touchpad/touchscreen |
 |:-----------------------------------|:---------------------------------------------------------|:---------------------|
@@ -158,8 +275,7 @@ week, which is useful in understanding what "normal" looks like, or to identify 
 memory usage.
 
 The actions above are _normal_ vertical zoom actions. We also provide an horizontal zoom action that helps you focus on
-a
-specific Y-axis area to further investigate a spike or dive on your charts.
+a specific Y-axis area to further investigate a spike or dive on your charts.
 
 ![Y5IESOjD3s.gif](https://images.zenhubusercontent.com/60b4ebb03f4163193ec31819/f8722ee8-e69b-426c-8bcb-6cb79897c177)
 

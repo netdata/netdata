@@ -1,13 +1,4 @@
-<!--
-title: "Introduction"
-sidebar_label: "Getting Started"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/getting-started/introduction.md"
-learn_status: "Published"
-sidebar_position: "1"
-learn_topic_type: "Getting started"
-learn_rel_path: "Getting started"
-learn_docs_purpose: "Present netdata in a nutshell"
--->
+# Getting started
 
 ## What is Netdata ?
 
