@@ -23,20 +23,21 @@ To install Netdata in minutes on your platform:
 2. You will be presented with an empty space, and a prompt to "Connect Nodes" with the install command for each platform
 3. Select the platform you want to install Netdata to, copy and paste the script into your node's terminal, and run it
 
-Upon installation completing successfully, you should be able to see the node live in your Netdata Space and live charts in the Overview tab. [Read more about the cloud features](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md).
+Upon installation completing successfully, you should be able to see the node live in your Netdata Space and live charts 
+in the Overview tab. [Read more about the cloud features](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md).
 
 Where you go from here is based on your use case, immediate needs, and experience with monitoring and troubleshooting, 
 but we have some hints on what you might want to do next.
 
 ### What's next?
 
-Explore our [general advanced installation options and troubleshooting](#advanced-installation-options-and-troubleshooting), specific options for the [single line installer](#install-on-linux-with-one-line-installer), or [other installation methods](#other-installation-methods).
+Explore our [general advanced installation options and troubleshooting](#advanced-installation-options-and-troubleshooting), specific options 
+for the [single line installer](#install-on-linux-with-one-line-installer), or [other installation methods](#other-installation-methods).
 
 #### Agent user interface
 
 To access the UI provided by the locally installed agent, open a browser and navigate to `http://NODE:19999`, replacing `NODE` with either `localhost` or
-the hostname/IP address of the remote node. You can also read more about [how the agent dashboard works](https://github.com/netdata/netdata/blob/master/docs/dashboard/how-dashboard-works.md), or dive directly into the many ways
-to [interact with charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.md).
+the hostname/IP address of the remote node. You can also read more about [how the agent dashboard works](https://github.com/netdata/netdata/blob/master/docs/dashboard/how-dashboard-works.md).
 
 #### Configuration
 
@@ -59,8 +60,8 @@ community, but you may want to [edit alarms](https://github.com/netdata/netdata/
 
 #### Make your deployment production ready
 
-Both [securing Netdata](https://github.com/netdata/netdata/blob/master/docs/netdata-security.md) and [setting up replication](https://github.com/netdata/netdata/blob/master/streaming/README.md) are strongly recommended.
-
+Go through our [deployment strategies](https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/deployment-strategies.md),
+for suggested configuration changes for production deployments.
 
 ## Install on Linux with one-line installer 
 

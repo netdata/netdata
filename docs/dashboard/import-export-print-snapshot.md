@@ -72,19 +72,3 @@ in the top panel.
 
 When you click **Print**, Netdata opens a new window to render every chart. This might take some time. When finished,
 Netdata opens a browser print dialog for you to save to PDF or print.
-
-## What's next?
-
-Now that you understand snapshots, now is a good time to delve deeper into some of the dashboard's lesser-known
-features, such as [customization](https://github.com/netdata/netdata/blob/master/docs/dashboard/customize.md) or [building new, custom
-dashboards](https://github.com/netdata/netdata/blob/master/web/gui/custom/README.md).
-
-### Further reading & related information
-
-- Dashboard
-  - [How the dashboard works](https://github.com/netdata/netdata/blob/master/docs/dashboard/how-dashboard-works.md)
-  - [Interact with charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.md)
-  - [Chart dimensions, contexts, and families](https://github.com/netdata/netdata/blob/master/docs/dashboard/dimensions-contexts-families.md)
-  - [Select timeframes to visualize](https://github.com/netdata/netdata/blob/master/docs/dashboard/visualization-date-and-time-controls.md)
-  - **[Import, export, and print a snapshot](https://github.com/netdata/netdata/blob/master/docs/dashboard/import-export-print-snapshot.md)**
-  - [Customize the standard dashboard](https://github.com/netdata/netdata/blob/master/docs/dashboard/customize.md)

@@ -1,32 +1,18 @@
-<!--
-title: "How metrics streaming works"
-description: >- 
-    "Netdata's real-time streaming allows you to replicate metrics data 
-    across multiple nodes, or centralize all your metrics data into a single 
-    time-series database (TSDB)."
-type: "explanation"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/how-streaming-works.md"
-sidebar_label: "How metrics streaming works"
-learn_status: "Published"
-learn_topic_type: "Concepts"
-learn_rel_path: "Concepts"
--->
-
 # How metrics streaming works
 
 Each node running Netdata can stream the metrics it collects, in real time, to another node. Streaming allows you to
 replicate metrics data across multiple nodes, or centralize all your metrics data into a single time-series database
 (TSDB).
 
-When one node streams metrics to another, the node receiving metrics can visualize them on the
-[dashboard](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.md), run health checks to [trigger
-alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alarms.md) and [send notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md), and
+When one node streams metrics to another, the node receiving metrics can visualize them on the dashboard, run health checks to 
+[trigger alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alarms.md) and 
+[send notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md), and
 [export](https://github.com/netdata/netdata/blob/master/docs/export/external-databases.md) all metrics to an external TSDB. When Netdata streams metrics to another
 Netdata, the receiving one is able to perform everything a Netdata instance is capable of.
 
 Streaming lets you decide exactly how you want to store and maintain metrics data. While we believe Netdata's
-[distributed architecture](https://github.com/netdata/netdata/blob/master/docs/store/distributed-data-architecture.md) is ideal for speed and scale, streaming
-provides centralization options for those who want to maintain only a single TSDB instance.
+[distributed architecture](https://github.com/netdata/netdata/blob/master/docs/store/distributed-data-architecture.md) is 
+ideal for speed and scale, streaming provides centralization options and high data availability.
 
 ## Streaming basics
 
