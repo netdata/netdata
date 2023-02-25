@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Fix broken links [\#14605](https://github.com/netdata/netdata/pull/14605) ([Ancairon](https://github.com/Ancairon))
+- Temporarily remove platform EOL check for Debian 12 [\#14603](https://github.com/netdata/netdata/pull/14603) ([tkatsoulas](https://github.com/tkatsoulas))
 - Update deployment-strategies.md [\#14601](https://github.com/netdata/netdata/pull/14601) ([cakrit](https://github.com/cakrit))
 - Add deployment strategies [\#14600](https://github.com/netdata/netdata/pull/14600) ([cakrit](https://github.com/cakrit))
 - Replace web server readme with its improved replica [\#14598](https://github.com/netdata/netdata/pull/14598) ([cakrit](https://github.com/cakrit))
@@ -14,6 +16,7 @@
 - Delete interact-dashboard-charts [\#14594](https://github.com/netdata/netdata/pull/14594) ([cakrit](https://github.com/cakrit))
 - Change link text to collectors.md [\#14590](https://github.com/netdata/netdata/pull/14590) ([cakrit](https://github.com/cakrit))
 - Merge security documents [\#14588](https://github.com/netdata/netdata/pull/14588) ([cakrit](https://github.com/cakrit))
+- Prevent core dump when the agent is performing a quick shutdown [\#14587](https://github.com/netdata/netdata/pull/14587) ([stelfrag](https://github.com/stelfrag))
 - Clean host structure [\#14584](https://github.com/netdata/netdata/pull/14584) ([stelfrag](https://github.com/stelfrag))
 - Correct the sidebar position label metdata for learn [\#14583](https://github.com/netdata/netdata/pull/14583) ([cakrit](https://github.com/cakrit))
 - final install reorg for learn [\#14580](https://github.com/netdata/netdata/pull/14580) ([cakrit](https://github.com/cakrit))
@@ -386,8 +389,6 @@
 - add Cassandra icon to dashboard info [\#13975](https://github.com/netdata/netdata/pull/13975) ([ilyam8](https://github.com/ilyam8))
 - Change the db-engine calculator to a read only gsheet [\#13974](https://github.com/netdata/netdata/pull/13974) ([tkatsoulas](https://github.com/tkatsoulas))
 - enable collecting ECC memory errors by default [\#13970](https://github.com/netdata/netdata/pull/13970) ([ilyam8](https://github.com/ilyam8))
-- break active-active loop from replicating non-existing child to each other [\#13968](https://github.com/netdata/netdata/pull/13968) ([ktsaou](https://github.com/ktsaou))
-- document password param for tor collector [\#13966](https://github.com/netdata/netdata/pull/13966) ([andrewm4894](https://github.com/andrewm4894))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
