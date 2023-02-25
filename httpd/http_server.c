@@ -219,8 +219,6 @@ static inline int _netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req, RRDH
     void *managed = h2o_mem_alloc_shared(&req->pool, body.len, NULL);
     memcpy(managed, body.base, body.len);
     body.base = managed;
-    buffer_free(w.response.data);
-    buffer_free(w.response.header);
 
     req->res.status = 200;
     req->res.reason = "OK";
@@ -230,6 +228,9 @@ static inline int _netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req, RRDH
         h2o_add_header(&req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL, CONTENT_TEXT_UTF8);
     h2o_start_response(req, &generator);
     h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
+
+    buffer_free(w.response.data);
+    buffer_free(w.response.header);
 
     return 0;
 }
