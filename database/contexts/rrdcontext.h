@@ -192,16 +192,16 @@ struct query_data_statistics {
     NETDATA_DOUBLE anomaly_sum;
 };
 
-typedef struct query_host {
+typedef struct query_node {
     uint32_t slot;
-    RRDHOST *host;
+    RRDHOST *rrdhost;
     char node_id[UUID_STR_LEN];
 
     struct query_data_statistics query_stats;
     struct query_instances_counts instances;
     struct query_metrics_counts metrics;
     struct query_alerts_counts alerts;
-} QUERY_HOST;
+} QUERY_NODE;
 
 typedef struct query_context {
     uint32_t slot;
@@ -378,12 +378,12 @@ typedef struct query_target {
     } contexts;
 
     struct {
-        QUERY_HOST *array;
+        QUERY_NODE *array;
         uint32_t used;                      // how many items of the array are used
         uint32_t size;                      // the size of the array
         SIMPLE_PATTERN *pattern;
         SIMPLE_PATTERN *scope_pattern;
-    } hosts;
+    } nodes;
 
     struct {
         size_t used;
@@ -406,9 +406,9 @@ typedef struct query_target {
     } timings;
 } QUERY_TARGET;
 
-static inline NEVERNULL QUERY_HOST *query_host(QUERY_TARGET *qt, size_t id) {
-    internal_fatal(id >= qt->hosts.used, "QUERY: invalid query host id");
-    return &qt->hosts.array[id];
+static inline NEVERNULL QUERY_NODE *query_node(QUERY_TARGET *qt, size_t id) {
+    internal_fatal(id >= qt->nodes.used, "QUERY: invalid query host id");
+    return &qt->nodes.array[id];
 }
 
 static inline NEVERNULL QUERY_CONTEXT *query_context(QUERY_TARGET *qt, size_t query_context_id) {

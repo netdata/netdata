@@ -189,7 +189,7 @@ RRDR *data_query_group_by(RRDR *r) {
 
         QUERY_METRIC *qm = query_metric(qt, c);
         QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
-        QUERY_HOST *qh = query_host(qt, qm->link.query_host_id);
+        QUERY_NODE *qn = query_node(qt, qm->link.query_host_id);
 
         if(qi != last_qi) {
             priority = 0;
@@ -218,7 +218,7 @@ RRDR *data_query_group_by(RRDR *r) {
         }
         if(qt->request.group_by & RRDR_GROUP_BY_NODE) {
             buffer_fast_strcat(key, "|", 1);
-            buffer_strcat(key, qh->host->machine_guid);
+            buffer_strcat(key, qn->rrdhost->machine_guid);
         }
         buffer_fast_strcat(key, "|", 1);
         buffer_strcat(key, rrdinstance_acquired_units(qi->ria));
@@ -259,7 +259,7 @@ RRDR *data_query_group_by(RRDR *r) {
                 if(buffer_strlen(key) != 0)
                     buffer_fast_strcat(key, ",", 1);
 
-                buffer_strcat(key, qh->host->machine_guid);
+                buffer_strcat(key, qn->rrdhost->machine_guid);
             }
             entries[pos].id = string_strdupz(buffer_tostring(key));
 
@@ -290,7 +290,7 @@ RRDR *data_query_group_by(RRDR *r) {
                 if(buffer_strlen(key) != 0)
                     buffer_fast_strcat(key, ",", 1);
 
-                buffer_strcat(key, rrdhost_hostname(qh->host));
+                buffer_strcat(key, rrdhost_hostname(qn->rrdhost));
             }
             entries[pos].name = string_strdupz(buffer_tostring(key));
 

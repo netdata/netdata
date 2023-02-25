@@ -246,22 +246,22 @@ static inline void query_target_data_statistics(BUFFER *wb, QUERY_TARGET *qt, st
 
 static void query_target_summary_nodes_v2(BUFFER *wb, QUERY_TARGET *qt, const char *key, struct summary_total_counts *totals) {
     buffer_json_member_add_array(wb, key);
-    for (size_t c = 0; c < qt->hosts.used; c++) {
-        QUERY_HOST *qh = query_host(qt, c);
-        RRDHOST *host = qh->host;
+    for (size_t c = 0; c < qt->nodes.used; c++) {
+        QUERY_NODE *qn = query_node(qt, c);
+        RRDHOST *host = qn->rrdhost;
         buffer_json_add_array_item_object(wb);
-        buffer_json_member_add_uint64(wb, "ni", qh->slot);
+        buffer_json_member_add_uint64(wb, "ni", qn->slot);
         buffer_json_member_add_string(wb, "mg", host->machine_guid);
-        if(qh->node_id[0])
-            buffer_json_member_add_string(wb, "nd", qh->node_id);
+        if(qn->node_id[0])
+            buffer_json_member_add_string(wb, "nd", qn->node_id);
         buffer_json_member_add_string(wb, "nm", rrdhost_hostname(host));
-        query_target_instance_counts(wb, &qh->instances);
-        query_target_metric_counts(wb, &qh->metrics);
-        query_target_alerts_counts(wb, &qh->alerts, NULL, false);
-        query_target_data_statistics(wb, qt, &qh->query_stats);
+        query_target_instance_counts(wb, &qn->instances);
+        query_target_metric_counts(wb, &qn->metrics);
+        query_target_alerts_counts(wb, &qn->alerts, NULL, false);
+        query_target_data_statistics(wb, qt, &qn->query_stats);
         buffer_json_object_close(wb);
 
-        aggregate_into_summary_totals(totals, &qh->metrics);
+        aggregate_into_summary_totals(totals, &qn->metrics);
     }
     buffer_json_array_close(wb);
 }
@@ -927,9 +927,9 @@ static void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS
     RRDINSTANCE_ACQUIRED *last_ria = NULL;
 
     size_t h = 0, c = 0, i = 0, m = 0, q = 0;
-    for(; h < qt->hosts.used ; h++) {
-        QUERY_HOST *qh = query_host(qt, h);
-        RRDHOST *host = qh->host;
+    for(; h < qt->nodes.used ; h++) {
+        QUERY_NODE *qn = query_node(qt, h);
+        RRDHOST *host = qn->rrdhost;
 
         for( ;c < qt->contexts.used ;c++) {
             QUERY_CONTEXT *qc = query_context(qt, c);
@@ -978,9 +978,9 @@ static void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS
                         }
 
                         buffer_json_member_add_object(wb, host->machine_guid);
-                        if(qh->node_id[0])
-                            buffer_json_member_add_string(wb, "nd", qh->node_id);
-                        buffer_json_member_add_uint64(wb, "ni", qh->slot);
+                        if(qn->node_id[0])
+                            buffer_json_member_add_string(wb, "nd", qn->node_id);
+                        buffer_json_member_add_uint64(wb, "ni", qn->slot);
                         buffer_json_member_add_string(wb, "nm", rrdhost_hostname(host));
                         buffer_json_member_add_object(wb, "contexts");
 

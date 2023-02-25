@@ -2379,7 +2379,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         QUERY_DIMENSION *qd = query_dimension(qt, qm->link.query_dimension_id);
         QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
         QUERY_CONTEXT *qc = query_context(qt, qm->link.query_context_id);
-        QUERY_HOST *qh = query_host(qt, qm->link.query_host_id);
+        QUERY_NODE *qn = query_node(qt, qm->link.query_host_id);
 
         if(queries_prepared < max) {
             // preload another query
@@ -2402,7 +2402,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
             qi->metrics.queried++;
             qc->metrics.queried++;
-            qh->metrics.queried++;
+            qn->metrics.queried++;
 
             qd->status |= QUERY_STATUS_QUERIED;
             qm->status |= RRDR_DIMENSION_QUERIED;
@@ -2410,14 +2410,14 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             if(qt->request.version >= 2) {
                 query_target_merge_data_statistics(&qi->query_stats, &qm->query_stats);
                 query_target_merge_data_statistics(&qc->query_stats, &qm->query_stats);
-                query_target_merge_data_statistics(&qh->query_stats, &qm->query_stats);
+                query_target_merge_data_statistics(&qn->query_stats, &qm->query_stats);
                 query_target_merge_data_statistics(&qt->query_stats, &qm->query_stats);
             }
         }
         else {
             qi->metrics.failed++;
             qc->metrics.failed++;
-            qh->metrics.failed++;
+            qn->metrics.failed++;
 
             qd->status |= QUERY_STATUS_FAILED;
             qm->status |= RRDR_DIMENSION_FAILED;
@@ -2487,13 +2487,13 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     // update query instance counts in query host and query context
     if(qt->request.version >= 2) {
         size_t h = 0, c = 0, i = 0;
-        for(; h < qt->hosts.used ;h++) {
-            QUERY_HOST *qh = &qt->hosts.array[h];
+        for(; h < qt->nodes.used ; h++) {
+            QUERY_NODE *qn = &qt->nodes.array[h];
 
             for(; c < qt->contexts.used ;c++) {
                 QUERY_CONTEXT *qc = &qt->contexts.array[c];
 
-                if(!rrdcontext_acquired_belongs_to_host(qc->rca, qh->host))
+                if(!rrdcontext_acquired_belongs_to_host(qc->rca, qn->rrdhost))
                     break;
 
                 for(; i < qt->instances.used ;i++) {
@@ -2504,11 +2504,11 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
                     if(qi->metrics.queried) {
                         qc->instances.queried++;
-                        qh->instances.queried++;
+                        qn->instances.queried++;
                     }
                     else if(qi->metrics.failed) {
                         qc->instances.failed++;
-                        qh->instances.failed++;
+                        qn->instances.failed++;
                     }
                 }
             }
