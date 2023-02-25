@@ -83,6 +83,7 @@ dist_noinst_DATA = \
     packaging/protobuf.version \
     packaging/version \
     database/engine/journalfile_v2.ksy.in \
+    httpd/h2o \
     $(NULL)
 
 # until integrated within build
