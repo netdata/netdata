@@ -643,6 +643,7 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
     if(!dimensions_added) {
         qt->instances.used--;
         query_instance_release(qi);
+        return false;
     }
     else {
         if(metrics_added) {
@@ -706,6 +707,7 @@ static bool query_context_add(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryab
     if(!added) {
         query_context_release(qc);
         qt->contexts.used--;
+        return false;
     }
 
     return true;
