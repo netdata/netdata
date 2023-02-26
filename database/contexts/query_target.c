@@ -416,7 +416,7 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
     return true;
 }
 
-static inline STRING *rrdinstance_id_fqdn_v1(RRDINSTANCE_ACQUIRED *ria) {
+static inline STRING *rrdinstance_create_id_fqdn_v1(RRDINSTANCE_ACQUIRED *ria) {
     if(unlikely(!ria))
         return NULL;
 
@@ -424,7 +424,7 @@ static inline STRING *rrdinstance_id_fqdn_v1(RRDINSTANCE_ACQUIRED *ria) {
     return string_dup(ri->id);
 }
 
-static inline STRING *rrdinstance_name_fqdn_v1(RRDINSTANCE_ACQUIRED *ria) {
+static inline STRING *rrdinstance_create_name_fqdn_v1(RRDINSTANCE_ACQUIRED *ria) {
     if(unlikely(!ria))
         return NULL;
 
@@ -432,7 +432,7 @@ static inline STRING *rrdinstance_name_fqdn_v1(RRDINSTANCE_ACQUIRED *ria) {
     return string_dup(ri->name);
 }
 
-static inline STRING *rrdinstance_id_fqdn_v2(RRDINSTANCE_ACQUIRED *ria) {
+static inline STRING *rrdinstance_create_id_fqdn_v2(RRDINSTANCE_ACQUIRED *ria) {
     if(unlikely(!ria))
         return NULL;
 
@@ -443,7 +443,7 @@ static inline STRING *rrdinstance_id_fqdn_v2(RRDINSTANCE_ACQUIRED *ria) {
     return string_strdupz(buffer);
 }
 
-static inline STRING *rrdinstance_name_fqdn_v2(RRDINSTANCE_ACQUIRED *ria) {
+static inline STRING *rrdinstance_create_name_fqdn_v2(RRDINSTANCE_ACQUIRED *ria) {
     if(unlikely(!ria))
         return NULL;
 
@@ -452,6 +452,28 @@ static inline STRING *rrdinstance_name_fqdn_v2(RRDINSTANCE_ACQUIRED *ria) {
     RRDHOST *host = rrdinstance_acquired_rrdhost(ria);
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s", rrdinstance_acquired_name(ria), rrdhost_hostname(host));
     return string_strdupz(buffer);
+}
+
+inline STRING *query_instance_id_fqdn(QUERY_TARGET *qt, QUERY_INSTANCE *qi) {
+    if(!qi->id_fqdn) {
+        if (qt->request.version <= 1)
+            qi->id_fqdn = rrdinstance_create_id_fqdn_v1(qi->ria);
+        else
+            qi->id_fqdn = rrdinstance_create_id_fqdn_v2(qi->ria);
+    }
+
+    return qi->id_fqdn;
+}
+
+inline STRING *query_instance_name_fqdn(QUERY_TARGET *qt, QUERY_INSTANCE *qi) {
+    if(!qi->name_fqdn) {
+        if (qt->request.version <= 1)
+            qi->name_fqdn = rrdinstance_create_name_fqdn_v1(qi->ria);
+        else
+            qi->name_fqdn = rrdinstance_create_name_fqdn_v2(qi->ria);
+    }
+
+    return qi->name_fqdn;
 }
 
 RRDSET *rrdinstance_acquired_rrdset(RRDINSTANCE_ACQUIRED *ria) {
@@ -587,15 +609,6 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
     qi->ria = rrdinstance_acquired_dup(ria);
     qi->query_host_id = qn->slot;
 
-    if(qt->request.version <= 1) {
-        qi->id_fqdn = rrdinstance_id_fqdn_v1(ria);
-        qi->name_fqdn = rrdinstance_name_fqdn_v1(ria);
-    }
-    else {
-        qi->id_fqdn = rrdinstance_id_fqdn_v2(ria);
-        qi->name_fqdn = rrdinstance_name_fqdn_v2(ria);
-    }
-
     if(qt->db.minimum_latest_update_every_s == 0 || ri->update_every_s < qt->db.minimum_latest_update_every_s)
         qt->db.minimum_latest_update_every_s = ri->update_every_s;
 
@@ -604,8 +617,8 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
         if(!qt->instances.pattern
            || (qtl->match_ids   && simple_pattern_matches_string(qt->instances.pattern, ri->id))
            || (qtl->match_names && ri->name != ri->id && simple_pattern_matches_string(qt->instances.pattern, ri->name))
-           || (qtl->match_ids   && simple_pattern_matches_string(qt->instances.pattern, qi->id_fqdn))
-           || (qtl->match_names && qi->name_fqdn != qi->id_fqdn && simple_pattern_matches_string(qt->instances.pattern, qi->name_fqdn))
+           || (qtl->match_ids   && simple_pattern_matches_string(qt->instances.pattern, query_instance_id_fqdn(qt, qi)))
+           || (qtl->match_names && simple_pattern_matches_string(qt->instances.pattern, query_instance_name_fqdn(qt, qi)))
                 )
             queryable_instance = true;
     }

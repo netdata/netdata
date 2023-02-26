@@ -86,7 +86,7 @@ static inline long jsonwrap_v1_chart_ids(BUFFER *wb, const char *key, RRDR *r, R
 
         QUERY_METRIC *qm = query_metric(qt, c);
         QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
-        buffer_json_add_array_item_string(wb, string2str(qi->id_fqdn));
+        buffer_json_add_array_item_string(wb, rrdinstance_acquired_id(qi->ria));
         i++;
     }
     buffer_json_array_close(wb);

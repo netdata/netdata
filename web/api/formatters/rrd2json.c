@@ -207,7 +207,7 @@ RRDR *data_query_group_by(RRDR *r) {
         }
         if(qt->request.group_by & RRDR_GROUP_BY_INSTANCE) {
             buffer_fast_strcat(key, "|", 1);
-            buffer_strcat(key, string2str(qi->id_fqdn));
+            buffer_strcat(key, string2str(query_instance_id_fqdn(qt, qi)));
         }
         if(qt->request.group_by & RRDR_GROUP_BY_LABEL) {
             DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
@@ -245,7 +245,7 @@ RRDR *data_query_group_by(RRDR *r) {
                 if(qt->request.group_by & RRDR_GROUP_BY_NODE)
                     buffer_strcat(key, rrdinstance_acquired_id(qi->ria));
                 else
-                    buffer_strcat(key, string2str(qi->id_fqdn));
+                    buffer_strcat(key, string2str(query_instance_id_fqdn(qt, qi)));
             }
             if(qt->request.group_by & RRDR_GROUP_BY_LABEL) {
                 DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
@@ -276,7 +276,7 @@ RRDR *data_query_group_by(RRDR *r) {
                 if(qt->request.group_by & RRDR_GROUP_BY_NODE)
                     buffer_strcat(key, rrdinstance_acquired_name(qi->ria));
                 else
-                    buffer_strcat(key, string2str(qi->name_fqdn));
+                    buffer_strcat(key, string2str(query_instance_name_fqdn(qt, qi)));
             }
             if(qt->request.group_by & RRDR_GROUP_BY_LABEL) {
                 DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);

@@ -217,8 +217,8 @@ typedef struct query_instance {
     uint32_t slot;
     uint32_t query_host_id;
     RRDINSTANCE_ACQUIRED *ria;
-    STRING *id_fqdn;
-    STRING *name_fqdn;
+    STRING *id_fqdn;        // never access this directly - it is created on demand via query_instance_id_fqdn()
+    STRING *name_fqdn;      // never access this directly - it is created on demand via query_instance_name_fqdn()
 
     struct query_data_statistics query_stats;
     struct query_metrics_counts metrics;
@@ -440,6 +440,9 @@ static inline const char *query_metric_name(QUERY_TARGET *qt, QUERY_METRIC *qm) 
     QUERY_DIMENSION *qd = query_dimension(qt, qm->link.query_dimension_id);
     return rrdmetric_acquired_name(qd->rma);
 }
+
+STRING *query_instance_id_fqdn(QUERY_TARGET *qt, QUERY_INSTANCE *qi);
+STRING *query_instance_name_fqdn(QUERY_TARGET *qt, QUERY_INSTANCE *qi);
 
 void query_target_free(void);
 void query_target_release(QUERY_TARGET *qt);
