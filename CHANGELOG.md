@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Fix links to chart interactions [\#14609](https://github.com/netdata/netdata/pull/14609) ([cakrit](https://github.com/cakrit))
+- Reorg information and add titles [\#14608](https://github.com/netdata/netdata/pull/14608) ([cakrit](https://github.com/cakrit))
+- Update overview.md [\#14607](https://github.com/netdata/netdata/pull/14607) ([cakrit](https://github.com/cakrit))
 - Fix broken links [\#14605](https://github.com/netdata/netdata/pull/14605) ([Ancairon](https://github.com/Ancairon))
 - Temporarily remove platform EOL check for Debian 12 [\#14603](https://github.com/netdata/netdata/pull/14603) ([tkatsoulas](https://github.com/tkatsoulas))
 - Update deployment-strategies.md [\#14601](https://github.com/netdata/netdata/pull/14601) ([cakrit](https://github.com/cakrit))
@@ -388,7 +391,6 @@
 - Add \_total suffix to raw increment metrics for remote write [\#13977](https://github.com/netdata/netdata/pull/13977) ([vlvkobal](https://github.com/vlvkobal))
 - add Cassandra icon to dashboard info [\#13975](https://github.com/netdata/netdata/pull/13975) ([ilyam8](https://github.com/ilyam8))
 - Change the db-engine calculator to a read only gsheet [\#13974](https://github.com/netdata/netdata/pull/13974) ([tkatsoulas](https://github.com/tkatsoulas))
-- enable collecting ECC memory errors by default [\#13970](https://github.com/netdata/netdata/pull/13970) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
