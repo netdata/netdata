@@ -59,7 +59,6 @@ Here are a few example streaming configurations:
     metrics to parent `B`.
   - Any node with a database can generate alarms.
 
-
 ## Enable streaming between nodes
 
 The simplest streaming configuration is **replication**, in which a child node streams its metrics in real time to a

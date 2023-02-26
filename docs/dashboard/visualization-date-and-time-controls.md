@@ -87,6 +87,4 @@ depth of historical metrics.
 The default timezone used in all date and time fields in Netdata Cloud comes from your browser. To change it, open the
 date and time selector and use the control displayed here:
 
-<img width="437" alt="Untitled1" src="https://user-images.githubusercontent.com/43294513/216628390-c3bd1cd2-349d-4523-b8d3-c7e68395f670.png"/>
-
-
+<img alt="Untitled1" src="https://user-images.githubusercontent.com/43294513/216628390-c3bd1cd2-349d-4523-b8d3-c7e68395f670.png"/>
