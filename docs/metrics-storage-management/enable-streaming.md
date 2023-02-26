@@ -14,6 +14,9 @@ Streaming lets you decide exactly how you want to store and maintain metrics dat
 [distributed architecture](https://github.com/netdata/netdata/blob/master/docs/store/distributed-data-architecture.md) is 
 ideal for speed and scale, streaming provides centralization options and high data availability.
 
+This document will get you started quickly with streaming. More advanced concepts and suggested production deployments
+can be found in the [streaming and replication reference](https://github.com/netdata/netdata/blob/master/streaming/README.md).
+
 ## Streaming basics
 
 There are three types of nodes in Netdata's streaming ecosystem.
@@ -32,8 +35,8 @@ Once the parent node authorizes the child's API key, the child can start streami
 It's important to note that the streaming connection uses TCP, UDP, or Unix sockets, _not HTTP_. To proxy streaming
 metrics, you need to use a proxy that tunnels [OSI layer 4-7
 traffic](https://en.wikipedia.org/wiki/OSI_model#Layer_4:_Transport_Layer) without interfering with it, such as
-[SOCKS](https://en.wikipedia.org/wiki/SOCKS) or Nginx's [TCP/UDP load
-balancing](https://docs.nginx.com/nginx/admin-guide/load-balancer/tcp-udp-load-balancer/).
+[SOCKS](https://en.wikipedia.org/wiki/SOCKS) or Nginx's 
+[TCP/UDP load balancing](https://docs.nginx.com/nginx/admin-guide/load-balancer/tcp-udp-load-balancer/).
 
 ## Supported streaming configurations
 
@@ -64,8 +67,8 @@ parent node, and both nodes retain metrics in their own databases.
 
 To configure replication, you need two nodes, each running Netdata. First you'll first enable streaming on your parent
 node, then enable streaming on your child node. When you're finished, you'll be able to see the child node's metrics in
-the parent node's dashboard, quickly switch between the two dashboards, and be able to serve [alarm
-notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) from either or both nodes.
+the parent node's dashboard, quickly switch between the two dashboards, and be able to serve 
+[alarm notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) from either or both nodes.
 
 ### Enable streaming on the parent node
 
