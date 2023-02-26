@@ -598,14 +598,7 @@ static inline void query_instance_release(QUERY_INSTANCE *qi) {
     qi->name_fqdn = NULL;
 }
 
-static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CONTEXT *qc,
-                               RRDINSTANCE_ACQUIRED *ria, bool queryable_instance, bool filter_instances) {
-    QUERY_TARGET *qt = qtl->qt;
-
-    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
-    if(rrd_flag_is_deleted(ri))
-        return false;
-
+static inline QUERY_INSTANCE *query_instance_allocate(QUERY_TARGET *qt, RRDINSTANCE_ACQUIRED *ria, size_t qn_slot) {
     if(qt->instances.used == qt->instances.size) {
         size_t old_mem = qt->instances.size * sizeof(*qt->instances.array);
         qt->instances.size = (qt->instances.size) ? qt->instances.size * 2 : 1;
@@ -620,7 +613,19 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
     qi->slot = qt->instances.used;
     qt->instances.used++;
     qi->ria = rrdinstance_acquired_dup(ria);
-    qi->query_host_id = qn->slot;
+    qi->query_host_id = qn_slot;
+
+    return qi;
+}
+
+static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CONTEXT *qc,
+                               RRDINSTANCE_ACQUIRED *ria, bool queryable_instance, bool filter_instances) {
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    if(rrd_flag_is_deleted(ri))
+        return false;
+
+    QUERY_TARGET *qt = qtl->qt;
+    QUERY_INSTANCE *qi = query_instance_allocate(qt, ria, qn->slot);
 
     if(qt->db.minimum_latest_update_every_s == 0 || ri->update_every_s < qt->db.minimum_latest_update_every_s)
         qt->db.minimum_latest_update_every_s = ri->update_every_s;
@@ -692,15 +697,7 @@ static inline void query_context_release(QUERY_CONTEXT *qc) {
     qc->rca = NULL;
 }
 
-static bool query_context_add(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context) {
-    QUERY_TARGET_LOCALS *qtl = data;
-    QUERY_NODE *qn = qtl->qn;
-    QUERY_TARGET *qt = qtl->qt;
-
-    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
-    if(rrd_flag_is_deleted(rc))
-        return false;
-
+static inline QUERY_CONTEXT *query_context_allocate(QUERY_TARGET *qt, RRDCONTEXT_ACQUIRED *rca) {
     if(qt->contexts.used == qt->contexts.size) {
         size_t old_mem = qt->contexts.size * sizeof(*qt->contexts.array);
         qt->contexts.size = (qt->contexts.size) ? qt->contexts.size * 2 : 1;
@@ -713,6 +710,20 @@ static bool query_context_add(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryab
     memset(qc, 0, sizeof(*qc));
     qc->slot = qt->contexts.used++;
     qc->rca =  rrdcontext_acquired_dup(rca);
+
+    return qc;
+}
+
+static bool query_context_add(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context) {
+    QUERY_TARGET_LOCALS *qtl = data;
+
+    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+    if(rrd_flag_is_deleted(rc))
+        return false;
+
+    QUERY_NODE *qn = qtl->qn;
+    QUERY_TARGET *qt = qtl->qt;
+    QUERY_CONTEXT *qc = query_context_allocate(qt, rca);
 
     size_t added = 0;
     if(unlikely(qt->request.ria)) {
@@ -745,10 +756,7 @@ static inline void query_node_release(QUERY_NODE *qn) {
     qn->rrdhost = NULL;
 }
 
-static bool query_node_add(void *data, RRDHOST *host, bool queryable_host) {
-    QUERY_TARGET_LOCALS *qtl = data;
-    QUERY_TARGET *qt = qtl->qt;
-
+static inline QUERY_NODE *query_node_allocate(QUERY_TARGET *qt, RRDHOST *host) {
     if(qt->nodes.used == qt->nodes.size) {
         size_t old_mem = qt->nodes.size * sizeof(*qt->nodes.array);
         qt->nodes.size = (qt->nodes.size) ? qt->nodes.size * 2 : 1;
@@ -759,8 +767,17 @@ static bool query_node_add(void *data, RRDHOST *host, bool queryable_host) {
     }
     QUERY_NODE *qn = &qt->nodes.array[qt->nodes.used];
     memset(qn, 0, sizeof(*qn));
+
     qn->slot = qt->nodes.used++;
     qn->rrdhost = host;
+
+    return qn;
+}
+
+static bool query_node_add(void *data, RRDHOST *host, bool queryable_host) {
+    QUERY_TARGET_LOCALS *qtl = data;
+    QUERY_TARGET *qt = qtl->qt;
+    QUERY_NODE *qn = query_node_allocate(qt, host);
 
     if(host->node_id) {
         if(!qtl->host_uuid_buffer[0])
@@ -850,6 +867,24 @@ void query_target_generate_name(QUERY_TARGET *qt) {
                 , rrdcontext_acquired_id(qt->request.rca)
                 , rrdinstance_acquired_id(qt->request.ria)
                 , rrdmetric_acquired_id(qt->request.rma)
+                , (long long)qt->request.after
+                , (long long)qt->request.before
+                , qt->request.points
+                , time_grouping_tostring(qt->request.time_group_method)
+                , qt->request.time_group_options ? qt->request.time_group_options : ""
+                , options_buffer
+                , resampling_buffer
+                , tier_buffer
+        );
+    else if(qt->request.version >= 2)
+        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "data_v2://scope_nodes:%s/scope_contexts:%s/nodes:%s/contexts:%s/instances:%s/labels:%s/dimensions:%s/after:%lld/before:%lld/points:%zu/time_group:%s%s/options:%s%s%s"
+                , qt->request.scope_nodes ? qt->request.scope_nodes : "*"
+                , qt->request.scope_contexts ? qt->request.scope_contexts : "*"
+                , qt->request.nodes ? qt->request.nodes : "*"
+                , (qt->request.contexts) ? qt->request.contexts : "*"
+                , (qt->request.instances) ? qt->request.instances : "*"
+                , (qt->request.labels) ? qt->request.labels : "*"
+                , (qt->request.dimensions) ? qt->request.dimensions : "*"
                 , (long long)qt->request.after
                 , (long long)qt->request.before
                 , qt->request.points
