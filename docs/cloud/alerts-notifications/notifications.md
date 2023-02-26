@@ -1,11 +1,4 @@
-<!--
-title: "Cloud alert notifications"
-description: "Configure Netdata Cloud to send notifications to your team whenever any node on your infrastructure triggers an alert threshold."
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md"
-sidebar_label: "Cloud alert notifications"
-learn_status: "Published"
-learn_rel_path: "Integrations/Notify/Cloud alert notifications"
--->
+# Cloud alert notifications
 
 import Callout from '@site/src/components/Callout'
 
@@ -14,7 +7,7 @@ unreachable state. By enabling notifications, you ensure no alert, on any node i
 you or your team.
 
 Having this information centralized helps you:
-* Have a clear view of the health across your infrastructure, [seeing all a alerts in one place](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.md)
+* Have a clear view of the health across your infrastructure, seeing all alerts in one place.
 * Easily [setup your alert notification process](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md): 
 methods to use and where to use them, filtering rules, etc.
 * Quickly troubleshoot using [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md)
@@ -126,27 +119,3 @@ within Cloud's embedded dashboards.
 Here's an example email notification for the `ram_available` chart, which is in a critical state:
 
 ![Screenshot of an alarm notification email from Netdata Cloud](https://user-images.githubusercontent.com/1153921/87461878-e933c480-c5c3-11ea-870b-affdb0801854.png)
-
-## What's next?
-
-Netdata Cloud's alarm notifications feature leverages the alarms configuration on each node in your infrastructure. If
-you'd like to tweak any of these alarms, or even add new ones based on your needs, read our [Health
-configuration documentation](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md).
-
-You can also [view active alarms](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.md) in Netdata Cloud for an instant
-visualization of the health of your infrastructure.
-
-### Related Topics
-
-#### **Related Concepts**
-- [Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md)
-- [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md)
-- [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.md)
-
-#### Related Tasks
-- [View Active alarms](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.md)
-- [Manage notification methods](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md)
-- [Add webhook notification configuration](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/add-webhook-notification-configuration.md)
-- [Add Discord notification configuration](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/add-discord-notification.md)
-- [Add Slack notification configuration](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/add-slack-notification-configuration.md)
-- [Add PagerDuty notification configuration](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/add-pagerduty-notification-configuration.md)

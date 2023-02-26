@@ -1,14 +1,4 @@
-<!--
-title: "Reinstall the Netdata Agent"
-description: "Troubleshooting installation issues or force an update of the Netdata Agent by reinstalling it using the same method you used during installation."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/REINSTALL.md"
-sidebar_label: "Reinstall the Netdata Agent"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Installation"
--->
-
-# Reinstall the Netdata Agent
+# Reinstall Netdata
 
 In certain situations, such as needing to enable a feature or troubleshoot an issue, you may need to reinstall the
 Netdata Agent on your node.

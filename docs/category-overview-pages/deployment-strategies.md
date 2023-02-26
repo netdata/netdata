@@ -1,4 +1,4 @@
-# Netdata Deployment Strategies
+# Deployment strategies
 
 Netdata can be used to monitor all kinds of infrastructure, from stand-alone tiny IoT devices to complex hybrid setups 
 combining on-premise and cloud infrastructure, mixing bare-metal servers, virtual machines and containers.
@@ -7,13 +7,13 @@ There are 3 components to structure your Netdata ecosystem:
 
 1. **Netdata Agents**
    To monitor the physical or virtual nodes of your infrastructure, including all applications and containers running on them.
-   
+
    Netdata Agents are Open-Source, licensed under GPL v3+.
 
 2. **Netdata Parents**
    To create data centralization points within your infrastructure, to offload Netdata Agents functions from your production 
    systems, to provide high-availability of your data, increased data retention and isolation of your nodes. 
-   
+
    Netdata Parents are implemented using the Netdata Agent software. Any Netdata Agent can be an Agent for a node and a Parent 
    for other Agents, at the same time.
 
@@ -41,7 +41,7 @@ We suggest to do the following configuration changes for production deployments:
 2. Offload Netdata Agents running on production systems, using Netdata Parents to take over most of their functions
    To free system resources for the production applications running on them and to isolate production systems from the rest 
    of the world, while at the same time providing increased data retention, data high availability and security.
-   
+
    See [streaming and replication](https://github.com/netdata/netdata/blob/master/streaming/README.md)
 
 3. Use Netdata Cloud to access the dashboards

@@ -1,17 +1,8 @@
-<!--
-title: "Add PagerDuty notification configuration"
-sidebar_label: "Add PagerDuty notification configuration"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/add-pagerduty-notification-configuration.md"
-sidebar_position: "1"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Integrations/Notify/Cloud alert notifications"
-learn_docs_purpose: "Instructions on how to add notification configuration for PagerDuty"
--->
+# Add PagerDuty notification configuration
 
 From the Cloud interface, you can manage your space's notification settings and from these you can add a specific configuration to get notifications delivered on PagerDuty.
 
-#### Prerequisites
+## Prerequisites
 
 To add PagerDuty notification configurations you need
 
@@ -20,7 +11,7 @@ To add PagerDuty notification configurations you need
 - Space needs to be on **Business** plan or higher
 - Have a PagerDuty service to receive events, for mode details check [how to configure this on PagerDuty](#settings-on-pagerduty)
 
-#### Steps
+## Steps
 
 1. Click on the **Space settings** cog (located above your profile icon)
 1. Click on the **Notification** tab
@@ -34,9 +25,9 @@ To add PagerDuty notification configurations you need
    1. **Integration configuration** are the specific notification integration required settings, which vary by notification method. For PagerDuty:
       - Integration Key -  is a 32 character key provided by PagerDuty to receive events on your service. For more details check [how to configure this on PagerDuty](#settings-on-pagerduty)
 
-#### Settings on PagerDuty
+## Settings on PagerDuty
 
-#### Enable webhook integrations on PagerDuty
+## Enable webhook integrations on PagerDuty
 
 To enable the webhook integrations on PagerDuty you need:
 1. Create a service to receive events from your services directory page:
@@ -49,12 +40,4 @@ To enable the webhook integrations on PagerDuty you need:
 
 1. Once the service is created you will be redirected to its configuration page, where you can copy the **integration key**, that you will need need to add to your notification configuration on Netdata UI:
 
-
    ![image](https://user-images.githubusercontent.com/2930882/214255916-0d2e53d5-87cc-408a-9f5b-0308a3262d5c.png)
-
-
-#### Related topics
-
-- [Alerts Configuration](https://github.com/netdata/netdata/blob/master/health/README.md)
-- [Alert Notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md)
-- [Manage notification methods](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md)

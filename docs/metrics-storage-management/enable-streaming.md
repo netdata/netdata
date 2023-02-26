@@ -1,28 +1,75 @@
-<!--
-title: "Enable streaming between nodes"
-description: >-
-    "With metrics streaming enabled, you can not only replicate metrics data 
-    into a second database, but also view dashboards and trigger alarm notifications 
-    for multiple nodes in parallel."
-type: "how-to"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md"
-sidebar_label: "Enable streaming between nodes"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Configuration"
--->
+# How metrics streaming works
 
-# Enable streaming between nodes
+Each node running Netdata can stream the metrics it collects, in real time, to another node. Streaming allows you to
+replicate metrics data across multiple nodes, or centralize all your metrics data into a single time-series database
+(TSDB).
+
+When one node streams metrics to another, the node receiving metrics can visualize them on the dashboard, run health checks to 
+[trigger alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alarms.md) and 
+[send notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md), and
+[export](https://github.com/netdata/netdata/blob/master/docs/export/external-databases.md) all metrics to an external TSDB. When Netdata streams metrics to another
+Netdata, the receiving one is able to perform everything a Netdata instance is capable of.
+
+Streaming lets you decide exactly how you want to store and maintain metrics data. While we believe Netdata's
+[distributed architecture](https://github.com/netdata/netdata/blob/master/docs/store/distributed-data-architecture.md) is 
+ideal for speed and scale, streaming provides centralization options and high data availability.
+
+This document will get you started quickly with streaming. More advanced concepts and suggested production deployments
+can be found in the [streaming and replication reference](https://github.com/netdata/netdata/blob/master/streaming/README.md).
+
+## Streaming basics
+
+There are three types of nodes in Netdata's streaming ecosystem.
+
+- **Parent**: A node, running Netdata, that receives streamed metric data.
+- **Child**: A node, running Netdata, that streams metric data to one or more parent.
+- **Proxy**: A node, running Netdata, that receives metric data from a child and "forwards" them on to a
+  separate parent node.
+
+Netdata uses API keys, which are just random GUIDs, to authorize the communication between child and parent nodes. We
+recommend using `uuidgen` for generating API keys, which can then be used across any number of streaming connections.
+Or, you can generate unique API keys for each parent-child relationship.
+
+Once the parent node authorizes the child's API key, the child can start streaming metrics.
+
+It's important to note that the streaming connection uses TCP, UDP, or Unix sockets, _not HTTP_. To proxy streaming
+metrics, you need to use a proxy that tunnels [OSI layer 4-7
+traffic](https://en.wikipedia.org/wiki/OSI_model#Layer_4:_Transport_Layer) without interfering with it, such as
+[SOCKS](https://en.wikipedia.org/wiki/SOCKS) or Nginx's 
+[TCP/UDP load balancing](https://docs.nginx.com/nginx/admin-guide/load-balancer/tcp-udp-load-balancer/).
+
+## Supported streaming configurations
+
+Netdata supports any combination of parent, child, and proxy nodes that you can imagine. Any node can act as both a
+parent, child, or proxy at the same time, sending or receiving streaming metrics from any number of other nodes.
+
+Here are a few example streaming configurations:
+
+- **Headless collector**: 
+  - Child `A`, _without_ a database or web dashboard, streams metrics to parent `B`.
+  - `A` metrics are only available via the local Agent dashboard for `B`.
+  - `B` generates alarms for `A`.
+- **Replication**: 
+  - Child `A`, _with_ a database and web dashboard, streams metrics to parent `B`. 
+  - `A` metrics are available on both local Agent dashboards, and can be stored with the same or different metrics
+    retention policies.
+  - Both `A` and `B` generate alarms.
+- **Proxy**:
+  - Child `A`, _with or without_ a database, sends metrics to proxy `C`, also _with or without_ a database. `C` sends
+    metrics to parent `B`.
+  - Any node with a database can generate alarms.
+
+## Enable streaming between nodes
 
 The simplest streaming configuration is **replication**, in which a child node streams its metrics in real time to a
 parent node, and both nodes retain metrics in their own databases.
 
 To configure replication, you need two nodes, each running Netdata. First you'll first enable streaming on your parent
 node, then enable streaming on your child node. When you're finished, you'll be able to see the child node's metrics in
-the parent node's dashboard, quickly switch between the two dashboards, and be able to serve [alarm
-notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) from either or both nodes.
+the parent node's dashboard, quickly switch between the two dashboards, and be able to serve 
+[alarm notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) from either or both nodes.
 
-## Enable streaming on the parent node
+### Enable streaming on the parent node
 
 First, log onto the node that will act as the parent.
 
@@ -58,7 +105,7 @@ simplified version of the configuration, minus the commented lines, looks like t
 Save the file and close it, then restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
 method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your system.
 
-## Enable streaming on the child node
+### Enable streaming on the child node
 
 Connect to your child node with SSH.
 
@@ -79,7 +126,7 @@ looks like the following:
 Save the file and close it, then restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
 method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your system.
 
-## Enable TLS/SSL on streaming (optional)
+### Enable TLS/SSL on streaming (optional)
 
 While encrypting the connection between your parent and child nodes is recommended for security, it's not required to
 get started. If you're not interested in encryption, skip ahead to [view streamed
@@ -119,7 +166,16 @@ self-signed certificates.
 Restart both the parent and child nodes with `sudo systemctl restart netdata`, or the [appropriate
 method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your system, to stream encrypted metrics using TLS/SSL.
 
-## View streamed metrics in Netdata's dashboard
+### View streamed metrics in Netdata Cloud
+
+In Netdata Cloud you should now be able to see a new parent showing up in the Home tab under "Nodes by data replication".
+The replication factor for the child node has now increased to 2, meaning that its data is now highly available.
+
+You don't need to do anything else, as the cloud will automatically prefer to fetch data about the child from the parent
+and switch to querying the child only when the parent is unavailable, or for some reason doesn't have the requested 
+data (e.g. the connection between parent and the child is broken). 
+
+### View streamed metrics in Netdata's dashboard
 
 At this point, the child node is streaming its metrics in real time to its parent. Open the local Agent dashboard for
 the parent by navigating to `http://PARENT-NODE:19999` in your browser, replacing `PARENT-NODE` with its IP address or
@@ -130,29 +186,7 @@ This dashboard shows parent metrics. To see child metrics, open the left-hand si
 in the top panel. Both nodes appear under the **Replicated Nodes** menu. Click on either of the links to switch between
 separate parent and child dashboards.
 
-![Switching between parent and child
-dashboards](https://user-images.githubusercontent.com/1153921/110043346-761ec000-7d04-11eb-8e58-77670ba39161.gif)
+![Switching between parent and child dashboards](https://user-images.githubusercontent.com/1153921/110043346-761ec000-7d04-11eb-8e58-77670ba39161.gif)
 
 The child dashboard is also available directly at `http://PARENT-NODE:19999/host/CHILD-HOSTNAME`, which in this example
 is `http://203.0.113.0:19999/host/netdata-child`.
-
-## What's next?
-
-Now that you have a basic streaming setup with replication, you may want to tweak the configuration to eliminate the
-child database, disable the child dashboard, or enable SSL on the streaming connection between the parent and child.
-
-See the [streaming reference
-doc](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/reference-streaming.md#examples) for details about
-other possible configurations.
-
-When using Netdata's default TSDB (`dbengine`), the parent node maintains separate, parallel databases for itself and
-every child node streaming to it. Each instance is sized identically based on the `dbengine multihost disk space`
-setting in `netdata.conf`. See our doc on [changing metrics retention](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md) for
-details.
-
-### Related information & further reading
-
-- Streaming
-  - [How Netdata streams metrics](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/how-streaming-works.md)
-  - **[Enable streaming between nodes](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md)**
-  - [Streaming reference](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/reference-streaming.md)

@@ -1,12 +1,4 @@
-<!--
-title: "Sign in with email, Google, or GitHub"
-description: "Learn how signing in to Cloud works via one of our three authentication methods, plus some tips if you're having trouble signing in."
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.md"
-sidebar_label: "Sign in with email, Google, or GitHub"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Operations"
--->
+# Sign in with email, Google, or GitHub
 
 You can [sign in to Netdata](https://app.netdata.cloud/sign-in?cloudRoute=spaces?utm_source=docs&utm_content=sign_in_button_first_section) through one of three methods: email, Google, or GitHub. Email uses a
 time-sensitive link that authenticates your browser, and Google/GitHub both use OAuth to associate your email address
@@ -81,8 +73,3 @@ with `user2@example.com`, Netdata Cloud creates a new account and begins the onb
 
 It is not currently possible to link an account created with `user@example.com` to a Google account associated with
 `user2@example.com`.
-
-## What's next? 
-
-If you haven't already onboarded to Netdata Cloud and connected your first nodes, visit 
-the [Get Started section of our documentation](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md).

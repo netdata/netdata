@@ -1,17 +1,8 @@
-<!--
-title: "Add Discord notification configuration"
-sidebar_label: "Add Discord notification configuration"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/add-discord-notification-configuration.md"
-sidebar_position: "1"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Integrations/Notify/Cloud alert notifications"
-learn_docs_purpose: "Instructions on how to add notification configuration for Discord"
--->
+# Add Discord notification configuration
 
 From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on Discord.
 
-#### Prerequisites
+## Prerequisites
 
 To enable Discord notifications you need:
 
@@ -19,7 +10,7 @@ To enable Discord notifications you need:
 - Access to the space as an **administrator**
 - Have a Discord server able to receive webhook integrations. For mode details check [how to configure this on Discord](#settings-on-discord)
 
-#### Steps
+## Steps
 
 1. Click on the **Space settings** cog (located above your profile icon)
 1. Click on the **Notification** tab
@@ -35,9 +26,9 @@ To enable Discord notifications you need:
       - Webhook URL - URL provided on Discord for the channel you want to receive your notifications. For more details check [how to configure this on Discord](#settings-on-discord)
       - Thread name - if the Discord channel is a **Forum channel** you will need to provide the thread name as well
 
-#### Settings on Discord
+## Settings on Discord
 
-#### Enable webhook integrations on Discord server
+## Enable webhook integrations on Discord server
 
 To enable the webhook integrations on Discord you need:
 1. Go to *Integrations** under your **Server Settings
@@ -51,9 +42,3 @@ To enable the webhook integrations on Discord you need:
    ![image](https://user-images.githubusercontent.com/82235632/214092713-d16389e3-080f-4e1c-b150-c0fccbf4570e.png)
 
 For more details please read this article from Discord: [Intro to Webhooks](https://support.discord.com/hc/en-us/articles/228383668).
-
-#### Related topics
-
-- [Alerts Configuration](https://github.com/netdata/netdata/blob/master/health/README.md)
-- [Alert Notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md)
-- [Manage notification methods](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md)

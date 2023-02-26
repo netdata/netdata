@@ -1,13 +1,4 @@
-<!--
-title: "Streaming and replication"
-description: "Replicate and mirror Netdata's metrics through real-time streaming from child to parent nodes. Then combine, correlate, and export."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/streaming/README.md
-sidebar_label: "Streaming and replication"
-learn_status: "Published"
-learn_rel_path: "Configuration"
--->
-
-# Streaming and replication
+# Streaming and replication reference
 
 Each Netdata node is able to replicate/mirror its database to another Netdata node, by streaming the collected
 metrics in real-time. This is quite different to 
@@ -22,8 +13,10 @@ When one Netdata node streams metrics another, the receiving instance can use th
 -   Run health checks that trigger alarms and send alarm notifications
 -   Export metrics to an external time-series database
 
-
-
+This document contains advanced streaming options and suggested deployment options for production. 
+If you haven't already done so, we suggest you first go through the 
+[quick introduction to streaming](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md)
+, for your first, basic parent child setup.
 
 ## Supported configurations
 
@@ -128,10 +121,6 @@ Once the communication is authorized, the sending Netdata node can push metrics 
 
 The following sections describe how you can configure sending and receiving Netdata nodes.
 
-
- 
-
-
 ##### Options for the sending node
 
 This is the section for the sending Netdata node. On the receiving node, `[stream].enabled` can be `no`.
@@ -206,7 +195,6 @@ You can also use `default memory mode = dbengine` for an API key or `memory mode
 that use `*` as wildcard (any number of times) and a `!` prefix for a negative match.
 So: `allow from = !10.1.2.3 10.*` will allow all IPs in `10.*` except `10.1.2.3`. The order is
 important: left to right, the first positive or negative match is used.
-
 
 ##### Tracing
 

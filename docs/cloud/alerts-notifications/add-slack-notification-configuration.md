@@ -1,17 +1,8 @@
-<!--
-title: "Add Slack notification configuration"
-sidebar_label: "Add Slack notification configuration"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/add-slack-notification-configuration.md"
-sidebar_position: "1"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Integrations/Notify/Cloud alert notifications"
-learn_docs_purpose: "Instructions on how to add notification configuration for Slack"
--->
+# Add Slack notification configuration
 
 From the Cloud interface, you can manage your space's notification settings and from these you can add a specific configuration to get notifications delivered on Slack.
 
-#### Prerequisites
+## Prerequisites
 
 To add discord notification configurations you need
 
@@ -20,7 +11,7 @@ To add discord notification configurations you need
 - Space needs to be on **Business** plan or higher
 - Have a Slack app on your workspace to receive the webhooks, for mode details check [how to configure this on Slack](#settings-on-slack)
 
-#### Steps
+## Steps
 
 1. Click on the **Space settings** cog (located above your profile icon)
 1. Click on the **Notification** tab
@@ -34,7 +25,7 @@ To add discord notification configurations you need
    1. **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Slack:
       - Webhook URL - URL provided on Slack for the channel you want to receive your notifications. For more details check [how to configure this on Slack](#settings-on-slack)
 
-#### Settings on Slack
+## Settings on Slack
 
 To enable the webhook integrations on Slack you need:
 1. Create an app to receive webhook integrations. Check [Create an app](https://api.slack.com/apps?new_app=1) from Slack documentation for further details
@@ -54,10 +45,3 @@ To enable the webhook integrations on Slack you need:
    ![image](https://user-images.githubusercontent.com/82235632/214104412-13aaeced-1b40-4894-85f6-9db0eb35c584.png)
 
 For more details please check Slacks's article [Incoming webhooks for Slack](https://slack.com/help/articles/115005265063-Incoming-webhooks-for-Slack).
-
-
-#### Related topics
-
-- [Alerts Configuration](https://github.com/netdata/netdata/blob/master/health/README.md)
-- [Alert Notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md)
-- [Manage notification methods](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md)

@@ -1,14 +1,4 @@
-<!--
-title: "Invite your team"
-description: >-
-    "Invite your entire SRE, DevOPs, or ITOps team to Netdata Cloud to give everyone insights into your
-    infrastructure from a single pane of glass."
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/manage/invite-your-team.md"
-sidebar_label: "Invite your team"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Operations"
--->
+# Invite your team
 
 Invite new users to your Space by clicking on **Invite Users** in
 the [Space](https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md) management area.
