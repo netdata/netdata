@@ -209,12 +209,12 @@ static inline void query_target_alerts_counts(BUFFER *wb, struct query_alerts_co
 }
 
 static inline void query_target_data_statistics(BUFFER *wb, QUERY_TARGET *qt, struct query_data_statistics *d) {
-    if(!d->count)
+    if(!d->group_points)
         return;
 
     buffer_json_member_add_object(wb, "sts");
     if(qt->request.group_by_aggregate_function == RRDR_GROUP_BY_FUNCTION_SUM_COUNT) {
-        buffer_json_member_add_uint64(wb, "cnt", d->count);
+        buffer_json_member_add_uint64(wb, "cnt", d->group_points);
 
         if(d->sum != 0.0)
             buffer_json_member_add_double(wb, "sum", d->sum);
@@ -229,11 +229,11 @@ static inline void query_target_data_statistics(BUFFER *wb, QUERY_TARGET *qt, st
 //        buffer_json_member_add_double(wb, "min", d->min);
 //        buffer_json_member_add_double(wb, "max", d->max);
 
-        NETDATA_DOUBLE avg = (d->count) ? d->sum / (NETDATA_DOUBLE)d->count : 0.0;
+        NETDATA_DOUBLE avg = (d->group_points) ? d->sum / (NETDATA_DOUBLE)d->group_points : 0.0;
         if(avg != 0.0)
             buffer_json_member_add_double(wb, "avg", avg);
 
-        NETDATA_DOUBLE arp = (d->count) ? d->anomaly_sum / (NETDATA_DOUBLE)d->count : 0.0;
+        NETDATA_DOUBLE arp = (d->group_points) ? d->anomaly_sum / (NETDATA_DOUBLE)d->group_points : 0.0;
         if(arp != 0.0)
             buffer_json_member_add_double(wb, "arp", arp);
 
@@ -798,7 +798,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR
 
     buffer_json_member_add_array(wb, "db_points_per_tier");
     for(size_t tier = 0; tier < storage_tiers ; tier++)
-        buffer_json_add_array_item_uint64(wb, r->stats.tier_points_read[tier]);
+        buffer_json_add_array_item_uint64(wb, qt->db.tiers[tier].points);
     buffer_json_array_close(wb);
 
     if(options & RRDR_OPTION_SHOW_PLAN)
@@ -1202,12 +1202,22 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
 
     buffer_json_member_add_object(wb, "db");
     {
+        buffer_json_member_add_uint64(wb, "tiers", storage_tiers);
         buffer_json_member_add_time_t(wb, "update_every", qt->db.minimum_latest_update_every_s);
         buffer_json_member_add_time_t(wb, "first_entry", qt->db.first_time_s);
         buffer_json_member_add_time_t(wb, "last_entry", qt->db.last_time_s);
-        buffer_json_member_add_array(wb, "points_per_tier");
-        for(size_t tier = 0; tier < storage_tiers ; tier++)
-            buffer_json_add_array_item_uint64(wb, r->stats.tier_points_read[tier]);
+
+        buffer_json_member_add_array(wb, "tiers");
+        for(size_t tier = 0; tier < storage_tiers ; tier++) {
+            buffer_json_add_array_item_object(wb);
+            buffer_json_member_add_uint64(wb, "tier", tier);
+            buffer_json_member_add_uint64(wb, "queries", qt->db.tiers[tier].queries);
+            buffer_json_member_add_uint64(wb, "points", qt->db.tiers[tier].points);
+            buffer_json_member_add_time_t(wb, "update_every", qt->db.tiers[tier].update_every);
+            buffer_json_member_add_time_t(wb, "first_entry", qt->db.tiers[tier].retention.first_time_s);
+            buffer_json_member_add_time_t(wb, "last_entry", qt->db.tiers[tier].retention.last_time_s);
+            buffer_json_object_close(wb);
+        }
         buffer_json_array_close(wb);
     }
     buffer_json_object_close(wb);

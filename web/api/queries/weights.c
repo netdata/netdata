@@ -501,7 +501,7 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
     stats->result_points += r->stats.result_points_generated;
     stats->db_points += r->stats.db_points_read;
     for(size_t tr = 0; tr < storage_tiers ; tr++)
-        stats->db_points_per_tier[tr] += r->stats.tier_points_read[tr];
+        stats->db_points_per_tier[tr] += r->internal.qt->db.tiers[tr].points;
 
     if(r->d != 1) {
         error("WEIGHTS: on query '%s' expected 1 dimension in RRDR but got %zu", r->internal.qt->id, r->d);

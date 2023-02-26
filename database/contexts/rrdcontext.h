@@ -183,13 +183,13 @@ struct query_alerts_counts {
     size_t other;
 };
 
-struct query_data_statistics {
-    size_t count;
-    NETDATA_DOUBLE min;
-    NETDATA_DOUBLE max;
-    NETDATA_DOUBLE sum;
-    NETDATA_DOUBLE volume;
-    NETDATA_DOUBLE anomaly_sum;
+struct query_data_statistics {      // time-aggregated (group points) statistics
+    size_t group_points;            // the number of group points the query generated
+    NETDATA_DOUBLE min;             // the min value of the group points
+    NETDATA_DOUBLE max;             // the max value of the group points
+    NETDATA_DOUBLE sum;             // the sum of the group points
+    NETDATA_DOUBLE volume;          // the volume of the group points
+    NETDATA_DOUBLE anomaly_sum;     // the anomaly sum of the group points
 };
 
 typedef struct query_node {
@@ -317,12 +317,22 @@ typedef struct query_target_request {
 
 #define GROUP_BY_MAX_LABEL_KEYS 10
 
+struct query_tier_statistics {
+    size_t queries;
+    size_t points;
+    time_t update_every;
+    struct {
+        time_t first_time_s;
+        time_t last_time_s;
+    } retention;
+};
+
 typedef struct query_target {
     char id[MAX_QUERY_TARGET_ID_LENGTH + 1]; // query identifier (for logging)
     QUERY_TARGET_REQUEST request;
 
     bool used;                              // when true, this query is currently being used
-    size_t queries;                         // how many query we have done so far
+    size_t queries;                         // how many query we have done so far with this QUERY_TARGET - not related to database queries
 
     struct {
         bool relative;                      // true when the request made with relative timestamps, true if it was absolute
@@ -341,9 +351,11 @@ typedef struct query_target {
     } window;
 
     struct {
+        size_t queries[RRD_STORAGE_TIERS];
         time_t first_time_s;                  // the combined first_time_t of all metrics in the query, across all tiers
         time_t last_time_s;                   // the combined last_time_T of all metrics in the query, across all tiers
         time_t minimum_latest_update_every_s; // the min update every of the metrics in the query
+        struct query_tier_statistics tiers[RRD_STORAGE_TIERS];
     } db;
 
     struct {

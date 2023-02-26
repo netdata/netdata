@@ -1087,6 +1087,8 @@ static void query_planer_initialize_plans(QUERY_ENGINE_OPS *ops) {
         qm->plan.array[p].expanded_after = after;
         qm->plan.array[p].expanded_before = before;
 
+        ops->r->internal.qt->db.tiers[tier].queries++;
+
         struct query_metric_tier *tier_ptr = &qm->tiers[tier];
         tier_ptr->eng->api.query_ops.init(
                 tier_ptr->db_metric_handle,
@@ -1724,7 +1726,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
             qm->query_stats.anomaly_sum += group_ar;
             qm->query_stats.sum += stats_value;
             qm->query_stats.volume += stats_value * (NETDATA_DOUBLE)ops->view_update_every;
-            qm->query_stats.count++;
+            qm->query_stats.group_points++;
 
             points_added++;
             ops->group_points_added = 0;
@@ -1744,7 +1746,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
     r->stats.result_points_generated += points_added;
     r->stats.db_points_read += ops->db_total_points_read;
     for(size_t tr = 0; tr < storage_tiers ; tr++)
-        r->stats.tier_points_read[tr] += ops->db_points_read_per_tier[tr];
+        qt->db.tiers[tr].points += ops->db_points_read_per_tier[tr];
 
     r->view.min = min;
     r->view.max = max;
@@ -2286,10 +2288,10 @@ RRDR *rrd2rrdr_legacy(
 }
 
 void query_target_merge_data_statistics(struct query_data_statistics *d, struct query_data_statistics *s) {
-    if(!d->count)
+    if(!d->group_points)
         *d = *s;
     else {
-        d->count += s->count;
+        d->group_points += s->group_points;
         d->sum += s->sum;
         d->anomaly_sum += s->anomaly_sum;
         d->volume += s->volume;

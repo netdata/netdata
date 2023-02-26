@@ -145,7 +145,7 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
         };
 
         for(size_t t = 0; t < storage_tiers ;t++)
-            qv.storage_points_per_tier[t] = r->stats.tier_points_read[t];
+            qv.storage_points_per_tier[t] = r->internal.qt->db.tiers[t].points;
 
         long i = (!(options & RRDR_OPTION_REVERSED))?(long)rrdr_rows(r) - 1:0;
         int all_values_are_null = 0;

@@ -109,7 +109,7 @@ int rrdset2value_api_v1(
 
     if(db_points_per_tier) {
         for(size_t t = 0; t < storage_tiers ;t++)
-            db_points_per_tier[t] += r->stats.tier_points_read[t];
+            db_points_per_tier[t] += r->internal.qt->db.tiers[t].points;
     }
 
     if(result_points_generated)

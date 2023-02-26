@@ -232,6 +232,17 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
         }
     }
 
+    for (size_t tier = 0; tier < storage_tiers; tier++) {
+        if(!qt->db.tiers[tier].update_every || (tier_retention[tier].db_update_every_s && tier_retention[tier].db_update_every_s < qt->db.tiers[tier].update_every))
+            qt->db.tiers[tier].update_every = tier_retention[tier].db_update_every_s;
+
+        if(!qt->db.tiers[tier].retention.first_time_s || (tier_retention[tier].db_first_time_s && tier_retention[tier].db_first_time_s < qt->db.tiers[tier].retention.first_time_s))
+            qt->db.tiers[tier].retention.first_time_s = tier_retention[tier].db_first_time_s;
+
+        if(!qt->db.tiers[tier].retention.last_time_s || (tier_retention[tier].db_last_time_s && tier_retention[tier].db_last_time_s > qt->db.tiers[tier].retention.last_time_s))
+            qt->db.tiers[tier].retention.last_time_s = tier_retention[tier].db_last_time_s;
+    }
+
     bool timeframe_matches =
             (tiers_added &&
             query_target_retention_matches_query(qt, common_first_time_s, common_last_time_s, common_update_every_s))
@@ -888,6 +899,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     if(qtr->contexts && !qtr->scope_contexts)
         qtr->scope_contexts = qtr->contexts;
 
+    memset(&qt->db, 0, sizeof(qt->db));
     memset(&qt->query_stats, 0, sizeof(qt->query_stats));
 
     // copy the request into query_thread_target
@@ -915,8 +927,6 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     };
 
     RRDHOST *host = qt->request.host;
-
-    qt->db.minimum_latest_update_every_s = 0; // it will be updated by query_target_add_query()
 
     // prepare all the patterns
     qt->nodes.scope_pattern = string_to_simple_pattern(qtl.scope_nodes);
