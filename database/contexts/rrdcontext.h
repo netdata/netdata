@@ -140,10 +140,9 @@ DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contex
 typedef enum __attribute__ ((__packed__)) {
     QUERY_STATUS_NONE             = 0,
     QUERY_STATUS_QUERIED          = (1 << 0),
-    QUERY_STATUS_DIMENSION_NODATA = (1 << 1),
-    QUERY_STATUS_DIMENSION_HIDDEN = (1 << 2),
-    QUERY_STATUS_EXCLUDED         = (1 << 3),
-    QUERY_STATUS_FAILED           = (1 << 4),
+    QUERY_STATUS_DIMENSION_HIDDEN = (1 << 1),
+    QUERY_STATUS_EXCLUDED         = (1 << 2),
+    QUERY_STATUS_FAILED           = (1 << 3),
 } QUERY_STATUS;
 
 typedef struct query_plan_entry {

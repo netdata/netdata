@@ -409,7 +409,6 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
             }
             else {
                 undo = true;
-                status |= QUERY_STATUS_DIMENSION_NODATA;
                 qtl->metrics_skipped_due_to_not_matching_timeframe++;
             }
         }
