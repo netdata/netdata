@@ -238,6 +238,9 @@ typedef struct ebpf_plugin_stats {
     uint32_t retprobes;   // Number of kretprobes loaded
     uint32_t tracepoints; // Number of tracepoints used
     uint32_t trampolines; // Number of trampolines used
+
+    uint64_t memlock_kern; // The same information reported by bpftool, but it is not accurated
+                           // https://lore.kernel.org/linux-mm/20230112155326.26902-5-laoar.shao@gmail.com/T/
 } ebpf_plugin_stats_t;
 
 typedef enum netdata_apps_integration_flags {
