@@ -1,13 +1,4 @@
-<!--
-title: "View Plan & Billing"
-sidebar_label: "View Plan & Billing"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/manage/view-plan-billing.md"
-sidebar_position: "1"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Operations"
-learn_docs_purpose: "How to check details on your space plan and billing"
--->
+# View Plan & Billing
 
 From the Cloud interface, you can view and manage your space's plan and billing settings, and see the space's usage in terms of running nodes.
 To view and manage some specific settings, related to billing options and invoices, you'll be redirected to our billing provider Customer Portal.

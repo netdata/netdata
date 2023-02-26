@@ -1,101 +1,10 @@
-<!--
-title: "Netdata daemon"
-date: "2020-04-29"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/daemon/README.md"
-sidebar_label: "Netdata daemon"
-learn_status: "Published"
-learn_rel_path: "Operations"
--->
-
 # Netdata daemon
 
-## Starting netdata
+The Netdata daemon is practically a synonym for the Netdata Agent, as it controls its 
+entire operation. We support various methods to 
+[start, stop, or restart the daemon](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md).
 
--   You can start Netdata by executing it with `/usr/sbin/netdata` (the installer will also start it).
-
--   You can stop Netdata by killing it with `killall netdata`. You can stop and start Netdata at any point. When
-    exiting, the [database engine](https://github.com/netdata/netdata/blob/master/database/engine/README.md) saves metrics to `/var/cache/netdata/dbengine/` so that
-    it can continue when started again.
-
-Access to the web site, for all graphs, is by default on port `19999`, so go to:
-
-```sh
-http://127.0.0.1:19999/
-```
-
-You can get the running config file at any time, by accessing `http://127.0.0.1:19999/netdata.conf`.
-
-### Starting Netdata at boot
-
-In the `system` directory you can find scripts and configurations for the
-various distros.
-
-#### systemd
-
-The installer already installs `netdata.service` if it detects a systemd system.
-
-To install `netdata.service` by hand, run:
-
-```sh
-# stop Netdata
-killall netdata
-
-# copy netdata.service to systemd
-cp system/netdata.service /etc/systemd/system/
-
-# let systemd know there is a new service
-systemctl daemon-reload
-
-# enable Netdata at boot
-systemctl enable netdata
-
-# start Netdata
-systemctl start netdata
-```
-
-#### init.d
-
-In the system directory you can find `netdata-lsb`. Copy it to the proper place according to your distribution
-documentation. For Ubuntu, this can be done via running the following commands as root.
-
-```sh
-# copy the Netdata startup file to /etc/init.d
-cp system/netdata-lsb /etc/init.d/netdata
-
-# make sure it is executable
-chmod +x /etc/init.d/netdata
-
-# enable it
-update-rc.d netdata defaults
-```
-
-#### openrc (gentoo)
-
-In the `system` directory you can find `netdata-openrc`. Copy it to the proper
-place according to your distribution documentation.
-
-#### CentOS / Red Hat Enterprise Linux
-
-For older versions of RHEL/CentOS that don't have systemd, an init script is included in the system directory. This can
-be installed by running the following commands as root.
-
-```sh
-# copy the Netdata startup file to /etc/init.d
-cp system/netdata-init-d /etc/init.d/netdata
-
-# make sure it is executable
-chmod +x /etc/init.d/netdata
-
-# enable it
-chkconfig --add netdata
-```
-
-_There have been some recent work on the init script, see PR
-<https://github.com/netdata/netdata/pull/403>_
-
-#### other systems
-
-You can start Netdata by running it from `/etc/rc.local` or equivalent.
+This document provides some basic information on the command line options, log files, and how to debug and troubleshoot
 
 ## Command line options
 
@@ -302,7 +211,7 @@ You can use the following:
 
 For more information see `man sched`.
 
-### scheduling priority for `rr` and `fifo`
+### Scheduling priority for `rr` and `fifo`
 
 Once the policy is set to one of `rr` or `fifo`, the following will appear:
 
@@ -323,7 +232,7 @@ When the policy is set to `other`, `nice`, or `batch`, the following will appear
     process nice level = 19
 ```
 
-## scheduling settings and systemd
+## Scheduling settings and systemd
 
 Netdata will not be able to set its scheduling policy and priority to more important values when it is started as the
 `netdata` user (systemd case).
@@ -471,7 +380,7 @@ will contain the messages.
 > Do not forget to disable tracing (`debug flags = 0`) when you are done tracing. The file `debug.log` can grow too
 > fast.
 
-### compiling Netdata with debugging
+### Compiling Netdata with debugging
 
 To compile Netdata with debugging, use this:
 
@@ -486,7 +395,7 @@ CFLAGS="-O1 -ggdb -DNETDATA_INTERNAL_CHECKS=1" ./netdata-installer.sh
 The above will compile and install Netdata with debugging info embedded. You can now use `debug flags` to set the
 section(s) you need to trace.
 
-### debugging crashes
+### Debugging crashes
 
 We have made the most to make Netdata crash free. If however, Netdata crashes on your system, it would be very helpful
 to provide stack traces of the crash. Without them, is will be almost impossible to find the issue (the code base is
@@ -514,7 +423,7 @@ Run the following command and post the output on a github issue.
 gdb $(which netdata) /path/to/core/dump
 ```
 
-### you can reproduce a Netdata crash on your system
+### You can reproduce a Netdata crash on your system
 
 > you need to have Netdata compiled with debugging info for this to work (check above)
 
@@ -526,5 +435,3 @@ valgrind $(which netdata) -D
 
 Netdata will start and it will be a lot slower. Now reproduce the crash and `valgrind` will dump on your console the
 stack trace. Open a new github issue and post the output.
-
-

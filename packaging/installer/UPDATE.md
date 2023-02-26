@@ -1,14 +1,4 @@
-<!--
-title: "Update the Netdata Agent"
-description: "If you opted out of automatic updates, you need to update your Netdata Agent to the latest nightly or stable version."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/UPDATE.md"
-sidebar_label: "Update the Netdata Agent"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Installation"
--->
-
-# Update the Netdata Agent
+# Update Netdata
 
 By default, the Netdata Agent automatically updates with the latest nightly or stable version depending on which
 you installed. If you opted out of automatic updates, you need to update your Netdata Agent to the latest nightly

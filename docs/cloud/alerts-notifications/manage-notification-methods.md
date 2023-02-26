@@ -1,25 +1,17 @@
-<!--
-title: "Manage notification methods"
-sidebar_label: "Manage notification methods"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Integrations/Notify/Cloud alert notifications"
-learn_docs_purpose: "Instructions on how to manage notification methods"
--->
+# Manage notification methods
 
 From the Cloud interface, you can manage your space's notification settings as well as allow users to personalize their notifications setting
 
-### Manage space notification settings
+## Manage space notification settings
 
-#### Prerequisites
+### Prerequisites
 
 To manage space notification settings, you will need the following:
 
 - A Netdata Cloud account
 - Access to the space as an **administrator**
 
-#### Available actions per notification methods based on service level
+### Available actions per notification methods based on service level
 
 | **Action** | **Personal service level** | **System service level** |
 | :- | :-: | :-: |
@@ -32,7 +24,7 @@ Notes:
 * For Netadata provided ones you can't delete the existing notification method configuration.
 * Enable, Edit and Add actions over specific notification methods will only be allowed if your plan has access to those ([service classification](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md#service-classification))
 
-#### Steps
+### Steps
 
 1. Click on the **Space settings** cog (located above your profile icon)
 1. Click on the **Notification** tab
@@ -53,9 +45,9 @@ Notes:
    1. **Delete an existing** notification method configuartion. Netdata provided ones can't be deleted, e.g. Email
       - Use the trash icon to delete your configuration 
 
-### Manage user notification settings
+## Manage user notification settings
 
-#### Prerequisites
+### Prerequisites
 
 To manage user specific notification settings, you will need the following:
 
@@ -64,7 +56,7 @@ To manage user specific notification settings, you will need the following:
 
 Note: If an administrator has disabled a Personal [service level](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md#service-level) notification method this will override any user specific setting.
 
-#### Steps
+### Steps
 
 1. Click on the **User notification settings** shortcut on top of the help button
 1. You are presented with:
@@ -78,11 +70,3 @@ Note: If an administrator has disabled a Personal [service level](https://github
    1. **Activate notifications** for a room you aren't a member of
       - From the **All Rooms** tab click on the Join button for the room(s) you want
 
-#### Related topics
-
-- [Alert Notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md)
-- [Alerts Configuration](https://github.com/netdata/netdata/blob/master/health/README.md)
-- [Add webhook notification configuration](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/add-webhook-notification-configuration.md)
-- [Add Discord notification configuration](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/add-discord-notification.md)
-- [Add Slack notification configuration](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/add-slack-notification-configuration.md)
-- [Add PagerDuty notification configuration](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/add-pagerduty-notification-configuration.md)
