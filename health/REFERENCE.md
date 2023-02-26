@@ -37,6 +37,8 @@ You can configure the Agent's health watchdog service by editing files in two lo
 Navigate to your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) and
 use `edit-config` to make changes to any of these files.
 
+### Edit individual alerts
+
 For example, to edit the `cpu.conf` health configuration file, run:
 
 ```bash
@@ -69,16 +71,52 @@ to the values of your choosing. For example:
     crit: $this > (($status == $CRITICAL) ? (75) : (85))
 ```
 
-Save the file and [reload Netdata's health configuration](#reload-health-configuration) to make your changes live.
+Save the file and [reload Netdata's health configuration](#reload-health-configuration) to apply your changes.
 
-### Silence an individual alarm
+## Disable or silence alerts
 
-Instead of disabling an alarm altogether, or even disabling _all_ alarms, you can silence individual alarms by changing
-one line in a given health entity. To silence any single alarm, change the `to:` line in its entity to `silent`.
+Alerts and notifications can be disabled permanently via configuration changes, or temporarily, via the
+[health management API](https://github.com/netdata/netdata/blob/master/web/api/health/README.md). The 
+available options are described below.
+
+### Disable all alerts
+
+In the `netdata.conf` `[health]` section, set `enabled` to `no`, and restart the agent.
+
+### Disable some alerts
+
+In the `netdata.conf` `[health]` section, set `enabled alerms` to a 
+[simple pattern](https://github.com/netdata/netdata/edit/master/libnetdata/simple_pattern/README.md) that
+excludes one or more alerts. e.g. `enabled alarms = !oom_kill *` will load all alarms except `oom_kill`. 
+
+You can also [edit the file where the alert is defined](#edit-individual-alerts), comment out its definition, 
+and [reload Netdata's health configuration](#reload-health-configuration).
+
+### Silence an individual alert
+
+You can stop receiving notification for an individual alert by [changing](#edit-individual-alerts) the `to:` line to `silent`.
 
 ```yaml
       to: silent
 ```
+
+This action requires that you [reload Netdata's health configuration](#reload-health-configuration).
+
+### Temporarily disable alerts at runtime
+
+When you need to frequently disable all or some alerts from triggering during certain times (for instance 
+when running backups) you can use the 
+[health management API](https://github.com/netdata/netdata/blob/master/web/api/health/README.md).
+The API allows you to issue commands to control the health engine's behavior without changing configuration,
+or restarting the agent.
+
+### Temporarily silence notifications at runtime
+
+If you want health checks to keep running and alerts to keep getting triggered, but notifications to be 
+suppressed temporarily, you can use the 
+[health management API](https://github.com/netdata/netdata/blob/master/web/api/health/README.md).
+The API allows you to issue commands to control the health engine's behavior without changing configuration,
+or restarting the agent.
 
 ## Write a new health entity
 
@@ -1124,33 +1162,6 @@ template: ml_5min_node
 
 The `lookup` line will use the `anomaly_rate` dimension of the `anomaly_detection.anomaly_rate` ML chart to calculate the average [node level anomaly rate](https://learn.netdata.cloud/docs/agent/ml#node-anomaly-rate) over the last 5 minues.
 
-## Troubleshooting
-
-You can compile Netdata with [debugging](https://github.com/netdata/netdata/blob/master/daemon/README.md#debugging) and then set in `netdata.conf`:
-
-```yaml
-[global]
-   debug flags = 0x0000000000800000
-```
-
-Then check your `/var/log/netdata/debug.log`. It will show you how it works. Important: this will generate a lot of
-output in debug.log.
-
-You can find the context of charts by looking up the chart in either `http://NODE:19999/netdata.conf` or
-`http://NODE:19999/api/v1/charts`, replacing `NODE` with the IP address or hostname for your Agent dashboard.
-
-You can find how Netdata interpreted the expressions by examining the alarm at
-`http://NODE:19999/api/v1/alarms?all`. For each expression, Netdata will return the expression as given in its
-config file, and the same expression with additional parentheses added to indicate the evaluation flow of the
-expression.
-
-## Disabling health checks or silencing notifications at runtime
-
-It's currently not possible to schedule notifications from within the alarm template. For those scenarios where you need
-to temporary disable notifications (for instance when running backups triggers a disk alert) you can disable or silence
-notifications are runtime. The health checks can be controlled at runtime via the 
-[health management API](https://github.com/netdata/netdata/blob/master/web/api/health/README.md).
-
 ## Use dimension templates to create dynamic alarms
 
 In v1.18 of Netdata, we introduced **dimension templates** for alarms, which simplifies the process of 
@@ -1311,3 +1322,23 @@ And how just a few of those dimension template-generated alarms look like in the
 
 All in all, this single entity creates 36 individual alarms. Much easier than writing 36 separate entities in your
 health configuration files!
+
+## Troubleshooting
+
+You can compile Netdata with [debugging](https://github.com/netdata/netdata/blob/master/daemon/README.md#debugging) and then set in `netdata.conf`:
+
+```yaml
+[global]
+   debug flags = 0x0000000000800000
+```
+
+Then check your `/var/log/netdata/debug.log`. It will show you how it works. Important: this will generate a lot of
+output in debug.log.
+
+You can find the context of charts by looking up the chart in either `http://NODE:19999/netdata.conf` or
+`http://NODE:19999/api/v1/charts`, replacing `NODE` with the IP address or hostname for your Agent dashboard.
+
+You can find how Netdata interpreted the expressions by examining the alarm at
+`http://NODE:19999/api/v1/alarms?all`. For each expression, Netdata will return the expression as given in its
+config file, and the same expression with additional parentheses added to indicate the evaluation flow of the
+expression.

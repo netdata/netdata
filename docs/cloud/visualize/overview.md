@@ -1,4 +1,4 @@
-# Home, Overview and Single Node view
+# Home, overview and single node views
 
 ## Home
 
@@ -7,7 +7,7 @@ The Home tab provides a predefined dashboard of relevant information about entit
 This tab will automatically present summarized information in an easily digestible display. You can see information about your
 nodes, data collection and retention stats, alerts, users and dashboards.
 
-## Overview and Single Node view
+## Overview and single node view
 
 The Overview tab is another great way to monitor infrastructure using Netdata Cloud. While the interface might look
 similar to local dashboards served by an Agent Overview uses **composite charts**.
@@ -19,7 +19,7 @@ you can see your infrastructure from a single pane of glass, discover trends or 
 The Single Node view dashboard is exactly the same as the Overview, but with a hard-coded filter to only show 
 a single node. 
 
-### Chart Navigation Menu
+### Chart navigation Menu
 
 Netdata Cloud uses a similar menu to local Agent dashboards, with sections
 and sub-menus aggregated from every contributing node. For example, even if only two nodes actively collect from and

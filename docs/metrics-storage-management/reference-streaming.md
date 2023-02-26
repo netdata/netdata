@@ -11,7 +11,7 @@ learn_rel_path: "Configuration"
 # Streaming reference
 
 Each node running Netdata can stream the metrics it collects, in real time, to another node. To learn more, read about
-[how streaming works](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/how-streaming-works.md).
+[how streaming works](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md).
 
 For a quickstart guide for enabling a simple `parent-child` streaming relationship, see our [stream metrics between
 nodes](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md) doc. All other configuration options and scenarios are

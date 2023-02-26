@@ -1,21 +1,11 @@
-<!--
-title: "View active health alarms"
-description: "View active alarms and their rich data to discover and resolve anomalies and performance issues across your infrastructure."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/monitor/view-active-alarms.md"
-sidebar_label: "View active health alarms"
-learn_status: "Published"
-learn_topic_type: "Concepts"
-learn_rel_path: "Operations/Alerts"
--->
-
-# View active health alarms
+# View active alerts
 
 Every Netdata Agent comes with hundreds of pre-installed health alarms designed to notify you when an anomaly or
-performance issue affects your node or the applications it runs.
+performance issue affects your node or the applications it runs. 
 
 ## Netdata Cloud
 
-A War Room's [alarms indicator](https://learn.netdata.cloud/docs/cloud/war-rooms#indicators) displays the number of
+A War Room's [indicator](https://learn.netdata.cloud/docs/cloud/war-rooms#indicators) displays the number of
 active `critical` (red) and `warning` (yellow) alerts for the nodes in this War Room. Click on either the critical or
 warning badges to open a pre-filtered modal displaying only those types of [active
 alarms](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.md).

@@ -18,6 +18,6 @@ community-configured alarms for every app/service [the Agent collects metrics fr
 silence anything you're not interested in. You can even power complex lookups by running statistical algorithms against
 your metrics.
 
-Ready to take the next steps with health monitoring?
-
-[Configuration reference](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md)
+You can [use various alert notification methods](https://github.com/netdata/netdata/edit/master/docs/monitor/enable-notifications.md), 
+[customize alerts](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md), and 
+[disable/silence](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#disable-or-silence-alerts) alerts.
