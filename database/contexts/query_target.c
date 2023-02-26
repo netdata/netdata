@@ -176,9 +176,8 @@ static inline void query_metric_release(QUERY_METRIC *qm) {
 }
 
 static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CONTEXT *qc,
-                             QUERY_INSTANCE *qi, QUERY_DIMENSION *qd, RRDR_DIMENSION_FLAGS options) {
+                             QUERY_INSTANCE *qi, size_t qd_slot, RRDMETRIC *rm, RRDR_DIMENSION_FLAGS options) {
     QUERY_TARGET *qt = qtl->qt;
-    RRDMETRIC *rm = rrdmetric_acquired_value(qd->rma);
     RRDINSTANCE *ri = rm->ri;
 
     time_t common_first_time_s = 0;
@@ -268,7 +267,7 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
         qm->link.query_host_id = qn->slot;
         qm->link.query_context_id = qc->slot;
         qm->link.query_instance_id = qi->slot;
-        qm->link.query_dimension_id = qd->slot;
+        qm->link.query_dimension_id = qd_slot;
 
         if (!qt->db.first_time_s || common_first_time_s < qt->db.first_time_s)
             qt->db.first_time_s = common_first_time_s;
@@ -309,14 +308,7 @@ static inline void query_dimension_release(QUERY_DIMENSION *qd) {
     qd->rma = NULL;
 }
 
-static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi,
-                                RRDMETRIC_ACQUIRED *rma, bool queryable_instance, size_t *metrics_added) {
-    QUERY_TARGET *qt = qtl->qt;
-
-    RRDMETRIC *rm = rrdmetric_acquired_value(rma);
-    if(rrd_flag_is_deleted(rm))
-        return false;
-
+static QUERY_DIMENSION *query_dimension_allocate(QUERY_TARGET *qt, RRDMETRIC_ACQUIRED *rma, QUERY_STATUS status) {
     if(qt->dimensions.used == qt->dimensions.size) {
         size_t old_mem = qt->dimensions.size * sizeof(*qt->dimensions.array);
         qt->dimensions.size = (qt->dimensions.size) ? qt->dimensions.size * 2 : 1;
@@ -330,7 +322,20 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
 
     qd->slot = qt->dimensions.used++;
     qd->rma = rrdmetric_acquired_dup(rma);
-    qd->status = QUERY_STATUS_NONE;
+    qd->status = status;
+
+    return qd;
+}
+
+static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi,
+                                RRDMETRIC_ACQUIRED *rma, bool queryable_instance, size_t *metrics_added) {
+    QUERY_TARGET *qt = qtl->qt;
+
+    RRDMETRIC *rm = rrdmetric_acquired_value(rma);
+    if(rrd_flag_is_deleted(rm))
+        return false;
+
+    QUERY_STATUS status = QUERY_STATUS_NONE;
 
     bool undo = false;
     if(!queryable_instance) {
@@ -338,7 +343,7 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
             qi->metrics.excluded++;
             qc->metrics.excluded++;
             qn->metrics.excluded++;
-            qd->status |= QUERY_STATUS_EXCLUDED;
+            status |= QUERY_STATUS_EXCLUDED;
         }
         else
             undo = true;
@@ -383,7 +388,7 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
             if(rrd_flag_check(rm, RRD_FLAG_HIDDEN) || (rm->rrddim && rrddim_option_check(rm->rrddim, RRDDIM_OPTION_HIDDEN))) {
                 // this is a hidden dimension
                 // we don't need to query it
-                qd->status |= QUERY_STATUS_DIMENSION_HIDDEN;
+                status |= QUERY_STATUS_DIMENSION_HIDDEN;
             }
             else {
                 // this is a not hidden dimension
@@ -395,7 +400,7 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
         }
 
         if (needed) {
-            if(query_metric_add(qtl, qn, qc, qi, qd, options)) {
+            if(query_metric_add(qtl, qn, qc, qi, qt->dimensions.used, rm, options)) {
                 (*metrics_added)++;
 
                 qi->metrics.selected++;
@@ -404,7 +409,7 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
             }
             else {
                 undo = true;
-                qd->status |= QUERY_STATUS_DIMENSION_NODATA;
+                status |= QUERY_STATUS_DIMENSION_NODATA;
                 qtl->metrics_skipped_due_to_not_matching_timeframe++;
             }
         }
@@ -412,18 +417,16 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
             qi->metrics.excluded++;
             qc->metrics.excluded++;
             qn->metrics.excluded++;
-            qd->status |= QUERY_STATUS_EXCLUDED;
+            status |= QUERY_STATUS_EXCLUDED;
         }
         else
             undo = true;
     }
 
-    if(undo) {
-        query_dimension_release(qd);
-        qt->dimensions.used--;
+    if(undo)
         return false;
-    }
 
+    query_dimension_allocate(qt, rma, status);
     return true;
 }
 
