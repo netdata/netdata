@@ -176,7 +176,7 @@ static inline void query_metric_release(QUERY_METRIC *qm) {
 }
 
 static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CONTEXT *qc,
-                             QUERY_INSTANCE *qi, QUERY_DIMENSION *qd) {
+                             QUERY_INSTANCE *qi, QUERY_DIMENSION *qd, RRDR_DIMENSION_FLAGS options) {
     QUERY_TARGET *qt = qtl->qt;
     RRDMETRIC *rm = rrdmetric_acquired_value(qd->rma);
     RRDINSTANCE *ri = rm->ri;
@@ -232,101 +232,50 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
         }
     }
 
-    bool release_retention = true;
     bool timeframe_matches =
             (tiers_added &&
             query_target_retention_matches_query(qt, common_first_time_s, common_last_time_s, common_update_every_s))
             ? true : false;
 
     if(timeframe_matches) {
-        RRDR_DIMENSION_FLAGS options = RRDR_DIMENSION_DEFAULT;
+        if(ri->rrdset)
+            ri->rrdset->last_accessed_time_s = qtl->start_s;
 
-        if (rrd_flag_check(rm, RRD_FLAG_HIDDEN)
-            || (rm->rrddim && rrddim_option_check(rm->rrddim, RRDDIM_OPTION_HIDDEN))) {
-            options |= RRDR_DIMENSION_HIDDEN;
-            options &= ~RRDR_DIMENSION_SELECTED;
+        if (qt->query.used == qt->query.size) {
+            size_t old_mem = qt->query.size * sizeof(*qt->query.array);
+            qt->query.size = (qt->query.size) ? qt->query.size * 2 : 1;
+            size_t new_mem = qt->query.size * sizeof(*qt->query.array);
+            qt->query.array = reallocz(qt->query.array, new_mem);
+
+            __atomic_add_fetch(&netdata_buffers_statistics.query_targets_size, new_mem - old_mem, __ATOMIC_RELAXED);
+        }
+        QUERY_METRIC *qm = &qt->query.array[qt->query.used++];
+        memset(qm, 0, sizeof(*qm));
+
+        qm->status = options;
+
+        qm->link.query_host_id = qn->slot;
+        qm->link.query_context_id = qc->slot;
+        qm->link.query_instance_id = qi->slot;
+        qm->link.query_dimension_id = qd->slot;
+
+        if (!qt->db.first_time_s || common_first_time_s < qt->db.first_time_s)
+            qt->db.first_time_s = common_first_time_s;
+
+        if (!qt->db.last_time_s || common_last_time_s > qt->db.last_time_s)
+            qt->db.last_time_s = common_last_time_s;
+
+        for (size_t tier = 0; tier < storage_tiers; tier++) {
+            qm->tiers[tier].eng = tier_retention[tier].eng;
+            qm->tiers[tier].db_metric_handle = tier_retention[tier].db_metric_handle;
+            qm->tiers[tier].db_first_time_s = tier_retention[tier].db_first_time_s;
+            qm->tiers[tier].db_last_time_s = tier_retention[tier].db_last_time_s;
+            qm->tiers[tier].db_update_every_s = tier_retention[tier].db_update_every_s;
         }
 
-        if (qt->query.pattern) {
-            // we have a dimensions pattern, and it matched this metric at query_dimension_add()
-            // so, we need to remove the hidden flag
-            options |= (RRDR_DIMENSION_SELECTED | RRDR_DIMENSION_NONZERO);
-            options &= ~RRDR_DIMENSION_HIDDEN;
-        }
-        else {
-            // we don't have a dimensions pattern
-            // so this is a selected dimension
-            // if it is not hidden
-            if(!(options & RRDR_DIMENSION_HIDDEN))
-                options |= RRDR_DIMENSION_SELECTED;
-        }
-
-        if((options & RRDR_DIMENSION_HIDDEN) && (options & RRDR_DIMENSION_SELECTED))
-            options &= ~RRDR_DIMENSION_HIDDEN;
-
-        if(!(options & RRDR_DIMENSION_HIDDEN) || (qt->request.options & RRDR_OPTION_PERCENTAGE)) {
-            // we have a non-hidden dimension
-            // let's add it to the query metrics
-
-            if(ri->rrdset)
-                ri->rrdset->last_accessed_time_s = qtl->start_s;
-
-            if (qt->query.used == qt->query.size) {
-                size_t old_mem = qt->query.size * sizeof(*qt->query.array);
-                qt->query.size = (qt->query.size) ? qt->query.size * 2 : 1;
-                size_t new_mem = qt->query.size * sizeof(*qt->query.array);
-                qt->query.array = reallocz(qt->query.array, new_mem);
-
-                __atomic_add_fetch(&netdata_buffers_statistics.query_targets_size, new_mem - old_mem, __ATOMIC_RELAXED);
-            }
-            QUERY_METRIC *qm = &qt->query.array[qt->query.used++];
-            memset(qm, 0, sizeof(*qm));
-
-            qm->status = options;
-
-            qm->link.query_host_id = qn->slot;
-            qm->link.query_context_id = qc->slot;
-            qm->link.query_instance_id = qi->slot;
-            qm->link.query_dimension_id = qd->slot;
-
-            if (!qt->db.first_time_s || common_first_time_s < qt->db.first_time_s)
-                qt->db.first_time_s = common_first_time_s;
-
-            if (!qt->db.last_time_s || common_last_time_s > qt->db.last_time_s)
-                qt->db.last_time_s = common_last_time_s;
-
-            for (size_t tier = 0; tier < storage_tiers; tier++) {
-                qm->tiers[tier].eng = tier_retention[tier].eng;
-                qm->tiers[tier].db_metric_handle = tier_retention[tier].db_metric_handle;
-                qm->tiers[tier].db_first_time_s = tier_retention[tier].db_first_time_s;
-                qm->tiers[tier].db_last_time_s = tier_retention[tier].db_last_time_s;
-                qm->tiers[tier].db_update_every_s = tier_retention[tier].db_update_every_s;
-            }
-
-            release_retention = false;
-
-            qi->metrics.selected++;
-            qc->metrics.selected++;
-            qn->metrics.selected++;
-        }
-        else {
-            qi->metrics.excluded++;
-            qc->metrics.excluded++;
-            qn->metrics.excluded++;
-
-            qd->status |= QUERY_STATUS_DIMENSION_HIDDEN;
-        }
+        return true;
     }
     else {
-//        qi->metrics.excluded++;
-//        qc->metrics.excluded++;
-//        qn->metrics.excluded++;
-
-        qd->status |= QUERY_STATUS_DIMENSION_NODATA;
-        qtl->metrics_skipped_due_to_not_matching_timeframe++;
-    }
-
-    if(release_retention) {
         // cleanup anything we allocated to the retention we will not use
         for(size_t tier = 0; tier < storage_tiers ;tier++) {
             if (tier_retention[tier].db_metric_handle)
@@ -335,8 +284,6 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
 
         return false;
     }
-
-    return true;
 }
 
 static inline bool rrdmetric_retention_matches_query(QUERY_TARGET *qt, RRDMETRIC *rm, time_t now_s) {
@@ -386,14 +333,69 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
             undo = true;
     }
     else {
-        if (!qt->query.pattern ||
-           (qtl->match_ids && simple_pattern_matches_string(qt->query.pattern, rm->id)) ||
-           (qtl->match_names && rm->name != rm->id && simple_pattern_matches_string(qt->query.pattern, rm->name))
-           ) {
-            if(query_metric_add(qtl, qn, qc, qi, qd))
+        RRDR_DIMENSION_FLAGS options = RRDR_DIMENSION_DEFAULT;
+        bool needed = false;
+
+        if (qt->query.pattern) {
+            // the user asked for specific dimensions
+
+            if ((qtl->match_ids && simple_pattern_matches_string(qt->query.pattern, rm->id)) ||
+                (qtl->match_names && rm->name != rm->id &&
+                 simple_pattern_matches_string(qt->query.pattern, rm->name))) {
+                // the user asked for this dimension
+                needed = true;
+                options |= RRDR_DIMENSION_SELECTED | RRDR_DIMENSION_NONZERO;
+            }
+            else {
+                // the user selection does not match this dimension
+                // but, we may still need to query it
+
+                if (qt->request.options & RRDR_OPTION_PERCENTAGE) {
+                    // this is percentage calculation
+                    // so, we need this dimension to calculate the percentage
+                    needed = true;
+                    options |= RRDR_DIMENSION_HIDDEN;
+                }
+                else {
+                    // the user did not select this dimension
+                    // and the calculation is not percentage
+                    // so, no need to query it
+                    ;
+                }
+            }
+        }
+        else {
+            // we don't have a dimensions pattern
+            // so this is a selected dimension
+            // if it is not hidden
+
+            if(rrd_flag_check(rm, RRD_FLAG_HIDDEN) || (rm->rrddim && rrddim_option_check(rm->rrddim, RRDDIM_OPTION_HIDDEN))) {
+                // this is a hidden dimension
+                // we don't need to query it
+                qd->status |= QUERY_STATUS_DIMENSION_HIDDEN;
+            }
+            else {
+                // this is a not hidden dimension
+                // and the user did not provide any selection for dimensions
+                // so, we need to query it
+                needed = true;
+                options |= RRDR_DIMENSION_SELECTED;
+            }
+        }
+
+        if (needed) {
+            if(query_metric_add(qtl, qn, qc, qi, qd, options)) {
                 (*metrics_added)++;
-            else
+
+                qi->metrics.selected++;
+                qc->metrics.selected++;
+                qn->metrics.selected++;
+            }
+            else {
                 undo = true;
+                qd->status |= QUERY_STATUS_DIMENSION_NODATA;
+                qtl->metrics_skipped_due_to_not_matching_timeframe++;
+            }
         }
         else if(rrdmetric_retention_matches_query(qt, rm, qtl->start_s)) {
             qi->metrics.excluded++;
