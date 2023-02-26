@@ -162,8 +162,7 @@ collect from across your infrastructure with Netdata.
   <Box
     title="Alerts and notifications">
     <BoxList>
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.md)" title="View active alerts" />
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/smartboard.md)" title="Alerts Smartboard" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alarms.md#netdata-cloud)" title="View active alerts" />
       <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md)" title="Alert notifications" />
     </BoxList>
   </Box>
@@ -194,8 +193,7 @@ collect from across your infrastructure with Netdata.
   - [Kubernetes](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md)
   - [Create new dashboards](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md)
 - Alerts and notifications
-  - [View active alerts](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.md)
-  - [Alerts Smartboard](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/smartboard.md)
+  - [View active alerts](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alarms.md#netdata-cloud)
   - [Alert notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md)
 - Troubleshooting with Netdata Cloud
   - [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md)

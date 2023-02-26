@@ -1,12 +1,4 @@
-<!--
-title: "Nodes view"
-description: "See charts from all your nodes in one pane of glass, then dive in to embedded dashboards for granular troubleshooting of ongoing issues."
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md"
-sidebar_label: "Nodes view"
-learn_status: "Published"
-learn_topic_type: "Concepts"
-learn_rel_path: "Operations/Visualizations"
--->
+# Nodes view
 
 The Nodes view lets you see and customize key metrics from any number of Agent-monitored nodes and seamlessly navigate
 to any node's dashboard for troubleshooting performance issues or anomalies using Netdata's highly-granular metrics.
@@ -45,8 +37,3 @@ to learn how to use dozens of pre-installed collectors that can instantly collec
 If you want to see up to 30 days of historical metrics in Cloud (and more on individual node dashboards), read about [changing how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md). Also, see our
 [calculator](/docs/store/change-metrics-storage#calculate-the-system-resources-RAM-disk-space-needed-to-store-metrics)
 for finding the disk and RAM you need to store metrics for a certain period of time.
-
-## What's next?
-
-Now that you know how to view your nodes at a glance, learn how to [track active
-alarms](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.md) with the Alerts Smartboard.
