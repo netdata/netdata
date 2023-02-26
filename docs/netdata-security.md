@@ -1,13 +1,3 @@
-<!--
-title: "Security design"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-security.md
-sidebar_label: "Security Design"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Configuration"
-sidebar_position: 20
--->
-
 # Security design
 
 We have given special attention to all aspects of Netdata, ensuring that everything throughout its operation is as secure as possible. Netdata has been designed with security in mind.
@@ -241,7 +231,7 @@ Of course, there are many more methods you could use to protect Netdata:
     Netdata server. This requires more resources (you will need a bigger parent Netdata server), but does not require
     any firewall changes, since all the child Netdata servers will not be listening for incoming connections.
 
-## Anonymous Statistics
+## Anonymous statistics
 
 ### Registry or how to not send any information to a third party server
 
@@ -255,7 +245,7 @@ If sending this information to the central Netdata registry violates your securi
 ### Opt-out of anonymous statistics
 
 Starting with v1.30, Netdata collects anonymous usage information by default and sends it to a self hosted PostHog instance within the Netdata infrastructure. Read
-about the information collected, and learn how to-opt, on our [anonymous statistics](anonymous-statistics.md) page.
+about the information collected, and learn how to-opt, on our [anonymous telemetry events](https://github.com/netdata/netdata/blob/master/docs/anonymous-statistics.md) page.
 
 The usage statistics are _vital_ for us, as we use them to discover bugs and prioritize new features. We thank you for
 _actively_ contributing to Netdata's future.
