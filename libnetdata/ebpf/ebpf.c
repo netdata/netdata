@@ -454,6 +454,51 @@ void ebpf_update_stats(ebpf_plugin_stats_t *report, ebpf_module_t *em)
     ebpf_stats_targets(report, em->targets);
 }
 
+/**
+ * Update Kernel memory
+ *
+ * This algorithm is an adaptation of https://elixir.bootlin.com/linux/v6.1.14/source/tools/bpf/bpftool/common.c#L402
+ * to get 'memlock' data.
+ *
+ * @param report  the output structure
+ * @param fd      the file descriptor that function needs to get information
+ */
+void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *map)
+{
+    int fd = map->map_fd;
+    if (fd == ND_EBPF_MAP_FD_NOT_INITIALIZED)
+        return;
+
+    char filename[FILENAME_MAX+1];
+    snprintfz(filename, FILENAME_MAX, "/proc/self/fdinfo/%d", fd);
+    procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
+    if(unlikely(!ff)) {
+        error("Cannot open %s", filename);
+        return;
+    }
+
+    ff = procfile_readall(ff);
+    if(unlikely(!ff))
+        return;
+
+    unsigned long i, lines = procfile_lines(ff);
+    char *memlock = { "memlock" };
+    size_t length = strlen(memlock);
+    for(i = 0; i < lines ; i++) {
+        char *cmp = procfile_lineword(ff, i,0);
+        if (!strncmp(memlock, cmp, length)) {
+            uint64_t memsize = (uint64_t) str2l(procfile_lineword(ff, i,1));
+            report->memlock_kern += memsize;
+#ifdef NETDATA_DEV_MODE
+            info("Hash table %s (FD = %d) is consuming %lu bytes", map->name, fd, memsize);
+#endif
+            break;
+        }
+    }
+
+    procfile_close(ff);
+}
+
 //----------------------------------------------------------------------------------------------------------------------
 
 void ebpf_update_pid_table(ebpf_local_maps_t *pid, ebpf_module_t *em)
