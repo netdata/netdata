@@ -241,6 +241,7 @@ typedef struct ebpf_plugin_stats {
 
     uint64_t memlock_kern; // The same information reported by bpftool, but it is not accurated
                            // https://lore.kernel.org/linux-mm/20230112155326.26902-5-laoar.shao@gmail.com/T/
+    uint32_t hash_tables; // Number of hash tables used on the system.
 } ebpf_plugin_stats_t;
 
 typedef enum netdata_apps_integration_flags {

@@ -489,6 +489,7 @@ void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *m
         if (!strncmp(memlock, cmp, length)) {
             uint64_t memsize = (uint64_t) str2l(procfile_lineword(ff, i,1));
             report->memlock_kern += memsize;
+            report->hash_tables += 1;
 #ifdef NETDATA_DEV_MODE
             info("Hash table %s (FD = %d) is consuming %lu bytes", map->name, fd, memsize);
 #endif
