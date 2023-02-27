@@ -5,6 +5,10 @@
 #include "ebpf.h"
 #include "ebpf_socket.h"
 
+// ----------------------------------------------------------------------------
+// ARAL vectors used to speed up processing
+ARAL *ebpf_aral_socket_pid;
+
 /*****************************************************************
  *
  *  GLOBAL VARIABLES
@@ -428,6 +432,46 @@ static inline int ebpf_socket_load_and_attach(struct socket_bpf *obj, ebpf_modul
     return ret;
 }
 #endif
+
+/*****************************************************************
+ *
+ *  ARAL FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * eBPF socket Aral init
+ *
+ * Initiallize array allocator that will be used when integration with apps is enabled.
+ */
+static inline void ebpf_socket_aral_init()
+{
+    ebpf_aral_socket_pid = ebpf_allocate_pid_aral("ebpf-socket", sizeof(ebpf_socket_publish_apps_t));
+}
+
+/**
+ * eBPF socket get
+ *
+ * Get a ebpf_socket_publish_apps_t entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+ebpf_socket_publish_apps_t *ebpf_socket_stat_get(void)
+{
+    ebpf_socket_publish_apps_t *target = aral_mallocz(ebpf_aral_socket_pid);
+    memset(target, 0, sizeof(ebpf_socket_publish_apps_t));
+    return target;
+}
+
+/**
+ * eBPF socket release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_socket_release(ebpf_socket_publish_apps_t *stat)
+{
+    aral_freez(ebpf_aral_socket_pid, stat);
+}
 
 /*****************************************************************
  *
@@ -2227,7 +2271,7 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
 {
     ebpf_socket_publish_apps_t *curr = socket_bandwidth_curr[current_pid];
     if (!curr) {
-        curr = callocz(1, sizeof(ebpf_socket_publish_apps_t));
+        curr = ebpf_socket_stat_get();
         socket_bandwidth_curr[current_pid] = curr;
     }
 
@@ -2947,10 +2991,11 @@ static void ebpf_socket_allocate_global_vectors(int apps)
     memset(socket_publish_aggregated, 0 ,NETDATA_MAX_SOCKET_VECTOR * sizeof(netdata_publish_syscall_t));
     socket_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
 
-    if (apps)
+    if (apps) {
+        ebpf_socket_aral_init();
         socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
-
-    bandwidth_vector = callocz((size_t)ebpf_nprocs, sizeof(ebpf_bandwidth_t));
+        bandwidth_vector = callocz((size_t)ebpf_nprocs, sizeof(ebpf_bandwidth_t));
+    }
 
     socket_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_socket_t));
     if (network_viewer_opt.enabled) {

@@ -168,6 +168,7 @@ extern netdata_publish_vfs_t **vfs_pid;
 
 void *ebpf_vfs_thread(void *ptr);
 void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr);
+void ebpf_vfs_release(netdata_publish_vfs_t *stat);
 extern netdata_ebpf_targets_t vfs_targets[];
 
 extern struct config vfs_config;
