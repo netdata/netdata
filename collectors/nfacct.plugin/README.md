@@ -13,6 +13,11 @@ learn_rel_path: "Integrations/Monitor/Networking"
 
 ## Prerequisites
 
+If you are using our native DEB/RPM packages, install the
+`netdata-plugin-nfacct` package using your system package manager.
+
+If you built Netdata locally:
+
 1.  install `libmnl-dev` and `libnetfilter-acct-dev` using the package manager of your system.
 
 2.  re-install Netdata from source. The installer will detect that the required libraries are now available and will also build `netdata.plugin`.
