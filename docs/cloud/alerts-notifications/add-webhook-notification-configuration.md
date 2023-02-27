@@ -56,8 +56,8 @@ The notification content sent to the destination service will be a JSON object h
 | severity | string | Alert severity, can be one of "warning", "critical" or "clear". |
 | date | string | Date of the alert in ISO8601 format. |
 | duration | string |  Duration the alert has been raised. |
-| critical_count | integer | umber of critical alerts currently existing on the same node. |
-| warning_count | integer | Number of warning alerts currently existing on the same node. |
+| additional_active_critical_alerts | integer | Number of additional critical alerts currently existing on the same node. |
+| additional_active_warning_alerts | integer | Number of additional warning alerts currently existing on the same node. |
 | alarm_url | string | Netdata Cloud URL for this alarm. |
 
 ### Extra headers
