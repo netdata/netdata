@@ -47,17 +47,19 @@ A few important things that users should be aware of:
 
 </a>
 
-Flex / Bison
+Logs management introduces minimal extra dependencies: `flex` and `bison` packages are required to build Fluent Bit and that's it! 
+
+However, if systemd development libraries are missing at build time, the systemd log collector will not be available. This can be fixed by installing the missing libraries prior to building the agent:
+
+Debian / Ubuntu:
 
 ```
-sudo apt install libsystemd-dev
+apt install libsystemd-dev
 ```
-
-If /dev/kmsg permission denied for normal user (non-root):
+or Centos / Fedora:
 ```
-sudo sysctl kernel.dmesg_restrict=0
+yum install systemd-devel
 ```
-
 
 <a name="general-configuration"/>
 
@@ -85,6 +87,11 @@ Configuration options common to all log source types:
 ## Collector-specific Configuration
 
 </a>
+
+If /dev/kmsg permission denied for normal user (non-root):
+```
+sudo sysctl kernel.dmesg_restrict=0
+```
 
 For kmsg, pay attention to `KERNEL_LOGS_COLLECT_INIT_WAIT`.
 
