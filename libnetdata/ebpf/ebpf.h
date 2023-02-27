@@ -372,6 +372,6 @@ struct btf *ebpf_load_btf_file(char *path, char *filename);
 int ebpf_is_function_inside_btf(struct btf *file, char *function);
 #endif
 
-void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *map);
+void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *maps);
 
 #endif /* NETDATA_EBPF_H */
