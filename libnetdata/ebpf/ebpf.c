@@ -497,7 +497,8 @@ void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *m
                 report->memlock_kern += memsize;
                 report->hash_tables += 1;
 #ifdef NETDATA_DEV_MODE
-                info("Hash table %s (FD = %d) is consuming %lu bytes", map->name, fd, memsize);
+                info("Hash table %u: %s (FD = %d) is consuming %lu bytes totalizing %lu bytes",
+                     report->hash_tables, map->name, fd, memsize, report->memlock_kern);
 #endif
                 break;
             }
