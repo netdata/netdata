@@ -4,7 +4,13 @@
 NETDATA_OWNER="@netdata_user_POST@:@netdata_user_POST@"
 NETDATA_PIDFILE="@localstatedir_POST@/run/netdata/netdata.pid"
 
+description="Run the Netdata system monitoring agent."
+
 extra_started_commands="reload rotate save"
+description_reload="Reload health configuration."
+description_rotate="Reopen log files."
+description_save="Force sync of database to disk."
+
 command_prefix="@sbindir_POST@"
 command="${command_prefix}/netdata"
 command_args="-P ${NETDATA_PIDFILE} ${NETDATA_EXTRA_ARGS}"
