@@ -46,7 +46,8 @@
 
 <form id="form" name="query_form" action="javascript:submit_query()"">
   <h3>Query parameters</h3>
-  <select id="sources"></select><br><br>
+  <hr>
+  <div id="sources"></div>
   <label for="req_from">Requested from:</label>
   <input type="text" id="req_from" name="req_from"><br><br>
   <label for="req_until">Requested until:</label>
@@ -71,27 +72,30 @@ document.getElementById('quota').value = '524288';
 document.getElementById('keyword_is_regex').checked = true;
 document.getElementById('keyword_case_sensitive').checked = false;
 
-function populateSelect() {
+function populate_sources_checkboxes() {
   const xmlhttp = new XMLHttpRequest();
   xmlhttp.onload = function() {
     results_obj = JSON.parse(this.responseText);
     console.log(results_obj["log sources"]);
     let ele = document.getElementById('sources');
+    ele.innerHTML += '<h4>Select log sources:</h4>';
     Object.keys(results_obj["log sources"]).forEach(function(log_source) {
-      ele.innerHTML += '<option value="' + log_source + '">' + log_source + '</option>';
+      console.log(log_source.basename);
+      ele.innerHTML +=  '<label>' + log_source + '</label>' + 
+                        '<input type="checkbox" name="' + log_source +'" class="sourceCheckBox"><br><br>';
     });
   }
   xmlhttp.open("GET", "http://localhost:19999/api/v1/logsmanagement_sources", true);
   xmlhttp.send(null);
 }
-window.onload = populateSelect;
+window.onload = populate_sources_checkboxes;
 
 function submit_query() {
   const xmlhttp = new XMLHttpRequest();
   xmlhttp.onload = function() {
     results_obj = JSON.parse(this.responseText);
     console.log(results_obj);
-    text =  "<h3>Results</h3>" +
+    text =  "<h3>Results</h3><hr>" +
             "<b>API version:</b> " + results_obj.api_version + "<br>" +
             "<b>Requested from:</b> " + results_obj.requested_from + "<br>" +
             "<b>Requested until:</b> " + results_obj.requested_until + "<br>" +
@@ -125,14 +129,25 @@ function submit_query() {
   keyword_value = encodeURIComponent(keyword.value);
   sanitize_keyword = document.getElementById('keyword_is_regex').checked ? "0" : "1";
   ignore_case = document.getElementById('keyword_case_sensitive').checked ? "0" : "1";
-  xmlhttp.open("GET", "http://localhost:19999/api/v1/logsmanagement?" + 
+
+  xmlhttp_req = "http://localhost:19999/api/v1/logsmanagement?" + 
                       "from=" + req_from_value + 
                       "&until=" + req_until_value + 
                       "&quota=" + quota_value +
                       "&keyword=" + keyword_value +
                       "&sanitize_keyword=" + sanitize_keyword +
-                      "&ignore_case=" + ignore_case +
-                      "&chart_name=" + sources_value, true);
+                      "&ignore_case=" + ignore_case;
+  
+  Array.from(document.getElementsByClassName("sourceCheckBox")).forEach(
+    function(element, index, array) {
+        if(element.checked){
+          xmlhttp_req += "&chart_name=" + element.name;
+          console.log(element.name);
+        }
+      }
+  );
+
+  xmlhttp.open("GET", xmlhttp_req, true);
   xmlhttp.send(null);
 }
 </script>
