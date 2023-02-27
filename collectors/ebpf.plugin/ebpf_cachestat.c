@@ -1334,7 +1334,7 @@ void *ebpf_cachestat_thread(void *ptr)
 
     pthread_mutex_lock(&lock);
     ebpf_update_stats(&plugin_statistics, em);
-    ebpf_update_kernel_memory(&plugin_statistics, cachestat_maps);
+    ebpf_update_kernel_memory(&plugin_statistics, em->maps);
     ebpf_create_memory_charts(em);
     pthread_mutex_unlock(&lock);
 
