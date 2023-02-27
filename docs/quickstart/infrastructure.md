@@ -94,7 +94,7 @@ from every node in your infrastructure on a single dashboard.
 ![An example system CPU
 dashboard](https://user-images.githubusercontent.com/1153921/108732974-4b09c480-74eb-11eb-87a2-c67e569c08b6.png)
 
-Read more about [creating new dashboards](https://github.com/netdata/netdata/blob/master/docs/visualize/create-dashboards.md) for more details about the process and
+Read more about [creating new dashboards](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md) for more details about the process and
 additional tips on best leveraging the feature to help you troubleshoot complex performance problems.
 
 ## Set up your nodes
