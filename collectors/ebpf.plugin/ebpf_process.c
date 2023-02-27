@@ -55,6 +55,7 @@ struct config process_config = { .first_section = NULL,
 
 static char *threads_stat[NETDATA_EBPF_THREAD_STAT_END] = {"total", "running"};
 static char *load_event_stat[NETDATA_EBPF_LOAD_STAT_END] = {"legacy", "co-re"};
+static char *memlock_stat = {"memory_locked"};
 
 /*****************************************************************
  *
@@ -457,6 +458,31 @@ static inline void ebpf_create_statistic_load_chart(ebpf_module_t *em)
 }
 
 /**
+ * Create chart for Load Thread
+ *
+ * Write to standard output current values for load mode.
+ *
+ * @param em a pointer to the structure with the default values.
+ */
+static inline void ebpf_create_statistic_kernel_memory(ebpf_module_t *em)
+{
+    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
+                         NETDATA_EBPF_KERNEL_MEMORY,
+                         "Memory allocated for hash tables.",
+                         "bytes",
+                         NETDATA_EBPF_FAMILY,
+                         NETDATA_EBPF_CHART_TYPE_LINE,
+                         NULL,
+                         140002,
+                         em->update_every,
+                         NETDATA_EBPF_MODULE_NAME_PROCESS);
+
+    ebpf_write_global_dimension(memlock_stat,
+                                memlock_stat,
+                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+}
+
+/**
  * Update Internal Metric variable
  *
  * By default eBPF.plugin sends internal metrics for netdata, but user can
@@ -487,6 +513,8 @@ static void ebpf_create_statistic_charts(ebpf_module_t *em)
     ebpf_create_statistic_thread_chart(em);
 
     ebpf_create_statistic_load_chart(em);
+
+    ebpf_create_statistic_kernel_memory(em);
 }
 
 /**
@@ -1000,6 +1028,10 @@ void ebpf_send_statistic_data()
     write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_LOAD_METHOD);
     write_chart_dimension(load_event_stat[NETDATA_EBPF_LOAD_STAT_LEGACY], (long long)plugin_statistics.legacy);
     write_chart_dimension(load_event_stat[NETDATA_EBPF_LOAD_STAT_CORE], (long long)plugin_statistics.core);
+    write_end_chart();
+
+    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_KERNEL_MEMORY);
+    write_chart_dimension(memlock_stat, (long long)plugin_statistics.memlock_kern);
     write_end_chart();
 }
 
