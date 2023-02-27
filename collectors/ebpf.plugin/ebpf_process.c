@@ -458,9 +458,9 @@ static inline void ebpf_create_statistic_load_chart(ebpf_module_t *em)
 }
 
 /**
- * Create chart for Load Thread
+ * Create chart for Kernel Memory
  *
- * Write to standard output current values for load mode.
+ * Write to standard output current values for allocated memory.
  *
  * @param em a pointer to the structure with the default values.
  */
