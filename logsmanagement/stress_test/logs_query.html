@@ -48,6 +48,7 @@
   <h3>Query parameters</h3>
   <hr>
   <div id="sources"></div>
+  <h4>Set query parameters:</h4>
   <label for="req_from">Requested from:</label>
   <input type="text" id="req_from" name="req_from"><br><br>
   <label for="req_until">Requested until:</label>
@@ -79,11 +80,14 @@ function populate_sources_checkboxes() {
     console.log(results_obj["log sources"]);
     let ele = document.getElementById('sources');
     ele.innerHTML += '<h4>Select log sources:</h4>';
-    Object.keys(results_obj["log sources"]).forEach(function(log_source) {
-      console.log(log_source.basename);
-      ele.innerHTML +=  '<label>' + log_source + '</label>' + 
-                        '<input type="checkbox" name="' + log_source +'" class="sourceCheckBox"><br><br>';
-    });
+    for (const [key, value] of Object.entries(results_obj["log sources"])) {
+      ele.innerHTML +=  '<label>' + key + '</label>' 
+      if(value["DB dir"]){
+        ele.innerHTML += '<input type="checkbox" name="' + key +'" class="sourceCheckBox"><br><br>';
+      } else {
+        ele.innerHTML += '<input type="checkbox" name="' + key +'" class="sourceCheckBox" disabled="disabled"> <i>(non-queryable)</i><br><br>';
+      }
+    }
   }
   xmlhttp.open("GET", "http://localhost:19999/api/v1/logsmanagement_sources", true);
   xmlhttp.send(null);
