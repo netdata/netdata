@@ -67,12 +67,3 @@ names:
 | `disk.ops`     | `disk_ops.sda`     | `disk_ops.sdb`     |
 | `disk.backlog` | `disk_backlog.sda` | `disk_backlog.sdb` |
 | `disk.util`    | `disk_util.sda`    | `disk_util.sdb`    |
-
-## What's next?
-
-With an understanding of a chart's dimensions, context, and family, you're now ready to dig even deeper into Netdata's
-dashboard. We recommend looking into [using the timeframe selector](https://github.com/netdata/netdata/blob/master/docs/dashboard/visualization-date-and-time-controls.md).
-
-If you feel comfortable with the [dashboard](https://github.com/netdata/netdata/blob/master/docs/dashboard/how-dashboard-works.md) and interacting with charts, we
-recommend learning about [configuration](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md). While Netdata doesn't _require_ a complicated setup
-process or a query language to create charts, there are a lot of ways to tweak the experience to match your needs.

@@ -1,13 +1,4 @@
-<!--
-title: "Health monitoring"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/health/README.md
-sidebar_label: "Health monitoring"
-learn_status: "Published"
-learn_topic_type: "Concepts"
-learn_rel_path: "Concepts"
--->
-
-# Health monitoring
+# Alerts and notifications
 
 The Netdata Agent is a health watchdog for the health and performance of your systems, services, and applications. We've
 worked closely with our community of DevOps engineers, SREs, and developers to define hundreds of production-ready
