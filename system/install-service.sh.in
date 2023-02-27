@@ -346,10 +346,12 @@ disable_openrc() {
 install_openrc_service() {
   install_generic_service openrc/init.d OpenRC /etc/init.d/netdata enable_openrc disable_openrc
 
-  info "Installing OpenRC configuration file."
+  if [ ! -f /etc/conf.d/netdata ]; then
+    info "Installing OpenRC configuration file."
 
-  if ! install -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/openrc/conf.d/netdata" "/etc/conf.d/netdata"; then
-    warning "Failed to install configuration file, however the service will still work."
+    if ! install -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/openrc/conf.d/netdata" "/etc/conf.d/netdata"; then
+        warning "Failed to install configuration file, however the service will still work."
+    fi
   fi
 }
 
