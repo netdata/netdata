@@ -344,7 +344,7 @@ static void ebpf_dcstat_exit(void *ptr)
  */
 static inline void ebpf_dcstat_aral_init()
 {
-    ebpf_aral_dcstat_pid = ebpf_allocate_pid_aral("ebpf-dcstat", sizeof(netdata_publish_dcstat_t));
+    ebpf_aral_dcstat_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_DCSTAT_ARAL_NAME, sizeof(netdata_publish_dcstat_t));
 }
 
 /**
@@ -1053,6 +1053,9 @@ static void dcstat_collector(ebpf_module_t *em)
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_dcache_send_apps_data(apps_groups_root_target);
 
+        if (ebpf_aral_dcstat_pid)
+            ebpf_send_data_aral_chart(ebpf_aral_dcstat_pid, em);
+
         if (cgroups)
             ebpf_dc_send_cgroup_data(update_every);
 
@@ -1202,6 +1205,9 @@ void *ebpf_dcstat_thread(void *ptr)
     ebpf_create_filesystem_charts(em->update_every);
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
+    if (ebpf_aral_dcstat_pid)
+        ebpf_statistic_create_aral_chart(NETDATA_EBPF_DCSTAT_ARAL_NAME, em);
+
     pthread_mutex_unlock(&lock);
 
     dcstat_collector(em);
