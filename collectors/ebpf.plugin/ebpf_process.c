@@ -56,6 +56,7 @@ struct config process_config = { .first_section = NULL,
 static char *threads_stat[NETDATA_EBPF_THREAD_STAT_END] = {"total", "running"};
 static char *load_event_stat[NETDATA_EBPF_LOAD_STAT_END] = {"legacy", "co-re"};
 static char *memlock_stat = {"memory_locked"};
+static char *hash_table_stat = {"hash_table"};
 
 /*****************************************************************
  *
@@ -483,6 +484,31 @@ static inline void ebpf_create_statistic_kernel_memory(ebpf_module_t *em)
 }
 
 /**
+ * Create chart Hash Table
+ *
+ * Write to standard output number of hash tables used with this software.
+ *
+ * @param em a pointer to the structure with the default values.
+ */
+static inline void ebpf_create_statistic_hash_tables(ebpf_module_t *em)
+{
+    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
+                         NETDATA_EBPF_HASH_TABLES_LOADED,
+                         "Number of hash tables loaded.",
+                         "hash tables",
+                         NETDATA_EBPF_FAMILY,
+                         NETDATA_EBPF_CHART_TYPE_LINE,
+                         NULL,
+                         140003,
+                         em->update_every,
+                         NETDATA_EBPF_MODULE_NAME_PROCESS);
+
+    ebpf_write_global_dimension(hash_table_stat,
+                                hash_table_stat,
+                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+}
+
+/**
  * Update Internal Metric variable
  *
  * By default eBPF.plugin sends internal metrics for netdata, but user can
@@ -515,6 +541,8 @@ static void ebpf_create_statistic_charts(ebpf_module_t *em)
     ebpf_create_statistic_load_chart(em);
 
     ebpf_create_statistic_kernel_memory(em);
+
+    ebpf_create_statistic_hash_tables(em);
 }
 
 /**
@@ -1032,6 +1060,10 @@ void ebpf_send_statistic_data()
 
     write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_KERNEL_MEMORY);
     write_chart_dimension(memlock_stat, (long long)plugin_statistics.memlock_kern);
+    write_end_chart();
+
+    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_HASH_TABLES_LOADED);
+    write_chart_dimension(hash_table_stat, (long long)plugin_statistics.hash_tables);
     write_end_chart();
 }
 
