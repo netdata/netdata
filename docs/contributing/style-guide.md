@@ -1,13 +1,3 @@
-<!--
-title: "Netdata style guide"
-description: "The Netdata style guide establishes editorial guidelines for all of Netdata's writing, including documentation, blog posts, in-product UX copy, and more."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/contributing/style-guide.md
-sidebar_label: "Netdata style guide"
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Contribute"
--->
-
 # Netdata style guide
 
 The _Netdata style guide_ establishes editorial guidelines for any writing produced by the Netdata team or the Netdata
@@ -356,34 +346,6 @@ The Netdata team uses [`remark-lint`](https://github.com/remarkjs/remark-lint) f
 
 If you want to see all the settings, open the
 [`remarkrc.js`](https://github.com/netdata/netdata/blob/master/.remarkrc.js) file in the `netdata/netdata` repository.
-
-### Frontmatter
-
-Every document must begin with frontmatter, followed by an H1 (`#`) heading.
-
-Unlike typical Markdown frontmatter, Netdata uses HTML comments (`<!--`, `-->`) to begin and end the frontmatter block.
-These HTML comments are later converted into typical frontmatter syntax when building [Netdata
-Learn](https://learn.netdata.cloud).
-
-Frontmatter _must_ contain the following variables:
-
-- A `title` that quickly and distinctly describes the document's content.
-- A `description` that elaborates on the purpose or goal of the document using no less than 100 characters and no more
-  than 155 characters.
-- A `custom_edit_url` that links directly to the GitHub URL where another user could suggest additional changes to the
-  published document.
-
-Some documents, like the Ansible guide and others in the `/docs/guides` folder, require an `image` variable as well. In
-this case, replace `/docs` with `/img/seo`, and then rebuild the remainder of the path to the document in question. End
-the path with `.png`. A member of the Netdata team will assist in creating the image when publishing the content.
-
-For example, here is the frontmatter for the guide
-about [deploying the Netdata Agent with Ansible](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/ansible.md).
-
-<img width="751" alt="image" src="https://user-images.githubusercontent.com/43294513/217607958-ef0f270d-7947-4d91-a9a5-56b17b4255ee.png"/>
-
-Questions about frontmatter in
-documentation? [Ask on our community forum](https://community.netdata.cloud/c/blog-posts-and-articles/6).
 
 ### Linking between documentation
 

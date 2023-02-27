@@ -85,7 +85,7 @@ given node to quickly _jump to the same chart in that node's single-node dashboa
 You can use single-node dashboards in Netdata Cloud to drill down on specific issues, scrub backward in time to
 investigate historical data, and see like metrics presented meaningfully to help you troubleshoot performance problems.
 All of the familiar [interactions](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md) are available, as is adding any chart
-to a [new dashboard](https://github.com/netdata/netdata/blob/master/docs/visualize/create-dashboards.md).
+to a [new dashboard](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md).
 
 ## Nodes view
 

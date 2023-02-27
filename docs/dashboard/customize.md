@@ -1,19 +1,6 @@
-<!--
-title: "Customize the standard dashboard"
-description: >-
-    "Netdata's preconfigured dashboard offers many customization options, such as choosing when 
-    charts are updated, your preferred theme, and custom text to document processes, and more."
-type: "how-to"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/dashboard/customize.md"
-sidebar_label: "Customize the standard dashboard"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Operations"
--->
-
 # Customize the standard dashboard
 
-While the [Netdata dashboard](https://github.com/netdata/netdata/blob/master/docs/dashboard/how-dashboard-works.md) comes preconfigured with hundreds of charts and
+While the [Netdata dashboard](https://github.com/netdata/netdata/blob/master/web/gui/README.md) comes preconfigured with hundreds of charts and
 thousands of metrics, you may want to alter your experience based on a particular use case or preferences.
 
 ## Dashboard settings

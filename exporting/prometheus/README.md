@@ -1,225 +1,21 @@
-<!--
-title: "Export metrics to Prometheus"
-description: "Export Netdata metrics to Prometheus for archiving and further analysis."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/exporting/prometheus/README.md"
-sidebar_label: "Using Netdata with Prometheus"
-learn_status: "Published"
-learn_rel_path: "Integrations/Export"
--->
-
-import { OneLineInstallWget, OneLineInstallCurl } from '@site/src/components/OneLineInstall/'
-
 # Using Netdata with Prometheus
 
-Prometheus is a distributed monitoring system which offers a very simple setup along with a robust data model. Recently
-Netdata added support for Prometheus. I'm going to quickly show you how to install both Netdata and Prometheus on the
-same server. We can then use Grafana pointed at Prometheus to obtain long term metrics Netdata offers. I'm assuming we
-are starting at a fresh ubuntu shell (whether you'd like to follow along in a VM or a cloud instance is up to you).
+Netdata supports exporting metrics to Prometheus in two ways:
 
-## Installing Netdata and Prometheus
+ - You can [configure Prometheus to scrape Netdata metrics](#configure-prometheus-to-scrape-netdata-metrics).
 
-### Installing Netdata
-
-There are number of ways to install Netdata according to
-[Installation](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md). The suggested way
-of installing the latest Netdata and keep it upgrade automatically.
-
-<!-- candidate for reuse -->
-
-To install Netdata, run the following as your normal user:
-
-<OneLineInstallWget/>
-
-Or, if you have cURL but not wget (such as on macOS):
-
-<OneLineInstallCurl/>
-
-At this point we should have Netdata listening on port 19999. Attempt to take your browser here:
-
-```sh
-http://your.netdata.ip:19999
-```
-
-_(replace `your.netdata.ip` with the IP or hostname of the server running Netdata)_
-
-### Installing Prometheus
-
-In order to install Prometheus we are going to introduce our own systemd startup script along with an example of
-prometheus.yaml configuration. Prometheus needs to be pointed to your server at a specific target url for it to scrape
-Netdata's api. Prometheus is always a pull model meaning Netdata is the passive client within this architecture.
-Prometheus always initiates the connection with Netdata.
-
-#### Download Prometheus
-
-```sh
-cd /tmp && curl -s https://api.github.com/repos/prometheus/prometheus/releases/latest \
-| grep "browser_download_url.*linux-amd64.tar.gz" \
-| cut -d '"' -f 4 \
-| wget -qi -
-```
-
-#### Create prometheus system user
-
-```sh
-sudo useradd -r prometheus
-```
-
-#### Create prometheus directory
-
-```sh
-sudo mkdir /opt/prometheus
-sudo chown prometheus:prometheus /opt/prometheus
-```
-
-#### Untar prometheus directory
-
-```sh
-sudo tar -xvf /tmp/prometheus-*linux-amd64.tar.gz -C /opt/prometheus --strip=1
-```
-
-#### Install prometheus.yml
-
-We will use the following `prometheus.yml` file. Save it at `/opt/prometheus/prometheus.yml`.
-
-Make sure to replace `your.netdata.ip` with the IP or hostname of the host running Netdata.
-
-```yaml
-# my global config
-global:
-  scrape_interval: 5s # Set the scrape interval to every 5 seconds. Default is every 1 minute.
-  evaluation_interval: 5s # Evaluate rules every 5 seconds. The default is every 1 minute.
-  # scrape_timeout is set to the global default (10s).
-
-  # Attach these labels to any time series or alerts when communicating with
-  # external systems (federation, remote storage, Alertmanager).
-  external_labels:
-    monitor: 'codelab-monitor'
-
-# Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
-rule_files:
-# - "first.rules"
-# - "second.rules"
-
-# A scrape configuration containing exactly one endpoint to scrape:
-# Here it's Prometheus itself.
-scrape_configs:
-  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
-  - job_name: 'prometheus'
-
-    # metrics_path defaults to '/metrics'
-    # scheme defaults to 'http'.
-
-    static_configs:
-      - targets: [ '0.0.0.0:9090' ]
-
-  - job_name: 'netdata-scrape'
-
-    metrics_path: '/api/v1/allmetrics'
-    params:
-      # format: prometheus | prometheus_all_hosts
-      # You can use `prometheus_all_hosts` if you want Prometheus to set the `instance` to your hostname instead of IP 
-      format: [ prometheus ]
-      #
-      # sources: as-collected | raw | average | sum | volume
-      # default is: average
-      #source: [as-collected]
-      #
-      # server name for this prometheus - the default is the client IP
-      # for Netdata to uniquely identify it
-      #server: ['prometheus1']
-    honor_labels: true
-
-    static_configs:
-      - targets: [ '{your.netdata.ip}:19999' ]
-```
-
-#### Install nodes.yml
-
-The following is completely optional, it will enable Prometheus to generate alerts from some Netdata sources. Tweak the
-values to your own needs. We will use the following `nodes.yml` file below. Save it at `/opt/prometheus/nodes.yml`, and
-add a _- "nodes.yml"_ entry under the _rule_files:_ section in the example prometheus.yml file above.
-
-```yaml
-groups:
-  - name: nodes
-
-    rules:
-      - alert: node_high_cpu_usage_70
-        expr: sum(sum_over_time(netdata_system_cpu_percentage_average{dimension=~"(user|system|softirq|irq|guest)"}[10m])) by (job) / sum(count_over_time(netdata_system_cpu_percentage_average{dimension="idle"}[10m])) by (job) > 70
-        for: 1m
-        annotations:
-          description: '{{ $labels.job }} on ''{{ $labels.job }}'' CPU usage is at {{ humanize $value }}%.'
-          summary: CPU alert for container node '{{ $labels.job }}'
-
-      - alert: node_high_memory_usage_70
-        expr: 100 / sum(netdata_system_ram_MB_average) by (job)
-          * sum(netdata_system_ram_MB_average{dimension=~"free|cached"}) by (job) < 30
-        for: 1m
-        annotations:
-          description: '{{ $labels.job }} memory usage is {{ humanize $value}}%.'
-          summary: Memory alert for container node '{{ $labels.job }}'
-
-      - alert: node_low_root_filesystem_space_20
-        expr: 100 / sum(netdata_disk_space_GB_average{family="/"}) by (job)
-          * sum(netdata_disk_space_GB_average{family="/",dimension=~"avail|cached"}) by (job) < 20
-        for: 1m
-        annotations:
-          description: '{{ $labels.job }} root filesystem space is {{ humanize $value}}%.'
-          summary: Root filesystem alert for container node '{{ $labels.job }}'
-
-      - alert: node_root_filesystem_fill_rate_6h
-        expr: predict_linear(netdata_disk_space_GB_average{family="/",dimension=~"avail|cached"}[1h], 6 * 3600) < 0
-        for: 1h
-        labels:
-          severity: critical
-        annotations:
-          description: Container node {{ $labels.job }} root filesystem is going to fill up in 6h.
-          summary: Disk fill alert for Swarm node '{{ $labels.job }}'
-```
-
-#### Install prometheus.service
-
-Save this service file as `/etc/systemd/system/prometheus.service`:
-
-```sh
-[Unit]
-Description=Prometheus Server
-AssertPathExists=/opt/prometheus
-
-[Service]
-Type=simple
-WorkingDirectory=/opt/prometheus
-User=prometheus
-Group=prometheus
-ExecStart=/opt/prometheus/prometheus --config.file=/opt/prometheus/prometheus.yml --log.level=info
-ExecReload=/bin/kill -SIGHUP $MAINPID
-ExecStop=/bin/kill -SIGINT $MAINPID
-
-[Install]
-WantedBy=multi-user.target
-```
-
-##### Start Prometheus
-
-```sh
-sudo systemctl start prometheus
-sudo systemctl enable prometheus
-```
-
-Prometheus should now start and listen on port 9090. Attempt to head there with your browser.
-
-If everything is working correctly when you fetch `http://your.prometheus.ip:9090` you will see a 'Status' tab. Click
-this and click on 'targets' We should see the Netdata host as a scraped target.
-
----
+ - You can [configure Netdata to push metrics to Prometheus](https://github.com/netdata/netdata/blob/master/exporting/prometheus/remote_write/README.md)
+   , using the Prometheus remote write API.
 
 ## Netdata support for Prometheus
 
-Before explaining the changes, we have to understand the key differences between Netdata and Prometheus.
+Regardless of the methodology, you first need to understand how Netdata structures the metrics it exports to Prometheus
+and the capabilities it provides. The examples provided in this document assume that you will be using Netdata as 
+a metrics endpoint, but the concepts apply as well to the remote write API method.
 
-### understanding Netdata metrics
+### Understanding Netdata metrics
 
-#### charts
+#### Charts
 
 Each chart in Netdata has several properties (common to all its metrics):
 
@@ -234,7 +30,7 @@ Each chart in Netdata has several properties (common to all its metrics):
 
 - `units` is the units for all the metrics attached to the chart.
 
-#### dimensions
+#### Dimensions
 
 Then each Netdata chart contains metrics called `dimensions`. All the dimensions of a chart have the same units of
 measurement, and are contextually in the same category (ie. the metrics for disk bandwidth are `read` and `write` and
@@ -465,4 +261,101 @@ through a web proxy, or when multiple Prometheus servers are NATed to a single I
 `&server=NAME` to the URL. This `NAME` is used by Netdata to uniquely identify each Prometheus server and keep track of
 its last access time.
 
+## Configure Prometheus to scrape Netdata metrics
 
+The following `prometheus.yml` file will scrape all netdata metrics "as collected". 
+
+Make sure to replace `your.netdata.ip` with the IP or hostname of the host running Netdata.
+
+```yaml
+# my global config
+global:
+  scrape_interval: 5s # Set the scrape interval to every 5 seconds. Default is every 1 minute.
+  evaluation_interval: 5s # Evaluate rules every 5 seconds. The default is every 1 minute.
+  # scrape_timeout is set to the global default (10s).
+
+  # Attach these labels to any time series or alerts when communicating with
+  # external systems (federation, remote storage, Alertmanager).
+  external_labels:
+    monitor: 'codelab-monitor'
+
+# Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
+rule_files:
+# - "first.rules"
+# - "second.rules"
+
+# A scrape configuration containing exactly one endpoint to scrape:
+# Here it's Prometheus itself.
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: 'prometheus'
+
+    # metrics_path defaults to '/metrics'
+    # scheme defaults to 'http'.
+
+    static_configs:
+      - targets: [ '0.0.0.0:9090' ]
+
+  - job_name: 'netdata-scrape'
+
+    metrics_path: '/api/v1/allmetrics'
+    params:
+      # format: prometheus | prometheus_all_hosts
+      # You can use `prometheus_all_hosts` if you want Prometheus to set the `instance` to your hostname instead of IP 
+      format: [ prometheus ]
+      #
+      # sources: as-collected | raw | average | sum | volume
+      # default is: average
+      #source: [as-collected]
+      #
+      # server name for this prometheus - the default is the client IP
+      # for Netdata to uniquely identify it
+      #server: ['prometheus1']
+    honor_labels: true
+
+    static_configs:
+      - targets: [ '{your.netdata.ip}:19999' ]
+```
+
+### Prometheus alerts for Netdata metrics
+
+The following is an example of a `nodes.yml` file that will allow Prometheus to generate alerts from some Netdata sources. 
+Save it at `/opt/prometheus/nodes.yml`, and add a _- "nodes.yml"_ entry under the _rule_files:_ section in the example prometheus.yml file above.
+
+```yaml
+groups:
+  - name: nodes
+
+    rules:
+      - alert: node_high_cpu_usage_70
+        expr: sum(sum_over_time(netdata_system_cpu_percentage_average{dimension=~"(user|system|softirq|irq|guest)"}[10m])) by (job) / sum(count_over_time(netdata_system_cpu_percentage_average{dimension="idle"}[10m])) by (job) > 70
+        for: 1m
+        annotations:
+          description: '{{ $labels.job }} on ''{{ $labels.job }}'' CPU usage is at {{ humanize $value }}%.'
+          summary: CPU alert for container node '{{ $labels.job }}'
+
+      - alert: node_high_memory_usage_70
+        expr: 100 / sum(netdata_system_ram_MB_average) by (job)
+          * sum(netdata_system_ram_MB_average{dimension=~"free|cached"}) by (job) < 30
+        for: 1m
+        annotations:
+          description: '{{ $labels.job }} memory usage is {{ humanize $value}}%.'
+          summary: Memory alert for container node '{{ $labels.job }}'
+
+      - alert: node_low_root_filesystem_space_20
+        expr: 100 / sum(netdata_disk_space_GB_average{family="/"}) by (job)
+          * sum(netdata_disk_space_GB_average{family="/",dimension=~"avail|cached"}) by (job) < 20
+        for: 1m
+        annotations:
+          description: '{{ $labels.job }} root filesystem space is {{ humanize $value}}%.'
+          summary: Root filesystem alert for container node '{{ $labels.job }}'
+
+      - alert: node_root_filesystem_fill_rate_6h
+        expr: predict_linear(netdata_disk_space_GB_average{family="/",dimension=~"avail|cached"}[1h], 6 * 3600) < 0
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          description: Container node {{ $labels.job }} root filesystem is going to fill up in 6h.
+          summary: Disk fill alert for Swarm node '{{ $labels.job }}'
+```
