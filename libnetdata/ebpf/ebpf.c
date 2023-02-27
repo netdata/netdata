@@ -461,7 +461,68 @@ void ebpf_update_stats(ebpf_plugin_stats_t *report, ebpf_module_t *em)
  * to get 'memlock' data and update report.
  *
  * @param report  the output structure
- * @param maps    pointer to maps. Last map must fish with name = NULL
+ * @param map     pointer to a map.
+ * @param action  What action will be done with this map.
+ */
+void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *map, ebpf_stats_action_t action)
+{
+    char filename[FILENAME_MAX+1];
+    snprintfz(filename, FILENAME_MAX, "/proc/self/fdinfo/%d", map->map_fd);
+    procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
+    if(unlikely(!ff)) {
+        error("Cannot open %s", filename);
+        return;
+    }
+
+    ff = procfile_readall(ff);
+    if(unlikely(!ff))
+        return;
+
+    unsigned long j, lines = procfile_lines(ff);
+    char *memlock = { "memlock" };
+    size_t length = strlen(memlock);
+    for (j = 0; j < lines ; j++) {
+        char *cmp = procfile_lineword(ff, j,0);
+        if (!strncmp(memlock, cmp, length)) {
+            uint64_t memsize = (uint64_t) str2l(procfile_lineword(ff, j,1));
+            switch (action) {
+                case EBPF_ACTION_STAT_ADD: {
+                    report->memlock_kern += memsize;
+                    report->hash_tables += 1;
+#ifdef NETDATA_DEV_MODE
+                    info("Hash table %u: %s (FD = %d) is consuming %lu bytes totalizing %lu bytes",
+                         report->hash_tables, map->name, map->map_fd, memsize, report->memlock_kern);
+#endif
+                    break;
+                }
+                case EBPF_ACTION_STAT_REMOVE: {
+                    report->memlock_kern -= memsize;
+                    report->hash_tables -= 1;
+#ifdef NETDATA_DEV_MODE
+                    info("Hash table %s (FD = %d) was removed releasing %lu bytes, now we have %u tables loaded totalizing %lu bytes.",
+                         map->name, map->map_fd, memsize, report->hash_tables, report->memlock_kern);
+#endif
+                    break;
+                }
+                default: {
+                    break;
+                }
+            }
+            break;
+        }
+    }
+
+    procfile_close(ff);
+}
+
+/**
+ * Update Kernel memory with memory
+ *
+ * This algorithm is an adaptation of https://elixir.bootlin.com/linux/v6.1.14/source/tools/bpf/bpftool/common.c#L402
+ * to get 'memlock' data and update report.
+ *
+ * @param report  the output structure
+ * @param map     pointer to a map. Last map must fish with name = NULL
  */
 void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report, ebpf_local_maps_t *maps)
 {
@@ -475,36 +536,7 @@ void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report, ebpf_loc
         if (fd == ND_EBPF_MAP_FD_NOT_INITIALIZED)
             continue;
 
-        char filename[FILENAME_MAX+1];
-        snprintfz(filename, FILENAME_MAX, "/proc/self/fdinfo/%d", fd);
-        procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff)) {
-            error("Cannot open %s", filename);
-            return;
-        }
-
-        ff = procfile_readall(ff);
-        if(unlikely(!ff))
-            return;
-
-        unsigned long j, lines = procfile_lines(ff);
-        char *memlock = { "memlock" };
-        size_t length = strlen(memlock);
-        for (j = 0; j < lines ; j++) {
-            char *cmp = procfile_lineword(ff, j,0);
-            if (!strncmp(memlock, cmp, length)) {
-                uint64_t memsize = (uint64_t) str2l(procfile_lineword(ff, j,1));
-                report->memlock_kern += memsize;
-                report->hash_tables += 1;
-#ifdef NETDATA_DEV_MODE
-                info("Hash table %u: %s (FD = %d) is consuming %lu bytes totalizing %lu bytes",
-                     report->hash_tables, map->name, fd, memsize, report->memlock_kern);
-#endif
-                break;
-            }
-        }
-
-        procfile_close(ff);
+        ebpf_update_kernel_memory(report, map, EBPF_ACTION_STAT_ADD);
     }
 }
 

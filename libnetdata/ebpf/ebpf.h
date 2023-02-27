@@ -244,6 +244,11 @@ typedef struct ebpf_plugin_stats {
     uint32_t hash_tables; // Number of hash tables used on the system.
 } ebpf_plugin_stats_t;
 
+typedef enum ebpf_stats_action {
+    EBPF_ACTION_STAT_ADD,
+    EBPF_ACTION_STAT_REMOVE,
+} ebpf_stats_action_t;
+
 typedef enum netdata_apps_integration_flags {
     NETDATA_EBPF_APPS_FLAG_NO,
     NETDATA_EBPF_APPS_FLAG_YES,
@@ -373,5 +378,6 @@ int ebpf_is_function_inside_btf(struct btf *file, char *function);
 #endif
 
 void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report, ebpf_local_maps_t *maps);
+void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *map, ebpf_stats_action_t action);
 
 #endif /* NETDATA_EBPF_H */
