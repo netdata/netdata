@@ -64,7 +64,7 @@ CPU_CORES=$(grep ^cpu\\scores /proc/cpuinfo | uniq |  awk '{print $4}')
 if [ "$build_clean_netdata" -eq 1 ]
 then
 	cd ../..
-	sudo $INSTALL_PATH/netdata/usr/libexec/netdata/netdata-uninstaller.sh --yes --force --env $INSTALL_PATH/netdata/etc/netdata/.environment
+	sudo $INSTALL_PATH/netdata/usr/libexec/netdata/netdata-uninstaller.sh -y -f -e $INSTALL_PATH/netdata/etc/netdata/.environment
 	sudo rm -rf $INSTALL_PATH/netdata/etc/netdata # Remove /etc/netdata if it persists for some reason
 	sudo git clean -dfxf && git submodule update --init --recursive --force
 
@@ -97,6 +97,9 @@ then
 					--enable-logsmanagement \
 					--install-prefix $INSTALL_PATH
 	fi
+
+	sudo cp logsmanagement/stress_test/logs_query.html "$INSTALL_PATH/netdata/usr/share/netdata/web"
+	sudo chown -R netdata:netdata "$INSTALL_PATH/netdata/usr/share/netdata/web/logs_query.html"
 
 else
 	cd ../.. && sudo make -j"$CPU_CORES" || exit 1 && sudo make install 

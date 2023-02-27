@@ -170,7 +170,7 @@ function submit_query() {
     );
   }
   
-
+  console.log("Query:\n" + xmlhttp_req);
   xmlhttp.open("GET", xmlhttp_req, true);
   xmlhttp.send(null);
 }
