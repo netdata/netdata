@@ -1,11 +1,9 @@
 <!--
 title: "Install Netdata with Docker"
-date: "2020-04-23"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/docker/README.md"
-sidebar_label: "Install Netdata with Docker"
+sidebar_label: "Docker"
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Installation"
+learn_rel_path: "Installation/Installation methods"
 sidebar_position: 40
 -->
 
@@ -156,6 +154,20 @@ Additionally, for each stable release, three tags are pushed, one with the full 
 (for example, `v1`). The tags for the minor versions and major versions are updated whenever a release is published
 that would match that tag (for example, if `v1.30.1` were to be published, the `v1.30` tag would be updated to
 point to that instead of `v1.30.0`).
+
+## Adding extra packages at runtime
+
+By default, the official Netdata container images do not include a number of optional runtime dependencies. You
+can add these dependencies, or any other APK packages, at runtime by listing them in the environment variable
+`NETDATA_EXTRA_APK_PACKAGES`.
+
+Commonly useful packages include:
+
+- `apcupsd`: For monitoring APC UPS devices.
+- `libvirt-daemon`: For resolving cgroup names for libvirt domains.
+- `lm-sensors`: For monitoring hardware sensors.
+- `msmtp`: For email alert support.
+- `netcat-openbsd`: For IRC alert support.
 
 ## Health Checks
 

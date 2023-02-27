@@ -293,61 +293,73 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
     struct web_client *w = (struct web_client *)pi->data;
     int fd = pi->fd;
 
-    if(unlikely(web_client_receive(w) < 0)) {
-        ret = -1;
-        goto cleanup;
-    }
+    web_client_disable_wait_receive(w);
+    web_client_disable_wait_send(w);
 
-    debug(D_WEB_CLIENT, "%llu: processing received data on fd %d.", w->id, fd);
-    worker_is_idle();
-    worker_is_busy(WORKER_JOB_PROCESS);
-    web_client_process_request(w);
+    ssize_t bytes;
+    bytes = web_client_receive(w);
 
-    if (unlikely(w->mode == WEB_CLIENT_MODE_STREAM)) {
-        web_client_send(w);
-    }
+    if (likely(bytes > 0)) {
+        debug(D_WEB_CLIENT, "%llu: processing received data on fd %d.", w->id, fd);
+        worker_is_idle();
+        worker_is_busy(WORKER_JOB_PROCESS);
+        web_client_process_request(w);
 
-    else if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
-        if(w->pollinfo_filecopy_slot == 0) {
-            debug(D_WEB_CLIENT, "%llu: FILECOPY DETECTED ON FD %d", w->id, pi->fd);
+        if (unlikely(w->mode == WEB_CLIENT_MODE_STREAM)) {
+            web_client_send(w);
+        }
 
-            if (unlikely(w->ifd != -1 && w->ifd != w->ofd && w->ifd != fd)) {
-                // add a new socket to poll_events, with the same
-                debug(D_WEB_CLIENT, "%llu: CREATING FILECOPY SLOT ON FD %d", w->id, pi->fd);
+        else if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
+            if(w->pollinfo_filecopy_slot == 0) {
+                debug(D_WEB_CLIENT, "%llu: FILECOPY DETECTED ON FD %d", w->id, pi->fd);
 
-                POLLINFO *fpi = poll_add_fd(
-                        pi->p
-                        , w->ifd
-                        , pi->port_acl
-                        , 0
-                        , POLLINFO_FLAG_CLIENT_SOCKET
-                        , "FILENAME"
-                        , ""
-                        , ""
-                        , web_server_file_add_callback
-                        , web_server_file_del_callback
-                        , web_server_file_read_callback
-                        , web_server_file_write_callback
-                        , (void *) w
-                );
+                if (unlikely(w->ifd != -1 && w->ifd != w->ofd && w->ifd != fd)) {
+                    // add a new socket to poll_events, with the same
+                    debug(D_WEB_CLIENT, "%llu: CREATING FILECOPY SLOT ON FD %d", w->id, pi->fd);
 
-                if(fpi)
-                    w->pollinfo_filecopy_slot = fpi->slot;
-                else {
-                    error("Failed to add filecopy fd. Closing client.");
-                    ret = -1;
-                    goto cleanup;
+                    POLLINFO *fpi = poll_add_fd(
+                                                pi->p
+                                                , w->ifd
+                                                , pi->port_acl
+                                                , 0
+                                                , POLLINFO_FLAG_CLIENT_SOCKET
+                                                , "FILENAME"
+                                                , ""
+                                                , ""
+                                                , web_server_file_add_callback
+                                                , web_server_file_del_callback
+                                                , web_server_file_read_callback
+                                                , web_server_file_write_callback
+                                                , (void *) w
+                                                );
+
+                    if(fpi)
+                        w->pollinfo_filecopy_slot = fpi->slot;
+                    else {
+                        error("Failed to add filecopy fd. Closing client.");
+                        ret = -1;
+                        goto cleanup;
+                    }
                 }
             }
         }
-    }
-    else {
+        else {
+            if(unlikely(w->ifd == fd && web_client_has_wait_receive(w)))
+                *events |= POLLIN;
+        }
+
+        if(unlikely(w->ofd == fd && web_client_has_wait_send(w)))
+            *events |= POLLOUT;
+    } else if(unlikely(bytes < 0)) {
+        ret = -1;
+        goto cleanup;
+    } else if (unlikely(bytes == 0)) {
         if(unlikely(w->ifd == fd && web_client_has_wait_receive(w)))
             *events |= POLLIN;
-    }
 
-    if(unlikely(w->ofd == fd && web_client_has_wait_send(w)))
-        *events |= POLLOUT;
+        if(unlikely(w->ofd == fd && web_client_has_wait_send(w)))
+            *events |= POLLOUT;
+    }
 
     ret = web_server_check_client_status(w);
 

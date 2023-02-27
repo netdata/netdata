@@ -16,6 +16,7 @@ jobs:
     outputs:
       actionlint: ${{ steps.actionlint.outputs.run }}
       eslint: ${{ steps.eslint.outputs.run }}
+      flake8: ${{ steps.flake8.outputs.run }}
       hadolint: ${{ steps.hadolint.outputs.run }}
       shellcheck: ${{ steps.shellcheck.outputs.run }}
       yamllint: ${{ steps.yamllint.outputs.run }}
@@ -44,6 +45,17 @@ jobs:
           elif git diff --name-only origin/${{ github.base_ref }} HEAD | grep -v "web/gui/dashboard" | grep -Eq '.*\.js|node\.d\.plugin\.in' ; then
             echo "run=true" >> "${GITHUB_OUTPUT}"
             echo 'JS files have changed, need to run ESLint.'
+          else
+            echo "run=false" >> "${GITHUB_OUTPUT}"
+          fi
+      - name: Check files for flake8
+        id: flake8
+        run: |
+          if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/flake8') }}" = "true" ]; then
+            echo "run=true" >> "${GITHUB_OUTPUT}"
+          elif git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '.*\.py' ; then
+            echo "run=true" >> "${GITHUB_OUTPUT}"
+            echo 'Python files have changed, need to run flake8.'
           else
             echo "run=false" >> "${GITHUB_OUTPUT}"
           fi
@@ -117,6 +129,27 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
           eslint_flags: '.'
+
+  flake8:
+    name: flake8
+    needs: prep-review
+    if: needs.prep-review.outputs.flake8 == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git clone repository
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - name: Run flake8
+        uses: reviewdog/action-flake8@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-check
 
   hadolint:
     name: hadolint

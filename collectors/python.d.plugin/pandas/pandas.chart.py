@@ -3,6 +3,7 @@
 # Author: Andrew Maguire (andrewm4894)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import os
 import pandas as pd
 
 try:
@@ -10,6 +11,12 @@ try:
     HAS_REQUESTS = True
 except ImportError:
     HAS_REQUESTS = False
+
+try:
+    from sqlalchemy import create_engine
+    HAS_SQLALCHEMY = True
+except ImportError:
+    HAS_SQLALCHEMY = False
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -47,6 +54,9 @@ class Service(SimpleService):
 
         if not HAS_REQUESTS:
             self.warn('requests library could not be imported')
+
+        if not HAS_SQLALCHEMY:
+            self.warn('sqlalchemy library could not be imported')
 
         if not self.chart_configs:
             self.error('chart_configs must be defined')

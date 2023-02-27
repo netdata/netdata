@@ -54,11 +54,11 @@ static void oomkill_cleanup(void *ptr)
 static void oomkill_write_data(int32_t *keys, uint32_t total)
 {
     // for each app, see if it was OOM killed. record as 1 if so otherwise 0.
-    struct target *w;
+    struct ebpf_target *w;
     for (w = apps_groups_root_target; w != NULL; w = w->next) {
         if (likely(w->exposed && w->processes)) {
             bool was_oomkilled = false;
-            struct pid_on_target *pids = w->root_pid;
+            struct ebpf_pid_on_target *pids = w->root_pid;
             while (pids) {
                 uint32_t j;
                 for (j = 0; j < total; j++) {
@@ -334,7 +334,7 @@ static void oomkill_collector(ebpf_module_t *em)
  */
 void ebpf_oomkill_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    struct target *root = ptr;
+    struct ebpf_target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_OOMKILL_CHART,
                                "OOM kills",
                                EBPF_COMMON_DIMENSION_KILLS,
@@ -361,7 +361,7 @@ void *ebpf_oomkill_thread(void *ptr)
     em->maps = oomkill_maps;
 
 #define NETDATA_DEFAULT_OOM_DISABLED_MSG "Disabling OOMKILL thread, because"
-    if (unlikely(!all_pids || !em->apps_charts)) {
+    if (unlikely(!ebpf_all_pids || !em->apps_charts)) {
         // When we are not running integration with apps, we won't fill necessary variables for this thread to run, so
         // we need to disable it.
         if (em->thread->enabled)

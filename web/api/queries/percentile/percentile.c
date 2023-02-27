@@ -14,7 +14,7 @@ struct grouping_percentile {
 };
 
 static void grouping_create_percentile_internal(RRDR *r, const char *options, NETDATA_DOUBLE def) {
-    long entries = r->group;
+    long entries = r->view.group;
     if(entries < 10) entries = 10;
 
     struct grouping_percentile *g = (struct grouping_percentile *)onewayalloc_callocz(r->internal.owa, 1, sizeof(struct grouping_percentile));
@@ -30,7 +30,7 @@ static void grouping_create_percentile_internal(RRDR *r, const char *options, NE
     }
 
     g->percent = g->percent / 100.0;
-    r->internal.grouping_data = g;
+    r->grouping.data = g;
 }
 
 void grouping_create_percentile25(RRDR *r, const char *options) {
@@ -64,20 +64,20 @@ void grouping_create_percentile99(RRDR *r, const char *options) {
 // resets when switches dimensions
 // so, clear everything to restart
 void grouping_reset_percentile(RRDR *r) {
-    struct grouping_percentile *g = (struct grouping_percentile *)r->internal.grouping_data;
+    struct grouping_percentile *g = (struct grouping_percentile *)r->grouping.data;
     g->next_pos = 0;
 }
 
 void grouping_free_percentile(RRDR *r) {
-    struct grouping_percentile *g = (struct grouping_percentile *)r->internal.grouping_data;
+    struct grouping_percentile *g = (struct grouping_percentile *)r->grouping.data;
     if(g) onewayalloc_freez(r->internal.owa, g->series);
 
-    onewayalloc_freez(r->internal.owa, r->internal.grouping_data);
-    r->internal.grouping_data = NULL;
+    onewayalloc_freez(r->internal.owa, r->grouping.data);
+    r->grouping.data = NULL;
 }
 
 void grouping_add_percentile(RRDR *r, NETDATA_DOUBLE value) {
-    struct grouping_percentile *g = (struct grouping_percentile *)r->internal.grouping_data;
+    struct grouping_percentile *g = (struct grouping_percentile *)r->grouping.data;
 
     if(unlikely(g->next_pos >= g->series_size)) {
         g->series = onewayalloc_doublesize( r->internal.owa, g->series, g->series_size * sizeof(NETDATA_DOUBLE));
@@ -88,7 +88,7 @@ void grouping_add_percentile(RRDR *r, NETDATA_DOUBLE value) {
 }
 
 NETDATA_DOUBLE grouping_flush_percentile(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_percentile *g = (struct grouping_percentile *)r->internal.grouping_data;
+    struct grouping_percentile *g = (struct grouping_percentile *)r->grouping.data;
 
     NETDATA_DOUBLE value;
     size_t available_slots = g->next_pos;

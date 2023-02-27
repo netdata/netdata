@@ -19,7 +19,7 @@ infrastructure based on their configuration. Every node comes with hundreds of p
 tested by Netdata's community of DevOps engineers and SREs, but you may want to customize existing alerts or create new
 ones entirely.
 
-Read our doc on [health alerts](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) to
+Read our documentation on [health alerts](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) to
 learn how to tweak existing alerts or create new
 health entities based on the specific needs of your infrastructure. By taking charge of alert configuration, you'll
 ensure Netdata Cloud always delivers the most relevant alerts about the well-being of your nodes.

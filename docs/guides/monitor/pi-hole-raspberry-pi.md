@@ -101,8 +101,7 @@ part of your system might affect another.
 ![The Netdata dashboard in
 action](https://user-images.githubusercontent.com/1153921/80827388-b9fee100-8b98-11ea-8f60-0d7824667cd3.gif)
 
-If you're completely new to Netdata, look at our [step-by-step guide](https://github.com/netdata/netdata/blob/master/docs/guides/step-by-step/step-00.md) for a
-walkthrough of all its features. For a more expedited tour, see the [get started documentation](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md).
+If you're completely new to Netdata, look at the [Introduction](https://github.com/netdata/netdata/blob/master/docs/getting-started/introduction.md) section for a walkthrough of all its features. For a more expedited tour, see the [get started documentation](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md).
 
 ### Enable temperature sensor monitoring
 
@@ -140,7 +139,7 @@ more than 256.
 
 Use our [database sizing
 calculator](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
-and [guide on storing historical metrics](https://github.com/netdata/netdata/blob/master/docs/guides/longer-metrics-storage.md) to help you determine the right
+and the [Database configuration documentation](https://github.com/netdata/netdata/blob/master/database/README.md) to help you determine the right
 setting for your Raspberry Pi.
 
 ## What's next?
@@ -153,7 +152,7 @@ Most importantly, you can always install additional services and instantly colle
 
 -   [Optimize performance](https://github.com/netdata/netdata/blob/master/docs/guides/configure/performance.md) using tweaks developed for IoT devices.
 -   [Stream Raspberry Pi metrics](https://github.com/netdata/netdata/blob/master/streaming/README.md) to a parent host for easy access or longer-term storage.
--   [Tweak alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) for either Pi-hole or the health of your Raspberry Pi.
+-   [Tweak alarms](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) for either Pi-hole or the health of your Raspberry Pi.
 -   [Export metrics to external databases](https://github.com/netdata/netdata/blob/master/exporting/README.md) with the exporting engine.
 
 Or, head over to [our guides](https://learn.netdata.cloud/guides/) for even more experiments and insights into

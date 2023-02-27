@@ -1,6 +1,6 @@
 # This defines the full set of distros we run CI on.
 ---
-platform_map: # map packaging architectures to docker platforms
+platform_map:  # map packaging architectures to docker platforms
   aarch64: linux/arm64/v8
   amd64: linux/amd64
   arm64: linux/arm64/v8
@@ -8,7 +8,7 @@ platform_map: # map packaging architectures to docker platforms
   armhfp: linux/arm/v7
   i386: linux/i386
   x86_64: linux/amd64
-arch_order: # sort order for per-architecture jobs in CI
+arch_order:  # sort order for per-architecture jobs in CI
   - amd64
   - x86_64
   - i386
@@ -20,6 +20,7 @@ include:
   - &alpine
     distro: alpine
     version: edge
+    eol_check: false
     env_prep: |
       apk add -U bash
     jsonc_removal: |
@@ -28,15 +29,20 @@ include:
       ebpf-core: true
   - <<: *alpine
     version: "3.17"
+    eol_check: true
   - <<: *alpine
     version: "3.16"
+    eol_check: true
   - <<: *alpine
     version: "3.15"
+    eol_check: true
   - <<: *alpine
     version: "3.14"
+    eol_check: true
 
   - distro: archlinux
     version: latest
+    eol_check: false
     env_prep: |
       pacman --noconfirm -Syu && pacman --noconfirm -Sy grep libffi
     test:
@@ -47,6 +53,7 @@ include:
     version: "9"
     jsonc_removal: |
       dnf remove -y json-c-devel
+    eol_check: true
     packages: &alma_packages
       type: rpm
       repo_distro: el/9
@@ -69,6 +76,7 @@ include:
 
   - distro: centos
     version: "7"
+    eol_check: false
     packages:
       type: rpm
       repo_distro: el/7
@@ -84,6 +92,7 @@ include:
     distro: debian
     version: "12"
     base_image: debian:bookworm
+    eol_check: true
     env_prep: |
       apt-get update
     jsonc_removal: |
@@ -118,6 +127,7 @@ include:
   - &fedora
     distro: fedora
     version: "37"
+    eol_check: true
     jsonc_removal: |
       dnf remove -y json-c-devel
     packages: &fedora_packages
@@ -139,6 +149,7 @@ include:
   - &opensuse
     distro: opensuse
     version: "15.4"
+    eol_check: true
     base_image: opensuse/leap:15.4
     jsonc_removal: |
       zypper rm -y libjson-c-devel
@@ -154,6 +165,7 @@ include:
   - &oracle
     distro: oraclelinux
     version: "8"
+    eol_check: true
     jsonc_removal: |
       dnf remove -y json-c-devel
     packages: &oracle_packages
@@ -173,6 +185,7 @@ include:
   - &ubuntu
     distro: ubuntu
     version: "22.10"
+    eol_check: true
     env_prep: |
       rm -f /etc/apt/apt.conf.d/docker && apt-get update
     jsonc_removal: |

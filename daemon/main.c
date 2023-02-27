@@ -656,9 +656,14 @@ void cancel_main_threads() {
     int i, found = 0;
     usec_t max = 5 * USEC_PER_SEC, step = 100000;
     for (i = 0; static_threads[i].name != NULL ; i++) {
-        if(static_threads[i].enabled == NETDATA_MAIN_THREAD_RUNNING) {
-            info("EXIT: Stopping main thread: %s", static_threads[i].name);
-            netdata_thread_cancel(*static_threads[i].thread);
+        if (static_threads[i].enabled == NETDATA_MAIN_THREAD_RUNNING) {
+            if (static_threads[i].thread) {
+                info("EXIT: Stopping main thread: %s", static_threads[i].name);
+                netdata_thread_cancel(*static_threads[i].thread);
+            } else {
+                info("EXIT: No thread running (marking as EXITED): %s", static_threads[i].name);
+                static_threads[i].enabled = NETDATA_MAIN_THREAD_EXITED;
+            }
             found++;
         }
     }

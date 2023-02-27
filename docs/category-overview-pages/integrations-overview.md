@@ -5,6 +5,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/category-o
 description: "Available integrations in Netdata"
 learn_status: "Published"
 learn_rel_path: "Integrations"
+sidebar_position: 60
 -->
 
 # Netdata Integrations
@@ -23,7 +24,7 @@ either centrally, via the
 
 We designed Netdata with interoperability in mind. The Agent collects thousands of metrics every second, and then what
 you do with them is up to you. You can 
-[store metrics in the database engine](https://github.com/netdata/netdata/blob/master/docs/guides/longer-metrics-storage.md),
+[store metrics in the database engine](https://github.com/netdata/netdata/blob/master/database/README.md),
 or send them to another time series database for long-term storage or further analysis using
 Netdata's [exporting engine](https://github.com/netdata/netdata/edit/master/exporting/README.md).
 

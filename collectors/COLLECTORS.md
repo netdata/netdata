@@ -1,5 +1,5 @@
 <!--
-title: "Supported collectors list"
+title: "Monitor anything with Netdata"
 description: "Netdata gathers real-time metrics from hundreds of data sources using collectors. Most require zero configuration and are pre-configured out of the box."
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/COLLECTORS.md"
 sidebar_label: "Monitor"
@@ -7,7 +7,7 @@ learn_status: "Published"
 learn_rel_path: "Integrations/Monitor"
 -->
 
-# Supported collectors list
+# Monitor anything with Netdata
 
 Netdata uses collectors to help you gather metrics from your favorite applications and services and view them in
 real-time, interactive charts. The following list includes collectors for both external services/applications and
@@ -52,7 +52,10 @@ If you don't see the app/service you'd like to monitor in this list:
 
 ## Available Collectors
 
-- [Service and application collectors](#service-and-application-collectors)
+- [Supported collectors list](#supported-collectors-list)
+  - [Add your application to Netdata](#add-your-application-to-netdata)
+  - [Available Collectors](#available-collectors)
+  - [Service and application collectors](#service-and-application-collectors)
     - [Generic](#generic)
     - [APM (application performance monitoring)](#apm-application-performance-monitoring)
     - [Containers and VMs](#containers-and-vms)
@@ -68,7 +71,7 @@ If you don't see the app/service you'd like to monitor in this list:
     - [Search](#search)
     - [Storage](#storage)
     - [Web](#web)
-- [System collectors](#system-collectors)
+  - [System collectors](#system-collectors)
     - [Applications](#applications)
     - [Disks and filesystems](#disks-and-filesystems)
     - [eBPF](#ebpf)
@@ -79,10 +82,10 @@ If you don't see the app/service you'd like to monitor in this list:
     - [Processes](#processes)
     - [Resources](#resources)
     - [Users](#users)
-- [Netdata collectors](#netdata-collectors)
-- [Orchestrators](#orchestrators)
-- [Third-party collectors](#third-party-collectors)
-- [Etc](#etc)
+  - [Netdata collectors](#netdata-collectors)
+  - [Orchestrators](#orchestrators)
+  - [Third-party collectors](#third-party-collectors)
+  - [Etc](#etc)
 
 ## Service and application collectors
 
@@ -218,8 +221,7 @@ configure any of these collectors according to your setup and infrastructure.
   server log files and provide summary (client, traffic) metrics.
 - [Squid web server logs](https://github.com/netdata/go.d.plugin/blob/master/modules/squidlog/README.md): Tail Squid
   access logs to return the volume of requests, types of requests, bandwidth, and much more.
-- [Web server logs (Go version for Apache,
-  NGINX)](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md/): Tail access logs and provide
+- [Web server logs (Go version for Apache, NGINX)](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md): Tail access logs and provide
   very detailed web server performance statistics. This module is able to parse 200k+ rows in less than half a second.
 - [Web server logs (Apache, NGINX)](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md): Tail
   access log
@@ -397,19 +399,18 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
 - [Monit](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/monit/README.md): Monitor statuses
   of targets (service-checks) using the XML
   stats interface.
-- [WMI (Windows Management Instrumentation)
-  exporter](https://github.com/netdata/go.d.plugin/blob/master/modules/wmi/README.md): Collect CPU, memory,
-  network, disk, OS, system, and log-in metrics scraping `wmi_exporter`.
+- [Windows](https://github.com/netdata/go.d.plugin/blob/master/modules/windows/README.md): Collect CPU, memory,
+  network, disk, OS, system, and log-in metrics scraping [windows_exporter](https://github.com/prometheus-community/windows_exporter).
 
 ### Disks and filesystems
 
 - [BCACHE](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Monitor BCACHE statistics
-  with the the `proc.plugin` collector.
+  with the `proc.plugin` collector.
 - [Block devices](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Gather metrics about
   the health and performance of block
-  devices using the the `proc.plugin` collector.
+  devices using the `proc.plugin` collector.
 - [Btrfs](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Monitors Btrfs filesystems
-  with the the `proc.plugin` collector.
+  with the `proc.plugin` collector.
 - [Device mapper](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Gather metrics about
   the Linux device mapper with the proc
   collector.
@@ -423,10 +424,9 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
   read/write latency.
 - [NFS file servers and clients](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md):
   Gather operations, utilization, and space usage
-  using the the `proc.plugin` collector.
+  using the `proc.plugin` collector.
 - [RAID arrays](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Collect health, disk
-  status, operation status, and more with the
-  the `proc.plugin` collector.
+  status, operation status, and more with the `proc.plugin` collector.
 - [Veritas Volume Manager](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Gather
   metrics about the Veritas Volume Manager (VVM).
 - [ZFS](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Monitor bandwidth and
@@ -474,8 +474,7 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
 ### Memory
 
 - [Available memory](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Tracks changes in
-  available RAM using the the `proc.plugin`
-  collector.
+  available RAM using the `proc.plugin` collector.
 - [Committed memory](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Monitor committed
   memory using the `proc.plugin` collector.
 - [Huge pages](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Gather metrics about

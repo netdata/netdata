@@ -4,8 +4,7 @@ description: "The local Netdata Agent dashboard is the heart of health monitorin
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/gui/README.md
 sidebar_label: "Local Agent dashboard"
 learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "References"
+learn_rel_path: "Operations"
 -->
 
 # Local Agent dashboard

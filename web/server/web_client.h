@@ -211,6 +211,8 @@ char *strip_control_characters(char *url);
 
 int web_client_socket_is_now_used_for_streaming(struct web_client *w);
 
+#include "web/api/web_api_v1.h"
+#include "web/api/web_api_v2.h"
 #include "daemon/common.h"
 
 #endif

@@ -411,7 +411,7 @@ static void read_apps_table()
 {
     netdata_publish_shm_t *cv = shm_vector;
     uint32_t key;
-    struct pid_stat *pids = root_of_pids;
+    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     int fd = shm_maps[NETDATA_PID_SHM_TABLE].map_fd;
     size_t length = sizeof(netdata_publish_shm_t)*ebpf_nprocs;
     while (pids) {
@@ -487,7 +487,7 @@ static void ebpf_shm_read_global_table()
 /**
  * Sum values for all targets.
  */
-static void ebpf_shm_sum_pids(netdata_publish_shm_t *shm, struct pid_on_target *root)
+static void ebpf_shm_sum_pids(netdata_publish_shm_t *shm, struct ebpf_pid_on_target *root)
 {
     while (root) {
         int32_t pid = root->pid;
@@ -513,9 +513,9 @@ static void ebpf_shm_sum_pids(netdata_publish_shm_t *shm, struct pid_on_target *
  *
  * @param root the target list.
 */
-void ebpf_shm_send_apps_data(struct target *root)
+void ebpf_shm_send_apps_data(struct ebpf_target *root)
 {
-    struct target *w;
+    struct ebpf_target *w;
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             ebpf_shm_sum_pids(&w->shm, w->root_pid);
@@ -895,7 +895,7 @@ static void shm_collector(ebpf_module_t *em)
  */
 void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    struct target *root = ptr;
+    struct ebpf_target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_SHMGET_CHART,
                                "Calls to syscall <code>shmget(2)</code>.",
                                EBPF_COMMON_DIMENSION_CALL,

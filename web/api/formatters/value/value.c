@@ -49,12 +49,12 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
             n = n * 100 / total;
 
             if(unlikely(set_min_max)) {
-                r->min = r->max = n;
+                r->view.min = r->view.max = n;
                 set_min_max = 0;
             }
 
-            if(n < r->min) r->min = n;
-            if(n > r->max) r->max = n;
+            if(n < r->view.min) r->view.min = n;
+            if(n > r->view.max) r->view.max = n;
         }
 
         if(unlikely(init)) {
@@ -110,6 +110,7 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
                             size_t tier, time_t timeout, QUERY_SOURCE query_source, STORAGE_PRIORITY priority
 ) {
     QUERY_TARGET_REQUEST qtr = {
+            .version = 1,
             .host = host,
             .rca = rca,
             .ria = ria,
@@ -139,14 +140,14 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
     }
     else {
         qv = (QUERY_VALUE) {
-                .after = r->after,
-                .before = r->before,
-                .points_read = r->internal.db_points_read,
-                .result_points = r->internal.result_points_generated,
+                .after = r->view.after,
+                .before = r->view.before,
+                .points_read = r->stats.db_points_read,
+                .result_points = r->stats.result_points_generated,
         };
 
         for(size_t t = 0; t < storage_tiers ;t++)
-            qv.storage_points_per_tier[t] = r->internal.tier_points_read[t];
+            qv.storage_points_per_tier[t] = r->stats.tier_points_read[t];
 
         long i = (!(options & RRDR_OPTION_REVERSED))?(long)rrdr_rows(r) - 1:0;
         int all_values_are_null = 0;

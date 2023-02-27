@@ -14,7 +14,7 @@ struct grouping_median {
 };
 
 void grouping_create_median_internal(RRDR *r, const char *options, NETDATA_DOUBLE def) {
-    long entries = r->group;
+    long entries = r->view.group;
     if(entries < 10) entries = 10;
 
     struct grouping_median *g = (struct grouping_median *)onewayalloc_callocz(r->internal.owa, 1, sizeof(struct grouping_median));
@@ -30,7 +30,7 @@ void grouping_create_median_internal(RRDR *r, const char *options, NETDATA_DOUBL
     }
 
     g->percent = g->percent / 100.0;
-    r->internal.grouping_data = g;
+    r->grouping.data = g;
 }
 
 void grouping_create_median(RRDR *r, const char *options) {
@@ -64,20 +64,20 @@ void grouping_create_trimmed_median25(RRDR *r, const char *options) {
 // resets when switches dimensions
 // so, clear everything to restart
 void grouping_reset_median(RRDR *r) {
-    struct grouping_median *g = (struct grouping_median *)r->internal.grouping_data;
+    struct grouping_median *g = (struct grouping_median *)r->grouping.data;
     g->next_pos = 0;
 }
 
 void grouping_free_median(RRDR *r) {
-    struct grouping_median *g = (struct grouping_median *)r->internal.grouping_data;
+    struct grouping_median *g = (struct grouping_median *)r->grouping.data;
     if(g) onewayalloc_freez(r->internal.owa, g->series);
 
-    onewayalloc_freez(r->internal.owa, r->internal.grouping_data);
-    r->internal.grouping_data = NULL;
+    onewayalloc_freez(r->internal.owa, r->grouping.data);
+    r->grouping.data = NULL;
 }
 
 void grouping_add_median(RRDR *r, NETDATA_DOUBLE value) {
-    struct grouping_median *g = (struct grouping_median *)r->internal.grouping_data;
+    struct grouping_median *g = (struct grouping_median *)r->grouping.data;
 
     if(unlikely(g->next_pos >= g->series_size)) {
         g->series = onewayalloc_doublesize( r->internal.owa, g->series, g->series_size * sizeof(NETDATA_DOUBLE));
@@ -88,7 +88,7 @@ void grouping_add_median(RRDR *r, NETDATA_DOUBLE value) {
 }
 
 NETDATA_DOUBLE grouping_flush_median(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_median *g = (struct grouping_median *)r->internal.grouping_data;
+    struct grouping_median *g = (struct grouping_median *)r->grouping.data;
 
     size_t available_slots = g->next_pos;
     NETDATA_DOUBLE value;

@@ -44,7 +44,7 @@ connector to enable and configure for your database of choice.
 -   [**Graphite**](https://github.com/netdata/netdata/blob/master/exporting/graphite/README.md): A plaintext interface. Metrics are sent to the database server as
     `prefix.hostname.chart.dimension`. `prefix` is configured below, `hostname` is the hostname of the machine (can
     also be configured). Learn more in our guide to [export and visualize Netdata metrics in
-    Graphite](https://github.com/netdata/netdata/blob/master/docs/guides/export/export-netdata-metrics-graphite.md).
+    Graphite](https://github.com/netdata/netdata/blob/master/exporting/graphite/README.md).
 -   [**JSON** document databases](https://github.com/netdata/netdata/blob/master/exporting/json/README.md)
 -   [**OpenTSDB**](https://github.com/netdata/netdata/blob/master/exporting/opentsdb/README.md): Use a plaintext or HTTP interfaces. Metrics are sent to
     OpenTSDB as `prefix.chart.dimension` with tag `host=hostname`.

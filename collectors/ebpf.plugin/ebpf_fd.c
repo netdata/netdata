@@ -495,7 +495,7 @@ static void read_apps_table()
 {
     netdata_fd_stat_t *fv = fd_vector;
     uint32_t key;
-    struct pid_stat *pids = root_of_pids;
+    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     int fd = fd_maps[NETDATA_FD_PID_STATS].map_fd;
     size_t length = sizeof(netdata_fd_stat_t) * ebpf_nprocs;
     while (pids) {
@@ -560,7 +560,7 @@ static void ebpf_update_fd_cgroup()
  * @param fd   the output
  * @param root list of pids
  */
-static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct pid_on_target *root)
+static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct ebpf_pid_on_target *root)
 {
     uint32_t open_call = 0;
     uint32_t close_call = 0;
@@ -593,9 +593,9 @@ static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct pid_on_target *root)
  * @param em   the structure with thread information
  * @param root the target list.
 */
-void ebpf_fd_send_apps_data(ebpf_module_t *em, struct target *root)
+void ebpf_fd_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
 {
-    struct target *w;
+    struct ebpf_target *w;
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             ebpf_fd_sum_pids(&w->fd, w->root_pid);
@@ -972,7 +972,7 @@ static void fd_collector(ebpf_module_t *em)
  */
 void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    struct target *root = ptr;
+    struct ebpf_target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_OPEN,
                                "Number of open files",
                                EBPF_COMMON_DIMENSION_CALL,

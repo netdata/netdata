@@ -342,7 +342,7 @@ static void ebpf_dcstat_exit(void *ptr)
  */
 void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    struct target *root = ptr;
+    struct ebpf_target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_DC_HIT_CHART,
                                "Percentage of files inside directory cache",
                                EBPF_COMMON_DIMENSION_PERCENTAGE,
@@ -448,7 +448,7 @@ static void read_apps_table()
 {
     netdata_dcstat_pid_t *cv = dcstat_vector;
     uint32_t key;
-    struct pid_stat *pids = root_of_pids;
+    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     int fd = dcstat_maps[NETDATA_DCSTAT_PID_STATS].map_fd;
     size_t length = sizeof(netdata_dcstat_pid_t)*ebpf_nprocs;
     while (pids) {
@@ -540,7 +540,7 @@ static void ebpf_dc_read_global_table()
  * @param publish  output structure.
  * @param root     structure with listed IPs
  */
-void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct pid_on_target *root)
+void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct ebpf_pid_on_target *root)
 {
     memset(&publish->curr, 0, sizeof(netdata_dcstat_pid_t));
     netdata_dcstat_pid_t *dst = &publish->curr;
@@ -563,9 +563,9 @@ void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct pid_on_targe
  *
  * @param root the target list.
 */
-void ebpf_dcache_send_apps_data(struct target *root)
+void ebpf_dcache_send_apps_data(struct ebpf_target *root)
 {
-    struct target *w;
+    struct ebpf_target *w;
     collected_number value;
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_HIT_CHART);

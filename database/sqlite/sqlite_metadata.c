@@ -1272,6 +1272,9 @@ void metadata_sync_shutdown(void)
 
 void metadata_sync_shutdown_prepare(void)
 {
+    if (unlikely(!metasync_worker.loop))
+        return;
+
     struct metadata_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
 

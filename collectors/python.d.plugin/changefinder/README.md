@@ -108,7 +108,7 @@ The default configuration should look something like this. Here you can see each
 information about each one and what it does.
 
 ```yaml
-# ----------------------------------------------------------------------
+# -
 # JOBS (data collection sources)
 
 # Pull data from local Netdata node.
@@ -218,4 +218,24 @@ sudo su -s /bin/bash netdata
   Anodot also have some great whitepapers in this space too that some may find useful.
 - Novelty and outlier detection in
   the [scikit-learn documentation](https://scikit-learn.org/stable/modules/outlier_detection.html).
+
+### Troubleshooting
+
+To troubleshoot issues with the `changefinder` module, run the `python.d.plugin` with the debug option enabled. The 
+output will give you the output of the data collection job or error messages on why the collector isn't working.
+
+First, navigate to your plugins directory, usually they are located under `/usr/libexec/netdata/plugins.d/`. If that's 
+not the case on your system, open `netdata.conf` and look for the setting `plugins directory`. Once you're in the 
+plugin's directory, switch to the `netdata` user.
+
+```bash
+cd /usr/libexec/netdata/plugins.d/
+sudo su -s /bin/bash netdata
+```
+
+Now you can manually run the `changefinder` module in debug mode:
+
+```bash
+./python.d.plugin changefinder debug trace
+```
 

@@ -42,87 +42,100 @@ typedef enum rrdr_options {
     RRDR_OPTION_SELECTED_TIER   = 0x00400000, // Use the selected tier for the query
     RRDR_OPTION_ALL_DIMENSIONS  = 0x00800000, // Return the full dimensions list
     RRDR_OPTION_SHOW_PLAN       = 0x01000000, // Return the query plan in jsonwrap
+    RRDR_OPTION_SHOW_DETAILS    = 0x02000000, // v2 returns detailed object tree
+    RRDR_OPTION_DEBUG           = 0x04000000, // v2 returns request description
 
     // internal ones - not to be exposed to the API
     RRDR_OPTION_INTERNAL_AR     = 0x10000000, // internal use only, to let the formatters we want to render the anomaly rate
+    RRDR_OPTION_INTERNAL_GBC    = 0x20000000, // internal use only, to let the formatters we want to render the group by count
     RRDR_OPTION_HEALTH_RSRVD1   = 0x80000000, // reserved for RRDCALC_OPTION_NO_CLEAR_NOTIFICATION
 } RRDR_OPTIONS;
 
-typedef enum rrdr_value_flag {
-    RRDR_VALUE_NOTHING      = 0x00, // no flag set (a good default)
-    RRDR_VALUE_EMPTY        = 0x01, // the database value is empty
-    RRDR_VALUE_RESET        = 0x02, // the database value is marked as reset (overflown)
+typedef enum __attribute__ ((__packed__)) rrdr_value_flag {
+    RRDR_VALUE_NOTHING      = 0,            // no flag set (a good default)
+    RRDR_VALUE_EMPTY        = (1 << 0),     // the database value is empty
+    RRDR_VALUE_RESET        = (1 << 1),     // the database value is marked as reset (overflown)
 } RRDR_VALUE_FLAGS;
 
-typedef enum rrdr_dimension_flag {
-    RRDR_DIMENSION_DEFAULT  = 0x00,
-    RRDR_DIMENSION_HIDDEN   = 0x04, // the dimension is hidden (not to be presented to callers)
-    RRDR_DIMENSION_NONZERO  = 0x08, // the dimension is non zero (contains non-zero values)
-    RRDR_DIMENSION_QUERIED = 0x10, // the dimension is selected for evaluation in this RRDR
+typedef enum __attribute__ ((__packed__)) rrdr_dimension_flag {
+    RRDR_DIMENSION_DEFAULT  = 0,
+    RRDR_DIMENSION_HIDDEN   = (1 << 0), // the dimension is hidden (not to be presented to callers)
+    RRDR_DIMENSION_NONZERO  = (1 << 1), // the dimension is non zero (contains non-zero values)
+    RRDR_DIMENSION_SELECTED = (1 << 2), // the dimension has been selected for query
+    RRDR_DIMENSION_QUERIED  = (1 << 3), // the dimension has been queried
+    RRDR_DIMENSION_FAILED   = (1 << 4), // the dimension failed to be queried
+    RRDR_DIMENSION_GROUPED  = (1 << 5), // the dimension has been grouped in this RRDR
 } RRDR_DIMENSION_FLAGS;
 
 // RRDR result options
-typedef enum rrdr_result_flags {
-    RRDR_RESULT_OPTION_ABSOLUTE      = 0x00000001, // the query uses absolute time-frames
-                                                   // (can be cached by browsers and proxies)
-    RRDR_RESULT_OPTION_RELATIVE      = 0x00000002, // the query uses relative time-frames
-                                                   // (should not to be cached by browsers and proxies)
-    RRDR_RESULT_OPTION_VARIABLE_STEP = 0x00000004, // the query uses variable-step time-frames
-    RRDR_RESULT_OPTION_CANCEL        = 0x00000008, // the query needs to be cancelled
-} RRDR_RESULT_OPTIONS;
+typedef enum __attribute__ ((__packed__)) rrdr_result_flags {
+    RRDR_RESULT_FLAG_ABSOLUTE      = (1 << 0), // the query uses absolute time-frames
+                                               // (can be cached by browsers and proxies)
+    RRDR_RESULT_FLAG_RELATIVE      = (1 << 1), // the query uses relative time-frames
+                                               // (should not to be cached by browsers and proxies)
+    RRDR_RESULT_FLAG_CANCEL        = (1 << 2), // the query needs to be cancelled
+} RRDR_RESULT_FLAGS;
 
 typedef struct rrdresult {
-    RRDR_RESULT_OPTIONS result_options; // RRDR_RESULT_OPTION_*
-
     size_t d;                 // the number of dimensions
-    size_t n;                 // the number of values in the arrays
-    size_t rows;              // the number of rows used
+    size_t n;                 // the number of values in the arrays (number of points per dimension)
+    size_t rows;              // the number of actual rows used
 
     RRDR_DIMENSION_FLAGS *od; // the options for the dimensions
+
+    STRING **di;              // array of d dimension ids
+    STRING **dn;              // array of d dimension names
+    STRING **du;              // array of d dimension units
+    uint32_t *dgbc;           // array of d dimension units - NOT ALLOCATED when RRDR is created
+    uint32_t *dp;             // array of d dimension units - NOT ALLOCATED when RRDR is created
 
     time_t *t;                // array of n timestamps
     NETDATA_DOUBLE *v;        // array n x d values
     RRDR_VALUE_FLAGS *o;      // array n x d options for each value returned
     NETDATA_DOUBLE *ar;       // array n x d of anomaly rates (0 - 100)
+    uint32_t *gbc;            // array n x d of group by count - NOT ALLOCATED when RRDR is created
 
-    size_t group;             // how many collected values were grouped for each row
-    time_t update_every;      // what is the suggested update frequency in seconds
-
-    NETDATA_DOUBLE min;
-    NETDATA_DOUBLE max;
-
-    time_t before;
-    time_t after;
-
-    // internal rrd2rrdr() members below this point
     struct {
-        ONEWAYALLOC *owa;                   // the allocator used
-        struct query_target *qt;            // the QUERY_TARGET
+        size_t group;         // how many collected values were grouped for each row - NEEDED BY GROUPING FUNCTIONS
+        time_t after;
+        time_t before;
+        time_t update_every;  // what is the suggested update frequency in seconds
+        NETDATA_DOUBLE min;
+        NETDATA_DOUBLE max;
+        RRDR_RESULT_FLAGS flags; // RRDR_RESULT_FLAG_*
+        RRDR_OPTIONS options; // RRDR_OPTION_* (as run by the query)
+    } view;
 
-        RRDR_OPTIONS query_options;         // RRDR_OPTION_* (as run by the query)
+    struct {
+        size_t db_points_read;
+        size_t result_points_generated;
+        size_t tier_points_read[RRD_STORAGE_TIERS];
+    } stats;
+
+    struct {
+        void *data;                         // the internal data of the grouping function
+
+        // grouping function pointers
+        void (*create)(struct rrdresult *r, const char *options);
+        void (*reset)(struct rrdresult *r);
+        void (*free)(struct rrdresult *r);
+        void (*add)(struct rrdresult *r, NETDATA_DOUBLE value);
+        NETDATA_DOUBLE (*flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
+
+        TIER_QUERY_FETCH tier_query_fetch;  // which value to use from STORAGE_POINT
 
         size_t points_wanted;               // used by SES and DES
         size_t resampling_group;            // used by AVERAGE
         NETDATA_DOUBLE resampling_divisor;  // used by AVERAGE
+    } grouping;
 
-        // grouping function pointers
-        void (*grouping_create)(struct rrdresult *r, const char *options);
-        void (*grouping_reset)(struct rrdresult *r);
-        void (*grouping_free)(struct rrdresult *r);
-        void (*grouping_add)(struct rrdresult *r, NETDATA_DOUBLE value);
-        NETDATA_DOUBLE (*grouping_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
-
-        TIER_QUERY_FETCH tier_query_fetch;  // which value to use from STORAGE_POINT
-        void *grouping_data;                // the internal data of the grouping function
+    struct {
+        ONEWAYALLOC *owa;           // the allocator used
+        struct query_target *qt;    // the QUERY_TARGET
 
 #ifdef NETDATA_INTERNAL_CHECKS
         const char *log;
 #endif
-
-        // statistics
-        size_t db_points_read;
-        size_t result_points_generated;
-        size_t tier_points_read[RRD_STORAGE_TIERS];
     } internal;
 } RRDR;
 
@@ -130,7 +143,7 @@ typedef struct rrdresult {
 
 #include "database/rrd.h"
 void rrdr_free(ONEWAYALLOC *owa, RRDR *r);
-RRDR *rrdr_create(ONEWAYALLOC *owa, struct query_target *qt);
+RRDR *rrdr_create(ONEWAYALLOC *owa, struct query_target *qt, size_t dimensions, size_t points);
 
 #include "../web_api_v1.h"
 #include "web/api/queries/query.h"

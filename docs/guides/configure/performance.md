@@ -107,7 +107,7 @@ update_every: 10
 ## Disable unneeded plugins or collectors
 
 If you know that you don't need an [entire plugin or a specific
-collector](https://github.com/netdata/netdata/blob/master/docs/collect/how-collectors-work.md#collector-architecture-and-terminology), you can disable any of them.
+collector](https://github.com/netdata/netdata/blob/master/collectors/README.md#collector-architecture-and-terminology), you can disable any of them.
 Keep in mind that if a plugin/collector has nothing to do, it simply shuts down and does not consume system resources.
 You will only improve the Agent's performance by disabling plugins/collectors that are actively collecting metrics.
 
@@ -142,40 +142,7 @@ modules:
 
 ## Lower memory usage for metrics retention
 
-Reduce the disk space that the [database engine](https://github.com/netdata/netdata/blob/master/database/engine/README.md) uses to retain metrics by editing
-the `dbengine multihost disk space` option in `netdata.conf`. The default value is `256`, but can be set to a minimum of
-`64`. By reducing the disk space allocation, Netdata also needs to store less metadata in the node's memory.
-
-The `page cache size` option also directly impacts Netdata's memory usage, but has a minimum value of `32`.
-
-Reducing the value of `dbengine multihost disk space` does slim down Netdata's resource usage, but it also reduces how
-long Netdata retains metrics. Find the right balance of performance and metrics retention by using the [dbengine
-calculator](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics).
-
-All the settings are found in the `[global]` section of `netdata.conf`:
-
-```conf
-[db]
-    memory mode = dbengine
-    page cache size = 32
-    dbengine multihost disk space = 256
-```
-
-To save even more memory, you can disable the dbengine and reduce retention to just 30 minutes, as shown below:
-
-```conf
-[db]
-   storage tiers = 1
-   mode = alloc
-   retention = 1800
-```
-
-Metric retention is not important in certain use cases, such as:
- - Data collection nodes stream collected metrics collected to a centralization point.
- - Data collection nodes export their metrics to another time series DB, or are scraped by Prometheus
- - Netdata installed only during incidents, to get richer information.
-In such cases, you may not want to use the dbengine at all and instead opt for memory mode 
-`memory mode = alloc` or `memory mode = none`.
+See how to [change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md).
 
 ## Disable machine learning
 
@@ -262,19 +229,3 @@ On the child nodes you should add to `netdata.conf` the following:
 [health]
    enabled = no
 ```
-
-## What's next?
-
-We hope this guide helped you better understand how to optimize the performance of the Netdata Agent.
-
-Now that your Agent is running smoothly, we recommend you [secure your nodes](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) if you haven't
-already.
-
-Next, dive into some of Netdata's more complex features, such as configuring its health watchdog or exporting metrics to
-an external time-series database.
-
--   [Interact with dashboards and charts](https://github.com/netdata/netdata/blob/master/docs/visualize/interact-dashboards-charts.md)
--   [Configure health alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md)
--   [Export metrics to external time-series databases](https://github.com/netdata/netdata/blob/master/docs/export/external-databases.md)
-
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fconfigure%2Fperformance.md&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

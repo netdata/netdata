@@ -95,24 +95,5 @@ active alarm, and the **Log** tab shows a historical record of exactly when alar
 log](https://user-images.githubusercontent.com/1153921/80842482-8c289500-8bb6-11ea-9791-600cfdbe82ce.gif)
 
 Learn more about [viewing active alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alarms.md), [configuring
-alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md), or [enabling a new notification
+alarms](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md), or [enabling a new notification
 method](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md).
-
-## What's next?
-
-Learn more about [interacting with charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.md) to quickly pan through time, zoom, and
-show/hide dimensions to best understand the state of your node in any timeframe. A complete understanding of [chart
-dimensions, contexts, and families](https://github.com/netdata/netdata/blob/master/docs/dashboard/dimensions-contexts-families.md) will also help with how Netdata
-organizes its dashboard and operates [alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md).
-
-### Further reading & related information
-
-- Dashboard
-  - **[How the dashboard works](https://github.com/netdata/netdata/blob/master/docs/dashboard/how-dashboard-works.md)**
-  - [Interact with charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.md)
-  - [Chart dimensions, contexts, and families](https://github.com/netdata/netdata/blob/master/docs/dashboard/dimensions-contexts-families.md)
-  - [Select timeframes to visualize](https://github.com/netdata/netdata/blob/master/docs/dashboard/visualization-date-and-time-controls.md)
-  - [Import, export, and print a snapshot](https://github.com/netdata/netdata/blob/master/docs/dashboard/import-export-print-snapshot.md)
-  - [Customize the standard dashboard](https://github.com/netdata/netdata/blob/master/docs/dashboard/customize.md)
-- [HTTP API](https://github.com/netdata/netdata/blob/master/web/api/README.md)
-- [Custom dashboards](https://github.com/netdata/netdata/blob/master/web/gui/custom/README.md)

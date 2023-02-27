@@ -32,6 +32,9 @@ extern "C" {
 #define OS_FREEBSD 2
 #define OS_MACOS   3
 
+#define MALLOC_ALIGNMENT (sizeof(uintptr_t) * 2)
+#define size_t_atomic_count(op, var, size) __atomic_## op ##_fetch(&(var), size, __ATOMIC_RELAXED)
+#define size_t_atomic_bytes(op, var, size) __atomic_## op ##_fetch(&(var), ((size) % MALLOC_ALIGNMENT)?((size) + MALLOC_ALIGNMENT - ((size) % MALLOC_ALIGNMENT)):(size), __ATOMIC_RELAXED)
 
 // ----------------------------------------------------------------------------
 // system include files for all netdata C programs

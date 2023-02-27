@@ -341,7 +341,7 @@ static void read_apps_table()
 {
     netdata_publish_swap_t *cv = swap_vector;
     uint32_t key;
-    struct pid_stat *pids = root_of_pids;
+    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     int fd = swap_maps[NETDATA_PID_SWAP_TABLE].map_fd;
     size_t length = sizeof(netdata_publish_swap_t)*ebpf_nprocs;
     while (pids) {
@@ -410,7 +410,7 @@ static void ebpf_swap_read_global_table()
  * @param swap
  * @param root
  */
-static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct pid_on_target *root)
+static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct ebpf_pid_on_target *root)
 {
     uint64_t local_read = 0;
     uint64_t local_write = 0;
@@ -435,9 +435,9 @@ static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct pid_on_targe
  *
  * @param root the target list.
 */
-void ebpf_swap_send_apps_data(struct target *root)
+void ebpf_swap_send_apps_data(struct ebpf_target *root)
 {
-    struct target *w;
+    struct ebpf_target *w;
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             ebpf_swap_sum_pids(&w->swap, w->root_pid);
@@ -707,7 +707,7 @@ static void swap_collector(ebpf_module_t *em)
  */
 void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    struct target *root = ptr;
+    struct ebpf_target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_MEM_SWAP_READ_CHART,
                                "Calls to function <code>swap_readpage</code>.",
                                EBPF_COMMON_DIMENSION_CALL,

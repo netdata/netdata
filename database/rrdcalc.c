@@ -95,7 +95,7 @@ static STRING *rrdcalc_replace_variables_with_rrdset_labels(const char *line, RR
             temp = buf;
         }
         else if (!strncmp(var, RRDCALC_VAR_LABEL, RRDCALC_VAR_LABEL_LEN)) {
-            char label_val[RRDCALC_VAR_MAX + 1] = { 0 };
+            char label_val[RRDCALC_VAR_MAX + RRDCALC_VAR_LABEL_LEN + 1] = { 0 };
             strcpy(label_val, var+RRDCALC_VAR_LABEL_LEN);
             label_val[i - RRDCALC_VAR_LABEL_LEN - 1] = '\0';
 

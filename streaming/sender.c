@@ -178,8 +178,16 @@ void sender_commit(struct sender_state *s, BUFFER *wb) {
 
     replication_recalculate_buffer_used_ratio_unsafe(s);
 
+    bool signal_sender = false;
+    if(!rrdpush_sender_pipe_has_pending_data(s)) {
+        rrdpush_sender_pipe_set_pending_data(s);
+        signal_sender = true;
+    }
+
     netdata_mutex_unlock(&s->mutex);
-    rrdpush_signal_sender_to_wake_up(s);
+
+    if(signal_sender)
+        rrdpush_signal_sender_to_wake_up(s);
 }
 
 static inline void rrdpush_sender_add_host_variable_to_buffer(BUFFER *wb, const RRDVAR_ACQUIRED *rva) {
@@ -1016,7 +1024,6 @@ void execute_commands(struct sender_state *s) {
 }
 
 struct rrdpush_sender_thread_data {
-    struct sender_state *sender_state;
     RRDHOST *host;
     char *pipe_buffer;
 };
@@ -1249,7 +1256,6 @@ void *rrdpush_sender_thread(void *ptr) {
 
     struct rrdpush_sender_thread_data *thread_data = callocz(1, sizeof(struct rrdpush_sender_thread_data));
     thread_data->pipe_buffer = mallocz(pipe_buffer_size);
-    thread_data->sender_state = s;
     thread_data->host = s->host;
 
     netdata_thread_cleanup_push(rrdpush_sender_thread_cleanup_callback, thread_data);
@@ -1305,8 +1311,10 @@ void *rrdpush_sender_thread(void *ptr) {
         netdata_mutex_lock(&s->mutex);
         size_t outstanding = cbuffer_next_unsafe(s->buffer, NULL);
         size_t available = cbuffer_available_size_unsafe(s->buffer);
-        if (unlikely(!outstanding))
+        if (unlikely(!outstanding)) {
+            rrdpush_sender_pipe_clear_pending_data(s);
             rrdpush_sender_cbuffer_recreate_timed(s, now_s, true, false);
+        }
         netdata_mutex_unlock(&s->mutex);
 
         worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, (NETDATA_DOUBLE)(s->buffer->max_size - available) * 100.0 / (NETDATA_DOUBLE)s->buffer->max_size);

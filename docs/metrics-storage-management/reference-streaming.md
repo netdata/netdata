@@ -5,8 +5,7 @@ type: "reference"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/metrics-storage-management/reference-streaming.md"
 sidebar_label: "Streaming reference"
 learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "References/Configuration"
+learn_rel_path: "Configuration"
 -->
 
 # Streaming reference

@@ -4,14 +4,14 @@ description: "Replicate and mirror Netdata's metrics through real-time streaming
 custom_edit_url: https://github.com/netdata/netdata/edit/master/streaming/README.md
 sidebar_label: "Streaming and replication"
 learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "References"
+learn_rel_path: "Configuration"
 -->
 
+# Streaming and replication
 
 Each Netdata node is able to replicate/mirror its database to another Netdata node, by streaming the collected
-metrics in real-time. This is quite different to [data archiving to third party time-series
-databases](https://github.com/netdata/netdata/blob/master/exporting/README.md).
+metrics in real-time. This is quite different to 
+[data archiving to third party time-series databases](https://github.com/netdata/netdata/blob/master/exporting/README.md).
 The nodes that send metrics are called **child** nodes, and the nodes that receive metrics are called **parent** nodes.
 
 There are also **proxy** nodes, which collect metrics from a child and sends it to a parent.

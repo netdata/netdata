@@ -36,21 +36,19 @@ To see your plan and billing setting you need:
             * Address
             * Phone number
             * Tax ID
-            * Please note, shipping address is also available but it isn't relevant since our paid plans are services
          * View your invoice history
    1. At the middle, you'll see details on your current plan as well as means to:
-      * Upgrade or downgrade your plan
+      * Upgrade or cancel your plan
       * View full plan details page
-      * Change your billing frequency
-      * Update the committed nodes (in case of a Yearly plan subscription)
    1. At the bottom, you will find your Usage chart that displays:
-      * Total nodes - Measured active nodes on your space at a point in time of day (no calculation applied)
-      * P90 - Calculated value used for billing. See more details at [Running nodes and billing](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md#running-nodes-and-billing)) (only applicable if you are on a paid plan subscription)
-      * Committed nodes - Current subscription committed nodes (not historical)
+      * Daily count - The weighted 90th percentile of the live node count during the day, taking time as the weight. If you have 30 live nodes throughout the day
+      except for a two hour peak of 44 live nodes, the daily value is 31.
+      * Period count: The 90th percentile of the daily counts for this period up to the date. The last value for the period is used as the number of nodes for the bill for that period. See more details in [running nodes and billing](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md#running-nodes-and-billing) (only applicable if you are on a paid plan subscription)
+      * Committed nodes: The number of nodes committed to in the yearly plan. In case the period count is higher than the number of committed nodes, the difference is billed as overage.
 
-> ⚠️ At the moment, any changes to an active paid plan, upgrades, change billing frequency or committed nodes, will be a two-setup flow:
-> 1. cancel your current subscription - move you to the Community plan - that will be triggered by us once you confirm
-> 2. chose the plan with the intended changes, which will need to be done by you.
+> ⚠️ At the moment, any changes to an active paid plan, upgrades, change billing frequency or committed nodes, will be a manual two-setup flow:
+> 1. cancel your current subscription - move you to the Community plan
+> 2. chose the plan with the intended changes
 >
 > This is a temporary process that we aim to sort out soon so that it will effortless for you to do any of these actions.
 

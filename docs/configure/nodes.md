@@ -24,7 +24,7 @@ anomaly, or change in infrastructure affects how their Agents should perform.
 ## The Netdata config directory
 
 On most Linux systems, using our [recommended one-line
-installation](https://github.com/netdata/netdata/blob/master/docs/get-started.md#install-on-linux-with-one-line-installer), the **Netdata config
+installation](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#install-on-linux-with-one-line-installer), the **Netdata config
 directory** is `/etc/netdata/`. The config directory contains several configuration files with the `.conf` extension, a
 few directories, and a shell script named `edit-config`.
 
@@ -52,7 +52,7 @@ exist.
 - `apps_groups.conf` is a configuration file for changing how applications/processes are grouped when viewing the
   **Application** charts from [`apps.plugin`](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md) or
   [`ebpf.plugin`](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/README.md).
-- `health.d/` is a directory that contains [health configuration files](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md).
+- `health.d/` is a directory that contains [health configuration files](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md).
 - `health_alarm_notify.conf` enables and configures [alarm notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md).
 - `statsd.d/` is a directory for configuring Netdata's [statsd collector](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/README.md).
 - `stream.conf` configures [parent-child streaming](https://github.com/netdata/netdata/blob/master/streaming/README.md) between separate nodes running the Agent.
@@ -147,29 +147,3 @@ wget -O /etc/netdata/netdata.conf http://localhost:19999/netdata.conf
 # or
 curl -o /etc/netdata/netdata.conf http://NODE:19999/netdata.conf
 ```
-
-## What's next?
-
-Learn more about [starting, stopping, or restarting](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) the Netdata daemon to apply
-configuration changes.
-
-Apply some [common configuration changes](https://github.com/netdata/netdata/blob/master/docs/configure/common-changes.md) to quickly tweak the Agent's behavior.
-
-[Add security to your node](https://github.com/netdata/netdata/blob/master/docs/configure/secure-nodes.md) with what you've learned about the Netdata config directory
-and `edit-config`. We put together a few security best practices based on how you use the Netdata.
-
-You can also take what you've learned about node configuration to enable or enhance features:
-
--   [Enable new collectors](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md) or tweak their behavior.
--   [Configure existing health alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) or create new ones.
--   [Enable notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to receive updates about the health of your
-    infrastructure.
--   Change [the long-term metrics retention period](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md) using the database engine.
-
-### Related reference documentation
-
-- [Netdata Agent · Daemon](https://github.com/netdata/netdata/blob/master/daemon/README.md)
-- [Netdata Agent · Health monitoring](https://github.com/netdata/netdata/blob/master/health/README.md)
-- [Netdata Agent · Notifications](https://github.com/netdata/netdata/blob/master/health/notifications/README.md)
-
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fconfigure%2Fnodes&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

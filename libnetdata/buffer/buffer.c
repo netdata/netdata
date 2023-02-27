@@ -495,6 +495,7 @@ int buffer_unittest(void) {
     buffer_json_finalize(wb);
     errors += buffer_expect(wb, "{\n    \"hello\":\"world\",\n    \"alpha\":\"this: \\\" is a double quote\",\n    \"object1\":{\n        \"hello\":\"world\"\n    }\n}\n");
 
+    buffer_free(wb);
     return errors;
 }
 

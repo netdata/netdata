@@ -753,7 +753,8 @@ static void health_main_cleanup(void *ptr) {
     log_health("Health thread ended.");
 }
 
-static void initialize_health(RRDHOST *host, int is_localhost) {
+static void initialize_health(RRDHOST *host)
+{
     if(!host->health.health_enabled ||
         rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH) ||
         !service_running(SERVICE_HEALTH))
@@ -785,19 +786,6 @@ static void initialize_health(RRDHOST *host, int is_localhost) {
     netdata_rwlock_init(&host->health_log.alarm_log_rwlock);
 
     char filename[FILENAME_MAX + 1];
-
-    if(!is_localhost) {
-        int r = mkdir(host->varlib_dir, 0775);
-        if (r != 0 && errno != EEXIST)
-            error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), host->varlib_dir);
-    }
-
-    {
-        snprintfz(filename, FILENAME_MAX, "%s/health", host->varlib_dir);
-        int r = mkdir(filename, 0775);
-        if(r != 0 && errno != EEXIST)
-            error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), filename);
-    }
 
     snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
     host->health.health_default_exec = string_strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
@@ -1039,7 +1027,7 @@ void *health_main(void *ptr) {
 
             if (unlikely(!rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH))) {
                 rrd_unlock();
-                initialize_health(host, host == localhost);
+                initialize_health(host);
                 rrd_rdlock();
             }
 

@@ -38,7 +38,7 @@ static size_t countif_greaterequal(NETDATA_DOUBLE v, NETDATA_DOUBLE target) {
 
 void grouping_create_countif(RRDR *r, const char *options __maybe_unused) {
     struct grouping_countif *g = onewayalloc_callocz(r->internal.owa, 1, sizeof(struct grouping_countif));
-    r->internal.grouping_data = g;
+    r->grouping.data = g;
 
     if(options && *options) {
         // skip any leading spaces
@@ -100,24 +100,24 @@ void grouping_create_countif(RRDR *r, const char *options __maybe_unused) {
 // resets when switches dimensions
 // so, clear everything to restart
 void grouping_reset_countif(RRDR *r) {
-    struct grouping_countif *g = (struct grouping_countif *)r->internal.grouping_data;
+    struct grouping_countif *g = (struct grouping_countif *)r->grouping.data;
     g->matched = 0;
     g->count = 0;
 }
 
 void grouping_free_countif(RRDR *r) {
-    onewayalloc_freez(r->internal.owa, r->internal.grouping_data);
-    r->internal.grouping_data = NULL;
+    onewayalloc_freez(r->internal.owa, r->grouping.data);
+    r->grouping.data = NULL;
 }
 
 void grouping_add_countif(RRDR *r, NETDATA_DOUBLE value) {
-    struct grouping_countif *g = (struct grouping_countif *)r->internal.grouping_data;
+    struct grouping_countif *g = (struct grouping_countif *)r->grouping.data;
     g->matched += g->comparison(value, g->target);
     g->count++;
 }
 
 NETDATA_DOUBLE grouping_flush_countif(RRDR *r,  RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_countif *g = (struct grouping_countif *)r->internal.grouping_data;
+    struct grouping_countif *g = (struct grouping_countif *)r->grouping.data;
 
     NETDATA_DOUBLE value;
 

@@ -25,12 +25,30 @@ typedef struct rrdcontext_acquired RRDCONTEXT_ACQUIRED;
 
 const char *rrdmetric_acquired_id(RRDMETRIC_ACQUIRED *rma);
 const char *rrdmetric_acquired_name(RRDMETRIC_ACQUIRED *rma);
+
+STRING *rrdmetric_acquired_id_dup(RRDMETRIC_ACQUIRED *rma);
+STRING *rrdmetric_acquired_name_dup(RRDMETRIC_ACQUIRED *rma);
+
 NETDATA_DOUBLE rrdmetric_acquired_last_stored_value(RRDMETRIC_ACQUIRED *rma);
+time_t rrdmetric_acquired_first_entry(RRDMETRIC_ACQUIRED *rma);
+time_t rrdmetric_acquired_last_entry(RRDMETRIC_ACQUIRED *rma);
+bool rrdmetric_acquired_belongs_to_instance(RRDMETRIC_ACQUIRED *rma, RRDINSTANCE_ACQUIRED *ria);
 
 const char *rrdinstance_acquired_id(RRDINSTANCE_ACQUIRED *ria);
 const char *rrdinstance_acquired_name(RRDINSTANCE_ACQUIRED *ria);
+const char *rrdinstance_acquired_units(RRDINSTANCE_ACQUIRED *ria);
+STRING *rrdinstance_acquired_units_dup(RRDINSTANCE_ACQUIRED *ria);
 DICTIONARY *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria);
 DICTIONARY *rrdinstance_acquired_functions(RRDINSTANCE_ACQUIRED *ria);
+RRDHOST *rrdinstance_acquired_rrdhost(RRDINSTANCE_ACQUIRED *ria);
+RRDSET *rrdinstance_acquired_rrdset(RRDINSTANCE_ACQUIRED *ria);
+
+bool rrdinstance_acquired_belongs_to_context(RRDINSTANCE_ACQUIRED *ria, RRDCONTEXT_ACQUIRED *rca);
+time_t rrdinstance_acquired_update_every(RRDINSTANCE_ACQUIRED *ria);
+
+const char *rrdcontext_acquired_units(RRDCONTEXT_ACQUIRED *rca);
+const char *rrdcontext_acquired_title(RRDCONTEXT_ACQUIRED *rca);
+RRDSET_TYPE rrdcontext_acquired_chart_type(RRDCONTEXT_ACQUIRED *rca);
 
 // ----------------------------------------------------------------------------
 // public API for rrdhost
@@ -67,6 +85,7 @@ int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, 
 // public API for rrdcontexts
 
 const char *rrdcontext_acquired_id(RRDCONTEXT_ACQUIRED *rca);
+bool rrdcontext_acquired_belongs_to_host(RRDCONTEXT_ACQUIRED *rca, RRDHOST *host);
 
 // ----------------------------------------------------------------------------
 // public API for rrddims
@@ -118,6 +137,15 @@ DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contex
 // ----------------------------------------------------------------------------
 // public API for queries
 
+typedef enum __attribute__ ((__packed__)) {
+    QUERY_STATUS_NONE             = 0,
+    QUERY_STATUS_QUERIED          = (1 << 0),
+    QUERY_STATUS_DIMENSION_NODATA = (1 << 1),
+    QUERY_STATUS_DIMENSION_HIDDEN = (1 << 2),
+    QUERY_STATUS_EXCLUDED         = (1 << 3),
+    QUERY_STATUS_FAILED           = (1 << 4),
+} QUERY_STATUS;
+
 typedef struct query_plan_entry {
     size_t tier;
     time_t after;
@@ -134,7 +162,75 @@ typedef struct query_plan_entry {
 
 #define QUERY_PLANS_MAX (RRD_STORAGE_TIERS * 2)
 
+struct query_instances_counts {
+    size_t selected;
+    size_t excluded;
+};
+
+struct query_metrics_counts {
+    size_t selected;
+    size_t excluded;
+    size_t queried;
+    size_t failed;
+};
+
+struct query_alerts_counts {
+    size_t clear;
+    size_t warning;
+    size_t critical;
+    size_t other;
+};
+
+struct query_data_statistics {
+    size_t count;
+    NETDATA_DOUBLE min;
+    NETDATA_DOUBLE max;
+    NETDATA_DOUBLE sum;
+    NETDATA_DOUBLE volume;
+};
+
+typedef struct query_host {
+    uint32_t slot;
+    RRDHOST *host;
+    char node_id[UUID_STR_LEN];
+
+    struct query_data_statistics query_stats;
+    struct query_instances_counts instances;
+    struct query_metrics_counts metrics;
+    struct query_alerts_counts alerts;
+} QUERY_HOST;
+
+typedef struct query_context {
+    uint32_t slot;
+    RRDCONTEXT_ACQUIRED *rca;
+
+    struct query_data_statistics query_stats;
+    struct query_instances_counts instances;
+    struct query_metrics_counts metrics;
+    struct query_alerts_counts alerts;
+} QUERY_CONTEXT;
+
+typedef struct query_instance {
+    uint32_t slot;
+    uint32_t query_host_id;
+    RRDINSTANCE_ACQUIRED *ria;
+    STRING *id_fqdn;
+    STRING *name_fqdn;
+
+    struct query_data_statistics query_stats;
+    struct query_metrics_counts metrics;
+    struct query_alerts_counts alerts;
+} QUERY_INSTANCE;
+
+typedef struct query_dimension {
+    uint32_t slot;
+    RRDMETRIC_ACQUIRED *rma;
+    QUERY_STATUS status;
+} QUERY_DIMENSION;
+
 typedef struct query_metric {
+    RRDR_DIMENSION_FLAGS status;
+
     struct query_metric_tier {
         struct storage_engine *eng;
         STORAGE_METRIC_HANDLE *db_metric_handle;
@@ -150,28 +246,31 @@ typedef struct query_metric {
     } plan;
 
     struct {
-        RRDHOST *host;
-        RRDCONTEXT_ACQUIRED *rca;
-        RRDINSTANCE_ACQUIRED *ria;
-        RRDMETRIC_ACQUIRED *rma;
+        uint32_t query_host_id;
+        uint32_t query_context_id;
+        uint32_t query_instance_id;
+        uint32_t query_dimension_id;
     } link;
 
-    struct {
-        STRING *id;
-        STRING *name;
-        RRDR_DIMENSION_FLAGS options;
-    } dimension;
+    struct query_data_statistics query_stats;
 
     struct {
+        size_t slot;
         STRING *id;
         STRING *name;
-    } chart;
+        STRING *units;
+    } grouped_as;
 
 } QUERY_METRIC;
 
 #define MAX_QUERY_TARGET_ID_LENGTH 255
 
 typedef struct query_target_request {
+    size_t version;
+
+    const char *scope_hosts;
+    const char *scope_contexts;
+
     // selecting / filtering metrics to be queried
     RRDHOST *host;                      // the host to be queried (can be NULL, hosts will be used)
     RRDCONTEXT_ACQUIRED *rca;           // the context to be queried (can be NULL)
@@ -183,7 +282,8 @@ typedef struct query_target_request {
     const char *charts;                 // charts simple pattern (for context queries)
     const char *dimensions;             // dimensions simple pattern
     const char *chart_label_key;        // select only the chart having this label key
-    const char *charts_labels_filter;   // select only the charts having this combo of label key:value
+    const char *labels;                 // select only the charts having this combo of label key:value
+    const char *alerts;                 // select only the charts having this combo of alert name:status
 
     time_t after;                       // the requested timeframe
     time_t before;                      // the requested timeframe
@@ -206,10 +306,13 @@ typedef struct query_target_request {
 
     // group by across multiple time-series
     RRDR_GROUP_BY group_by;
-    const char *group_by_key;
-    RRDR_GROUP_BY_FUNCTION group_by_function;
+    char *group_by_label;
+    RRDR_GROUP_BY_FUNCTION group_by_aggregate_function;
 
+    usec_t received_ut;
 } QUERY_TARGET_REQUEST;
+
+#define GROUP_BY_MAX_LABEL_KEYS 10
 
 typedef struct query_target {
     char id[MAX_QUERY_TARGET_ID_LENGTH + 1]; // query identifier (for logging)
@@ -248,35 +351,87 @@ typedef struct query_target {
     } query;
 
     struct {
-        RRDMETRIC_ACQUIRED **array;
+        QUERY_DIMENSION *array;
         uint32_t used;                      // how many items of the array are used
         uint32_t size;                      // the size of the array
-    } metrics;
+    } dimensions;
 
     struct {
-        RRDINSTANCE_ACQUIRED **array;
+        QUERY_INSTANCE *array;
         uint32_t used;                      // how many items of the array are used
         uint32_t size;                      // the size of the array
         SIMPLE_PATTERN *pattern;
+        SIMPLE_PATTERN *labels_pattern;
+        SIMPLE_PATTERN *alerts_pattern;
         SIMPLE_PATTERN *chart_label_key_pattern;
-        SIMPLE_PATTERN *charts_labels_filter_pattern;
     } instances;
 
     struct {
-        RRDCONTEXT_ACQUIRED **array;
+        QUERY_CONTEXT *array;
         uint32_t used;                      // how many items of the array are used
         uint32_t size;                      // the size of the array
         SIMPLE_PATTERN *pattern;
+        SIMPLE_PATTERN *scope_pattern;
     } contexts;
 
     struct {
-        RRDHOST **array;
+        QUERY_HOST *array;
         uint32_t used;                      // how many items of the array are used
         uint32_t size;                      // the size of the array
         SIMPLE_PATTERN *pattern;
+        SIMPLE_PATTERN *scope_pattern;
     } hosts;
 
+    struct {
+        size_t used;
+        char *label_keys[GROUP_BY_MAX_LABEL_KEYS];
+    } group_by;
+
+    struct query_data_statistics query_stats;
+
+    struct {
+        usec_t received_ut;
+        usec_t preprocessed_ut;
+        usec_t executed_ut;
+        usec_t group_by_ut;
+        usec_t finished_ut;
+    } timings;
 } QUERY_TARGET;
+
+static inline NEVERNULL QUERY_HOST *query_host(QUERY_TARGET *qt, size_t id) {
+    internal_fatal(id >= qt->hosts.used, "QUERY: invalid query host id");
+    return &qt->hosts.array[id];
+}
+
+static inline NEVERNULL QUERY_CONTEXT *query_context(QUERY_TARGET *qt, size_t query_context_id) {
+    internal_fatal(query_context_id >= qt->contexts.used, "QUERY: invalid query context id");
+    return &qt->contexts.array[query_context_id];
+}
+
+static inline NEVERNULL QUERY_INSTANCE *query_instance(QUERY_TARGET *qt, size_t query_instance_id) {
+    internal_fatal(query_instance_id >= qt->instances.used, "QUERY: invalid query instance id");
+    return &qt->instances.array[query_instance_id];
+}
+
+static inline NEVERNULL QUERY_DIMENSION *query_dimension(QUERY_TARGET *qt, size_t query_dimension_id) {
+    internal_fatal(query_dimension_id >= qt->dimensions.used, "QUERY: invalid query dimension id");
+    return &qt->dimensions.array[query_dimension_id];
+}
+
+static inline NEVERNULL QUERY_METRIC *query_metric(QUERY_TARGET *qt, size_t id) {
+    internal_fatal(id >= qt->query.used, "QUERY: invalid query metric id");
+    return &qt->query.array[id];
+}
+
+static inline const char *query_metric_id(QUERY_TARGET *qt, QUERY_METRIC *qm) {
+    QUERY_DIMENSION *qd = query_dimension(qt, qm->link.query_dimension_id);
+    return rrdmetric_acquired_id(qd->rma);
+}
+
+static inline const char *query_metric_name(QUERY_TARGET *qt, QUERY_METRIC *qm) {
+    QUERY_DIMENSION *qd = query_dimension(qt, qm->link.query_dimension_id);
+    return rrdmetric_acquired_name(qd->rma);
+}
 
 void query_target_free(void);
 void query_target_release(QUERY_TARGET *qt);

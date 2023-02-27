@@ -21,20 +21,3 @@ your metrics.
 Ready to take the next steps with health monitoring?
 
 [Configuration reference](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md)
-
-## Guides
-
-Every infrastructure is different, so we're not interested in mandating how you should configure Netdata's health
-monitoring features. Instead, these guides should give you the details you need to tweak alarms to your heart's
-content.
-
-[Stopping notifications for individual alarms](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/stop-notifications-alarms.md)
-
-[Use dimension templates to create dynamic alarms](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/dimension-templates.md)
-
-## Related features
-
-**[Notifications](https://github.com/netdata/netdata/blob/master/health/notifications/README.md)**: Get notified about ongoing alarms from your Agents via your
-favorite platform(s), such as Slack, Discord, PagerDuty, email, and much more.
-
-
