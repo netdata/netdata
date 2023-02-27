@@ -14,7 +14,7 @@
             .len = (reqptr)->path.len - (reqptr)->query_at }
 
 #define PRINTF_H2O_IOVEC_FMT "%.*s"
-#define PRINTF_H2O_IOVEC(iovec) (iovec)->len, (iovec)->base
+#define PRINTF_H2O_IOVEC(iovec) ((int)(iovec)->len), ((iovec)->base)
 
 char *iovec_to_cstr(h2o_iovec_t *str);
 
