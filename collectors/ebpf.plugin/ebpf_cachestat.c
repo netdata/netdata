@@ -5,7 +5,7 @@
 
 // ----------------------------------------------------------------------------
 // ARAL vectors used to speed up processing
-ARAL *ebpf_aral_cachestat_pid;
+ARAL *ebpf_aral_cachestat_pid = NULL;
 
 netdata_publish_cachestat_t **cachestat_pid;
 
@@ -1133,10 +1133,11 @@ static void cachestat_collector(ebpf_module_t *em)
 
         cachestat_send_global(&publish);
 
-        if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
+        if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_cache_send_apps_data(apps_groups_root_target);
+
+        if (ebpf_aral_cachestat_pid)
             ebpf_send_data_aral_chart(ebpf_aral_cachestat_pid, em);
-        }
 
         if (cgroups)
             ebpf_cachestat_send_cgroup_data(update_every);
@@ -1338,7 +1339,9 @@ void *ebpf_cachestat_thread(void *ptr)
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
     ebpf_create_memory_charts(em);
-    ebpf_statistic_create_aral_chart(NETDATA_EBPF_CACHESTAT_ARAL_NAME, em);
+    if (ebpf_aral_cachestat_pid)
+        ebpf_statistic_create_aral_chart(NETDATA_EBPF_CACHESTAT_ARAL_NAME, em);
+
     pthread_mutex_unlock(&lock);
 
     cachestat_collector(em);
