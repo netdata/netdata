@@ -1206,7 +1206,7 @@ void *ebpf_process_thread(void *ptr)
     }
 
     ebpf_update_stats(&plugin_statistics, em);
-    ebpf_update_kernel_memory(&plugin_statistics, em->maps);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
     ebpf_create_statistic_charts(em);
 
     pthread_mutex_unlock(&lock);

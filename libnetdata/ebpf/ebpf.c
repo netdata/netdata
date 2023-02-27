@@ -455,15 +455,15 @@ void ebpf_update_stats(ebpf_plugin_stats_t *report, ebpf_module_t *em)
 }
 
 /**
- * Update Kernel memory
+ * Update Kernel memory with memory
  *
  * This algorithm is an adaptation of https://elixir.bootlin.com/linux/v6.1.14/source/tools/bpf/bpftool/common.c#L402
- * to get 'memlock' data.
+ * to get 'memlock' data and update report.
  *
  * @param report  the output structure
- * @param maps    pointers to maps
+ * @param maps    pointer to maps. Last map must fish with name = NULL
  */
-void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *maps)
+void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report, ebpf_local_maps_t *maps)
 {
     if (!maps)
         return;

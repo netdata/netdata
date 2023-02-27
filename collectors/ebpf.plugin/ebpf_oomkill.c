@@ -392,7 +392,7 @@ void *ebpf_oomkill_thread(void *ptr)
 
     pthread_mutex_lock(&lock);
     ebpf_update_stats(&plugin_statistics, em);
-    ebpf_update_kernel_memory(&plugin_statistics, em->maps);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
     pthread_mutex_unlock(&lock);
 
     oomkill_collector(em);
