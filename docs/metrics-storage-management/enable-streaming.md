@@ -59,6 +59,34 @@ Here are a few example streaming configurations:
     metrics to parent `B`.
   - Any node with a database can generate alarms.
 
+### A basic auto-scaling setup
+
+If your nodes are ephemeral, a Netdata parent with persistent storage outside your production infrastructure can be used to
+store all the metrics from the Netdata children running on the ephemeral nodes.
+
+![A diagram of an auto-scaling setup with Netdata](https://user-images.githubusercontent.com/1153921/84290043-0c1c1600-aaf8-11ea-9757-dd8dd8a8ec6c.png)
+
+### Archiving to a time-series database
+
+The parent Netdata node can also archive metrics, for all its child nodes, to an external time-series database.
+
+Check the Netdata [exporting documentation](https://github.com/netdata/netdata/blob/master/docs/export/external-databases.md) for configuring this.
+
+This is how such a solution will work:
+
+![Diagram showing an example configuration for archiving to a time-series
+database](https://user-images.githubusercontent.com/1153921/84291308-c2ccc600-aaf9-11ea-98a9-89ccbf3a62dd.png)
+
+### An advanced setup
+
+Netdata also supports `proxies` with and without a local database, and data retention can be different between all nodes.
+
+This means a setup like the following is also possible:
+
+<p align="center">
+<img src="https://cloud.githubusercontent.com/assets/2662304/23629551/bb1fd9c2-02c0-11e7-90f5-cab5a3ed4c53.png"/>
+</p>
+
 ## Enable streaming between nodes
 
 The simplest streaming configuration is **replication**, in which a child node streams its metrics in real time to a
@@ -190,3 +218,4 @@ separate parent and child dashboards.
 
 The child dashboard is also available directly at `http://PARENT-NODE:19999/host/CHILD-HOSTNAME`, which in this example
 is `http://203.0.113.0:19999/host/netdata-child`.
+
