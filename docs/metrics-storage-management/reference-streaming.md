@@ -1,22 +1,3 @@
-<!--
-title: "Streaming reference"
-description: "Each node running Netdata can stream the metrics it collects, in real time, to another node. See all of the available settings in this reference document."
-type: "reference"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/metrics-storage-management/reference-streaming.md"
-sidebar_label: "Streaming reference"
-learn_status: "Published"
-learn_rel_path: "Configuration"
--->
-
-# Streaming reference
-
-Each node running Netdata can stream the metrics it collects, in real time, to another node. To learn more, read about
-[how streaming works](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md).
-
-For a quickstart guide for enabling a simple `parent-child` streaming relationship, see our [stream metrics between
-nodes](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md) doc. All other configuration options and scenarios are
-covered in the sections below.
-
 ## Configuration
 
 There are two files responsible for configuring Netdata's streaming capabilities: `stream.conf` and `netdata.conf`.
@@ -28,10 +9,6 @@ open either `stream.conf` or `netdata.conf`.
 sudo ./edit-config stream.conf
 sudo ./edit-config netdata.conf
 ```
-
-## Settings
-
-As mentioned above, both `stream.conf` and `netdata.conf` contain settings relevant to streaming.
 
 ### `stream.conf`
 
