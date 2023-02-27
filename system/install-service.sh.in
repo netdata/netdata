@@ -102,7 +102,7 @@ valid_types() {
 }
 
 install_generic_service() {
-  svc_type="${1}"
+  svc_path="${1}"
   svc_type_name="${2}"
   svc_file="${3}"
   svc_enable_hook="${4}"
@@ -113,7 +113,7 @@ install_generic_service() {
     ENABLE="enable"
   fi
 
-  if ! install -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/netdata-${svc_type}" "${svc_file}"; then
+  if ! install -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/${svc_path}/netdata" "${svc_file}"; then
     error "Failed to install service file."
     exit 4
   fi
@@ -236,10 +236,10 @@ get_systemd_service_dir() {
 }
 
 install_systemd_service() {
-  SRCFILE="${SVC_SOURCE}/netdata.service"
+  SRCFILE="${SVC_SOURCE}/systemd/netdata.service"
 
   if [ "$(systemctl --version | head -n 1 | cut -f 2 -d ' ')" -le 235 ]; then
-    SRCFILE="${SVC_SOURCE}/netdata.service.v235"
+    SRCFILE="${SVC_SOURCE}/systemd/netdata.service.v235"
   fi
 
   if [ "${ENABLE}" = "auto" ]; then
@@ -341,7 +341,7 @@ disable_openrc() {
 }
 
 install_openrc_service() {
-  install_generic_service openrc OpenRC /etc/init.d/netdata enable_openrc disable_openrc
+  install_generic_service openrc/init.d OpenRC /etc/init.d/netdata enable_openrc disable_openrc
 }
 
 openrc_cmds() {
@@ -399,7 +399,7 @@ disable_lsb() {
 }
 
 install_lsb_service() {
-  install_generic_service lsb LSB /etc/init.d/netdata enable_lsb disable_lsb
+  install_generic_service lsb/init.d LSB /etc/init.d/netdata enable_lsb disable_lsb
 }
 
 lsb_cmds() {
@@ -454,7 +454,7 @@ disable_initd() {
 }
 
 install_initd_service() {
-  install_generic_service init-d init.d /etc/init.d/netdata enable_initd disable_initd
+  install_generic_service initd/init.d init.d /etc/init.d/netdata enable_initd disable_initd
 }
 
 initd_cmds() {
@@ -552,7 +552,7 @@ disable_freebsd() {
 }
 
 install_freebsd_service() {
-  install_generic_service freebsd "FreeBSD rc.d" /usr/local/etc/rc.d/netdata enable_freebsd disable_freebsd
+  install_generic_service freebsd/rc.d "FreeBSD rc.d" /usr/local/etc/rc.d/netdata enable_freebsd disable_freebsd
 }
 
 freebsd_cmds() {
@@ -566,7 +566,7 @@ freebsd_cmds() {
 
 install_darwin_service() {
   info "Installing macOS plist file for launchd."
-  if ! install -C -S -p -m 0644 -o 0 -g 0 system/netdata.plist /Library/LaunchDaemons/com.github.netdata.plist; then
+  if ! install -C -S -p -m 0644 -o 0 -g 0 system/launchd/netdata.plist /Library/LaunchDaemons/com.github.netdata.plist; then
     error "Failed to copy plist file."
     exit 4
   fi

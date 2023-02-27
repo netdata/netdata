@@ -29,11 +29,7 @@ run cp \
   packaging/makeself/install-or-update.sh \
   packaging/installer/functions.sh \
   configs.signatures \
-  system/netdata-init-d \
-  system/netdata-lsb \
-  system/netdata-openrc \
-  system/netdata.logrotate \
-  system/netdata.service \
+  system/logrotate/netdata \
   "${NETDATA_INSTALL_PATH}/system/"
 
 # -----------------------------------------------------------------------------
