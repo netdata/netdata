@@ -1,25 +1,9 @@
 #!/sbin/openrc-run
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# The user netdata is configured to run as.
-# If you edit its configuration file to set a different
-# user, set it here too, to have its files switch ownership
-: "${NETDATA_OWNER:=@netdata_user_POST@:@netdata_user_POST@}"
-
-# The timeout in seconds to wait for netdata
-# to save its database on disk and exit.
-: "${NETDATA_WAIT_EXIT_TIMEOUT:=60}"
-
-# When set to 1, if netdata does not exit in
-# NETDATA_WAIT_EXIT_TIMEOUT, we will force it
-# to exit.
-: "${NETDATA_FORCE_EXIT:=0}"
-
-# When set to 1, we use netdatacli for reload/rotate/save commands instead of s-s-d.
-: "${NETDATA_USE_NETDATACLI:=0}"
-
-# Specifies the pidfile to use when running in the background.
-: "${NETDATA_PIDFILE:=@localstatedir_POST@/run/netdata/netdata.pid}"
+NETDATA_OWNER="@netdata_user_POST@:@netdata_user_POST@"
+NETDATA_WAIT_EXIT_TIMEOUT=60
+NETDATA_PIDFILE="@localstatedir_POST@/run/netdata/netdata.pid"
 
 extra_started_commands="reload rotate save"
 command_prefix="@sbindir_POST@"
