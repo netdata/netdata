@@ -61,6 +61,8 @@
   <input type="checkbox" id="keyword_is_regex" name="keyword_is_regex" ><br><br>
   <label for="keyword_case_sensitive">Case-sensitive keyword / regex search:</label>
   <input type="checkbox" id="keyword_case_sensitive" name="keyword_case_sensitive" ><br><br>
+  <label for="use_functions">Use functions instead of GET API:</label>
+  <input type="checkbox" id="use_functions" name="use_functions" ><br><br>
   <input type="submit" value="Submit">
 </form>
 
@@ -77,7 +79,6 @@ function populate_sources_checkboxes() {
   const xmlhttp = new XMLHttpRequest();
   xmlhttp.onload = function() {
     results_obj = JSON.parse(this.responseText);
-    console.log(results_obj["log sources"]);
     let ele = document.getElementById('sources');
     ele.innerHTML += '<h4>Select log sources:</h4>';
     for (const [key, value] of Object.entries(results_obj["log sources"])) {
@@ -98,18 +99,18 @@ function submit_query() {
   const xmlhttp = new XMLHttpRequest();
   xmlhttp.onload = function() {
     results_obj = JSON.parse(this.responseText);
-    console.log(results_obj);
+    logs_management_meta = document.getElementById('use_functions').checked ? results_obj.logs_management_meta : results_obj;
     text =  "<h3>Results</h3><hr>" +
-            "<b>API version:</b> " + results_obj.api_version + "<br>" +
-            "<b>Requested from:</b> " + results_obj.requested_from + "<br>" +
-            "<b>Requested until:</b> " + results_obj.requested_until + "<br>" +
-            "<b>Actual from:</b> " + results_obj.actual_from + "<br>" +
-            "<b>Actual until:</b> " + results_obj.actual_until + "<br>" +
-            "<b>Keyword matches on this page:</b> " + results_obj.keyword_matches + "<br>" +
-            "<b>User time:</b> " + results_obj.user_time + "<br>" +
-            "<b>System time:</b> " + results_obj.system_time + "<br>" +
-            "<b>Error code:</b> " + results_obj.error_code + "<br>" +
-            "<b>Error message:</b> " + results_obj.error + "<br>";
+            "<b>API version:</b> " + logs_management_meta.api_version + "<br>" +
+            "<b>Requested from:</b> " + logs_management_meta.requested_from + "<br>" +
+            "<b>Requested until:</b> " + logs_management_meta.requested_until + "<br>" +
+            "<b>Actual from:</b> " + logs_management_meta.actual_from + "<br>" +
+            "<b>Actual until:</b> " + logs_management_meta.actual_until + "<br>" +
+            "<b>Keyword matches on this page:</b> " + logs_management_meta.keyword_matches + "<br>" +
+            "<b>User time:</b> " + logs_management_meta.user_time + "<br>" +
+            "<b>System time:</b> " + logs_management_meta.system_time + "<br>" +
+            "<b>Error code:</b> " + logs_management_meta.error_code + "<br>" +
+            "<b>Error message:</b> " + logs_management_meta.error + "<br>";
     text += "<br><table border='1'><thead><tr><th>Collection time</th><th>Log Record</th></thead>";
     
       results_obj.data.forEach(function(data_entry) {
@@ -134,22 +135,41 @@ function submit_query() {
   sanitize_keyword = document.getElementById('keyword_is_regex').checked ? "0" : "1";
   ignore_case = document.getElementById('keyword_case_sensitive').checked ? "0" : "1";
 
-  xmlhttp_req = "http://localhost:19999/api/v1/logsmanagement?" + 
-                      "from=" + req_from_value + 
-                      "&until=" + req_until_value + 
-                      "&quota=" + quota_value +
-                      "&keyword=" + keyword_value +
-                      "&sanitize_keyword=" + sanitize_keyword +
-                      "&ignore_case=" + ignore_case;
+
+  if(document.getElementById('use_functions').checked){
+    xmlhttp_req = "http://localhost:19999/api/v1/function?function=logsmanagement" + 
+                      " from:" + req_from_value + 
+                      " until:" + req_until_value + 
+                      " quota:" + quota_value +
+                      " keyword:" + keyword_value +
+                      " sanitize_keyword: " + sanitize_keyword +
+                      " ignore_case:" + ignore_case;
   
-  Array.from(document.getElementsByClassName("sourceCheckBox")).forEach(
-    function(element, index, array) {
-        if(element.checked){
-          xmlhttp_req += "&chart_name=" + element.name;
-          console.log(element.name);
+    Array.from(document.getElementsByClassName("sourceCheckBox")).forEach(
+      function(element, index, array) {
+          if(element.checked){
+            xmlhttp_req += ' chart_name:"' + element.name + '"';
+          }
         }
-      }
-  );
+    );
+  } else {
+      xmlhttp_req = "http://localhost:19999/api/v1/logsmanagement?" + 
+                        "from=" + req_from_value + 
+                        "&until=" + req_until_value + 
+                        "&quota=" + quota_value +
+                        "&keyword=" + keyword_value +
+                        "&sanitize_keyword=" + sanitize_keyword +
+                        "&ignore_case=" + ignore_case;
+    
+    Array.from(document.getElementsByClassName("sourceCheckBox")).forEach(
+      function(element, index, array) {
+          if(element.checked){
+            xmlhttp_req += "&chart_name=" + element.name;
+          }
+        }
+    );
+  }
+  
 
   xmlhttp.open("GET", xmlhttp_req, true);
   xmlhttp.send(null);
