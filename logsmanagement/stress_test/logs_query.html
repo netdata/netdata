@@ -9,9 +9,11 @@
     }
     #form {
       width: 400px;
+      padding: 5px;
       float:left; 
     }
     #results {
+      padding: 5px;
       overflow: hidden;
     }
 
@@ -41,16 +43,10 @@
 <h2>Logs management queries</h2>
 <hr>
 
-<!-- <select id="myselect" onchange="change_myselect(this.value)">
-  <option value="">Choose an option:</option>
-  <option value="customers">Customers</option>
-  <option value="products">Products</option>
-  <option value="suppliers">Suppliers</option>
-</select> -->
-
-<h3>Query parameters</h3>
 
 <form id="form" name="query_form" action="javascript:submit_query()"">
+  <h3>Query parameters</h3>
+  <select id="sources"></select><br><br>
   <label for="req_from">Requested from:</label>
   <input type="text" id="req_from" name="req_from"><br><br>
   <label for="req_until">Requested until:</label>
@@ -75,23 +71,37 @@ document.getElementById('quota').value = '524288';
 document.getElementById('keyword_is_regex').checked = true;
 document.getElementById('keyword_case_sensitive').checked = false;
 
+function populateSelect() {
+  const xmlhttp = new XMLHttpRequest();
+  xmlhttp.onload = function() {
+    results_obj = JSON.parse(this.responseText);
+    console.log(results_obj["log sources"]);
+    let ele = document.getElementById('sources');
+    Object.keys(results_obj["log sources"]).forEach(function(log_source) {
+      ele.innerHTML += '<option value="' + log_source + '">' + log_source + '</option>';
+    });
+  }
+  xmlhttp.open("GET", "http://localhost:19999/api/v1/logsmanagement_sources", true);
+  xmlhttp.send(null);
+}
+window.onload = populateSelect;
+
 function submit_query() {
-  // const dbParam = JSON.stringify({table:sel,limit:20});
   const xmlhttp = new XMLHttpRequest();
   xmlhttp.onload = function() {
     results_obj = JSON.parse(this.responseText);
     console.log(results_obj);
     text =  "<h3>Results</h3>" +
-            "API version: " + results_obj.api_version + "<br>" +
-            "Requested from: " + results_obj.requested_from + "<br>" +
-            "Requested until: " + results_obj.requested_until + "<br>" +
-            "Actual from: " + results_obj.actual_from + "<br>" +
-            "Actual until: " + results_obj.actual_until + "<br>" +
-            "Keyword matches on this page: " + results_obj.keyword_matches + "<br>" +
-            "User time: " + results_obj.user_time + "<br>" +
-            "System time: " + results_obj.system_time + "<br>" +
-            "Error code: " + results_obj.error_code + "<br>" +
-            "Error message: " + results_obj.error + "<br>";
+            "<b>API version:</b> " + results_obj.api_version + "<br>" +
+            "<b>Requested from:</b> " + results_obj.requested_from + "<br>" +
+            "<b>Requested until:</b> " + results_obj.requested_until + "<br>" +
+            "<b>Actual from:</b> " + results_obj.actual_from + "<br>" +
+            "<b>Actual until:</b> " + results_obj.actual_until + "<br>" +
+            "<b>Keyword matches on this page:</b> " + results_obj.keyword_matches + "<br>" +
+            "<b>User time:</b> " + results_obj.user_time + "<br>" +
+            "<b>System time:</b> " + results_obj.system_time + "<br>" +
+            "<b>Error code:</b> " + results_obj.error_code + "<br>" +
+            "<b>Error message:</b> " + results_obj.error + "<br>";
     text += "<br><table border='1'><thead><tr><th>Collection time</th><th>Log Record</th></thead>";
     
       results_obj.data.forEach(function(data_entry) {
@@ -103,6 +113,8 @@ function submit_query() {
     text += "</table>";
     document.getElementById("results").innerHTML = text;
   }
+  source = document.getElementById("sources");
+  sources_value = encodeURIComponent(sources.value);
   req_from = document.getElementById("req_from");
   req_from_value = encodeURIComponent(req_from.value);
   req_until = document.getElementById("req_until");
@@ -120,7 +132,7 @@ function submit_query() {
                       "&keyword=" + keyword_value +
                       "&sanitize_keyword=" + sanitize_keyword +
                       "&ignore_case=" + ignore_case +
-                      "&chart_name=Systemd%20Logs", true);
+                      "&chart_name=" + sources_value, true);
   xmlhttp.send(null);
 }
 </script>
