@@ -10,6 +10,7 @@
 #include <linux/btf.h>
 #endif
 #include <stdlib.h> // Necessary for stdtoul
+#include "libnetdata/aral/aral.h"
 
 #define NETDATA_DEBUGFS "/sys/kernel/debug/tracing/"
 #define NETDATA_KALLSYMS "/proc/kallsyms"
@@ -255,6 +256,10 @@ typedef enum netdata_apps_integration_flags {
     NETDATA_EBPF_APPS_FLAG_CHART_CREATED
 } netdata_apps_integration_flags_t;
 
+#define NETDATA_EBPF_CHART_MEM_LENGTH 48
+#define NETDATA_EBPF_STAT_DIMENSION_MEMORY "memory"
+#define NETDATA_EBPF_STAT_DIMENSION_ARAL "aral"
+
 typedef struct ebpf_module {
     const char *thread_name;
     const char *config_name;
@@ -280,6 +285,10 @@ typedef struct ebpf_module {
     struct bpf_link **probe_links;
     struct bpf_object *objects;
     struct netdata_static_thread *thread;
+
+    // charts
+    char memory_usage[NETDATA_EBPF_CHART_MEM_LENGTH];
+    char memory_allocations[NETDATA_EBPF_CHART_MEM_LENGTH];
 } ebpf_module_t;
 
 int ebpf_get_kernel_version();
@@ -379,5 +388,7 @@ int ebpf_is_function_inside_btf(struct btf *file, char *function);
 
 void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report, ebpf_local_maps_t *maps);
 void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *map, ebpf_stats_action_t action);
+void ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em);
+void ebpf_send_data_aral_chart(ARAL *memory, ebpf_module_t *em);
 
 #endif /* NETDATA_EBPF_H */
