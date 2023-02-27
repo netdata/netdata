@@ -84,6 +84,7 @@ jobs:
         uses: github/codeql-action/init@v2
         with:
           languages: cpp
+          config-file: ./.github/codeql/c-cpp-config.yml
       - name: Prepare environment
         run: ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
       - name: Build netdata
