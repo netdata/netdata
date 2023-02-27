@@ -12,3 +12,4 @@
 [submodule "httpd/h2o"]
 	path = httpd/h2o
 	url = https://github.com/h2o/h2o.git
+	ignore = untracked
