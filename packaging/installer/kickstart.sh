@@ -193,8 +193,8 @@ USAGE: kickstart.sh [options]
 
 The following options are mutually exclusive and specifiy special operations other than trying to install Netdata normally or update an existing install:
 
-  --reinstall                      If there is an existing install, reinstall it instead of trying to update it. If there is not an existing install, install netdata normally.
-  --reinstall-even-if-unsafe       If there is an existing install, reinstall it instead of trying to update it, even if doing so is known to potentially break things. If there is not an existing install, install Netdata normally.
+  --reinstall                      If there is an existing install, reinstall it instead of trying to update it. If there is no existing install, install netdata normally.
+  --reinstall-even-if-unsafe       If there is an existing install, reinstall it instead of trying to update it, even if doing so is known to potentially break things. If there is no existing install, install Netdata normally.
   --reinstall-clean                If there is an existing install, uninstall it before trying to install Netdata. Fails if there is no existing install.
   --uninstall                      Uninstall an existing installation of Netdata. Fails if there is no existing install.
   --claim-only                     If there is an existing install, only try to claim it without attempting to update it. If there is no existing install, install and claim Netdata normally.
