@@ -1060,7 +1060,7 @@ fi
 # -----------------------------------------------------------------------------
 progress "Fix generated files permissions"
 
-run chmod 755 ./system/*/init.d/netdata ./system/*/rc.d/netdata ./system/install-service.sh
+run chmod 755 ./system/*/init.d/netdata ./system/*/rc.d/netdata ./system/runit/run ./system/install-service.sh
 
 # -----------------------------------------------------------------------------
 progress "Creating standard user and groups for netdata"
