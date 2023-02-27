@@ -3,7 +3,6 @@
 
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 CLEANFILES = \
-    netdata-runit \
     cron/netdata-updater-daily \
     freebsd/rc.d/netdata \
     initd/init.d/netdata \
@@ -12,6 +11,7 @@ CLEANFILES = \
     lsb/init.d/netdata \
     openrc/conf.d/netdata \
     openrc/init.d/netdata \
+    runit/run \
     systemd/netdata.service \
     systemd/netdata.service.v235 \
     systemd/netdata-updater.service \
@@ -67,10 +67,6 @@ dist_libconfigvnodes_DATA = \
 libexecnetdatadir=$(libexecdir)/netdata
 nodist_libexecnetdata_SCRIPTS = \
     install-service.sh \
-    $(NULL)
-
-nodist_libsys_DATA = \
-    netdata-runit \
     $(NULL)
 
 nodist_libsyscron_DATA = \
