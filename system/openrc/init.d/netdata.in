@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 NETDATA_OWNER="@netdata_user_POST@:@netdata_user_POST@"
-NETDATA_WAIT_EXIT_TIMEOUT=60
 NETDATA_PIDFILE="@localstatedir_POST@/run/netdata/netdata.pid"
 
 extra_started_commands="reload rotate save"
@@ -11,11 +10,6 @@ command="${command_prefix}/netdata"
 command_args="-P ${NETDATA_PIDFILE} ${NETDATA_EXTRA_ARGS}"
 command_args_foreground="-D"
 start_stop_daemon_args="-u ${NETDATA_OWNER}"
-if [ "${NETDATA_FORCE_EXIT}" -eq 1 ]; then
-    retry="TERM/${NETDATA_WAIT_EXIT_TIMEOUT}/KILL/1"
-else
-    retry="TERM/${NETDATA_WAIT_EXIT_TIMEOUT}"
-fi
 
 depend() {
     use logger
@@ -28,6 +22,14 @@ start_pre() {
 
     if [ -z "${supervisor}" ]; then
         pidfile="${NETDATA_PIDFILE}"
+    fi
+}
+
+stop_pre() {
+    if [ "0${NETDATA_FORCE_EXIT}" -eq 1 ]; then
+        retry="TERM/${NETDATA_WAIT_EXIT_TIMEOUT:-60}/KILL/1"
+    else
+        retry="TERM/${NETDATA_WAIT_EXIT_TIMEOUT:-60}"
     fi
 }
 
