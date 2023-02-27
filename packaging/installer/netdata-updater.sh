@@ -225,9 +225,8 @@ enable_netdata_updater() {
       ;;
     "crontab")
       if [ -d "/etc/cron.d" ]; then
-        cat > "/etc/cron.d/netdata-updater" <<-EOF
-	2 57 * * * root ${NETDATA_PREFIX}/netdata-updater.sh
-	EOF
+        [ -f "/etc/cron.d/netdata-updater" ] && rm -f "/etc/cron.d/netdata-updater"
+        install -p -m 0644 -o 0 -g 0 "${NETDATA_PREFIX}/usr/lib/system/cron/netdata-updater-daily" "/etc/cron.d/netdata-updater-daily"
 
         info "Auto-updating has been ENABLED through cron, using a crontab at /etc/cron.d/netdata-updater\n"
         info "If the update process fails and you have email notifications set up correctly for cron on this system, you should receive an email notification of the failure."
@@ -262,6 +261,7 @@ disable_netdata_updater() {
 
   if [ -d /etc/cron.d ]; then
     rm -f /etc/cron.d/netdata-updater
+    rm -f /etc/cron.d/netdata-updater-daily
   fi
 
   info "Auto-updates have been DISABLED."
