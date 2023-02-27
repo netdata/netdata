@@ -1201,6 +1201,7 @@ void *ebpf_dcstat_thread(void *ptr)
     pthread_mutex_lock(&lock);
     ebpf_create_filesystem_charts(em->update_every);
     ebpf_update_stats(&plugin_statistics, em);
+    ebpf_update_kernel_memory(&plugin_statistics, dcstat_maps);
     pthread_mutex_unlock(&lock);
 
     dcstat_collector(em);
