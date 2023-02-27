@@ -1110,6 +1110,7 @@ void *ebpf_shm_thread(void *ptr)
     pthread_mutex_lock(&lock);
     ebpf_create_shm_charts(em->update_every);
     ebpf_update_stats(&plugin_statistics, em);
+    ebpf_update_kernel_memory(&plugin_statistics, em->maps);
     pthread_mutex_unlock(&lock);
 
     shm_collector(em);
