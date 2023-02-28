@@ -76,35 +76,52 @@ If you have not passed the `--auto-update` or `-u` parameter for the installer t
 The `netdata-updater.sh` script will update your Agent.
 
 ## Optional parameters to alter your installation
-| parameters | Description |
-|:-----:|-----------|
-|`--install-prefix <path>`| Install netdata in `<path>.` Ex: `--install-prefix /opt` will put netdata in `/opt/netdata`|
-| `--dont-start-it` | Do not (re)start netdata after installation|
-| `--dont-wait` | Run installation in non-interactive mode|
-| `--auto-update` or `-u` | Install netdata-updater in cron to update netdata automatically once per day|
-| `--stable-channel` | Use packages from GitHub release pages instead of GCS (nightly updates). This results in less frequent updates|
-| `--nightly-channel` | Use most recent nightly updates instead of GitHub releases. This results in more frequent updates|
-| `--disable-go` | Disable installation of go.d.plugin|
-| `--disable-ebpf` | Disable eBPF Kernel plugin (Default: enabled)|
-| `--disable-cloud` | Disable all Netdata Cloud functionality|
-| `--require-cloud` | Fail the install if it can't build Netdata Cloud support|
-| `--enable-plugin-freeipmi` | Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available|
-| `--disable-plugin-freeipmi` | Enable the FreeIPMI plugin|
-| `--disable-https` | Explicitly disable TLS support|
-| `--disable-dbengine` | Explicitly disable DB engine support|
-| `--enable-plugin-nfacct` | Enable nfacct plugin. Default: enable it when libmnl and libnetfilter_acct are available|
-| `--disable-plugin-nfacct` | Disable nfacct plugin. Default: enable it when libmnl and libnetfilter_acct are available|
-| `--enable-plugin-xenstat` | Enable the xenstat plugin. Default: enable it when libxenstat and libyajl are available|
-| `--disable-plugin-xenstat` | Disable the xenstat plugin|
-| `--disable-exporting-kinesis` | Disable AWS Kinesis exporting connector. Default: enable it when libaws_cpp_sdk_kinesis and libraries (it depends on are available)|
-| `--enable-exporting-prometheus-remote-write` | Enable Prometheus remote write exporting connector. Default: enable it when libprotobuf and libsnappy are available|
-| `--disable-exporting-prometheus-remote-write` | Disable Prometheus remote write exporting connector. Default: enable it when libprotobuf and libsnappy are available|
-| `--enable-exporting-mongodb` | Enable MongoDB exporting connector. Default: enable it when libmongoc is available|
-| `--disable-exporting-mongodb` | Disable MongoDB exporting connector|
-| `--enable-lto` | Enable Link-Time-Optimization. Default: enabled|
-| `--disable-lto` | Disable Link-Time-Optimization. Default: enabled|
-| `--disable-x86-sse` | Disable SSE instructions. By default SSE optimizations are enabled|
-| `--zlib-is-really-here` or `--libs-are-really-here` | If you get errors about missing zlib or libuuid but you know it is available, you might have a broken pkg-config. Use this option to proceed without checking pkg-config|
-|`--disable-telemetry` | Use this flag to opt-out from our anonymous telemetry program. (DISABLE_TELEMETRY=1)|
 
+The `kickstart.sh` script accepts a number of optional parameters to control how the installation process works:
 
+- `--non-interactive`: Don’t prompt for anything and assume yes whenever possible, overriding any automatic detection of an interactive run.
+- `--interactive`: Act as if running interactively, even if automatic detection indicates a run is non-interactive.
+- `--dont-wait`: Synonym for `--non-interactive`
+- `--dry-run`: Show what the installer would do, but don’t actually do any of it.
+- `--dont-start-it`: Don’t auto-start the daemon after installing. This parameter is not guaranteed to work.
+- `--release-channel`: Specify a particular release channel to install from. Currently supported release channels are:
+    - `nightly`: Installs a nightly build (this is currently the default).
+    - `stable`: Installs a stable release.
+    - `default`: Explicitly request whatever the current default is.
+- `--nightly-channel`: Synonym for `--release-channel nightly`.
+- `--stable-channel`: Synonym for `--release-channel stable`.
+- `--auto-update`: Enable automatic updates (this is the default).
+- `--no-updates`: Disable automatic updates.
+- `--disable-telemetry`: Disable anonymous statistics.
+- `--native-only`: Only install if native binary packages are available.
+- `--static-only`: Only install if a static build is available.
+- `--build-only`: Only install using a local build.
+- `--disable-cloud`: For local builds, don’t build any of the cloud code at all. For native packages and static builds,
+    use runtime configuration to disable cloud support.
+- `--require-cloud`: Only install if Netdata Cloud can be enabled. Overrides `--disable-cloud`.
+- `--install-prefix`: Specify an installation prefix for local builds (by default, we use a sane prefix based on the type of system).
+- `--install-version`: Specify the version of Netdata to install.
+- `--old-install-prefix`: Specify the custom local build's installation prefix that should be removed.
+- `--local-build-options`: Specify additional options to pass to the installer code when building locally. Only valid if `--build-only` is also specified.
+- `--static-install-options`: Specify additional options to pass to the static installer code. Only valid if --static-only is also specified.
+
+The following options are mutually exclusive and specifiy special operations other than trying to install Netdata normally or update an existing install:
+
+- `--reinstall`: If there is an existing install, reinstall it instead of trying to update it. If there is not an existing install, install netdata normally.
+- `--reinstall-even-if-unsafe`: If there is an existing install, reinstall it instead of trying to update it, even if doing so is known to potentially break things (for example, if we cannot detect what tyep of installation it is). If there is not an existing install, install Netdata normally.
+- `--reinstall-clean`: If there is an existing install, uninstall it before trying to install Netdata. Fails if there is no existing install.
+- `--uninstall`: Uninstall an existing installation of Netdata. Fails if there is no existing install.
+- `--claim-only`: If there is an existing install, only try to claim it without attempting to update it. If there is no existing install, install and claim Netdata normally.
+- `--repositories-only`: Only install repository configuration packages instead of doing a full install of Netdata. Automatically sets --native-only.
+- `--prepare-offline-install-source`: Instead of insallling the agent, prepare a directory that can be used to install on another system without needing to download anything. See our [offline installation documentation](/packaging/installer/methods/offline.md) for more info.
+
+Additionally, the following environment variables may be used to further customize how the script runs (most users
+should not need to use special values for any of these):
+
+- `TMPDIR`: Used to specify where to put temporary files. On most systems, the default we select automatically
+  should be fine. The user running the script needs to both be able to write files to the temporary directory,
+  and run files from that location.
+- `ROOTCMD`: Used to specify a command to use to run another command with root privileges if needed. By default
+  we try to use sudo, doas, or pkexec (in that order of preference), but if you need special options for one of
+  those to work, or have a different tool to do the same thing on your system, you can specify it here.
+- `DISABLE_TELEMETRY`: If set to a value other than 0, behave as if `--disable-telemetry` was specified.

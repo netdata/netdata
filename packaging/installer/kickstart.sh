@@ -44,7 +44,6 @@ SELECTED_INSTALL_METHOD="none"
 INSTALL_TYPE="unknown"
 INSTALL_PREFIX=""
 NETDATA_AUTO_UPDATES="default"
-NETDATA_CLAIM_ONLY=0
 NETDATA_CLAIM_URL="https://api.netdata.cloud"
 NETDATA_COMMAND="default"
 NETDATA_DISABLE_CLOUD=0
@@ -105,7 +104,7 @@ main() {
       uninstall
       cleanup
 
-      ACTION=
+      ACTION=''
       INSTALL_PREFIX="${NEW_INSTALL_PREFIX}"
       # shellcheck disable=SC2086
       main
@@ -177,12 +176,9 @@ USAGE: kickstart.sh [options]
   --auto-update                    Enable automatic updates.
   --auto-update-type               Specify a particular scheduling type for auto-updates (valid types: systemd, interval, crontab)
   --disable-telemetry              Opt-out of anonymous statistics.
-  --repositories-only              Only install appropriate repository configuration packages (only for native install).
   --native-only                    Only install if native binary packages are available.
   --static-only                    Only install if a static build is available.
   --build-only                     Only install using a local build.
-  --reinstall                      Explicitly reinstall instead of updating any existing install.
-  --reinstall-even-if-unsafe       Even try to reinstall if we don't think we can do so safely (implies --reinstall).
   --disable-cloud                  Disable support for Netdata Cloud (default: detect)
   --require-cloud                  Only install if Netdata Cloud can be enabled. Overrides --disable-cloud.
   --install-prefix <path>          Specify an installation prefix for local builds (default: autodetect based on system type).
@@ -190,13 +186,19 @@ USAGE: kickstart.sh [options]
   --install-version <version>      Specify the version of Netdata to install.
   --claim-token                    Use a specified token for claiming to Netdata Cloud.
   --claim-rooms                    When claiming, add the node to the specified rooms.
-  --claim-only                     If there is an existing install, only try to claim it, not update it.
   --claim-*                        Specify other options for the claiming script.
   --no-cleanup                     Don't do any cleanup steps. This is intended to help with debugging the installer.
-  --uninstall                      Uninstall an existing installation of Netdata.
-  --reinstall-clean                Clean reinstall Netdata.
   --local-build-options            Specify additional options to pass to the installer code when building locally. Only valid if --build-only is also specified.
   --static-install-options         Specify additional options to pass to the static installer code. Only valid if --static-only is also specified.
+
+The following options are mutually exclusive and specifiy special operations other than trying to install Netdata normally or update an existing install:
+
+  --reinstall                      If there is an existing install, reinstall it instead of trying to update it. If there is no existing install, install netdata normally.
+  --reinstall-even-if-unsafe       If there is an existing install, reinstall it instead of trying to update it, even if doing so is known to potentially break things. If there is no existing install, install Netdata normally.
+  --reinstall-clean                If there is an existing install, uninstall it before trying to install Netdata. Fails if there is no existing install.
+  --uninstall                      Uninstall an existing installation of Netdata. Fails if there is no existing install.
+  --claim-only                     If there is an existing install, only try to claim it without attempting to update it. If there is no existing install, install and claim Netdata normally.
+  --repositories-only              Only install repository configuration packages instead of doing a full install of Netdata. Automatically sets --native-only.
   --prepare-offline-install-source Instead of installing the agent, prepare a directory that can be used to install on another system without needing to download anything.
 
 Additionally, this script may use the following environment variables:
@@ -924,7 +926,7 @@ handle_existing_install() {
         progress "Found an existing netdata install at ${ndprefix}, with installation type '${INSTALL_TYPE}'."
       fi
 
-      if [ -n "${NETDATA_REINSTALL}" ] || [ -n "${NETDATA_UNSAFE_REINSTALL}" ]; then
+      if [ "${ACTION}" = "reinstall" ] || [ "${ACTION}" = "unsafe-reinstall" ]; then
         progress "Found an existing netdata install at ${ndprefix}, but user requested reinstall, continuing."
 
         case "${INSTALL_TYPE}" in
@@ -932,7 +934,7 @@ handle_existing_install() {
           *-build) NETDATA_ONLY_BUILD=1 ;;
           *-static) NETDATA_ONLY_STATIC=1 ;;
           *)
-            if [ -n "${NETDATA_UNSAFE_REINSTALL}" ]; then
+            if [ "${ACTION}" = "unsafe-reinstall" ]; then
               warning "Reinstalling over top of a ${INSTALL_TYPE} installation may be unsafe, but the user has requested we proceed."
             elif [ "${INTERACTIVE}" -eq 0 ]; then
               fatal "User requested reinstall, but we cannot safely reinstall over top of a ${INSTALL_TYPE} installation, exiting." F0104
@@ -975,7 +977,7 @@ handle_existing_install() {
 
       ret=0
 
-      if [ "${NETDATA_CLAIM_ONLY}" -eq 0 ]; then
+      if [ "${ACTION}" != "claim" ]; then
         if ! update; then
           warning "Failed to update existing Netdata install at ${ndprefix}."
         else
@@ -990,7 +992,7 @@ handle_existing_install() {
         INSTALL_PREFIX="${ndprefix}"
         claim
         ret=$?
-      elif [ "${NETDATA_CLAIM_ONLY}" -eq 1 ]; then
+      elif [ "${ACTION}" = "claim" ]; then
         fatal "User asked to claim, but did not proide a claiming token." F0202
       else
         progress "Not attempting to claim existing install at ${ndprefix} (no claiming token provided)."
@@ -1006,8 +1008,8 @@ handle_existing_install() {
       fatal "This is an OCI container, use the regular container lifecycle management commands for your container tools instead of this script for managing it." F0203
       ;;
     *)
-      if [ -n "${NETDATA_REINSTALL}" ] || [ -n "${NETDATA_UNSAFE_REINSTALL}" ]; then
-        if [ -n "${NETDATA_UNSAFE_REINSTALL}" ]; then
+      if [ "${ACTION}" = "reinstall" ] || [ "${ACTION}" = "unsafe-reinstall" ]; then
+        if [ "${ACTION}" = "unsafe-reinstall" ]; then
           warning "Reinstalling over top of a ${INSTALL_TYPE} installation may be unsafe, but the user has requested we proceed."
         elif [ "${INTERACTIVE}" -eq 0 ]; then
           fatal "User requested reinstall, but we cannot safely reinstall over top of a ${INSTALL_TYPE} installation, exiting." F0104
@@ -1028,7 +1030,7 @@ handle_existing_install() {
           cleanup
           trap - EXIT
           exit $ret
-        elif [ "${NETDATA_CLAIM_ONLY}" -eq 1 ]; then
+        elif [ "${ACTION}" = "claim" ]; then
           fatal "User asked to claim, but did not proide a claiming token." F0202
         else
           fatal "Found an existing netdata install at ${ndprefix}, but the install type is '${INSTALL_TYPE}', which is not supported by this script, refusing to proceed." F0103
@@ -1550,8 +1552,8 @@ try_package_install() {
     progress "Repository configuration is already present, attempting to install netdata."
   fi
 
-  if [ "${REPO_ACTION}" = "repositories-only" ]; then
-    progress "Successfully installed repository configuration package."
+  if [ "${ACTION}" = "repositories-only" ]; then
+    progress "Successfully installed repository configuraion package."
     deferred_warnings
     cleanup
     trap - EXIT
@@ -2063,6 +2065,10 @@ install_on_freebsd() {
 validate_args() {
   check_claim_opts
 
+  if [ "${ACTION}" = "repositories-only" ] && [ "${NETDATA_ONLY_NATIVE}" -eq 1 ]; then
+    fatal "Repositories can only be installed for native installs." F050D
+  fi
+
   if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
     if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ] || [ "${NETDATA_ONLY_BUILD}" -eq 1 ]; then
       fatal "Offline installs are only supported for static builds currently." F0502
@@ -2120,6 +2126,17 @@ validate_args() {
   fi
 }
 
+set_action() {
+  new_action="${1}"
+
+  if [ -n "${ACTION}" ]; then
+    warning "Ignoring previously specified '${ACTION}' operation in favor of '${new_action}' specified later on the command line."
+  fi
+
+  ACTION="${new_action}"
+  NETDATA_COMMAND="${new_action}"
+}
+
 parse_args() {
   while [ -n "${1}" ]; do
     case "${1}" in
@@ -2147,6 +2164,11 @@ parse_args() {
         ;;
       "--stable-channel") RELEASE_CHANNEL="stable" ;;
       "--nightly-channel") RELEASE_CHANNEL="nightly" ;;
+      "--reinstall") set_action 'reinstall' ;;
+      "--reinstall-even-if-unsafe") set_action 'unsafe-reinstall' ;;
+      "--reinstall-clean") set_action 'reinstall-clean' ;;
+      "--uninstall") set_action 'uninstall' ;;
+      "--claim-only") set_action 'claim' ;;
       "--no-updates") NETDATA_AUTO_UPDATES=0 ;;
       "--auto-update") NETDATA_AUTO_UPDATES="1" ;;
       "--auto-update-method")
@@ -2160,18 +2182,6 @@ parse_args() {
             exit 1
             ;;
         esac
-        ;;
-      "--reinstall")
-        NETDATA_REINSTALL=1
-        NETDATA_COMMAND="reinstall"
-        ;;
-      "--reinstall-even-if-unsafe")
-        NETDATA_UNSAFE_REINSTALL=1
-        NETDATA_COMMAND="unsafe-reinstall"
-        ;;
-      "--claim-only")
-        NETDATA_CLAIM_ONLY=1
-        NETDATA_COMMAND="claim-only"
         ;;
       "--disable-cloud")
         NETDATA_DISABLE_CLOUD=1
@@ -2218,19 +2228,14 @@ parse_args() {
           fatal "A distribution name and release must be specified for the --distro-override option." F050F
         fi
         ;;
-      "--uninstall")
-        ACTION="uninstall"
-        NETDATA_COMMAND="uninstall"
-        ;;
-      "--reinstall-clean")
-        ACTION="reinstall-clean"
-        NETDATA_COMMAND="reinstall-clean"
+      "--native-only")
+        NETDATA_ONLY_NATIVE=1
+        NETDATA_ONLY_STATIC=0
+        NETDATA_ONLY_BUILD=0
+        SELECTED_INSTALL_METHOD="native"
         ;;
       "--repositories-only")
-        REPO_ACTION="repositories-only"
-        NETDATA_COMMAND="repositories"
-        ;;
-      "--native-only")
+        set_action 'repositories-only'
         NETDATA_ONLY_NATIVE=1
         NETDATA_ONLY_STATIC=0
         NETDATA_ONLY_BUILD=0
@@ -2285,8 +2290,7 @@ parse_args() {
         ;;
       "--prepare-offline-install-source")
         if [ -n "${2}" ]; then
-          ACTION="prepare-offline"
-          NETDATA_COMMAND="prepare-offline"
+          set_action 'prepare-offline'
           OFFLINE_TARGET="${2}"
           shift 1
         else
