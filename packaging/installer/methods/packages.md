@@ -41,7 +41,7 @@ Under each of those directories is a directory for each supported release of tha
 directory for each supported CPU architecture which contains the actual repository.
 
 For example, for stable release packages for RHEL 9 on 64-bit x86, the full URL for the repository would be
-https://repo.netdata.cloud/repos/stable/el/9/x86\_64/
+https://repo.netdata.cloud/repos/stable/el/9/x86_64/
 
 Our RPM packages and repository metadata are signed using a GPG key with a user name of ‘Netdatabot’. The
 current key fingerprint is `6588FDD7B14721FE7C3115E6F9177B5265F56346`. The associated public key can be fetched from
