@@ -30,7 +30,8 @@ set -euo pipefail
 
 fetch() {
   local dir="${1}" url="${2}" sha256="${3}" key="${4}"
-  local tar="$(basename "${2}")"
+  local tar
+  tar="$(basename "${2}")"
   local cache="${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/${key}"
 
   if [ -d "${NETDATA_MAKESELF_PATH}/tmp/${dir}" ]; then

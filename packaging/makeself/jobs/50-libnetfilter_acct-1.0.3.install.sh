@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Install the libnetfilter_acct and it's dependency libmnl
-# 
+#
 
 # shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
@@ -27,7 +27,7 @@ if [ "${CACHE_HIT:-0}" -eq 0 ]; then
         --exec-prefix="/libnetfilter-acct-static"
 
     run make clean
-    run make -j "$(nproc)" 
+    run make -j "$(nproc)"
 fi
 
 run make install
