@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Networking"
 -->
 
-# nfacct.plugin
+# Monitor Netfilter statistics (nfacct.plugin)
 
 `nfacct.plugin` collects Netfilter statistics.
 

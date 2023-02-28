@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/System metrics"
 -->
 
-# apps.plugin
+# Application monitoring (apps.plugin)
 
 `apps.plugin` breaks down system resource usage to **processes**, **users** and **user groups**.
 

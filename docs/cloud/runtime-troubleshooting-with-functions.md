@@ -9,6 +9,8 @@ learn_rel_path: "Operations"
 learn_docs_purpose: "Instructions on how to use Functions"
 -->
 
+# Run-time troubleshooting with Functions
+
 Netdata Functions feature allows you to execute on-demand a pre-defined routine on a node where a Netdata Agent is running. These routines are exposed by a given collector. 
 These routines can be used to retrieve additional information to help you troubleshoot or to trigger some action to happen on the node itself.
 

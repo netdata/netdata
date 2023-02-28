@@ -8,6 +8,8 @@ learn_topic_type: "Tasks"
 learn_rel_path: "Operations"
 -->
 
+# Metric Correlations
+
 The Metric Correlations (MC) feature lets you quickly find metrics and charts related to a particular window of interest that you want to explore further. By displaying the standard Netdata dashboard, filtered to show only charts that are relevant to the window of interest, you can get to the root cause sooner.
 
 Because Metric Correlations uses every available metric from your infrastructure, with as high as 1-second granularity, you get the most accurate insights using every possible metric.

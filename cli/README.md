@@ -7,7 +7,7 @@ learn_status: "Published"
 learn_rel_path: "Operations"
 -->
 
-# Netdata CLI
+# Netdata Agent CLI
 
 The `netdatacli` executable provides a simple way to control the Netdata agent's operation. 
 

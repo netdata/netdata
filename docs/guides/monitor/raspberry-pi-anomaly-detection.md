@@ -8,6 +8,8 @@ learn_status: "Published"
 learn_rel_path: "Miscellaneous"
 -->
 
+# Unsupervised anomaly detection for Raspberry Pi monitoring
+
 We love IoT and edge at Netdata, we also love machine learning. Even better if we can combine the two to ease the pain
 of monitoring increasingly complex systems.
 
@@ -63,7 +65,6 @@ Now you're ready to enable the collector and [restart Netdata](https://github.co
 
 ```bash
 sudo ./edit-config python.d.conf
-# set `anomalies: no` to `anomalies: yes`
 
 # restart netdata
 sudo systemctl restart netdata

@@ -8,7 +8,7 @@ learn_rel_path: "Installation/Installation methods"
 sidebar_position: 20
 -->
 
-# Installing Netdata using native DEB or RPM packages.
+# Install Netdata using native DEB/RPM packages.
 
 For most common Linux distributions that use either DEB or RPM packages, Netdata provides pre-built native packages
 for current releases in-line with

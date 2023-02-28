@@ -9,7 +9,7 @@ learn_topic_type: "Tasks"
 learn_rel_path: "Configuration"
 -->
 
-# Agent-cloud link (ACLK)
+# Agent-Cloud link (ACLK)
 
 The Agent-Cloud link (ACLK) is the mechanism responsible for securely connecting a Netdata Agent to your web browser
 through Netdata Cloud. The ACLK establishes an outgoing secure WebSocket (WSS) connection to Netdata Cloud on port

@@ -8,7 +8,7 @@ learn_topic_type: "Concepts"
 learn_rel_path: "Concepts"
 -->
 
-# DBENGINE
+# Database engine
 
 DBENGINE is the time-series database of Netdata.
 

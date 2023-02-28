@@ -9,7 +9,7 @@ learn_rel_path: "Installation"
 learn_docs_purpose: "Present all the supported platform in the Netdata solution"
 -->
 
-# Netdata platform support policy
+# Platform support policy
 
 Netdata defines three tiers of official support:
 

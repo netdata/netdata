@@ -7,6 +7,8 @@ learn_status: "Published"
 learn_rel_path: "Integrations/Monitor/Anything"
 -->
 
+# StatsD
+
 [StatsD](https://github.com/statsd/statsd) is a system to collect data from any application. Applications send metrics to it, 
 usually via non-blocking UDP communication, and StatsD servers collect these metrics, perform a few simple calculations on 
 them and push them to backend time-series databases.
@@ -317,7 +319,6 @@ For example, if you want to monitor the application `myapp` using StatsD and Net
 	private charts = no
 	gaps when not collected = no
 	history = 60
-# 	memory mode = ram	
 
 [dictionary]
     m1 = metric1
