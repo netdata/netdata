@@ -2948,8 +2948,10 @@ static void socket_collector(ebpf_module_t *em)
         if (socket_apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_socket_send_apps_data(em, apps_groups_root_target);
 
+#ifdef NETDATA_DEV_MODE
         if (ebpf_aral_socket_pid)
             ebpf_send_data_aral_chart(ebpf_aral_socket_pid, em);
+#endif
 
         if (cgroups)
             ebpf_socket_send_cgroup_data(update_every);
@@ -4014,8 +4016,10 @@ void *ebpf_socket_thread(void *ptr)
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
 
+#ifdef NETDATA_DEV_MODE
     if (ebpf_aral_socket_pid)
         ebpf_statistic_create_aral_chart(NETDATA_EBPF_SOCKET_ARAL_NAME, em);
+#endif
 
     pthread_mutex_unlock(&lock);
 

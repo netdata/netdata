@@ -1528,8 +1528,10 @@ static void vfs_collector(ebpf_module_t *em)
         if (apps)
             ebpf_vfs_read_apps();
 
+#ifdef NETDATA_DEV_MODE
         if (ebpf_aral_vfs_pid)
             ebpf_send_data_aral_chart(ebpf_aral_vfs_pid, em);
+#endif
 
         if (cgroups)
             read_update_vfs_cgroup();
@@ -1960,8 +1962,10 @@ void *ebpf_vfs_thread(void *ptr)
     ebpf_create_global_charts(em);
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
+#ifdef NETDATA_DEV_MODE
     if (ebpf_aral_vfs_pid)
         ebpf_statistic_create_aral_chart(NETDATA_EBPF_VFS_ARAL_NAME, em);
+#endif
 
     pthread_mutex_unlock(&lock);
 
