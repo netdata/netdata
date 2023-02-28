@@ -33,6 +33,9 @@
 #define NETDATA_SYSTEMD_FD_CLOSE_CONTEXT "services.fd_close"
 #define NETDATA_SYSTEMD_FD_CLOSE_ERR_CONTEXT "services.fd_close_error"
 
+// ARAL name
+#define NETDATA_EBPF_FD_ARAL_NAME "ebpf_fd"
+
 typedef struct netdata_fd_stat {
     uint32_t open_call;                    // Open syscalls (open and openat)
     uint32_t close_call;                   // Close syscall (close)
