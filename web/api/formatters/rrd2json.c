@@ -362,7 +362,7 @@ RRDR *data_query_group_by(RRDR *r) {
         for (size_t c2 = 0; c2 < r2->d; c2++) {
             cn2[c2] = 0.0;
             ar2[c2] = 0.0;
-            co2[c2] = RRDR_VALUE_EMPTY | RRDR_VALUE_PARTIAL;
+            co2[c2] = RRDR_VALUE_EMPTY;
         }
     }
 
@@ -424,9 +424,7 @@ RRDR *data_query_group_by(RRDR *r) {
                     break;
             }
 
-            if(o & RRDR_VALUE_RESET)
-                *co2 |= RRDR_VALUE_RESET;
-
+            *co2 |= (o & (RRDR_VALUE_RESET|RRDR_VALUE_PARTIAL));
             *ar2 += ar;
             (*gbc2)++;
         }
@@ -449,8 +447,8 @@ RRDR *data_query_group_by(RRDR *r) {
             if(likely(gbc2)) {
                 *co2 &= ~RRDR_VALUE_EMPTY;
 
-                if(gbc2 == r2->dgbc[c2])
-                    *co2 &= ~RRDR_VALUE_PARTIAL;
+                if(gbc2 != r2->dgbc[c2])
+                    *co2 |= RRDR_VALUE_PARTIAL;
 
                 NETDATA_DOUBLE n;
 

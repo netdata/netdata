@@ -1246,60 +1246,77 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
     buffer_json_object_close(wb);
 }
 
-void rrdr_json_wrapper_annotations(RRDR *r __maybe_unused, BUFFER *wb, DATASOURCE_FORMAT format __maybe_unused, RRDR_OPTIONS options) {
-    buffer_json_member_add_object(wb, "annotations");
-
-    buffer_json_member_add_array(wb, "labels");
-    long c, i;
-    const long used = (long)r->d;
-    for(c = 0, i = 0; c < used ; c++) {
-        if(!rrdr_dimension_should_be_exposed(r->od[c], options))
+static void annotations_for_value_flags(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format __maybe_unused, RRDR_OPTIONS options, RRDR_VALUE_FLAGS flags, const char *type) {
+    const size_t dims = r->d, rows = r->rows;
+    size_t next_d_idx = 0;
+    for(size_t d = 0; d < dims ; d++) {
+        if(!rrdr_dimension_should_be_exposed(r->od[d], options))
             continue;
 
-        buffer_json_add_array_item_string(wb, string2str(r->dn[c]));
-        i++;
-    }
-    buffer_json_array_close(wb); // labels
+        size_t d_idx = next_d_idx++;
 
-    buffer_json_member_add_array(wb, "data");
-    long start = 0, end = rrdr_rows(r), step = 1;
-    if(!(options & RRDR_OPTION_REVERSED)) {
-        start = rrdr_rows(r) - 1;
-        end = -1;
-        step = -1;
-    }
+        size_t t = 0;
+        while(t < rows) {
 
-    // for each line in the array
-    char buf[10] = "";
-    for(i = start; i != end ;i += step) {
-        RRDR_VALUE_FLAGS *co = &r->o[i * r->d];
-
-        RRDR_VALUE_FLAGS row_options = RRDR_VALUE_NOTHING;
-        for (c = 0; c < used; c++) {
-            row_options |= co[c] & (RRDR_VALUE_RESET|RRDR_VALUE_PARTIAL);
-        }
-
-        if(row_options != RRDR_VALUE_NOTHING) {
-            buffer_json_add_array_item_array(wb); // row
-            buffer_json_add_array_item_time_t(wb, r->t[i]); // the time
-            for (c = 0; c < used; c++) {
-                char *d = buf;
-                RRDR_VALUE_FLAGS o = co[c];
-                if(o & RRDR_VALUE_PARTIAL)
-                    *d++ = 'P';
-                if(o & RRDR_VALUE_RESET)
-                    *d++ = 'R';
-
-                *d = '\0';
-                buffer_json_add_array_item_string(wb, buf);
+            // find the beginning
+            time_t started = 0;
+            for(; t < rows ;t++) {
+                RRDR_VALUE_FLAGS o = r->o[t * r->d + d];
+                if(o & flags) {
+                    started = r->t[t];
+                    break;
+                }
             }
-            buffer_json_array_close(wb); // row
+
+            if(started) {
+                time_t ended = 0;
+                for(; t < rows ;t++) {
+                    RRDR_VALUE_FLAGS o = r->o[t * r->d + d];
+                    if(!(o & flags)) {
+                        ended = r->t[t];
+                        break;
+                    }
+                }
+
+                if(!ended)
+                    ended = r->t[rows - 1];
+
+                buffer_json_add_array_item_object(wb);
+                buffer_json_member_add_string(wb, "t", type);
+                // buffer_json_member_add_string(wb, "d", string2str(r->dn[d]));
+                buffer_json_member_add_uint64(wb, "d", d_idx);
+                if(started == ended) {
+                    if(options & RRDR_OPTION_MILLISECONDS)
+                        buffer_json_member_add_time_t2ms(wb, "x", started);
+                    else
+                        buffer_json_member_add_time_t(wb, "x", started);
+                }
+                else {
+                    buffer_json_member_add_array(wb, "x");
+                    if(options & RRDR_OPTION_MILLISECONDS) {
+                        buffer_json_add_array_item_time_t2ms(wb, started);
+                        buffer_json_add_array_item_time_t2ms(wb, ended);
+                    }
+                    else {
+                        buffer_json_add_array_item_time_t(wb, started);
+                        buffer_json_add_array_item_time_t(wb, ended);
+                    }
+                    buffer_json_array_close(wb);
+                }
+                buffer_json_object_close(wb);
+            }
         }
     }
+}
 
-    buffer_json_array_close(wb); // data
+void rrdr_json_wrapper_annotations(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format __maybe_unused, RRDR_OPTIONS options) {
+    buffer_json_member_add_array(wb, "annotations");
 
-    buffer_json_object_close(wb); // annotations
+    annotations_for_value_flags(r, wb, format, options, RRDR_VALUE_EMPTY, "G"); // Gap
+    annotations_for_value_flags(r, wb, format, options, RRDR_VALUE_RESET, "O"); // Overflow
+    annotations_for_value_flags(r, wb, format, options, RRDR_VALUE_PARTIAL, "P"); // Partial
+
+    buffer_json_array_close(wb); // annotations
 }
 
 void rrdr_json_wrapper_end(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format __maybe_unused, RRDR_OPTIONS options __maybe_unused) {
