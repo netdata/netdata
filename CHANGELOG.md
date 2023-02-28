@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- rename glossary [\#14622](https://github.com/netdata/netdata/pull/14622) ([cakrit](https://github.com/cakrit))
+- Reorg learn 0227 [\#14621](https://github.com/netdata/netdata/pull/14621) ([cakrit](https://github.com/cakrit))
+- bump go.d.plugin v0.51.2 [\#14618](https://github.com/netdata/netdata/pull/14618) ([ilyam8](https://github.com/ilyam8))
 - fix relative link to anonymous statistics [\#14614](https://github.com/netdata/netdata/pull/14614) ([cakrit](https://github.com/cakrit))
 - fix proxy links in netdata security [\#14613](https://github.com/netdata/netdata/pull/14613) ([cakrit](https://github.com/cakrit))
 - fix links from removed docs [\#14612](https://github.com/netdata/netdata/pull/14612) ([cakrit](https://github.com/cakrit))
@@ -15,13 +18,13 @@
 - Reorg information and add titles [\#14608](https://github.com/netdata/netdata/pull/14608) ([cakrit](https://github.com/cakrit))
 - Update overview.md [\#14607](https://github.com/netdata/netdata/pull/14607) ([cakrit](https://github.com/cakrit))
 - Fix broken links [\#14605](https://github.com/netdata/netdata/pull/14605) ([Ancairon](https://github.com/Ancairon))
-- Temporarily remove platform EOL check for Debian 12 [\#14603](https://github.com/netdata/netdata/pull/14603) ([tkatsoulas](https://github.com/tkatsoulas))
 - Update deployment-strategies.md [\#14601](https://github.com/netdata/netdata/pull/14601) ([cakrit](https://github.com/cakrit))
 - Add deployment strategies [\#14600](https://github.com/netdata/netdata/pull/14600) ([cakrit](https://github.com/cakrit))
 - Replace web server readme with its improved replica [\#14598](https://github.com/netdata/netdata/pull/14598) ([cakrit](https://github.com/cakrit))
 - Update interact-new-charts.md [\#14596](https://github.com/netdata/netdata/pull/14596) ([cakrit](https://github.com/cakrit))
 - Fix context unittest coredump [\#14595](https://github.com/netdata/netdata/pull/14595) ([stelfrag](https://github.com/stelfrag))
 - Delete interact-dashboard-charts [\#14594](https://github.com/netdata/netdata/pull/14594) ([cakrit](https://github.com/cakrit))
+- Use vector allocation whenever is possible \(eBPF\) [\#14591](https://github.com/netdata/netdata/pull/14591) ([thiagoftsm](https://github.com/thiagoftsm))
 - Change link text to collectors.md [\#14590](https://github.com/netdata/netdata/pull/14590) ([cakrit](https://github.com/cakrit))
 - Merge security documents [\#14588](https://github.com/netdata/netdata/pull/14588) ([cakrit](https://github.com/cakrit))
 - Prevent core dump when the agent is performing a quick shutdown [\#14587](https://github.com/netdata/netdata/pull/14587) ([stelfrag](https://github.com/stelfrag))
@@ -54,6 +57,7 @@
 - Hide netdata for IoT from learn. [\#14548](https://github.com/netdata/netdata/pull/14548) ([cakrit](https://github.com/cakrit))
 - Reorg markdown files for learn [\#14547](https://github.com/netdata/netdata/pull/14547) ([cakrit](https://github.com/cakrit))
 - Fix two issues with the edit-config script. [\#14545](https://github.com/netdata/netdata/pull/14545) ([Ferroin](https://github.com/Ferroin))
+- Reorganize system directory to better reflect what files are actually used for. [\#14544](https://github.com/netdata/netdata/pull/14544) ([Ferroin](https://github.com/Ferroin))
 - Fix coverity issues [\#14543](https://github.com/netdata/netdata/pull/14543) ([stelfrag](https://github.com/stelfrag))
 - Remove unused config options and functions [\#14542](https://github.com/netdata/netdata/pull/14542) ([stelfrag](https://github.com/stelfrag))
 - Add renamed markdown files [\#14540](https://github.com/netdata/netdata/pull/14540) ([cakrit](https://github.com/cakrit))
@@ -388,9 +392,6 @@
 - remove python.d/nginx\_plus [\#13995](https://github.com/netdata/netdata/pull/13995) ([ilyam8](https://github.com/ilyam8))
 - bump go.d.plugin to v0.43.1 [\#13993](https://github.com/netdata/netdata/pull/13993) ([ilyam8](https://github.com/ilyam8))
 - Add 'funcs' capability [\#13992](https://github.com/netdata/netdata/pull/13992) ([underhood](https://github.com/underhood))
-- added debug info on left-over query targets [\#13990](https://github.com/netdata/netdata/pull/13990) ([ktsaou](https://github.com/ktsaou))
-- replication improvements [\#13989](https://github.com/netdata/netdata/pull/13989) ([ktsaou](https://github.com/ktsaou))
-- use calculator app instead of spreadsheet [\#13981](https://github.com/netdata/netdata/pull/13981) ([andrewm4894](https://github.com/andrewm4894))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
