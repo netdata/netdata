@@ -1,12 +1,4 @@
-<!--
-title: "Configure agent alerts"
-sidebar_label: "Health"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/REFERENCE.md"
-learn_status: "Published"
-learn_rel_path: "Configuration"
--->
-
-# Configure agent alerts
+# Configure alerts
 
 Netdata's health watchdog is highly configurable, with support for dynamic thresholds, hysteresis, alarm templates, and
 more. You can tweak any of the existing alarms based on your infrastructure's topology or specific monitoring needs, or
