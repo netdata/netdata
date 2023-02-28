@@ -111,6 +111,10 @@ troubleshooting with Netdata.
     os="Install on macOS" 
     svg="macos" />
   <InstallBoxRegexLink
+    to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/packages.md)"
+    os="Native DEB/RPM packages"
+    svg="linux" />
+  <InstallBoxRegexLink
     to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md)"
     os="Linux from Git" 
     svg="linux" />
