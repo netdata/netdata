@@ -29,77 +29,42 @@ def device_charts(devs):
     for d in devs:
         fam = d.id
 
-        order.append('dev_{0}_rx_bw'.format(d.id))
+        order.append('dev_{0}_bw'.format(d.id))
         charts.update(
             {
-                'dev_{0}_rx_bw'.format(d.id): {
-                    'options': [None, 'Rx Bandwidth Gb/s', 'absolute', fam,
-                                'ethtool.dev_rx_bandwidth', 'line'],
+                'dev_{0}_bw'.format(d.id): {
+                    'options': [None, 'Bandwidth Gb/s', 'absolute', fam,
+                                'ethtool.dev_bandwidth', 'line'],
                     'lines': [
-                        ['dev_{0}_rx_bw'.format(d.id), 'device {0}'.format(d.id)],
+                        ['dev_{0}_rx_bw'.format(d.id), 'rx device'],
+                        ['dev_{0}_tx_bw'.format(d.id), 'tx device'],
                     ]
                 }
             }
         )
 
-        order.append('dev_{0}_rx_bw_util'.format(d.id))
+        order.append('dev_{0}_bw_util'.format(d.id))
         charts.update(
             {
-                'dev_{0}_rx_bw_util'.format(d.id): {
-                    'options': [None, 'Rx Bandwidth Percentage', 'percentage', fam,
-                                'ethtool.dev_rx_bandwidth_util', 'line'],
+                'dev_{0}_bw_util'.format(d.id): {
+                    'options': [None, 'Bandwidth Percentage', 'percentage', fam,
+                                'ethtool.dev_bandwidth_util', 'line'],
                     'lines': [
-                        ['dev_{0}_rx_bw_util'.format(d.id), 'device {0}'.format(d.id)],
+                        ['dev_{0}_rx_bw_util'.format(d.id), 'rx util'],
+                        ['dev_{0}_tx_bw_util'.format(d.id), 'tx util'],
                     ]
                 }
             }
         )
 
-        order.append('dev_{0}_rx_packets_lost'.format(d.id))
+        order.append('dev_{0}_packets_lost'.format(d.id))
         charts.update(
             {
-                'dev_{0}_rx_packets_lost'.format(d.id): {
-                    'options': [None, 'Rx lost packets', 'lost packets', fam, 'ethtool.packets_lost', 'line'],
+                'dev_{0}_packets_lost'.format(d.id): {
+                    'options': [None, 'Lost packets', 'Lost packets', fam, 'ethtool.packets_lost', 'line'],
                     'lines': [
-                        ['dev_{0}_rx_packets_lost'.format(d.id), 'adapter {0}'.format(d.id)],
-                    ]
-                }
-            }
-        )
-
-        order.append('dev_{0}_tx_bw'.format(d.id))
-        charts.update(
-            {
-                'dev_{0}_tx_bw'.format(d.id): {
-                    'options': [None, 'Tx Bandwidth Gb/s', 'absolute', fam,
-                                'ethtool.dev_rx_bandwidth', 'line'],
-                    'lines': [
-                        ['dev_{0}_tx_bw'.format(d.id), 'device {0}'.format(d.id)],
-                    ]
-                }
-            }
-        )
-
-        order.append('dev_{0}_tx_bw_util'.format(d.id))
-        charts.update(
-            {
-                'dev_{0}_tx_bw_util'.format(d.id): {
-                    'options': [None, 'Tx Bandwidth Percentage', 'percentage', fam,
-                                'ethtool.dev_rx_bandwidth_util', 'line'],
-                    'lines': [
-                        ['dev_{0}_tx_bw_util'.format(d.id), 'device {0}'.format(d.id)],
-                    ]
-                }
-            }
-        )
-
-        order.append('dev_{0}_tx_packets_lost'.format(d.id))
-        charts.update(
-            {
-                'dev_{0}_tx_packets_lost'.format(d.id): {
-                    'options': [None, 'Tx lost packets', 'Tx lost packets', fam, 'ethtool.packets_lost', 'line'],
-                    'lines': [
-                        ['dev_{0}_tx_packets_lost'.format(d.id), 'adapter {0}'.format(d.id)],
+                        ['dev_{0}_rx_packets_lost'.format(d.id), 'rx lost packets'],
+                        ['dev_{0}_tx_packets_lost'.format(d.id), 'tx lost packets'],
                     ]
                 }
             }
@@ -111,25 +76,23 @@ def device_charts(devs):
 class Metrics:
     def __init__(self, device_id, rx_bytes, rx_bw, rx_bw_util, rx_discards_phy, tx_bytes, tx_bw, tx_bw_util, tx_discards_phy, update_time):
         self.id = device_id
+        self.rx_bytes = rx_bytes
         self.rx_discards_phy = rx_discards_phy
         self.rx_bw = rx_bw
         self.rx_bw_util = rx_bw_util
-        self.rx_bytes = rx_bytes
+        self.tx_bytes = tx_bytes
         self.tx_discards_phy = tx_discards_phy
         self.tx_bw = tx_bw
         self.tx_bw_util = tx_bw_util
-        self.tx_bytes = tx_bytes
         self.update_time = update_time
 
     def data(self):
         return {
-            'dev_{0}_rx_bytes'.format(self.id): self.rx_bytes,
             'dev_{0}_rx_bw'.format(self.id): self.rx_bw,
-            'dev_{0}_rx_bw_util'.format(self.id): self.rx_bw_util,
-            'dev_{0}_rx_packets_lost'.format(self.id): self.rx_discards_phy,
-            'dev_{0}_tx_bytes'.format(self.id): self.tx_bytes,
             'dev_{0}_tx_bw'.format(self.id): self.tx_bw,
+            'dev_{0}_rx_bw_util'.format(self.id): self.rx_bw_util,
             'dev_{0}_tx_bw_util'.format(self.id): self.tx_bw_util,
+            'dev_{0}_rx_packets_lost'.format(self.id): self.rx_discards_phy,
             'dev_{0}_tx_packets_lost'.format(self.id): self.tx_discards_phy,
         }
 
@@ -172,7 +135,7 @@ class Service(ExecutableService):
             nb_sec = (last_update - self.metrics[name].update_time).total_seconds()
             self.debug(' rx_bytes {0} last_rx_bytes {1} nb seconds {2}'.format(rx_bytes, self.metrics[name].rx_bytes, nb_sec))
             # Calculation of the bandwidth in Gb/s
-            rx_bw = int((rx_bytes - self.metrics[name].rx_bytes) / nb_sec) * 8 / (1000*1000*1000)
+            rx_bw = int((rx_bytes - self.metrics[name].rx_bytes) / nb_sec * 8 / (1000*1000*1000))
             rx_bw_util = rx_bw / self.max_bw_per_device[name] * 100
             tx_bw = int((tx_bytes - self.metrics[name].tx_bytes) / nb_sec * 8 / (1000*1000*1000))
             tx_bw_util = int(tx_bw / self.max_bw_per_device[name] * 100)
