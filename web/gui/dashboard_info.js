@@ -4921,7 +4921,23 @@ netdataDashboard.context = {
         info: 'Show number of threads loaded using legacy code (independent binary) or <code>CO-RE (Compile Once Run Everywhere)</code>.'
     },
 
-    // ------------------------------------------------------------------------
+    'netdata.ebpf_kernel_memory': {
+        info: 'Show amount of memory allocated inside kernel ring for hash tables. This chart shows the same information displayed by command `bpftool map show`.'
+    },
+
+    'netdata.ebpf_hash_tables_count': {
+        info: 'Show total number of hash tables loaded by eBPF.plugin`.'
+    },
+
+    'netdata.ebpf_aral_stat_size': {
+        info: 'Show total memory allocated for the specific ARAL.'
+    },
+
+    'netdata.ebpf_aral_stat_alloc': {
+        info: 'Show total memory of calls to get a specific region of memory inside an ARAL region.'
+    },
+
+// ------------------------------------------------------------------------
     // RETROSHARE
 
     'retroshare.bandwidth': {
