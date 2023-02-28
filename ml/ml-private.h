@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_NML_H
-#define NETDATA_NML_H
+#ifndef NETDATA_ML_PRIVATE_H
+#define NETDATA_ML_PRIVATE_H
 
 #include "dlib/matrix.h"
 #include "ml/ml.h"
@@ -28,7 +28,7 @@ typedef struct {
     size_t src_n;
 
     std::vector<DSample> &preprocessed_features;
-} nml_features_t;
+} ml_features_t;
 
 /*
  * KMeans
@@ -41,9 +41,7 @@ typedef struct {
 
     calculated_number_t min_dist;
     calculated_number_t max_dist;
-} nml_kmeans_t;
-
-#include "json/single_include/nlohmann/json.hpp"
+} ml_kmeans_t;
 
 typedef struct machine_learning_stats_t {
     size_t num_machine_learning_status_enabled;
@@ -59,11 +57,9 @@ typedef struct machine_learning_stats_t {
 
     size_t num_anomalous_dimensions;
     size_t num_normal_dimensions;
-} nml_machine_learning_stats_t;
+} ml_machine_learning_stats_t;
 
 typedef struct training_stats_t {
-    struct rusage training_ru;
-
     size_t queue_size;
     size_t num_popped_items;
 
@@ -76,9 +72,9 @@ typedef struct training_stats_t {
     size_t training_result_not_enough_collected_values;
     size_t training_result_null_acquired_dimension;
     size_t training_result_chart_under_replication;
-} nml_training_stats_t;
+} ml_training_stats_t;
 
-enum nml_metric_type {
+enum ml_metric_type {
     // The dimension has constant values, no need to train
     METRIC_TYPE_CONSTANT,
 
@@ -86,7 +82,7 @@ enum nml_metric_type {
     METRIC_TYPE_VARIABLE,
 };
 
-enum nml_machine_learning_status {
+enum ml_machine_learning_status {
     // Enable training/prediction
     MACHINE_LEARNING_STATUS_ENABLED,
 
@@ -94,7 +90,7 @@ enum nml_machine_learning_status {
     MACHINE_LEARNING_STATUS_DISABLED_DUE_TO_EXCLUDED_CHART,
 };
 
-enum nml_training_status {
+enum ml_training_status {
     // We don't have a model for this dimension
     TRAINING_STATUS_UNTRAINED,
 
@@ -108,7 +104,7 @@ enum nml_training_status {
     TRAINING_STATUS_TRAINED,
 };
 
-enum nml_training_result {
+enum ml_training_result {
     // We managed to create a KMeans model
     TRAINING_RESULT_OK,
 
@@ -137,7 +133,7 @@ typedef struct {
     // at the point the request was made
     time_t first_entry_on_request;
     time_t last_entry_on_request;
-} nml_training_request_t;
+} ml_training_request_t;
 
 typedef struct {
     // Time when the request for this response was made
@@ -166,71 +162,52 @@ typedef struct {
     size_t total_values;
 
     // Result of training response
-    enum nml_training_result result;
-} nml_training_response_t;
+    enum ml_training_result result;
+} ml_training_response_t;
 
 /*
  * Queue
 */
-
 typedef struct {
-    std::queue<nml_training_request_t> internal;
+    std::queue<ml_training_request_t> internal;
     netdata_mutex_t mutex;
     pthread_cond_t cond_var;
     std::atomic<bool> exit;
-} nml_queue_t;
+} ml_queue_t;
 
-nml_queue_t *nml_queue_init(void);
-void nml_queue_destroy(nml_queue_t *q);
-
-void nml_queue_push(nml_queue_t *q, const nml_training_request_t req);
-nml_training_request_t nml_queue_pop(nml_queue_t *q);
-size_t nml_queue_size(nml_queue_t *q);
-
-void nml_queue_signal(nml_queue_t *q);
 
 typedef struct {
     RRDDIM *rd;
 
-    enum nml_metric_type mt;
-    enum nml_training_status ts;
-    enum nml_machine_learning_status mls;
+    enum ml_metric_type mt;
+    enum ml_training_status ts;
+    enum ml_machine_learning_status mls;
 
-    nml_training_response_t tr;
+    ml_training_response_t tr;
     time_t last_training_time;
 
     std::vector<calculated_number_t> cns;
 
-    std::vector<nml_kmeans_t> km_contexts;
+    std::vector<ml_kmeans_t> km_contexts;
     netdata_mutex_t mutex;
-    nml_kmeans_t kmeans;
+    ml_kmeans_t kmeans;
     std::vector<DSample> feature;
-} nml_dimension_t;
-
-nml_dimension_t *nml_dimension_new(RRDDIM *rd);
-void nml_dimension_delete(nml_dimension_t *dim);
-
-bool nml_dimension_predict(nml_dimension_t *d, time_t curr_t, calculated_number_t value, bool exists);
+} ml_dimension_t;
 
 typedef struct {
     RRDSET *rs;
-    nml_machine_learning_stats_t mls;
+    ml_machine_learning_stats_t mls;
 
     netdata_mutex_t mutex;
-} nml_chart_t;
+} ml_chart_t;
 
-nml_chart_t *nml_chart_new(RRDSET *rs);
-void nml_chart_delete(nml_chart_t *chart);
-
-void nml_chart_update_begin(nml_chart_t *chart);
-void nml_chart_update_end(nml_chart_t *chart);
-void nml_chart_update_dimension(nml_chart_t *chart, nml_dimension_t *dim, bool is_anomalous);
+void ml_chart_update_dimension(ml_chart_t *chart, ml_dimension_t *dim, bool is_anomalous);
 
 typedef struct {
     RRDHOST *rh;
 
-    nml_machine_learning_stats_t mls;
-    nml_training_stats_t ts;
+    ml_machine_learning_stats_t mls;
+    ml_training_stats_t ts;
 
     calculated_number_t host_anomaly_rate;
 
@@ -238,7 +215,7 @@ typedef struct {
     std::atomic<bool> threads_cancelled;
     std::atomic<bool> threads_joined;
 
-    nml_queue_t *training_queue;
+    ml_queue_t *training_queue;
 
     netdata_mutex_t mutex;
 
@@ -288,17 +265,7 @@ typedef struct {
     RRDDIM *training_results_not_enough_collected_values_rd;
     RRDDIM *training_results_null_acquired_dimension_rd;
     RRDDIM *training_results_chart_under_replication_rd;
-} nml_host_t;
-
-nml_host_t *nml_host_new(RRDHOST *rh);
-void nml_host_delete(nml_host_t *host);
-
-void nml_host_start_training_thread(nml_host_t *host);
-void nml_host_stop_training_thread(nml_host_t *host, bool join);
-
-void nml_host_get_config_as_json(nml_host_t *host, BUFFER *wb);
-void nml_host_get_models_as_json(nml_host_t *host, nlohmann::json &j);
-void nml_host_get_detection_info_as_json(nml_host_t *host, nlohmann::json &j);
+} ml_host_t;
 
 typedef struct {
     bool enable_anomaly_detection;
@@ -335,12 +302,10 @@ typedef struct {
     std::vector<uint32_t> random_nums;
 
     netdata_thread_t detection_thread;
-} nml_config_t;
+} ml_config_t;
 
-void nml_config_load(nml_config_t *cfg);
+void ml_config_load(ml_config_t *cfg);
 
-void *nml_detect_main(void *arg);
+extern ml_config_t Cfg;
 
-extern nml_config_t Cfg;
-
-#endif /* NETDATA_NML_H */
+#endif /* NETDATA_ML_PRIVATE_H */

@@ -8,78 +8,81 @@ bool ml_capable() {
     return false;
 }
 
-bool ml_enabled(RRDHOST *RH) {
-    (void) RH;
+bool ml_enabled(RRDHOST *rh) {
+    UNUSED(rh);
+    return false;
+}
+
+bool ml_streaming_enabled() {
     return false;
 }
 
 void ml_init(void) {}
 
-void ml_host_new(RRDHOST *RH) {
-    UNUSED(RH);
+void ml_host_new(RRDHOST *rh) {
+    UNUSED(rh);
 }
 
-void ml_host_delete(RRDHOST *RH) {
-    UNUSED(RH);
+void ml_host_delete(RRDHOST *rh) {
+    UNUSED(rh);
 }
 
-void ml_chart_new(RRDSET *RS) {
-    UNUSED(RS);
+void ml_host_start_training_thread(RRDHOST *rh) {
+    UNUSED(rh);
 }
 
-void ml_chart_delete(RRDSET *RS) {
-    UNUSED(RS);
+void ml_host_stop_training_thread(RRDHOST *rh) {
+    UNUSED(rh);
 }
 
-void ml_dimension_new(RRDDIM *RD) {
-    UNUSED(RD);
+void ml_host_cancel_training_thread(RRDHOST *rh) {
+    UNUSED(rh);
 }
 
-void ml_dimension_delete(RRDDIM *RD) {
-    UNUSED(RD);
+void ml_host_get_info(RRDHOST *rh, BUFFER *wb) {
+    UNUSED(rh);
+    UNUSED(wb);
 }
 
-void ml_start_training_thread(RRDHOST *RH) {
-    UNUSED(RH);
+void ml_host_get_models(RRDHOST *rh, BUFFER *wb) {
+    UNUSED(rh);
+    UNUSED(wb);
 }
 
-void ml_stop_training_thread(RRDHOST *RH) {
-    UNUSED(RH);
+void ml_host_get_runtime_info(RRDHOST *rh) {
+    UNUSED(rh);
 }
 
-void ml_get_host_info(RRDHOST *RH, BUFFER *wb) {
-    (void) RH;
-    (void) wb;
+void ml_chart_new(RRDSET *rs) {
+    UNUSED(rs);
 }
 
-char *ml_get_host_runtime_info(RRDHOST *RH) {
-    (void) RH;
-    return NULL;
+void ml_chart_delete(RRDSET *rs) {
+    UNUSED(rs);
 }
 
-bool ml_chart_update_begin(RRDSET *RS) {
-    (void) RS;
+bool ml_chart_update_begin(RRDSET *rs) {
+    UNUSED(rs);
     return false;
 }
 
-void ml_chart_update_end(RRDSET *RS) {
-    (void) RS;
+void ml_chart_update_end(RRDSET *rs) {
+    UNUSED(rs);
 }
 
-char *ml_get_host_models(RRDHOST *RH) {
-    (void) RH;
-    return NULL;
+void ml_dimension_new(RRDDIM *rd) {
+    UNUSED(rd);
 }
 
-bool ml_is_anomalous(RRDDIM *RD, time_t CurrT, double Value, bool Exists) {
-    (void) RD;
-    (void) CurrT;
-    (void) Value;
-    (void) Exists;
-    return false;
+void ml_dimension_delete(RRDDIM *rd) {
+    UNUSED(rd);
 }
 
-bool ml_streaming_enabled() {
+bool ml_dimension_is_anomalous(RRDDIM *rd, time_t curr_time, double value, bool exists) {
+    UNUSED(rd);
+    UNUSED(curr_time);
+    UNUSED(value);
+    UNUSED(exists);
     return false;
 }
 

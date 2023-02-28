@@ -9,7 +9,3 @@
 	url = https://github.com/davisking/dlib.git
 	shallow = true
 	ignore = dirty
-[submodule "ml/json"]
-	path = ml/json
-	url = https://github.com/nlohmann/json.git
-	shallow = true
