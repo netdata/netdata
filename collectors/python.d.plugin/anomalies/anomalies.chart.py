@@ -58,8 +58,7 @@ class Service(SimpleService):
         self.collected_dims = {'probability': set(), 'anomaly': set()}
 
     def check(self):
-        python_version = float('{}.{}'.format(sys.version_info[0], sys.version_info[1]))
-        if python_version < 3.6:
+        if not (sys.version_info[0] >= 3 and sys.version_info[1] >= 6):
             self.error("anomalies collector only works with Python>=3.6")
         if len(self.host_charts_dict[self.host]) > 0:
             _ = get_allmetrics_async(host_charts_dict=self.host_charts_dict, protocol=self.protocol, user=self.username, pwd=self.password)
