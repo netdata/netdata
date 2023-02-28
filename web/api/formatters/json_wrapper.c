@@ -732,7 +732,7 @@ static inline size_t rrdr_latest_values(BUFFER *wb, const char *key, RRDR *r, RR
     return i;
 }
 
-void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR_OPTIONS options, bool string_value,
+void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR_OPTIONS options,
                              RRDR_TIME_GROUPING group_method)
 {
     QUERY_TARGET *qt = r->internal.qt;
@@ -803,9 +803,6 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR
 
     if(options & RRDR_OPTION_SHOW_PLAN)
         jsonwrap_query_plan(r, wb);
-
-    buffer_sprintf(wb, ",\n    %sresult%s:", kq, kq);
-    if(string_value) buffer_strcat(wb, sq);
 }
 
 static void rrdset_rrdcalc_entries(BUFFER *wb, RRDINSTANCE_ACQUIRED *ria) {
@@ -1072,7 +1069,7 @@ static void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS
     buffer_json_object_close(wb); // hosts
 }
 
-void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR_OPTIONS options, bool string_value,
+void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR_OPTIONS options,
                              RRDR_TIME_GROUPING group_method)
 {
     QUERY_TARGET *qt = r->internal.qt;
@@ -1247,62 +1244,66 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb);
-
-    buffer_sprintf(wb, ",\n    %sresult%s:", kq, kq);
-    if(string_value) buffer_strcat(wb, sq);
 }
 
-void rrdr_json_wrapper_anomaly_rates(RRDR *r __maybe_unused, BUFFER *wb, DATASOURCE_FORMAT format __maybe_unused, RRDR_OPTIONS options, bool string_value) {
+void rrdr_json_wrapper_annotations(RRDR *r __maybe_unused, BUFFER *wb, DATASOURCE_FORMAT format __maybe_unused, RRDR_OPTIONS options) {
+    buffer_json_member_add_object(wb, "annotations");
 
-    char kq[2] = "",                    // key quote
-        sq[2] = "";                     // string quote
+    buffer_json_member_add_array(wb, "labels");
+    long c, i;
+    const long used = (long)r->d;
+    for(c = 0, i = 0; c < used ; c++) {
+        if(!rrdr_dimension_should_be_exposed(r->od[c], options))
+            continue;
 
-    if( options & RRDR_OPTION_GOOGLE_JSON ) {
-        kq[0] = '\0';
-        sq[0] = '\'';
+        buffer_json_add_array_item_string(wb, string2str(r->dn[c]));
+        i++;
     }
-    else {
-        kq[0] = '"';
-        sq[0] = '"';
+    buffer_json_array_close(wb); // labels
+
+    buffer_json_member_add_array(wb, "data");
+    long start = 0, end = rrdr_rows(r), step = 1;
+    if(!(options & RRDR_OPTION_REVERSED)) {
+        start = rrdr_rows(r) - 1;
+        end = -1;
+        step = -1;
     }
 
-    if(string_value) buffer_strcat(wb, sq);
+    // for each line in the array
+    char buf[10] = "";
+    for(i = start; i != end ;i += step) {
+        RRDR_VALUE_FLAGS *co = &r->o[i * r->d];
 
-    buffer_sprintf(wb, ",\n    %sanomaly_rates%s: ", kq, kq);
+        RRDR_VALUE_FLAGS row_options = RRDR_VALUE_NOTHING;
+        for (c = 0; c < used; c++) {
+            row_options |= co[c] & (RRDR_VALUE_RESET|RRDR_VALUE_PARTIAL);
+        }
+
+        if(row_options != RRDR_VALUE_NOTHING) {
+            buffer_json_add_array_item_array(wb); // row
+            buffer_json_add_array_item_time_t(wb, r->t[i]); // the time
+            for (c = 0; c < used; c++) {
+                char *d = buf;
+                RRDR_VALUE_FLAGS o = co[c];
+                if(o & RRDR_VALUE_PARTIAL)
+                    *d++ = 'P';
+                if(o & RRDR_VALUE_RESET)
+                    *d++ = 'R';
+
+                *d = '\0';
+                buffer_json_add_array_item_string(wb, buf);
+            }
+            buffer_json_array_close(wb); // row
+        }
+    }
+
+    buffer_json_array_close(wb); // data
+
+    buffer_json_object_close(wb); // annotations
 }
 
-void rrdr_json_wrapper_group_by_count(RRDR *r __maybe_unused, BUFFER *wb, DATASOURCE_FORMAT format __maybe_unused, RRDR_OPTIONS options, bool string_value) {
-
-    char kq[2] = "",                    // key quote
-    sq[2] = "";                     // string quote
-
-    if( options & RRDR_OPTION_GOOGLE_JSON ) {
-        kq[0] = '\0';
-        sq[0] = '\'';
-    }
-    else {
-        kq[0] = '"';
-        sq[0] = '"';
-    }
-
-    if(string_value) buffer_strcat(wb, sq);
-
-    buffer_sprintf(wb, ",\n    %sgroup_by_count%s: ", kq, kq);
-}
-
-void rrdr_json_wrapper_end(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format __maybe_unused, RRDR_OPTIONS options, bool string_value) {
+void rrdr_json_wrapper_end(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format __maybe_unused, RRDR_OPTIONS options __maybe_unused) {
     QUERY_TARGET *qt = r->internal.qt;
-
-    char sq[2] = "";                     // string quote
-
-    if( options & RRDR_OPTION_GOOGLE_JSON ) {
-        sq[0] = '\'';
-    }
-    else {
-        sq[0] = '"';
-    }
-
-    if(string_value) buffer_strcat(wb, sq);
 
     buffer_json_member_add_double(wb, "min", r->view.min);
     buffer_json_member_add_double(wb, "max", r->view.max);

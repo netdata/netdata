@@ -45,6 +45,7 @@ static struct {
         , {"details"           , 0    , RRDR_OPTION_SHOW_DETAILS}
         , {"debug"             , 0    , RRDR_OPTION_DEBUG}
         , {"minify"            , 0    , RRDR_OPTION_MINIFY}
+        , {"annotations"       , 0    , RRDR_OPTION_JW_ANNOTATIONS}
         , {NULL                , 0    , 0}
 };
 
@@ -729,9 +730,6 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
             goto cleanup;
         }
     }
-
-    debug(D_WEB_CLIENT, "%llu: API command 'data' for chart '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%u', format '%u', options '0x%08x'"
-          , w->id, chart, (dimensions)?buffer_tostring(dimensions):"", after, before , points, group, format, options);
 
     if(outFileName && *outFileName) {
         buffer_sprintf(w->response.header, "Content-Disposition: attachment; filename=\"%s\"\r\n", outFileName);
