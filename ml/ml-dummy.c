@@ -47,10 +47,9 @@ void ml_stop_training_thread(RRDHOST *RH) {
     UNUSED(RH);
 }
 
-char *ml_get_host_info(RRDHOST *RH, BUFFER *wb) {
+void ml_get_host_info(RRDHOST *RH, BUFFER *wb) {
     (void) RH;
     (void) wb;
-    return NULL;
 }
 
 char *ml_get_host_runtime_info(RRDHOST *RH) {
