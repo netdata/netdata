@@ -128,6 +128,7 @@ troubleshooting with Netdata.
     svg="linux" />
 </InstallRegexLink>
 
+- [Native DEB/RPM packages](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/packages.md)
 - [Run with Docker](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md)
 - [Deploy on Kubernetes](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kubernetes.md)
 - [Install on macOS](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/macos.md)
