@@ -27,6 +27,9 @@
 #define NETDATA_SYSTEMD_SHM_DT_CONTEXT "services.shmdt"
 #define NETDATA_SYSTEMD_SHM_CTL_CONTEXT "services.shmctl"
 
+// ARAL name
+#define NETDATA_EBPF_SHM_ARAL_NAME "ebpf_shm"
+
 typedef struct netdata_publish_shm {
     uint64_t get;
     uint64_t at;
