@@ -14,7 +14,7 @@ the `perf_event_open()` system call.
 
 ## Important Notes
 
-If you are using our native DEB/RPM packages, you will need to install
+If you are using [our official native DEB/RPM packages](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/packages.md), you will need to install
 the `netdata-plugin-perf` package using your system package manager.
 
 Accessing hardware PMUs requires root permissions, so the plugin is setuid to root.

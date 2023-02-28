@@ -21,7 +21,7 @@ One chart for every sensor chip found and each of the above will be created.
 
 ## Enable the collector
 
-If using our native DEB/RPM packages, make sure `netdata-plugin-chartsd` is installed.
+If using [our official native DEB/RPM packages](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/packages.md), make sure `netdata-plugin-chartsd` is installed.
 
 The `sensors` collector is disabled by default.
 

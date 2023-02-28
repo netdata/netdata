@@ -17,7 +17,7 @@ memory, collecting data with as little overheads as possible
 `charts.d.plugin` looks for scripts in `/usr/lib/netdata/charts.d`.
 The scripts should have the filename suffix: `.chart.sh`.
 
-By default, `charts.d.plugin` is not included as part of the install when using our native DEB/RPM packages. You can install it by installing the `netdata-plugin-chartsd` package to use it.
+By default, `charts.d.plugin` is not included as part of the install when using [our official native DEB/RPM packages](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/packages.md). You can install it by installing the `netdata-plugin-chartsd` package.
 
 ## Configuration
 

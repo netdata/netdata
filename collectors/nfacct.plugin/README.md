@@ -13,7 +13,7 @@ learn_rel_path: "Integrations/Monitor/Networking"
 
 ## Prerequisites
 
-If you are using our native DEB/RPM packages, install the
+If you are using [our official native DEB/RPM packages](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/packages.md), install the
 `netdata-plugin-nfacct` package using your system package manager.
 
 If you built Netdata locally:
