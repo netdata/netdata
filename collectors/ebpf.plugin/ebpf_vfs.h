@@ -69,6 +69,9 @@
 #define NETDATA_SYSTEMD_VFS_FSYNC_CONTEXT "services.vfs_fsync"
 #define NETDATA_SYSTEMD_VFS_FSYNC_ERROR_CONTEXT "services.vfs_fsync_error"
 
+// ARAL name
+#define NETDATA_EBPF_VFS_ARAL_NAME "ebpf_vfs"
+
 typedef struct netdata_publish_vfs {
     uint64_t pid_tgid;
     uint32_t pid;
