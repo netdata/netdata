@@ -964,7 +964,7 @@ void ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em)
                          "bytes",
                          NETDATA_EBPF_FAMILY,
                          NETDATA_EBPF_CHART_TYPE_STACKED,
-                         NULL,
+                         "netdata.ebpf_aral_stat_size",
                          priority++,
                          em->update_every,
                          NETDATA_EBPF_MODULE_NAME_PROCESS);
@@ -979,7 +979,7 @@ void ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em)
                          "calls",
                          NETDATA_EBPF_FAMILY,
                          NETDATA_EBPF_CHART_TYPE_STACKED,
-                         NULL,
+                         "netdata.ebpf_aral_stat_alloc",
                          priority++,
                          em->update_every,
                          NETDATA_EBPF_MODULE_NAME_PROCESS);
