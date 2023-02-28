@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/QoS"
 -->
 
-# ioping.plugin
+# Monitor latency for directories/files/devices (ioping.plugin)
 
 The ioping plugin supports monitoring latency for any number of directories/files/devices,
 by pinging them with `ioping`.

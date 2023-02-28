@@ -7,7 +7,9 @@ learn_topic_type: "References"
 learn_rel_path: "Developers/Database"
 -->
 
-#### Introduction
+# Parser
+
+## Introduction
 
 Generic parser that is used to register keywords and a corresponding function that will be executed when that
 keyword is encountered in the command stream (either from plugins or via streaming)

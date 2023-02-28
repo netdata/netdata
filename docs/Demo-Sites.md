@@ -9,7 +9,7 @@ learn_rel_path: "Getting started"
 sidebar_position: "90"
 -->
 
-# Demo sites
+# Live demos
 
 See the live Netdata Cloud demo with rooms for specific use cases at **https://app.netdata.cloud/spaces/netdata-demo**
 

@@ -8,7 +8,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Netdata"
 -->
 
-# Z-Scores - basic anomaly detection for your key metrics and charts
+# zscores
 
 Smoothed, rolling [Z-Scores](https://en.wikipedia.org/wiki/Standard_score) for selected metrics or charts.
 

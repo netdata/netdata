@@ -8,7 +8,7 @@ learn_rel_path: "Installation/Installation methods"
 sidebar_position: 30
 -->
 
-# Netdata static binary packages
+# Netdata static binary build
 
 We publish pre-built static builds of Netdata for Linux systems. Currently, these are published for 64-bit x86, ARMv7,
 AArch64, and POWER8+ hardware. These static builds are able to operate in a mostly self-contained manner and only

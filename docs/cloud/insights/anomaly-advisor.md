@@ -8,6 +8,8 @@ learn_topic_type: "Tasks"
 learn_rel_path: "Operations"
 -->
 
+# Anomaly Advisor
+
 import ReactPlayer from 'react-player'
 
 The Anomaly Advisor feature lets you quickly surface potentially anomalous metrics and charts related to a particular highlight window of

@@ -7,7 +7,7 @@ learn_topic_type: "Tasks"
 learn_rel_path: "Developers/libnetdata"
 -->
 
-# STRING
+# String
 
 STRING provides a way to allocate and free text strings, while de-duplicating them.
 

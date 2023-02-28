@@ -12,7 +12,7 @@ learn_topic_type: "Tasks"
 learn_rel_path: "Operations"
 -->
 
-# Import, export, and print snapshots
+# Import, export, and print a snapshot
 
 Netdata can export snapshots of the contents of your dashboard at a given time, which you can then import into any other
 node running Netdata. Or, you can create a print-ready version of your dashboard to save to PDF or actually print to

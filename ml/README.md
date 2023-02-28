@@ -8,7 +8,7 @@ learn_topic_type: "Tasks"
 learn_rel_path: "Configuration"
 -->
 
-# Machine learning (ML) powered anomaly detection
+# Configure machine learning (ML) powered anomaly detection
 
 ## Overview
 
