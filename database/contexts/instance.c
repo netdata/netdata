@@ -499,7 +499,12 @@ inline void rrdinstance_updated_rrdset_flags(RRDSET *st) {
 
 inline void rrdinstance_collected_rrdset(RRDSET *st) {
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
-    if(unlikely(!ri)) return;
+    if(unlikely(!ri)) {
+        rrdcontext_updated_rrdset(st);
+        ri = rrdset_get_rrdinstance(st);
+        if(unlikely(!ri))
+            return;
+    }
 
     rrdinstance_updated_rrdset_flags_no_action(ri, st);
 
