@@ -22,39 +22,6 @@ ORDER = [
     TX_BW,
 ]
 
-RE_BATTERY = re.compile(
-    r'BBU Capacity Info for Adapter: ([0-9]+) Relative State of Charge: ([0-9]+) % Cycle Count: ([0-9]+)'
-)
-
-# def ethernet_charts(device):
-#     order = [
-#         'bytes_received',
-#     ]
-
-#     charts = {
-#         'bytes_received': {
-#             'options': [None, 'RX Bytes', 'Bytes', "{0}".format(device.id), 'ethtool.bytes_received', 'line'],
-#             'lines': [
-#                 ['dev_{0}_bytes_received'.format(device.id), 'received', 'absolute', 1, 1],
-#             ]
-#         },
-#     }
-
-#     return order, charts
-
-class Ethtool :
-    def __init__(self, num, raw):
-        self.raw = raw
-        self.num = num
-
-    def data(self):
-        data = {
-            'bytes_received' : 0,
-            'bytes_lost' :0,
-        }
-        return dict(('gpu{0}_{1}'.format(self.num, k), v) for k, v in data.items())
-
-
 def device_charts(devs):
     order = list()
     charts = dict()
@@ -66,7 +33,7 @@ def device_charts(devs):
         charts.update(
             {
                 'dev_{0}_rx_bw'.format(d.id): {
-                    'options': [None, 'Rx Bandwidth Bytes/sec', 'absolute', fam,
+                    'options': [None, 'Rx Bandwidth Gb/s', 'absolute', fam,
                                 'ethtool.dev_rx_bandwidth', 'line'],
                     'lines': [
                         ['dev_{0}_rx_bw'.format(d.id), 'device {0}'.format(d.id)],
@@ -75,6 +42,18 @@ def device_charts(devs):
             }
         )
 
+        order.append('dev_{0}_rx_bw_util'.format(d.id))
+        charts.update(
+            {
+                'dev_{0}_rx_bw_util'.format(d.id): {
+                    'options': [None, 'Rx Bandwidth Percentage', 'percentage', fam,
+                                'ethtool.dev_rx_bandwidth_util', 'line'],
+                    'lines': [
+                        ['dev_{0}_rx_bw_util'.format(d.id), 'device {0}'.format(d.id)],
+                    ]
+                }
+            }
+        )
 
         order.append('dev_{0}_packets_lost'.format(d.id))
         charts.update(
@@ -92,14 +71,19 @@ def device_charts(devs):
 
 
 class Metrics:
-    def __init__(self, device_id, rx_bw, rx_discards_phy):
+    def __init__(self, device_id, rx_bytes_received, rx_bw, rx_bw_util, rx_discards_phy, update_time):
         self.id = device_id
         self.rx_discards_phy = rx_discards_phy
         self.rx_bw = rx_bw
+        self.rx_bw_util = rx_bw_util
+        self.update_time = update_time
+        self.rx_bytes_received = rx_bytes_received
 
     def data(self):
         return {
+            'dev_{0}_rx_bytes_received'.format(self.id): self.rx_bytes_received,
             'dev_{0}_rx_bw'.format(self.id): self.rx_bw,
+            'dev_{0}_rx_bw_util'.format(self.id): self.rx_bw_util,
             'dev_{0}_packets_lost'.format(self.id): self.rx_discards_phy,
         }
 
@@ -114,11 +98,9 @@ class Service(ExecutableService):
         self.ethtool = find_binary('ethtool')
         self.ethtool_info =  [self.ethtool, '-S']
         self.devices = self.find_devices()
-        self.last_update = 0
-        self.start_rx_bytes_received = 0
-        self.last_rx_bytes_received = 0
+        self.metrics = dict()
+        self.max_bw_per_device = self.get_max_bw_per_device()
         
-
         
     def format_data(self, raw_data, name, last_update):
         rx_bytes_received = 0
@@ -129,20 +111,21 @@ class Service(ExecutableService):
             if 'rx_discards_phy' in line.split(':')[0] :
                 rx_discards_phy = int(line.split(':')[1])
 
-        if self.last_update == 0 :
+        if name not in self.metrics.keys() :
+            self.debug('Init metrics of device {}'.format(name))
+            self.metrics[name] = Metrics(name, 0, 0, 0, 0, last_update)
             rx_bw = 0
-            self.start_rx_bytes_received = rx_bytes_received
-            self.debug('init rx bw and last update start rx bytes received {}'.format(self.start_rx_bytes_received))
+            rx_bw_util = 0
         else:
-            nb_sec = (last_update - self.last_update).total_seconds()
-            self.debug(' rx_bytes_received {0} last_rx_bytes_received {1} nb seconds {2}'.format(rx_bytes_received, self.last_rx_bytes_received, nb_sec))
-            rx_bw = int((rx_bytes_received - self.last_rx_bytes_received) / nb_sec)
-        self.last_rx_bytes_received = rx_bytes_received
-        self.last_update = last_update
-        toto = Metrics(name, rx_bw, rx_discards_phy)
-        self.debug('last_rx_bytes_received {}'.format(self.last_rx_bytes_received))
-        self.debug('toto {}'.format(toto.data()))
-        return toto
+            nb_sec = (last_update - self.metrics[name].update_time).total_seconds()
+            self.debug(' rx_bytes_received {0} last_rx_bytes_received {1} nb seconds {2}'.format(rx_bytes_received, self.metrics[name].rx_bytes_received, nb_sec))
+            # Calculation of the bandwidth in Gb/s
+            rx_bw = int((rx_bytes_received - self.metrics[name].rx_bytes_received) / nb_sec) * 8 / (1000*1000*1000)
+            rx_bw_util = rx_bw / self.max_bw_per_device[name] * 100
+        data = Metrics(name, rx_bytes_received, rx_bw, rx_bw_util, rx_discards_phy, last_update)
+        self.debug('toto {}'.format(data.data()))
+        self.metrics[name] = data
+        return data
 
     def find_devices(self):
         ls = find_binary('ls')
@@ -160,10 +143,26 @@ class Service(ExecutableService):
 
         return devices_filtered
 
+    def get_max_bw_per_device(self):
+        max_bw_per_device = dict()
+        for d in self.devices:
+            command = [find_binary('ethtool'), d]
+            raw_data = self._get_raw_data(command=command)
+            for l in raw_data:
+                s = l.split(':')
+                if 'Speed' in s[0]:
+                    bw = int(s[1].split('M')[0]) / 1000 # in Gb/s
+                    self.debug('------- Max speed of device {0} is {1} Gb/s'.format(d, bw))
+                    max_bw_per_device[d] = bw
+        
+        return max_bw_per_device
+                    
+
     def check(self):
+        # check when it is used
         self.debug('------ check my ethtool service ')
         if not self.devices:
-            self.error('Not devices found "{0}" output'.format(' '.join(self.ethtool_info)))
+            self.error('No devices found "{0}" output'.format(' '.join(self.ethtool_info)))
             return False
 
         data = []
