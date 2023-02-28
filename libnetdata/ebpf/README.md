@@ -7,7 +7,7 @@ learn_topic_type: "Tasks"
 learn_rel_path: "Developers/libnetdata"
 -->
 
-# eBPF
+# eBPF library
 
 Netdata's eBPF library supports the [eBPF collector](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/README.md).
 
