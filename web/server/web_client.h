@@ -71,6 +71,9 @@ typedef enum web_client_flags {
     WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET = 1 << 9, // don't close the socket when cleaning up (static-threaded web server)
 
     WEB_CLIENT_CHUNKED_TRANSFER = 1 << 10, // chunked transfer (used with zlib compression)
+
+    WEB_CLIENT_FLAG_SSL_WAIT_RECEIVE = 1 << 11, // if set, we are waiting more input data from an ssl conn
+    WEB_CLIENT_FLAG_SSL_WAIT_SEND = 1 << 12,    // if set, we have data to send to the client from an ssl conn
 } WEB_CLIENT_FLAGS;
 
 #define web_client_flag_check(w, flag) ((w)->flags & (flag))
@@ -99,6 +102,14 @@ typedef enum web_client_flags {
 #define web_client_has_wait_send(w) web_client_flag_check(w, WEB_CLIENT_FLAG_WAIT_SEND)
 #define web_client_enable_wait_send(w) web_client_flag_set(w, WEB_CLIENT_FLAG_WAIT_SEND)
 #define web_client_disable_wait_send(w) web_client_flag_clear(w, WEB_CLIENT_FLAG_WAIT_SEND)
+
+#define web_client_has_ssl_wait_receive(w) web_client_flag_check(w, WEB_CLIENT_FLAG_SSL_WAIT_RECEIVE)
+#define web_client_enable_ssl_wait_receive(w) web_client_flag_set(w, WEB_CLIENT_FLAG_SSL_WAIT_RECEIVE)
+#define web_client_disable_ssl_wait_receive(w) web_client_flag_clear(w, WEB_CLIENT_FLAG_SSL_WAIT_RECEIVE)
+
+#define web_client_has_ssl_wait_send(w) web_client_flag_check(w, WEB_CLIENT_FLAG_SSL_WAIT_SEND)
+#define web_client_enable_ssl_wait_send(w) web_client_flag_set(w, WEB_CLIENT_FLAG_SSL_WAIT_SEND)
+#define web_client_disable_ssl_wait_send(w) web_client_flag_clear(w, WEB_CLIENT_FLAG_SSL_WAIT_SEND)
 
 #define web_client_set_tcp(w) web_client_flag_set(w, WEB_CLIENT_FLAG_TCP_CLIENT)
 #define web_client_set_unix(w) web_client_flag_set(w, WEB_CLIENT_FLAG_UNIX_CLIENT)
