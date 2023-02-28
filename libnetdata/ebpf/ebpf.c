@@ -480,10 +480,9 @@ void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *m
 
     unsigned long j, lines = procfile_lines(ff);
     char *memlock = { "memlock" };
-    size_t length = strlen(memlock);
     for (j = 0; j < lines ; j++) {
         char *cmp = procfile_lineword(ff, j,0);
-        if (!strncmp(memlock, cmp, length)) {
+        if (!strncmp(memlock, cmp, 7)) {
             uint64_t memsize = (uint64_t) str2l(procfile_lineword(ff, j,1));
             switch (action) {
                 case EBPF_ACTION_STAT_ADD: {
