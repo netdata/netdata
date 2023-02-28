@@ -1128,6 +1128,9 @@ static void process_collector(ebpf_module_t *em)
                     ebpf_process_send_apps_data(apps_groups_root_target, em);
                 }
 
+                if (ebpf_aral_process_stat)
+                    ebpf_send_data_aral_chart(ebpf_aral_process_stat, em);
+
                 if (cgroups && shm_ebpf_cgroup.header) {
                     ebpf_process_send_cgroup_data(em);
                 }
@@ -1271,6 +1274,10 @@ void *ebpf_process_thread(void *ptr)
 
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
+
+    if (ebpf_aral_process_stat)
+        ebpf_statistic_create_aral_chart(NETDATA_EBPF_PROC_ARAL_NAME, em);
+
     ebpf_create_statistic_charts(em);
 
     pthread_mutex_unlock(&lock);
