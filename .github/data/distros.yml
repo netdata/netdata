@@ -92,7 +92,7 @@ include:
     distro: debian
     version: "12"
     base_image: debian:bookworm
-    eol_check: false
+    eol_check: true
     env_prep: |
       apt-get update
     jsonc_removal: |
