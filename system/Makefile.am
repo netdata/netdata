@@ -9,6 +9,7 @@ CLEANFILES = \
     launchd/netdata.plist \
     logrotate/netdata \
     lsb/init.d/netdata \
+    openrc/conf.d/netdata \
     openrc/init.d/netdata \
     systemd/netdata.service \
     systemd/netdata.service.v235 \
@@ -37,6 +38,7 @@ libsyslsbdir=$(libsysdir)/lsb
 libsyslsbinitddir=$(libsyslsbdir)/init.d
 libsysopenrcdir=$(libsysdir)/openrc
 libsysopenrcinitddir=$(libsysopenrcdir)/init.d
+libsysopenrcconfddir=$(libsysopenrcdir)/conf.d
 libsyssystemddir=$(libsysdir)/systemd
 
 # Explicitly install directories to avoid permission issues due to umask
@@ -51,6 +53,7 @@ install-exec-local:
 	$(INSTALL) -d $(DESTDIR)$(libsyslsbinitddir)
 	$(INSTALL) -d $(DESTDIR)$(libsyssystemddir)
 	$(INSTALL) -d $(DESTDIR)$(libsysopenrcinitddir)
+	$(INSTALL) -d $(DESTDIR)$(libsysopenrcconfddir)
 
 libexecnetdatadir=$(libexecdir)/netdata
 nodist_libexecnetdata_SCRIPTS = \
@@ -85,6 +88,10 @@ nodist_libsysopenrcinitd_DATA = \
     openrc/init.d/netdata \
     $(NULL)
 
+nodist_libsysopenrcconfd_DATA = \
+    openrc/conf.d/netdata \
+    $(NULL)
+
 nodist_libsyssystemd_DATA = \
     systemd/netdata.service \
     systemd/netdata.service.v235 \
@@ -104,6 +111,7 @@ dist_noinst_DATA = \
     launchd/netdata.plist.in \
     logrotate/netdata.in \
     lsb/init.d/netdata.in \
+    openrc/conf.d/netdata.in \
     openrc/init.d/netdata.in \
     systemd/netdata.service.in \
     systemd/netdata.service.v235.in \
