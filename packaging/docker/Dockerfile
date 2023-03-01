@@ -51,6 +51,7 @@ RUN mkdir -p /app/usr/sbin/ \
     mv /usr/sbin/netdatacli    /app/usr/sbin/ && \
     mv packaging/docker/run.sh        /app/usr/sbin/ && \
     mv packaging/docker/health.sh     /app/usr/sbin/ && \
+    mkdir -p /deps/etc && \
     cp -rp /deps/etc /app/usr/local/etc && \
     chmod -R o+rX /app && \
     chmod +x /app/usr/sbin/run.sh
