@@ -130,7 +130,7 @@ Requires(pre): /usr/sbin/useradd
 # #####################################################################
 # CentOS prior to CentOS 8 does not have a new enough version of RPM
 # to support weak dependencies. Explicitly requiring our default plugins
-# makes it impossible to properly test the packages prior to updload,
+# makes it impossible to properly test the packages prior to upload,
 # so we just skip depending on them on CentOS 7.
 %if 0%{?centos_ver} != 7
 %if 0%{?_have_ebpf}
@@ -139,6 +139,12 @@ Recommends: netdata-plugin-ebpf
 Recommends: netdata-plugin-apps
 Recommends: netdata-plugin-pythond
 Recommends: netdata-plugin-go
+Suggests:   netdata-plugin-cups
+Suggests:   netdata-plugin-freeipmi
+Suggests:   netdata-plugin-nfacct
+Suggests:   netdata-plugin-chartsd
+Suggests:   netdata-plugin-slabinfo
+Suggests:   netdata-plugin-perf
 %endif
 
 # #####################################################################

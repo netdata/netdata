@@ -46,6 +46,12 @@ Recommends: netdata-plugin-ebpf,
             netdata-plugin-apps,
             netdata-plugin-pythond,
             netdata-plugin-go
+Suggests: netdata-plugin-cups,
+          netdata-plugin-freeipmi,
+          netdata-plugin-nfacct,
+          netdata-plugin-chartsd,
+          netdata-plugin-slabinfo,
+          netdata-plugin-perf
 Pre-Depends: dpkg (>= 1.17.14)
 Description: real-time charts for system monitoring
  Netdata is a daemon that collects data in realtime (per second)
