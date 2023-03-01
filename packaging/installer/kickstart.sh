@@ -692,11 +692,6 @@ get_system_info() {
         centos|ol)
           SYSVERSION=$(echo "$SYSVERSION" | cut -d'.' -f1)
           ;;
-        ubuntu|debian)
-          if [ -z "${SYSCODENAME}" ]; then
-            fatal "Could not determine ${DISTRO} release code name. This is required information on these systems." F0511
-          fi
-          ;;
       esac
       ;;
     Darwin)
@@ -1360,9 +1355,16 @@ check_special_native_deps() {
 try_package_install() {
   failed_refresh_msg="Failed to refresh repository metadata. ${BADNET_MSG} or by misconfiguration of one or more rpackage repositories in the system package manager configuration."
 
-  if [ -z "${DISTRO}" ] || [ "${DISTRO}" = "unknown" ]; then
+  if [ -z "${DISTRO_COMPAT_NAME}" ] || [ "${DISTRO_COMPAT_NAME}" = "unknown" ]; then
     warning "Unable to determine Linux distribution for native packages."
     return 2
+  elif [ -z "${SYSCODENAME}" ]; then
+    case "${DISTRO_COMPAT_NAME}" in
+      debian|ubuntu)
+        warning "Release codename not set. Unable to check availability of native packages for this system."
+        return 2
+        ;;
+    esac
   fi
 
   set_tmpdir
