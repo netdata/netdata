@@ -805,7 +805,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR
         jsonwrap_query_plan(r, wb);
 }
 
-static void rrdset_rrdcalc_entries(BUFFER *wb, RRDINSTANCE_ACQUIRED *ria) {
+static void rrdset_rrdcalc_entries_v2(BUFFER *wb, RRDINSTANCE_ACQUIRED *ria) {
     RRDSET *st = rrdinstance_acquired_rrdset(ria);
     if(st) {
         netdata_rwlock_rdlock(&st->alerts.rwlock);
@@ -827,8 +827,11 @@ static void rrdset_rrdcalc_entries(BUFFER *wb, RRDINSTANCE_ACQUIRED *ria) {
     }
 }
 
-static void query_target_combined_units(BUFFER *wb, QUERY_TARGET *qt, size_t contexts) {
-    if(contexts == 1) {
+static void query_target_combined_units_v2(BUFFER *wb, QUERY_TARGET *qt, size_t contexts) {
+    if(query_target_has_percentage_units(qt)) {
+        buffer_json_member_add_string(wb, "units", "%");
+    }
+    else if(contexts == 1) {
         buffer_json_member_add_string(wb, "units", rrdcontext_acquired_units(qt->contexts.array[0].rca));
     }
     else if(contexts > 1) {
@@ -855,13 +858,19 @@ static void query_target_combined_chart_type(BUFFER *wb, QUERY_TARGET *qt, size_
         buffer_json_member_add_string(wb, "chart_type", rrdset_type_name(rrdcontext_acquired_chart_type(qt->contexts.array[0].rca)));
 }
 
-static void rrdr_dimension_units_array(BUFFER *wb, RRDR *r) {
+static void rrdr_dimension_units_array_v2(BUFFER *wb, RRDR *r) {
     if(!r->du)
         return;
 
+    bool percentage = query_target_has_percentage_units(r->internal.qt);
+
     buffer_json_member_add_array(wb, "units");
-    for(size_t c = 0; c < r->d ; c++)
-        buffer_json_add_array_item_string(wb, string2str(r->du[c]));
+    for(size_t c = 0; c < r->d ; c++) {
+        if(percentage)
+            buffer_json_add_array_item_string(wb, "%");
+        else
+            buffer_json_add_array_item_string(wb, string2str(r->du[c]));
+    }
     buffer_json_array_close(wb);
 }
 
@@ -1018,7 +1027,7 @@ static void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS
                             rrdlabels_to_buffer_json_members(labels, wb);
                             buffer_json_object_close(wb);
                         }
-                        rrdset_rrdcalc_entries(wb, ria);
+                        rrdset_rrdcalc_entries_v2(wb, ria);
                         buffer_json_member_add_object(wb, "dimensions");
 
                         last_ria = ria;
@@ -1229,13 +1238,13 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
         buffer_json_member_add_time_t(wb, "after", r->view.after);
         buffer_json_member_add_time_t(wb, "before", r->view.before);
         buffer_json_member_add_uint64(wb, "points", rows);
-        query_target_combined_units(wb, qt, contexts);
+        query_target_combined_units_v2(wb, qt, contexts);
         query_target_combined_chart_type(wb, qt, contexts);
         buffer_json_member_add_object(wb, "dimensions");
         {
             rrdr_dimension_ids(wb, "ids", r, options);
             rrdr_dimension_names(wb, "names", r, options);
-            rrdr_dimension_units_array(wb, r);
+            rrdr_dimension_units_array_v2(wb, r);
             rrdr_dimension_priority_array(wb, r);
             rrdr_dimension_grouped_array(wb, r);
             size_t dims = rrdr_latest_values(wb, "view_latest_values", r, options);

@@ -3,6 +3,14 @@
 #include "web/api/web_api_v1.h"
 #include "database/storage_engine.h"
 
+inline bool query_target_has_percentage_units(struct query_target *qt) {
+    if(qt->request.options & RRDR_OPTION_PERCENTAGE ||
+       qt->request.time_group_method == RRDR_GROUPING_CV)
+        return true;
+
+    return false;
+}
+
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb) {
     rrdset2json(st, wb, NULL, NULL, 0);
 }
@@ -148,7 +156,7 @@ static int group_by_label_is_space(char c) {
     return 0;
 }
 
-RRDR *data_query_group_by(RRDR *r) {
+static RRDR *data_query_group_by(RRDR *r) {
     QUERY_TARGET *qt = r->internal.qt;
     RRDR_OPTIONS options = qt->request.options;
     size_t rows = rrdr_rows(r);
@@ -209,8 +217,15 @@ RRDR *data_query_group_by(RRDR *r) {
             buffer_fast_strcat(key, "|", 1);
             buffer_strcat(key, qn->rrdhost->machine_guid);
         }
-        buffer_fast_strcat(key, "|", 1);
-        buffer_strcat(key, rrdinstance_acquired_units(qi->ria));
+
+        // append the units
+        if(query_target_has_percentage_units(qt)) {
+            buffer_fast_strcat(key, "|%", 2);
+        }
+        else {
+            buffer_fast_strcat(key, "|", 1);
+            buffer_strcat(key, rrdinstance_acquired_units(qi->ria));
+        }
 
         // lookup the key in the dictionary
 
