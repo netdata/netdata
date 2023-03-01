@@ -952,17 +952,8 @@ AC_CHECK_HEADER(
     [have_nfnetlink_conntrack=no]
 )
 
-PKG_CHECK_MODULES(
-    [NFACCT],
-    [libnetfilter_acct],
-    [AC_CHECK_LIB(
-        [netfilter_acct],
-        [nfacct_alloc],
-        [have_libnetfilter_acct=yes],
-        [have_libnetfilter_acct=no]
-    )],
-    [have_libnetfilter_acct=no]
-)
+LIBS_BAK="${LIBS}"
+LIBS="${LIBS} -lmnl"
 
 PKG_CHECK_MODULES(
     [LIBMNL],
@@ -975,6 +966,24 @@ PKG_CHECK_MODULES(
     )],
     [have_libmnl=no]
 )
+
+
+LIBS="${LIBS}"
+
+PKG_CHECK_MODULES(
+    [NFACCT],
+    [libnetfilter_acct],
+    AC_SEARCH_LIBS(
+        [nfacct_alloc],
+        [netfilter_acct libnetfilter_acct],
+        [have_libnetfilter_acct=yes],
+        [have_libnetfilter_acct=no],
+        [${LIBS} -L/libnetfilter-acct-static/lib/libnetfilter_acct.a]
+    )],
+    [have_libnetfilter_acct=no]
+)
+
+LIBS="${LIBS_BAK}"
 
 test "${enable_plugin_nfacct}" = "yes" -a "${have_nfnetlink_conntrack}" != "yes" && \
     AC_MSG_ERROR([nfnetlink_conntrack.h required but not found or too old])
