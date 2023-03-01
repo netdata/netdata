@@ -213,6 +213,12 @@ AC_ARG_ENABLE(
     [aclk_ssl_debug="yes"],
     [aclk_ssl_debug="no"]
 )
+AC_ARG_ENABLE(
+    [httpd],
+    [AS_HELP_STRING([--disable-httpd], [Disable webserver (h2o based) @<:@default autodetect@:>@])],
+    ,
+    [enable_httpd="detect"]
+)
 
 # -----------------------------------------------------------------------------
 # Enforce building with C99, bail early if we can't.
@@ -802,7 +808,36 @@ AM_CONDITIONAL([ENABLE_CAPABILITY], [test "${with_libcap}" = "yes"])
 # -----------------------------------------------------------------------------
 # HTTPD and h2o related
 
-HTTPD_CFLAGS="-I\$(abs_top_srcdir)/httpd/h2o/include -I\$(abs_top_srcdir)/httpd/h2o/deps/picotls/include -I\$(abs_top_srcdir)/httpd/h2o/deps/quicly/include"
+can_build_httpd="no"
+if test "${enable_httpd}" != "no"; then
+    can_build_httpd="yes"
+    AC_MSG_CHECKING([can build HTTPD])
+    if test -z "${UV_LIBS}"; then
+        can_build_httpd="no"
+    fi
+    if test -n "${SSL_LIBS}"; then
+        OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
+        OPTIONAL_SSL_LIBS="${SSL_LIBS}"
+    else
+        can_build_httpd="no"
+    fi
+    if test "${with_zlib}" != "yes"; then
+        can_build_httpd="no"
+    fi
+    AC_MSG_RESULT([${can_build_httpd}])
+
+    if test "${can_build_httpd}" = "no" -a "${enable_httpd}" = "yes"; then
+        AC_MSG_ERROR([HTTPD was requested but it cannot be built])
+    fi
+
+    if test "${can_build_httpd}" = "yes"; then
+        AC_DEFINE([ENABLE_HTTPD], [1], [HTTPD (h2o based web server)])
+        HTTPD_CFLAGS="-I\$(abs_top_srcdir)/httpd/h2o/include -I\$(abs_top_srcdir)/httpd/h2o/deps/picotls/include -I\$(abs_top_srcdir)/httpd/h2o/deps/quicly/include"
+    else
+        AC_DEFINE([ENABLE_HTTPD], [0], [HTTPD (h2o based web server)])
+    fi
+fi
+AM_CONDITIONAL([ENABLE_HTTPD], [test "${can_build_httpd}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # ACLK

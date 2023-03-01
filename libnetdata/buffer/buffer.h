@@ -6,7 +6,9 @@
 #include "../string/utf8.h"
 #include "../libnetdata.h"
 
+#ifdef ENABLE_HTTPD
 #include "h2o/memory.h"
+#endif
 
 #define WEB_DATA_LENGTH_INCREASE_STEP 1024
 
@@ -131,7 +133,9 @@ void buffer_char_replace(BUFFER *wb, char from, char to);
 
 void buffer_print_sn_flags(BUFFER *wb, SN_FLAGS flags, bool send_anomaly_bit);
 
+#ifdef ENABLE_HTTPD
 h2o_iovec_t buffer_to_h2o_iovec(BUFFER *wb);
+#endif
 
 static inline void buffer_need_bytes(BUFFER *buffer, size_t needed_free_size) {
     if(unlikely(buffer->len + needed_free_size >= buffer->size))
