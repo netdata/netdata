@@ -38,10 +38,21 @@ on the maximum retention and the memory used by Netdata is described in detail, 
     
     # Tier 1, per minute data
     dbengine tier 1 multihost disk space MB = 128
-
+    dbengine tier 1 update every iterations = 60
+    
     # Tier 2, per hour data
     dbengine tier 2 multihost disk space MB = 64
+    dbengine tier 2 update every iterations = 60
 ```
+
+The default "update every iterations" of 60 means that if a metric is collected per second in Tier 0, then
+we will have a data point every minute in tier 1 and every minute in tier 2. 
+
+You may add, or remove tiers and/or modify these multipliers, as long as the product of all the "update every" does not exceed 65535. 
+
+e.g. If you simply add a fourth tier by setting `storage tiers` to 4 and defining the disk space for it, 
+the product of the update every will be 60 * 60 * 60 = 216,000, which is > 65535. So you'd need to reduce  
+the `update every iterations` of the tiers, to stay under the limit.
 
 The exact retention that can be achieved by each tier depends on the number of metrics collected. The more 
 the metrics, the smaller the retention that will fit in a given size. The general rule is that Netdata needs 
