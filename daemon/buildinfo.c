@@ -20,6 +20,12 @@
 #endif
 #endif
 
+#ifdef ENABLE_HTTPD
+#define FEAT_HTTPD 1
+#else
+#define FEAT_HTTPD 0
+#endif
+
 #ifdef ENABLE_DBENGINE
 #define FEAT_DBENGINE 1
 #else
@@ -275,6 +281,7 @@ void print_build_info(void) {
     printf("    TLS Host Verification:      %s\n", FEAT_YES_NO(FEAT_TLS_HOST_VERIFY));
     printf("    Machine Learning:           %s\n", FEAT_YES_NO(FEAT_ML));
     printf("    Stream Compression:         %s\n", FEAT_YES_NO(FEAT_STREAM_COMPRESSION));
+    printf("    HTTPD (h2o):                %s\n", FEAT_YES_NO(FEAT_HTTPD));
 
     printf("Libraries:\n");
     printf("    protobuf:                %s%s\n", FEAT_YES_NO(FEAT_PROTOBUF), FEAT_PROTOBUF_BUNDLED);
@@ -328,7 +335,8 @@ void print_build_info_json(void) {
 
     printf("    \"tls-host-verify\": %s,\n",   FEAT_JSON_BOOL(FEAT_TLS_HOST_VERIFY));
     printf("    \"machine-learning\": %s\n",   FEAT_JSON_BOOL(FEAT_ML));
-    printf("    \"stream-compression\": %s\n",   FEAT_JSON_BOOL(FEAT_STREAM_COMPRESSION));
+    printf("    \"stream-compression\": %s\n", FEAT_JSON_BOOL(FEAT_STREAM_COMPRESSION));
+    printf("    \"httpd-h2o\": %s\n",          FEAT_JSON_BOOL(FEAT_HTTPD));
     printf("  },\n");
 
     printf("  \"libs\": {\n");
