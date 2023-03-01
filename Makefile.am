@@ -745,7 +745,8 @@ libmqttwebsockets_a_SOURCES = \
     mqtt_websockets/c-rbuf/src/ringbuffer_internal.h \
     mqtt_websockets/c_rhash/src/c_rhash.c \
     mqtt_websockets/c_rhash/include/c_rhash.h \
-    mqtt_websockets/c_rhash/src/c_rhash_internal.h
+    mqtt_websockets/c_rhash/src/c_rhash_internal.h \
+    $(NULL)
 
 libmqttwebsockets_a_CFLAGS = $(CFLAGS) -DMQTT_WSS_CUSTOM_ALLOC -DRBUF_CUSTOM_MALLOC -DMQTT_WSS_CPUSTATS -I$(srcdir)/aclk/helpers -I$(srcdir)/mqtt_websockets/c_rhash/include
 
@@ -926,7 +927,12 @@ DAEMON_FILES = \
     daemon/unit_test.h \
     $(NULL)
 
-noinst_LIBRARIES += libh2o.a
+HTTPD_FILES = \
+    httpd/http_server.c \
+    httpd/http_server.h \
+    httpd/h2o_utils.c \
+    httpd/h2o_utils.h \
+    $(NULL)
 
 libh2o_dir = httpd/h2o
 
@@ -1027,19 +1033,16 @@ libh2o_a_INCLUDES = \
     -I$(srcdir)/$(libh2o_dir)/deps/yoml \
     $(NULL)
 
+if ENABLE_HTTPD
+noinst_LIBRARIES += libh2o.a
+
 # until h2o updates support for OpenSSL 3.0 we silence the warnings
 libh2o_a_CFLAGS = $(CFLAGS) -Wno-deprecated-declarations $(libh2o_a_INCLUDES)
 
 if LINUX
     libh2o_a_CFLAGS += -D_GNU_SOURCE
 endif
-
-HTTPD_FILES = \
-    httpd/http_server.c \
-    httpd/http_server.h \
-    httpd/h2o_utils.c \
-    httpd/h2o_utils.h \
-    $(NULL)
+endif #ENABLE_HTTPD
 
 NETDATA_FILES = \
     collectors/all.h \
@@ -1061,7 +1064,6 @@ NETDATA_FILES = \
     $(ACLK_FILES) \
     $(SPAWN_PLUGIN_FILES) \
     $(TIMEX_PLUGIN_FILES) \
-    $(HTTPD_FILES) \
     $(NULL)
 
 if FREEBSD
@@ -1103,11 +1105,15 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_YAML_LIBS) \
     $(OPTIONAL_ATOMIC_LIBS) \
     $(OPTIONAL_DL_LIBS) \
-    libh2o.a \
     $(NULL)
 
 if ENABLE_ACLK
     NETDATA_COMMON_LIBS += libmqttwebsockets.a
+endif
+
+if ENABLE_HTTPD
+    NETDATA_FILES += $(HTTPD_FILES)
+    NETDATA_COMMON_LIBS += libh2o.a
 endif
 
 if LINK_STATIC_JSONC

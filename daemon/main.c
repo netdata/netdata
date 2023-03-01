@@ -1966,12 +1966,14 @@ int main(int argc, char **argv) {
 
         if(web_server_mode != WEB_SERVER_MODE_NONE)
             api_listen_sockets_setup();
-        
+
+#ifdef ENABLE_HTTPD
         delta_startup_time("initialize httpd server");
         for (int i = 0; static_threads[i].name; i++) {
             if (static_threads[i].start_routine == httpd_main)
                 static_threads[i].enabled = httpd_is_enabled();
         }
+#endif
     }
 
     delta_startup_time("set resource limits");
