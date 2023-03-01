@@ -9,6 +9,8 @@ learn_rel_path: "Concepts"
 learn_docs_purpose: "Present the Netdata Functions what these are and why they should be used."
 -->
 
+# Netdata Functions
+
 Netdata Agent collectors are able to expose functions that can be executed in run-time and on-demand. These will be
 executed on the node - host where the function is made
 available.

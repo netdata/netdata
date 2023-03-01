@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/System metrics"
 -->
 
-# proc.plugin
+# OS provided metrics (proc.plugin)
 
 -   `/proc/net/dev` (all network interfaces for all their values)
 -   `/proc/diskstats` (all disks for all their values)

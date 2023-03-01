@@ -1,37 +1,21 @@
 #!/sbin/openrc-run
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# The user netdata is configured to run as.
-# If you edit its configuration file to set a different
-# user, set it here too, to have its files switch ownership
-: "${NETDATA_OWNER:=@netdata_user_POST@:@netdata_user_POST@}"
+NETDATA_OWNER="@netdata_user_POST@:@netdata_user_POST@"
+NETDATA_PIDFILE="@localstatedir_POST@/run/netdata/netdata.pid"
 
-# The timeout in seconds to wait for netdata
-# to save its database on disk and exit.
-: "${NETDATA_WAIT_EXIT_TIMEOUT:=60}"
-
-# When set to 1, if netdata does not exit in
-# NETDATA_WAIT_EXIT_TIMEOUT, we will force it
-# to exit.
-: "${NETDATA_FORCE_EXIT:=0}"
-
-# When set to 1, we use netdatacli for reload/rotate/save commands instead of s-s-d.
-: "${NETDATA_USE_NETDATACLI:=0}"
-
-# Specifies the pidfile to use when running in the background.
-: "${NETDATA_PIDFILE:=@localstatedir_POST@/run/netdata/netdata.pid}"
+description="Run the Netdata system monitoring agent."
 
 extra_started_commands="reload rotate save"
+description_reload="Reload health configuration."
+description_rotate="Reopen log files."
+description_save="Force sync of database to disk."
+
 command_prefix="@sbindir_POST@"
 command="${command_prefix}/netdata"
 command_args="-P ${NETDATA_PIDFILE} ${NETDATA_EXTRA_ARGS}"
 command_args_foreground="-D"
 start_stop_daemon_args="-u ${NETDATA_OWNER}"
-if [ "${NETDATA_FORCE_EXIT}" -eq 1 ]; then
-    retry="TERM/${NETDATA_WAIT_EXIT_TIMEOUT}/KILL/1"
-else
-    retry="TERM/${NETDATA_WAIT_EXIT_TIMEOUT}"
-fi
 
 depend() {
     use logger
@@ -44,6 +28,14 @@ start_pre() {
 
     if [ -z "${supervisor}" ]; then
         pidfile="${NETDATA_PIDFILE}"
+    fi
+}
+
+stop_pre() {
+    if [ "0${NETDATA_FORCE_EXIT}" -eq 1 ]; then
+        retry="TERM/${NETDATA_WAIT_EXIT_TIMEOUT:-60}/KILL/1"
+    else
+        retry="TERM/${NETDATA_WAIT_EXIT_TIMEOUT:-60}"
     fi
 }
 

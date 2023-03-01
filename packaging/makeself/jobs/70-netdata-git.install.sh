@@ -7,12 +7,12 @@
 cd "${NETDATA_SOURCE_PATH}" || exit 1
 
 if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then
-  export CFLAGS="-static -O2 -I/openssl-static/include -pipe"
+  export CFLAGS="-static -O2 -I/openssl-static/include -I/libnetfilter-acct-static/include/libnetfilter_acct -I/usr/include/libmnl -pipe"
 else
-  export CFLAGS="-static -O1 -pipe -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -D_FORTIFY_SOURCE=2 -DNETDATA_INTERNAL_CHECKS=1 -I/openssl-static/include"
+  export CFLAGS="-static -O1 -pipe -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -D_FORTIFY_SOURCE=2 -DNETDATA_INTERNAL_CHECKS=1 -I/openssl-static/include -I/libnetfilter-acct-static/include/libnetfilter_acct -I/usr/include/libmnl"
 fi
 
-export LDFLAGS="-static -L/openssl-static/lib"
+export LDFLAGS="-static -L/openssl-static/lib -L/libnetfilter-acct-static/lib -lnetfilter_acct -L/usr/lib -lmnl"
 
 # We export this to 'yes', installer sets this to .environment.
 # The updater consumes this one, so that it can tell whether it should update a static install or a non-static one
@@ -20,7 +20,8 @@ export IS_NETDATA_STATIC_BINARY="yes"
 
 # Set eBPF LIBC to "static" to bundle the `-static` variant of the kernel-collector
 export EBPF_LIBC="static"
-export PKG_CONFIG_PATH="/openssl-static/lib/pkgconfig"
+export PKG_CONFIG="pkg-config --static"
+export PKG_CONFIG_PATH="/openssl-static/lib/pkgconfig:/libnetfilter-acct-static/lib/pkgconfig:/usr/lib/pkgconfig"
 
 # Set correct CMake flags for building against non-System OpenSSL
 # See: https://github.com/warmcat/libwebsockets/blob/master/READMEs/README.build.md

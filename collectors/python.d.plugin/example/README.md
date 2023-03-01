@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Mock Collectors"
 -->
 
-# Example
+# Example module in Python
 
 You can add custom data collectors using Python.
 

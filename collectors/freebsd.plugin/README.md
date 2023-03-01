@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/System metrics"
 -->
 
-# freebsd.plugin
+# FreeBSD system metrics (freebsd.plugin)
 
 Collects resource usage and performance data on FreeBSD systems
 

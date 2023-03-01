@@ -7,9 +7,9 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/moni
 learn_status: "Published"
 learn_rel_path: "Miscellaneous"
 -->
-import { OneLineInstallWget } from '@site/src/components/OneLineInstall/'
 
-# Monitor Pi-hole (and a Raspberry Pi) with Netdata
+# Monitor Pi-hole (and a Raspberry Pi) with Netdataimport { OneLineInstallWget } from '@site/src/components/OneLineInstall/'
+
 
 Between intrusive ads, invasive trackers, and vicious malware, many techies and homelab enthusiasts are advancing their
 networks' security and speed with a tiny computer and a powerful piece of software: [Pi-hole](https://pi-hole.net/).

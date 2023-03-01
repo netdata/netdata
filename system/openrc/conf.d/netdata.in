@@ -1,0 +1,24 @@
+# The user netdata is configured to run as.
+# If you edit its configuration file to set a different user, set it
+# here too, to have its files switch ownership
+NETDATA_OWNER="@netdata_user_POST@:@netdata_user_POST@"
+
+# How long to wait for the agent to save it's database during shutdown.
+NETDATA_WAIT_EXIT_TIMEOUT=60
+
+# If set to 1, force an exit if we time out waiting for the agent to
+# save it's database during shutdown.
+NETDATA_FORCE_EXIT=0
+
+# If set to 1, use netdatacli when sending commands to the agent.
+# This should not be needed in most cases, but it can sometimes help
+# work around issues.
+#NETDATA_USE_NETDATACLI=1
+
+# Specify the path to the pidfile to be used when running in the
+# background.
+NETDATA_PIDFILE="@localstatedir_POST@/run/netdata/netdata.pid"
+
+# Uncomment the below line to run Netdata under OpenRC's native process
+# supervision.
+#supervisor="supervise-daemon"

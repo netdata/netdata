@@ -7,7 +7,7 @@ learn_status: "Published"
 learn_rel_path: "Integrations/Notify"
 -->
 
-# Enable alert notifications
+# Alert notifications
 
 Netdata offers two ways to receive alert notifications on external platforms. These methods work independently _or_ in
 parallel, which means you can enable both at the same time to send alert notifications to any number of endpoints.

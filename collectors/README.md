@@ -7,7 +7,7 @@ learn_status: "Published"
 learn_rel_path: "Concepts"
 -->
 
-# Collecting metrics
+# Collectors
 
 When Netdata starts, and with zero configuration, it auto-detects thousands of data sources and immediately collects
 per-second metrics.

@@ -54,9 +54,13 @@ jobs:
           d="$(.github/scripts/platform-impending-eol.py ${{ matrix.distro }} ${{ matrix.release }})"
           case $? in
             0) echo "pending=false" >> "${GITHUB_OUTPUT}" ;;
-            2)
+            1)
               echo "pending=true" >> "${GITHUB_OUTPUT}"
               echo "date=${d}" >> "${GITHUB_OUTPUT}"
+              ;;
+            2)
+              echo "pending=false" >> "${GITHUB_OUTPUT}"
+              echo "::info::No EOL information found for ${{ matrix.distro }} ${{ matrix.release }}"
               ;;
             *)
               echo "::error::Failed to check EOL date for ${{ matrix.distro }} ${{ matrix.release }}"

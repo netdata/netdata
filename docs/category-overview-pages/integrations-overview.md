@@ -8,7 +8,7 @@ learn_rel_path: "Integrations"
 sidebar_position: 60
 -->
 
-# Netdata Integrations
+# Integrations
 
 Netdata's ability to monitor out of the box every potentially useful aspect of a node's operation is unparalleled.
 But Netdata also provides out of the box, meaningful charts and alerts for hundreds of applications, with the ability

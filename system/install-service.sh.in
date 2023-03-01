@@ -290,6 +290,9 @@ _check_openrc() {
   # if there is no /etc/init.d, it's not OpenRC
   [ ! -d /etc/init.d ] && echo "NO" && return 0
 
+  # if there is no /etc/conf.d, it's not OpenRC
+  [ ! -d /etc/conf.d ] && echo "NO" && return 0
+
   # if there is no rc-update command, it's not OpenRC
   [ -z "$(command -v rc-update 2>/dev/null || true)" ] && echo "NO" && return 0
 
@@ -342,6 +345,14 @@ disable_openrc() {
 
 install_openrc_service() {
   install_generic_service openrc/init.d OpenRC /etc/init.d/netdata enable_openrc disable_openrc
+
+  if [ ! -f /etc/conf.d/netdata ]; then
+    info "Installing OpenRC configuration file."
+
+    if ! install -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/openrc/conf.d/netdata" "/etc/conf.d/netdata"; then
+        warning "Failed to install configuration file, however the service will still work."
+    fi
+  fi
 }
 
 openrc_cmds() {
