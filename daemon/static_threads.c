@@ -141,6 +141,8 @@ const struct netdata_static_thread static_threads_common[] = {
         .init_routine = NULL,
         .start_routine = socket_listen_main_static_threaded
     },
+
+#ifdef ENABLE_HTTPD
     {
         .name = "httpd",
         .config_section = NULL,
@@ -150,6 +152,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .init_routine = NULL,
         .start_routine = httpd_main
     },
+#endif
 
 #ifdef ENABLE_ACLK
     {
