@@ -622,12 +622,9 @@ Requires: netdata = %{version}
 Conflicts: netdata <= %{version}
 %if 0%{?centos_ver} != 7
 Recommends: netdata-plugin-apps = %{version}
+Recommends: netdata-ebpf-legacy-code >= %{version}
 %else
 Requires: netdata-plugin-apps = %{version}
-%endif
-%if 0%{?centos_ver} > 8 || 0%{?fedora} >= 35 || 0%{?suse_version} >= 1500
-Suggests: netdata-ebpf-legacy-code >= %{version}
-%else
 Requires: netdata-ebpf-legacy-code >= %{version}
 %endif
 

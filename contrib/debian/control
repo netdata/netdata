@@ -109,7 +109,8 @@ Conflicts: netdata (< ${source:Version})
 Description: Compiled eBPF legacy code for the Netdata eBPF plugin
  This package provides the pre-compiled eBPF legacy code for use by
  the Netdata eBPF plugin.  This code is only needed when using the eBPF
- plugin with kernel versions before 5.10.
+ plugin with kernel that do not include BTF support (mostly kernel
+ versions lower than 5.10)..
 
 Package: netdata-plugin-pythond
 Architecture: all
@@ -131,7 +132,7 @@ Suggests: nvme-cli, sudo
 Conflicts: netdata (< ${source:Version})
 Description: The go.d metrics collection plugin for the Netdata Agent
  This plugin adds a selection of additional collectors written in Go to
- the Netdata Agent A significant percentage of the application specific
+ the Netdata Agent. A significant percentage of the application specific
  collectors provided by Netdata are part of this plugin, so most users
  will want it installed.
 
