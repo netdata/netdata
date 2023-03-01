@@ -1328,6 +1328,7 @@ int pgc_unittest(void);
 int mrg_unittest(void);
 int julytest(void);
 int pluginsd_parser_unittest(void);
+void replication_initialize(void);
 
 int main(int argc, char **argv) {
     // initialize the system clocks
@@ -1899,6 +1900,8 @@ int main(int argc, char **argv) {
         aral_judy_init();
 
         get_system_timezone();
+
+        replication_initialize();
 
         // --------------------------------------------------------------------
         // get the certificate and start security

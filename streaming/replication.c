@@ -1838,12 +1838,14 @@ static void replication_main_cleanup(void *ptr) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
+void replication_initialize(void) {
+    replication_globals.aral_rse = aral_create("rse", sizeof(struct replication_sort_entry),
+                                               0, 65536, aral_by_size_statistics(),
+                                               NULL, NULL, false, false);
+}
+
 void *replication_thread_main(void *ptr __maybe_unused) {
     replication_initialize_workers(true);
-
-    replication_globals.aral_rse = aral_create("rse", sizeof(struct replication_sort_entry),
-            0, 65536, aral_by_size_statistics(),
-            NULL, NULL, false, false);
 
     int threads = config_get_number(CONFIG_SECTION_DB, "replication threads", 1);
     if(threads < 1 || threads > MAX_REPLICATION_THREADS) {
