@@ -1125,11 +1125,14 @@ static void replication_sort_entry_add(struct replication_request *rq) {
         return;
     }
 
+    // cache this, because it will be changed
+    bool decrement_no_room = rq->not_indexed_buffer_full;
+
     struct replication_sort_entry *rse = replication_sort_entry_create(rq);
 
     replication_recursive_lock();
 
-    if(rq->not_indexed_buffer_full)
+    if(decrement_no_room)
         replication_globals.unsafe.pending_no_room--;
 
 //    if(rq->after < (time_t)replication_globals.protected.queue.after &&
