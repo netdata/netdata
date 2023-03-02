@@ -3504,7 +3504,7 @@ size_t dictionary_unittest_views(void) {
 
     fprintf(stderr, "\nPASS 2: Deleting master item:\n");
     dictionary_del(master, "KEY 1");
-    dictionary_version(view);
+    garbage_collect_pending_deletes(view);
     errors += unittest_check_dictionary("master", master, 0, 0, 1, 1, 0);
     errors += unittest_check_dictionary("view", view, 0, 0, 1, 1, 0);
     errors += unittest_check_item("master", master, item1_on_master, "KEY 1", item1_on_master->shared->value, 1, ITEM_FLAG_DELETED, false, false, true);
