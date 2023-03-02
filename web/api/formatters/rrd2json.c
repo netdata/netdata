@@ -381,6 +381,19 @@ static RRDR *data_query_group_by(RRDR *r) {
         }
     }
 
+    // copy the dimension flags decided by the query target
+    // we need this, because if a dimension is explicitly selected
+    // the query target adds to it the non-zero flag
+    for(size_t c = 0; c < r->d ;c++) {
+        if (!rrdr_dimension_should_be_exposed(r->od[c], options))
+            continue;
+
+        QUERY_METRIC *qm = query_metric(qt, c);
+        size_t c2 = qm->grouped_as.slot;
+
+        r2->od[c2] |= r->od[c];
+    }
+
     // do the group_by
     for(size_t i = 0; i != rows ;i++) {
         size_t idx = i * r->d;
