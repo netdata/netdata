@@ -741,7 +741,7 @@ info: average ratio of HTTP responses with unexpected status over the last 5 min
 
 ## Expressions
 
-Netdata has an internal [infix expression parser](/libnetdata/eval). This parses expressions and creates an internal
+Netdata has an internal infix expression parser under `libnetdata/eval`. This parses expressions and creates an internal
 structure that allows fast execution of them.
 
 These operators are supported `+`, `-`, `*`, `/`, `<`, `==`, `<=`, `<>`, `!=`, `>`, `>=`, `&&`, `||`, `!`, `AND`, `OR`, `NOT`.
