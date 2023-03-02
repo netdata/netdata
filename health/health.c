@@ -357,13 +357,11 @@ static void health_reload_host(RRDHOST *host) {
 void health_reload(void) {
     sql_refresh_hashes();
 
-    rrd_rdlock();
-
     RRDHOST *host;
-    rrdhost_foreach_read(host)
+    dfe_start_reentrant(rrdhost_root_index, host){
         health_reload_host(host);
-
-    rrd_unlock();
+    }
+    dfe_done(host);
 
 #ifdef ENABLE_ACLK
     if (netdata_cloud_setting) {
@@ -804,7 +802,7 @@ static void initialize_health(RRDHOST *host)
 
     // link the loaded alarms to their charts
     RRDSET *st;
-    rrdset_foreach_write(st, host) {
+    rrdset_foreach_reentrant(st, host) {
         if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))
             continue;
 
@@ -1016,9 +1014,7 @@ void *health_main(void *ptr) {
 #endif
 
         worker_is_busy(WORKER_HEALTH_JOB_RRD_LOCK);
-        rrd_rdlock();
-
-        rrdhost_foreach_read(host) {
+        dfe_start_reentrant(rrdhost_root_index, host) {
 
             if(unlikely(!service_running(SERVICE_HEALTH)))
                 break;
@@ -1026,11 +1022,8 @@ void *health_main(void *ptr) {
             if (unlikely(!host->health.health_enabled))
                 continue;
 
-            if (unlikely(!rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH))) {
-                rrd_unlock();
+            if (unlikely(!rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)))
                 initialize_health(host);
-                rrd_rdlock();
-            }
 
             health_execute_delayed_initializations(host);
 
@@ -1495,9 +1488,8 @@ void *health_main(void *ptr) {
                 }
                 break;
             }
-        } //for each host
-
-        rrd_unlock();
+        }
+        dfe_done(host);
 
         // wait for all notifications to finish before allowing health to be cleaned up
         ALARM_ENTRY *ae;
@@ -1510,7 +1502,7 @@ void *health_main(void *ptr) {
 
 #ifdef ENABLE_ACLK
         if (netdata_cloud_setting && unlikely(aclk_alert_reloaded) && loop > (marked_aclk_reload_loop + 2)) {
-            rrdhost_foreach_read(host) {
+            dfe_start_reentrant(rrdhost_root_index, host) {
                 if(unlikely(!service_running(SERVICE_HEALTH)))
                     break;
 
@@ -1519,6 +1511,7 @@ void *health_main(void *ptr) {
 
                 sql_queue_removed_alerts_to_aclk(host);
             }
+            dfe_done(host);
             aclk_alert_reloaded = 0;
             marked_aclk_reload_loop = 0;
         }

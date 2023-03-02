@@ -755,18 +755,15 @@ void rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(RRDHOST *host
 }
 
 void rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts() {
-    rrd_rdlock();
-
     RRDHOST *host;
-    rrdhost_foreach_read(host) {
+    dfe_start_reentrant(rrdhost_root_index, host) {
         if (unlikely(!host->health.health_enabled))
             continue;
 
         if (host->rrdlabels)
             rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(host);
     }
-
-    rrd_unlock();
+    dfe_done(host);
 }
 
 void rrdcalc_unlink_all_rrdset_alerts(RRDSET *st) {

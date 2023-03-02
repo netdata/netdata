@@ -1240,11 +1240,10 @@ void rrdhost_free_all(void) {
 
 void rrd_finalize_collection_for_all_hosts(void) {
     RRDHOST *host;
-    rrd_wrlock();
-    rrdhost_foreach_read(host) {
+    dfe_start_reentrant(rrdhost_root_index, host) {
         rrdhost_finalize_collection(host);
     }
-    rrd_unlock();
+    dfe_done(host);
 }
 
 // ----------------------------------------------------------------------------
@@ -1442,7 +1441,7 @@ void rrdhost_finalize_collection(RRDHOST *host) {
     info("RRD: 'host:%s' stopping data collection...", rrdhost_hostname(host));
 
     RRDSET *st;
-    rrdset_foreach_write(st, host)
+    rrdset_foreach_read(st, host)
         rrdset_finalize_collection(st, true);
     rrdset_foreach_done(st);
 }
