@@ -344,7 +344,7 @@ size_t dictionary_version(DICTIONARY *dict) {
     if(unlikely(!dict)) return 0;
 
     // this is required for views to return the right number
-    garbage_collect_pending_deletes(dict);
+    // garbage_collect_pending_deletes(dict);
 
     return __atomic_load_n(&dict->version, __ATOMIC_RELAXED);
 }
@@ -352,11 +352,10 @@ size_t dictionary_entries(DICTIONARY *dict) {
     if(unlikely(!dict)) return 0;
 
     // this is required for views to return the right number
-    garbage_collect_pending_deletes(dict);
+    // garbage_collect_pending_deletes(dict);
 
     long int entries = __atomic_load_n(&dict->entries, __ATOMIC_RELAXED);
-    if(entries < 0)
-        fatal("DICTIONARY: entries is negative: %ld", entries);
+    internal_fatal(entries < 0, "DICTIONARY: entries is negative: %ld", entries);
 
     return entries;
 }
