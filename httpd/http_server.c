@@ -75,7 +75,12 @@ static int ssl_init()
     snprintfz(default_fn, FILENAME_MAX, "%s/ssl/cert.pem", netdata_configured_user_config_dir);
     const char *cert_fn = config_get(HTTPD_CONFIG_SECTION, "ssl certificate",  default_fn);
 
+#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
     accept_ctx.ssl_ctx = SSL_CTX_new(SSLv23_server_method());
+#else
+    accept_ctx.ssl_ctx = SSL_CTX_new(TLS_server_method());
+#endif
+
     SSL_CTX_set_options(accept_ctx.ssl_ctx, SSL_OP_NO_SSLv2);
 
     /* load certificate and private key */
