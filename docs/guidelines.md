@@ -54,6 +54,23 @@ Editing documentation locally is the preferred method for completely new documen
 documents. Clone the repository where you wish to make your changes, work on a new branch and create a pull request 
 with that branch. 
 
+### Links to other documents
+
+Please ensure that any links to a different documentation resource are fully expanded URLs to the relevant markdown document,
+not links to learn.netdata.cloud. 
+
+e.g.
+```
+[Correct link to this document](https://github.com/netdata/netdata/blob/master/docs/guidelines.md)
+vs
+[Incorrect link to this document](https://learn.netdata.cloud/XYZ)
+```
+
+This permalink ensures that the link will not be broken by any future restructuring in learn.netdata.cloud.
+
+You can see the URL to the source of any published documentation page in the **Edit this page** link at the bottom. If you 
+just replace `edit` with `blob` in that URL, you have the permalink to the original markdown document.
+
 ### Making a pull request
 
 Pull requests (PRs) should be concise and informative. See our 
