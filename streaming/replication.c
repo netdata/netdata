@@ -969,11 +969,12 @@ struct replication_sort_entry {
 
 // the global variables for the replication thread
 static struct replication_thread {
+    ARAL *aral_rse;
+
     SPINLOCK spinlock;
 
     struct {
         size_t pending;                 // number of requests pending in the queue
-        Word_t unique_id;               // the last unique id we gave to a request (auto-increment, starting from 1)
 
         // statistics
         size_t added;                   // number of requests added to the queue
@@ -992,6 +993,7 @@ static struct replication_thread {
     } unsafe;                           // protected from replication_recursive_lock()
 
     struct {
+        Word_t unique_id;               // the last unique id we gave to a request (auto-increment, starting from 1)
         size_t executed;                // the number of replication requests executed
         size_t latest_first_time;       // the 'after' timestamp of the last request we executed
         size_t memory;                  // the total memory allocated by replication
@@ -1005,10 +1007,10 @@ static struct replication_thread {
     } main_thread;                      // access is allowed only by the main thread
 
 } replication_globals = {
+        .aral_rse = NULL,
         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
         .unsafe = {
                 .pending = 0,
-                .unique_id = 0,
 
                 .added = 0,
                 .removed = 0,
@@ -1025,6 +1027,7 @@ static struct replication_thread {
                 },
         },
         .atomic = {
+                .unique_id = 0,
                 .executed = 0,
                 .latest_first_time = 0,
                 .memory = 0,
@@ -1088,17 +1091,15 @@ void replication_set_next_point_in_time(time_t after, size_t unique_id) {
 // ----------------------------------------------------------------------------
 // replication sort entry management
 
-static struct replication_sort_entry *replication_sort_entry_create_unsafe(struct replication_request *rq) {
-    fatal_when_replication_is_not_locked_for_me();
-
-    struct replication_sort_entry *rse = mallocz(sizeof(struct replication_sort_entry));
+static struct replication_sort_entry *replication_sort_entry_create(struct replication_request *rq) {
+    struct replication_sort_entry *rse = aral_mallocz(replication_globals.aral_rse);
     __atomic_add_fetch(&replication_globals.atomic.memory, sizeof(struct replication_sort_entry), __ATOMIC_RELAXED);
 
     rrdpush_sender_pending_replication_requests_plus_one(rq->sender);
 
     // copy the request
     rse->rq = rq;
-    rse->unique_id = ++replication_globals.unsafe.unique_id;
+    rse->unique_id = __atomic_add_fetch(&replication_globals.atomic.unique_id, 1, __ATOMIC_SEQ_CST);
 
     // save the unique id into the request, to be able to delete it later
     rq->unique_id = rse->unique_id;
@@ -1109,26 +1110,30 @@ static struct replication_sort_entry *replication_sort_entry_create_unsafe(struc
 }
 
 static void replication_sort_entry_destroy(struct replication_sort_entry *rse) {
-    freez(rse);
+    aral_freez(replication_globals.aral_rse, rse);
     __atomic_sub_fetch(&replication_globals.atomic.memory, sizeof(struct replication_sort_entry), __ATOMIC_RELAXED);
 }
 
 static void replication_sort_entry_add(struct replication_request *rq) {
-    replication_recursive_lock();
-
     if(rrdpush_sender_replication_buffer_full_get(rq->sender)) {
         rq->indexed_in_judy = false;
         rq->not_indexed_buffer_full = true;
         rq->not_indexed_preprocessing = false;
+        replication_recursive_lock();
         replication_globals.unsafe.pending_no_room++;
         replication_recursive_unlock();
         return;
     }
 
-    if(rq->not_indexed_buffer_full)
-        replication_globals.unsafe.pending_no_room--;
+    // cache this, because it will be changed
+    bool decrement_no_room = rq->not_indexed_buffer_full;
 
-    struct replication_sort_entry *rse = replication_sort_entry_create_unsafe(rq);
+    struct replication_sort_entry *rse = replication_sort_entry_create(rq);
+
+    replication_recursive_lock();
+
+    if(decrement_no_room)
+        replication_globals.unsafe.pending_no_room--;
 
 //    if(rq->after < (time_t)replication_globals.protected.queue.after &&
 //        rq->sender->buffer_used_percentage <= MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED &&
@@ -1827,10 +1832,19 @@ static void replication_main_cleanup(void *ptr) {
     replication_globals.main_thread.threads_ptrs = NULL;
     __atomic_sub_fetch(&replication_buffers_allocated, threads * sizeof(netdata_thread_t *), __ATOMIC_RELAXED);
 
+    aral_destroy(replication_globals.aral_rse);
+    replication_globals.aral_rse = NULL;
+
     // custom code
     worker_unregister();
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+}
+
+void replication_initialize(void) {
+    replication_globals.aral_rse = aral_create("rse", sizeof(struct replication_sort_entry),
+                                               0, 65536, aral_by_size_statistics(),
+                                               NULL, NULL, false, false);
 }
 
 void *replication_thread_main(void *ptr __maybe_unused) {

@@ -410,12 +410,21 @@ PLUGINSD_PLUGIN_FILES = \
     $(NULL)
 
 RRD_PLUGIN_FILES = \
+    database/contexts/rrdcontext.c \
+    database/contexts/rrdcontext.h \
+    database/contexts/metric.c \
+    database/contexts/instance.c \
+    database/contexts/context.c \
+    database/contexts/worker.c \
+    database/contexts/query_target.c \
+    database/contexts/query_scope.c \
+    database/contexts/api_v1.c \
+    database/contexts/api_v2.c \
+    database/contexts/internal.h \
     database/rrdcalc.c \
     database/rrdcalc.h \
     database/rrdcalctemplate.c \
     database/rrdcalctemplate.h \
-    database/rrdcontext.c \
-    database/rrdcontext.h \
     database/rrddim.c \
     database/rrddimvar.c \
     database/rrddimvar.h \

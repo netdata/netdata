@@ -832,6 +832,7 @@ void rrdlabels_copy(DICTIONARY *dst, DICTIONARY *src) {
 // returns true when there are keys in the dictionary matching a simple pattern
 
 struct simple_pattern_match_name_value {
+    size_t searches;
     SIMPLE_PATTERN *pattern;
     char equal;
 };
@@ -842,6 +843,7 @@ static int simple_pattern_match_name_only_callback(const DICTIONARY_ITEM *item, 
     (void)value;
 
     // we return -1 to stop the walkthrough on first match
+    t->searches++;
     if(simple_pattern_matches(t->pattern, name)) return -1;
 
     return 0;
@@ -853,6 +855,7 @@ static int simple_pattern_match_name_and_value_callback(const DICTIONARY_ITEM *i
     RRDLABEL *lb = (RRDLABEL *)value;
 
     // we return -1 to stop the walkthrough on first match
+    t->searches++;
     if(simple_pattern_matches(t->pattern, name)) return -1;
 
     size_t len = RRDLABELS_MAX_NAME_LENGTH + RRDLABELS_MAX_VALUE_LENGTH + 2; // +1 for =, +1 for \0
@@ -871,20 +874,26 @@ static int simple_pattern_match_name_and_value_callback(const DICTIONARY_ITEM *i
     // terminate it
     *dst = '\0';
 
-    if(simple_pattern_matches(t->pattern, tmp)) return -1;
+    t->searches++;
+    if(simple_pattern_matches_length_extract(t->pattern, tmp, dst - tmp, NULL, 0))
+        return -1;
 
     return 0;
 }
 
-bool rrdlabels_match_simple_pattern_parsed(DICTIONARY *labels, SIMPLE_PATTERN *pattern, char equal) {
+bool rrdlabels_match_simple_pattern_parsed(DICTIONARY *labels, SIMPLE_PATTERN *pattern, char equal, size_t *searches) {
     if (!labels) return false;
 
     struct simple_pattern_match_name_value t = {
+        .searches = 0,
         .pattern = pattern,
         .equal = equal
     };
 
     int ret = dictionary_walkthrough_read(labels, equal?simple_pattern_match_name_and_value_callback:simple_pattern_match_name_only_callback, &t);
+
+    if(searches)
+        *searches = t.searches;
 
     return (ret == -1)?true:false;
 }
@@ -892,7 +901,7 @@ bool rrdlabels_match_simple_pattern_parsed(DICTIONARY *labels, SIMPLE_PATTERN *p
 bool rrdlabels_match_simple_pattern(DICTIONARY *labels, const char *simple_pattern_txt) {
     if (!labels) return false;
 
-    SIMPLE_PATTERN *pattern = simple_pattern_create(simple_pattern_txt, " ,|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+    SIMPLE_PATTERN *pattern = simple_pattern_create(simple_pattern_txt, " ,|\t\r\n\f\v", SIMPLE_PATTERN_EXACT, true);
     char equal = '\0';
 
     const char *s;
@@ -903,7 +912,7 @@ bool rrdlabels_match_simple_pattern(DICTIONARY *labels, const char *simple_patte
         }
     }
 
-    bool ret = rrdlabels_match_simple_pattern_parsed(labels, pattern, equal);
+    bool ret = rrdlabels_match_simple_pattern_parsed(labels, pattern, equal, NULL);
 
     simple_pattern_free(pattern);
 

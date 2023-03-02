@@ -229,7 +229,8 @@ static void rrdhost_initialize_rrdpush_sender(RRDHOST *host,
         rrdpush_destinations_init(host);
 
         host->rrdpush_send_api_key = strdupz(rrdpush_api_key);
-        host->rrdpush_send_charts_matching = simple_pattern_create(rrdpush_send_charts_matching, NULL, SIMPLE_PATTERN_EXACT);
+        host->rrdpush_send_charts_matching = simple_pattern_create(rrdpush_send_charts_matching, NULL,
+                                                                   SIMPLE_PATTERN_EXACT, true);
 
         rrdhost_option_set(host, RRDHOST_OPTION_SENDER_ENABLED);
     }
@@ -1239,11 +1240,10 @@ void rrdhost_free_all(void) {
 
 void rrd_finalize_collection_for_all_hosts(void) {
     RRDHOST *host;
-    rrd_wrlock();
-    rrdhost_foreach_read(host) {
+    dfe_start_reentrant(rrdhost_root_index, host) {
         rrdhost_finalize_collection(host);
     }
-    rrd_unlock();
+    dfe_done(host);
 }
 
 // ----------------------------------------------------------------------------
@@ -1441,7 +1441,7 @@ void rrdhost_finalize_collection(RRDHOST *host) {
     info("RRD: 'host:%s' stopping data collection...", rrdhost_hostname(host));
 
     RRDSET *st;
-    rrdset_foreach_write(st, host)
+    rrdset_foreach_read(st, host)
         rrdset_finalize_collection(st, true);
     rrdset_foreach_done(st);
 }

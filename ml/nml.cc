@@ -1118,17 +1118,16 @@ void *nml_detect_main(void *arg) {
         worker_is_idle();
         heartbeat_next(&hb, USEC_PER_SEC);
 
-        rrd_rdlock();
+        void *rhp;
+        dfe_start_reentrant(rrdhost_root_index, rhp) {
+            RRDHOST *rh = (RRDHOST *) rhp;
 
-        RRDHOST *rh;
-        rrdhost_foreach_read(rh) {
             if (!rh->ml_host)
                 continue;
 
             nml_host_detect_once(reinterpret_cast<nml_host_t *>(rh->ml_host));
         }
-
-        rrd_unlock();
+        dfe_done(rhp);
     }
 
     return NULL;

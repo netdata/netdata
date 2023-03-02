@@ -16,13 +16,13 @@ typedef struct rrdinstance_acquired RRDINSTANCE_ACQUIRED;
 // ----------------------------------------------------------------------------
 // RRDCONTEXT
 
-typedef struct rrdcontexts_dictionary RRDCONTEXTS;
 typedef struct rrdcontext_acquired RRDCONTEXT_ACQUIRED;
 
 // ----------------------------------------------------------------------------
 
-#include "rrd.h"
+#include "../rrd.h"
 
+bool rrdinstance_acquired_id_and_name_are_same(RRDINSTANCE_ACQUIRED *ria);
 const char *rrdmetric_acquired_id(RRDMETRIC_ACQUIRED *rma);
 const char *rrdmetric_acquired_name(RRDMETRIC_ACQUIRED *rma);
 
@@ -140,10 +140,9 @@ DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contex
 typedef enum __attribute__ ((__packed__)) {
     QUERY_STATUS_NONE             = 0,
     QUERY_STATUS_QUERIED          = (1 << 0),
-    QUERY_STATUS_DIMENSION_NODATA = (1 << 1),
-    QUERY_STATUS_DIMENSION_HIDDEN = (1 << 2),
-    QUERY_STATUS_EXCLUDED         = (1 << 3),
-    QUERY_STATUS_FAILED           = (1 << 4),
+    QUERY_STATUS_DIMENSION_HIDDEN = (1 << 1),
+    QUERY_STATUS_EXCLUDED         = (1 << 2),
+    QUERY_STATUS_FAILED           = (1 << 3),
 } QUERY_STATUS;
 
 typedef struct query_plan_entry {
@@ -162,12 +161,14 @@ typedef struct query_plan_entry {
 
 #define QUERY_PLANS_MAX (RRD_STORAGE_TIERS * 2)
 
-struct query_instances_counts {
+struct query_metrics_counts {
     size_t selected;
     size_t excluded;
+    size_t queried;
+    size_t failed;
 };
 
-struct query_metrics_counts {
+struct query_instances_counts {
     size_t selected;
     size_t excluded;
     size_t queried;
@@ -181,24 +182,25 @@ struct query_alerts_counts {
     size_t other;
 };
 
-struct query_data_statistics {
-    size_t count;
-    NETDATA_DOUBLE min;
-    NETDATA_DOUBLE max;
-    NETDATA_DOUBLE sum;
-    NETDATA_DOUBLE volume;
+struct query_data_statistics {      // time-aggregated (group points) statistics
+    size_t group_points;            // the number of group points the query generated
+    NETDATA_DOUBLE min;             // the min value of the group points
+    NETDATA_DOUBLE max;             // the max value of the group points
+    NETDATA_DOUBLE sum;             // the sum of the group points
+    NETDATA_DOUBLE volume;          // the volume of the group points
+    NETDATA_DOUBLE anomaly_sum;     // the anomaly sum of the group points
 };
 
-typedef struct query_host {
+typedef struct query_node {
     uint32_t slot;
-    RRDHOST *host;
+    RRDHOST *rrdhost;
     char node_id[UUID_STR_LEN];
 
     struct query_data_statistics query_stats;
     struct query_instances_counts instances;
     struct query_metrics_counts metrics;
     struct query_alerts_counts alerts;
-} QUERY_HOST;
+} QUERY_NODE;
 
 typedef struct query_context {
     uint32_t slot;
@@ -214,8 +216,8 @@ typedef struct query_instance {
     uint32_t slot;
     uint32_t query_host_id;
     RRDINSTANCE_ACQUIRED *ria;
-    STRING *id_fqdn;
-    STRING *name_fqdn;
+    STRING *id_fqdn;        // never access this directly - it is created on demand via query_instance_id_fqdn()
+    STRING *name_fqdn;      // never access this directly - it is created on demand via query_instance_name_fqdn()
 
     struct query_data_statistics query_stats;
     struct query_metrics_counts metrics;
@@ -268,7 +270,7 @@ typedef struct query_metric {
 typedef struct query_target_request {
     size_t version;
 
-    const char *scope_hosts;
+    const char *scope_nodes;
     const char *scope_contexts;
 
     // selecting / filtering metrics to be queried
@@ -277,9 +279,9 @@ typedef struct query_target_request {
     RRDINSTANCE_ACQUIRED *ria;          // the instance to be queried (can be NULL)
     RRDMETRIC_ACQUIRED *rma;            // the metric to be queried (can be NULL)
     RRDSET *st;                         // the chart to be queried (NULL, for context queries)
-    const char *hosts;                  // hosts simple pattern
+    const char *nodes;                  // hosts simple pattern
     const char *contexts;               // contexts simple pattern (context queries)
-    const char *charts;                 // charts simple pattern (for context queries)
+    const char *instances;                 // charts simple pattern (for context queries)
     const char *dimensions;             // dimensions simple pattern
     const char *chart_label_key;        // select only the chart having this label key
     const char *labels;                 // select only the charts having this combo of label key:value
@@ -314,12 +316,22 @@ typedef struct query_target_request {
 
 #define GROUP_BY_MAX_LABEL_KEYS 10
 
+struct query_tier_statistics {
+    size_t queries;
+    size_t points;
+    time_t update_every;
+    struct {
+        time_t first_time_s;
+        time_t last_time_s;
+    } retention;
+};
+
 typedef struct query_target {
     char id[MAX_QUERY_TARGET_ID_LENGTH + 1]; // query identifier (for logging)
     QUERY_TARGET_REQUEST request;
 
     bool used;                              // when true, this query is currently being used
-    size_t queries;                         // how many query we have done so far
+    size_t queries;                         // how many query we have done so far with this QUERY_TARGET - not related to database queries
 
     struct {
         bool relative;                      // true when the request made with relative timestamps, true if it was absolute
@@ -338,9 +350,11 @@ typedef struct query_target {
     } window;
 
     struct {
+        size_t queries[RRD_STORAGE_TIERS];
         time_t first_time_s;                  // the combined first_time_t of all metrics in the query, across all tiers
         time_t last_time_s;                   // the combined last_time_T of all metrics in the query, across all tiers
         time_t minimum_latest_update_every_s; // the min update every of the metrics in the query
+        struct query_tier_statistics tiers[RRD_STORAGE_TIERS];
     } db;
 
     struct {
@@ -375,12 +389,12 @@ typedef struct query_target {
     } contexts;
 
     struct {
-        QUERY_HOST *array;
+        QUERY_NODE *array;
         uint32_t used;                      // how many items of the array are used
         uint32_t size;                      // the size of the array
         SIMPLE_PATTERN *pattern;
         SIMPLE_PATTERN *scope_pattern;
-    } hosts;
+    } nodes;
 
     struct {
         size_t used;
@@ -388,6 +402,11 @@ typedef struct query_target {
     } group_by;
 
     struct query_data_statistics query_stats;
+
+    struct {
+        uint64_t contexts_hard_hash;
+        uint64_t contexts_soft_hash;
+    } versions;
 
     struct {
         usec_t received_ut;
@@ -398,9 +417,9 @@ typedef struct query_target {
     } timings;
 } QUERY_TARGET;
 
-static inline NEVERNULL QUERY_HOST *query_host(QUERY_TARGET *qt, size_t id) {
-    internal_fatal(id >= qt->hosts.used, "QUERY: invalid query host id");
-    return &qt->hosts.array[id];
+static inline NEVERNULL QUERY_NODE *query_node(QUERY_TARGET *qt, size_t id) {
+    internal_fatal(id >= qt->nodes.used, "QUERY: invalid query host id");
+    return &qt->nodes.array[id];
 }
 
 static inline NEVERNULL QUERY_CONTEXT *query_context(QUERY_TARGET *qt, size_t query_context_id) {
@@ -433,10 +452,39 @@ static inline const char *query_metric_name(QUERY_TARGET *qt, QUERY_METRIC *qm) 
     return rrdmetric_acquired_name(qd->rma);
 }
 
+STRING *query_instance_id_fqdn(QUERY_TARGET *qt, QUERY_INSTANCE *qi);
+STRING *query_instance_name_fqdn(QUERY_TARGET *qt, QUERY_INSTANCE *qi);
+
 void query_target_free(void);
 void query_target_release(QUERY_TARGET *qt);
 
 QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr);
+
+struct api_v2_contexts_request {
+    char *scope_nodes;
+    char *scope_contexts;
+    char *nodes;
+    char *contexts;
+    char *q;
+
+    struct {
+        usec_t received_ut;
+        usec_t processing_ut;
+        usec_t output_ut;
+        usec_t finished_ut;
+    } timings;
+};
+
+typedef enum __attribute__ ((__packed__)) {
+    CONTEXTS_V2_DEBUG    = (1 << 0),
+    CONTEXTS_V2_SEARCH   = (1 << 1),
+    CONTEXTS_V2_NODES    = (1 << 2),
+    CONTEXTS_V2_CONTEXTS = (1 << 3),
+} CONTEXTS_V2_OPTIONS;
+
+int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_OPTIONS options);
+
+RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o);
 
 #endif // NETDATA_RRDCONTEXT_H
 

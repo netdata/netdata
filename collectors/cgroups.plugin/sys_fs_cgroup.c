@@ -449,70 +449,70 @@ void read_cgroup_plugin_configuration() {
             config_get("plugin:cgroups", "enable by default cgroups matching",
             // ----------------------------------------------------------------
 
-                    " !*/init.scope "                      // ignore init.scope
-                    " !/system.slice/run-*.scope "         // ignore system.slice/run-XXXX.scope
-                    " *.scope "                            // we need all other *.scope for sure
+                       " !*/init.scope "                      // ignore init.scope
+                       " !/system.slice/run-*.scope "         // ignore system.slice/run-XXXX.scope
+                       " *.scope "                            // we need all other *.scope for sure
 
-            // ----------------------------------------------------------------
+                       // ----------------------------------------------------------------
 
-                    " /machine.slice/*.service "           // #3367 systemd-nspawn
+                       " /machine.slice/*.service "           // #3367 systemd-nspawn
 
-            // ----------------------------------------------------------------
+                       // ----------------------------------------------------------------
 
-                    " */kubepods/pod*/* "                   // k8s containers
-                    " */kubepods/*/pod*/* "                 // k8s containers
-                    " */*-kubepods-pod*/* "                 // k8s containers
-                    " */*-kubepods-*-pod*/* "               // k8s containers
-                    " !*kubepods* !*kubelet* "              // all other k8s cgroups
+                       " */kubepods/pod*/* "                   // k8s containers
+                       " */kubepods/*/pod*/* "                 // k8s containers
+                       " */*-kubepods-pod*/* "                 // k8s containers
+                       " */*-kubepods-*-pod*/* "               // k8s containers
+                       " !*kubepods* !*kubelet* "              // all other k8s cgroups
 
-            // ----------------------------------------------------------------
+                       // ----------------------------------------------------------------
 
-                    " !*/vcpu* "                           // libvirtd adds these sub-cgroups
-                    " !*/emulator "                        // libvirtd adds these sub-cgroups
-                    " !*.mount "
-                    " !*.partition "
-                    " !*.service "
-                    " !*.socket "
-                    " !*.slice "
-                    " !*.swap "
-                    " !*.user "
-                    " !/ "
-                    " !/docker "
-                    " !*/libvirt "
-                    " !/lxc "
-                    " !/lxc/*/* "                          //  #1397 #2649
-                    " !/lxc.monitor* "
-                    " !/lxc.pivot "
-                    " !/lxc.payload "
-                    " !/machine "
-                    " !/qemu "
-                    " !/system "
-                    " !/systemd "
-                    " !/user "
-                    " * "                                  // enable anything else
-            ), NULL, SIMPLE_PATTERN_EXACT);
+                       " !*/vcpu* "                           // libvirtd adds these sub-cgroups
+                       " !*/emulator "                        // libvirtd adds these sub-cgroups
+                       " !*.mount "
+                       " !*.partition "
+                       " !*.service "
+                       " !*.socket "
+                       " !*.slice "
+                       " !*.swap "
+                       " !*.user "
+                       " !/ "
+                       " !/docker "
+                       " !*/libvirt "
+                       " !/lxc "
+                       " !/lxc/*/* "                          //  #1397 #2649
+                       " !/lxc.monitor* "
+                       " !/lxc.pivot "
+                       " !/lxc.payload "
+                       " !/machine "
+                       " !/qemu "
+                       " !/system "
+                       " !/systemd "
+                       " !/user "
+                       " * "                                  // enable anything else
+            ), NULL, SIMPLE_PATTERN_EXACT, true);
 
     enabled_cgroup_names = simple_pattern_create(
             config_get("plugin:cgroups", "enable by default cgroups names matching",
-                    " * "
-            ), NULL, SIMPLE_PATTERN_EXACT);
+                       " * "
+            ), NULL, SIMPLE_PATTERN_EXACT, true);
 
     search_cgroup_paths = simple_pattern_create(
             config_get("plugin:cgroups", "search for cgroups in subpaths matching",
-                    " !*/init.scope "                      // ignore init.scope
-                    " !*-qemu "                            //  #345
-                    " !*.libvirt-qemu "                    //  #3010
-                    " !/init.scope "
-                    " !/system "
-                    " !/systemd "
-                    " !/user "
-                    " !/user.slice "
-                    " !/lxc/*/* "                          //  #2161 #2649
-                    " !/lxc.monitor "
-                    " !/lxc.payload/*/* "
-                    " !/lxc.payload.* "
-                    " * "
-            ), NULL, SIMPLE_PATTERN_EXACT);
+                       " !*/init.scope "                      // ignore init.scope
+                       " !*-qemu "                            //  #345
+                       " !*.libvirt-qemu "                    //  #3010
+                       " !/init.scope "
+                       " !/system "
+                       " !/systemd "
+                       " !/user "
+                       " !/user.slice "
+                       " !/lxc/*/* "                          //  #2161 #2649
+                       " !/lxc.monitor "
+                       " !/lxc.payload/*/* "
+                       " !/lxc.payload.* "
+                       " * "
+            ), NULL, SIMPLE_PATTERN_EXACT, true);
 
     snprintfz(filename, FILENAME_MAX, "%s/cgroup-name.sh", netdata_configured_primary_plugins_dir);
     cgroups_rename_script = config_get("plugin:cgroups", "script to get cgroup names", filename);
@@ -522,37 +522,37 @@ void read_cgroup_plugin_configuration() {
 
     enabled_cgroup_renames = simple_pattern_create(
             config_get("plugin:cgroups", "run script to rename cgroups matching",
-                    " !/ "
-                    " !*.mount "
-                    " !*.socket "
-                    " !*.partition "
-                    " /machine.slice/*.service "          // #3367 systemd-nspawn
-                    " !*.service "
-                    " !*.slice "
-                    " !*.swap "
-                    " !*.user "
-                    " !init.scope "
-                    " !*.scope/vcpu* "                    // libvirtd adds these sub-cgroups
-                    " !*.scope/emulator "                 // libvirtd adds these sub-cgroups
-                    " *.scope "
-                    " *docker* "
-                    " *lxc* "
-                    " *qemu* "
-                    " */kubepods/pod*/* "                   // k8s containers
-                    " */kubepods/*/pod*/* "                 // k8s containers
-                    " */*-kubepods-pod*/* "                 // k8s containers
-                    " */*-kubepods-*-pod*/* "               // k8s containers
-                    " !*kubepods* !*kubelet* "              // all other k8s cgroups
-                    " *.libvirt-qemu "                    // #3010
-                    " * "
-            ), NULL, SIMPLE_PATTERN_EXACT);
+                       " !/ "
+                       " !*.mount "
+                       " !*.socket "
+                       " !*.partition "
+                       " /machine.slice/*.service "          // #3367 systemd-nspawn
+                       " !*.service "
+                       " !*.slice "
+                       " !*.swap "
+                       " !*.user "
+                       " !init.scope "
+                       " !*.scope/vcpu* "                    // libvirtd adds these sub-cgroups
+                       " !*.scope/emulator "                 // libvirtd adds these sub-cgroups
+                       " *.scope "
+                       " *docker* "
+                       " *lxc* "
+                       " *qemu* "
+                       " */kubepods/pod*/* "                   // k8s containers
+                       " */kubepods/*/pod*/* "                 // k8s containers
+                       " */*-kubepods-pod*/* "                 // k8s containers
+                       " */*-kubepods-*-pod*/* "               // k8s containers
+                       " !*kubepods* !*kubelet* "              // all other k8s cgroups
+                       " *.libvirt-qemu "                    // #3010
+                       " * "
+            ), NULL, SIMPLE_PATTERN_EXACT, true);
 
     if(cgroup_enable_systemd_services) {
         systemd_services_cgroups = simple_pattern_create(
                 config_get("plugin:cgroups", "cgroups to match as systemd services",
-                        " !/system.slice/*/*.service "
-                        " /system.slice/*.service "
-                ), NULL, SIMPLE_PATTERN_EXACT);
+                           " !/system.slice/*/*.service "
+                           " /system.slice/*.service "
+                ), NULL, SIMPLE_PATTERN_EXACT, true);
     }
 
     mountinfo_free_all(root);
@@ -2784,10 +2784,10 @@ void cgroup_discovery_worker(void *ptr)
     worker_register_job_name(WORKER_DISCOVERY_LOCK,               "lock");
 
     entrypoint_parent_process_comm = simple_pattern_create(
-        " runc:[* " // http://terenceli.github.io/%E6%8A%80%E6%9C%AF/2021/12/28/runc-internals-3)
-        " exe ", // https://github.com/falcosecurity/falco/blob/9d41b0a151b83693929d3a9c84f7c5c85d070d3a/rules/falco_rules.yaml#L1961
-        NULL,
-        SIMPLE_PATTERN_EXACT);
+            " runc:[* " // http://terenceli.github.io/%E6%8A%80%E6%9C%AF/2021/12/28/runc-internals-3)
+            " exe ", // https://github.com/falcosecurity/falco/blob/9d41b0a151b83693929d3a9c84f7c5c85d070d3a/rules/falco_rules.yaml#L1961
+            NULL,
+            SIMPLE_PATTERN_EXACT, true);
 
     while (service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();

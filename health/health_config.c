@@ -251,7 +251,7 @@ static SIMPLE_PATTERN *health_pattern_from_foreach(const char *s) {
 
     if(convert) {
         dimension_remove_pipe_comma(convert);
-        val = simple_pattern_create(convert, NULL, SIMPLE_PATTERN_EXACT);
+        val = simple_pattern_create(convert, NULL, SIMPLE_PATTERN_EXACT, true);
         freez(convert);
     }
 
@@ -679,9 +679,9 @@ static int health_readfile(const char *filename, void *data) {
         else if(hash == hash_os && !strcasecmp(key, HEALTH_OS_KEY)) {
             char *os_match = value;
             if (alert_cfg) alert_cfg->os = string_strdupz(value);
-            SIMPLE_PATTERN *os_pattern = simple_pattern_create(os_match, NULL, SIMPLE_PATTERN_EXACT);
+            SIMPLE_PATTERN *os_pattern = simple_pattern_create(os_match, NULL, SIMPLE_PATTERN_EXACT, true);
 
-            if(!simple_pattern_matches(os_pattern, rrdhost_os(host))) {
+            if(!simple_pattern_matches_string(os_pattern, host->os)) {
                 if(rc)
                     debug(D_HEALTH, "HEALTH on '%s' ignoring alarm '%s' defined at %zu@%s: host O/S does not match '%s'", rrdhost_hostname(host), rrdcalc_name(rc), line, filename, os_match);
 
@@ -696,9 +696,9 @@ static int health_readfile(const char *filename, void *data) {
         else if(hash == hash_host && !strcasecmp(key, HEALTH_HOST_KEY)) {
             char *host_match = value;
             if (alert_cfg) alert_cfg->host = string_strdupz(value);
-            SIMPLE_PATTERN *host_pattern = simple_pattern_create(host_match, NULL, SIMPLE_PATTERN_EXACT);
+            SIMPLE_PATTERN *host_pattern = simple_pattern_create(host_match, NULL, SIMPLE_PATTERN_EXACT, true);
 
-            if(!simple_pattern_matches(host_pattern, rrdhost_hostname(host))) {
+            if(!simple_pattern_matches_string(host_pattern, host->hostname)) {
                 if(rc)
                     debug(D_HEALTH, "HEALTH on '%s' ignoring alarm '%s' defined at %zu@%s: hostname does not match '%s'", rrdhost_hostname(host), rrdcalc_name(rc), line, filename, host_match);
 
@@ -918,7 +918,8 @@ static int health_readfile(const char *filename, void *data) {
                     rc->host_labels = string_strdupz(tmp);
                     freez(tmp);
                 }
-                rc->host_labels_pattern = simple_pattern_create(rrdcalc_host_labels(rc), NULL, SIMPLE_PATTERN_EXACT);
+                rc->host_labels_pattern = simple_pattern_create(rrdcalc_host_labels(rc), NULL, SIMPLE_PATTERN_EXACT,
+                                                                true);
             }
             else if(hash == hash_plugin && !strcasecmp(key, HEALTH_PLUGIN_KEY)) {
                 alert_cfg->plugin = string_strdupz(value);
@@ -926,7 +927,7 @@ static int health_readfile(const char *filename, void *data) {
                 simple_pattern_free(rc->plugin_pattern);
 
                 rc->plugin_match = string_strdupz(value);
-                rc->plugin_pattern = simple_pattern_create(rrdcalc_plugin_match(rc), NULL, SIMPLE_PATTERN_EXACT);
+                rc->plugin_pattern = simple_pattern_create(rrdcalc_plugin_match(rc), NULL, SIMPLE_PATTERN_EXACT, true);
             }
             else if(hash == hash_module && !strcasecmp(key, HEALTH_MODULE_KEY)) {
                 alert_cfg->module = string_strdupz(value);
@@ -934,7 +935,7 @@ static int health_readfile(const char *filename, void *data) {
                 simple_pattern_free(rc->module_pattern);
 
                 rc->module_match = string_strdupz(value);
-                rc->module_pattern = simple_pattern_create(rrdcalc_module_match(rc), NULL, SIMPLE_PATTERN_EXACT);
+                rc->module_pattern = simple_pattern_create(rrdcalc_module_match(rc), NULL, SIMPLE_PATTERN_EXACT, true);
             }
             else {
                 error("Health configuration at line %zu of file '%s' for alarm '%s' has unknown key '%s'.",
@@ -998,7 +999,8 @@ static int health_readfile(const char *filename, void *data) {
                 simple_pattern_free(rt->family_pattern);
 
                 rt->family_match = string_strdupz(value);
-                rt->family_pattern = simple_pattern_create(rrdcalctemplate_family_match(rt), NULL, SIMPLE_PATTERN_EXACT);
+                rt->family_pattern = simple_pattern_create(rrdcalctemplate_family_match(rt), NULL, SIMPLE_PATTERN_EXACT,
+                                                           true);
             }
             else if(hash == hash_plugin && !strcasecmp(key, HEALTH_PLUGIN_KEY)) {
                 alert_cfg->plugin = string_strdupz(value);
@@ -1006,7 +1008,8 @@ static int health_readfile(const char *filename, void *data) {
                 simple_pattern_free(rt->plugin_pattern);
 
                 rt->plugin_match = string_strdupz(value);
-                rt->plugin_pattern = simple_pattern_create(rrdcalctemplate_plugin_match(rt), NULL, SIMPLE_PATTERN_EXACT);
+                rt->plugin_pattern = simple_pattern_create(rrdcalctemplate_plugin_match(rt), NULL, SIMPLE_PATTERN_EXACT,
+                                                           true);
             }
             else if(hash == hash_module && !strcasecmp(key, HEALTH_MODULE_KEY)) {
                 alert_cfg->module = string_strdupz(value);
@@ -1014,7 +1017,8 @@ static int health_readfile(const char *filename, void *data) {
                 simple_pattern_free(rt->module_pattern);
 
                 rt->module_match = string_strdupz(value);
-                rt->module_pattern = simple_pattern_create(rrdcalctemplate_module_match(rt), NULL, SIMPLE_PATTERN_EXACT);
+                rt->module_pattern = simple_pattern_create(rrdcalctemplate_module_match(rt), NULL, SIMPLE_PATTERN_EXACT,
+                                                           true);
             }
             else if(hash == hash_charts && !strcasecmp(key, HEALTH_CHARTS_KEY)) {
                 alert_cfg->charts = string_strdupz(value);
@@ -1022,7 +1026,8 @@ static int health_readfile(const char *filename, void *data) {
                 simple_pattern_free(rt->charts_pattern);
 
                 rt->charts_match = string_strdupz(value);
-                rt->charts_pattern = simple_pattern_create(rrdcalctemplate_charts_match(rt), NULL, SIMPLE_PATTERN_EXACT);
+                rt->charts_pattern = simple_pattern_create(rrdcalctemplate_charts_match(rt), NULL, SIMPLE_PATTERN_EXACT,
+                                                           true);
             }
             else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
                 alert_cfg->lookup = string_strdupz(value);
@@ -1181,7 +1186,8 @@ static int health_readfile(const char *filename, void *data) {
                     rt->host_labels = string_strdupz(tmp);
                     freez(tmp);
                 }
-                rt->host_labels_pattern = simple_pattern_create(rrdcalctemplate_host_labels(rt), NULL, SIMPLE_PATTERN_EXACT);
+                rt->host_labels_pattern = simple_pattern_create(rrdcalctemplate_host_labels(rt), NULL,
+                                                                SIMPLE_PATTERN_EXACT, true);
             }
             else {
                 error("Health configuration at line %zu of file '%s' for template '%s' has unknown key '%s'.",

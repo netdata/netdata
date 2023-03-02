@@ -2092,7 +2092,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
 
     struct section_pages *sp = *section_pages_pptr;
     if(!netdata_spinlock_trylock(&sp->migration_to_v2_spinlock)) {
-        internal_fatal(true, "DBENGINE: migration to journal v2 is already running for this section");
+        info("DBENGINE: migration to journal v2 for datafile %u is postponed, another jv2 indexer is already running for this section", datafile_fileno);
         pgc_ll_unlock(cache, &cache->hot);
         return;
     }

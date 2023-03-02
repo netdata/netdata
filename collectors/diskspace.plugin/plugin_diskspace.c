@@ -308,16 +308,12 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         }
 
         excluded_mountpoints = simple_pattern_create(
-                config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths", DEFAULT_EXCLUDED_PATHS)
-                , NULL
-                , mode
-        );
+                config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths", DEFAULT_EXCLUDED_PATHS), NULL,
+                mode, true);
 
         excluded_filesystems = simple_pattern_create(
-                config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on filesystems", DEFAULT_EXCLUDED_FILESYSTEMS)
-                , NULL
-                , SIMPLE_PATTERN_EXACT
-        );
+                config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on filesystems",
+                           DEFAULT_EXCLUDED_FILESYSTEMS), NULL, SIMPLE_PATTERN_EXACT, true);
 
         dict_mountpoints = dictionary_create_advanced(DICT_OPTION_NONE, &dictionary_stats_category_collectors, 0);
     }

@@ -1720,6 +1720,7 @@ AC_CONFIG_FILES([
     collectors/perf.plugin/Makefile
     daemon/Makefile
     database/Makefile
+    database/contexts/Makefile
     database/engine/Makefile
     database/ram/Makefile
     database/sqlite/Makefile

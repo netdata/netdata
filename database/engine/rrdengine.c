@@ -1442,20 +1442,27 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __mayb
     worker_is_busy(UV_EVENT_DBENGINE_JOURNAL_INDEX);
     count = 0;
     while (datafile && datafile->fileno != ctx_last_fileno_get(ctx) && datafile->fileno != ctx_last_flush_fileno_get(ctx)) {
+        if(journalfile_v2_data_available(datafile->journalfile)) {
+            // journal file v2 is already there for this datafile
+            datafile = datafile->next;
+            continue;
+        }
 
         netdata_spinlock_lock(&datafile->writers.spinlock);
         bool available = (datafile->writers.running || datafile->writers.flushed_to_open_running) ? false : true;
         netdata_spinlock_unlock(&datafile->writers.spinlock);
 
-        if(!available)
+        if(!available) {
+            info("DBENGINE: journal file %u needs to be indexed, but it has writers working on it - skipping it for now", datafile->fileno);
+            datafile = datafile->next;
             continue;
-
-        if (unlikely(!journalfile_v2_data_available(datafile->journalfile))) {
-            info("DBENGINE: journal file %u is ready to be indexed", datafile->fileno);
-            pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->config.page_type,
-                                         journalfile_migrate_to_v2_callback, (void *) datafile->journalfile);
-            count++;
         }
+
+        info("DBENGINE: journal file %u is ready to be indexed", datafile->fileno);
+        pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->config.page_type,
+                                     journalfile_migrate_to_v2_callback, (void *) datafile->journalfile);
+
+        count++;
 
         datafile = datafile->next;
 

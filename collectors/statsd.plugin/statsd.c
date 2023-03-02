@@ -1418,7 +1418,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
             }
             else if (!strcmp(name, "metrics")) {
                 simple_pattern_free(app->metrics);
-                app->metrics = simple_pattern_create(value, NULL, SIMPLE_PATTERN_EXACT);
+                app->metrics = simple_pattern_create(value, NULL, SIMPLE_PATTERN_EXACT, true);
             }
             else if (!strcmp(name, "private charts")) {
                 if (!strcmp(value, "yes") || !strcmp(value, "on"))
@@ -1533,7 +1533,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                 );
 
                 if(pattern)
-                    dim->metric_pattern = simple_pattern_create(dim->metric, NULL, SIMPLE_PATTERN_EXACT);
+                    dim->metric_pattern = simple_pattern_create(dim->metric, NULL, SIMPLE_PATTERN_EXACT, true);
             }
             else {
                 error("STATSD: ignoring line %zu ('%s') of file '%s'. Unknown keyword for the [%s] section.", line, name, filename, chart->id);
@@ -2462,7 +2462,9 @@ void *statsd_main(void *ptr) {
     statsd.recvmmsg_size = (size_t)config_get_number(CONFIG_SECTION_STATSD, "udp messages to process at once", (long long)statsd.recvmmsg_size);
 #endif
 
-    statsd.charts_for = simple_pattern_create(config_get(CONFIG_SECTION_STATSD, "create private charts for metrics matching", "*"), NULL, SIMPLE_PATTERN_EXACT);
+    statsd.charts_for = simple_pattern_create(
+            config_get(CONFIG_SECTION_STATSD, "create private charts for metrics matching", "*"), NULL,
+            SIMPLE_PATTERN_EXACT, true);
     statsd.max_private_charts_hard = (size_t)config_get_number(CONFIG_SECTION_STATSD, "max private charts hard limit", (long long)statsd.max_private_charts_hard);
     statsd.private_charts_rrd_history_entries = (int)config_get_number(CONFIG_SECTION_STATSD, "private charts history", default_rrd_history_entries);
     statsd.decimal_detail = (collected_number)config_get_number(CONFIG_SECTION_STATSD, "decimal detail", (long long int)statsd.decimal_detail);

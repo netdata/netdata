@@ -4,17 +4,20 @@
 
 struct simple_pattern {
     const char *match;
-    size_t len;
+    uint32_t len;
 
     SIMPLE_PREFIX_MODE mode;
-    char negative;
+    bool negative;
+    bool case_sensitive;
 
     struct simple_pattern *child;
-
     struct simple_pattern *next;
 };
 
-static inline struct simple_pattern *parse_pattern(char *str, SIMPLE_PREFIX_MODE default_mode) {
+static struct simple_pattern *parse_pattern(char *str, SIMPLE_PREFIX_MODE default_mode, size_t count) {
+    if(unlikely(count >= 1000))
+        return NULL;
+
     // fprintf(stderr, "PARSING PATTERN: '%s'\n", str);
 
     SIMPLE_PREFIX_MODE mode;
@@ -31,7 +34,7 @@ static inline struct simple_pattern *parse_pattern(char *str, SIMPLE_PREFIX_MODE
     // do we have an asterisk in the middle?
     if(*c == '*' && c[1] != '\0') {
         // yes, we have
-        child = parse_pattern(c, default_mode);
+        child = parse_pattern(c, default_mode, count + 1);
         c[1] = '\0';
     }
 
@@ -70,12 +73,12 @@ static inline struct simple_pattern *parse_pattern(char *str, SIMPLE_PREFIX_MODE
     return m;
 }
 
-SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, SIMPLE_PREFIX_MODE default_mode) {
+SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, SIMPLE_PREFIX_MODE default_mode, bool case_sensitive) {
     struct simple_pattern *root = NULL, *last = NULL;
 
     if(unlikely(!list || !*list)) return root;
 
-    int isseparator[256] = {
+    char isseparator[256] = {
             [' '] = 1       // space
             , ['\t'] = 1    // tab
             , ['\r'] = 1    // carriage return
@@ -96,14 +99,14 @@ SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, 
         buf[0] = '\0';
         char *c = buf;
 
-        char negative = 0;
+        bool negative = false;
 
         // skip all spaces
         while(isseparator[(unsigned char)*s])
             s++;
 
         if(*s == '!') {
-            negative = 1;
+            negative = true;
             s++;
         }
 
@@ -137,8 +140,9 @@ SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, 
             continue;
 
         // fprintf(stderr, "FOUND PATTERN: '%s'\n", buf);
-        struct simple_pattern *m = parse_pattern(buf, default_mode);
+        struct simple_pattern *m = parse_pattern(buf, default_mode, 0);
         m->negative = negative;
+        m->case_sensitive = case_sensitive;
 
         // link it at the end
         if(unlikely(!root))
@@ -174,76 +178,128 @@ static inline char *add_wildcarded(const char *matched, size_t matched_size, cha
     return wildcarded;
 }
 
-static inline int match_pattern(struct simple_pattern *m, const char *str, size_t len, char *wildcarded, size_t *wildcarded_size) {
+static inline int sp_strcmp(const char *s1, const char *s2, bool case_sensitive) {
+    if(case_sensitive)
+        return strcmp(s1, s2);
+
+    return strcasecmp(s1, s2);
+}
+
+static inline int sp_strncmp(const char *s1, const char *s2, size_t n, bool case_sensitive) {
+    if(case_sensitive)
+        return strncmp(s1, s2, n);
+
+    return strncasecmp(s1, s2, n);
+}
+
+static inline char *sp_strstr(const char *haystack, const char *needle, bool case_sensitive) {
+    if(case_sensitive)
+        return strstr(haystack, needle);
+
+    return strcasestr(haystack, needle);
+}
+
+static inline bool match_pattern(struct simple_pattern *m, const char *str, size_t len, char *wildcarded, size_t *wildcarded_size) {
     char *s;
 
-    if(m->len <= len) {
+    bool loop = true;
+    while(loop && m->len <= len) {
+        loop = false;
+
         switch(m->mode) {
+            default:
+            case SIMPLE_PATTERN_EXACT:
+                if(unlikely(sp_strcmp(str, m->match, m->case_sensitive) == 0)) {
+                    if(!m->child) return true;
+                    return false;
+                }
+                break;
+
             case SIMPLE_PATTERN_SUBSTRING:
-                if(!m->len) return 1;
-                if((s = strstr(str, m->match))) {
+                if(!m->len) return true;
+                if((s = sp_strstr(str, m->match, m->case_sensitive))) {
                     wildcarded = add_wildcarded(str, s - str, wildcarded, wildcarded_size);
                     if(!m->child) {
-                        wildcarded = add_wildcarded(&s[m->len], len - (&s[m->len] - str), wildcarded, wildcarded_size);
-                        return 1;
+                        add_wildcarded(&s[m->len], len - (&s[m->len] - str), wildcarded, wildcarded_size);
+                        return true;
                     }
-                    return match_pattern(m->child, &s[m->len], len - (s - str) - m->len, wildcarded, wildcarded_size);
+
+                    // instead of recursion
+                    {
+                        len = len - (s - str) - m->len;
+                        str = &s[m->len];
+                        m = m->child;
+                        loop = true;
+                        // return match_pattern(m->child, &s[m->len], len - (s - str) - m->len, wildcarded, wildcarded_size);
+                    }
                 }
                 break;
 
             case SIMPLE_PATTERN_PREFIX:
-                if(unlikely(strncmp(str, m->match, m->len) == 0)) {
+                if(unlikely(sp_strncmp(str, m->match, m->len, m->case_sensitive) == 0)) {
                     if(!m->child) {
-                        wildcarded = add_wildcarded(&str[m->len], len - m->len, wildcarded, wildcarded_size);
-                        return 1;
+                        add_wildcarded(&str[m->len], len - m->len, wildcarded, wildcarded_size);
+                        return true;
                     }
-                    return match_pattern(m->child, &str[m->len], len - m->len, wildcarded, wildcarded_size);
+                    // instead of recursion
+                    {
+                        len = len - m->len;
+                        str = &str[m->len];
+                        m = m->child;
+                        loop = true;
+                        // return match_pattern(m->child, &str[m->len], len - m->len, wildcarded, wildcarded_size);
+                    }
                 }
                 break;
 
             case SIMPLE_PATTERN_SUFFIX:
-                if(unlikely(strcmp(&str[len - m->len], m->match) == 0)) {
-                    wildcarded = add_wildcarded(str, len - m->len, wildcarded, wildcarded_size);
-                    if(!m->child) return 1;
-                    return 0;
-                }
-                break;
-
-            case SIMPLE_PATTERN_EXACT:
-            default:
-                if(unlikely(strcmp(str, m->match) == 0)) {
-                    if(!m->child) return 1;
-                    return 0;
+                if(unlikely(sp_strcmp(&str[len - m->len], m->match, m->case_sensitive) == 0)) {
+                    add_wildcarded(str, len - m->len, wildcarded, wildcarded_size);
+                    if(!m->child) return true;
+                    return false;
                 }
                 break;
         }
     }
 
-    return 0;
+    return false;
 }
 
-int simple_pattern_matches_extract(SIMPLE_PATTERN *list, const char *str, char *wildcarded, size_t wildcarded_size) {
+static inline int simple_pattern_matches_extract_with_length(SIMPLE_PATTERN *list, const char *str, size_t len, char *wildcarded, size_t wildcarded_size) {
     struct simple_pattern *m, *root = (struct simple_pattern *)list;
 
-    if(unlikely(!root || !str || !*str)) return 0;
-
-    size_t len = strlen(str);
     for(m = root; m ; m = m->next) {
         char *ws = wildcarded;
         size_t wss = wildcarded_size;
         if(unlikely(ws)) *ws = '\0';
 
         if (match_pattern(m, str, len, ws, &wss)) {
-
-            //if(ws && wss)
-            //    fprintf(stderr, "FINAL WILDCARDED '%s' of length %zu\n", ws, strlen(ws));
-
             if (m->negative) return 0;
             return 1;
         }
     }
 
     return 0;
+}
+
+int simple_pattern_matches_buffer_extract(SIMPLE_PATTERN *list, BUFFER *str, char *wildcarded, size_t wildcarded_size) {
+    if(!list || !str || buffer_strlen(str)) return 0;
+    return simple_pattern_matches_extract_with_length(list, buffer_tostring(str), buffer_strlen(str), wildcarded, wildcarded_size);
+}
+
+int simple_pattern_matches_string_extract(SIMPLE_PATTERN *list, STRING *str, char *wildcarded, size_t wildcarded_size) {
+    if(!list || !str) return 0;
+    return simple_pattern_matches_extract_with_length(list, string2str(str), string_strlen(str), wildcarded, wildcarded_size);
+}
+
+int simple_pattern_matches_extract(SIMPLE_PATTERN *list, const char *str, char *wildcarded, size_t wildcarded_size) {
+    if(!list || !str || !*str) return 0;
+    return simple_pattern_matches_extract_with_length(list, str, strlen(str), wildcarded, wildcarded_size);
+}
+
+int simple_pattern_matches_length_extract(SIMPLE_PATTERN *list, const char *str, size_t len, char *wildcarded, size_t wildcarded_size) {
+    if(!list || !str || !*str || !len) return 0;
+    return simple_pattern_matches_extract_with_length(list, str, len, wildcarded, wildcarded_size);
 }
 
 static inline void free_pattern(struct simple_pattern *m) {

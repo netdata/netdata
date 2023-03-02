@@ -101,12 +101,12 @@ void nml_config_load(nml_config_t *cfg) {
     cfg->dimension_anomaly_score_threshold = dimension_anomaly_rate_threshold;
 
     cfg->hosts_to_skip = config_get(config_section_ml, "hosts to skip from training", "!*");
-    cfg->sp_host_to_skip = simple_pattern_create(cfg->hosts_to_skip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
+    cfg->sp_host_to_skip = simple_pattern_create(cfg->hosts_to_skip.c_str(), NULL, SIMPLE_PATTERN_EXACT, true);
 
     // Always exclude anomaly_detection charts from training.
     cfg->charts_to_skip = "anomaly_detection.* ";
     cfg->charts_to_skip += config_get(config_section_ml, "charts to skip from training", "netdata.*");
-    cfg->sp_charts_to_skip = simple_pattern_create(cfg->charts_to_skip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
+    cfg->sp_charts_to_skip = simple_pattern_create(cfg->charts_to_skip.c_str(), NULL, SIMPLE_PATTERN_EXACT, true);
 
     cfg->stream_anomaly_detection_charts = config_get_boolean(config_section_ml, "stream anomaly detection charts", true);
 }

@@ -327,8 +327,9 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
         enable_only_active = config_get_boolean_ondemand(
             CONFIG_SECTION_PLUGIN_SYS_CLASS_INFINIBAND, "monitor only active ports", CONFIG_BOOLEAN_AUTO);
         disabled_list = simple_pattern_create(
-            config_get(CONFIG_SECTION_PLUGIN_SYS_CLASS_INFINIBAND, "disable by default interfaces matching", ""), NULL,
-            SIMPLE_PATTERN_EXACT);
+                config_get(CONFIG_SECTION_PLUGIN_SYS_CLASS_INFINIBAND, "disable by default interfaces matching", ""),
+                NULL,
+                SIMPLE_PATTERN_EXACT, true);
 
         dt_to_refresh_ports =
             config_get_number(CONFIG_SECTION_PLUGIN_SYS_CLASS_INFINIBAND, "refresh ports state every seconds", 30) *

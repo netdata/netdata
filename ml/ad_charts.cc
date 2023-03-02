@@ -276,7 +276,7 @@ void nml_update_host_and_detection_rate_charts(nml_host_t *host, collected_numbe
                 0, /* timeout */
                 0, /* tier */
                 QUERY_SOURCE_ML,
-                STORAGE_PRIORITY_BEST_EFFORT
+                STORAGE_PRIORITY_SYNCHRONOUS
         );
 
         if (R) {
