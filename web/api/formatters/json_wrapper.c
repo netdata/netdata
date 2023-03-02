@@ -858,7 +858,7 @@ static void query_target_combined_chart_type(BUFFER *wb, QUERY_TARGET *qt, size_
         buffer_json_member_add_string(wb, "chart_type", rrdset_type_name(rrdcontext_acquired_chart_type(qt->contexts.array[0].rca)));
 }
 
-static void rrdr_dimension_units_array_v2(BUFFER *wb, RRDR *r) {
+static void rrdr_dimension_units_array_v2(BUFFER *wb, RRDR *r, RRDR_OPTIONS options) {
     if(!r->du)
         return;
 
@@ -866,6 +866,9 @@ static void rrdr_dimension_units_array_v2(BUFFER *wb, RRDR *r) {
 
     buffer_json_member_add_array(wb, "units");
     for(size_t c = 0; c < r->d ; c++) {
+        if(!rrdr_dimension_should_be_exposed(r->od[c], options))
+            continue;
+
         if(percentage)
             buffer_json_add_array_item_string(wb, "%");
         else
@@ -874,23 +877,31 @@ static void rrdr_dimension_units_array_v2(BUFFER *wb, RRDR *r) {
     buffer_json_array_close(wb);
 }
 
-static void rrdr_dimension_priority_array(BUFFER *wb, RRDR *r) {
+static void rrdr_dimension_priority_array(BUFFER *wb, RRDR *r, RRDR_OPTIONS options) {
     if(!r->dp)
         return;
 
     buffer_json_member_add_array(wb, "priorities");
-    for(size_t c = 0; c < r->d ; c++)
+    for(size_t c = 0; c < r->d ; c++) {
+        if(!rrdr_dimension_should_be_exposed(r->od[c], options))
+            continue;
+
         buffer_json_add_array_item_uint64(wb, r->dp[c]);
+    }
     buffer_json_array_close(wb);
 }
 
-static void rrdr_dimension_grouped_array(BUFFER *wb, RRDR *r) {
+static void rrdr_dimension_grouped_array(BUFFER *wb, RRDR *r, RRDR_OPTIONS options) {
     if(!r->dgbc)
         return;
 
     buffer_json_member_add_array(wb, "grouped");
-    for(size_t c = 0; c < r->d ;c++)
+    for(size_t c = 0; c < r->d ;c++) {
+        if(!rrdr_dimension_should_be_exposed(r->od[c], options))
+            continue;
+
         buffer_json_add_array_item_uint64(wb, r->dgbc[c]);
+    }
     buffer_json_array_close(wb);
 }
 
@@ -1244,9 +1255,9 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
         {
             rrdr_dimension_ids(wb, "ids", r, options);
             rrdr_dimension_names(wb, "names", r, options);
-            rrdr_dimension_units_array_v2(wb, r);
-            rrdr_dimension_priority_array(wb, r);
-            rrdr_dimension_grouped_array(wb, r);
+            rrdr_dimension_units_array_v2(wb, r, options);
+            rrdr_dimension_priority_array(wb, r, options);
+            rrdr_dimension_grouped_array(wb, r, options);
             size_t dims = rrdr_latest_values(wb, "view_latest_values", r, options);
             buffer_json_member_add_uint64(wb, "count", dims);
         }
