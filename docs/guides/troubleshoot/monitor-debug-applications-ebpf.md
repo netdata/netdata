@@ -86,7 +86,7 @@ to show other charts that will help you debug and troubleshoot how it interacts 
 
 ## Configure the eBPF collector to monitor errors
 
-The eBPF collector has [two possible modes](/collectors/ebpf.plugin#ebpf-load-mode): `entry` and `return`. The default
+The eBPF collector has [two possible modes](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/README.md#ebpf-load-mode): `entry` and `return`. The default
 is `entry`, and only monitors calls to kernel functions, but the `return` also monitors and charts _whether these calls
 return in error_.
 
