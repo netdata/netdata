@@ -15,6 +15,25 @@ typedef struct btrfs_disk {
     struct btrfs_disk *next;
 } BTRFS_DISK;
 
+typedef struct btrfs_device {
+    int id;
+    int exists;
+
+    char *error_stats_filename;
+    RRDDIM *rd_write_errs;
+    RRDDIM *rd_read_errs;
+    RRDDIM *rd_flush_errs;
+    RRDDIM *rd_corruption_errs;
+    RRDDIM *rd_generation_errs;
+    collected_number write_errs;
+    collected_number read_errs;
+    collected_number flush_errs;
+    collected_number corruption_errs;
+    collected_number generation_errs;
+
+    struct btrfs_device *next;
+} BTRFS_DEVICE;
+
 typedef struct btrfs_node {
     int exists;
     int logged_error;
@@ -92,12 +111,44 @@ typedef struct btrfs_node {
 
     BTRFS_DISK *disks;
 
+    RRDSET *st_error_stats;
+    BTRFS_DEVICE *devices;
+
     struct btrfs_node *next;
 } BTRFS_NODE;
 
 static BTRFS_NODE *nodes = NULL;
 
-static int collect_btrfs_commits_stats(BTRFS_NODE *node){
+static inline int collect_btrfs_error_stats(BTRFS_DEVICE *device){
+    char buffer[120 + 1];
+    
+    int ret = read_file(device->error_stats_filename, buffer, 120);
+    if(unlikely(ret)) {
+        collector_error("BTRFS: failed to read '%s'", device->error_stats_filename);
+        device->write_errs = 0;
+        device->read_errs = 0;
+        device->flush_errs = 0;
+        device->corruption_errs = 0;
+        device->generation_errs = 0;
+        return ret;
+    } 
+    
+    char *p = buffer;
+    while(p){
+        char *val = mystrsep(&p, "\n");
+        if(unlikely(!val || !*val)) break;
+        char *key = mystrsep(&val, " ");
+
+        if(!strcmp(key, "write_errs")) device->write_errs = str2ull(val, NULL);
+        else if(!strcmp(key, "read_errs")) device->read_errs = str2ull(val, NULL);
+        else if(!strcmp(key, "flush_errs")) device->flush_errs = str2ull(val, NULL);
+        else if(!strcmp(key, "corruption_errs")) device->corruption_errs = str2ull(val, NULL);
+        else if(!strcmp(key, "generation_errs")) device->generation_errs = str2ull(val, NULL);
+    }
+    return 0;
+}
+
+static inline int collect_btrfs_commits_stats(BTRFS_NODE *node){
     char buffer[120 + 1];
     
     int ret = read_file(node->commit_stats_filename, buffer, 120);
@@ -130,6 +181,11 @@ static inline void btrfs_free_disk(BTRFS_DISK *d) {
     freez(d);
 }
 
+static inline void btrfs_free_device(BTRFS_DEVICE *d) {
+    freez(d->error_stats_filename);
+    freez(d);
+}
+
 static inline void btrfs_free_node(BTRFS_NODE *node) {
     // collector_info("BTRFS: destroying '%s'", node->id);
 
@@ -150,6 +206,9 @@ static inline void btrfs_free_node(BTRFS_NODE *node) {
         rrdset_is_obsolete(node->st_commit_stats_timings);
     }
 
+    if(node->st_error_stats)
+        rrdset_is_obsolete(node->st_error_stats);
+
     freez(node->allocation_data_bytes_used_filename);
     freez(node->allocation_data_total_bytes_filename);
 
@@ -165,6 +224,12 @@ static inline void btrfs_free_node(BTRFS_NODE *node) {
         BTRFS_DISK *d = node->disks;
         node->disks = node->disks->next;
         btrfs_free_disk(d);
+    }
+
+     while(node->devices) {
+        BTRFS_DEVICE *d = node->devices;
+        node->devices = node->devices->next;
+        btrfs_free_device(d);
     }
 
     freez(node->label);
@@ -207,8 +272,10 @@ static inline int find_btrfs_disks(BTRFS_NODE *node, const char *path) {
         // search for it
 
         for(d = node->disks ; d ; d = d->next) {
-            if(hash == d->hash && !strcmp(de->d_name, d->name))
+            if(hash == d->hash && !strcmp(de->d_name, d->name)){
+                // collector_info("BTRFS: existing disk name '%s'", d->name);
                 break;
+            }
         }
 
         // --------------------------------------------------------------------
@@ -278,6 +345,111 @@ static inline int find_btrfs_disks(BTRFS_NODE *node, const char *path) {
     return 0;
 }
 
+static inline int find_btrfs_devices(BTRFS_NODE *node, const char *path) {
+    char filename[FILENAME_MAX + 1];
+
+    // node->all_disks_total = 0;
+
+    BTRFS_DEVICE *d;
+    for(d = node->devices ; d ; d = d->next)
+        d->exists = 0;
+
+    DIR *dir = opendir(path);
+    if (!dir) {
+        if(!node->logged_error) {
+            collector_error("BTRFS: Cannot open directory '%s'.", path);
+            node->logged_error = 1;
+        }
+        return 1;
+    }
+    node->logged_error = 0;
+
+    struct dirent *de = NULL;
+    while ((de = readdir(dir))) {
+        if (de->d_type != DT_DIR
+            || !strcmp(de->d_name, ".")
+            || !strcmp(de->d_name, "..")
+                ) {
+            // collector_info("BTRFS: ignoring '%s'", de->d_name);
+            continue;
+        }
+
+        // uint32_t hash = simple_hash(de->d_name);
+
+        collector_info("BTRFS: device found '%s'", de->d_name);
+
+        // --------------------------------------------------------------------
+        // search for it
+
+        for(d = node->devices ; d ; d = d->next) {
+            if(str2ll(de->d_name, NULL) == d->id){
+                collector_info("BTRFS: existing device id '%d'", d->id);
+                break;
+            }
+        }
+
+        // --------------------------------------------------------------------
+        // did we find it?
+
+        if(!d) {
+            d = callocz(sizeof(BTRFS_DEVICE), 1);
+
+            d->id = str2ll(de->d_name, NULL);
+            collector_info("BTRFS: new device with id '%d'", d->id);
+
+            snprintfz(filename, FILENAME_MAX, "%s/%d/error_stats", path, d->id);
+            d->error_stats_filename = strdupz(filename);
+            collector_info("BTRFS: error_stats_filename '%s'", filename);
+
+            // link it
+            d->next = node->devices;
+            node->devices = d;
+        }
+
+        d->exists = 1;
+
+
+        // --------------------------------------------------------------------
+        // update the values
+
+        if(collect_btrfs_error_stats(d)){
+            btrfs_free_node(node);
+            d->exists = 0;
+            continue;
+        }  
+    }
+    closedir(dir);
+
+    // ------------------------------------------------------------------------
+    // cleanup
+
+    BTRFS_DEVICE *last = NULL;
+    d = node->devices;
+
+    while(d) {
+        if(unlikely(!d->exists)) {
+            if(unlikely(node->devices == d)) {
+                node->devices = d->next;
+                btrfs_free_device(d);
+                d = node->devices;
+                last = NULL;
+            }
+            else {
+                last->next = d->next;
+                btrfs_free_device(d);
+                d = last->next;
+            }
+
+            continue;
+        }
+
+        last = d;
+        d = d->next;
+    }
+
+    return 0;
+}
+
 
 static inline int find_all_btrfs_pools(const char *path) {
     static int logged_error = 0;
@@ -328,7 +500,7 @@ static inline int find_all_btrfs_pools(const char *path) {
             continue;
         }
 
-        // collector_info("BTRFS: adding '%s'", de->d_name);
+        collector_info("BTRFS: adding '%s'", de->d_name);
 
         // not found, create it
         node = callocz(sizeof(BTRFS_NODE), 1);
@@ -440,7 +612,7 @@ static inline int find_all_btrfs_pools(const char *path) {
         if(collect_btrfs_commits_stats(node)){
             btrfs_free_node(node);
             continue;
-        }       
+        }     
 
         // --------------------------------------------------------------------
         // find all disks related to this node
@@ -449,11 +621,17 @@ static inline int find_all_btrfs_pools(const char *path) {
         snprintfz(filename, FILENAME_MAX, "%s/%s/devices", path, de->d_name);
         find_btrfs_disks(node, filename);
 
+        // --------------------------------------------------------------------
+        // find all devices related to this node
+
+        snprintfz(filename, FILENAME_MAX, "%s/%s/devinfo", path, de->d_name);
+        collector_error("BTRFS: path to search for devices '%s'", filename);
+        find_btrfs_devices(node, filename);  
 
         // --------------------------------------------------------------------
         // link it
 
-        // collector_info("BTRFS: linking '%s'", node->id);
+        collector_info("BTRFS: linking '%s'", node->id);
         node->next = nodes;
         nodes = node;
     }
@@ -501,7 +679,8 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
         , do_allocation_system = CONFIG_BOOLEAN_AUTO
         , do_allocation_data = CONFIG_BOOLEAN_AUTO
         , do_allocation_metadata = CONFIG_BOOLEAN_AUTO
-        , do_commit_stats = CONFIG_BOOLEAN_AUTO;
+        , do_commit_stats = CONFIG_BOOLEAN_AUTO
+        , do_error_stats = CONFIG_BOOLEAN_AUTO;
 
     static usec_t refresh_delta = 0, refresh_every = 60 * USEC_PER_SEC;
     static char *btrfs_path = NULL;
@@ -523,6 +702,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
         do_allocation_metadata = config_get_boolean_ondemand("plugin:proc:/sys/fs/btrfs", "metadata allocation", do_allocation_metadata);
         do_allocation_system = config_get_boolean_ondemand("plugin:proc:/sys/fs/btrfs", "system allocation", do_allocation_system);
         do_commit_stats = config_get_boolean_ondemand("plugin:proc:/sys/fs/btrfs", "commit stats", do_commit_stats);
+        do_error_stats = config_get_boolean_ondemand("plugin:proc:/sys/fs/btrfs", "error stats", do_error_stats);
     }
 
     refresh_delta += dt;
@@ -591,6 +771,22 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
         if(do_commit_stats != CONFIG_BOOLEAN_NO) {
             if (unlikely(collect_btrfs_commits_stats(node))) {
                 collector_error("BTRFS: failed to collect commit stats for '%s'", node->id);
+                // make it refresh btrfs at the next iteration
+                refresh_delta = refresh_every;
+                continue;
+            }
+        }
+
+        if(do_error_stats != CONFIG_BOOLEAN_NO) {
+            int collection_failed = 0;
+            for(BTRFS_DEVICE *d = node->devices ; d ; d = d->next) {
+                if(unlikely(collect_btrfs_error_stats(d))){
+                    collector_error("BTRFS: failed to collect error stats for '%s', devid:'%d'", node->id, d);
+                    collection_failed = 1;
+                    break;
+                }
+            }
+            if(unlikely(collection_failed)){
                 // make it refresh btrfs at the next iteration
                 refresh_delta = refresh_every;
                 continue;
@@ -794,8 +990,8 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
         // commit_stats
 
         if(do_commit_stats == CONFIG_BOOLEAN_YES || (do_commit_stats == CONFIG_BOOLEAN_AUTO &&
-                                                          (node->commit_stats_commits ||
-                                                           netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+                                                        (node->commit_stats_commits ||
+                                                        netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
             do_commit_stats = CONFIG_BOOLEAN_YES;
 
             if(unlikely(!node->st_commit_stats_commits)) {
@@ -868,6 +1064,92 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
             rrddim_set_by_pointer(node->st_commit_stats_timings, node->rd_commit_stats_timings_max, node->commit_stats_timings_max);
             rrddim_set_by_pointer(node->st_commit_stats_timings, node->rd_commit_stats_timings_total, node->commit_stats_timings_total);
             rrdset_done(node->st_commit_stats_timings);
+        }
+
+        // --------------------------------------------------------------------
+        // error_stats per device
+
+        if(do_error_stats == CONFIG_BOOLEAN_YES ||  (do_error_stats == CONFIG_BOOLEAN_AUTO &&
+                                                    (node->devices ||
+                                                    netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+            do_error_stats = CONFIG_BOOLEAN_YES;
+
+            if(unlikely(!node->st_error_stats)) {
+                char id[RRD_ID_LENGTH_MAX + 1], name[RRD_ID_LENGTH_MAX + 1], title[200 + 1];
+
+                snprintf(id, RRD_ID_LENGTH_MAX, "error_stats_%s", node->id);
+                snprintf(name, RRD_ID_LENGTH_MAX, "error_stats_%s", node->label);
+                snprintf(title, 200, "BTRFS Errors");
+
+                netdata_fix_chart_id(id);
+                netdata_fix_chart_name(name);
+
+                node->st_error_stats = rrdset_create_localhost(
+                        "btrfs"
+                        , id
+                        , name
+                        , node->label
+                        , "btrfs.errors"
+                        , title
+                        , "errors"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_BTRFS_NAME
+                        , NETDATA_CHART_PRIO_BTRFS_ERRORS
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
+
+                add_labels_to_btrfs(node, node->st_error_stats);
+            }
+
+
+            for(BTRFS_DEVICE *d = node->devices ; d ; d = d->next) {
+                char rd_id[RRD_ID_LENGTH_MAX + 1];
+                if(d->write_errs){
+                    if(unlikely(!d->rd_write_errs)){
+                        snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:write_errs", d->id);
+                        d->rd_write_errs = rrddim_add(node->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    }
+                    rrddim_set_by_pointer(node->st_error_stats, d->rd_write_errs, d->write_errs);
+                }
+                if(d->read_errs){
+                    if(unlikely(!d->rd_read_errs)){
+                        snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:read_errs", d->id);
+                        d->rd_read_errs = rrddim_add(node->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    }
+                    rrddim_set_by_pointer(node->st_error_stats, d->rd_read_errs, d->read_errs);
+                }
+                if(d->flush_errs){
+                    if(unlikely(!d->rd_flush_errs)){
+                        snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:flush_errs", d->id);
+                        d->rd_flush_errs = rrddim_add(node->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    }
+                    rrddim_set_by_pointer(node->st_error_stats, d->rd_flush_errs, d->flush_errs);
+                }
+                if(d->flush_errs){
+                    if(unlikely(!d->rd_flush_errs)){
+                        snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:flush_errs", d->id);
+                        d->rd_flush_errs = rrddim_add(node->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    }
+                    rrddim_set_by_pointer(node->st_error_stats, d->rd_flush_errs, d->flush_errs);
+                }
+                if(d->corruption_errs){
+                    if(unlikely(!d->rd_corruption_errs)){
+                        snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:corruption_errs", d->id);
+                        d->rd_corruption_errs = rrddim_add(node->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    }
+                    rrddim_set_by_pointer(node->st_error_stats, d->rd_corruption_errs, d->corruption_errs);
+                }
+                if(d->generation_errs){
+                    if(unlikely(!d->rd_generation_errs)){
+                        snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:generation_errs", d->id);
+                        d->rd_generation_errs = rrddim_add(node->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    }
+                    rrddim_set_by_pointer(node->st_error_stats, d->rd_generation_errs, d->generation_errs);
+                }
+            }
+
+            rrdset_done(node->st_error_stats);
         }
     }
 
