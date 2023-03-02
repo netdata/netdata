@@ -147,6 +147,7 @@ struct group_by_entry {
     STRING *id;
     STRING *name;
     STRING *units;
+    RRDR_DIMENSION_FLAGS od;
 };
 
 static int group_by_label_is_space(char c) {
@@ -316,7 +317,12 @@ static RRDR *data_query_group_by(RRDR *r) {
         qm->grouped_as.id = entries[pos].id;
         qm->grouped_as.name = entries[pos].name;
         qm->grouped_as.units = entries[pos].units;
-        qm->status |= RRDR_DIMENSION_GROUPED;
+
+        // copy the dimension flags decided by the query target
+        // we need this, because if a dimension is explicitly selected
+        // the query target adds to it the non-zero flag
+        qm->status |= RRDR_DIMENSION_GROUPED | r->od[c];
+        entries[pos].od |= RRDR_DIMENSION_GROUPED | r->od[c];
     }
 
     // check if we have multiple units
@@ -357,7 +363,7 @@ static RRDR *data_query_group_by(RRDR *r) {
 
     // initialize r2 (dimension options, names, and ids)
     for(size_t c2 = 0; c2 < r2->d ; c2++) {
-        r2->od[c2] = RRDR_DIMENSION_QUERIED;
+        r2->od[c2] = entries[c2].od;
         r2->di[c2] = entries[c2].id;
         r2->dn[c2] = entries[c2].name;
         r2->du[c2] = entries[c2].units;
@@ -379,19 +385,6 @@ static RRDR *data_query_group_by(RRDR *r) {
             ar2[c2] = 0.0;
             co2[c2] = RRDR_VALUE_EMPTY;
         }
-    }
-
-    // copy the dimension flags decided by the query target
-    // we need this, because if a dimension is explicitly selected
-    // the query target adds to it the non-zero flag
-    for(size_t c = 0; c < r->d ;c++) {
-        if (!rrdr_dimension_should_be_exposed(r->od[c], options))
-            continue;
-
-        QUERY_METRIC *qm = query_metric(qt, c);
-        size_t c2 = qm->grouped_as.slot;
-
-        r2->od[c2] |= r->od[c];
     }
 
     // do the group_by
