@@ -389,6 +389,13 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
                 // this is a hidden dimension
                 // we don't need to query it
                 status |= QUERY_STATUS_DIMENSION_HIDDEN;
+                options |= RRDR_DIMENSION_HIDDEN;
+
+                if (qt->request.options & RRDR_OPTION_PERCENTAGE) {
+                    // this is percentage calculation
+                    // so, we need this dimension to calculate the percentage
+                    needed = true;
+                }
             }
             else {
                 // this is a not hidden dimension
