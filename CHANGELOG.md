@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Update pi-hole-raspberry-pi.md [\#14644](https://github.com/netdata/netdata/pull/14644) ([tkatsoulas](https://github.com/tkatsoulas))
+- Update change-metrics-storage.md [\#14641](https://github.com/netdata/netdata/pull/14641) ([cakrit](https://github.com/cakrit))
+- Update change-metrics-storage.md [\#14640](https://github.com/netdata/netdata/pull/14640) ([cakrit](https://github.com/cakrit))
 - Fix broken links [\#14634](https://github.com/netdata/netdata/pull/14634) ([Ancairon](https://github.com/Ancairon))
 - Add link to native packages also on the list [\#14633](https://github.com/netdata/netdata/pull/14633) ([cakrit](https://github.com/cakrit))
 - Re-add link from install page to DEB/RPM package documentation. [\#14631](https://github.com/netdata/netdata/pull/14631) ([Ferroin](https://github.com/Ferroin))
@@ -14,6 +17,7 @@
 - Make the title metadata H1 in all markdown files [\#14625](https://github.com/netdata/netdata/pull/14625) ([Ancairon](https://github.com/Ancairon))
 - rename glossary [\#14622](https://github.com/netdata/netdata/pull/14622) ([cakrit](https://github.com/cakrit))
 - Reorg learn 0227 [\#14621](https://github.com/netdata/netdata/pull/14621) ([cakrit](https://github.com/cakrit))
+- Assorted improvements to OpenRC support. [\#14620](https://github.com/netdata/netdata/pull/14620) ([Ferroin](https://github.com/Ferroin))
 - bump go.d.plugin v0.51.2 [\#14618](https://github.com/netdata/netdata/pull/14618) ([ilyam8](https://github.com/ilyam8))
 - fix python version check to work for 3.10 and above [\#14616](https://github.com/netdata/netdata/pull/14616) ([andrewm4894](https://github.com/andrewm4894))
 - fix relative link to anonymous statistics [\#14614](https://github.com/netdata/netdata/pull/14614) ([cakrit](https://github.com/cakrit))
@@ -83,6 +87,7 @@
 - added section to explain impacts on member role [\#14527](https://github.com/netdata/netdata/pull/14527) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - fix setting go.d.plugin capabilities [\#14525](https://github.com/netdata/netdata/pull/14525) ([ilyam8](https://github.com/ilyam8))
 - Simplify parser README.md and add parser files to CMakeLists.txt [\#14523](https://github.com/netdata/netdata/pull/14523) ([stelfrag](https://github.com/stelfrag))
+- Link statically libnetfilter\_acct into our static builds [\#14516](https://github.com/netdata/netdata/pull/14516) ([tkatsoulas](https://github.com/tkatsoulas))
 - Fix broken links in markdown files [\#14513](https://github.com/netdata/netdata/pull/14513) ([Ancairon](https://github.com/Ancairon))
 - Make external plugins a category page in learn [\#14511](https://github.com/netdata/netdata/pull/14511) ([cakrit](https://github.com/cakrit))
 - Learn integrations category changes [\#14510](https://github.com/netdata/netdata/pull/14510) ([cakrit](https://github.com/cakrit))
@@ -352,8 +357,6 @@
 - MQTT 5 publish topic alias support [\#14067](https://github.com/netdata/netdata/pull/14067) ([underhood](https://github.com/underhood))
 - Refactor ML code and add support for multiple KMeans models. [\#14065](https://github.com/netdata/netdata/pull/14065) ([vkalintiris](https://github.com/vkalintiris))
 - Adds some introspection into the MQTT\_WSS [\#14039](https://github.com/netdata/netdata/pull/14039) ([underhood](https://github.com/underhood))
-- add clickhouse third party collector and install instructions [\#14021](https://github.com/netdata/netdata/pull/14021) ([andrewm4894](https://github.com/andrewm4894))
-- Switch nightlies to GitHub releases. [\#14020](https://github.com/netdata/netdata/pull/14020) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
@@ -389,7 +392,6 @@
 - remove retries from SSL [\#14026](https://github.com/netdata/netdata/pull/14026) ([ktsaou](https://github.com/ktsaou))
 - Fix documentation TLS streaming [\#14024](https://github.com/netdata/netdata/pull/14024) ([thiagoftsm](https://github.com/thiagoftsm))
 - streaming compression, query planner and replication fixes [\#14023](https://github.com/netdata/netdata/pull/14023) ([ktsaou](https://github.com/ktsaou))
-- Change relative links to absolute for learn components [\#14015](https://github.com/netdata/netdata/pull/14015) ([tkatsoulas](https://github.com/tkatsoulas))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
