@@ -136,7 +136,7 @@ static inline int _netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req, RRDH
         if (!*host)
             *host = rrdhost_find_by_guid(c_host_id);
         if (!*host) {
-            req->res.status = 400;
+            req->res.status = HTTP_RESP_BAD_REQUEST;
             req->res.reason = "Wrong host id";
             h2o_send_inline(req, H2O_STRLIT("Host id provided was not found!\n"));
             freez(c_host_id);
@@ -220,7 +220,7 @@ static inline int _netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req, RRDH
     memcpy(managed, body.base, body.len);
     body.base = managed;
 
-    req->res.status = 200;
+    req->res.status = HTTP_RESP_OK;
     req->res.reason = "OK";
     if (w.response.data->content_type == CT_APPLICATION_JSON)
         h2o_add_header(&req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL, CONTENT_JSON_UTF8);
@@ -278,7 +278,7 @@ static int hdl_netdata_conf(h2o_handler_t *self, h2o_req_t *req)
     void *managed = h2o_mem_alloc_shared(&req->pool, buf->len, NULL);
     memcpy(managed, buf->buffer, buf->len);
 
-    req->res.status = 200;
+    req->res.status = HTTP_RESP_OK;
     req->res.reason = "OK";
     h2o_add_header(&req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL, CONTENT_TEXT_UTF8);
     h2o_send_inline(req, managed, buf->len);
