@@ -1038,7 +1038,7 @@ if ENABLE_HTTPD
 noinst_LIBRARIES += libh2o.a
 
 # until h2o updates support for OpenSSL 3.0 we silence the warnings
-libh2o_a_CFLAGS = $(CFLAGS) -Wno-deprecated-declarations $(libh2o_a_INCLUDES)
+libh2o_a_CFLAGS = $(CFLAGS) -Wno-deprecated-declarations -Wno-unused-parameter -Wno-sign-compare -Wno-format -Wno-missing-field-initializers $(libh2o_a_INCLUDES)
 
 if LINUX
     libh2o_a_CFLAGS += -D_GNU_SOURCE
