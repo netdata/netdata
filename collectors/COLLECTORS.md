@@ -274,7 +274,7 @@ configure any of these collectors according to your setup and infrastructure.
 - [NSD](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/nsd/README.md): Monitor nameserver
   performance metrics using the `nsd-control`
   tool.
-- [NTP daemon](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/ntpd): Monitor the system variables
+- [NTP daemon](https://github.com/netdata/go.d.plugin/blob/master/modules/ntpd/README.md): Monitor the system variables
   of the local `ntpd` daemon (optionally including variables of the polled peers) using the NTP Control Message Protocol
   via a UDP socket.
 - [OpenSIPS](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/opensips/README.md): Collect
