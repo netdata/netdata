@@ -241,7 +241,7 @@ static int netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req)
 
     int ret = _netdata_uberhandler(self, req, &host);
 
-    char host_uuid_str[GUID_LEN + 1];
+    char host_uuid_str[UUID_STR_LEN];
     uuid_unparse_lower(host->host_uuid, host_uuid_str);
 
     if (!ret) {
