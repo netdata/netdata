@@ -222,10 +222,10 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                 CONFIG_BOOLEAN_AUTO);
 
         excluded_disks = simple_pattern_create(
-                config_get(CONFIG_SECTION_KERN_DEVSTAT, "disable by default disks matching", DEFAULT_EXCLUDED_DISKS)
-                , NULL
-                , SIMPLE_PATTERN_EXACT
-        );
+            config_get(CONFIG_SECTION_KERN_DEVSTAT, "disable by default disks matching", DEFAULT_EXCLUDED_DISKS),
+            NULL,
+            SIMPLE_PATTERN_EXACT,
+            true);
     }
 
     if (likely(do_system_io || do_io || do_ops || do_qops || do_util || do_iotime || do_await || do_avagsz || do_svctm)) {

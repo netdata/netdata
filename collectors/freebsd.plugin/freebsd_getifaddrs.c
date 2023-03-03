@@ -177,15 +177,15 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                         CONFIG_BOOLEAN_AUTO);
 
         excluded_interfaces = simple_pattern_create(
-                config_get(CONFIG_SECTION_GETIFADDRS, "disable by default interfaces matching", DEFAULT_EXCLUDED_INTERFACES)
-                , NULL
-                , SIMPLE_PATTERN_EXACT
-        );
+            config_get(CONFIG_SECTION_GETIFADDRS, "disable by default interfaces matching", DEFAULT_EXCLUDED_INTERFACES),
+            NULL,
+            SIMPLE_PATTERN_EXACT,
+            true);
         physical_interfaces = simple_pattern_create(
-                config_get(CONFIG_SECTION_GETIFADDRS, "set physical interfaces for system.net", DEFAULT_PHYSICAL_INTERFACES)
-                , NULL
-                , SIMPLE_PATTERN_EXACT
-        );
+            config_get(CONFIG_SECTION_GETIFADDRS, "set physical interfaces for system.net", DEFAULT_PHYSICAL_INTERFACES),
+            NULL,
+            SIMPLE_PATTERN_EXACT,
+            true);
     }
 
     if (likely(do_bandwidth_ipv4 || do_bandwidth_ipv6 || do_bandwidth || do_packets || do_errors || do_bandwidth_net || do_packets_net ||
