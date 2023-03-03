@@ -6445,6 +6445,18 @@ netdataDashboard.context = {
         info: 'Logical disk usage for BTRFS system. System chunks store information about the allocation of other chunks. The disk space reported here is the usable allocation (i.e. after any striping or replication). The values reported here should be relatively small compared to Data and Metadata, and will scale with the volume size and overall space usage.'
     },
 
+    'btrfs.commits': {
+        info: 'Tracks filesystem wide commits. Commits mark fully consistent synchronization points for the filesystem, and are triggered automatically when certain events happen or when enough time has elapsed since the last commit.'
+    },
+
+    'btrfs.commit_timings': {
+        info: 'Tracks timing information for commits.'
+    },
+
+    'btrfs.errors': {
+        info: 'Tracks per-device error counts. Dimension names are prefixed with the device ID. Five types of errors are tracked: read errors, write errors, flush errors, corruption errors, and generation errors. Read, write, and flush errors are errors reported by the underlying block device when trying to perform the associated operations on behalf of BTRFS. Corruption errors count checksum mismatches, which usually are a result of either at-rest data corruption or hardware problems. Generation errors count generational mismatches within the internal data structures of the volume, and are also usually indicative of at-rest data corruption or hardware problems. Note that errors reported here may not trigger an associated IO error in userspace, as BTRFS has relatively robust error recovery that allows it to return correct data in most multi-device setups.'
+    },
+
     // ------------------------------------------------------------------------
     // RabbitMQ
 
