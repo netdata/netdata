@@ -1099,41 +1099,23 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
             for(BTRFS_DEVICE *d = node->devices ; d ; d = d->next) {
                 char rd_id[RRD_ID_LENGTH_MAX + 1];
-                if(d->write_errs){
-                    if(unlikely(!d->rd_write_errs)){
-                        snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:write_errs", d->id);
-                        d->rd_write_errs = rrddim_add(node->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                    }
-                    rrddim_set_by_pointer(node->st_error_stats, d->rd_write_errs, d->write_errs);
+                if(unlikely(!d->rd_write_errs)){
+                    snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:write_errs", d->id);
+                    d->rd_write_errs = rrddim_add(node->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:read_errs", d->id);
+                    d->rd_read_errs = rrddim_add(node->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:flush_errs", d->id);
+                    d->rd_flush_errs = rrddim_add(node->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:corruption_errs", d->id);
+                    d->rd_corruption_errs = rrddim_add(node->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:generation_errs", d->id);
+                    d->rd_generation_errs = rrddim_add(node->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
-                if(d->read_errs){
-                    if(unlikely(!d->rd_read_errs)){
-                        snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:read_errs", d->id);
-                        d->rd_read_errs = rrddim_add(node->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                    }
-                    rrddim_set_by_pointer(node->st_error_stats, d->rd_read_errs, d->read_errs);
-                }
-                if(d->flush_errs){
-                    if(unlikely(!d->rd_flush_errs)){
-                        snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:flush_errs", d->id);
-                        d->rd_flush_errs = rrddim_add(node->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                    }
-                    rrddim_set_by_pointer(node->st_error_stats, d->rd_flush_errs, d->flush_errs);
-                }
-                if(d->corruption_errs){
-                    if(unlikely(!d->rd_corruption_errs)){
-                        snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:corruption_errs", d->id);
-                        d->rd_corruption_errs = rrddim_add(node->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                    }
-                    rrddim_set_by_pointer(node->st_error_stats, d->rd_corruption_errs, d->corruption_errs);
-                }
-                if(d->generation_errs){
-                    if(unlikely(!d->rd_generation_errs)){
-                        snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:generation_errs", d->id);
-                        d->rd_generation_errs = rrddim_add(node->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                    }
-                    rrddim_set_by_pointer(node->st_error_stats, d->rd_generation_errs, d->generation_errs);
-                }
+                rrddim_set_by_pointer(node->st_error_stats, d->rd_write_errs, d->write_errs);
+                rrddim_set_by_pointer(node->st_error_stats, d->rd_read_errs, d->read_errs);
+                rrddim_set_by_pointer(node->st_error_stats, d->rd_flush_errs, d->flush_errs);
+                rrddim_set_by_pointer(node->st_error_stats, d->rd_corruption_errs, d->corruption_errs);
+                rrddim_set_by_pointer(node->st_error_stats, d->rd_generation_errs, d->generation_errs);
             }
 
             rrdset_done(node->st_error_stats);
