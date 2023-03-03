@@ -118,9 +118,11 @@ jobs:
         run: |
           sed -i 's/^RELEASE_CHANNEL="nightly" *#/RELEASE_CHANNEL="stable" #/' netdata-installer.sh packaging/makeself/install-or-update.sh
       - name: Get Cache Key
+        if: github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'run-ci/no-cache')
         id: cache-key
-        run: .github/scripts/get-static-cache-key.sh ${{ matrix.arch }}
+        run: .github/scripts/get-static-cache-key.sh ${{ matrix.arch }} "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/no-cache') }}"
       - name: Cache
+        if: github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'run-ci/no-cache')
         id: cache
         uses: actions/cache@v3
         with:
@@ -135,7 +137,7 @@ jobs:
         uses: nick-fields/retry@v2
         with:
           timeout_minutes: 180
-          retries: 3
+          max_attempts: 3
           command: .github/scripts/build-static.sh ${{ matrix.arch }}
       - name: Store
         id: store
