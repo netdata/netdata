@@ -4,7 +4,7 @@
 
 // DBENGINE2: Helper
 
-static void update_metric_retention_and_granularity_by_uuid(
+void update_metric_retention_and_granularity_by_uuid(
         struct rrdengine_instance *ctx, uuid_t *uuid,
         time_t first_time_s, time_t last_time_s,
         time_t update_every_s, time_t now_s)
@@ -904,7 +904,11 @@ static inline time_t get_metric_latest_update_every(struct journal_page_header *
     return (time_t)metric_page[entries - 1].update_every_s;
 }
 
-void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile) {
+void journalfile_v2_populate_retention_to_mrg(
+    struct rrdengine_instance *ctx,
+    struct rrdengine_journalfile *journalfile,
+    struct local_judy_mrg *local_mrg)
+{
     usec_t started_ut = now_monotonic_usec();
 
     size_t data_size = 0;
@@ -918,11 +922,37 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
     struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
     time_t header_start_time_s  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
     time_t now_s = max_acceptable_collected_time();
+    if (likely(local_mrg)) {
+        local_mrg->data_size += data_size;
+        local_mrg->entries += entries;
+    }
     for (size_t i=0; i < entries; i++) {
         time_t start_time_s = header_start_time_s + metric->delta_start_s;
         time_t end_time_s = header_start_time_s + metric->delta_end_s;
         time_t update_every_s = get_metric_latest_update_every((struct journal_page_header *) (data_start + metric->page_offset));
-        update_metric_retention_and_granularity_by_uuid(
+
+        if (likely(local_mrg)) {
+            struct local_metric_retention *metric_entry;
+            Pvoid_t *PValue = JudyHSIns(&local_mrg->JudyHS, &metric->uuid, sizeof(uuid_t), PJE0);
+            if (likely(PValue && *PValue)) {
+                metric_entry = *PValue;
+                metric_entry->first_time_s = MIN(metric_entry->first_time_s, start_time_s);
+                metric_entry->last_time_s = MAX(metric_entry->last_time_s, end_time_s);
+            }
+            else {
+                local_mrg->count++;
+                *PValue = metric_entry = aral_mallocz(local_mrg->metric_aral);
+                uuid_copy(metric_entry->uuid, metric->uuid);
+                metric_entry->first_time_s = start_time_s;
+                metric_entry->last_time_s = end_time_s;
+
+                PValue = JudyLIns(&local_mrg->JudyL, local_mrg->count, PJE0);
+                if (likely(PValue && !*PValue))
+                    *PValue = metric_entry;
+            }
+            metric_entry->update_every_s = update_every_s;
+        } else
+            update_metric_retention_and_granularity_by_uuid(
                 ctx, &metric->uuid, start_time_s, end_time_s, update_every_s, now_s);
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -936,12 +966,15 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
     journalfile_v2_data_release(journalfile);
     usec_t ended_ut = now_monotonic_usec();
 
-    info("DBENGINE: journal v2 of tier %d, datafile %u populated, size: %0.2f MiB, metrics: %0.2f k, %0.2f ms"
-        , ctx->config.tier, journalfile->datafile->fileno
-        , (double)data_size / 1024 / 1024
-        , (double)entries / 1000
-        , ((double)(ended_ut - started_ut) / USEC_PER_MS)
-        );
+    if (unlikely(!local_mrg))
+        info("DBENGINE: journal v2 of tier %d, datafile %u populated, size: %0.2f MiB, metrics: %0.2f k, %0.2f ms, rate %0.2f / sec"
+            , ctx->config.tier, journalfile->datafile->fileno
+            , (double)data_size / 1024 / 1024
+            , (double)entries / 1000
+            , ((double)(ended_ut - started_ut) / USEC_PER_MS)
+            ,  (double)entries / ((double)(ended_ut - started_ut) / USEC_PER_SEC)
+            );
+
 }
 
 int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)

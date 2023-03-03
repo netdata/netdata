@@ -1080,13 +1080,13 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
             datafile = datafile->prev;
 
         if(datafile->journalfile->v2.flags & JOURNALFILE_FLAG_IS_AVAILABLE) {
-            journalfile_v2_populate_retention_to_mrg(ctx, datafile->journalfile);
+            journalfile_v2_populate_retention_to_mrg(ctx, datafile->journalfile, NULL);
             datafile->populate_mrg.populated = true;
         }
 
         datafile = ctx->datafiles.first;
         if(datafile->journalfile->v2.flags & JOURNALFILE_FLAG_IS_AVAILABLE) {
-            journalfile_v2_populate_retention_to_mrg(ctx, datafile->journalfile);
+            journalfile_v2_populate_retention_to_mrg(ctx, datafile->journalfile, NULL);
             datafile->populate_mrg.populated = true;
         }
     }

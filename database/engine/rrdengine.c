@@ -1275,6 +1275,20 @@ static void after_populate_mrg(struct rrdengine_instance *ctx __maybe_unused, vo
 static void *populate_mrg_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     worker_is_busy(UV_EVENT_DBENGINE_POPULATE_MRG);
 
+    struct local_judy_mrg local_mrg = {
+        .JudyHS =(Pvoid_t) NULL,
+        .JudyL =(Pvoid_t) NULL,
+        .count = 0,
+        .data_size = 0,
+        .entries = 0,
+        .metric_aral = aral_create("mrg_load",
+                        sizeof(struct local_metric_retention),
+                        1000,
+                        20000 * sizeof(struct local_metric_retention), NULL,
+                        NULL, NULL,
+                        NULL, true)
+    };
+    size_t datafile_count = 0;
     do {
         struct rrdengine_datafile *datafile = NULL;
 
@@ -1297,11 +1311,46 @@ static void *populate_mrg_tp_worker(struct rrdengine_instance *ctx __maybe_unuse
         if(!datafile)
             break;
 
-        journalfile_v2_populate_retention_to_mrg(ctx, datafile->journalfile);
+        journalfile_v2_populate_retention_to_mrg(ctx, datafile->journalfile, &local_mrg);
         datafile->populate_mrg.populated = true;
+        datafile_count++;
         netdata_spinlock_unlock(&datafile->populate_mrg.spinlock);
 
     } while(1);
+
+    // Populate MRG
+    if (likely(local_mrg.count)) {
+        Pvoid_t *PValue;
+        bool first_then_next = false;
+        time_t now_s = max_acceptable_collected_time();
+        Word_t Index = 0;
+
+        usec_t started_ut = now_monotonic_usec();
+        while ((PValue = JudyLFirstThenNext(local_mrg.JudyL, &Index, &first_then_next))) {
+            struct local_metric_retention *metric_entry = *PValue;
+            update_metric_retention_and_granularity_by_uuid(
+                ctx,
+                &metric_entry->uuid,
+                metric_entry->first_time_s,
+                metric_entry->last_time_s,
+                metric_entry->update_every_s,
+                now_s);
+            aral_freez(local_mrg.metric_aral, metric_entry);
+        }
+        usec_t ended_ut = now_monotonic_usec();
+        info("DBENGINE: journal v2 of tier %d, datafiles %zu populated, size: %0.2f MiB, metrics: %0.2f k, unique: %0.2f k,  %0.2f ms, rate %0.2f / sec"
+             , ctx->config.tier, datafile_count
+             , (double)local_mrg.data_size / 1024 / 1024
+             , (double)local_mrg.entries / 1000
+             , (double)local_mrg.count / 1000
+             , ((double)(ended_ut - started_ut) / USEC_PER_MS)
+                 ,  (double)local_mrg.count / ((double)(ended_ut - started_ut) / USEC_PER_SEC)
+        );
+        JudyHSFreeArray(&local_mrg.JudyHS, PJE0);
+        JudyLFreeArray(&local_mrg.JudyL, PJE0);
+    }
+    aral_destroy(local_mrg.metric_aral);
+
 
     completion_mark_complete(completion);
 

@@ -128,6 +128,22 @@ struct journal_v2_header {
     void *data;                         // Used when building the index
 };
 
+struct local_metric_retention {
+    uuid_t uuid;
+    time_t first_time_s;
+    time_t last_time_s;
+    uint32_t update_every_s;
+};
+
+struct local_judy_mrg {
+    Pvoid_t JudyHS;
+    Pvoid_t JudyL;
+    size_t count;
+    size_t data_size;
+    size_t entries;
+    ARAL *metric_aral;
+};
+
 #define JOURNAL_V2_HEADER_PADDING_SZ (RRDENG_BLOCK_SIZE - (sizeof(struct journal_v2_header)))
 
 struct wal;
@@ -142,7 +158,16 @@ int journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct
 int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
                      struct rrdengine_datafile *datafile);
-void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile);
+void journalfile_v2_populate_retention_to_mrg(
+    struct rrdengine_instance *ctx,
+    struct rrdengine_journalfile *journalfile,
+    struct local_judy_mrg *local_mrg);
+
+void update_metric_retention_and_granularity_by_uuid(
+    struct rrdengine_instance *ctx, uuid_t *uuid,
+    time_t first_time_s, time_t last_time_s,
+    time_t update_every_s, time_t now_s);
+
 
 void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno __maybe_unused, uint8_t type __maybe_unused,
                                         Pvoid_t JudyL_metrics, Pvoid_t JudyL_extents_pos,
