@@ -231,7 +231,7 @@ On this bar you have access to immediate actions over the chart, the available a
 - Add chart to dashboard: This allows you to add the chart to an existing custom dashboard or directly create a new one
   that includes the chart.
 
-![image](https://user-images.githubusercontent.com/70198089/222689501-4116f5fe-e447-4359-83b5-62dadb33f4ef.png)
+<img src="https://user-images.githubusercontent.com/70198089/222689501-4116f5fe-e447-4359-83b5-62dadb33f4ef.png" width="40%" height="40%" />
 
 
 ## Exploration action bar
