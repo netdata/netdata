@@ -118,11 +118,11 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 - [**Netdata Functions** or **Functions**](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md): Routines exposed by a collector on the Netdata Agent that can  bring additional information to support troubleshooting or trigger some action to happen on the node itself.
 
-<!-- No link for this keyword - [**Netdata Logs**](https://github.com/netdata/netdata/blob/master/docs/tasks/miscellaneous/check-netdata-logs.md): The three log files - `error.log`, `access.log` and `debug.log` - used by Netdata -->
+<!-- No link for this keyword - **Netdata Logs** https://github.com/netdata/netdata/blob/master/docs/tasks/miscellaneous/check-netdata-logs.md: The three log files - `error.log`, `access.log` and `debug.log` - used by Netdata -->
 
 <!-- Here we need to explain Agent notifications and Cloud notifications, not just "notifications"
 
-- [**Notifications**](https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/notifications.md): Netdata can send centralized alert notifications to your team whenever a node enters a warning, critical, or unreachable state. By enabling notifications, you ensure no alert, on any node in your infrastructure, goes unnoticed by you or your team. -->
+- **Notifications** https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/notifications.md: Netdata can send centralized alert notifications to your team whenever a node enters a warning, critical, or unreachable state. By enabling notifications, you ensure no alert, on any node in your infrastructure, goes unnoticed by you or your team. -->
 
 ## O
 
@@ -152,7 +152,7 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 - [**Single Node Dashboard**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md#overview-and-single-node-view): A dashboard pre-configured with every installation of the Netdata agent, with thousand of metrics and hundreds of interactive charts that requires no set up.
 
-<!-- No link for this file in current structure. - [**Snapshots**](https://github.com/netdata/netdata/blob/master/docs/tasks/miscellaneous/snapshot-data.md): An image of your dashboard at any given time, whicn can be imiported into any other node running Netdata or used to genereated a PDF file for your records. -->
+<!-- No link for this file in current structure. - **Snapshots** https://github.com/netdata/netdata/blob/master/docs/tasks/miscellaneous/snapshot-data.md: An image of your dashboard at any given time, whicn can be imiported into any other node running Netdata or used to genereated a PDF file for your records. -->
 
 - [**Space**](https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md): A high-level container and virtual collaboration area where you can organize team members, access levels,and the nodes you want to monitor.
 
