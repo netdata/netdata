@@ -1519,8 +1519,9 @@ void web_client_process_request(struct web_client *w) {
 
                 debug(D_WEB_CLIENT_ACCESS, "%llu: Received request is too big (%zu bytes).", w->id, w->response.data->len);
 
+                size_t len = w->response.data->len;
                 buffer_flush(w->response.data);
-                buffer_sprintf(w->response.data, "Received request is too big  (%zu bytes).\r\n", w->response.data->len);
+                buffer_sprintf(w->response.data, "Received request is too big  (received %zu bytes, max is %zu bytes).\r\n", len, (size_t)NETDATA_WEB_REQUEST_MAX_SIZE);
                 w->response.code = HTTP_RESP_BAD_REQUEST;
             }
             else {
