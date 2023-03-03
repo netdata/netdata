@@ -352,7 +352,7 @@ ENDIF()
 # Detect ml dependencies
 file(STRINGS "${CMAKE_SOURCE_DIR}/config.h" DEFINE_ENABLE_ML REGEX "^#define ENABLE_ML 1$")
 IF(DEFINE_ENABLE_ML MATCHES ".+" AND
-   EXISTS "${CMAKE_SOURCE_DIR}/ml/dlib/dlib/all/source.cpp" AND
+   EXISTS "${CMAKE_SOURCE_DIR}/ml/dlib/dlib/all/source.cpp")
     set(ENABLE_ML True)
     list(APPEND NETDATA_COMMON_CFLAGS "-DDLIB_NO_GUI_SUPPORT")
     list(APPEND NETDATA_COMMON_INCLUDE_DIRS "ml/dlib")
@@ -717,12 +717,21 @@ set(STATSD_PLUGIN_FILES
         )
 
 set(RRD_PLUGIN_FILES
+        database/contexts/api_v1.c
+        database/contexts/api_v2.c
+        database/contexts/context.c
+        database/contexts/instance.c
+        database/contexts/internal.h
+        database/contexts/metric.c
+        database/contexts/query_scope.c
+        database/contexts/query_target.c
+        database/contexts/rrdcontext.c
+        database/contexts/rrdcontext.h
+        database/contexts/worker.c
         database/rrdcalc.c
         database/rrdcalc.h
         database/rrdcalctemplate.c
         database/rrdcalctemplate.h
-        database/rrdcontext.c
-        database/rrdcontext.h
         database/rrddim.c
         database/rrddimvar.c
         database/rrddimvar.h
@@ -746,7 +755,7 @@ set(RRD_PLUGIN_FILES
         database/sqlite/sqlite_metadata.h
         database/sqlite/sqlite_functions.c
         database/sqlite/sqlite_functions.h
-		database/sqlite/sqlite_context.c
+        database/sqlite/sqlite_context.c
         database/sqlite/sqlite_context.h
         database/sqlite/sqlite_db_migration.c
         database/sqlite/sqlite_db_migration.h
