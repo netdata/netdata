@@ -1126,13 +1126,6 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                     }
                     rrddim_set_by_pointer(node->st_error_stats, d->rd_flush_errs, d->flush_errs);
                 }
-                if(d->flush_errs){
-                    if(unlikely(!d->rd_flush_errs)){
-                        snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:flush_errs", d->id);
-                        d->rd_flush_errs = rrddim_add(node->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                    }
-                    rrddim_set_by_pointer(node->st_error_stats, d->rd_flush_errs, d->flush_errs);
-                }
                 if(d->corruption_errs){
                     if(unlikely(!d->rd_corruption_errs)){
                         snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:corruption_errs", d->id);
