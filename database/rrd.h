@@ -1358,12 +1358,12 @@ void rrdset_delete_files(RRDSET *st);
 void rrdset_save(RRDSET *st);
 void rrdset_free(RRDSET *st);
 
+void rrddim_free(RRDSET *st, RRDDIM *rd);
+
 #ifdef NETDATA_RRD_INTERNALS
 
 char *rrdhost_cache_dir_for_rrdset_alloc(RRDHOST *host, const char *id);
 const char *rrdset_cache_dir(RRDSET *st);
-
-void rrddim_free(RRDSET *st, RRDDIM *rd);
 
 void rrdset_reset(RRDSET *st);
 void rrdset_delete_obsolete_dimensions(RRDSET *st);
