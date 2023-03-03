@@ -272,10 +272,8 @@ static inline int find_btrfs_disks(BTRFS_NODE *node, const char *path) {
         // search for it
 
         for(d = node->disks ; d ; d = d->next) {
-            if(hash == d->hash && !strcmp(de->d_name, d->name)){
-                // collector_info("BTRFS: existing disk name '%s'", d->name);
+            if(hash == d->hash && !strcmp(de->d_name, d->name))
                 break;
-            }
         }
 
         // --------------------------------------------------------------------
@@ -348,8 +346,6 @@ static inline int find_btrfs_disks(BTRFS_NODE *node, const char *path) {
 static inline int find_btrfs_devices(BTRFS_NODE *node, const char *path) {
     char filename[FILENAME_MAX + 1];
 
-    // node->all_disks_total = 0;
-
     BTRFS_DEVICE *d;
     for(d = node->devices ; d ; d = d->next)
         d->exists = 0;
@@ -373,8 +369,6 @@ static inline int find_btrfs_devices(BTRFS_NODE *node, const char *path) {
             // collector_info("BTRFS: ignoring '%s'", de->d_name);
             continue;
         }
-
-        // uint32_t hash = simple_hash(de->d_name);
 
         collector_info("BTRFS: device found '%s'", de->d_name);
 
@@ -500,7 +494,7 @@ static inline int find_all_btrfs_pools(const char *path) {
             continue;
         }
 
-        collector_info("BTRFS: adding '%s'", de->d_name);
+        // collector_info("BTRFS: adding '%s'", de->d_name);
 
         // not found, create it
         node = callocz(sizeof(BTRFS_NODE), 1);
@@ -631,7 +625,7 @@ static inline int find_all_btrfs_pools(const char *path) {
         // --------------------------------------------------------------------
         // link it
 
-        collector_info("BTRFS: linking '%s'", node->id);
+        // collector_info("BTRFS: linking '%s'", node->id);
         node->next = nodes;
         nodes = node;
     }
