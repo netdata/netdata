@@ -1004,7 +1004,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                     web_client_split_path_query(w, encoded_url);
 
                     if (w->url_search_path && w->separator) {
-                        *w->url_search_path = 0x00;
+                        *w->url_search_path = '\0';
                     }
 
                     if(!url_decode_r(w->decoded_url, encoded_url, NETDATA_WEB_REQUEST_URL_SIZE + 1))
@@ -1919,7 +1919,7 @@ ssize_t web_client_receive(struct web_client *w)
     ssize_t left = (ssize_t)(w->response.data->size - w->response.data->len);
 
     // do we have any space for more data?
-    buffer_need_bytes(w->response.data, NETDATA_WEB_REQUEST_RECEIVE_SIZE);
+    buffer_need_bytes(w->response.data, NETDATA_WEB_REQUEST_INITIAL_SIZE);
 
 #ifdef ENABLE_HTTPS
     if ( (!web_client_check_unix(w)) && (netdata_ssl_srv_ctx) ) {

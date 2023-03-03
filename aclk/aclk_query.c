@@ -73,8 +73,8 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
 
     struct web_client *w = (struct web_client *)callocz(1, sizeof(struct web_client));
     w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, &netdata_buffers_statistics.buffers_aclk);
-    w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE, &netdata_buffers_statistics.buffers_aclk);
-    w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE, &netdata_buffers_statistics.buffers_aclk);
+    w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE, &netdata_buffers_statistics.buffers_aclk);
+    w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE, &netdata_buffers_statistics.buffers_aclk);
     strcpy(w->origin, "*"); // Simulate web_client_create_on_fd()
     w->cookie1[0] = 0;      // Simulate web_client_create_on_fd()
     w->cookie2[0] = 0;      // Simulate web_client_create_on_fd()
