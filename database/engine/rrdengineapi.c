@@ -1070,6 +1070,8 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
     if(cpus > MRG_PARTITIONS)
         cpus = MRG_PARTITIONS;
 
+    cpus = 2;
+
     info("DBENGINE: populating retention to MRG from %zu journal files of tier %d, using %zu threads...", datafiles, ctx->config.tier, cpus);
 
     if(datafiles > 2) {
