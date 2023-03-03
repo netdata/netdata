@@ -43,11 +43,19 @@ static int create_listener(const char *ip, int port)
 {
     static uv_tcp_t listener;
     struct sockaddr_in addr;
-    int r;
+    struct sockaddr_in6 addr6;
+    int r, ip6 = 0;
 
     uv_tcp_init(ctx.loop, &listener);
-    uv_ip4_addr(ip, port, &addr);
-    if ((r = uv_tcp_bind(&listener, (struct sockaddr *)&addr, 0)) != 0) {
+    if (uv_ip4_addr(ip, port, &addr)) {
+        ip6 = 1;
+        if (uv_ip6_addr(ip, port, &addr6)) {
+            error_report("Could not parse the ip address");
+            goto Error;
+        }
+    }
+
+    if ((r = uv_tcp_bind(&listener, (ip6 ? (struct sockaddr *)&addr6 : (struct sockaddr *)&addr), 0)) != 0) {
         fprintf(stderr, "uv_tcp_bind:%s\n", uv_strerror(r));
         goto Error;
     }
