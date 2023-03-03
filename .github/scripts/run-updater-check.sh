@@ -2,6 +2,7 @@
 
 echo ">>> Installing CI support packages..."
 /netdata/.github/scripts/ci-support-pkgs.sh
+mkdir -p /etc/cron.daily # Needed to make auto-update checking work correctly on some platforms.
 echo ">>> Installing Netdata..."
 /netdata/packaging/installer/kickstart.sh --dont-wait --build-only --disable-telemetry || exit 1
 echo "::group::>>> Pre-Update Environment File Contents"
