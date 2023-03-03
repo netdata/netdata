@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Fix links [\#14651](https://github.com/netdata/netdata/pull/14651) ([cakrit](https://github.com/cakrit))
+- Fix doc links [\#14650](https://github.com/netdata/netdata/pull/14650) ([cakrit](https://github.com/cakrit))
+- Update guidelines.md [\#14649](https://github.com/netdata/netdata/pull/14649) ([cakrit](https://github.com/cakrit))
+- Update README.md [\#14647](https://github.com/netdata/netdata/pull/14647) ([cakrit](https://github.com/cakrit))
 - Update pi-hole-raspberry-pi.md [\#14644](https://github.com/netdata/netdata/pull/14644) ([tkatsoulas](https://github.com/tkatsoulas))
 - Update change-metrics-storage.md [\#14641](https://github.com/netdata/netdata/pull/14641) ([cakrit](https://github.com/cakrit))
 - Update change-metrics-storage.md [\#14640](https://github.com/netdata/netdata/pull/14640) ([cakrit](https://github.com/cakrit))
@@ -36,6 +40,7 @@
 - Update interact-new-charts.md [\#14596](https://github.com/netdata/netdata/pull/14596) ([cakrit](https://github.com/cakrit))
 - Fix context unittest coredump [\#14595](https://github.com/netdata/netdata/pull/14595) ([stelfrag](https://github.com/stelfrag))
 - Delete interact-dashboard-charts [\#14594](https://github.com/netdata/netdata/pull/14594) ([cakrit](https://github.com/cakrit))
+- /api/v2/contexts [\#14592](https://github.com/netdata/netdata/pull/14592) ([ktsaou](https://github.com/ktsaou))
 - Use vector allocation whenever is possible \(eBPF\) [\#14591](https://github.com/netdata/netdata/pull/14591) ([thiagoftsm](https://github.com/thiagoftsm))
 - Change link text to collectors.md [\#14590](https://github.com/netdata/netdata/pull/14590) ([cakrit](https://github.com/cakrit))
 - Add an option to the kickstart script to override distro detection. [\#14589](https://github.com/netdata/netdata/pull/14589) ([Ferroin](https://github.com/Ferroin))
@@ -389,9 +394,6 @@
 - improve performance of worker utilization statistics [\#14034](https://github.com/netdata/netdata/pull/14034) ([ktsaou](https://github.com/ktsaou))
 - use 2 levels of judy arrays to speed up replication on very busy parents [\#14031](https://github.com/netdata/netdata/pull/14031) ([ktsaou](https://github.com/ktsaou))
 - bump go.d.plugin v0.44.0 [\#14030](https://github.com/netdata/netdata/pull/14030) ([ilyam8](https://github.com/ilyam8))
-- remove retries from SSL [\#14026](https://github.com/netdata/netdata/pull/14026) ([ktsaou](https://github.com/ktsaou))
-- Fix documentation TLS streaming [\#14024](https://github.com/netdata/netdata/pull/14024) ([thiagoftsm](https://github.com/thiagoftsm))
-- streaming compression, query planner and replication fixes [\#14023](https://github.com/netdata/netdata/pull/14023) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
