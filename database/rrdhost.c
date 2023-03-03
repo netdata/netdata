@@ -366,7 +366,6 @@ int is_legacy = 1;
     rrdfamily_index_init(host);
     rrdcalctemplate_index_init(host);
     rrdcalc_rrdhost_index_init(host);
-    metaqueue_host_update_info(host);
 
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
@@ -521,7 +520,7 @@ int is_legacy = 1;
     );
 
     if(!archived)
-        rrdhost_flag_set(host,RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
+        metaqueue_host_update_info(host);
 
     rrdhost_load_rrdcontext_data(host);
     if (!archived) {

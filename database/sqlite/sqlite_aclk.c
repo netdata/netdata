@@ -10,6 +10,16 @@ void sanity_check(void) {
     BUILD_BUG_ON(WORKER_UTILIZATION_MAX_JOB_TYPES < ACLK_MAX_ENUMERATIONS_DEFINED);
 }
 
+void schedule_node_info_update(RRDHOST *host)
+{
+    if (unlikely(!host))
+        return;
+
+    struct aclk_database_worker_config *wc = host->dbsync_worker;
+    if (likely(wc))
+        wc->node_info_send = 1;
+}
+
 static int sql_check_aclk_table(void *data, int argc, char **argv, char **column)
 {
     struct aclk_database_worker_config *wc = data;

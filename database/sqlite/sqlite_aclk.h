@@ -168,5 +168,6 @@ void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id);
 void sql_aclk_sync_init(void);
 int claimed();
 void aclk_sync_exit_all();
+void schedule_node_info_update(RRDHOST *host);
 struct aclk_database_worker_config *find_inactive_wc_by_node_id(char *node_id);
 #endif //NETDATA_SQLITE_ACLK_H
