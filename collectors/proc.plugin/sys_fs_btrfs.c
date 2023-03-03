@@ -1013,7 +1013,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                         , RRDSET_TYPE_LINE
                 );
 
-                node->rd_commits = rrddim_add(node->st_commits, "commits", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                node->rd_commits = rrddim_add(node->st_commits, "commits", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 add_labels_to_btrfs(node, node->st_commits);
             }
@@ -1049,7 +1049,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
                 node->rd_commit_timings_last = rrddim_add(node->st_commit_timings, "last commit", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 node->rd_commit_timings_max = rrddim_add(node->st_commit_timings, "max commit", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                node->rd_commit_timings_total = rrddim_add(node->st_commit_timings, "total commit", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                node->rd_commit_timings_total = rrddim_add(node->st_commit_timings, "current commit", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 add_labels_to_btrfs(node, node->st_commit_timings);
             }
