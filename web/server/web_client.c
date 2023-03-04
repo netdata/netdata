@@ -919,7 +919,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
         is_it_valid = url_is_request_complete(s, &s[last_pos], w->header_parse_last_size);
         if(!is_it_valid) {
-            if(w->header_parse_tries > 10) {
+            if(w->header_parse_tries > HTTP_REQ_MAX_HEADER_FETCH_TRIES) {
                 info("Disabling slow client after %zu attempts to read the request (%zu bytes received)", w->header_parse_tries, buffer_strlen(w->response.data));
                 w->header_parse_tries = 0;
                 w->header_parse_last_size = 0;
@@ -1551,17 +1551,17 @@ void web_client_process_request(struct web_client *w) {
         }
 #endif
         case HTTP_VALIDATION_MALFORMED_URL:
-            debug(D_WEB_CLIENT_ACCESS, "%llu: URL parsing failed (malformed URL). Cannot understand '%s'.", w->id, w->response.data->buffer);
+            debug(D_WEB_CLIENT_ACCESS, "%llu: Malformed URL '%s'.", w->id, w->response.data->buffer);
 
             buffer_flush(w->response.data);
-            buffer_strcat(w->response.data, "URL not valid. I don't understand you...\r\n");
+            buffer_strcat(w->response.data, "Malformed URL...\r\n");
             w->response.code = HTTP_RESP_BAD_REQUEST;
             break;
         case HTTP_VALIDATION_NOT_SUPPORTED:
-            debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot understand '%s'.", w->id, w->response.data->buffer);
+            debug(D_WEB_CLIENT_ACCESS, "%llu: Not supported request '%s'.", w->id, w->response.data->buffer);
 
             buffer_flush(w->response.data);
-            buffer_strcat(w->response.data, "I don't understand you...\r\n");
+            buffer_strcat(w->response.data, "Not supported request...\r\n");
             w->response.code = HTTP_RESP_BAD_REQUEST;
             break;
     }
