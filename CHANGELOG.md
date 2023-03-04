@@ -6,11 +6,14 @@
 
 **Merged pull requests:**
 
+- fix simple\_pattern\_create on freebsd [\#14656](https://github.com/netdata/netdata/pull/14656) ([ilyam8](https://github.com/ilyam8))
+- Fix broken links in glossary.md [\#14653](https://github.com/netdata/netdata/pull/14653) ([Ancairon](https://github.com/Ancairon))
 - Fix links [\#14651](https://github.com/netdata/netdata/pull/14651) ([cakrit](https://github.com/cakrit))
 - Fix doc links [\#14650](https://github.com/netdata/netdata/pull/14650) ([cakrit](https://github.com/cakrit))
 - Update guidelines.md [\#14649](https://github.com/netdata/netdata/pull/14649) ([cakrit](https://github.com/cakrit))
 - Update README.md [\#14647](https://github.com/netdata/netdata/pull/14647) ([cakrit](https://github.com/cakrit))
 - Update pi-hole-raspberry-pi.md [\#14644](https://github.com/netdata/netdata/pull/14644) ([tkatsoulas](https://github.com/tkatsoulas))
+- Fix handling of missing release codename on DEB systems. [\#14642](https://github.com/netdata/netdata/pull/14642) ([Ferroin](https://github.com/Ferroin))
 - Update change-metrics-storage.md [\#14641](https://github.com/netdata/netdata/pull/14641) ([cakrit](https://github.com/cakrit))
 - Update change-metrics-storage.md [\#14640](https://github.com/netdata/netdata/pull/14640) ([cakrit](https://github.com/cakrit))
 - Fix broken links [\#14634](https://github.com/netdata/netdata/pull/14634) ([Ancairon](https://github.com/Ancairon))
@@ -391,9 +394,6 @@
 - replication fixes \#5 [\#14038](https://github.com/netdata/netdata/pull/14038) ([ktsaou](https://github.com/ktsaou))
 - do not merge duplicate replication requests  [\#14037](https://github.com/netdata/netdata/pull/14037) ([ktsaou](https://github.com/ktsaou))
 - Replication fixes \#3 [\#14035](https://github.com/netdata/netdata/pull/14035) ([ktsaou](https://github.com/ktsaou))
-- improve performance of worker utilization statistics [\#14034](https://github.com/netdata/netdata/pull/14034) ([ktsaou](https://github.com/ktsaou))
-- use 2 levels of judy arrays to speed up replication on very busy parents [\#14031](https://github.com/netdata/netdata/pull/14031) ([ktsaou](https://github.com/ktsaou))
-- bump go.d.plugin v0.44.0 [\#14030](https://github.com/netdata/netdata/pull/14030) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
