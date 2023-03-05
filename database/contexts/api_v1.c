@@ -366,7 +366,7 @@ int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, R
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
 
     if(after != 0 && before != 0)
-        rrdr_relative_window_to_absolute(&after, &before);
+        rrdr_relative_window_to_absolute(&after, &before, NULL);
 
     buffer_json_initialize(wb, "\"", "\"", 0, true, false);
     struct rrdcontext_to_json t_contexts = {
@@ -403,7 +403,7 @@ int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, 
         uuid_unparse(*host->node_id, node_uuid);
 
     if(after != 0 && before != 0)
-        rrdr_relative_window_to_absolute(&after, &before);
+        rrdr_relative_window_to_absolute(&after, &before, NULL);
 
     buffer_json_initialize(wb, "\"", "\"", 0, true, false);
     buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));

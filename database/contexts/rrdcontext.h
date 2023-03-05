@@ -334,6 +334,7 @@ typedef struct query_target {
     size_t queries;                         // how many query we have done so far with this QUERY_TARGET - not related to database queries
 
     struct {
+        time_t now;                         // the current timestamp, the absolute max for any query timestamp
         bool relative;                      // true when the request made with relative timestamps, true if it was absolute
         bool aligned;
         time_t after;                       // the absolute timestamp this query is about

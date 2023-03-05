@@ -67,7 +67,18 @@ static struct {
                 .flush = grouping_flush_average,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
-        {.name = "mean",                           // alias on 'average'
+        {.name = "avg",                             // alias on 'average'
+                .hash  = 0,
+                .value = RRDR_GROUPING_AVERAGE,
+                .init  = NULL,
+                .create= grouping_create_average,
+                .reset = grouping_reset_average,
+                .free  = grouping_free_average,
+                .add   = grouping_add_average,
+                .flush = grouping_flush_average,
+                .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
+        },
+        {.name = "mean",                            // alias on 'average'
                 .hash  = 0,
                 .value = RRDR_GROUPING_AVERAGE,
                 .init  = NULL,
@@ -701,6 +712,9 @@ RRDR_GROUP_BY_FUNCTION group_by_aggregate_function_parse(const char *s) {
         return RRDR_GROUP_BY_FUNCTION_SUM_COUNT;
 
     if(strcmp(s, "average") == 0)
+        return RRDR_GROUP_BY_FUNCTION_AVERAGE;
+
+    if(strcmp(s, "avg") == 0)
         return RRDR_GROUP_BY_FUNCTION_AVERAGE;
 
     if(strcmp(s, "min") == 0)
@@ -1891,8 +1905,11 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
 #endif // NETDATA_INTERNAL_CHECKS
 
 // Returns 1 if an absolute period was requested or 0 if it was a relative period
-bool rrdr_relative_window_to_absolute(time_t *after, time_t *before) {
+bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t *now_ptr) {
     time_t now = now_realtime_sec() - 1;
+
+    if(now_ptr)
+        *now_ptr = now;
 
     int absolute_period_requested = -1;
     long long after_requested, before_requested;
@@ -2086,7 +2103,7 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     }
 
     // convert our before_wanted and after_wanted to absolute
-    rrdr_relative_window_to_absolute(&after_wanted, &before_wanted);
+    rrdr_relative_window_to_absolute(&after_wanted, &before_wanted, NULL);
     query_debug_log(":relative2absolute after %ld, before %ld", after_wanted, before_wanted);
 
     if (natural_points && (options & RRDR_OPTION_SELECTED_TIER) && tier > 0 && storage_tiers > 1) {

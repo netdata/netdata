@@ -952,7 +952,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     query_target_generate_name(qt);
     qt->window.after = qt->request.after;
     qt->window.before = qt->request.before;
-    rrdr_relative_window_to_absolute(&qt->window.after, &qt->window.before);
+    rrdr_relative_window_to_absolute(&qt->window.after, &qt->window.before, &qt->window.now);
 
     // prepare our local variables - we need these across all these functions
     QUERY_TARGET_LOCALS qtl = {
