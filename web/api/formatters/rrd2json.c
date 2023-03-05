@@ -201,11 +201,15 @@ static RRDR *data_query_group_by(RRDR *r) {
         else
             priority++;
 
+        // --------------------------------------------------------------------
         // generate the group by key
 
         buffer_flush(key);
         if(unlikely(r->od[d] & RRDR_DIMENSION_HIDDEN)) {
             buffer_strcat(key, "__hidden_dimensions__");
+        }
+        else if(unlikely(qt->request.group_by & RRDR_GROUP_BY_SELECTED)) {
+            buffer_strcat(key, "selected");
         }
         else {
             if (qt->request.group_by & RRDR_GROUP_BY_DIMENSION) {
@@ -249,11 +253,15 @@ static RRDR *data_query_group_by(RRDR *r) {
 
             *set = pos = added++;
 
+            // ----------------------------------------------------------------
             // generate the dimension id
 
             buffer_flush(key);
             if(unlikely(r->od[d] & RRDR_DIMENSION_HIDDEN)) {
                 buffer_strcat(key, "__hidden_dimensions__");
+            }
+            else if(unlikely(qt->request.group_by & RRDR_GROUP_BY_SELECTED)) {
+                buffer_strcat(key, "selected");
             }
             else {
                 if (qt->request.group_by & RRDR_GROUP_BY_DIMENSION) {
@@ -289,35 +297,48 @@ static RRDR *data_query_group_by(RRDR *r) {
 
             entries[pos].id = string_strdupz(buffer_tostring(key));
 
+            // ----------------------------------------------------------------
             // generate the dimension name
 
             buffer_flush(key);
-            if(qt->request.group_by & RRDR_GROUP_BY_DIMENSION) {
-                buffer_strcat(key, query_metric_name(qt, qm));
+            if(unlikely(r->od[d] & RRDR_DIMENSION_HIDDEN)) {
+                buffer_strcat(key, "__hidden_dimensions__");
             }
-            if(qt->request.group_by & RRDR_GROUP_BY_INSTANCE) {
-                if(buffer_strlen(key) != 0)
-                    buffer_fast_strcat(key, ",", 1);
+            else if(unlikely(qt->request.group_by & RRDR_GROUP_BY_SELECTED)) {
+                buffer_strcat(key, "selected");
+            }
+            else {
+                if (qt->request.group_by & RRDR_GROUP_BY_DIMENSION) {
+                    buffer_strcat(key, query_metric_name(qt, qm));
+                }
 
-                if(qt->request.group_by & RRDR_GROUP_BY_NODE)
-                    buffer_strcat(key, rrdinstance_acquired_name(qi->ria));
-                else
-                    buffer_strcat(key, string2str(query_instance_name_fqdn(qt, qi)));
-            }
-            if(qt->request.group_by & RRDR_GROUP_BY_LABEL) {
-                DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
-                for(size_t l = 0; l < qt->group_by.used ;l++) {
-                    if(buffer_strlen(key) != 0)
+                if (qt->request.group_by & RRDR_GROUP_BY_INSTANCE) {
+                    if (buffer_strlen(key) != 0)
                         buffer_fast_strcat(key, ",", 1);
-                    rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by.label_keys[l], "[unset]");
+
+                    if (qt->request.group_by & RRDR_GROUP_BY_NODE)
+                        buffer_strcat(key, rrdinstance_acquired_name(qi->ria));
+                    else
+                        buffer_strcat(key, string2str(query_instance_name_fqdn(qt, qi)));
+                }
+
+                if (qt->request.group_by & RRDR_GROUP_BY_LABEL) {
+                    DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
+                    for (size_t l = 0; l < qt->group_by.used; l++) {
+                        if (buffer_strlen(key) != 0)
+                            buffer_fast_strcat(key, ",", 1);
+                        rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by.label_keys[l], "[unset]");
+                    }
+                }
+
+                if (qt->request.group_by & RRDR_GROUP_BY_NODE) {
+                    if (buffer_strlen(key) != 0)
+                        buffer_fast_strcat(key, ",", 1);
+
+                    buffer_strcat(key, rrdhost_hostname(qn->rrdhost));
                 }
             }
-            if(qt->request.group_by & RRDR_GROUP_BY_NODE) {
-                if(buffer_strlen(key) != 0)
-                    buffer_fast_strcat(key, ",", 1);
 
-                buffer_strcat(key, rrdhost_hostname(qn->rrdhost));
-            }
             entries[pos].name = string_strdupz(buffer_tostring(key));
 
             // add the rest of the info

@@ -162,6 +162,9 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
     if(group_by == RRDR_GROUP_BY_NONE)
         group_by = RRDR_GROUP_BY_DIMENSION;
 
+    if(group_by & RRDR_GROUP_BY_SELECTED)
+        group_by = RRDR_GROUP_BY_SELECTED; // remove all other groupings
+
     if(group_by & ~(RRDR_GROUP_BY_DIMENSION))
         options |= RRDR_OPTION_ABSOLUTE;
 

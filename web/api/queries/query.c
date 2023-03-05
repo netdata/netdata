@@ -694,6 +694,9 @@ RRDR_GROUP_BY group_by_parse(char *s) {
 }
 
 void buffer_json_group_by_to_array(BUFFER *wb, RRDR_GROUP_BY group_by) {
+    if(group_by & RRDR_GROUP_BY_SELECTED)
+        buffer_json_add_array_item_string(wb, "selected");
+
     if(group_by & RRDR_GROUP_BY_DIMENSION)
         buffer_json_add_array_item_string(wb, "dimension");
 

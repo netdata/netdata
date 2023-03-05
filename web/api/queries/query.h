@@ -58,6 +58,7 @@ typedef enum rrdr_group_by {
     RRDR_GROUP_BY_NODE      = (1 << 1),
     RRDR_GROUP_BY_INSTANCE  = (1 << 2),
     RRDR_GROUP_BY_LABEL     = (1 << 3),
+    RRDR_GROUP_BY_SELECTED  = (1 << 4),
 } RRDR_GROUP_BY;
 
 struct web_buffer;
