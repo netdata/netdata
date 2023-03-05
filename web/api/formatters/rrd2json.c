@@ -174,7 +174,7 @@ static RRDR *data_query_group_by(RRDR *r) {
     if(!qt->group_by.used)
         qt->request.group_by &= ~RRDR_GROUP_BY_LABEL;
 
-    if(!(qt->request.group_by & (RRDR_GROUP_BY_NODE | RRDR_GROUP_BY_INSTANCE | RRDR_GROUP_BY_DIMENSION | RRDR_GROUP_BY_LABEL)))
+    if(!(qt->request.group_by & (RRDR_GROUP_BY_NODE | RRDR_GROUP_BY_INSTANCE | RRDR_GROUP_BY_DIMENSION | RRDR_GROUP_BY_LABEL | RRDR_GROUP_BY_SELECTED)))
         qt->request.group_by = RRDR_GROUP_BY_DIMENSION;
 
     int added = 0;

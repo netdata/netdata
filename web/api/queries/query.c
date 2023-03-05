@@ -688,6 +688,9 @@ RRDR_GROUP_BY group_by_parse(char *s) {
 
         if (strcmp(key, "label") == 0)
             group_by |= RRDR_GROUP_BY_LABEL;
+
+        if (strcmp(key, "selected") == 0)
+            group_by |= RRDR_GROUP_BY_SELECTED;
     }
 
     return group_by;
