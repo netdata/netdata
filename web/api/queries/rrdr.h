@@ -133,6 +133,12 @@ typedef struct rrdresult {
     } grouping;
 
     struct {
+        time_t max_update_every;
+        time_t expected_after;
+        time_t trimmed_after;
+    } partial_data_trimming;
+
+    struct {
         ONEWAYALLOC *owa;           // the allocator used
         struct query_target *qt;    // the QUERY_TARGET
 

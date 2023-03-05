@@ -368,9 +368,6 @@ static RRDR *data_query_group_by(RRDR *r) {
         }
     }
 
-    bool may_need_to_be_cut = (qt->window.before >= qt->window.now);
-    time_t may_cut_after = (may_need_to_be_cut) ? qt->window.before - update_every_max : qt->window.before;
-
     RRDR *r2 = rrdr_create(r->internal.owa, qt, added, rows);
     if(!r2)
         goto cleanup;
@@ -394,6 +391,13 @@ static RRDR *data_query_group_by(RRDR *r) {
         r2->dp[d2] = entries[d2].priority;
         r2->dgbc[d2] = entries[d2].count;
     }
+
+    r2->partial_data_trimming.max_update_every = update_every_max;
+    r2->partial_data_trimming.expected_after =
+            (qt->window.before >= qt->window.now - update_every_max) ?
+            qt->window.before - update_every_max :
+            qt->window.before;
+    r2->partial_data_trimming.trimmed_after = qt->window.before;
 
     // initialize r2 (timestamps and value flags)
     for(size_t i = 0; i != rows ;i++) {
@@ -479,8 +483,9 @@ static RRDR *data_query_group_by(RRDR *r) {
             row_gbc++;
         }
 
-        if(unlikely(r->t[i] > may_cut_after && row_gbc < last_row_gbc)) {
+        if(unlikely(r->t[i] > r2->partial_data_trimming.expected_after && row_gbc < last_row_gbc)) {
             // discard the rest of the points
+            r2->partial_data_trimming.trimmed_after = r->t[i];
             r2->rows = i;
             rows = i;
             break;

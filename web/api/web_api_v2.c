@@ -168,6 +168,9 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
     if(options & RRDR_OPTION_SHOW_PLAN)
         options |= RRDR_OPTION_DEBUG;
 
+    if(options & RRDR_OPTION_DEBUG)
+        options &= ~RRDR_OPTION_MINIFY;
+
     if(tier_str && *tier_str) {
         tier = str2ul(tier_str);
         if(tier < storage_tiers)

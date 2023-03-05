@@ -1248,6 +1248,13 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
         buffer_json_member_add_time_t(wb, "update_every", r->view.update_every);
         buffer_json_member_add_time_t(wb, "after", r->view.after);
         buffer_json_member_add_time_t(wb, "before", r->view.before);
+
+        buffer_json_member_add_object(wb, "partial_data_trimming");
+        buffer_json_member_add_time_t(wb, "max_update_every", r->partial_data_trimming.max_update_every);
+        buffer_json_member_add_time_t(wb, "expected_after", r->partial_data_trimming.expected_after);
+        buffer_json_member_add_time_t(wb, "trimmed_after", r->partial_data_trimming.trimmed_after);
+        buffer_json_object_close(wb);
+
         buffer_json_member_add_uint64(wb, "points", rows);
         query_target_combined_units_v2(wb, qt, contexts);
         query_target_combined_chart_type(wb, qt, contexts);
