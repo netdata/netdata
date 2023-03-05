@@ -41,8 +41,8 @@ static struct {
         , {"natural-points"    , 0    , RRDR_OPTION_NATURAL_POINTS}
         , {"virtual-points"    , 0    , RRDR_OPTION_VIRTUAL_POINTS}
         , {"all-dimensions"    , 0    , RRDR_OPTION_ALL_DIMENSIONS}
-        , {"plan"              , 0    , RRDR_OPTION_SHOW_PLAN}
         , {"details"           , 0    , RRDR_OPTION_SHOW_DETAILS}
+        , {"plan"              , 0    , RRDR_OPTION_DEBUG}
         , {"debug"             , 0    , RRDR_OPTION_DEBUG}
         , {"minify"            , 0    , RRDR_OPTION_MINIFY}
         , {"annotations"       , 0    , RRDR_OPTION_JW_ANNOTATIONS}

@@ -801,7 +801,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR
         buffer_json_add_array_item_uint64(wb, qt->db.tiers[tier].points);
     buffer_json_array_close(wb);
 
-    if(options & RRDR_OPTION_SHOW_PLAN)
+    if(options & RRDR_OPTION_DEBUG)
         jsonwrap_query_plan(r, wb);
 }
 
@@ -1061,7 +1061,7 @@ static void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS
 
                             query_target_data_statistics(wb, qt, &qm->query_stats);
 
-                            if(options & RRDR_OPTION_SHOW_PLAN)
+                            if(options & RRDR_OPTION_DEBUG)
                                 jsonwrap_query_metric_plan(wb, qm);
                         }
                     }

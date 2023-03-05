@@ -79,7 +79,7 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
     RRDR_GROUP_BY group_by = RRDR_GROUP_BY_DIMENSION;
     RRDR_GROUP_BY_FUNCTION group_by_aggregate = RRDR_GROUP_BY_FUNCTION_AVERAGE;
     DATASOURCE_FORMAT format = DATASOURCE_JSON;
-    RRDR_OPTIONS options = 0;
+    RRDR_OPTIONS options = RRDR_OPTION_VIRTUAL_POINTS;
 
     while(url) {
         char *value = mystrsep(&url, "&");
@@ -167,9 +167,6 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
 
     if(group_by & ~(RRDR_GROUP_BY_DIMENSION))
         options |= RRDR_OPTION_ABSOLUTE;
-
-    if(options & RRDR_OPTION_SHOW_PLAN)
-        options |= RRDR_OPTION_DEBUG;
 
     if(options & RRDR_OPTION_DEBUG)
         options &= ~RRDR_OPTION_MINIFY;

@@ -41,11 +41,10 @@ typedef enum rrdr_options {
     RRDR_OPTION_RETURN_JWAR     = (1 << 20), // Return anomaly rates in jsonwrap
     RRDR_OPTION_SELECTED_TIER   = (1 << 21), // Use the selected tier for the query
     RRDR_OPTION_ALL_DIMENSIONS  = (1 << 22), // Return the full dimensions list
-    RRDR_OPTION_SHOW_PLAN       = (1 << 23), // Return the query plan in jsonwrap
-    RRDR_OPTION_SHOW_DETAILS    = (1 << 24), // v2 returns detailed object tree
-    RRDR_OPTION_DEBUG           = (1 << 25), // v2 returns request description
-    RRDR_OPTION_MINIFY          = (1 << 26), // remove JSON spaces and newlines from JSON output
-    RRDR_OPTION_JW_ANNOTATIONS  = (1 << 27), // add annotation array to the JSON output
+    RRDR_OPTION_SHOW_DETAILS    = (1 << 23), // v2 returns detailed object tree
+    RRDR_OPTION_DEBUG           = (1 << 24), // v2 returns request description
+    RRDR_OPTION_MINIFY          = (1 << 25), // remove JSON spaces and newlines from JSON output
+    RRDR_OPTION_JW_ANNOTATIONS  = (1 << 26), // add annotation array to the JSON output
 
     // internal ones - not to be exposed to the API
     RRDR_OPTION_HEALTH_RSRVD1        = (1 << 28), // reserved for RRDCALC_OPTION_NO_CLEAR_NOTIFICATION

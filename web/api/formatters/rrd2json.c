@@ -415,7 +415,7 @@ static RRDR *data_query_group_by(RRDR *r) {
 
     r2->partial_data_trimming.max_update_every = update_every_max;
     r2->partial_data_trimming.expected_after =
-            (qt->window.before >= qt->window.now - update_every_max) ?
+            (!(qt->request.options & RRDR_OPTION_RETURN_RAW) && qt->window.before >= qt->window.now - update_every_max) ?
             qt->window.before - update_every_max :
             qt->window.before;
     r2->partial_data_trimming.trimmed_after = qt->window.before;
