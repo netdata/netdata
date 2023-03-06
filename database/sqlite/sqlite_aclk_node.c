@@ -80,7 +80,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     char *host_version = NULL;
     if (host != localhost) {
         netdata_mutex_lock(&host->receiver_lock);
-        host_version = strdupz(host->receiver && host->receiver->program_version ? host->receiver->program_version : "unknown");
+        host_version = strdupz(host->receiver && host->receiver->program_version ? host->receiver->program_version : rrdhost_program_version(host));
         netdata_mutex_unlock(&host->receiver_lock);
     }
 
