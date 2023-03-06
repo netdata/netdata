@@ -49,6 +49,7 @@ include boinc/Makefile.inc
 include ceph/Makefile.inc
 include changefinder/Makefile.inc
 include dovecot/Makefile.inc
+include ethtool/Makefile.inc
 include example/Makefile.inc
 include exim/Makefile.inc
 include fail2ban/Makefile.inc
