@@ -16,7 +16,6 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
     NETDATA_DOUBLE total = 1;
     NETDATA_DOUBLE total_anomaly_rate = 0;
 
-    int set_min_max = 0;
     if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
         total = 0;
         for (c = 0; c < r->d ; c++) {
@@ -30,7 +29,6 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
         }
         // prevent a division by zero
         if(total == 0) total = 1;
-        set_min_max = 1;
     }
 
     // for each dimension
@@ -46,13 +44,13 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
         if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
             n = n * 100 / total;
 
-            if(unlikely(set_min_max)) {
+            if(unlikely(c == 0)) {
                 r->view.min = r->view.max = n;
-                set_min_max = 0;
             }
-
-            if(n < r->view.min) r->view.min = n;
-            if(n > r->view.max) r->view.max = n;
+            else {
+                if (n < r->view.min) r->view.min = n;
+                if (n > r->view.max) r->view.max = n;
+            }
         }
 
         if(unlikely(init)) {
