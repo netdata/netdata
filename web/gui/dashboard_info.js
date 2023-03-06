@@ -6449,8 +6449,12 @@ netdataDashboard.context = {
         info: 'Tracks filesystem wide commits. Commits mark fully consistent synchronization points for the filesystem, and are triggered automatically when certain events happen or when enough time has elapsed since the last commit.'
     },
 
+    'btrfs.commits_perc_time': {
+        info: 'Tracks commits time share. The reported time share metrics are valid only when BTRFS commit interval is longer than Netdata\'s <b>update_every</b> interval.'
+    },
+
     'btrfs.commit_timings': {
-        info: 'Tracks timing information for commits. Note that <b>current commit</b> may not always be the same as <b>last commit</b>, as it is calculated using different stats (by subtracting subsequent <b>total_commit_ms</b> values, which may include rounding errors).'
+        info: 'Tracks timing information for commits. <b>last</b> dimension metrics are valid only when BTRFS commit interval is longer than Netdata\'s <b>update_every</b> interval.'
     },
 
     'btrfs.errors': {

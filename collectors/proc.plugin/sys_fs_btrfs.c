@@ -99,16 +99,19 @@ typedef struct btrfs_node {
 
     RRDSET *st_commits;
     RRDDIM *rd_commits;
-    collected_number commits;
+    long long commits_total;
+    collected_number commits_new;
+
+    RRDSET *st_commits_percentage_time;
+    RRDDIM *rd_commits_percentage_time;
+    long long commit_timings_total;
+    long long commits_percentage_time;
 
     RRDSET *st_commit_timings;
     RRDDIM *rd_commit_timings_last;
     RRDDIM *rd_commit_timings_max;
-    RRDDIM *rd_commit_timings_current;
     collected_number commit_timings_last;
     collected_number commit_timings_max;
-    collected_number commit_timings_total;
-    collected_number commit_timings_current;
 
     BTRFS_DISK *disks;
 
@@ -149,16 +152,19 @@ static inline int collect_btrfs_error_stats(BTRFS_DEVICE *device){
     return 0;
 }
 
-static inline int collect_btrfs_commits_stats(BTRFS_NODE *node){
+static inline int collect_btrfs_commits_stats(BTRFS_NODE *node, int update_every){
     char buffer[120 + 1];
     
     int ret = read_file(node->commit_stats_filename, buffer, 120);
     if(unlikely(ret)) {
         collector_error("BTRFS: failed to read '%s'", node->commit_stats_filename);
-        node->commits = 0;
+        node->commits_total = 0;
+        node->commits_new = 0;
         node->commit_timings_last = 0;
         node->commit_timings_max = 0;
-        node->commit_timings_current = 0;
+        node->commit_timings_total = 0;
+        node->commits_percentage_time = 0;
+
         return ret;
     } 
     
@@ -168,14 +174,25 @@ static inline int collect_btrfs_commits_stats(BTRFS_NODE *node){
         if(unlikely(!val || !*val)) break;
         char *key = mystrsep(&val, " ");
 
-        if(!strcmp(key, "commits")) node->commits = str2ull(val, NULL);
+        if(!strcmp(key, "commits")){
+            long long commits_total_new = str2ull(val, NULL);
+            if(likely(node->commits_total)){
+                if(node->commits_new = commits_total_new - node->commits_total)
+                    node->commits_total = commits_total_new;
+            } else node->commits_total = commits_total_new;
+        }
         else if(!strcmp(key, "last_commit_ms")) node->commit_timings_last = str2ull(val, NULL);
         else if(!strcmp(key, "max_commit_ms")) node->commit_timings_max = str2ull(val, NULL);
         else if(!strcmp(key, "total_commit_ms")) {
             long long commit_timings_total_new = str2ull(val, NULL);
-            node->commit_timings_current = commit_timings_total_new - node->commit_timings_total;
-            node->commit_timings_total = commit_timings_total_new;
-            
+            if(likely(node->commit_timings_total)){
+                long time_delta = commit_timings_total_new - node->commit_timings_total;
+                if(time_delta){
+                    node->commits_percentage_time = time_delta * 10 / update_every;
+                    node->commit_timings_total = commit_timings_total_new;
+                } else node->commits_percentage_time = 0;
+                
+            } else node->commit_timings_total = commit_timings_total_new;           
         }
     }
     return 0;
@@ -451,7 +468,7 @@ static inline int find_btrfs_devices(BTRFS_NODE *node, const char *path) {
 }
 
 
-static inline int find_all_btrfs_pools(const char *path) {
+static inline int find_all_btrfs_pools(const char *path, int update_every) {
     static int logged_error = 0;
     char filename[FILENAME_MAX + 1];
 
@@ -609,7 +626,7 @@ static inline int find_all_btrfs_pools(const char *path) {
 
         snprintfz(filename, FILENAME_MAX, "%s/%s/commit_stats", path, de->d_name);
         if(!node->commit_stats_filename) node->commit_stats_filename = strdupz(filename);
-        if(collect_btrfs_commits_stats(node)){
+        if(collect_btrfs_commits_stats(node, update_every)){
             btrfs_free_node(node);
             continue;
         }     
@@ -708,7 +725,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
     refresh_delta += dt;
     if(refresh_delta >= refresh_every) {
         refresh_delta = 0;
-        find_all_btrfs_pools(btrfs_path);
+        find_all_btrfs_pools(btrfs_path, update_every);
     }
 
     BTRFS_NODE *node;
@@ -769,7 +786,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
         }
 
         if(do_commit_stats != CONFIG_BOOLEAN_NO) {
-            if (unlikely(collect_btrfs_commits_stats(node))) {
+            if (unlikely(collect_btrfs_commits_stats(node, update_every))) {
                 collector_error("BTRFS: failed to collect commit stats for '%s'", node->id);
                 // make it refresh btrfs at the next iteration
                 refresh_delta = refresh_every;
@@ -990,7 +1007,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
         // commit_stats
 
         if(do_commit_stats == CONFIG_BOOLEAN_YES || (do_commit_stats == CONFIG_BOOLEAN_AUTO &&
-                                                        (node->commits ||
+                                                        (node->commits_total ||
                                                         netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
             do_commit_stats = CONFIG_BOOLEAN_YES;
 
@@ -1019,13 +1036,46 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                         , RRDSET_TYPE_LINE
                 );
 
-                node->rd_commits = rrddim_add(node->st_commits, "commits", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                node->rd_commits = rrddim_add(node->st_commits, "commits", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 add_labels_to_btrfs(node, node->st_commits);
             }
 
-            rrddim_set_by_pointer(node->st_commits, node->rd_commits, node->commits);
+            rrddim_set_by_pointer(node->st_commits, node->rd_commits, node->commits_new);
             rrdset_done(node->st_commits);
+
+            if(unlikely(!node->st_commits_percentage_time)) {
+                char id[RRD_ID_LENGTH_MAX + 1], name[RRD_ID_LENGTH_MAX + 1], title[200 + 1];
+
+                snprintf(id, RRD_ID_LENGTH_MAX, "commits_perc_time_%s", node->id);
+                snprintf(name, RRD_ID_LENGTH_MAX, "commits_perc_time_%s", node->label);
+                snprintf(title, 200, "BTRFS Commits Time Share");
+
+                netdata_fix_chart_id(id);
+                netdata_fix_chart_name(name);
+
+                node->st_commits_percentage_time = rrdset_create_localhost(
+                        "btrfs"
+                        , id
+                        , name
+                        , node->label
+                        , "btrfs.commits_perc_time"
+                        , title
+                        , "percentage"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_BTRFS_NAME
+                        , NETDATA_CHART_PRIO_BTRFS_COMMITS_PERC_TIME
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
+
+                node->rd_commits_percentage_time = rrddim_add(node->st_commits_percentage_time, "commits", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+
+                add_labels_to_btrfs(node, node->st_commits_percentage_time);
+            }
+
+            rrddim_set_by_pointer(node->st_commits_percentage_time, node->rd_commits_percentage_time, node->commits_percentage_time);
+            rrdset_done(node->st_commits_percentage_time);
 
 
             if(unlikely(!node->st_commit_timings)) {
@@ -1053,16 +1103,14 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                         , RRDSET_TYPE_LINE
                 );
 
-                node->rd_commit_timings_last = rrddim_add(node->st_commit_timings, "last commit", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                node->rd_commit_timings_max = rrddim_add(node->st_commit_timings, "max commit", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                node->rd_commit_timings_current = rrddim_add(node->st_commit_timings, "current commit", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                node->rd_commit_timings_last = rrddim_add(node->st_commit_timings, "last", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                node->rd_commit_timings_max = rrddim_add(node->st_commit_timings, "max", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 add_labels_to_btrfs(node, node->st_commit_timings);
             }
 
             rrddim_set_by_pointer(node->st_commit_timings, node->rd_commit_timings_last, node->commit_timings_last);
             rrddim_set_by_pointer(node->st_commit_timings, node->rd_commit_timings_max, node->commit_timings_max);
-            rrddim_set_by_pointer(node->st_commit_timings, node->rd_commit_timings_current, node->commit_timings_current);
             rrdset_done(node->st_commit_timings);
         }
 
