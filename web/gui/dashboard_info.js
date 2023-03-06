@@ -6450,7 +6450,7 @@ netdataDashboard.context = {
     },
 
     'btrfs.commit_timings': {
-        info: 'Tracks timing information for commits.'
+        info: 'Tracks timing information for commits. Note that <b>current commit</b> may not always be the same as <b>last commit</b>, as it is calculated using different stats (by subtracting subsequent <b>total_commit_ms</b> values, which may include rounding errors).'
     },
 
     'btrfs.errors': {

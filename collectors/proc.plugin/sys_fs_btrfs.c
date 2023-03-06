@@ -104,10 +104,11 @@ typedef struct btrfs_node {
     RRDSET *st_commit_timings;
     RRDDIM *rd_commit_timings_last;
     RRDDIM *rd_commit_timings_max;
-    RRDDIM *rd_commit_timings_total;
+    RRDDIM *rd_commit_timings_current;
     collected_number commit_timings_last;
     collected_number commit_timings_max;
     collected_number commit_timings_total;
+    collected_number commit_timings_current;
 
     BTRFS_DISK *disks;
 
@@ -157,7 +158,7 @@ static inline int collect_btrfs_commits_stats(BTRFS_NODE *node){
         node->commits = 0;
         node->commit_timings_last = 0;
         node->commit_timings_max = 0;
-        node->commit_timings_total = 0;
+        node->commit_timings_current = 0;
         return ret;
     } 
     
@@ -170,7 +171,12 @@ static inline int collect_btrfs_commits_stats(BTRFS_NODE *node){
         if(!strcmp(key, "commits")) node->commits = str2ull(val, NULL);
         else if(!strcmp(key, "last_commit_ms")) node->commit_timings_last = str2ull(val, NULL);
         else if(!strcmp(key, "max_commit_ms")) node->commit_timings_max = str2ull(val, NULL);
-        else if(!strcmp(key, "total_commit_ms")) node->commit_timings_total = str2ull(val, NULL);
+        else if(!strcmp(key, "total_commit_ms")) {
+            long long commit_timings_total_new = str2ull(val, NULL);
+            node->commit_timings_current = commit_timings_total_new - node->commit_timings_total;
+            node->commit_timings_total = commit_timings_total_new;
+            
+        }
     }
     return 0;
 }
@@ -1049,14 +1055,14 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
                 node->rd_commit_timings_last = rrddim_add(node->st_commit_timings, "last commit", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 node->rd_commit_timings_max = rrddim_add(node->st_commit_timings, "max commit", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                node->rd_commit_timings_total = rrddim_add(node->st_commit_timings, "current commit", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                node->rd_commit_timings_current = rrddim_add(node->st_commit_timings, "current commit", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 add_labels_to_btrfs(node, node->st_commit_timings);
             }
 
             rrddim_set_by_pointer(node->st_commit_timings, node->rd_commit_timings_last, node->commit_timings_last);
             rrddim_set_by_pointer(node->st_commit_timings, node->rd_commit_timings_max, node->commit_timings_max);
-            rrddim_set_by_pointer(node->st_commit_timings, node->rd_commit_timings_total, node->commit_timings_total);
+            rrddim_set_by_pointer(node->st_commit_timings, node->rd_commit_timings_current, node->commit_timings_current);
             rrdset_done(node->st_commit_timings);
         }
 
