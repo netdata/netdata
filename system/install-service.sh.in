@@ -644,7 +644,7 @@ detect_linux_svc_type() {
 install_linux_service() {
   t="$(detect_linux_svc_type)"
 
-  if [ -z "${t}" ]; then
+  if [ -z "${t}" ] || [ "${t}" = 'detect' ]; then
     exit 2
   fi
 
@@ -654,7 +654,7 @@ install_linux_service() {
 linux_cmds() {
   t="$(detect_linux_svc_type)"
 
-  if [ -z "${t}" ]; then
+  if [ -z "${t}" ] || [ "${t}" = 'detect' ]; then
     exit 2
   fi
 
