@@ -240,7 +240,7 @@ USAGE: ${PROGRAM} [options]
                              have a broken pkg-config. Use this option to proceed without checking pkg-config.
   --disable-telemetry        Opt-out from our anonymous telemetry program. (DISABLE_TELEMETRY=1)
   --skip-available-ram-check Skip checking the amount of RAM the system has and pretend it has enough to build safely.
-  --enable-logsmanagement    Enable the logs management plugin. Default: disabled.
+  --disable-logsmanagement   Disable the logs management plugin. Default: autodetect.
   --enable-logsmanagement-tests Enable the logs management tests. Default: disabled.
 
 Netdata will by default be compiled with gcc optimization -O2
@@ -334,7 +334,10 @@ while [ -n "${1}" ]; do
       NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ml)}" | sed 's/$/ --disable-ml/g')"
       NETDATA_ENABLE_ML=0
       ;;
-    "--enable-logsmanagement") NETDATA_ENABLE_LOGS_MANAGEMENT=1;;
+    "--disable-logsmanagement") 
+      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-logsmanagement)}" | sed 's/$/ --disable-logsmanagement/g')"
+      NETDATA_DISABLE_LOGS_MANAGEMENT=1
+      ;;
     "--enable-logsmanagement-tests") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-logsmanagement-tests)}" | sed 's/$/ --enable-logsmanagement-tests/g')" ;;
     "--disable-lto") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-lto)}" | sed 's/$/ --disable-lto/g')" ;;
     "--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-x86-sse)}" | sed 's/$/ --disable-x86-sse/g')" ;;
@@ -925,11 +928,12 @@ build_fluentbit() {
 }
 
 bundle_fluentbit() {
-  if [ -z "${NETDATA_ENABLE_LOGS_MANAGEMENT}" ]; then
+  progress "Prepare Fluent-Bit"
+
+  if [ -n "${NETDATA_DISABLE_LOGS_MANAGEMENT}" ]; then
+    warning "You have explicitly requested to disable Netdata Logs Management support, Fluent-Bit build is skipped."
     return 0
   fi
-
-  progress "Prepare Fluent-Bit"
 
   if [ ! -d "fluent-bit" ]; then
     run_failed "Missing submodule Fluent-Bit. The install process will continue, but Netdata Logs Management support will be disabled."
@@ -1647,14 +1651,14 @@ progress "eBPF Kernel Collector"
 install_ebpf
 
 should_install_fluentbit() {
-  if [ -z "${NETDATA_ENABLE_LOGS_MANAGEMENT}" ]; then
-    run_failed "netdata-installer.sh run without --enable-logsmanagement, Netdata Logs Management support will be disabled in this build."
+  if [ -n "${NETDATA_DISABLE_LOGS_MANAGEMENT}" ]; then
+    warning "netdata-installer.sh run with --disable-logsmanagement, Fluent-Bit installation is skipped."
     return 1
   elif [ "${FLUENT_BIT_BUILD_SUCCESS:=0}" -eq 0 ]; then
-    run_failed "--enable-logsmanagement was requested but Fluent-Bit was not built successfully, Netdata Logs Management support will be disabled in this build."
+    run_failed "Fluent-Bit was not built successfully, Netdata Logs Management support will be disabled in this build."
     return 1
   elif [ ! -f fluent-bit/build/lib/libfluent-bit.so ]; then
-    run_failed "--enable-logsmanagement was requested but libfluent-bit.so is missing, Netdata Logs Management support will be disabled in this build."
+    run_failed "libfluent-bit.so is missing, Netdata Logs Management support will be disabled in this build."
     return 1
   fi
   
