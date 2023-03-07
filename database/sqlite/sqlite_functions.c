@@ -771,7 +771,7 @@ failed:
 }
 
 #define SQL_GET_NODE_INSTANCE_LIST "select ni.node_id, ni.host_id, h.hostname " \
-    "from node_instance ni, host h where ni.host_id = h.host_id;"
+    "from node_instance ni, host h where ni.host_id = h.host_id AND h.hops >=0;"
 
 struct node_instance_list *get_node_list(void)
 {
