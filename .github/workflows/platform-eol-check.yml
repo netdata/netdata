@@ -50,6 +50,7 @@ jobs:
       # Actually check the EOL date for the platform.
       - name: Check EOL Date
         id: check
+        shell: sh {0}
         run: |
           d="$(.github/scripts/platform-impending-eol.py ${{ matrix.distro }} ${{ matrix.release }})"
           case $? in
