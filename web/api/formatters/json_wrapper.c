@@ -1350,6 +1350,7 @@ void rrdr_json_wrapper_annotations(RRDR *r __maybe_unused, BUFFER *wb, DATASOURC
     buffer_json_member_add_object(wb, "annotations");
 
     buffer_json_member_add_array(wb, "labels");
+    buffer_json_add_array_item_string(wb, "time");
     long d, i;
     const long used = (long)r->d;
     for(d = 0, i = 0; d < used ; d++) {
