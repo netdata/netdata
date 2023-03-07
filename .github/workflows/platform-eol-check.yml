@@ -102,13 +102,9 @@ jobs:
           labels: area/packaging, needs triage
           title: ${{ steps.title.outputs.title }}
           body: |
-            Based on information from https://endoflife.date/${{ matrix.distro }},
-            upstream support for ${{ matrix.full_name }} will be ending
-            on ${{ steps.check.outputs.date }}. A PR should be created
-            to remove this platform from our platform support document,
-            CI, and packaging code.
+            Based on information from https://endoflife.date/${{ matrix.distro }}, upstream support for ${{ matrix.full_name }} will be ending on ${{ steps.check.outputs.date }}. A PR should be created to remove this platform from our platform support document, CI, and packaging code.
 
-            - [ ]: Remove platform from `packaging/PLATFORM_SUPPORT.md`
-            - [ ]: Remove platform from `.github/data/distros.yml`
-            - [ ]: Remove platform package builder from helper-images repo (if applicable).
-            - [ ]: Verify any other platform support code that needs to be cleaned up.
+            - [ ] Remove platform from `packaging/PLATFORM_SUPPORT.md`
+            - [ ] Remove platform from `.github/data/distros.yml`
+            - [ ] Remove platform package builder from helper-images repo (if applicable).
+            - [ ] Verify any other platform support code that needs to be cleaned up.
