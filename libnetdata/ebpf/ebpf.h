@@ -40,6 +40,8 @@
 
 #define EBPF_CFG_PROGRAM_PATH "btf path"
 
+#define EBPF_CFG_MAPS_PER_CORE "maps per core"
+
 #define EBPF_CFG_UPDATE_EVERY "update every"
 #define EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT 10
 #define EBPF_CFG_PID_SIZE "pid table size"
