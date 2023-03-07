@@ -84,7 +84,6 @@ then
 					--disable-ebpf \
 					--disable-ml \
 					--use-system-protobuf \
-					--enable-logsmanagement \
 					--enable-logsmanagement-tests \
 					--install-prefix $INSTALL_PATH
 	else
@@ -94,7 +93,6 @@ then
 					--dont-start-it \
 					--dont-wait \
 					--disable-telemetry \
-					--enable-logsmanagement \
 					--install-prefix $INSTALL_PATH
 	fi
 
