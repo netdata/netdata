@@ -16,6 +16,7 @@ for item in data['include']:
         entries.append({
             'distro': item['distro'],
             'release': item['version'],
+            'full_name': f'{ item['distro'] } { item['version'] }'
         })
 
 entries.sort(key=lambda k: (k['distro'], k['release']))
