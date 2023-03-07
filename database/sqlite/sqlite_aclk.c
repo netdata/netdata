@@ -16,8 +16,16 @@ void schedule_node_info_update(RRDHOST *host)
         return;
 
     struct aclk_database_worker_config *wc = host->dbsync_worker;
-    if (likely(wc))
-        wc->node_info_send = 1;
+
+    if (unlikely(!wc))
+        return;
+
+    struct aclk_database_cmd cmd;
+    memset(&cmd, 0, sizeof(cmd));
+    cmd.opcode = ACLK_DATABASE_NODE_STATE;
+    cmd.completion = NULL;
+    aclk_database_enq_cmd(wc, &cmd);
+    info("WARNING: %s schedule_node_info_update", rrdhost_hostname(host));
 }
 
 static int sql_check_aclk_table(void *data, int argc, char **argv, char **column)
@@ -510,6 +518,7 @@ static void aclk_database_worker(void *arg)
     worker_register_job_name(ACLK_DATABASE_CLEANUP,              "cleanup");
     worker_register_job_name(ACLK_DATABASE_DELETE_HOST,          "node delete");
     worker_register_job_name(ACLK_DATABASE_NODE_INFO,            "node info");
+    worker_register_job_name(ACLK_DATABASE_NODE_STATE,           "node state");
     worker_register_job_name(ACLK_DATABASE_NODE_COLLECTORS,      "node collectors");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT,           "alert push");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_CONFIG,    "alert conf push");
@@ -630,6 +639,14 @@ static void aclk_database_worker(void *arg)
                     break;
 
 // NODE OPERATIONS
+                case ACLK_DATABASE_NODE_STATE:
+                    debug(D_ACLK_SYNC,"Sending state update for %s", wc->uuid_str);
+                    if (wc->host) {
+                        RRDHOST *host = wc->host;
+                        int live = (host == localhost || host->receiver || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) ? 1 : 0;
+                        aclk_host_state_update(wc->host, live);
+                    }
+                    break;
                 case ACLK_DATABASE_NODE_INFO:
                     debug(D_ACLK_SYNC,"Sending node info for %s", wc->uuid_str);
                     sql_build_node_info(wc, cmd);

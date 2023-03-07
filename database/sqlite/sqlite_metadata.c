@@ -1122,7 +1122,6 @@ static void metadata_event_loop(void *arg)
     while (shutdown == 0 || (wc->flags & METADATA_WORKER_BUSY)) {
         uuid_t  *uuid;
         RRDHOST *host = NULL;
-        int rc;
 
         worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
