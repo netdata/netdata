@@ -959,9 +959,9 @@ handle_existing_install() {
           failmsg="We do not support trying to update or claim installations when we cannot determine the install type. You will need to uninstall the existing install using the same method you used to install it to proceed. ${claimonly_notice}"
           promptmsg="Attempting to update an existing install is not officially supported. It may work, but it also might break your system. ${claimonly_notice} Are you sure you want to continue?"
         fi
-        if [ "${INTERACTIVE}" -eq 0 ] && [ "${NETDATA_CLAIM_ONLY}" -eq 0 ]; then
+        if [ "${INTERACTIVE}" -eq 0 ] && [ "${ACTION}" != "claim" ]; then
           fatal "${failmsg}" F0106
-        elif [ "${INTERACTIVE}" -eq 1 ] && [ "${NETDATA_CLAIM_ONLY}" -eq 0 ]; then
+        elif [ "${INTERACTIVE}" -eq 1 ] && [ "${ACTION}" != "claim" ]; then
           if confirm "${promptmsg}"; then
             progress "OK, continuing"
           else
