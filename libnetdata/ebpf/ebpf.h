@@ -196,6 +196,9 @@ typedef struct ebpf_local_maps {
     uint32_t user_input;
     uint32_t type;
     int map_fd;
+#ifdef LIBBPF_MAJOR_VERSION
+    enum bpf_map_type map_type;
+#endif
 } ebpf_local_maps_t;
 
 typedef struct ebpf_specify_name {
