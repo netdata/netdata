@@ -299,6 +299,7 @@ typedef struct ebpf_module {
     // charts
     char memory_usage[NETDATA_EBPF_CHART_MEM_LENGTH];
     char memory_allocations[NETDATA_EBPF_CHART_MEM_LENGTH];
+    int maps_per_core;
 } ebpf_module_t;
 
 int ebpf_get_kernel_version();
