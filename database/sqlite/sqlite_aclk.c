@@ -25,7 +25,6 @@ void schedule_node_info_update(RRDHOST *host)
     cmd.opcode = ACLK_DATABASE_NODE_STATE;
     cmd.completion = NULL;
     aclk_database_enq_cmd(wc, &cmd);
-    info("WARNING: %s schedule_node_info_update", rrdhost_hostname(host));
 }
 
 static int sql_check_aclk_table(void *data, int argc, char **argv, char **column)
