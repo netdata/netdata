@@ -27,11 +27,6 @@ static const char * const log_source_t_str[] = {LOG_SRC_TYPES};
 struct Circ_buff;
 struct Circ_buff_item_ptrs;
 
-typedef enum {
-    LOGS_MANAG_DB_MODE_FULL = 0,
-    LOGS_MANAG_DB_MODE_NONE
-} logs_manag_db_mode_t;
-
 typedef struct flb_serial_config {
     char *bitrate;
     char *min_bytes;
@@ -113,5 +108,13 @@ extern struct File_infos_arr *p_file_infos_arr;     /**< Array that contains all
 extern volatile sig_atomic_t p_file_infos_arr_ready; /**< Variable to synchronise chart creation in logsmanagement.plugin, once the main logs management engine is ready **/
 
 extern int g_logs_manag_update_every;               /**< Variable defining global "update every" value for logs management **/
+
+typedef struct {
+    int update_every;
+    int circ_buff_spare_items;
+    logs_manag_db_mode_t db_mode;
+} g_logs_manag_config_t;
+
+extern g_logs_manag_config_t g_logs_manag_config;
 
 #endif  // FILE_INFO_H_

@@ -48,9 +48,19 @@ struct File_infos_arr *p_file_infos_arr = NULL;
 uv_loop_t *main_loop = NULL; 
 
 volatile sig_atomic_t p_file_infos_arr_ready = 0;
-int g_logs_manag_update_every = 1;
-int g_logs_manag_circ_buff_spare_items = CIRCULAR_BUFF_SPARE_ITEMS_DEFAULT;
 
+g_logs_manag_config_t g_logs_manag_config = {
+    .update_every = 1,
+    .circ_buff_spare_items = CIRCULAR_BUFF_SPARE_ITEMS_DEFAULT,
+    .db_mode = GLOBAL_DB_MODE_DEFAULT
+};
+
+static logs_manag_db_mode_t db_mode_str_to_db_mode(const char *const db_mode_str){
+    if(!db_mode_str || !*db_mode_str) return g_logs_manag_config.db_mode;
+    else if(!strcasecmp(db_mode_str, "full")) return LOGS_MANAG_DB_MODE_FULL;
+    else if(!strcasecmp(db_mode_str, "none")) return LOGS_MANAG_DB_MODE_NONE;
+    else return g_logs_manag_config.db_mode;
+}
 
 static bool metrics_dict_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused){
     ((Kernel_metrics_dict_item_t *)old_value)->num += ((Kernel_metrics_dict_item_t *)new_value)->num;
@@ -132,19 +142,25 @@ static int logs_manag_config_load(void){
         rc = -1;
     }
 
-    g_logs_manag_update_every = (int)config_get_number( CONFIG_SECTION_LOGS_MANAGEMENT, 
+    g_logs_manag_config.update_every = (int)config_get_number( CONFIG_SECTION_LOGS_MANAGEMENT, 
                                                         "update every", 
                                                         localhost->rrd_update_every);
-    if(g_logs_manag_update_every < localhost->rrd_update_every) g_logs_manag_update_every = localhost->rrd_update_every;
-    info("CONFIG: global logs management update every: %d", g_logs_manag_update_every);
+    if(g_logs_manag_config.update_every < localhost->rrd_update_every) g_logs_manag_config.update_every = localhost->rrd_update_every;
+    info("CONFIG: global logs management update every: %d", g_logs_manag_config.update_every);
 
-    g_logs_manag_circ_buff_spare_items = (int)config_get_number(CONFIG_SECTION_LOGS_MANAGEMENT, 
+
+    g_logs_manag_config.circ_buff_spare_items = (int)config_get_number(CONFIG_SECTION_LOGS_MANAGEMENT, 
                                                                 "circular buffer spare items", 
                                                                 CIRCULAR_BUFF_SPARE_ITEMS_DEFAULT);
 
     char db_default_dir[FILENAME_MAX + 1];
     snprintfz(db_default_dir, FILENAME_MAX, "%s" LOGS_MANAG_DB_SUBPATH, netdata_configured_cache_dir);
     db_set_main_dir(config_get(CONFIG_SECTION_LOGS_MANAGEMENT, "db dir", db_default_dir));
+
+
+    const char *const db_mode_str = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, "db mode", GLOBAL_DB_MODE_DEFAULT_STR);
+    g_logs_manag_config.db_mode = db_mode_str_to_db_mode(db_mode_str);
+
 
     char *filename = strdupz_path_subpath(netdata_configured_user_config_dir, "logsmanagement.conf");
     if(!appconfig_load(&log_management_config, filename, 0, NULL)) {
@@ -158,7 +174,7 @@ static int logs_manag_config_load(void){
         }
     }
     freez(filename);
-    
+
     return rc;
 }
 
@@ -317,8 +333,8 @@ static void logs_management_init(struct section *config_section){
      * Read "update every" configuration.
      * ------------------------------------------------------------------------- */
     p_file_info->update_every = appconfig_get_number(   &log_management_config, config_section->name, 
-                                                        "update every", g_logs_manag_update_every);
-    if(p_file_info->update_every < g_logs_manag_update_every) p_file_info->update_every = g_logs_manag_update_every;
+                                                        "update every", g_logs_manag_config.update_every);
+    if(p_file_info->update_every < g_logs_manag_config.update_every) p_file_info->update_every = g_logs_manag_config.update_every;
     info("[%s]: update every = %d", p_file_info->chart_name, p_file_info->update_every);
 
 
@@ -333,12 +349,10 @@ static void logs_management_init(struct section *config_section){
     /* -------------------------------------------------------------------------
      * Read DB mode.
      * ------------------------------------------------------------------------- */
-    char *db_mode = appconfig_get(&log_management_config, config_section->name, "DB mode", "full");
-    if(!db_mode || !*db_mode || !strcasecmp(db_mode, "full")) p_file_info->db_mode = LOGS_MANAG_DB_MODE_FULL;
-    else if(!strcasecmp(db_mode, "none")) p_file_info->db_mode = LOGS_MANAG_DB_MODE_NONE;
-    else p_file_info->db_mode = LOGS_MANAG_DB_MODE_FULL;
-    info("[%s]: DB mode = %s", p_file_info->chart_name, db_mode);
-    freez(db_mode);
+    const char *const db_mode_str = appconfig_get(&log_management_config, config_section->name, "db mode", NULL);
+    info("[%s]: db mode = %s", p_file_info->chart_name, db_mode_str ? db_mode_str : "NULL");
+    p_file_info->db_mode = db_mode_str_to_db_mode(db_mode_str);
+    freez((void *)db_mode_str);
 
 
     /* -------------------------------------------------------------------------
@@ -354,18 +368,18 @@ static void logs_management_init(struct section *config_section){
      * Read save logs from buffers to DB interval configuration.
      * ------------------------------------------------------------------------- */
     p_file_info->buff_flush_to_db_interval = appconfig_get_number(  &log_management_config, config_section->name, 
-                                                                    "buffer flush to DB", SAVE_BLOB_TO_DB_DEFAULT);
+                                                                    "buffer flush to db", SAVE_BLOB_TO_DB_DEFAULT);
     if(p_file_info->buff_flush_to_db_interval > SAVE_BLOB_TO_DB_MAX) {
         p_file_info->buff_flush_to_db_interval = SAVE_BLOB_TO_DB_MAX;
-        info("[%s]: buffer flush to DB out of range. Using maximum permitted value: %d", 
+        info("[%s]: buffer flush to db out of range. Using maximum permitted value: %d", 
                 p_file_info->chart_name, p_file_info->buff_flush_to_db_interval);
 
     } else if(p_file_info->buff_flush_to_db_interval < SAVE_BLOB_TO_DB_MIN) {
         p_file_info->buff_flush_to_db_interval = SAVE_BLOB_TO_DB_MIN;
-        info("[%s]: buffer flush to DB out of range. Using minimum permitted value: %d",
+        info("[%s]: buffer flush to db out of range. Using minimum permitted value: %d",
                 p_file_info->chart_name, p_file_info->buff_flush_to_db_interval);
     } 
-    info("[%s]: buffer flush to DB = %d", p_file_info->chart_name, p_file_info->buff_flush_to_db_interval);
+    info("[%s]: buffer flush to db = %d", p_file_info->chart_name, p_file_info->buff_flush_to_db_interval);
 
 
     /* -------------------------------------------------------------------------
@@ -708,7 +722,7 @@ static void logs_management_init(struct section *config_section){
                                                                     "circular buffer drop logs if full", 0);
     info("[%s]: circular buffer drop logs if full = %d", p_file_info->chart_name, circular_buffer_allow_dropped_logs);
 
-    p_file_info->circ_buff = circ_buff_init(p_file_info->buff_flush_to_db_interval + g_logs_manag_circ_buff_spare_items,
+    p_file_info->circ_buff = circ_buff_init(p_file_info->buff_flush_to_db_interval + g_logs_manag_config.circ_buff_spare_items,
                                             circular_buffer_max_size, circular_buffer_allow_dropped_logs);
 
 

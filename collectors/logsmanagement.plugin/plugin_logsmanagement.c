@@ -471,7 +471,7 @@ void *logsmanagement_plugin_main(void *ptr){
             , "logsmanagement.plugin"
             , NULL
             , NETDATA_CHART_PRIO_CIRC_BUFF_MEM_TOT 
-            , g_logs_manag_update_every
+            , g_logs_manag_config.update_every
             , RRDSET_TYPE_AREA
     );
     stats_chart_data->dim_circ_buff_mem_total_arr = callocz(p_file_infos_arr->count, sizeof(RRDDIM));
@@ -489,7 +489,7 @@ void *logsmanagement_plugin_main(void *ptr){
             , "logsmanagement.plugin"
             , NULL
             , NETDATA_CHART_PRIO_CIRC_BUFF_MEM_UNC 
-            , g_logs_manag_update_every
+            , g_logs_manag_config.update_every
             , RRDSET_TYPE_AREA
     );
     stats_chart_data->dim_circ_buff_mem_uncompressed_arr = callocz(p_file_infos_arr->count, sizeof(RRDDIM));
@@ -507,7 +507,7 @@ void *logsmanagement_plugin_main(void *ptr){
             , "logsmanagement.plugin"
             , NULL
             , NETDATA_CHART_PRIO_CIRC_BUFF_MEM_COM 
-            , g_logs_manag_update_every
+            , g_logs_manag_config.update_every
             , RRDSET_TYPE_AREA
     );
     stats_chart_data->dim_circ_buff_mem_compressed_arr = callocz(p_file_infos_arr->count, sizeof(RRDDIM));
@@ -525,7 +525,7 @@ void *logsmanagement_plugin_main(void *ptr){
             , "logsmanagement.plugin"
             , NULL
             , NETDATA_CHART_PRIO_COMPR_RATIO 
-            , g_logs_manag_update_every
+            , g_logs_manag_config.update_every
             , RRDSET_TYPE_AREA
     );
     stats_chart_data->dim_compression_ratio = callocz(p_file_infos_arr->count, sizeof(RRDDIM));
@@ -543,7 +543,7 @@ void *logsmanagement_plugin_main(void *ptr){
             , "logsmanagement.plugin"
             , NULL
             , NETDATA_CHART_PRIO_DISK_USAGE 
-            , g_logs_manag_update_every
+            , g_logs_manag_config.update_every
             , RRDSET_TYPE_AREA
     );
     stats_chart_data->dim_disk_usage = callocz(p_file_infos_arr->count, sizeof(RRDDIM));
@@ -622,7 +622,7 @@ void *logsmanagement_plugin_main(void *ptr){
     }
 
 
-    usec_t step = g_logs_manag_update_every * USEC_PER_SEC;
+    usec_t step = g_logs_manag_config.update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
 
