@@ -125,17 +125,22 @@ static void p_file_info_destroy(struct File_info *p_file_info){
  * -2 if config file not found
  */
 static int logs_manag_config_load(void){
+    int rc = 0;
 
-    if(config_get_boolean(CONFIG_SECTION_LOGS_MANAGEMENT, "enabled", 1) == 0){
-        info("CONFIG: Logs management disabled globally.");
-        return -1;
+    if(config_get_boolean(CONFIG_SECTION_LOGS_MANAGEMENT, "enabled", 0) == 0){
+        info("CONFIG: Logs management disabled due to configuration option.");
+        rc = -1;
     }
 
-    g_logs_manag_update_every = (int)config_get_number(CONFIG_SECTION_LOGS_MANAGEMENT, "update every", localhost->rrd_update_every);
+    g_logs_manag_update_every = (int)config_get_number( CONFIG_SECTION_LOGS_MANAGEMENT, 
+                                                        "update every", 
+                                                        localhost->rrd_update_every);
     if(g_logs_manag_update_every < localhost->rrd_update_every) g_logs_manag_update_every = localhost->rrd_update_every;
     info("CONFIG: global logs management update every: %d", g_logs_manag_update_every);
 
-    g_logs_manag_circ_buff_spare_items = (int)config_get_number(CONFIG_SECTION_LOGS_MANAGEMENT, "circular buffer spare items", CIRCULAR_BUFF_SPARE_ITEMS_DEFAULT);
+    g_logs_manag_circ_buff_spare_items = (int)config_get_number(CONFIG_SECTION_LOGS_MANAGEMENT, 
+                                                                "circular buffer spare items", 
+                                                                CIRCULAR_BUFF_SPARE_ITEMS_DEFAULT);
 
     char db_default_dir[FILENAME_MAX + 1];
     snprintfz(db_default_dir, FILENAME_MAX, "%s" LOGS_MANAG_DB_SUBPATH, netdata_configured_cache_dir);
@@ -149,12 +154,12 @@ static int logs_manag_config_load(void){
         filename = strdupz_path_subpath(netdata_configured_stock_config_dir, "logsmanagement.conf");
         if(!appconfig_load(&log_management_config, filename, 0, NULL)){
             error("CONFIG: cannot load stock config '%s'. Logs management will be disabled.", filename);
-            freez(filename);
-            return -2;
+            rc = -2;
         }
     }
     freez(filename);
-    return 0;
+    
+    return rc;
 }
 
 /**

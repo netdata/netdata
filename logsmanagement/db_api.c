@@ -376,6 +376,11 @@ int db_init() {
     char *err_msg = 0;
     uv_fs_t mkdir_req;
     
+    if(!main_db_dir || !*main_db_dir){
+        rc = -1;
+        error("main_db_dir is not set");
+        goto return_error;
+    }
     size_t main_db_path_len = strlen(main_db_dir) + sizeof(MAIN_DB) + 1;
     main_db_path = mallocz(main_db_path_len);
     snprintfz(main_db_path, main_db_path_len, "%s/" MAIN_DB, main_db_dir);
