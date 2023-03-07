@@ -1184,6 +1184,9 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_m
     value = ebpf_convert_collect_pid_to_string(modules->apps_level);
     value = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_COLLECT_PID, value);
     modules->apps_level =  ebpf_convert_string_to_apps_level(value);
+
+    modules->maps_per_core = appconfig_get_boolean(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_MAPS_PER_CORE,
+                                                   modules->maps_per_core);
 }
 
 /**
