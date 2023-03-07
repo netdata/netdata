@@ -597,14 +597,15 @@ void ebpf_update_map_size(struct bpf_map *map, ebpf_local_maps_t *lmap, ebpf_mod
 }
 
 /**
- * Update Legacy map sizes
+ * Update Legacy map
  *
- * Update map size for eBPF legacy code.
+ * Update map for eBPF legacy code.
  *
  * @param program the structure with values read from binary.
  * @param em      the structure with information about how the module/thread is working.
+ * @param kver    the kernel version according /usr/include/linux/version.h
  */
-static void ebpf_update_legacy_map_sizes(struct bpf_object *program, ebpf_module_t *em)
+static void ebpf_update_legacy_map(struct bpf_object *program, ebpf_module_t *em, int kver)
 {
     struct bpf_map *map;
     ebpf_local_maps_t *maps = em->maps;
@@ -614,13 +615,25 @@ static void ebpf_update_legacy_map_sizes(struct bpf_object *program, ebpf_module
     bpf_map__for_each(map, program)
     {
         const char *map_name = bpf_map__name(map);
-        int i = 0; ;
+        int i = 0;
         while (maps[i].name) {
             ebpf_local_maps_t *w = &maps[i];
-            if (w->type & NETDATA_EBPF_MAP_RESIZABLE) {
-                if (!strcmp(w->name, map_name)) {
+
+            if (!strcmp(w->name, map_name)) {
+                // Modify size
+                if (w->type & NETDATA_EBPF_MAP_RESIZABLE) {
                     ebpf_update_map_size(map, w, em, map_name);
                 }
+
+#ifdef LIBBPF_MAJOR_VERSION
+                // Modify type
+                // Before kernel 4.15 there was not percpu hash tables
+                if (kver >= NETDATA_EBPF_KERNEL_4_15 && em->maps_per_core == CONFIG_BOOLEAN_YES) {
+                    if (bpf_map__set_type(map, w->map_type)) {
+                        error("Cannot modify map type for %s", w->name);
+                    }
+                }
+#endif
             }
 
             i++;
@@ -796,7 +809,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
         return NULL;
     }
 
-    ebpf_update_legacy_map_sizes(*obj, em);
+    ebpf_update_legacy_map(*obj, em, kver);
 
     if (bpf_object__load(*obj)) {
         error("ERROR: loading BPF object file failed %s\n", lpath);
