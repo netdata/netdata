@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Properly handle service type detection failures when installing as a system service. [\#14658](https://github.com/netdata/netdata/pull/14658) ([Ferroin](https://github.com/Ferroin))
 - fix simple\_pattern\_create on freebsd [\#14656](https://github.com/netdata/netdata/pull/14656) ([ilyam8](https://github.com/ilyam8))
 - Fix broken links in glossary.md [\#14653](https://github.com/netdata/netdata/pull/14653) ([Ancairon](https://github.com/Ancairon))
 - Fix links [\#14651](https://github.com/netdata/netdata/pull/14651) ([cakrit](https://github.com/cakrit))
@@ -393,7 +394,6 @@
 - minor - Adds better information in case of SSL error [\#14041](https://github.com/netdata/netdata/pull/14041) ([underhood](https://github.com/underhood))
 - replication fixes \#5 [\#14038](https://github.com/netdata/netdata/pull/14038) ([ktsaou](https://github.com/ktsaou))
 - do not merge duplicate replication requests  [\#14037](https://github.com/netdata/netdata/pull/14037) ([ktsaou](https://github.com/ktsaou))
-- Replication fixes \#3 [\#14035](https://github.com/netdata/netdata/pull/14035) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
