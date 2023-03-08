@@ -77,11 +77,13 @@ You can visit the _Billing Options & Invoices_ in the **Plan & Billing** section
 
 Every time you purchase or renew a Plan, two separate Invoices are generated:
 
-- One Invoice includes the recurring fees of the Plan you have chosen 
+- One Invoice includes the recurring fees of the Plan you have chosen
+
 - The other Invoice includes your monthly “On Demand - Usage”.
-         Right after the activation of your subscription you will receive a zero value Invoice
-         since you had no usage when you subscribed. Starting next month
-         you will receive an Invoice based on your monthly usage.
+
+  Right after the activation of your subscription, you will receive a zero value Invoice since you had no usage when you subscribed. 
+  
+  On the following month you will receive an Invoice based on your monthly usage.
 
 You can find some further details on the [Netdata Plans page](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md#plans).
 
