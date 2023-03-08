@@ -19,6 +19,9 @@ static h2o_accept_ctx_t accept_ctx;
 #define HTTPD_CONFIG_SECTION "httpd"
 #define HTTPD_ENABLED_DEFAULT false
 
+#define NETDATA_STREAM_PROTO_NAME "netdata_stream/2.0"
+#define NETDATA_STREAM_URL "/stream"
+
 static void on_accept(uv_stream_t *listener, int status)
 {
     uv_tcp_t *conn;
@@ -101,7 +104,23 @@ static int ssl_init()
         return -1;
     }
 
-    h2o_ssl_register_alpn_protocols(accept_ctx.ssl_ctx, h2o_http2_alpn_protocols);
+    // now this might be a bit confusing to figure out
+    // so here is an explanation (you are eternaly welcome)
+    // h2o will call on_ssl_handshake_complete
+    // where it will figure out that "netdata_stream/2.0"
+    // is not member of h2o_http2_alpn_protocols and therefore
+    // fallback to HTTP/1.1 which in turn allows us to use
+    // HTTP/1.1 upgrade header to upgrade to our stream protocol
+    // therefore using the same code path used when TLS is disabled
+#define ALPN_ENTRY(s) \
+    {                 \
+        H2O_STRLIT(s) \
+    }
+
+#define NETDATA_ALPN_PROTOCOLS ALPN_ENTRY("h2"), ALPN_ENTRY("h2-16"), ALPN_ENTRY("h2-14"), ALPN_ENTRY("http/1.1"), ALPN_ENTRY(NETDATA_STREAM_PROTO_NAME)
+
+    static const h2o_iovec_t alpn_protocols[] = { NETDATA_ALPN_PROTOCOLS, {NULL} };
+    h2o_ssl_register_alpn_protocols(accept_ctx.ssl_ctx, alpn_protocols);
 
     return 0;
 }
@@ -300,6 +319,36 @@ static int hdl_netdata_conf(h2o_handler_t *self, h2o_req_t *req)
     return 0;
 }
 
+static inline int is_streaming_handshake(h2o_req_t *req)
+{
+    /* method */
+    if (!h2o_memis(req->input.method.base, req->input.method.len, H2O_STRLIT("GET")))
+        return 1;
+
+    if (!h2o_memis(req->path_normalized.base, req->path_normalized.len, H2O_STRLIT(NETDATA_STREAM_URL))) {
+        return 1;
+    }
+
+    /* upgrade header */
+    if (req->upgrade.base == NULL || !h2o_lcstris(req->upgrade.base, req->upgrade.len, H2O_STRLIT(NETDATA_STREAM_PROTO_NAME)))
+        return 1;
+
+    // TODO consider adding some key in form of random number
+    // to prevent caching on route especially if TLS is not used
+    // e.g. client sends random number
+    // server replies with it xored
+
+    return 0;
+}
+
+static int hdl_stream(h2o_handler_t *self, h2o_req_t *req)
+{
+    if (is_streaming_handshake(req)) {
+        return 1;
+    }
+
+}
+
 void *httpd_main(void *ptr) {
     h2o_pathconf_t *pathconf;
     h2o_hostconf_t *hostconf;
@@ -313,6 +362,10 @@ void *httpd_main(void *ptr) {
     pathconf = h2o_config_register_path(hostconf, "/netdata.conf", 0);
     h2o_handler_t *handler = h2o_create_handler(pathconf, sizeof(*handler));
     handler->on_req = hdl_netdata_conf;
+
+    pathconf = h2o_config_register_path(hostconf, NETDATA_STREAM_URL, 0);
+    handler = h2o_create_handler(pathconf, sizeof(*handler));
+    handler->on_req = hdl_stream;
 
     pathconf = h2o_config_register_path(hostconf, "/", 0);
     handler = h2o_create_handler(pathconf, sizeof(*handler));
