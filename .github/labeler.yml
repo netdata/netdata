@@ -10,7 +10,7 @@
 #
 # Please keep the labels sorted and deduplicated.
 
-area/ACLK:
+area/aclk:
   - aclk/*
   - aclk/**/*
   - database/sqlite/sqlite_aclk*
@@ -45,7 +45,7 @@ area/database:
   - database/*
   - database/**/*
 
-area/docs:
+documentation:
   - "*.md"
   - "**/*.md"
   - "**/*.mdx"
@@ -53,10 +53,6 @@ area/docs:
   - diagrams/**/*
 
 # -----------------collectors----------------------
-
-area/collectors:
-  - collectors/*
-  - collectors/**/*
 
 collectors/plugins.d:
   - collectors/plugins.d/*
@@ -179,6 +175,14 @@ area/tests:
   - cppcheck.sh
   - netdata.cppcheck
 
-area/web:
-  - web/*
-  - web/**/*
+area/web/api:
+  - web/api/*
+  - web/api/**/*
+
+area/web/gui:
+  - web/gui/*
+  - web/gui/**/*
+
+area/web/server:
+  - web/server/*
+  - web/server/**/*
