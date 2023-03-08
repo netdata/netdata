@@ -78,7 +78,7 @@ You can visit the _Billing Options & Invoices_ in the **Plan & Billing** section
 Every time you purchase or renew a Plan, two separate Invoices are generated:
 
 - One Invoice includes the recurring fees of the Plan you have chosen 
-     - The other Invoice includes your monthly “On Demand - Usage”.
+- The other Invoice includes your monthly “On Demand - Usage”.
          Right after the activation of your subscription you will receive a zero value Invoice
          since you had no usage when you subscribed. Starting next month
          you will receive an Invoice based on your monthly usage.
