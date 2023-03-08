@@ -79,6 +79,7 @@
  *
  */
 enum netdata_ebpf_kernel_versions {
+    NETDATA_EBPF_KERNEL_4_06 = 263680,  //  264960 = 4 * 65536 +  6 * 256
     NETDATA_EBPF_KERNEL_4_11 = 264960,  //  264960 = 4 * 65536 + 15 * 256
     NETDATA_EBPF_KERNEL_4_14 = 265728,  //  264960 = 4 * 65536 + 14 * 256
     NETDATA_EBPF_KERNEL_4_15 = 265984,  //  265984 = 4 * 65536 + 15 * 256
@@ -397,6 +398,8 @@ void ebpf_adjust_thread_load(ebpf_module_t *mod, struct btf *file);
 struct btf *ebpf_parse_btf_file(const char *filename);
 struct btf *ebpf_load_btf_file(char *path, char *filename);
 int ebpf_is_function_inside_btf(struct btf *file, char *function);
+void ebpf_update_map_type(struct bpf_map *map, ebpf_local_maps_t *w);
+void ebpf_define_map_type(ebpf_local_maps_t *maps, int maps_per_core, int kver);
 #endif
 
 void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report, ebpf_local_maps_t *maps);

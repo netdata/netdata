@@ -596,6 +596,58 @@ void ebpf_update_map_size(struct bpf_map *map, ebpf_local_maps_t *lmap, ebpf_mod
 #endif
 }
 
+#ifdef LIBBPF_MAJOR_VERSION
+/**
+ * Update map type
+ *
+ * Update map type with information given.
+ *
+ * @param map   the map we want to modify
+ * @param w     a structure with user input
+ */
+void ebpf_update_map_type(struct bpf_map *map, ebpf_local_maps_t *w)
+{
+    if (bpf_map__set_type(map, w->map_type)) {
+        error("Cannot modify map type for %s", w->name);
+    }
+}
+
+/**
+ * Define map type
+ *
+ * This PR defines the type used by hash tables according user input.
+ *
+ * @param maps          the list of maps used with a hash table.
+ * @param maps_per_core define if map type according user specification.
+ * @param kver          kernel version host is running.
+ */
+void ebpf_define_map_type(ebpf_local_maps_t *maps, int maps_per_core, int kver)
+{
+    // Before kernel 4.06 there was not percpu hash tables
+    if (kver < NETDATA_EBPF_KERNEL_4_06)
+        maps_per_core = CONFIG_BOOLEAN_NO;
+
+    int i = 0;
+    while (maps[i].name) {
+        ebpf_local_maps_t *map = &maps[i];
+        // maps_per_core is a boolean value in configuration files.
+        if (maps_per_core) {
+            if (map->map_type == BPF_MAP_TYPE_HASH)
+                map->map_type = BPF_MAP_TYPE_PERCPU_HASH;
+            else if (map->map_type == BPF_MAP_TYPE_ARRAY)
+                map->map_type = BPF_MAP_TYPE_PERCPU_ARRAY;
+        } else {
+            if (map->map_type == BPF_MAP_TYPE_PERCPU_HASH)
+                map->map_type = BPF_MAP_TYPE_HASH;
+            else if (map->map_type == BPF_MAP_TYPE_PERCPU_ARRAY)
+                map->map_type = BPF_MAP_TYPE_ARRAY;
+        }
+
+        i++;
+    }
+}
+#endif
+
 /**
  * Update Legacy map
  *
@@ -603,9 +655,8 @@ void ebpf_update_map_size(struct bpf_map *map, ebpf_local_maps_t *lmap, ebpf_mod
  *
  * @param program the structure with values read from binary.
  * @param em      the structure with information about how the module/thread is working.
- * @param kver    the kernel version according /usr/include/linux/version.h
  */
-static void ebpf_update_legacy_map(struct bpf_object *program, ebpf_module_t *em, int kver)
+static void ebpf_update_legacy_map(struct bpf_object *program, ebpf_module_t *em)
 {
     struct bpf_map *map;
     ebpf_local_maps_t *maps = em->maps;
@@ -626,13 +677,7 @@ static void ebpf_update_legacy_map(struct bpf_object *program, ebpf_module_t *em
                 }
 
 #ifdef LIBBPF_MAJOR_VERSION
-                // Modify type
-                // Before kernel 4.15 there was not percpu hash tables
-                if (kver >= NETDATA_EBPF_KERNEL_4_15 && em->maps_per_core == CONFIG_BOOLEAN_YES) {
-                    if (bpf_map__set_type(map, w->map_type)) {
-                        error("Cannot modify map type for %s", w->name);
-                    }
-                }
+                ebpf_update_map_type(map, w);
 #endif
             }
 
@@ -809,7 +854,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
         return NULL;
     }
 
-    ebpf_update_legacy_map(*obj, em, kver);
+    ebpf_update_legacy_map(*obj, em);
 
     if (bpf_object__load(*obj)) {
         error("ERROR: loading BPF object file failed %s\n", lpath);
