@@ -203,3 +203,19 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
+
+  # The following jobs always run
+
+  labels:
+    name: label-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git clone repository
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: Install dependencies
+        run: pip install ruamel.yaml
+      - name: Check labels
+        run: .github/scripts/check-labels.py
