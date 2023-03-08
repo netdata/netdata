@@ -1245,6 +1245,9 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_m
 
     modules->maps_per_core = appconfig_get_boolean(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_MAPS_PER_CORE,
                                                    modules->maps_per_core);
+    if (kver < NETDATA_EBPF_KERNEL_4_06)
+        modules->maps_per_core = CONFIG_BOOLEAN_NO;
+
 #ifdef NETDATA_DEV_MODE
     info("The thread %s was configured with: mode = %s; update every = %d; apps = %s; cgroup = %s; ebpf type format = %s; ebpf co-re tracing = %s; collect pid = %s; maps per core = %s",
          modules->thread_name,
