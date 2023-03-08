@@ -1,3 +1,4 @@
+---
 # This configures label matching for PR's.
 #
 # The keys are labels, and the values are lists of minimatch patterns
@@ -45,18 +46,67 @@ area/database:
   - database/*
   - database/**/*
 
-documentation:
-  - "*.md"
-  - "**/*.md"
-  - "**/*.mdx"
-  - diagrams/*
-  - diagrams/**/*
+area/health:
+  - health/*
+  - health/**/*
 
-# -----------------collectors----------------------
+area/ml:
+  - ml/*
+  - ml/**/*
 
-collectors/plugins.d:
-  - collectors/plugins.d/*
-  - collectors/plugins.d/**/*
+area/packaging:
+  - contrib/*
+  - contrib/**/*
+  - packaging/*
+  - packaging/**/*
+  - system/*
+  - system/**/*
+  - Dockerfile*
+  - netdata-installer.sh
+  - netdata.spec.in
+
+area/packaging/deb:
+  - packaging/repoconfig/debian/*
+  - packaging/repoconfig/debian/**/*
+  - packaging/repoconfig/build-deb.sh
+  - packaging/repoconfig/Makefile
+  - packaging/repoconfig/netdata.list.in
+  - contrib/debian/*
+  - contrib/debian/**/*
+
+area/packaging/rpm:
+  - packaging/repoconfig/netdata-repo.spec
+  - packaging/repoconfig/build-rpm.sh
+  - packaging/repoconfig/netdata*.repo.*
+  - netdata.spec.in
+
+area/registry:
+  - registry/*
+  - registry/**/*
+
+area/streaming:
+  - streaming/*
+  - streaming/**/*
+
+area/tests:
+  - tests/*
+  - tests/**/*
+  - daemon/unit_test*
+  - coverity-scan.sh
+  - cppcheck.sh
+  - netdata.cppcheck
+
+area/web/api:
+  - web/api/*
+  - web/api/**/*
+
+area/web/gui:
+  - web/gui/*
+  - web/gui/**/*
+
+area/web/server:
+  - web/server/*
+  - web/server/**/*
 
 collectors/apps:
   - collectors/apps.plugin/*
@@ -110,6 +160,10 @@ collectors/perf:
   - collectors/perf.plugin/*
   - collectors/perf.plugin/**/*
 
+collectors/plugins.d:
+  - collectors/plugins.d/*
+  - collectors/plugins.d/**/*
+
 collectors/proc:
   - collectors/proc.plugin/*
   - collectors/proc.plugin/**/*
@@ -138,51 +192,56 @@ collectors/xenstat:
   - collectors/xenstat.plugin/*
   - collectors/xenstat.plugin/**/*
 
-# ----------------/collectors----------------------
+collectors/new:
+  - all:
+      - collectors/*/*
+      - collectors/*/**/*
+      - '!collectors/apps.plugin/*'
+      - '!collectors/apps.plugin/**/*'
+      - '!collectors/cgroups.plugin/*'
+      - '!collectors/cgroups.plugin/**/*'
+      - '!collectors/charts.d.plugin/*'
+      - '!collectors/charts.d.plugin/**/*'
+      - '!collectors/cups.plugin/*'
+      - '!collectors/cups.plugin/**/*'
+      - '!collectors/diskspace.plugin/*'
+      - '!collectors/diskspace.plugin/**/*'
+      - '!collectors/ebpf.plugin/*'
+      - '!collectors/ebpf.plugin/**/*'
+      - '!collectors/freebsd.plugin/*'
+      - '!collectors/freebsd.plugin/**/*'
+      - '!collectors/freeipmi.plugin/*'
+      - '!collectors/freeipmi.plugin/**/*'
+      - '!collectors/idlejitter.plugin/*'
+      - '!collectors/idlejitter.plugin/**/*'
+      - '!collectors/ioping.plugin/*'
+      - '!collectors/ioping.plugin/**/*'
+      - '!collectors/macos.plugin/*'
+      - '!collectors/macos.plugin/**/*'
+      - '!collectors/nfacct.plugin/*'
+      - '!collectors/nfacct.plugin/**/*'
+      - '!collectors/perf.plugin/*'
+      - '!collectors/perf.plugin/**/*'
+      - '!collectors/plugins.d/*'
+      - '!collectors/plugins.d/**/*'
+      - '!collectors/proc.plugin/*'
+      - '!collectors/proc.plugin/**/*'
+      - '!collectors/python.d.plugin/*'
+      - '!collectors/python.d.plugin/**/*'
+      - '!collectors/slabinfo.plugin/*'
+      - '!collectors/slabinfo.plugin/**/*'
+      - '!collectors/statsd.plugin/*'
+      - '!collectors/statsd.plugin/**/*'
+      - '!collectors/tc.plugin/*'
+      - '!collectors/tc.plugin/**/*'
+      - '!collectors/timex.plugin/*'
+      - '!collectors/timex.plugin/**/*'
+      - '!collectors/xenstat.plugin/*'
+      - '!collectors/xenstat.plugin/**/*'
 
-area/health:
-  - health/*
-  - health/**/*
-
-area/ml:
-  - ml/*
-  - ml/**/*
-
-area/packaging:
-  - contrib/*
-  - contrib/**/*
-  - packaging/*
-  - packaging/**/*
-  - system/*
-  - system/**/*
-  - Dockerfile*
-  - netdata-installer.sh
-  - netdata.spec.in
-
-area/registry:
-  - registry/*
-  - registry/**/*
-
-area/streaming:
-  - streaming/*
-  - streaming/**/*
-
-area/tests:
-  - tests/*
-  - tests/**/*
-  - daemon/unit_test*
-  - coverity-scan.sh
-  - cppcheck.sh
-  - netdata.cppcheck
-
-area/web/api:
-  - web/api/*
-  - web/api/**/*
-
-area/web/gui:
-  - web/gui/*
-  - web/gui/**/*
-
-area/web/server:
-  - web/server/*
-  - web/server/**/*
+documentation:
+  - "*.md"
+  - "**/*.md"
+  - "**/*.mdx"
+  - diagrams/*
+  - diagrams/**/*
