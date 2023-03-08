@@ -256,7 +256,7 @@ paths:
         - name: scope_nodes
           in: query
           description: |
-            A simple pattern limiting the nodes scope of the query. The scope controls both data and metadata response. The simple pattern is checked against the nodes' machine guid, node id, hostname. The default nodes scope is all nodes for which this agent has data for. Usually the nodes scope is used to slice the entire dashboard (e.g. the Global Nodes Selector at the Netdata Cloud overview dashboard).
+            A simple pattern limiting the nodes scope of the query. The scope controls both data and metadata response. The simple pattern is checked against the nodes' machine guid, node id, hostname. The default nodes scope is all nodes for which this agent has data for. Usually the nodes scope is used to slice the entire dashboard (e.g. the Global Nodes Selector at the Netdata Cloud overview dashboard). Both positive and negative simple pattern expressions are supported.
           required: false
           schema:
             type: string
@@ -265,7 +265,7 @@ paths:
         - name: scope_contexts
           in: query
           description: |
-            A simple pattern limiting the contexts scope of the query. The scope controls both data and metadata response. The default contexts scope is all contexts for which this agent has data for. Usually the contexts scope is used to slice charts of the dashboard (e.g. each context based chart has its own contexts scope, limiting the chart to all the instances of the selected contexts).
+            A simple pattern limiting the contexts scope of the query. The scope controls both data and metadata response. The default contexts scope is all contexts for which this agent has data for. Usually the contexts scope is used to slice charts of the dashboard (e.g. each context based chart has its own contexts scope, limiting the chart to all the instances of the selected contexts). Both positive and negative simple pattern expressions are supported.
           required: false
           schema:
             type: string
@@ -274,7 +274,7 @@ paths:
         - name: nodes
           in: query
           description: |
-            A simple pattern matching the nodes to be queried. This only controls the data response, not the metadata. The simple pattern is checked against the nodes' machine guid, node id, hostname. The default nodes selector is all the nodes matched by the nodes scope.
+            A simple pattern matching the nodes to be queried. This only controls the data response, not the metadata. The simple pattern is checked against the nodes' machine guid, node id, hostname. The default nodes selector is all the nodes matched by the nodes scope. Both positive and negative simple pattern expressions are supported.
           required: false
           schema:
             type: string
@@ -283,7 +283,7 @@ paths:
         - name: contexts
           in: query
           description: |
-            A simple pattern matching the contexts to be queried. This only controls the data response, not the metadata.
+            A simple pattern matching the contexts to be queried. This only controls the data response, not the metadata. Both positive and negative simple pattern expressions are supported.
           required: false
           schema:
             type: string
@@ -292,8 +292,7 @@ paths:
         - name: instances
           in: query
           description: |
-            A simple pattern matching the instances to be queried.
-            The simple pattern is checked against the instance `id`, the instance `name`, the fully qualified name of the instance `id` and `name`, like `instance@machine_guid`, where `instance` is either its `id` or `name`.
+            A simple pattern matching the instances to be queried. The simple pattern is checked against the instance `id`, the instance `name`, the fully qualified name of the instance `id` and `name`, like `instance@machine_guid`, where `instance` is either its `id` or `name`. Both positive and negative simple pattern expressions are supported.
           required: false
           schema:
             type: string
@@ -302,7 +301,7 @@ paths:
         - name: labels
           in: query
           description: |
-            A simple pattern matching the labels to be queried. The simple pattern is checked against `name:value` of all the labels of all the eligible instances (as filtered by all the above: scope nodes, scope contexts, nodes, contexts and instances).
+            A simple pattern matching the labels to be queried. The simple pattern is checked against `name:value` of all the labels of all the eligible instances (as filtered by all the above: scope nodes, scope contexts, nodes, contexts and instances). Negative simple patterns should not be used in this filter.
           required: false
           schema:
             type: string
@@ -311,7 +310,7 @@ paths:
         - name: alerts
           in: query
           description: |
-            A simple pattern matching the alerts to be queried. The simple pattern is checked against the `name` of alerts and the combination of `name:status`, when status is one of `CLEAR`, `WARNING`, `CRITICAL`, `REMOVED`, `UNDEFINED`, `UNINITIALIZED`, of all the alerts of all the eligible instances (as filtered by all the above).
+            A simple pattern matching the alerts to be queried. The simple pattern is checked against the `name` of alerts and the combination of `name:status`, when status is one of `CLEAR`, `WARNING`, `CRITICAL`, `REMOVED`, `UNDEFINED`, `UNINITIALIZED`, of all the alerts of all the eligible instances (as filtered by all the above). A negative simple pattern will exclude the instances having the labels matched.
           required: false
           schema:
             type: string
@@ -320,7 +319,7 @@ paths:
         - name: dimensions
           in: query
           description: |
-            A simple patterns matching the dimensions to be queried. The simple pattern is checked against and `id` and the `name` of the dimensions of the eligible instances (as filtered by all the above).
+            A simple patterns matching the dimensions to be queried. The simple pattern is checked against and `id` and the `name` of the dimensions of the eligible instances (as filtered by all the above). Both positive and negative simple pattern expressions are supported.
           required: false
           schema:
             type: string

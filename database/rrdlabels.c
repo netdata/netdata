@@ -875,7 +875,7 @@ static int simple_pattern_match_name_and_value_callback(const DICTIONARY_ITEM *i
     *dst = '\0';
 
     t->searches++;
-    if(simple_pattern_matches_length_extract(t->pattern, tmp, dst - tmp, NULL, 0))
+    if(simple_pattern_matches_length_extract(t->pattern, tmp, dst - tmp, NULL, 0) == SP_MATCHED_POSITIVE)
         return -1;
 
     return 0;

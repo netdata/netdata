@@ -355,10 +355,15 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
         if (qt->query.pattern) {
             // the user asked for specific dimensions
 
-            if ((qtl->match_ids && simple_pattern_matches_string(qt->query.pattern, rm->id)) ||
-                (qtl->match_names && rm->name != rm->id &&
-                 simple_pattern_matches_string(qt->query.pattern, rm->name))) {
-                // the user asked for this dimension
+            SIMPLE_PATTERN_RESULT ret = SP_NOT_MATCHED;
+
+            if(qtl->match_ids)
+                ret = simple_pattern_matches_string_extract(qt->query.pattern, rm->id, NULL, 0);
+
+            if(ret == SP_NOT_MATCHED && qtl->match_names && (rm->name != rm->id || !qtl->match_ids))
+                ret = simple_pattern_matches_string_extract(qt->query.pattern, rm->name, NULL, 0);
+
+            if(ret == SP_MATCHED_POSITIVE) {
                 needed = true;
                 options |= RRDR_DIMENSION_SELECTED | RRDR_DIMENSION_NONZERO;
             }
@@ -568,12 +573,16 @@ static bool query_target_match_alert_pattern(QUERY_INSTANCE *qi, SIMPLE_PATTERN 
     netdata_rwlock_rdlock(&st->alerts.rwlock);
     if (st->alerts.base) {
         for (RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
-            if(simple_pattern_matches_string(pattern, rc->name)) {
+            SIMPLE_PATTERN_RESULT ret = simple_pattern_matches_string_extract(pattern, rc->name, NULL, 0);
+
+            if(ret == SP_MATCHED_POSITIVE) {
                 matched = true;
                 break;
             }
+            else if(ret == SP_MATCHED_NEGATIVE)
+                break;
 
-            if(!wb)
+            if (!wb)
                 wb = buffer_create(0, NULL);
             else
                 buffer_flush(wb);
@@ -582,10 +591,14 @@ static bool query_target_match_alert_pattern(QUERY_INSTANCE *qi, SIMPLE_PATTERN 
             buffer_fast_strcat(wb, ":", 1);
             buffer_strcat(wb, rrdcalc_status2string(rc->status));
 
-            if(simple_pattern_matches_buffer(pattern, wb)) {
+            ret = simple_pattern_matches_buffer_extract(pattern, wb, NULL, 0);
+
+            if(ret == SP_MATCHED_POSITIVE) {
                 matched = true;
                 break;
             }
+            else if(ret == SP_MATCHED_NEGATIVE)
+                break;
         }
     }
     netdata_rwlock_unlock(&st->alerts.rwlock);
@@ -638,14 +651,22 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
         qt->db.minimum_latest_update_every_s = ri->update_every_s;
 
     if(queryable_instance && filter_instances) {
-        queryable_instance = false;
-        if(!qt->instances.pattern
-           || (qtl->match_ids   && simple_pattern_matches_string(qt->instances.pattern, ri->id))
-           || (qtl->match_names && ri->name != ri->id && simple_pattern_matches_string(qt->instances.pattern, ri->name))
-           || (qtl->match_ids   && simple_pattern_matches_string(qt->instances.pattern, query_instance_id_fqdn(qt, qi)))
-           || (qtl->match_names && simple_pattern_matches_string(qt->instances.pattern, query_instance_name_fqdn(qt, qi)))
-                )
-            queryable_instance = true;
+        SIMPLE_PATTERN_RESULT ret = SP_MATCHED_POSITIVE;
+
+        if(qt->instances.pattern) {
+            ret = SP_NOT_MATCHED;
+
+            if(qtl->match_ids)
+                ret = simple_pattern_matches_string_extract(qt->instances.pattern, ri->id, NULL, 0);
+            if (ret == SP_NOT_MATCHED && qtl->match_names && (ri->name != ri->id || !qtl->match_ids))
+                ret = simple_pattern_matches_string_extract(qt->instances.pattern, ri->name, NULL, 0);
+            if (ret == SP_NOT_MATCHED && qtl->match_ids)
+                ret = simple_pattern_matches_string_extract(qt->instances.pattern, query_instance_id_fqdn(qt, qi), NULL, 0);
+            if (ret == SP_NOT_MATCHED && qtl->match_names)
+                ret = simple_pattern_matches_string_extract(qt->instances.pattern, query_instance_name_fqdn(qt, qi), NULL, 0);
+        }
+
+        queryable_instance = (ret == SP_MATCHED_POSITIVE);
     }
 
     if(queryable_instance) {

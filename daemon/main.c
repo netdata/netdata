@@ -1617,11 +1617,15 @@ int main(int argc, char **argv) {
                             char wildcarded[len];
 
                             SIMPLE_PATTERN *p = simple_pattern_create(haystack, NULL, SIMPLE_PATTERN_EXACT, true);
-                            int ret = simple_pattern_matches_extract(p, needle, wildcarded, len);
+                            SIMPLE_PATTERN_RESULT ret = simple_pattern_matches_extract(p, needle, wildcarded, len);
                             simple_pattern_free(p);
 
-                            if(ret) {
-                                fprintf(stdout, "RESULT: MATCHED - pattern '%s' matches '%s', wildcarded '%s'\n", haystack, needle, wildcarded);
+                            if(ret == SP_MATCHED_POSITIVE) {
+                                fprintf(stdout, "RESULT: POSITIVE MATCHED - pattern '%s' matches '%s', wildcarded '%s'\n", haystack, needle, wildcarded);
+                                return 0;
+                            }
+                            else if(ret == SP_MATCHED_NEGATIVE) {
+                                fprintf(stdout, "RESULT: NEGATIVE MATCHED - pattern '%s' matches '%s', wildcarded '%s'\n", haystack, needle, wildcarded);
                                 return 0;
                             }
                             else {

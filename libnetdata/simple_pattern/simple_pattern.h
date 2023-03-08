@@ -13,6 +13,12 @@ typedef enum __attribute__ ((__packed__)) {
     SIMPLE_PATTERN_SUBSTRING
 } SIMPLE_PREFIX_MODE;
 
+typedef enum __attribute__ ((__packed__)) {
+    SP_NOT_MATCHED,
+    SP_MATCHED_NEGATIVE,
+    SP_MATCHED_POSITIVE,
+} SIMPLE_PATTERN_RESULT;
+
 typedef void SIMPLE_PATTERN;
 
 // create a simple_pattern from the string given
@@ -20,18 +26,18 @@ typedef void SIMPLE_PATTERN;
 // should be considered PREFIX matches.
 SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, SIMPLE_PREFIX_MODE default_mode, bool case_sensitive);
 
-// test if string str is matched from the pattern and fill 'wildcarded' with the parts matched by '*'
-int simple_pattern_matches_extract(SIMPLE_PATTERN *list, const char *str, char *wildcarded, size_t wildcarded_size);
-
 struct netdata_string;
-int simple_pattern_matches_string_extract(SIMPLE_PATTERN *list, struct netdata_string *str, char *wildcarded, size_t wildcarded_size);
-int simple_pattern_matches_buffer_extract(SIMPLE_PATTERN *list, BUFFER *str, char *wildcarded, size_t wildcarded_size);
-int simple_pattern_matches_length_extract(SIMPLE_PATTERN *list, const char *str, size_t len, char *wildcarded, size_t wildcarded_size);
+
+// test if string str is matched from the pattern and fill 'wildcarded' with the parts matched by '*'
+SIMPLE_PATTERN_RESULT simple_pattern_matches_extract(SIMPLE_PATTERN *list, const char *str, char *wildcarded, size_t wildcarded_size);
+SIMPLE_PATTERN_RESULT simple_pattern_matches_string_extract(SIMPLE_PATTERN *list, struct netdata_string *str, char *wildcarded, size_t wildcarded_size);
+SIMPLE_PATTERN_RESULT simple_pattern_matches_buffer_extract(SIMPLE_PATTERN *list, BUFFER *str, char *wildcarded, size_t wildcarded_size);
+SIMPLE_PATTERN_RESULT simple_pattern_matches_length_extract(SIMPLE_PATTERN *list, const char *str, size_t len, char *wildcarded, size_t wildcarded_size);
 
 // test if string str is matched from the pattern
-#define simple_pattern_matches(list, str) simple_pattern_matches_extract(list, str, NULL, 0)
-#define simple_pattern_matches_string(list, str) simple_pattern_matches_string_extract(list, str, NULL, 0)
-#define simple_pattern_matches_buffer(list, str) simple_pattern_matches_buffer_extract(list, str, NULL, 0)
+#define simple_pattern_matches(list, str) (simple_pattern_matches_extract(list, str, NULL, 0) == SP_MATCHED_POSITIVE)
+#define simple_pattern_matches_string(list, str) (simple_pattern_matches_string_extract(list, str, NULL, 0) == SP_MATCHED_POSITIVE)
+#define simple_pattern_matches_buffer(list, str) (simple_pattern_matches_buffer_extract(list, str, NULL, 0) == SP_MATCHED_POSITIVE)
 
 // free a simple_pattern that was created with simple_pattern_create()
 // list can be NULL, in which case, this does nothing.
