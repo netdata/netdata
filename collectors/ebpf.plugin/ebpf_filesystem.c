@@ -8,9 +8,126 @@ struct config fs_config = { .first_section = NULL,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
 
+ebpf_local_maps_t ext4_maps[] = {{.name = "tbl_ext4", .internal_input = NETDATA_KEY_CALLS_SYNC,
+                                  .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                  .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                  .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                  },
+                                  {.name = "tmp_ext4", .internal_input = 4192, .user_input = 4192,
+                                   .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                   .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                   .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
+                                   },
+                                   {.name = NULL, .internal_input = 0, .user_input = 0,
+                                    .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                    .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                    .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
+                                    }};
+
+ebpf_local_maps_t xfs_maps[] = {{.name = "tbl_xfs", .internal_input = NETDATA_KEY_CALLS_SYNC,
+                                 .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                 .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                 .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                 },
+                                {.name = "tmp_xfs", .internal_input = 4192, .user_input = 4192,
+                                 .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                 .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                 .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
+                                 },
+                                 {.name = NULL, .internal_input = 0, .user_input = 0,
+                                  .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                  .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                  .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
+                                 }};
+
+ebpf_local_maps_t nfs_maps[] = {{.name = "tbl_nfs", .internal_input = NETDATA_KEY_CALLS_SYNC,
+                                 .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                 .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                 .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                 },
+                                {.name = "tmp_nfs", .internal_input = 4192, .user_input = 4192,
+                                 .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                 .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                 .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
+                                },
+                                {.name = NULL, .internal_input = 0, .user_input = 0,
+                                 .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                 .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                 .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
+                                 }};
+
+ebpf_local_maps_t zfs_maps[] = {{.name = "tbl_zfs", .internal_input = NETDATA_KEY_CALLS_SYNC,
+                                 .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                 .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                 .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                },
+                                {.name = "tmp_zfs", .internal_input = 4192, .user_input = 4192,
+                                 .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                 .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                 .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
+                                },
+                                {.name = NULL, .internal_input = 0, .user_input = 0,
+                                 .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                 .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                 .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
+                                }};
+
+ebpf_local_maps_t btrfs_maps[] = {{.name = "tbl_btrfs", .internal_input = NETDATA_KEY_CALLS_SYNC,
+                                   .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                   .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                   .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                },
+                                {.name = "tbl_ext_addr", .internal_input = 1, .user_input = 1,
+                                 .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                 .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                 .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
+                                },
+                                {.name = "tmp_btrfs", .internal_input = 4192, .user_input = 4192,
+                                 .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                 .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                 .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
+                                },
+                                {.name = NULL, .internal_input = 0, .user_input = 0,
+                                 .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                 .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                 .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
+    }};
+
 static ebpf_local_maps_t fs_maps[] = {{.name = "tbl_ext4", .internal_input = NETDATA_KEY_CALLS_SYNC,
-                                       .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
-                                       .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                          .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                          .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
                                       {.name = "tbl_xfs", .internal_input = NETDATA_KEY_CALLS_SYNC,
                                        .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
                                        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},

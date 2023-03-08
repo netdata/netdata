@@ -45,4 +45,10 @@ enum netdata_filesystem_table {
 void *ebpf_filesystem_thread(void *ptr);
 extern struct config fs_config;
 
+extern ebpf_local_maps_t ext4_maps[];
+extern ebpf_local_maps_t xfs_maps[];
+extern ebpf_local_maps_t nfs_maps[];
+extern ebpf_local_maps_t zfs_maps[];
+extern ebpf_local_maps_t btrfs_maps[];
+
 #endif /* NETDATA_EBPF_FILESYSTEM_H */
