@@ -1214,8 +1214,8 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_m
 {
     char default_value[EBPF_MAX_MODE_LENGTH + 1];
     ebpf_select_mode_string(default_value, EBPF_MAX_MODE_LENGTH, modules->mode);
-    char *value = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_LOAD_MODE, default_value);
-    modules->mode = ebpf_select_mode(value);
+    char *load_mode = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_LOAD_MODE, default_value);
+    modules->mode = ebpf_select_mode(load_mode);
 
     modules->update_every = (int)appconfig_get_number(modules->cfg, EBPF_GLOBAL_SECTION,
                                                      EBPF_CFG_UPDATE_EVERY, modules->update_every);
@@ -1229,22 +1229,35 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_m
     modules->pid_map_size = (uint32_t)appconfig_get_number(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_PID_SIZE,
                                                            modules->pid_map_size);
 
-    value = ebpf_convert_load_mode_to_string(modules->load & NETDATA_EBPF_LOAD_METHODS);
-    value = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_TYPE_FORMAT, value);
-    netdata_ebpf_load_mode_t load = epbf_convert_string_to_load_mode(value);
+    char *value = ebpf_convert_load_mode_to_string(modules->load & NETDATA_EBPF_LOAD_METHODS);
+    char *type_format = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_TYPE_FORMAT, value);
+    netdata_ebpf_load_mode_t load = epbf_convert_string_to_load_mode(type_format);
     load = ebpf_select_load_mode(btf_file, load, kver, is_rh);
     modules->load = origin | load;
 
-    value = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_CORE_ATTACH, EBPF_CFG_ATTACH_TRAMPOLINE);
-    netdata_ebpf_program_loaded_t fill_lm = ebpf_convert_core_type(value, modules->mode);
+    char *core_attach = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_CORE_ATTACH, EBPF_CFG_ATTACH_TRAMPOLINE);
+    netdata_ebpf_program_loaded_t fill_lm = ebpf_convert_core_type(core_attach, modules->mode);
     ebpf_update_target_with_conf(modules, fill_lm);
 
     value = ebpf_convert_collect_pid_to_string(modules->apps_level);
-    value = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_COLLECT_PID, value);
-    modules->apps_level =  ebpf_convert_string_to_apps_level(value);
+    char *collect_pid = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_COLLECT_PID, value);
+    modules->apps_level =  ebpf_convert_string_to_apps_level(collect_pid);
 
     modules->maps_per_core = appconfig_get_boolean(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_MAPS_PER_CORE,
                                                    modules->maps_per_core);
+#ifdef NETDATA_DEV_MODE
+    info("The thread %s was configured with: mode = %s; update every = %d; apps = %s; cgroup = %s; ebpf type format = %s; ebpf co-re tracing = %s; collect pid = %s; maps per core = %s",
+         modules->thread_name,
+         load_mode,
+         modules->update_every,
+         (modules->apps_charts)?"enabled":"disabled",
+         (modules->cgroup_charts)?"enabled":"disabled",
+         type_format,
+         core_attach,
+         collect_pid,
+         (modules->maps_per_core)?"enabled":"disabled"
+         );
+#endif
 }
 
 /**
