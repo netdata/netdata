@@ -28,6 +28,9 @@
 #define NETDATA_SYSTEMD_DC_NOT_CACHE_CONTEXT "services.dc_not_cache"
 #define NETDATA_SYSTEMD_DC_NOT_FOUND_CONTEXT "services.dc_not_found"
 
+// ARAL name
+#define NETDATA_EBPF_DCSTAT_ARAL_NAME "ebpf_dcstat"
+
 enum directory_cache_indexes {
     NETDATA_DCSTAT_IDX_RATIO,
     NETDATA_DCSTAT_IDX_REFERENCE,
