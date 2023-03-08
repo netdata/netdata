@@ -27,6 +27,7 @@ static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unu
     options |= CONTEXTS_V2_DEBUG;
 
     buffer_flush(w->response.data);
+    buffer_no_cacheable(w->response.data);
     return rrdcontext_to_json_v2(w->response.data, &req, options);
 }
 
