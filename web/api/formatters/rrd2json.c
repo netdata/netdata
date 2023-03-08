@@ -20,6 +20,9 @@ const char *rrdr_format_to_string(DATASOURCE_FORMAT format)  {
         case DATASOURCE_JSON:
             return DATASOURCE_FORMAT_JSON;
 
+        case DATASOURCE_JSON2:
+            return DATASOURCE_FORMAT_JSON2;
+
         case DATASOURCE_DATATABLE_JSON:
             return DATASOURCE_FORMAT_DATATABLE_JSON;
 
@@ -823,19 +826,23 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         rrdr2json(r, wb, options, 0);
 
         if(options & RRDR_OPTION_JSON_WRAP) {
-            if(qt->request.group_by_aggregate_function == RRDR_GROUP_BY_FUNCTION_SUM_COUNT) {
+            if (qt->request.group_by_aggregate_function == RRDR_GROUP_BY_FUNCTION_SUM_COUNT) {
                 buffer_json_member_add_key_only(wb, "group_by_count");
                 rrdr2json(r, wb, options | RRDR_OPTION_INTERNAL_GBC, false);
             }
-            if(options & RRDR_OPTION_RETURN_JWAR) {
+            if (options & RRDR_OPTION_RETURN_JWAR) {
                 buffer_json_member_add_key_only(wb, "anomaly_rates");
                 rrdr2json(r, wb, options | RRDR_OPTION_INTERNAL_AR, false);
             }
-            if(options & RRDR_OPTION_JW_ANNOTATIONS) {
-                rrdr_json_wrapper_annotations(r, wb, format, options);
-            }
             wrapper_end(r, wb, format, options);
         }
+        break;
+
+    case DATASOURCE_JSON2:
+        wb->content_type = CT_APPLICATION_JSON;
+        wrapper_begin(r, wb, format, options, group_method);
+        rrdr2json_v2(r, wb, format, options);
+        wrapper_end(r, wb, format, options);
         break;
     }
 

@@ -10,7 +10,7 @@ typedef void (*wrapper_begin_t)(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, R
 typedef void (*wrapper_end_t)(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR_OPTIONS options);
 
 void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR_OPTIONS options, RRDR_TIME_GROUPING group_method);
-void rrdr_json_wrapper_annotations(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR_OPTIONS options);
+void rrdr2json_v2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR_OPTIONS options);
 void rrdr_json_wrapper_end(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR_OPTIONS options);
 
 void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR_OPTIONS options, RRDR_TIME_GROUPING group_method);

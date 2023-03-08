@@ -1346,8 +1346,10 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
 //    buffer_json_array_close(wb); // annotations
 //}
 
-void rrdr_json_wrapper_annotations(RRDR *r __maybe_unused, BUFFER *wb, DATASOURCE_FORMAT format __maybe_unused, RRDR_OPTIONS options) {
-    buffer_json_member_add_object(wb, "annotations");
+void rrdr2json_v2(RRDR *r __maybe_unused, BUFFER *wb, DATASOURCE_FORMAT format __maybe_unused, RRDR_OPTIONS options) {
+    bool expose_gbc = (r->internal.qt->request.group_by_aggregate_function == RRDR_GROUP_BY_FUNCTION_SUM_COUNT);
+
+    buffer_json_member_add_object(wb, "result");
 
     buffer_json_member_add_array(wb, "labels");
     buffer_json_add_array_item_string(wb, "time");
@@ -1362,6 +1364,14 @@ void rrdr_json_wrapper_annotations(RRDR *r __maybe_unused, BUFFER *wb, DATASOURC
     }
     buffer_json_array_close(wb); // labels
 
+    buffer_json_member_add_object(wb, "point");
+    buffer_json_member_add_uint64(wb, "value", 0);
+    buffer_json_member_add_uint64(wb, "ar", 1);
+    buffer_json_member_add_uint64(wb, "pa", 2);
+    if(expose_gbc)
+        buffer_json_member_add_uint64(wb, "count", 3);
+    buffer_json_object_close(wb);
+
     buffer_json_member_add_array(wb, "data");
     if(i) {
         long start = 0, end = rrdr_rows(r), step = 1;
@@ -1374,21 +1384,77 @@ void rrdr_json_wrapper_annotations(RRDR *r __maybe_unused, BUFFER *wb, DATASOURC
         // for each line in the array
         char buf[10] = "";
         for (i = start; i != end; i += step) {
-            RRDR_VALUE_FLAGS *co = &r->o[i * r->d];
+            NETDATA_DOUBLE *cn = &r->v[ i * r->d ];
+            RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
+            NETDATA_DOUBLE *ar = &r->ar[ i * r->d ];
+            uint32_t *gbc = &r->gbc [ i * r->d ];
+            time_t now = r->t[i];
 
             buffer_json_add_array_item_array(wb); // row
 
             if (options & RRDR_OPTION_MILLISECONDS)
-                buffer_json_add_array_item_time_ms(wb, r->t[i]); // the time
+                buffer_json_add_array_item_time_ms(wb, now); // the time
             else
-                buffer_json_add_array_item_time_t(wb, r->t[i]); // the time
+                buffer_json_add_array_item_time_t(wb, now); // the time
+
+            NETDATA_DOUBLE total = 1;
+            if(unlikely((options & RRDR_OPTION_PERCENTAGE) && !(options & (RRDR_OPTION_INTERNAL_GBC|RRDR_OPTION_INTERNAL_AR)))) {
+                total = 0;
+                for(d = 0; d < used ; d++) {
+                    if(unlikely(!(r->od[d] & RRDR_DIMENSION_QUERIED))) continue;
+
+                    NETDATA_DOUBLE n = cn[d];
+                    if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
+                        n = -n;
+
+                    total += n;
+                }
+
+                // prevent a division by zero
+                if(total == 0) total = 1;
+            }
 
             for (d = 0; d < used; d++) {
                 if (!rrdr_dimension_should_be_exposed(r->od[d], options))
                     continue;
 
-                char *a = buf;
                 RRDR_VALUE_FLAGS o = co[d];
+
+                buffer_json_add_array_item_array(wb); // point
+
+                // add the value
+                NETDATA_DOUBLE n = cn[d];
+
+                if(o & RRDR_VALUE_EMPTY) {
+                    if (unlikely(options & RRDR_OPTION_NULL2ZERO))
+                        buffer_json_add_array_item_double(wb, 0);
+                    else
+                        buffer_json_add_array_item_double(wb, NAN);
+                }
+                else {
+                    if (unlikely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
+                        n = -n;
+
+                    if (unlikely((options & RRDR_OPTION_PERCENTAGE))) {
+                        n = n * 100 / total;
+                    }
+
+                    if(unlikely(i == start && d == 0)) {
+                        r->view.min = r->view.max = n;
+                    }
+                    else {
+                        if (n < r->view.min) r->view.min = n;
+                        if (n > r->view.max) r->view.max = n;
+                    }
+
+                    buffer_json_add_array_item_double(wb, n);
+                }
+
+                // add the anomaly
+                buffer_json_add_array_item_double(wb, ar[d]);
+
+                // add the point annotations
+                char *a = buf;
                 if (o & RRDR_VALUE_PARTIAL)
                     *a++ = 'P'; // Partial
                 if (o & RRDR_VALUE_RESET)
@@ -1398,6 +1464,12 @@ void rrdr_json_wrapper_annotations(RRDR *r __maybe_unused, BUFFER *wb, DATASOURC
 
                 *a = '\0';
                 buffer_json_add_array_item_string(wb, buf);
+
+                // add the count
+                if(expose_gbc)
+                    buffer_json_add_array_item_uint64(wb, gbc[d]);
+
+                buffer_json_array_close(wb); // point
             }
 
             buffer_json_array_close(wb); // row

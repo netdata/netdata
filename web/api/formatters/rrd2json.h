@@ -17,6 +17,7 @@ typedef enum {
     DATASOURCE_SSV_COMMA        = 9,
     DATASOURCE_CSV_JSON_ARRAY   = 10,
     DATASOURCE_CSV_MARKDOWN     = 11,
+    DATASOURCE_JSON2            = 12,
 } DATASOURCE_FORMAT;
 
 #include "web/api/web_api_v1.h"
@@ -40,6 +41,7 @@ typedef enum {
 #define API_RELATIVE_TIME_MAX (3 * 365 * 86400)
 
 #define DATASOURCE_FORMAT_JSON "json"
+#define DATASOURCE_FORMAT_JSON2 "json2"
 #define DATASOURCE_FORMAT_DATATABLE_JSON "datatable"
 #define DATASOURCE_FORMAT_DATATABLE_JSONP "datasource"
 #define DATASOURCE_FORMAT_JSONP "jsonp"

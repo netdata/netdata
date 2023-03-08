@@ -56,6 +56,7 @@ static struct {
         {  DATASOURCE_FORMAT_DATATABLE_JSON , 0 , DATASOURCE_DATATABLE_JSON}
         , {DATASOURCE_FORMAT_DATATABLE_JSONP, 0 , DATASOURCE_DATATABLE_JSONP}
         , {DATASOURCE_FORMAT_JSON           , 0 , DATASOURCE_JSON}
+        , {DATASOURCE_FORMAT_JSON2          , 0 , DATASOURCE_JSON2}
         , {DATASOURCE_FORMAT_JSONP          , 0 , DATASOURCE_JSONP}
         , {DATASOURCE_FORMAT_SSV            , 0 , DATASOURCE_SSV}
         , {DATASOURCE_FORMAT_CSV            , 0 , DATASOURCE_CSV}
@@ -66,7 +67,9 @@ static struct {
         , {DATASOURCE_FORMAT_SSV_COMMA      , 0 , DATASOURCE_SSV_COMMA}
         , {DATASOURCE_FORMAT_CSV_JSON_ARRAY , 0 , DATASOURCE_CSV_JSON_ARRAY}
         , {DATASOURCE_FORMAT_CSV_MARKDOWN   , 0 , DATASOURCE_CSV_MARKDOWN}
-        , {                                 NULL, 0, 0}
+
+        // terminator
+        , {NULL, 0, 0}
 };
 
 static struct {
