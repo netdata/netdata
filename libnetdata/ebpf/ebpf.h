@@ -355,6 +355,7 @@ typedef struct ebpf_filesystem_partitions {
 
     ebpf_addresses_t addresses;
     uint64_t kernels;
+    ebpf_local_maps_t *fs_maps;
 } ebpf_filesystem_partitions_t;
 
 typedef struct ebpf_sync_syscalls {
