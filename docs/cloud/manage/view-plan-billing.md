@@ -67,7 +67,7 @@ Payments for Netdata subscriptions are refundable **only** if you cancel your su
             
 #### 5. How do I cancel my paid Plan?
 
-Your annual or monthly Netdata Subscription plan will automatically renew until you cancel them. You can cancel your paid plan at any time by clicking ‘Cancel Plan’ from the **Plan & Billing** section under settings. You can also cancel your paid Plan by clicking the _Select_ button under **Community** plan in the **Plan & Billing** Section under Settings. 
+Your annual or monthly Netdata Subscription plan will automatically renew until you cancel it. You can cancel your paid plan at any time by clicking ‘Cancel Plan’ from the **Plan & Billing** section under settings. You can also cancel your paid Plan by clicking the _Select_ button under **Community** plan in the **Plan & Billing** Section under Settings. 
 
 
 #### 6. How can I access my Invoices/Receipts after I paid for a Plan?
