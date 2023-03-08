@@ -75,7 +75,7 @@ You can visit the _Billing Options & Invoices_ in the **Plan & Billing** section
 
 #### 7. Why do I see two separate Invoices? 
 
-Every time you purchase or renew a Plan, either a Monthly or an Annual, then two  separate Invoices are generated:
+Every time you purchase or renew a Plan, two separate Invoices are generated:
 
      a) one includes the recurring fees of the Plan you have chosen 
      b) the other one includes your monthly “On Demand - Usage”.
