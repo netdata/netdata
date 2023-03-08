@@ -17,14 +17,20 @@ static ebpf_local_maps_t hardirq_maps[] = {
         .internal_input = NETDATA_HARDIRQ_MAX_IRQS,
         .user_input = 0,
         .type = NETDATA_EBPF_MAP_STATIC,
-        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED
+        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+        .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
     },
     {
         .name = "tbl_hardirq_static",
         .internal_input = HARDIRQ_EBPF_STATIC_END,
         .user_input = 0,
         .type = NETDATA_EBPF_MAP_STATIC,
-        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED
+        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+        .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
     },
     /* end */
     {
@@ -32,7 +38,10 @@ static ebpf_local_maps_t hardirq_maps[] = {
         .internal_input = 0,
         .user_input = 0,
         .type = NETDATA_EBPF_MAP_CONTROLLER,
-        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED
+        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+        .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
     }
 };
 
@@ -386,7 +395,14 @@ static int hardirq_read_latency_map(int mapfd)
     return 0;
 }
 
-static void hardirq_read_latency_static_map(int mapfd)
+/**
+ * Read Latency Static Map
+ *
+ * Read data from kernel ring to plot.
+ *
+ * @param maps_per_core do I need to read all cores?
+ */
+static void hardirq_read_latency_static_map(int mapfd, int maps_per_core)
 {
     static hardirq_ebpf_static_val_t *hardirq_ebpf_static_vals = NULL;
     if (!hardirq_ebpf_static_vals)
@@ -402,7 +418,7 @@ static void hardirq_read_latency_static_map(int mapfd)
 
         uint64_t total_latency = 0;
         int cpu_i;
-        int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
+        int end = (!maps_per_core) ? 1 : ebpf_nprocs;
         for (cpu_i = 0; cpu_i < end; cpu_i++) {
             total_latency += hardirq_ebpf_static_vals[cpu_i].latency/1000;
         }
@@ -555,6 +571,9 @@ void *ebpf_hardirq_thread(void *ptr)
         goto endhardirq;
     }
 
+#ifdef LIBBPF_MAJOR_VERSION
+   ebpf_define_map_type(em->maps, em->maps_per_core, running_on_kernel);
+#endif
     em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
     if (!em->probe_links) {
         goto endhardirq;
