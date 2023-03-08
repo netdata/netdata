@@ -363,6 +363,7 @@ void update_listen_table(uint16_t value, uint16_t proto, netdata_passive_connect
 void parse_network_viewer_section(struct config *cfg);
 void ebpf_fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table);
 void parse_service_name_section(struct config *cfg);
+void ebpf_socket_release(ebpf_socket_publish_apps_t *stat);
 
 extern ebpf_socket_publish_apps_t **socket_bandwidth_curr;
 extern struct config socket_config;

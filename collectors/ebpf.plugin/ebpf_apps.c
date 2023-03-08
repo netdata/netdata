@@ -22,13 +22,10 @@ void ebpf_aral_init(void)
         max_elements = NETDATA_EBPF_ALLOC_MIN_ELEMENTS;
     }
 
-    ebpf_aral_apps_pid_stat = aral_create("ebpf-pid_stat", sizeof(struct ebpf_pid_stat),
-                                          0, max_elements,
-                                          NULL, NULL, NULL, false, false);
+    ebpf_aral_apps_pid_stat = ebpf_allocate_pid_aral("ebpf-pid_stat", sizeof(struct ebpf_pid_stat));
 
-    ebpf_aral_process_stat = aral_create("ebpf-proc_stat", sizeof(ebpf_process_stat_t),
-                                          0, max_elements,
-                                          NULL, NULL, NULL, false, false);
+    ebpf_aral_process_stat = ebpf_allocate_pid_aral("ebpf-proc_stat", sizeof(ebpf_process_stat_t));
+
 #ifdef NETDATA_DEV_MODE
     info("Plugin is using ARAL with values %d", NETDATA_EBPF_ALLOC_MAX_PID);
 #endif
@@ -1021,19 +1018,19 @@ void cleanup_variables_from_other_threads(uint32_t pid)
 {
     // Clean socket structures
     if (socket_bandwidth_curr) {
-        freez(socket_bandwidth_curr[pid]);
+        ebpf_socket_release(socket_bandwidth_curr[pid]);
         socket_bandwidth_curr[pid] = NULL;
     }
 
     // Clean cachestat structure
     if (cachestat_pid) {
-        freez(cachestat_pid[pid]);
+        ebpf_cachestat_release(cachestat_pid[pid]);
         cachestat_pid[pid] = NULL;
     }
 
     // Clean directory cache structure
     if (dcstat_pid) {
-        freez(dcstat_pid[pid]);
+        ebpf_dcstat_release(dcstat_pid[pid]);
         dcstat_pid[pid] = NULL;
     }
 
@@ -1045,19 +1042,19 @@ void cleanup_variables_from_other_threads(uint32_t pid)
 
     // Clean vfs structure
     if (vfs_pid) {
-        freez(vfs_pid[pid]);
+        ebpf_vfs_release(vfs_pid[pid]);
         vfs_pid[pid] = NULL;
     }
 
     // Clean fd structure
     if (fd_pid) {
-        freez(fd_pid[pid]);
+        ebpf_fd_release(fd_pid[pid]);
         fd_pid[pid] = NULL;
     }
 
     // Clean shm structure
     if (shm_pid) {
-        freez(shm_pid[pid]);
+        ebpf_shm_release(shm_pid[pid]);
         shm_pid[pid] = NULL;
     }
 }

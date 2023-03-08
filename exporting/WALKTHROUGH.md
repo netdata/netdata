@@ -1,13 +1,3 @@
-<!--
-title: "User guide: Exporting to Netdata, Prometheus, Grafana stack"
-description: "Using Netdata in conjunction with Prometheus and Grafana."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/exporting/WALKTHROUGH.md"
-sidebar_label: "User guide: Netdata, Prometheus, Grafana stack"
-learn_status: "Published"
-learn_rel_path: "Integrations/Export"
-sidebar_position: 100
--->
-
 # Netdata, Prometheus, Grafana stack
 
 ## Intro

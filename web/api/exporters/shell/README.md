@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Developers/Web/Api/Exporters"
 -->
 
-# shell exporter
+# Shell exporter
 
 Shell scripts can now query Netdata:
 

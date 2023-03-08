@@ -44,6 +44,8 @@ static struct {
         , {"plan"              , 0    , RRDR_OPTION_SHOW_PLAN}
         , {"details"           , 0    , RRDR_OPTION_SHOW_DETAILS}
         , {"debug"             , 0    , RRDR_OPTION_DEBUG}
+        , {"minify"            , 0    , RRDR_OPTION_MINIFY}
+        , {"annotations"       , 0    , RRDR_OPTION_JW_ANNOTATIONS}
         , {NULL                , 0    , 0}
 };
 
@@ -403,38 +405,6 @@ inline int web_client_api_request_v1_alarm_variables(RRDHOST *host, struct web_c
     return web_client_api_request_single_chart(host, w, url, health_api_v1_chart_variables2json);
 }
 
-static RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o) {
-    RRDCONTEXT_TO_JSON_OPTIONS options = RRDCONTEXT_OPTION_NONE;
-    char *tok;
-
-    while(o && *o && (tok = mystrsep(&o, ", |"))) {
-        if(!*tok) continue;
-
-        if(!strcmp(tok, "full") || !strcmp(tok, "all"))
-            options |= RRDCONTEXT_OPTIONS_ALL;
-        else if(!strcmp(tok, "charts") || !strcmp(tok, "instances"))
-            options |= RRDCONTEXT_OPTION_SHOW_INSTANCES;
-        else if(!strcmp(tok, "dimensions") || !strcmp(tok, "metrics"))
-            options |= RRDCONTEXT_OPTION_SHOW_METRICS;
-        else if(!strcmp(tok, "queue"))
-            options |= RRDCONTEXT_OPTION_SHOW_QUEUED;
-        else if(!strcmp(tok, "flags"))
-            options |= RRDCONTEXT_OPTION_SHOW_FLAGS;
-        else if(!strcmp(tok, "uuids"))
-            options |= RRDCONTEXT_OPTION_SHOW_UUIDS;
-        else if(!strcmp(tok, "deleted"))
-            options |= RRDCONTEXT_OPTION_SHOW_DELETED;
-        else if(!strcmp(tok, "labels"))
-            options |= RRDCONTEXT_OPTION_SHOW_LABELS;
-        else if(!strcmp(tok, "deepscan"))
-            options |= RRDCONTEXT_OPTION_DEEPSCAN;
-        else if(!strcmp(tok, "hidden"))
-            options |= RRDCONTEXT_OPTION_SHOW_HIDDEN;
-    }
-
-    return options;
-}
-
 static int web_client_api_request_v1_context(RRDHOST *host, struct web_client *w, char *url) {
     char *context = NULL;
     RRDCONTEXT_TO_JSON_OPTIONS options = RRDCONTEXT_OPTION_NONE;
@@ -478,13 +448,15 @@ static int web_client_api_request_v1_context(RRDHOST *host, struct web_client *w
     SIMPLE_PATTERN *chart_dimensions_pattern = NULL;
 
     if(chart_label_key)
-        chart_label_key_pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+        chart_label_key_pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT, true);
 
     if(chart_labels_filter)
-        chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+        chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT,
+                                                            true);
 
     if(dimensions) {
-        chart_dimensions_pattern = simple_pattern_create(buffer_tostring(dimensions), ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+        chart_dimensions_pattern = simple_pattern_create(buffer_tostring(dimensions), ",|\t\r\n\f\v",
+                                                         SIMPLE_PATTERN_EXACT, true);
         buffer_free(dimensions);
     }
 
@@ -534,13 +506,15 @@ static int web_client_api_request_v1_contexts(RRDHOST *host, struct web_client *
     SIMPLE_PATTERN *chart_dimensions_pattern = NULL;
 
     if(chart_label_key)
-        chart_label_key_pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+        chart_label_key_pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT, true);
 
     if(chart_labels_filter)
-        chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+        chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT,
+                                                            true);
 
     if(dimensions) {
-        chart_dimensions_pattern = simple_pattern_create(buffer_tostring(dimensions), ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+        chart_dimensions_pattern = simple_pattern_create(buffer_tostring(dimensions), ",|\t\r\n\f\v",
+                                                         SIMPLE_PATTERN_EXACT, true);
         buffer_free(dimensions);
     }
 
@@ -719,9 +693,9 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
             .before = before,
             .host = host,
             .st = st,
-            .hosts = NULL,
+            .nodes = NULL,
             .contexts = context,
-            .charts = chart,
+            .instances = chart,
             .dimensions = (dimensions)?buffer_tostring(dimensions):NULL,
             .timeout = timeout,
             .points = points,
@@ -756,9 +730,6 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
             goto cleanup;
         }
     }
-
-    debug(D_WEB_CLIENT, "%llu: API command 'data' for chart '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%u', format '%u', options '0x%08x'"
-          , w->id, chart, (dimensions)?buffer_tostring(dimensions):"", after, before , points, group, format, options);
 
     if(outFileName && *outFileName) {
         buffer_sprintf(w->response.header, "Content-Disposition: attachment; filename=\"%s\"\r\n", outFileName);
@@ -1114,7 +1085,7 @@ static void host_collectors(RRDHOST *host, BUFFER *wb) {
 
 extern int aclk_connected;
 inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb) {
-    buffer_json_initialize(wb, "\"", "\"", 0, true);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
 
     buffer_json_member_add_string(wb, "version", rrdhost_program_version(host));
     buffer_json_member_add_string(wb, "uid", host->machine_guid);
@@ -1369,7 +1340,8 @@ static int web_client_api_request_v1_weights_internal(RRDHOST *host, struct web_
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
 
-    SIMPLE_PATTERN *contexts = (contexts_str) ? simple_pattern_create(contexts_str, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
+    SIMPLE_PATTERN *contexts = (contexts_str) ? simple_pattern_create(contexts_str, ",|\t\r\n\f\v",
+                                                                      SIMPLE_PATTERN_EXACT, true) : NULL;
 
     int ret = web_api_v1_weights(host, wb, method, format, group, group_options, baseline_after, baseline_before, after, before, points, options, contexts, tier, timeout);
 
@@ -1425,7 +1397,7 @@ int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, cha
     wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
 
-    buffer_json_initialize(wb, "\"", "\"", 0, true);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
     host_functions2json(host, wb);
     buffer_json_finalize(wb);
 

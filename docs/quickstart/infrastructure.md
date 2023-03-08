@@ -1,13 +1,4 @@
-<!--
-title: "Monitor your infrastructure"
-description: "Real-time infrastructure monitoring with Netdata Cloud. View key metrics, insightful charts, and active alarms from all your nodes."
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md"
-sidebar_label: "Monitor your infrastructure"
-learn_status: "Published"
-learn_topic_type: "Concepts"
-learn_rel_path: "Getting Started"
-sidebar_position: "50"
--->
+# Monitor your infrastructure
 
 import { Grid, Box, BoxList, BoxListItemRegexLink } from '@site/src/components/Grid/'
 import { RiExternalLinkLine } from 'react-icons/ri'
@@ -91,7 +82,7 @@ historical data, and see like metrics presented meaningfully to help you trouble
 
 Read about the process in the [infrastructure
 overview](https://github.com/netdata/netdata/blob/master/docs/visualize/overview-infrastructure.md#drill-down-with-single-node-dashboards) doc, then learn about [interacting with
-dashboards and charts](https://github.com/netdata/netdata/blob/master/docs/visualize/interact-dashboards-charts.md) to get the most from all of Netdata's real-time
+dashboards and charts](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md) to get the most from all of Netdata's real-time
 metrics.
 
 ### Create new dashboards
@@ -103,7 +94,7 @@ from every node in your infrastructure on a single dashboard.
 ![An example system CPU
 dashboard](https://user-images.githubusercontent.com/1153921/108732974-4b09c480-74eb-11eb-87a2-c67e569c08b6.png)
 
-Read more about [creating new dashboards](https://github.com/netdata/netdata/blob/master/docs/visualize/create-dashboards.md) for more details about the process and
+Read more about [creating new dashboards](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md) for more details about the process and
 additional tips on best leveraging the feature to help you troubleshoot complex performance problems.
 
 ## Set up your nodes
@@ -171,8 +162,7 @@ collect from across your infrastructure with Netdata.
   <Box
     title="Alerts and notifications">
     <BoxList>
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.md)" title="View active alerts" />
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/smartboard.md)" title="Alerts Smartboard" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alarms.md#netdata-cloud)" title="View active alerts" />
       <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md)" title="Alert notifications" />
     </BoxList>
   </Box>
@@ -203,8 +193,7 @@ collect from across your infrastructure with Netdata.
   - [Kubernetes](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md)
   - [Create new dashboards](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md)
 - Alerts and notifications
-  - [View active alerts](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.md)
-  - [Alerts Smartboard](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/smartboard.md)
+  - [View active alerts](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alarms.md#netdata-cloud)
   - [Alert notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md)
 - Troubleshooting with Netdata Cloud
   - [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md)

@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Virtualized environments/Containers"
 -->
 
-# cgroups.plugin
+# Monitor Cgroups (cgroups.plugin)
 
 You can monitor containers and virtual machines using **cgroups**.
 

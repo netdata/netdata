@@ -3,6 +3,14 @@
 #include "web/api/web_api_v1.h"
 #include "database/storage_engine.h"
 
+inline bool query_target_has_percentage_units(struct query_target *qt) {
+    if(qt->request.options & RRDR_OPTION_PERCENTAGE ||
+       qt->request.time_group_method == RRDR_GROUPING_CV)
+        return true;
+
+    return false;
+}
+
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb) {
     rrdset2json(st, wb, NULL, NULL, 0);
 }
@@ -11,47 +19,36 @@ const char *rrdr_format_to_string(DATASOURCE_FORMAT format)  {
     switch(format) {
         case DATASOURCE_JSON:
             return DATASOURCE_FORMAT_JSON;
-            break;
 
         case DATASOURCE_DATATABLE_JSON:
             return DATASOURCE_FORMAT_DATATABLE_JSON;
-            break;
 
         case DATASOURCE_DATATABLE_JSONP:
             return DATASOURCE_FORMAT_DATATABLE_JSONP;
-            break;
 
         case DATASOURCE_JSONP:
             return DATASOURCE_FORMAT_JSONP;
-            break;
 
         case DATASOURCE_SSV:
             return DATASOURCE_FORMAT_SSV;
-            break;
 
         case DATASOURCE_CSV:
             return DATASOURCE_FORMAT_CSV;
-            break;
 
         case DATASOURCE_TSV:
             return DATASOURCE_FORMAT_TSV;
-            break;
 
         case DATASOURCE_HTML:
             return DATASOURCE_FORMAT_HTML;
-            break;
 
         case DATASOURCE_JS_ARRAY:
             return DATASOURCE_FORMAT_JS_ARRAY;
-            break;
 
         case DATASOURCE_SSV_COMMA:
             return DATASOURCE_FORMAT_SSV_COMMA;
-            break;
 
         default:
             return "unknown";
-            break;
     }
 }
 
@@ -109,7 +106,7 @@ int rrdset2value_api_v1(
 
     if(db_points_per_tier) {
         for(size_t t = 0; t < storage_tiers ;t++)
-            db_points_per_tier[t] += r->stats.tier_points_read[t];
+            db_points_per_tier[t] += r->internal.qt->db.tiers[t].points;
     }
 
     if(result_points_generated)
@@ -150,6 +147,7 @@ struct group_by_entry {
     STRING *id;
     STRING *name;
     STRING *units;
+    RRDR_DIMENSION_FLAGS od;
 };
 
 static int group_by_label_is_space(char c) {
@@ -159,7 +157,7 @@ static int group_by_label_is_space(char c) {
     return 0;
 }
 
-RRDR *data_query_group_by(RRDR *r) {
+static RRDR *data_query_group_by(RRDR *r) {
     QUERY_TARGET *qt = r->internal.qt;
     RRDR_OPTIONS options = qt->request.options;
     size_t rows = rrdr_rows(r);
@@ -189,7 +187,7 @@ RRDR *data_query_group_by(RRDR *r) {
 
         QUERY_METRIC *qm = query_metric(qt, c);
         QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
-        QUERY_HOST *qh = query_host(qt, qm->link.query_host_id);
+        QUERY_NODE *qn = query_node(qt, qm->link.query_host_id);
 
         if(qi != last_qi) {
             priority = 0;
@@ -207,7 +205,7 @@ RRDR *data_query_group_by(RRDR *r) {
         }
         if(qt->request.group_by & RRDR_GROUP_BY_INSTANCE) {
             buffer_fast_strcat(key, "|", 1);
-            buffer_strcat(key, string2str(qi->id_fqdn));
+            buffer_strcat(key, string2str(query_instance_id_fqdn(qt, qi)));
         }
         if(qt->request.group_by & RRDR_GROUP_BY_LABEL) {
             DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
@@ -218,10 +216,17 @@ RRDR *data_query_group_by(RRDR *r) {
         }
         if(qt->request.group_by & RRDR_GROUP_BY_NODE) {
             buffer_fast_strcat(key, "|", 1);
-            buffer_strcat(key, qh->host->machine_guid);
+            buffer_strcat(key, qn->rrdhost->machine_guid);
         }
-        buffer_fast_strcat(key, "|", 1);
-        buffer_strcat(key, rrdinstance_acquired_units(qi->ria));
+
+        // append the units
+        if(query_target_has_percentage_units(qt)) {
+            buffer_fast_strcat(key, "|%", 2);
+        }
+        else {
+            buffer_fast_strcat(key, "|", 1);
+            buffer_strcat(key, rrdinstance_acquired_units(qi->ria));
+        }
 
         // lookup the key in the dictionary
 
@@ -245,7 +250,7 @@ RRDR *data_query_group_by(RRDR *r) {
                 if(qt->request.group_by & RRDR_GROUP_BY_NODE)
                     buffer_strcat(key, rrdinstance_acquired_id(qi->ria));
                 else
-                    buffer_strcat(key, string2str(qi->id_fqdn));
+                    buffer_strcat(key, string2str(query_instance_id_fqdn(qt, qi)));
             }
             if(qt->request.group_by & RRDR_GROUP_BY_LABEL) {
                 DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
@@ -259,7 +264,7 @@ RRDR *data_query_group_by(RRDR *r) {
                 if(buffer_strlen(key) != 0)
                     buffer_fast_strcat(key, ",", 1);
 
-                buffer_strcat(key, qh->host->machine_guid);
+                buffer_strcat(key, qn->rrdhost->machine_guid);
             }
             entries[pos].id = string_strdupz(buffer_tostring(key));
 
@@ -276,7 +281,7 @@ RRDR *data_query_group_by(RRDR *r) {
                 if(qt->request.group_by & RRDR_GROUP_BY_NODE)
                     buffer_strcat(key, rrdinstance_acquired_name(qi->ria));
                 else
-                    buffer_strcat(key, string2str(qi->name_fqdn));
+                    buffer_strcat(key, string2str(query_instance_name_fqdn(qt, qi)));
             }
             if(qt->request.group_by & RRDR_GROUP_BY_LABEL) {
                 DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
@@ -290,7 +295,7 @@ RRDR *data_query_group_by(RRDR *r) {
                 if(buffer_strlen(key) != 0)
                     buffer_fast_strcat(key, ",", 1);
 
-                buffer_strcat(key, rrdhost_hostname(qh->host));
+                buffer_strcat(key, rrdhost_hostname(qn->rrdhost));
             }
             entries[pos].name = string_strdupz(buffer_tostring(key));
 
@@ -312,7 +317,12 @@ RRDR *data_query_group_by(RRDR *r) {
         qm->grouped_as.id = entries[pos].id;
         qm->grouped_as.name = entries[pos].name;
         qm->grouped_as.units = entries[pos].units;
-        qm->status |= RRDR_DIMENSION_GROUPED;
+
+        // copy the dimension flags decided by the query target
+        // we need this, because if a dimension is explicitly selected
+        // the query target adds to it the non-zero flag
+        qm->status |= RRDR_DIMENSION_GROUPED | r->od[c];
+        entries[pos].od |= RRDR_DIMENSION_GROUPED | r->od[c];
     }
 
     // check if we have multiple units
@@ -353,7 +363,7 @@ RRDR *data_query_group_by(RRDR *r) {
 
     // initialize r2 (dimension options, names, and ids)
     for(size_t c2 = 0; c2 < r2->d ; c2++) {
-        r2->od[c2] = RRDR_DIMENSION_QUERIED;
+        r2->od[c2] = entries[c2].od;
         r2->di[c2] = entries[c2].id;
         r2->dn[c2] = entries[c2].name;
         r2->du[c2] = entries[c2].units;
@@ -380,23 +390,23 @@ RRDR *data_query_group_by(RRDR *r) {
     // do the group_by
     for(size_t i = 0; i != rows ;i++) {
         size_t idx = i * r->d;
+        NETDATA_DOUBLE *cn_base = &r->v[ idx ];
+        RRDR_VALUE_FLAGS *co_base = &r->o[ idx ];
+        NETDATA_DOUBLE *ar_base = &r->ar[ idx ];
+
         size_t idx2 = i * r2->d;
-
-        NETDATA_DOUBLE *cn = &r->v[ idx ];
-        RRDR_VALUE_FLAGS *co = &r->o[ idx ];
-        NETDATA_DOUBLE *ar = &r->ar[ idx ];
-
-        NETDATA_DOUBLE *cn2 = &r2->v[ idx2 ];
-        RRDR_VALUE_FLAGS *co2 = &r2->o[ idx2 ];
-        NETDATA_DOUBLE *ar2 = &r2->ar[ idx2 ];
-        uint32_t *gbc2 = &r2->gbc[ idx2 ];
+        NETDATA_DOUBLE *cn2_base = &r2->v[ idx2 ];
+        RRDR_VALUE_FLAGS *co2_base = &r2->o[ idx2 ];
+        NETDATA_DOUBLE *ar2_base = &r2->ar[ idx2 ];
+        uint32_t *gbc2_base = &r2->gbc[ idx2 ];
 
         for(size_t c = 0; c < r->d ;c++) {
             if (!rrdr_dimension_should_be_exposed(r->od[c], options))
                 continue;
 
-            NETDATA_DOUBLE n = cn[c];
-            RRDR_VALUE_FLAGS o = co[c];
+            NETDATA_DOUBLE n = cn_base[c];
+            RRDR_VALUE_FLAGS o = co_base[c];
+            NETDATA_DOUBLE ar = ar_base[c];
 
             if(o & RRDR_VALUE_EMPTY) {
                 if(options & RRDR_OPTION_NULL2ZERO)
@@ -411,35 +421,38 @@ RRDR *data_query_group_by(RRDR *r) {
             QUERY_METRIC *qm = query_metric(qt, c);
             size_t c2 = qm->grouped_as.slot;
 
+            NETDATA_DOUBLE *cn2 = &cn2_base[c2];
+            RRDR_VALUE_FLAGS *co2 = &co2_base[c2];
+            NETDATA_DOUBLE *ar2 = &ar2_base[c2];
+            uint32_t *gbc2 = &gbc2_base[c2];
+
             switch(qt->request.group_by_aggregate_function) {
                 default:
                 case RRDR_GROUP_BY_FUNCTION_AVERAGE:
                 case RRDR_GROUP_BY_FUNCTION_SUM:
                 case RRDR_GROUP_BY_FUNCTION_SUM_COUNT:
-                    cn2[c2] += n;
+                    *cn2 += n;
                     break;
 
                 case RRDR_GROUP_BY_FUNCTION_MIN:
-                    if(n < cn2[c2])
-                        cn2[c2] = n;
+                    if(n < *cn2)
+                        *cn2 = n;
                     break;
 
                 case RRDR_GROUP_BY_FUNCTION_MAX:
-                    if(n > cn2[c2])
-                        cn2[c2] = n;
+                    if(n > *cn2)
+                        *cn2 = n;
                     break;
             }
 
-            if(o & RRDR_VALUE_RESET)
-                co2[c2] |= RRDR_VALUE_RESET;
-
-            ar2[c2] += ar[c];
-            gbc2[c2]++;
+            *co2 |= (o & (RRDR_VALUE_RESET|RRDR_VALUE_PARTIAL));
+            *ar2 += ar;
+            (*gbc2)++;
         }
     }
 
     // apply averaging, remove RRDR_VALUE_EMPTY, find the non-zero dimensions, min and max
-    size_t values = 0;
+    size_t min_max_values = 0;
     NETDATA_DOUBLE min = NAN, max = NAN;
     for (size_t c2 = 0; c2 < r2->d; c2++) {
         size_t non_zero = 0;
@@ -450,29 +463,33 @@ RRDR *data_query_group_by(RRDR *r) {
             NETDATA_DOUBLE *cn2 = &r2->v[ idx2 ];
             RRDR_VALUE_FLAGS *co2 = &r2->o[ idx2 ];
             NETDATA_DOUBLE *ar2 = &r2->ar[ idx2 ];
-            uint32_t *gbc2 = &r2->gbc[ idx2 ];
+            uint32_t gbc2 = r2->gbc[ idx2 ];
 
-            if(likely(*gbc2)) {
+            if(likely(gbc2)) {
                 *co2 &= ~RRDR_VALUE_EMPTY;
 
-                *ar2 /= *gbc2;
+                if(gbc2 != r2->dgbc[c2])
+                    *co2 |= RRDR_VALUE_PARTIAL;
 
                 NETDATA_DOUBLE n;
 
                 if(qt->request.group_by_aggregate_function == RRDR_GROUP_BY_FUNCTION_SUM_COUNT) {
-                    n = *cn2 / *gbc2;
+                    n = *cn2 / gbc2;
                 }
                 else if(qt->request.group_by_aggregate_function == RRDR_GROUP_BY_FUNCTION_AVERAGE) {
-                    n = *cn2 / *gbc2;
+                    *ar2 /= gbc2;
+                    n = *cn2 / gbc2;
                     *cn2 = n;
                 }
-                else
+                else {
+                    *ar2 /= gbc2;
                     n = *cn2;
+                }
 
                 if(islessgreater(n, 0.0))
                     non_zero++;
 
-                if(unlikely(!values++)) {
+                if(unlikely(!min_max_values++)) {
                     min = n;
                     max = n;
                 }
@@ -506,6 +523,22 @@ cleanup:
     dictionary_destroy(groups);
 
     return r2;
+}
+
+static inline void buffer_json_member_add_key_only(BUFFER *wb, const char *key) {
+    buffer_print_json_comma_newline_spacing(wb);
+    buffer_print_json_key(wb, key);
+    buffer_fast_strcat(wb, ":", 1);
+    wb->json.stack[wb->json.depth].count++;
+}
+
+static inline void buffer_json_member_add_string_open(BUFFER *wb, const char *key) {
+    buffer_json_member_add_key_only(wb, key);
+    buffer_strcat(wb, wb->json.value_quote);
+}
+
+static inline void buffer_json_member_add_string_close(BUFFER *wb) {
+    buffer_strcat(wb, wb->json.value_quote);
 }
 
 int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *latest_timestamp) {
@@ -547,9 +580,11 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
     case DATASOURCE_SSV:
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->content_type = CT_APPLICATION_JSON;
-            wrapper_begin(r, wb, format, options, true, group_method);
+            wrapper_begin(r, wb, format, options, group_method);
+            buffer_json_member_add_string_open(wb, "result");
             rrdr2ssv(r, wb, options, "", " ", "");
-            wrapper_end(r, wb, format, options, true);
+            buffer_json_member_add_string_close(wb);
+            wrapper_end(r, wb, format, options);
         }
         else {
             wb->content_type = CT_TEXT_PLAIN;
@@ -560,9 +595,11 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
     case DATASOURCE_SSV_COMMA:
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->content_type = CT_APPLICATION_JSON;
-            wrapper_begin(r, wb, format, options, true, group_method);
+            wrapper_begin(r, wb, format, options, group_method);
+            buffer_json_member_add_string_open(wb, "result");
             rrdr2ssv(r, wb, options, "", ",", "");
-            wrapper_end(r, wb, format, options, true);
+            buffer_json_member_add_string_close(wb);
+            wrapper_end(r, wb, format, options);
         }
         else {
             wb->content_type = CT_TEXT_PLAIN;
@@ -573,9 +610,11 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
     case DATASOURCE_JS_ARRAY:
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->content_type = CT_APPLICATION_JSON;
-            wrapper_begin(r, wb, format, options, false, group_method);
-            rrdr2ssv(r, wb, options, "[", ",", "]");
-            wrapper_end(r, wb, format, options, false);
+            wrapper_begin(r, wb, format, options, group_method);
+            buffer_json_member_add_array(wb, "result");
+            rrdr2ssv(r, wb, options, "", ",", "");
+            buffer_json_array_close(wb);
+            wrapper_end(r, wb, format, options);
         }
         else {
             wb->content_type = CT_APPLICATION_JSON;
@@ -586,9 +625,11 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
     case DATASOURCE_CSV:
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->content_type = CT_APPLICATION_JSON;
-            wrapper_begin(r, wb, format, options, true, group_method);
+            wrapper_begin(r, wb, format, options, group_method);
+            buffer_json_member_add_string_open(wb, "result");
             rrdr2csv(r, wb, format, options, "", ",", "\\n", "");
-            wrapper_end(r, wb, format, options, true);
+            buffer_json_member_add_string_close(wb);
+            wrapper_end(r, wb, format, options);
         }
         else {
             wb->content_type = CT_TEXT_PLAIN;
@@ -599,9 +640,11 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
     case DATASOURCE_CSV_MARKDOWN:
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->content_type = CT_APPLICATION_JSON;
-            wrapper_begin(r, wb, format, options, true, group_method);
+            wrapper_begin(r, wb, format, options, group_method);
+            buffer_json_member_add_string_open(wb, "result");
             rrdr2csv(r, wb, format, options, "", "|", "\\n", "");
-            wrapper_end(r, wb, format, options, true);
+            buffer_json_member_add_string_close(wb);
+            wrapper_end(r, wb, format, options);
         }
         else {
             wb->content_type = CT_TEXT_PLAIN;
@@ -612,11 +655,11 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
     case DATASOURCE_CSV_JSON_ARRAY:
         wb->content_type = CT_APPLICATION_JSON;
         if(options & RRDR_OPTION_JSON_WRAP) {
-            wrapper_begin(r, wb, format, options, false, group_method);
-            buffer_strcat(wb, "[\n");
+            wrapper_begin(r, wb, format, options, group_method);
+            buffer_json_member_add_array(wb, "result");
             rrdr2csv(r, wb, format, options + RRDR_OPTION_LABEL_QUOTES, "[", ",", "]", ",\n");
-            buffer_strcat(wb, "\n]");
-            wrapper_end(r, wb, format, options, false);
+            buffer_json_array_close(wb);
+            wrapper_end(r, wb, format, options);
         }
         else {
             wb->content_type = CT_APPLICATION_JSON;
@@ -629,9 +672,11 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
     case DATASOURCE_TSV:
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->content_type = CT_APPLICATION_JSON;
-            wrapper_begin(r, wb, format, options, true, group_method);
+            wrapper_begin(r, wb, format, options, group_method);
+            buffer_json_member_add_string_open(wb, "result");
             rrdr2csv(r, wb, format, options, "", "\t", "\\n", "");
-            wrapper_end(r, wb, format, options, true);
+            buffer_json_member_add_string_close(wb);
+            wrapper_end(r, wb, format, options);
         }
         else {
             wb->content_type = CT_TEXT_PLAIN;
@@ -642,11 +687,13 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
     case DATASOURCE_HTML:
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->content_type = CT_APPLICATION_JSON;
-            wrapper_begin(r, wb, format, options, true, group_method);
+            wrapper_begin(r, wb, format, options, group_method);
+            buffer_json_member_add_string_open(wb, "result");
             buffer_strcat(wb, "<html>\\n<center>\\n<table border=\\\"0\\\" cellpadding=\\\"5\\\" cellspacing=\\\"5\\\">\\n");
             rrdr2csv(r, wb, format, options, "<tr><td>", "</td><td>", "</td></tr>\\n", "");
             buffer_strcat(wb, "</table>\\n</center>\\n</html>\\n");
-            wrapper_end(r, wb, format, options, true);
+            buffer_json_member_add_string_close(wb);
+            wrapper_end(r, wb, format, options);
         }
         else {
             wb->content_type = CT_TEXT_HTML;
@@ -659,57 +706,71 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
     case DATASOURCE_DATATABLE_JSONP:
         wb->content_type = CT_APPLICATION_X_JAVASCRIPT;
 
-        if(options & RRDR_OPTION_JSON_WRAP)
-            wrapper_begin(r, wb, format, options, false, group_method);
+        if(options & RRDR_OPTION_JSON_WRAP) {
+            wrapper_begin(r, wb, format, options, group_method);
+            buffer_json_member_add_key_only(wb, "result");
+        }
 
         rrdr2json(r, wb, options, 1);
 
         if(options & RRDR_OPTION_JSON_WRAP)
-            wrapper_end(r, wb, format, options, false);
+            wrapper_end(r, wb, format, options);
+
         break;
 
     case DATASOURCE_DATATABLE_JSON:
         wb->content_type = CT_APPLICATION_JSON;
 
-        if(options & RRDR_OPTION_JSON_WRAP)
-            wrapper_begin(r, wb, format, options, false, group_method);
+        if(options & RRDR_OPTION_JSON_WRAP) {
+            wrapper_begin(r, wb, format, options, group_method);
+            buffer_json_member_add_key_only(wb, "result");
+        }
 
         rrdr2json(r, wb, options, 1);
 
         if(options & RRDR_OPTION_JSON_WRAP)
-            wrapper_end(r, wb, format, options, false);
+            wrapper_end(r, wb, format, options);
+
         break;
 
     case DATASOURCE_JSONP:
         wb->content_type = CT_APPLICATION_X_JAVASCRIPT;
-        if(options & RRDR_OPTION_JSON_WRAP)
-            wrapper_begin(r, wb, format, options, false, group_method);
+        if(options & RRDR_OPTION_JSON_WRAP) {
+            wrapper_begin(r, wb, format, options, group_method);
+            buffer_json_member_add_key_only(wb, "result");
+        }
 
         rrdr2json(r, wb, options, 0);
 
         if(options & RRDR_OPTION_JSON_WRAP)
-            wrapper_end(r, wb, format, options, false);
+            wrapper_end(r, wb, format, options);
+
         break;
 
     case DATASOURCE_JSON:
     default:
         wb->content_type = CT_APPLICATION_JSON;
 
-        if(options & RRDR_OPTION_JSON_WRAP)
-            wrapper_begin(r, wb, format, options, false, group_method);
+        if(options & RRDR_OPTION_JSON_WRAP) {
+            wrapper_begin(r, wb, format, options, group_method);
+            buffer_json_member_add_key_only(wb, "result");
+        }
 
         rrdr2json(r, wb, options, 0);
 
         if(options & RRDR_OPTION_JSON_WRAP) {
             if(qt->request.group_by_aggregate_function == RRDR_GROUP_BY_FUNCTION_SUM_COUNT) {
-                rrdr_json_wrapper_group_by_count(r, wb, format, options, 0);
-                rrdr2json(r, wb, options | RRDR_OPTION_INTERNAL_GBC, 0);
+                buffer_json_member_add_key_only(wb, "group_by_count");
+                rrdr2json(r, wb, options | RRDR_OPTION_INTERNAL_GBC, false);
             }
             if(options & RRDR_OPTION_RETURN_JWAR) {
-                rrdr_json_wrapper_anomaly_rates(r, wb, format, options, 0);
-                rrdr2json(r, wb, options | RRDR_OPTION_INTERNAL_AR, 0);
+                buffer_json_member_add_key_only(wb, "anomaly_rates");
+                rrdr2json(r, wb, options | RRDR_OPTION_INTERNAL_AR, false);
             }
-            wrapper_end(r, wb, format, options, false);
+            if(options & RRDR_OPTION_JW_ANNOTATIONS) {
+                rrdr_json_wrapper_annotations(r, wb, format, options);
+            }
+            wrapper_end(r, wb, format, options);
         }
         break;
     }

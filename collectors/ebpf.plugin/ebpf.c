@@ -457,6 +457,35 @@ char *btf_path = NULL;
 
 /*****************************************************************
  *
+ *  FUNCTIONS USED TO ALLOCATE APPS/CGROUP MEMORIES (ARAL)
+ *
+ *****************************************************************/
+
+/**
+ * Allocate PID ARAL
+ *
+ * Allocate memory using ARAL functions to speed up processing.
+ *
+ * @param name the internal name used for allocated region.
+ * @param size size of each element inside allocated space
+ *
+ * @return It returns the address on success and NULL otherwise.
+ */
+ARAL *ebpf_allocate_pid_aral(char *name, size_t size)
+{
+    static size_t max_elements = NETDATA_EBPF_ALLOC_MAX_PID;
+    if (max_elements < NETDATA_EBPF_ALLOC_MIN_ELEMENTS) {
+        error("Number of elements given is too small, adjusting it for %d", NETDATA_EBPF_ALLOC_MIN_ELEMENTS);
+        max_elements = NETDATA_EBPF_ALLOC_MIN_ELEMENTS;
+    }
+
+    return aral_create(name, size,
+        0, max_elements,
+        NULL, NULL, NULL, false, false);
+}
+
+/*****************************************************************
+ *
  *  FUNCTIONS USED TO CLEAN MEMORY AND OPERATE SYSTEM FILES
  *
  *****************************************************************/

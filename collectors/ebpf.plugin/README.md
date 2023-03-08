@@ -8,7 +8,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/System metrics"
 -->
 
-# eBPF monitoring with Netdata
+# Kernel traces/metrics (eBPF) monitoring with Netdata
 
 The Netdata Agent provides many [eBPF](https://ebpf.io/what-is-ebpf/) programs to help you troubleshoot and debug how applications interact with the Linux kernel. The `ebpf.plugin` uses [tracepoints, trampoline, and2 kprobes](#how-netdata-collects-data-using-probes-and-tracepoints) to collect a wide array of high value data about the host that would otherwise be impossible to capture. 
 

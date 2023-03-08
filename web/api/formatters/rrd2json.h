@@ -57,6 +57,9 @@ const char *rrdr_format_to_string(DATASOURCE_FORMAT format);
 
 int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, struct query_target *qt, time_t *latest_timestamp);
 
+struct query_target;
+bool query_target_has_percentage_units(struct query_target *qt);
+
 int rrdset2value_api_v1(
         RRDSET *st
         , BUFFER *wb

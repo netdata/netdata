@@ -10,9 +10,9 @@ BASE_CONFIG = system/netdata.conf
 SYSTEMD_VERSION = $(shell /bin/sh -c "systemd --version 2>&1 | head -n 1 | cut -f 2 -d ' '")
 
 ifeq ($(shell test $(SYSTEMD_VERSION) -ge 235 && echo "1"), 1)
-SYSTEMD_UNIT = system/netdata.service.v235
+SYSTEMD_UNIT = system/systemd/netdata.service.v235
 else
-SYSTEMD_UNIT = system/netdata.service
+SYSTEMD_UNIT = system/systemd/netdata.service
 endif
 
 ifeq ($(shell test `uname -m` != "x86_64" && echo "1"), 1)
@@ -124,8 +124,27 @@ override_dh_fixperms:
 	chmod 4750 $(TOP)-plugin-freeipmi/usr/libexec/netdata/plugins.d/freeipmi.plugin
 
 override_dh_installlogrotate:
-	cp system/netdata.logrotate debian/netdata.logrotate
+	cp system/logrotate/netdata debian/netdata.logrotate
 	dh_installlogrotate
+
+override_dh_installdeb:
+	dh_installdeb
+	@echo "Recreating conffiles without auto-adding /etc files"
+	@for dir in ${CURDIR}/debian/*/DEBIAN; do \
+	    PKG=$$(basename $$(dirname $$dir)); \
+	    FILES=""; \
+	    if [ -f ${CURDIR}/debian/conffiles ]; then \
+	        FILES="${CURDIR}/debian/conffiles"; \
+	    fi; \
+	    if [ -f ${CURDIR}/debian/$${PKG}.conffiles ]; then \
+	        FILES="$$FILES ${CURDIR}/debian/$${PKG}.conffiles"; \
+	    fi; \
+	    if [ -n "$$FILES" ]; then \
+	        cat $$FILES | sort -u > $$dir/conffiles; \
+	    elif [ -f $$dir/conffiles ]; then \
+	        rm $$dir/conffiles; \
+	    fi; \
+	done
 
 override_dh_clean:
 	dh_clean

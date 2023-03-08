@@ -8,6 +8,8 @@ learn_topic_type: "Concepts"
 learn_rel_path: "Operations/Visualizations"
 -->
 
+# Kubernetes visualizations
+
 Netdata Cloud features enhanced visualizations for the resource utilization of Kubernetes (k8s) clusters, embedded in
 the default [Overview](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md) dashboard.
 

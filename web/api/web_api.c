@@ -25,3 +25,35 @@ int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url, st
     buffer_strcat_htmlescape(w->response.data, url);
     return HTTP_RESP_NOT_FOUND;
 }
+
+RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o) {
+    RRDCONTEXT_TO_JSON_OPTIONS options = RRDCONTEXT_OPTION_NONE;
+    char *tok;
+
+    while(o && *o && (tok = mystrsep(&o, ", |"))) {
+        if(!*tok) continue;
+
+        if(!strcmp(tok, "full") || !strcmp(tok, "all"))
+            options |= RRDCONTEXT_OPTIONS_ALL;
+        else if(!strcmp(tok, "charts") || !strcmp(tok, "instances"))
+            options |= RRDCONTEXT_OPTION_SHOW_INSTANCES;
+        else if(!strcmp(tok, "dimensions") || !strcmp(tok, "metrics"))
+            options |= RRDCONTEXT_OPTION_SHOW_METRICS;
+        else if(!strcmp(tok, "queue"))
+            options |= RRDCONTEXT_OPTION_SHOW_QUEUED;
+        else if(!strcmp(tok, "flags"))
+            options |= RRDCONTEXT_OPTION_SHOW_FLAGS;
+        else if(!strcmp(tok, "uuids"))
+            options |= RRDCONTEXT_OPTION_SHOW_UUIDS;
+        else if(!strcmp(tok, "deleted"))
+            options |= RRDCONTEXT_OPTION_SHOW_DELETED;
+        else if(!strcmp(tok, "labels"))
+            options |= RRDCONTEXT_OPTION_SHOW_LABELS;
+        else if(!strcmp(tok, "deepscan"))
+            options |= RRDCONTEXT_OPTION_DEEPSCAN;
+        else if(!strcmp(tok, "hidden"))
+            options |= RRDCONTEXT_OPTION_SHOW_HIDDEN;
+    }
+
+    return options;
+}

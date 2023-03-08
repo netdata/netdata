@@ -7,6 +7,7 @@ SUBDIRS = \
     engine \
     ram \
     sqlite \
+    contexts \
     $(NULL)
 
 dist_noinst_DATA = \

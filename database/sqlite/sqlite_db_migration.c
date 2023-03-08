@@ -49,7 +49,7 @@ static int column_exists_in_table(const char *table, const char *column)
 }
 
 const char *database_migrate_v1_v2[] = {
-    "ALTER TABLE host ADD hops INTEGER;",
+    "ALTER TABLE host ADD hops INTEGER NOT NULL DEFAULT 0;",
     NULL
 };
 

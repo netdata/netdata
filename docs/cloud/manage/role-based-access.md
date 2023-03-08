@@ -1,17 +1,8 @@
-<!--
-title: "Role-Based Access model"
-sidebar_label: "Role-Based Access model"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md"
-sidebar_position: "1"
-learn_status: "Published"
-learn_topic_type: "Concepts"
-learn_rel_path: "Concepts"
-learn_docs_purpose: "Explanation of Netdata roles and permissions linked to them"
--->
+# Role-Based Access model"
 
 Netdata Cloud's role-based-access mechanism allows you to control what functionalities in the app users can access. Each user can be assigned only one role, which fully specifies all the capabilities they are afforded.
 
-#### What roles are available?
+## What roles are available?
 
 With the advent of the paid plans we revamped the roles to cover needs expressed by Netdata users, like providing more limited access to their customers, or
 being able to join any room. We also aligned the offered roles to the target audience of each plan. The end result is the following:
@@ -25,15 +16,15 @@ being able to join any room. We also aligned the offered roles to the target aud
 | **Billing**<p>This role is for users that need to manage billing options and see invoices, with no further access to the system.</p> | - | - | :heavy_check_mark: | - |
 | **Member** ⚠️ Legacy role<p>This role allows users to manage War Rooms and invite fellow Member teammates.</p><p>These users cannot see all War Rooms in the Space but can see all Nodes since they are always on the _All Nodes_ room.</p>| - | - | - | :heavy_check_mark: | 
 
-#### What happens to the previous Member role?
+## What happens to the previous Member role?
 
 We will maintain a Early Bird plan for existing users, which will continue to provide access to the Member role.
 
-#### Which functionalities are available for each role?
+## Which functionalities are available for each role?
 
 In more detail, you can find on the following tables which functionalities are available for each role on each domain.
 
-##### Space Management
+### Space Management
 
 | **Functionality** | **Administrator** | **Manager** | **Troubleshooter** | **Observer** | **Billing** | **Member** |
 | :-- | :--: | :--: | :--: | :--: | :--: | :--: |
@@ -43,7 +34,7 @@ In more detail, you can find on the following tables which functionalities are a
 | Change name | :heavy_check_mark: | - | - | - | - | - |
 | Change description | :heavy_check_mark: | - | - | - | - | - |
 
-##### Node Management
+### Node Management
 
 | **Functionality** | **Administrator** | **Manager** | **Troubleshooter** | **Observer** | **Billing** | **Member** | Notes |
 | :-- | :--: | :--: | :--: | :--: | :--: | :--: | :-- |
@@ -51,7 +42,7 @@ In more detail, you can find on the following tables which functionalities are a
 | Connect Node to Space | :heavy_check_mark: | - | - | - | - | - | - |
 | Delete Node from Space | :heavy_check_mark: | - | - | - | - | - | - |
 
-##### User Management
+### User Management
 
 | **Functionality** | **Administrator** | **Manager** | **Troubleshooter** | **Observer** | **Billing** | **Member** | Notes |
 | :-- | :--: | :--: | :--: | :--: | :--: | :--: | :-- |
@@ -69,7 +60,7 @@ In more detail, you can find on the following tables which functionalities are a
 | Invite existing user to Room | :heavy_check_mark: | :heavy_check_mark: | - | - | - | :heavy_check_mark: | User already invited to the Space |
 | Remove user from Room | :heavy_check_mark: | :heavy_check_mark: | - | - | - | - | |
 
-##### Room Management
+### Room Management
 
 | **Functionality** | **Administrator** | **Manager** | **Troubleshooter** | **Observer** | **Billing** | **Member** | Notes |
 | :-- | :--: | :--: | :--: | :--: | :--: |  :--: | :-- |
@@ -83,7 +74,7 @@ In more detail, you can find on the following tables which functionalities are a
 | Add existing Nodes to Room | :heavy_check_mark: | :heavy_check_mark: | - | - | - | :heavy_check_mark: | Node already connected to the Space |
 | Remove Nodes from Room | :heavy_check_mark: | :heavy_check_mark: | - | - | - | :heavy_check_mark: | |
 
-##### Notifications Management
+### Notifications Management
 
 | **Functionality** | **Administrator** | **Manager** | **Troubleshooter** | **Observer** | **Billing** | **Member** | Notes |
 | :-- | :--: | :--: | :--: | :--: | :--: | :--: | :-- |
@@ -97,7 +88,7 @@ In more detail, you can find on the following tables which functionalities are a
 Notes:
 * Enable, Edit and Add actions over specific notification methods will only be allowed if your plan has access to those ([service classification](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md#service-classification))
 
-##### Dashboards
+### Dashboards
 
 | **Functionality** | **Administrator** | **Manager** | **Troubleshooter** | **Observer** | **Billing** | **Member** |
 | :-- | :--: | :--: | :--: | :--: | :--: | :--: |
@@ -108,7 +99,7 @@ Notes:
 | Delete any dashboard in Room | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - | - | :heavy_check_mark: |
 | Delete own dashboard in Room | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - | :heavy_check_mark: |
 
-##### Functions
+### Functions
 
 | **Functionality** | **Administrator** | **Manager** | **Troubleshooter** | **Observer** | **Billing** | **Member** | Notes |
 | :-- | :--: | :--: | :--: | :--: | :--: |  :--: | :-- |
@@ -117,14 +108,14 @@ Notes:
 | Run read-only function in Room | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - | :heavy_check_mark: |  |
 | Run sensitive function in Room | :heavy_check_mark: | :heavy_check_mark: | - | - | - | - | There isn't any function on this category yet, so subject to change. |
 
-##### Events feed
+### Events feed
 
 | **Functionality** | **Administrator** | **Manager** | **Troubleshooter** | **Observer** | **Billing** | **Member** | Notes |
 | :-- | :--: | :--: | :--: | :--: | :--: | :--: | :-- |
 | See Alert or Topology events | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - | :heavy_check_mark: | |
 | See Auditing events | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - | - | These are coming soon, not currently available  |
 
-##### Billing
+### Billing
 
 | **Functionality** | **Administrator** | **Manager** | **Troubleshooter** | **Observer** | **Billing** | **Member** | Notes |
 | :-- | :--: | :--: | :--: | :--: | :--: | :--: | :-- |
@@ -134,7 +125,7 @@ Notes:
 | Manage payment methods | :heavy_check_mark: | - | - | - | :heavy_check_mark: | - | |
 | Update billing email | :heavy_check_mark: | - | - | - | :heavy_check_mark: | - | |
 
-##### Other permissions
+### Other permissions
 
 | **Functionality** | **Administrator** | **Manager** | **Troubleshooter** | **Observer** | **Billing** | **Member** |
 | :-- | :--: | :--: | :--: | :--: | :--: | :--: |

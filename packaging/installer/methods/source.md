@@ -233,7 +233,7 @@ using glibc or musl. To use one of these:
 
 Alternatively, you may wish to build the eBPF code locally yourself. For
 instructions, please consult [the README file for our kernel-collector
-repository](https://github.com/netdata/kernel-collector/blob/master/README.md),
+repository](https://github.com/netdata/kernel-collector/#readme),
 which outlines both the required dependencies, as well as multiple
 options for building the code.
 

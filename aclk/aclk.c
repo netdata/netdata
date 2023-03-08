@@ -870,6 +870,11 @@ void aclk_send_node_instances()
             uuid_unparse_lower(list->host_id, host_id);
 
             RRDHOST *host = rrdhost_find_by_guid(host_id);
+            if (unlikely(!host)) {
+                freez((void*)node_state_update.node_id);
+                freez(query);
+                continue;
+            }
             node_state_update.capabilities = aclk_get_node_instance_capas(host);
 
             rrdhost_aclk_state_lock(localhost);

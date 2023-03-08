@@ -3,6 +3,10 @@
 #include "ebpf.h"
 #include "ebpf_fd.h"
 
+// ----------------------------------------------------------------------------
+// ARAL vectors used to speed up processing
+ARAL *ebpf_aral_fd_pid;
+
 static char *fd_dimension_names[NETDATA_FD_SYSCALL_END] = { "open", "close" };
 static char *fd_id_names[NETDATA_FD_SYSCALL_END] = { "do_sys_open",  "__close_fd" };
 
@@ -396,6 +400,46 @@ static void ebpf_fd_exit(void *ptr)
 
 /*****************************************************************
  *
+ *  ARAL FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * eBPF file descriptor Aral init
+ *
+ * Initiallize array allocator that will be used when integration with apps is enabled.
+ */
+static inline void ebpf_fd_aral_init()
+{
+    ebpf_aral_fd_pid = ebpf_allocate_pid_aral("ebpf-fd", sizeof(netdata_fd_stat_t));
+}
+
+/**
+ * eBPF publish file descriptor get
+ *
+ * Get a netdata_fd_stat_t entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+netdata_fd_stat_t *ebpf_fd_stat_get(void)
+{
+    netdata_fd_stat_t *target = aral_mallocz(ebpf_aral_fd_pid);
+    memset(target, 0, sizeof(netdata_fd_stat_t));
+    return target;
+}
+
+/**
+ * eBPF file descriptor release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_fd_release(netdata_fd_stat_t *stat)
+{
+    aral_freez(ebpf_aral_fd_pid, stat);
+}
+
+/*****************************************************************
+ *
  *  MAIN LOOP
  *
  *****************************************************************/
@@ -479,7 +523,7 @@ static void fd_fill_pid(uint32_t current_pid, netdata_fd_stat_t *publish)
 {
     netdata_fd_stat_t *curr = fd_pid[current_pid];
     if (!curr) {
-        curr = callocz(1, sizeof(netdata_fd_stat_t));
+        curr = ebpf_fd_stat_get();
         fd_pid[current_pid] = curr;
     }
 
@@ -1070,10 +1114,11 @@ static void ebpf_create_fd_global_charts(ebpf_module_t *em)
  */
 static void ebpf_fd_allocate_global_vectors(int apps)
 {
-    if (apps)
+    if (apps) {
+        ebpf_fd_aral_init();
         fd_pid = callocz((size_t)pid_max, sizeof(netdata_fd_stat_t *));
-
-    fd_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_fd_stat_t));
+        fd_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_fd_stat_t));
+    }
 
     fd_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 }

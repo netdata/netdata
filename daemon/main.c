@@ -530,38 +530,41 @@ void web_server_config_options(void)
         web_x_frame_options = NULL;
 
     web_allow_connections_from =
-        simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow connections from", "localhost *"),
-                              NULL, SIMPLE_PATTERN_EXACT);
+            simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow connections from", "localhost *"),
+                                  NULL, SIMPLE_PATTERN_EXACT, true);
     web_allow_connections_dns  =
         make_dns_decision(CONFIG_SECTION_WEB, "allow connections by dns", "heuristic", web_allow_connections_from);
     web_allow_dashboard_from   =
-        simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow dashboard from", "localhost *"),
-                              NULL, SIMPLE_PATTERN_EXACT);
+            simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow dashboard from", "localhost *"),
+                                  NULL, SIMPLE_PATTERN_EXACT, true);
     web_allow_dashboard_dns    =
         make_dns_decision(CONFIG_SECTION_WEB, "allow dashboard by dns", "heuristic", web_allow_dashboard_from);
     web_allow_badges_from      =
-        simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow badges from", "*"), NULL, SIMPLE_PATTERN_EXACT);
+            simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow badges from", "*"), NULL, SIMPLE_PATTERN_EXACT,
+                                  true);
     web_allow_badges_dns       =
         make_dns_decision(CONFIG_SECTION_WEB, "allow badges by dns", "heuristic", web_allow_badges_from);
     web_allow_registry_from    =
-        simple_pattern_create(config_get(CONFIG_SECTION_REGISTRY, "allow from", "*"), NULL, SIMPLE_PATTERN_EXACT);
+            simple_pattern_create(config_get(CONFIG_SECTION_REGISTRY, "allow from", "*"), NULL, SIMPLE_PATTERN_EXACT,
+                                  true);
     web_allow_registry_dns     = make_dns_decision(CONFIG_SECTION_REGISTRY, "allow by dns", "heuristic",
                                                    web_allow_registry_from);
     web_allow_streaming_from   = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow streaming from", "*"),
-                                                       NULL, SIMPLE_PATTERN_EXACT);
+                                                       NULL, SIMPLE_PATTERN_EXACT, true);
     web_allow_streaming_dns    = make_dns_decision(CONFIG_SECTION_WEB, "allow streaming by dns", "heuristic",
                                                    web_allow_streaming_from);
     // Note the default is not heuristic, the wildcards could match DNS but the intent is ip-addresses.
     web_allow_netdataconf_from = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow netdata.conf from",
-                                                       "localhost fd* 10.* 192.168.* 172.16.* 172.17.* 172.18.*"
-                                                       " 172.19.* 172.20.* 172.21.* 172.22.* 172.23.* 172.24.*"
-                                                       " 172.25.* 172.26.* 172.27.* 172.28.* 172.29.* 172.30.*"
-                                                       " 172.31.* UNKNOWN"), NULL, SIMPLE_PATTERN_EXACT);
+                                                                  "localhost fd* 10.* 192.168.* 172.16.* 172.17.* 172.18.*"
+                                                                  " 172.19.* 172.20.* 172.21.* 172.22.* 172.23.* 172.24.*"
+                                                                  " 172.25.* 172.26.* 172.27.* 172.28.* 172.29.* 172.30.*"
+                                                                  " 172.31.* UNKNOWN"), NULL, SIMPLE_PATTERN_EXACT,
+                                                       true);
     web_allow_netdataconf_dns  =
         make_dns_decision(CONFIG_SECTION_WEB, "allow netdata.conf by dns", "no", web_allow_netdataconf_from);
     web_allow_mgmt_from        =
-        simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow management from", "localhost"),
-                              NULL, SIMPLE_PATTERN_EXACT);
+            simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow management from", "localhost"),
+                                  NULL, SIMPLE_PATTERN_EXACT, true);
     web_allow_mgmt_dns         =
         make_dns_decision(CONFIG_SECTION_WEB, "allow management by dns","heuristic",web_allow_mgmt_from);
 
@@ -1325,6 +1328,7 @@ int pgc_unittest(void);
 int mrg_unittest(void);
 int julytest(void);
 int pluginsd_parser_unittest(void);
+void replication_initialize(void);
 
 int main(int argc, char **argv) {
     // initialize the system clocks
@@ -1612,7 +1616,7 @@ int main(int argc, char **argv) {
                             size_t len = strlen(needle) + 1;
                             char wildcarded[len];
 
-                            SIMPLE_PATTERN *p = simple_pattern_create(haystack, NULL, SIMPLE_PATTERN_EXACT);
+                            SIMPLE_PATTERN *p = simple_pattern_create(haystack, NULL, SIMPLE_PATTERN_EXACT, true);
                             int ret = simple_pattern_matches_extract(p, needle, wildcarded, len);
                             simple_pattern_free(p);
 
@@ -1896,6 +1900,8 @@ int main(int argc, char **argv) {
         aral_judy_init();
 
         get_system_timezone();
+
+        replication_initialize();
 
         // --------------------------------------------------------------------
         // get the certificate and start security

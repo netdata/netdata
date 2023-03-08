@@ -86,7 +86,7 @@ to show other charts that will help you debug and troubleshoot how it interacts 
 
 ## Configure the eBPF collector to monitor errors
 
-The eBPF collector has [two possible modes](/collectors/ebpf.plugin#ebpf-load-mode): `entry` and `return`. The default
+The eBPF collector has [two possible modes](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/README.md#ebpf-load-mode): `entry` and `return`. The default
 is `entry`, and only monitors calls to kernel functions, but the `return` also monitors and charts _whether these calls
 return in error_.
 
@@ -243,7 +243,7 @@ You can also read how to [monitor your infrastructure with Netdata Cloud](https:
 
 Once you've added one or more nodes to a Space in Netdata Cloud, you can see aggregated eBPF metrics in the [Overview
 dashboard](https://github.com/netdata/netdata/blob/master/docs/visualize/overview-infrastructure.md) under the same **Applications** or **eBPF** sections that you
-find on the local Agent dashboard. Or, [create new dashboards](https://github.com/netdata/netdata/blob/master/docs/visualize/create-dashboards.md) using eBPF metrics
+find on the local Agent dashboard. Or, [create new dashboards](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md) using eBPF metrics
 from any number of distributed nodes to see how your application interacts with multiple Linux kernels on multiple Linux
 systems. 
 

@@ -190,8 +190,8 @@ static inline bool should_send_chart_matching(RRDSET *st, RRDSET_FLAGS flags) {
             else
                 rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_IGNORE);
         }
-        else if(simple_pattern_matches(host->rrdpush_send_charts_matching, rrdset_id(st)) ||
-            simple_pattern_matches(host->rrdpush_send_charts_matching, rrdset_name(st)))
+        else if(simple_pattern_matches_string(host->rrdpush_send_charts_matching, st->id) ||
+            simple_pattern_matches_string(host->rrdpush_send_charts_matching, st->name))
 
             rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_SEND);
         else
@@ -941,7 +941,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     {
         SIMPLE_PATTERN *key_allow_from = simple_pattern_create(
                 appconfig_get(&stream_config, rpt->key, "allow from", "*"),
-                NULL, SIMPLE_PATTERN_EXACT);
+                NULL, SIMPLE_PATTERN_EXACT, true);
 
         if(key_allow_from) {
             if(!simple_pattern_matches(key_allow_from, w->client_ip)) {
@@ -988,7 +988,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     {
         SIMPLE_PATTERN *machine_allow_from = simple_pattern_create(
                 appconfig_get(&stream_config, rpt->machine_guid, "allow from", "*"),
-                NULL, SIMPLE_PATTERN_EXACT);
+                NULL, SIMPLE_PATTERN_EXACT, true);
 
         if(machine_allow_from) {
             if(!simple_pattern_matches(machine_allow_from, w->client_ip)) {

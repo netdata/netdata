@@ -3,6 +3,10 @@
 #include "ebpf.h"
 #include "ebpf_cachestat.h"
 
+// ----------------------------------------------------------------------------
+// ARAL vectors used to speed up processing
+ARAL *ebpf_aral_cachestat_pid;
+
 netdata_publish_cachestat_t **cachestat_pid;
 
 static char *cachestat_counter_dimension_name[NETDATA_CACHESTAT_END] = { "ratio", "dirty", "hit",
@@ -366,6 +370,46 @@ static void ebpf_cachestat_exit(void *ptr)
 
 /*****************************************************************
  *
+ *  ARAL FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * eBPF Cachestat Aral init
+ *
+ * Initiallize array allocator that will be used when integration with apps is enabled.
+ */
+static inline void ebpf_cachestat_aral_init()
+{
+    ebpf_aral_cachestat_pid = ebpf_allocate_pid_aral("ebpf-cachestat", sizeof(netdata_publish_cachestat_t));
+}
+
+/**
+ * eBPF publish cachestat get
+ *
+ * Get a netdata_publish_cachestat_t entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+netdata_publish_cachestat_t *ebpf_publish_cachestat_get(void)
+{
+    netdata_publish_cachestat_t *target = aral_mallocz(ebpf_aral_cachestat_pid);
+    memset(target, 0, sizeof(netdata_publish_cachestat_t));
+    return target;
+}
+
+/**
+ * eBPF cachestat release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_cachestat_release(netdata_publish_cachestat_t *stat)
+{
+    aral_freez(ebpf_aral_cachestat_pid, stat);
+}
+
+/*****************************************************************
+ *
  *  COMMON FUNCTIONS
  *
  *****************************************************************/
@@ -502,7 +546,7 @@ static void cachestat_fill_pid(uint32_t current_pid, netdata_cachestat_pid_t *pu
 {
     netdata_publish_cachestat_t *curr = cachestat_pid[current_pid];
     if (!curr) {
-        curr = callocz(1, sizeof(netdata_publish_cachestat_t));
+        curr = ebpf_publish_cachestat_get();
         cachestat_pid[current_pid] = curr;
 
         cachestat_save_pid_values(curr, publish);
@@ -1167,10 +1211,11 @@ static void ebpf_create_memory_charts(ebpf_module_t *em)
  */
 static void ebpf_cachestat_allocate_global_vectors(int apps)
 {
-    if (apps)
+    if (apps) {
         cachestat_pid = callocz((size_t)pid_max, sizeof(netdata_publish_cachestat_t *));
-
-    cachestat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_cachestat_pid_t));
+        ebpf_cachestat_aral_init();
+        cachestat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_cachestat_pid_t));
+    }
 
     cachestat_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 

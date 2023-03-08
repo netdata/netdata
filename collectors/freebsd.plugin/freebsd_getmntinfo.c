@@ -143,18 +143,16 @@ int do_getmntinfo(int update_every, usec_t dt) {
         do_inodes = config_get_boolean_ondemand(CONFIG_SECTION_GETMNTINFO, "inodes usage for all disks", CONFIG_BOOLEAN_AUTO);
 
         excluded_mountpoints = simple_pattern_create(
-                config_get(CONFIG_SECTION_GETMNTINFO, "exclude space metrics on paths",
-                           DEFAULT_EXCLUDED_PATHS)
-                , NULL
-                , SIMPLE_PATTERN_EXACT
-        );
+            config_get(CONFIG_SECTION_GETMNTINFO, "exclude space metrics on paths", DEFAULT_EXCLUDED_PATHS),
+            NULL,
+            SIMPLE_PATTERN_EXACT,
+            true);
 
         excluded_filesystems = simple_pattern_create(
-                config_get(CONFIG_SECTION_GETMNTINFO, "exclude space metrics on filesystems",
-                           DEFAULT_EXCLUDED_FILESYSTEMS)
-                , NULL
-                , SIMPLE_PATTERN_EXACT
-        );
+            config_get(CONFIG_SECTION_GETMNTINFO, "exclude space metrics on filesystems", DEFAULT_EXCLUDED_FILESYSTEMS),
+            NULL,
+            SIMPLE_PATTERN_EXACT,
+            true);
     }
 
     if (likely(do_space || do_inodes)) {

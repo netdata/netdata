@@ -18,43 +18,47 @@ typedef enum tier_query_fetch {
 } TIER_QUERY_FETCH;
 
 typedef enum rrdr_options {
-    RRDR_OPTION_NONZERO         = 0x00000001, // don't output dimensions with just zero values
-    RRDR_OPTION_REVERSED        = 0x00000002, // output the rows in reverse order (oldest to newest)
-    RRDR_OPTION_ABSOLUTE        = 0x00000004, // values positive, for DATASOURCE_SSV before summing
-    RRDR_OPTION_MIN2MAX         = 0x00000008, // when adding dimensions, use max - min, instead of sum
-    RRDR_OPTION_SECONDS         = 0x00000010, // output seconds, instead of dates
-    RRDR_OPTION_MILLISECONDS    = 0x00000020, // output milliseconds, instead of dates
-    RRDR_OPTION_NULL2ZERO       = 0x00000040, // do not show nulls, convert them to zeros
-    RRDR_OPTION_OBJECTSROWS     = 0x00000080, // each row of values should be an object, not an array
-    RRDR_OPTION_GOOGLE_JSON     = 0x00000100, // comply with google JSON/JSONP specs
-    RRDR_OPTION_JSON_WRAP       = 0x00000200, // wrap the response in a JSON header with info about the result
-    RRDR_OPTION_LABEL_QUOTES    = 0x00000400, // in CSV output, wrap header labels in double quotes
-    RRDR_OPTION_PERCENTAGE      = 0x00000800, // give values as percentage of total
-    RRDR_OPTION_NOT_ALIGNED     = 0x00001000, // do not align charts for persistent timeframes
-    RRDR_OPTION_DISPLAY_ABS     = 0x00002000, // for badges, display the absolute value, but calculate colors with sign
-    RRDR_OPTION_MATCH_IDS       = 0x00004000, // when filtering dimensions, match only IDs
-    RRDR_OPTION_MATCH_NAMES     = 0x00008000, // when filtering dimensions, match only names
-    RRDR_OPTION_NATURAL_POINTS  = 0x00020000, // return the natural points of the database
-    RRDR_OPTION_VIRTUAL_POINTS  = 0x00040000, // return virtual points
-    RRDR_OPTION_ANOMALY_BIT     = 0x00080000, // Return the anomaly bit stored in each collected_number
-    RRDR_OPTION_RETURN_RAW      = 0x00100000, // Return raw data for aggregating across multiple nodes
-    RRDR_OPTION_RETURN_JWAR     = 0x00200000, // Return anomaly rates in jsonwrap
-    RRDR_OPTION_SELECTED_TIER   = 0x00400000, // Use the selected tier for the query
-    RRDR_OPTION_ALL_DIMENSIONS  = 0x00800000, // Return the full dimensions list
-    RRDR_OPTION_SHOW_PLAN       = 0x01000000, // Return the query plan in jsonwrap
-    RRDR_OPTION_SHOW_DETAILS    = 0x02000000, // v2 returns detailed object tree
-    RRDR_OPTION_DEBUG           = 0x04000000, // v2 returns request description
+    RRDR_OPTION_NONZERO         = (1 << 0), // don't output dimensions with just zero values
+    RRDR_OPTION_REVERSED        = (1 << 1), // output the rows in reverse order (oldest to newest)
+    RRDR_OPTION_ABSOLUTE        = (1 << 2), // values positive, for DATASOURCE_SSV before summing
+    RRDR_OPTION_MIN2MAX         = (1 << 3), // when adding dimensions, use max - min, instead of sum
+    RRDR_OPTION_SECONDS         = (1 << 4), // output seconds, instead of dates
+    RRDR_OPTION_MILLISECONDS    = (1 << 5), // output milliseconds, instead of dates
+    RRDR_OPTION_NULL2ZERO       = (1 << 6), // do not show nulls, convert them to zeros
+    RRDR_OPTION_OBJECTSROWS     = (1 << 7), // each row of values should be an object, not an array
+    RRDR_OPTION_GOOGLE_JSON     = (1 << 8), // comply with google JSON/JSONP specs
+    RRDR_OPTION_JSON_WRAP       = (1 << 9), // wrap the response in a JSON header with info about the result
+    RRDR_OPTION_LABEL_QUOTES    = (1 << 10), // in CSV output, wrap header labels in double quotes
+    RRDR_OPTION_PERCENTAGE      = (1 << 11), // give values as percentage of total
+    RRDR_OPTION_NOT_ALIGNED     = (1 << 12), // do not align charts for persistent timeframes
+    RRDR_OPTION_DISPLAY_ABS     = (1 << 13), // for badges, display the absolute value, but calculate colors with sign
+    RRDR_OPTION_MATCH_IDS       = (1 << 14), // when filtering dimensions, match only IDs
+    RRDR_OPTION_MATCH_NAMES     = (1 << 15), // when filtering dimensions, match only names
+    RRDR_OPTION_NATURAL_POINTS  = (1 << 16), // return the natural points of the database
+    RRDR_OPTION_VIRTUAL_POINTS  = (1 << 17), // return virtual points
+    RRDR_OPTION_ANOMALY_BIT     = (1 << 18), // Return the anomaly bit stored in each collected_number
+    RRDR_OPTION_RETURN_RAW      = (1 << 19), // Return raw data for aggregating across multiple nodes
+    RRDR_OPTION_RETURN_JWAR     = (1 << 20), // Return anomaly rates in jsonwrap
+    RRDR_OPTION_SELECTED_TIER   = (1 << 21), // Use the selected tier for the query
+    RRDR_OPTION_ALL_DIMENSIONS  = (1 << 22), // Return the full dimensions list
+    RRDR_OPTION_SHOW_PLAN       = (1 << 23), // Return the query plan in jsonwrap
+    RRDR_OPTION_SHOW_DETAILS    = (1 << 24), // v2 returns detailed object tree
+    RRDR_OPTION_DEBUG           = (1 << 25), // v2 returns request description
+    RRDR_OPTION_MINIFY          = (1 << 26), // remove JSON spaces and newlines from JSON output
+    RRDR_OPTION_JW_ANNOTATIONS  = (1 << 27), // add annotation array to the JSON output
 
     // internal ones - not to be exposed to the API
-    RRDR_OPTION_INTERNAL_AR     = 0x10000000, // internal use only, to let the formatters we want to render the anomaly rate
-    RRDR_OPTION_INTERNAL_GBC    = 0x20000000, // internal use only, to let the formatters we want to render the group by count
-    RRDR_OPTION_HEALTH_RSRVD1   = 0x80000000, // reserved for RRDCALC_OPTION_NO_CLEAR_NOTIFICATION
+    RRDR_OPTION_HEALTH_RSRVD1        = (1 << 28), // reserved for RRDCALC_OPTION_NO_CLEAR_NOTIFICATION
+    RRDR_OPTION_INTERNAL_ANNOTATIONS = (1 << 29), // internal use only, to let the formatters know we want to render the annotations
+    RRDR_OPTION_INTERNAL_AR          = (1 << 30), // internal use only, to let the formatters know we want to render the anomaly rate
+    RRDR_OPTION_INTERNAL_GBC         = (1 << 31), // internal use only, to let the formatters know we want to render the group by count
 } RRDR_OPTIONS;
 
 typedef enum __attribute__ ((__packed__)) rrdr_value_flag {
     RRDR_VALUE_NOTHING      = 0,            // no flag set (a good default)
     RRDR_VALUE_EMPTY        = (1 << 0),     // the database value is empty
     RRDR_VALUE_RESET        = (1 << 1),     // the database value is marked as reset (overflown)
+    RRDR_VALUE_PARTIAL      = (1 << 2),     // the database provides partial data about this point (used in group-by)
 } RRDR_VALUE_FLAGS;
 
 typedef enum __attribute__ ((__packed__)) rrdr_dimension_flag {
@@ -87,7 +91,7 @@ typedef struct rrdresult {
     STRING **dn;              // array of d dimension names
     STRING **du;              // array of d dimension units
     uint32_t *dgbc;           // array of d dimension units - NOT ALLOCATED when RRDR is created
-    uint32_t *dp;             // array of d dimension units - NOT ALLOCATED when RRDR is created
+    uint32_t *dp;             // array of d dimension priority - NOT ALLOCATED when RRDR is created
 
     time_t *t;                // array of n timestamps
     NETDATA_DOUBLE *v;        // array n x d values
@@ -109,7 +113,6 @@ typedef struct rrdresult {
     struct {
         size_t db_points_read;
         size_t result_points_generated;
-        size_t tier_points_read[RRD_STORAGE_TIERS];
     } stats;
 
     struct {

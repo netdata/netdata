@@ -8,7 +8,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/QoS"
 -->
 
-# Online changepoint detection with Netdata
+# Online change point detection with Netdata
 
 This collector uses the Python [changefinder](https://github.com/shunsukeaihara/changefinder) library to
 perform [online](https://en.wikipedia.org/wiki/Online_machine_learning) [changepoint detection](https://en.wikipedia.org/wiki/Change_detection)

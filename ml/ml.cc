@@ -1,23 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "Config.h"
-#include "Dimension.h"
-#include "Chart.h"
-#include "Host.h"
+#include "nml.h"
 
 #include <random>
-
-using namespace ml;
 
 bool ml_capable() {
     return true;
 }
 
-bool ml_enabled(RRDHOST *RH) {
-    if (!Cfg.EnableAnomalyDetection)
+bool ml_enabled(RRDHOST *rh) {
+    if (!Cfg.enable_anomaly_detection)
         return false;
 
-    if (simple_pattern_matches(Cfg.SP_HostsToSkip, rrdhost_hostname(RH)))
+    if (simple_pattern_matches(Cfg.sp_host_to_skip, rrdhost_hostname(rh)))
         return false;
 
     return true;
@@ -31,9 +26,9 @@ bool ml_enabled(RRDHOST *RH) {
 
 void ml_init(void) {
     // Read config values
-    Cfg.readMLConfig();
+    nml_config_load(&Cfg);
 
-    if (!Cfg.EnableAnomalyDetection)
+    if (!Cfg.enable_anomaly_detection)
         return;
 
     // Generate random numbers to efficiently sample the features we need
@@ -41,160 +36,158 @@ void ml_init(void) {
     std::random_device RD;
     std::mt19937 Gen(RD());
 
-    Cfg.RandomNums.reserve(Cfg.MaxTrainSamples);
-    for (size_t Idx = 0; Idx != Cfg.MaxTrainSamples; Idx++)
-        Cfg.RandomNums.push_back(Gen());
+    Cfg.random_nums.reserve(Cfg.max_train_samples);
+    for (size_t Idx = 0; Idx != Cfg.max_train_samples; Idx++)
+        Cfg.random_nums.push_back(Gen());
+
+
+    // start detection & training threads
+    char tag[NETDATA_THREAD_TAG_MAX + 1];
+
+    snprintfz(tag, NETDATA_THREAD_TAG_MAX, "%s", "PREDICT");
+    netdata_thread_create(&Cfg.detection_thread, tag, NETDATA_THREAD_OPTION_JOINABLE, nml_detect_main, NULL);
 }
 
-void ml_host_new(RRDHOST *RH) {
-    if (!ml_enabled(RH))
+void ml_host_new(RRDHOST *rh) {
+    if (!ml_enabled(rh))
         return;
 
-    Host *H = new Host(RH);
-    RH->ml_host = reinterpret_cast<ml_host_t *>(H);
+    nml_host_t *host = nml_host_new(rh);
+    rh->ml_host = reinterpret_cast<ml_host_t *>(host);
 }
 
-void ml_host_delete(RRDHOST *RH) {
-    Host *H = reinterpret_cast<Host *>(RH->ml_host);
-    if (!H)
+void ml_host_delete(RRDHOST *rh) {
+    nml_host_t *host = reinterpret_cast<nml_host_t *>(rh->ml_host);
+    if (!host)
         return;
 
-    delete H;
-    RH->ml_host = nullptr;
+    nml_host_delete(host);
+    rh->ml_host = NULL;
 }
 
-void ml_chart_new(RRDSET *RS) {
-    Host *H = reinterpret_cast<Host *>(RS->rrdhost->ml_host);
-    if (!H)
+void ml_chart_new(RRDSET *rs) {
+    nml_host_t *host = reinterpret_cast<nml_host_t *>(rs->rrdhost->ml_host);
+    if (!host)
         return;
 
-    Chart *C = new Chart(RS);
-    RS->ml_chart = reinterpret_cast<ml_chart_t *>(C);
-
-    H->addChart(C);
+    nml_chart_t *chart = nml_chart_new(rs);
+    rs->ml_chart = reinterpret_cast<ml_chart_t *>(chart);
 }
 
-void ml_chart_delete(RRDSET *RS) {
-    Host *H = reinterpret_cast<Host *>(RS->rrdhost->ml_host);
-    if (!H)
+void ml_chart_delete(RRDSET *rs) {
+    nml_host_t *host = reinterpret_cast<nml_host_t *>(rs->rrdhost->ml_host);
+    if (!host)
         return;
 
-    Chart *C = reinterpret_cast<Chart *>(RS->ml_chart);
-    H->removeChart(C);
+    nml_chart_t *chart = reinterpret_cast<nml_chart_t *>(rs->ml_chart);
 
-    delete C;
-    RS->ml_chart = nullptr;
+    nml_chart_delete(chart);
+    rs->ml_chart = NULL;
 }
 
-void ml_dimension_new(RRDDIM *RD) {
-    Chart *C = reinterpret_cast<Chart *>(RD->rrdset->ml_chart);
-    if (!C)
+void ml_dimension_new(RRDDIM *rd) {
+    nml_chart_t *chart = reinterpret_cast<nml_chart_t *>(rd->rrdset->ml_chart);
+    if (!chart)
         return;
 
-    Dimension *D = new Dimension(RD);
-    RD->ml_dimension = reinterpret_cast<ml_dimension_t *>(D);
-    C->addDimension(D);
+    nml_dimension_t *dim = nml_dimension_new(rd);
+    rd->ml_dimension = reinterpret_cast<ml_dimension_t *>(dim);
 }
 
-void ml_dimension_delete(RRDDIM *RD) {
-    Dimension *D = reinterpret_cast<Dimension *>(RD->ml_dimension);
-    if (!D)
+void ml_dimension_delete(RRDDIM *rd) {
+    nml_dimension_t *dim = reinterpret_cast<nml_dimension_t *>(rd->ml_dimension);
+    if (!dim)
         return;
 
-    Chart *C = reinterpret_cast<Chart *>(RD->rrdset->ml_chart);
-    C->removeDimension(D);
-
-    delete D;
-    RD->ml_dimension = nullptr;
+    nml_dimension_delete(dim);
+    rd->ml_dimension = NULL;
 }
 
-void ml_get_host_info(RRDHOST *RH, BUFFER *wb) {
-    if (RH && RH->ml_host) {
-        Host *H = reinterpret_cast<Host *>(RH->ml_host);
-        H->getConfigAsJson(wb);
+void ml_get_host_info(RRDHOST *rh, BUFFER *wb) {
+    if (rh && rh->ml_host) {
+        nml_host_t *host = reinterpret_cast<nml_host_t *>(rh->ml_host);
+        nml_host_get_config_as_json(host, wb);
     } else {
         buffer_json_member_add_boolean(wb, "enabled", false);
     }
 }
 
-char *ml_get_host_runtime_info(RRDHOST *RH) {
-    nlohmann::json ConfigJson;
+char *ml_get_host_runtime_info(RRDHOST *rh) {
+    nlohmann::json config_json;
 
-    if (RH && RH->ml_host) {
-        Host *H = reinterpret_cast<Host *>(RH->ml_host);
-        H->getDetectionInfoAsJson(ConfigJson);
+    if (rh && rh->ml_host) {
+        nml_host_t *host = reinterpret_cast<nml_host_t *>(rh->ml_host);
+        nml_host_get_detection_info_as_json(host, config_json);
     } else {
-        return nullptr;
+        return NULL;
     }
 
-    return strdup(ConfigJson.dump(1, '\t').c_str());
+    return strdup(config_json.dump(1, '\t').c_str());
 }
 
-char *ml_get_host_models(RRDHOST *RH) {
-    nlohmann::json ModelsJson;
+char *ml_get_host_models(RRDHOST *rh) {
+    nlohmann::json j;
 
-    if (RH && RH->ml_host) {
-        Host *H = reinterpret_cast<Host *>(RH->ml_host);
-        H->getModelsAsJson(ModelsJson);
-        return strdup(ModelsJson.dump(2, '\t').c_str());
+    if (rh && rh->ml_host) {
+        nml_host_t *host = reinterpret_cast<nml_host_t *>(rh->ml_host);
+        nml_host_get_models_as_json(host, j);
+        return strdup(j.dump(2, '\t').c_str());
     }
 
-    return nullptr;
+    return NULL;
 }
 
-void ml_start_anomaly_detection_threads(RRDHOST *RH) {
-    if (RH && RH->ml_host) {
-        Host *H = reinterpret_cast<Host *>(RH->ml_host);
-        H->startAnomalyDetectionThreads();
-    }
-}
-
-void ml_stop_anomaly_detection_threads(RRDHOST *RH) {
-    if (RH && RH->ml_host) {
-        Host *H = reinterpret_cast<Host *>(RH->ml_host);
-        H->stopAnomalyDetectionThreads(true);
-    }
-}
-
-void ml_cancel_anomaly_detection_threads(RRDHOST *RH) {
-    if (RH && RH->ml_host) {
-        Host *H = reinterpret_cast<Host *>(RH->ml_host);
-        H->stopAnomalyDetectionThreads(false);
-    }
-}
-
-bool ml_chart_update_begin(RRDSET *RS) {
-    Chart *C = reinterpret_cast<Chart *>(RS->ml_chart);
-    if (!C)
+bool ml_chart_update_begin(RRDSET *rs) {
+    nml_chart_t *chart = reinterpret_cast<nml_chart_t *>(rs->ml_chart);
+    if (!chart)
         return false;
 
-    C->updateBegin();
-
+    nml_chart_update_begin(chart);
     return true;
 }
 
-void ml_chart_update_end(RRDSET *RS) {
-    Chart *C = reinterpret_cast<Chart *>(RS->ml_chart);
-    if (!C)
+void ml_chart_update_end(RRDSET *rs) {
+    nml_chart_t *chart = reinterpret_cast<nml_chart_t *>(rs->ml_chart);
+    if (!chart)
         return;
 
-    C->updateEnd();
+    nml_chart_update_end(chart);
 }
 
-bool ml_is_anomalous(RRDDIM *RD, time_t CurrT, double Value, bool Exists) {
-    Dimension *D = reinterpret_cast<Dimension *>(RD->ml_dimension);
-    if (!D)
+bool ml_is_anomalous(RRDDIM *rd, time_t curr_time, double value, bool exists) {
+    nml_dimension_t *dim = reinterpret_cast<nml_dimension_t *>(rd->ml_dimension);
+    if (!dim)
         return false;
 
-    Chart *C = reinterpret_cast<Chart *>(RD->rrdset->ml_chart);
+    nml_chart_t *chart = reinterpret_cast<nml_chart_t *>(rd->rrdset->ml_chart);
 
-    bool IsAnomalous = D->predict(CurrT, Value, Exists);
-    C->updateDimension(D, IsAnomalous);
-    return IsAnomalous;
+    bool is_anomalous = nml_dimension_predict(dim, curr_time, value, exists);
+    nml_chart_update_dimension(chart, dim, is_anomalous);
+
+    return is_anomalous;
 }
 
 bool ml_streaming_enabled() {
-    return Cfg.StreamADCharts;
+    return Cfg.stream_anomaly_detection_charts;
 }
 
-#include "ml-private.h"
+void ml_start_training_thread(RRDHOST *rh) {
+    if (rh && rh->ml_host) {
+        nml_host_t *host = reinterpret_cast<nml_host_t *>(rh->ml_host);
+        nml_host_start_training_thread(host);
+    }
+}
+
+void ml_stop_training_thread(RRDHOST *rh) {
+    if (rh && rh->ml_host) {
+        nml_host_t *host = reinterpret_cast<nml_host_t *>(rh->ml_host);
+        nml_host_stop_training_thread(host, /* join */ true);
+    }
+}
+
+void ml_cancel_training_thread(RRDHOST *rh) {
+    if (rh && rh->ml_host) {
+        nml_host_t *host = reinterpret_cast<nml_host_t *>(rh->ml_host);
+        nml_host_stop_training_thread(host, /* join */ false);
+    }
+}

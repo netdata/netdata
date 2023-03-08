@@ -12,37 +12,37 @@ extern "C" {
 
 // This is a DBEngine function redeclared here so that we can free
 // the anomaly rate dimension, whenever its backing dimension is freed.
-void rrddim_free(RRDSET *st, RRDDIM *rd);
+void rrddim_free(RRDSET *rs, RRDDIM *rd);
 
 bool ml_capable();
 
-bool ml_enabled(RRDHOST *RH);
+bool ml_enabled(RRDHOST *rh);
 
 void ml_init(void);
 
-void ml_host_new(RRDHOST *RH);
-void ml_host_delete(RRDHOST *RH);
+void ml_host_new(RRDHOST *rh);
+void ml_host_delete(RRDHOST *rh);
 
-void ml_chart_new(RRDSET *RS);
-void ml_chart_delete(RRDSET *RS);
+void ml_chart_new(RRDSET *rs);
+void ml_chart_delete(RRDSET *rs);
 
-void ml_dimension_new(RRDDIM *RD);
-void ml_dimension_delete(RRDDIM *RD);
-
-void ml_start_anomaly_detection_threads(RRDHOST *RH);
-void ml_stop_anomaly_detection_threads(RRDHOST *RH);
-void ml_cancel_anomaly_detection_threads(RRDHOST *RH);
+void ml_dimension_new(RRDDIM *rd);
+void ml_dimension_delete(RRDDIM *rd);
 
 void ml_get_host_info(RRDHOST *RH, BUFFER *wb);
 char *ml_get_host_runtime_info(RRDHOST *RH);
 char *ml_get_host_models(RRDHOST *RH);
 
-bool ml_chart_update_begin(RRDSET *RS);
-void ml_chart_update_end(RRDSET *RS);
+bool ml_chart_update_begin(RRDSET *rs);
+void ml_chart_update_end(RRDSET *rs);
 
-bool ml_is_anomalous(RRDDIM *RD, time_t curr_t, double value, bool exists);
+bool ml_is_anomalous(RRDDIM *rd, time_t curr_time, double value, bool exists);
 
 bool ml_streaming_enabled();
+
+void ml_start_training_thread(RRDHOST *rh);
+void ml_cancel_training_thread(RRDHOST *rh);
+void ml_stop_training_thread(RRDHOST *rh);
 
 #ifdef __cplusplus
 };

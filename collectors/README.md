@@ -1,13 +1,4 @@
-<!--
-title: "Collectors"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/README.md"
-id: "collectors-ref"
-sidebar_label: "Collectors"
-learn_status: "Published"
-learn_rel_path: "Concepts"
--->
-
-# Collecting metrics
+# Collectors
 
 When Netdata starts, and with zero configuration, it auto-detects thousands of data sources and immediately collects
 per-second metrics.
@@ -16,8 +7,8 @@ Netdata can immediately collect metrics from these endpoints thanks to 300+ **co
 when you [install Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md).
 
 All collectors are **installed by default** with every installation of Netdata. You do not need to install
-collectors manually to collect metrics from new sources. See how you can  
-[monitor anything with Netdata](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md).
+collectors manually to collect metrics from new sources. 
+See how you can [monitor anything with Netdata](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md).
 
 Upon startup, Netdata will **auto-detect** any application or service that has a collector, as long as both the collector
 and the app/service are configured correctly. If you don't see charts for your application, see
@@ -34,7 +25,7 @@ If the collector finds compatible metrics exposed on the configured endpoint, it
 Netdata Agent gathers these metrics, sends them to the 
 [database engine for storage](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md)
 , and immediately 
-[visualizes them meaningfully](https://github.com/netdata/netdata/blob/master/docs/visualize/interact-dashboards-charts.md) 
+[visualizes them meaningfully](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md) 
 on dashboards.
 
 Each collector comes with a pre-defined configuration that matches the default setup for that application. This endpoint

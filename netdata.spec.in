@@ -287,7 +287,7 @@ install -m 755 -p packaging/installer/netdata-updater.sh "${RPM_BUILD_ROOT}%{_li
 # ###########################################################
 # logrotate settings
 install -m 755 -d "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d"
-install -m 644 -p system/netdata.logrotate "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/%{name}"
+install -m 644 -p system/logrotate/netdata "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/%{name}"
 
 # ###########################################################
 # Install freeipmi
@@ -330,11 +330,11 @@ install -m 755 -d "${RPM_BUILD_ROOT}%{_localstatedir}/lib/%{name}/registry"
 # Install netdata service
 %if %{with systemd}
 install -m 755 -d "${RPM_BUILD_ROOT}%{_unitdir}"
-install -m 644 -p system/netdata.service "${RPM_BUILD_ROOT}%{_unitdir}/netdata.service"
+install -m 644 -p system/systemd/netdata.service "${RPM_BUILD_ROOT}%{_unitdir}/netdata.service"
 %else
 # install SYSV init stuff
 install -d "${RPM_BUILD_ROOT}/etc/rc.d/init.d"
-install -m 755 system/netdata-init-d \
+install -m 755 system/initd/init.d/netdata \
         "${RPM_BUILD_ROOT}/etc/rc.d/init.d/netdata"
 %endif
 

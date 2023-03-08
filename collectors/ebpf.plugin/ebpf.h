@@ -292,6 +292,7 @@ void ebpf_write_chart_obsolete(char *type, char *id, char *title, char *units, c
                                       char *charttype, char *context, int order, int update_every);
 void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, char **dimensions, uint32_t end);
 void ebpf_update_disabled_plugin_stats(ebpf_module_t *em);
+ARAL *ebpf_allocate_pid_aral(char *name, size_t size);
 extern ebpf_filesystem_partitions_t localfs[];
 extern ebpf_sync_syscalls_t local_syscalls[];
 extern int ebpf_exit_plugin;

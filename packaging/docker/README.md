@@ -31,24 +31,6 @@ and unfortunately not something we can realistically work around.
 
 ## Create a new Netdata Agent container
 
-> :bookmark_tabs: Note
->
-> All `docker run` commands and `docker-compose` configurations explicitly set the `nofile` limit.
-> This is required on some distros until [14177](https://github.com/netdata/netdata/issues/14177) is resolved.
-> Failure to do so may cause a task running in a container to hang and consume 100% of the CPU core.
->  
-> <details>
-> <summary>What are these "some distros"?</summary>
->
-> If `LimitNOFILE=infinity` results in an open file limit of 1073741816:
->
-> ```bash
-> [fedora37 ~]$ docker run --rm busybox grep open /proc/self/limits
-> Max open files            1073741816           1073741816           files
-> ```
->  
-> </details>
-
 You can create a new Agent container using either `docker run` or `docker-compose`. After using either method, you can
 visit the Agent dashboard `http://NODE:19999`.
 
@@ -78,7 +60,6 @@ docker run -d --name=netdata \
   --restart unless-stopped \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
-  --ulimit nofile=4096 \
   netdata/netdata
 ```
 
@@ -109,9 +90,6 @@ docker run -d --name=netdata \
         - SYS_PTRACE
       security_opt:
         - apparmor:unconfined
-      ulimits:
-        nofile:
-          soft: 4096
       volumes:
         - netdataconfig:/etc/netdata
         - netdatalib:/var/lib/netdata
@@ -243,7 +221,6 @@ docker run -d --name=netdata \
   --restart unless-stopped \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
-  --ulimit nofile=4096 \
   netdata/netdata
 ```
 
@@ -265,9 +242,6 @@ services:
       - SYS_PTRACE
     security_opt:
       - apparmor:unconfined
-    ulimits:
-      nofile:
-        soft: 4096
     volumes:
       - ./netdataconfig/netdata:/etc/netdata:ro
       - netdatalib:/var/lib/netdata
@@ -534,9 +508,6 @@ services:
       - SYS_PTRACE
     security_opt:
       - apparmor:unconfined
-    ulimits:
-      nofile:
-        soft: 4096
     volumes:
       - netdatalib:/var/lib/netdata
       - netdatacache:/var/cache/netdata

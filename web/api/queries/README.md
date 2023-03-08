@@ -6,7 +6,7 @@ learn_status: "Published"
 learn_rel_path: "Integrations/Export"
 -->
 
-# Database Queries
+# REST API for Database Queries
 
 The Netdata database can be queried with the `/api/v1/data` and `/api/v1/badge.svg` REST API methods.
 

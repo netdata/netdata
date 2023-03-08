@@ -81,19 +81,19 @@ SILENCER *health_silencers_addparam(SILENCER *silencer, char *key, char *value) 
 
     if (hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) {
         silencer->alarms = strdupz(value);
-        silencer->alarms_pattern = simple_pattern_create(silencer->alarms, NULL, SIMPLE_PATTERN_EXACT);
+        silencer->alarms_pattern = simple_pattern_create(silencer->alarms, NULL, SIMPLE_PATTERN_EXACT, true);
     } else if (hash == hash_chart && !strcasecmp(key, HEALTH_CHART_KEY)) {
         silencer->charts = strdupz(value);
-        silencer->charts_pattern = simple_pattern_create(silencer->charts, NULL, SIMPLE_PATTERN_EXACT);
+        silencer->charts_pattern = simple_pattern_create(silencer->charts, NULL, SIMPLE_PATTERN_EXACT, true);
     } else if (hash == hash_context && !strcasecmp(key, HEALTH_CONTEXT_KEY)) {
         silencer->contexts = strdupz(value);
-        silencer->contexts_pattern = simple_pattern_create(silencer->contexts, NULL, SIMPLE_PATTERN_EXACT);
+        silencer->contexts_pattern = simple_pattern_create(silencer->contexts, NULL, SIMPLE_PATTERN_EXACT, true);
     } else if (hash == hash_host && !strcasecmp(key, HEALTH_HOST_KEY)) {
         silencer->hosts = strdupz(value);
-        silencer->hosts_pattern = simple_pattern_create(silencer->hosts, NULL, SIMPLE_PATTERN_EXACT);
+        silencer->hosts_pattern = simple_pattern_create(silencer->hosts, NULL, SIMPLE_PATTERN_EXACT, true);
     } else if (hash == hash_families && !strcasecmp(key, HEALTH_FAMILIES_KEY)) {
         silencer->families = strdupz(value);
-        silencer->families_pattern = simple_pattern_create(silencer->families, NULL, SIMPLE_PATTERN_EXACT);
+        silencer->families_pattern = simple_pattern_create(silencer->families, NULL, SIMPLE_PATTERN_EXACT, true);
     }
 
     return silencer;

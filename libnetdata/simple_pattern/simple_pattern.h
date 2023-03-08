@@ -6,7 +6,7 @@
 #include "../libnetdata.h"
 
 
-typedef enum {
+typedef enum __attribute__ ((__packed__)) {
     SIMPLE_PATTERN_EXACT,
     SIMPLE_PATTERN_PREFIX,
     SIMPLE_PATTERN_SUFFIX,
@@ -18,13 +18,20 @@ typedef void SIMPLE_PATTERN;
 // create a simple_pattern from the string given
 // default_mode is used in cases where EXACT matches, without an asterisk,
 // should be considered PREFIX matches.
-SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, SIMPLE_PREFIX_MODE default_mode);
+SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, SIMPLE_PREFIX_MODE default_mode, bool case_sensitive);
 
 // test if string str is matched from the pattern and fill 'wildcarded' with the parts matched by '*'
 int simple_pattern_matches_extract(SIMPLE_PATTERN *list, const char *str, char *wildcarded, size_t wildcarded_size);
 
+struct netdata_string;
+int simple_pattern_matches_string_extract(SIMPLE_PATTERN *list, struct netdata_string *str, char *wildcarded, size_t wildcarded_size);
+int simple_pattern_matches_buffer_extract(SIMPLE_PATTERN *list, BUFFER *str, char *wildcarded, size_t wildcarded_size);
+int simple_pattern_matches_length_extract(SIMPLE_PATTERN *list, const char *str, size_t len, char *wildcarded, size_t wildcarded_size);
+
 // test if string str is matched from the pattern
 #define simple_pattern_matches(list, str) simple_pattern_matches_extract(list, str, NULL, 0)
+#define simple_pattern_matches_string(list, str) simple_pattern_matches_string_extract(list, str, NULL, 0)
+#define simple_pattern_matches_buffer(list, str) simple_pattern_matches_buffer_extract(list, str, NULL, 0)
 
 // free a simple_pattern that was created with simple_pattern_create()
 // list can be NULL, in which case, this does nothing.
@@ -37,6 +44,11 @@ char *simple_pattern_iterate(SIMPLE_PATTERN **p);
 // Auxiliary function to create a pattern
 char *simple_pattern_trim_around_equal(char *src);
 
+#define SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS ",|\t\r\n\f\v"
+
 #define is_valid_sp(x) ((x) && *(x) && !((x)[0] == '*' && (x)[1] == '\0'))
+
+#define string_to_simple_pattern(str) (is_valid_sp(str) ? simple_pattern_create(str, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_EXACT, true) : NULL)
+#define string_to_simple_pattern_nocase(str) (is_valid_sp(str) ? simple_pattern_create(str, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_EXACT, false) : NULL)
 
 #endif //NETDATA_SIMPLE_PATTERN_H

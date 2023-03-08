@@ -1,20 +1,10 @@
-<!--
-title: "Start, stop, or restart the Netdata Agent"
-description: "Manage the Netdata Agent daemon, load configuration changes, and troubleshoot stuck processes on systemd and non-systemd nodes."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/configure/start-stop-restart.md"
-sidebar_label: "Start, stop, or restart the Netdata Agent"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Operations"
--->
-
 # Start, stop, or restart the Netdata Agent
 
-When you install the Netdata Agent, the [daemon](https://github.com/netdata/netdata/blob/master/daemon/README.md) is configured to start at boot and stop and
-restart/shutdown.
+When you install the Netdata Agent, the [daemon](https://github.com/netdata/netdata/blob/master/daemon/README.md) is 
+configured to start at boot and stop and restart/shutdown.
 
-You will most often need to _restart_ the Agent to load new or editing configuration files. [Health
-configuration](#reload-health-configuration) files are the only exception, as they can be reloaded without restarting
+You will most often need to _restart_ the Agent to load new or editing configuration files. 
+[Health configuration](#reload-health-configuration) files are the only exception, as they can be reloaded without restarting
 the entire Agent.
 
 Stopping or restarting the Netdata Agent will cause gaps in stored metrics until the `netdata` process initiates
@@ -81,3 +71,76 @@ ps aux| grep netdata
 
 The output of `ps aux` should show no `netdata` or associated processes running. You can now start the Netdata Agent
 again with `service netdata start`, or the appropriate method for your system.
+
+## Starting Netdata at boot
+
+In the `system` directory you can find scripts and configurations for the
+various distros.
+
+### systemd
+
+The installer already installs `netdata.service` if it detects a systemd system.
+
+To install `netdata.service` by hand, run:
+
+```sh
+# stop Netdata
+killall netdata
+
+# copy netdata.service to systemd
+cp system/netdata.service /etc/systemd/system/
+
+# let systemd know there is a new service
+systemctl daemon-reload
+
+# enable Netdata at boot
+systemctl enable netdata
+
+# start Netdata
+systemctl start netdata
+```
+
+### init.d
+
+In the system directory you can find `netdata-lsb`. Copy it to the proper place according to your distribution
+documentation. For Ubuntu, this can be done via running the following commands as root.
+
+```sh
+# copy the Netdata startup file to /etc/init.d
+cp system/netdata-lsb /etc/init.d/netdata
+
+# make sure it is executable
+chmod +x /etc/init.d/netdata
+
+# enable it
+update-rc.d netdata defaults
+```
+
+### openrc (gentoo)
+
+In the `system` directory you can find `netdata-openrc`. Copy it to the proper
+place according to your distribution documentation.
+
+### CentOS / Red Hat Enterprise Linux
+
+For older versions of RHEL/CentOS that don't have systemd, an init script is included in the system directory. This can
+be installed by running the following commands as root.
+
+```sh
+# copy the Netdata startup file to /etc/init.d
+cp system/netdata-init-d /etc/init.d/netdata
+
+# make sure it is executable
+chmod +x /etc/init.d/netdata
+
+# enable it
+chkconfig --add netdata
+```
+
+_There have been some recent work on the init script, see PR
+<https://github.com/netdata/netdata/pull/403>_
+
+### other systems
+
+You can start Netdata by running it from `/etc/rc.local` or equivalent.
+
