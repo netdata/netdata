@@ -18,17 +18,33 @@ static char *status[] = { "process", "zombie" };
 static ebpf_local_maps_t process_maps[] = {{.name = "tbl_pid_stats", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
                                             .user_input = 0,
                                             .type = NETDATA_EBPF_MAP_RESIZABLE  | NETDATA_EBPF_MAP_PID,
-                                            .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                            .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                            .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
+                                           },
                                            {.name = "tbl_total_stats", .internal_input = NETDATA_KEY_END_VECTOR,
                                             .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
-                                            .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                            .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                            .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                           },
                                            {.name = "process_ctrl", .internal_input = NETDATA_CONTROLLER_END,
                                             .user_input = 0,
                                             .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                            .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                            .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                            .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                           },
                                            {.name = NULL, .internal_input = 0, .user_input = 0,
                                             .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                            .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
+                                            .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                            .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                            }};
 
 char *tracepoint_sched_type = { "sched" } ;
 char *tracepoint_sched_process_exit = { "sched_process_exit" };
@@ -39,6 +55,7 @@ static int was_sched_process_exec_enabled = 0;
 static int was_sched_process_fork_enabled = 0;
 
 static netdata_idx_t *process_hash_values = NULL;
+ebpf_process_stat_t *process_stat_vector = NULL;
 static netdata_syscall_stat_t process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_END];
 static netdata_publish_syscall_t process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_END];
 
@@ -252,7 +269,7 @@ void ebpf_process_send_apps_data(struct ebpf_target *root, ebpf_module_t *em)
 /**
  * Read the hash table and store data to allocated vectors.
  */
-static void read_hash_global_tables()
+static void ebpf_read_process_hash_global_tables(int maps_per_core)
 {
     uint64_t idx;
     netdata_idx_t res[NETDATA_KEY_END_VECTOR];
@@ -263,7 +280,7 @@ static void read_hash_global_tables()
         if (!bpf_map_lookup_elem(fd, &idx, val)) {
             uint64_t total = 0;
             int i;
-            int end = ebpf_nprocs;
+            int end = (maps_per_core) ? ebpf_nprocs : 1;
             for (i = 0; i < end; i++)
                 total += val[i];
 
@@ -287,11 +304,14 @@ static void read_hash_global_tables()
  *
  * Update cgroup data based in
  */
-static void ebpf_update_process_cgroup()
+static void ebpf_update_process_cgroup(int maps_per_core)
 {
     ebpf_cgroup_target_t *ect ;
     int pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
 
+    size_t length =  sizeof(ebpf_process_stat_t);
+    if (maps_per_core)
+        length *= ebpf_nprocs;
     pthread_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
@@ -303,9 +323,15 @@ static void ebpf_update_process_cgroup()
 
                 memcpy(out, in, sizeof(ebpf_process_stat_t));
             } else {
-                if (bpf_map_lookup_elem(pid_fd, &pid, out)) {
+                if (bpf_map_lookup_elem(pid_fd, &pid, process_stat_vector)) {
                     memset(out, 0, sizeof(ebpf_process_stat_t));
                 }
+
+                ebpf_process_apps_accumulator(process_stat_vector, maps_per_core);
+
+                memcpy(out, process_stat_vector, sizeof(ebpf_process_stat_t));
+
+                memset(process_stat_vector, 0, length);
             }
         }
     }
@@ -647,6 +673,7 @@ static void ebpf_process_exit(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     freez(process_hash_values);
+    freez(process_stat_vector);
 
     ebpf_process_disable_tracepoints();
 
@@ -1041,14 +1068,14 @@ static void process_collector(ebpf_module_t *em)
         if (++counter == update_every) {
             counter = 0;
 
-            read_hash_global_tables();
+            ebpf_read_process_hash_global_tables(maps_per_core);
 
             netdata_apps_integration_flags_t apps_enabled = em->apps_charts;
             pthread_mutex_lock(&collect_data_mutex);
 
             if (ebpf_all_pids_count > 0) {
                 if (cgroups && shm_ebpf_cgroup.header) {
-                    ebpf_update_process_cgroup();
+                    ebpf_update_process_cgroup(maps_per_core);
                 }
             }
 
@@ -1099,6 +1126,7 @@ static void ebpf_process_allocate_global_vectors(size_t length)
     memset(process_aggregated_data, 0, length * sizeof(netdata_syscall_stat_t));
     memset(process_publish_aggregated, 0, length * sizeof(netdata_publish_syscall_t));
     process_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
+    process_stat_vector = callocz(ebpf_nprocs, sizeof(ebpf_process_stat_t));
 
     global_process_stats = callocz((size_t)pid_max, sizeof(ebpf_process_stat_t *));
 }
