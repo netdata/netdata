@@ -466,7 +466,6 @@ if [ "${VIRTUALIZATION}" != "none" ] && command -v curl > /dev/null 2>&1; then
       fi
     fi
 
-    # TODO: needs to be tested in Microsoft Azure
     # Try Azure IMDS
     if [ "${CLOUD_TYPE}" = "unknown" ]; then
       AZURE_IMDS_DATA="$(curl --fail -s --connect-timeout 1 -m 5 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=2021-10-01")"
