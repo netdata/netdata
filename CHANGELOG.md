@@ -6,8 +6,14 @@
 
 **Merged pull requests:**
 
+- Fix conditionals for claim-only case in kickstart.sh. [\#14679](https://github.com/netdata/netdata/pull/14679) ([Ferroin](https://github.com/Ferroin))
+- add note on readme on how to easily see all ml related blog posts [\#14675](https://github.com/netdata/netdata/pull/14675) ([andrewm4894](https://github.com/andrewm4894))
+- Guard for null host when sending node instances [\#14673](https://github.com/netdata/netdata/pull/14673) ([MrZammler](https://github.com/MrZammler))
+- If a child is not streaming, send to the cloud last known version instead of unknown [\#14671](https://github.com/netdata/netdata/pull/14671) ([MrZammler](https://github.com/MrZammler))
+- Handle conffiles for DEB packages explicitly instead of automatically. [\#14662](https://github.com/netdata/netdata/pull/14662) ([Ferroin](https://github.com/Ferroin))
 - Properly handle service type detection failures when installing as a system service. [\#14658](https://github.com/netdata/netdata/pull/14658) ([Ferroin](https://github.com/Ferroin))
 - fix simple\_pattern\_create on freebsd [\#14656](https://github.com/netdata/netdata/pull/14656) ([ilyam8](https://github.com/ilyam8))
+- Move images in "interact-new-charts" from zenhub to github [\#14654](https://github.com/netdata/netdata/pull/14654) ([Ancairon](https://github.com/Ancairon))
 - Fix broken links in glossary.md [\#14653](https://github.com/netdata/netdata/pull/14653) ([Ancairon](https://github.com/Ancairon))
 - Fix links [\#14651](https://github.com/netdata/netdata/pull/14651) ([cakrit](https://github.com/cakrit))
 - Fix doc links [\#14650](https://github.com/netdata/netdata/pull/14650) ([cakrit](https://github.com/cakrit))
@@ -21,6 +27,7 @@
 - Add link to native packages also on the list [\#14633](https://github.com/netdata/netdata/pull/14633) ([cakrit](https://github.com/cakrit))
 - Re-add link from install page to DEB/RPM package documentation. [\#14631](https://github.com/netdata/netdata/pull/14631) ([Ferroin](https://github.com/Ferroin))
 - Fix broken link [\#14630](https://github.com/netdata/netdata/pull/14630) ([cakrit](https://github.com/cakrit))
+- Fix intermittent permissions issues in some Docker builds. [\#14629](https://github.com/netdata/netdata/pull/14629) ([Ferroin](https://github.com/Ferroin))
 - Update REFERENCE.md [\#14627](https://github.com/netdata/netdata/pull/14627) ([cakrit](https://github.com/cakrit))
 - Make the title metadata H1 in all markdown files [\#14625](https://github.com/netdata/netdata/pull/14625) ([Ancairon](https://github.com/Ancairon))
 - rename glossary [\#14622](https://github.com/netdata/netdata/pull/14622) ([cakrit](https://github.com/cakrit))
@@ -365,7 +372,6 @@
 - Add workflow dispatch trigger for parent/child with cloud integration smoke tests [\#14070](https://github.com/netdata/netdata/pull/14070) ([dimko](https://github.com/dimko))
 - MQTT 5 publish topic alias support [\#14067](https://github.com/netdata/netdata/pull/14067) ([underhood](https://github.com/underhood))
 - Refactor ML code and add support for multiple KMeans models. [\#14065](https://github.com/netdata/netdata/pull/14065) ([vkalintiris](https://github.com/vkalintiris))
-- Adds some introspection into the MQTT\_WSS [\#14039](https://github.com/netdata/netdata/pull/14039) ([underhood](https://github.com/underhood))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
@@ -385,15 +391,6 @@
 - Add Alpine 3.17 to supported distros. [\#14056](https://github.com/netdata/netdata/pull/14056) ([Ferroin](https://github.com/Ferroin))
 - replication fixes No 7 [\#14053](https://github.com/netdata/netdata/pull/14053) ([ktsaou](https://github.com/ktsaou))
 - bump go.d.plugin to v0.45.0 [\#14052](https://github.com/netdata/netdata/pull/14052) ([ilyam8](https://github.com/ilyam8))
-- Remove eBPF plugin warning [\#14047](https://github.com/netdata/netdata/pull/14047) ([thiagoftsm](https://github.com/thiagoftsm))
-- replication fixes \#6 [\#14046](https://github.com/netdata/netdata/pull/14046) ([ktsaou](https://github.com/ktsaou))
-- fix build on old openssl versions on centos [\#14045](https://github.com/netdata/netdata/pull/14045) ([underhood](https://github.com/underhood))
-- Don't let slow disk plugin thread delay shutdown [\#14044](https://github.com/netdata/netdata/pull/14044) ([MrZammler](https://github.com/MrZammler))
-- minor - wss to point to master instead of branch [\#14043](https://github.com/netdata/netdata/pull/14043) ([underhood](https://github.com/underhood))
-- fix dictionaries unittest [\#14042](https://github.com/netdata/netdata/pull/14042) ([ktsaou](https://github.com/ktsaou))
-- minor - Adds better information in case of SSL error [\#14041](https://github.com/netdata/netdata/pull/14041) ([underhood](https://github.com/underhood))
-- replication fixes \#5 [\#14038](https://github.com/netdata/netdata/pull/14038) ([ktsaou](https://github.com/ktsaou))
-- do not merge duplicate replication requests  [\#14037](https://github.com/netdata/netdata/pull/14037) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
