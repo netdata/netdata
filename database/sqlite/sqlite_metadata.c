@@ -957,6 +957,24 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count, size_t *query_
     return more_to_do;
 }
 
+static void store_host_and_system_info(RRDHOST *host, size_t *query_counter)
+{
+    BUFFER *work_buffer = sql_store_host_system_info(host);
+    if (work_buffer) {
+        db_execute(buffer_tostring(work_buffer));
+        buffer_free(work_buffer);
+        if (likely(query_counter))
+            (*query_counter)++;
+    }
+
+    int rc = sql_store_host_info(host);
+    if (unlikely(rc))
+        error_report("METADATA: 'host:%s': failed to store host info", string2str(host->hostname));
+    else
+        if (likely(query_counter))
+            (*query_counter)++;
+}
+
 // Worker thread to scan hosts for pending metadata to store
 static void start_metadata_hosts(uv_work_t *req __maybe_unused)
 {
@@ -1012,19 +1030,7 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
 
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_INFO))) {
             rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_INFO);
-
-            BUFFER *work_buffer = sql_store_host_system_info(host);
-            if(work_buffer) {
-                db_execute(buffer_tostring(work_buffer));
-                buffer_free(work_buffer);
-                query_counter++;
-            }
-
-            int rc = sql_store_host_info(host);
-            if (unlikely(rc))
-                error_report("METADATA: 'host:%s': failed to store host info", string2str(host->hostname));
-            else
-                query_counter++;
+            store_host_and_system_info(host, &query_counter);
         }
 
         if (data->max_count)
@@ -1116,7 +1122,6 @@ static void metadata_event_loop(void *arg)
     while (shutdown == 0 || (wc->flags & METADATA_WORKER_BUSY)) {
         uuid_t  *uuid;
         RRDHOST *host = NULL;
-        int rc;
 
         worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
@@ -1158,9 +1163,11 @@ static void metadata_event_loop(void *arg)
                     break;
                 case METADATA_ADD_HOST_INFO:
                     host = (RRDHOST *) cmd.param[0];
-                    rc = sql_store_host_info(host);
-                    if (unlikely(rc))
-                        error_report("Failed to store host info in the database for %s", string2str(host->hostname));
+                    store_host_and_system_info(host, NULL);
+                    if (unlikely(!host->dbsync_worker))
+                        sql_create_aclk_table(host, &host->host_uuid, host->node_id);
+                    else
+                        schedule_node_info_update(host);
                     break;
                 case METADATA_SCAN_HOSTS:
                     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SCANNING_HOSTS)))

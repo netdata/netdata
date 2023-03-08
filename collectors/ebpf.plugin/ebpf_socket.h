@@ -160,6 +160,9 @@ typedef enum ebpf_socket_idx {
 #define NETDATA_SERVICES_SOCKET_UDP_RECV_CONTEXT "services.net_udp_recv"
 #define NETDATA_SERVICES_SOCKET_UDP_SEND_CONTEXT "services.net_udp_send"
 
+// ARAL name
+#define NETDATA_EBPF_SOCKET_ARAL_NAME "ebpf_socket"
+
 typedef struct ebpf_socket_publish_apps {
     // Data read
     uint64_t bytes_sent;            // Bytes sent

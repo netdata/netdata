@@ -442,6 +442,7 @@ void *ebpf_mount_thread(void *ptr)
     pthread_mutex_lock(&lock);
     ebpf_create_mount_charts(em->update_every);
     ebpf_update_stats(&plugin_statistics, em);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
     pthread_mutex_unlock(&lock);
 
     mount_collector(em);

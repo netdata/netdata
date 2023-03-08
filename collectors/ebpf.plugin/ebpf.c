@@ -446,7 +446,8 @@ ebpf_network_viewer_options_t network_viewer_opt;
 
 // Statistic
 ebpf_plugin_stats_t plugin_statistics = {.core = 0, .legacy = 0, .running = 0, .threads = 0, .tracepoints = 0,
-                                         .probes = 0, .retprobes = 0, .trampolines = 0};
+                                         .probes = 0, .retprobes = 0, .trampolines = 0, .memlock_kern = 0,
+                                         .hash_tables = 0};
 
 #ifdef LIBBPF_MAJOR_VERSION
 struct btf *default_btf = NULL;
@@ -937,6 +938,79 @@ void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, 
     write_end_chart();
 
     fflush(stdout);
+}
+
+/**
+ * ARAL Charts
+ *
+ * Add chart to monitor ARAL usage
+ * Caller must call this function with mutex locked.
+ *
+ * @param name    the name used to create aral
+ * @param em      a pointer to the structure with the default values.
+ */
+void ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em)
+{
+    static int priority = 140100;
+    char *mem = { NETDATA_EBPF_STAT_DIMENSION_MEMORY };
+    char *aral = { NETDATA_EBPF_STAT_DIMENSION_ARAL };
+
+    snprintfz(em->memory_usage, NETDATA_EBPF_CHART_MEM_LENGTH -1, "aral_%s_size", name);
+    snprintfz(em->memory_allocations, NETDATA_EBPF_CHART_MEM_LENGTH -1, "aral_%s_alloc", name);
+
+    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
+                         em->memory_usage,
+                         "Bytes allocated for ARAL.",
+                         "bytes",
+                         NETDATA_EBPF_FAMILY,
+                         NETDATA_EBPF_CHART_TYPE_STACKED,
+                         "netdata.ebpf_aral_stat_size",
+                         priority++,
+                         em->update_every,
+                         NETDATA_EBPF_MODULE_NAME_PROCESS);
+
+    ebpf_write_global_dimension(mem,
+                                mem,
+                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+
+    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
+                         em->memory_allocations,
+                         "Calls to allocate memory.",
+                         "calls",
+                         NETDATA_EBPF_FAMILY,
+                         NETDATA_EBPF_CHART_TYPE_STACKED,
+                         "netdata.ebpf_aral_stat_alloc",
+                         priority++,
+                         em->update_every,
+                         NETDATA_EBPF_MODULE_NAME_PROCESS);
+
+    ebpf_write_global_dimension(aral,
+                                aral,
+                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+}
+
+/**
+ * Send data from aral chart
+ *
+ * Send data for eBPF plugin
+ *
+ * @param memory  a pointer to the allocated address
+ * @param em      a pointer to the structure with the default values.
+ */
+void ebpf_send_data_aral_chart(ARAL *memory, ebpf_module_t *em)
+{
+    char *mem = { NETDATA_EBPF_STAT_DIMENSION_MEMORY };
+    char *aral = { NETDATA_EBPF_STAT_DIMENSION_ARAL };
+
+    struct aral_statistics *stats = aral_statistics(memory);
+
+    write_begin_chart(NETDATA_MONITORING_FAMILY, em->memory_usage);
+    write_chart_dimension(mem, (long long)stats->structures.allocated_bytes);
+    write_end_chart();
+
+    write_begin_chart(NETDATA_MONITORING_FAMILY, em->memory_allocations);
+    write_chart_dimension(aral, (long long)stats->structures.allocations);
+    write_end_chart();
 }
 
 /*****************************************************************

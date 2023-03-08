@@ -77,7 +77,8 @@ The elements that you can find on this top bar are:
 - Chart action bar: here you'll have access to chart info, change chart types, enables fullscreen mode, and the ability
   to add the chart to a custom dashboard
 
-![image.png](https://images.zenhubusercontent.com/60b4ebb03f4163193ec31819/c8f5f0bd-5f84-4812-970b-0e4340f4773b)
+![image](https://user-images.githubusercontent.com/70198089/222689197-f9506ca7-a869-40a9-871f-8c4e1fa4b927.png)
+
 
 ## Definition bar
 
@@ -230,7 +231,8 @@ On this bar you have access to immediate actions over the chart, the available a
 - Add chart to dashboard: This allows you to add the chart to an existing custom dashboard or directly create a new one
   that includes the chart.
 
-<img src="https://images.zenhubusercontent.com/60b4ebb03f4163193ec31819/65ac4fc8-3d8d-4617-8234-dbb9b31b4264" width="40%" height="40%" />
+<img src="https://user-images.githubusercontent.com/70198089/222689501-4116f5fe-e447-4359-83b5-62dadb33f4ef.png" width="40%" height="40%" />
+
 
 ## Exploration action bar
 
@@ -242,7 +244,7 @@ available actions that you can see are:
 - Horizontal and Vertical zooms
 - In-context zoom in and out
 
-<img src="https://images.zenhubusercontent.com/60b4ebb03f4163193ec31819/0417ad66-fcf6-42d5-9a24-e9392ec51f87" width="40%" height="40%" />
+<img src="https://user-images.githubusercontent.com/70198089/222689556-58ad77bc-924f-4c3f-b38b-fc63de2f5773.png" width="40%" height="40%" />
 
 ### Pan
 
@@ -277,7 +279,9 @@ memory usage.
 The actions above are _normal_ vertical zoom actions. We also provide an horizontal zoom action that helps you focus on
 a specific Y-axis area to further investigate a spike or dive on your charts.
 
-![Y5IESOjD3s.gif](https://images.zenhubusercontent.com/60b4ebb03f4163193ec31819/f8722ee8-e69b-426c-8bcb-6cb79897c177)
+![f8722ee8-e69b-426c-8bcb-6cb79897c177](https://user-images.githubusercontent.com/70198089/222689676-ad16a2a0-3c3d-48fa-87af-c40ae142dd79.gif)
+
+
 
 | Interaction                                | Keyboard/mouse                       | Touchpad/touchscreen                                 |
 |:-------------------------------------------|:-------------------------------------|:-----------------------------------------------------|
@@ -296,7 +300,7 @@ The bottom legend of the chart where you can see the dimensions of the chart can
 - Dimension name (Ascending or Descending)
 - Dimension value (Ascending or Descending)
 
-<img src="https://images.zenhubusercontent.com/60b4ebb03f4163193ec31819/d3031c35-37bc-46c1-bcf9-be29dea0b476" width="50%" height="50%" />
+<img src="https://user-images.githubusercontent.com/70198089/222689791-48c77890-1093-4beb-84c2-7598353ca049.png" width="50%" height="50%" />
 
 ### Show and hide dimensions
 
@@ -314,4 +318,4 @@ To resize the chart, click-and-drag the icon on the bottom-right corner of any c
 original height,
 double-click the same icon.
 
-![AjqnkIHB9H.gif](https://images.zenhubusercontent.com/60b4ebb03f4163193ec31819/1bcc6a0a-a58e-457b-8a0c-e5d361a3083c)
+![1bcc6a0a-a58e-457b-8a0c-e5d361a3083c](https://user-images.githubusercontent.com/70198089/222689845-51a9c054-a57d-49dc-925d-39b924dae2f8.gif)

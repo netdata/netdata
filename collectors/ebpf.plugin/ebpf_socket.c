@@ -7,7 +7,7 @@
 
 // ----------------------------------------------------------------------------
 // ARAL vectors used to speed up processing
-ARAL *ebpf_aral_socket_pid;
+ARAL *ebpf_aral_socket_pid = NULL;
 
 /*****************************************************************
  *
@@ -446,7 +446,7 @@ static inline int ebpf_socket_load_and_attach(struct socket_bpf *obj, ebpf_modul
  */
 static inline void ebpf_socket_aral_init()
 {
-    ebpf_aral_socket_pid = ebpf_allocate_pid_aral("ebpf-socket", sizeof(ebpf_socket_publish_apps_t));
+    ebpf_aral_socket_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_SOCKET_ARAL_NAME, sizeof(ebpf_socket_publish_apps_t));
 }
 
 /**
@@ -2948,6 +2948,11 @@ static void socket_collector(ebpf_module_t *em)
         if (socket_apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_socket_send_apps_data(em, apps_groups_root_target);
 
+#ifdef NETDATA_DEV_MODE
+        if (ebpf_aral_socket_pid)
+            ebpf_send_data_aral_chart(ebpf_aral_socket_pid, em);
+#endif
+
         if (cgroups)
             ebpf_socket_send_cgroup_data(update_every);
 
@@ -4009,6 +4014,12 @@ void *ebpf_socket_thread(void *ptr)
     ebpf_create_global_charts(em);
 
     ebpf_update_stats(&plugin_statistics, em);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
+
+#ifdef NETDATA_DEV_MODE
+    if (ebpf_aral_socket_pid)
+        ebpf_statistic_create_aral_chart(NETDATA_EBPF_SOCKET_ARAL_NAME, em);
+#endif
 
     pthread_mutex_unlock(&lock);
 
