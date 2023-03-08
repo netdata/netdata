@@ -268,6 +268,8 @@ void ebpf_process_send_apps_data(struct ebpf_target *root, ebpf_module_t *em)
 
 /**
  * Read the hash table and store data to allocated vectors.
+ *
+ * @param maps_per_core do I need to read all cores?
  */
 static void ebpf_read_process_hash_global_tables(int maps_per_core)
 {
@@ -302,7 +304,9 @@ static void ebpf_read_process_hash_global_tables(int maps_per_core)
 /**
  * Update cgroup
  *
- * Update cgroup data based in
+ * Update cgroup data based in PID running.
+ *
+ * @param maps_per_core do I need to read all cores?
  */
 static void ebpf_update_process_cgroup(int maps_per_core)
 {
