@@ -1432,9 +1432,10 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
     time_t now_end_time   = after_wanted + ops->view_update_every - ops->query_granularity;
 
     size_t db_points_read_since_plan_switch = 0; (void)db_points_read_since_plan_switch;
+    size_t query_is_finished_counter = 0;
 
     // The main loop, based on the query granularity we need
-    for( ; points_added < points_wanted ; now_start_time = now_end_time, now_end_time += ops->view_update_every) {
+    for( ; points_added < points_wanted && query_is_finished_counter <= 10 ; now_start_time = now_end_time, now_end_time += ops->view_update_every) {
 
         if(unlikely(query_plan_should_switch_plan(ops, now_end_time))) {
             query_planer_next_plan(ops, now_end_time, new_point.end_time);
@@ -1451,6 +1452,8 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
             }
 
             if(unlikely(ops->is_finished(ops->handle))) {
+                query_is_finished_counter++;
+
                 if(count_same_end_time != 0) {
                     last2_point = last1_point;
                     last1_point = new_point;
@@ -1463,6 +1466,8 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
 //
                 break;
             }
+            else
+                query_is_finished_counter = 0;
 
             // fetch the new point
             {
