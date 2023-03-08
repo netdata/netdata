@@ -68,7 +68,6 @@ notification platform.
 -   [**Dynatrace**](https://github.com/netdata/netdata/blob/master/health/notifications/dynatrace/README.md)
 -   [**Email**](https://github.com/netdata/netdata/blob/master/health/notifications/email/README.md)
 -   [**Flock**](https://github.com/netdata/netdata/blob/master/health/notifications/flock/README.md)
--   [**Google Hangouts**](https://github.com/netdata/netdata/blob/master/health/notifications/hangouts/README.md)
 -   [**Gotify**](https://github.com/netdata/netdata/blob/master/health/notifications/gotify/README.md)
 -   [**IRC**](https://github.com/netdata/netdata/blob/master/health/notifications/irc/README.md)
 -   [**Kavenegar**](https://github.com/netdata/netdata/blob/master/health/notifications/kavenegar/README.md)
