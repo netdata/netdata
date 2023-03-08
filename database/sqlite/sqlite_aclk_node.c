@@ -49,7 +49,6 @@ void sql_build_node_collectors(struct aclk_database_worker_config *wc)
 #else
     UNUSED(wc);
 #endif
-    return;
 }
 
 void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
@@ -59,14 +58,17 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
 #ifdef ENABLE_ACLK
     struct update_node_info node_info;
 
-    if (!wc->host) {
+    char *claim_id = get_agent_claimid();
+    if (!wc->host || !claim_id) {
         wc->node_info_send = 1;
+        freez(claim_id);
         return;
     }
 
+    wc->node_info_send = 0;
     rrd_rdlock();
     node_info.node_id = wc->node_id;
-    node_info.claim_id = get_agent_claimid();
+    node_info.claim_id = claim_id;
     node_info.machine_guid = wc->host_guid;
     node_info.child = (wc->host != localhost);
     node_info.ml_info.ml_capable = ml_capable(localhost);
@@ -127,6 +129,4 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
 #else
     UNUSED(wc);
 #endif
-
-    return;
 }
