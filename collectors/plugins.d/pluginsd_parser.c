@@ -1902,6 +1902,12 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     return count;
 }
 
+PARSER_RC pluginsd_exit(char **words __maybe_unused, size_t num_words __maybe_unused, void *user __maybe_unused)
+{
+    info("PLUGINSD: plugin called EXIT.");
+    return PARSER_RC_STOP;
+}
+
 static void pluginsd_keywords_init_internal(PARSER *parser, PLUGINSD_KEYWORDS types, void (*add_func)(PARSER *parser, char *keyword, keyword_function func)) {
 
     if (types & PARSER_INIT_PLUGINSD) {
@@ -1912,6 +1918,8 @@ static void pluginsd_keywords_init_internal(PARSER *parser, PLUGINSD_KEYWORDS ty
         add_func(parser, PLUGINSD_KEYWORD_HOST_DEFINE_END, pluginsd_host_define_end);
         add_func(parser, PLUGINSD_KEYWORD_HOST_LABEL, pluginsd_host_labels);
         add_func(parser, PLUGINSD_KEYWORD_HOST, pluginsd_host);
+
+        add_func(parser, PLUGINSD_KEYWORD_EXIT, pluginsd_exit);
     }
 
     if (types & (PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING)) {

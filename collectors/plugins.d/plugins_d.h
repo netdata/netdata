@@ -43,6 +43,8 @@
 #define PLUGINSD_KEYWORD_HOST_LABEL             "HOST_LABEL"
 #define PLUGINSD_KEYWORD_HOST                   "HOST"
 
+#define PLUGINSD_KEYWORD_EXIT                   "EXIT"
+
 #define PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT 10 // seconds
 
 #define PLUGINSD_LINE_MAX_SSL_READ 512
