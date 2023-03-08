@@ -61,6 +61,7 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, struct query_target *qt, ti
 
 struct query_target;
 bool query_target_has_percentage_units(struct query_target *qt);
+bool query_target_aggregatable(struct query_target *qt);
 
 int rrdset2value_api_v1(
         RRDSET *st

@@ -714,9 +714,6 @@ void buffer_json_group_by_to_array(BUFFER *wb, RRDR_GROUP_BY group_by) {
 }
 
 RRDR_GROUP_BY_FUNCTION group_by_aggregate_function_parse(const char *s) {
-    if(strcmp(s, "sum-count") == 0)
-        return RRDR_GROUP_BY_FUNCTION_SUM_COUNT;
-
     if(strcmp(s, "average") == 0)
         return RRDR_GROUP_BY_FUNCTION_AVERAGE;
 
@@ -740,9 +737,6 @@ const char *group_by_aggregate_function_to_string(RRDR_GROUP_BY_FUNCTION group_b
         default:
         case RRDR_GROUP_BY_FUNCTION_AVERAGE:
             return "average";
-
-        case RRDR_GROUP_BY_FUNCTION_SUM_COUNT:
-            return "sum-count";
 
         case RRDR_GROUP_BY_FUNCTION_MIN:
             return "min";

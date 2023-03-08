@@ -395,6 +395,179 @@ paths:
               - average
               - sum
             default: average
+        - name: time_group
+          in: query
+          description: |
+            Time aggregation function. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods supported "min", "max", "average", "sum", "incremental-sum". "max" is actually calculated on the absolute value collected (so it works for both positive and negative dimensions to return the most extreme value in either direction).
+          required: true
+          schema:
+            type: string
+            enum:
+              - min
+              - max
+              - avg
+              - average
+              - median
+              - stddev
+              - sum
+              - incremental-sum
+              - ses
+              - des
+              - cv
+              - countif
+              - percentile
+              - percentile25
+              - percentile50
+              - percentile75
+              - percentile80
+              - percentile90
+              - percentile95
+              - percentile97
+              - percentile98
+              - percentile99
+              - trimmed-mean
+              - trimmed-mean1
+              - trimmed-mean2
+              - trimmed-mean3
+              - trimmed-mean5
+              - trimmed-mean10
+              - trimmed-mean15
+              - trimmed-mean20
+              - trimmed-mean25
+              - trimmed-median
+              - trimmed-median1
+              - trimmed-median2
+              - trimmed-median3
+              - trimmed-median5
+              - trimmed-median10
+              - trimmed-median15
+              - trimmed-median20
+              - trimmed-median25
+            default: average
+        - name: time_group_options
+          in: query
+          description: |
+            When the group function supports additional parameters, this field can be used to pass them to it. Currently `countif`, `trimmed-mean`, `trimmed-median` and `percentile` support this. For `countif` the string may start with `<`, `<=`, `<:`, `<>`, `!=`, `>`, `>=`, `>:`. For all others just a number is expected.
+          required: false
+          schema:
+            type: string
+        - name: time_resampling
+          in: query
+          description: |
+            For incremental values that are "per second", this value is used to resample them to "per minute` (60) or "per hour" (3600). It can only be used in conjunction with group=average.
+          required: false
+          schema:
+            type: number
+            format: integer
+            default: 0
+        - name: timeout
+          in: query
+          description: |
+            Specify a timeout value in milliseconds after which the agent will abort the query and return a 503 error. A value of 0 indicates no timeout.
+          required: false
+          schema:
+            type: number
+            format: integer
+            default: 0
+        - name: format
+          in: query
+          description: |
+            The format of the data to be returned.
+          required: true
+          allowEmptyValue: false
+          schema:
+            type: string
+            enum:
+              - json
+              - json2
+              - jsonp
+              - csv
+              - tsv
+              - tsv-excel
+              - ssv
+              - ssvcomma
+              - datatable
+              - datasource
+              - html
+              - markdown
+              - array
+              - csvjsonarray
+            default: json
+        - name: options
+          in: query
+          description: |
+            Options that affect data generation.
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - nonzero
+                - flip
+                - jsonwrap
+                - min2max
+                - seconds
+                - milliseconds
+                - abs
+                - absolute
+                - absolute-sum
+                - null2zero
+                - objectrows
+                - google_json
+                - percentage
+                - unaligned
+                - match-ids
+                - match-names
+                - allow_past
+                - anomaly-bit
+            default:
+              - seconds
+              - jsonwrap
+        - name: tier
+          in: query
+          description: |
+            Use only the specified database tier.
+          required: false
+          schema:
+            type: number
+            format: integer
+        - name: callback
+          in: query
+          description: |
+            For JSONP responses, the callback function name.
+          required: false
+          schema:
+            type: string
+        - name: filename
+          in: query
+          description: |
+            Add `Content-Disposition: attachment; filename=` header to the response, that will instruct the browser to save the response with the given filename."
+          required: false
+          schema:
+            type: string
+        - name: tqx
+          in: query
+          description: |
+            [Google Visualization API](https://developers.google.com/chart/interactive/docs/dev/implementing_data_source?hl=en) formatted parameter.
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: |
+            The call was successful. The response includes the data in the format requested. Swagger2.0 does not process the discriminator field to show polymorphism. The response will be one of the sub-types of the data-schema according to the chosen format, e.g. json -> data_json.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/data_json2"
+        "400":
+          description: |
+            Bad request - the body will include a message stating what is wrong.
+        "500":
+          description: |
+            Internal server error. This usually means the server is out of memory.
   /api/v1/data:
     get:
       summary: Get collected data for a specific chart
@@ -2230,6 +2403,260 @@ components:
           type: object
           additionalProperties:
             $ref: "#/components/schemas/chart_variables"
+    data_json2:
+      description: |
+        Data response with `format=json2`
+      type: object
+      properties:
+        versions:
+          description: |
+            Hashes that allow the caller to detect important database changes of Netdata agents.
+          type: object
+          properties:
+            contexts_hard_hash:
+              description: |
+                An auto-increment value that reflects the number of changes to the number of contexts maintained by the server. Everytime a context is added or removed, this number gets incremented.
+              type: integer
+            contexts_soft_hash:
+              description: |
+                An auto-increment value that reflects the number of changes to the queue that sends contexts updates to Netdata Cloud. Everytime the contents of a context are updated, this number gets incremented.
+              type: integer
+        summary:
+          description: |
+            Summarized information about nodes, contexts, instances, labels, alerts, and dimensions. The items returned are determined by the scope of the query only, however the statistical data in them are influenced by the filters of the query. Using this information the dashboard allows users to slice and dice the data by filtering and grouping.
+          type: object
+          properties:
+            nodes:
+              type: array
+              items:
+                type: object
+                description: |
+                  An object describing a node. `is` stands for instances, `ds` for dimensions, `al` for alerts, `sts` for statistics.
+                properties:
+                  ni:
+                    description: the node index id, a number that uniquely identifies this node for this query.
+                    type: integer
+                  mg:
+                    description: the machine guid of the node.
+                    type: string
+                    format: UUID
+                  nd:
+                    description: the node id of the node.
+                    type: string
+                    format: UUID
+                  nm:
+                    description: the name (hostname) of the node.
+                    type: string
+                  is:
+                    $ref: "#/components/schemas/data_json2_items_count"
+                  ds:
+                    $ref: "#/components/schemas/data_json2_items_count"
+                  al:
+                    $ref: "#/components/schemas/data_json2_alerts_count"
+                  sts:
+                    oneOf:
+                      - $ref: "#/components/schemas/data_json2_sts"
+                      - $ref: "#/components/schemas/data_json2_sts_raw"
+            contexts:
+              type: array
+              items:
+                type: object
+                description: |
+                  An object describing a unique context. `is` stands for instances, `ds` for dimensions, `al` for alerts, `sts` for statistics.
+                properties:
+                  id:
+                    description: the context id.
+                    type: string
+                  is:
+                    $ref: "#/components/schemas/data_json2_items_count"
+                  ds:
+                    $ref: "#/components/schemas/data_json2_items_count"
+                  al:
+                    $ref: "#/components/schemas/data_json2_alerts_count"
+                  sts:
+                    oneOf:
+                      - $ref: "#/components/schemas/data_json2_sts"
+                      - $ref: "#/components/schemas/data_json2_sts_raw"
+            instances:
+              type: array
+              items:
+                type: object
+                description: |
+                  An object describing an instance. `ds` stands for dimensions, `al` for alerts, `sts` for statistics.
+                properties:
+                  id:
+                    description: the id of the instance.
+                    type: string
+                  nm:
+                    description: the name of the instance (may be absent when it is the same with the id)
+                    type: string
+                  ni:
+                    description: the node index id this instance belongs to. The UI uses this to compone the fully qualified name of the instance, using the node hostname to present it to users and its machine guid to add it to filters.
+                  ds:
+                    $ref: "#/components/schemas/data_json2_items_count"
+                  al:
+                    $ref: "#/components/schemas/data_json2_alerts_count"
+                  sts:
+                    oneOf:
+                      - $ref: "#/components/schemas/data_json2_sts"
+                      - $ref: "#/components/schemas/data_json2_sts_raw"
+            dimensions:
+              type: array
+              items:
+                type: object
+                description: |
+                  An object describing a unique dimension. `ds` stands for `dimensions`, `sts` for statistics.
+                properties:
+                  id:
+                    description: the id of the dimension.
+                    type: string
+                  nm:
+                    description: the name of the dimension (may be absent when it is the same with the id)
+                    type: string
+                  ds:
+                    $ref: "#/components/schemas/data_json2_items_count"
+                  sts:
+                    oneOf:
+                      - $ref: "#/components/schemas/data_json2_sts"
+                      - $ref: "#/components/schemas/data_json2_sts_raw"
+            labels:
+              type: array
+              items:
+                type: object
+                description: |
+                  An object describing a label key. `ds` stands for `dimensions`, `sts` for statistics.
+                properties:
+                  id:
+                    description: the key of the label.
+                    type: string
+                  ds:
+                    $ref: "#/components/schemas/data_json2_items_count"
+                  sts:
+                    oneOf:
+                      - $ref: "#/components/schemas/data_json2_sts"
+                      - $ref: "#/components/schemas/data_json2_sts_raw"
+                  vl:
+                    description: |
+                      An array of values for this key.
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          description: The value string
+                          type: string
+                          ds:
+                            $ref: "#/components/schemas/data_json2_items_count"
+                          sts:
+                            oneOf:
+                              - $ref: "#/components/schemas/data_json2_sts"
+                              - $ref: "#/components/schemas/data_json2_sts_raw"
+            alerts:
+              description: |
+                An array of all the unique alerts running, grouped by alert name (`nm` is available here)
+              type: array
+              items:
+                $ref: "#/components/schemas/data_json2_alerts_count"
+        totals:
+          type: object
+          properties:
+            nodes:
+              $ref: "#/components/schemas/data_json2_items_count"
+            contexts:
+              $ref: "#/components/schemas/data_json2_items_count"
+            instances:
+              $ref: "#/components/schemas/data_json2_items_count"
+            dimensions:
+              $ref: "#/components/schemas/data_json2_items_count"
+            label_keys:
+              $ref: "#/components/schemas/data_json2_items_count"
+            label_key_values:
+              $ref: "#/components/schemas/data_json2_items_count"
+        functions:
+          type: array
+          items:
+            type: string
+        db:
+          type: object
+        view:
+          type: object
+        result:
+          type: object
+        min:
+          type: number
+        max:
+          type: number
+        timings:
+          type: object
+    data_json2_sts:
+      description: |
+        Statistical values
+      type: object
+      properties:
+        avg:
+          description: The average value of all metrics aggregated
+          type: number
+        arp:
+          description: The average anomaly rate of all metrics aggregated
+          type: number
+        con:
+          description: The contribution percentage of all the metrics aggregated
+          type: number
+    data_json2_sts_raw:
+      description: |
+        Statistical values when `raw` option is given.
+      type: object
+      properties:
+        sum:
+          description: The sum value of all metrics aggregated
+          type: number
+        ars:
+          description: The sum anomaly rate of all metrics aggregated
+          type: number
+        vol:
+          description: The volume of all the metrics aggregated
+          type: number
+        cnt:
+          description: The count of all metrics aggregated
+          type: integer
+    data_json2_items_count:
+      description: |
+        Depending on the placement of this object, `items` may be `nodes`, `contexts`, `instances`, `dimensions`, `label keys`, `label key-value pairs`. Furthermore, if the whole object is missing it should be assumed that all its members are zero.
+      type: object
+      properties:
+        sl:
+          description: The number of items `selected` to query. If absent it is zero.
+          type: integer
+        ex:
+          description: The number of items `excluded` from querying. If absent it is zero.
+          type: integer
+        qr:
+          description: The number of items (out of `selected`) the query successfully `queried`.  If absent it is zero.
+          type: integer
+        fl:
+          description: The number of items (from `selected`) that `failed` to be queried.  If absent it is zero.
+          type: integer
+    data_json2_alerts_count:
+      description: |
+        Counters about alert statuses. If this object is missing, it is assumed that all its members are zero.
+      type: object
+      properties:
+        nm:
+          description: The name of the alert. Can be absent when the counters refer to more than one alert instances.
+          type: string
+        cl:
+          description: The number of CLEAR alerts. If absent, it is zero.
+          type: integer
+        wr:
+          description: The number of WARNING alerts. If absent, it is zero.
+          type: integer
+        cr:
+          description: The number of CRITICAL alerts. If absent, it is zero.
+          type: integer
+        ot:
+          description: |
+            The number of alerts that are not CLEAR, WARNING, CRITICAL (so, they are "other").  If absent, it is zero.
+          type: integer
     data_json:
       description: Data response in json format.
       allOf:
@@ -2244,9 +2671,8 @@ components:
                   items:
                     type: string
                 data:
-                  description: The data requested, one element per sample with each element
-                    containing the values of the dimensions described in the
-                    labels value.
+                  description: |
+                    The data requested, one element per sample with each element containing the values of the dimensions described in the labels value.
                   type: array
                   items:
                     type: number

@@ -44,7 +44,6 @@ static struct {
         , {"details"           , 0    , RRDR_OPTION_SHOW_DETAILS}
         , {"debug"             , 0    , RRDR_OPTION_DEBUG}
         , {"minify"            , 0    , RRDR_OPTION_MINIFY}
-        , {"annotations"       , 0    , RRDR_OPTION_JW_ANNOTATIONS}
         , {NULL                , 0    , 0}
 };
 

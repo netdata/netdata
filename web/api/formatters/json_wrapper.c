@@ -213,7 +213,7 @@ static inline void query_target_data_statistics(BUFFER *wb, QUERY_TARGET *qt, st
         return;
 
     buffer_json_member_add_object(wb, "sts");
-    if(qt->request.group_by_aggregate_function == RRDR_GROUP_BY_FUNCTION_SUM_COUNT) {
+    if(query_target_aggregatable(qt)) {
         buffer_json_member_add_uint64(wb, "cnt", d->group_points);
 
         if(d->sum != 0.0)
@@ -1347,7 +1347,7 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
 //}
 
 void rrdr2json_v2(RRDR *r __maybe_unused, BUFFER *wb, DATASOURCE_FORMAT format __maybe_unused, RRDR_OPTIONS options) {
-    bool expose_gbc = (r->internal.qt->request.group_by_aggregate_function == RRDR_GROUP_BY_FUNCTION_SUM_COUNT);
+    bool expose_gbc = query_target_aggregatable(r->internal.qt);
 
     buffer_json_member_add_object(wb, "result");
 
@@ -1382,7 +1382,6 @@ void rrdr2json_v2(RRDR *r __maybe_unused, BUFFER *wb, DATASOURCE_FORMAT format _
         }
 
         // for each line in the array
-        char buf[10] = "";
         for (i = start; i != end; i += step) {
             NETDATA_DOUBLE *cn = &r->v[ i * r->d ];
             RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
@@ -1454,16 +1453,7 @@ void rrdr2json_v2(RRDR *r __maybe_unused, BUFFER *wb, DATASOURCE_FORMAT format _
                 buffer_json_add_array_item_double(wb, ar[d]);
 
                 // add the point annotations
-                char *a = buf;
-                if (o & RRDR_VALUE_PARTIAL)
-                    *a++ = 'P'; // Partial
-                if (o & RRDR_VALUE_RESET)
-                    *a++ = 'O'; // Overflow
-                if (o & RRDR_VALUE_EMPTY)
-                    *a++ = 'E'; // Empty
-
-                *a = '\0';
-                buffer_json_add_array_item_string(wb, buf);
+                buffer_json_add_array_item_uint64(wb, o);
 
                 // add the count
                 if(expose_gbc)
