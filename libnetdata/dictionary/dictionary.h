@@ -156,6 +156,8 @@ void dictionary_flush(DICTIONARY *dict);
 
 void dictionary_version_increment(DICTIONARY *dict);
 
+void dictionary_garbage_collect(DICTIONARY *dict);
+
 // ----------------------------------------------------------------------------
 // Set an item in the dictionary
 //

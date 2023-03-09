@@ -1069,15 +1069,18 @@ void *rrdcontext_main(void *ptr) {
                     worker_is_busy(WORKER_JOB_HOSTS);
 
                     if(host->rrdctx.pp_queue) {
-                        pp_queued_contexts_for_all_hosts +=
-                                dictionary_entries(host->rrdctx.pp_queue);
+                        pp_queued_contexts_for_all_hosts += dictionary_entries(host->rrdctx.pp_queue);
                         rrdcontext_post_process_queued_contexts(host);
+                        dictionary_garbage_collect(host->rrdctx.pp_queue);
                     }
 
                     if(host->rrdctx.hub_queue) {
                         hub_queued_contexts_for_all_hosts += dictionary_entries(host->rrdctx.hub_queue);
                         rrdcontext_dispatch_queued_contexts_to_hub(host, now_ut);
+                        dictionary_garbage_collect(host->rrdctx.hub_queue);
                     }
+
+                    dictionary_garbage_collect(host->rrdctx.contexts);
                 }
                 dfe_done(host);
 

@@ -811,6 +811,10 @@ static void garbage_collect_pending_deletes(DICTIONARY *dict) {
                           examined, deleted, pending);
 }
 
+void dictionary_garbage_collect(DICTIONARY *dict) {
+    garbage_collect_pending_deletes(dict);
+}
+
 // ----------------------------------------------------------------------------
 // reference counters
 
@@ -2148,6 +2152,8 @@ DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_view_set_and_acquire_item_advanced(D
 
     if(unlikely(is_master_dictionary(dict)))
         fatal("DICTIONARY: this dictionary is a master, you cannot add items from other dictionaries.");
+
+    garbage_collect_pending_deletes(dict);
 
     dictionary_acquired_item_dup(dict->master, master_item);
     DICTIONARY_ITEM *item = dict_item_add_or_reset_value_and_acquire(dict, name, name_len, NULL, 0, NULL, master_item);
