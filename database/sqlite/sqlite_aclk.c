@@ -27,6 +27,7 @@ void schedule_node_info_update(RRDHOST *host)
     aclk_database_enq_cmd(wc, &cmd);
 }
 
+#ifdef ENABLE_ACLK
 static int sql_check_aclk_table(void *data, int argc, char **argv, char **column)
 {
     struct aclk_database_worker_config *wc = data;
@@ -161,6 +162,7 @@ void sql_delete_aclk_table_list(struct aclk_database_worker_config *wc, struct a
 fail:
     buffer_free(sql);
 }
+#endif
 
 uv_mutex_t aclk_async_lock;
 struct aclk_database_worker_config  *aclk_thread_head = NULL;
@@ -467,7 +469,7 @@ void sql_aclk_sync_init(void)
     info("ACLK sync initialization completed");
 #endif
 }
-
+#ifdef ENABLE_ACLK
 static void async_cb(uv_async_t *handle)
 {
     uv_stop(handle->loop);
@@ -482,7 +484,6 @@ static void timer_cb(uv_timer_t* handle)
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
 
-#ifdef ENABLE_ACLK
     struct aclk_database_worker_config *wc = handle->data;
     struct aclk_database_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
@@ -504,7 +505,6 @@ static void timer_cb(uv_timer_t* handle)
             aclk_database_enq_cmd_noblock(wc, &cmd);
         }
     }
-#endif
 }
 
 static void aclk_database_worker(void *arg)
@@ -636,7 +636,6 @@ static void aclk_database_worker(void *arg)
                     debug(D_ACLK_SYNC, "Queueing removed alerts for node %s", wc->host_guid);
                     sql_process_queue_removed_alerts_to_aclk(wc, cmd);
                     break;
-
 // NODE OPERATIONS
                 case ACLK_DATABASE_NODE_STATE:
                     debug(D_ACLK_SYNC,"Sending state update for %s", wc->uuid_str);
@@ -654,15 +653,12 @@ static void aclk_database_worker(void *arg)
                     debug(D_ACLK_SYNC,"Sending node collectors info for %s", wc->uuid_str);
                     sql_build_node_collectors(wc);
                     break;
-#ifdef ENABLE_ACLK
-
 // NODE_INSTANCE DETECTION
                 case ACLK_DATABASE_ORPHAN_HOST:
                     wc->host = NULL;
                     wc->is_orphan = 1;
                     aclk_add_worker_thread(wc);
                     break;
-#endif
                 case ACLK_DATABASE_TIMER:
                     if (unlikely(localhost && !wc->host && !wc->is_orphan)) {
                         if (claimed()) {
@@ -744,6 +740,7 @@ error_after_loop_init:
     freez(loop);
     worker_unregister();
 }
+#endif
 
 // -------------------------------------------------------------
 
