@@ -5,6 +5,7 @@
 - [Summary](#summary)  
     - [Types of available collectors](#collector-types)  
 - [Requirements](#requirements)
+    - [systemd collector](#requirements-systemd-collector)
 - [General Configuration](#general-configuration)
 - [Collector-specific Configuration](#collector-configuration)
 - [Custom Charts](#custom-charts)
@@ -59,7 +60,11 @@ Logs management introduces minimal extra package dependencies: `flex` and `bison
 
 However, there may be some exceptions to this rule as more collectors are added to the logs management engine, so if a specific collector is disabled due to missing dependencies, refer to this section.
 
+<a name="requirements-systemd-collector"/>
+
 ### systemd collector
+
+</a>
 
 If systemd development libraries are missing at build time, the systemd log collector will not be available. This can be fixed by installing the missing libraries prior to building the agent:
 
