@@ -6,11 +6,18 @@
 
 **Merged pull requests:**
 
+- Remove google hangouts from list of integrations [\#14689](https://github.com/netdata/netdata/pull/14689) ([cakrit](https://github.com/cakrit))
+- Fix Azure IMDS [\#14686](https://github.com/netdata/netdata/pull/14686) ([shyamvalsan](https://github.com/shyamvalsan))
+- Send an EOF from charts.d.plugin before exit [\#14680](https://github.com/netdata/netdata/pull/14680) ([MrZammler](https://github.com/MrZammler))
 - Fix conditionals for claim-only case in kickstart.sh. [\#14679](https://github.com/netdata/netdata/pull/14679) ([Ferroin](https://github.com/Ferroin))
+- Fix kernel test script [\#14676](https://github.com/netdata/netdata/pull/14676) ([thiagoftsm](https://github.com/thiagoftsm))
 - add note on readme on how to easily see all ml related blog posts [\#14675](https://github.com/netdata/netdata/pull/14675) ([andrewm4894](https://github.com/andrewm4894))
 - Guard for null host when sending node instances [\#14673](https://github.com/netdata/netdata/pull/14673) ([MrZammler](https://github.com/MrZammler))
+- reviewed role description to be according to app [\#14672](https://github.com/netdata/netdata/pull/14672) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - If a child is not streaming, send to the cloud last known version instead of unknown [\#14671](https://github.com/netdata/netdata/pull/14671) ([MrZammler](https://github.com/MrZammler))
+- add FAQ information provided by Finance [\#14664](https://github.com/netdata/netdata/pull/14664) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Handle conffiles for DEB packages explicitly instead of automatically. [\#14662](https://github.com/netdata/netdata/pull/14662) ([Ferroin](https://github.com/Ferroin))
+- Fix cloud node stale status when a virtual host is created [\#14660](https://github.com/netdata/netdata/pull/14660) ([stelfrag](https://github.com/stelfrag))
 - Properly handle service type detection failures when installing as a system service. [\#14658](https://github.com/netdata/netdata/pull/14658) ([Ferroin](https://github.com/Ferroin))
 - fix simple\_pattern\_create on freebsd [\#14656](https://github.com/netdata/netdata/pull/14656) ([ilyam8](https://github.com/ilyam8))
 - Move images in "interact-new-charts" from zenhub to github [\#14654](https://github.com/netdata/netdata/pull/14654) ([Ancairon](https://github.com/Ancairon))
@@ -30,6 +37,7 @@
 - Fix intermittent permissions issues in some Docker builds. [\#14629](https://github.com/netdata/netdata/pull/14629) ([Ferroin](https://github.com/Ferroin))
 - Update REFERENCE.md [\#14627](https://github.com/netdata/netdata/pull/14627) ([cakrit](https://github.com/cakrit))
 - Make the title metadata H1 in all markdown files [\#14625](https://github.com/netdata/netdata/pull/14625) ([Ancairon](https://github.com/Ancairon))
+- eBPF new charts \(user ring\) [\#14623](https://github.com/netdata/netdata/pull/14623) ([thiagoftsm](https://github.com/thiagoftsm))
 - rename glossary [\#14622](https://github.com/netdata/netdata/pull/14622) ([cakrit](https://github.com/cakrit))
 - Reorg learn 0227 [\#14621](https://github.com/netdata/netdata/pull/14621) ([cakrit](https://github.com/cakrit))
 - Assorted improvements to OpenRC support. [\#14620](https://github.com/netdata/netdata/pull/14620) ([Ferroin](https://github.com/Ferroin))
@@ -370,8 +378,6 @@
 - remove deprecated fping.plugin in accordance with v1.37.0 deprecation notice  [\#14073](https://github.com/netdata/netdata/pull/14073) ([ilyam8](https://github.com/ilyam8))
 - remove deprecated python.d collectors announced in v1.37.0 deprecation notice [\#14072](https://github.com/netdata/netdata/pull/14072) ([ilyam8](https://github.com/ilyam8))
 - Add workflow dispatch trigger for parent/child with cloud integration smoke tests [\#14070](https://github.com/netdata/netdata/pull/14070) ([dimko](https://github.com/dimko))
-- MQTT 5 publish topic alias support [\#14067](https://github.com/netdata/netdata/pull/14067) ([underhood](https://github.com/underhood))
-- Refactor ML code and add support for multiple KMeans models. [\#14065](https://github.com/netdata/netdata/pull/14065) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
@@ -380,17 +386,6 @@
 ## [v1.37.0](https://github.com/netdata/netdata/tree/v1.37.0) (2022-11-30)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.36.1...v1.37.0)
-
-**Merged pull requests:**
-
-- fix spinlock [\#14068](https://github.com/netdata/netdata/pull/14068) ([ktsaou](https://github.com/ktsaou))
-- Sanitize command arguments. [\#14064](https://github.com/netdata/netdata/pull/14064) ([vkalintiris](https://github.com/vkalintiris))
-- Strict control of streaming API keys and MACHINE GUIDs in stream.conf [\#14063](https://github.com/netdata/netdata/pull/14063) ([ktsaou](https://github.com/ktsaou))
-- replication fixes No 8 [\#14061](https://github.com/netdata/netdata/pull/14061) ([ktsaou](https://github.com/ktsaou))
-- fix\(updater\): don't produce any output if static update completed successfully [\#14058](https://github.com/netdata/netdata/pull/14058) ([ilyam8](https://github.com/ilyam8))
-- Add Alpine 3.17 to supported distros. [\#14056](https://github.com/netdata/netdata/pull/14056) ([Ferroin](https://github.com/Ferroin))
-- replication fixes No 7 [\#14053](https://github.com/netdata/netdata/pull/14053) ([ktsaou](https://github.com/ktsaou))
-- bump go.d.plugin to v0.45.0 [\#14052](https://github.com/netdata/netdata/pull/14052) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
