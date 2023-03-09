@@ -113,11 +113,6 @@ If you want to enable `apps.plugin` integration, change the "apps" setting to "y
    apps = yes
 ```
 
-When the integration is enabled, eBPF collector allocates memory for each process running. The total allocated memory
-has direct relationship with the kernel version. When the eBPF plugin is running on kernels newer than `4.15`, it uses
-per-cpu maps to speed up the update of hash tables. This also implies storing data for the same PID for each processor
-it runs.
-
 #### Integration with `cgroups.plugin`
 
 The eBPF collector also creates charts for each cgroup through an integration with the
@@ -135,6 +130,13 @@ _enable_ the integration with `cgroups.plugin`, change the `cgroups` setting to 
 If you do not need to monitor specific metrics for your `cgroups`, you can enable `cgroups` inside
 `ebpf.d.conf`, and then disable the plugin for a specific `thread` by following the steps in the
 [Configuration](#configuring-ebpfplugin) section.
+
+#### Maps per Core
+
+When netdata is running on kernels newer than `4.6` users are allowed to modify how `ebpf.plugin` creates maps (hash or 
+array). When `maps per core` is defined as `yes`, plugin will create a map per core on host, on the other hand,
+when the value is set as `no` only one hash table will be created, this option will use less memory, but it also can
+increase overhead for processes.
 
 #### Collect PID
 
@@ -888,12 +890,19 @@ These are tracepoints related to [OOM](https://en.wikipedia.org/wiki/Out_of_memo
 eBPF monitoring is complex and produces a large volume of metrics. We've discovered scenarios where the eBPF plugin
 significantly increases kernel memory usage by several hundred MB.
 
-If your node is experiencing high memory usage and there is no obvious culprit to be found in the `apps.mem` chart,
-consider testing for high kernel memory usage by [disabling eBPF monitoring](#configuring-ebpfplugin). Next,
-[restart Netdata](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) with `sudo systemctl restart netdata` to see if system memory
-usage (see the `system.ram` chart) has dropped significantly.
+When the integration with apps or cgroup is enabled, eBPF collector allocates memory for each process running. If your
+node is experiencing high memory usage and there is no obvious culprit to be found in the `apps.mem` chart, consider:
 
-Beginning with `v1.31`, kernel memory usage is configurable via the [`pid table size` setting](#ebpf-load-mode)
+- Modify [maps per core](#maps-per-core) to use only one map.
+- Disable [integration with apps](#integration-with-appsplugin).
+- Disable [integration with cgroup](#integration-with-cgroupsplugin).
+
+If with these changes you still consider plugin having a high memory usage, and there is no obvious culprit to be found 
+in the `apps.mem` chart, consider testing for high kernel memory usage by [disabling eBPF monitoring](#configuring-ebpfplugin).
+Next, [restart Netdata](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) with
+`sudo systemctl restart netdata` to see if system memory usage (see the `system.ram` chart) has dropped significantly.
+
+Beginning with `v1.31`, kernel memory usage is configurable via the [`pid table size` setting](#pid-table-size)
 in `ebpf.conf`.
 
 ### SELinux
