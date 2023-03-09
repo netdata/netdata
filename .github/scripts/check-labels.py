@@ -6,6 +6,7 @@ Validate GitHub label configuration.
 Copyright (C) 2023 Netdata Inc.
 '''
 
+import re
 import sys
 
 from pathlib import Path
@@ -17,6 +18,14 @@ from ruamel.yaml import YAMLError
 SCRIPT_PATH = Path(__file__).resolve()
 SCRIPT_DIR = SCRIPT_PATH.parent
 SRC_DIR = SCRIPT_DIR.parent.parent
+
+
+# Regex defining accepted label names.
+# The limitations it describes are our own and are imposed for consistency.
+LABEL_REGEX = re.compile('^([a-zA-Z0-9 ._/-])+$')
+
+# Regex for matching six-digit hexadecimal strings.
+COLOR_REGEX = re.compile('^[a-fA-F0-9]{6}$')
 
 # These area labels are required to be present, but are not expected to
 # have a corresponding source directory.
@@ -67,19 +76,44 @@ def validate_labels_config(labels_config):
     ret = True
 
     for idx, item in enumerate(labels_config):
-        if not isinstance(item, dict):
-            print(f'!!! Incorrect type at index { idx } in labels config.')
-            sys.exit(1)
+        match item:
+            case {'name': n, 'description': d, 'color': c, **other}:
+                if other:
+                    print(f'!!! Unrecognized keys for { n } in labels config.')
+                    ret = False
 
-        for key in ['name', 'description', 'color']:
-            if key not in item.keys():
-                print(f'!!! Missing { key } entry at index { idx }' +
-                      ' in labels config.')
-                ret = False
-            elif not isinstance(item[key], str):
-                print(f'!!! Incorrect item type for { key } at index { idx }' +
-                      ' in labels config.')
-                ret = False
+                if not isinstance(n, str):
+                    print(f'!!! Label name is not a string at index { idx }' +
+                          ' in labels config.')
+                    ret = False
+                elif not LABEL_REGEX.match(n):
+                    print(f'!!! Label name { n } is not valid. ' +
+                          'Label names must consist only of English letters, numbers, ' +
+                          '`/`, `-`, `_`, `.`, or spaces.')
+                    ret = False
+
+                if not isinstance(d, str):
+                    print(f'!!! Description for label { n } is not a string.')
+                    ret = False
+                elif len(d) > 100:
+                    print(f'!!! Description for label { n } is too long. GitHub limits descriptions to 100 characters.')
+                    ret = False
+
+                if not isinstance(c, str):
+                    print(f'!!! Color for label { n } is not a string. Did you forget to quote it?')
+                    ret = False
+                elif not COLOR_REGEX.match(c):
+                    print(f'!!! Color for label { n } is not a six-digit hexidecimal string.')
+                    ret = False
+            case {**other}:
+                for k in {'name', 'description', 'color'}:
+                    if k not in other.keys():
+                        print(f'!!! Missing { k } entry at index { idx }' +
+                              ' in labels config.')
+                        ret = False
+            case _:
+                print(f'!!! Incorrect type at index { idx } in labels config.')
+                sys.exit(1)
 
     if ret:
         print('>>> Labels config has valid syntax.')

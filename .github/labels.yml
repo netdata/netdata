@@ -133,7 +133,7 @@
   description: Issues and PRs related to machine learning
   color: bee569
 - name: area/packaging
-  description: Issues and PRs related to packaging and platform support (should have an appropriate platform label too).
+  description: Issues and PRs related to packaging and platform support.
   color: *area
 - name: area/packaging/deb
   description: Issues and PRs related to our official DEB packages
@@ -188,7 +188,7 @@
   description: Issues and PRs related to running on Fedora and it’s derivatives
   color: *platform
 - name: platform/linux/rhel
-  description: Issues and PRs related to running on RHEL and it’s ABI-compatible derivatives (such as Alma and Rocky)
+  description: Issues and PRs related to running on RHEL and it’s ABI-compatible derivatives
   color: *platform
 - name: platform/linux/oracle
   description: Issues and PRs related to running on Oracle Linux
