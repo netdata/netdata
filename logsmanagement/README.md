@@ -89,6 +89,9 @@ _TODO: Which sources support 'auto' parameter?_
 
 There are some fundamental configuration options that are common to all collector types. These options can be set globally in the `[logs management]` section of `netdata.conf` or customized per collector using `edit-config logsmanagement.conf`:
 
+|  Configuration Option | Default | Description  |
+| ------------  | ------------  | ------------ |
+
 - `enabled`: Whether this log source will be monitored or not. Default: `no`.
 - `update every`: How often collected metrics will be updated. Default: equivalent value in `[logs management]` section of `netdata.conf` (or Netdata global value, if higher). 
 - `log type`: Type of this log collector, see [relevant table](#collector-types) for a complete list of supported collectors. Default: `flb_generic`.
