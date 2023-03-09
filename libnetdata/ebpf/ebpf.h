@@ -373,6 +373,7 @@ typedef struct ebpf_sync_syscalls {
 #else
     void *sync_obj;
 #endif
+    ebpf_local_maps_t *sync_maps;
 } ebpf_sync_syscalls_t;
 
 void ebpf_histogram_dimension_cleanup(char **ptr, size_t length);
