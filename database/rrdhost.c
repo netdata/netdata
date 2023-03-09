@@ -524,7 +524,6 @@ int is_legacy = 1;
         rrdhost_load_rrdcontext_data(host);
 //        rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
         ml_host_new(host);
-        ml_host_start_training_thread(host);
     } else
         rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD | RRDHOST_FLAG_ARCHIVED | RRDHOST_FLAG_ORPHAN);
 
@@ -641,7 +640,6 @@ static void rrdhost_update(RRDHOST *host
         host->rrdpush_replication_step = rrdpush_replication_step;
 
         ml_host_new(host);
-        ml_host_start_training_thread(host);
         
         rrdhost_load_rrdcontext_data(host);
         info("Host %s is not in archived mode anymore", rrdhost_hostname(host));
@@ -1143,7 +1141,6 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     rrdcalctemplate_index_destroy(host);
 
     // cleanup ML resources
-    ml_host_stop_training_thread(host);
     ml_host_delete(host);
 
     freez(host->exporting_flags);

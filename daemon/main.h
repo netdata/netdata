@@ -33,17 +33,15 @@ typedef enum {
     ABILITY_STREAMING_CONNECTIONS = (1 << 2),
     SERVICE_MAINTENANCE           = (1 << 3),
     SERVICE_COLLECTORS            = (1 << 4),
-    SERVICE_ML_TRAINING           = (1 << 5),
-    SERVICE_ML_PREDICTION         = (1 << 6),
-    SERVICE_REPLICATION           = (1 << 7),
-    SERVICE_WEB_SERVER            = (1 << 8),
-    SERVICE_ACLK                  = (1 << 9),
-    SERVICE_HEALTH                = (1 << 10),
-    SERVICE_STREAMING             = (1 << 11),
-    SERVICE_CONTEXT               = (1 << 12),
-    SERVICE_ANALYTICS             = (1 << 13),
-    SERVICE_EXPORTERS             = (1 << 14),
-    SERVICE_ACLKSYNC              = (1 << 15)
+    SERVICE_REPLICATION           = (1 << 5),
+    SERVICE_WEB_SERVER            = (1 << 6),
+    SERVICE_ACLK                  = (1 << 7),
+    SERVICE_HEALTH                = (1 << 8),
+    SERVICE_STREAMING             = (1 << 9),
+    SERVICE_CONTEXT               = (1 << 10),
+    SERVICE_ANALYTICS             = (1 << 11),
+    SERVICE_EXPORTERS             = (1 << 12),
+    SERVICE_ACLKSYNC              = (1 << 13)
 } SERVICE_TYPE;
 
 typedef enum {
