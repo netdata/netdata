@@ -30,7 +30,7 @@ ebpf_local_maps_t dcstat_maps[] = {{.name = "dcstat_global", .internal_input = N
                                     .type = NETDATA_EBPF_MAP_RESIZABLE | NETDATA_EBPF_MAP_PID,
                                     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-                                    .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+                                    .map_type = BPF_MAP_TYPE_PERCPU_HASH
 #endif
                                    },
                                    {.name = "dcstat_ctrl", .internal_input = NETDATA_CONTROLLER_END,
