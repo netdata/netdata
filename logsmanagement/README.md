@@ -47,9 +47,13 @@ A few important things that users should be aware of:
 
 </a>
 
-Logs management introduces minimal extra dependencies: `flex` and `bison` packages are required to build Fluent Bit and that's it! 
+Logs management introduces minimal extra package dependencies: `flex` and `bison` packages are required to build Fluent Bit and that's it! 
 
-However, if systemd development libraries are missing at build time, the systemd log collector will not be available. This can be fixed by installing the missing libraries prior to building the agent:
+However, there may be some exceptions to this rule as more collectors are added to the logs management engine, so if a specific collector is disabled due to missing dependencies, refer to this section.
+
+### systemd collector
+
+If systemd development libraries are missing at build time, the systemd log collector will not be available. This can be fixed by installing the missing libraries prior to building the agent:
 
 Debian / Ubuntu:
 
@@ -70,16 +74,18 @@ yum install systemd-devel
 _TODO: Which sources support log path parameter?_
 _TODO: Which sources support 'auto' parameter?_
 
-Configuration options common to all log source types:
+There are some fundamental configuration options that are common to all collectors:
 
-- `enabled`: Whether this log source will be monitored or not.
-- `update every`: How often the charts will be updated (`netdata.conf` `update every` has priority over this)
-- `log type`: Type of this log. If unset, `flb_generic` will be used as the default.
-- `circular buffer max size`: Maximum RAM used to buffer collected logs until they are inserted in the database.
+- `enabled`: Whether this log source will be monitored or not. Default: `no`.
+- `update every`: How often the charts will be updated. Default: equivalent value in `[logs management]` section of `netdata.conf`. 
+- `log type`: Type of this log. Default: `flb_generic`.
+- `circular buffer max size`: Maximum RAM used to buffer collected logs until they are inserted in the database. Default: equivalent value in `[logs management]` section of `netdata.conf`.
 - `circular buffer drop logs if full`: 
 - `compression acceleration`: Fine-tunes tradeoff between log compression speed and compression ratio, see [here](https://github.com/lz4/lz4/blob/90d68e37093d815e7ea06b0ee3c168cccffc84b8/lib/lz4.h#L195) for more.
 - `buffer flush to DB`: Interval at which logs will be transferred from in-memory buffers to the database.
 - `disk space limit`: Maximum disk space that all compressed logs in database can occupy (per log source).
+
+These options can be set globally in the `[logs management]` section of `netdata.conf` or customized per collector using `edit-config logsmanagement.conf`.
 
 
 <a name="collector-configuration"/>
