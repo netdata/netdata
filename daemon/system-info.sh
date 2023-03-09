@@ -96,6 +96,11 @@ if [ "${CONTAINER}" = "unknown" ]; then
     CONT_DETECTION="dockerenv"
   fi
 
+  if [ -n "${KUBERNETES_SERVICE_HOST}" ]; then
+    CONTAINER="container"
+    CONT_DETECTION="kubernetes"
+  fi
+
 fi
 
 # -------------------------------------------------------------------------------------------------
