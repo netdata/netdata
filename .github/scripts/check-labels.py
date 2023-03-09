@@ -178,7 +178,9 @@ def check_collector_labels(labels):
     collectors = set(sub_labels(labels, 'collectors/'))
 
     collector_dirs = {d.name for d in COLLECTOR_PREFIX.iterdir() if d.is_dir()}
-    collector_dirs = {(d if d in SPECIAL_COLLECTORS else '.'.join(d.split('.')[:-1])) for d in collector_dirs} | NODIR_COLLECTORS
+    collector_dirs = {
+        (d if d in SPECIAL_COLLECTORS else '.'.join(d.split('.')[:-1])) for d in collector_dirs
+    } | NODIR_COLLECTORS
 
     missing_labels = collector_dirs - collectors - IGNORE_COLLECTORS
     missing_dirs = collectors - collector_dirs
