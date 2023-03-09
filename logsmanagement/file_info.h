@@ -114,7 +114,10 @@ typedef struct {
     int circ_buff_spare_items;
     int circ_buff_max_size_in_mib;
     int circ_buff_drop_logs;
+    int compression_acceleration;
     logs_manag_db_mode_t db_mode;
+    int disk_space_limit_in_mib;
+    int buff_flush_to_db_interval;
 } g_logs_manag_config_t;
 
 extern g_logs_manag_config_t g_logs_manag_config;

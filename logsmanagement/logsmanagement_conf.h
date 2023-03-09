@@ -31,13 +31,13 @@ typedef enum {
     LOGS_MANAG_DB_MODE_NONE
 } logs_manag_db_mode_t;
 
-#define SAVE_BLOB_TO_DB_DEFAULT 8                       /**< Default interval to save buffers from RAM to disk **/
+#define SAVE_BLOB_TO_DB_DEFAULT 6                       /**< Global default configuration interval to save buffers from RAM to disk **/
 #define SAVE_BLOB_TO_DB_MIN 2                           /**< Minimum allowed interval to save buffers from RAM to disk **/
-#define SAVE_BLOB_TO_DB_MAX 256                         /**< Maximum allowed interval to save buffers from RAM to disk **/
+#define SAVE_BLOB_TO_DB_MAX 1800                        /**< Maximum allowed interval to save buffers from RAM to disk **/
 
 #define BLOB_MAX_FILES 10	                            /**< Maximum allowed number of BLOB files (per collection) that are used to store compressed logs. When exceeded, the olderst one will be overwritten. **/
 
-#define DISK_SPACE_LIMIT_DEFAULT 500                    /**< Default maximum database disk space limit per log source **/
+#define DISK_SPACE_LIMIT_DEFAULT 500                    /**< Global default configuration maximum database disk space limit per log source **/
 
 #define GLOBAL_DB_MODE_DEFAULT_STR "none"               /**< db mode string to be used as global default in configuration **/
 #define GLOBAL_DB_MODE_DEFAULT LOGS_MANAG_DB_MODE_NONE  /**< db mode to be used as global default, matching GLOBAL_DB_MODE_DEFAULT_STR **/
@@ -67,6 +67,7 @@ typedef enum {
 /* -------------------------------------------------------------------------- */
 
 #define VALIDATE_COMPRESSION 0                          /**< For testing purposes only as it slows down compression considerably. **/
+#define COMPRESSION_ACCELERATION_DEFAULT 1              /**< Global default value for compression acceleration **/
 
 /* -------------------------------------------------------------------------- */
 

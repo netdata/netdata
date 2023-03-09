@@ -54,7 +54,10 @@ g_logs_manag_config_t g_logs_manag_config = {
     .circ_buff_spare_items = CIRCULAR_BUFF_SPARE_ITEMS_DEFAULT,
     .circ_buff_max_size_in_mib = CIRCULAR_BUFF_DEFAULT_MAX_SIZE / (1 MiB),
     .circ_buff_drop_logs = CIRCULAR_BUFF_DEFAULT_DROP_LOGS,
-    .db_mode = GLOBAL_DB_MODE_DEFAULT
+    .compression_acceleration = COMPRESSION_ACCELERATION_DEFAULT,
+    .db_mode = GLOBAL_DB_MODE_DEFAULT,
+    .disk_space_limit_in_mib = DISK_SPACE_LIMIT_DEFAULT,  
+    .buff_flush_to_db_interval = SAVE_BLOB_TO_DB_DEFAULT
 };
 
 static logs_manag_db_mode_t db_mode_str_to_db_mode(const char *const db_mode_str){
@@ -149,7 +152,7 @@ static int logs_manag_config_load(void){
                                                                 localhost->rrd_update_every);
     if(g_logs_manag_config.update_every < localhost->rrd_update_every) 
         g_logs_manag_config.update_every = localhost->rrd_update_every;
-    info("CONFIG: global logs management update every: %d", g_logs_manag_config.update_every);
+    info("CONFIG: global logs management update_every: %d", g_logs_manag_config.update_every);
 
 
     g_logs_manag_config.circ_buff_spare_items = (int)config_get_number( CONFIG_SECTION_LOGS_MANAGEMENT, 
@@ -166,8 +169,12 @@ static int logs_manag_config_load(void){
     g_logs_manag_config.circ_buff_drop_logs = config_get_boolean(   CONFIG_SECTION_LOGS_MANAGEMENT, 
                                                                     "circular buffer drop logs if full", 
                                                                     g_logs_manag_config.circ_buff_drop_logs);
-    info("CONFIG: global logs management circular buffer drop logs if full: %s", 
-            g_logs_manag_config.circ_buff_drop_logs ? "yes" : "no");
+    info("CONFIG: global logs management circ_buff_drop_logs: %d", g_logs_manag_config.circ_buff_drop_logs);
+
+    g_logs_manag_config.compression_acceleration = config_get_number(   CONFIG_SECTION_LOGS_MANAGEMENT, 
+                                                                        "compression acceleration", 
+                                                                        g_logs_manag_config.compression_acceleration);
+    info("CONFIG: global logs management compression_acceleration: %d", g_logs_manag_config.compression_acceleration);
 
     char db_default_dir[FILENAME_MAX + 1];
     snprintfz(db_default_dir, FILENAME_MAX, "%s" LOGS_MANAG_DB_SUBPATH, netdata_configured_cache_dir);
@@ -190,6 +197,19 @@ static int logs_manag_config_load(void){
         }
     }
     freez(filename);
+
+
+    g_logs_manag_config.buff_flush_to_db_interval = config_get_number(  CONFIG_SECTION_LOGS_MANAGEMENT, 
+                                                                        "circular buffer flush to db", 
+                                                                        g_logs_manag_config.buff_flush_to_db_interval);
+    info("CONFIG: global logs management buff_flush_to_db_interval: %d", g_logs_manag_config.buff_flush_to_db_interval);
+
+
+    g_logs_manag_config.disk_space_limit_in_mib = config_get_number(CONFIG_SECTION_LOGS_MANAGEMENT, 
+                                                                    "disk space limit MiB", 
+                                                                    g_logs_manag_config.disk_space_limit_in_mib);
+    info("CONFIG: global logs management disk_space_limit_in_mib: %d", g_logs_manag_config.disk_space_limit_in_mib);
+
 
     return rc;
 }
@@ -358,7 +378,8 @@ static void logs_management_init(struct section *config_section){
      * Read compression acceleration configuration.
      * ------------------------------------------------------------------------- */
     p_file_info->compression_accel = appconfig_get_number(  &log_management_config, config_section->name, 
-                                                            "compression acceleration", 1);
+                                                            "compression acceleration", 
+                                                            g_logs_manag_config.compression_acceleration);
     info("[%s]: compression acceleration = %d", p_file_info->chart_name, p_file_info->compression_accel);
 
 
@@ -372,30 +393,31 @@ static void logs_management_init(struct section *config_section){
 
 
     /* -------------------------------------------------------------------------
-     * Read BLOB max size configuration.
-     * ------------------------------------------------------------------------- */
-    p_file_info->blob_max_size  = (appconfig_get_number( &log_management_config, config_section->name, 
-                                                            "disk space limit", DISK_SPACE_LIMIT_DEFAULT) MiB
-                                                            ) / BLOB_MAX_FILES;
-    info("[%s]: BLOB max size = %lld", p_file_info->chart_name, (long long)p_file_info->blob_max_size);
-
-
-    /* -------------------------------------------------------------------------
      * Read save logs from buffers to DB interval configuration.
      * ------------------------------------------------------------------------- */
     p_file_info->buff_flush_to_db_interval = appconfig_get_number(  &log_management_config, config_section->name, 
-                                                                    "buffer flush to db", SAVE_BLOB_TO_DB_DEFAULT);
+                                                                    "circular buffer flush to db", 
+                                                                    g_logs_manag_config.buff_flush_to_db_interval);
     if(p_file_info->buff_flush_to_db_interval > SAVE_BLOB_TO_DB_MAX) {
         p_file_info->buff_flush_to_db_interval = SAVE_BLOB_TO_DB_MAX;
-        info("[%s]: buffer flush to db out of range. Using maximum permitted value: %d", 
+        info("[%s]: circular buffer flush to db out of range. Using maximum permitted value: %d", 
                 p_file_info->chart_name, p_file_info->buff_flush_to_db_interval);
 
     } else if(p_file_info->buff_flush_to_db_interval < SAVE_BLOB_TO_DB_MIN) {
         p_file_info->buff_flush_to_db_interval = SAVE_BLOB_TO_DB_MIN;
-        info("[%s]: buffer flush to db out of range. Using minimum permitted value: %d",
+        info("[%s]: circular buffer flush to db out of range. Using minimum permitted value: %d",
                 p_file_info->chart_name, p_file_info->buff_flush_to_db_interval);
     } 
-    info("[%s]: buffer flush to db = %d", p_file_info->chart_name, p_file_info->buff_flush_to_db_interval);
+    info("[%s]: circular buffer flush to db = %d", p_file_info->chart_name, p_file_info->buff_flush_to_db_interval);
+
+
+    /* -------------------------------------------------------------------------
+     * Read BLOB max size configuration.
+     * ------------------------------------------------------------------------- */
+    p_file_info->blob_max_size  = appconfig_get_number( &log_management_config, config_section->name, 
+                                                        "disk space limit MiB", 
+                                                        g_logs_manag_config.disk_space_limit_in_mib) MiB / BLOB_MAX_FILES;
+    info("[%s]: BLOB max size = %lld", p_file_info->chart_name, (long long)p_file_info->blob_max_size);
 
 
     /* -------------------------------------------------------------------------
