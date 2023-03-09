@@ -113,6 +113,7 @@ typedef struct {
     int update_every;
     int circ_buff_spare_items;
     int circ_buff_max_size_in_mib;
+    int circ_buff_drop_logs;
     logs_manag_db_mode_t db_mode;
 } g_logs_manag_config_t;
 

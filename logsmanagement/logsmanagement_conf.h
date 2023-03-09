@@ -55,6 +55,8 @@ typedef enum {
 #define CIRCULAR_BUFF_MAX_SIZE_RANGE_MIN (1 MiB)        /**< circular_buffer_max_size read from configuration cannot be smaller than this **/
 #define CIRCULAR_BUFF_MAX_SIZE_RANGE_MAX (4 GiB)        /**< circular_buffer_max_size read from configuration cannot be larger than this **/
 
+#define CIRCULAR_BUFF_DEFAULT_DROP_LOGS 0               /**< Global default configuration value whether to drop logs if circular buffer is full **/
+
 #define CIRC_BUFF_PREP_WR_RETRY_AFTER_MS 1000           /**< If circ_buff_prepare_write() fails due to not enough space, how many millisecs to wait before retrying **/
 
 /* -------------------------------------------------------------------------- */

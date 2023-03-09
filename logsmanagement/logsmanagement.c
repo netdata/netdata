@@ -53,6 +53,7 @@ g_logs_manag_config_t g_logs_manag_config = {
     .update_every = 1,
     .circ_buff_spare_items = CIRCULAR_BUFF_SPARE_ITEMS_DEFAULT,
     .circ_buff_max_size_in_mib = CIRCULAR_BUFF_DEFAULT_MAX_SIZE / (1 MiB),
+    .circ_buff_drop_logs = CIRCULAR_BUFF_DEFAULT_DROP_LOGS,
     .db_mode = GLOBAL_DB_MODE_DEFAULT
 };
 
@@ -153,7 +154,7 @@ static int logs_manag_config_load(void){
 
     g_logs_manag_config.circ_buff_spare_items = (int)config_get_number( CONFIG_SECTION_LOGS_MANAGEMENT, 
                                                                         "circular buffer spare items", 
-                                                                        CIRCULAR_BUFF_SPARE_ITEMS_DEFAULT);
+                                                                        g_logs_manag_config.circ_buff_spare_items);
     info("CONFIG: global logs management circ_buff_spare_items: %d", g_logs_manag_config.circ_buff_spare_items);
 
 
@@ -162,6 +163,11 @@ static int logs_manag_config_load(void){
                                                                         g_logs_manag_config.circ_buff_max_size_in_mib);
     info("CONFIG: global logs management circ_buff_max_size_in_mib: %d", g_logs_manag_config.circ_buff_max_size_in_mib);
 
+    g_logs_manag_config.circ_buff_drop_logs = config_get_boolean(   CONFIG_SECTION_LOGS_MANAGEMENT, 
+                                                                    "circular buffer drop logs if full", 
+                                                                    g_logs_manag_config.circ_buff_drop_logs);
+    info("CONFIG: global logs management circular buffer drop logs if full: %s", 
+            g_logs_manag_config.circ_buff_drop_logs ? "yes" : "no");
 
     char db_default_dir[FILENAME_MAX + 1];
     snprintfz(db_default_dir, FILENAME_MAX, "%s" LOGS_MANAG_DB_SUBPATH, netdata_configured_cache_dir);
@@ -729,8 +735,10 @@ static void logs_management_init(struct section *config_section){
 
     int circular_buffer_allow_dropped_logs = appconfig_get_boolean( &log_management_config, 
                                                                     config_section->name,
-                                                                    "circular buffer drop logs if full", 0);
-    info("[%s]: circular buffer drop logs if full = %d", p_file_info->chart_name, circular_buffer_allow_dropped_logs);
+                                                                    "circular buffer drop logs if full", 
+                                                                    g_logs_manag_config.circ_buff_drop_logs);
+    info("[%s]: circular buffer drop logs if full = %s", p_file_info->chart_name, 
+        circular_buffer_allow_dropped_logs ? "yes" : "no");
 
     p_file_info->circ_buff = circ_buff_init(p_file_info->buff_flush_to_db_interval + 
                                                 g_logs_manag_config.circ_buff_spare_items,

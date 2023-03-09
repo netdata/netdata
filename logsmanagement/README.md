@@ -77,12 +77,12 @@ _TODO: Which sources support 'auto' parameter?_
 There are some fundamental configuration options that are common to all collectors:
 
 - `enabled`: Whether this log source will be monitored or not. Default: `no`.
-- `update every`: How often the charts will be updated. Default: equivalent value in `[logs management]` section of `netdata.conf`. 
+- `update every`: How often collected metrics will be updated. Default: equivalent value in `[logs management]` section of `netdata.conf`. 
 - `log type`: Type of this log. Default: `flb_generic`.
-- `circular buffer max size`: Maximum RAM used to buffer collected logs until they are inserted in the database. Default: equivalent value in `[logs management]` section of `netdata.conf`.
-- `circular buffer drop logs if full`: 
-- `compression acceleration`: Fine-tunes tradeoff between log compression speed and compression ratio, see [here](https://github.com/lz4/lz4/blob/90d68e37093d815e7ea06b0ee3c168cccffc84b8/lib/lz4.h#L195) for more.
-- `buffer flush to DB`: Interval at which logs will be transferred from in-memory buffers to the database.
+- `circular buffer max size`: Maximum RAM used to buffer collected logs until they are saved to the disk database. Default: equivalent value in `[logs management]` section of `netdata.conf`.
+- `circular buffer drop logs if full`: If there are new logs pending to be collected and the circular buffer is full, enabling this setting will allow old buffered logs to be dropped in favor of new ones. If disabled, collection of new logs will be blocked until there is enough space again in the buffer. Default: equivalent value in `[logs management]` section of `netdata.conf` (`no` by default). 
+- `compression acceleration`: Fine-tunes tradeoff between log compression speed and compression ratio, see [here](https://github.com/lz4/lz4/blob/90d68e37093d815e7ea06b0ee3c168cccffc84b8/lib/lz4.h#L195) for more. Default: equivalent value in `[logs management]` section of `netdata.conf`. 
+- `buffer flush to DB`: Interval at which logs will be transferred from in-memory buffers to the database (`1` by default).
 - `disk space limit`: Maximum disk space that all compressed logs in database can occupy (per log source).
 
 These options can be set globally in the `[logs management]` section of `netdata.conf` or customized per collector using `edit-config logsmanagement.conf`.
