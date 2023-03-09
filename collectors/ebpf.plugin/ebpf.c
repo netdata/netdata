@@ -431,38 +431,45 @@ ebpf_filesystem_partitions_t localfs[] =
 ebpf_sync_syscalls_t local_syscalls[] = {
     {.syscall = NETDATA_SYSCALLS_SYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
 #ifdef LIBBPF_MAJOR_VERSION
-        .sync_obj = NULL
+     .sync_obj = NULL,
 #endif
+      .sync_maps = sync_maps
     },
     {.syscall = NETDATA_SYSCALLS_SYNCFS, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
 #ifdef LIBBPF_MAJOR_VERSION
-        .sync_obj = NULL
+     .sync_obj = NULL,
 #endif
+     .sync_maps = syncfs_maps
     },
     {.syscall = NETDATA_SYSCALLS_MSYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
 #ifdef LIBBPF_MAJOR_VERSION
-        .sync_obj = NULL
+     .sync_obj = NULL,
 #endif
+     .sync_maps = msync_maps
     },
     {.syscall = NETDATA_SYSCALLS_FSYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
 #ifdef LIBBPF_MAJOR_VERSION
-        .sync_obj = NULL
+     .sync_obj = NULL,
 #endif
+     .sync_maps = fsync_maps
     },
     {.syscall = NETDATA_SYSCALLS_FDATASYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
 #ifdef LIBBPF_MAJOR_VERSION
-        .sync_obj = NULL
+     .sync_obj = NULL,
 #endif
+     .sync_maps = fdatasync_maps
     },
     {.syscall = NETDATA_SYSCALLS_SYNC_FILE_RANGE, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
 #ifdef LIBBPF_MAJOR_VERSION
-        .sync_obj = NULL
+     .sync_obj = NULL,
 #endif
+     .sync_maps = sync_file_range_maps
     },
     {.syscall = NULL, .enabled = CONFIG_BOOLEAN_NO, .objects = NULL, .probe_links = NULL,
 #ifdef LIBBPF_MAJOR_VERSION
-        .sync_obj = NULL
+     .sync_obj = NULL,
 #endif
+     .sync_maps = NULL
     }
 };
 
