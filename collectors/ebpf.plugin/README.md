@@ -99,8 +99,6 @@ accepts the following values:
 -   `return`: In the `return` mode, the eBPF collector monitors the same kernel functions as `entry`, but also creates new
     charts for the return of these functions, such as errors. Monitoring function returns can help in debugging software,
     such as failing to close file descriptors or creating zombie processes.
--   `update every`:  Number of seconds used for eBPF to send data for Netdata.
--   `pid table size`: Defines the maximum number of PIDs stored inside the application hash table.
 
 #### Integration with `apps.plugin`
 
@@ -156,6 +154,16 @@ The threads that have integration with other collectors have an internal clean u
 `trampoline` or a `kprobe` to `release_task` internal function. To avoid `overload` on this function, `ebpf.plugin`
 will only enable these threads integrated with other collectors when the kernel is compiled with
 `CONFIG_DEBUG_INFO_BTF`, unless you enable them manually.
+
+#### Collection period
+
+Plugin uses option `update every` to define number of seconds used for eBPF to send data for Netdata. The default value
+is 5 seconds.
+
+#### PID table size
+
+The option `pid table size` defines the maximum number of PIDs stored inside the application hash table. Default value
+is defined according [kernel](https://elixir.bootlin.com/linux/v6.0.19/source/include/linux/threads.h#L28) source code.
 
 #### Integration Dashboard Elements
 
