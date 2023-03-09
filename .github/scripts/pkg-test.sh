@@ -62,7 +62,7 @@ install_amazon_linux() {
   pkg_version="$(echo "${VERSION}" | tr - .)"
 
   # Install Netdata
-  "$PKGMGR" install -y /netdata/artifacts/netdata-"${pkg_version}"-*.rpm
+  "$PKGMGR" install -y "/netdata/artifacts/netdata-${pkg_version}-*.rpm"
 
   # Install testing tools
   "$PKGMGR" install -y ${opts} curl nc jq || exit 1
