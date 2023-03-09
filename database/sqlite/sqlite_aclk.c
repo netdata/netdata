@@ -25,113 +25,6 @@ void sanity_check(void) {
     BUILD_BUG_ON(WORKER_UTILIZATION_MAX_JOB_TYPES < ACLK_MAX_ENUMERATIONS_DEFINED);
 }
 
-//void schedule_node_info_update(RRDHOST *host)
-//{
-//    if (unlikely(!host))
-//        return;
-//
-//    struct aclk_database_worker_config *wc = host->dbsync_worker;
-//
-//    if (unlikely(!wc))
-//        return;
-//
-//    struct aclk_database_cmd cmd;
-//    memset(&cmd, 0, sizeof(cmd));
-//    cmd.opcode = ACLK_DATABASE_NODE_STATE;
-//    cmd.completion = NULL;
-//    aclk_database_enq_cmd(wc, &cmd);
-//}
-
-#define SQL_SELECT_HOST_BY_UUID  "SELECT host_id FROM host WHERE host_id = @host_id;"
-
-static int is_host_available(uuid_t *host_id)
-{
-    sqlite3_stmt *res = NULL;
-    int rc;
-
-    if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            error_report("Database has not been initialized");
-        return 1;
-    }
-
-    rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_HOST_BY_UUID, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to select node instance information for a node");
-        return 1;
-    }
-
-    rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id parameter to check host existence");
-        goto failed;
-    }
-    rc = sqlite3_step_monitored(res);
-
-failed:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when checking host existence");
-
-    return (rc == SQLITE_ROW);
-}
-
-// OPCODE: ACLK_DATABASE_DELETE_HOST
-static void sql_delete_aclk_table_list(char *host_guid)
-{
-    char uuid_str[GUID_LEN + 1];
-    char host_str[GUID_LEN + 1];
-
-    int rc;
-    uuid_t host_uuid;
-
-    if (unlikely(!host_guid))
-        return;
-
-    rc = uuid_parse(host_guid, host_uuid);
-    freez(host_guid);
-    if (rc)
-        return;
-
-    uuid_unparse_lower(host_uuid, host_str);
-    uuid_unparse_lower_fix(&host_uuid, uuid_str);
-
-    debug(D_ACLK_SYNC, "Checking if I should delete aclk tables for node %s", host_str);
-
-    if (is_host_available(&host_uuid)) {
-        debug(D_ACLK_SYNC, "Host %s exists, not deleting aclk sync tables", host_str);
-        return;
-    }
-
-    debug(D_ACLK_SYNC, "Host %s does NOT exist, can delete aclk sync tables", host_str);
-
-    sqlite3_stmt *res = NULL;
-    BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE, &netdata_buffers_statistics.buffers_sqlite);
-
-    buffer_sprintf(sql,"SELECT 'drop '||type||' IF EXISTS '||name||';' FROM sqlite_schema " \
-                        "WHERE name LIKE 'aclk_%%_%s' AND type IN ('table', 'trigger', 'index');", uuid_str);
-
-    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement to clean up aclk tables");
-        goto fail;
-    }
-    buffer_flush(sql);
-
-    while (sqlite3_step_monitored(res) == SQLITE_ROW)
-        buffer_strcat(sql, (char *) sqlite3_column_text(res, 0));
-
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize statement to clean up aclk tables, rc = %d", rc);
-
-    rc = db_execute(buffer_tostring(sql));
-    if (unlikely(rc))
-        error("Failed to drop unused ACLK tables");
-
-fail:
-    buffer_free(sql);
-}
-
 
 int aclk_database_enq_cmd_noblock(struct aclk_database_cmd *cmd)
 {
@@ -177,7 +70,7 @@ static void aclk_database_enq_cmd(struct aclk_database_cmd *cmd)
         debug(D_ACLK_SYNC, "Failed to wake up event loop");
 }
 
-struct aclk_database_cmd aclk_database_deq_cmd(void)
+static struct aclk_database_cmd aclk_database_deq_cmd(void)
 {
     struct aclk_database_cmd ret;
     unsigned queue_size;
@@ -279,6 +172,95 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
 }
 
 #ifdef ENABLE_ACLK
+#define SQL_SELECT_HOST_BY_UUID  "SELECT host_id FROM host WHERE host_id = @host_id;"
+static int is_host_available(uuid_t *host_id)
+{
+    sqlite3_stmt *res = NULL;
+    int rc;
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            error_report("Database has not been initialized");
+        return 1;
+    }
+
+    rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_HOST_BY_UUID, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to select node instance information for a node");
+        return 1;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to check host existence");
+        goto failed;
+    }
+    rc = sqlite3_step_monitored(res);
+
+failed:
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when checking host existence");
+
+    return (rc == SQLITE_ROW);
+}
+
+// OPCODE: ACLK_DATABASE_DELETE_HOST
+static void sql_delete_aclk_table_list(char *host_guid)
+{
+    char uuid_str[GUID_LEN + 1];
+    char host_str[GUID_LEN + 1];
+
+    int rc;
+    uuid_t host_uuid;
+
+    if (unlikely(!host_guid))
+        return;
+
+    rc = uuid_parse(host_guid, host_uuid);
+    freez(host_guid);
+    if (rc)
+        return;
+
+    uuid_unparse_lower(host_uuid, host_str);
+    uuid_unparse_lower_fix(&host_uuid, uuid_str);
+
+    debug(D_ACLK_SYNC, "Checking if I should delete aclk tables for node %s", host_str);
+
+    if (is_host_available(&host_uuid)) {
+        debug(D_ACLK_SYNC, "Host %s exists, not deleting aclk sync tables", host_str);
+        return;
+    }
+
+    debug(D_ACLK_SYNC, "Host %s does NOT exist, can delete aclk sync tables", host_str);
+
+    sqlite3_stmt *res = NULL;
+    BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE, &netdata_buffers_statistics.buffers_sqlite);
+
+    buffer_sprintf(sql,"SELECT 'drop '||type||' IF EXISTS '||name||';' FROM sqlite_schema " \
+                        "WHERE name LIKE 'aclk_%%_%s' AND type IN ('table', 'trigger', 'index');", uuid_str);
+
+    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement to clean up aclk tables");
+        goto fail;
+    }
+    buffer_flush(sql);
+
+    while (sqlite3_step_monitored(res) == SQLITE_ROW)
+        buffer_strcat(sql, (char *) sqlite3_column_text(res, 0));
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement to clean up aclk tables, rc = %d", rc);
+
+    rc = db_execute(buffer_tostring(sql));
+    if (unlikely(rc))
+        error("Failed to drop unused ACLK tables");
+
+fail:
+    buffer_free(sql);
+}
+
 static int sql_check_aclk_table(void *data __maybe_unused, int argc __maybe_unused, char **argv __maybe_unused, char **column __maybe_unused)
 {
     debug(D_ACLK_SYNC,"Scheduling aclk sync table check for node %s", (char *) argv[0]);
@@ -385,6 +367,7 @@ static void aclk_synchronization(void *arg __maybe_unused)
     worker_register_job_name(ACLK_DATABASE_ALARM_HEALTH_LOG,     "alert log");
     worker_register_job_name(ACLK_DATABASE_CLEANUP,              "cleanup");
     worker_register_job_name(ACLK_DATABASE_DELETE_HOST,          "node delete");
+    worker_register_job_name(ACLK_DATABASE_NODE_STATE,           "node state");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT,           "alert push");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_CONFIG,    "alert conf push");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_SNAPSHOT,  "alert snapshot");
@@ -435,6 +418,15 @@ static void aclk_synchronization(void *arg __maybe_unused)
 
                 case ACLK_DATABASE_DELETE_HOST:
                     sql_delete_aclk_table_list(cmd.param[0]);
+                    break;
+// NODE STATE
+                case ACLK_DATABASE_NODE_STATE:;
+                    RRDHOST *host = cmd.param[0];
+                    int live = (host == localhost || host->receiver || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) ? 1 : 0;
+                    struct aclk_sync_host_config *ahc = host->aclk_sync_host_config;
+                    if (unlikely(!ahc))
+                        sql_create_aclk_table(host, &host->host_uuid, host->node_id);
+                    aclk_host_state_update(host, live);
                     break;
 // ALERTS
                 case ACLK_DATABASE_PUSH_ALERT_CONFIG:
@@ -524,7 +516,6 @@ void sql_create_aclk_table(RRDHOST *host __maybe_unused, uuid_t *host_uuid __may
     }
     wc->host = host;
     strcpy(wc->uuid_str, uuid_str);
-    strcpy(wc->host_guid, host_guid);
     wc->alert_updates = 0;
     wc->node_info_send = 1;
 #endif
@@ -615,4 +606,19 @@ void aclk_push_node_removed_alerts(const char *node_id)
         return;
 
     queue_aclk_sync_cmd(ACLK_DATABASE_QUEUE_REMOVED_ALERTS, strdupz(node_id), NULL);
+}
+
+void schedule_node_info_update(RRDHOST *host __maybe_unused)
+{
+#ifdef ENABLE_ACLK
+    if (unlikely(!host))
+        return;
+
+    struct aclk_database_cmd cmd;
+    memset(&cmd, 0, sizeof(cmd));
+    cmd.opcode = ACLK_DATABASE_NODE_STATE;
+    cmd.param[0] = host;
+    cmd.completion = NULL;
+    aclk_database_enq_cmd(&cmd);
+#endif
 }

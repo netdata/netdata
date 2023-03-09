@@ -44,6 +44,7 @@ enum aclk_database_opcode {
     ACLK_DATABASE_ALARM_HEALTH_LOG,
     ACLK_DATABASE_CLEANUP,
     ACLK_DATABASE_DELETE_HOST,
+    ACLK_DATABASE_NODE_STATE,
     ACLK_DATABASE_PUSH_ALERT,
     ACLK_DATABASE_PUSH_ALERT_CONFIG,
     ACLK_DATABASE_PUSH_ALERT_SNAPSHOT,
@@ -75,7 +76,6 @@ struct aclk_sync_host_config {
     time_t node_collectors_send;
     char uuid_str[GUID_LEN + 1];
     char node_id[GUID_LEN + 1];
-    char host_guid[GUID_LEN + 1];
     uint64_t alerts_batch_id;           // batch id for alerts to use
     uint64_t alerts_start_seq_id;       // cloud has asked to start streaming from
     uint64_t alerts_snapshot_id;        // will contain the snapshot_id value if snapshot was requested
@@ -105,13 +105,12 @@ static inline RRDHOST *find_host_by_node_id(char *node_id)
 extern sqlite3 *db_meta;
 
 int aclk_database_enq_cmd_noblock(struct aclk_database_cmd *cmd);
-//void aclk_database_enq_cmd(struct aclk_database_cmd *cmd);
 void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id);
 void sql_aclk_sync_init(void);
 void aclk_push_alert_config(const char *node_id, const char *config_hash);
 void aclk_push_node_alert_snapshot(const char *node_id);
 void aclk_push_node_health_log(const char *node_id);
 void aclk_push_node_removed_alerts(const char *node_id);
-void aclk_sync_exit_all();
+void schedule_node_info_update(RRDHOST *host);
 
 #endif //NETDATA_SQLITE_ACLK_H

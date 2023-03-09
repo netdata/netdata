@@ -312,12 +312,12 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
         buffer_sprintf(sql_fix, TABLE_ACLK_ALERT, wc->uuid_str);
         rc = db_execute(buffer_tostring(sql_fix));
         if (unlikely(rc))
-            error_report("Failed to create ACLK alert table for host %s", wc->host ? rrdhost_hostname(wc->host) : wc->host_guid);
+            error_report("Failed to create ACLK alert table for host %s", rrdhost_hostname(wc->host));
         else {
             buffer_flush(sql_fix);
             buffer_sprintf(sql_fix, INDEX_ACLK_ALERT, wc->uuid_str, wc->uuid_str);
             if (unlikely(db_execute(buffer_tostring(sql_fix))))
-                error_report("Failed to create ACLK alert table for host %s", wc->host ? rrdhost_hostname(wc->host) : wc->host_guid);
+                error_report("Failed to create ACLK alert table for host %s", rrdhost_hostname(wc->host));
         }
         buffer_free(sql_fix);
 
@@ -428,7 +428,7 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
                        wc->uuid_str, first_sequence_id, last_sequence_id);
 
         if (unlikely(db_execute(buffer_tostring(sql))))
-            error_report("Failed to mark ACLK alert entries as submitted for host %s", wc->host ? rrdhost_hostname(wc->host) : wc->host_guid);
+            error_report("Failed to mark ACLK alert entries as submitted for host %s", rrdhost_hostname(wc->host));
 
         // Mark to do one more check
         rrdhost_flag_set(wc->host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
@@ -620,7 +620,7 @@ void aclk_send_alarm_configuration(char *config_hash)
     "options, host_labels, p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after," \
     "p_db_lookup_before, p_update_every FROM alert_hash WHERE hash_id = @hash_id;"
 
-int aclk_push_alert_config_event(char *node_id, char *config_hash)
+int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash __maybe_unused)
 {
     int rc = 0;
 
@@ -795,11 +795,11 @@ void sql_process_queue_removed_alerts_to_aclk(char *node_id)
         "ON CONFLICT (alert_unique_id) DO NOTHING;", wc->uuid_str, wc->uuid_str, wc->uuid_str);
 
     if (unlikely(db_execute(sql))) {
-        log_access("ACLK STA [%s (%s)]: QUEUED REMOVED ALERTS FAILED", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
-        error_report("Failed to queue ACLK alert removed entries for host %s", wc->host ? rrdhost_hostname(wc->host) : wc->host_guid);
+        log_access("ACLK STA [%s (%s)]: QUEUED REMOVED ALERTS FAILED", wc->node_id, rrdhost_hostname(wc->host));
+        error_report("Failed to queue ACLK alert removed entries for host %s", rrdhost_hostname(wc->host));
     }
     else
-        log_access("ACLK STA [%s (%s)]: QUEUED REMOVED ALERTS", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
+        log_access("ACLK STA [%s (%s)]: QUEUED REMOVED ALERTS", wc->node_id, rrdhost_hostname(wc->host));
     rrdhost_flag_set(wc->host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
 }
 
@@ -933,11 +933,6 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
 
     struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
 
-    if (unlikely(!wc->host)) {
-        error_report("ACLK synchronization thread for %s is not linked to HOST", wc->host_guid);
-        return;
-    }
-
     // we perhaps we don't need this for snapshots
     if (unlikely(!wc->alert_updates)) {
         log_access(
@@ -962,7 +957,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
         char sql[512];
         snprintfz(sql, 511, "UPDATE aclk_alert_%s SET date_cloud_ack=unixepoch() WHERE sequence_id <= %"PRIu64, wc->uuid_str, wc->alerts_ack_sequence_id);
         if (unlikely(db_execute(sql)))
-            error_report("Failed to set ACLK alert entries cloud ACK status for host %s", wc->host ? rrdhost_hostname(wc->host) : wc->host_guid);
+            error_report("Failed to set ACLK alert entries cloud ACK status for host %s", rrdhost_hostname(host));
     }
 
     uint32_t cnt = 0;

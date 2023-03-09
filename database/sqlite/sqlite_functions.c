@@ -648,7 +648,7 @@ failed:
     return (rc == SQLITE_ROW) ? 0 : -1;
 }
 
-#define SQL_SELECT_NODE_ID  "select node_id from node_instance where host_id = @host_id and node_id not null;"
+#define SQL_SELECT_NODE_ID  "SELECT node_id FROM node_instance WHERE host_id = @host_id AND node_id IS NOT NULL;"
 
 int get_node_id(uuid_t *host_id, uuid_t *node_id)
 {
@@ -684,8 +684,8 @@ failed:
     return (rc == SQLITE_ROW) ? 0 : -1;
 }
 
-#define SQL_INVALIDATE_NODE_INSTANCES "update node_instance set node_id = NULL where exists " \
-    "(select host_id from node_instance where host_id = @host_id and (@claim_id is null or claim_id <> @claim_id));"
+#define SQL_INVALIDATE_NODE_INSTANCES "UPDATE node_instance SET node_id = NULL WHERE EXISTS " \
+    "(SELECT host_id FROM node_instance WHERE host_id = @host_id AND (@claim_id IS NULL OR claim_id <> @claim_id));"
 
 void invalidate_node_instances(uuid_t *host_id, uuid_t *claim_id)
 {
@@ -729,8 +729,8 @@ failed:
         error_report("Failed to finalize the prepared statement when invalidating node instance information");
 }
 
-#define SQL_GET_NODE_INSTANCE_LIST "select ni.node_id, ni.host_id, h.hostname " \
-    "from node_instance ni, host h where ni.host_id = h.host_id AND h.hops >=0;"
+#define SQL_GET_NODE_INSTANCE_LIST "SELECT ni.node_id, ni.host_id, h.hostname " \
+    "FROM node_instance ni, host h WHERE ni.host_id = h.host_id AND h.hops >=0;"
 
 struct node_instance_list *get_node_list(void)
 {

@@ -1064,22 +1064,36 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count, bool use_trans
     return more_to_do;
 }
 
-static void store_host_and_system_info(RRDHOST *host, size_t *query_counter)
+static void store_host_and_system_info(RRDHOST *host, BUFFER *work_buffer, size_t *query_counter)
 {
-    BUFFER *work_buffer = sql_store_host_system_info(host);
-    if (work_buffer) {
-        db_execute(buffer_tostring(work_buffer));
-        buffer_free(work_buffer);
+    bool free_work_buffer = (NULL == work_buffer);
+
+    if (unlikely(free_work_buffer))
+        work_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
+
+    if (build_host_system_info_statements(host, work_buffer)) {
+        int rc = db_execute(buffer_tostring(work_buffer));
+        if (unlikely(rc)) {
+            error_report("METADATA: 'host:%s': Failed to store host updated information in the database", rrdhost_hostname(host));
+            rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
+        }
+        else {
+            if (likely(query_counter))
+                (*query_counter)++;
+        }
+    }
+
+    if (unlikely(store_host_metadata(host))) {
+        error_report("METADATA: 'host:%s': Failed to store host info in the database", rrdhost_hostname(host));
+        rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
+    }
+    else {
         if (likely(query_counter))
             (*query_counter)++;
     }
 
-    int rc = sql_store_host_info(host);
-    if (unlikely(rc))
-        error_report("METADATA: 'host:%s': failed to store host info", string2str(host->hostname));
-    else
-        if (likely(query_counter))
-            (*query_counter)++;
+    if (unlikely(free_work_buffer))
+        buffer_free(work_buffer);
 }
 
 // Worker thread to scan hosts for pending metadata to store
@@ -1151,26 +1165,9 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
             else
                 query_counter++;
         }
-
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_INFO))) {
             rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_INFO);
-
-            if (build_host_system_info_statements(host, work_buffer)) {
-                int rc = db_execute(buffer_tostring(work_buffer));
-                if (unlikely(rc)) {
-                    error_report("METADATA: 'host:%s': Failed to store host updated information in the database", rrdhost_hostname(host));
-                    rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
-                }
-                else
-                    query_counter++;
-            }
-
-            if (unlikely(store_host_metadata(host))) {
-                error_report("METADATA: 'host:%s': Failed to store host info in the database", rrdhost_hostname(host));
-                rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
-            }
-            else
-                query_counter++;
+            store_host_and_system_info(host, work_buffer, &query_counter);
         }
 
         // For clarity
@@ -1262,7 +1259,6 @@ static void metadata_event_loop(void *arg)
     while (shutdown == 0 || (wc->flags & METADATA_WORKER_BUSY)) {
         uuid_t  *uuid;
         RRDHOST *host = NULL;
-        int rc;
 
         worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
@@ -1304,14 +1300,13 @@ static void metadata_event_loop(void *arg)
                     break;
                 case METADATA_ADD_HOST_INFO:
                     host = (RRDHOST *) cmd.param[0];
-                    rc = store_host_metadata(host);
-                    if (unlikely(rc))
-                        error_report("Failed to store host info in the database for %s", string2str(host->hostname));
-//                    store_host_and_system_info(host, NULL);
-//                    if (unlikely(!host->dbsync_worker))
+                    store_host_and_system_info(host, NULL, NULL);
+//                    struct aclk_sync_host_config *ahc = host->aclk_sync_host_config;
+//                    if (unlikely(!ahc))
 //                        sql_create_aclk_table(host, &host->host_uuid, host->node_id);
-//                    else
-//                        schedule_node_info_update(host);
+//
+//                    int live = (host == localhost || host->receiver || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) ? 1 : 0;
+//                    aclk_host_state_update(host, live);
                     break;
                 case METADATA_SCAN_HOSTS:
                     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SCANNING_HOSTS)))

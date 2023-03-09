@@ -78,9 +78,9 @@ static void build_node_info(char *node_id __maybe_unused)
     rrd_rdlock();
     node_info.node_id = wc->node_id;
     node_info.claim_id = get_agent_claimid();
-    node_info.machine_guid = wc->host_guid;
+    node_info.machine_guid = host->machine_guid;
     node_info.child = (wc->host != localhost);
-    node_info.ml_info.ml_capable = ml_capable(localhost);
+    node_info.ml_info.ml_capable = ml_capable();
     node_info.ml_info.ml_enabled = ml_enabled(wc->host);
 
     node_info.node_instance_capabilities = aclk_get_node_instance_capas(wc->host);
@@ -111,7 +111,7 @@ static void build_node_info(char *node_id __maybe_unused)
     node_info.data.virtualization_type = host->system_info->virtualization ? host->system_info->virtualization : "unknown";
     node_info.data.container_type = host->system_info->container ? host->system_info->container : "unknown";
     node_info.data.custom_info = config_get(CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
-    node_info.data.machine_guid = wc->host_guid;
+    node_info.data.machine_guid = host->machine_guid;
 
     struct capability node_caps[] = {
         { .name = "ml", .version = host->system_info->ml_capable, .enabled = host->system_info->ml_enabled },
@@ -126,7 +126,7 @@ static void build_node_info(char *node_id __maybe_unused)
     node_info.data.host_labels_ptr = host->rrdlabels;
 
     aclk_update_node_info(&node_info);
-    log_access("ACLK RES [%s (%s)]: NODE INFO SENT for guid [%s] (%s)", wc->node_id, rrdhost_hostname(wc->host), wc->host_guid, wc->host == localhost ? "parent" : "child");
+    log_access("ACLK RES [%s (%s)]: NODE INFO SENT for guid [%s] (%s)", wc->node_id, rrdhost_hostname(wc->host), host->machine_guid, wc->host == localhost ? "parent" : "child");
 
     rrd_unlock();
     freez(node_info.claim_id);
