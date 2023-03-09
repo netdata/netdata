@@ -89,23 +89,25 @@ _TODO: Which sources support 'auto' parameter?_
 
 There are some fundamental configuration options that are common to all collector types. These options can be set globally in the `[logs management]` section of `netdata.conf` or customized per collector using `edit-config logsmanagement.conf`:
 
-|  Configuration Option | Default | Description  |
-| ------------  | ------------  | ------------ |
-
-- `enabled`: Whether this log source will be monitored or not. Default: `no`.
-- `update every`: How often collected metrics will be updated. Default: equivalent value in `[logs management]` section of `netdata.conf` (or Netdata global value, if higher). 
-- `log type`: Type of this log collector, see [relevant table](#collector-types) for a complete list of supported collectors. Default: `flb_generic`.
-- `circular buffer max size`: Maximum RAM that can be used to buffer collected logs until they are saved to the disk database. Default: equivalent value in `[logs management]` section of `netdata.conf`.
-- `circular buffer drop logs if full`: If there are new logs pending to be collected and the circular buffer is full, enabling this setting will allow old buffered logs to be dropped in favor of new ones. If disabled, collection of new logs will be blocked until there is free space again in the buffer (no logs will be lost in this case, but logs will not be ingested in real-time). Default: equivalent value in `[logs management]` section of `netdata.conf` (`no` by default). 
-- `compression acceleration`: Fine-tunes tradeoff between log compression speed and compression ratio, see [here](https://github.com/lz4/lz4/blob/90d68e37093d815e7ea06b0ee3c168cccffc84b8/lib/lz4.h#L195) for more. Default: equivalent value in `[logs management]` section of `netdata.conf` (`1` by default). 
-- `db mode`: Mode of logs management database per collector. If set to `none`, logs will be collected, buffered, parsed and then discarded. If set to `full`, buffered logs will be saved to the logs management database instead of being discarded. When mode is `none`, logs management queries cannot be executed. Default: equivalent value in `[logs management]` section of `netdata.conf` (`none` by default). 
-- `buffer flush to DB`: Interval in seconds at which logs will be transferred from RAM buffers to the database. Default: equivalent value in `[logs management]` section of `netdata.conf` (`6` by default). 
-- `disk space limit`: Maximum disk space that all compressed logs in database can occupy (per log source). Once exceeded, oldest BLOB of logs will be truncated for new logs to be written over. Each log source database can contain a maximum of 10 BLOBs at any point, so each truncation equates to a deletion of about 10% of the oldest logs. The number of BLOBS will be configurable in a future release. Default: equivalent value in `[logs management]` section of `netdata.conf` (`500 MiB` by default). 
+|  Configuration Option | Default 		| Description  |
+|      ------------  	| ------------  | ------------ |
+| `enabled` | `no` 		| Whether this log source will be monitored or not.
+| `update every` 		| Equivalent value in `[logs management]` section of `netdata.conf` (or Netdata global value, if higher). | How often collected metrics will be updated.
+| `log type` 			| `flb_generic`	| Type of this log collector, see [relevant table](#collector-types) for a complete list of supported collectors.
+| `circular buffer max size` | Default: equivalent value in `[logs management]` section of `netdata.conf`. | Maximum RAM that can be used to buffer collected logs until they are saved to the disk database.
+| `circular buffer drop logs if full` | Equivalent value in `[logs management]` section of `netdata.conf` (`no` by default). | If there are new logs pending to be collected and the circular buffer is full, enabling this setting will allow old buffered logs to be dropped in favor of new ones. If disabled, collection of new logs will be blocked until there is free space again in the buffer (no logs will be lost in this case, but logs will not be ingested in real-time).
+| `compression acceleration` | Equivalent value in `[logs management]` section of `netdata.conf` (`1` by default). | Fine-tunes tradeoff between log compression speed and compression ratio, see [here](https://github.com/lz4/lz4/blob/90d68e37093d815e7ea06b0ee3c168cccffc84b8/lib/lz4.h#L195) for more. 
+| `db mode` | Equivalent value in `[logs management]` section of `netdata.conf` (`none` by default). | Mode of logs management database per collector. If set to `none`, logs will be collected, buffered, parsed and then discarded. If set to `full`, buffered logs will be saved to the logs management database instead of being discarded. When mode is `none`, logs management queries cannot be executed.
+| `buffer flush to DB` | Equivalent value in `[logs management]` section of `netdata.conf` (`6` by default). | Interval in seconds at which logs will be transferred from RAM buffers to the database.
+| `disk space limit` | Equivalent value in `[logs management]` section of `netdata.conf` (`500 MiB` by default). | Maximum disk space that all compressed logs in database can occupy (per log source). Once exceeded, oldest BLOB of logs will be truncated for new logs to be written over. Each log source database can contain a maximum of 10 BLOBs at any point, so each truncation equates to a deletion of about 10% of the oldest logs. The number of BLOBS will be configurable in a future release.
 
 There are also two settings that cannot be set per log source, but can only be defined in the `[logs management]` section of `netdata.conf`:
 
-- `circular buffer spare items`: Spare items to be allocated for each circular buffer. This is required to ensure new log collection will not be blocked if operations such as parsing take longer than normal to complete in case of high load, so the circular buffers cannot be flushed to the database or discarded in time. It is recommended not to modify the default value. Default: `2`.
-- `db dir`: Logs management database path, will be created if it does not exist. Default: `/var/cache/netdata/logs_management_db`.
+|  Configuration Option | Default 		| Description  |
+|      ------------  	| :------------:  | ------------ |
+| `circular buffer spare items` | `2` 	| Spare items to be allocated for each circular buffer. This is required to ensure new log collection will not be blocked if operations such as parsing take longer than normal to complete in case of high load, so the circular buffers cannot be flushed to the database or discarded in time. It is recommended not to modify the default value.
+| `db dir` 	| `/var/cache/netdata/logs_management_db` | Logs management database path, will be created if it does not exist.
+
 
 
 <a name="collector-configuration"/>
