@@ -111,8 +111,11 @@
 - name: area/claim
   description: Issues and PRs related to the Cloud claming process
   color: e8a694
+- name: area/collectors
+  description: Issues and PRs related to data collection
+  color: *area
 - name: area/daemon
-  description: Issues and PRs related to the core agent code.
+  description: Issues and PRs related to the core agent code
   color: *area
 - name: area/database
   description: Issues and PRs related to on-disk metrics storage and queries
