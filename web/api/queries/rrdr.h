@@ -144,6 +144,7 @@ typedef struct rrdresult {
     struct {
         ONEWAYALLOC *owa;           // the allocator used
         struct query_target *qt;    // the QUERY_TARGET
+        size_t contexts;            // temp needed between json_wrapper_begin2() and json_wrapper_end2()
 
 #ifdef NETDATA_INTERNAL_CHECKS
         const char *log;
