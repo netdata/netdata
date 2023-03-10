@@ -28,7 +28,7 @@ dist_config_DATA = \
     $(NULL)
 
 dist_libconfig_DATA = \
-    vnodes/vnodes.yaml
+    vnodes/vnodes.conf
     $(NULL)
 
 libsyscrondir=$(libsysdir)/cron
