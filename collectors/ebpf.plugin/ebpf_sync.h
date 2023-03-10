@@ -56,11 +56,4 @@ void *ebpf_sync_thread(void *ptr);
 extern struct config sync_config;
 extern netdata_ebpf_targets_t sync_targets[];
 
-extern ebpf_local_maps_t sync_maps[];
-extern ebpf_local_maps_t syncfs_maps[];
-extern ebpf_local_maps_t msync_maps[];
-extern ebpf_local_maps_t fsync_maps[];
-extern ebpf_local_maps_t fdatasync_maps[];
-extern ebpf_local_maps_t sync_file_range_maps[];
-
 #endif /* NETDATA_EBPF_SYNC_H */

@@ -587,6 +587,22 @@ static void ebpf_sync_parse_syscalls()
 }
 
 /**
+ * Set sync maps
+ *
+ * When thread is initialized the variable sync_maps is set as null,
+ * this function fills the variable before to use.
+ */
+static void ebpf_set_sync_maps()
+{
+    local_syscalls[NETDATA_SYNC_SYNC_IDX].sync_maps = sync_maps;
+    local_syscalls[NETDATA_SYNC_SYNCFS_IDX].sync_maps = syncfs_maps;
+    local_syscalls[NETDATA_SYNC_MSYNC_IDX].sync_maps = msync_maps;
+    local_syscalls[NETDATA_SYNC_FSYNC_IDX].sync_maps = fsync_maps;
+    local_syscalls[NETDATA_SYNC_FDATASYNC_IDX].sync_maps = fdatasync_maps;
+    local_syscalls[NETDATA_SYNC_SYNC_FILE_RANGE_IDX].sync_maps = sync_file_range_maps;
+}
+
+/**
  * Sync thread
  *
  * Thread used to make sync thread
@@ -602,6 +618,7 @@ void *ebpf_sync_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = sync_maps;
 
+    ebpf_set_sync_maps();
     ebpf_sync_parse_syscalls();
 
 #ifdef LIBBPF_MAJOR_VERSION
