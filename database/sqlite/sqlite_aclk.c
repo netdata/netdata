@@ -389,13 +389,12 @@ static void aclk_synchronization(void *arg __maybe_unused)
 
     while (likely(service_running(SERVICE_ACLKSYNC))) {
         enum aclk_database_opcode opcode;
-        struct aclk_database_cmd cmd;
         worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
 
         /* wait for commands */
         do {
-            cmd = aclk_database_deq_cmd();
+            struct aclk_database_cmd cmd = aclk_database_deq_cmd();
 
             if (unlikely(!service_running(SERVICE_ACLKSYNC)))
                 break;

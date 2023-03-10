@@ -867,10 +867,7 @@ struct scan_metadata_payload {
     uv_work_t request;
     struct metadata_wc *wc;
     struct completion *completion;
-    union {
-       BUFFER *work_buffer;
-       RRDHOST *host;
-    };
+    BUFFER *work_buffer;
     uint32_t max_count;
 };
 
@@ -923,11 +920,9 @@ static void cleanup_finished_threads(struct host_context_load_thread *hclt, size
 
 static size_t find_available_thread_slot(struct host_context_load_thread *hclt, size_t max_thread_slots, size_t *found_index)
 {
-    size_t index;
-
     size_t retries = MAX_FIND_THREAD_RETRIES;
     while (retries--) {
-       index = 0;
+       size_t index = 0;
        while (index < max_thread_slots) {
            if (false == __atomic_load_n(&(hclt[index].busy), __ATOMIC_ACQUIRE)) {
                 *found_index = index;

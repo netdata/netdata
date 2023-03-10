@@ -574,8 +574,7 @@ void sql_check_removed_alerts_state(char *uuid_str)
 {
     int rc;
     char command[MAX_HEALTH_SQL_SIZE + 1];
-    RRDCALC_STATUS status;
-    uint32_t alarm_id, alarm_event_id, unique_id, max_unique_id = 0;
+    uint32_t max_unique_id = 0;
 
     sqlite3_stmt *res = NULL;
 
@@ -587,6 +586,9 @@ void sql_check_removed_alerts_state(char *uuid_str)
     }
 
      while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+         uint32_t alarm_id, alarm_event_id, unique_id;
+         RRDCALC_STATUS status;
+
          status  = (RRDCALC_STATUS) sqlite3_column_int(res, 0);
          unique_id = (uint32_t) sqlite3_column_int64(res, 1);
          alarm_id = (uint32_t) sqlite3_column_int64(res, 2);
