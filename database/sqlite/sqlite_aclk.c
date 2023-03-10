@@ -504,16 +504,19 @@ void sql_create_aclk_table(RRDHOST *host __maybe_unused, uuid_t *host_uuid __may
     if (likely(host) && unlikely(host->aclk_sync_host_config))
         return;
 
+    if (unlikely(!host))
+        return;
+
     struct aclk_sync_host_config *wc = callocz(1, sizeof(struct aclk_sync_host_config));
     if (node_id && !uuid_is_null(*node_id))
         uuid_unparse_lower(*node_id, wc->node_id);
-    if (likely(host)) {
-        host->aclk_sync_host_config = (void *)wc;
-        if (node_id && !host->node_id) {
-            host->node_id = mallocz(sizeof(*host->node_id));
-            uuid_copy(*host->node_id, *node_id);
-        }
+
+    host->aclk_sync_host_config = (void *)wc;
+    if (node_id && !host->node_id) {
+        host->node_id = mallocz(sizeof(*host->node_id));
+        uuid_copy(*host->node_id, *node_id);
     }
+
     wc->host = host;
     strcpy(wc->uuid_str, uuid_str);
     wc->alert_updates = 0;
