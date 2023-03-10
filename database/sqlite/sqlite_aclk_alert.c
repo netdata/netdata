@@ -930,6 +930,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
         freez(node_id);
         return;
     }
+    freez(node_id);
 
     struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
 
@@ -946,10 +947,8 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
         return;
 
     char *claim_id = get_agent_claimid();
-    if (unlikely(!claim_id)) {
-        freez(node_id);
+    if (unlikely(!claim_id))
         return;
-    }
 
     log_access("ACLK REQ [%s (%s)]: Sending alerts snapshot, snapshot_id %" PRIu64, wc->node_id, rrdhost_hostname(wc->host), wc->alerts_snapshot_id);
 
@@ -1045,7 +1044,6 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
     wc->alerts_snapshot_id = 0;
 
     freez(claim_id);
-    freez(node_id);
 #endif
 }
 
