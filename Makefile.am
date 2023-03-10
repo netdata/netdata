@@ -239,9 +239,7 @@ ML_FILES += \
     ml/ad_charts.cc \
     ml/Config.cc \
     ml/dlib/dlib/all/source.cpp \
-    ml/json/single_include/nlohmann/json.hpp \
-    ml/nml.h \
-    ml/nml.cc \
+    ml/ml-private.h \
     ml/ml.cc \
     $(NULL)
 

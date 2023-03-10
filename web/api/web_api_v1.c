@@ -1191,7 +1191,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
 #if defined(ENABLE_ML)
     buffer_json_member_add_object(wb, "ml-info");
-    ml_get_host_info(host, wb);
+    ml_host_get_info(host, wb);
     buffer_json_object_close(wb);
 #endif
 
@@ -1206,17 +1206,16 @@ int web_client_api_request_v1_ml_info(RRDHOST *host, struct web_client *w, char 
     if (!netdata_ready)
         return HTTP_RESP_BACKEND_FETCH_FAILED;
 
-    char *s = ml_get_host_runtime_info(host);
-    if (!s)
-        s = strdupz("{\"error\": \"json string is empty\" }\n");
-
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
-    buffer_strcat(wb, s);
+
+    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    ml_host_get_detection_info(host, wb);
+    buffer_json_finalize(wb);
+
     buffer_no_cacheable(wb);
 
-    freez(s);
     return HTTP_RESP_OK;
 }
 
@@ -1226,20 +1225,15 @@ int web_client_api_request_v1_ml_models(RRDHOST *host, struct web_client *w, cha
     if (!netdata_ready)
         return HTTP_RESP_BACKEND_FETCH_FAILED;
 
-    char *s = ml_get_host_models(host);
-    if (!s)
-        s = strdupz("{\"error\": \"json string is empty\" }\n");
-
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
-    buffer_strcat(wb, s);
+    ml_host_get_models(host, wb);
     buffer_no_cacheable(wb);
 
-    freez(s);
     return HTTP_RESP_OK;
 }
-#endif
+#endif // ENABLE_ML
 
 inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;

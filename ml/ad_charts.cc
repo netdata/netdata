@@ -2,7 +2,7 @@
 
 #include "ad_charts.h"
 
-void nml_update_dimensions_chart(nml_host_t *host, const nml_machine_learning_stats_t &mls) {
+void ml_update_dimensions_chart(ml_host_t *host, const ml_machine_learning_stats_t &mls) {
     /*
      * Machine learning status
     */
@@ -182,7 +182,7 @@ void nml_update_dimensions_chart(nml_host_t *host, const nml_machine_learning_st
 
 }
 
-void nml_update_host_and_detection_rate_charts(nml_host_t *host, collected_number AnomalyRate) {
+void ml_update_host_and_detection_rate_charts(ml_host_t *host, collected_number AnomalyRate) {
     /*
      * Anomaly rate
     */
@@ -301,7 +301,7 @@ void nml_update_host_and_detection_rate_charts(nml_host_t *host, collected_numbe
     }
 }
 
-void nml_update_training_statistics_chart(nml_host_t *host, const nml_training_stats_t &ts) {
+void ml_update_training_statistics_chart(ml_host_t *host, const ml_training_stats_t &ts) {
     /*
      * queue stats
     */

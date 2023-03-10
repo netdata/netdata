@@ -30,9 +30,9 @@ typedef struct rrdhost_acquired RRDHOST_ACQUIRED;
 typedef struct rrdset_acquired RRDSET_ACQUIRED;
 typedef struct rrddim_acquired RRDDIM_ACQUIRED;
 
-typedef struct ml_host ml_host_t;
-typedef struct ml_chart ml_chart_t;
-typedef struct ml_dimension ml_dimension_t;
+typedef struct ml_host rrd_ml_host_t;
+typedef struct ml_chart rrd_ml_chart_t;
+typedef struct ml_dimension rrd_ml_dimension_t;
 
 typedef enum __attribute__ ((__packed__)) {
     QUERY_SOURCE_UNKNOWN = 0,
@@ -363,7 +363,7 @@ struct rrddim {
     // ------------------------------------------------------------------------
     // operational state members
 
-    ml_dimension_t *ml_dimension;                   // machine learning data about this dimension
+    rrd_ml_dimension_t *ml_dimension;                   // machine learning data about this dimension
 
     // ------------------------------------------------------------------------
     // linking to siblings and parents
@@ -626,7 +626,7 @@ struct rrdset {
     DICTIONARY *rrddimvar_root_index;               // dimension variables
                                                     // we use this dictionary to manage their allocation
 
-    ml_chart_t *ml_chart;
+    rrd_ml_chart_t *ml_chart;
 
     // ------------------------------------------------------------------------
     // operational state members
@@ -1067,7 +1067,7 @@ struct rrdhost {
 
     // ------------------------------------------------------------------------
     // ML handle
-    ml_host_t *ml_host;
+    rrd_ml_host_t *ml_host;
 
     // ------------------------------------------------------------------------
     // Support for host-level labels
@@ -1358,12 +1358,12 @@ void rrdset_delete_files(RRDSET *st);
 void rrdset_save(RRDSET *st);
 void rrdset_free(RRDSET *st);
 
+void rrddim_free(RRDSET *st, RRDDIM *rd);
+
 #ifdef NETDATA_RRD_INTERNALS
 
 char *rrdhost_cache_dir_for_rrdset_alloc(RRDHOST *host, const char *id);
 const char *rrdset_cache_dir(RRDSET *st);
-
-void rrddim_free(RRDSET *st, RRDDIM *rd);
 
 void rrdset_reset(RRDSET *st);
 void rrdset_delete_obsolete_dimensions(RRDSET *st);

@@ -1693,10 +1693,10 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
         flags = SN_EMPTY_SLOT;
 
         if(u->v2.ml_locked)
-            ml_is_anomalous(rd, u->v2.end_time, 0, false);
+            ml_dimension_is_anomalous(rd, u->v2.end_time, 0, false);
     }
     else if(u->v2.ml_locked) {
-        if (ml_is_anomalous(rd, u->v2.end_time, value, true)) {
+        if (ml_dimension_is_anomalous(rd, u->v2.end_time, value, true)) {
             // clear anomaly bit: 0 -> is anomalous, 1 -> not anomalous
             flags &= ~((storage_number) SN_FLAG_NOT_ANOMALOUS);
         }
