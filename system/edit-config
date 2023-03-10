@@ -163,7 +163,7 @@ list_files() {
   check_directories
   handle_container
 
-  if test -t; then
+  if test -t && command -v tput > /dev/null 2>&1; then
     width="$(tput cols)"
   fi
 
