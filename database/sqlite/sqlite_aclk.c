@@ -70,36 +70,6 @@ static void aclk_database_enq_cmd(struct aclk_database_cmd *cmd)
         debug(D_ACLK_SYNC, "Failed to wake up event loop");
 }
 
-static struct aclk_database_cmd aclk_database_deq_cmd(void)
-{
-    struct aclk_database_cmd ret;
-    unsigned queue_size;
-
-    uv_mutex_lock(&aclk_sync_config.cmd_mutex);
-    queue_size = aclk_sync_config.queue_size;
-    if (queue_size == 0) {
-        memset(&ret, 0, sizeof(ret));
-        ret.opcode = ACLK_DATABASE_NOOP;
-        ret.completion = NULL;
-
-    } else {
-        /* dequeue command */
-        ret = aclk_sync_config.cmd_queue.cmd_array[aclk_sync_config.cmd_queue.head];
-        if (queue_size == 1) {
-            aclk_sync_config.cmd_queue.head = aclk_sync_config.cmd_queue.tail = 0;
-        } else {
-            aclk_sync_config.cmd_queue.head = aclk_sync_config.cmd_queue.head != ACLK_DATABASE_CMD_Q_MAX_SIZE - 1 ?
-                                                  aclk_sync_config.cmd_queue.head + 1 : 0;
-        }
-        aclk_sync_config.queue_size = queue_size - 1;
-        /* wake up producers */
-        uv_cond_signal(&aclk_sync_config.cmd_cond);
-    }
-    uv_mutex_unlock(&aclk_sync_config.cmd_mutex);
-
-    return ret;
-}
-
 enum {
     IDX_HOST_ID,
     IDX_HOSTNAME,
@@ -172,6 +142,36 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
 }
 
 #ifdef ENABLE_ACLK
+static struct aclk_database_cmd aclk_database_deq_cmd(void)
+{
+    struct aclk_database_cmd ret;
+    unsigned queue_size;
+
+    uv_mutex_lock(&aclk_sync_config.cmd_mutex);
+    queue_size = aclk_sync_config.queue_size;
+    if (queue_size == 0) {
+        memset(&ret, 0, sizeof(ret));
+        ret.opcode = ACLK_DATABASE_NOOP;
+        ret.completion = NULL;
+
+    } else {
+        /* dequeue command */
+        ret = aclk_sync_config.cmd_queue.cmd_array[aclk_sync_config.cmd_queue.head];
+        if (queue_size == 1) {
+            aclk_sync_config.cmd_queue.head = aclk_sync_config.cmd_queue.tail = 0;
+        } else {
+            aclk_sync_config.cmd_queue.head = aclk_sync_config.cmd_queue.head != ACLK_DATABASE_CMD_Q_MAX_SIZE - 1 ?
+                                                  aclk_sync_config.cmd_queue.head + 1 : 0;
+        }
+        aclk_sync_config.queue_size = queue_size - 1;
+        /* wake up producers */
+        uv_cond_signal(&aclk_sync_config.cmd_cond);
+    }
+    uv_mutex_unlock(&aclk_sync_config.cmd_mutex);
+
+    return ret;
+}
+
 #define SQL_SELECT_HOST_BY_UUID  "SELECT host_id FROM host WHERE host_id = @host_id;"
 static int is_host_available(uuid_t *host_id)
 {
