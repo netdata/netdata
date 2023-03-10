@@ -1008,7 +1008,7 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count, bool use_trans
     uint32_t scan_count = 1;
 
     if (use_transaction)
-        db_execute("BEGIN TRANSACTION;");
+        (void)db_execute("BEGIN TRANSACTION;");
 
     rrdset_foreach_reentrant(st, host) {
         if (scan_count == max_count) {
@@ -1057,7 +1057,7 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count, bool use_trans
     rrdset_foreach_done(st);
 
     if (use_transaction)
-        db_execute("COMMIT TRANSACTION;");
+        (void)db_execute("COMMIT TRANSACTION;");
 
     return more_to_do;
 }
