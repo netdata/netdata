@@ -905,6 +905,9 @@ Next, [restart Netdata](https://github.com/netdata/netdata/blob/master/docs/conf
 Beginning with `v1.31`, kernel memory usage is configurable via the [`pid table size` setting](#pid-table-size)
 in `ebpf.conf`.
 
+The total memory usage is a well known [issue](https://lore.kernel.org/all/167821082315.1693.6957546778534183486.git-patchwork-notify@kernel.org/) 
+for eBPF, this is not a bug present in plugin.
+
 ### SELinux
 
 When [SELinux](https://www.redhat.com/en/topics/linux/what-is-selinux) is enabled, it may prevent `ebpf.plugin` from
