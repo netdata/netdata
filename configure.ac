@@ -653,16 +653,6 @@ AM_CONDITIONAL([LINK_STATIC_YAML], [test "${YAML_LIBS}" = "static"])
 test -z "${YAML_LIBS}" && \
     AC_MSG_ERROR([LIBYAML required but not found. Try installing 'libyaml-dev'.])
 
-# AC_MSG_CHECKING([if json-c should be used])
-# if test "${enable_jsonc}" != "no" -a "${JSONC_LIBS}"; then
-# 	enable_jsonc="yes"
-# 	AC_DEFINE([ENABLE_JSONC], [1], [netdata json-c usability])
-# else
-# 	enable_jsonc="no"
-# fi
-# AC_MSG_RESULT([${enable_jsonc}])
-# AM_CONDITIONAL([ENABLE_JSONC], [test "${enable_jsonc}" = "yes"])
-
 # -----------------------------------------------------------------------------
 # compiler options
 
