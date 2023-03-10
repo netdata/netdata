@@ -286,11 +286,12 @@ static void sql_check_aclk_table_list(void)
     }
 }
 
+#define SQL_ALERT_CLEANUP "DELETE FROM aclk_alert_%s WHERE date_submitted IS NOT NULL AND CAST(date_cloud_ack AS INT) < unixepoch()-%d;"
+
 static int sql_maint_aclk_sync_database(void *data __maybe_unused, int argc __maybe_unused, char **argv, char **column __maybe_unused)
 {
     char sql[512];
-    snprintf(sql,511, "DELETE FROM aclk_alert_%s WHERE date_submitted IS NOT NULL AND "
-                       "CAST(date_cloud_ack AS INT) < unixepoch()-%d;", (char *) argv[0], ACLK_DELETE_ACK_ALERTS_INTERNAL);
+    snprintfz(sql,511, SQL_ALERT_CLEANUP, (char *) argv[0], ACLK_DELETE_ACK_ALERTS_INTERNAL);
     if (unlikely(db_execute(sql)))
         error_report("Failed to clean stale ACLK alert entries");
     return 0;
@@ -520,6 +521,12 @@ void sql_create_aclk_table(RRDHOST *host __maybe_unused, uuid_t *host_uuid __may
 #endif
 }
 
+#define SQL_FETCH_ALL_HOSTS "SELECT host_id, hostname, registry_hostname, update_every, os, " \
+    "timezone, tags, hops, memory_mode, abbrev_timezone, utc_offset, program_name, " \
+    "program_version, entries, health_enabled FROM host WHERE hops >0;"
+
+#define SQL_FETCH_ALL_INSTANCES "SELECT ni.host_id, ni.node_id FROM host h, node_instance ni " \
+                                "WHERE h.host_id = ni.host_id AND ni.node_id IS NOT NULL; "
 void sql_aclk_sync_init(void)
 {
     char *err_msg = NULL;
@@ -534,10 +541,7 @@ void sql_aclk_sync_init(void)
     }
 
     info("Creating archived hosts");
-    rc = sqlite3_exec_monitored(db_meta, "SELECT host_id, hostname, registry_hostname, update_every, os, "
-                                         "timezone, tags, hops, memory_mode, abbrev_timezone, utc_offset, program_name, "
-                                         "program_version, entries, health_enabled FROM host WHERE hops >0;",
-                                create_host_callback, NULL, &err_msg);
+    rc = sqlite3_exec_monitored(db_meta, SQL_FETCH_ALL_HOSTS, create_host_callback, NULL, &err_msg);
 
     if (rc != SQLITE_OK) {
         error_report("SQLite error when loading archived hosts, rc = %d (%s)", rc, err_msg);
@@ -547,9 +551,7 @@ void sql_aclk_sync_init(void)
     metadata_queue_load_host_context(NULL);
 
 #ifdef ENABLE_ACLK
-    rc = sqlite3_exec_monitored(db_meta, "SELECT ni.host_id, ni.node_id FROM host h, node_instance ni " \
-        "WHERE h.host_id = ni.host_id AND ni.node_id IS NOT NULL;",
-        aclk_config_parameters, NULL,&err_msg);
+    rc = sqlite3_exec_monitored(db_meta, SQL_FETCH_ALL_INSTANCES,aclk_config_parameters, NULL,&err_msg);
 
     if (rc != SQLITE_OK) {
         error_report("SQLite error when configuring host ACLK synchonization parameters, rc = %d (%s)", rc, err_msg);

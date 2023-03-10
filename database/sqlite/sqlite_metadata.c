@@ -155,15 +155,18 @@ static int chart_label_store_to_sql_callback(const char *name, const char *value
     return 1;
 }
 
+#define SQL_DELETE_CHART_LABEL "DELETE FROM chart_label WHERE chart_id = @chart_id;"
+#define SQL_DELETE_CHART_LABEL_HISTORY "DELETE FROM chart_label WHERE date_created < %ld AND chart_id = @chart_id;"
+
 static void clean_old_chart_labels(RRDSET *st)
 {
     char sql[512];
     time_t first_time_s = rrdset_first_entry_s(st);
 
     if (unlikely(!first_time_s))
-        snprintfz(sql, 511,"DELETE FROM chart_label WHERE chart_id = @chart_id;");
+        snprintfz(sql, 511,SQL_DELETE_CHART_LABEL);
     else
-        snprintfz(sql, 511,"DELETE FROM chart_label WHERE date_created < %ld AND chart_id = @chart_id;", first_time_s);
+        snprintfz(sql, 511,SQL_DELETE_CHART_LABEL_HISTORY, first_time_s);
 
     int rc = exec_statement_with_uuid(sql, &st->chart_uuid);
     if (unlikely(rc))
