@@ -6,7 +6,7 @@
 #define query_target_realloc_size(size, start) \
             (size) ? ((size) < QUERY_TARGET_MAX_REALLOC_INCREASE ? (size) * 2 : (size) + QUERY_TARGET_MAX_REALLOC_INCREASE) : (start);
 
-static void query_metric_release(QUERY_METRIC *qm);
+static void query_metric_release(QUERY_TARGET *qt, QUERY_METRIC *qm);
 static void query_dimension_release(QUERY_DIMENSION *qd);
 static void query_instance_release(QUERY_INSTANCE *qi);
 static void query_context_release(QUERY_CONTEXT *qc);
@@ -76,7 +76,7 @@ void query_target_release(QUERY_TARGET *qt) {
     // release the query
     for(size_t i = 0, used = qt->query.used; i < used ;i++) {
         QUERY_METRIC *qm = query_metric(qt, i);
-        query_metric_release(qm);
+        query_metric_release(qt, qm);
     }
     qt->query.used = 0;
 
@@ -155,17 +155,20 @@ void query_target_free(void) {
     (((first_entry_s) - ((update_every_s) * 2) <= (qt)->window.before) &&                     \
      ((last_entry_s)  + ((update_every_s) * 2) >= (qt)->window.after))
 
+struct storage_engine *query_metric_storage_engine(QUERY_TARGET *qt, QUERY_METRIC *qm, size_t tier) {
+    QUERY_NODE *qn = query_node(qt, qm->link.query_node_id);
+    return qn->rrdhost->db[tier].eng;
+}
 
-static inline void query_metric_release(QUERY_METRIC *qm) {
+static inline void query_metric_release(QUERY_TARGET *qt, QUERY_METRIC *qm) {
     qm->plan.used = 0;
 
     // reset the tiers
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
         if(qm->tiers[tier].db_metric_handle) {
-            STORAGE_ENGINE *eng = qm->tiers[tier].eng;
+            STORAGE_ENGINE *eng = query_metric_storage_engine(qt, qm, tier);
             eng->api.metric_release(qm->tiers[tier].db_metric_handle);
             qm->tiers[tier].db_metric_handle = NULL;
-            qm->tiers[tier].eng = NULL;
         }
     }
 }
@@ -259,7 +262,7 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
 
         qm->status = options;
 
-        qm->link.query_host_id = qn->slot;
+        qm->link.query_node_id = qn->slot;
         qm->link.query_context_id = qc->slot;
         qm->link.query_instance_id = qi->slot;
         qm->link.query_dimension_id = qd_slot;
@@ -271,7 +274,7 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
             qt->db.last_time_s = common_last_time_s;
 
         for (size_t tier = 0; tier < storage_tiers; tier++) {
-            qm->tiers[tier].eng = tier_retention[tier].eng;
+            internal_fatal(tier_retention[tier].eng != query_metric_storage_engine(qt, qm, tier), "QUERY TARGET: storage engine mismatch");
             qm->tiers[tier].db_metric_handle = tier_retention[tier].db_metric_handle;
             qm->tiers[tier].db_first_time_s = tier_retention[tier].db_first_time_s;
             qm->tiers[tier].db_last_time_s = tier_retention[tier].db_last_time_s;
@@ -280,15 +283,14 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
 
         return true;
     }
-    else {
-        // cleanup anything we allocated to the retention we will not use
-        for(size_t tier = 0; tier < storage_tiers ;tier++) {
-            if (tier_retention[tier].db_metric_handle)
-                tier_retention[tier].eng->api.metric_release(tier_retention[tier].db_metric_handle);
-        }
 
-        return false;
+    // cleanup anything we allocated to the retention we will not use
+    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+        if (tier_retention[tier].db_metric_handle)
+            tier_retention[tier].eng->api.metric_release(tier_retention[tier].db_metric_handle);
     }
+
+    return false;
 }
 
 static inline bool rrdmetric_retention_matches_query(QUERY_TARGET *qt, RRDMETRIC *rm, time_t now_s) {

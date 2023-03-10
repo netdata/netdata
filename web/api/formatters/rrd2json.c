@@ -195,7 +195,7 @@ static RRDR *data_query_group_by(RRDR *r) {
 
         QUERY_METRIC *qm = query_metric(qt, d);
         QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
-        QUERY_NODE *qn = query_node(qt, qm->link.query_host_id);
+        QUERY_NODE *qn = query_node(qt, qm->link.query_node_id);
 
         if(qi != last_qi) {
             priority = 0;

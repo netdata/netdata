@@ -1112,15 +1112,16 @@ static void query_planer_initialize_plans(QUERY_ENGINE_OPS *ops) {
         ops->r->internal.qt->db.tiers[tier].queries++;
 
         struct query_metric_tier *tier_ptr = &qm->tiers[tier];
-        tier_ptr->eng->api.query_ops.init(
+        STORAGE_ENGINE *eng = query_metric_storage_engine(ops->r->internal.qt, qm, tier);
+        eng->api.query_ops.init(
                 tier_ptr->db_metric_handle,
                 &ops->plans[p].handle,
                 after, before,
                 ops->r->internal.qt->request.priority);
 
-        ops->plans[p].next_metric = tier_ptr->eng->api.query_ops.next_metric;
-        ops->plans[p].is_finished = tier_ptr->eng->api.query_ops.is_finished;
-        ops->plans[p].finalize = tier_ptr->eng->api.query_ops.finalize;
+        ops->plans[p].next_metric = eng->api.query_ops.next_metric;
+        ops->plans[p].is_finished = eng->api.query_ops.is_finished;
+        ops->plans[p].finalize = eng->api.query_ops.finalize;
         ops->plans[p].initialized = true;
         ops->plans[p].finalized = false;
     }
@@ -1253,7 +1254,7 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
         // check if our selected tier can start the query
         if (selected_tier_first_time_s > after_wanted) {
             // we need some help from other tiers
-            for (size_t tr = (int)selected_tier + 1; tr < storage_tiers; tr++) {
+            for (size_t tr = (int)selected_tier + 1; tr < storage_tiers && qm->plan.used < QUERY_PLANS_MAX ; tr++) {
                 if(!query_metric_is_valid_tier(qm, tr))
                     continue;
 
@@ -1286,7 +1287,7 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
         // check if our selected tier can finish the query
         if (selected_tier_last_time_s < before_wanted) {
             // we need some help from other tiers
-            for (int tr = (int)selected_tier - 1; tr >= 0; tr--) {
+            for (int tr = (int)selected_tier - 1; tr >= 0 && qm->plan.used < QUERY_PLANS_MAX ; tr--) {
                 if(!query_metric_is_valid_tier(qm, tr))
                     continue;
 
@@ -2463,7 +2464,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         QUERY_DIMENSION *qd = query_dimension(qt, qm->link.query_dimension_id);
         QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
         QUERY_CONTEXT *qc = query_context(qt, qm->link.query_context_id);
-        QUERY_NODE *qn = query_node(qt, qm->link.query_host_id);
+        QUERY_NODE *qn = query_node(qt, qm->link.query_node_id);
 
         if(queries_prepared < max) {
             // preload another query
