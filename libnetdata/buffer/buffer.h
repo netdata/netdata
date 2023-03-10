@@ -3,6 +3,7 @@
 #ifndef NETDATA_WEB_BUFFER_H
 #define NETDATA_WEB_BUFFER_H 1
 
+#include "../string/utf8.h"
 #include "../libnetdata.h"
 
 #define WEB_DATA_LENGTH_INCREASE_STEP 1024
@@ -203,18 +204,56 @@ static inline void buffer_strcat(BUFFER *wb, const char *txt) {
 static inline void buffer_json_strcat(BUFFER *wb, const char *txt) {
     if(unlikely(!txt || !*txt)) return;
 
-    const char *t = txt;
+    const unsigned char *t = (const unsigned char *)txt;
     while(*t) {
-        buffer_need_bytes(wb, 100);
-        char *s = &wb->buffer[wb->len];
-        char *d = s;
-        const char *e = &wb->buffer[wb->size - 1]; // remove 1 to make room for the escape character
+        buffer_need_bytes(wb, 110);
+        unsigned char *s = (unsigned char *)&wb->buffer[wb->len];
+        unsigned char *d = s;
+        const unsigned char *e = (unsigned char *)&wb->buffer[wb->size - 10]; // make room for the max escape sequence
 
         while(*t && d < e) {
-            if(unlikely(*t == '\\' || *t == '\"'))
-                *d++ = '\\';
+#ifdef BUFFER_JSON_ESCAPE_UTF
+            if(unlikely(IS_UTF8_STARTBYTE(*t) && IS_UTF8_BYTE(t[1]))) {
+                // UTF-8 multi-byte encoded character
 
-            *d++ = *t++;
+                // find how big this character is (2-4 bytes)
+                size_t utf_character_size = 2;
+                while(utf_character_size < 4 && t[utf_character_size] && IS_UTF8_BYTE(t[utf_character_size]) && !IS_UTF8_STARTBYTE(t[utf_character_size]))
+                    utf_character_size++;
+
+                uint32_t code_point = 0;
+                for (size_t i = 0; i < utf_character_size; i++) {
+                    code_point <<= 6;
+                    code_point |= (t[i] & 0x3F);
+                }
+
+                t += utf_character_size;
+
+                // encode as \u escape sequence
+                *d++ = '\\';
+                *d++ = 'u';
+                *d++ = hex_digits[(code_point >> 12) & 0xf];
+                *d++ = hex_digits[(code_point >> 8) & 0xf];
+                *d++ = hex_digits[(code_point >> 4) & 0xf];
+                *d++ = hex_digits[code_point & 0xf];
+            }
+            else
+#endif
+            if(unlikely(*t < ' ')) {
+                uint32_t v = *t++;
+                *d++ = '\\';
+                *d++ = 'u';
+                *d++ = hex_digits[(v >> 12) & 0xf];
+                *d++ = hex_digits[(v >> 8) & 0xf];
+                *d++ = hex_digits[(v >> 4) & 0xf];
+                *d++ = hex_digits[v & 0xf];
+            }
+            else {
+                if (unlikely(*t == '\\' || *t == '\"'))
+                    *d++ = '\\';
+
+                *d++ = *t++;
+            }
         }
 
         wb->len += d - s;

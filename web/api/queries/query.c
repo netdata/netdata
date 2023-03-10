@@ -677,11 +677,11 @@ RRDR_GROUP_BY group_by_parse(char *s) {
         char *key = mystrsep(&s, ",| ");
         if (!key || !*key) continue;
 
+        if (strcmp(key, "selected") == 0)
+            group_by |= RRDR_GROUP_BY_SELECTED;
+
         if (strcmp(key, "dimension") == 0)
             group_by |= RRDR_GROUP_BY_DIMENSION;
-
-        if (strcmp(key, "node") == 0)
-            group_by |= RRDR_GROUP_BY_NODE;
 
         if (strcmp(key, "instance") == 0)
             group_by |= RRDR_GROUP_BY_INSTANCE;
@@ -689,8 +689,14 @@ RRDR_GROUP_BY group_by_parse(char *s) {
         if (strcmp(key, "label") == 0)
             group_by |= RRDR_GROUP_BY_LABEL;
 
-        if (strcmp(key, "selected") == 0)
-            group_by |= RRDR_GROUP_BY_SELECTED;
+        if (strcmp(key, "node") == 0)
+            group_by |= RRDR_GROUP_BY_NODE;
+
+        if (strcmp(key, "context") == 0)
+            group_by |= RRDR_GROUP_BY_CONTEXT;
+
+        if (strcmp(key, "units") == 0)
+            group_by |= RRDR_GROUP_BY_UNITS;
     }
 
     return group_by;
@@ -703,14 +709,20 @@ void buffer_json_group_by_to_array(BUFFER *wb, RRDR_GROUP_BY group_by) {
     if(group_by & RRDR_GROUP_BY_DIMENSION)
         buffer_json_add_array_item_string(wb, "dimension");
 
-    if(group_by & RRDR_GROUP_BY_NODE)
-        buffer_json_add_array_item_string(wb, "node");
-
     if(group_by & RRDR_GROUP_BY_INSTANCE)
         buffer_json_add_array_item_string(wb, "instance");
 
     if(group_by & RRDR_GROUP_BY_LABEL)
         buffer_json_add_array_item_string(wb, "label");
+
+    if(group_by & RRDR_GROUP_BY_NODE)
+        buffer_json_add_array_item_string(wb, "node");
+
+    if(group_by & RRDR_GROUP_BY_CONTEXT)
+        buffer_json_add_array_item_string(wb, "context");
+
+    if(group_by & RRDR_GROUP_BY_UNITS)
+        buffer_json_add_array_item_string(wb, "units");
 }
 
 RRDR_GROUP_BY_FUNCTION group_by_aggregate_function_parse(const char *s) {

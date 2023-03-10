@@ -858,6 +858,46 @@ static void query_target_combined_chart_type(BUFFER *wb, QUERY_TARGET *qt, size_
         buffer_json_member_add_string(wb, "chart_type", rrdset_type_name(rrdcontext_acquired_chart_type(qt->contexts.array[0].rca)));
 }
 
+static void rrdr_grouped_by_array_v2(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options __maybe_unused) {
+    QUERY_TARGET *qt = r->internal.qt;
+
+    buffer_json_member_add_array(wb, key);
+
+    if(qt->request.group_by & RRDR_GROUP_BY_SELECTED)
+        buffer_json_add_array_item_string(wb, "selected");
+
+    else {
+
+        if(qt->request.group_by & RRDR_GROUP_BY_DIMENSION)
+            buffer_json_add_array_item_string(wb, "dimension");
+
+        if(qt->request.group_by & RRDR_GROUP_BY_INSTANCE)
+            buffer_json_add_array_item_string(wb, "instance");
+
+        if(qt->request.group_by & RRDR_GROUP_BY_LABEL) {
+            BUFFER *b = buffer_create(0, NULL);
+            for (size_t l = 0; l < qt->group_by.used; l++) {
+                buffer_flush(b);
+                buffer_fast_strcat(b, "label:", 6);
+                buffer_strcat(b, qt->group_by.label_keys[l]);
+                buffer_json_add_array_item_string(wb, buffer_tostring(b));
+            }
+            buffer_free(b);
+        }
+
+        if(qt->request.group_by & RRDR_GROUP_BY_NODE)
+            buffer_json_add_array_item_string(wb, "node");
+
+        if(qt->request.group_by & RRDR_GROUP_BY_CONTEXT)
+            buffer_json_add_array_item_string(wb, "context");
+
+        if(qt->request.group_by & RRDR_GROUP_BY_UNITS)
+            buffer_json_add_array_item_string(wb, "units");
+    }
+
+    buffer_json_array_close(wb); // group_by_order
+}
+
 static void rrdr_dimension_units_array_v2(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
     if(!r->du)
         return;
@@ -1260,33 +1300,7 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
         query_target_combined_chart_type(wb, qt, contexts);
         buffer_json_member_add_object(wb, "dimensions");
         {
-            buffer_json_member_add_array(wb, "grouped_by");
-            if(qt->request.group_by & RRDR_GROUP_BY_SELECTED)
-                buffer_json_add_array_item_string(wb, "selected");
-            else {
-
-                if(qt->request.group_by & RRDR_GROUP_BY_DIMENSION)
-                    buffer_json_add_array_item_string(wb, "dimension");
-
-                if(qt->request.group_by & RRDR_GROUP_BY_INSTANCE)
-                    buffer_json_add_array_item_string(wb, "instance");
-
-                if(qt->request.group_by & RRDR_GROUP_BY_LABEL) {
-                    BUFFER *b = buffer_create(0, NULL);
-                    for (size_t l = 0; l < qt->group_by.used; l++) {
-                        buffer_flush(b);
-                        buffer_fast_strcat(b, "label:", 6);
-                        buffer_strcat(b, qt->group_by.label_keys[l]);
-                        buffer_json_add_array_item_string(wb, buffer_tostring(b));
-                    }
-                    buffer_free(b);
-                }
-
-                if(qt->request.group_by & RRDR_GROUP_BY_NODE)
-                    buffer_json_add_array_item_string(wb, "node");
-            }
-            buffer_json_array_close(wb); // group_by_order
-
+            rrdr_grouped_by_array_v2(wb, "grouped_by", r, options);
             rrdr_dimension_ids(wb, "ids", r, options);
             rrdr_dimension_names(wb, "names", r, options);
             rrdr_dimension_units_array_v2(wb, "units", r, options);

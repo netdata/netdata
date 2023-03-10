@@ -181,7 +181,7 @@ static RRDR *data_query_group_by(RRDR *r) {
     if(!qt->group_by.used)
         qt->request.group_by &= ~RRDR_GROUP_BY_LABEL;
 
-    if(!(qt->request.group_by & (RRDR_GROUP_BY_NODE | RRDR_GROUP_BY_INSTANCE | RRDR_GROUP_BY_DIMENSION | RRDR_GROUP_BY_LABEL | RRDR_GROUP_BY_SELECTED)))
+    if(!(qt->request.group_by & (RRDR_GROUP_BY_SELECTED | RRDR_GROUP_BY_DIMENSION | RRDR_GROUP_BY_INSTANCE | RRDR_GROUP_BY_LABEL | RRDR_GROUP_BY_NODE | RRDR_GROUP_BY_CONTEXT)))
         qt->request.group_by = RRDR_GROUP_BY_DIMENSION;
 
     int added = 0;
@@ -195,6 +195,7 @@ static RRDR *data_query_group_by(RRDR *r) {
 
         QUERY_METRIC *qm = query_metric(qt, d);
         QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
+        QUERY_CONTEXT *qc = query_context(qt, qm->link.query_context_id);
         QUERY_NODE *qn = query_node(qt, qm->link.query_node_id);
 
         if(qi != last_qi) {
@@ -242,12 +243,14 @@ static RRDR *data_query_group_by(RRDR *r) {
                 buffer_strcat(key, qn->rrdhost->machine_guid);
             }
 
-            // append the units
-            if (query_target_has_percentage_units(qt)) {
-                buffer_fast_strcat(key, "|%", 2);
-            } else {
+            if (qt->request.group_by & RRDR_GROUP_BY_CONTEXT) {
                 buffer_fast_strcat(key, "|", 1);
-                buffer_strcat(key, rrdinstance_acquired_units(qi->ria));
+                buffer_strcat(key, rrdcontext_acquired_id(qc->rca));
+            }
+
+            if (qt->request.group_by & RRDR_GROUP_BY_UNITS) {
+                buffer_fast_strcat(key, "|", 1);
+                buffer_strcat(key, query_target_has_percentage_units(qt) ? "%" : rrdinstance_acquired_units(qi->ria));
             }
         }
 
@@ -300,6 +303,20 @@ static RRDR *data_query_group_by(RRDR *r) {
 
                     buffer_strcat(key, qn->rrdhost->machine_guid);
                 }
+
+                if (qt->request.group_by & RRDR_GROUP_BY_CONTEXT) {
+                    if (buffer_strlen(key) != 0)
+                        buffer_fast_strcat(key, ",", 1);
+
+                    buffer_strcat(key, rrdcontext_acquired_id(qc->rca));
+                }
+
+                if (qt->request.group_by & RRDR_GROUP_BY_UNITS) {
+                    if (buffer_strlen(key) != 0)
+                        buffer_fast_strcat(key, ",", 1);
+
+                    buffer_strcat(key, query_target_has_percentage_units(qt) ? "%" : rrdinstance_acquired_units(qi->ria));
+                }
             }
 
             entries[pos].id = string_strdupz(buffer_tostring(key));
@@ -343,6 +360,20 @@ static RRDR *data_query_group_by(RRDR *r) {
                         buffer_fast_strcat(key, ",", 1);
 
                     buffer_strcat(key, rrdhost_hostname(qn->rrdhost));
+                }
+
+                if (qt->request.group_by & RRDR_GROUP_BY_CONTEXT) {
+                    if (buffer_strlen(key) != 0)
+                        buffer_fast_strcat(key, ",", 1);
+
+                    buffer_strcat(key, rrdcontext_acquired_id(qc->rca));
+                }
+
+                if (qt->request.group_by & RRDR_GROUP_BY_UNITS) {
+                    if (buffer_strlen(key) != 0)
+                        buffer_fast_strcat(key, ",", 1);
+
+                    buffer_strcat(key, query_target_has_percentage_units(qt) ? "%" : rrdinstance_acquired_units(qi->ria));
                 }
             }
 
