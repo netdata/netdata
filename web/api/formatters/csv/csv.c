@@ -84,7 +84,6 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
             buffer_date(wb, tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
         }
 
-        int set_min_max = 0;
         if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
             total = 0;
             for(c = 0; c < used ;c++) {
@@ -99,7 +98,6 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
             }
             // prevent a division by zero
             if(total == 0) total = 1;
-            set_min_max = 1;
         }
 
         // for each dimension
@@ -124,13 +122,13 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
                 if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
                     n = n * 100 / total;
 
-                    if(unlikely(set_min_max)) {
+                    if(unlikely(i == start && c == 0)) {
                         r->view.min = r->view.max = n;
-                        set_min_max = 0;
                     }
-
-                    if(n < r->view.min) r->view.min = n;
-                    if(n > r->view.max) r->view.max = n;
+                    else {
+                        if (n < r->view.min) r->view.min = n;
+                        if (n > r->view.max) r->view.max = n;
+                    }
                 }
 
                 buffer_print_netdata_double(wb, n);

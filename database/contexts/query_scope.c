@@ -16,17 +16,27 @@ uint64_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN
         if(host->node_id)
             uuid_unparse_lower(*host->node_id, host_uuid_buffer);
 
-        if(!scope_hosts_sp ||
-           simple_pattern_matches_string(scope_hosts_sp, host->hostname) ||
-           simple_pattern_matches(scope_hosts_sp, host->machine_guid) ||
-           (*host_uuid_buffer && simple_pattern_matches(scope_hosts_sp, host_uuid_buffer))) {
+        SIMPLE_PATTERN_RESULT ret = SP_MATCHED_POSITIVE;
+        if(scope_hosts_sp) {
+            ret = simple_pattern_matches_string_extract(scope_hosts_sp, host->hostname, NULL, 0);
+            if(ret == SP_NOT_MATCHED) {
+                ret = simple_pattern_matches_extract(scope_hosts_sp, host->machine_guid, NULL, 0);
+                if(ret == SP_NOT_MATCHED && *host_uuid_buffer)
+                    ret = simple_pattern_matches_extract(scope_hosts_sp, host_uuid_buffer, NULL, 0);
+            }
+        }
 
-            bool queryable_host = false;
-            if(!hosts_sp ||
-               simple_pattern_matches_string(hosts_sp, host->hostname) ||
-               simple_pattern_matches(hosts_sp, host->machine_guid) ||
-               (*host_uuid_buffer && simple_pattern_matches(hosts_sp, host_uuid_buffer)))
-                queryable_host = true;
+        if(ret == SP_MATCHED_POSITIVE) {
+            if(hosts_sp) {
+                ret = simple_pattern_matches_string_extract(hosts_sp, host->hostname, NULL, 0);
+                if(ret == SP_NOT_MATCHED) {
+                    ret = simple_pattern_matches_extract(hosts_sp, host->machine_guid, NULL, 0);
+                    if(ret == SP_NOT_MATCHED && *host_uuid_buffer)
+                        ret = simple_pattern_matches_extract(hosts_sp, host_uuid_buffer, NULL, 0);
+                }
+            }
+
+            bool queryable_host = (ret == SP_MATCHED_POSITIVE);
 
             count++;
             v_hash += dictionary_version(host->rrdctx.contexts);
@@ -48,7 +58,11 @@ uint64_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN
 size_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, SIMPLE_PATTERN *scope_contexts_sp, SIMPLE_PATTERN *contexts_sp, foreach_context_cb_t cb, bool queryable_host, void *data) {
     size_t added = 0;
 
-    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdctx.contexts, scope_contexts);
+    RRDCONTEXT_ACQUIRED *rca = NULL;
+
+    if(scope_contexts)
+        rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdctx.contexts, scope_contexts);
+
     if(likely(rca)) {
         // we found it!
 

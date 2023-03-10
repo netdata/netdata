@@ -804,7 +804,7 @@ int web_api_v1_weights(
     usec_t timeout_usec = timeout * USEC_PER_MS;
     usec_t started_usec = now_realtime_usec();
 
-    if(!rrdr_relative_window_to_absolute(&after, &before))
+    if(!rrdr_relative_window_to_absolute(&after, &before, NULL))
         buffer_no_cacheable(wb);
 
     if (before <= after) {
@@ -820,7 +820,7 @@ int web_api_v1_weights(
         if(baseline_before <= API_RELATIVE_TIME_MAX)
             baseline_before += after;
 
-        rrdr_relative_window_to_absolute(&baseline_after, &baseline_before);
+        rrdr_relative_window_to_absolute(&baseline_after, &baseline_before, NULL);
 
         if (baseline_before <= baseline_after) {
             resp = HTTP_RESP_BAD_REQUEST;

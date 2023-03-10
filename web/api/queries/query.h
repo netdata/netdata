@@ -58,6 +58,7 @@ typedef enum rrdr_group_by {
     RRDR_GROUP_BY_NODE      = (1 << 1),
     RRDR_GROUP_BY_INSTANCE  = (1 << 2),
     RRDR_GROUP_BY_LABEL     = (1 << 3),
+    RRDR_GROUP_BY_SELECTED  = (1 << 4),
 } RRDR_GROUP_BY;
 
 struct web_buffer;
@@ -70,7 +71,6 @@ typedef enum rrdr_group_by_function {
     RRDR_GROUP_BY_FUNCTION_MIN,
     RRDR_GROUP_BY_FUNCTION_MAX,
     RRDR_GROUP_BY_FUNCTION_SUM,
-    RRDR_GROUP_BY_FUNCTION_SUM_COUNT,
 } RRDR_GROUP_BY_FUNCTION;
 
 RRDR_GROUP_BY_FUNCTION group_by_aggregate_function_parse(const char *s);

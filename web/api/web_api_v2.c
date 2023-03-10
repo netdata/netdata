@@ -27,6 +27,7 @@ static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unu
     options |= CONTEXTS_V2_DEBUG;
 
     buffer_flush(w->response.data);
+    buffer_no_cacheable(w->response.data);
     return rrdcontext_to_json_v2(w->response.data, &req, options);
 }
 
@@ -79,7 +80,7 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
     RRDR_GROUP_BY group_by = RRDR_GROUP_BY_DIMENSION;
     RRDR_GROUP_BY_FUNCTION group_by_aggregate = RRDR_GROUP_BY_FUNCTION_AVERAGE;
     DATASOURCE_FORMAT format = DATASOURCE_JSON;
-    RRDR_OPTIONS options = 0;
+    RRDR_OPTIONS options = RRDR_OPTION_VIRTUAL_POINTS | RRDR_OPTION_JSON_WRAP | RRDR_OPTION_RETURN_JWAR;
 
     while(url) {
         char *value = mystrsep(&url, "&");
@@ -162,11 +163,14 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
     if(group_by == RRDR_GROUP_BY_NONE)
         group_by = RRDR_GROUP_BY_DIMENSION;
 
+    if(group_by & RRDR_GROUP_BY_SELECTED)
+        group_by = RRDR_GROUP_BY_SELECTED; // remove all other groupings
+
     if(group_by & ~(RRDR_GROUP_BY_DIMENSION))
         options |= RRDR_OPTION_ABSOLUTE;
 
-    if(options & RRDR_OPTION_SHOW_PLAN)
-        options |= RRDR_OPTION_DEBUG;
+    if(options & RRDR_OPTION_DEBUG)
+        options &= ~RRDR_OPTION_MINIFY;
 
     if(tier_str && *tier_str) {
         tier = str2ul(tier_str);

@@ -2,9 +2,9 @@ openapi: 3.0.0
 info:
   title: Netdata API
   description: Real-time performance and health monitoring.
-  version: 1.33.1
+  version: "1.38"
 paths:
-  /info:
+  /api/v1/info:
     get:
       summary: Get netdata basic information
       description: |
@@ -28,7 +28,7 @@ paths:
                 $ref: "#/components/schemas/info"
         "503":
           description: netdata daemon not ready (used for health checks).
-  /charts:
+  /api/v1/charts:
     get:
       summary: Get a list of all charts available at the server
       description: The charts endpoint returns a summary about all charts stored in the
@@ -40,7 +40,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/chart_summary"
-  /chart:
+  /api/v1/chart:
     get:
       summary: Get info about a specific chart
       description: The chart endpoint returns detailed information about a chart.
@@ -64,7 +64,7 @@ paths:
           description: No chart id was supplied in the request.
         "404":
           description: No chart with the given id is found.
-  /contexts:
+  /api/v1/contexts:
     get:
       summary: Get a list of all contexts available at the server
       description: The contexts endpoint returns a summary about all contexts stored in the
@@ -135,7 +135,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/context_summary"
-  /context:
+  /api/v1/context:
     get:
       summary: Get info about a specific context
       description: The context endpoint returns detailed information about a given context.
@@ -217,7 +217,7 @@ paths:
           description: No context id was supplied in the request.
         "404":
           description: No context with the given id is found.
-  /alarm_variables:
+  /api/v1/alarm_variables:
     get:
       summary: List variables available to configure alarms for a chart
       description: Returns the basic information of a chart and all the variables that can
@@ -247,7 +247,327 @@ paths:
         "500":
           description: Internal server error. This usually means the server is out of
             memory.
-  /data:
+  /api/v2/data:
+    get:
+      summary: Query metrics data
+      description: |
+        Multi-node, multi-context, multi-instance, multi-dimension data queries, with time and metric aggregation.
+      parameters:
+        - name: scope_nodes
+          in: query
+          description: |
+            A simple pattern limiting the nodes scope of the query. The scope controls both data and metadata response. The simple pattern is checked against the nodes' machine guid, node id, hostname. The default nodes scope is all nodes for which this agent has data for. Usually the nodes scope is used to slice the entire dashboard (e.g. the Global Nodes Selector at the Netdata Cloud overview dashboard). Both positive and negative simple pattern expressions are supported.
+          required: false
+          schema:
+            type: string
+            format: simple pattern
+            default: "*"
+        - name: scope_contexts
+          in: query
+          description: |
+            A simple pattern limiting the contexts scope of the query. The scope controls both data and metadata response. The default contexts scope is all contexts for which this agent has data for. Usually the contexts scope is used to slice charts of the dashboard (e.g. each context based chart has its own contexts scope, limiting the chart to all the instances of the selected contexts). Both positive and negative simple pattern expressions are supported.
+          required: false
+          schema:
+            type: string
+            format: simple pattern
+            default: "*"
+        - name: nodes
+          in: query
+          description: |
+            A simple pattern matching the nodes to be queried. This only controls the data response, not the metadata. The simple pattern is checked against the nodes' machine guid, node id, hostname. The default nodes selector is all the nodes matched by the nodes scope. Both positive and negative simple pattern expressions are supported.
+          required: false
+          schema:
+            type: string
+            format: simple pattern
+            default: "*"
+        - name: contexts
+          in: query
+          description: |
+            A simple pattern matching the contexts to be queried. This only controls the data response, not the metadata. Both positive and negative simple pattern expressions are supported.
+          required: false
+          schema:
+            type: string
+            format: simple pattern
+            default: "*"
+        - name: instances
+          in: query
+          description: |
+            A simple pattern matching the instances to be queried. The simple pattern is checked against the instance `id`, the instance `name`, the fully qualified name of the instance `id` and `name`, like `instance@machine_guid`, where `instance` is either its `id` or `name`. Both positive and negative simple pattern expressions are supported.
+          required: false
+          schema:
+            type: string
+            format: simple pattern
+            default: "*"
+        - name: labels
+          in: query
+          description: |
+            A simple pattern matching the labels to be queried. The simple pattern is checked against `name:value` of all the labels of all the eligible instances (as filtered by all the above: scope nodes, scope contexts, nodes, contexts and instances). Negative simple patterns should not be used in this filter.
+          required: false
+          schema:
+            type: string
+            format: simple pattern
+            default: "*"
+        - name: alerts
+          in: query
+          description: |
+            A simple pattern matching the alerts to be queried. The simple pattern is checked against the `name` of alerts and the combination of `name:status`, when status is one of `CLEAR`, `WARNING`, `CRITICAL`, `REMOVED`, `UNDEFINED`, `UNINITIALIZED`, of all the alerts of all the eligible instances (as filtered by all the above). A negative simple pattern will exclude the instances having the labels matched.
+          required: false
+          schema:
+            type: string
+            format: simple pattern
+            default: "*"
+        - name: dimensions
+          in: query
+          description: |
+            A simple patterns matching the dimensions to be queried. The simple pattern is checked against and `id` and the `name` of the dimensions of the eligible instances (as filtered by all the above). Both positive and negative simple pattern expressions are supported.
+          required: false
+          schema:
+            type: string
+            format: simple pattern
+            default: "*"
+        - name: before
+          in: query
+          description: |
+            The end timestamp (unix epoch) of the data query, or a negative number specifying the number of seconds
+            in the past relative now.
+          required: false
+          schema:
+            type: number
+            format: integer
+            default: 0
+        - name: after
+          in: query
+          description: |
+            The start timestamp (unix epoch) of the data query, or a negative number specifying the number of seconds
+            in the past relative to parameter `before`.
+          required: false
+          schema:
+            type: number
+            format: integer
+            default: 0
+        - name: points
+          in: query
+          description: |
+            The number of points to be returned. If not given, or it is <= 0, or it is bigger than the points stored in the database for the given duration, all the available collected values for the given duration will be returned.
+          required: false
+          schema:
+            type: number
+            format: integer
+            default: 0
+        - name: group_by
+          in: query
+          description: |
+            A comma separated list of `dimension`, `label`, `instance`, `node`, `selected`. All possible values can be combined together, except `selected`. If `selected` is given in the list, all others are ignored. The order they are placed in the list is currently ignored. The result will always have in the order given here.
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - dimension
+                - label
+                - instance
+                - node
+                - selected
+            default:
+              - dimension
+        - name: group_by_label
+          in: query
+          description: |
+            A comma separated list of the label keys to group by their values. The order of the labels in the list is respected.
+          required: false
+          schema:
+            type: string
+            format: comma separated list of label keys to group by
+            default: ""
+        - name: aggregation
+          in: query
+          description: |
+            The aggregation function to apply when grouping metrics together.
+          required: false
+          schema:
+            type: string
+            enum:
+              - min
+              - max
+              - avg
+              - average
+              - sum
+            default: average
+        - name: time_group
+          in: query
+          description: |
+            Time aggregation function. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods supported "min", "max", "average", "sum", "incremental-sum". "max" is actually calculated on the absolute value collected (so it works for both positive and negative dimensions to return the most extreme value in either direction).
+          required: true
+          schema:
+            type: string
+            enum:
+              - min
+              - max
+              - avg
+              - average
+              - median
+              - stddev
+              - sum
+              - incremental-sum
+              - ses
+              - des
+              - cv
+              - countif
+              - percentile
+              - percentile25
+              - percentile50
+              - percentile75
+              - percentile80
+              - percentile90
+              - percentile95
+              - percentile97
+              - percentile98
+              - percentile99
+              - trimmed-mean
+              - trimmed-mean1
+              - trimmed-mean2
+              - trimmed-mean3
+              - trimmed-mean5
+              - trimmed-mean10
+              - trimmed-mean15
+              - trimmed-mean20
+              - trimmed-mean25
+              - trimmed-median
+              - trimmed-median1
+              - trimmed-median2
+              - trimmed-median3
+              - trimmed-median5
+              - trimmed-median10
+              - trimmed-median15
+              - trimmed-median20
+              - trimmed-median25
+            default: average
+        - name: time_group_options
+          in: query
+          description: |
+            When the group function supports additional parameters, this field can be used to pass them to it. Currently `countif`, `trimmed-mean`, `trimmed-median` and `percentile` support this. For `countif` the string may start with `<`, `<=`, `<:`, `<>`, `!=`, `>`, `>=`, `>:`. For all others just a number is expected.
+          required: false
+          schema:
+            type: string
+        - name: time_resampling
+          in: query
+          description: |
+            For incremental values that are "per second", this value is used to resample them to "per minute` (60) or "per hour" (3600). It can only be used in conjunction with group=average.
+          required: false
+          schema:
+            type: number
+            format: integer
+            default: 0
+        - name: timeout
+          in: query
+          description: |
+            Specify a timeout value in milliseconds after which the agent will abort the query and return a 503 error. A value of 0 indicates no timeout.
+          required: false
+          schema:
+            type: number
+            format: integer
+            default: 0
+        - name: format
+          in: query
+          description: |
+            The format of the data to be returned.
+          required: true
+          allowEmptyValue: false
+          schema:
+            type: string
+            enum:
+              - json
+              - json2
+              - jsonp
+              - csv
+              - tsv
+              - tsv-excel
+              - ssv
+              - ssvcomma
+              - datatable
+              - datasource
+              - html
+              - markdown
+              - array
+              - csvjsonarray
+            default: json
+        - name: options
+          in: query
+          description: |
+            Options that affect data generation.
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - nonzero
+                - flip
+                - jsonwrap
+                - min2max
+                - seconds
+                - milliseconds
+                - abs
+                - absolute
+                - absolute-sum
+                - null2zero
+                - objectrows
+                - google_json
+                - percentage
+                - unaligned
+                - match-ids
+                - match-names
+                - allow_past
+                - anomaly-bit
+            default:
+              - seconds
+              - jsonwrap
+        - name: tier
+          in: query
+          description: |
+            Use only the specified database tier.
+          required: false
+          schema:
+            type: number
+            format: integer
+        - name: callback
+          in: query
+          description: |
+            For JSONP responses, the callback function name.
+          required: false
+          schema:
+            type: string
+        - name: filename
+          in: query
+          description: |
+            Add `Content-Disposition: attachment; filename=` header to the response, that will instruct the browser to save the response with the given filename."
+          required: false
+          schema:
+            type: string
+        - name: tqx
+          in: query
+          description: |
+            [Google Visualization API](https://developers.google.com/chart/interactive/docs/dev/implementing_data_source?hl=en) formatted parameter.
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: |
+            The call was successful. The response includes the data in the format requested. Swagger2.0 does not process the discriminator field to show polymorphism. The response will be one of the sub-types of the data-schema according to the chosen format, e.g. json -> data_json.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/data_json2"
+        "400":
+          description: |
+            Bad request - the body will include a message stating what is wrong.
+        "500":
+          description: |
+            Internal server error. This usually means the server is out of memory.
+  /api/v1/data:
     get:
       summary: Get collected data for a specific chart
       description: The data endpoint returns data stored in the round robin database of a
@@ -519,7 +839,7 @@ paths:
         "500":
           description: Internal server error. This usually means the server is out of
             memory.
-  /badge.svg:
+  /api/v1/badge.svg:
     get:
       summary: Generate a badge in form of SVG image for a chart (or dimension)
       description: Successful responses are SVG images.
@@ -818,7 +1138,7 @@ paths:
         "500":
           description: Internal server error. This usually means the server is out of
             memory.
-  /allmetrics:
+  /api/v1/allmetrics:
     get:
       summary: Get a value of all the metrics maintained by netdata
       description: The allmetrics endpoint returns the latest value of all charts and
@@ -951,7 +1271,7 @@ paths:
           description: All the metrics returned in the format requested.
         "400":
           description: The format requested is not supported.
-  /alarms:
+  /api/v1/alarms:
     get:
       summary: Get a list of active or raised alarms on the server
       description: The alarms endpoint returns the list of all raised or enabled alarms on
@@ -980,7 +1300,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/alarms"
-  /alarms_values:
+  /api/v1/alarms_values:
     get:
       summary: Get a list of active or raised alarms on the server
       description: "The alarms_values endpoint returns the list of all raised or enabled alarms on
@@ -1011,7 +1331,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/alarms_values"
-  /alarm_log:
+  /api/v1/alarm_log:
     get:
       summary: Retrieves the entries of the alarm log
       description: Returns an array of alarm_log entries, with historical information on
@@ -1036,7 +1356,7 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/alarm_log_entry"
-  /alarm_count:
+  /api/v1/alarm_count:
     get:
       summary: Get an overall status of the chart
       description: Checks multiple charts with the same context and counts number of alarms
@@ -1082,7 +1402,7 @@ paths:
         "500":
           description: Internal server error. This usually means the server is out of
             memory.
-  /manage/health:
+  /api/v1/manage/health:
     get:
       summary: "Accesses the health management API to control health checks and
         notifications at runtime."
@@ -1144,7 +1464,7 @@ paths:
           description: A plain text response based on the result of the command.
         "403":
           description: Bearer authentication error.
-  /aclk:
+  /api/v1/aclk:
     get:
       summary: Get information about current ACLK state
       description: "ACLK endpoint returns detailed information
@@ -1156,7 +1476,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/aclk_state"
-  /metric_correlations:
+  /api/v1/metric_correlations:
     get:
       summary: "Analyze all the metrics to find their correlations"
       description: "THIS ENDPOINT IS OBSOLETE. Use the /weights endpoint.
@@ -1350,7 +1670,7 @@ paths:
             that correlated the metrics did not produce any result.
         "504":
           description: Timeout - the query took too long and has been cancelled.
-  /function:
+  /api/v1/function:
     get:
       summary: "Execute a collector function."
       parameters:
@@ -1384,14 +1704,14 @@ paths:
           description: Timeout while waiting for the collector to execute the function.
         "591":
           description: The collector sent a response, but it was invalid or corrupted.
-  /functions:
+  /api/v1/functions:
     get:
       summary: Get a list of all registered collector functions.
       description: Collector functions are programs that can be executed on demand.
       responses:
         "200":
           description: A JSON object containing one object per supported function.
-  /weights:
+  /api/v1/weights:
     get:
       summary: "Analyze all the metrics using an algorithm and score them accordingly"
       description: "This endpoint goes through all metrics and scores them according to an algorithm."
@@ -1595,8 +1915,9 @@ paths:
         "504":
           description: Timeout - the query took too long and has been cancelled.
 servers:
-  - url: https://registry.my-netdata.io/api/v1
-  - url: http://registry.my-netdata.io/api/v1
+  - url: https://registry.my-netdata.io
+  - url: http://registry.my-netdata.io
+  - url: http://localhost:19999
 components:
   schemas:
     info:
@@ -2081,6 +2402,260 @@ components:
           type: object
           additionalProperties:
             $ref: "#/components/schemas/chart_variables"
+    data_json2:
+      description: |
+        Data response with `format=json2`
+      type: object
+      properties:
+        versions:
+          description: |
+            Hashes that allow the caller to detect important database changes of Netdata agents.
+          type: object
+          properties:
+            contexts_hard_hash:
+              description: |
+                An auto-increment value that reflects the number of changes to the number of contexts maintained by the server. Everytime a context is added or removed, this number gets incremented.
+              type: integer
+            contexts_soft_hash:
+              description: |
+                An auto-increment value that reflects the number of changes to the queue that sends contexts updates to Netdata Cloud. Everytime the contents of a context are updated, this number gets incremented.
+              type: integer
+        summary:
+          description: |
+            Summarized information about nodes, contexts, instances, labels, alerts, and dimensions. The items returned are determined by the scope of the query only, however the statistical data in them are influenced by the filters of the query. Using this information the dashboard allows users to slice and dice the data by filtering and grouping.
+          type: object
+          properties:
+            nodes:
+              type: array
+              items:
+                type: object
+                description: |
+                  An object describing a node. `is` stands for instances, `ds` for dimensions, `al` for alerts, `sts` for statistics.
+                properties:
+                  ni:
+                    description: the node index id, a number that uniquely identifies this node for this query.
+                    type: integer
+                  mg:
+                    description: the machine guid of the node.
+                    type: string
+                    format: UUID
+                  nd:
+                    description: the node id of the node.
+                    type: string
+                    format: UUID
+                  nm:
+                    description: the name (hostname) of the node.
+                    type: string
+                  is:
+                    $ref: "#/components/schemas/data_json2_items_count"
+                  ds:
+                    $ref: "#/components/schemas/data_json2_items_count"
+                  al:
+                    $ref: "#/components/schemas/data_json2_alerts_count"
+                  sts:
+                    oneOf:
+                      - $ref: "#/components/schemas/data_json2_sts"
+                      - $ref: "#/components/schemas/data_json2_sts_raw"
+            contexts:
+              type: array
+              items:
+                type: object
+                description: |
+                  An object describing a unique context. `is` stands for instances, `ds` for dimensions, `al` for alerts, `sts` for statistics.
+                properties:
+                  id:
+                    description: the context id.
+                    type: string
+                  is:
+                    $ref: "#/components/schemas/data_json2_items_count"
+                  ds:
+                    $ref: "#/components/schemas/data_json2_items_count"
+                  al:
+                    $ref: "#/components/schemas/data_json2_alerts_count"
+                  sts:
+                    oneOf:
+                      - $ref: "#/components/schemas/data_json2_sts"
+                      - $ref: "#/components/schemas/data_json2_sts_raw"
+            instances:
+              type: array
+              items:
+                type: object
+                description: |
+                  An object describing an instance. `ds` stands for dimensions, `al` for alerts, `sts` for statistics.
+                properties:
+                  id:
+                    description: the id of the instance.
+                    type: string
+                  nm:
+                    description: the name of the instance (may be absent when it is the same with the id)
+                    type: string
+                  ni:
+                    description: the node index id this instance belongs to. The UI uses this to compone the fully qualified name of the instance, using the node hostname to present it to users and its machine guid to add it to filters.
+                  ds:
+                    $ref: "#/components/schemas/data_json2_items_count"
+                  al:
+                    $ref: "#/components/schemas/data_json2_alerts_count"
+                  sts:
+                    oneOf:
+                      - $ref: "#/components/schemas/data_json2_sts"
+                      - $ref: "#/components/schemas/data_json2_sts_raw"
+            dimensions:
+              type: array
+              items:
+                type: object
+                description: |
+                  An object describing a unique dimension. `ds` stands for `dimensions`, `sts` for statistics.
+                properties:
+                  id:
+                    description: the id of the dimension.
+                    type: string
+                  nm:
+                    description: the name of the dimension (may be absent when it is the same with the id)
+                    type: string
+                  ds:
+                    $ref: "#/components/schemas/data_json2_items_count"
+                  sts:
+                    oneOf:
+                      - $ref: "#/components/schemas/data_json2_sts"
+                      - $ref: "#/components/schemas/data_json2_sts_raw"
+            labels:
+              type: array
+              items:
+                type: object
+                description: |
+                  An object describing a label key. `ds` stands for `dimensions`, `sts` for statistics.
+                properties:
+                  id:
+                    description: the key of the label.
+                    type: string
+                  ds:
+                    $ref: "#/components/schemas/data_json2_items_count"
+                  sts:
+                    oneOf:
+                      - $ref: "#/components/schemas/data_json2_sts"
+                      - $ref: "#/components/schemas/data_json2_sts_raw"
+                  vl:
+                    description: |
+                      An array of values for this key.
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          description: The value string
+                          type: string
+                          ds:
+                            $ref: "#/components/schemas/data_json2_items_count"
+                          sts:
+                            oneOf:
+                              - $ref: "#/components/schemas/data_json2_sts"
+                              - $ref: "#/components/schemas/data_json2_sts_raw"
+            alerts:
+              description: |
+                An array of all the unique alerts running, grouped by alert name (`nm` is available here)
+              type: array
+              items:
+                $ref: "#/components/schemas/data_json2_alerts_count"
+        totals:
+          type: object
+          properties:
+            nodes:
+              $ref: "#/components/schemas/data_json2_items_count"
+            contexts:
+              $ref: "#/components/schemas/data_json2_items_count"
+            instances:
+              $ref: "#/components/schemas/data_json2_items_count"
+            dimensions:
+              $ref: "#/components/schemas/data_json2_items_count"
+            label_keys:
+              $ref: "#/components/schemas/data_json2_items_count"
+            label_key_values:
+              $ref: "#/components/schemas/data_json2_items_count"
+        functions:
+          type: array
+          items:
+            type: string
+        db:
+          type: object
+        view:
+          type: object
+        result:
+          type: object
+        min:
+          type: number
+        max:
+          type: number
+        timings:
+          type: object
+    data_json2_sts:
+      description: |
+        Statistical values
+      type: object
+      properties:
+        avg:
+          description: The average value of all metrics aggregated
+          type: number
+        arp:
+          description: The average anomaly rate of all metrics aggregated
+          type: number
+        con:
+          description: The contribution percentage of all the metrics aggregated
+          type: number
+    data_json2_sts_raw:
+      description: |
+        Statistical values when `raw` option is given.
+      type: object
+      properties:
+        sum:
+          description: The sum value of all metrics aggregated
+          type: number
+        ars:
+          description: The sum anomaly rate of all metrics aggregated
+          type: number
+        vol:
+          description: The volume of all the metrics aggregated
+          type: number
+        cnt:
+          description: The count of all metrics aggregated
+          type: integer
+    data_json2_items_count:
+      description: |
+        Depending on the placement of this object, `items` may be `nodes`, `contexts`, `instances`, `dimensions`, `label keys`, `label key-value pairs`. Furthermore, if the whole object is missing it should be assumed that all its members are zero.
+      type: object
+      properties:
+        sl:
+          description: The number of items `selected` to query. If absent it is zero.
+          type: integer
+        ex:
+          description: The number of items `excluded` from querying. If absent it is zero.
+          type: integer
+        qr:
+          description: The number of items (out of `selected`) the query successfully `queried`.  If absent it is zero.
+          type: integer
+        fl:
+          description: The number of items (from `selected`) that `failed` to be queried.  If absent it is zero.
+          type: integer
+    data_json2_alerts_count:
+      description: |
+        Counters about alert statuses. If this object is missing, it is assumed that all its members are zero.
+      type: object
+      properties:
+        nm:
+          description: The name of the alert. Can be absent when the counters refer to more than one alert instances.
+          type: string
+        cl:
+          description: The number of CLEAR alerts. If absent, it is zero.
+          type: integer
+        wr:
+          description: The number of WARNING alerts. If absent, it is zero.
+          type: integer
+        cr:
+          description: The number of CRITICAL alerts. If absent, it is zero.
+          type: integer
+        ot:
+          description: |
+            The number of alerts that are not CLEAR, WARNING, CRITICAL (so, they are "other").  If absent, it is zero.
+          type: integer
     data_json:
       description: Data response in json format.
       allOf:
@@ -2095,9 +2670,8 @@ components:
                   items:
                     type: string
                 data:
-                  description: The data requested, one element per sample with each element
-                    containing the values of the dimensions described in the
-                    labels value.
+                  description: |
+                    The data requested, one element per sample with each element containing the values of the dimensions described in the labels value.
                   type: array
                   items:
                     type: number

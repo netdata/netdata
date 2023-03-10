@@ -149,17 +149,9 @@ typedef struct query_plan_entry {
     size_t tier;
     time_t after;
     time_t before;
-    time_t expanded_after;
-    time_t expanded_before;
-    struct storage_engine_query_handle handle;
-    STORAGE_POINT (*next_metric)(struct storage_engine_query_handle *handle);
-    int (*is_finished)(struct storage_engine_query_handle *handle);
-    void (*finalize)(struct storage_engine_query_handle *handle);
-    bool initialized;
-    bool finalized;
 } QUERY_PLAN_ENTRY;
 
-#define QUERY_PLANS_MAX (RRD_STORAGE_TIERS * 2)
+#define QUERY_PLANS_MAX (RRD_STORAGE_TIERS)
 
 struct query_metrics_counts {
     size_t selected;
@@ -234,7 +226,6 @@ typedef struct query_metric {
     RRDR_DIMENSION_FLAGS status;
 
     struct query_metric_tier {
-        struct storage_engine *eng;
         STORAGE_METRIC_HANDLE *db_metric_handle;
         time_t db_first_time_s;         // the oldest timestamp available for this tier
         time_t db_last_time_s;          // the latest timestamp available for this tier
@@ -248,7 +239,7 @@ typedef struct query_metric {
     } plan;
 
     struct {
-        uint32_t query_host_id;
+        uint32_t query_node_id;
         uint32_t query_context_id;
         uint32_t query_instance_id;
         uint32_t query_dimension_id;
@@ -334,6 +325,7 @@ typedef struct query_target {
     size_t queries;                         // how many query we have done so far with this QUERY_TARGET - not related to database queries
 
     struct {
+        time_t now;                         // the current timestamp, the absolute max for any query timestamp
         bool relative;                      // true when the request made with relative timestamps, true if it was absolute
         bool aligned;
         time_t after;                       // the absolute timestamp this query is about
@@ -451,6 +443,8 @@ static inline const char *query_metric_name(QUERY_TARGET *qt, QUERY_METRIC *qm) 
     QUERY_DIMENSION *qd = query_dimension(qt, qm->link.query_dimension_id);
     return rrdmetric_acquired_name(qd->rma);
 }
+
+struct storage_engine *query_metric_storage_engine(QUERY_TARGET *qt, QUERY_METRIC *qm, size_t tier);
 
 STRING *query_instance_id_fqdn(QUERY_TARGET *qt, QUERY_INSTANCE *qi);
 STRING *query_instance_name_fqdn(QUERY_TARGET *qt, QUERY_INSTANCE *qi);

@@ -211,8 +211,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
             buffer_fast_strcat(wb, post_date, post_date_len);
         }
 
-        int set_min_max = 0;
-        if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
+        if(unlikely((options & RRDR_OPTION_PERCENTAGE) && !(options & (RRDR_OPTION_INTERNAL_GBC|RRDR_OPTION_INTERNAL_AR)))) {
             total = 0;
             for(c = 0; c < used ;c++) {
                 if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
@@ -232,7 +231,6 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
             }
             // prevent a division by zero
             if(total == 0) total = 1;
-            set_min_max = 1;
         }
 
         // for each dimension
@@ -263,16 +261,16 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
                 if(unlikely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
                     n = -n;
 
-                if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
+                if(unlikely((options & RRDR_OPTION_PERCENTAGE) && !(options & (RRDR_OPTION_INTERNAL_GBC|RRDR_OPTION_INTERNAL_AR)))) {
                     n = n * 100 / total;
 
-                    if(unlikely(set_min_max)) {
+                    if(unlikely(i == start && c == 0)) {
                         r->view.min = r->view.max = n;
-                        set_min_max = 0;
                     }
-
-                    if(n < r->view.min) r->view.min = n;
-                    if(n > r->view.max) r->view.max = n;
+                    else {
+                        if (n < r->view.min) r->view.min = n;
+                        if (n > r->view.max) r->view.max = n;
+                    }
                 }
 
                 buffer_print_netdata_double(wb, n);

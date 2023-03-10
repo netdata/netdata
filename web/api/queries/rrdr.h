@@ -41,20 +41,22 @@ typedef enum rrdr_options {
     RRDR_OPTION_RETURN_JWAR     = (1 << 20), // Return anomaly rates in jsonwrap
     RRDR_OPTION_SELECTED_TIER   = (1 << 21), // Use the selected tier for the query
     RRDR_OPTION_ALL_DIMENSIONS  = (1 << 22), // Return the full dimensions list
-    RRDR_OPTION_SHOW_PLAN       = (1 << 23), // Return the query plan in jsonwrap
-    RRDR_OPTION_SHOW_DETAILS    = (1 << 24), // v2 returns detailed object tree
-    RRDR_OPTION_DEBUG           = (1 << 25), // v2 returns request description
-    RRDR_OPTION_MINIFY          = (1 << 26), // remove JSON spaces and newlines from JSON output
-    RRDR_OPTION_JW_ANNOTATIONS  = (1 << 27), // add annotation array to the JSON output
+    RRDR_OPTION_SHOW_DETAILS    = (1 << 23), // v2 returns detailed object tree
+    RRDR_OPTION_DEBUG           = (1 << 24), // v2 returns request description
+    RRDR_OPTION_MINIFY          = (1 << 25), // remove JSON spaces and newlines from JSON output
 
     // internal ones - not to be exposed to the API
-    RRDR_OPTION_HEALTH_RSRVD1        = (1 << 28), // reserved for RRDCALC_OPTION_NO_CLEAR_NOTIFICATION
-    RRDR_OPTION_INTERNAL_ANNOTATIONS = (1 << 29), // internal use only, to let the formatters know we want to render the annotations
+    RRDR_OPTION_HEALTH_RSRVD1        = (1 << 29), // reserved for RRDCALC_OPTION_NO_CLEAR_NOTIFICATION
     RRDR_OPTION_INTERNAL_AR          = (1 << 30), // internal use only, to let the formatters know we want to render the anomaly rate
     RRDR_OPTION_INTERNAL_GBC         = (1 << 31), // internal use only, to let the formatters know we want to render the group by count
 } RRDR_OPTIONS;
 
 typedef enum __attribute__ ((__packed__)) rrdr_value_flag {
+
+    // IMPORTANT:
+    // THIS IS AN AGREED BIT MAP BETWEEN AGENT, CLOUD FRONT-END AND CLOUD BACK-END
+    // DO NOT CHANGE THE MAPPINGS !
+
     RRDR_VALUE_NOTHING      = 0,            // no flag set (a good default)
     RRDR_VALUE_EMPTY        = (1 << 0),     // the database value is empty
     RRDR_VALUE_RESET        = (1 << 1),     // the database value is marked as reset (overflown)
@@ -133,6 +135,12 @@ typedef struct rrdresult {
     } grouping;
 
     struct {
+        time_t max_update_every;
+        time_t expected_after;
+        time_t trimmed_after;
+    } partial_data_trimming;
+
+    struct {
         ONEWAYALLOC *owa;           // the allocator used
         struct query_target *qt;    // the QUERY_TARGET
 
@@ -161,7 +169,7 @@ RRDR *rrd2rrdr_legacy(
 RRDR *rrd2rrdr(ONEWAYALLOC *owa, struct query_target *qt);
 bool query_target_calculate_window(struct query_target *qt);
 
-bool rrdr_relative_window_to_absolute(time_t *after, time_t *before);
+bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t *now_ptr);
 
 #ifdef __cplusplus
 }

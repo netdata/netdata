@@ -67,7 +67,18 @@ static struct {
                 .flush = grouping_flush_average,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
-        {.name = "mean",                           // alias on 'average'
+        {.name = "avg",                             // alias on 'average'
+                .hash  = 0,
+                .value = RRDR_GROUPING_AVERAGE,
+                .init  = NULL,
+                .create= grouping_create_average,
+                .reset = grouping_reset_average,
+                .free  = grouping_free_average,
+                .add   = grouping_add_average,
+                .flush = grouping_flush_average,
+                .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
+        },
+        {.name = "mean",                            // alias on 'average'
                 .hash  = 0,
                 .value = RRDR_GROUPING_AVERAGE,
                 .init  = NULL,
@@ -677,12 +688,18 @@ RRDR_GROUP_BY group_by_parse(char *s) {
 
         if (strcmp(key, "label") == 0)
             group_by |= RRDR_GROUP_BY_LABEL;
+
+        if (strcmp(key, "selected") == 0)
+            group_by |= RRDR_GROUP_BY_SELECTED;
     }
 
     return group_by;
 }
 
 void buffer_json_group_by_to_array(BUFFER *wb, RRDR_GROUP_BY group_by) {
+    if(group_by & RRDR_GROUP_BY_SELECTED)
+        buffer_json_add_array_item_string(wb, "selected");
+
     if(group_by & RRDR_GROUP_BY_DIMENSION)
         buffer_json_add_array_item_string(wb, "dimension");
 
@@ -697,10 +714,10 @@ void buffer_json_group_by_to_array(BUFFER *wb, RRDR_GROUP_BY group_by) {
 }
 
 RRDR_GROUP_BY_FUNCTION group_by_aggregate_function_parse(const char *s) {
-    if(strcmp(s, "sum-count") == 0)
-        return RRDR_GROUP_BY_FUNCTION_SUM_COUNT;
-
     if(strcmp(s, "average") == 0)
+        return RRDR_GROUP_BY_FUNCTION_AVERAGE;
+
+    if(strcmp(s, "avg") == 0)
         return RRDR_GROUP_BY_FUNCTION_AVERAGE;
 
     if(strcmp(s, "min") == 0)
@@ -720,9 +737,6 @@ const char *group_by_aggregate_function_to_string(RRDR_GROUP_BY_FUNCTION group_b
         default:
         case RRDR_GROUP_BY_FUNCTION_AVERAGE:
             return "average";
-
-        case RRDR_GROUP_BY_FUNCTION_SUM_COUNT:
-            return "sum-count";
 
         case RRDR_GROUP_BY_FUNCTION_MIN:
             return "min";
@@ -762,11 +776,6 @@ static inline long rrdr_line_init(RRDR *r, time_t t, long rrdr_line) {
 
     return rrdr_line;
 }
-
-static inline void rrdr_done(RRDR *r, long rrdr_line) {
-    r->rows = rrdr_line + 1;
-}
-
 
 // ----------------------------------------------------------------------------
 // tier management
@@ -1028,6 +1037,19 @@ typedef struct query_engine_ops {
     // statistics
     size_t db_total_points_read;
     size_t db_points_read_per_tier[RRD_STORAGE_TIERS];
+
+    struct {
+        time_t expanded_after;
+        time_t expanded_before;
+        struct storage_engine_query_handle handle;
+        STORAGE_POINT (*next_metric)(struct storage_engine_query_handle *handle);
+        int (*is_finished)(struct storage_engine_query_handle *handle);
+        void (*finalize)(struct storage_engine_query_handle *handle);
+        bool initialized;
+        bool finalized;
+    } plans[QUERY_PLANS_MAX];
+
+    struct query_engine_ops *next;
 } QUERY_ENGINE_OPS;
 
 
@@ -1084,36 +1106,37 @@ static void query_planer_initialize_plans(QUERY_ENGINE_OPS *ops) {
         time_t after = qm->plan.array[p].after - (time_t)(update_every * points_to_add_to_after);
         time_t before = qm->plan.array[p].before + (time_t)(update_every * points_to_add_to_before);
 
-        qm->plan.array[p].expanded_after = after;
-        qm->plan.array[p].expanded_before = before;
+        ops->plans[p].expanded_after = after;
+        ops->plans[p].expanded_before = before;
 
         ops->r->internal.qt->db.tiers[tier].queries++;
 
         struct query_metric_tier *tier_ptr = &qm->tiers[tier];
-        tier_ptr->eng->api.query_ops.init(
+        STORAGE_ENGINE *eng = query_metric_storage_engine(ops->r->internal.qt, qm, tier);
+        eng->api.query_ops.init(
                 tier_ptr->db_metric_handle,
-                &qm->plan.array[p].handle,
+                &ops->plans[p].handle,
                 after, before,
                 ops->r->internal.qt->request.priority);
 
-        qm->plan.array[p].next_metric = tier_ptr->eng->api.query_ops.next_metric;
-        qm->plan.array[p].is_finished = tier_ptr->eng->api.query_ops.is_finished;
-        qm->plan.array[p].finalize = tier_ptr->eng->api.query_ops.finalize;
-        qm->plan.array[p].initialized = true;
-        qm->plan.array[p].finalized = false;
+        ops->plans[p].next_metric = eng->api.query_ops.next_metric;
+        ops->plans[p].is_finished = eng->api.query_ops.is_finished;
+        ops->plans[p].finalize = eng->api.query_ops.finalize;
+        ops->plans[p].initialized = true;
+        ops->plans[p].finalized = false;
     }
 }
 
 static void query_planer_finalize_plan(QUERY_ENGINE_OPS *ops, size_t plan_id) {
-    QUERY_METRIC *qm = ops->qm;
+    // QUERY_METRIC *qm = ops->qm;
 
-    if(qm->plan.array[plan_id].initialized && !qm->plan.array[plan_id].finalized) {
-        qm->plan.array[plan_id].finalize(&qm->plan.array[plan_id].handle);
-        qm->plan.array[plan_id].initialized = false;
-        qm->plan.array[plan_id].finalized = true;
-        qm->plan.array[plan_id].next_metric = NULL;
-        qm->plan.array[plan_id].is_finished = NULL;
-        qm->plan.array[plan_id].finalize = NULL;
+    if(ops->plans[plan_id].initialized && !ops->plans[plan_id].finalized) {
+        ops->plans[plan_id].finalize(&ops->plans[plan_id].handle);
+        ops->plans[plan_id].initialized = false;
+        ops->plans[plan_id].finalized = true;
+        ops->plans[plan_id].next_metric = NULL;
+        ops->plans[plan_id].is_finished = NULL;
+        ops->plans[plan_id].finalize = NULL;
 
         if(ops->current_plan == plan_id) {
             ops->next_metric = NULL;
@@ -1134,17 +1157,17 @@ static void query_planer_activate_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, ti
     QUERY_METRIC *qm = ops->qm;
 
     internal_fatal(plan_id >= qm->plan.used, "QUERY: invalid plan_id given");
-    internal_fatal(!qm->plan.array[plan_id].initialized, "QUERY: plan has not been initialized");
-    internal_fatal(qm->plan.array[plan_id].finalized, "QUERY: plan has been finalized");
+    internal_fatal(!ops->plans[plan_id].initialized, "QUERY: plan has not been initialized");
+    internal_fatal(ops->plans[plan_id].finalized, "QUERY: plan has been finalized");
 
     internal_fatal(qm->plan.array[plan_id].after > qm->plan.array[plan_id].before, "QUERY: flipped after/before");
 
     ops->tier = qm->plan.array[plan_id].tier;
     ops->tier_ptr = &qm->tiers[ops->tier];
-    ops->handle = &qm->plan.array[plan_id].handle;
-    ops->next_metric = qm->plan.array[plan_id].next_metric;
-    ops->is_finished = qm->plan.array[plan_id].is_finished;
-    ops->finalize = qm->plan.array[plan_id].finalize;
+    ops->handle = &ops->plans[plan_id].handle;
+    ops->next_metric = ops->plans[plan_id].next_metric;
+    ops->is_finished = ops->plans[plan_id].is_finished;
+    ops->finalize = ops->plans[plan_id].finalize;
     ops->current_plan = plan_id;
 
     if(plan_id + 1 < qm->plan.used && qm->plan.array[plan_id + 1].after < qm->plan.array[plan_id].before)
@@ -1152,8 +1175,8 @@ static void query_planer_activate_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, ti
     else
         ops->current_plan_expire_time = qm->plan.array[plan_id].before;
 
-    ops->plan_expanded_after = qm->plan.array[plan_id].expanded_after;
-    ops->plan_expanded_before = qm->plan.array[plan_id].expanded_before;
+    ops->plan_expanded_after = ops->plans[plan_id].expanded_after;
+    ops->plan_expanded_before = ops->plans[plan_id].expanded_before;
 }
 
 static bool query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t last_point_end_time) {
@@ -1231,7 +1254,7 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
         // check if our selected tier can start the query
         if (selected_tier_first_time_s > after_wanted) {
             // we need some help from other tiers
-            for (size_t tr = (int)selected_tier + 1; tr < storage_tiers; tr++) {
+            for (size_t tr = (int)selected_tier + 1; tr < storage_tiers && qm->plan.used < QUERY_PLANS_MAX ; tr++) {
                 if(!query_metric_is_valid_tier(qm, tr))
                     continue;
 
@@ -1245,9 +1268,9 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
                         .tier = tr,
                         .after = (tier_first_time_s < after_wanted) ? after_wanted : tier_first_time_s,
                         .before = selected_tier_first_time_s,
-                        .initialized = false,
-                        .finalized = false,
                     };
+                    ops->plans[qm->plan.used].initialized = false;
+                    ops->plans[qm->plan.used].finalized = false;
                     qm->plan.array[qm->plan.used++] = t;
 
                     internal_fatal(!t.after || !t.before, "QUERY: invalid plan selected");
@@ -1264,7 +1287,7 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
         // check if our selected tier can finish the query
         if (selected_tier_last_time_s < before_wanted) {
             // we need some help from other tiers
-            for (int tr = (int)selected_tier - 1; tr >= 0; tr--) {
+            for (int tr = (int)selected_tier - 1; tr >= 0 && qm->plan.used < QUERY_PLANS_MAX ; tr--) {
                 if(!query_metric_is_valid_tier(qm, tr))
                     continue;
 
@@ -1280,9 +1303,9 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
                         .tier = tr,
                         .after = selected_tier_last_time_s,
                         .before = (tier_last_time_s > before_wanted) ? before_wanted : tier_last_time_s,
-                        .initialized = false,
-                        .finalized = false,
                     };
+                    ops->plans[qm->plan.used].initialized = false;
+                    ops->plans[qm->plan.used].finalized = false;
                     qm->plan.array[qm->plan.used++] = t;
 
                     // prepare for the tier
@@ -1356,10 +1379,42 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
     (ops)->group_anomaly_all_points = (point).anomaly_all_points;       \
 } while(0)
 
-static QUERY_ENGINE_OPS *rrd2rrdr_query_prep(RRDR *r, size_t dim_id_in_rrdr) {
+static __thread QUERY_ENGINE_OPS *released_ops = NULL;
+
+static void rrd2rrdr_query_ops_freeall(RRDR *r __maybe_unused) {
+    while(released_ops) {
+        QUERY_ENGINE_OPS *ops = released_ops;
+        released_ops = ops->next;
+
+        onewayalloc_freez(r->internal.owa, ops);
+    }
+}
+
+static void rrd2rrdr_query_ops_release(RRDR *r __maybe_unused, QUERY_ENGINE_OPS *ops) {
+    if(!ops) return;
+
+    ops->next = released_ops;
+    released_ops = ops;
+}
+
+static QUERY_ENGINE_OPS *rrd2rrdr_query_ops_get(RRDR *r) {
+    QUERY_ENGINE_OPS *ops;
+    if(released_ops) {
+        ops = released_ops;
+        released_ops = ops->next;
+    }
+    else {
+        ops = onewayalloc_mallocz(r->internal.owa, sizeof(QUERY_ENGINE_OPS));
+    }
+
+    memset(ops, 0, sizeof(*ops));
+    return ops;
+}
+
+static QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, size_t dim_id_in_rrdr) {
     QUERY_TARGET *qt = r->internal.qt;
 
-    QUERY_ENGINE_OPS *ops = onewayalloc_mallocz(r->internal.owa, sizeof(QUERY_ENGINE_OPS));
+    QUERY_ENGINE_OPS *ops = rrd2rrdr_query_ops_get(r);
     *ops = (QUERY_ENGINE_OPS) {
             .r = r,
             .qm = query_metric(qt, dim_id_in_rrdr),
@@ -1371,8 +1426,10 @@ static QUERY_ENGINE_OPS *rrd2rrdr_query_prep(RRDR *r, size_t dim_id_in_rrdr) {
             .group_value_flags = RRDR_VALUE_NOTHING,
     };
 
-    if(!query_plan(ops, qt->window.after, qt->window.before, qt->window.points))
+    if(!query_plan(ops, qt->window.after, qt->window.before, qt->window.points)) {
+        rrd2rrdr_query_ops_release(r, ops);
         return NULL;
+    }
 
     return ops;
 }
@@ -1412,9 +1469,10 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
     time_t now_end_time   = after_wanted + ops->view_update_every - ops->query_granularity;
 
     size_t db_points_read_since_plan_switch = 0; (void)db_points_read_since_plan_switch;
+    size_t query_is_finished_counter = 0;
 
     // The main loop, based on the query granularity we need
-    for( ; points_added < points_wanted ; now_start_time = now_end_time, now_end_time += ops->view_update_every) {
+    for( ; points_added < points_wanted && query_is_finished_counter <= 10 ; now_start_time = now_end_time, now_end_time += ops->view_update_every) {
 
         if(unlikely(query_plan_should_switch_plan(ops, now_end_time))) {
             query_planer_next_plan(ops, now_end_time, new_point.end_time);
@@ -1431,6 +1489,8 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
             }
 
             if(unlikely(ops->is_finished(ops->handle))) {
+                query_is_finished_counter++;
+
                 if(count_same_end_time != 0) {
                     last2_point = last1_point;
                     last1_point = new_point;
@@ -1443,6 +1503,8 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
 //
                 break;
             }
+            else
+                query_is_finished_counter = 0;
 
             // fetch the new point
             {
@@ -1743,16 +1805,32 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
     }
     query_planer_finalize_remaining_plans(ops);
 
-    r->stats.result_points_generated += points_added;
-    r->stats.db_points_read += ops->db_total_points_read;
-    for(size_t tr = 0; tr < storage_tiers ; tr++)
-        qt->db.tiers[tr].points += ops->db_points_read_per_tier[tr];
+    // fill the rest of the points with empty values
+    while (points_added < points_wanted) {
+        if(!max_date)
+            min_date = max_date = after_wanted + ops->view_update_every - ops->query_granularity;
+        else
+            max_date += ops->view_update_every;
+
+        rrdr_line = rrdr_line_init(r, max_date, rrdr_line);
+        size_t rrdr_o_v_index = rrdr_line * r->d + dim_id_in_rrdr;
+        r->o[rrdr_o_v_index] = RRDR_VALUE_EMPTY;
+        r->v[rrdr_o_v_index] = 0.0;
+        r->ar[rrdr_o_v_index] = 0.0;
+
+        points_added++;
+    }
 
     r->view.min = min;
     r->view.max = max;
     r->view.before = max_date;
     r->view.after = min_date - ops->view_update_every + ops->query_granularity;
-    rrdr_done(r, rrdr_line);
+    r->rows = rrdr_line + 1;
+
+    r->stats.result_points_generated += points_added;
+    r->stats.db_points_read += ops->db_total_points_read;
+    for(size_t tr = 0; tr < storage_tiers ; tr++)
+        qt->db.tiers[tr].points += ops->db_points_read_per_tier[tr];
 
     internal_error(points_added != points_wanted,
                    "QUERY: '%s', dimension '%s', requested %zu points, but RRDR added %zu (%zu db points read).",
@@ -1891,8 +1969,11 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
 #endif // NETDATA_INTERNAL_CHECKS
 
 // Returns 1 if an absolute period was requested or 0 if it was a relative period
-bool rrdr_relative_window_to_absolute(time_t *after, time_t *before) {
+bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t *now_ptr) {
     time_t now = now_realtime_sec() - 1;
+
+    if(now_ptr)
+        *now_ptr = now;
 
     int absolute_period_requested = -1;
     long long after_requested, before_requested;
@@ -2086,7 +2167,7 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     }
 
     // convert our before_wanted and after_wanted to absolute
-    rrdr_relative_window_to_absolute(&after_wanted, &before_wanted);
+    rrdr_relative_window_to_absolute(&after_wanted, &before_wanted, NULL);
     query_debug_log(":relative2absolute after %ld, before %ld", after_wanted, before_wanted);
 
     if (natural_points && (options & RRDR_OPTION_SELECTED_TIER) && tier > 0 && storage_tiers > 1) {
@@ -2363,6 +2444,8 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     size_t last_db_points_read = 0;
     size_t last_result_points_generated = 0;
 
+    internal_fatal(released_ops, "QUERY: released_ops should be NULL when the query starts");
+
     QUERY_ENGINE_OPS **ops = NULL;
     if(qt->query.used)
         ops = onewayalloc_callocz(r->internal.owa, qt->query.used, sizeof(QUERY_ENGINE_OPS *));
@@ -2372,35 +2455,37 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     size_t queries_prepared = 0;
     while(queries_prepared < max_queries_to_prepare) {
         // preload another query
-        ops[queries_prepared] = rrd2rrdr_query_prep(r, queries_prepared);
+        ops[queries_prepared] = rrd2rrdr_query_ops_prep(r, queries_prepared);
         queries_prepared++;
     }
 
-    for(size_t c = 0, max = qt->query.used; c < max ; c++) {
-        QUERY_METRIC *qm = query_metric(qt, c);
+    for(size_t d = 0, max = qt->query.used; d < max ; d++) {
+        QUERY_METRIC *qm = query_metric(qt, d);
         QUERY_DIMENSION *qd = query_dimension(qt, qm->link.query_dimension_id);
         QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
         QUERY_CONTEXT *qc = query_context(qt, qm->link.query_context_id);
-        QUERY_NODE *qn = query_node(qt, qm->link.query_host_id);
+        QUERY_NODE *qn = query_node(qt, qm->link.query_node_id);
 
         if(queries_prepared < max) {
             // preload another query
-            ops[queries_prepared] = rrd2rrdr_query_prep(r, queries_prepared);
+            ops[queries_prepared] = rrd2rrdr_query_ops_prep(r, queries_prepared);
             queries_prepared++;
         }
 
         // set the query target dimension options to rrdr
-        r->od[c] = qm->status;
+        r->od[d] = qm->status;
 
         // reset the grouping for the new dimension
         r->grouping.reset(r);
 
-        if(ops[c]) {
-            rrd2rrdr_query_execute(r, c, ops[c]);
+        if(ops[d]) {
+            rrd2rrdr_query_execute(r, d, ops[d]);
+            rrd2rrdr_query_ops_release(r, ops[d]); // reuse this ops allocation
+            ops[d] = NULL;
 
-            r->od[c] |= RRDR_DIMENSION_QUERIED;
-            r->di[c] = rrdmetric_acquired_id_dup(qd->rma);
-            r->dn[c] = rrdmetric_acquired_name_dup(qd->rma);
+            r->od[d] |= RRDR_DIMENSION_QUERIED;
+            r->di[d] = rrdmetric_acquired_id_dup(qd->rma);
+            r->dn[d] = rrdmetric_acquired_name_dup(qd->rma);
 
             qi->metrics.queried++;
             qc->metrics.queried++;
@@ -2439,7 +2524,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         if (qt->request.timeout)
             now_realtime_timeval(&query_current_time);
 
-        if(r->od[c] & RRDR_DIMENSION_NONZERO)
+        if(r->od[d] & RRDR_DIMENSION_NONZERO)
             dimensions_nonzero++;
 
         // verify all dimensions are aligned
@@ -2477,9 +2562,12 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                        (NETDATA_DOUBLE)dt_usec(&query_start_time, &query_current_time) / 1000.0, (long long)qt->request.timeout);
             r->view.flags |= RRDR_RESULT_FLAG_CANCEL;
 
-            for(size_t i = c + 1; i < queries_prepared ; i++) {
-                if(ops[i])
+            for(size_t i = d + 1; i < queries_prepared ; i++) {
+                if(ops[i]) {
                     query_planer_finalize_remaining_plans(ops[i]);
+                    rrd2rrdr_query_ops_release(r, ops[i]);
+                    ops[i] = NULL;
+                }
             }
 
             break;
@@ -2564,8 +2652,12 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 #endif
 
     // free the query pipelining ops
-    for(size_t c = 0; c < qt->query.used ;c++)
-        onewayalloc_freez(owa, ops[c]);
+    for(size_t d = 0; d < qt->query.used ; d++) {
+        rrd2rrdr_query_ops_release(r, ops[d]);
+        ops[d] = NULL;
+    }
+    rrd2rrdr_query_ops_freeall(r);
+    internal_fatal(released_ops, "QUERY: released_ops should be NULL when the query ends");
 
     onewayalloc_freez(owa, ops);
 

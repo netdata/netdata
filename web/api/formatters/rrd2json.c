@@ -11,6 +11,10 @@ inline bool query_target_has_percentage_units(struct query_target *qt) {
     return false;
 }
 
+bool query_target_aggregatable(struct query_target *qt) {
+    return (qt->request.options & RRDR_OPTION_RETURN_RAW);
+}
+
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb) {
     rrdset2json(st, wb, NULL, NULL, 0);
 }
@@ -19,6 +23,9 @@ const char *rrdr_format_to_string(DATASOURCE_FORMAT format)  {
     switch(format) {
         case DATASOURCE_JSON:
             return DATASOURCE_FORMAT_JSON;
+
+        case DATASOURCE_JSON2:
+            return DATASOURCE_FORMAT_JSON2;
 
         case DATASOURCE_DATATABLE_JSON:
             return DATASOURCE_FORMAT_DATATABLE_JSON;
@@ -174,58 +181,74 @@ static RRDR *data_query_group_by(RRDR *r) {
     if(!qt->group_by.used)
         qt->request.group_by &= ~RRDR_GROUP_BY_LABEL;
 
-    if(!(qt->request.group_by & (RRDR_GROUP_BY_NODE | RRDR_GROUP_BY_INSTANCE | RRDR_GROUP_BY_DIMENSION | RRDR_GROUP_BY_LABEL)))
+    if(!(qt->request.group_by & (RRDR_GROUP_BY_NODE | RRDR_GROUP_BY_INSTANCE | RRDR_GROUP_BY_DIMENSION | RRDR_GROUP_BY_LABEL | RRDR_GROUP_BY_SELECTED)))
         qt->request.group_by = RRDR_GROUP_BY_DIMENSION;
 
     int added = 0;
     BUFFER *key = buffer_create(0, NULL);
     QUERY_INSTANCE *last_qi = NULL;
     size_t priority = 0;
-    for(size_t c = 0; c < qt->query.used ;c++) {
-        if(!rrdr_dimension_should_be_exposed(r->od[c], options))
+    time_t update_every_max = 0;
+    for(size_t d = 0; d < qt->query.used ; d++) {
+        if(unlikely(!(r->od[d] & RRDR_DIMENSION_QUERIED)))
             continue;
 
-        QUERY_METRIC *qm = query_metric(qt, c);
+        QUERY_METRIC *qm = query_metric(qt, d);
         QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
-        QUERY_NODE *qn = query_node(qt, qm->link.query_host_id);
+        QUERY_NODE *qn = query_node(qt, qm->link.query_node_id);
 
         if(qi != last_qi) {
             priority = 0;
             last_qi = qi;
+
+            time_t update_every = rrdinstance_acquired_update_every(qi->ria);
+            if(update_every > update_every_max)
+                update_every_max = update_every;
         }
         else
             priority++;
 
+        // --------------------------------------------------------------------
         // generate the group by key
 
         buffer_flush(key);
-        if(qt->request.group_by & RRDR_GROUP_BY_DIMENSION) {
-            buffer_fast_strcat(key, "|", 1);
-            buffer_strcat(key, query_metric_id(qt, qm));
+        if(unlikely(r->od[d] & RRDR_DIMENSION_HIDDEN)) {
+            buffer_strcat(key, "__hidden_dimensions__");
         }
-        if(qt->request.group_by & RRDR_GROUP_BY_INSTANCE) {
-            buffer_fast_strcat(key, "|", 1);
-            buffer_strcat(key, string2str(query_instance_id_fqdn(qt, qi)));
-        }
-        if(qt->request.group_by & RRDR_GROUP_BY_LABEL) {
-            DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
-            for(size_t l = 0; l < qt->group_by.used ;l++) {
-                buffer_fast_strcat(key, "|", 1);
-                rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by.label_keys[l], "[unset]");
-            }
-        }
-        if(qt->request.group_by & RRDR_GROUP_BY_NODE) {
-            buffer_fast_strcat(key, "|", 1);
-            buffer_strcat(key, qn->rrdhost->machine_guid);
-        }
-
-        // append the units
-        if(query_target_has_percentage_units(qt)) {
-            buffer_fast_strcat(key, "|%", 2);
+        else if(unlikely(qt->request.group_by & RRDR_GROUP_BY_SELECTED)) {
+            buffer_strcat(key, "selected");
         }
         else {
-            buffer_fast_strcat(key, "|", 1);
-            buffer_strcat(key, rrdinstance_acquired_units(qi->ria));
+            if (qt->request.group_by & RRDR_GROUP_BY_DIMENSION) {
+                buffer_fast_strcat(key, "|", 1);
+                buffer_strcat(key, query_metric_id(qt, qm));
+            }
+
+            if (qt->request.group_by & RRDR_GROUP_BY_INSTANCE) {
+                buffer_fast_strcat(key, "|", 1);
+                buffer_strcat(key, string2str(query_instance_id_fqdn(qt, qi)));
+            }
+
+            if (qt->request.group_by & RRDR_GROUP_BY_LABEL) {
+                DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
+                for (size_t l = 0; l < qt->group_by.used; l++) {
+                    buffer_fast_strcat(key, "|", 1);
+                    rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by.label_keys[l], "[unset]");
+                }
+            }
+
+            if (qt->request.group_by & RRDR_GROUP_BY_NODE) {
+                buffer_fast_strcat(key, "|", 1);
+                buffer_strcat(key, qn->rrdhost->machine_guid);
+            }
+
+            // append the units
+            if (query_target_has_percentage_units(qt)) {
+                buffer_fast_strcat(key, "|%", 2);
+            } else {
+                buffer_fast_strcat(key, "|", 1);
+                buffer_strcat(key, rrdinstance_acquired_units(qi->ria));
+            }
         }
 
         // lookup the key in the dictionary
@@ -237,66 +260,92 @@ static RRDR *data_query_group_by(RRDR *r) {
 
             *set = pos = added++;
 
+            // ----------------------------------------------------------------
             // generate the dimension id
 
             buffer_flush(key);
-            if(qt->request.group_by & RRDR_GROUP_BY_DIMENSION) {
-                buffer_strcat(key, query_metric_id(qt, qm));
+            if(unlikely(r->od[d] & RRDR_DIMENSION_HIDDEN)) {
+                buffer_strcat(key, "__hidden_dimensions__");
             }
-            if(qt->request.group_by & RRDR_GROUP_BY_INSTANCE) {
-                if(buffer_strlen(key) != 0)
-                    buffer_fast_strcat(key, ",", 1);
+            else if(unlikely(qt->request.group_by & RRDR_GROUP_BY_SELECTED)) {
+                buffer_strcat(key, "selected");
+            }
+            else {
+                if (qt->request.group_by & RRDR_GROUP_BY_DIMENSION) {
+                    buffer_strcat(key, query_metric_id(qt, qm));
+                }
 
-                if(qt->request.group_by & RRDR_GROUP_BY_NODE)
-                    buffer_strcat(key, rrdinstance_acquired_id(qi->ria));
-                else
-                    buffer_strcat(key, string2str(query_instance_id_fqdn(qt, qi)));
-            }
-            if(qt->request.group_by & RRDR_GROUP_BY_LABEL) {
-                DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
-                for(size_t l = 0; l < qt->group_by.used ;l++) {
-                    if(buffer_strlen(key) != 0)
+                if (qt->request.group_by & RRDR_GROUP_BY_INSTANCE) {
+                    if (buffer_strlen(key) != 0)
                         buffer_fast_strcat(key, ",", 1);
-                    rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by.label_keys[l], "[unset]");
+
+                    if (qt->request.group_by & RRDR_GROUP_BY_NODE)
+                        buffer_strcat(key, rrdinstance_acquired_id(qi->ria));
+                    else
+                        buffer_strcat(key, string2str(query_instance_id_fqdn(qt, qi)));
+                }
+
+                if (qt->request.group_by & RRDR_GROUP_BY_LABEL) {
+                    DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
+                    for (size_t l = 0; l < qt->group_by.used; l++) {
+                        if (buffer_strlen(key) != 0)
+                            buffer_fast_strcat(key, ",", 1);
+                        rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by.label_keys[l], "[unset]");
+                    }
+                }
+
+                if (qt->request.group_by & RRDR_GROUP_BY_NODE) {
+                    if (buffer_strlen(key) != 0)
+                        buffer_fast_strcat(key, ",", 1);
+
+                    buffer_strcat(key, qn->rrdhost->machine_guid);
                 }
             }
-            if(qt->request.group_by & RRDR_GROUP_BY_NODE) {
-                if(buffer_strlen(key) != 0)
-                    buffer_fast_strcat(key, ",", 1);
 
-                buffer_strcat(key, qn->rrdhost->machine_guid);
-            }
             entries[pos].id = string_strdupz(buffer_tostring(key));
 
+            // ----------------------------------------------------------------
             // generate the dimension name
 
             buffer_flush(key);
-            if(qt->request.group_by & RRDR_GROUP_BY_DIMENSION) {
-                buffer_strcat(key, query_metric_name(qt, qm));
+            if(unlikely(r->od[d] & RRDR_DIMENSION_HIDDEN)) {
+                buffer_strcat(key, "__hidden_dimensions__");
             }
-            if(qt->request.group_by & RRDR_GROUP_BY_INSTANCE) {
-                if(buffer_strlen(key) != 0)
-                    buffer_fast_strcat(key, ",", 1);
+            else if(unlikely(qt->request.group_by & RRDR_GROUP_BY_SELECTED)) {
+                buffer_strcat(key, "selected");
+            }
+            else {
+                if (qt->request.group_by & RRDR_GROUP_BY_DIMENSION) {
+                    buffer_strcat(key, query_metric_name(qt, qm));
+                }
 
-                if(qt->request.group_by & RRDR_GROUP_BY_NODE)
-                    buffer_strcat(key, rrdinstance_acquired_name(qi->ria));
-                else
-                    buffer_strcat(key, string2str(query_instance_name_fqdn(qt, qi)));
-            }
-            if(qt->request.group_by & RRDR_GROUP_BY_LABEL) {
-                DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
-                for(size_t l = 0; l < qt->group_by.used ;l++) {
-                    if(buffer_strlen(key) != 0)
+                if (qt->request.group_by & RRDR_GROUP_BY_INSTANCE) {
+                    if (buffer_strlen(key) != 0)
                         buffer_fast_strcat(key, ",", 1);
-                    rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by.label_keys[l], "[unset]");
+
+                    if (qt->request.group_by & RRDR_GROUP_BY_NODE)
+                        buffer_strcat(key, rrdinstance_acquired_name(qi->ria));
+                    else
+                        buffer_strcat(key, string2str(query_instance_name_fqdn(qt, qi)));
+                }
+
+                if (qt->request.group_by & RRDR_GROUP_BY_LABEL) {
+                    DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
+                    for (size_t l = 0; l < qt->group_by.used; l++) {
+                        if (buffer_strlen(key) != 0)
+                            buffer_fast_strcat(key, ",", 1);
+                        rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by.label_keys[l], "[unset]");
+                    }
+                }
+
+                if (qt->request.group_by & RRDR_GROUP_BY_NODE) {
+                    if (buffer_strlen(key) != 0)
+                        buffer_fast_strcat(key, ",", 1);
+
+                    buffer_strcat(key, rrdhost_hostname(qn->rrdhost));
                 }
             }
-            if(qt->request.group_by & RRDR_GROUP_BY_NODE) {
-                if(buffer_strlen(key) != 0)
-                    buffer_fast_strcat(key, ",", 1);
 
-                buffer_strcat(key, rrdhost_hostname(qn->rrdhost));
-            }
             entries[pos].name = string_strdupz(buffer_tostring(key));
 
             // add the rest of the info
@@ -321,8 +370,8 @@ static RRDR *data_query_group_by(RRDR *r) {
         // copy the dimension flags decided by the query target
         // we need this, because if a dimension is explicitly selected
         // the query target adds to it the non-zero flag
-        qm->status |= RRDR_DIMENSION_GROUPED | r->od[c];
-        entries[pos].od |= RRDR_DIMENSION_GROUPED | r->od[c];
+        qm->status |= RRDR_DIMENSION_GROUPED | r->od[d];
+        entries[pos].od |= RRDR_DIMENSION_GROUPED | r->od[d];
     }
 
     // check if we have multiple units
@@ -362,14 +411,21 @@ static RRDR *data_query_group_by(RRDR *r) {
     r2->stats.result_points_generated = r2->d * r2->n;
 
     // initialize r2 (dimension options, names, and ids)
-    for(size_t c2 = 0; c2 < r2->d ; c2++) {
-        r2->od[c2] = entries[c2].od;
-        r2->di[c2] = entries[c2].id;
-        r2->dn[c2] = entries[c2].name;
-        r2->du[c2] = entries[c2].units;
-        r2->dp[c2] = entries[c2].priority;
-        r2->dgbc[c2] = entries[c2].count;
+    for(size_t d2 = 0; d2 < r2->d ; d2++) {
+        r2->od[d2] = entries[d2].od;
+        r2->di[d2] = entries[d2].id;
+        r2->dn[d2] = entries[d2].name;
+        r2->du[d2] = entries[d2].units;
+        r2->dp[d2] = entries[d2].priority;
+        r2->dgbc[d2] = entries[d2].count;
     }
+
+    r2->partial_data_trimming.max_update_every = update_every_max;
+    r2->partial_data_trimming.expected_after =
+            (!(qt->request.options & RRDR_OPTION_RETURN_RAW) && qt->window.before >= qt->window.now - update_every_max) ?
+            qt->window.before - update_every_max :
+            qt->window.before;
+    r2->partial_data_trimming.trimmed_after = qt->window.before;
 
     // initialize r2 (timestamps and value flags)
     for(size_t i = 0; i != rows ;i++) {
@@ -380,15 +436,17 @@ static RRDR *data_query_group_by(RRDR *r) {
         NETDATA_DOUBLE *cn2 = &r2->v[ i * r2->d ];
         RRDR_VALUE_FLAGS *co2 = &r2->o[ i * r2->d ];
         NETDATA_DOUBLE *ar2 = &r2->ar[ i * r2->d ];
-        for (size_t c2 = 0; c2 < r2->d; c2++) {
-            cn2[c2] = 0.0;
-            ar2[c2] = 0.0;
-            co2[c2] = RRDR_VALUE_EMPTY;
+        for (size_t d2 = 0; d2 < r2->d; d2++) {
+            cn2[d2] = 0.0;
+            ar2[d2] = 0.0;
+            co2[d2] = RRDR_VALUE_EMPTY;
         }
     }
 
     // do the group_by
+    size_t last_row_gbc = 0;
     for(size_t i = 0; i != rows ;i++) {
+
         size_t idx = i * r->d;
         NETDATA_DOUBLE *cn_base = &r->v[ idx ];
         RRDR_VALUE_FLAGS *co_base = &r->o[ idx ];
@@ -400,13 +458,14 @@ static RRDR *data_query_group_by(RRDR *r) {
         NETDATA_DOUBLE *ar2_base = &r2->ar[ idx2 ];
         uint32_t *gbc2_base = &r2->gbc[ idx2 ];
 
-        for(size_t c = 0; c < r->d ;c++) {
-            if (!rrdr_dimension_should_be_exposed(r->od[c], options))
+        size_t row_gbc = 0;
+        for(size_t d = 0; d < r->d ; d++) {
+            if(unlikely(!(r->od[d] & RRDR_DIMENSION_QUERIED)))
                 continue;
 
-            NETDATA_DOUBLE n = cn_base[c];
-            RRDR_VALUE_FLAGS o = co_base[c];
-            NETDATA_DOUBLE ar = ar_base[c];
+            NETDATA_DOUBLE n = cn_base[d];
+            RRDR_VALUE_FLAGS o = co_base[d];
+            NETDATA_DOUBLE ar = ar_base[d];
 
             if(o & RRDR_VALUE_EMPTY) {
                 if(options & RRDR_OPTION_NULL2ZERO)
@@ -418,19 +477,18 @@ static RRDR *data_query_group_by(RRDR *r) {
             if(unlikely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
                 n = -n;
 
-            QUERY_METRIC *qm = query_metric(qt, c);
-            size_t c2 = qm->grouped_as.slot;
+            QUERY_METRIC *qm = query_metric(qt, d);
+            size_t d2 = qm->grouped_as.slot;
 
-            NETDATA_DOUBLE *cn2 = &cn2_base[c2];
-            RRDR_VALUE_FLAGS *co2 = &co2_base[c2];
-            NETDATA_DOUBLE *ar2 = &ar2_base[c2];
-            uint32_t *gbc2 = &gbc2_base[c2];
+            NETDATA_DOUBLE *cn2 = &cn2_base[d2];
+            RRDR_VALUE_FLAGS *co2 = &co2_base[d2];
+            NETDATA_DOUBLE *ar2 = &ar2_base[d2];
+            uint32_t *gbc2 = &gbc2_base[d2];
 
             switch(qt->request.group_by_aggregate_function) {
                 default:
                 case RRDR_GROUP_BY_FUNCTION_AVERAGE:
                 case RRDR_GROUP_BY_FUNCTION_SUM:
-                case RRDR_GROUP_BY_FUNCTION_SUM_COUNT:
                     *cn2 += n;
                     break;
 
@@ -448,17 +506,29 @@ static RRDR *data_query_group_by(RRDR *r) {
             *co2 |= (o & (RRDR_VALUE_RESET|RRDR_VALUE_PARTIAL));
             *ar2 += ar;
             (*gbc2)++;
+
+            row_gbc++;
         }
+
+        if(unlikely(r->t[i] > r2->partial_data_trimming.expected_after && row_gbc < last_row_gbc)) {
+            // discard the rest of the points
+            r2->partial_data_trimming.trimmed_after = r->t[i];
+            r2->rows = i;
+            rows = i;
+            break;
+        }
+        else
+            last_row_gbc = row_gbc;
     }
 
     // apply averaging, remove RRDR_VALUE_EMPTY, find the non-zero dimensions, min and max
     size_t min_max_values = 0;
     NETDATA_DOUBLE min = NAN, max = NAN;
-    for (size_t c2 = 0; c2 < r2->d; c2++) {
+    for (size_t d2 = 0; d2 < r2->d; d2++) {
         size_t non_zero = 0;
 
         for(size_t i = 0; i != rows ;i++) {
-            size_t idx2 = i * r2->d + c2;
+            size_t idx2 = i * r2->d + d2;
 
             NETDATA_DOUBLE *cn2 = &r2->v[ idx2 ];
             RRDR_VALUE_FLAGS *co2 = &r2->o[ idx2 ];
@@ -468,23 +538,18 @@ static RRDR *data_query_group_by(RRDR *r) {
             if(likely(gbc2)) {
                 *co2 &= ~RRDR_VALUE_EMPTY;
 
-                if(gbc2 != r2->dgbc[c2])
+                if(gbc2 != r2->dgbc[d2])
                     *co2 |= RRDR_VALUE_PARTIAL;
 
                 NETDATA_DOUBLE n;
 
-                if(qt->request.group_by_aggregate_function == RRDR_GROUP_BY_FUNCTION_SUM_COUNT) {
-                    n = *cn2 / gbc2;
-                }
-                else if(qt->request.group_by_aggregate_function == RRDR_GROUP_BY_FUNCTION_AVERAGE) {
-                    *ar2 /= gbc2;
-                    n = *cn2 / gbc2;
-                    *cn2 = n;
-                }
-                else {
-                    *ar2 /= gbc2;
+                if(qt->request.group_by_aggregate_function == RRDR_GROUP_BY_FUNCTION_AVERAGE)
+                    n = (*cn2 /= gbc2);
+                else
                     n = *cn2;
-                }
+
+                if(!query_target_aggregatable(qt))
+                    *ar2 /= gbc2;
 
                 if(islessgreater(n, 0.0))
                     non_zero++;
@@ -504,7 +569,7 @@ static RRDR *data_query_group_by(RRDR *r) {
         }
 
         if(non_zero)
-            r2->od[c2] |= RRDR_DIMENSION_NONZERO;
+            r2->od[d2] |= RRDR_DIMENSION_NONZERO;
     }
 
     r2->view.min = min;
@@ -514,9 +579,9 @@ cleanup:
     buffer_free(key);
 
     if(!r2 && entries && added) {
-        for(long c = 0; c < added ;c++) {
-            string_freez(entries[c].id);
-            string_freez(entries[c].name);
+        for(int d2 = 0; d2 < added ; d2++) {
+            string_freez(entries[d2].id);
+            string_freez(entries[d2].name);
         }
     }
     onewayalloc_freez(r->internal.owa, entries);
@@ -759,19 +824,23 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         rrdr2json(r, wb, options, 0);
 
         if(options & RRDR_OPTION_JSON_WRAP) {
-            if(qt->request.group_by_aggregate_function == RRDR_GROUP_BY_FUNCTION_SUM_COUNT) {
+            if (query_target_aggregatable(qt)) {
                 buffer_json_member_add_key_only(wb, "group_by_count");
                 rrdr2json(r, wb, options | RRDR_OPTION_INTERNAL_GBC, false);
             }
-            if(options & RRDR_OPTION_RETURN_JWAR) {
+            if (options & RRDR_OPTION_RETURN_JWAR) {
                 buffer_json_member_add_key_only(wb, "anomaly_rates");
                 rrdr2json(r, wb, options | RRDR_OPTION_INTERNAL_AR, false);
             }
-            if(options & RRDR_OPTION_JW_ANNOTATIONS) {
-                rrdr_json_wrapper_annotations(r, wb, format, options);
-            }
             wrapper_end(r, wb, format, options);
         }
+        break;
+
+    case DATASOURCE_JSON2:
+        wb->content_type = CT_APPLICATION_JSON;
+        wrapper_begin(r, wb, format, options, group_method);
+        rrdr2json_v2(r, wb, format, options);
+        wrapper_end(r, wb, format, options);
         break;
     }
 

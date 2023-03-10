@@ -732,6 +732,15 @@ static inline void buffer_json_add_array_item_time_t(BUFFER *wb, time_t value) {
     wb->json.stack[wb->json.depth].count++;
 }
 
+static inline void buffer_json_add_array_item_time_ms(BUFFER *wb, time_t value) {
+    if(wb->json.stack[wb->json.depth].count)
+        buffer_fast_strcat(wb, ",", 1);
+
+    buffer_print_int64(wb, value);
+    buffer_fast_strcat(wb, "000", 3);
+    wb->json.stack[wb->json.depth].count++;
+}
+
 static inline void buffer_json_add_array_item_time_t2ms(BUFFER *wb, time_t value) {
     if(wb->json.stack[wb->json.depth].count)
         buffer_fast_strcat(wb, ",", 1);

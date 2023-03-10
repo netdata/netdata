@@ -32,6 +32,8 @@ extern int web_enable_gzip, web_gzip_level, web_gzip_strategy;
 #define HTTP_RESP_GATEWAY_TIMEOUT 504
 #define HTTP_RESP_BACKEND_RESPONSE_INVALID 591
 
+#define HTTP_REQ_MAX_HEADER_FETCH_TRIES 100
+
 extern int respect_web_browser_do_not_track_policy;
 extern char *web_x_frame_options;
 
@@ -45,12 +47,12 @@ typedef enum web_client_mode {
 typedef enum {
     HTTP_VALIDATION_OK,
     HTTP_VALIDATION_NOT_SUPPORTED,
+    HTTP_VALIDATION_TOO_MANY_READ_RETRIES,
+    HTTP_VALIDATION_EXCESS_REQUEST_DATA,
     HTTP_VALIDATION_MALFORMED_URL,
-#ifdef ENABLE_HTTPS
     HTTP_VALIDATION_INCOMPLETE,
+#ifdef ENABLE_HTTPS
     HTTP_VALIDATION_REDIRECT
-#else
-    HTTP_VALIDATION_INCOMPLETE
 #endif
 } HTTP_VALIDATION;
 
@@ -118,14 +120,16 @@ typedef enum web_client_flags {
 
 #define web_client_is_corkable(w) web_client_flag_check(w, WEB_CLIENT_FLAG_TCP_CLIENT)
 
-#define NETDATA_WEB_REQUEST_URL_SIZE 8192
+#define NETDATA_WEB_REQUEST_URL_SIZE 65536              // static allocation
+#define NETDATA_WEB_REQUEST_COOKIE_SIZE 1024            // static allocation
+#define NETDATA_WEB_REQUEST_ORIGIN_HEADER_SIZE 1024     // static allocation
+
 #define NETDATA_WEB_RESPONSE_ZLIB_CHUNK_SIZE 16384
-#define NETDATA_WEB_RESPONSE_HEADER_SIZE 4096
-#define NETDATA_WEB_REQUEST_COOKIE_SIZE 1024
-#define NETDATA_WEB_REQUEST_ORIGIN_HEADER_SIZE 1024
-#define NETDATA_WEB_RESPONSE_INITIAL_SIZE 16384
-#define NETDATA_WEB_REQUEST_RECEIVE_SIZE 16384
-#define NETDATA_WEB_REQUEST_MAX_SIZE 16384
+
+#define NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE 4096
+#define NETDATA_WEB_RESPONSE_INITIAL_SIZE 8192
+#define NETDATA_WEB_REQUEST_INITIAL_SIZE 8192
+#define NETDATA_WEB_REQUEST_MAX_SIZE 65536
 
 struct response {
     BUFFER *header;        // our response header

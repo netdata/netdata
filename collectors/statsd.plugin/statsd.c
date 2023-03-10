@@ -2129,7 +2129,7 @@ static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC
                         strcpy(wildcarded, dim->name);
                         char *ws = &wildcarded[dim_name_len];
 
-                        if(simple_pattern_matches_extract(dim->metric_pattern, m->name, ws, wildcarded_len - dim_name_len)) {
+                        if(simple_pattern_matches_extract(dim->metric_pattern, m->name, ws, wildcarded_len - dim_name_len) == SP_MATCHED_POSITIVE) {
 
                             char *final_name = NULL;
 

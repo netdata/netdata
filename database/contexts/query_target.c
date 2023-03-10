@@ -2,7 +2,11 @@
 
 #include "internal.h"
 
-static void query_metric_release(QUERY_METRIC *qm);
+#define QUERY_TARGET_MAX_REALLOC_INCREASE 500
+#define query_target_realloc_size(size, start) \
+            (size) ? ((size) < QUERY_TARGET_MAX_REALLOC_INCREASE ? (size) * 2 : (size) + QUERY_TARGET_MAX_REALLOC_INCREASE) : (start);
+
+static void query_metric_release(QUERY_TARGET *qt, QUERY_METRIC *qm);
 static void query_dimension_release(QUERY_DIMENSION *qd);
 static void query_instance_release(QUERY_INSTANCE *qi);
 static void query_context_release(QUERY_CONTEXT *qc);
@@ -72,7 +76,7 @@ void query_target_release(QUERY_TARGET *qt) {
     // release the query
     for(size_t i = 0, used = qt->query.used; i < used ;i++) {
         QUERY_METRIC *qm = query_metric(qt, i);
-        query_metric_release(qm);
+        query_metric_release(qt, qm);
     }
     qt->query.used = 0;
 
@@ -151,26 +155,20 @@ void query_target_free(void) {
     (((first_entry_s) - ((update_every_s) * 2) <= (qt)->window.before) &&                     \
      ((last_entry_s)  + ((update_every_s) * 2) >= (qt)->window.after))
 
+struct storage_engine *query_metric_storage_engine(QUERY_TARGET *qt, QUERY_METRIC *qm, size_t tier) {
+    QUERY_NODE *qn = query_node(qt, qm->link.query_node_id);
+    return qn->rrdhost->db[tier].eng;
+}
 
-static inline void query_metric_release(QUERY_METRIC *qm) {
-    // reset the plans
-    for(size_t p = 0; p < qm->plan.used; p++) {
-        internal_fatal(qm->plan.array[p].initialized &&
-                       !qm->plan.array[p].finalized,
-                       "QUERY: left-over initialized plan");
-
-        qm->plan.array[p].initialized = false;
-        qm->plan.array[p].finalized = false;
-    }
+static inline void query_metric_release(QUERY_TARGET *qt, QUERY_METRIC *qm) {
     qm->plan.used = 0;
 
     // reset the tiers
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
         if(qm->tiers[tier].db_metric_handle) {
-            STORAGE_ENGINE *eng = qm->tiers[tier].eng;
+            STORAGE_ENGINE *eng = query_metric_storage_engine(qt, qm, tier);
             eng->api.metric_release(qm->tiers[tier].db_metric_handle);
             qm->tiers[tier].db_metric_handle = NULL;
-            qm->tiers[tier].eng = NULL;
         }
     }
 }
@@ -253,7 +251,7 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
 
         if (qt->query.used == qt->query.size) {
             size_t old_mem = qt->query.size * sizeof(*qt->query.array);
-            qt->query.size = (qt->query.size) ? qt->query.size * 2 : 1;
+            qt->query.size = query_target_realloc_size(qt->query.size, 4);
             size_t new_mem = qt->query.size * sizeof(*qt->query.array);
             qt->query.array = reallocz(qt->query.array, new_mem);
 
@@ -264,7 +262,7 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
 
         qm->status = options;
 
-        qm->link.query_host_id = qn->slot;
+        qm->link.query_node_id = qn->slot;
         qm->link.query_context_id = qc->slot;
         qm->link.query_instance_id = qi->slot;
         qm->link.query_dimension_id = qd_slot;
@@ -276,7 +274,7 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
             qt->db.last_time_s = common_last_time_s;
 
         for (size_t tier = 0; tier < storage_tiers; tier++) {
-            qm->tiers[tier].eng = tier_retention[tier].eng;
+            internal_fatal(tier_retention[tier].eng != query_metric_storage_engine(qt, qm, tier), "QUERY TARGET: storage engine mismatch");
             qm->tiers[tier].db_metric_handle = tier_retention[tier].db_metric_handle;
             qm->tiers[tier].db_first_time_s = tier_retention[tier].db_first_time_s;
             qm->tiers[tier].db_last_time_s = tier_retention[tier].db_last_time_s;
@@ -285,15 +283,14 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
 
         return true;
     }
-    else {
-        // cleanup anything we allocated to the retention we will not use
-        for(size_t tier = 0; tier < storage_tiers ;tier++) {
-            if (tier_retention[tier].db_metric_handle)
-                tier_retention[tier].eng->api.metric_release(tier_retention[tier].db_metric_handle);
-        }
 
-        return false;
+    // cleanup anything we allocated to the retention we will not use
+    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+        if (tier_retention[tier].db_metric_handle)
+            tier_retention[tier].eng->api.metric_release(tier_retention[tier].db_metric_handle);
     }
+
+    return false;
 }
 
 static inline bool rrdmetric_retention_matches_query(QUERY_TARGET *qt, RRDMETRIC *rm, time_t now_s) {
@@ -311,7 +308,7 @@ static inline void query_dimension_release(QUERY_DIMENSION *qd) {
 static QUERY_DIMENSION *query_dimension_allocate(QUERY_TARGET *qt, RRDMETRIC_ACQUIRED *rma, QUERY_STATUS status) {
     if(qt->dimensions.used == qt->dimensions.size) {
         size_t old_mem = qt->dimensions.size * sizeof(*qt->dimensions.array);
-        qt->dimensions.size = (qt->dimensions.size) ? qt->dimensions.size * 2 : 1;
+        qt->dimensions.size = query_target_realloc_size(qt->dimensions.size, 4);
         size_t new_mem = qt->dimensions.size * sizeof(*qt->dimensions.array);
         qt->dimensions.array = reallocz(qt->dimensions.array, new_mem);
 
@@ -355,10 +352,15 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
         if (qt->query.pattern) {
             // the user asked for specific dimensions
 
-            if ((qtl->match_ids && simple_pattern_matches_string(qt->query.pattern, rm->id)) ||
-                (qtl->match_names && rm->name != rm->id &&
-                 simple_pattern_matches_string(qt->query.pattern, rm->name))) {
-                // the user asked for this dimension
+            SIMPLE_PATTERN_RESULT ret = SP_NOT_MATCHED;
+
+            if(qtl->match_ids)
+                ret = simple_pattern_matches_string_extract(qt->query.pattern, rm->id, NULL, 0);
+
+            if(ret == SP_NOT_MATCHED && qtl->match_names && (rm->name != rm->id || !qtl->match_ids))
+                ret = simple_pattern_matches_string_extract(qt->query.pattern, rm->name, NULL, 0);
+
+            if(ret == SP_MATCHED_POSITIVE) {
                 needed = true;
                 options |= RRDR_DIMENSION_SELECTED | RRDR_DIMENSION_NONZERO;
             }
@@ -568,12 +570,16 @@ static bool query_target_match_alert_pattern(QUERY_INSTANCE *qi, SIMPLE_PATTERN 
     netdata_rwlock_rdlock(&st->alerts.rwlock);
     if (st->alerts.base) {
         for (RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
-            if(simple_pattern_matches_string(pattern, rc->name)) {
+            SIMPLE_PATTERN_RESULT ret = simple_pattern_matches_string_extract(pattern, rc->name, NULL, 0);
+
+            if(ret == SP_MATCHED_POSITIVE) {
                 matched = true;
                 break;
             }
+            else if(ret == SP_MATCHED_NEGATIVE)
+                break;
 
-            if(!wb)
+            if (!wb)
                 wb = buffer_create(0, NULL);
             else
                 buffer_flush(wb);
@@ -582,10 +588,14 @@ static bool query_target_match_alert_pattern(QUERY_INSTANCE *qi, SIMPLE_PATTERN 
             buffer_fast_strcat(wb, ":", 1);
             buffer_strcat(wb, rrdcalc_status2string(rc->status));
 
-            if(simple_pattern_matches_buffer(pattern, wb)) {
+            ret = simple_pattern_matches_buffer_extract(pattern, wb, NULL, 0);
+
+            if(ret == SP_MATCHED_POSITIVE) {
                 matched = true;
                 break;
             }
+            else if(ret == SP_MATCHED_NEGATIVE)
+                break;
         }
     }
     netdata_rwlock_unlock(&st->alerts.rwlock);
@@ -608,7 +618,7 @@ static inline void query_instance_release(QUERY_INSTANCE *qi) {
 static inline QUERY_INSTANCE *query_instance_allocate(QUERY_TARGET *qt, RRDINSTANCE_ACQUIRED *ria, size_t qn_slot) {
     if(qt->instances.used == qt->instances.size) {
         size_t old_mem = qt->instances.size * sizeof(*qt->instances.array);
-        qt->instances.size = (qt->instances.size) ? qt->instances.size * 2 : 1;
+        qt->instances.size = query_target_realloc_size(qt->instances.size, 2);
         size_t new_mem = qt->instances.size * sizeof(*qt->instances.array);
         qt->instances.array = reallocz(qt->instances.array, new_mem);
 
@@ -638,14 +648,22 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
         qt->db.minimum_latest_update_every_s = ri->update_every_s;
 
     if(queryable_instance && filter_instances) {
-        queryable_instance = false;
-        if(!qt->instances.pattern
-           || (qtl->match_ids   && simple_pattern_matches_string(qt->instances.pattern, ri->id))
-           || (qtl->match_names && ri->name != ri->id && simple_pattern_matches_string(qt->instances.pattern, ri->name))
-           || (qtl->match_ids   && simple_pattern_matches_string(qt->instances.pattern, query_instance_id_fqdn(qt, qi)))
-           || (qtl->match_names && simple_pattern_matches_string(qt->instances.pattern, query_instance_name_fqdn(qt, qi)))
-                )
-            queryable_instance = true;
+        SIMPLE_PATTERN_RESULT ret = SP_MATCHED_POSITIVE;
+
+        if(qt->instances.pattern) {
+            ret = SP_NOT_MATCHED;
+
+            if(qtl->match_ids)
+                ret = simple_pattern_matches_string_extract(qt->instances.pattern, ri->id, NULL, 0);
+            if (ret == SP_NOT_MATCHED && qtl->match_names && (ri->name != ri->id || !qtl->match_ids))
+                ret = simple_pattern_matches_string_extract(qt->instances.pattern, ri->name, NULL, 0);
+            if (ret == SP_NOT_MATCHED && qtl->match_ids)
+                ret = simple_pattern_matches_string_extract(qt->instances.pattern, query_instance_id_fqdn(qt, qi), NULL, 0);
+            if (ret == SP_NOT_MATCHED && qtl->match_names)
+                ret = simple_pattern_matches_string_extract(qt->instances.pattern, query_instance_name_fqdn(qt, qi), NULL, 0);
+        }
+
+        queryable_instance = (ret == SP_MATCHED_POSITIVE);
     }
 
     if(queryable_instance) {
@@ -707,7 +725,7 @@ static inline void query_context_release(QUERY_CONTEXT *qc) {
 static inline QUERY_CONTEXT *query_context_allocate(QUERY_TARGET *qt, RRDCONTEXT_ACQUIRED *rca) {
     if(qt->contexts.used == qt->contexts.size) {
         size_t old_mem = qt->contexts.size * sizeof(*qt->contexts.array);
-        qt->contexts.size = (qt->contexts.size) ? qt->contexts.size * 2 : 1;
+        qt->contexts.size = query_target_realloc_size(qt->contexts.size, 2);
         size_t new_mem = qt->contexts.size * sizeof(*qt->contexts.array);
         qt->contexts.array = reallocz(qt->contexts.array, new_mem);
 
@@ -766,7 +784,7 @@ static inline void query_node_release(QUERY_NODE *qn) {
 static inline QUERY_NODE *query_node_allocate(QUERY_TARGET *qt, RRDHOST *host) {
     if(qt->nodes.used == qt->nodes.size) {
         size_t old_mem = qt->nodes.size * sizeof(*qt->nodes.array);
-        qt->nodes.size = (qt->nodes.size) ? qt->nodes.size * 2 : 1;
+        qt->nodes.size = query_target_realloc_size(qt->nodes.size, 2);
         size_t new_mem = qt->nodes.size * sizeof(*qt->nodes.array);
         qt->nodes.array = reallocz(qt->nodes.array, new_mem);
 
@@ -952,7 +970,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     query_target_generate_name(qt);
     qt->window.after = qt->request.after;
     qt->window.before = qt->request.before;
-    rrdr_relative_window_to_absolute(&qt->window.after, &qt->window.before);
+    rrdr_relative_window_to_absolute(&qt->window.after, &qt->window.before, &qt->window.now);
 
     // prepare our local variables - we need these across all these functions
     QUERY_TARGET_LOCALS qtl = {
