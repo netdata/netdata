@@ -2,6 +2,10 @@
 
 #include "internal.h"
 
+#define QUERY_TARGET_MAX_REALLOC_INCREASE 500
+#define query_target_realloc_size(size, start) \
+            (size) ? ((size) < QUERY_TARGET_MAX_REALLOC_INCREASE ? (size) * 2 : (size) + QUERY_TARGET_MAX_REALLOC_INCREASE) : (start);
+
 static void query_metric_release(QUERY_METRIC *qm);
 static void query_dimension_release(QUERY_DIMENSION *qd);
 static void query_instance_release(QUERY_INSTANCE *qi);
@@ -253,7 +257,7 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
 
         if (qt->query.used == qt->query.size) {
             size_t old_mem = qt->query.size * sizeof(*qt->query.array);
-            qt->query.size = (qt->query.size) ? qt->query.size * 2 : 1;
+            qt->query.size = query_target_realloc_size(qt->query.size, 4);
             size_t new_mem = qt->query.size * sizeof(*qt->query.array);
             qt->query.array = reallocz(qt->query.array, new_mem);
 
@@ -311,7 +315,7 @@ static inline void query_dimension_release(QUERY_DIMENSION *qd) {
 static QUERY_DIMENSION *query_dimension_allocate(QUERY_TARGET *qt, RRDMETRIC_ACQUIRED *rma, QUERY_STATUS status) {
     if(qt->dimensions.used == qt->dimensions.size) {
         size_t old_mem = qt->dimensions.size * sizeof(*qt->dimensions.array);
-        qt->dimensions.size = (qt->dimensions.size) ? qt->dimensions.size * 2 : 1;
+        qt->dimensions.size = query_target_realloc_size(qt->dimensions.size, 4);
         size_t new_mem = qt->dimensions.size * sizeof(*qt->dimensions.array);
         qt->dimensions.array = reallocz(qt->dimensions.array, new_mem);
 
@@ -621,7 +625,7 @@ static inline void query_instance_release(QUERY_INSTANCE *qi) {
 static inline QUERY_INSTANCE *query_instance_allocate(QUERY_TARGET *qt, RRDINSTANCE_ACQUIRED *ria, size_t qn_slot) {
     if(qt->instances.used == qt->instances.size) {
         size_t old_mem = qt->instances.size * sizeof(*qt->instances.array);
-        qt->instances.size = (qt->instances.size) ? qt->instances.size * 2 : 1;
+        qt->instances.size = query_target_realloc_size(qt->instances.size, 2);
         size_t new_mem = qt->instances.size * sizeof(*qt->instances.array);
         qt->instances.array = reallocz(qt->instances.array, new_mem);
 
@@ -728,7 +732,7 @@ static inline void query_context_release(QUERY_CONTEXT *qc) {
 static inline QUERY_CONTEXT *query_context_allocate(QUERY_TARGET *qt, RRDCONTEXT_ACQUIRED *rca) {
     if(qt->contexts.used == qt->contexts.size) {
         size_t old_mem = qt->contexts.size * sizeof(*qt->contexts.array);
-        qt->contexts.size = (qt->contexts.size) ? qt->contexts.size * 2 : 1;
+        qt->contexts.size = query_target_realloc_size(qt->contexts.size, 2);
         size_t new_mem = qt->contexts.size * sizeof(*qt->contexts.array);
         qt->contexts.array = reallocz(qt->contexts.array, new_mem);
 
@@ -787,7 +791,7 @@ static inline void query_node_release(QUERY_NODE *qn) {
 static inline QUERY_NODE *query_node_allocate(QUERY_TARGET *qt, RRDHOST *host) {
     if(qt->nodes.used == qt->nodes.size) {
         size_t old_mem = qt->nodes.size * sizeof(*qt->nodes.array);
-        qt->nodes.size = (qt->nodes.size) ? qt->nodes.size * 2 : 1;
+        qt->nodes.size = query_target_realloc_size(qt->nodes.size, 2);
         size_t new_mem = qt->nodes.size * sizeof(*qt->nodes.array);
         qt->nodes.array = reallocz(qt->nodes.array, new_mem);
 

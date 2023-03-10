@@ -777,11 +777,6 @@ static inline long rrdr_line_init(RRDR *r, time_t t, long rrdr_line) {
     return rrdr_line;
 }
 
-static inline void rrdr_done(RRDR *r, long rrdr_line) {
-    r->rows = rrdr_line + 1;
-}
-
-
 // ----------------------------------------------------------------------------
 // tier management
 
@@ -1385,8 +1380,10 @@ static QUERY_ENGINE_OPS *rrd2rrdr_query_prep(RRDR *r, size_t dim_id_in_rrdr) {
             .group_value_flags = RRDR_VALUE_NOTHING,
     };
 
-    if(!query_plan(ops, qt->window.after, qt->window.before, qt->window.points))
+    if(!query_plan(ops, qt->window.after, qt->window.before, qt->window.points)) {
+        onewayalloc_freez(r->internal.owa, ops);
         return NULL;
+    }
 
     return ops;
 }
@@ -1762,16 +1759,32 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
     }
     query_planer_finalize_remaining_plans(ops);
 
-    r->stats.result_points_generated += points_added;
-    r->stats.db_points_read += ops->db_total_points_read;
-    for(size_t tr = 0; tr < storage_tiers ; tr++)
-        qt->db.tiers[tr].points += ops->db_points_read_per_tier[tr];
+    // fill the rest of the points with empty values
+    while (points_added < points_wanted) {
+        if(!max_date)
+            min_date = max_date = after_wanted + ops->view_update_every - ops->query_granularity;
+        else
+            max_date += ops->view_update_every;
+
+        rrdr_line = rrdr_line_init(r, max_date, rrdr_line);
+        size_t rrdr_o_v_index = rrdr_line * r->d + dim_id_in_rrdr;
+        r->o[rrdr_o_v_index] = RRDR_VALUE_EMPTY;
+        r->v[rrdr_o_v_index] = 0.0;
+        r->ar[rrdr_o_v_index] = 0.0;
+
+        points_added++;
+    }
 
     r->view.min = min;
     r->view.max = max;
     r->view.before = max_date;
     r->view.after = min_date - ops->view_update_every + ops->query_granularity;
-    rrdr_done(r, rrdr_line);
+    r->rows = rrdr_line + 1;
+
+    r->stats.result_points_generated += points_added;
+    r->stats.db_points_read += ops->db_total_points_read;
+    for(size_t tr = 0; tr < storage_tiers ; tr++)
+        qt->db.tiers[tr].points += ops->db_points_read_per_tier[tr];
 
     internal_error(points_added != points_wanted,
                    "QUERY: '%s', dimension '%s', requested %zu points, but RRDR added %zu (%zu db points read).",
