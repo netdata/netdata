@@ -1037,6 +1037,8 @@ typedef struct query_engine_ops {
     // statistics
     size_t db_total_points_read;
     size_t db_points_read_per_tier[RRD_STORAGE_TIERS];
+
+    struct query_engine_ops *next;
 } QUERY_ENGINE_OPS;
 
 
@@ -1365,10 +1367,41 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
     (ops)->group_anomaly_all_points = (point).anomaly_all_points;       \
 } while(0)
 
-static QUERY_ENGINE_OPS *rrd2rrdr_query_prep(RRDR *r, size_t dim_id_in_rrdr) {
+static __thread QUERY_ENGINE_OPS *released_ops = NULL;
+
+static void rrd2rrdr_query_ops_freeall(RRDR *r __maybe_unused) {
+    while(released_ops) {
+        QUERY_ENGINE_OPS *ops = released_ops;
+        released_ops = ops->next;
+
+        onewayalloc_freez(r->internal.owa, ops);
+    }
+}
+
+static void rrd2rrdr_query_ops_release(RRDR *r __maybe_unused, QUERY_ENGINE_OPS *ops) {
+    if(!ops) return;
+
+    ops->next = released_ops;
+    released_ops = ops;
+}
+
+static QUERY_ENGINE_OPS *rrd2rrdr_query_ops_get(RRDR *r) {
+    QUERY_ENGINE_OPS *ops;
+    if(released_ops) {
+        ops = released_ops;
+        released_ops = ops->next;
+    }
+    else {
+        ops = onewayalloc_mallocz(r->internal.owa, sizeof(QUERY_ENGINE_OPS));
+    }
+
+    return ops;
+}
+
+static QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, size_t dim_id_in_rrdr) {
     QUERY_TARGET *qt = r->internal.qt;
 
-    QUERY_ENGINE_OPS *ops = onewayalloc_mallocz(r->internal.owa, sizeof(QUERY_ENGINE_OPS));
+    QUERY_ENGINE_OPS *ops = rrd2rrdr_query_ops_get(r);
     *ops = (QUERY_ENGINE_OPS) {
             .r = r,
             .qm = query_metric(qt, dim_id_in_rrdr),
@@ -1381,7 +1414,7 @@ static QUERY_ENGINE_OPS *rrd2rrdr_query_prep(RRDR *r, size_t dim_id_in_rrdr) {
     };
 
     if(!query_plan(ops, qt->window.after, qt->window.before, qt->window.points)) {
-        onewayalloc_freez(r->internal.owa, ops);
+        rrd2rrdr_query_ops_release(r, ops);
         return NULL;
     }
 
@@ -2398,6 +2431,8 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     size_t last_db_points_read = 0;
     size_t last_result_points_generated = 0;
 
+    internal_fatal(released_ops, "QUERY: released_ops should be NULL when the query starts");
+
     QUERY_ENGINE_OPS **ops = NULL;
     if(qt->query.used)
         ops = onewayalloc_callocz(r->internal.owa, qt->query.used, sizeof(QUERY_ENGINE_OPS *));
@@ -2407,12 +2442,12 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     size_t queries_prepared = 0;
     while(queries_prepared < max_queries_to_prepare) {
         // preload another query
-        ops[queries_prepared] = rrd2rrdr_query_prep(r, queries_prepared);
+        ops[queries_prepared] = rrd2rrdr_query_ops_prep(r, queries_prepared);
         queries_prepared++;
     }
 
-    for(size_t c = 0, max = qt->query.used; c < max ; c++) {
-        QUERY_METRIC *qm = query_metric(qt, c);
+    for(size_t d = 0, max = qt->query.used; d < max ; d++) {
+        QUERY_METRIC *qm = query_metric(qt, d);
         QUERY_DIMENSION *qd = query_dimension(qt, qm->link.query_dimension_id);
         QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
         QUERY_CONTEXT *qc = query_context(qt, qm->link.query_context_id);
@@ -2420,22 +2455,24 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
         if(queries_prepared < max) {
             // preload another query
-            ops[queries_prepared] = rrd2rrdr_query_prep(r, queries_prepared);
+            ops[queries_prepared] = rrd2rrdr_query_ops_prep(r, queries_prepared);
             queries_prepared++;
         }
 
         // set the query target dimension options to rrdr
-        r->od[c] = qm->status;
+        r->od[d] = qm->status;
 
         // reset the grouping for the new dimension
         r->grouping.reset(r);
 
-        if(ops[c]) {
-            rrd2rrdr_query_execute(r, c, ops[c]);
+        if(ops[d]) {
+            rrd2rrdr_query_execute(r, d, ops[d]);
+            rrd2rrdr_query_ops_release(r, ops[d]); // reuse this ops allocation
+            ops[d] = NULL;
 
-            r->od[c] |= RRDR_DIMENSION_QUERIED;
-            r->di[c] = rrdmetric_acquired_id_dup(qd->rma);
-            r->dn[c] = rrdmetric_acquired_name_dup(qd->rma);
+            r->od[d] |= RRDR_DIMENSION_QUERIED;
+            r->di[d] = rrdmetric_acquired_id_dup(qd->rma);
+            r->dn[d] = rrdmetric_acquired_name_dup(qd->rma);
 
             qi->metrics.queried++;
             qc->metrics.queried++;
@@ -2474,7 +2511,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         if (qt->request.timeout)
             now_realtime_timeval(&query_current_time);
 
-        if(r->od[c] & RRDR_DIMENSION_NONZERO)
+        if(r->od[d] & RRDR_DIMENSION_NONZERO)
             dimensions_nonzero++;
 
         // verify all dimensions are aligned
@@ -2512,9 +2549,12 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                        (NETDATA_DOUBLE)dt_usec(&query_start_time, &query_current_time) / 1000.0, (long long)qt->request.timeout);
             r->view.flags |= RRDR_RESULT_FLAG_CANCEL;
 
-            for(size_t i = c + 1; i < queries_prepared ; i++) {
-                if(ops[i])
+            for(size_t i = d + 1; i < queries_prepared ; i++) {
+                if(ops[i]) {
                     query_planer_finalize_remaining_plans(ops[i]);
+                    rrd2rrdr_query_ops_release(r, ops[i]);
+                    ops[i] = NULL;
+                }
             }
 
             break;
@@ -2599,8 +2639,11 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 #endif
 
     // free the query pipelining ops
-    for(size_t c = 0; c < qt->query.used ;c++)
-        onewayalloc_freez(owa, ops[c]);
+    for(size_t d = 0; d < qt->query.used ; d++) {
+        rrd2rrdr_query_ops_release(r, ops[d]);
+        ops[d] = NULL;
+    }
+    rrd2rrdr_query_ops_freeall(r);
 
     onewayalloc_freez(owa, ops);
 
