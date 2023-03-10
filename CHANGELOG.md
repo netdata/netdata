@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Revert "Handle conffiles for DEB packages explicitly instead of automatically." [\#14700](https://github.com/netdata/netdata/pull/14700) ([tkatsoulas](https://github.com/tkatsoulas))
 - Fix compilation error when --disable-cloud is specified [\#14695](https://github.com/netdata/netdata/pull/14695) ([stelfrag](https://github.com/stelfrag))
 - fix: detect the host os in k8s on non-docker cri [\#14694](https://github.com/netdata/netdata/pull/14694) ([witalisoft](https://github.com/witalisoft))
 - Remove google hangouts from list of integrations [\#14689](https://github.com/netdata/netdata/pull/14689) ([cakrit](https://github.com/cakrit))
@@ -17,9 +18,11 @@
 - Guard for null host when sending node instances [\#14673](https://github.com/netdata/netdata/pull/14673) ([MrZammler](https://github.com/MrZammler))
 - reviewed role description to be according to app [\#14672](https://github.com/netdata/netdata/pull/14672) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - If a child is not streaming, send to the cloud last known version instead of unknown [\#14671](https://github.com/netdata/netdata/pull/14671) ([MrZammler](https://github.com/MrZammler))
+- /api/v2/X improvements part 3 [\#14665](https://github.com/netdata/netdata/pull/14665) ([ktsaou](https://github.com/ktsaou))
 - add FAQ information provided by Finance [\#14664](https://github.com/netdata/netdata/pull/14664) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Handle conffiles for DEB packages explicitly instead of automatically. [\#14662](https://github.com/netdata/netdata/pull/14662) ([Ferroin](https://github.com/Ferroin))
 - Fix cloud node stale status when a virtual host is created [\#14660](https://github.com/netdata/netdata/pull/14660) ([stelfrag](https://github.com/stelfrag))
+- Refactor ML code. [\#14659](https://github.com/netdata/netdata/pull/14659) ([vkalintiris](https://github.com/vkalintiris))
 - Properly handle service type detection failures when installing as a system service. [\#14658](https://github.com/netdata/netdata/pull/14658) ([Ferroin](https://github.com/Ferroin))
 - fix simple\_pattern\_create on freebsd [\#14656](https://github.com/netdata/netdata/pull/14656) ([ilyam8](https://github.com/ilyam8))
 - Move images in "interact-new-charts" from zenhub to github [\#14654](https://github.com/netdata/netdata/pull/14654) ([Ancairon](https://github.com/Ancairon))
@@ -374,10 +377,6 @@
 - add basic dashboard info for NGINX Plus [\#14080](https://github.com/netdata/netdata/pull/14080) ([ilyam8](https://github.com/ilyam8))
 - replication fixes 9 [\#14079](https://github.com/netdata/netdata/pull/14079) ([ktsaou](https://github.com/ktsaou))
 - optimize workers statistics performance [\#14077](https://github.com/netdata/netdata/pull/14077) ([ktsaou](https://github.com/ktsaou))
-- fix SSL related crashes [\#14076](https://github.com/netdata/netdata/pull/14076) ([ktsaou](https://github.com/ktsaou))
-- remove python.d/springboot [\#14075](https://github.com/netdata/netdata/pull/14075) ([ilyam8](https://github.com/ilyam8))
-- fix backfilling statistics [\#14074](https://github.com/netdata/netdata/pull/14074) ([ktsaou](https://github.com/ktsaou))
-- remove deprecated fping.plugin in accordance with v1.37.0 deprecation notice  [\#14073](https://github.com/netdata/netdata/pull/14073) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
