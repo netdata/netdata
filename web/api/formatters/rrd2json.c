@@ -432,6 +432,7 @@ static RRDR *data_query_group_by(RRDR *r) {
         goto cleanup;
 
     r2->dp = onewayalloc_callocz(r2->internal.owa, r2->d, sizeof(*r2->dp));
+    r2->dv = onewayalloc_callocz(r2->internal.owa, r2->d, sizeof(*r2->dv));
     r2->dgbc = onewayalloc_callocz(r2->internal.owa, r2->d, sizeof(*r2->dgbc));
     r2->gbc = onewayalloc_callocz(r2->internal.owa, r2->n * r2->d, sizeof(*r2->gbc));
 
@@ -558,6 +559,9 @@ static RRDR *data_query_group_by(RRDR *r) {
     for (size_t d2 = 0; d2 < r2->d; d2++) {
         size_t non_zero = 0;
 
+        NETDATA_DOUBLE sum = 0;
+        size_t count = 0;
+
         for(size_t i = 0; i != rows ;i++) {
             size_t idx2 = i * r2->d + d2;
 
@@ -573,6 +577,9 @@ static RRDR *data_query_group_by(RRDR *r) {
                     *co2 |= RRDR_VALUE_PARTIAL;
 
                 NETDATA_DOUBLE n;
+
+                sum += *cn2;
+                count += gbc2;
 
                 if(qt->request.group_by_aggregate_function == RRDR_GROUP_BY_FUNCTION_AVERAGE)
                     n = (*cn2 /= gbc2);
@@ -601,6 +608,8 @@ static RRDR *data_query_group_by(RRDR *r) {
 
         if(non_zero)
             r2->od[d2] |= RRDR_DIMENSION_NONZERO;
+
+        r2->dv[d2] = (count) ? sum / (NETDATA_DOUBLE)count : 0.0;
     }
 
     r2->view.min = min;

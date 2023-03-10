@@ -94,6 +94,7 @@ typedef struct rrdresult {
     STRING **du;              // array of d dimension units
     uint32_t *dgbc;           // array of d dimension units - NOT ALLOCATED when RRDR is created
     uint32_t *dp;             // array of d dimension priority - NOT ALLOCATED when RRDR is created
+    NETDATA_DOUBLE *dv;       // array of d dimension averages - NOT ALLOCATED when RRDR is created
 
     time_t *t;                // array of n timestamps
     NETDATA_DOUBLE *v;        // array n x d values

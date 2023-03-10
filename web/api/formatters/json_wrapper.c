@@ -676,7 +676,7 @@ static inline long query_target_metrics_latest_values(BUFFER *wb, const char *ke
     return i;
 }
 
-static inline size_t rrdr_latest_values(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
+static inline size_t rrdr_dimension_latest_values(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
     size_t c, i;
 
     buffer_json_member_add_array(wb, key);
@@ -730,6 +730,22 @@ static inline size_t rrdr_latest_values(BUFFER *wb, const char *key, RRDR *r, RR
     buffer_json_array_close(wb);
 
     return i;
+}
+
+static inline void rrdr_dimension_average_values(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
+    if(!r->dv)
+        return;
+
+    buffer_json_member_add_array(wb, key);
+
+    for(size_t c = 0; c < r->d ; c++) {
+        if(!rrdr_dimension_should_be_exposed(r->od[c], options))
+            continue;
+
+        buffer_json_add_array_item_double(wb, r->dv[c]);
+    }
+
+    buffer_json_array_close(wb);
 }
 
 void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR_OPTIONS options,
@@ -788,7 +804,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR
     if(!query_target_metrics_latest_values(wb, "latest_values", r, options))
         rows = 0;
 
-    size_t dimensions = rrdr_latest_values(wb, "view_latest_values", r, options);
+    size_t dimensions = rrdr_dimension_latest_values(wb, "view_latest_values", r, options);
     if(!dimensions)
         rows = 0;
 
@@ -1306,7 +1322,8 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
             rrdr_dimension_units_array_v2(wb, "units", r, options);
             rrdr_dimension_priority_array_v2(wb, "priorities", r, options);
             rrdr_dimension_aggregated_array_v2(wb, "aggregated", r, options);
-            size_t dims = rrdr_latest_values(wb, "view_latest_values", r, options);
+            rrdr_dimension_average_values(wb, "view_average_values", r, options);
+            size_t dims = rrdr_dimension_latest_values(wb, "view_latest_values", r, options);
             buffer_json_member_add_uint64(wb, "count", dims);
         }
         buffer_json_object_close(wb);
