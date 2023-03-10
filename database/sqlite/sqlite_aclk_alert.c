@@ -74,7 +74,7 @@ static inline bool is_event_from_alert_variable_config(uint32_t unique_id, char 
 int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
 {
     sqlite3_stmt *res = NULL;
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
     int send = 1;
 
@@ -1054,7 +1054,7 @@ void sql_aclk_alert_clean_dead_entries(RRDHOST *host)
     if (!claimed())
         return;
 
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
     char sql[512];

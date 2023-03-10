@@ -74,8 +74,8 @@ struct aclk_sync_host_config {
     int alert_updates;
     int node_info_send;
     time_t node_collectors_send;
-    char uuid_str[GUID_LEN + 1];
-    char node_id[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
+    char node_id[UUID_STR_LEN];
     uint64_t alerts_batch_id;           // batch id for alerts to use
     uint64_t alerts_start_seq_id;       // cloud has asked to start streaming from
     uint64_t alerts_snapshot_id;        // will contain the snapshot_id value if snapshot was requested

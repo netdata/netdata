@@ -207,8 +207,8 @@ failed:
 // OPCODE: ACLK_DATABASE_DELETE_HOST
 static void sql_delete_aclk_table_list(char *host_guid)
 {
-    char uuid_str[GUID_LEN + 1];
-    char host_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
+    char host_str[UUID_STR_LEN];
 
     int rc;
     uuid_t host_uuid;
