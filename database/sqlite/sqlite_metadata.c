@@ -1299,12 +1299,6 @@ static void metadata_event_loop(void *arg)
                 case METADATA_ADD_HOST_INFO:
                     host = (RRDHOST *) cmd.param[0];
                     store_host_and_system_info(host, NULL, NULL);
-//                    struct aclk_sync_host_config *ahc = host->aclk_sync_host_config;
-//                    if (unlikely(!ahc))
-//                        sql_create_aclk_table(host, &host->host_uuid, host->node_id);
-//
-//                    int live = (host == localhost || host->receiver || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) ? 1 : 0;
-//                    aclk_host_state_update(host, live);
                     break;
                 case METADATA_SCAN_HOSTS:
                     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SCANNING_HOSTS)))
