@@ -821,9 +821,9 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
             if(unlikely(!node->st_allocation_disks)) {
                 char id[RRD_ID_LENGTH_MAX + 1], name[RRD_ID_LENGTH_MAX + 1], title[200 + 1];
 
-                snprintf(id, RRD_ID_LENGTH_MAX, "disk_%s", node->id);
-                snprintf(name, RRD_ID_LENGTH_MAX, "disk_%s", node->label);
-                snprintf(title, 200, "BTRFS Physical Disk Allocation");
+                snprintfz(id, RRD_ID_LENGTH_MAX, "disk_%s", node->id);
+                snprintfz(name, RRD_ID_LENGTH_MAX, "disk_%s", node->label);
+                snprintfz(title, 200, "BTRFS Physical Disk Allocation");
 
                 netdata_fix_chart_id(id);
                 netdata_fix_chart_name(name);
@@ -880,9 +880,9 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
             if(unlikely(!node->st_allocation_data)) {
                 char id[RRD_ID_LENGTH_MAX + 1], name[RRD_ID_LENGTH_MAX + 1], title[200 + 1];
 
-                snprintf(id, RRD_ID_LENGTH_MAX, "data_%s", node->id);
-                snprintf(name, RRD_ID_LENGTH_MAX, "data_%s", node->label);
-                snprintf(title, 200, "BTRFS Data Allocation");
+                snprintfz(id, RRD_ID_LENGTH_MAX, "data_%s", node->id);
+                snprintfz(name, RRD_ID_LENGTH_MAX, "data_%s", node->label);
+                snprintfz(title, 200, "BTRFS Data Allocation");
 
                 netdata_fix_chart_id(id);
                 netdata_fix_chart_name(name);
@@ -924,9 +924,9 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
             if(unlikely(!node->st_allocation_metadata)) {
                 char id[RRD_ID_LENGTH_MAX + 1], name[RRD_ID_LENGTH_MAX + 1], title[200 + 1];
 
-                snprintf(id, RRD_ID_LENGTH_MAX, "metadata_%s", node->id);
-                snprintf(name, RRD_ID_LENGTH_MAX, "metadata_%s", node->label);
-                snprintf(title, 200, "BTRFS Metadata Allocation");
+                snprintfz(id, RRD_ID_LENGTH_MAX, "metadata_%s", node->id);
+                snprintfz(name, RRD_ID_LENGTH_MAX, "metadata_%s", node->label);
+                snprintfz(title, 200, "BTRFS Metadata Allocation");
 
                 netdata_fix_chart_id(id);
                 netdata_fix_chart_name(name);
@@ -970,9 +970,9 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
             if(unlikely(!node->st_allocation_system)) {
                 char id[RRD_ID_LENGTH_MAX + 1], name[RRD_ID_LENGTH_MAX + 1], title[200 + 1];
 
-                snprintf(id, RRD_ID_LENGTH_MAX, "system_%s", node->id);
-                snprintf(name, RRD_ID_LENGTH_MAX, "system_%s", node->label);
-                snprintf(title, 200, "BTRFS System Allocation");
+                snprintfz(id, RRD_ID_LENGTH_MAX, "system_%s", node->id);
+                snprintfz(name, RRD_ID_LENGTH_MAX, "system_%s", node->label);
+                snprintfz(title, 200, "BTRFS System Allocation");
 
                 netdata_fix_chart_id(id);
                 netdata_fix_chart_name(name);
@@ -1014,9 +1014,9 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
             if(unlikely(!node->st_commits)) {
                 char id[RRD_ID_LENGTH_MAX + 1], name[RRD_ID_LENGTH_MAX + 1], title[200 + 1];
 
-                snprintf(id, RRD_ID_LENGTH_MAX, "commits_%s", node->id);
-                snprintf(name, RRD_ID_LENGTH_MAX, "commits_%s", node->label);
-                snprintf(title, 200, "BTRFS Commits");
+                snprintfz(id, RRD_ID_LENGTH_MAX, "commits_%s", node->id);
+                snprintfz(name, RRD_ID_LENGTH_MAX, "commits_%s", node->label);
+                snprintfz(title, 200, "BTRFS Commits");
 
                 netdata_fix_chart_id(id);
                 netdata_fix_chart_name(name);
@@ -1047,9 +1047,9 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
             if(unlikely(!node->st_commits_percentage_time)) {
                 char id[RRD_ID_LENGTH_MAX + 1], name[RRD_ID_LENGTH_MAX + 1], title[200 + 1];
 
-                snprintf(id, RRD_ID_LENGTH_MAX, "commits_perc_time_%s", node->id);
-                snprintf(name, RRD_ID_LENGTH_MAX, "commits_perc_time_%s", node->label);
-                snprintf(title, 200, "BTRFS Commits Time Share");
+                snprintfz(id, RRD_ID_LENGTH_MAX, "commits_perc_time_%s", node->id);
+                snprintfz(name, RRD_ID_LENGTH_MAX, "commits_perc_time_%s", node->label);
+                snprintfz(title, 200, "BTRFS Commits Time Share");
 
                 netdata_fix_chart_id(id);
                 netdata_fix_chart_name(name);
@@ -1081,9 +1081,9 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
             if(unlikely(!node->st_commit_timings)) {
                 char id[RRD_ID_LENGTH_MAX + 1], name[RRD_ID_LENGTH_MAX + 1], title[200 + 1];
 
-                snprintf(id, RRD_ID_LENGTH_MAX, "commit_timings_%s", node->id);
-                snprintf(name, RRD_ID_LENGTH_MAX, "commit_timings_%s", node->label);
-                snprintf(title, 200, "BTRFS Commit Timings");
+                snprintfz(id, RRD_ID_LENGTH_MAX, "commit_timings_%s", node->id);
+                snprintfz(name, RRD_ID_LENGTH_MAX, "commit_timings_%s", node->label);
+                snprintfz(title, 200, "BTRFS Commit Timings");
 
                 netdata_fix_chart_id(id);
                 netdata_fix_chart_name(name);
@@ -1125,9 +1125,9 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
             if(unlikely(!node->st_error_stats)) {
                 char id[RRD_ID_LENGTH_MAX + 1], name[RRD_ID_LENGTH_MAX + 1], title[200 + 1];
 
-                snprintf(id, RRD_ID_LENGTH_MAX, "error_stats_%s", node->id);
-                snprintf(name, RRD_ID_LENGTH_MAX, "error_stats_%s", node->label);
-                snprintf(title, 200, "BTRFS Errors");
+                snprintfz(id, RRD_ID_LENGTH_MAX, "error_stats_%s", node->id);
+                snprintfz(name, RRD_ID_LENGTH_MAX, "error_stats_%s", node->label);
+                snprintfz(title, 200, "BTRFS Errors");
 
                 netdata_fix_chart_id(id);
                 netdata_fix_chart_name(name);
