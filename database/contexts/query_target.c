@@ -157,15 +157,6 @@ void query_target_free(void) {
 
 
 static inline void query_metric_release(QUERY_METRIC *qm) {
-    // reset the plans
-    for(size_t p = 0; p < qm->plan.used; p++) {
-        internal_fatal(qm->plan.array[p].initialized &&
-                       !qm->plan.array[p].finalized,
-                       "QUERY: left-over initialized plan");
-
-        qm->plan.array[p].initialized = false;
-        qm->plan.array[p].finalized = false;
-    }
     qm->plan.used = 0;
 
     // reset the tiers

@@ -1038,6 +1038,17 @@ typedef struct query_engine_ops {
     size_t db_total_points_read;
     size_t db_points_read_per_tier[RRD_STORAGE_TIERS];
 
+    struct {
+        time_t expanded_after;
+        time_t expanded_before;
+        struct storage_engine_query_handle handle;
+        STORAGE_POINT (*next_metric)(struct storage_engine_query_handle *handle);
+        int (*is_finished)(struct storage_engine_query_handle *handle);
+        void (*finalize)(struct storage_engine_query_handle *handle);
+        bool initialized;
+        bool finalized;
+    } plans[QUERY_PLANS_MAX];
+
     struct query_engine_ops *next;
 } QUERY_ENGINE_OPS;
 
@@ -1095,36 +1106,36 @@ static void query_planer_initialize_plans(QUERY_ENGINE_OPS *ops) {
         time_t after = qm->plan.array[p].after - (time_t)(update_every * points_to_add_to_after);
         time_t before = qm->plan.array[p].before + (time_t)(update_every * points_to_add_to_before);
 
-        qm->plan.array[p].expanded_after = after;
-        qm->plan.array[p].expanded_before = before;
+        ops->plans[p].expanded_after = after;
+        ops->plans[p].expanded_before = before;
 
         ops->r->internal.qt->db.tiers[tier].queries++;
 
         struct query_metric_tier *tier_ptr = &qm->tiers[tier];
         tier_ptr->eng->api.query_ops.init(
                 tier_ptr->db_metric_handle,
-                &qm->plan.array[p].handle,
+                &ops->plans[p].handle,
                 after, before,
                 ops->r->internal.qt->request.priority);
 
-        qm->plan.array[p].next_metric = tier_ptr->eng->api.query_ops.next_metric;
-        qm->plan.array[p].is_finished = tier_ptr->eng->api.query_ops.is_finished;
-        qm->plan.array[p].finalize = tier_ptr->eng->api.query_ops.finalize;
-        qm->plan.array[p].initialized = true;
-        qm->plan.array[p].finalized = false;
+        ops->plans[p].next_metric = tier_ptr->eng->api.query_ops.next_metric;
+        ops->plans[p].is_finished = tier_ptr->eng->api.query_ops.is_finished;
+        ops->plans[p].finalize = tier_ptr->eng->api.query_ops.finalize;
+        ops->plans[p].initialized = true;
+        ops->plans[p].finalized = false;
     }
 }
 
 static void query_planer_finalize_plan(QUERY_ENGINE_OPS *ops, size_t plan_id) {
-    QUERY_METRIC *qm = ops->qm;
+    // QUERY_METRIC *qm = ops->qm;
 
-    if(qm->plan.array[plan_id].initialized && !qm->plan.array[plan_id].finalized) {
-        qm->plan.array[plan_id].finalize(&qm->plan.array[plan_id].handle);
-        qm->plan.array[plan_id].initialized = false;
-        qm->plan.array[plan_id].finalized = true;
-        qm->plan.array[plan_id].next_metric = NULL;
-        qm->plan.array[plan_id].is_finished = NULL;
-        qm->plan.array[plan_id].finalize = NULL;
+    if(ops->plans[plan_id].initialized && !ops->plans[plan_id].finalized) {
+        ops->plans[plan_id].finalize(&ops->plans[plan_id].handle);
+        ops->plans[plan_id].initialized = false;
+        ops->plans[plan_id].finalized = true;
+        ops->plans[plan_id].next_metric = NULL;
+        ops->plans[plan_id].is_finished = NULL;
+        ops->plans[plan_id].finalize = NULL;
 
         if(ops->current_plan == plan_id) {
             ops->next_metric = NULL;
@@ -1145,17 +1156,17 @@ static void query_planer_activate_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, ti
     QUERY_METRIC *qm = ops->qm;
 
     internal_fatal(plan_id >= qm->plan.used, "QUERY: invalid plan_id given");
-    internal_fatal(!qm->plan.array[plan_id].initialized, "QUERY: plan has not been initialized");
-    internal_fatal(qm->plan.array[plan_id].finalized, "QUERY: plan has been finalized");
+    internal_fatal(!ops->plans[plan_id].initialized, "QUERY: plan has not been initialized");
+    internal_fatal(ops->plans[plan_id].finalized, "QUERY: plan has been finalized");
 
     internal_fatal(qm->plan.array[plan_id].after > qm->plan.array[plan_id].before, "QUERY: flipped after/before");
 
     ops->tier = qm->plan.array[plan_id].tier;
     ops->tier_ptr = &qm->tiers[ops->tier];
-    ops->handle = &qm->plan.array[plan_id].handle;
-    ops->next_metric = qm->plan.array[plan_id].next_metric;
-    ops->is_finished = qm->plan.array[plan_id].is_finished;
-    ops->finalize = qm->plan.array[plan_id].finalize;
+    ops->handle = &ops->plans[plan_id].handle;
+    ops->next_metric = ops->plans[plan_id].next_metric;
+    ops->is_finished = ops->plans[plan_id].is_finished;
+    ops->finalize = ops->plans[plan_id].finalize;
     ops->current_plan = plan_id;
 
     if(plan_id + 1 < qm->plan.used && qm->plan.array[plan_id + 1].after < qm->plan.array[plan_id].before)
@@ -1163,8 +1174,8 @@ static void query_planer_activate_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, ti
     else
         ops->current_plan_expire_time = qm->plan.array[plan_id].before;
 
-    ops->plan_expanded_after = qm->plan.array[plan_id].expanded_after;
-    ops->plan_expanded_before = qm->plan.array[plan_id].expanded_before;
+    ops->plan_expanded_after = ops->plans[plan_id].expanded_after;
+    ops->plan_expanded_before = ops->plans[plan_id].expanded_before;
 }
 
 static bool query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t last_point_end_time) {
@@ -1256,9 +1267,9 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
                         .tier = tr,
                         .after = (tier_first_time_s < after_wanted) ? after_wanted : tier_first_time_s,
                         .before = selected_tier_first_time_s,
-                        .initialized = false,
-                        .finalized = false,
                     };
+                    ops->plans[qm->plan.used].initialized = false;
+                    ops->plans[qm->plan.used].finalized = false;
                     qm->plan.array[qm->plan.used++] = t;
 
                     internal_fatal(!t.after || !t.before, "QUERY: invalid plan selected");
@@ -1291,9 +1302,9 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
                         .tier = tr,
                         .after = selected_tier_last_time_s,
                         .before = (tier_last_time_s > before_wanted) ? before_wanted : tier_last_time_s,
-                        .initialized = false,
-                        .finalized = false,
                     };
+                    ops->plans[qm->plan.used].initialized = false;
+                    ops->plans[qm->plan.used].finalized = false;
                     qm->plan.array[qm->plan.used++] = t;
 
                     // prepare for the tier
@@ -1395,6 +1406,7 @@ static QUERY_ENGINE_OPS *rrd2rrdr_query_ops_get(RRDR *r) {
         ops = onewayalloc_mallocz(r->internal.owa, sizeof(QUERY_ENGINE_OPS));
     }
 
+    memset(ops, 0, sizeof(*ops));
     return ops;
 }
 
@@ -2644,6 +2656,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         ops[d] = NULL;
     }
     rrd2rrdr_query_ops_freeall(r);
+    internal_fatal(released_ops, "QUERY: released_ops should be NULL when the query ends");
 
     onewayalloc_freez(owa, ops);
 

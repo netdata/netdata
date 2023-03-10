@@ -149,14 +149,6 @@ typedef struct query_plan_entry {
     size_t tier;
     time_t after;
     time_t before;
-    time_t expanded_after;
-    time_t expanded_before;
-    struct storage_engine_query_handle handle;
-    STORAGE_POINT (*next_metric)(struct storage_engine_query_handle *handle);
-    int (*is_finished)(struct storage_engine_query_handle *handle);
-    void (*finalize)(struct storage_engine_query_handle *handle);
-    bool initialized;
-    bool finalized;
 } QUERY_PLAN_ENTRY;
 
 #define QUERY_PLANS_MAX (RRD_STORAGE_TIERS * 2)
