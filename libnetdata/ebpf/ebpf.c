@@ -623,6 +623,9 @@ void ebpf_update_map_type(struct bpf_map *map, ebpf_local_maps_t *w)
  */
 void ebpf_define_map_type(ebpf_local_maps_t *maps, int maps_per_core, int kver)
 {
+    if (!maps)
+        return;
+
     // Before kernel 4.06 there was not percpu hash tables
     if (kver < NETDATA_EBPF_KERNEL_4_06)
         maps_per_core = CONFIG_BOOLEAN_NO;

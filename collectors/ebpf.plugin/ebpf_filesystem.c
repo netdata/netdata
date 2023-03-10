@@ -649,6 +649,21 @@ static void ebpf_update_filesystem()
 }
 
 /**
+ * Set maps
+ *
+ * When thread is initialized the variable fs_maps is set as null,
+ * this function fills the variable before to use.
+ */
+static void ebpf_set_maps()
+{
+    localfs[NETDATA_FS_LOCALFS_EXT4].fs_maps = ext4_maps;
+    localfs[NETDATA_FS_LOCALFS_XFS].fs_maps = xfs_maps;
+    localfs[NETDATA_FS_LOCALFS_NFS].fs_maps = nfs_maps;
+    localfs[NETDATA_FS_LOCALFS_ZFS].fs_maps = zfs_maps;
+    localfs[NETDATA_FS_LOCALFS_BTRFS].fs_maps = btrfs_maps;
+}
+
+/**
  * Filesystem thread
  *
  * Thread used to generate socket charts.
@@ -662,6 +677,7 @@ void *ebpf_filesystem_thread(void *ptr)
     netdata_thread_cleanup_push(ebpf_filesystem_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    ebpf_set_maps();
     ebpf_update_filesystem();
 
     // Initialize optional as zero, to identify when there are not partitions to monitor
