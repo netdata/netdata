@@ -710,6 +710,70 @@ bundle_jsonc() {
 bundle_jsonc
 
 # -----------------------------------------------------------------------------
+build_yaml() {
+  env_cmd=''
+
+  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
+    env_cmd="env CFLAGS='-fPIC -pipe -Wno-unused-value' CXXFLAGS='-fPIC -pipe' LDFLAGS="
+  fi
+
+  cd "${1}" > /dev/null || return 1
+  run eval "${env_cmd} ./configure --disable-shared --disable-dependency-tracking --with-pic"
+  run eval "${env_cmd} ${make} ${MAKEOPTS}"
+  cd - > /dev/null || return 1
+}
+
+copy_yaml() {
+  target_dir="${PWD}/externaldeps/libyaml"
+
+  run mkdir -p "${target_dir}" || return 1
+
+  run cp "${1}/src/.libs/libyaml.a" "${target_dir}/libyaml.a" || return 1
+  run cp "${1}/include/yaml.h" "${target_dir}/" || return 1
+}
+
+bundle_yaml() {
+  if pkg-config yaml-0.1; then
+    return 0
+  fi
+
+  if [ -z "$(command -v cmake)" ]; then
+    run_failed "Could not find cmake, which is required to build YAML. Critical error."
+    return 0
+  fi
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling YAML."
+
+  progress "Prepare YAML"
+
+  YAML_PACKAGE_VERSION="$(cat packaging/yaml.version)"
+
+  tmp="$(mktemp -d -t netdata-yaml-XXXXXX)"
+  YAML_PACKAGE_BASENAME="yaml-${YAML_PACKAGE_VERSION}.tar.gz"
+
+  if fetch_and_verify "yaml" \
+    "https://github.com/yaml/libyaml/releases/download/${YAML_PACKAGE_VERSION}/${YAML_PACKAGE_BASENAME}" \
+    "${YAML_PACKAGE_BASENAME}" \
+    "${tmp}" \
+    "${NETDATA_LOCAL_TARBALL_OVERRIDE_YAML}"; then
+    if run tar --no-same-owner -xf "${tmp}/${YAML_PACKAGE_BASENAME}" -C "${tmp}" &&
+      build_yaml "${tmp}/yaml-${YAML_PACKAGE_VERSION}" &&
+      copy_yaml "${tmp}/yaml-${YAML_PACKAGE_VERSION}" &&
+      rm -rf "${tmp}"; then
+      run_ok "YAML built and prepared."
+    else
+      run_failed "Failed to build YAML, critical error."
+    fi
+  else
+    run_failed "Unable to fetch sources for YAML, critical error."
+  fi
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
+}
+
+bundle_yaml
+
+# -----------------------------------------------------------------------------
 
 get_kernel_version() {
   r="$(uname -r | cut -f 1 -d '-')"

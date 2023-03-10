@@ -676,6 +676,20 @@ declare -A pkg_json_c_dev=(
   ['default']="json-c-devel"
 )
 
+#TODO::
+declare -A pkg_libyaml_dev=(
+  ['alpine']="libyaml-dev"
+  ['arch']="json-c"
+  ['clearlinux']="devpkg-json-c"
+  ['debian']="libyaml-dev"
+  ['gentoo']="dev-libs/libyaml"
+  ['sabayon']="dev-libs/libyaml"
+  ['suse']="libjson-c-devel"
+  ['freebsd']="json-c"
+  ['macos']="json-c"
+  ['default']="json-c-devel"
+)
+
 declare -A pkg_libatomic=(
   ['arch']="NOTREQUIRED"
   ['clearlinux']="NOTREQUIRED"
