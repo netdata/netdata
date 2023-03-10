@@ -115,8 +115,8 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
         , (const char *) argv[IDX_TAGS]
         , (const char *) (argv[IDX_PROGRAM_NAME] ? argv[IDX_PROGRAM_NAME] : "unknown")
         , (const char *) (argv[IDX_PROGRAM_VERSION] ? argv[IDX_PROGRAM_VERSION] : "unknown")
-        , argv[3] ? str2i(argv[IDX_UPDATE_EVERY]) : 1
-        , argv[13] ? str2i(argv[IDX_ENTRIES]) : 0
+        , argv[IDX_UPDATE_EVERY] ? str2i(argv[IDX_UPDATE_EVERY]) : 1
+        , argv[IDX_ENTRIES] ? str2i(argv[IDX_ENTRIES]) : 0
         , default_rrd_memory_mode
         , 0 // health
         , 0 // rrdpush enabled
