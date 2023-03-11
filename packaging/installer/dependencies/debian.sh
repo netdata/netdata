@@ -31,6 +31,7 @@ package_tree="
   liblz4-dev
   libssl-dev
   libelf-dev
+  libyaml-dev
   python
   python3
   "

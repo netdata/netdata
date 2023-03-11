@@ -676,18 +676,18 @@ declare -A pkg_json_c_dev=(
   ['default']="json-c-devel"
 )
 
-#TODO::
+#TODO:: clearlinux ?
 declare -A pkg_libyaml_dev=(
-  ['alpine']="libyaml-dev"
-  ['arch']="json-c"
-  ['clearlinux']="devpkg-json-c"
+  ['alpine']="yaml-dev"
+  ['arch']="libyaml"
+  ['clearlinux']="yaml-dev"
   ['debian']="libyaml-dev"
   ['gentoo']="dev-libs/libyaml"
   ['sabayon']="dev-libs/libyaml"
-  ['suse']="libjson-c-devel"
-  ['freebsd']="json-c"
-  ['macos']="json-c"
-  ['default']="json-c-devel"
+  ['suse']="libyaml-devel"
+  ['freebsd']="libyaml"
+  ['macos']="libyaml"
+  ['default']="libyaml-devel"
 )
 
 declare -A pkg_libatomic=(
@@ -1241,6 +1241,7 @@ packages() {
     suitable_package libuuid-dev
     suitable_package libmnl-dev
     suitable_package json-c-dev
+    suitable_package libyaml-dev
   fi
 
   # -------------------------------------------------------------------------
