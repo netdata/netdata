@@ -148,6 +148,67 @@ cleanup:
     return ret;
 }
 
+struct group_by_label_key {
+    DICTIONARY *values;
+};
+
+static void group_by_label_key_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
+    // add the key to our r->label_keys global keys dictionary
+    DICTIONARY *label_keys = data;
+    dictionary_set(label_keys, dictionary_acquired_item_name(item), NULL, 0);
+
+    // create a dictionary for the values of this key
+    struct group_by_label_key *k = value;
+    k->values = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, 0);
+}
+
+static void group_by_label_key_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct group_by_label_key *k = value;
+    dictionary_destroy(k->values);
+}
+
+static int rrdlabels_traversal_cb_to_group_by_label_key(const char *name, const char *value, RRDLABEL_SRC ls __maybe_unused, void *data) {
+    DICTIONARY *dl = data;
+    struct group_by_label_key *k = dictionary_set(dl, name, NULL, sizeof(struct group_by_label_key));
+    dictionary_set(k->values, value, NULL, 0);
+    return 1;
+}
+
+void rrdr_json_group_by_labels(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
+    if(!r->label_keys || !r->dl)
+        return;
+
+    buffer_json_member_add_object(wb, key);
+
+    void *t;
+    dfe_start_read(r->label_keys, t) {
+        buffer_json_member_add_array(wb, t_dfe.name);
+
+        for(size_t d = 0; d < r->d ;d++) {
+            if(!rrdr_dimension_should_be_exposed(r->od[d], options))
+                continue;
+
+            struct group_by_label_key *k = dictionary_get(r->dl[d], t_dfe.name);
+            if(k) {
+                buffer_json_add_array_item_array(wb);
+                void *tt;
+                dfe_start_read(k->values, tt) {
+                    buffer_json_add_array_item_string(wb, tt_dfe.name);
+                }
+                dfe_done(tt);
+                buffer_json_array_close(wb);
+            }
+            else
+                buffer_json_add_array_item_string(wb, NULL);
+        }
+
+        buffer_json_array_close(wb);
+    }
+    dfe_done(t);
+
+    buffer_json_object_close(wb); // key
+}
+
 struct group_by_entry {
     size_t priority;
     size_t count;
@@ -155,6 +216,7 @@ struct group_by_entry {
     STRING *name;
     STRING *units;
     RRDR_DIMENSION_FLAGS od;
+    DICTIONARY *dl;
 };
 
 static int group_by_label_is_space(char c) {
@@ -183,6 +245,10 @@ static RRDR *data_query_group_by(RRDR *r) {
 
     if(!(qt->request.group_by & (RRDR_GROUP_BY_SELECTED | RRDR_GROUP_BY_DIMENSION | RRDR_GROUP_BY_INSTANCE | RRDR_GROUP_BY_LABEL | RRDR_GROUP_BY_NODE | RRDR_GROUP_BY_CONTEXT)))
         qt->request.group_by = RRDR_GROUP_BY_DIMENSION;
+
+    DICTIONARY *label_keys = NULL;
+    if(options & RRDR_OPTION_GROUP_BY_LABELS)
+        label_keys = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, 0);
 
     int added = 0;
     BUFFER *key = buffer_create(0, NULL);
@@ -382,6 +448,14 @@ static RRDR *data_query_group_by(RRDR *r) {
             // add the rest of the info
             entries[pos].units = rrdinstance_acquired_units_dup(qi->ria);
             entries[pos].priority = priority;
+
+            if(options & RRDR_OPTION_GROUP_BY_LABELS) {
+                entries[pos].dl = dictionary_create_advanced(
+                        DICT_OPTION_SINGLE_THREADED | DICT_OPTION_FIXED_SIZE | DICT_OPTION_DONT_OVERWRITE_VALUE,
+                        NULL, sizeof(struct group_by_label_key));
+                dictionary_register_insert_callback(entries[pos].dl, group_by_label_key_insert_cb, label_keys);
+                dictionary_register_delete_callback(entries[pos].dl, group_by_label_key_delete_cb, label_keys);
+            }
         }
         else {
             // the key found in the dictionary
@@ -403,6 +477,10 @@ static RRDR *data_query_group_by(RRDR *r) {
         // the query target adds to it the non-zero flag
         qm->status |= RRDR_DIMENSION_GROUPED | r->od[d];
         entries[pos].od |= RRDR_DIMENSION_GROUPED | r->od[d];
+
+        if(entries[pos].dl)
+            rrdlabels_walkthrough_read(rrdinstance_acquired_labels(qi->ria),
+                                       rrdlabels_traversal_cb_to_group_by_label_key, entries[pos].dl);
     }
 
     // check if we have multiple units
@@ -436,6 +514,11 @@ static RRDR *data_query_group_by(RRDR *r) {
     r2->dgbc = onewayalloc_callocz(r2->internal.owa, r2->d, sizeof(*r2->dgbc));
     r2->gbc = onewayalloc_callocz(r2->internal.owa, r2->n * r2->d, sizeof(*r2->gbc));
 
+    if(options & RRDR_OPTION_GROUP_BY_LABELS) {
+        r2->dl = onewayalloc_callocz(r2->internal.owa, r2->d, sizeof(DICTIONARY *));
+        r2->label_keys = label_keys;
+    }
+
     // copy from previous rrdr
     r2->view = r->view;
     r2->stats = r->stats;
@@ -450,6 +533,9 @@ static RRDR *data_query_group_by(RRDR *r) {
         r2->du[d2] = entries[d2].units;
         r2->dp[d2] = entries[d2].priority;
         r2->dgbc[d2] = entries[d2].count;
+
+        if(r2->dl)
+            r2->dl[d2] = entries[d2].dl;
     }
 
     r2->partial_data_trimming.max_update_every = update_every_max;
@@ -618,11 +704,15 @@ static RRDR *data_query_group_by(RRDR *r) {
 cleanup:
     buffer_free(key);
 
-    if(!r2 && entries && added) {
-        for(int d2 = 0; d2 < added ; d2++) {
-            string_freez(entries[d2].id);
-            string_freez(entries[d2].name);
+    if(!r2) {
+        if(entries) {
+            for (int d2 = 0; d2 < added; d2++) {
+                string_freez(entries[d2].id);
+                string_freez(entries[d2].name);
+                dictionary_destroy(entries[d2].dl);
+            }
         }
+        dictionary_destroy(label_keys);
     }
     onewayalloc_freez(r->internal.owa, entries);
     dictionary_destroy(groups);
@@ -865,10 +955,6 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         rrdr2json(r, wb, options, 0);
 
         if(options & RRDR_OPTION_JSON_WRAP) {
-            if (query_target_aggregatable(qt)) {
-                buffer_json_member_add_key_only(wb, "group_by_count");
-                rrdr2json(r, wb, options | RRDR_OPTION_INTERNAL_GBC, false);
-            }
             if (options & RRDR_OPTION_RETURN_JWAR) {
                 buffer_json_member_add_key_only(wb, "anomaly_rates");
                 rrdr2json(r, wb, options | RRDR_OPTION_INTERNAL_AR, false);

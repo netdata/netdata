@@ -43,7 +43,9 @@ static struct {
         , {"all-dimensions"    , 0    , RRDR_OPTION_ALL_DIMENSIONS}
         , {"details"           , 0    , RRDR_OPTION_SHOW_DETAILS}
         , {"debug"             , 0    , RRDR_OPTION_DEBUG}
+        , {"plan"              , 0    , RRDR_OPTION_DEBUG}
         , {"minify"            , 0    , RRDR_OPTION_MINIFY}
+        , {"group-by-labels"   , 0    , RRDR_OPTION_GROUP_BY_LABELS}
         , {NULL                , 0    , 0}
 };
 

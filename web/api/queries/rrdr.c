@@ -81,6 +81,16 @@ inline void rrdr_free(ONEWAYALLOC *owa, RRDR *r) {
     onewayalloc_freez(owa, r->ar);
     onewayalloc_freez(owa, r->gbc);
     onewayalloc_freez(owa, r->dgbc);
+
+    if(r->dl) {
+        for(size_t d = 0; d < r->d ;d++)
+            dictionary_destroy(r->dl[d]);
+
+        onewayalloc_freez(owa, r->dl);
+    }
+
+    dictionary_destroy(r->label_keys);
+
     onewayalloc_freez(owa, r);
 }
 

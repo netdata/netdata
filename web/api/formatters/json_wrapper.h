@@ -12,8 +12,6 @@ typedef void (*wrapper_end_t)(RRDR *r, BUFFER *wb);
 void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb);
 void rrdr_json_wrapper_end(RRDR *r, BUFFER *wb);
 
-void rrdr2json_v2(RRDR *r, BUFFER *wb);
-
 void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb);
 void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb);
 

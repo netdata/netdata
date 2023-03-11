@@ -44,11 +44,11 @@ typedef enum rrdr_options {
     RRDR_OPTION_SHOW_DETAILS    = (1 << 23), // v2 returns detailed object tree
     RRDR_OPTION_DEBUG           = (1 << 24), // v2 returns request description
     RRDR_OPTION_MINIFY          = (1 << 25), // remove JSON spaces and newlines from JSON output
+    RRDR_OPTION_GROUP_BY_LABELS = (1 << 26), // v2 returns flattened labels per dimension of the chart
 
     // internal ones - not to be exposed to the API
-    RRDR_OPTION_HEALTH_RSRVD1        = (1 << 29), // reserved for RRDCALC_OPTION_NO_CLEAR_NOTIFICATION
-    RRDR_OPTION_INTERNAL_AR          = (1 << 30), // internal use only, to let the formatters know we want to render the anomaly rate
-    RRDR_OPTION_INTERNAL_GBC         = (1 << 31), // internal use only, to let the formatters know we want to render the group by count
+    RRDR_OPTION_HEALTH_RSRVD1        = (1 << 30), // reserved for RRDCALC_OPTION_NO_CLEAR_NOTIFICATION
+    RRDR_OPTION_INTERNAL_AR          = (1 << 31), // internal use only, to let the formatters know we want to render the anomaly rate
 } RRDR_OPTIONS;
 
 typedef enum __attribute__ ((__packed__)) rrdr_value_flag {
@@ -95,6 +95,9 @@ typedef struct rrdresult {
     uint32_t *dgbc;           // array of d dimension units - NOT ALLOCATED when RRDR is created
     uint32_t *dp;             // array of d dimension priority - NOT ALLOCATED when RRDR is created
     NETDATA_DOUBLE *dv;       // array of d dimension averages - NOT ALLOCATED when RRDR is created
+    DICTIONARY **dl;          // array of d dimension labels - NOT ALLOCATED when RRDR is created
+
+    DICTIONARY *label_keys;
 
     time_t *t;                // array of n timestamps
     NETDATA_DOUBLE *v;        // array n x d values

@@ -59,6 +59,8 @@ const char *rrdr_format_to_string(DATASOURCE_FORMAT format);
 
 int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, struct query_target *qt, time_t *latest_timestamp);
 
+void rrdr_json_group_by_labels(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options);
+
 struct query_target;
 bool query_target_has_percentage_units(struct query_target *qt);
 bool query_target_aggregatable(struct query_target *qt);
