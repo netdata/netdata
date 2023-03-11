@@ -453,6 +453,11 @@ void ebpf_update_stats(ebpf_plugin_stats_t *report, ebpf_module_t *em)
     else if (em->load & EBPF_LOAD_CORE)
         report->core++;
 
+    if (em->maps_per_core)
+        report->hash_percpu++;
+    else
+        report->hash_unique++;
+
     ebpf_stats_targets(report, em->targets);
 }
 

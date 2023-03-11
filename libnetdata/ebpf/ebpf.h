@@ -249,6 +249,9 @@ typedef struct ebpf_plugin_stats {
     uint64_t memlock_kern; // The same information reported by bpftool, but it is not accurated
                            // https://lore.kernel.org/linux-mm/20230112155326.26902-5-laoar.shao@gmail.com/T/
     uint32_t hash_tables; // Number of hash tables used on the system.
+
+    uint32_t hash_percpu; // Number of threads running per cpu maps
+    uint32_t hash_unique; // Number of threads running an unique map for all cores.
 } ebpf_plugin_stats_t;
 
 typedef enum ebpf_stats_action {
