@@ -91,6 +91,16 @@ inline void rrdr_free(ONEWAYALLOC *owa, RRDR *r) {
 
     dictionary_destroy(r->label_keys);
 
+    if(r->group_by.r) {
+        // prevent accidental infinite recursion
+        r->group_by.r->group_by.r = NULL;
+
+        // do not release qt twice
+        r->group_by.r->internal.qt = NULL;
+
+        rrdr_free(owa, r->group_by.r);
+    }
+
     onewayalloc_freez(owa, r);
 }
 
@@ -105,7 +115,7 @@ RRDR *rrdr_create(ONEWAYALLOC *owa, QUERY_TARGET *qt, size_t dimensions, size_t 
 
     r->view.before = qt->window.before;
     r->view.after = qt->window.after;
-    r->grouping.points_wanted = points;
+    r->time_grouping.points_wanted = points;
     r->d = (int)dimensions;
     r->n = (int)points;
 

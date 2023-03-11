@@ -1443,6 +1443,9 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
     }
     buffer_json_object_close(wb); // view
 
+    buffer_json_member_add_double(wb, "min", r->view.min);
+    buffer_json_member_add_double(wb, "max", r->view.max);
+
     rrdr_timings_v12(wb, "timings", r);
     buffer_json_finalize(wb);
 }

@@ -82,6 +82,16 @@ typedef enum __attribute__ ((__packed__)) rrdr_result_flags {
     RRDR_RESULT_FLAG_CANCEL        = (1 << 2), // the query needs to be cancelled
 } RRDR_RESULT_FLAGS;
 
+struct rrdr_group_by_entry {
+    size_t priority;
+    size_t count;
+    STRING *id;
+    STRING *name;
+    STRING *units;
+    RRDR_DIMENSION_FLAGS od;
+    DICTIONARY *dl;
+};
+
 typedef struct rrdresult {
     size_t d;                 // the number of dimensions
     size_t n;                 // the number of values in the arrays (number of points per dimension)
@@ -136,7 +146,11 @@ typedef struct rrdresult {
         size_t points_wanted;               // used by SES and DES
         size_t resampling_group;            // used by AVERAGE
         NETDATA_DOUBLE resampling_divisor;  // used by AVERAGE
-    } grouping;
+    } time_grouping;
+
+    struct {
+        struct rrdresult *r;
+    } group_by;
 
     struct {
         time_t max_update_every;
@@ -148,6 +162,7 @@ typedef struct rrdresult {
         ONEWAYALLOC *owa;           // the allocator used
         struct query_target *qt;    // the QUERY_TARGET
         size_t contexts;            // temp needed between json_wrapper_begin2() and json_wrapper_end2()
+        size_t queries_count;       // temp needed to know if a query is the first executed
 
 #ifdef NETDATA_INTERNAL_CHECKS
         const char *log;

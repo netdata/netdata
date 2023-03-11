@@ -30,7 +30,7 @@ void grouping_create_median_internal(RRDR *r, const char *options, NETDATA_DOUBL
     }
 
     g->percent = g->percent / 100.0;
-    r->grouping.data = g;
+    r->time_grouping.data = g;
 }
 
 void grouping_create_median(RRDR *r, const char *options) {
@@ -64,20 +64,20 @@ void grouping_create_trimmed_median25(RRDR *r, const char *options) {
 // resets when switches dimensions
 // so, clear everything to restart
 void grouping_reset_median(RRDR *r) {
-    struct grouping_median *g = (struct grouping_median *)r->grouping.data;
+    struct grouping_median *g = (struct grouping_median *)r->time_grouping.data;
     g->next_pos = 0;
 }
 
 void grouping_free_median(RRDR *r) {
-    struct grouping_median *g = (struct grouping_median *)r->grouping.data;
+    struct grouping_median *g = (struct grouping_median *)r->time_grouping.data;
     if(g) onewayalloc_freez(r->internal.owa, g->series);
 
-    onewayalloc_freez(r->internal.owa, r->grouping.data);
-    r->grouping.data = NULL;
+    onewayalloc_freez(r->internal.owa, r->time_grouping.data);
+    r->time_grouping.data = NULL;
 }
 
 void grouping_add_median(RRDR *r, NETDATA_DOUBLE value) {
-    struct grouping_median *g = (struct grouping_median *)r->grouping.data;
+    struct grouping_median *g = (struct grouping_median *)r->time_grouping.data;
 
     if(unlikely(g->next_pos >= g->series_size)) {
         g->series = onewayalloc_doublesize( r->internal.owa, g->series, g->series_size * sizeof(NETDATA_DOUBLE));
@@ -88,7 +88,7 @@ void grouping_add_median(RRDR *r, NETDATA_DOUBLE value) {
 }
 
 NETDATA_DOUBLE grouping_flush_median(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_median *g = (struct grouping_median *)r->grouping.data;
+    struct grouping_median *g = (struct grouping_median *)r->time_grouping.data;
 
     size_t available_slots = g->next_pos;
     NETDATA_DOUBLE value;
