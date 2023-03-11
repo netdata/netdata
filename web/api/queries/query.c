@@ -2705,7 +2705,7 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         // we need this, because if a dimension is explicitly selected
         // the query target adds to it the non-zero flag
         qm->status |= RRDR_DIMENSION_GROUPED;
-        entries[pos].od |= RRDR_DIMENSION_GROUPED;
+        entries[pos].od |= qm->status;
 
         if(entries[pos].dl)
             rrdlabels_walkthrough_read(rrdinstance_acquired_labels(qi->ria),
