@@ -159,9 +159,9 @@ static void ebpf_dc_adjust_map(struct dc_bpf *obj, ebpf_module_t *em)
     ebpf_update_map_size(obj->maps.dcstat_pid, &dcstat_maps[NETDATA_DCSTAT_PID_STATS],
                          em, bpf_map__name(obj->maps.dcstat_pid));
 
-    ebpf_update_map_type(obj->maps.dcstat_global, &cachestat_maps[NETDATA_DCSTAT_GLOBAL_STATS]);
-    ebpf_update_map_type(obj->maps.dcstat_pid, &cachestat_maps[NETDATA_DCSTAT_PID_STATS]);
-    ebpf_update_map_type(obj->maps.dcstat_ctrl, &cachestat_maps[NETDATA_DCSTAT_CTRL]);
+    ebpf_update_map_type(obj->maps.dcstat_global, &dcstat_maps[NETDATA_DCSTAT_GLOBAL_STATS]);
+    ebpf_update_map_type(obj->maps.dcstat_pid, &dcstat_maps[NETDATA_DCSTAT_PID_STATS]);
+    ebpf_update_map_type(obj->maps.dcstat_ctrl, &dcstat_maps[NETDATA_DCSTAT_CTRL]);
 }
 
 /**

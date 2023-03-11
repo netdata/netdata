@@ -232,9 +232,9 @@ static void ebpf_shm_adjust_map(struct shm_bpf *obj, ebpf_module_t *em)
     ebpf_update_map_size(obj->maps.tbl_pid_shm, &shm_maps[NETDATA_PID_SHM_TABLE],
                          em, bpf_map__name(obj->maps.tbl_pid_shm));
 
-    ebpf_update_map_type(obj->maps.tbl_shm, &cachestat_maps[NETDATA_SHM_GLOBAL_TABLE]);
-    ebpf_update_map_type(obj->maps.tbl_pid_shm, &cachestat_maps[NETDATA_PID_SHM_TABLE]);
-    ebpf_update_map_type(obj->maps.shm_ctrl, &cachestat_maps[NETDATA_SHM_CONTROLLER]);
+    ebpf_update_map_type(obj->maps.tbl_shm, &shm_maps[NETDATA_SHM_GLOBAL_TABLE]);
+    ebpf_update_map_type(obj->maps.tbl_pid_shm, &shm_maps[NETDATA_PID_SHM_TABLE]);
+    ebpf_update_map_type(obj->maps.shm_ctrl, &shm_maps[NETDATA_SHM_CONTROLLER]);
 }
 
 /**

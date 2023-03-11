@@ -292,9 +292,9 @@ static void ebpf_fd_adjust_map(struct fd_bpf *obj, ebpf_module_t *em)
     ebpf_update_map_size(obj->maps.tbl_fd_pid, &fd_maps[NETDATA_FD_PID_STATS],
                          em, bpf_map__name(obj->maps.tbl_fd_pid));
 
-    ebpf_update_map_type(obj->maps.tbl_fd_global, &cachestat_maps[NETDATA_FD_GLOBAL_STATS]);
-    ebpf_update_map_type(obj->maps.tbl_fd_pid, &cachestat_maps[NETDATA_FD_PID_STATS]);
-    ebpf_update_map_type(obj->maps.fd_ctrl, &cachestat_maps[NETDATA_FD_CONTROLLER]);
+    ebpf_update_map_type(obj->maps.tbl_fd_global, &fd_maps[NETDATA_FD_GLOBAL_STATS]);
+    ebpf_update_map_type(obj->maps.tbl_fd_pid, &fd_maps[NETDATA_FD_PID_STATS]);
+    ebpf_update_map_type(obj->maps.fd_ctrl, &fd_maps[NETDATA_FD_CONTROLLER]);
 }
 
 /**
