@@ -27,7 +27,7 @@ dist_config_DATA = \
     .install-type \
     $(NULL)
 
-libconfigvnodesdir=$(libconfig)/vnodes
+libconfigvnodesdir=$(libconfigdir)/vnodes
 libsyscrondir=$(libsysdir)/cron
 libsysfreebsddir=$(libsysdir)/freebsd
 libsysfreebsdrcddir=$(libsysfreebsddir)/rc.d
