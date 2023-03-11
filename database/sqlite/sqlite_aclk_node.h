@@ -5,4 +5,5 @@
 
 void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void sql_build_node_collectors(struct aclk_database_worker_config *wc);
+void register_update_node_instance_connection_msg(RRDHOST *host, int cmd);
 #endif //NETDATA_SQLITE_ACLK_NODE_H
