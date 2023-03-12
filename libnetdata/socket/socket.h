@@ -75,7 +75,7 @@ ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
 #endif
 
 bool fd_is_socket(int fd);
-bool sock_has_error(int fd);
+bool sock_has_output_error(int fd);
 
 int sock_setnonblock(int fd);
 int sock_delnonblock(int fd);

@@ -20,19 +20,35 @@ bool fd_is_socket(int fd) {
     return true;
 }
 
-bool sock_has_error(int fd) {
-    if(fd < 0)
+bool sock_has_output_error(int fd) {
+    if(fd < 0) {
+        //internal_error(true, "invalid socket %d", fd);
         return false;
+    }
 
-    struct pollfd pfd = { 0 };
-    pfd.fd = fd;
-    pfd.events = POLLOUT | POLLHUP | POLLERR;
-    pfd.revents = 0;
-    int ret = poll(&pfd, 1, 0);
-    if (ret == -1)
+//    if(!fd_is_socket(fd)) {
+//        //internal_error(true, "fd %d is not a socket", fd);
+//        return false;
+//    }
+
+    short int errors = POLLERR | POLLHUP | POLLNVAL;
+
+#ifdef POLLRDHUP
+    errors |= POLLRDHUP;
+#endif
+
+    struct pollfd pfd = {
+            .fd = fd,
+            .events = POLLOUT | errors,
+            .revents = 0,
+    };
+
+    if(poll(&pfd, 1, 0) == -1) {
+        //internal_error(true, "poll() failed");
         return false;
+    }
 
-    return (pfd.revents & (POLLHUP | POLLERR));
+    return ((pfd.revents & errors) || !(pfd.revents & POLLOUT));
 }
 
 int sock_setnonblock(int fd) {
