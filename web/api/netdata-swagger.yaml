@@ -2546,12 +2546,12 @@ components:
                         id:
                           description: The value string
                           type: string
-                          ds:
-                            $ref: "#/components/schemas/data_json2_items_count"
-                          sts:
-                            oneOf:
-                              - $ref: "#/components/schemas/data_json2_sts"
-                              - $ref: "#/components/schemas/data_json2_sts_raw"
+                        ds:
+                          $ref: "#/components/schemas/data_json2_items_count"
+                        sts:
+                          oneOf:
+                            - $ref: "#/components/schemas/data_json2_sts"
+                            - $ref: "#/components/schemas/data_json2_sts_raw"
             alerts:
               description: |
                 An array of all the unique alerts running, grouped by alert name (`nm` is available here)
@@ -2763,14 +2763,6 @@ components:
                   description: |
                     The number of dimensions in the `result`.
                   type: integer
-                min:
-                  description: |
-                    The minimum value of all points included in the `result`.
-                  type: number
-                max:
-                  description: |
-                    The maximum value of all points included in the `result`.
-                  type: number
                 labels:
                   description: |
                     The labels associated with each dimension in the query.
@@ -2787,6 +2779,14 @@ components:
                         type: array
                         items:
                           type: string
+            min:
+              description: |
+                The minimum value of all points included in the `result`.
+              type: number
+            max:
+              description: |
+                The maximum value of all points included in the `result`.
+              type: number
         result:
           description: |
             The result of the query.
@@ -2826,6 +2826,10 @@ components:
                   type: integer
             data:
               type: array
+              items:
+                allOf:
+                  - type: integer
+                  - type: array
         timings:
           type: object
     data_json2_sts:
