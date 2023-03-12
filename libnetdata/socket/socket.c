@@ -24,17 +24,15 @@ bool sock_has_error(int fd) {
     if(fd < 0)
         return false;
 
-    if(!fd_is_socket(fd))
+    struct pollfd pfd = { 0 };
+    pfd.fd = fd;
+    pfd.events = POLLOUT | POLLHUP | POLLERR;
+    pfd.revents = 0;
+    int ret = poll(&pfd, 1, 0);
+    if (ret == -1)
         return false;
 
-    int error;
-    socklen_t len = sizeof(error);
-    if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &len) == 0) {
-        if (error != 0)
-            return true;
-    }
-
-    return false;
+    return (pfd.revents & (POLLHUP | POLLERR));
 }
 
 int sock_setnonblock(int fd) {
