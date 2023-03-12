@@ -586,26 +586,32 @@ netdataDashboard.menu = {
     },
 
     'mssql': {
-        title: 'MS SQL Server',
+        title: 'SQL Server',
         icon: '<i class="fas fa-database"></i>',
         info: undefined
     },
 
     'ad': {
-        title: 'AD Domain Service',
+        title: 'Active Directory',
         icon: '<i class="fab fa-windows"></i>',
         info: undefined
     },
 
     'adcs': {
-        title: 'AD Certification Service',
+        title: 'Certification Service',
         icon: '<i class="fab fa-windows"></i>',
         info: undefined
     },
 
     'adfs': {
-        title: 'AD Federation Service',
+        title: 'Federation Service',
         icon: '<i class="fab fa-windows"></i>',
+        info: undefined
+    },
+
+    'exchange': {
+        title: 'Exchange',
+        icon: '<i class="fab envelope"></i>',
         info: undefined
     },
 
