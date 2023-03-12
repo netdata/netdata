@@ -1303,7 +1303,7 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb) {
         buffer_json_member_add_time_t(wb, "first_entry", qt->db.first_time_s);
         buffer_json_member_add_time_t(wb, "last_entry", qt->db.last_time_s);
 
-        buffer_json_member_add_array(wb, "tiers");
+        buffer_json_member_add_array(wb, "per_tier");
         for(size_t tier = 0; tier < storage_tiers ; tier++) {
             buffer_json_add_array_item_object(wb);
             buffer_json_member_add_uint64(wb, "tier", tier);
@@ -1436,10 +1436,10 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
             size_t dims = rrdr_dimension_latest_values(wb, "view_latest_values", r, options);
             buffer_json_member_add_uint64(wb, "count", dims);
             rrdr_json_group_by_labels(wb, "labels", r, options);
+            buffer_json_member_add_double(wb, "min", r->view.min);
+            buffer_json_member_add_double(wb, "max", r->view.max);
         }
         buffer_json_object_close(wb); // dimensions
-        buffer_json_member_add_double(wb, "min", r->view.min);
-        buffer_json_member_add_double(wb, "max", r->view.max);
     }
     buffer_json_object_close(wb); // view
 
