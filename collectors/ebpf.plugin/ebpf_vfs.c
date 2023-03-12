@@ -1505,15 +1505,15 @@ static void vfs_collector(ebpf_module_t *em)
         if (apps)
             ebpf_vfs_read_apps(maps_per_core);
 
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_vfs_pid)
-            ebpf_send_data_aral_chart(ebpf_aral_vfs_pid, em);
-#endif
-
         if (cgroups)
             read_update_vfs_cgroup(maps_per_core);
 
         pthread_mutex_lock(&lock);
+
+#ifdef NETDATA_DEV_MODE
+        if (ebpf_aral_vfs_pid)
+            ebpf_send_data_aral_chart(ebpf_aral_vfs_pid, em);
+#endif
 
         ebpf_vfs_send_data(em);
         fflush(stdout);

@@ -959,15 +959,15 @@ static void fd_collector(ebpf_module_t *em)
         if (apps)
             read_fd_apps_table(maps_per_core);
 
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_fd_pid)
-            ebpf_send_data_aral_chart(ebpf_aral_fd_pid, em);
-#endif
-
         if (cgroups)
             ebpf_update_fd_cgroup(maps_per_core);
 
         pthread_mutex_lock(&lock);
+
+#ifdef NETDATA_DEV_MODE
+        if (ebpf_aral_fd_pid)
+            ebpf_send_data_aral_chart(ebpf_aral_fd_pid, em);
+#endif
 
         ebpf_fd_send_data(em);
 
