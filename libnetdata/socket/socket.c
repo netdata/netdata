@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE // for POLLRDHUP
+#endif
+
+#ifndef __BSD_VISIBLE
+#define __BSD_VISIBLE // for POLLRDHUP
+#endif
+
 #include "../libnetdata.h"
 
 // --------------------------------------------------------------------------------------------------------------------
