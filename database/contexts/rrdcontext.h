@@ -258,6 +258,8 @@ typedef struct query_metric {
 
 #define MAX_QUERY_TARGET_ID_LENGTH 255
 
+typedef bool (*interrupt_callback_t)(void *data);
+
 typedef struct query_target_request {
     size_t version;
 
@@ -303,6 +305,9 @@ typedef struct query_target_request {
     RRDR_GROUP_BY_FUNCTION group_by_aggregate_function;
 
     usec_t received_ut;
+
+    interrupt_callback_t interrupt_callback;
+    void *interrupt_callback_data;
 } QUERY_TARGET_REQUEST;
 
 #define GROUP_BY_MAX_LABEL_KEYS 10

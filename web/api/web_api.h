@@ -29,6 +29,8 @@ static inline void fix_google_param(char *s) {
     }
 }
 
+bool web_client_interrupt_callback(void *data);
+
 #include "web_api_v1.h"
 #include "web_api_v2.h"
 

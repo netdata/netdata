@@ -11,6 +11,32 @@
 #define LARGE_SOCK_SIZE 4096
 #endif
 
+bool fd_is_socket(int fd) {
+    int type;
+    socklen_t len = sizeof(type);
+    if (getsockopt(fd, SOL_SOCKET, SO_TYPE, &type, &len) == -1)
+        return false;
+
+    return true;
+}
+
+bool sock_has_error(int fd) {
+    if(fd < 0)
+        return false;
+
+    if(!fd_is_socket(fd))
+        return false;
+
+    int error;
+    socklen_t len = sizeof(error);
+    if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &len) == 0) {
+        if (error != 0)
+            return true;
+    }
+
+    return false;
+}
+
 int sock_setnonblock(int fd) {
     int flags;
 

@@ -215,6 +215,9 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
             .query_source = QUERY_SOURCE_API_DATA,
             .priority = STORAGE_PRIORITY_NORMAL,
             .received_ut = received_ut,
+
+            .interrupt_callback = web_client_interrupt_callback,
+            .interrupt_callback_data = w,
     };
     QUERY_TARGET *qt = query_target_create(&qtr);
     ONEWAYALLOC *owa = NULL;

@@ -3243,9 +3243,20 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         }
 
         dimensions_used++;
+
+        bool cancel = false;
+        if (qt->request.interrupt_callback && qt->request.interrupt_callback(qt->request.interrupt_callback_data)) {
+            cancel = true;
+            log_access("QUERY INTERRUPTED");
+        }
+
         if (qt->request.timeout && ((NETDATA_DOUBLE)dt_usec(&query_start_time, &query_current_time) / 1000.0) > (NETDATA_DOUBLE)qt->request.timeout) {
+            cancel = true;
             log_access("QUERY CANCELED RUNTIME EXCEEDED %0.2f ms (LIMIT %lld ms)",
                        (NETDATA_DOUBLE)dt_usec(&query_start_time, &query_current_time) / 1000.0, (long long)qt->request.timeout);
+        }
+
+        if(cancel) {
             r->view.flags |= RRDR_RESULT_FLAG_CANCEL;
 
             for(size_t i = d + 1; i < queries_prepared ; i++) {
@@ -3266,7 +3277,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     rrd2rrdr_group_by_finalize(r);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if (dimensions_used) {
+    if (dimensions_used && !(r->view.flags & RRDR_RESULT_FLAG_CANCEL)) {
         if(r->internal.log)
             rrd2rrdr_log_request_response_metadata(r, qt->window.options, qt->window.group_method, qt->window.aligned, qt->window.group, qt->request.resampling_time, qt->window.resampling_group,
                                                    qt->window.after, qt->request.after, qt->window.before, qt->request.before,

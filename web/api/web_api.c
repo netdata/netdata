@@ -57,3 +57,12 @@ RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o) {
 
     return options;
 }
+
+bool web_client_interrupt_callback(void *data) {
+    struct web_client *w = data;
+    bool ret = sock_has_error(w->ifd);
+    if(!ret && w->ifd != w->ofd)
+        ret = sock_has_error(w->ofd);
+
+    return ret;
+}
