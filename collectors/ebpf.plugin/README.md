@@ -164,7 +164,7 @@ is 5 seconds.
 
 #### PID table size
 
-The option `pid table size` defines the maximum number of PIDs stored inside the application hash table. Default value
+The option `pid table size` defines the maximum number of PIDs stored inside the application hash table. The default value
 is defined according [kernel](https://elixir.bootlin.com/linux/v6.0.19/source/include/linux/threads.h#L28) source code.
 
 #### Integration Dashboard Elements
