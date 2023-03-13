@@ -1307,7 +1307,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
             protocol = "http";
 #endif
             url_host = (!w->forwarded_host[0])?w->server_host:w->forwarded_host;
-            buffer_sprintf(w->response.header, "Location: %s://%s%s/\r\n", protocol, url_host, w->last_url);
+            buffer_sprintf(w->response.header, "Location: %s://%s%s/%s\r\n", protocol, url_host, w->decoded_url, w->decoded_query_string);
             buffer_strcat(w->response.data, "Permanent redirect");
             return HTTP_RESP_REDIR_PERM;
         }
