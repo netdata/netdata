@@ -124,7 +124,7 @@ class Service(ExecutableService):
             if 'tx_discards_phy' in line.split(':')[0]:
                 tx_discards_phy = int(line.split(':')[1])
 
-        if name not in self.metrics.keys() :
+        if name not in self.metrics.keys():
             self.debug('Init metrics of device {}'.format(name))
             self.metrics[name] = Metrics(name, 0, 0, 0, 0, 0, 0, 0, 0, last_update)
             rx_bw = 0
