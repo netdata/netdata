@@ -6,7 +6,7 @@ learn_status: "Published"
 learn_rel_path: "Integrations/Monitor/VoIP"
 -->
 
-# Asterisk monitoring with Netdata
+# Asterisk collector
 
 Monitors [Asterisk](https://www.asterisk.org/) dialplan application's statistics.
 

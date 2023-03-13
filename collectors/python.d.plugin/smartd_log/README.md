@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Devices"
 -->
 
-# Storage devices monitoring with Netdata
+# Storage devices collector
 
 Monitors `smartd` log files to collect HDD/SSD S.M.A.R.T attributes.
 

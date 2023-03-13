@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Devices"
 -->
 
-# Linux machine sensors monitoring with Netdata
+# Linux machine sensors collector
 
 Reads system sensors information (temperature, voltage, electric current, power, etc.).
 

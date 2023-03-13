@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Webapps"
 -->
 
-# SpigotMC monitoring with Netdata
+# SpigotMC collector
 
 Performs basic monitoring for Spigot Minecraft servers.
 

@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Storage"
 -->
 
-# Monit monitoring with Netdata
+# Monit collector
 
 Monit monitoring module. Data is grabbed from stats XML interface (exists for a long time, but not mentioned in official
 documentation). Mostly this plugin shows statuses of monit targets, i.e.
