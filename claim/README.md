@@ -550,7 +550,9 @@ To remove a node from you Space in Netdata Cloud, and connect it to another Spac
     docker stack rm STACK
     ```
 
-4. Finally, go to your new Space, copy the install command with the new claim token and run it. The node should now appear online in that Space.
+4. Finally, go to your new Space, copy the install command with the new claim token and run it.  
+  If you are using a `docker-compose.yml` file, you will have to overwrite it with the new claiming token.  
+  The node should now appear online in that Space.
 
 ## Connecting reference
 In the sections below, you can find reference material for the kickstart script, claiming script, connecting via the Agent's command line
