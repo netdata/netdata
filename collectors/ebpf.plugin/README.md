@@ -897,7 +897,7 @@ node is experiencing high memory usage and there is no obvious culprit to be fou
 - Disable [integration with apps](#integration-with-appsplugin).
 - Disable [integration with cgroup](#integration-with-cgroupsplugin).
 
-If with these changes you still consider plugin having a high memory usage, and there is no obvious culprit to be found 
+If with these changes you still suspect eBPF using too much memory, and there is no obvious culprit to be found 
 in the `apps.mem` chart, consider testing for high kernel memory usage by [disabling eBPF monitoring](#configuring-ebpfplugin).
 Next, [restart Netdata](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) with
 `sudo systemctl restart netdata` to see if system memory usage (see the `system.ram` chart) has dropped significantly.
