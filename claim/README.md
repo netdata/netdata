@@ -519,9 +519,9 @@ To remove a node from you Space in Netdata Cloud, and connect it to another Spac
 2. Delete `/var/lib/netdata/cloud.d` and `/var/lib/netdata/registry/netdata.public.unique.id`
 
    ```bash
-   rm -rf var/lib/netdata/cloud.d/
+   rm -rf /var/lib/netdata/cloud.d/
    
-   rm var/lib/netdata/registry/netdata.public.unique.id 
+   rm /var/lib/netdata/registry/netdata.public.unique.id 
    ```
 
 3. Stop and remove the container
