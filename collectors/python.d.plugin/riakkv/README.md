@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Databases"
 -->
 
-# Riak KV monitoring with Netdata
+# Riak KV collector
 
 Collects database stats from `/stats` endpoint.
 

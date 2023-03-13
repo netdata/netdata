@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Webapps"
 -->
 
-# Varnish Cache monitoring with Netdata
+# Varnish Cache collector
 
 Provides HTTP accelerator global, Backends (VBE) and Storages (SMF, SMA, MSE) statistics using `varnishstat` tool.
 

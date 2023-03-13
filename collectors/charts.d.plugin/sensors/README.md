@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Devices"
 -->
 
-# Linux machine sensors monitoring with Netdata
+# Linux machine sensors collector
 
 Use this collector when `lm-sensors` doesn't work on your device (e.g. for RPi temperatures). 
 For all other cases use the [Python collector](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/sensors), which supports multiple 

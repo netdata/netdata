@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Provisioning tools"
 -->
 
-# Puppet monitoring with Netdata
+# Puppet collector
 
 Monitor status of Puppet Server and Puppet DB.
 
