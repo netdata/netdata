@@ -159,7 +159,7 @@ will only enable these threads integrated with other collectors when the kernel 
 
 #### Collection period
 
-Plugin uses option `update every` to define number of seconds used for eBPF to send data for Netdata. The default value
+The plugin uses the option `update every` to define number of seconds used for eBPF to send data for Netdata. The default value
 is 5 seconds.
 
 #### PID table size
