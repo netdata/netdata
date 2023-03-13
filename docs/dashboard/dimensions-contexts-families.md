@@ -1,4 +1,4 @@
-# Chart dimensions, contexts, and families
+# Fundamentals in metric collections jobs
 
 While Netdata's charts require no configuration and are [easy to interact with](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md),
 they have a lot of underlying complexity. To meaningfully organize charts out of the box based on what's happening in
@@ -67,3 +67,37 @@ names:
 | `disk.ops`     | `disk_ops.sda`     | `disk_ops.sdb`     |
 | `disk.backlog` | `disk_backlog.sda` | `disk_backlog.sdb` |
 | `disk.util`    | `disk_util.sda`    | `disk_util.sdb`    |
+
+
+## Custom labels per metric collection job
+
+> Important: This functionality is available only for go.d.plugin's modules and metric colleciton jobs
+
+In addition to the default labels associated with a collector and metrics context (you can identify them by seeing which ones have an underscore as a prefix), there is now a new feature enabled to create custom labels. These custom labels may be needed to group your jobs or instances into various categories.
+
+
+
+```conf
+jobs:
+  - name: example_1
+    someOption: someValue
+    labels:
+      label1: value1
+      label2: value2
+  - name: example_2
+    someOption: someValue
+    labels:
+      label3: value3
+      label4: value4
+```
+
+For instance, you may be running multiple Postgres database instances within an infrastructure. Some of these may be associated with testing environments, some with staging and some with production environments. You can now associate each Postgres job / instance with a custom label. The “group by” and filtering options will then allow you to associate individual jobs by specific labels.
+
+```conf
+jobs:
+  - name: local
+    dsn: 'postgres://postgres:postgres@127.0.0.1:5432/postgres'
+    collect_databases_matching: '*'
+    labels:
+        instance_type: production
+```
