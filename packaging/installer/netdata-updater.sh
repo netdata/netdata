@@ -838,8 +838,8 @@ ndtmpdir=
 
 trap cleanup EXIT
 
-if [ -t 2 ]; then
-  # we are running on a terminal
+if [ -t 2 ] || [ "${GITHUB_ACTIONS}" ]; then
+  # we are running on a terminal or under CI
   # open fd 3 and send it to stderr
   exec 3>&2
 else

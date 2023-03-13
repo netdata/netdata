@@ -74,6 +74,17 @@ include:
         - el/8Server
         - el/8Client
 
+  - distro: amazonlinux
+    version: "2"
+    packages:
+      type: rpm
+      repo_distro: amazonlinux/2
+      arches:
+        - x86_64
+        - aarch64
+    test:
+      ebpf-core: false
+
   - distro: centos
     version: "7"
     eol_check: false
