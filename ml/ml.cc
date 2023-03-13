@@ -850,7 +850,7 @@ ml_detect_main(void *arg)
                 training_stats.training_result_chart_under_replication = 0;
             }
 
-            ml_update_training_statistics_chart(training_thread, training_stats);
+            // ml_update_training_statistics_chart(training_thread, training_stats);
         }
     }
 
