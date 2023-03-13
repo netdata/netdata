@@ -27,6 +27,7 @@ dist_config_DATA = \
     .install-type \
     $(NULL)
 
+libconfigvnodesdir=$(libconfigdir)/vnodes
 libsyscrondir=$(libsysdir)/cron
 libsysfreebsddir=$(libsysdir)/freebsd
 libsysfreebsdrcddir=$(libsysfreebsddir)/rc.d
@@ -54,6 +55,11 @@ install-exec-local:
 	$(INSTALL) -d $(DESTDIR)$(libsyssystemddir)
 	$(INSTALL) -d $(DESTDIR)$(libsysopenrcinitddir)
 	$(INSTALL) -d $(DESTDIR)$(libsysopenrcconfddir)
+	$(INSTALL) -d $(DESTDIR)$(libconfigvnodesdir)
+
+dist_libconfigvnodes_DATA = \
+    vnodes/vnodes.conf
+    $(NULL)
 
 libexecnetdatadir=$(libexecdir)/netdata
 nodist_libexecnetdata_SCRIPTS = \
