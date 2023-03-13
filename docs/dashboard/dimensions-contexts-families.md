@@ -1,4 +1,4 @@
-# Fundamentals in metric collections jobs
+# Fundamentals of metric collection
 
 While Netdata's charts require no configuration and are [easy to interact with](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md),
 they have a lot of underlying complexity. To meaningfully organize charts out of the box based on what's happening in
