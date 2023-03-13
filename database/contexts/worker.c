@@ -1080,7 +1080,8 @@ void *rrdcontext_main(void *ptr) {
                         dictionary_garbage_collect(host->rrdctx.hub_queue);
                     }
 
-                    dictionary_garbage_collect(host->rrdctx.contexts);
+                    if (host->rrdctx.contexts)
+                        dictionary_garbage_collect(host->rrdctx.contexts);
                 }
                 dfe_done(host);
 
