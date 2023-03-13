@@ -73,7 +73,9 @@ names:
 
 > Important: This functionality is available only for go.d.plugin's modules and metric collection jobs.
 
-In addition to the default labels associated with a collector and metrics context (you can identify them by seeing which ones have an underscore as a prefix), there is now a new feature enabled to create custom labels. These custom labels may be needed to group your jobs or instances into various categories.
+In addition to the default labels associated with a collector and metrics context (you can identify them by seeing 
+which ones have an underscore as a prefix), there is now a new feature enabled to create custom labels. These custom 
+labels may be needed to group your jobs or instances into various categories.
 
 
 ```yaml
@@ -90,7 +92,10 @@ jobs:
       label4: value4
 ```
 
-For instance, you may be running multiple Postgres database instances within an infrastructure. Some of these may be associated with testing environments, some with staging and some with production environments. You can now associate each Postgres job / instance with a custom label. The “group by” and filtering options will then allow you to associate individual jobs by specific labels.
+For instance, you may be running multiple Postgres database instances within an infrastructure. Some of these may 
+be associated with testing environments, some with staging and some with production environments. You can now 
+associate each Postgres job / instance with a custom label. The “group by” and filtering options will then allow 
+you to associate individual jobs by specific labels.
 
 ```yaml
 jobs:
