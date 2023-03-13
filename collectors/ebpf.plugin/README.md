@@ -890,7 +890,7 @@ These are tracepoints related to [OOM](https://en.wikipedia.org/wiki/Out_of_memo
 eBPF monitoring is complex and produces a large volume of metrics. We've discovered scenarios where the eBPF plugin
 significantly increases kernel memory usage by several hundred MB.
 
-When the integration with apps or cgroup is enabled, eBPF collector allocates memory for each process running. If your
+When the integration with apps or cgroup is enabled, the eBPF collector allocates memory for each process running. If your
 node is experiencing high memory usage and there is no obvious culprit to be found in the `apps.mem` chart, consider:
 
 - Modify [maps per core](#maps-per-core) to use only one map.
