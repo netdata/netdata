@@ -145,12 +145,14 @@ BuildRequires: protobuf-devel
 BuildRequires: libprotobuf-c-devel
 BuildRequires: liblz4-devel
 BuildRequires: libjson-c-devel
+BuildRequires: libyaml-devel
 %else
 %if 0%{?fedora}
 BuildRequires: protobuf-devel
 BuildRequires: protobuf-c-devel
 BuildRequires: lz4-devel
 BuildRequires: json-c-devel
+BuildRequires: libyaml-devel
 %else
 %if 0%{?centos_ver} >= 8
 BuildRequires: protobuf-devel
@@ -158,6 +160,7 @@ BuildRequires: protobuf-c-devel
 %endif
 BuildRequires: lz4-devel
 BuildRequires: json-c-devel
+BuildRequires: libyaml-devel
 %endif
 %endif
 
