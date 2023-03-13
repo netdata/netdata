@@ -133,7 +133,7 @@ If you do not need to monitor specific metrics for your `cgroups`, you can enabl
 
 #### Maps per Core
 
-When netdata is running on kernels newer than `4.6` users are allowed to modify how `ebpf.plugin` creates maps (hash or 
+When netdata is running on kernels newer than `4.6` users are allowed to modify how the `ebpf.plugin` creates maps (hash or 
 array). When `maps per core` is defined as `yes`, plugin will create a map per core on host, on the other hand,
 when the value is set as `no` only one hash table will be created, this option will use less memory, but it also can
 increase overhead for processes.
