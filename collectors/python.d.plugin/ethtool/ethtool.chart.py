@@ -167,8 +167,8 @@ class Service(ExecutableService):
         for d in self.devices:
             command = [find_binary('ethtool'), d]
             raw_data = self._get_raw_data(command=command)
-            for l in raw_data:
-                s = l.split(':')
+            for line in raw_data:
+                s = line.split(':')
                 if 'Speed' in s[0]:
                     bw = int(s[1].split('M')[0]) / 1000  # in Gb/s
                     self.debug('------- Max speed of device {0} is {1} Gb/s'.format(d, bw))
