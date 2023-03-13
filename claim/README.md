@@ -484,6 +484,8 @@ with details about your system and relevant output from `error.log`.
 
 ### Remove and reconnect a node
 
+#### Linux based installations
+
 To remove a node from your Space in Netdata Cloud, delete the `cloud.d/` directory in your Netdata library directory.
 
 ```bash
@@ -495,12 +497,62 @@ This node no longer has access to the credentials it was used when connecting to
 You will still be able to see this node in your War Rooms in an **unreachable** state.
 
 If you want to reconnect this node, you need to:
+
 1. Ensure that the `/var/lib/netdata/cloud.d` directory doesn't exist. In some installations, the path is `/opt/netdata/var/lib/netdata/cloud.d`.
 2. Stop the agent.
 3. Ensure that the `uuidgen-runtime` package is installed. Run ```echo "$(uuidgen)"``` and validate you get back a UUID.
 4. Copy the kickstart.sh command to add a node from your space and add to the end of it `--claim-id "$(uuidgen)"`. Run the command and look for the message `Node was successfully claimed.`
 5. Start the agent
 
+#### Docker based installations
+
+To remove a node from you Space in Netdata Cloud, and connect it to another Space, follow these steps:
+
+1. Enter the running container you wish to remove from your Space
+
+   ```bash
+   docker exec -it CONTAINER_NAME sh
+   ```
+
+   Replacing `CONTAINER_NAME` with either the container's name or ID.
+
+2. Delete `/var/lib/netdata/cloud.d` and `/var/lib/netdata/registry/netdata.public.unique.id`
+
+   ```bash
+   rm -rf /var/lib/netdata/cloud.d/
+   
+   rm /var/lib/netdata/registry/netdata.public.unique.id 
+   ```
+
+3. Stop and remove the container
+
+    **Docker CLI:**
+
+    ```bash
+    docker stop CONTAINER_NAME
+    
+    docker rm CONTAINER_NAME
+    ```
+
+    Replacing `CONTAINER_NAME` with either the container's name or ID.
+
+    **Docker Compose:**  
+    Inside the directory that has the `docker-compose.yml` file, run:
+
+    ```bash
+    docker compose down
+    ```
+
+    **Docker Swarm:**  
+    Run the following, and replace `STACK` with your Stack's name:
+
+    ```bash
+    docker stack rm STACK
+    ```
+
+4. Finally, go to your new Space, copy the install command with the new claim token and run it.  
+  If you are using a `docker-compose.yml` file, you will have to overwrite it with the new claiming token.  
+  The node should now appear online in that Space.
 
 ## Connecting reference
 In the sections below, you can find reference material for the kickstart script, claiming script, connecting via the Agent's command line
