@@ -495,7 +495,7 @@ paths:
               - markdown
               - array
               - csvjsonarray
-            default: json
+            default: json2
         - name: options
           in: query
           description: |

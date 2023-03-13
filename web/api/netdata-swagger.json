@@ -620,7 +620,7 @@
                 "array",
                 "csvjsonarray"
               ],
-              "default": "json"
+              "default": "json2"
             }
           },
           {
