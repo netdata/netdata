@@ -79,7 +79,7 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
     RRDR_TIME_GROUPING time_group = RRDR_GROUPING_AVERAGE;
     RRDR_GROUP_BY group_by = RRDR_GROUP_BY_DIMENSION;
     RRDR_GROUP_BY_FUNCTION group_by_aggregate = RRDR_GROUP_BY_FUNCTION_AVERAGE;
-    DATASOURCE_FORMAT format = DATASOURCE_JSON;
+    DATASOURCE_FORMAT format = DATASOURCE_JSON2;
     RRDR_OPTIONS options = RRDR_OPTION_VIRTUAL_POINTS | RRDR_OPTION_JSON_WRAP | RRDR_OPTION_RETURN_JWAR;
 
     while(url) {
@@ -166,7 +166,7 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
     if(group_by & RRDR_GROUP_BY_SELECTED)
         group_by = RRDR_GROUP_BY_SELECTED; // remove all other groupings
 
-    if(group_by & ~(RRDR_GROUP_BY_DIMENSION))
+    if((group_by & ~(RRDR_GROUP_BY_DIMENSION)) || (options & RRDR_OPTION_PERCENTAGE))
         options |= RRDR_OPTION_ABSOLUTE;
 
     if(options & RRDR_OPTION_DEBUG)
@@ -215,6 +215,9 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
             .query_source = QUERY_SOURCE_API_DATA,
             .priority = STORAGE_PRIORITY_NORMAL,
             .received_ut = received_ut,
+
+            .interrupt_callback = web_client_interrupt_callback,
+            .interrupt_callback_data = w,
     };
     QUERY_TARGET *qt = query_target_create(&qtr);
     ONEWAYALLOC *owa = NULL;

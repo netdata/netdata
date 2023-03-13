@@ -399,7 +399,7 @@ size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_si
 
             // find how big this character is (2-4 bytes)
             size_t utf_character_size = 2;
-            while(utf_character_size <= 4 && src[utf_character_size] && IS_UTF8_BYTE(src[utf_character_size]) && !IS_UTF8_STARTBYTE(src[utf_character_size]))
+            while(utf_character_size < 4 && src[utf_character_size] && IS_UTF8_BYTE(src[utf_character_size]) && !IS_UTF8_STARTBYTE(src[utf_character_size]))
                 utf_character_size++;
 
             if(utf) {

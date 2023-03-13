@@ -30,7 +30,7 @@ static void grouping_create_trimmed_mean_internal(RRDR *r, const char *options, 
     }
 
     g->percent = 1.0 - ((g->percent / 100.0) * 2.0);
-    r->grouping.data = g;
+    r->time_grouping.data = g;
 }
 
 void grouping_create_trimmed_mean1(RRDR *r, const char *options) {
@@ -61,20 +61,20 @@ void grouping_create_trimmed_mean25(RRDR *r, const char *options) {
 // resets when switches dimensions
 // so, clear everything to restart
 void grouping_reset_trimmed_mean(RRDR *r) {
-    struct grouping_trimmed_mean *g = (struct grouping_trimmed_mean *)r->grouping.data;
+    struct grouping_trimmed_mean *g = (struct grouping_trimmed_mean *)r->time_grouping.data;
     g->next_pos = 0;
 }
 
 void grouping_free_trimmed_mean(RRDR *r) {
-    struct grouping_trimmed_mean *g = (struct grouping_trimmed_mean *)r->grouping.data;
+    struct grouping_trimmed_mean *g = (struct grouping_trimmed_mean *)r->time_grouping.data;
     if(g) onewayalloc_freez(r->internal.owa, g->series);
 
-    onewayalloc_freez(r->internal.owa, r->grouping.data);
-    r->grouping.data = NULL;
+    onewayalloc_freez(r->internal.owa, r->time_grouping.data);
+    r->time_grouping.data = NULL;
 }
 
 void grouping_add_trimmed_mean(RRDR *r, NETDATA_DOUBLE value) {
-    struct grouping_trimmed_mean *g = (struct grouping_trimmed_mean *)r->grouping.data;
+    struct grouping_trimmed_mean *g = (struct grouping_trimmed_mean *)r->time_grouping.data;
 
     if(unlikely(g->next_pos >= g->series_size)) {
         g->series = onewayalloc_doublesize( r->internal.owa, g->series, g->series_size * sizeof(NETDATA_DOUBLE));
@@ -85,7 +85,7 @@ void grouping_add_trimmed_mean(RRDR *r, NETDATA_DOUBLE value) {
 }
 
 NETDATA_DOUBLE grouping_flush_trimmed_mean(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_trimmed_mean *g = (struct grouping_trimmed_mean *)r->grouping.data;
+    struct grouping_trimmed_mean *g = (struct grouping_trimmed_mean *)r->time_grouping.data;
 
     NETDATA_DOUBLE value;
     size_t available_slots = g->next_pos;

@@ -44,11 +44,11 @@ typedef enum rrdr_options {
     RRDR_OPTION_SHOW_DETAILS    = (1 << 23), // v2 returns detailed object tree
     RRDR_OPTION_DEBUG           = (1 << 24), // v2 returns request description
     RRDR_OPTION_MINIFY          = (1 << 25), // remove JSON spaces and newlines from JSON output
+    RRDR_OPTION_GROUP_BY_LABELS = (1 << 26), // v2 returns flattened labels per dimension of the chart
 
     // internal ones - not to be exposed to the API
-    RRDR_OPTION_HEALTH_RSRVD1        = (1 << 29), // reserved for RRDCALC_OPTION_NO_CLEAR_NOTIFICATION
-    RRDR_OPTION_INTERNAL_AR          = (1 << 30), // internal use only, to let the formatters know we want to render the anomaly rate
-    RRDR_OPTION_INTERNAL_GBC         = (1 << 31), // internal use only, to let the formatters know we want to render the group by count
+    RRDR_OPTION_HEALTH_RSRVD1        = (1 << 30), // reserved for RRDCALC_OPTION_NO_CLEAR_NOTIFICATION
+    RRDR_OPTION_INTERNAL_AR          = (1 << 31), // internal use only, to let the formatters know we want to render the anomaly rate
 } RRDR_OPTIONS;
 
 typedef enum __attribute__ ((__packed__)) rrdr_value_flag {
@@ -82,6 +82,16 @@ typedef enum __attribute__ ((__packed__)) rrdr_result_flags {
     RRDR_RESULT_FLAG_CANCEL        = (1 << 2), // the query needs to be cancelled
 } RRDR_RESULT_FLAGS;
 
+struct rrdr_group_by_entry {
+    size_t priority;
+    size_t count;
+    STRING *id;
+    STRING *name;
+    STRING *units;
+    RRDR_DIMENSION_FLAGS od;
+    DICTIONARY *dl;
+};
+
 typedef struct rrdresult {
     size_t d;                 // the number of dimensions
     size_t n;                 // the number of values in the arrays (number of points per dimension)
@@ -94,6 +104,10 @@ typedef struct rrdresult {
     STRING **du;              // array of d dimension units
     uint32_t *dgbc;           // array of d dimension units - NOT ALLOCATED when RRDR is created
     uint32_t *dp;             // array of d dimension priority - NOT ALLOCATED when RRDR is created
+    NETDATA_DOUBLE *dv;       // array of d dimension averages - NOT ALLOCATED when RRDR is created
+    DICTIONARY **dl;          // array of d dimension labels - NOT ALLOCATED when RRDR is created
+
+    DICTIONARY *label_keys;
 
     time_t *t;                // array of n timestamps
     NETDATA_DOUBLE *v;        // array n x d values
@@ -132,7 +146,11 @@ typedef struct rrdresult {
         size_t points_wanted;               // used by SES and DES
         size_t resampling_group;            // used by AVERAGE
         NETDATA_DOUBLE resampling_divisor;  // used by AVERAGE
-    } grouping;
+    } time_grouping;
+
+    struct {
+        struct rrdresult *r;
+    } group_by;
 
     struct {
         time_t max_update_every;
@@ -143,6 +161,8 @@ typedef struct rrdresult {
     struct {
         ONEWAYALLOC *owa;           // the allocator used
         struct query_target *qt;    // the QUERY_TARGET
+        size_t contexts;            // temp needed between json_wrapper_begin2() and json_wrapper_end2()
+        size_t queries_count;       // temp needed to know if a query is the first executed
 
 #ifdef NETDATA_INTERNAL_CHECKS
         const char *log;

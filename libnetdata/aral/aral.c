@@ -885,10 +885,10 @@ void aral_by_size_release(ARAL *ar) {
             fatal("ARAL BY SIZE: double release detected");
 
         aral_by_size_globals.array[size].refcount--;
-        if(!aral_by_size_globals.array[size].refcount) {
-            aral_destroy(aral_by_size_globals.array[size].ar);
-            aral_by_size_globals.array[size].ar = NULL;
-        }
+//        if(!aral_by_size_globals.array[size].refcount) {
+//            aral_destroy(aral_by_size_globals.array[size].ar);
+//            aral_by_size_globals.array[size].ar = NULL;
+//        }
 
         netdata_spinlock_unlock(&aral_by_size_globals.spinlock);
     }

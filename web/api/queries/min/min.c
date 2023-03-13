@@ -11,24 +11,24 @@ struct grouping_min {
 };
 
 void grouping_create_min(RRDR *r, const char *options __maybe_unused) {
-    r->grouping.data = onewayalloc_callocz(r->internal.owa, 1, sizeof(struct grouping_min));
+    r->time_grouping.data = onewayalloc_callocz(r->internal.owa, 1, sizeof(struct grouping_min));
 }
 
 // resets when switches dimensions
 // so, clear everything to restart
 void grouping_reset_min(RRDR *r) {
-    struct grouping_min *g = (struct grouping_min *)r->grouping.data;
+    struct grouping_min *g = (struct grouping_min *)r->time_grouping.data;
     g->min = 0;
     g->count = 0;
 }
 
 void grouping_free_min(RRDR *r) {
-    onewayalloc_freez(r->internal.owa, r->grouping.data);
-    r->grouping.data = NULL;
+    onewayalloc_freez(r->internal.owa, r->time_grouping.data);
+    r->time_grouping.data = NULL;
 }
 
 void grouping_add_min(RRDR *r, NETDATA_DOUBLE value) {
-    struct grouping_min *g = (struct grouping_min *)r->grouping.data;
+    struct grouping_min *g = (struct grouping_min *)r->time_grouping.data;
 
     if(!g->count || fabsndd(value) < fabsndd(g->min)) {
         g->min = value;
@@ -37,7 +37,7 @@ void grouping_add_min(RRDR *r, NETDATA_DOUBLE value) {
 }
 
 NETDATA_DOUBLE grouping_flush_min(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_min *g = (struct grouping_min *)r->grouping.data;
+    struct grouping_min *g = (struct grouping_min *)r->time_grouping.data;
 
     NETDATA_DOUBLE value;
 

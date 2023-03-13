@@ -357,7 +357,9 @@ paths:
         - name: group_by
           in: query
           description: |
-            A comma separated list of `dimension`, `label`, `instance`, `node`, `selected`. All possible values can be combined together, except `selected`. If `selected` is given in the list, all others are ignored. The order they are placed in the list is currently ignored. The result will always have in the order given here.
+            A comma separated list of the groupings required.
+            All possible values can be combined together, except `selected`. If `selected` is given in the list, all others are ignored.
+            The order they are placed in the list is currently ignored.
           required: false
           schema:
             type: array
@@ -365,9 +367,11 @@ paths:
               type: string
               enum:
                 - dimension
-                - label
                 - instance
+                - label
                 - node
+                - context
+                - units
                 - selected
             default:
               - dimension
@@ -491,11 +495,12 @@ paths:
               - markdown
               - array
               - csvjsonarray
-            default: json
+            default: json2
         - name: options
           in: query
           description: |
             Options that affect data generation.
+            `raw` changes the output so that the values can be aggregated across multiple such queries.
           required: false
           allowEmptyValue: false
           schema:
@@ -503,24 +508,21 @@ paths:
             items:
               type: string
               enum:
+                - raw
                 - nonzero
                 - flip
-                - jsonwrap
                 - min2max
                 - seconds
                 - milliseconds
                 - abs
                 - absolute
-                - absolute-sum
                 - null2zero
-                - objectrows
-                - google_json
                 - percentage
                 - unaligned
                 - match-ids
                 - match-names
-                - allow_past
                 - anomaly-bit
+                - group-by-labels
             default:
               - seconds
               - jsonwrap
@@ -2544,12 +2546,12 @@ components:
                         id:
                           description: The value string
                           type: string
-                          ds:
-                            $ref: "#/components/schemas/data_json2_items_count"
-                          sts:
-                            oneOf:
-                              - $ref: "#/components/schemas/data_json2_sts"
-                              - $ref: "#/components/schemas/data_json2_sts_raw"
+                        ds:
+                          $ref: "#/components/schemas/data_json2_items_count"
+                        sts:
+                          oneOf:
+                            - $ref: "#/components/schemas/data_json2_sts"
+                            - $ref: "#/components/schemas/data_json2_sts_raw"
             alerts:
               description: |
                 An array of all the unique alerts running, grouped by alert name (`nm` is available here)
@@ -2577,14 +2579,257 @@ components:
             type: string
         db:
           type: object
+          properties:
+            tiers:
+              description: |
+                The number of tiers this server is using.
+              type: integer
+            update_every:
+              description: |
+                The minimum update every, in seconds, for all tiers and all metrics aggregated into this query.
+              type: integer
+            first_entry:
+              description: |
+                The minimum unix epoch timestamp of the retention across all tiers for all metrics aggregated into this query.
+              type: integer
+            last_entry:
+              description: |
+                The maximum unix epoch timestamp of the retention across all tier for all metrics aggregated into this query.
+              type: integer
+            per_tier:
+              description: |
+                An array with information for each of the tiers available, related to this query.
+              type: array
+              items:
+                type: object
+                properties:
+                  tier:
+                    description: |
+                      The tier number of this tier, starting at 0.
+                    type: integer
+                  queries:
+                    description: |
+                      The number of queries executed on this tier. Usually one query per metric is made, but the query may cross multiple tier, in which case more than one query per metric is made.
+                    type: integer
+                  points:
+                    description: |
+                      The number of points read from this tier.
+                    type: integer
+                  update_every:
+                    description: |
+                      The minimum resolution of all metrics queried on this tier.
+                    type: integer
+                  first_entry:
+                    description: |
+                      The minimum unix epoch timestamp available across all metrics that used this tier. This reflects the oldest timestamp of the tier's retention.
+                    type: integer
+                  last_entry:
+                    description: |
+                      The maximum unix epoch timestamp available across all metrics that used this tier. This reflects the newest timestamp of the tier's retention.
         view:
           type: object
+          properties:
+            title:
+              description: |
+                The title the chart should have.
+              type: string
+            format:
+              description: |
+                The format the `result` top level member has.
+              type: string
+            options:
+              description: |
+                An array presenting all the options given to the query.
+              type: array
+              items:
+                type: string
+            time_group:
+              description: |
+                The same as the parameter `time_group`.
+              type: string
+            after:
+              description: |
+                The oldest unix epoch timestamp of the data returned in the `result`.
+              type: integer
+            before:
+              description: |
+                The newest unix epoch timestamp of the data returned in the `result`.
+              type: integer
+            partial_data_trimming:
+              description: |
+                Information related to trimming of the last few points of the `result`, that was required to remove (increasing) partial data.
+                Trimming is disabled when the `raw` option is given to the query.
+              type: object
+              properties:
+                max_update_every:
+                  description: |
+                    The maximum `update_every` for all metrics aggregated into the query.
+                    Trimming is by default enabled at `view.before - max_update_every`, but only when `view.before >= now - max_update_every`.
+                  type: integer
+                expected_after:
+                  description: |
+                    The timestamp at which trimming can be enabled.
+                    If this timestamp is greater or equal to `view.before`, there is no trimming.
+                  type: integer
+                trimmed_after:
+                  description: |
+                    The timestamp at which trimming has been applied.
+                    If this timestamp is greater or equal to `view.before`, there is no trimming.
+            points:
+              description: |
+                The number of points in `result`.
+              type: integer
+            units:
+              description: |
+                The units of the query.
+              oneOf:
+                - type: string
+                - type: array
+                  items:
+                    type: string
+            chart_type:
+              description: |
+                The default chart type of the query.
+              type: string
+              enum:
+                - line
+                - area
+                - stacked
+            dimensions:
+              description: |
+                Detailed information about the chart dimensions included in the `result`.
+              type: object
+              properties:
+                grouped_by:
+                  description: |
+                    An array with the order of the groupings performed.
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                      - selected
+                      - dimension
+                      - instance
+                      - node
+                      - context
+                      - units
+                      - "label:key1"
+                      - "label:key2"
+                      - "label:keyN"
+                ids:
+                  description: |
+                    An array with the dimension ids that uniquely identify the dimensions for this query.
+                  type: array
+                  items:
+                    type: string
+                names:
+                  description: |
+                    An array with the dimension names to be presented to users. Names may be overlapping, but IDs are not.
+                  type: array
+                  items:
+                    type: string
+                units:
+                  description: |
+                    An array with the units each dimension has.
+                  type: array
+                  items:
+                    type: string
+                priorities:
+                  description: |
+                    An array with the relative priorities of the dimensions.
+                    Numbers may not be sequential or unique. The application is expected to order by this and then by name.
+                  type: array
+                  items:
+                    type: integer
+                aggregated:
+                  description: |
+                    An array with the number of source metrics aggregated into each dimension.
+                  type: array
+                  items:
+                    type: integer
+                view_average_values:
+                  description: |
+                    An array of the average value of each dimension across the entire query.
+                  type: array
+                  items:
+                    type: number
+                view_latest_values:
+                  description: |
+                    An array of the latest value of each dimension, included in this query.
+                  type: array
+                  items:
+                    type: number
+                count:
+                  description: |
+                    The number of dimensions in the `result`.
+                  type: integer
+                labels:
+                  description: |
+                    The labels associated with each dimension in the query.
+                    This object is only available when the `group-by-labels` option is given to the query.
+                  type: object
+                  properties:
+                    label_key1:
+                      description: |
+                        An array having one entry for each of the dimensions of the query.
+                      type: array
+                      items:
+                        description: |
+                          An array having one entry for each of the values this label key has for the given dimension.
+                        type: array
+                        items:
+                          type: string
+            min:
+              description: |
+                The minimum value of all points included in the `result`.
+              type: number
+            max:
+              description: |
+                The maximum value of all points included in the `result`.
+              type: number
         result:
+          description: |
+            The result of the query.
+            The format explained here is `json2`.
           type: object
-        min:
-          type: number
-        max:
-          type: number
+          properties:
+            labels:
+              description: |
+                The IDs of the dimensions returned. The first is always `time`.
+              type: array
+              items:
+                type: string
+            point:
+              description: |
+                The format of each point returned.
+              type: object
+              properties:
+                value:
+                  description: |
+                    The index of the value in each point.
+                  type: integer
+                ar:
+                  description: |
+                    The index of the anomaly rate in each point.
+                  type: integer
+                pa:
+                  description: |
+                    The index of the point annotations in each point.
+                    This is a bitmap. `EMPTY = 1`, `RESET = 2`, `PARTIAL = 4`.
+                    `EMPTY` means the point has no value.
+                    `RESET` means that at least one metric aggregated experienced an overflow (a counter that wrapped).
+                    `PARTIAL` means that this point should have more metrics aggregated into it, but not all metrics had data.
+                  type: integer
+                count:
+                  description: |
+                    The number of metrics aggregated into this point. This exists only when the option `raw` is given to the query.
+                  type: integer
+            data:
+              type: array
+              items:
+                allOf:
+                  - type: integer
+                  - type: array
         timings:
           type: object
     data_json2_sts:
