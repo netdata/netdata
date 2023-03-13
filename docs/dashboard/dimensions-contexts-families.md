@@ -71,10 +71,9 @@ names:
 
 ## Custom labels per metric collection job
 
-> Important: This functionality is available only for go.d.plugin's modules and metric colleciton jobs
+> Important: This functionality is available only for go.d.plugin's modules and metric collection jobs.
 
 In addition to the default labels associated with a collector and metrics context (you can identify them by seeing which ones have an underscore as a prefix), there is now a new feature enabled to create custom labels. These custom labels may be needed to group your jobs or instances into various categories.
-
 
 
 ```conf
