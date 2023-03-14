@@ -822,35 +822,37 @@ ml_detect_main(void *arg)
         }
         dfe_done(rhp);
 
-        // collect and update training thread stats
-        for (size_t idx = 0; idx != Cfg.num_training_threads; idx++) {
-            ml_training_thread_t *training_thread = &Cfg.training_threads[idx];
+        if (Cfg.enable_statistics_charts) {
+            // collect and update training thread stats
+            for (size_t idx = 0; idx != Cfg.num_training_threads; idx++) {
+                ml_training_thread_t *training_thread = &Cfg.training_threads[idx];
 
-            netdata_mutex_lock(&training_thread->nd_mutex);
-            ml_training_stats_t training_stats = training_thread->training_stats;
-            training_thread->training_stats = {};
-            netdata_mutex_unlock(&training_thread->nd_mutex);
+                netdata_mutex_lock(&training_thread->nd_mutex);
+                ml_training_stats_t training_stats = training_thread->training_stats;
+                training_thread->training_stats = {};
+                netdata_mutex_unlock(&training_thread->nd_mutex);
 
-            // calc the avg values
-            if (training_stats.num_popped_items) {
-                training_stats.queue_size /= training_stats.num_popped_items;
-                training_stats.allotted_ut /= training_stats.num_popped_items;
-                training_stats.consumed_ut /= training_stats.num_popped_items;
-                training_stats.remaining_ut /= training_stats.num_popped_items;
-            } else {
-                training_stats.queue_size = 0;
-                training_stats.allotted_ut = 0;
-                training_stats.consumed_ut = 0;
-                training_stats.remaining_ut = 0;
+                // calc the avg values
+                if (training_stats.num_popped_items) {
+                    training_stats.queue_size /= training_stats.num_popped_items;
+                    training_stats.allotted_ut /= training_stats.num_popped_items;
+                    training_stats.consumed_ut /= training_stats.num_popped_items;
+                    training_stats.remaining_ut /= training_stats.num_popped_items;
+                } else {
+                    training_stats.queue_size = 0;
+                    training_stats.allotted_ut = 0;
+                    training_stats.consumed_ut = 0;
+                    training_stats.remaining_ut = 0;
 
-                training_stats.training_result_ok = 0;
-                training_stats.training_result_invalid_query_time_range = 0;
-                training_stats.training_result_not_enough_collected_values = 0;
-                training_stats.training_result_null_acquired_dimension = 0;
-                training_stats.training_result_chart_under_replication = 0;
+                    training_stats.training_result_ok = 0;
+                    training_stats.training_result_invalid_query_time_range = 0;
+                    training_stats.training_result_not_enough_collected_values = 0;
+                    training_stats.training_result_null_acquired_dimension = 0;
+                    training_stats.training_result_chart_under_replication = 0;
+                }
+
+                ml_update_training_statistics_chart(training_thread, training_stats);
             }
-
-            // ml_update_training_statistics_chart(training_thread, training_stats);
         }
     }
 
@@ -1141,8 +1143,9 @@ static void *ml_train_main(void *arg) {
         if (consumed_ut < allotted_ut)
             remaining_ut = allotted_ut - consumed_ut;
 
-        worker_is_busy(WORKER_TRAIN_UPDATE_HOST);
-        {
+        if (Cfg.enable_statistics_charts) {
+            worker_is_busy(WORKER_TRAIN_UPDATE_HOST);
+
             netdata_mutex_lock(&training_thread->nd_mutex);
 
             training_thread->training_stats.queue_size += queue_size;

@@ -316,6 +316,8 @@ typedef struct {
 
     std::vector<ml_training_thread_t> training_threads;
     std::atomic<bool> training_stop;
+
+    bool enable_statistics_charts;
 } ml_config_t;
 
 void ml_config_load(ml_config_t *cfg);

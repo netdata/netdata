@@ -6,7 +6,7 @@ void ml_update_dimensions_chart(ml_host_t *host, const ml_machine_learning_stats
     /*
      * Machine learning status
     */
-    {
+    if (Cfg.enable_statistics_charts) {
         if (!host->machine_learning_status_rs) {
             char id_buf[1024];
             char name_buf[1024];
@@ -48,7 +48,7 @@ void ml_update_dimensions_chart(ml_host_t *host, const ml_machine_learning_stats
     /*
      * Metric type
     */
-    {
+    if (Cfg.enable_statistics_charts) {
         if (!host->metric_type_rs) {
             char id_buf[1024];
             char name_buf[1024];
@@ -90,7 +90,7 @@ void ml_update_dimensions_chart(ml_host_t *host, const ml_machine_learning_stats
     /*
      * Training status
     */
-    {
+    if (Cfg.enable_statistics_charts) {
         if (!host->training_status_rs) {
             char id_buf[1024];
             char name_buf[1024];
@@ -441,5 +441,35 @@ void ml_update_training_statistics_chart(ml_training_thread_t *training_thread, 
                               training_thread->training_results_chart_under_replication_rd, ts.training_result_chart_under_replication);
 
         rrdset_done(training_thread->training_results_rs);
+    }
+}
+
+void ml_update_global_statistics_charts(uint64_t models_consulted) {
+    if (Cfg.enable_statistics_charts) {
+        static RRDSET *st = NULL;
+        static RRDDIM *rd = NULL;
+
+        if (unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    "netdata" // type
+                    , "ml_models_consulted" // id
+                    , NULL // name
+                    , NETDATA_ML_CHART_FAMILY // family
+                    , NULL // context
+                    , "KMeans models used for prediction" // title
+                    , "models" // units
+                    , NETDATA_ML_PLUGIN // plugin
+                    , NETDATA_ML_MODULE_DETECTION // module
+                    , NETDATA_ML_CHART_PRIO_MACHINE_LEARNING_STATUS // priority
+                    , localhost->rrd_update_every // update_every
+                    , RRDSET_TYPE_AREA // chart_type
+            );
+
+            rd = rrddim_add(st, "num_models_consulted", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+
+        rrddim_set_by_pointer(st, rd, (collected_number) models_consulted);
+
+        rrdset_done(st);
     }
 }
