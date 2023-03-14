@@ -5,6 +5,8 @@
 
 #include "libnetdata/libnetdata.h"
 
+#include "mqtt_websockets/c-rbuf/include/ringbuffer.h"
+
 typedef enum http_req_type {
     HTTP_REQ_GET = 0,
     HTTP_REQ_POST,
@@ -76,5 +78,24 @@ void https_req_response_init(https_req_response_t *res);
     }
 
 int https_request(https_req_t *request, https_req_response_t *response);
+
+// we expose previously internal parser as this is usefull also from
+// other parts of the code
+enum http_parse_state {
+    HTTP_PARSE_INITIAL = 0,
+    HTTP_PARSE_HEADERS,
+    HTTP_PARSE_CONTENT
+};
+
+typedef struct {
+    enum http_parse_state state;
+    int content_length;
+    int http_code;
+} http_parse_ctx;
+
+#define HTTP_PARSE_NEED_MORE_DATA  0
+#define HTTP_PARSE_SUCCESS   1
+#define HTTP_PARSE_ERROR    -1
+int parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx);
 
 #endif /* NETDATA_HTTPS_CLIENT_H */
