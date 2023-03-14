@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "daemon/common.h"
+#include "streaming/common.h"
 #include "http_server.h"
 #include "h2o.h"
 
@@ -18,9 +19,6 @@ static h2o_accept_ctx_t accept_ctx;
 
 #define HTTPD_CONFIG_SECTION "httpd"
 #define HTTPD_ENABLED_DEFAULT false
-
-#define NETDATA_STREAM_PROTO_NAME "netdata_stream/2.0"
-#define NETDATA_STREAM_URL "/stream"
 
 static void on_accept(uv_stream_t *listener, int status)
 {
