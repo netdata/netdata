@@ -812,6 +812,7 @@ static void garbage_collect_pending_deletes(DICTIONARY *dict) {
 }
 
 void dictionary_garbage_collect(DICTIONARY *dict) {
+    if(!dict) return;
     garbage_collect_pending_deletes(dict);
 }
 
