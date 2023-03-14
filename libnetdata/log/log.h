@@ -111,7 +111,12 @@ typedef enum netdata_log_level {
     NETDATA_LOG_LEVEL_ALL
 } netdata_log_level_t;
 
+#define NETDATA_LOG_LEVEL_INFO_STR "info"
+#define NETDATA_LOG_LEVEL_ERROR_STR "error"
+#define NETDATA_LOG_LEVEL_ALL_STR "all"
+
 extern netdata_log_level_t use_log_level;
+netdata_log_level_t log_select_log_level(char *level);
 
 #define error_limit_static_global_var(var, log_every_secs, sleep_usecs) static ERROR_LIMIT var = { .last_logged = 0, .count = 0, .log_every = (log_every_secs), .sleep_ut = (sleep_usecs) }
 #define error_limit_static_thread_var(var, log_every_secs, sleep_usecs) static __thread ERROR_LIMIT var = { .last_logged = 0, .count = 0, .log_every = (log_every_secs), .sleep_ut = (sleep_usecs) }

@@ -1127,3 +1127,17 @@ void log_aclk_message_bin( const char *data, const size_t data_len, int tx, cons
     }
 }
 #endif
+
+netdata_log_level_t log_select_log_level(char *level)
+{
+    if (!strcmp(level, NETDATA_LOG_LEVEL_INFO_STR))
+        return NETDATA_LOG_LEVEL_INFO;
+    else if (!strcmp(level, NETDATA_LOG_LEVEL_ERROR_STR))
+        return NETDATA_LOG_LEVEL_ERROR;
+    else if (!strcmp(level, NETDATA_LOG_LEVEL_ALL_STR))
+        return NETDATA_LOG_LEVEL_ALL;
+
+    error("The value `%s` is not a known value. Netdata will run with default `info`.", level);
+
+    return NETDATA_LOG_LEVEL_INFO;
+}

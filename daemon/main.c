@@ -874,6 +874,9 @@ static void log_init(void) {
 
     setenv("NETDATA_ERRORS_THROTTLE_PERIOD", config_get(CONFIG_SECTION_LOGS, "errors flood protection period"    , ""), 1);
     setenv("NETDATA_ERRORS_PER_PERIOD",      config_get(CONFIG_SECTION_LOGS, "errors to trigger flood protection", ""), 1);
+
+    char *select_level = config_get(CONFIG_SECTION_LOGS, "log level",  NETDATA_LOG_LEVEL_INFO_STR);
+    use_log_level = log_select_log_level(select_level);
 }
 
 char *initialize_lock_directory_path(char *prefix)
