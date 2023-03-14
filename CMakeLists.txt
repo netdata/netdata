@@ -511,8 +511,10 @@ set(LIBNETDATA_FILES
         libnetdata/string/utf8.h
         libnetdata/worker_utilization/worker_utilization.c
         libnetdata/worker_utilization/worker_utilization.h
-		libnetdata/parser/parser.h
-		libnetdata/parser/parser.c
+        libnetdata/parser/parser.h
+        libnetdata/parser/parser.c
+        libnetdata/parser/splitter.inc.h
+        libnetdata/parser/splitter.h
         )
 
 IF(ENABLE_PLUGIN_EBPF)

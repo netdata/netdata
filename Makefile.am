@@ -161,6 +161,8 @@ LIBNETDATA_FILES = \
     libnetdata/onewayalloc/onewayalloc.h \
     libnetdata/parser/parser.c \
     libnetdata/parser/parser.h \
+    libnetdata/parser/splitter.inc.h \
+    libnetdata/parser/splitter.h \
     libnetdata/popen/popen.c \
     libnetdata/popen/popen.h \
     libnetdata/procfile/procfile.c \
