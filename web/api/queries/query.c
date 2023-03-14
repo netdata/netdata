@@ -2458,7 +2458,9 @@ static void rrd2rrdr_set_timestamps(RRDR *r) {
     }
 
     internal_fatal(r->t[0] != first_point_end_time, "QUERY: wrong first timestamp in the query");
-    internal_fatal(r->t[points_wanted - 1] != before_wanted, "QUERY: wrong last timestamp in the query");
+    internal_error(r->t[points_wanted - 1] != before_wanted,
+                   "QUERY: wrong last timestamp in the query, expected %ld, found %ld",
+                   before_wanted, r->t[points_wanted - 1]);
 }
 
 static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
