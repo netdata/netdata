@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "daemon/common.h"
+#include "streaming/common.h"
 #include "http_server.h"
 #include "h2o.h"
 
