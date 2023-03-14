@@ -199,6 +199,7 @@ static void ebpf_hardirq_free(ebpf_module_t *em)
     for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
         ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
     }
+
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
@@ -402,7 +403,8 @@ static int hardirq_read_latency_map(int mapfd)
  *
  * @param maps_per_core do I need to read all cores?
  */
-static void hardirq_read_latency_static_map(int mapfd, int maps_per_core)
+static void hardirq_read_latency_static_map(int mapfd, int maps_per_core,
+                                            hardirq_ebpf_static_val_t *hardirq_ebpf_static_vals)
 {
     static hardirq_ebpf_static_val_t *hardirq_ebpf_static_vals = NULL;
     if (!hardirq_ebpf_static_vals)
