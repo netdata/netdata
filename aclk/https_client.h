@@ -6,6 +6,7 @@
 #include "libnetdata/libnetdata.h"
 
 #include "mqtt_websockets/c-rbuf/include/ringbuffer.h"
+#include "mqtt_websockets/c_rhash/include/c_rhash.h"
 
 typedef enum http_req_type {
     HTTP_REQ_GET = 0,
@@ -91,11 +92,17 @@ typedef struct {
     enum http_parse_state state;
     int content_length;
     int http_code;
+    c_rhash headers;
 } http_parse_ctx;
+
+void http_parse_ctx_create(http_parse_ctx *ctx);
+void http_parse_ctx_destroy(http_parse_ctx *ctx);
 
 #define HTTP_PARSE_NEED_MORE_DATA  0
 #define HTTP_PARSE_SUCCESS   1
 #define HTTP_PARSE_ERROR    -1
 int parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx);
+
+const char *get_http_header_by_name(http_parse_ctx *ctx, const char *name);
 
 #endif /* NETDATA_HTTPS_CLIENT_H */
