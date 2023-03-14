@@ -87,7 +87,7 @@ get_os_key() {
 valid_types() {
   case "${PLATFORM}" in
     Linux)
-      echo "detect systemd openrc lsb initd"
+      echo "detect ${LINUX_INIT_TYPES}"
       ;;
     FreeBSD)
       echo "detect freebsd"
@@ -475,8 +475,6 @@ initd_cmds() {
 
 # =====================================================================
 # runit support functions
-#
-# Currently not supported, this exists to provide useful error messages.
 
 _check_runit() {
   # if there is no runsvdir command, then it's not runit
@@ -503,19 +501,61 @@ check_runit() {
 }
 
 install_runit_service() {
-  error "Detected runit, which we do not currently support."
-  exit 3
+  if [ -d /etc/sv ]; then
+    svc_dir="/etc/sv/netdata"
+  elif [ -d /etc/runit/sv ]; then
+    svc_dir="/etc/runit/sv/netdata"
+  else
+    error "Failed to locate service directory"
+    exit 4
+  fi
+
+  if [ -d /service ]; then
+    live_svc_dir="/service"
+  elif [ -d /var/service ]; then
+    live_svc_dir="/var/service"
+  elif [ -d /run/runit/service ]; then
+    live_svc_dir="/run/runit/service"
+  elif [ -d /etc/runit/runsvdir/default ]; then
+    live_svc_dir="/etc/runit/runsvdir/default"
+  else
+    error "Failed to locate live service directory"
+    exit 4
+  fi
+
+  svc_file="${svc_dir}/run"
+
+  info "Installing runit service file."
+  if [ ! -f "${svc_file}" ] && [ "${ENABLE}" = "auto" ]; then
+    ENABLE="enable"
+  fi
+
+  if ! install -D -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/runit/run" "${svc_file}"; then
+    error "Failed to install service file."
+    exit 4
+  fi
+
+  case ${ENABLE} in
+    enable)
+      if ! ln -s "${svc_dir}" "${live_svc_dir}"; then
+        warning "Failed to enable the Netdata service."
+      fi
+      ;;
+    disable)
+      if ! rm "${live_svc_dir}/netdata"; then
+        warning "Failed to disable the Netdata service."
+      fi
+      ;;
+  esac
 }
 
 runit_cmds() {
-  error "Detected runit, which we do not currently support."
-  exit 3
+  NETDATA_START_CMD="sv start netdata"
+  NETDATA_STOP_CMD="sv stop netdata"
 }
 
 # =====================================================================
 # WSL support functions
-#
-# Cannot be supported, this exists to provide useful error messages.
 
 _check_wsl() {
   # If uname -r contains the string WSL, then it's WSL.

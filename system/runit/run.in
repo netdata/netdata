@@ -1,0 +1,16 @@
+#!/bin/sh
+
+piddir="@localstatedir_POST@/run/netdata/netdata.pid"
+pidfile="${piddir}/netdata.pid"
+
+cachedir="@localstatedir_POST@/cache/netdata"
+
+command="@sbindir_POST@/netdata"
+command_args="-P ${pidfile} -D"
+
+[ ! -d "${piddir}" ] && mkdir -p "${piddir}"
+[ ! -d "${cachedir}" ] && mkdir -p "${cachedir}"
+chown -R @netdata_user_POST@ "${piddir}"
+chown -R @netdata_user_POST@ "${cachedir}"
+
+exec ${command} ${command_args}
