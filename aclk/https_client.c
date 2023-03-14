@@ -4,17 +4,9 @@
 
 #include "https_client.h"
 
-#include "mqtt_websockets/c-rbuf/include/ringbuffer.h"
-
 #include "aclk_util.h"
 
 #include "daemon/global_statistics.h"
-
-enum http_parse_state {
-    HTTP_PARSE_INITIAL = 0,
-    HTTP_PARSE_HEADERS,
-    HTTP_PARSE_CONTENT
-};
 
 static const char *http_req_type_to_str(http_req_type_t req) {
     switch (req) {
@@ -29,12 +21,6 @@ static const char *http_req_type_to_str(http_req_type_t req) {
     }
 }
 
-typedef struct {
-    enum http_parse_state state;
-    int content_length;
-    int http_code;
-} http_parse_ctx;
-
 #define HTTP_PARSE_CTX_INITIALIZER { .state = HTTP_PARSE_INITIAL, .content_length = -1, .http_code = 0 }
 static inline void http_parse_ctx_clear(http_parse_ctx *ctx) {
     ctx->state = HTTP_PARSE_INITIAL;
@@ -44,9 +30,6 @@ static inline void http_parse_ctx_clear(http_parse_ctx *ctx) {
 
 #define POLL_TO_MS 100
 
-#define NEED_MORE_DATA  0
-#define PARSE_SUCCESS   1
-#define PARSE_ERROR    -1
 #define HTTP_LINE_TERM "\x0D\x0A"
 #define RESP_PROTO "HTTP/1.1 "
 #define HTTP_KEYVAL_SEPARATOR ": "
@@ -105,34 +88,34 @@ static int parse_http_hdr(rbuf_t buf, http_parse_ctx *parse_ctx)
     return 0;
 }
 
-static int parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx)
+int parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx)
 {
     int idx;
     char rc[4];
 
     do {
         if (parse_ctx->state != HTTP_PARSE_CONTENT && !rbuf_find_bytes(buf, HTTP_LINE_TERM, strlen(HTTP_LINE_TERM), &idx))
-            return NEED_MORE_DATA;
+            return HTTP_PARSE_NEED_MORE_DATA;
         switch (parse_ctx->state) {
             case HTTP_PARSE_INITIAL:
                 if (rbuf_memcmp_n(buf, RESP_PROTO, strlen(RESP_PROTO))) {
                     error("Expected response to start with \"%s\"", RESP_PROTO);
-                    return PARSE_ERROR;
+                    return HTTP_PARSE_ERROR;
                 }
                 rbuf_bump_tail(buf, strlen(RESP_PROTO));
                 if (rbuf_pop(buf, rc, 4) != 4) {
                     error("Expected HTTP status code");
-                    return PARSE_ERROR;
+                    return HTTP_PARSE_ERROR;
                 }
                 if (rc[3] != ' ') {
                     error("Expected space after HTTP return code");
-                    return PARSE_ERROR;
+                    return HTTP_PARSE_ERROR;
                 }
                 rc[3] = 0;
                 parse_ctx->http_code = atoi(rc);
                 if (parse_ctx->http_code < 100 || parse_ctx->http_code >= 600) {
                     error("HTTP code not in range 100 to 599");
-                    return PARSE_ERROR;
+                    return HTTP_PARSE_ERROR;
                 }
 
                 rbuf_find_bytes(buf, HTTP_LINE_TERM, strlen(HTTP_LINE_TERM), &idx);
@@ -148,18 +131,18 @@ static int parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx)
                     break;
                 }
                 if (parse_http_hdr(buf, parse_ctx))
-                    return PARSE_ERROR;
+                    return HTTP_PARSE_ERROR;
                 rbuf_find_bytes(buf, HTTP_LINE_TERM, strlen(HTTP_LINE_TERM), &idx);
                 rbuf_bump_tail(buf, idx + strlen(HTTP_LINE_TERM));
                 break;
             case HTTP_PARSE_CONTENT:
                 // replies like CONNECT etc. do not have content
                 if (parse_ctx->content_length < 0)
-                    return PARSE_SUCCESS;
+                    return HTTP_PARSE_SUCCESS;
 
                 if (rbuf_bytes_available(buf) >= (size_t)parse_ctx->content_length)
-                    return PARSE_SUCCESS;
-                return NEED_MORE_DATA;
+                    return HTTP_PARSE_SUCCESS;
+                return HTTP_PARSE_NEED_MORE_DATA;
         }
     } while(1);
 }
@@ -345,7 +328,7 @@ static int read_parse_response(https_req_ctx_t *ctx) {
         }
     } while (!(ret = parse_http_response(ctx->buf_rx, &ctx->parse_ctx)));
 
-    if (ret != PARSE_SUCCESS) {
+    if (ret != HTTP_PARSE_SUCCESS) {
         error("Error parsing HTTP response");
         return 1;
     }
