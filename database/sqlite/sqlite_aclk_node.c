@@ -155,6 +155,9 @@ void aclk_check_node_info_and_collectors(void)
 
         struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
 
+        if (unlikely(!wc))
+            continue;
+
         if (wc->node_info_send) {
             build_node_info(strdupz(wc->node_id));
             internal_error(true, "ACLK SYNC: Sending node info for %s", rrdhost_hostname(host));
