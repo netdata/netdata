@@ -2,8 +2,7 @@
 
 The _Netdata style guide_ establishes editorial guidelines for any writing produced by the Netdata team or the Netdata community, including documentation, articles, in-product UX copy, and more.
 
-> 📑 Note
->
+> ### Note
 > This document is meant to be accompanied by the [Documentation Guidelines](https://github.com/netdata/netdata/blob/master/docs/guidelines.md). If you want to contribute to Netdata's documentation, please read it too.
 
 Both internal Netdata teams and external contributors to any of Netdata's open-source projects should reference and adhere to this style guide as much as possible.
@@ -415,31 +414,26 @@ the [Docusaurus documentation](https://v2.docusaurus.io/docs/markdown-features#c
 Notes inside files should render properly both in GitHub and in Learn, to do that, it is best to use the format listed below:
 
 ```
-> 📑 Info, Note
->
+> ### Note
 > This is an info or a note block.
 
-> 💡 Tip, Best Practice
-> 
+> ### Tip, Best Practice
 > This is a tip or a best practice block.
 
-> ⚠️ Warning, Caution
-> 
+> ### Warning, Caution
 > This is a warning or a caution block.
 ```
 
 Which renders into:
 
-> 📑 Info, Note
->
+
+> ### Note
 > This is an info or a note block.
 
-> 💡 Tip, Best Practice
->
+> ### Tip, Best Practice
 > This is a tip or a best practice block.
 
-> ⚠️ Warning, Caution
->
+> ### Warning, Caution
 > This is a warning or a caution block.
 
 ### Tabs
