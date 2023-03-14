@@ -2436,13 +2436,6 @@ void rrdr_json_group_by_labels(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTION
     buffer_json_object_close(wb); // key
 }
 
-static int group_by_label_is_space(char c) {
-    if(c == ',' || c == '|')
-        return 1;
-
-    return 0;
-}
-
 static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     RRDR_OPTIONS options = qt->request.options;
 
@@ -2470,7 +2463,7 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     DICTIONARY *groups = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
 
     if(qt->request.group_by & RRDR_GROUP_BY_LABEL && qt->request.group_by_label && *qt->request.group_by_label)
-        qt->group_by.used = quoted_strings_splitter(qt->request.group_by_label, qt->group_by.label_keys, GROUP_BY_MAX_LABEL_KEYS, group_by_label_is_space);
+        qt->group_by.used = split_quoted_words_by_is_space_rrd2json_label(qt->request.group_by_label, qt->group_by.label_keys, GROUP_BY_MAX_LABEL_KEYS);
 
     if(!qt->group_by.used)
         qt->request.group_by &= ~RRDR_GROUP_BY_LABEL;

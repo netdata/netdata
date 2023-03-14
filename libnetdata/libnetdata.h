@@ -485,10 +485,9 @@ void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value);
 
 #define COMPRESSION_MAX_MSG_SIZE 0x4000
 #define PLUGINSD_LINE_MAX (COMPRESSION_MAX_MSG_SIZE - 1024)
-int config_isspace(char c);
-int pluginsd_space(char c);
 
-size_t quoted_strings_splitter(char *str, char **words, size_t max_words, int (*custom_isspace)(char));
+#include "parser/splitter.h"
+
 size_t pluginsd_split_words(char *str, char **words, size_t max_words);
 
 static inline char *get_word(char **words, size_t num_words, size_t index) {

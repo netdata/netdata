@@ -157,7 +157,7 @@ inline int parser_action(PARSER *parser, char *input)
 
     if(unlikely(parser->flags & PARSER_DEFER_UNTIL_KEYWORD)) {
         char command[PLUGINSD_LINE_MAX + 1];
-        bool has_keyword = find_first_keyword(input, command, PLUGINSD_LINE_MAX, pluginsd_space);
+        bool has_keyword = find_first_keyword(input, command, PLUGINSD_LINE_MAX, is_space_pluginsd);
 
         if(!has_keyword || strcmp(command, parser->defer.end_keyword) != 0) {
             if(parser->defer.response) {
