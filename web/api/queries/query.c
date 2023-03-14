@@ -2073,7 +2073,7 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     time_t resampling_time_requested = qt->request.resampling_time;
     RRDR_OPTIONS options = qt->request.options;
     size_t tier = qt->request.tier;
-    time_t update_every = qt->db.minimum_latest_update_every_s;
+    time_t update_every = qt->db.minimum_latest_update_every_s ? qt->db.minimum_latest_update_every_s : 1;
 
     // RULES
     // points_requested = 0
@@ -2132,27 +2132,36 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
         time_t last_entry_s = qt->db.last_time_s;
 
         if (first_entry_s == 0 || last_entry_s == 0) {
-            internal_error(true, "QUERY: no data detected on query '%s' (db first_entry_t = %ld, last_entry_t = %ld", qt->id, first_entry_s, last_entry_s);
-            query_debug_log_free();
-            return false;
+            internal_error(true, "QUERY: no data detected on query '%s' (db first_entry_t = %ld, last_entry_t = %ld)", qt->id, first_entry_s, last_entry_s);
+            after_wanted = qt->window.after;
+            before_wanted = qt->window.before;
+
+            if(after_wanted == before_wanted)
+                after_wanted = before_wanted - update_every;
+
+            if (points_wanted == 0) {
+                points_wanted = (before_wanted - after_wanted) / update_every;
+                query_debug_log(":zero points_wanted %zu", points_wanted);
+            }
         }
+        else {
+            query_debug_log(":first_entry_t %ld, last_entry_t %ld", first_entry_s, last_entry_s);
 
-        query_debug_log(":first_entry_t %ld, last_entry_t %ld", first_entry_s, last_entry_s);
+            if (after_wanted == 0) {
+                after_wanted = first_entry_s;
+                query_debug_log(":zero after_wanted %ld", after_wanted);
+            }
 
-        if (after_wanted == 0) {
-            after_wanted = first_entry_s;
-            query_debug_log(":zero after_wanted %ld", after_wanted);
-        }
+            if (before_wanted == 0) {
+                before_wanted = last_entry_s;
+                before_is_aligned_to_db_end = true;
+                query_debug_log(":zero before_wanted %ld", before_wanted);
+            }
 
-        if (before_wanted == 0) {
-            before_wanted = last_entry_s;
-            before_is_aligned_to_db_end = true;
-            query_debug_log(":zero before_wanted %ld", before_wanted);
-        }
-
-        if (points_wanted == 0) {
-            points_wanted = (last_entry_s - first_entry_s) / update_every;
-            query_debug_log(":zero points_wanted %zu", points_wanted);
+            if (points_wanted == 0) {
+                points_wanted = (last_entry_s - first_entry_s) / update_every;
+                query_debug_log(":zero points_wanted %zu", points_wanted);
+            }
         }
     }
 
