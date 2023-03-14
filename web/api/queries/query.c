@@ -775,16 +775,13 @@ static inline NETDATA_DOUBLE *UNUSED_FUNCTION(rrdr_line_values)(RRDR *r, long rr
 static inline long rrdr_line_init(RRDR *r, time_t t, long rrdr_line) {
     rrdr_line++;
 
-    internal_error(rrdr_line >= (long)r->n,
+    internal_fatal(rrdr_line >= (long)r->n,
                    "QUERY: requested to step above RRDR size for query '%s'",
                    r->internal.qt->id);
 
-    internal_error(r->t[rrdr_line] != 0 && r->t[rrdr_line] != t,
-                   "QUERY: overwriting the timestamp of RRDR line %zu from %zu to %zu, of query '%s'",
-                   (size_t)rrdr_line, (size_t)r->t[rrdr_line], (size_t)t, r->internal.qt->id);
-
-    // save the time
-    r->t[rrdr_line] = t;
+    internal_fatal(r->t[rrdr_line] != t,
+                   "QUERY: wrong timestamp at RRDR line %ld, expected %ld, got %ld, of query '%s'",
+                   rrdr_line, r->t[rrdr_line], t, r->internal.qt->id);
 
     return rrdr_line;
 }
@@ -1458,9 +1455,6 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
 //    if(strcmp("user", string2str(rd->id)) == 0 && strcmp("system.cpu", string2str(rd->rrdset->id)) == 0)
 //        debug_this = true;
 
-    time_t max_date = 0,
-           min_date = 0;
-
     size_t points_added = 0;
 
     long rrdr_line = -1;
@@ -1484,7 +1478,8 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
     size_t query_is_finished_counter = 0;
 
     // The main loop, based on the query granularity we need
-    for( ; points_added < points_wanted && query_is_finished_counter <= 10 ; now_start_time = now_end_time, now_end_time += ops->view_update_every) {
+    for( ; points_added < points_wanted && query_is_finished_counter <= 10 ;
+        now_start_time = now_end_time, now_end_time += ops->view_update_every) {
 
         if(unlikely(query_plan_should_switch_plan(ops, now_end_time))) {
             query_planer_next_plan(ops, now_end_time, new_point.end_time);
@@ -1684,7 +1679,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
         }
 
         time_t stop_time = new_point.end_time;
-        if(unlikely(!storage_point_is_unset(next1_point))) {
+        if(unlikely(!storage_point_is_unset(next1_point) && next1_point.start_time_s >= now_end_time)) {
             // ONE POINT READ-AHEAD
             // the point crosses the start time of the
             // read ahead storage point we have read
@@ -1695,10 +1690,11 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
         // we have 3 points in memory: last2, last1, new
         // we select the one to use based on their timestamps
 
-        size_t iterations = 0;
-        for ( ; now_end_time <= stop_time && points_added < points_wanted ;
-                now_end_time += ops->view_update_every, iterations++) {
+        internal_fatal(now_end_time > stop_time || points_added >= points_wanted,
+            "QUERY: first part of query provides invalid point to interpolate (now_end_time %ld, stop_time %ld",
+            now_end_time, stop_time);
 
+        do {
             // now_start_time is wrong in this loop
             // but, we don't need it
 
@@ -1748,9 +1744,6 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
 
             rrdr_line = rrdr_line_init(r, now_end_time, rrdr_line);
             size_t rrdr_o_v_index = rrdr_line * r->d + dim_id_in_rrdr;
-
-            if(unlikely(!min_date)) min_date = now_end_time;
-            max_date = now_end_time;
 
             // find the place to store our values
             RRDR_VALUE_FLAGS *rrdr_value_options_ptr = &r->o[rrdr_o_v_index];
@@ -1808,47 +1801,35 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
             ops->group_points_non_zero = 0;
             ops->group_anomaly_outlier_points = 0;
             ops->group_anomaly_all_points = 0;
-        }
-        // the loop above increased "now" by query_granularity,
+
+            now_end_time += ops->view_update_every;
+        } while(now_end_time <= stop_time && points_added < points_wanted);
+
+        // the loop above increased "now" by ops->view_update_every,
         // but the main loop will increase it too,
         // so, let's undo the last iteration of this loop
-        if(iterations)
-            now_end_time   -= ops->view_update_every;
+        now_end_time -= ops->view_update_every;
     }
     query_planer_finalize_remaining_plans(ops);
 
     // fill the rest of the points with empty values
     while (points_added < points_wanted) {
-        if(!max_date)
-            min_date = max_date = after_wanted + ops->view_update_every - ops->query_granularity;
-        else
-            max_date += ops->view_update_every;
-
-        rrdr_line = rrdr_line_init(r, max_date, rrdr_line);
+        rrdr_line++;
         size_t rrdr_o_v_index = rrdr_line * r->d + dim_id_in_rrdr;
         r->o[rrdr_o_v_index] = RRDR_VALUE_EMPTY;
         r->v[rrdr_o_v_index] = 0.0;
         r->ar[rrdr_o_v_index] = 0.0;
-
         points_added++;
     }
 
     r->internal.queries_count++;
     r->view.min = min;
     r->view.max = max;
-    r->view.before = max_date;
-    r->view.after = min_date - ops->view_update_every + ops->query_granularity;
-    r->rows = rrdr_line + 1;
 
     r->stats.result_points_generated += points_added;
     r->stats.db_points_read += ops->db_total_points_read;
     for(size_t tr = 0; tr < storage_tiers ; tr++)
         qt->db.tiers[tr].points += ops->db_points_read_per_tier[tr];
-
-    internal_error(points_added != points_wanted,
-                   "QUERY: '%s', dimension '%s', requested %zu points, but RRDR added %zu (%zu db points read).",
-                   qt->id, query_metric_id(qt, qm),
-                   (size_t)points_wanted, (size_t)points_added, ops->db_total_points_read);
 }
 
 // ----------------------------------------------------------------------------
@@ -2443,6 +2424,43 @@ static int group_by_label_is_space(char c) {
     return 0;
 }
 
+static void rrd2rrdr_set_timestamps(RRDR *r) {
+    QUERY_TARGET *qt = r->internal.qt;
+
+    internal_fatal(qt->window.points != r->n, "QUERY: mismatch to the number of points in qt and r");
+
+    r->view.group = qt->window.group;
+    r->view.update_every = (int) (qt->window.group * qt->window.query_granularity);
+    r->view.before = qt->window.before;
+    r->view.after = qt->window.after;
+    r->view.options = qt->window.options;
+
+    r->time_grouping.points_wanted = qt->window.points;
+    r->time_grouping.resampling_group = qt->window.resampling_group;
+    r->time_grouping.resampling_divisor = qt->window.resampling_divisor;
+
+    r->rows = qt->window.points;
+
+    size_t points_wanted = qt->window.points;
+    time_t after_wanted = qt->window.after;
+    time_t before_wanted = qt->window.before;
+
+    time_t view_update_every = r->view.update_every;
+    time_t query_granularity = (time_t)(r->view.update_every / r->view.group);
+
+    size_t rrdr_line = 0;
+    time_t first_point_end_time = after_wanted + view_update_every - query_granularity;
+    time_t now_end_time = first_point_end_time;
+
+    while (rrdr_line < points_wanted) {
+        r->t[rrdr_line++] = now_end_time;
+        now_end_time += view_update_every;
+    }
+
+    internal_fatal(r->t[0] != first_point_end_time, "QUERY: wrong first timestamp in the query");
+    internal_fatal(r->t[points_wanted - 1] != before_wanted, "QUERY: wrong last timestamp in the query");
+}
+
 static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     RRDR_OPTIONS options = qt->request.options;
 
@@ -2463,6 +2481,7 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
              r->dn[d] = rrdmetric_acquired_name_dup(qd->rma);
          }
 
+         rrd2rrdr_set_timestamps(r);
          return r;
     }
 
@@ -2747,6 +2766,9 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                        qt->id, qt->window.after, qt->window.before, 1, qt->window.points);
         goto cleanup;
     }
+
+    rrd2rrdr_set_timestamps(r);
+    rrd2rrdr_set_timestamps(r->group_by.r);
 
     r->dp = onewayalloc_callocz(r->internal.owa, r->d, sizeof(*r->dp));
     r->dv = onewayalloc_callocz(r->internal.owa, r->d, sizeof(*r->dv));
@@ -3072,23 +3094,6 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         r->view.flags |= RRDR_RESULT_FLAG_RELATIVE;
     else
         r->view.flags |= RRDR_RESULT_FLAG_ABSOLUTE;
-
-    // -------------------------------------------------------------------------
-    // initialize RRDR
-
-    r->view.group = qt->window.group;
-    r->view.update_every = (int) (qt->window.group * qt->window.query_granularity);
-    r->view.before = qt->window.before;
-    r->view.after = qt->window.after;
-    r->view.options = qt->window.options;
-    r->time_grouping.points_wanted = qt->window.points;
-    r->time_grouping.resampling_group = qt->window.resampling_group;
-    r->time_grouping.resampling_divisor = qt->window.resampling_divisor;
-
-    if(r->group_by.r) {
-        r->group_by.r->view = r->view;
-        r->group_by.r->time_grouping = r->time_grouping;
-    }
 
     RRDR *r_tmp = r->group_by.r ? r->group_by.r : r;
 
