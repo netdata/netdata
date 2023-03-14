@@ -682,3 +682,5 @@ $ sudo systemctl restart netdata
   example `charts.d` collector.
 - [python.d example](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/example/README.md): An
   example `python.d` collector.
+- [go.d example](https://github.com/netdata/go.d.plugin/blob/master/modules/example/README.md): An
+  example `go.d` collector.
