@@ -34,6 +34,8 @@ const char *facility_log = NULL;
 const char *stdhealth_filename = NULL;
 const char *stdcollector_filename = NULL;
 
+netdata_log_level_t use_log_level = NETDATA_LOG_LEVEL_INFO;
+
 #ifdef ENABLE_ACLK
 const char *aclklog_filename = NULL;
 int aclklog_fd = -1;
