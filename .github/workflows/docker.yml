@@ -236,6 +236,15 @@ jobs:
           workflow: Agent Version PR
           ref: refs/heads/master
           inputs: '{"agent_version": "${{ needs.normalize-tag.outputs.tag }}"}'
+      - name: Trigger MSI build
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly' && github.repository == 'netdata/netdata'
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          repo: netdata/msi-installer
+          workflow: Build
+          ref: refs/heads/master
+          inputs: '{"tag": "${{ needs.normalize-tag.outputs.tag }}", "pwd": "${{ secrets.MSI_CODE_SIGNING_PASSWORD }}"}'
 
   docker-dbg-publish:
     if: github.event_name == 'workflow_dispatch'
