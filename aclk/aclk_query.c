@@ -11,12 +11,17 @@ pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
 #define QUERY_THREAD_LOCK pthread_mutex_lock(&query_lock_wait)
 #define QUERY_THREAD_UNLOCK pthread_mutex_unlock(&query_lock_wait)
 
-static usec_t aclk_web_api_v1_request(RRDHOST *host, struct web_client *w, char *url)
+static usec_t aclk_web_api_request(RRDHOST *host, struct web_client *w, char *url, const size_t api_version)
 {
     usec_t t;
 
     t = now_monotonic_high_precision_usec();
-    w->response.code = web_client_api_request_v1(host, w, url);
+
+    if(api_version == 2)
+        w->response.code = web_client_api_request_v2(host, w, url);
+    else
+        w->response.code = web_client_api_request_v1(host, w, url);
+
     t = now_monotonic_high_precision_usec() - t;
 
     if (aclk_stats_enabled) {
@@ -119,6 +124,16 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
         }
     }
 
+    size_t api_version = 1;
+    {
+        char *s = strstr(query->data.http_api_v2.query, "/api/v");
+        if(s && s[6]) {
+            api_version = str2u(&s[6]);
+            if(api_version != 1 && api_version != 2)
+                api_version = 1;
+        }
+    }
+
     char *mysep = strchr(query->data.http_api_v2.query, '?');
     if (mysep) {
         url_decode_r(w->decoded_query_string, mysep, NETDATA_WEB_REQUEST_URL_SIZE + 1);
@@ -136,7 +151,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
     }
 
     // execute the query
-    t = aclk_web_api_v1_request(query_host, w, mysep ? mysep + 1 : "noop");
+    t = aclk_web_api_request(query_host, w, mysep ? mysep + 1 : "noop", api_version);
     size = (w->mode == WEB_CLIENT_MODE_FILECOPY) ? w->response.rlen : w->response.data->len;
     sent = size;
 
