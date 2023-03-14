@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- Change H1 of collector docs to separate from the website [\#14715](https://github.com/netdata/netdata/pull/14715) ([cakrit](https://github.com/cakrit))
+- Add instructions for reconnecting a Docker node to another Space [\#14714](https://github.com/netdata/netdata/pull/14714) ([Ancairon](https://github.com/Ancairon))
+- fix system info disk size detection on raspberry pi  [\#14711](https://github.com/netdata/netdata/pull/14711) ([ilyam8](https://github.com/ilyam8))
+- /api/v2 part 4 [\#14706](https://github.com/netdata/netdata/pull/14706) ([ktsaou](https://github.com/ktsaou))
+- Don’t try to use tput in edit-config unless it’s installed. [\#14705](https://github.com/netdata/netdata/pull/14705) ([Ferroin](https://github.com/Ferroin))
 - Revert "Handle conffiles for DEB packages explicitly instead of automatically." [\#14700](https://github.com/netdata/netdata/pull/14700) ([tkatsoulas](https://github.com/tkatsoulas))
 - Fix compilation error when --disable-cloud is specified [\#14695](https://github.com/netdata/netdata/pull/14695) ([stelfrag](https://github.com/stelfrag))
 - fix: detect the host os in k8s on non-docker cri [\#14694](https://github.com/netdata/netdata/pull/14694) ([witalisoft](https://github.com/witalisoft))
@@ -60,6 +65,7 @@
 - Misc SSL improvements 3 [\#14602](https://github.com/netdata/netdata/pull/14602) ([MrZammler](https://github.com/MrZammler))
 - Update deployment-strategies.md [\#14601](https://github.com/netdata/netdata/pull/14601) ([cakrit](https://github.com/cakrit))
 - Add deployment strategies [\#14600](https://github.com/netdata/netdata/pull/14600) ([cakrit](https://github.com/cakrit))
+- Add Amazon Linux 2 to CI and platform support. [\#14599](https://github.com/netdata/netdata/pull/14599) ([Ferroin](https://github.com/Ferroin))
 - Replace web server readme with its improved replica [\#14598](https://github.com/netdata/netdata/pull/14598) ([cakrit](https://github.com/cakrit))
 - Update interact-new-charts.md [\#14596](https://github.com/netdata/netdata/pull/14596) ([cakrit](https://github.com/cakrit))
 - Fix context unittest coredump [\#14595](https://github.com/netdata/netdata/pull/14595) ([stelfrag](https://github.com/stelfrag))
@@ -95,6 +101,7 @@
 - Reorg learn 021723 [\#14556](https://github.com/netdata/netdata/pull/14556) ([cakrit](https://github.com/cakrit))
 - Update email notification docs with info about setup in Docker. [\#14555](https://github.com/netdata/netdata/pull/14555) ([Ferroin](https://github.com/Ferroin))
 - Fix broken links in integrations-overview [\#14554](https://github.com/netdata/netdata/pull/14554) ([Ancairon](https://github.com/Ancairon))
+- Add vnodes default configuration file. [\#14553](https://github.com/netdata/netdata/pull/14553) ([Ferroin](https://github.com/Ferroin))
 - More reorg learn 021623 [\#14550](https://github.com/netdata/netdata/pull/14550) ([cakrit](https://github.com/cakrit))
 - Update learn path of python plugin readme [\#14549](https://github.com/netdata/netdata/pull/14549) ([cakrit](https://github.com/cakrit))
 - Hide netdata for IoT from learn. [\#14548](https://github.com/netdata/netdata/pull/14548) ([cakrit](https://github.com/cakrit))
@@ -369,14 +376,6 @@
 - Switch to self-hosted infrastructure for RPM package distribution. [\#14100](https://github.com/netdata/netdata/pull/14100) ([Ferroin](https://github.com/Ferroin))
 - Fix missing required package install of tar on FreeBSD [\#14095](https://github.com/netdata/netdata/pull/14095) ([Dim-P](https://github.com/Dim-P))
 - Add version to netdatacli [\#14094](https://github.com/netdata/netdata/pull/14094) ([MrZammler](https://github.com/MrZammler))
-- docs: add a note to set container nofile ulimit for Fedora users [\#14092](https://github.com/netdata/netdata/pull/14092) ([ilyam8](https://github.com/ilyam8))
-- Fix eBPF load on RH 8.x family and improve code. [\#14090](https://github.com/netdata/netdata/pull/14090) ([thiagoftsm](https://github.com/thiagoftsm))
-- fix v1.37 dbengine page alignment crashes [\#14086](https://github.com/netdata/netdata/pull/14086) ([ktsaou](https://github.com/ktsaou))
-- Fix \_\_atomic\_compare\_exchange\_n\(\) atomics [\#14085](https://github.com/netdata/netdata/pull/14085) ([ktsaou](https://github.com/ktsaou))
-- Fix 1.37 crashes [\#14081](https://github.com/netdata/netdata/pull/14081) ([stelfrag](https://github.com/stelfrag))
-- add basic dashboard info for NGINX Plus [\#14080](https://github.com/netdata/netdata/pull/14080) ([ilyam8](https://github.com/ilyam8))
-- replication fixes 9 [\#14079](https://github.com/netdata/netdata/pull/14079) ([ktsaou](https://github.com/ktsaou))
-- optimize workers statistics performance [\#14077](https://github.com/netdata/netdata/pull/14077) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
