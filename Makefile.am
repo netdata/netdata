@@ -637,6 +637,7 @@ STREAMING_PLUGIN_FILES = \
     streaming/replication.h \
     streaming/replication.c \
     streaming/rrdpush.h \
+    streaming/common.h \
     $(NULL)
 
 REGISTRY_PLUGIN_FILES = \
