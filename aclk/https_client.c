@@ -26,10 +26,27 @@ static const char *http_req_type_to_str(http_req_type_t req) {
 #define TRANSFER_ENCODING_CHUNKED (-2)
 
 #define HTTP_PARSE_CTX_INITIALIZER { .state = HTTP_PARSE_INITIAL, .content_length = -1, .http_code = 0 }
-static inline void http_parse_ctx_clear(http_parse_ctx *ctx) {
+void http_parse_ctx_create(http_parse_ctx *ctx)
+{
     ctx->state = HTTP_PARSE_INITIAL;
     ctx->content_length = -1;
     ctx->http_code = 0;
+    ctx->headers = c_rhash_new(0);
+}
+
+void http_parse_ctx_destroy(http_parse_ctx *ctx)
+{
+    c_rhash_iter_t iter;
+    const char *key;
+
+    c_rhash_iter_t_initialize(&iter);
+    while ( !c_rhash_iter_str_keys(ctx->headers, &iter, &key) ) {
+        void *val;
+        c_rhash_get_ptr_by_str(ctx->headers, key, &val);
+        freez(val);
+    }
+
+    c_rhash_destroy(ctx->headers);
 }
 
 #define POLL_TO_MS 100
@@ -70,7 +87,18 @@ static int process_http_hdr(http_parse_ctx *parse_ctx, const char *key, const ch
         }
         return 0;
     }
+    char *val_cpy = strdupz(val);
+    c_rhash_insert_str_ptr(parse_ctx->headers, key, val_cpy);
     return 0;
+}
+
+const char *get_http_header_by_name(http_parse_ctx *ctx, const char *name)
+{
+    const char *ret;
+    if (c_rhash_get_ptr_by_str(ctx->headers, name, (void**)&ret))
+        return NULL;
+
+    return ret;
 }
 
 static int parse_http_hdr(rbuf_t buf, http_parse_ctx *parse_ctx)
@@ -468,7 +496,7 @@ static int handle_http_request(https_req_ctx_t *ctx) {
     BUFFER *hdr = buffer_create(TX_BUFFER_SIZE, &netdata_buffers_statistics.buffers_aclk);
     int rc = 0;
 
-    http_parse_ctx_clear(&ctx->parse_ctx);
+    http_parse_ctx_create(&ctx->parse_ctx);
 
     // Prepare data to send
     switch (ctx->request->request_type) {
@@ -629,12 +657,15 @@ int https_request(https_req_t *request, https_req_response_t *response) {
         ctx->request = &req;
         if (handle_http_request(ctx)) {
             netdata_log_error("Failed to CONNECT with proxy");
+            http_parse_ctx_destroy(&ctx->parse_ctx);
             goto exit_sock;
         }
         if (ctx->parse_ctx.http_code != 200) {
             netdata_log_error("Proxy didn't return 200 OK (got %d)", ctx->parse_ctx.http_code);
+            http_parse_ctx_destroy(&ctx->parse_ctx);
             goto exit_sock;
         }
+        http_parse_ctx_destroy(&ctx->parse_ctx);
         netdata_log_info("Proxy accepted CONNECT upgrade");
     }
     ctx->request = request;
@@ -681,8 +712,10 @@ int https_request(https_req_t *request, https_req_response_t *response) {
     // The actual request here
     if (handle_http_request(ctx)) {
         netdata_log_error("Couldn't process request");
+        http_parse_ctx_destroy(&ctx->parse_ctx);
         goto exit_SSL;
     }
+    http_parse_ctx_destroy(&ctx->parse_ctx);
     response->http_code = ctx->parse_ctx.http_code;
     if (ctx->parse_ctx.content_length == TRANSFER_ENCODING_CHUNKED) {
         response->payload_size = ctx->parse_ctx.chunked_response_size;
