@@ -162,6 +162,7 @@ This is a list of platforms that we have supported in the recent past but no lon
 | openSUSE     | Leap 15.3 | EOL as of 2022-12-01 |
 | Ubuntu       | 21.10     | EOL as of 2022-07-31 |
 | Ubuntu       | 21.04     | EOL as of 2022-01-01 |
+| Ubuntu       | 18.04     | EOL as of 2023-04-02 |
 
 ## Static builds
 
