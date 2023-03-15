@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Update change-metrics-storage.md [\#14726](https://github.com/netdata/netdata/pull/14726) ([cakrit](https://github.com/cakrit))
+- add go.d example collector to \#etc section [\#14722](https://github.com/netdata/netdata/pull/14722) ([andrewm4894](https://github.com/andrewm4894))
 - Change H1 of collector docs to separate from the website [\#14715](https://github.com/netdata/netdata/pull/14715) ([cakrit](https://github.com/cakrit))
 - Add instructions for reconnecting a Docker node to another Space [\#14714](https://github.com/netdata/netdata/pull/14714) ([Ancairon](https://github.com/Ancairon))
 - fix system info disk size detection on raspberry pi  [\#14711](https://github.com/netdata/netdata/pull/14711) ([ilyam8](https://github.com/ilyam8))
@@ -18,6 +20,7 @@
 - Fix Azure IMDS [\#14686](https://github.com/netdata/netdata/pull/14686) ([shyamvalsan](https://github.com/shyamvalsan))
 - Send an EOF from charts.d.plugin before exit [\#14680](https://github.com/netdata/netdata/pull/14680) ([MrZammler](https://github.com/MrZammler))
 - Fix conditionals for claim-only case in kickstart.sh. [\#14679](https://github.com/netdata/netdata/pull/14679) ([Ferroin](https://github.com/Ferroin))
+- Improve guideline docs [\#14678](https://github.com/netdata/netdata/pull/14678) ([Ancairon](https://github.com/Ancairon))
 - Fix kernel test script [\#14676](https://github.com/netdata/netdata/pull/14676) ([thiagoftsm](https://github.com/thiagoftsm))
 - add note on readme on how to easily see all ml related blog posts [\#14675](https://github.com/netdata/netdata/pull/14675) ([andrewm4894](https://github.com/andrewm4894))
 - Guard for null host when sending node instances [\#14673](https://github.com/netdata/netdata/pull/14673) ([MrZammler](https://github.com/MrZammler))
@@ -102,6 +105,7 @@
 - Update email notification docs with info about setup in Docker. [\#14555](https://github.com/netdata/netdata/pull/14555) ([Ferroin](https://github.com/Ferroin))
 - Fix broken links in integrations-overview [\#14554](https://github.com/netdata/netdata/pull/14554) ([Ancairon](https://github.com/Ancairon))
 - Add vnodes default configuration file. [\#14553](https://github.com/netdata/netdata/pull/14553) ([Ferroin](https://github.com/Ferroin))
+- RPM: Added elfutils-libelf-devel for build with eBPF [\#14552](https://github.com/netdata/netdata/pull/14552) ([k0ste](https://github.com/k0ste))
 - More reorg learn 021623 [\#14550](https://github.com/netdata/netdata/pull/14550) ([cakrit](https://github.com/cakrit))
 - Update learn path of python plugin readme [\#14549](https://github.com/netdata/netdata/pull/14549) ([cakrit](https://github.com/cakrit))
 - Hide netdata for IoT from learn. [\#14548](https://github.com/netdata/netdata/pull/14548) ([cakrit](https://github.com/cakrit))
@@ -373,9 +377,6 @@
 - add filtering options to functions table output [\#14108](https://github.com/netdata/netdata/pull/14108) ([ktsaou](https://github.com/ktsaou))
 - fix health emphemerality labels src [\#14105](https://github.com/netdata/netdata/pull/14105) ([ilyam8](https://github.com/ilyam8))
 - fix docker host editable config [\#14104](https://github.com/netdata/netdata/pull/14104) ([ilyam8](https://github.com/ilyam8))
-- Switch to self-hosted infrastructure for RPM package distribution. [\#14100](https://github.com/netdata/netdata/pull/14100) ([Ferroin](https://github.com/Ferroin))
-- Fix missing required package install of tar on FreeBSD [\#14095](https://github.com/netdata/netdata/pull/14095) ([Dim-P](https://github.com/Dim-P))
-- Add version to netdatacli [\#14094](https://github.com/netdata/netdata/pull/14094) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
