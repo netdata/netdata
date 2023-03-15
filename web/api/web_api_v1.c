@@ -977,8 +977,8 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     }
 }
 
-void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host, BUFFER *wb) {
-    buffer_json_member_add_object(wb, "alarms");
+void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host, BUFFER *wb, const char *key) {
+    buffer_json_member_add_object(wb, key);
 
     size_t normal = 0, warning = 0, critical = 0;
     RRDCALC *rc;
@@ -1048,8 +1048,8 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
     rrd_unlock();
 }
 
-void host_labels2json(RRDHOST *host, BUFFER *wb) {
-    buffer_json_member_add_object(wb, "host_labels");
+void host_labels2json(RRDHOST *host, BUFFER *wb, const char *key) {
+    buffer_json_member_add_object(wb, key);
     rrdlabels_to_buffer_json_members(host->rrdlabels, wb);
     buffer_json_object_close(wb);
 }
@@ -1096,7 +1096,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_json_member_add_uint64(wb, "hosts-available", rrdhost_hosts_available());
     web_client_api_request_v1_info_mirrored_hosts(wb);
 
-    web_client_api_request_v1_info_summary_alarm_statuses(host, wb);
+    web_client_api_request_v1_info_summary_alarm_statuses(host, wb, "alarms");
 
     buffer_json_member_add_string_or_empty(wb, "os_name", host->system_info->host_os_name);
     buffer_json_member_add_string_or_empty(wb, "os_id", host->system_info->host_os_id);
@@ -1129,7 +1129,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_json_member_add_string_or_omit(wb, "cloud_instance_type", host->system_info->cloud_instance_type);
     buffer_json_member_add_string_or_omit(wb, "cloud_instance_region", host->system_info->cloud_instance_region);
 
-    host_labels2json(host, wb);
+    host_labels2json(host, wb, "host_labels");
     host_functions2json(host, wb);
     host_collectors(host, wb);
 

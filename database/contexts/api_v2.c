@@ -274,8 +274,13 @@ static bool rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool query
         buffer_json_member_add_string(wb, "nm", rrdhost_hostname(host));
 
         if(ctl->options & CONTEXTS_V2_NODES_DETAILED) {
+            buffer_json_member_add_string(wb, "version", rrdhost_program_version(host));
             buffer_json_member_add_uint64(wb, "hops", host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
             buffer_json_member_add_string(wb, "state", (host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)) ? "reachable" : "stale");
+            buffer_json_member_add_boolean(wb, "isDeleted", false);
+
+            buffer_json_member_add_array(wb, "services");
+            buffer_json_array_close(wb);
 
             buffer_json_member_add_array(wb, "capabilities");
             buffer_json_add_array_item_object(wb);
@@ -295,9 +300,9 @@ static bool rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool query
             buffer_json_object_close(wb);
             buffer_json_array_close(wb);
 
-            web_client_api_request_v1_info_summary_alarm_statuses(host, wb);
+            web_client_api_request_v1_info_summary_alarm_statuses(host, wb, "alarmCounters");
 
-            host_labels2json(host, wb);
+            host_labels2json(host, wb, "hostLabels");
 
             buffer_json_member_add_object(wb, "mlInfo");
             buffer_json_member_add_boolean(wb, "mlCapable", ml_capable(host));
