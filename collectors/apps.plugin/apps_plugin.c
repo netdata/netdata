@@ -4385,6 +4385,16 @@ static void parse_args(int argc, char **argv)
         }
 #endif
 
+        if(strcmp("severity-level", argv[i]) == 0) {
+            if(argc <= i + 1) {
+                fprintf(stderr, "Parameter 'severity-level' requires a number as argument.\n");
+                exit(1);
+            }
+            i++;
+            log_collector_log_level(argv[i]);
+            continue;
+        }
+
         if(strcmp("no-childs", argv[i]) == 0 || strcmp("without-childs", argv[i]) == 0) {
             include_exited_childs = 0;
             continue;

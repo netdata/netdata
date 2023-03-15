@@ -1134,6 +1134,15 @@ void log_aclk_message_bin( const char *data, const size_t data_len, int tx, cons
 }
 #endif
 
+void log_collector_log_level(char *value)
+{
+    int slevel = str2i(value);
+    if (slevel < NETDATA_LOG_LEVEL_INFO || slevel > NETDATA_LOG_LEVEL_ERROR)
+        slevel = NETDATA_LOG_LEVEL_INFO;
+
+    use_log_level = (netdata_log_level_t) slevel;
+}
+
 netdata_log_level_t log_select_log_level(char *level)
 {
     if (!strcmp(level, NETDATA_LOG_LEVEL_INFO_STR))
