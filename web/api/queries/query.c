@@ -2938,7 +2938,7 @@ static void rrd2rrdr_group_by_finalize(RRDR *r) {
         r->t[i] = r->group_by.r->t[i];
     }
 
-    if(!(options & RRDR_OPTION_RETURN_RAW)) {
+    if(!(options & RRDR_OPTION_RETURN_RAW) && r->partial_data_trimming.expected_after < qt->window.before) {
         // partial trimming
         size_t last_row_gbc = 0;
         for (size_t i = 0; i != r->n; i++) {

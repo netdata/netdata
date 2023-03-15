@@ -475,10 +475,11 @@ struct api_v2_contexts_request {
 };
 
 typedef enum __attribute__ ((__packed__)) {
-    CONTEXTS_V2_DEBUG    = (1 << 0),
-    CONTEXTS_V2_SEARCH   = (1 << 1),
-    CONTEXTS_V2_NODES    = (1 << 2),
-    CONTEXTS_V2_CONTEXTS = (1 << 3),
+    CONTEXTS_V2_DEBUG          = (1 << 0),
+    CONTEXTS_V2_SEARCH         = (1 << 1),
+    CONTEXTS_V2_NODES          = (1 << 2),
+    CONTEXTS_V2_NODES_DETAILED = (1 << 3),
+    CONTEXTS_V2_CONTEXTS       = (1 << 4),
 } CONTEXTS_V2_OPTIONS;
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_OPTIONS options);

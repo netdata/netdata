@@ -40,7 +40,7 @@ static int web_client_api_request_v2_contexts(RRDHOST *host __maybe_unused, stru
 }
 
 static int web_client_api_request_v2_nodes(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_NODES);
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED);
 }
 
 static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {

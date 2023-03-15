@@ -977,7 +977,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     }
 }
 
-static inline void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host, BUFFER *wb) {
+void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host, BUFFER *wb) {
     buffer_json_member_add_object(wb, "alarms");
 
     size_t normal = 0, warning = 0, critical = 0;
@@ -1048,7 +1048,7 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
     rrd_unlock();
 }
 
-static inline void host_labels2json(RRDHOST *host, BUFFER *wb) {
+void host_labels2json(RRDHOST *host, BUFFER *wb) {
     buffer_json_member_add_object(wb, "host_labels");
     rrdlabels_to_buffer_json_members(host->rrdlabels, wb);
     buffer_json_object_close(wb);
