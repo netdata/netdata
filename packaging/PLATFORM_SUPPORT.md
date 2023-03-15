@@ -77,7 +77,7 @@ to work on these platforms with minimal user effort.
 | Ubuntu                   | 22.10          | x86\_64, ARMv7, AArch64                |                                                                                                                                                    |
 | Ubuntu                   | 22.04          | x86\_64, ARMv7, AArch64                |                                                                                                                                                    |
 | Ubuntu                   | 20.04          | x86\_64, ARMv7, AArch64                |                                                                                                                                                    |
-| Ubuntu                   | 18.04          | x86\_64, i386, ARMv7, AArch64          |                                                                                                                                                    |
+
 
 ### Intermediate
 
