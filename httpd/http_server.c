@@ -339,12 +339,41 @@ static inline int is_streaming_handshake(h2o_req_t *req)
     return 0;
 }
 
+static void stream_on_complete(void *user_data, h2o_socket_t *sock, size_t reqsize)
+{
+    h2o_stream_conn_t *conn = user_data;
+
+    /* close the connection on error */
+    if (sock == NULL) {
+// can call connection close callback here  (*conn->cb)(conn, NULL);
+        return;
+    }
+
+    conn->sock = sock;
+    sock->data = conn;
+    h2o_buffer_consume(&sock->input, reqsize);
+//    stream_process(conn);
+}
+
 static int hdl_stream(h2o_handler_t *self, h2o_req_t *req)
 {
+    h2o_stream_conn_t *conn = mallocz(sizeof(*conn));
+    memset(conn, 0, sizeof(*conn));
+
     if (is_streaming_handshake(req)) {
         return 1;
     }
 
+    /* build response */
+    req->res.status = 101;
+    req->res.reason = "Switching Protocols";
+    h2o_add_header(&req->pool, &req->res.headers, H2O_TOKEN_UPGRADE, NULL, H2O_STRLIT(NETDATA_STREAM_PROTO_NAME));
+
+//  TODO we should consider adding some nonce header here
+//    h2o_add_header_by_str(&req->pool, &req->res.headers, H2O_STRLIT("whatever reply"), 0, NULL, accept_key,
+//                          strlen(accept_key));
+
+    h2o_http1_upgrade(req, NULL, 0, stream_on_complete, conn);
 }
 
 void *httpd_main(void *ptr) {
