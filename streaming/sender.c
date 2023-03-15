@@ -530,6 +530,11 @@ static bool rrdpush_sender_connect_ssl(struct sender_state *s) {
 #endif
 }
 
+unsigned char alpn_proto_list[] = {
+    18, 'n', 'e', 't', 'd', 'a', 't', 'a', '_', 's', 't', 'r', 'e', 'a', 'm', '/', '2', '.', '0',
+    8, 'h', 't', 't', 'p', '/', '1', '.', '1'
+};
+
 static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_port, int timeout, struct sender_state *s) {
 
     struct timeval tv = {
@@ -556,6 +561,36 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     }
 
     // info("STREAM %s [send to %s]: initializing communication...", rrdhost_hostname(host), s->connected_to);
+
+#ifdef ENABLE_HTTPS
+    if(netdata_ssl_client_ctx){
+        host->sender->ssl.flags = NETDATA_SSL_START;
+        if (!host->sender->ssl.conn){
+            host->sender->ssl.conn = SSL_new(netdata_ssl_client_ctx);
+            if(!host->sender->ssl.conn){
+                error("Failed to allocate SSL structure.");
+                host->sender->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+            }
+            SSL_set_alpn_protos(host->sender->ssl.conn, alpn_proto_list, sizeof(alpn_proto_list));
+        }
+        else{
+            SSL_clear(host->sender->ssl.conn);
+        }
+
+        if (host->sender->ssl.conn)
+        {
+            if (SSL_set_fd(host->sender->ssl.conn, s->rrdpush_sender_socket) != 1) {
+                error("Failed to set the socket to the SSL on socket fd %d.", s->rrdpush_sender_socket);
+                host->sender->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+            } else{
+                host->sender->ssl.flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
+            }
+        }
+    }
+    else {
+        host->sender->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+    }
+#endif
 
     // reset our capabilities to default
     s->capabilities = stream_our_capabilities();
