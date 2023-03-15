@@ -95,9 +95,9 @@ with minimal user effort.
 | Alpine Linux  | 3.14    | No                       |                                                                                                      |
 | Amazon Linux  | 2       | x86\_64, AArch64         | Scheduled for promotion to Core tier at some point after the release of v1.39.0 of the Netdata Agent |
 | Arch Linux    | Latest  | No                       | We officially recommend the community packages available for Arch Linux                              |
+| Fedora        | 38      | x86\_64, AArch64         | Scheduled for promotion to Core tier at some point after the release of v1.39.0 of the Netdata Agent |
 | Manjaro Linux | Latest  | No                       | We officially recommend the community packages available for Arch Linux                              |
 | Ubuntu        | 23.04   | x86\_64, AArch64, ARMv7  | Scheduled for promotion to Core tier at some point after the release of v1.39.0 of the Netdata Agent |
-| Fedora        | 38      | x86\_64, AArch64         | Scheduled for promotion to Core tier at some point after the release of v1.39.0 of the Netdata Agent |
 
 
 ### Community
