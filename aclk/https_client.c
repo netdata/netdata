@@ -32,6 +32,7 @@ void http_parse_ctx_create(http_parse_ctx *ctx)
     ctx->content_length = -1;
     ctx->http_code = 0;
     ctx->headers = c_rhash_new(0);
+    ctx->flags = HTTP_PARSE_FLAGS_DEFAULT;
 }
 
 void http_parse_ctx_destroy(http_parse_ctx *ctx)
@@ -290,6 +291,9 @@ int parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx)
                     return process_chunked_content(buf, parse_ctx);
 
                 if (parse_ctx->content_length < 0)
+                    return HTTP_PARSE_SUCCESS;
+
+                if (parse_ctx->flags & HTTP_PARSE_FLAG_DONT_WAIT_FOR_CONTENT)
                     return HTTP_PARSE_SUCCESS;
 
                 if (rbuf_bytes_available(buf) >= (size_t)parse_ctx->content_length)

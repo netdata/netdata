@@ -88,7 +88,15 @@ enum http_parse_state {
     HTTP_PARSE_CONTENT
 };
 
+typedef uint32_t parse_ctx_flags_t;
+
+#define HTTP_PARSE_FLAG_DONT_WAIT_FOR_CONTENT ((parse_ctx_flags_t)0x01)
+
+#define HTTP_PARSE_FLAGS_DEFAULT ((parse_ctx_flags_t)0)
+
 typedef struct {
+    parse_ctx_flags_t flags;
+
     enum http_parse_state state;
     int content_length;
     int http_code;
