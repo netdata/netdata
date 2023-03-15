@@ -68,6 +68,9 @@ void print_help() {
             "  -d                      enable verbose output\n"
             "                          default: disabled\n"
             "\n"
+            " severity-level N        informs the log level used by plugin:\n"
+            "                         0 - info; 1 - error \n"
+            "\n"
             "  -v                      print version and exit\n"
             "\n"
             "  -h                      print this message and exit\n"
@@ -91,6 +94,15 @@ void parse_command_line(int argc, char **argv) {
             exit(0);
         } else if (strcmp("-d", argv[i]) == 0) {
             debug = 1;
+            continue;
+        } else if ((strcmp("severity-level", argv[i]) == 0) || (strcmp("-severity-level", argv[i]) == 0)) {
+            if(argc <= i + 1) {
+                fprintf(stderr, "Parameter 'severity-level' requires a number as argument.\n");
+                print_help();
+                exit(1);
+            }
+            i++;
+            log_collector_log_level(argv[i]);
             continue;
         } else if (strcmp("-h", argv[i]) == 0) {
             print_help();
