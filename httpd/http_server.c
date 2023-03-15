@@ -4,6 +4,7 @@
 #include "streaming/common.h"
 #include "http_server.h"
 #include "h2o.h"
+#include "h2o/http1.h"
 
 #include "h2o_utils.h"
 
