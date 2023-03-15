@@ -782,7 +782,7 @@ void debug_int( const char *file, const char *function, const unsigned long line
 
 void info_int( int is_collector, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... )
 {
-    if (use_log_level == NETDATA_LOG_LEVEL_ERROR)
+    if (use_log_level > NETDATA_LOG_LEVEL_INFO)
         return;
 
     va_list args;
@@ -913,8 +913,7 @@ void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __ma
 }
 
 void error_int(int is_collector, const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
-    if ((use_log_level == NETDATA_LOG_LEVEL_ERROR && !strcmp(prefix, "INFO")) ||
-        (use_log_level == NETDATA_LOG_LEVEL_INFO && !strcmp(prefix, "ERROR")))
+    if (use_log_level == NETDATA_LOG_LEVEL_INFO && !strcmp(prefix, "ERROR"))
         return;
 
     // save a copy of errno - just in case this function generates a new error
@@ -1141,8 +1140,6 @@ netdata_log_level_t log_select_log_level(char *level)
         return NETDATA_LOG_LEVEL_INFO;
     else if (!strcmp(level, NETDATA_LOG_LEVEL_ERROR_STR))
         return NETDATA_LOG_LEVEL_ERROR;
-    else if (!strcmp(level, NETDATA_LOG_LEVEL_ALL_STR))
-        return NETDATA_LOG_LEVEL_ALL;
 
     error("The value `%s` is not a known value. Netdata will run with default `info`.", level);
 

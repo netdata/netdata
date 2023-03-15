@@ -107,13 +107,11 @@ typedef struct error_with_limit {
 
 typedef enum netdata_log_level {
     NETDATA_LOG_LEVEL_INFO,
-    NETDATA_LOG_LEVEL_ERROR,
-    NETDATA_LOG_LEVEL_ALL
+    NETDATA_LOG_LEVEL_ERROR
 } netdata_log_level_t;
 
 #define NETDATA_LOG_LEVEL_INFO_STR "info"
 #define NETDATA_LOG_LEVEL_ERROR_STR "error"
-#define NETDATA_LOG_LEVEL_ALL_STR "all"
 
 extern netdata_log_level_t use_log_level;
 netdata_log_level_t log_select_log_level(char *level);
