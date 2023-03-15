@@ -125,7 +125,7 @@ The Netdata parent in our production infrastructure at the time of writing:
 
 The rule of thumb calculation for this set up gives us
 ```
-DBENGINE memory = 206,000 x 16 / 1024 = 3 GiB
+DBENGINE memory = 206,000 x 16 / 1024 MiB = 3,217 MiB = about 3 GiB
 Extra cache = 4 GiB
 Metric cardinality factor = 4
 Estimated total Netdata memory = 3 * 4 + 4 = 16 GiB
