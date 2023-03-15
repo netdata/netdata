@@ -480,6 +480,11 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
     return false;
 }
 
+unsigned char alpn_proto_list[] = {
+    18, 'n', 'e', 't', 'd', 'a', 't', 'a', '_', 's', 't', 'r', 'e', 'a', 'm', '/', '2', '.', '0',
+    8, 'h', 't', 't', 'p', '/', '1', '.', '1'
+};
+
 static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_port, int timeout, struct sender_state *s) {
 
     struct timeval tv = {
@@ -516,6 +521,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
                 error("Failed to allocate SSL structure.");
                 host->sender->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
             }
+            SSL_set_alpn_protos(host->sender->ssl.conn, alpn_proto_list, sizeof(alpn_proto_list));
         }
         else{
             SSL_clear(host->sender->ssl.conn);
