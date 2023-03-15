@@ -95,6 +95,8 @@ inline void health_alarm_log_add_entry(
 ) {
     debug(D_HEALTH, "Health adding alarm log entry with id: %u", ae->unique_id);
 
+    __atomic_add_fetch(&host->health_transitions, 1, __ATOMIC_RELAXED);
+
     // link it
     netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
     ae->next = host->health_log.alarms;

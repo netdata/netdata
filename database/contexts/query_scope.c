@@ -2,7 +2,10 @@
 
 #include "internal.h"
 
-uint64_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hosts_sp, foreach_host_cb_t cb, void *data, uint64_t *hard_hash, uint64_t *soft_hash, char *host_uuid_buffer) {
+uint64_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hosts_sp, foreach_host_cb_t cb, void *data,
+                                  uint64_t *contexts_hard_hash, uint64_t *context_soft_hash,
+                                  uint64_t *alerts_hard_hash, uint64_t *alerts_soft_hash,
+                                  char *host_uuid_buffer) {
     char uuid[UUID_STR_LEN];
     if(!host_uuid_buffer) host_uuid_buffer = uuid;
     host_uuid_buffer[0] = '\0';
@@ -11,6 +14,8 @@ uint64_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN
     size_t count = 0;
     uint64_t v_hash = 0;
     uint64_t h_hash = 0;
+    uint64_t a_hash = 0;
+    uint64_t t_hash = 0;
 
     dfe_start_reentrant(rrdhost_root_index, host) {
         if(host->node_id)
@@ -41,16 +46,24 @@ uint64_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN
             count++;
             v_hash += dictionary_version(host->rrdctx.contexts);
             h_hash += dictionary_version(host->rrdctx.hub_queue);
+            a_hash += dictionary_version(host->rrdcalc_root_index);
+            t_hash += __atomic_load_n(&host->health_transitions, __ATOMIC_RELAXED);
             cb(data, host, queryable_host);
         }
     }
     dfe_done(host);
 
-    if(hard_hash)
-        *hard_hash = v_hash;
+    if(contexts_hard_hash)
+        *contexts_hard_hash = v_hash;
 
-    if(soft_hash)
-        *soft_hash = h_hash;
+    if(context_soft_hash)
+        *context_soft_hash = h_hash;
+
+    if(alerts_hard_hash)
+        *alerts_hard_hash = a_hash;
+
+    if(alerts_soft_hash)
+        *alerts_soft_hash = t_hash;
 
     return count;
 }

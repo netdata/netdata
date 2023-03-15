@@ -92,8 +92,10 @@ struct rrdcontext_to_json_v2_data {
     DICTIONARY *ctx;
 
     CONTEXTS_V2_OPTIONS options;
-    uint64_t hard_hash;
-    uint64_t soft_hash;
+    uint64_t contexts_hard_hash;
+    uint64_t contexts_soft_hash;
+    uint64_t alerts_hard_hash;
+    uint64_t alerts_soft_hash;
 
     struct {
         SIMPLE_PATTERN *scope_pattern;
@@ -323,6 +325,23 @@ static bool rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool query
                 buffer_json_member_add_string_or_empty(wb, "osName", host->system_info->host_os_name);
                 buffer_json_member_add_string_or_empty(wb, "osVersion", host->system_info->host_os_version);
             }
+
+            buffer_json_member_add_object(wb, "status");
+
+            size_t receiver_hops = host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1;
+            buffer_json_member_add_object(wb, "collection");
+            buffer_json_member_add_uint64(wb, "hops", receiver_hops);
+            buffer_json_member_add_boolean(wb, "online", host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED));
+            buffer_json_member_add_boolean(wb, "replicating", rrdhost_receiver_replicating_charts(host));
+            buffer_json_object_close(wb); // collection
+
+            buffer_json_member_add_object(wb, "streaming");
+            buffer_json_member_add_uint64(wb, "hops", host->sender ? host->sender->hops : receiver_hops + 1);
+            buffer_json_member_add_boolean(wb, "online", rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED));
+            buffer_json_member_add_boolean(wb, "replicating", rrdhost_sender_replicating_charts(host));
+            buffer_json_object_close(wb); // streaming
+
+            buffer_json_object_close(wb); // status
         }
 
         buffer_json_object_close(wb);
@@ -356,8 +375,8 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
             .request = req,
             .ctx = NULL,
             .options = options,
-            .hard_hash = 0,
-            .soft_hash = 0,
+            .contexts_hard_hash = 0,
+            .contexts_soft_hash = 0,
             .nodes.scope_pattern = string_to_simple_pattern(req->scope_nodes),
             .nodes.pattern = string_to_simple_pattern(req->nodes),
             .contexts.pattern = string_to_simple_pattern(req->contexts),
@@ -405,16 +424,15 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         buffer_json_member_add_array(wb, "nodes");
 
     query_scope_foreach_host(ctl.nodes.scope_pattern, ctl.nodes.pattern,
-                                              rrdcontext_to_json_v2_add_host, &ctl, &ctl.hard_hash, &ctl.soft_hash,
-                                              ctl.q.host_uuid_buffer);
+                             rrdcontext_to_json_v2_add_host, &ctl,
+                             &ctl.contexts_hard_hash, &ctl.contexts_soft_hash,
+                             &ctl.alerts_hard_hash, &ctl.alerts_soft_hash,
+                             ctl.q.host_uuid_buffer);
     if(options & (CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED | CONTEXTS_V2_DEBUG))
         buffer_json_array_close(wb);
 
     req->timings.output_ut = now_monotonic_usec();
-    buffer_json_member_add_object(wb, "versions");
-    buffer_json_member_add_uint64(wb, "contexts_hard_hash", ctl.hard_hash);
-    buffer_json_member_add_uint64(wb, "contexts_soft_hash", ctl.soft_hash);
-    buffer_json_object_close(wb);
+    version_hashes_api_v2(wb, ctl.contexts_hard_hash, ctl.contexts_soft_hash, ctl.alerts_hard_hash, ctl.alerts_soft_hash);
 
     if(options & CONTEXTS_V2_CONTEXTS) {
         buffer_json_member_add_object(wb, "contexts");

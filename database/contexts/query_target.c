@@ -1026,12 +1026,15 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
         // single host query
         qt->versions.contexts_hard_hash = dictionary_version(host->rrdctx.contexts);
         qt->versions.contexts_soft_hash = dictionary_version(host->rrdctx.hub_queue);
+        qt->versions.alerts_hard_hash = dictionary_version(host->rrdcalc_root_index);
+        qt->versions.alerts_soft_hash = __atomic_load_n(&host->health_transitions, __ATOMIC_RELAXED);
         query_node_add(&qtl, host, true);
         qtl.nodes = rrdhost_hostname(host);
     }
     else
         query_scope_foreach_host(qt->nodes.scope_pattern, qt->nodes.pattern, query_node_add, &qtl,
                                  &qt->versions.contexts_hard_hash, &qt->versions.contexts_soft_hash,
+                                 &qt->versions.alerts_hard_hash, &qt->versions.alerts_soft_hash,
                                  qtl.host_uuid_buffer);
 
     // we need the available db retention for this call

@@ -1059,6 +1059,7 @@ struct rrdhost {
     uint32_t health_last_processed_id;              // the last processed health id from the log
     uint32_t health_max_unique_id;                  // the max alarm log unique id given for the host
     uint32_t health_max_alarm_id;                   // the max alarm id given for the host
+    size_t health_transitions;                      // the number of times an alert changed state
 
     // ------------------------------------------------------------------------
     // locks

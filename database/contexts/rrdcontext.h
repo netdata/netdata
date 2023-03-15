@@ -403,6 +403,8 @@ typedef struct query_target {
     struct {
         uint64_t contexts_hard_hash;
         uint64_t contexts_soft_hash;
+        uint64_t alerts_hard_hash;
+        uint64_t alerts_soft_hash;
     } versions;
 
     struct {

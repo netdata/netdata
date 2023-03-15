@@ -2414,6 +2414,10 @@ components:
             Hashes that allow the caller to detect important database changes of Netdata agents.
           type: object
           properties:
+            nodes_hard_hash:
+              description: |
+                An auto-increment value that reflects the number of changes to the number of nodes maintained by the server. Everytime a node is added or removed, this number gets incremented.
+              type: integer
             contexts_hard_hash:
               description: |
                 An auto-increment value that reflects the number of changes to the number of contexts maintained by the server. Everytime a context is added or removed, this number gets incremented.
@@ -2421,6 +2425,14 @@ components:
             contexts_soft_hash:
               description: |
                 An auto-increment value that reflects the number of changes to the queue that sends contexts updates to Netdata Cloud. Everytime the contents of a context are updated, this number gets incremented.
+              type: integer
+            alerts_hard_hash:
+              description: |
+                An auto-increment value that reflects the number of changes to the number of alerts. Everytime an alert is added or removed, this number gets incremented.
+              type: integer
+            alerts_soft_hash:
+              description: |
+                An auto-increment value that reflects the number of alerts transitions. Everytime an alert transitions to a new state, this number gets incremented.
               type: integer
         summary:
           description: |
