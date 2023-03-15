@@ -913,6 +913,10 @@ void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __ma
 }
 
 void error_int(int is_collector, const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
+    if ((use_log_level == NETDATA_LOG_LEVEL_ERROR && !strcmp(prefix, "INFO")) ||
+        (use_log_level == NETDATA_LOG_LEVEL_INFO && !strcmp(prefix, "ERROR")))
+        return;
+
     // save a copy of errno - just in case this function generates a new error
     int __errno = errno;
     FILE *fp = (is_collector || !stderror) ? stderr : stderror;
