@@ -26,7 +26,7 @@ dist_web_DATA = \
     $(srcdir)/index.html \
     $(srcdir)/infographic.html \
     $(srcdir)/manifest.json \
-    $(srcdir)/precache-manifest.5fec6109084644adf7bf854243e1a044.js \
+    $(srcdir)/precache-manifest.254cf772b5f11952f30987521c3b684c.js \
     $(srcdir)/refresh-badges.js \
     $(srcdir)/robots.txt \
     $(srcdir)/service-worker.js \
@@ -147,9 +147,9 @@ webstaticjsdir=$(webdir)/static/js
 dist_webstaticjs_DATA = \
     $(srcdir)/static/js/10.a5cd7d0e.chunk.js \
     $(srcdir)/static/js/10.a5cd7d0e.chunk.js.map \
-    $(srcdir)/static/js/2.92ca8446.chunk.js \
-    $(srcdir)/static/js/2.92ca8446.chunk.js.LICENSE \
-    $(srcdir)/static/js/2.92ca8446.chunk.js.map \
+    $(srcdir)/static/js/2.e8fa8919.chunk.js \
+    $(srcdir)/static/js/2.e8fa8919.chunk.js.LICENSE \
+    $(srcdir)/static/js/2.e8fa8919.chunk.js.map \
     $(srcdir)/static/js/3.f137faca.chunk.js \
     $(srcdir)/static/js/3.f137faca.chunk.js.map \
     $(srcdir)/static/js/4.2dbcd906.chunk.js \
@@ -165,9 +165,9 @@ dist_webstaticjs_DATA = \
     $(srcdir)/static/js/8.b4161ea2.chunk.js.map \
     $(srcdir)/static/js/9.a4363968.chunk.js \
     $(srcdir)/static/js/9.a4363968.chunk.js.map \
-    $(srcdir)/static/js/main.7d1bdca1.chunk.js \
-    $(srcdir)/static/js/main.7d1bdca1.chunk.js.LICENSE \
-    $(srcdir)/static/js/main.7d1bdca1.chunk.js.map \
+    $(srcdir)/static/js/main.e40a898a.chunk.js \
+    $(srcdir)/static/js/main.e40a898a.chunk.js.LICENSE \
+    $(srcdir)/static/js/main.e40a898a.chunk.js.map \
     $(srcdir)/static/js/runtime-main.08abed8f.js \
     $(srcdir)/static/js/runtime-main.08abed8f.js.map \
     $(NULL)
