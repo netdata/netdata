@@ -339,6 +339,10 @@ static inline int is_streaming_handshake(h2o_req_t *req)
     return 0;
 }
 
+typedef struct {
+    h2o_socket_t *sock;
+} h2o_stream_conn_t;
+
 static void stream_on_complete(void *user_data, h2o_socket_t *sock, size_t reqsize)
 {
     h2o_stream_conn_t *conn = user_data;
