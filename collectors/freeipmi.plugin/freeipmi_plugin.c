@@ -1614,6 +1614,9 @@ int main (int argc, char **argv) {
                     "  ignore-status N1,N2,N3,... sensor IDs to ignore status (nominal/warning/critical)\n"
                     "                          default: none\n"
                     "\n"
+                    " severity-level N         informs the log level used by plugin:\n"
+                    "                          0 - info; 1 - error \n"
+                    "\n"
                     "  -v\n"
                     "  -V\n"
                     "  version                 print version and exit\n"
@@ -1717,6 +1720,15 @@ int main (int argc, char **argv) {
         }
         else if(i < argc && strcmp("ignore-status", argv[i]) == 0) {
             excluded_status_record_ids_parse(argv[++i], debug);
+            continue;
+        }
+        else if(strcmp("severity-level", argv[i]) == 0) {
+            if(argc <= i + 1) {
+                fprintf(stderr, "Parameter 'severity-level' requires a number as argument.\n");
+                exit(1);
+            }
+            i++;
+            log_collector_log_level(argv[i]);
             continue;
         }
 
