@@ -147,6 +147,7 @@ enum ebpf_main_index {
     EBPF_OPTION_LEGACY,
     EBPF_OPTION_CORE,
     EBPF_OPTION_UNITTEST
+    EBPF_OPTION_SEVERITY_LEVEL
 };
 
 typedef struct ebpf_tracepoint {
