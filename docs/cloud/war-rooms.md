@@ -7,7 +7,7 @@ Once you add nodes to a Space, all of your nodes will be visible in the **All no
 which gives you an overview of all of your nodes in this particular Space. Then you can create functional separations of
 your nodes into more War Rooms. Every War Room has its own dashboards, navigation, indicators, and management tools.
 
-![An example War Room](https://user-images.githubusercontent.com/70198089/225249330-46a252c5-ce95-4cac-a6b5-3223f31ed74c.png)
+![An example War Room](https://user-images.githubusercontent.com/43294513/225355998-f16730ba-06d4-4953-8fd3-f1c2751e102d.png)
 
 ## Navigation
 
