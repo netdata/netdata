@@ -137,16 +137,23 @@ include:
 
   - &fedora
     distro: fedora
-    version: "37"
+    version: "38"
     eol_check: true
     jsonc_removal: |
       dnf remove -y json-c-devel
     packages: &fedora_packages
       type: rpm
-      repo_distro: fedora/37
+      repo_distro: fedora/38
       arches:
         - x86_64
         - aarch64
+    test:
+      ebpf-core: true
+  - <<: *fedora
+    version: "37"
+    packages:
+      <<: *fedora_packages
+      repo_distro: fedora/37
     test:
       ebpf-core: true
   - <<: *fedora
@@ -210,6 +217,11 @@ include:
         - arm64
     test:
       ebpf-core: true
+  - <<: *ubuntu
+    version: "23.04"
+    packages:
+      <<: *ubuntu_packages
+      repo_distro: ubuntu/lunar
   - <<: *ubuntu
     version: "22.04"
     packages:
