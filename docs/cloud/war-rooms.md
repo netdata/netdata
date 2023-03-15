@@ -7,7 +7,8 @@ Once you add nodes to a Space, all of your nodes will be visible in the _All nod
 which gives you an overview of all of your nodes in this particular space. Then you can create functional separations of
 your nodes into more War Rooms. Every War Room has its own dashboards, navigation, indicators, and management tools.
 
-![An example War Room](/img/cloud/main-page.png)
+![An example War Room](https://user-images.githubusercontent.com/70198089/225249330-46a252c5-ce95-4cac-a6b5-3223f31ed74c.png)
+
 
 ## Navigation
 
@@ -18,33 +19,23 @@ this War Rooms. Let's explore what view you have available:
 
 - The default view for any War Room is
   the [Home tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md#home), which give you
-  an overview
-  of this space. Here you can see the number of Nodes claimed, data retention statics, user particate, alerts and more
+  an overview of this space. Here you can see the number of Nodes claimed, data retention statics, user particate, alerts and more.
 
-- The second and most important view is
-  the [Overview tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md#overview) which
-  uses composite
-  charts to display real-time metrics from every available node in a given War Room.
+- The second and most important view is the [Overview tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md#overview) which uses composite charts to display real-time metrics from every available node in a given War Room.
 
-- The [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md) gives you the ability to
-  see the status (offline or online), host details
-  , alarm status and also a short overview of some key metrics from all your nodes at a glance.
+- The [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md) gives you the ability to see the status (offline or online), host details, alarm status and also a short overview of some key metrics from all your nodes at a glance.
 
-- [Kubernetes tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md) is a logical
-  grouping of charts regards to your Kubernetes clusters.
-  It contains a subset of the charts available in the _Overview tab_
+- [Kubernetes tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md) is a logical grouping of charts regards to your Kubernetes clusters. It contains a subset of the charts available in the _Overview tab_.
 
--
+- The [Dashboards tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md) gives you the ability to have tailored made views of specific/targeted interfaces for your infrastructure using any number of charts from any number of nodes.
 
-The [Dashboards tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md)
-gives you the ability to have tailored made views of
-specific/targeted interfaces for your infrastructure using any number of charts from any number of nodes.
+- The [Alerts tab](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alarms.md) provides you with an overview for all the active alerts you receive for the nodes in this War Room, you can also see alla the alerts that are configured to be triggered in any given moment.
 
-- The **Alerts tab** provides you with an overview for all the active alerts you receive for the nodes in this War Room,
-  you can also see alla the alerts that are configured to be triggered in any given moment.
+- The [Anomalies tab](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.md) is dedicated to the Anomaly Advisor tool.
 
-- The **Anomalies tab** is dedicated to
-  the [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.md) tool
+- The [Functions tab](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md) gives you the ability to visualize funtions that the Netdata Agent collectors are able to expose. 
+
+- The [Feed & events](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md) tab lets you investigate events that occurred in the past, which is invaluable for troubleshooting.
 
 ### Non static tabs
 
@@ -82,7 +73,8 @@ The fields beneath the calendar display the beginning and ending timestamps your
 The node filter allows you to quickly filter the nodes visualized in a War Room's views. It appears on all views, but
 not on single-node dashboards.
 
-![The node filter](https://user-images.githubusercontent.com/12612986/172674440-df224058-2b2c-41da-bb45-f4eb82e342e5.png)
+![The node filter](https://user-images.githubusercontent.com/70198089/225249850-60ce4fcc-4398-4412-a6b5-6082308f4e60.png)
+
 
 ## War Room organization
 
@@ -107,8 +99,7 @@ getting to resolution as fast as possible.
 
 ## Add War Rooms
 
-To add new War Rooms to any Space, click on the green plus icon **+** next the **War Rooms** heading. on the left (
-space's) sidebar.
+To add new War Rooms to any Space, click on the green plus icon **+** next the **War Rooms** heading on the left (Space's) sidebar.
 
 In the panel, give the War Room a name and description, and choose whether it's public or private. Anyone in your Space
 can join public War Rooms, but can only join private War Rooms with an invitation.
