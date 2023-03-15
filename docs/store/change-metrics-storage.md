@@ -92,7 +92,15 @@ The quick rule of thumb, for a high level estimation is
 DBENGINE memory in MiB = METRICS x (TIERS - 1) x 8 / 1024 MiB
 Total Netdata memory in MiB = Metric cardinality factor x DBENGINE memory in MiB + "dbengine page cache size MB" from netdata.conf
 ```
-The cardinality factor is usually between 3 or 4 and depends mainly on the ephemerality of the collected metrics. The more ephemeral 
+
+You can get the currently collected **METRICS** from the "dbengine metrics" chart of the Netdata dashboard. You just need to divide the 
+value of the "collected" dimension with the number of tiers. For example, at the specific point highlighted in the chart below, 608k metrics 
+were being collected across all 3 tiers, which means that `METRICS = 608k / 3 = 203667`. 
+
+<img width="988" alt="image" src="https://user-images.githubusercontent.com/43294513/225335899-a9216ba7-a09e-469e-89f6-4690aada69a4.png" />
+
+
+The **cardinality factor** is usually between 3 or 4 and depends mainly on the ephemerality of the collected metrics. The more ephemeral 
 the infrastructure, the higher the factor. If the cardinality is extremely high with a lot of extremely short lived containers 
 (hundreds started every minute), the multiplication factor can get really high. In such cases, we recommend splitting the load across 
 multiple Netdata parents, until we can provide a way to lower the cardinality by aggregating similar metrics.
@@ -104,8 +112,9 @@ For 2000 metrics (dimensions) in 3 storage tiers and the default cache size:
 ```
 DBENGINE memory for 2k metrics = 2000 x (3 - 1) x 8 / 1024 MiB = 32 MiB
 dbengine page cache size MB = 32 MiB 
-Total Netdata memory in MiB = Between 2*32 + 32 = 96 MiB and 3*32 + 32 = 196 MiB, for low to average cardinality
+Total Netdata memory in MiB = 3*32 + 32 = 128 MiB (low cardinality)
 ```
+
 #### Large parent RAM usage
 
 The Netdata parent in our production infrastructure at the time of writing:
