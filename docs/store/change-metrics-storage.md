@@ -90,7 +90,7 @@ The quick rule of thumb, for a high level estimation is
 
 ```
 DBENGINE memory in MiB = METRICS x (TIERS - 1) x 8 / 1024 MiB
-Total Netdata memory in MiB = Metric cardinality factor x DBENGINE memory in MiB + "dbengine page cache size MB" from netdata.conf
+Total Netdata memory in MiB = Metric ephemerality factor x DBENGINE memory in MiB + "dbengine page cache size MB" from netdata.conf
 ```
 
 You can get the currently collected **METRICS** from the "dbengine metrics" chart of the Netdata dashboard. You just need to divide the 
@@ -100,10 +100,11 @@ were being collected across all 3 tiers, which means that `METRICS = 608k / 3 = 
 <img width="988" alt="image" src="https://user-images.githubusercontent.com/43294513/225335899-a9216ba7-a09e-469e-89f6-4690aada69a4.png" />
 
 
-The **cardinality factor** is usually between 3 or 4 and depends mainly on the ephemerality of the collected metrics. The more ephemeral 
-the infrastructure, the higher the factor. If the cardinality is extremely high with a lot of extremely short lived containers 
-(hundreds started every minute), the multiplication factor can get really high. In such cases, we recommend splitting the load across 
-multiple Netdata parents, until we can provide a way to lower the cardinality by aggregating similar metrics.
+The **ephemerality factor** is usually between 3 or 4 and depends on how frequently the identifiers of the collected metrics change, increasing their
+cardinality. The more ephemeral the infrastructure, the more short-lived metrics you have, increasing the ephemerality factor. If the metric cardinality is 
+extremely high due for example to a lot of extremely short lived containers (hundreds started every minute), the ephemerality factor can be much higher than 4.
+In such cases, we recommend splitting the load across multiple Netdata parents, until we can provide a way to lower the metric cardinality, 
+by aggregating similar metrics.
 
 #### Small agent RAM usage
 
@@ -112,14 +113,14 @@ For 2000 metrics (dimensions) in 3 storage tiers and the default cache size:
 ```
 DBENGINE memory for 2k metrics = 2000 x (3 - 1) x 8 / 1024 MiB = 32 MiB
 dbengine page cache size MB = 32 MiB 
-Total Netdata memory in MiB = 3*32 + 32 = 128 MiB (low cardinality)
+Total Netdata memory in MiB = 3*32 + 32 = 128 MiB (low ephemerality)
 ```
 
 #### Large parent RAM usage
 
 The Netdata parent in our production infrastructure at the time of writing:
  - Collects 206k metrics per second, most from children streaming data
- - The metrics include moderately ephemeral Kubernetes containers (average ephemerality), leading to a cardinality factor of about 4
+ - The metrics include moderately ephemeral Kubernetes containers, leading to an ephemerality factor of about 4
  - 3 tiers are used for retention
  - The `dbengine page cache size MB` in `netdata.conf` is configured to be 4GB
 
@@ -127,7 +128,7 @@ The rule of thumb calculation for this set up gives us
 ```
 DBENGINE memory = 206,000 x 16 / 1024 MiB = 3,217 MiB = about 3 GiB
 Extra cache = 4 GiB
-Metric cardinality factor = 4
+Metric ephemerality factor = 4
 Estimated total Netdata memory = 3 * 4 + 4 = 16 GiB
 ```
 
@@ -136,7 +137,7 @@ The actual measurement during a low usage time was the following:
 Purpose|RAM|Note
 :--- | ---: | :--- 
 DBENGINE usage | 5.9 GiB | Out of 7GB max 
-Cardinality related memory (k8s contexts, labels, strings) | 3.4 GiB
+Cardinality/ephemerality related memory (k8s contexts, labels, strings) | 3.4 GiB
 Buffer for queries | 0 GiB | Out of 0.5 GiB max, when heavily queried
 Other | 0.5 GiB | 
 System overhead | 4.4 GiB | Calculated by subtracting all of the above from the total 
