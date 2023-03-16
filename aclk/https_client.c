@@ -62,7 +62,7 @@ static int process_http_hdr(http_parse_ctx *parse_ctx, const char *key, const ch
 {
     // currently we care only about specific headers
     // we can skip the rest
-    if (!strcmp("content-length", key)) {
+    if (parse_ctx->content_length < 0 && !strcmp("content-length", key)) {
         if (parse_ctx->content_length == TRANSFER_ENCODING_CHUNKED) {
             netdata_log_error("Content-length and transfer-encoding: chunked headers are mutually exclusive");
             return 1;
