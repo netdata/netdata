@@ -58,6 +58,103 @@ RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o) {
     return options;
 }
 
+int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *url, WEIGHTS_METHOD method, WEIGHTS_FORMAT format, size_t api_version) {
+    if (!netdata_ready)
+        return HTTP_RESP_BACKEND_FETCH_FAILED;
+
+    long long baseline_after = 0, baseline_before = 0, after = 0, before = 0, points = 0;
+    RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO | RRDR_OPTION_NULL2ZERO;
+    int options_count = 0;
+    RRDR_TIME_GROUPING group = RRDR_GROUPING_AVERAGE;
+    int timeout = 0;
+    size_t tier = 0;
+    const char *group_options = NULL, *scope_contexts = NULL, *scope_nodes = NULL;
+
+    while (url) {
+        char *value = mystrsep(&url, "&");
+        if (!value || !*value)
+            continue;
+
+        char *name = mystrsep(&value, "=");
+        if (!name || !*name)
+            continue;
+        if (!value || !*value)
+            continue;
+
+        if (!strcmp(name, "baseline_after"))
+            baseline_after = (long long) strtoul(value, NULL, 0);
+
+        else if (!strcmp(name, "baseline_before"))
+            baseline_before = (long long) strtoul(value, NULL, 0);
+
+        else if (!strcmp(name, "after") || !strcmp(name, "highlight_after"))
+            after = (long long) strtoul(value, NULL, 0);
+
+        else if (!strcmp(name, "before") || !strcmp(name, "highlight_before"))
+            before = (long long) strtoul(value, NULL, 0);
+
+        else if (!strcmp(name, "points") || !strcmp(name, "max_points"))
+            points = (long long) strtoul(value, NULL, 0);
+
+        else if (!strcmp(name, "timeout"))
+            timeout = (int) strtoul(value, NULL, 0);
+
+        else if(!strcmp(name, "group"))
+            group = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
+
+        else if(!strcmp(name, "options")) {
+            if(!options_count) options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NULL2ZERO;
+            options |= web_client_api_request_v1_data_options(value);
+            options_count++;
+        }
+
+        else if(!strcmp(name, "method"))
+            method = weights_string_to_method(value);
+
+        else if(api_version == 1 && (!strcmp(name, "context") || !strcmp(name, "contexts")))
+            scope_contexts = value;
+
+        else if(api_version >= 2 && !strcmp(name, "scope_contexts"))
+            scope_contexts = value;
+
+        else if(api_version >= 2 && !strcmp(name, "scope_nodes"))
+            scope_nodes = value;
+
+        else if(!strcmp(name, "tier")) {
+            tier = str2ul(value);
+            if(tier < storage_tiers)
+                options |= RRDR_OPTION_SELECTED_TIER;
+            else
+                tier = 0;
+        }
+    }
+
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+    wb->content_type = CT_APPLICATION_JSON;
+
+    QUERY_WEIGHTS_REQUEST qwr = {
+            .version = api_version,
+            .host = (api_version == 1) ? NULL : host,
+            .scope_nodes = (api_version >= 2) ? scope_nodes : NULL,
+            .scope_contexts = scope_contexts,
+            .method = method,
+            .format = format,
+            .group = group,
+            .group_options = group_options,
+            .baseline_after = baseline_after,
+            .baseline_before = baseline_before,
+            .after = after,
+            .before = before,
+            .points = points,
+            .options = options,
+            .tier = tier,
+            .timeout = timeout,
+    };
+
+    return web_api_v12_weights(wb, &qwr);
+}
+
 bool web_client_interrupt_callback(void *data) {
     struct web_client *w = data;
     return sock_has_output_error(w->ofd);

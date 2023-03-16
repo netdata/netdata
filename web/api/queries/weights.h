@@ -9,6 +9,7 @@ typedef enum {
     WEIGHTS_METHOD_MC_KS2       = 1,
     WEIGHTS_METHOD_MC_VOLUME    = 2,
     WEIGHTS_METHOD_ANOMALY_RATE = 3,
+    WEIGHTS_METHOD_VALUE        = 4,
 } WEIGHTS_METHOD;
 
 typedef enum {
@@ -20,11 +21,26 @@ extern int enable_metric_correlations;
 extern int metric_correlations_version;
 extern WEIGHTS_METHOD default_metric_correlations_method;
 
-int web_api_v1_weights (RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS_FORMAT format,
-                        RRDR_TIME_GROUPING group, const char *group_options,
-                        time_t baseline_after, time_t baseline_before,
-                        time_t after, time_t before,
-                        size_t points, RRDR_OPTIONS options, SIMPLE_PATTERN *contexts, size_t tier, size_t timeout);
+typedef struct query_weights_request {
+    size_t version;
+    RRDHOST *host;
+    const char *scope_nodes;
+    const char *scope_contexts;
+    WEIGHTS_METHOD method;
+    WEIGHTS_FORMAT format;
+    RRDR_TIME_GROUPING group;
+    const char *group_options;
+    time_t baseline_after;
+    time_t baseline_before;
+    time_t after;
+    time_t before;
+    size_t points;
+    RRDR_OPTIONS options;
+    size_t tier;
+    size_t timeout;
+} QUERY_WEIGHTS_REQUEST;
+
+int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr);
 
 WEIGHTS_METHOD weights_string_to_method(const char *method);
 const char *weights_method_to_string(WEIGHTS_METHOD method);

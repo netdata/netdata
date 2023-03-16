@@ -1268,90 +1268,14 @@ static int web_client_api_request_v1_aclk_state(RRDHOST *host, struct web_client
     return HTTP_RESP_OK;
 }
 
-static int web_client_api_request_v1_weights_internal(RRDHOST *host, struct web_client *w, char *url, WEIGHTS_METHOD method, WEIGHTS_FORMAT format) {
-    if (!netdata_ready)
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
-
-    long long baseline_after = 0, baseline_before = 0, after = 0, before = 0, points = 0;
-    RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO | RRDR_OPTION_NULL2ZERO;
-    int options_count = 0;
-    RRDR_TIME_GROUPING group = RRDR_GROUPING_AVERAGE;
-    int timeout = 0;
-    size_t tier = 0;
-    const char *group_options = NULL, *contexts_str = NULL;
-
-    while (url) {
-        char *value = mystrsep(&url, "&");
-        if (!value || !*value)
-            continue;
-
-        char *name = mystrsep(&value, "=");
-        if (!name || !*name)
-            continue;
-        if (!value || !*value)
-            continue;
-
-        if (!strcmp(name, "baseline_after"))
-            baseline_after = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "baseline_before"))
-            baseline_before = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "after") || !strcmp(name, "highlight_after"))
-            after = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "before") || !strcmp(name, "highlight_before"))
-            before = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "points") || !strcmp(name, "max_points"))
-            points = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "timeout"))
-            timeout = (int) strtoul(value, NULL, 0);
-
-        else if(!strcmp(name, "group"))
-            group = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
-
-        else if(!strcmp(name, "options")) {
-            if(!options_count) options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NULL2ZERO;
-            options |= web_client_api_request_v1_data_options(value);
-            options_count++;
-        }
-
-        else if(!strcmp(name, "method"))
-            method = weights_string_to_method(value);
-
-        else if(!strcmp(name, "context") || !strcmp(name, "contexts"))
-            contexts_str = value;
-
-        else if(!strcmp(name, "tier")) {
-            tier = str2ul(value);
-            if(tier < storage_tiers)
-                options |= RRDR_OPTION_SELECTED_TIER;
-            else
-                tier = 0;
-        }
-    }
-
-    BUFFER *wb = w->response.data;
-    buffer_flush(wb);
-    wb->content_type = CT_APPLICATION_JSON;
-
-    SIMPLE_PATTERN *contexts = (contexts_str) ? simple_pattern_create(contexts_str, ",|\t\r\n\f\v",
-                                                                      SIMPLE_PATTERN_EXACT, true) : NULL;
-
-    int ret = web_api_v1_weights(host, wb, method, format, group, group_options, baseline_after, baseline_before, after, before, points, options, contexts, tier, timeout);
-
-    simple_pattern_free(contexts);
-    return ret;
-}
-
 int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_client *w, char *url) {
-    return web_client_api_request_v1_weights_internal(host, w, url, default_metric_correlations_method, WEIGHTS_FORMAT_CHARTS);
+    return web_client_api_request_weights(host, w, url, default_metric_correlations_method,
+                                          WEIGHTS_FORMAT_CHARTS, 1);
 }
 
 int web_client_api_request_v1_weights(RRDHOST *host, struct web_client *w, char *url) {
-    return web_client_api_request_v1_weights_internal(host, w, url, WEIGHTS_METHOD_ANOMALY_RATE, WEIGHTS_FORMAT_CONTEXTS);
+    return web_client_api_request_weights(host, w, url, WEIGHTS_METHOD_ANOMALY_RATE,
+                                          WEIGHTS_FORMAT_CONTEXTS, 1);
 }
 
 int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char *url) {

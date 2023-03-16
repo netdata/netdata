@@ -336,7 +336,7 @@ DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contex
     if(!host || !host->rrdctx.contexts)
         return NULL;
 
-    DICTIONARY *dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_rrdcontext, 0);
+    DICTIONARY *dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE|DICT_OPTION_FIXED_SIZE, &dictionary_stats_category_rrdcontext, sizeof(struct metric_entry));
     dictionary_register_insert_callback(dict, metric_entry_insert_callback, NULL);
     dictionary_register_delete_callback(dict, metric_entry_delete_callback, NULL);
     dictionary_register_conflict_callback(dict, metric_entry_conflict_callback, NULL);
