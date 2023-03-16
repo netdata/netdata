@@ -67,6 +67,7 @@ add_pythond_packages()
 
 from bases.collection import safe_print
 from bases.loggers import PythonDLogger
+from bases.loggers import NETDATA_SEVERITY_LEVELS
 from bases.loaders import load_config
 from third_party import filelock
 
@@ -534,7 +535,7 @@ class Plugin:
     config_name = 'python.d.conf'
     jobs_status_dump_name = 'pythond-jobs-statuses.json'
 
-    def __init__(self, modules_to_run, min_update_every, registry, netdata_severity_level = 1):
+    def __init__(self, modules_to_run, min_update_every, registry, netdata_severity_level = NETDATA_SEVERITY_LEVELS['info']):
         self.modules_to_run = modules_to_run
         self.min_update_every = min_update_every
         self.config = PluginConfig(PLUGIN_BASE_CONF)
@@ -795,7 +796,7 @@ def parse_command_line():
     trace = False
     nolock = False
     update_every = 1
-    netdata_severity_level = 0
+    netdata_severity_level = NETDATA_SEVERITY_LEVELS['info']
     modules_to_run = list()
 
     def find_first_integer_value(values, start = 1):
@@ -816,10 +817,13 @@ def parse_command_line():
         opts.remove('nolock')
     if 'severity-level' in opts:
         opts.remove('severity-level')
-        u = find_first_integer_value(opts, 0)
-        if u is not None:
-            netdata_severity_level = int(u)
-            opts.remove(u)
+        if 'error' in opts:
+            netdata_severity_level = NETDATA_SEVERITY_LEVELS['error']
+            opts.remove('error')
+        elif 'info' in opts:
+            netdata_severity_level = NETDATA_SEVERITY_LEVELS['info']
+            opts.remove('info')
+
     if opts:
         modules_to_run = list(opts)
 

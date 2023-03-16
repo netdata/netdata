@@ -23,6 +23,9 @@ LOGGING_LEVELS = {'CRITICAL': 50,
                   'DEBUG': 10,
                   'NOTSET': 0}
 
+NETDATA_SEVERITY_LEVELS = {'info': 0,
+                           'error': 1}
+
 DEFAULT_LOG_LINE_FORMAT = '%(asctime)s: %(name)s %(levelname)s : %(message)s'
 DEFAULT_LOG_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 

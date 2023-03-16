@@ -1131,13 +1131,9 @@ void log_aclk_message_bin( const char *data, const size_t data_len, int tx, cons
 }
 #endif
 
-void log_collector_severity_level(char *value)
+void log_collector_severity_level(netdata_log_level_t value)
 {
-    int slevel = str2i(value);
-    if (slevel < NETDATA_LOG_LEVEL_INFO || slevel > NETDATA_LOG_LEVEL_ERROR)
-        slevel = NETDATA_LOG_LEVEL_INFO;
-
-    use_severity_level = (netdata_log_level_t) slevel;
+    use_severity_level = (netdata_log_level_t) value;
 }
 
 netdata_log_level_t log_severity_string_to_severity_level(char *level)

@@ -4387,11 +4387,12 @@ static void parse_args(int argc, char **argv)
 
         if(strcmp("severity-level", argv[i]) == 0) {
             if(argc <= i + 1) {
-                fprintf(stderr, "Parameter 'severity-level' requires a number as argument.\n");
+                fprintf(stderr, "Parameter 'severity-level' requires a string ('info' or 'error') as argument.\n");
                 exit(1);
             }
             i++;
-            log_collector_severity_level(argv[i]);
+            netdata_log_level_t slevel =  log_severity_string_to_severity_level(argv[i]);
+            log_collector_severity_level(slevel);
             continue;
         }
 

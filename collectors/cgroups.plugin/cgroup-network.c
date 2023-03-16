@@ -716,13 +716,14 @@ int main(int argc, char **argv) {
         arg += 2;
     }
 
-    if(!strcmp(argv[arg], "--severity-level")) {
+    if(!strcmp(argv[arg], "--severity-level") || !strcmp(argv[arg], "severity-level")) {
         if (argc < arg + 1) {
-            collector_error("Argument `--security-level` needs a valid integer value.");
+            collector_error("Argument `[--]security-level` requires a string ('info' or 'error') as argument.");
             return 3;
         }
 
-        log_collector_severity_level(argv[arg + 1]);
+        netdata_log_level_t slevel =  log_severity_string_to_severity_level(argv[arg + 1]);
+        log_collector_severity_level(slevel);
         arg = 5;
     } else if (argc == 3)
         arg = 5;
