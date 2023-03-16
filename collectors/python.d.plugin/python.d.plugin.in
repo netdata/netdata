@@ -794,6 +794,7 @@ def parse_command_line():
     trace = False
     nolock = False
     update_every = 1
+    severity_level = 0
     modules_to_run = list()
 
     def find_first_positive_int(values):
@@ -812,6 +813,12 @@ def parse_command_line():
     if 'nolock' in opts:
         nolock = True
         opts.remove('nolock')
+    if 'severity-level' in opts:
+        opts.remove('severity-level')
+        u = find_first_positive_int(opts)
+        if u is not None:
+            severity_level = int(u)
+            opts.remove(u)
     if opts:
         modules_to_run = list(opts)
 
