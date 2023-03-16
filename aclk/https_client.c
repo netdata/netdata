@@ -59,7 +59,7 @@ static void process_http_hdr(http_parse_ctx *ctx, const char *key, const char *v
     // currently we care only about content-length
     // but in future the way this is written
     // it can be extended
-    if (!strcmp("content-length", key)) {
+    if (ctx->content_length < 0 && !strcmp("content-length", key)) {
         ctx->content_length = atoi(val);
         return;
     }
