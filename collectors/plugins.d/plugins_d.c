@@ -301,7 +301,7 @@ void *pluginsd_main(void *ptr)
                     cd->started_t = now_realtime_sec();
 
                     char def[32];
-                    snprintfz(def, 31, "severity-level %u", use_log_level);
+                    snprintfz(def, 31, "severity-level %u", use_severity_level);
 
                     snprintfz(
                         cd->cmd, PLUGINSD_CMD_MAX, "exec %s %d %s", cd->fullfilename, cd->update_every,

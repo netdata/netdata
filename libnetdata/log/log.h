@@ -113,7 +113,7 @@ typedef enum netdata_log_level {
 #define NETDATA_LOG_LEVEL_INFO_STR "info"
 #define NETDATA_LOG_LEVEL_ERROR_STR "error"
 
-extern netdata_log_level_t use_log_level;
+extern netdata_log_level_t use_severity_level;
 netdata_log_level_t log_select_log_level(char *level);
 void log_collector_log_level(char *value);
 

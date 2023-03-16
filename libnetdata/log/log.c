@@ -34,7 +34,7 @@ const char *facility_log = NULL;
 const char *stdhealth_filename = NULL;
 const char *stdcollector_filename = NULL;
 
-netdata_log_level_t use_log_level = NETDATA_LOG_LEVEL_INFO;
+netdata_log_level_t use_severity_level = NETDATA_LOG_LEVEL_INFO;
 
 #ifdef ENABLE_ACLK
 const char *aclklog_filename = NULL;
@@ -910,7 +910,7 @@ void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __ma
 }
 
 void error_int(int is_collector, const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
-    if (use_log_level == NETDATA_LOG_LEVEL_INFO && !strcmp(prefix, "ERROR"))
+    if (use_severity_level == NETDATA_LOG_LEVEL_INFO && !strcmp(prefix, "ERROR"))
         return;
 
     // save a copy of errno - just in case this function generates a new error
@@ -1137,7 +1137,7 @@ void log_collector_log_level(char *value)
     if (slevel < NETDATA_LOG_LEVEL_INFO || slevel > NETDATA_LOG_LEVEL_ERROR)
         slevel = NETDATA_LOG_LEVEL_INFO;
 
-    use_log_level = (netdata_log_level_t) slevel;
+    use_severity_level = (netdata_log_level_t) slevel;
 }
 
 netdata_log_level_t log_select_log_level(char *level)
