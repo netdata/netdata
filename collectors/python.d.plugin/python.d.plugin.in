@@ -262,7 +262,7 @@ class ModuleConfig:
 
 
 class JobsConfigsBuilder:
-    def __init__(self, config_dirs):
+    def __init__(self, config_dirs, netdata_severity_level = NETDATA_SEVERITY_LEVELS['info']):
         self.config_dirs = config_dirs
         self.log = PythonDLogger()
         self.job_defaults = None
@@ -596,7 +596,7 @@ class Plugin:
             DIRS.modules_stock_config,
         ]
 
-        builder = JobsConfigsBuilder(paths)
+        builder = JobsConfigsBuilder(paths, self.netdata_severity_level)
         builder.job_defaults = JOB_BASE_CONF
         builder.min_update_every = self.min_update_every
 
