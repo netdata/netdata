@@ -16,6 +16,7 @@ Let's look at the metadata Netdata Cloud stores using the publicly available dem
 - For each node connected to your Spaces in Netdata Cloud:
   - Hostname (as it appears in Netdata Cloud)
   - Information shown in `/api/v1/info`. For example: [https://frankfurt.my-netdata.io/api/v1/info](https://frankfurt.my-netdata.io/api/v1/info).
+  - Metric metadata information shown in `/api/v1/contexts`. For example: [https://frankfurt.my-netdata.io/api/v1/contexts](https://frankfurt.my-netdata.io/api/v1/contexts).
   - Alarm configurations shown in `/api/v1/alarms?all`. For example: [https://frankfurt.my-netdata.io/api/v1/alarms?all](https://frankfurt.my-netdata.io/api/v1/alarms?all).
   - Active alarms shown in `/api/v1/alarms`. For example: [https://frankfurt.my-netdata.io/api/v1/alarms](https://frankfurt.my-netdata.io/api/v1/alarms).
 
