@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
-# Description: nvidia-smi netdata python.d module
-# Original Author: Steven Noonan (tycho)
-# Author: Ilya Mashchenko (ilyam8)
-# User Memory Stat Author: Guido Scatena (scatenag)
+# Description: ethtool netdata python.d module
+# Author: Van Phan Quang (ghanapunq)
 
 import datetime
 
