@@ -3012,7 +3012,7 @@ static void rrd2rrdr_convert_to_percentage(RRDR *r) {
 
         size_t count = 0;
         NETDATA_DOUBLE min = 0, max = 0, sum = 0;
-        for(size_t i = 0; i != r->n ;i++) {
+        for(size_t i = 0; i != r->rows ;i++) { // we use r->rows to respect trimming
             size_t idx = i * r->d + d;
 
             RRDR_VALUE_FLAGS o = r->o[ idx ];

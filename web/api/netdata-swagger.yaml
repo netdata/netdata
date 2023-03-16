@@ -2759,6 +2759,18 @@ components:
                   type: array
                   items:
                     type: integer
+                view_minimum_values:
+                  description: |
+                    An array of the minimum value of each dimension across the entire query.
+                  type: array
+                  items:
+                    type: number
+                view_maximum_values:
+                  description: |
+                    An array of the maximum value of each dimension across the entire query.
+                  type: array
+                  items:
+                    type: number
                 view_average_values:
                   description: |
                     An array of the average value of each dimension across the entire query.
