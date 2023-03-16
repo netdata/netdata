@@ -49,6 +49,7 @@ void register_libuv_worker_jobs() {
     worker_register_job_name(UV_EVENT_DBENGINE_SHUTDOWN, "dbengine shutdown");
 
     // metadata
+    worker_register_job_name(UV_EVENT_HOST_CONTEXT_LOAD, "metadata load host context");
     worker_register_job_name(UV_EVENT_METADATA_STORE, "metadata store host");
     worker_register_job_name(UV_EVENT_METADATA_CLEANUP, "metadata cleanup");
 

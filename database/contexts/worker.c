@@ -327,7 +327,7 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jo
 
     RRDCONTEXT *rc;
     dfe_start_reentrant(host->rrdctx.contexts, rc) {
-                if(unlikely(!service_running(SERVICE_CONTEXT))) break;
+                if(unlikely(worker_jobs && !service_running(SERVICE_CONTEXT))) break;
 
                 if(worker_jobs) worker_is_busy(WORKER_JOB_CLEANUP);
 
@@ -335,7 +335,7 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jo
 
                 RRDINSTANCE *ri;
                 dfe_start_reentrant(rc->rrdinstances, ri) {
-                            if(unlikely(!service_running(SERVICE_CONTEXT))) break;
+                            if(unlikely(worker_jobs && !service_running(SERVICE_CONTEXT))) break;
 
                             RRDMETRIC *rm;
                             dfe_start_write(ri->rrdmetrics, rm) {
@@ -1080,7 +1080,8 @@ void *rrdcontext_main(void *ptr) {
                         dictionary_garbage_collect(host->rrdctx.hub_queue);
                     }
 
-                    dictionary_garbage_collect(host->rrdctx.contexts);
+                    if (host->rrdctx.contexts)
+                        dictionary_garbage_collect(host->rrdctx.contexts);
                 }
                 dfe_done(host);
 

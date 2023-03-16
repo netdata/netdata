@@ -369,9 +369,9 @@ int ctx_store_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
         goto skip_store;
     }
 
-    rc = sqlite3_bind_int(res, 10, (time_t) context_data->deleted);
+    rc = sqlite3_bind_int(res, 10, context_data->deleted);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind last_time_t to store context details");
+        error_report("Failed to bind deleted flag to store context details");
         goto skip_store;
     }
 

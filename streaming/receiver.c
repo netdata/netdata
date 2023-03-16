@@ -692,6 +692,12 @@ static int rrdpush_receive(struct receiver_state *rpt)
             return 1;
         }
 
+        if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
+            rrdpush_receive_log_status(rpt, "host is initializing", "INITIALIZATION IN PROGRESS RETRY LATER");
+            close(rpt->fd);
+            return 1;
+        }
+
         // system_info has been consumed by the host structure
         rpt->system_info = NULL;
 
