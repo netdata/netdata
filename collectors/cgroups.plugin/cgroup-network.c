@@ -722,7 +722,7 @@ int main(int argc, char **argv) {
             return 3;
         }
 
-        log_collector_log_level(argv[arg+1]);
+        log_collector_severity_level(argv[arg + 1]);
         arg = 5;
     } else if (argc == 3)
         arg = 5;

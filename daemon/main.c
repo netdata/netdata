@@ -876,7 +876,7 @@ static void log_init(void) {
     setenv("NETDATA_ERRORS_PER_PERIOD",      config_get(CONFIG_SECTION_LOGS, "errors to trigger flood protection", ""), 1);
 
     char *select_level = config_get(CONFIG_SECTION_LOGS, "severity-level",  NETDATA_LOG_LEVEL_INFO_STR);
-    use_severity_level = log_select_log_level(select_level);
+    use_severity_level = log_severity_string_to_severity_level(select_level);
 }
 
 char *initialize_lock_directory_path(char *prefix)

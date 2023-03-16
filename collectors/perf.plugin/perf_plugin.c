@@ -1210,7 +1210,7 @@ void parse_command_line(int argc, char **argv) {
                 exit(1);
             }
             i++;
-            log_collector_log_level(argv[i]);
+            log_collector_severity_level(argv[i]);
             continue;
         }
         else if(strcmp("-h", argv[i]) == 0 || strcmp("--help", argv[i]) == 0) {

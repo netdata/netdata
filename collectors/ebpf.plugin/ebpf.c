@@ -3396,7 +3396,7 @@ static void ebpf_parse_args(int argc, char **argv)
 unittest:
                 exit(exit_code);
             case EBPF_OPTION_SEVERITY_LEVEL: {
-                log_collector_log_level(optarg);
+                log_collector_severity_level(optarg);
                 break;
             }
             default: {
@@ -3416,7 +3416,7 @@ unittest:
             fprintf(stderr, "Parameter 'severity-level' requires a number as argument.\n");
             exit(1);
         }
-        log_collector_log_level(argv[i+1]);
+        log_collector_severity_level(argv[i + 1]);
         break;
     }
 

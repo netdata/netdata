@@ -1131,7 +1131,7 @@ void log_aclk_message_bin( const char *data, const size_t data_len, int tx, cons
 }
 #endif
 
-void log_collector_log_level(char *value)
+void log_collector_severity_level(char *value)
 {
     int slevel = str2i(value);
     if (slevel < NETDATA_LOG_LEVEL_INFO || slevel > NETDATA_LOG_LEVEL_ERROR)
@@ -1140,7 +1140,7 @@ void log_collector_log_level(char *value)
     use_severity_level = (netdata_log_level_t) slevel;
 }
 
-netdata_log_level_t log_select_log_level(char *level)
+netdata_log_level_t log_severity_string_to_severity_level(char *level)
 {
     if (!strcmp(level, NETDATA_LOG_LEVEL_INFO_STR))
         return NETDATA_LOG_LEVEL_INFO;
@@ -1150,4 +1150,15 @@ netdata_log_level_t log_select_log_level(char *level)
     error("The value `%s` is not a known value. Netdata will run with default `info`.", level);
 
     return NETDATA_LOG_LEVEL_INFO;
+}
+
+char *log_severity_level_to_severity_string(netdata_log_level_t level)
+{
+    switch (level) {
+        case NETDATA_LOG_LEVEL_ERROR:
+            return NETDATA_LOG_LEVEL_ERROR_STR;
+        case NETDATA_LOG_LEVEL_INFO:
+        default:
+            return NETDATA_LOG_LEVEL_INFO_STR;
+    }
 }

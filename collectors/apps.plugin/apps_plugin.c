@@ -4391,7 +4391,7 @@ static void parse_args(int argc, char **argv)
                 exit(1);
             }
             i++;
-            log_collector_log_level(argv[i]);
+            log_collector_severity_level(argv[i]);
             continue;
         }
 
