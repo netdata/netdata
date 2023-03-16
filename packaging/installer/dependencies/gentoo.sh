@@ -31,7 +31,6 @@ package_tree="
   virtual/libelf
   dev-lang/python
   dev-libs/libuv
-  dev-libs/libyaml
   "
 usage() {
   cat << EOF
