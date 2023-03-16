@@ -105,6 +105,8 @@ typedef struct rrdresult {
     uint32_t *dgbc;           // array of d dimension units - NOT ALLOCATED when RRDR is created
     uint32_t *dp;             // array of d dimension priority - NOT ALLOCATED when RRDR is created
     NETDATA_DOUBLE *dv;       // array of d dimension averages - NOT ALLOCATED when RRDR is created
+    NETDATA_DOUBLE *dmin;     // array of d dimension minimums - NOT ALLOCATED when RRDR is created
+    NETDATA_DOUBLE *dmax;     // array of d dimension maximums - NOT ALLOCATED when RRDR is created
     DICTIONARY **dl;          // array of d dimension labels - NOT ALLOCATED when RRDR is created
 
     DICTIONARY *label_keys;

@@ -13,23 +13,7 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
     NETDATA_DOUBLE sum = 0, min = 0, max = 0, v;
     int all_null = 1, init = 1;
 
-    NETDATA_DOUBLE total = 1;
     NETDATA_DOUBLE total_anomaly_rate = 0;
-
-    if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
-        total = 0;
-        for (c = 0; c < r->d ; c++) {
-            if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
-            NETDATA_DOUBLE n = cn[c];
-
-            if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
-                n = -n;
-
-            total += n;
-        }
-        // prevent a division by zero
-        if(total == 0) total = 1;
-    }
 
     // for each dimension
     for (c = 0; c < r->d ; c++) {
@@ -37,21 +21,6 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
             continue;
 
         NETDATA_DOUBLE n = cn[c];
-
-        if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
-            n = -n;
-
-        if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
-            n = n * 100 / total;
-
-            if(unlikely(c == 0)) {
-                r->view.min = r->view.max = n;
-            }
-            else {
-                if (n < r->view.min) r->view.min = n;
-                if (n > r->view.max) r->view.max = n;
-            }
-        }
 
         if(unlikely(init)) {
             if(n > 0) {

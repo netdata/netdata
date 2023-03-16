@@ -78,6 +78,8 @@ inline void rrdr_free(ONEWAYALLOC *owa, RRDR *r) {
     onewayalloc_freez(owa, r->du);
     onewayalloc_freez(owa, r->dp);
     onewayalloc_freez(owa, r->dv);
+    onewayalloc_freez(owa, r->dmin);
+    onewayalloc_freez(owa, r->dmax);
     onewayalloc_freez(owa, r->ar);
     onewayalloc_freez(owa, r->gbc);
     onewayalloc_freez(owa, r->dgbc);

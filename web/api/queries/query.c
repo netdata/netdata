@@ -1380,7 +1380,10 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
         if(unlikely((point).flags & SN_FLAG_RESET))                     \
             (ops)->group_value_flags |= RRDR_VALUE_RESET;               \
                                                                         \
-        (ops)->grouping_add(r, (point).value);                          \
+        if((options & RRDR_OPTION_ABSOLUTE) && signbit((point).value))  \
+            (ops)->grouping_add(r, -(point).value);                     \
+        else                                                            \
+            (ops)->grouping_add(r, (point).value);                      \
     }                                                                   \
                                                                         \
     (ops)->group_points_added++;                                        \
@@ -1447,6 +1450,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
     QUERY_TARGET *qt = r->internal.qt;
     QUERY_METRIC *qm = ops->qm;
 
+    RRDR_OPTIONS options = qt->request.options;
     size_t points_wanted = qt->window.points;
     time_t after_wanted = qt->window.after;
     time_t before_wanted = qt->window.before; (void)before_wanted;
@@ -1776,6 +1780,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                 min = max = group_value;
             }
 
+            // for volume contribution calculation we need the absolute value
             NETDATA_DOUBLE stats_value = group_value < 0 ? -group_value : group_value;
 
             if(unlikely(!points_added)) {
@@ -2783,6 +2788,8 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
     r->dp = onewayalloc_callocz(r->internal.owa, r->d, sizeof(*r->dp));
     r->dv = onewayalloc_callocz(r->internal.owa, r->d, sizeof(*r->dv));
+    r->dmin = onewayalloc_callocz(r->internal.owa, r->d, sizeof(*r->dmin));
+    r->dmax = onewayalloc_callocz(r->internal.owa, r->d, sizeof(*r->dmax));
     r->dgbc = onewayalloc_callocz(r->internal.owa, r->d, sizeof(*r->dgbc));
     r->gbc = onewayalloc_callocz(r->internal.owa, r->n * r->d, sizeof(*r->gbc));
 
@@ -2888,9 +2895,6 @@ static void rrd2rrdr_group_by_add_metric(RRDR *r, size_t query_metric_id) {
                     continue;
             }
 
-            if(unlikely((options & RRDR_OPTION_ABSOLUTE) && n_tmp < 0))
-                n_tmp = -n_tmp;
-
             QUERY_METRIC *qm = query_metric(qt, query_metric_id);
             size_t d = qm->grouped_as.slot;
 
@@ -2926,84 +2930,178 @@ static void rrd2rrdr_group_by_add_metric(RRDR *r, size_t query_metric_id) {
     }
 }
 
-static void rrd2rrdr_group_by_finalize(RRDR *r) {
-    if(!r->group_by.r)
+static void rrdr2rrdr_group_by_partial_trimming(RRDR *r) {
+    // FIXME - this is not optimal, we should not traverse the entire array to go to the end of it
+
+    size_t last_row_gbc = 0;
+    for (size_t i = 0; i != r->n; i++) {
+        size_t row_gbc = 0;
+        for (size_t d = 0; d < r->d; d++) {
+            if (unlikely(!(r->od[d] & RRDR_DIMENSION_QUERIED)))
+                continue;
+
+            row_gbc += r->gbc[ i * r->d + d ];
+        }
+
+        if (unlikely(r->t[i] > r->partial_data_trimming.expected_after && row_gbc < last_row_gbc)) {
+            // discard the rest of the points
+            r->partial_data_trimming.trimmed_after = r->t[i];
+            r->rows = i;
+            break;
+        }
+        else
+            last_row_gbc = row_gbc;
+    }
+}
+
+static void rrd2rrdr_convert_to_percentage(RRDR *r) {
+    size_t global_min_max_values = 0;
+    NETDATA_DOUBLE global_min = NAN, global_max = NAN;
+
+    for(size_t i = 0; i != r->n ;i++) {
+        NETDATA_DOUBLE *cn = &r->v[ i * r->d ];
+        RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
+
+        NETDATA_DOUBLE total = 0;
+        for (size_t d = 0; d < r->d; d++) {
+            if (unlikely(!(r->od[d] & RRDR_DIMENSION_QUERIED)))
+                continue;
+
+            if(co[d] & RRDR_VALUE_EMPTY)
+                continue;
+
+            total += cn[d];
+        }
+
+        if(total == 0.0)
+            total = 1.0;
+
+        for (size_t d = 0; d < r->d; d++) {
+            if (unlikely(!(r->od[d] & RRDR_DIMENSION_QUERIED)))
+                continue;
+
+            if(co[d] & RRDR_VALUE_EMPTY)
+                continue;
+
+            NETDATA_DOUBLE n = cn[d];
+            n = cn[d] = n * 100.0 / total;
+
+            if(unlikely(!global_min_max_values++))
+                global_min = global_max = n;
+            else {
+                if(n < global_min)
+                    global_min = n;
+                if(n > global_max)
+                    global_max = n;
+            }
+        }
+    }
+
+    r->view.min = global_min;
+    r->view.max = global_max;
+
+    if(!r->dv || !r->dmin || !r->dmax)
+        // v1 query
         return;
 
+    // v2 query
+
+    for (size_t d = 0; d < r->d; d++) {
+        if (unlikely(!(r->od[d] & RRDR_DIMENSION_QUERIED)))
+            continue;
+
+        size_t count = 0;
+        NETDATA_DOUBLE min = 0, max = 0, sum = 0;
+        for(size_t i = 0; i != r->n ;i++) {
+            size_t idx = i * r->d + d;
+
+            RRDR_VALUE_FLAGS o = r->o[ idx ];
+
+            if (o & RRDR_VALUE_EMPTY)
+                continue;
+
+            NETDATA_DOUBLE n = r->v[ idx ];
+            sum += n;
+
+            if(!count++)
+                min = max = n;
+            else {
+                if(n < min)
+                    min = n;
+                if(n > max)
+                    max = n;
+            }
+        }
+
+        r->dv[d] = (count) ? sum / (NETDATA_DOUBLE )count : 0.0;
+        r->dmin[d] = min;
+        r->dmax[d] = max;
+    }
+}
+
+static void rrd2rrdr_group_by_finalize(RRDR *r) {
     QUERY_TARGET *qt = r->internal.qt;
     RRDR_OPTIONS options = qt->request.options;
+
+    if(!r->group_by.r) {
+        // v1 query
+        if(options & RRDR_OPTION_PERCENTAGE)
+            rrd2rrdr_convert_to_percentage(r);
+        return;
+    }
+    // v2 query
 
     // copy the timestamps
     for(size_t i = 0; i != r->n ;i++) {
         r->t[i] = r->group_by.r->t[i];
     }
 
-    if(!(options & RRDR_OPTION_RETURN_RAW) && r->partial_data_trimming.expected_after < qt->window.before) {
-        // partial trimming
-        size_t last_row_gbc = 0;
-        for (size_t i = 0; i != r->n; i++) {
-            size_t row_gbc = 0;
-            for (size_t d = 0; d < r->d; d++) {
-                if (unlikely(!(r->od[d] & RRDR_DIMENSION_QUERIED)))
-                    continue;
-
-                row_gbc += r->gbc[ i * r->d + d ];
-            }
-
-            if (unlikely(r->t[i] > r->partial_data_trimming.expected_after && row_gbc < last_row_gbc)) {
-                // discard the rest of the points
-                r->partial_data_trimming.trimmed_after = r->t[i];
-                r->rows = i;
-                break;
-            }
-            else
-                last_row_gbc = row_gbc;
-        }
-    }
+    if(!(options & RRDR_OPTION_RETURN_RAW) && r->partial_data_trimming.expected_after < qt->window.before)
+        rrdr2rrdr_group_by_partial_trimming(r);
 
     // apply averaging, remove RRDR_VALUE_EMPTY, find the non-zero dimensions, min and max
-    size_t min_max_values = 0;
-    NETDATA_DOUBLE min = NAN, max = NAN;
+    size_t global_min_max_values = 0;
+    NETDATA_DOUBLE global_min = NAN, global_max = NAN;
     for (size_t d = 0; d < r->d; d++) {
+        if (unlikely(!(r->od[d] & RRDR_DIMENSION_QUERIED)))
+            continue;
+
         size_t non_zero = 0;
 
-        NETDATA_DOUBLE sum = 0;
+        NETDATA_DOUBLE min = 0, max = 0, sum = 0;
         size_t count = 0;
 
         for(size_t i = 0; i != r->n ;i++) {
-            size_t idx2 = i * r->d + d;
+            size_t idx = i * r->d + d;
 
-            NETDATA_DOUBLE *cn2 = &r->v[ idx2 ];
-            RRDR_VALUE_FLAGS *co2 = &r->o[ idx2 ];
-            NETDATA_DOUBLE *ar2 = &r->ar[ idx2 ];
-            uint32_t gbc2 = r->gbc[ idx2 ];
+            NETDATA_DOUBLE *cn = &r->v[ idx ];
+            RRDR_VALUE_FLAGS *co = &r->o[ idx ];
+            NETDATA_DOUBLE *ar = &r->ar[ idx ];
+            uint32_t gbc = r->gbc[ idx ];
 
-            if(likely(gbc2)) {
-                *co2 &= ~RRDR_VALUE_EMPTY;
+            if(likely(gbc)) {
+                *co &= ~RRDR_VALUE_EMPTY;
 
-                if(gbc2 != r->dgbc[d])
-                    *co2 |= RRDR_VALUE_PARTIAL;
+                if(gbc != r->dgbc[d])
+                    *co |= RRDR_VALUE_PARTIAL;
 
                 NETDATA_DOUBLE n;
 
-                sum += *cn2;
-                count += gbc2;
+                sum += *cn;
 
                 if(qt->request.group_by_aggregate_function == RRDR_GROUP_BY_FUNCTION_AVERAGE)
-                    n = (*cn2 /= gbc2);
+                    n = (*cn /= gbc);
                 else
-                    n = *cn2;
+                    n = *cn;
 
                 if(!query_target_aggregatable(qt))
-                    *ar2 /= gbc2;
+                    *ar /= gbc;
 
                 if(islessgreater(n, 0.0))
                     non_zero++;
 
-                if(unlikely(!min_max_values++)) {
-                    min = n;
-                    max = n;
-                }
+                if(unlikely(!count))
+                    min = max = n;
                 else {
                     if(n < min)
                         min = n;
@@ -3011,6 +3109,18 @@ static void rrd2rrdr_group_by_finalize(RRDR *r) {
                     if(n > max)
                         max = n;
                 }
+
+                if(unlikely(!global_min_max_values++))
+                    global_min = global_max = n;
+                else {
+                    if(n < global_min)
+                        global_min = n;
+
+                    if(n > global_max)
+                        global_max = n;
+                }
+
+                count += gbc;
             }
         }
 
@@ -3018,10 +3128,15 @@ static void rrd2rrdr_group_by_finalize(RRDR *r) {
             r->od[d] |= RRDR_DIMENSION_NONZERO;
 
         r->dv[d] = (count) ? sum / (NETDATA_DOUBLE)count : 0.0;
+        r->dmin[d] = min;
+        r->dmax[d] = max;
     }
 
-    r->view.min = min;
-    r->view.max = max;
+    r->view.min = global_min;
+    r->view.max = global_max;
+
+    if(options & RRDR_OPTION_PERCENTAGE)
+        rrd2rrdr_convert_to_percentage(r);
 
     // update query instance counts in query host and query context
     {
