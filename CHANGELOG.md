@@ -6,7 +6,12 @@
 
 **Merged pull requests:**
 
+- pandas collector replace `self.warn()` with `self.warning()` [\#14736](https://github.com/netdata/netdata/pull/14736) ([andrewm4894](https://github.com/andrewm4894))
+- Update change-metrics-storage.md [\#14734](https://github.com/netdata/netdata/pull/14734) ([cakrit](https://github.com/cakrit))
+- Correct calc and explain how to get METRICS in RAM usage [\#14733](https://github.com/netdata/netdata/pull/14733) ([cakrit](https://github.com/cakrit))
+- Update dashboard to version v2.30.0. [\#14732](https://github.com/netdata/netdata/pull/14732) ([netdatabot](https://github.com/netdatabot))
 - Update change-metrics-storage.md [\#14726](https://github.com/netdata/netdata/pull/14726) ([cakrit](https://github.com/cakrit))
+- New build\_external scenario. [\#14725](https://github.com/netdata/netdata/pull/14725) ([vkalintiris](https://github.com/vkalintiris))
 - add go.d example collector to \#etc section [\#14722](https://github.com/netdata/netdata/pull/14722) ([andrewm4894](https://github.com/andrewm4894))
 - Change H1 of collector docs to separate from the website [\#14715](https://github.com/netdata/netdata/pull/14715) ([cakrit](https://github.com/cakrit))
 - Add instructions for reconnecting a Docker node to another Space [\#14714](https://github.com/netdata/netdata/pull/14714) ([Ancairon](https://github.com/Ancairon))
@@ -373,10 +378,6 @@
 - don't log too much about streaming connections [\#14117](https://github.com/netdata/netdata/pull/14117) ([ktsaou](https://github.com/ktsaou))
 - fix get\_system\_cpus\(\) [\#14116](https://github.com/netdata/netdata/pull/14116) ([ktsaou](https://github.com/ktsaou))
 - Fix minor typo. [\#14111](https://github.com/netdata/netdata/pull/14111) ([tkatsoulas](https://github.com/tkatsoulas))
-- expose ACLK SSL KeyLog interface for developers [\#14109](https://github.com/netdata/netdata/pull/14109) ([underhood](https://github.com/underhood))
-- add filtering options to functions table output [\#14108](https://github.com/netdata/netdata/pull/14108) ([ktsaou](https://github.com/ktsaou))
-- fix health emphemerality labels src [\#14105](https://github.com/netdata/netdata/pull/14105) ([ilyam8](https://github.com/ilyam8))
-- fix docker host editable config [\#14104](https://github.com/netdata/netdata/pull/14104) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
