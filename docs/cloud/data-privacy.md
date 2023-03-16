@@ -8,7 +8,7 @@ The data passes through our systems, but it isn't stored. You can learn more abo
 
 However, to be able to offer the stunning visualizations and advanced functionality of Netdata Cloud, it does store a limited number of _metadata_.
 
-## Metadata
+## Data Netdata Cloud stores and processes
 
 Let's look at the metadata Netdata Cloud stores using the publicly available demo server `frankfurt.my-netdata.io`:
 
