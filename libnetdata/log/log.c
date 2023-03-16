@@ -782,9 +782,6 @@ void debug_int( const char *file, const char *function, const unsigned long line
 
 void info_int( int is_collector, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... )
 {
-    if (use_log_level > NETDATA_LOG_LEVEL_INFO)
-        return;
-
     va_list args;
     FILE *fp = (is_collector || !stderror) ? stderr : stderror;
 
