@@ -2849,6 +2849,12 @@ components:
         Statistical values
       type: object
       properties:
+        min:
+          description: The minimum value of all metrics aggregated
+          type: number
+        max:
+          description: The maximum value of all metrics aggregated
+          type: number
         avg:
           description: The average value of all metrics aggregated
           type: number
@@ -2863,6 +2869,12 @@ components:
         Statistical values when `raw` option is given.
       type: object
       properties:
+        min:
+          description: The minimum value of all metrics aggregated
+          type: number
+        max:
+          description: The maximum value of all metrics aggregated
+          type: number
         sum:
           description: The sum value of all metrics aggregated
           type: number

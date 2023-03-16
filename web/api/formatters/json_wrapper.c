@@ -213,6 +213,10 @@ static inline void query_target_data_statistics(BUFFER *wb, QUERY_TARGET *qt, st
         return;
 
     buffer_json_member_add_object(wb, "sts");
+
+    buffer_json_member_add_double(wb, "min", d->min);
+    buffer_json_member_add_double(wb, "max", d->max);
+
     if(query_target_aggregatable(qt)) {
         buffer_json_member_add_uint64(wb, "cnt", d->group_points);
 
