@@ -1,45 +1,46 @@
-<!--
-title: "How to optimize the Netdata Agent's performance"
-sidebar_label: "How to optimize the Netdata Agent's performance"
-description: "While the Netdata Agent is designed to monitor a system with only 1% CPU, you can optimize its performance for low-resource systems."
-image: /img/seo/guides/configure/performance.png
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/configure/performance.md
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Configuration"
--->
-
 # How to optimize the Netdata Agent's performance
 
 We designed the Netdata Agent to be incredibly lightweight, even when it's collecting a few thousand dimensions every
-second and visualizing that data into hundreds of charts. When properly configured for a production node, the Agent 
-itself should never use more than 1% of a single CPU core, roughly 50-100 MiB of RAM, and minimal disk I/O to collect, 
-store, and visualize all this data.
-  
-We take this scalability seriously. We have one user [running
-Netdata](https://github.com/netdata/netdata/issues/1323#issuecomment-266427841) on a system with 144 cores and 288
-threads. Despite collecting 100,000 metrics every second, the Agent still only uses 9% CPU utilization on a
-single core.
+second and visualizing that data into hundreds of charts. However, the default settings of the Netdata Agent are not 
+optimized for performance, but for a simple, standalone setup. We want the first install to give you something you can 
+run without any configuration. Most of the settings and options are enabled, since we want you to experience the full thing.
 
-But not everyone has such powerful systems at their disposal. For example, you might run the Agent on a cloud VM with
-only 512 MiB of RAM, or an IoT device like a [Raspberry Pi](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/pi-hole-raspberry-pi.md). In these
-cases, reducing Netdata's footprint beyond its already diminutive size can pay big dividends, giving your services more
-horsepower while still monitoring the health and the performance of the node, OS, hardware, and applications.
+By default, Netdata will automatically detect applications running on the node it is installed to start collecting metrics in 
+real-time, has health monitoring enabled to evaluate alerts and trains Machine Learning (ML) models for each metric, to detect anomalies.
 
-The default settings of the Netdata Agent are not optimized for performance, but for a simple standalone setup. We want 
-the first install to give you something you can run without any configuration. Most of the settings and options are 
-enabled, since we want you to experience the full thing.
+This document describes the resources required for the various default capabilities and the strategies to optimize Netdata for production use. 
 
+## Resources required by a default Netdata installation
 
-## Prerequisites
+### CPU consumption
 
--   A node running the Netdata Agent.
--   Familiarity with configuring the Netdata Agent with `edit-config`.
+Expect about:
+ - 1-3% of a single core for the netdata core
+ - 1-3% of a single core for the various collectors (e.g. go.d.plugin, apps.plugin)
+ - 5-10% of a single core, when ML training runs
 
-If you're not familiar with how to configure the Netdata Agent, read our [node configuration
-doc](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) before continuing with this guide. This guide assumes familiarity with the Netdata config
-directory, using `edit-config`, and the process of uncommenting/editing various settings in `netdata.conf` and other
-configuration files.
+Your experience may vary depending on the number of metrics collected, the collectors enabled and the specific environment they 
+run on, i.e. the work they have to do to collect these metrics.
+
+As a general rule, for modern hardware and VMs, the total CPU consumption of a standalone Netdata installation, including all its components, 
+should be below 5 - 15% of a single core. For example, on 8 core server it will use only 0.6% - 1.8% of a total CPU capacity, depending on 
+the CPU characteristics.
+
+### Memory consumption
+
+The memory footprint of Netdata is mainly influenced by the number of metrics concurrently being collected. Expect about 150MB of RAM for a typical 64-bit server collecting about 2000 to 3000 metrics.
+
+To estimate and control memory consumption, you can [change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md), or [use a different metric storage database](https://github.com/netdata/netdata/blob/master/database/README.md).
+
+### Disk footprint and I/O
+
+By default, Netdata should not use more than 1GB of disk space, most of which is dedicated for storing metric data and metadata. For typical installations collecting 2000 - 3000 metrics, this storage should provide a few days of high-resolution retention (per second), about a month of mid-resolution retention (per minute) and more than a year of low-resolution retention (per hour).
+
+Netdata spreads I/O operations across time. For typical standalone installations there should be a few write operations every 5-10 seconds of a few kilobytes each, occasionally up to 1MB.
+
+To configure retention, you can [change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md).
+To control disk I/O [use a different metric storage database](https://github.com/netdata/netdata/blob/master/database/README.md), avoid querying the 
+production system using a [streaming and replication](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md), [reduce the data collection frequency](#reduce-collection-frequency).
 
 ## What affects Netdata's performance?
 
@@ -65,7 +66,7 @@ The fastest way to improve the Agent's resource utilization is to reduce how oft
 ### Global
 
 If you don't need per-second metrics, or if the Netdata Agent uses a lot of CPU even when no one is viewing that node's
-dashboard, configure the Agent to collect metrics less often.
+dashboard, [configure the Agent](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) to collect metrics less often.
 
 Open `netdata.conf` and edit the `update every` setting. The default is `1`, meaning that the Agent collects metrics
 every second.
