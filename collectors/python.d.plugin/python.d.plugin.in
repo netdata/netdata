@@ -797,10 +797,10 @@ def parse_command_line():
     severity_level = 0
     modules_to_run = list()
 
-    def find_first_positive_int(values):
-        return next((v for v in values if v.isdigit() and int(v) >= 1), None)
+    def find_first_integer_value(values, start = 1):
+        return next((v for v in values if v.isdigit() and int(v) >= start), None)
 
-    u = find_first_positive_int(opts)
+    u = find_first_integer_value(opts)
     if u is not None:
         update_every = int(u)
         opts.remove(u)
@@ -815,7 +815,7 @@ def parse_command_line():
         opts.remove('nolock')
     if 'severity-level' in opts:
         opts.remove('severity-level')
-        u = find_first_positive_int(opts)
+        u = find_first_integer_value(opts, 0)
         if u is not None:
             severity_level = int(u)
             opts.remove(u)
