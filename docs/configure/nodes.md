@@ -67,6 +67,7 @@ directory, the script copies the stock version from `/usr/lib/netdata/conf.d` (o
 to the proper place in the config directory and opens the copy for editing. 
 
 If you have trouble running the script, you can manually copy the file and edit the copy.
+
 e.g. `cp /usr/lib/netdata/conf.d/go.d/bind.conf /etc/netdata/go.d/bind.conf; vi /etc/netdata/go.d/bind.conf`
 
 Run `edit-config` without options, to see details on its usage, or `edit-config --list` to see a list of all the configuration 
