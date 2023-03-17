@@ -85,7 +85,7 @@ These tabs can be separated into "static", meaning they are by default presented
 
 - The [Feed & events](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md) tab lets you investigate events that occurred in the past, which is invaluable for troubleshooting.
 
-#### Non static tabs
+#### Dynamic tabs
 
 If you open a [new dashboard](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md), jump to a single-node dashboard, or navigate to a dedicated alert page, a new tab will open in War Room bar.
 
