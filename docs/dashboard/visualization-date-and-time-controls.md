@@ -3,21 +3,19 @@
 ## Time controls
 
 The time control provides you the following options: **Play**, **Pause** and **Force Play**.
-* **Play** - the content of the page will be automatically refreshed while this is in the foreground
-* **Pause** - the content of the page isn't refreshed due to a manual request to pause it or, for example, when your investigating data on a 
-chart (cursor is on top of a chart)
-* **Force Play** - the content of the page will be automatically refreshed even if this is in the background
 
-With this, we aim to bring more clarity and allow you to distinguish if the content you are looking at is live or historical and also allow you
- to always refresh the content of the page when the tabs are in the background. 
+- **Play** - the content of the page will be automatically refreshed while this is in the foreground
+- **Pause** - the content of the page isn't refreshed due to a manual request to pause it or, for example, when your investigating data on a chart (cursor is on top of a chart)
+- **Force Play** - the content of the page will be automatically refreshed even if this is in the background
+
+With this, we aim to bring more clarity and allow you to distinguish if the content you are looking at is live or historical and also allow you to always refresh the content of the page when the tabs are in the background.
 
 Main use cases for **Force Play**:
-* You use a terminal or deployment tools to do changes in your infra and want to see immediately, Netdata is in the background, displaying the impact 
-of these changes
-* You want to have Netdata on the background, example displayed on a TV, to constantly see metrics through dashboards or to watch the alert 
-status
 
-![The time control with Play, Pause and Force Play](https://user-images.githubusercontent.com/82235632/129206460-03c47d0d-1a5b-428a-b972-473718b74bdb.png)
+- You use a terminal or deployment tools to do changes in your infra and want to see the effect immediately, Netdata is in the background, displaying the impact of these changes
+- You want to have Netdata on the background, example displayed on a TV, to constantly see metrics through dashboards or to watch the alert status
+
+![The time control with Play, Pause and Force Play](https://user-images.githubusercontent.com/82235632/129206460-03c47d0d-1a5b-428a-b972-473718b74bdb.png)UPDATE THIS IMAGE
 
 ## Date and time selector
 
@@ -25,21 +23,18 @@ The date and time selector allows you to change the visible timeframe and change
 
 ### Pick timeframes to visualize
 
-While [panning through time and zooming in/out](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md) from charts it is helpful when
-you're looking a recent history, or want to do granular troubleshooting, what if you want to see metrics from 6 hours
-ago? Or 6 days?
+While [panning through time and zooming in/out](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md) from charts it is helpful when you're looking a recent history, or want to do granular troubleshooting, what if you want to see metrics from 6 hours ago? Or 6 days?
 
 Netdata's dashboard features a **timeframe selector** to help you visualize specific timeframes in a few helpful ways.
-By default, it shows a certain number of minutes of historical metrics based on the your browser's viewport to ensure
-it's always showing per-second granularity.
+By default, it shows a certain number of minutes of historical metrics based on the your browser's viewport to ensure it's always showing per-second granularity.
 
 #### Open the timeframe selector
 
 To visualize a new timeframe, you need to open the picker, which appears just above the menu, near the top-right cover
 of the dashboard.
 
-![The timeframe selector in the local Agent
-dashboard](https://user-images.githubusercontent.com/1153921/101507784-2c585080-3934-11eb-9d6e-eff30b8553e4.png)
+![The timeframe selector in the local Agent dashboard](https://user-images.githubusercontent.com/1153921/101507784-2c585080-3934-11eb-9d6e-eff30b8553e4.png)
+UPDATE THIS IMAGE
 
 The **Clear** button resets the dashboard back to its default state based on your browser viewport, and **Apply** closes
 the picker and shifts all charts to the selected timeframe.
@@ -77,7 +72,7 @@ time-series database (TSDB) to store as many metrics as it can within a specific
 storage is 256 MiB, which should be enough for 1-3 days of historical metrics. If you navigate back to a timeframe
 beyond stored historical metrics, you'll see this message:
 
-![Screenshot of reaching the end of historical metrics storage](https://user-images.githubusercontent.com/1153921/114207597-63a23280-9911-11eb-863d-4d2f75b030b4.png)
+![Screenshot of reaching the end of historical metrics storage](https://user-images.githubusercontent.com/1153921/114207597-63a23280-9911-11eb-863d-4d2f75b030b4.png)UPDATE THIS IMAGE
 
 At any time, [configure the internal TSDB's storage capacity](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md) to expand your
 depth of historical metrics.
@@ -87,4 +82,4 @@ depth of historical metrics.
 The default timezone used in all date and time fields in Netdata Cloud comes from your browser. To change it, open the
 date and time selector and use the control displayed here:
 
-<img alt="Untitled1" src="https://user-images.githubusercontent.com/43294513/216628390-c3bd1cd2-349d-4523-b8d3-c7e68395f670.png"/>
+![Timezone selector](https://user-images.githubusercontent.com/43294513/216628390-c3bd1cd2-349d-4523-b8d3-c7e68395f670.png)
