@@ -675,6 +675,7 @@ $ sudo systemctl restart netdata
 - [SSH](https://github.com/Yaser-Amiri/netdata-ssh-module): Monitor failed authentication requests of an SSH server.
 - [ClickHouse](https://github.com/netdata/community/tree/main/collectors/python.d.plugin/clickhouse):
   Monitor [ClickHouse](https://clickhouse.com/) database.
+- [Ethtool](https://github.com/ghanapunq/netdata_ethtool_plugin): Monitor network interface with ethtool.
 
 ## Etc
 
