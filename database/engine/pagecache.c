@@ -101,7 +101,7 @@ inline TIME_RANGE_COMPARE is_page_in_time_range(time_t page_first_time_s, time_t
 
 static int journal_metric_uuid_compare(const void *key, const void *metric)
 {
-    return uuid_compare(*(uuid_t *) key, ((struct journal_metric_list *) metric)->uuid);
+    return memcmp(key, &(((struct journal_metric_list *) metric)->uuid), sizeof(uuid_t));
 }
 
 static inline struct page_details *pdc_find_page_for_time(

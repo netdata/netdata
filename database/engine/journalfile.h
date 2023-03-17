@@ -59,9 +59,9 @@ static inline uint64_t journalfile_current_size(struct rrdengine_journalfile *jo
 
 // Journal v2 structures
 
-#define JOURVAL_V2_MAGIC           (0x01221019)
-#define JOURVAL_V2_REBUILD_MAGIC   (0x00221019)
-#define JOURVAL_V2_SKIP_MAGIC      (0x02221019)
+#define JOURVAL_V2_MAGIC           (0x01230317)
+#define JOURVAL_V2_REBUILD_MAGIC   (0x00230317)
+#define JOURVAL_V2_SKIP_MAGIC      (0x02230317)
 
 struct journal_v2_block_trailer {
     union {
@@ -93,13 +93,14 @@ struct journal_page_list {
 };
 
 // UUID_LIST
-// 32 bytes
+// 36 bytes
 struct journal_metric_list {
     uuid_t uuid;
-    uint32_t entries;         // Number of entries
-    uint32_t page_offset;     // OFFSET that contains entries * struct( journal_page_list )
+    uint32_t entries;           // Number of entries
+    uint32_t page_offset;       // OFFSET that contains entries * struct( journal_page_list )
     uint32_t delta_start_s;     // Min time of metric
     uint32_t delta_end_s;       // Max time of metric  (to be used to populate page_index)
+    uint32_t update_every_s;    // Last update every for this metric in this journal (last page collected)
 };
 
 // 16 bytes
