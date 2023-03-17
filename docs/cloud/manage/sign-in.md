@@ -31,18 +31,23 @@ quickstart](https://github.com/netdata/netdata/blob/master/packaging/installer/R
 
 ### Troubleshooting
 
-You should receive your sign in email in less than a minute. The subject is **Verify your email!** and the sender is `no-reply@app.netdata.cloud` via `sendgrid.net`.
+You should receive your sign in email in less than a minute. The subject is **Verify your email!** for new sign-ups, **Sign in to Netdata** for sign ins. 
+The sender is `no-reply@netdata.cloud` via `sendgrid.net`.
 
 If you don't see the email, try the following:
 
--   Check [Netdata Cloud status](https://status.netdata.cloud) for ongoing issues with our infrastructure.
--   Request another sign in email via the [sign in page](https://app.netdata.cloud/sign-in?cloudRoute=spaces?utm_source=docs&utm_content=sign_in_button_troubleshooting_section).
 -   Check your spam folder.
 -   In Gmail, check the **Updates** category.
+-   Check [Netdata Cloud status](https://status.netdata.cloud) for ongoing issues with our infrastructure.
+-   Request another sign in email via the [sign in page](https://app.netdata.cloud/sign-in?cloudRoute=spaces?utm_source=docs&utm_content=sign_in_button_troubleshooting_section).
 
-You may also want to add `no-reply@app.netdata.cloud` to your address book or contacts list, especially if you're using
+You may also want to add `no-reply@netdata.cloud` to your address book or contacts list, especially if you're using
 a public email service, such as Gmail. You may also want to whitelist/allowlist either the specific email or the entire
-`app.netdata.cloud` domain.
+`netdata.cloud` domain.
+
+In some cases, temporary issues with your mail server or email account may result in your email address being added to a Bounce list by Sendgrid.
+If you are added to that list, no Netdata cloud email can reach you, including alarm notifications. Let us know in Discord that you have trouble receiving 
+any email from us and someone will ask you to provide your email address privately, so we can check if you are on the Bounce list.
 
 ## Google and GitHub OAuth
 
