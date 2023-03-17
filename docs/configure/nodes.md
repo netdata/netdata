@@ -65,6 +65,7 @@ The **recommended way to easily and safely edit Netdata's configuration** is wit
 opens existing Netdata configuration files using your system's `$EDITOR`. If the file doesn't yet exist in your config
 directory, the script copies the stock version from `/usr/lib/netdata/conf.d` (or wherever the symlink `orig` under the config directory leads to)
 to the proper place in the config directory and opens the copy for editing. 
+
 If you have trouble running the script, you can manually copy the file 
 (e.g. `cp /usr/lib/netdata/conf.d/go.d/bind.conf /etc/netdata/go.d/bind.conf`) and edit the copy.
 
