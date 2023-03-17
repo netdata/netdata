@@ -66,8 +66,8 @@ opens existing Netdata configuration files using your system's `$EDITOR`. If the
 directory, the script copies the stock version from `/usr/lib/netdata/conf.d` (or wherever the symlink `orig` under the config directory leads to)
 to the proper place in the config directory and opens the copy for editing. 
 
-If you have trouble running the script, you can manually copy the file 
-(e.g. `cp /usr/lib/netdata/conf.d/go.d/bind.conf /etc/netdata/go.d/bind.conf`) and edit the copy.
+If you have trouble running the script, you can manually copy the file and edit the copy.
+e.g. `cp /usr/lib/netdata/conf.d/go.d/bind.conf /etc/netdata/go.d/bind.conf; vi /etc/netdata/go.d/bind.conf`
 
 Run `edit-config` without options, to see details on its usage, or `edit-config --list` to see a list of all the configuration 
 files you can edit.
