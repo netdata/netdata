@@ -6,6 +6,14 @@
 
 **Merged pull requests:**
 
+- bump go.d.plugin version to v0.51.3 [\#14745](https://github.com/netdata/netdata/pull/14745) ([ilyam8](https://github.com/ilyam8))
+- increase RRD\_ID\_LENGTH\_MAX to 1000 [\#14744](https://github.com/netdata/netdata/pull/14744) ([ilyam8](https://github.com/ilyam8))
+- Update Performance Optimization Options [\#14743](https://github.com/netdata/netdata/pull/14743) ([cakrit](https://github.com/cakrit))
+- Update change-metrics-storage.md [\#14742](https://github.com/netdata/netdata/pull/14742) ([cakrit](https://github.com/cakrit))
+- Add contexts to privacy doc. [\#14741](https://github.com/netdata/netdata/pull/14741) ([cakrit](https://github.com/cakrit))
+- Create pci-soc-hipaa.md [\#14740](https://github.com/netdata/netdata/pull/14740) ([cakrit](https://github.com/cakrit))
+- Update data-privacy.md [\#14739](https://github.com/netdata/netdata/pull/14739) ([cakrit](https://github.com/cakrit))
+- Update data-privacy.md [\#14738](https://github.com/netdata/netdata/pull/14738) ([cakrit](https://github.com/cakrit))
 - pandas collector replace `self.warn()` with `self.warning()` [\#14736](https://github.com/netdata/netdata/pull/14736) ([andrewm4894](https://github.com/andrewm4894))
 - Update change-metrics-storage.md [\#14734](https://github.com/netdata/netdata/pull/14734) ([cakrit](https://github.com/cakrit))
 - Correct calc and explain how to get METRICS in RAM usage [\#14733](https://github.com/netdata/netdata/pull/14733) ([cakrit](https://github.com/cakrit))
@@ -203,6 +211,7 @@
 - Update the "Install Netdata with kickstart.sh" doc [\#14338](https://github.com/netdata/netdata/pull/14338) ([Ancairon](https://github.com/Ancairon))
 - Misc SSL improvements 2 [\#14334](https://github.com/netdata/netdata/pull/14334) ([MrZammler](https://github.com/MrZammler))
 - Indicate what root privileges are needed for in kickstart.sh. [\#14314](https://github.com/netdata/netdata/pull/14314) ([Ferroin](https://github.com/Ferroin))
+- Use one thread for ACLK synchonization [\#14281](https://github.com/netdata/netdata/pull/14281) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
@@ -370,14 +379,6 @@
 - fix httpcheck alarms [\#14133](https://github.com/netdata/netdata/pull/14133) ([ilyam8](https://github.com/ilyam8))
 - eBPF \(memory, NV, basis for functions\) [\#14131](https://github.com/netdata/netdata/pull/14131) ([thiagoftsm](https://github.com/thiagoftsm))
 - DBENGINE v2 [\#14125](https://github.com/netdata/netdata/pull/14125) ([ktsaou](https://github.com/ktsaou))
-- bump go.d.plugin to v0.46.0 [\#14124](https://github.com/netdata/netdata/pull/14124) ([ilyam8](https://github.com/ilyam8))
-- heartbeat: don't log every discrepancy [\#14122](https://github.com/netdata/netdata/pull/14122) ([ktsaou](https://github.com/ktsaou))
-- ARAL: add destroy function and optimize ifdefs [\#14121](https://github.com/netdata/netdata/pull/14121) ([ktsaou](https://github.com/ktsaou))
-- Enable retries for SSL\_ERROR\_WANT\_READ [\#14120](https://github.com/netdata/netdata/pull/14120) ([MrZammler](https://github.com/MrZammler))
-- ci: fix cgroup-parent name in packaging [\#14118](https://github.com/netdata/netdata/pull/14118) ([ilyam8](https://github.com/ilyam8))
-- don't log too much about streaming connections [\#14117](https://github.com/netdata/netdata/pull/14117) ([ktsaou](https://github.com/ktsaou))
-- fix get\_system\_cpus\(\) [\#14116](https://github.com/netdata/netdata/pull/14116) ([ktsaou](https://github.com/ktsaou))
-- Fix minor typo. [\#14111](https://github.com/netdata/netdata/pull/14111) ([tkatsoulas](https://github.com/tkatsoulas))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
