@@ -68,14 +68,14 @@ to work on these platforms with minimal user effort.
 | Debian                   | 10.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                                                    |
 | Fedora                   | 37             | x86\_64, AArch64                       |                                                                                                                                                    |
 | Fedora                   | 36             | x86\_64, AArch64                       |                                                                                                                                                    |
-| Fedora                   | 38             | x86\_64, AArch64                       | Scheduled for promotion to Core tier at some point after the release of v1.39.0 of the Netdata Agent                                               |
+| Fedora                   | 38             | x86\_64, AArch64                       |                                                                                                                                                    |
 | openSUSE                 | Leap 15.4      | x86\_64, AArch64                       |                                                                                                                                                    |
 | Oracle Linux             | 9.x            | x86\_64, AArch64                       |                                                                                                                                                    |
 | Oracle Linux             | 8.x            | x86\_64, AArch64                       |                                                                                                                                                    |
 | Red Hat Enterprise Linux | 9.x            | x86\_64, AArch64                       |                                                                                                                                                    |
 | Red Hat Enterprise Linux | 8.x            | x86\_64, AArch64                       |                                                                                                                                                    |
 | Red Hat Enterprise Linux | 7.x            | x86\_64                                |                                                                                                                                                    |
-| Ubuntu                   | 23.04          | x86\_64, AArch64, ARMv7                | Scheduled for promotion to Core tier at some point after the release of v1.39.0 of the Netdata Agent                                               |
+| Ubuntu                   | 23.04          | x86\_64, AArch64, ARMv7                |                                                                                                                                                    |
 | Ubuntu                   | 22.10          | x86\_64, ARMv7, AArch64                |                                                                                                                                                    |
 | Ubuntu                   | 22.04          | x86\_64, ARMv7, AArch64                |                                                                                                                                                    |
 | Ubuntu                   | 20.04          | x86\_64, ARMv7, AArch64                |                                                                                                                                                    |
@@ -98,7 +98,6 @@ with minimal user effort.
 | Amazon Linux  | 2       | x86\_64, AArch64         | Scheduled for promotion to Core tier at some point after the release of v1.39.0 of the Netdata Agent |
 | Arch Linux    | Latest  | No                       | We officially recommend the community packages available for Arch Linux                              |
 | Manjaro Linux | Latest  | No                       | We officially recommend the community packages available for Arch Linux                              |
-
 
 ### Community
 
