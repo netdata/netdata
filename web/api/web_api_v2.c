@@ -44,8 +44,8 @@ static int web_client_api_request_v2_nodes(RRDHOST *host __maybe_unused, struct 
 }
 
 static int web_client_api_request_v2_weights(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_weights(host, w, url, WEIGHTS_METHOD_ANOMALY_RATE,
-                                          WEIGHTS_FORMAT_CONTEXTS, 2);
+    return web_client_api_request_weights(host, w, url, WEIGHTS_METHOD_VALUE,
+                                          WEIGHTS_FORMAT_MULTINODE, 2);
 }
 
 static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {

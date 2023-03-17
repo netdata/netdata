@@ -2557,7 +2557,7 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
             if (qt->request.group_by & RRDR_GROUP_BY_INSTANCE) {
                 buffer_fast_strcat(key, "|", 1);
-                buffer_strcat(key, string2str(query_instance_id_fqdn(qt, qi)));
+                buffer_strcat(key, string2str(query_instance_id_fqdn(qi, qt->request.version)));
             }
 
             if (qt->request.group_by & RRDR_GROUP_BY_LABEL) {
@@ -2615,7 +2615,7 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                     if (qt->request.group_by & RRDR_GROUP_BY_NODE)
                         buffer_strcat(key, rrdinstance_acquired_id(qi->ria));
                     else
-                        buffer_strcat(key, string2str(query_instance_id_fqdn(qt, qi)));
+                        buffer_strcat(key, string2str(query_instance_id_fqdn(qi, qt->request.version)));
                 }
 
                 if (qt->request.group_by & RRDR_GROUP_BY_LABEL) {
@@ -2673,7 +2673,7 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                     if (qt->request.group_by & RRDR_GROUP_BY_NODE)
                         buffer_strcat(key, rrdinstance_acquired_name(qi->ria));
                     else
-                        buffer_strcat(key, string2str(query_instance_name_fqdn(qt, qi)));
+                        buffer_strcat(key, string2str(query_instance_name_fqdn(qi, qt->request.version)));
                 }
 
                 if (qt->request.group_by & RRDR_GROUP_BY_LABEL) {

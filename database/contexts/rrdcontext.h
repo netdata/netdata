@@ -124,17 +124,6 @@ void rrdcontext_db_rotation(void);
 void *rrdcontext_main(void *);
 
 // ----------------------------------------------------------------------------
-// public API for weights
-
-struct metric_entry {
-    RRDCONTEXT_ACQUIRED *rca;
-    RRDINSTANCE_ACQUIRED *ria;
-    RRDMETRIC_ACQUIRED *rma;
-};
-
-DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contexts);
-
-// ----------------------------------------------------------------------------
 // public API for queries
 
 typedef enum __attribute__ ((__packed__)) {
@@ -322,6 +311,13 @@ struct query_tier_statistics {
     } retention;
 };
 
+struct query_versions {
+    uint64_t contexts_hard_hash;
+    uint64_t contexts_soft_hash;
+    uint64_t alerts_hard_hash;
+    uint64_t alerts_soft_hash;
+};
+
 typedef struct query_target {
     char id[MAX_QUERY_TARGET_ID_LENGTH + 1]; // query identifier (for logging)
     QUERY_TARGET_REQUEST request;
@@ -400,12 +396,7 @@ typedef struct query_target {
 
     struct query_data_statistics query_stats;
 
-    struct {
-        uint64_t contexts_hard_hash;
-        uint64_t contexts_soft_hash;
-        uint64_t alerts_hard_hash;
-        uint64_t alerts_soft_hash;
-    } versions;
+    struct query_versions versions;
 
     struct {
         usec_t received_ut;
@@ -453,8 +444,8 @@ static inline const char *query_metric_name(QUERY_TARGET *qt, QUERY_METRIC *qm) 
 
 struct storage_engine *query_metric_storage_engine(QUERY_TARGET *qt, QUERY_METRIC *qm, size_t tier);
 
-STRING *query_instance_id_fqdn(QUERY_TARGET *qt, QUERY_INSTANCE *qi);
-STRING *query_instance_name_fqdn(QUERY_TARGET *qt, QUERY_INSTANCE *qi);
+STRING *query_instance_id_fqdn(QUERY_INSTANCE *qi, size_t version);
+STRING *query_instance_name_fqdn(QUERY_INSTANCE *qi, size_t version);
 
 void query_target_free(void);
 void query_target_release(QUERY_TARGET *qt);
@@ -488,5 +479,31 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
 RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o);
 
+// ----------------------------------------------------------------------------
+// scope
+
+typedef bool (*foreach_host_cb_t)(void *data, RRDHOST *host, bool queryable);
+uint64_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hosts_sp,
+                                  foreach_host_cb_t cb, void *data,
+                                  struct query_versions *versions,
+                                  char *host_uuid_buffer);
+
+typedef bool (*foreach_context_cb_t)(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context);
+size_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, SIMPLE_PATTERN *scope_contexts_sp, SIMPLE_PATTERN *contexts_sp, foreach_context_cb_t cb, bool queryable_host, void *data);
+
+// ----------------------------------------------------------------------------
+// public API for weights
+
+typedef bool (*weights_add_metric_t)(void *data, RRDHOST *host, RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma);
+size_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
+                                            SIMPLE_PATTERN *instances_sp,
+                                            SIMPLE_PATTERN *chart_label_key_sp,
+                                            SIMPLE_PATTERN *labels_sp,
+                                            SIMPLE_PATTERN *alerts_sp,
+                                            SIMPLE_PATTERN *dimensions_sp,
+                                            bool match_ids, bool match_names,
+                                            size_t version,
+                                            weights_add_metric_t cb,
+                                            void *data);
 #endif // NETDATA_RRDCONTEXT_H
 

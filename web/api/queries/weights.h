@@ -15,6 +15,7 @@ typedef enum {
 typedef enum {
     WEIGHTS_FORMAT_CHARTS    = 1,
     WEIGHTS_FORMAT_CONTEXTS  = 2,
+    WEIGHTS_FORMAT_MULTINODE = 3,
 } WEIGHTS_FORMAT;
 
 extern int enable_metric_correlations;
@@ -26,6 +27,12 @@ typedef struct query_weights_request {
     RRDHOST *host;
     const char *scope_nodes;
     const char *scope_contexts;
+    const char *nodes;
+    const char *contexts;
+    const char *instances;
+    const char *dimensions;
+    const char *labels;
+    const char *alerts;
     WEIGHTS_METHOD method;
     WEIGHTS_FORMAT format;
     RRDR_TIME_GROUPING group;

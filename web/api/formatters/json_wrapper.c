@@ -1167,13 +1167,13 @@ static void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS
     buffer_json_object_close(wb); // hosts
 }
 
-void version_hashes_api_v2(BUFFER *wb, uint64_t contexts_hard_hash, uint64_t contexts_soft_hash, uint64_t alerts_hard_hash, uint64_t alerts_soft_hash) {
+void version_hashes_api_v2(BUFFER *wb, struct query_versions *versions) {
     buffer_json_member_add_object(wb, "versions");
     buffer_json_member_add_uint64(wb, "nodes_hard_hash", dictionary_version(rrdhost_root_index));
-    buffer_json_member_add_uint64(wb, "contexts_hard_hash", contexts_hard_hash);
-    buffer_json_member_add_uint64(wb, "contexts_soft_hash", contexts_soft_hash);
-    buffer_json_member_add_uint64(wb, "alerts_hard_hash", alerts_hard_hash);
-    buffer_json_member_add_uint64(wb, "alerts_soft_hash", alerts_soft_hash);
+    buffer_json_member_add_uint64(wb, "contexts_hard_hash", versions->contexts_hard_hash);
+    buffer_json_member_add_uint64(wb, "contexts_soft_hash", versions->contexts_soft_hash);
+    buffer_json_member_add_uint64(wb, "alerts_hard_hash", versions->alerts_hard_hash);
+    buffer_json_member_add_uint64(wb, "alerts_soft_hash", versions->alerts_soft_hash);
     buffer_json_object_close(wb);
 }
 
@@ -1261,8 +1261,7 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb) {
         buffer_json_object_close(wb); // request
     }
 
-    version_hashes_api_v2(wb, qt->versions.contexts_hard_hash, qt->versions.contexts_soft_hash,
-                          qt->versions.alerts_hard_hash, qt->versions.alerts_soft_hash);
+    version_hashes_api_v2(wb, &qt->versions);
 
     buffer_json_member_add_object(wb, "summary");
     struct summary_total_counts

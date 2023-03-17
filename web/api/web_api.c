@@ -68,7 +68,8 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
     RRDR_TIME_GROUPING group = RRDR_GROUPING_AVERAGE;
     int timeout = 0;
     size_t tier = 0;
-    const char *group_options = NULL, *scope_contexts = NULL, *scope_nodes = NULL;
+    const char *group_options = NULL, *scope_contexts = NULL, *scope_nodes = NULL, *contexts = NULL, *nodes = NULL,
+        *instances = NULL, *dimensions = NULL, *labels = NULL, *alerts = NULL;
 
     while (url) {
         char *value = mystrsep(&url, "&");
@@ -114,11 +115,14 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
         else if(api_version == 1 && (!strcmp(name, "context") || !strcmp(name, "contexts")))
             scope_contexts = value;
 
-        else if(api_version >= 2 && !strcmp(name, "scope_contexts"))
-            scope_contexts = value;
-
-        else if(api_version >= 2 && !strcmp(name, "scope_nodes"))
-            scope_nodes = value;
+        else if(api_version >= 2 && !strcmp(name, "scope_nodes")) scope_nodes = value;
+        else if(api_version >= 2 && !strcmp(name, "scope_contexts")) scope_contexts = value;
+        else if(api_version >= 2 && !strcmp(name, "nodes")) nodes = value;
+        else if(api_version >= 2 && !strcmp(name, "contexts")) contexts = value;
+        else if(api_version >= 2 && !strcmp(name, "instances")) instances = value;
+        else if(api_version >= 2 && !strcmp(name, "dimensions")) dimensions = value;
+        else if(api_version >= 2 && !strcmp(name, "labels")) labels = value;
+        else if(api_version >= 2 && !strcmp(name, "alerts")) alerts = value;
 
         else if(!strcmp(name, "tier")) {
             tier = str2ul(value);
@@ -136,8 +140,14 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
     QUERY_WEIGHTS_REQUEST qwr = {
             .version = api_version,
             .host = (api_version == 1) ? NULL : host,
-            .scope_nodes = (api_version >= 2) ? scope_nodes : NULL,
+            .scope_nodes = scope_nodes,
             .scope_contexts = scope_contexts,
+            .nodes = nodes,
+            .contexts = contexts,
+            .instances = instances,
+            .dimensions = dimensions,
+            .labels = labels,
+            .alerts = alerts,
             .method = method,
             .format = format,
             .group = group,

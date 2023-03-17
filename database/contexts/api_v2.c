@@ -92,10 +92,7 @@ struct rrdcontext_to_json_v2_data {
     DICTIONARY *ctx;
 
     CONTEXTS_V2_OPTIONS options;
-    uint64_t contexts_hard_hash;
-    uint64_t contexts_soft_hash;
-    uint64_t alerts_hard_hash;
-    uint64_t alerts_soft_hash;
+    struct query_versions versions;
 
     struct {
         SIMPLE_PATTERN *scope_pattern;
@@ -375,8 +372,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
             .request = req,
             .ctx = NULL,
             .options = options,
-            .contexts_hard_hash = 0,
-            .contexts_soft_hash = 0,
+            .versions = { 0 },
             .nodes.scope_pattern = string_to_simple_pattern(req->scope_nodes),
             .nodes.pattern = string_to_simple_pattern(req->nodes),
             .contexts.pattern = string_to_simple_pattern(req->contexts),
@@ -425,14 +421,12 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
     query_scope_foreach_host(ctl.nodes.scope_pattern, ctl.nodes.pattern,
                              rrdcontext_to_json_v2_add_host, &ctl,
-                             &ctl.contexts_hard_hash, &ctl.contexts_soft_hash,
-                             &ctl.alerts_hard_hash, &ctl.alerts_soft_hash,
-                             ctl.q.host_uuid_buffer);
+                             &ctl.versions, ctl.q.host_uuid_buffer);
     if(options & (CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED | CONTEXTS_V2_DEBUG))
         buffer_json_array_close(wb);
 
     req->timings.output_ut = now_monotonic_usec();
-    version_hashes_api_v2(wb, ctl.contexts_hard_hash, ctl.contexts_soft_hash, ctl.alerts_hard_hash, ctl.alerts_soft_hash);
+    version_hashes_api_v2(wb, &ctl.versions);
 
     if(options & CONTEXTS_V2_CONTEXTS) {
         buffer_json_member_add_object(wb, "contexts");

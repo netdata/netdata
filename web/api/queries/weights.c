@@ -295,6 +295,127 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
     return total_dimensions;
 }
 
+static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *wb,
+                                                  time_t after, time_t before,
+                                                  time_t baseline_after, time_t baseline_before,
+                                                  size_t points, WEIGHTS_METHOD method,
+                                                  RRDR_TIME_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
+                                                  size_t examined_dimensions, usec_t duration,
+                                                  WEIGHTS_STATS *stats) {
+    results_header_to_json(results, wb, after, before, baseline_after, baseline_before,
+                           points, method, group, options, shifts, examined_dimensions, duration, stats);
+
+    buffer_json_member_add_object(wb, "nodes");
+
+    size_t nodes = 0, contexts = 0, instances = 0, total_dimensions = 0, node_dims = 0, context_dims = 0, instance_dims = 0;
+    NETDATA_DOUBLE context_total_weight = 0.0, instance_total_weight = 0.0, node_total_weight = 0.0;
+    struct register_result *t;
+    RRDHOST *last_host = NULL;
+    RRDCONTEXT_ACQUIRED *last_rca = NULL;
+    RRDINSTANCE_ACQUIRED *last_ria = NULL;
+    dfe_start_read(results, t) {
+
+        // close instance
+        if(t->ria != last_ria && last_ria) {
+            buffer_json_object_close(wb); // dimensions
+            buffer_json_member_add_double(wb, "weight", instance_total_weight / (double) instance_dims);
+            buffer_json_object_close(wb); // instance:id
+
+            last_ria = NULL;
+            instance_dims = 0;
+            instance_total_weight = 0.0;
+        }
+
+        // close context
+        if(t->rca != last_rca && last_rca) {
+            buffer_json_object_close(wb); // instances
+            buffer_json_member_add_double(wb, "weight", context_total_weight / (double) context_dims);
+            buffer_json_object_close(wb); // context:id
+            last_rca = NULL;
+            context_dims = 0;
+            context_total_weight = 0.0;
+        }
+
+        // close node
+        if(t->host != last_host && last_host) {
+            buffer_json_object_close(wb); // contexts
+            buffer_json_member_add_double(wb, "weight", node_total_weight / (double) node_dims);
+            buffer_json_object_close(wb); // host:hostname
+            last_host = NULL;
+            node_dims = 0;
+            node_total_weight = 0.0;
+        }
+
+        // open node
+        if(t->host != last_host) {
+            last_host = t->host;
+
+            buffer_json_member_add_object(wb, rrdhost_hostname(t->host));
+            buffer_json_member_add_object(wb, "contexts");
+            nodes++;
+        }
+
+        // open context
+        if(t->rca != last_rca) {
+            last_rca = t->rca;
+
+            buffer_json_member_add_object(wb, rrdcontext_acquired_id(t->rca));
+            buffer_json_member_add_object(wb, "instances");
+            contexts++;
+        }
+
+        // open instance
+        if(t->ria != last_ria) {
+            last_ria = t->ria;
+
+            buffer_json_member_add_object(wb, rrdinstance_acquired_id(t->ria));
+            buffer_json_member_add_object(wb, "dimensions");
+
+            instances++;
+        }
+
+
+        buffer_json_member_add_double(wb, rrdmetric_acquired_name(t->rma), t->value);
+        instance_total_weight += t->value;
+        context_total_weight += t->value;
+        node_total_weight += t->value;
+        instance_dims++;
+        context_dims++;
+        node_dims++;
+        total_dimensions++;
+    }
+    dfe_done(t);
+    
+    // close instance
+    if(last_ria) {
+        buffer_json_object_close(wb); // dimensions
+        buffer_json_member_add_double(wb, "weight", instance_total_weight / (double) instance_dims);
+        buffer_json_object_close(wb); // instance:id
+    }
+
+    // close context
+    if(last_rca) {
+        buffer_json_object_close(wb); // instances
+        buffer_json_member_add_double(wb, "weight", context_total_weight / (double) context_dims);
+        buffer_json_object_close(wb); // context:id
+    }
+
+    // close node
+    if(last_host) {
+        buffer_json_object_close(wb); // contexts
+        buffer_json_member_add_double(wb, "weight", node_total_weight / (double) node_dims);
+        buffer_json_object_close(wb); // host:hostname
+    }
+
+    buffer_json_object_close(wb); // nodes
+
+    buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
+    buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
+    buffer_json_finalize(wb);
+
+    return total_dimensions;
+}
+
 // ----------------------------------------------------------------------------
 // KS2 algorithm functions
 
@@ -781,108 +902,128 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
 // ----------------------------------------------------------------------------
 // The main function
 
-struct weights_host_data {
+struct query_weights_data {
+    QUERY_WEIGHTS_REQUEST *qwr;
+
+    SIMPLE_PATTERN *scope_nodes_sp;
+    SIMPLE_PATTERN *scope_contexts_sp;
+    SIMPLE_PATTERN *nodes_sp;
+    SIMPLE_PATTERN *contexts_sp;
+    SIMPLE_PATTERN *instances_sp;
+    SIMPLE_PATTERN *dimensions_sp;
+    SIMPLE_PATTERN *labels_sp;
+    SIMPLE_PATTERN *alerts_sp;
+
     usec_t now_us;
     usec_t started_us;
     usec_t timeout_us;
     bool timeout;
 
     size_t examined_dimensions;
+    bool register_zero;
+
+    DICTIONARY *results;
+    WEIGHTS_STATS stats;
+
+    uint32_t shifts;
+
+    struct query_versions versions;
 };
 
-static void weights_for_host(
-        QUERY_WEIGHTS_REQUEST *qwr,
-        RRDHOST *host,
-        SIMPLE_PATTERN *scope_contexts,
-        DICTIONARY *results,
-        WEIGHTS_STATS *stats,
-        bool register_zero,
-        struct weights_host_data *weights_host_data,
-        uint32_t shifts) {
+static bool weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma) {
+    struct query_weights_data *qwd = data;
+    QUERY_WEIGHTS_REQUEST *qwr = qwd->qwr;
 
-    DICTIONARY *metrics = rrdcontext_all_metrics_to_dict(host, scope_contexts);
-    struct metric_entry *me;
+    qwd->now_us = now_realtime_usec();
+    if(qwd->now_us - qwd->started_us > qwd->timeout_us) {
+        qwd->timeout = true;
+        return false;
+    }
 
-    // for every metric_entry in the dictionary
-    dfe_start_read(metrics, me) {
-                weights_host_data->now_us = now_realtime_usec();
-                if(weights_host_data->now_us - weights_host_data->started_us > weights_host_data->timeout_us) {
-                    weights_host_data->timeout = true;
-                    break;
-                }
+    qwd->examined_dimensions++;
 
-                weights_host_data->examined_dimensions++;
+    switch(qwr->method) {
+        case WEIGHTS_METHOD_VALUE:
+            rrdset_weights_value(
+                    host, rca, ria, rma,
+                    qwd->results,
+                    qwr->after, qwr->before,
+                    qwr->options, qwr->group, qwr->group_options, qwr->tier,
+                    &qwd->stats, qwd->register_zero
+            );
+            break;
 
-                switch(qwr->method) {
-                    case WEIGHTS_METHOD_VALUE:
-                        rrdset_weights_value(
-                                host,
-                                me->rca, me->ria, me->rma,
-                                results,
-                                qwr->after, qwr->before,
-                                qwr->options, qwr->group, qwr->group_options, qwr->tier,
-                                stats, register_zero
-                        );
-                        break;
+        case WEIGHTS_METHOD_ANOMALY_RATE:
+            qwr->options |= RRDR_OPTION_ANOMALY_BIT;
+            rrdset_weights_value(
+                    host, rca, ria, rma,
+                    qwd->results,
+                    qwr->after, qwr->before,
+                    qwr->options, qwr->group, qwr->group_options, qwr->tier,
+                    &qwd->stats, qwd->register_zero
+            );
+            break;
 
-                    case WEIGHTS_METHOD_ANOMALY_RATE:
-                        qwr->options |= RRDR_OPTION_ANOMALY_BIT;
-                        rrdset_weights_value(
-                                host,
-                                me->rca, me->ria, me->rma,
-                                results,
-                                qwr->after, qwr->before,
-                                qwr->options, qwr->group, qwr->group_options, qwr->tier,
-                                stats, register_zero
-                        );
-                        break;
+        case WEIGHTS_METHOD_MC_VOLUME:
+            rrdset_metric_correlations_volume(
+                    host, rca, ria, rma,
+                    qwd->results,
+                    qwr->baseline_after, qwr->baseline_before,
+                    qwr->after, qwr->before,
+                    qwr->options, qwr->group, qwr->group_options, qwr->tier,
+                    &qwd->stats, qwd->register_zero
+            );
+            break;
 
-                    case WEIGHTS_METHOD_MC_VOLUME:
-                        rrdset_metric_correlations_volume(
-                                host,
-                                me->rca, me->ria, me->rma,
-                                results,
-                                qwr->baseline_after, qwr->baseline_before,
-                                qwr->after, qwr->before,
-                                qwr->options, qwr->group, qwr->group_options, qwr->tier,
-                                stats, register_zero
-                        );
-                        break;
+        default:
+        case WEIGHTS_METHOD_MC_KS2:
+            rrdset_metric_correlations_ks2(
+                    host, rca, ria, rma,
+                    qwd->results,
+                    qwr->baseline_after, qwr->baseline_before,
+                    qwr->after, qwr->before, qwr->points,
+                    qwr->options, qwr->group, qwr->group_options, qwr->tier, qwd->shifts,
+                    &qwd->stats, qwd->register_zero
+            );
+            break;
+    }
 
-                    default:
-                    case WEIGHTS_METHOD_MC_KS2:
-                        rrdset_metric_correlations_ks2(
-                                host,
-                                me->rca, me->ria, me->rma,
-                                results,
-                                qwr->baseline_after, qwr->baseline_before,
-                                qwr->after, qwr->before, qwr->points,
-                                qwr->options, qwr->group, qwr->group_options, qwr->tier, shifts,
-                                stats, register_zero
-                        );
-                        break;
-                }
-            }
-    dfe_done(me);
+    return true;
+}
 
-    dictionary_destroy(metrics);
+static bool weights_do_context_callback(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context) {
+    if(!queryable_context)
+        return false;
+
+    struct query_weights_data *qwd = data;
+    if(weights_foreach_rrdmetric_in_context(rca,
+                                            qwd->instances_sp,
+                                            NULL,
+                                            qwd->labels_sp,
+                                            qwd->alerts_sp,
+                                            qwd->dimensions_sp,
+                                            true, true, qwd->qwr->version,
+                                            weights_for_rrdmetric, qwd))
+        return true;
+
+    return false;
+}
+
+bool weights_do_node_callback(void *data, RRDHOST *host, bool queryable) {
+    if(!queryable)
+        return false;
+
+    struct query_weights_data *qwd = data;
+
+    query_scope_foreach_context(host, qwd->qwr->scope_contexts,
+                                qwd->scope_contexts_sp, qwd->contexts_sp,
+                                weights_do_context_callback, queryable, qwd);
+
+    return true;
 }
 
 int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
 
-    SIMPLE_PATTERN *scope_nodes = (qwr->scope_nodes) ?
-            simple_pattern_create(qwr->scope_nodes, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS,
-                                  SIMPLE_PATTERN_EXACT, true) :
-                                  NULL;
-
-    SIMPLE_PATTERN *scope_contexts = (qwr->scope_contexts) ?
-            simple_pattern_create(qwr->scope_contexts, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS,
-                                  SIMPLE_PATTERN_EXACT, true) :
-                                  NULL;
-
-    WEIGHTS_STATS stats = {};
-
-    DICTIONARY *results = register_result_init();
     char *error = NULL;
     int resp = HTTP_RESP_OK;
 
@@ -896,11 +1037,25 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
     if(qwr->timeout < (long)(1 * MSEC_PER_SEC))
         qwr->timeout = 1 * MSEC_PER_SEC;
 
-    struct weights_host_data weights_host_data = {
+    struct query_weights_data qwd = {
+            .qwr = qwr,
+
+            .scope_nodes_sp = string_to_simple_pattern(qwr->scope_nodes),
+            .scope_contexts_sp = string_to_simple_pattern(qwr->scope_contexts),
+            .nodes_sp = string_to_simple_pattern(qwr->nodes),
+            .contexts_sp = string_to_simple_pattern(qwr->contexts),
+            .instances_sp = string_to_simple_pattern(qwr->instances),
+            .dimensions_sp = string_to_simple_pattern(qwr->dimensions),
+            .labels_sp = string_to_simple_pattern(qwr->labels),
+            .alerts_sp = string_to_simple_pattern(qwr->alerts),
             .timeout_us = qwr->timeout * USEC_PER_MS,
             .started_us = now_realtime_usec(),
             .timeout = false,
             .examined_dimensions = 0,
+            .register_zero = true,
+            .results = register_result_init(),
+            .stats = {},
+            .shifts = 0,
     };
 
     if(!rrdr_relative_window_to_absolute(&qwr->after, &qwr->before, NULL))
@@ -912,7 +1067,6 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
         goto cleanup;
     }
 
-    uint32_t shifts = 0;
     if(qwr->method == WEIGHTS_METHOD_MC_KS2 || qwr->method == WEIGHTS_METHOD_MC_VOLUME) {
         if(!qwr->points) qwr->points = 500;
 
@@ -951,18 +1105,18 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
         // we need to do, to divide baseline numbers to match
         // the highlight ones
         while(multiplier > 1) {
-            shifts++;
+            qwd.shifts++;
             multiplier = multiplier >> 1;
         }
 
         // if the baseline size will not comply to MAX_POINTS
         // lower the window of the baseline
-        while(shifts && (qwr->points << shifts) > MAX_POINTS)
-            shifts--;
+        while(qwd.shifts && (qwr->points << qwd.shifts) > MAX_POINTS)
+            qwd.shifts--;
 
         // if the baseline size still does not comply to MAX_POINTS
         // lower the resolution of the highlight and the baseline
-        while((qwr->points << shifts) > MAX_POINTS)
+        while((qwr->points << qwd.shifts) > MAX_POINTS)
             qwr->points = qwr->points >> 1;
 
         if(qwr->points < 15) {
@@ -972,29 +1126,33 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
         }
 
         // adjust the baseline to be multiplier times bigger than the highlight
-        qwr->baseline_after = qwr->baseline_before - (high_delta << shifts);
+        qwr->baseline_after = qwr->baseline_before - (high_delta << qwd.shifts);
     }
 
-    bool register_zero = true;
     if(qwr->options & RRDR_OPTION_NONZERO) {
-        register_zero = false;
+        qwd.register_zero = false;
         qwr->options &= ~RRDR_OPTION_NONZERO;
     }
 
+    if(qwr->host && qwr->version == 1)
+        weights_do_node_callback(&qwd, qwr->host, true);
+    else
+        query_scope_foreach_host(qwd.scope_nodes_sp, qwd.nodes_sp,
+                                 weights_do_node_callback, &qwd,
+                                 &qwd.versions,
+                                 NULL);
 
-    weights_for_host(qwr, qwr->host, scope_contexts, results, &stats, register_zero, &weights_host_data, shifts);
-
-    if(weights_host_data.timeout) {
+    if(qwd.timeout) {
         error = "timed out";
         resp = HTTP_RESP_GATEWAY_TIMEOUT;
         goto cleanup;
     }
 
-    if(!register_zero)
+    if(!qwd.register_zero)
         qwr->options |= RRDR_OPTION_NONZERO;
 
     if(!(qwr->options & RRDR_OPTION_RETURN_RAW))
-        spread_results_evenly(results, &stats);
+        spread_results_evenly(qwd.results, &qwd.stats);
 
     usec_t ended_usec = now_realtime_usec();
 
@@ -1006,24 +1164,35 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
         case WEIGHTS_FORMAT_CHARTS:
             added_dimensions =
                     registered_results_to_json_charts(
-                            results, wb,
+                            qwd.results, wb,
                             qwr->after, qwr->before,
                             qwr->baseline_after, qwr->baseline_before,
-                            qwr->points, qwr->method, qwr->group, qwr->options, shifts,
-                            weights_host_data.examined_dimensions,
-                            ended_usec - weights_host_data.started_us, &stats);
+                            qwr->points, qwr->method, qwr->group, qwr->options, qwd.shifts,
+                            qwd.examined_dimensions,
+                            ended_usec - qwd.started_us, &qwd.stats);
             break;
 
-        default:
         case WEIGHTS_FORMAT_CONTEXTS:
             added_dimensions =
                     registered_results_to_json_contexts(
-                            results, wb,
+                            qwd.results, wb,
                             qwr->after, qwr->before,
                             qwr->baseline_after, qwr->baseline_before,
-                            qwr->points, qwr->method, qwr->group, qwr->options, shifts,
-                            weights_host_data.examined_dimensions,
-                            ended_usec - weights_host_data.started_us, &stats);
+                            qwr->points, qwr->method, qwr->group, qwr->options, qwd.shifts,
+                            qwd.examined_dimensions,
+                            ended_usec - qwd.started_us, &qwd.stats);
+            break;
+
+        default:
+        case WEIGHTS_FORMAT_MULTINODE:
+            added_dimensions =
+                    registered_results_to_json_multinode(
+                            qwd.results, wb,
+                            qwr->after, qwr->before,
+                            qwr->baseline_after, qwr->baseline_before,
+                            qwr->points, qwr->method, qwr->group, qwr->options, qwd.shifts,
+                            qwd.examined_dimensions,
+                            ended_usec - qwd.started_us, &qwd.stats);
             break;
     }
 
@@ -1033,10 +1202,16 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
     }
 
 cleanup:
-    simple_pattern_free(scope_nodes);
-    simple_pattern_free(scope_contexts);
+    simple_pattern_free(qwd.scope_nodes_sp);
+    simple_pattern_free(qwd.scope_contexts_sp);
+    simple_pattern_free(qwd.nodes_sp);
+    simple_pattern_free(qwd.contexts_sp);
+    simple_pattern_free(qwd.instances_sp);
+    simple_pattern_free(qwd.dimensions_sp);
+    simple_pattern_free(qwd.labels_sp);
+    simple_pattern_free(qwd.alerts_sp);
 
-    if(results) register_result_destroy(results);
+    register_result_destroy(qwd.results);
 
     if(error) {
         buffer_flush(wb);

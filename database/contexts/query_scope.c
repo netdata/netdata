@@ -2,9 +2,9 @@
 
 #include "internal.h"
 
-uint64_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hosts_sp, foreach_host_cb_t cb, void *data,
-                                  uint64_t *contexts_hard_hash, uint64_t *context_soft_hash,
-                                  uint64_t *alerts_hard_hash, uint64_t *alerts_soft_hash,
+uint64_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hosts_sp,
+                                  foreach_host_cb_t cb, void *data,
+                                  struct query_versions *versions,
                                   char *host_uuid_buffer) {
     char uuid[UUID_STR_LEN];
     if(!host_uuid_buffer) host_uuid_buffer = uuid;
@@ -17,7 +17,7 @@ uint64_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN
     uint64_t a_hash = 0;
     uint64_t t_hash = 0;
 
-    dfe_start_reentrant(rrdhost_root_index, host) {
+    dfe_start_read(rrdhost_root_index, host) {
         if(host->node_id)
             uuid_unparse_lower(*host->node_id, host_uuid_buffer);
 
@@ -31,44 +31,43 @@ uint64_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN
             }
         }
 
-        if(ret == SP_MATCHED_POSITIVE) {
-            if(hosts_sp) {
-                ret = simple_pattern_matches_string_extract(hosts_sp, host->hostname, NULL, 0);
-                if(ret == SP_NOT_MATCHED) {
-                    ret = simple_pattern_matches_extract(hosts_sp, host->machine_guid, NULL, 0);
-                    if(ret == SP_NOT_MATCHED && *host_uuid_buffer)
-                        ret = simple_pattern_matches_extract(hosts_sp, host_uuid_buffer, NULL, 0);
-                }
+        if(ret != SP_MATCHED_POSITIVE)
+            continue;
+
+        dfe_unlock(host);
+
+        if(hosts_sp) {
+            ret = simple_pattern_matches_string_extract(hosts_sp, host->hostname, NULL, 0);
+            if(ret == SP_NOT_MATCHED) {
+                ret = simple_pattern_matches_extract(hosts_sp, host->machine_guid, NULL, 0);
+                if(ret == SP_NOT_MATCHED && *host_uuid_buffer)
+                    ret = simple_pattern_matches_extract(hosts_sp, host_uuid_buffer, NULL, 0);
             }
-
-            bool queryable_host = (ret == SP_MATCHED_POSITIVE);
-
-            count++;
-            v_hash += dictionary_version(host->rrdctx.contexts);
-            h_hash += dictionary_version(host->rrdctx.hub_queue);
-            a_hash += dictionary_version(host->rrdcalc_root_index);
-            t_hash += __atomic_load_n(&host->health_transitions, __ATOMIC_RELAXED);
-            cb(data, host, queryable_host);
         }
+
+        bool queryable_host = (ret == SP_MATCHED_POSITIVE);
+
+        count++;
+        v_hash += dictionary_version(host->rrdctx.contexts);
+        h_hash += dictionary_version(host->rrdctx.hub_queue);
+        a_hash += dictionary_version(host->rrdcalc_root_index);
+        t_hash += __atomic_load_n(&host->health_transitions, __ATOMIC_RELAXED);
+        cb(data, host, queryable_host);
     }
     dfe_done(host);
 
-    if(contexts_hard_hash)
-        *contexts_hard_hash = v_hash;
-
-    if(context_soft_hash)
-        *context_soft_hash = h_hash;
-
-    if(alerts_hard_hash)
-        *alerts_hard_hash = a_hash;
-
-    if(alerts_soft_hash)
-        *alerts_soft_hash = t_hash;
+    if(versions) {
+        versions->contexts_hard_hash = v_hash;
+        versions->contexts_soft_hash = h_hash;
+        versions->alerts_hard_hash = a_hash;
+        versions->alerts_soft_hash = t_hash;
+    }
 
     return count;
 }
 
-size_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, SIMPLE_PATTERN *scope_contexts_sp, SIMPLE_PATTERN *contexts_sp, foreach_context_cb_t cb, bool queryable_host, void *data) {
+size_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, SIMPLE_PATTERN *scope_contexts_sp,
+                                   SIMPLE_PATTERN *contexts_sp, foreach_context_cb_t cb, bool queryable_host, void *data) {
     size_t added = 0;
 
     RRDCONTEXT_ACQUIRED *rca = NULL;
@@ -95,6 +94,8 @@ size_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, SI
         dfe_start_read(host->rrdctx.contexts, rc) {
             if(scope_contexts_sp && !simple_pattern_matches_string(scope_contexts_sp, rc->id))
                 continue;
+
+            dfe_unlock(rc);
 
             bool queryable_context = queryable_host;
             if(queryable_context && contexts_sp && !simple_pattern_matches_string(contexts_sp, rc->id))
