@@ -385,7 +385,7 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
         total_dimensions++;
     }
     dfe_done(t);
-    
+
     // close instance
     if(last_ria) {
         buffer_json_object_close(wb); // dimensions
