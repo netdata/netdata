@@ -122,7 +122,7 @@ static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *w
                                    size_t examined_dimensions __maybe_unused, usec_t duration,
                                    WEIGHTS_STATS *stats) {
 
-    buffer_json_initialize(wb, "\"", "\"", 0, true, options & (RRDR_OPTION_MINIFY|RRDR_OPTION_DEBUG));
+    buffer_json_initialize(wb, "\"", "\"", 0, true, options & RRDR_OPTION_MINIFY);
     buffer_json_member_add_time_t(wb, "after", after);
     buffer_json_member_add_time_t(wb, "before", before);
     buffer_json_member_add_time_t(wb, "duration", before - after);
@@ -301,9 +301,12 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
                                                   size_t points, WEIGHTS_METHOD method,
                                                   RRDR_TIME_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
                                                   size_t examined_dimensions, usec_t duration,
-                                                  WEIGHTS_STATS *stats) {
+                                                  WEIGHTS_STATS *stats,
+                                                  struct query_versions *versions) {
     results_header_to_json(results, wb, after, before, baseline_after, baseline_before,
                            points, method, group, options, shifts, examined_dimensions, duration, stats);
+
+    version_hashes_api_v2(wb, versions);
 
     buffer_json_member_add_object(wb, "nodes");
 
@@ -1191,7 +1194,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
                             qwr->baseline_after, qwr->baseline_before,
                             qwr->points, qwr->method, qwr->group, qwr->options, qwd.shifts,
                             qwd.examined_dimensions,
-                            ended_usec - qwd.started_us, &qwd.stats);
+                            ended_usec - qwd.started_us, &qwd.stats, &qwd.versions);
             break;
     }
 
