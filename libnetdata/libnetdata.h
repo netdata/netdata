@@ -430,6 +430,7 @@ typedef struct storage_point {
             (dst).count += (src).count;                 \
             (dst).anomaly_count += (src).anomaly_count; \
                                                         \
+            (dst).flags |= (src).flags & SN_FLAG_RESET; \
         }                                               \
 } while(0)
 
@@ -453,6 +454,7 @@ typedef struct storage_point {
             (dst).count += (src).count;                 \
             (dst).anomaly_count += (src).anomaly_count; \
                                                         \
+            (dst).flags |= (src).flags & SN_FLAG_RESET; \
         }                                               \
 } while(0)
 

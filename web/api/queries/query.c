@@ -985,7 +985,7 @@ static time_t rrdset_find_natural_update_every_for_timeframe(QUERY_TARGET *qt, t
 typedef struct query_point {
     STORAGE_POINT sp;
     NETDATA_DOUBLE value;
-    SN_FLAGS flags;
+    bool added;
 #ifdef NETDATA_INTERNAL_CHECKS
     size_t id;
 #endif
@@ -994,7 +994,7 @@ typedef struct query_point {
 QUERY_POINT QUERY_POINT_EMPTY = {
         .sp = STORAGE_POINT_UNSET,
         .value = NAN,
-        .flags = SN_FLAG_NONE,
+        .added = false,
 #ifdef NETDATA_INTERNAL_CHECKS
         .id = 0,
 #endif
@@ -1370,11 +1370,13 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
         if(likely(fpclassify((point).value) != FP_ZERO))                \
             (ops)->group_points_non_zero++;                             \
                                                                         \
-        if(unlikely((point).flags & SN_FLAG_RESET))                     \
+        if(unlikely((point).sp.flags & SN_FLAG_RESET))                  \
             (ops)->group_value_flags |= RRDR_VALUE_RESET;               \
                                                                         \
         (ops)->grouping_add(r, (point).value);                          \
-        storage_point_merge_to((ops)->group_point, (point).sp);         \
+                                                                        \
+        if(!(point).added)                                              \
+            storage_point_merge_to((ops)->group_point, (point).sp);     \
     }                                                                   \
                                                                         \
     (ops)->group_points_added++;                                        \
@@ -1515,6 +1517,8 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                 if(likely(storage_point_is_unset(next1_point))) {
                     db_points_read_since_plan_switch++;
                     sp = ops->next_metric(ops->handle);
+                    ops->db_points_read_per_tier[ops->tier]++;
+                    ops->db_total_points_read++;
 
                     if(unlikely(options & RRDR_OPTION_ABSOLUTE))
                         storage_point_make_positive(sp);
@@ -1539,6 +1543,8 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                     // B. part of the point of the previous plan overlaps with the point from the next plan
 
                     STORAGE_POINT sp2 = ops->next_metric(ops->handle);
+                    ops->db_points_read_per_tier[ops->tier]++;
+                    ops->db_total_points_read++;
 
                     if(unlikely(options & RRDR_OPTION_ABSOLUTE))
                         storage_point_make_positive(sp);
@@ -1553,10 +1559,8 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                         next1_point = sp2;
                 }
 
-                ops->db_points_read_per_tier[ops->tier]++;
-                ops->db_total_points_read++;
-
                 new_point.sp = sp;
+                new_point.added = false;
                 query_point_set_id(new_point, ops->db_total_points_read);
 
 //                if(debug_this)
@@ -1590,10 +1594,8 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                         };
                     }
                 }
-                else {
+                else
                     new_point.value      = NAN;
-                    new_point.flags      = SN_FLAG_NONE;
-                }
             }
 
             // check if the db is giving us zero duration points
@@ -1635,6 +1637,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                     // this db point ends after our now_start time
 
                     query_add_point_to_group(r, new_point, ops);
+                    new_point.added = true;
                 }
                 else {
                     // we don't need this db point
@@ -1702,6 +1705,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
             if(likely(now_end_time > new_point.sp.start_time_s)) {
                 // it is time for our NEW point to be used
                 current_point = new_point;
+                new_point.added = true; // first copy, then set it, so that new_point will not be added again
                 query_interpolate_point(current_point, last1_point, now_end_time);
 
 //                internal_error(current_point.id > 0
@@ -1720,6 +1724,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
             else if(likely(now_end_time <= last1_point.sp.end_time_s)) {
                 // our LAST point is still valid
                 current_point = last1_point;
+                last1_point.added = true; // first copy, then set it, so that last1_point will not be added again
                 query_interpolate_point(current_point, last2_point, now_end_time);
 
 //                internal_error(current_point.id > 0
