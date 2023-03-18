@@ -258,7 +258,7 @@ int do_sys_block_zram(int update_every, usec_t dt) {
         ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
         if (ff == NULL)
         {
-            collector_error("Cannot read /proc/devices");
+            collector_error("Cannot read %s", filename);
             return 1;
         }
         ff = procfile_readall(ff);
