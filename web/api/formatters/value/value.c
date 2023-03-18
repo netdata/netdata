@@ -101,6 +101,13 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
         qv = (QUERY_VALUE) {
                 .value = NAN,
                 .anomaly_rate = NAN,
+                .sp = {
+                        .count = 0,
+                        .min = NAN,
+                        .max = NAN,
+                        .sum = NAN,
+                        .anomaly_count = 0,
+                }
         };
     }
     else {
@@ -109,7 +116,13 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
                 .before = r->view.before,
                 .points_read = r->stats.db_points_read,
                 .result_points = r->stats.result_points_generated,
+                .sp = {
+                        .count = 0,
+                }
         };
+
+        for(size_t d = 0; d < r->d ;d++)
+            storage_point_merge_to(qv.sp, r->drs[d]);
 
         for(size_t t = 0; t < storage_tiers ;t++)
             qv.storage_points_per_tier[t] = r->internal.qt->db.tiers[t].points;

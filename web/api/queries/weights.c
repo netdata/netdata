@@ -62,6 +62,7 @@ struct register_result {
     RRDINSTANCE_ACQUIRED *ria;
     RRDMETRIC_ACQUIRED *rma;
     NETDATA_DOUBLE value;
+    STORAGE_POINT highlighted;
 };
 
 static DICTIONARY *register_result_init() {
@@ -80,6 +81,8 @@ static void register_result(DICTIONARY *results,
                             RRDMETRIC_ACQUIRED *rma,
                             NETDATA_DOUBLE value,
                             RESULT_FLAGS flags,
+                            STORAGE_POINT *highlighted,
+                            STORAGE_POINT *baseline __maybe_unused,
                             WEIGHTS_STATS *stats,
                             bool register_zero) {
 
@@ -102,8 +105,11 @@ static void register_result(DICTIONARY *results,
         .rca = rca,
         .ria = ria,
         .rma = rma,
-        .value = v
+        .value = v,
     };
+
+    if(highlighted)
+        t.highlighted = *highlighted;
 
     // we can use the pointer address or RMA as a unique key for each metric
     char buf[20 + 1];
@@ -295,6 +301,28 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
     return total_dimensions;
 }
 
+static void storage_point_to_json(BUFFER *wb, STORAGE_POINT *sp, const char *key, RRDR_OPTIONS options) {
+    if(storage_point_is_unset(*sp) || storage_point_is_gap(*sp))
+        return;
+
+    if(key)
+        buffer_json_member_add_object(wb, key);
+
+    buffer_json_member_add_double(wb, "min", sp->min);
+    buffer_json_member_add_double(wb, "max", sp->max);
+    buffer_json_member_add_double(wb, "sum", sp->sum);
+    buffer_json_member_add_uint64(wb, "ars", sp->anomaly_count);
+    buffer_json_member_add_uint64(wb, "cnt", sp->count);
+
+    if(!(options & RRDR_OPTION_RETURN_RAW)) {
+        buffer_json_member_add_double(wb, "avg", (sp->count) ? sp->sum / (NETDATA_DOUBLE) sp->count : 0.0);
+        buffer_json_member_add_double(wb, "arp", storage_point_anomaly_rate(*sp));
+    }
+
+    if(key)
+        buffer_json_object_close(wb); // key
+}
+
 static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *wb,
                                                   time_t after, time_t before,
                                                   time_t baseline_after, time_t baseline_before,
@@ -312,6 +340,7 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
 
     size_t total_dimensions = 0, node_dims = 0, context_dims = 0, instance_dims = 0;
     NETDATA_DOUBLE context_total_weight = 0.0, instance_total_weight = 0.0, node_total_weight = 0.0;
+    STORAGE_POINT context_sp = STORAGE_POINT_UNSET, instance_sp = STORAGE_POINT_UNSET, node_sp = STORAGE_POINT_UNSET;
     struct register_result *t;
     RRDHOST *last_host = NULL;
     RRDCONTEXT_ACQUIRED *last_rca = NULL;
@@ -321,32 +350,38 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
         // close instance
         if(t->ria != last_ria && last_ria) {
             buffer_json_object_close(wb); // dimensions
-            buffer_json_member_add_double(wb, "weight", instance_total_weight / (double) instance_dims);
+            buffer_json_member_add_double(wb, "wgt", instance_total_weight / (double) instance_dims);
+            storage_point_to_json(wb, &instance_sp, NULL, options);
             buffer_json_object_close(wb); // instance:id
 
             last_ria = NULL;
             instance_dims = 0;
             instance_total_weight = 0.0;
+            instance_sp = STORAGE_POINT_UNSET;
         }
 
         // close context
         if(t->rca != last_rca && last_rca) {
             buffer_json_object_close(wb); // instances
-            buffer_json_member_add_double(wb, "weight", context_total_weight / (double) context_dims);
+            buffer_json_member_add_double(wb, "wgt", context_total_weight / (double) context_dims);
+            storage_point_to_json(wb, &context_sp, NULL, options);
             buffer_json_object_close(wb); // context:id
             last_rca = NULL;
             context_dims = 0;
             context_total_weight = 0.0;
+            context_sp = STORAGE_POINT_UNSET;
         }
 
         // close node
         if(t->host != last_host && last_host) {
             buffer_json_object_close(wb); // contexts
-            buffer_json_member_add_double(wb, "weight", node_total_weight / (double) node_dims);
+            buffer_json_member_add_double(wb, "wgt", node_total_weight / (double) node_dims);
+            storage_point_to_json(wb, &node_sp, NULL, options);
             buffer_json_object_close(wb); // host:hostname
             last_host = NULL;
             node_dims = 0;
             node_total_weight = 0.0;
+            node_sp = STORAGE_POINT_UNSET;
         }
 
         // open node
@@ -376,11 +411,19 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
             buffer_json_member_add_object(wb, "dimensions");
         }
 
+        buffer_json_member_add_object(wb, rrdmetric_acquired_name(t->rma));
+        buffer_json_member_add_double(wb, "wgt", t->value);
+        storage_point_to_json(wb, &t->highlighted, NULL, options);
+        buffer_json_object_close(wb);
 
-        buffer_json_member_add_double(wb, rrdmetric_acquired_name(t->rma), t->value);
         instance_total_weight += t->value;
         context_total_weight += t->value;
         node_total_weight += t->value;
+
+        storage_point_merge_to(instance_sp, t->highlighted);
+        storage_point_merge_to(context_sp, t->highlighted);
+        storage_point_merge_to(node_sp, t->highlighted);
+
         instance_dims++;
         context_dims++;
         node_dims++;
@@ -391,21 +434,24 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
     // close instance
     if(last_ria) {
         buffer_json_object_close(wb); // dimensions
-        buffer_json_member_add_double(wb, "weight", instance_total_weight / (double) instance_dims);
+        buffer_json_member_add_double(wb, "wgt", instance_total_weight / (double) instance_dims);
+        storage_point_to_json(wb, &instance_sp, NULL, options);
         buffer_json_object_close(wb); // instance:id
     }
 
     // close context
     if(last_rca) {
         buffer_json_object_close(wb); // instances
-        buffer_json_member_add_double(wb, "weight", context_total_weight / (double) context_dims);
+        buffer_json_member_add_double(wb, "wgt", context_total_weight / (double) context_dims);
+        storage_point_to_json(wb, &context_sp, NULL, options);
         buffer_json_object_close(wb); // context:id
     }
 
     // close node
     if(last_host) {
         buffer_json_object_close(wb); // contexts
-        buffer_json_member_add_double(wb, "weight", node_total_weight / (double) node_dims);
+        buffer_json_member_add_double(wb, "wgt", node_total_weight / (double) node_dims);
+        storage_point_to_json(wb, &node_sp, NULL, options);
         buffer_json_object_close(wb); // host:hostname
     }
 
@@ -709,7 +755,7 @@ static void rrdset_metric_correlations_ks2(
 
         // to spread the results evenly, 0.0 needs to be the less correlated and 1.0 the most correlated
         // so, we flip the result of kstwo()
-        register_result(results, host, rca, ria, rma, 1.0 - prob, RESULT_IS_BASE_HIGH_RATIO, stats, register_zero);
+        register_result(results, host, rca, ria, rma, 1.0 - prob, RESULT_IS_BASE_HIGH_RATIO, NULL, NULL, stats, register_zero);
     }
 
 cleanup:
@@ -790,7 +836,7 @@ static void rrdset_metric_correlations_volume(
         pcent = highlight_countif.value;
     }
 
-    register_result(results, host, rca, ria, rma, pcent, flags, stats, register_zero);
+    register_result(results, host, rca, ria, rma, pcent, flags, &highlight_average.sp, &baseline_average.sp, stats, register_zero);
 }
 
 // ----------------------------------------------------------------------------
@@ -814,7 +860,7 @@ static void rrdset_weights_value(
     merge_query_value_to_stats(&qv, stats);
 
     if(netdata_double_isnumber(qv.value))
-        register_result(results, host, rca, ria, rma, qv.value, 0, stats, register_zero);
+        register_result(results, host, rca, ria, rma, qv.value, 0, &qv.sp, NULL, stats, register_zero);
 }
 
 // ----------------------------------------------------------------------------
