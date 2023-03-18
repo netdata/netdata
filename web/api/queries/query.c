@@ -1758,9 +1758,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
             NETDATA_DOUBLE group_value = ops->grouping_flush(r, rrdr_value_options_ptr);
             r->v[rrdr_o_v_index] = group_value;
 
-            NETDATA_DOUBLE group_ar = r->ar[rrdr_o_v_index] = ops->group_point.count ?
-                    (NETDATA_DOUBLE)ops->group_point.anomaly_count * 100.0 / (NETDATA_DOUBLE)ops->group_point.count
-                    : 0.0;
+            NETDATA_DOUBLE group_ar = r->ar[rrdr_o_v_index] = storage_point_anomaly_rate(ops->group_point);
 
             if(likely(points_added || r->internal.queries_count)) {
                 // find the min/max across all dimensions
