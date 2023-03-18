@@ -11,10 +11,6 @@ inline bool query_target_has_percentage_units(struct query_target *qt) {
     return false;
 }
 
-bool query_target_aggregatable(struct query_target *qt) {
-    return (qt->request.options & RRDR_OPTION_RETURN_RAW);
-}
-
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb) {
     rrdset2json(st, wb, NULL, NULL, 0);
 }

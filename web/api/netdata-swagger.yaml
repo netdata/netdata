@@ -388,6 +388,7 @@ paths:
           in: query
           description: |
             The aggregation function to apply when grouping metrics together.
+            When option `raw` is given, `average` and `avg` behave like `sum` and the caller is expected to calculate the average.
           required: false
           schema:
             type: string

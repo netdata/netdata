@@ -122,7 +122,7 @@ static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *w
                                    size_t examined_dimensions __maybe_unused, usec_t duration,
                                    WEIGHTS_STATS *stats) {
 
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, options & (RRDR_OPTION_MINIFY|RRDR_OPTION_DEBUG));
     buffer_json_member_add_time_t(wb, "after", after);
     buffer_json_member_add_time_t(wb, "before", before);
     buffer_json_member_add_time_t(wb, "duration", before - after);
@@ -307,7 +307,7 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
 
     buffer_json_member_add_object(wb, "nodes");
 
-    size_t nodes = 0, contexts = 0, instances = 0, total_dimensions = 0, node_dims = 0, context_dims = 0, instance_dims = 0;
+    size_t total_dimensions = 0, node_dims = 0, context_dims = 0, instance_dims = 0;
     NETDATA_DOUBLE context_total_weight = 0.0, instance_total_weight = 0.0, node_total_weight = 0.0;
     struct register_result *t;
     RRDHOST *last_host = NULL;
@@ -350,9 +350,11 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
         if(t->host != last_host) {
             last_host = t->host;
 
-            buffer_json_member_add_object(wb, rrdhost_hostname(t->host));
+            buffer_json_member_add_object(wb, t->host->machine_guid);
+            if(t->host->node_id)
+                buffer_json_member_add_uuid(wb, "nd", t->host->node_id);
+            buffer_json_member_add_string(wb, "nm", rrdhost_hostname(t->host));
             buffer_json_member_add_object(wb, "contexts");
-            nodes++;
         }
 
         // open context
@@ -361,7 +363,6 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
 
             buffer_json_member_add_object(wb, rrdcontext_acquired_id(t->rca));
             buffer_json_member_add_object(wb, "instances");
-            contexts++;
         }
 
         // open instance
@@ -370,8 +371,6 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
 
             buffer_json_member_add_object(wb, rrdinstance_acquired_id(t->ria));
             buffer_json_member_add_object(wb, "dimensions");
-
-            instances++;
         }
 
 
@@ -1151,7 +1150,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
     if(!qwd.register_zero)
         qwr->options |= RRDR_OPTION_NONZERO;
 
-    if(!(qwr->options & RRDR_OPTION_RETURN_RAW))
+    if(!(qwr->options & RRDR_OPTION_RETURN_RAW) && qwr->method != WEIGHTS_METHOD_VALUE)
         spread_results_evenly(qwd.results, &qwd.stats);
 
     usec_t ended_usec = now_realtime_usec();

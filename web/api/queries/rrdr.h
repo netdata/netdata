@@ -108,6 +108,7 @@ typedef struct rrdresult {
     NETDATA_DOUBLE *dmin;     // array of d dimension minimums - NOT ALLOCATED when RRDR is created
     NETDATA_DOUBLE *dmax;     // array of d dimension maximums - NOT ALLOCATED when RRDR is created
     DICTIONARY **dl;          // array of d dimension labels - NOT ALLOCATED when RRDR is created
+    STORAGE_POINT *drs;       // array of d dimensions raw statistics (storage points)
 
     DICTIONARY *label_keys;
 

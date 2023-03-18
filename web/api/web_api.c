@@ -100,8 +100,11 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
         else if (!strcmp(name, "timeout"))
             timeout = (int) strtoul(value, NULL, 0);
 
-        else if(!strcmp(name, "group"))
+        else if((api_version == 1 && !strcmp(name, "group")) || (api_version >= 2 && !strcmp(name, "time_group")))
             group = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
+
+        else if((api_version == 1 && !strcmp(name, "group_options")) || (api_version >= 2 && !strcmp(name, "time_group_options")))
+            group_options = value;
 
         else if(!strcmp(name, "options")) {
             if(!options_count) options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NULL2ZERO;
@@ -132,6 +135,12 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
                 tier = 0;
         }
     }
+
+    if(options & RRDR_OPTION_PERCENTAGE)
+        options |= RRDR_OPTION_ABSOLUTE;
+
+    if(options & RRDR_OPTION_DEBUG)
+        options &= ~RRDR_OPTION_MINIFY;
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
