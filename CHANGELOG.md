@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- bump go.d.plugin to v0.51.4 [\#14756](https://github.com/netdata/netdata/pull/14756) ([ilyam8](https://github.com/ilyam8))
+- Add ethtool in third party collectors [\#14753](https://github.com/netdata/netdata/pull/14753) ([ghanapunq](https://github.com/ghanapunq))
+- Update sign-in.md [\#14751](https://github.com/netdata/netdata/pull/14751) ([cakrit](https://github.com/cakrit))
+- Update edit-config documentation [\#14749](https://github.com/netdata/netdata/pull/14749) ([cakrit](https://github.com/cakrit))
 - bump go.d.plugin version to v0.51.3 [\#14745](https://github.com/netdata/netdata/pull/14745) ([ilyam8](https://github.com/ilyam8))
 - increase RRD\_ID\_LENGTH\_MAX to 1000 [\#14744](https://github.com/netdata/netdata/pull/14744) ([ilyam8](https://github.com/ilyam8))
 - Update Performance Optimization Options [\#14743](https://github.com/netdata/netdata/pull/14743) ([cakrit](https://github.com/cakrit))
@@ -15,12 +19,16 @@
 - Update data-privacy.md [\#14739](https://github.com/netdata/netdata/pull/14739) ([cakrit](https://github.com/cakrit))
 - Update data-privacy.md [\#14738](https://github.com/netdata/netdata/pull/14738) ([cakrit](https://github.com/cakrit))
 - pandas collector replace `self.warn()` with `self.warning()` [\#14736](https://github.com/netdata/netdata/pull/14736) ([andrewm4894](https://github.com/andrewm4894))
+- Add CI support for Fedora 38 & Ubuntu 23.04 native packages [\#14735](https://github.com/netdata/netdata/pull/14735) ([tkatsoulas](https://github.com/tkatsoulas))
 - Update change-metrics-storage.md [\#14734](https://github.com/netdata/netdata/pull/14734) ([cakrit](https://github.com/cakrit))
 - Correct calc and explain how to get METRICS in RAM usage [\#14733](https://github.com/netdata/netdata/pull/14733) ([cakrit](https://github.com/cakrit))
 - Update dashboard to version v2.30.0. [\#14732](https://github.com/netdata/netdata/pull/14732) ([netdatabot](https://github.com/netdatabot))
+- Organize information from war-rooms.md to its correct location [\#14729](https://github.com/netdata/netdata/pull/14729) ([Ancairon](https://github.com/Ancairon))
 - Update change-metrics-storage.md [\#14726](https://github.com/netdata/netdata/pull/14726) ([cakrit](https://github.com/cakrit))
 - New build\_external scenario. [\#14725](https://github.com/netdata/netdata/pull/14725) ([vkalintiris](https://github.com/vkalintiris))
+- Suggest PRs to go to the community project [\#14724](https://github.com/netdata/netdata/pull/14724) ([cakrit](https://github.com/cakrit))
 - add go.d example collector to \#etc section [\#14722](https://github.com/netdata/netdata/pull/14722) ([andrewm4894](https://github.com/andrewm4894))
+- Update deployment-strategies.md [\#14716](https://github.com/netdata/netdata/pull/14716) ([cakrit](https://github.com/cakrit))
 - Change H1 of collector docs to separate from the website [\#14715](https://github.com/netdata/netdata/pull/14715) ([cakrit](https://github.com/cakrit))
 - Add instructions for reconnecting a Docker node to another Space [\#14714](https://github.com/netdata/netdata/pull/14714) ([Ancairon](https://github.com/Ancairon))
 - fix system info disk size detection on raspberry pi  [\#14711](https://github.com/netdata/netdata/pull/14711) ([ilyam8](https://github.com/ilyam8))
@@ -374,11 +382,6 @@
 - Document memory mode alloc [\#14142](https://github.com/netdata/netdata/pull/14142) ([cakrit](https://github.com/cakrit))
 - fix\(packaging\): add setuid for cgroup-network and ebpf.plugin in RPM [\#14140](https://github.com/netdata/netdata/pull/14140) ([ilyam8](https://github.com/ilyam8))
 - use chart labels in portcheck alarms [\#14137](https://github.com/netdata/netdata/pull/14137) ([ilyam8](https://github.com/ilyam8))
-- Remove Fedora 35 from the list of supported platforms. [\#14136](https://github.com/netdata/netdata/pull/14136) ([Ferroin](https://github.com/Ferroin))
-- Fix conditions for uploading repoconfig packages to new infra. [\#14134](https://github.com/netdata/netdata/pull/14134) ([Ferroin](https://github.com/Ferroin))
-- fix httpcheck alarms [\#14133](https://github.com/netdata/netdata/pull/14133) ([ilyam8](https://github.com/ilyam8))
-- eBPF \(memory, NV, basis for functions\) [\#14131](https://github.com/netdata/netdata/pull/14131) ([thiagoftsm](https://github.com/thiagoftsm))
-- DBENGINE v2 [\#14125](https://github.com/netdata/netdata/pull/14125) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
