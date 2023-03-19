@@ -176,7 +176,7 @@ static FTS_MATCH rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_jso
     return matched;
 }
 
-static bool rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context __maybe_unused) {
+static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context __maybe_unused) {
     struct rrdcontext_to_json_v2_data *ctl = data;
 
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
@@ -186,7 +186,7 @@ static bool rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED *r
         match = rrdcontext_to_json_v2_full_text_search(ctl, rc, ctl->q.pattern);
 
         if(match == FTS_MATCHED_NONE)
-            return false;
+            return 0;
     }
 
     struct rrdcontext_to_json_v2_entry t = {
@@ -219,17 +219,25 @@ static bool rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED *r
             z->last_time_s = rc->last_time_s;
     }
 
-    return true;
+    return 1;
 }
 
-static bool rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool queryable_host) {
+static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool queryable_host) {
     if(!queryable_host || !host->rrdctx.contexts)
         // the host matches the 'scope_host' but does not match the 'host' patterns
         // or the host does not have any contexts
-        return false;
+        return 0;
 
     struct rrdcontext_to_json_v2_data *ctl = data;
     BUFFER *wb = ctl->wb;
+
+    if(ctl->request->timeout && now_monotonic_usec() > ctl->request->timings.received_ut + ctl->request->timeout * USEC_PER_SEC)
+        // timed out
+        return -2;
+
+    if(ctl->request->interrupt_callback && ctl->request->interrupt_callback(ctl->request->interrupt_callback_data))
+        // interrupted
+        return -1;
 
     bool host_matched = (ctl->options & CONTEXTS_V2_NODES);
     bool do_contexts = (ctl->options & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH));
@@ -254,13 +262,16 @@ static bool rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool query
             // do not do pattern matching on contexts - we matched the host itself
             ctl->q.pattern = NULL;
 
-        size_t added = query_scope_foreach_context(
+        ssize_t added = query_scope_foreach_context(
                 host, ctl->request->scope_contexts,
                 ctl->contexts.scope_pattern, ctl->contexts.pattern,
                 rrdcontext_to_json_v2_add_context, queryable_host, ctl);
 
         // restore it
         ctl->q.pattern = old_q;
+
+        if(added == -1)
+            return -1;
 
         if(added)
             host_matched = true;
@@ -344,7 +355,7 @@ static bool rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool query
         buffer_json_object_close(wb);
     }
 
-    return host_matched;
+    return host_matched ? 1 : 0;
 }
 
 static void buffer_json_contexts_v2_options_to_array(BUFFER *wb, CONTEXTS_V2_OPTIONS options) {
@@ -362,6 +373,8 @@ static void buffer_json_contexts_v2_options_to_array(BUFFER *wb, CONTEXTS_V2_OPT
 }
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_OPTIONS options) {
+    int resp = HTTP_RESP_OK;
+
     req->timings.processing_ut = now_monotonic_usec();
 
     if(options & CONTEXTS_V2_SEARCH)
@@ -419,9 +432,24 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     if(options & (CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED | CONTEXTS_V2_DEBUG))
         buffer_json_member_add_array(wb, "nodes");
 
-    query_scope_foreach_host(ctl.nodes.scope_pattern, ctl.nodes.pattern,
+    ssize_t ret = query_scope_foreach_host(ctl.nodes.scope_pattern, ctl.nodes.pattern,
                              rrdcontext_to_json_v2_add_host, &ctl,
                              &ctl.versions, ctl.q.host_uuid_buffer);
+
+    if(unlikely(ret < 0)) {
+        buffer_flush(wb);
+
+        if(ret == -2) {
+            buffer_strcat(wb, "query timeout");
+            resp = HTTP_RESP_GATEWAY_TIMEOUT;
+        }
+        else {
+            buffer_strcat(wb, "query interrupted");
+            resp = HTTP_RESP_BACKEND_FETCH_FAILED;
+        }
+        goto cleanup;
+    }
+
     if(options & (CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED | CONTEXTS_V2_DEBUG))
         buffer_json_array_close(wb);
 
@@ -467,6 +495,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     buffer_json_object_close(wb);
     buffer_json_finalize(wb);
 
+cleanup:
     dictionary_destroy(ctl.ctx);
     simple_pattern_free(ctl.nodes.scope_pattern);
     simple_pattern_free(ctl.nodes.pattern);
@@ -474,6 +503,6 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     simple_pattern_free(ctl.contexts.scope_pattern);
     simple_pattern_free(ctl.q.pattern);
 
-    return HTTP_RESP_OK;
+    return resp;
 }
 

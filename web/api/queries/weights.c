@@ -999,7 +999,7 @@ struct query_weights_data {
     struct query_versions versions;
 };
 
-static int weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma) {
+static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma) {
     struct query_weights_data *qwd = data;
     QUERY_WEIGHTS_REQUEST *qwr = qwd->qwr;
 
@@ -1065,35 +1065,33 @@ static int weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUIRED 
     return 1;
 }
 
-static bool weights_do_context_callback(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context) {
+static ssize_t weights_do_context_callback(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context) {
     if(!queryable_context)
         return false;
 
     struct query_weights_data *qwd = data;
-    if(weights_foreach_rrdmetric_in_context(rca,
+    ssize_t ret = weights_foreach_rrdmetric_in_context(rca,
                                             qwd->instances_sp,
                                             NULL,
                                             qwd->labels_sp,
                                             qwd->alerts_sp,
                                             qwd->dimensions_sp,
                                             true, true, qwd->qwr->version,
-                                            weights_for_rrdmetric, qwd))
-        return true;
-
-    return false;
+                                            weights_for_rrdmetric, qwd);
+    return ret;
 }
 
-bool weights_do_node_callback(void *data, RRDHOST *host, bool queryable) {
+ssize_t weights_do_node_callback(void *data, RRDHOST *host, bool queryable) {
     if(!queryable)
-        return false;
+        return 0;
 
     struct query_weights_data *qwd = data;
 
-    query_scope_foreach_context(host, qwd->qwr->scope_contexts,
+    ssize_t ret = query_scope_foreach_context(host, qwd->qwr->scope_contexts,
                                 qwd->scope_contexts_sp, qwd->contexts_sp,
                                 weights_do_context_callback, queryable, qwd);
 
-    return true;
+    return ret;
 }
 
 int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {

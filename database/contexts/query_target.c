@@ -755,18 +755,18 @@ static inline QUERY_CONTEXT *query_context_allocate(QUERY_TARGET *qt, RRDCONTEXT
     return qc;
 }
 
-static bool query_context_add(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context) {
+static ssize_t query_context_add(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context) {
     QUERY_TARGET_LOCALS *qtl = data;
 
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
     if(rrd_flag_is_deleted(rc))
-        return false;
+        return 0;
 
     QUERY_NODE *qn = qtl->qn;
     QUERY_TARGET *qt = qtl->qt;
     QUERY_CONTEXT *qc = query_context_allocate(qt, rca);
 
-    size_t added = 0;
+    ssize_t added = 0;
     if(unlikely(qt->request.ria)) {
         if(query_instance_add(qtl, qn, qc, qt->request.ria, queryable_context, false))
             added++;
@@ -787,10 +787,10 @@ static bool query_context_add(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryab
     if(!added) {
         query_context_release(qc);
         qt->contexts.used--;
-        return false;
+        return 0;
     }
 
-    return true;
+    return added;
 }
 
 static inline void query_node_release(QUERY_NODE *qn) {
@@ -815,7 +815,7 @@ static inline QUERY_NODE *query_node_allocate(QUERY_TARGET *qt, RRDHOST *host) {
     return qn;
 }
 
-static bool query_node_add(void *data, RRDHOST *host, bool queryable_host) {
+static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
     QUERY_TARGET_LOCALS *qtl = data;
     QUERY_TARGET *qt = qtl->qt;
     QUERY_NODE *qn = query_node_allocate(qt, host);
@@ -847,7 +847,7 @@ static bool query_node_add(void *data, RRDHOST *host, bool queryable_host) {
 
     qtl->qn = qn;
 
-    size_t added = 0;
+    ssize_t added = 0;
     if(unlikely(qt->request.rca)) {
         if(query_context_add(qtl, qt->request.rca, true))
             added++;
@@ -863,6 +863,9 @@ static bool query_node_add(void *data, RRDHOST *host, bool queryable_host) {
                 host, qtl->scope_contexts,
                 qt->contexts.scope_pattern, qt->contexts.pattern,
                 query_context_add, queryable_host, qtl);
+
+        if(added < 0)
+            added = 0;
     }
 
     qtl->qn = NULL;
@@ -1062,7 +1065,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     return qt;
 }
 
-size_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
+ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                                             SIMPLE_PATTERN *instances_sp,
                                             SIMPLE_PATTERN *chart_label_key_sp,
                                             SIMPLE_PATTERN *labels_sp,
@@ -1079,14 +1082,11 @@ size_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
 
     bool proceed = true;
 
-    size_t count = 0;
+    ssize_t count = 0;
     RRDINSTANCE *ri;
     dfe_start_read(rc->rrdinstances, ri) {
                 if(rrd_flag_is_deleted(ri))
                     continue;
-
-                if(unlikely(!proceed))
-                    break;
 
                 RRDINSTANCE_ACQUIRED *ria = (RRDINSTANCE_ACQUIRED *) ri_dfe.item;
 
@@ -1129,17 +1129,19 @@ size_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                             dfe_unlock(rm);
 
                             RRDMETRIC_ACQUIRED *rma = (RRDMETRIC_ACQUIRED *)rm_dfe.item;
-                            int ret = cb(data, rc->rrdhost, rca, ria, rma);
+                            ssize_t ret = cb(data, rc->rrdhost, rca, ria, rma);
 
-                            if(ret == -1) {
+                            if(ret < 0) {
                                 proceed = false;
                                 break;
                             }
 
-                            if(ret > 0)
-                                count += ret;
+                            count += ret;
                         }
                 dfe_done(rm);
+
+                if(unlikely(!proceed))
+                    break;
             }
     dfe_done(ri);
 

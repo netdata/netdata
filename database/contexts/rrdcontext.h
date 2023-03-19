@@ -467,6 +467,11 @@ struct api_v2_contexts_request {
         usec_t output_ut;
         usec_t finished_ut;
     } timings;
+
+    time_t timeout;
+
+    qt_interrupt_callback_t interrupt_callback;
+    void *interrupt_callback_data;
 };
 
 typedef enum __attribute__ ((__packed__)) {
@@ -484,20 +489,20 @@ RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o);
 // ----------------------------------------------------------------------------
 // scope
 
-typedef bool (*foreach_host_cb_t)(void *data, RRDHOST *host, bool queryable);
-uint64_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hosts_sp,
+typedef ssize_t (*foreach_host_cb_t)(void *data, RRDHOST *host, bool queryable);
+ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hosts_sp,
                                   foreach_host_cb_t cb, void *data,
                                   struct query_versions *versions,
                                   char *host_uuid_buffer);
 
-typedef bool (*foreach_context_cb_t)(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context);
-size_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, SIMPLE_PATTERN *scope_contexts_sp, SIMPLE_PATTERN *contexts_sp, foreach_context_cb_t cb, bool queryable_host, void *data);
+typedef ssize_t (*foreach_context_cb_t)(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context);
+ssize_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, SIMPLE_PATTERN *scope_contexts_sp, SIMPLE_PATTERN *contexts_sp, foreach_context_cb_t cb, bool queryable_host, void *data);
 
 // ----------------------------------------------------------------------------
 // public API for weights
 
-typedef int (*weights_add_metric_t)(void *data, RRDHOST *host, RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma);
-size_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
+typedef ssize_t (*weights_add_metric_t)(void *data, RRDHOST *host, RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma);
+ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                                             SIMPLE_PATTERN *instances_sp,
                                             SIMPLE_PATTERN *chart_label_key_sp,
                                             SIMPLE_PATTERN *labels_sp,
