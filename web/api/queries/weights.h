@@ -35,8 +35,8 @@ typedef struct query_weights_request {
     const char *alerts;
     WEIGHTS_METHOD method;
     WEIGHTS_FORMAT format;
-    RRDR_TIME_GROUPING group;
-    const char *group_options;
+    RRDR_TIME_GROUPING time_group_method;
+    const char *time_group_options;
     time_t baseline_after;
     time_t baseline_before;
     time_t after;

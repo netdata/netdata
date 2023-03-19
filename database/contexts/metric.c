@@ -14,6 +14,11 @@ inline const char *rrdmetric_acquired_name(RRDMETRIC_ACQUIRED *rma) {
     return string2str(rm->name);
 }
 
+inline bool rrdmetric_acquired_has_name(RRDMETRIC_ACQUIRED *rma) {
+    RRDMETRIC *rm = rrdmetric_acquired_value(rma);
+    return (rm->name && rm->name != rm->id);
+}
+
 inline STRING *rrdmetric_acquired_id_dup(RRDMETRIC_ACQUIRED *rma) {
     RRDMETRIC *rm = rrdmetric_acquired_value(rma);
     return string_dup(rm->id);

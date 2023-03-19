@@ -65,10 +65,10 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
     long long baseline_after = 0, baseline_before = 0, after = 0, before = 0, points = 0;
     RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO | RRDR_OPTION_NULL2ZERO;
     int options_count = 0;
-    RRDR_TIME_GROUPING group = RRDR_GROUPING_AVERAGE;
+    RRDR_TIME_GROUPING time_group_method = RRDR_GROUPING_AVERAGE;
     int timeout = 0;
     size_t tier = 0;
-    const char *group_options = NULL, *scope_contexts = NULL, *scope_nodes = NULL, *contexts = NULL, *nodes = NULL,
+    const char *time_group_options = NULL, *scope_contexts = NULL, *scope_nodes = NULL, *contexts = NULL, *nodes = NULL,
         *instances = NULL, *dimensions = NULL, *labels = NULL, *alerts = NULL;
 
     while (url) {
@@ -101,10 +101,10 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
             timeout = (int) strtoul(value, NULL, 0);
 
         else if((api_version == 1 && !strcmp(name, "group")) || (api_version >= 2 && !strcmp(name, "time_group")))
-            group = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
+            time_group_method = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
 
         else if((api_version == 1 && !strcmp(name, "group_options")) || (api_version >= 2 && !strcmp(name, "time_group_options")))
-            group_options = value;
+            time_group_options = value;
 
         else if(!strcmp(name, "options")) {
             if(!options_count) options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NULL2ZERO;
@@ -159,8 +159,8 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
             .alerts = alerts,
             .method = method,
             .format = format,
-            .group = group,
-            .group_options = group_options,
+            .time_group_method = time_group_method,
+            .time_group_options = time_group_options,
             .baseline_after = baseline_after,
             .baseline_before = baseline_before,
             .after = after,

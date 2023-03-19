@@ -20,6 +20,11 @@ inline const char *rrdinstance_acquired_name(RRDINSTANCE_ACQUIRED *ria) {
     return string2str(ri->name);
 }
 
+inline bool rrdinstance_acquired_has_name(RRDINSTANCE_ACQUIRED *ria) {
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    return (ri->name && ri->name != ri->id);
+}
+
 inline const char *rrdinstance_acquired_units(RRDINSTANCE_ACQUIRED *ria) {
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
     return string2str(ri->units);

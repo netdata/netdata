@@ -25,6 +25,7 @@ typedef struct rrdcontext_acquired RRDCONTEXT_ACQUIRED;
 bool rrdinstance_acquired_id_and_name_are_same(RRDINSTANCE_ACQUIRED *ria);
 const char *rrdmetric_acquired_id(RRDMETRIC_ACQUIRED *rma);
 const char *rrdmetric_acquired_name(RRDMETRIC_ACQUIRED *rma);
+bool rrdmetric_acquired_has_name(RRDMETRIC_ACQUIRED *rma);
 
 STRING *rrdmetric_acquired_id_dup(RRDMETRIC_ACQUIRED *rma);
 STRING *rrdmetric_acquired_name_dup(RRDMETRIC_ACQUIRED *rma);
@@ -36,6 +37,7 @@ bool rrdmetric_acquired_belongs_to_instance(RRDMETRIC_ACQUIRED *rma, RRDINSTANCE
 
 const char *rrdinstance_acquired_id(RRDINSTANCE_ACQUIRED *ria);
 const char *rrdinstance_acquired_name(RRDINSTANCE_ACQUIRED *ria);
+bool rrdinstance_acquired_has_name(RRDINSTANCE_ACQUIRED *ria);
 const char *rrdinstance_acquired_units(RRDINSTANCE_ACQUIRED *ria);
 STRING *rrdinstance_acquired_units_dup(RRDINSTANCE_ACQUIRED *ria);
 DICTIONARY *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria);
