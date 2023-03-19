@@ -62,11 +62,11 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
     if (!netdata_ready)
         return HTTP_RESP_BACKEND_FETCH_FAILED;
 
-    long long baseline_after = 0, baseline_before = 0, after = 0, before = 0, points = 0;
-    RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO | RRDR_OPTION_NULL2ZERO;
-    int options_count = 0;
+    time_t baseline_after = 0, baseline_before = 0, after = 0, before = 0;
+    size_t points = 0;
+    RRDR_OPTIONS options = 0;
     RRDR_TIME_GROUPING time_group_method = RRDR_GROUPING_AVERAGE;
-    int timeout = 0;
+    time_t timeout = 0;
     size_t tier = 0;
     const char *time_group_options = NULL, *scope_contexts = NULL, *scope_nodes = NULL, *contexts = NULL, *nodes = NULL,
         *instances = NULL, *dimensions = NULL, *labels = NULL, *alerts = NULL;
@@ -83,22 +83,22 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
             continue;
 
         if (!strcmp(name, "baseline_after"))
-            baseline_after = (long long) strtoul(value, NULL, 0);
+            baseline_after = str2l(value);
 
         else if (!strcmp(name, "baseline_before"))
-            baseline_before = (long long) strtoul(value, NULL, 0);
+            baseline_before = str2l(value);
 
         else if (!strcmp(name, "after") || !strcmp(name, "highlight_after"))
-            after = (long long) strtoul(value, NULL, 0);
+            after = str2l(value);
 
         else if (!strcmp(name, "before") || !strcmp(name, "highlight_before"))
-            before = (long long) strtoul(value, NULL, 0);
+            before = str2l(value);
 
         else if (!strcmp(name, "points") || !strcmp(name, "max_points"))
-            points = (long long) strtoul(value, NULL, 0);
+            points = str2ul(value);
 
         else if (!strcmp(name, "timeout"))
-            timeout = (int) strtoul(value, NULL, 0);
+            timeout = str2l(value);
 
         else if((api_version == 1 && !strcmp(name, "group")) || (api_version >= 2 && !strcmp(name, "time_group")))
             time_group_method = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
@@ -106,11 +106,8 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
         else if((api_version == 1 && !strcmp(name, "group_options")) || (api_version >= 2 && !strcmp(name, "time_group_options")))
             time_group_options = value;
 
-        else if(!strcmp(name, "options")) {
-            if(!options_count) options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NULL2ZERO;
+        else if(!strcmp(name, "options"))
             options |= web_client_api_request_v1_data_options(value);
-            options_count++;
-        }
 
         else if(!strcmp(name, "method"))
             method = weights_string_to_method(value);
@@ -135,6 +132,13 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
                 tier = 0;
         }
     }
+
+    if(options == 0)
+        // the user did not set any options
+        options  = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NULL2ZERO | RRDR_OPTION_NONZERO;
+    else
+        // the user set some options, add also these
+        options |= RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NULL2ZERO;
 
     if(options & RRDR_OPTION_PERCENTAGE)
         options |= RRDR_OPTION_ABSOLUTE;
