@@ -373,6 +373,7 @@ else
 fi
 AC_MSG_RESULT([${with_math}])
 
+AC_CHECK_DECLS(isfinite,,,[#include <math.h>])
 AC_CHECK_FUNCS([isfinite])
 AC_CHECK_FUNCS([finite])
 
