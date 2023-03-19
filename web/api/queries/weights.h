@@ -22,6 +22,8 @@ extern int enable_metric_correlations;
 extern int metric_correlations_version;
 extern WEIGHTS_METHOD default_metric_correlations_method;
 
+typedef bool (*weights_interrupt_callback_t)(void *data);
+
 typedef struct query_weights_request {
     size_t version;
     RRDHOST *host;
@@ -45,6 +47,9 @@ typedef struct query_weights_request {
     RRDR_OPTIONS options;
     size_t tier;
     size_t timeout;
+
+    weights_interrupt_callback_t interrupt_callback;
+    void *interrupt_callback_data;
 } QUERY_WEIGHTS_REQUEST;
 
 int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr);

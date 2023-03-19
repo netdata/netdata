@@ -249,7 +249,7 @@ typedef struct query_metric {
 
 #define MAX_QUERY_TARGET_ID_LENGTH 255
 
-typedef bool (*interrupt_callback_t)(void *data);
+typedef bool (*qt_interrupt_callback_t)(void *data);
 
 typedef struct query_target_request {
     size_t version;
@@ -297,7 +297,7 @@ typedef struct query_target_request {
 
     usec_t received_ut;
 
-    interrupt_callback_t interrupt_callback;
+    qt_interrupt_callback_t interrupt_callback;
     void *interrupt_callback_data;
 } QUERY_TARGET_REQUEST;
 
@@ -496,7 +496,7 @@ size_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, SI
 // ----------------------------------------------------------------------------
 // public API for weights
 
-typedef bool (*weights_add_metric_t)(void *data, RRDHOST *host, RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma);
+typedef int (*weights_add_metric_t)(void *data, RRDHOST *host, RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma);
 size_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                                             SIMPLE_PATTERN *instances_sp,
                                             SIMPLE_PATTERN *chart_label_key_sp,

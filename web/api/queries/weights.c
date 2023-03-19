@@ -414,7 +414,7 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
 //            buffer_json_member_add_string(wb, "units", rrdcontext_acquired_units(t->rca));
 //            buffer_json_member_add_string(wb, "title", rrdcontext_acquired_title(t->rca));
 //            buffer_json_member_add_string(wb, "chart_type", rrdset_type_name(rrdcontext_acquired_chart_type(t->rca)));
-            buffer_json_member_add_object(wb, "instances");
+            buffer_json_member_add_object(wb, "i");
         }
 
         // open instance
@@ -424,7 +424,7 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
             buffer_json_member_add_object(wb, rrdinstance_acquired_id(t->ria));
             if(rrdinstance_acquired_has_name(t->ria))
                 buffer_json_member_add_string(wb, "nm", rrdinstance_acquired_name(t->ria));
-            buffer_json_member_add_object(wb, "dimensions");
+            buffer_json_member_add_object(wb, "d");
         }
 
         buffer_json_member_add_object(wb, rrdmetric_acquired_id(t->rma));
@@ -985,7 +985,8 @@ struct query_weights_data {
     usec_t now_us;
     usec_t started_us;
     usec_t timeout_us;
-    bool timeout;
+    bool timed_out;
+    bool interrupted;
 
     size_t examined_dimensions;
     bool register_zero;
@@ -998,14 +999,19 @@ struct query_weights_data {
     struct query_versions versions;
 };
 
-static bool weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma) {
+static int weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma) {
     struct query_weights_data *qwd = data;
     QUERY_WEIGHTS_REQUEST *qwr = qwd->qwr;
 
     qwd->now_us = now_realtime_usec();
     if(qwd->now_us - qwd->started_us > qwd->timeout_us) {
-        qwd->timeout = true;
-        return false;
+        qwd->timed_out = true;
+        return -1;
+    }
+
+    if(qwd->qwr->interrupt_callback && qwd->qwr->interrupt_callback(qwd->qwr->interrupt_callback_data)) {
+        qwd->interrupted = true;
+        return -1;
     }
 
     qwd->examined_dimensions++;
@@ -1056,7 +1062,7 @@ static bool weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUIRED
             break;
     }
 
-    return true;
+    return 1;
 }
 
 static bool weights_do_context_callback(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context) {
@@ -1118,7 +1124,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
             .alerts_sp = string_to_simple_pattern(qwr->alerts),
             .timeout_us = qwr->timeout * USEC_PER_MS,
             .started_us = now_realtime_usec(),
-            .timeout = false,
+            .timed_out = false,
             .examined_dimensions = 0,
             .register_zero = true,
             .results = register_result_init(),
@@ -1217,9 +1223,15 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
         qwr->options |= RRDR_OPTION_NONZERO;
     }
 
-    if(qwd.timeout) {
+    if(qwd.timed_out) {
         error = "timed out";
         resp = HTTP_RESP_GATEWAY_TIMEOUT;
+        goto cleanup;
+    }
+
+    if(qwd.interrupted) {
+        error = "interrupted";
+        resp = HTTP_RESP_BACKEND_FETCH_FAILED;
         goto cleanup;
     }
 

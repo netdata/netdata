@@ -1077,11 +1077,16 @@ size_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
     if(!rc || rrd_flag_is_deleted(rc))
         return 0;
 
+    bool proceed = true;
+
     size_t count = 0;
     RRDINSTANCE *ri;
     dfe_start_read(rc->rrdinstances, ri) {
                 if(rrd_flag_is_deleted(ri))
                     continue;
+
+                if(unlikely(!proceed))
+                    break;
 
                 RRDINSTANCE_ACQUIRED *ria = (RRDINSTANCE_ACQUIRED *) ri_dfe.item;
 
@@ -1124,8 +1129,15 @@ size_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                             dfe_unlock(rm);
 
                             RRDMETRIC_ACQUIRED *rma = (RRDMETRIC_ACQUIRED *)rm_dfe.item;
-                            if(cb(data, rc->rrdhost, rca, ria, rma))
-                                count++;
+                            int ret = cb(data, rc->rrdhost, rca, ria, rma);
+
+                            if(ret == -1) {
+                                proceed = false;
+                                break;
+                            }
+
+                            if(ret > 0)
+                                count += ret;
                         }
                 dfe_done(rm);
             }

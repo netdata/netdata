@@ -169,6 +169,9 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
             .options = options,
             .tier = tier,
             .timeout = timeout,
+
+            .interrupt_callback = web_client_interrupt_callback,
+            .interrupt_callback_data = w,
     };
 
     return web_api_v12_weights(wb, &qwr);
