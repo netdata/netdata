@@ -1600,7 +1600,7 @@ inline int web_client_api_request_v1_logsmanagement_sources(RRDHOST *host, struc
     if (unlikely(!netdata_ready)) return HTTP_RESP_BACKEND_FETCH_FAILED;
 
     buffer_flush(w->response.data);
-    w->response.data->contenttype = CT_APPLICATION_JSON;
+    w->response.data->content_type = CT_APPLICATION_JSON;
 
     buffer_sprintf( w->response.data, 
                     "{\n"
@@ -1643,7 +1643,7 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
     getrusage(RUSAGE_THREAD, &start);
 
     buffer_flush(w->response.data);
-    w->response.data->contenttype = CT_APPLICATION_JSON;
+    w->response.data->content_type = CT_APPLICATION_JSON;
 
     logs_query_params_t query_params = {0};
     query_params.quota = LOGS_MANAG_QUERY_QUOTA_DEFAULT;

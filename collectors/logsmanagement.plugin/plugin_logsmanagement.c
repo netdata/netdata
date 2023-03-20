@@ -162,7 +162,7 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
         if (!value || !*value) continue;
         else if(!strcmp(value, "help")){
             buffer_sprintf(dest_wb, FUNCTION_LOGSMANAGEMENT_HELP_LONG);
-            dest_wb->contenttype = CT_TEXT_PLAIN;
+            dest_wb->content_type = CT_TEXT_PLAIN;
             return HTTP_RESP_OK;
         }
         else if (!strcmp(value, "sources")){
