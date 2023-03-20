@@ -2048,16 +2048,7 @@ int main(int argc, char **argv) {
 
     delta_startup_time("initialize RRD structures");
 
-    char disk_full[FILENAME_MAX + 1];
-    snprintfz(disk_full, FILENAME_MAX, "%s/.disk_full", netdata_configured_varlib_dir);
-    int disk_full_detected = (unlink(disk_full) == 0);
-
-    if (unlikely(disk_full_detected))
-        fprintf(stderr, "DISK FULL DETECTED");
-
-    // Agent was shutdown due to disk full
-
-    if(rrd_init(netdata_configured_hostname, system_info, false))
+     if(rrd_init(netdata_configured_hostname, system_info, false))
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
 
     delta_startup_time("check for incomplete shutdown");

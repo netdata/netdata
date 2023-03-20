@@ -6,6 +6,12 @@
 #include "sqlite3.h"
 #include "sqlite_functions.h"
 
+extern sqlite3 *db_meta;
+
+// Help build archived hosts in memory when agent starts
+void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_info *system_info);
+DICTIONARY *sql_load_host_labels(uuid_t *host_id);
+
 // To initialize and shutdown
 void metadata_sync_init(void);
 void metadata_sync_shutdown(void);
@@ -18,6 +24,8 @@ void metaqueue_ml_load_models(RRDDIM *rd);
 void migrate_localhost(uuid_t *host_uuid);
 void metadata_queue_load_host_context(RRDHOST *host);
 
+// Provide statistics
+int sql_metadata_cache_stats(int op);
 // UNIT TEST
 int metadata_unittest(void);
 #endif //NETDATA_SQLITE_METADATA_H

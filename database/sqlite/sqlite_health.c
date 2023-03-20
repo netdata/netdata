@@ -1,8 +1,64 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "sqlite_health.h"
-#include "sqlite_functions.h"
 #include "sqlite_db_migration.h"
+
+#define DB_HEALTH_VERSION 1
+
+const char *database_health_config[] = {
+    "CREATE TABLE IF NOT EXISTS alert_hash(hash_id blob PRIMARY KEY, date_updated int, alarm text, template text, "
+    "on_key text, class text, component text, type text, os text, hosts text, lookup text, "
+    "every text, units text, calc text, families text, plugin text, module text, charts text, green text, "
+    "red text, warn text, crit text, exec text, to_key text, info text, delay text, options text, "
+    "repeat text, host_labels text, p_db_lookup_dimensions text, p_db_lookup_method text, p_db_lookup_options int, "
+    "p_db_lookup_after int, p_db_lookup_before int, p_update_every int);",
+
+    "VACUUM;",
+    NULL
+};
+
+sqlite3 *db_health = NULL;
+
+/*
+ * Initialize the SQLite database
+ * Return 0 on success
+ */
+int sql_init_health_database(int memory)
+{
+    char sqlite_database[FILENAME_MAX + 1];
+    int rc;
+
+    if (likely(!memory))
+        snprintfz(sqlite_database, FILENAME_MAX, "%s/netdata-health.db", netdata_configured_cache_dir);
+    else
+        strcpy(sqlite_database, ":memory:");
+
+    rc = sqlite3_open(sqlite_database, &db_health);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to initialize health database at %s, due to \"%s\"", sqlite_database, sqlite3_errstr(rc));
+        sqlite3_close(db_health);
+        db_health = NULL;
+        return 1;
+    }
+
+    info("SQLite health database %s initialization", sqlite_database);
+
+    int target_version = DB_HEALTH_VERSION;
+    if (likely(!memory))
+        target_version = perform_health_database_migration(db_health, DB_HEALTH_VERSION);
+
+    if (configure_database_params(db_health, target_version))
+        return 1;
+
+    if (init_database_batch(db_health, &database_health_config[0]))
+        return 1;
+
+    if (attach_database(db_health, "netdata-meta.db", "meta"))
+        return 1;
+
+    info("SQLite health database initialization completed");
+    return 0;
+}
 
 #define MAX_HEALTH_SQL_SIZE 2048
 #define sqlite3_bind_string_or_null(res,key,param) ((key) ? sqlite3_bind_text(res, param, string2str(key), -1, SQLITE_STATIC) : sqlite3_bind_null(res, param))
@@ -15,7 +71,7 @@ int sql_create_health_log_table(RRDHOST *host) {
     int rc;
     char command[MAX_HEALTH_SQL_SIZE + 1];
 
-    if (unlikely(!db_meta)) {
+    if (unlikely(!db_health)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             error_report("HEALTH [%s]: Database has not been initialized", rrdhost_hostname(host));
         return 1;
@@ -26,12 +82,12 @@ int sql_create_health_log_table(RRDHOST *host) {
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CREATE_HEALTH_LOG_TABLE(uuid_str));
 
-    rc = db_execute(db_meta, command);
+    rc = db_execute(db_health, command);
     if (unlikely(rc))
         error_report("HEALTH [%s]: SQLite error during creation of health log table", rrdhost_hostname(host));
     else {
         snprintfz(command, MAX_HEALTH_SQL_SIZE, "CREATE INDEX IF NOT EXISTS health_log_index_%s ON health_log_%s (unique_id); ", uuid_str, uuid_str);
-        rc = db_execute(db_meta, command);
+        rc = db_execute(db_health, command);
         if (unlikely(unlikely(rc)))
             error_report("HEALTH [%s]: SQLite error during creation of health log table index", rrdhost_hostname(host));
     }
@@ -48,7 +104,7 @@ void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
     int rc;
     char command[MAX_HEALTH_SQL_SIZE + 1];
 
-    if (unlikely(!db_meta)) {
+    if (unlikely(!db_health)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             error_report("HEALTH [%s]: Database has not been initialized", rrdhost_hostname(host));
         return;
@@ -59,10 +115,10 @@ void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_UPDATE_HEALTH_LOG(uuid_str));
 
-    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_health, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         sql_create_health_log_table(host);
-        rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+        rc = sqlite3_prepare_v2(db_health, command, -1, &res, 0);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("HEALTH [%s]: Failed to prepare statement for SQL_INSERT_HEALTH_LOG", rrdhost_hostname(host));
             return;
@@ -123,7 +179,7 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
     int rc;
     char command[MAX_HEALTH_SQL_SIZE + 1];
 
-    if (unlikely(!db_meta)) {
+    if (unlikely(!db_health)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             error_report("HEALTH [%s]: Database has not been initialized", rrdhost_hostname(host));
         return;
@@ -134,10 +190,10 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_INSERT_HEALTH_LOG(uuid_str));
 
-    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_health, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         sql_create_health_log_table(host);
-        rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+        rc = sqlite3_prepare_v2(db_health, command, -1, &res, 0);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("HEALTH [%s]: Failed to prepare statement for SQL_INSERT_HEALTH_LOG", rrdhost_hostname(host));
             return;
@@ -384,6 +440,7 @@ void sql_health_alarm_log_count(RRDHOST *host) {
         return;
     }
 
+    if (unlikely(!db_health)) {
     rc = sqlite3_step_monitored(res);
     if (likely(rc == SQLITE_ROW))
         host->health.health_log_entries_written = (size_t) sqlite3_column_int64(res, 0);
@@ -415,7 +472,7 @@ void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host, size_t rotate_every
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG_NOT_CLAIMED(uuid_str, (unsigned long int) (host->health.health_log_entries_written - rotate_every)));
 
-    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_health, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to cleanup health log table");
         return;
@@ -446,7 +503,7 @@ void sql_health_alarm_log_cleanup_claimed(RRDHOST *host, size_t rotate_every) {
     int rc;
     char command[MAX_HEALTH_SQL_SIZE + 1];
 
-    if (unlikely(!db_meta)) {
+    if (unlikely(!db_health)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             error_report("Database has not been initialized");
         return;
@@ -463,7 +520,7 @@ void sql_health_alarm_log_cleanup_claimed(RRDHOST *host, size_t rotate_every) {
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG_CLAIMED(uuid_str, uuid_str, uuid_str, (unsigned long int) (host->health.health_log_entries_written - rotate_every)));
 
-    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_health, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to cleanup health log table");
         return;
@@ -508,7 +565,9 @@ void sql_health_alarm_log_cleanup(RRDHOST *host) {
 "select hostname, ?1, ?2, ?3, config_hash_id, 0, ?4, unixepoch(), 0, 0, flags, exec_run_timestamp, " \
 "unixepoch(), name, chart, family, exec, recipient, source, units, info, exec_code, -2, new_status, delay, NULL, new_value, 0, class, component, type, chart_context " \
 "from health_log_%s where unique_id = ?5", guid, guid2
+
 #define SQL_INJECT_REMOVED_UPDATE(guid) "update health_log_%s set flags = flags | ?1, updated_by_id = ?2 where unique_id = ?3; ", guid
+
 void sql_inject_removed_status(char *uuid_str, uint32_t alarm_id, uint32_t alarm_event_id, uint32_t unique_id, uint32_t max_unique_id)
 {
     int rc;
@@ -520,7 +579,7 @@ void sql_inject_removed_status(char *uuid_str, uint32_t alarm_id, uint32_t alarm
     sqlite3_stmt *res = NULL;
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_INJECT_REMOVED(uuid_str, uuid_str));
-    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_health, command, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement when trying to inject removed event");
         return;
@@ -567,7 +626,7 @@ void sql_inject_removed_status(char *uuid_str, uint32_t alarm_id, uint32_t alarm
 
     //update the old entry
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_INJECT_REMOVED_UPDATE(uuid_str));
-    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_health, command, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement when trying to update during inject removed event");
         return;
@@ -612,7 +671,7 @@ uint32_t sql_get_max_unique_id (char *uuid_str)
     sqlite3_stmt *res = NULL;
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_SELECT_MAX_UNIQUE_ID(uuid_str));
-    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_health, command, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement when trying to get max unique id");
         return 0;
@@ -639,7 +698,7 @@ void sql_check_removed_alerts_state(char *uuid_str)
     sqlite3_stmt *res = NULL;
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_SELECT_LAST_STATUSES(uuid_str));
-    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_health, command, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement when trying to check removed statuses");
         return;
@@ -677,7 +736,7 @@ void sql_health_alarm_log_load(RRDHOST *host) {
 
     host->health.health_log_entries_written = 0;
 
-    if (unlikely(!db_meta)) {
+    if (unlikely(!db_health)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             error_report("HEALTH [%s]: Database has not been initialized", rrdhost_hostname(host));
         return;
@@ -690,7 +749,7 @@ void sql_health_alarm_log_load(RRDHOST *host) {
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_LOAD_HEALTH_LOG(uuid_str));
 
-    ret = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    ret = sqlite3_prepare_v2(db_health, command, -1, &res, 0);
     if (unlikely(ret != SQLITE_OK)) {
         error_report("HEALTH [%s]: Failed to prepare sql statement to load health log.", rrdhost_hostname(host));
         return;
@@ -892,7 +951,7 @@ int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
     static __thread sqlite3_stmt *res = NULL;
     int rc, param = 0;
 
-    if (unlikely(!db_meta)) {
+    if (unlikely(!db_health)) {
         if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
             return 0;
         error_report("Database has not been initialized");
@@ -900,7 +959,7 @@ int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
     }
 
     if (unlikely(!res)) {
-        rc = prepare_statement(db_meta, SQL_STORE_ALERT_CONFIG_HASH, &res);
+        rc = prepare_statement(db_health, SQL_STORE_ALERT_CONFIG_HASH, &res);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to store alert configuration, rc = %d", rc);
             return 1;

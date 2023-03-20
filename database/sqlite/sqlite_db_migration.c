@@ -7,7 +7,7 @@ static int return_int_cb(void *data, int argc, char **argv, char **column)
     int *status = data;
     UNUSED(argc);
     UNUSED(column);
-    *status = str2uint32_t(argv[0], NULL);
+    *status = (int) str2uint32_t(argv[0], NULL);
     return 0;
 }
 
@@ -80,27 +80,27 @@ const char *database_migrate_v5_v6[] = {
 };
 
 
-static int do_migration_v1_v2(sqlite3 *database, const char *name)
+static int do_metadata_migration_v1_v2(sqlite3 *database, const char *name)
 {
     UNUSED(name);
     info("Running \"%s\" database migration", name);
 
     if (table_exists_in_database("host") && !column_exists_in_table("host", "hops"))
-        return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v1_v2[0]);
+        return init_database_batch(database, &database_migrate_v1_v2[0]);
     return 0;
 }
 
-static int do_migration_v2_v3(sqlite3 *database, const char *name)
+static int do_metadata_migration_v2_v3(sqlite3 *database, const char *name)
 {
     UNUSED(name);
     info("Running \"%s\" database migration", name);
 
     if (table_exists_in_database("host") && !column_exists_in_table("host", "memory_mode"))
-        return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v2_v3[0]);
+        return init_database_batch(database, &database_migrate_v2_v3[0]);
     return 0;
 }
 
-static int do_migration_v3_v4(sqlite3 *database, const char *name)
+static int do_metadata_migration_v3_v4(sqlite3 *database, const char *name)
 {
     UNUSED(name);
     info("Running database migration %s", name);
@@ -132,23 +132,23 @@ static int do_migration_v3_v4(sqlite3 *database, const char *name)
     return 0;
 }
 
-static int do_migration_v4_v5(sqlite3 *database, const char *name)
+static int do_metadata_migration_v4_v5(sqlite3 *database, const char *name)
 {
     UNUSED(name);
     info("Running \"%s\" database migration", name);
 
-    return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v4_v5[0]);
+    return init_database_batch(database,  &database_migrate_v4_v5[0]);
 }
 
-static int do_migration_v5_v6(sqlite3 *database, const char *name)
+static int do_metadata_migration_v5_v6(sqlite3 *database, const char *name)
 {
     UNUSED(name);
     info("Running \"%s\" database migration", name);
 
-    return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v5_v6[0]);
+    return init_database_batch(database, &database_migrate_v5_v6[0]);
 }
 
-static int do_migration_v6_v7(sqlite3 *database, const char *name)
+static int do_metadata_migration_v6_v7(sqlite3 *database, const char *name)
 {
     UNUSED(name);
     info("Running \"%s\" database migration", name);
@@ -225,14 +225,14 @@ static int migrate_database(sqlite3 *database, int target_version, char *db_name
 
 }
 
-DATABASE_FUNC_MIGRATION_LIST migration_action[] = {
+DATABASE_FUNC_MIGRATION_LIST metadata_migration_action[] = {
     {.name = "v0 to v1",  .func = do_migration_noop},
-    {.name = "v1 to v2",  .func = do_migration_v1_v2},
-    {.name = "v2 to v3",  .func = do_migration_v2_v3},
-    {.name = "v3 to v4",  .func = do_migration_v3_v4},
-    {.name = "v4 to v5",  .func = do_migration_v4_v5},
-    {.name = "v5 to v6",  .func = do_migration_v5_v6},
-    {.name = "v6 to v7",  .func = do_migration_v6_v7},
+    {.name = "v1 to v2",  .func = do_metadata_migration_v1_v2},
+    {.name = "v2 to v3",  .func = do_metadata_migration_v2_v3},
+    {.name = "v3 to v4",  .func = do_metadata_migration_v3_v4},
+    {.name = "v4 to v5",  .func = do_metadata_migration_v4_v5},
+    {.name = "v5 to v6",  .func = do_metadata_migration_v5_v6},
+    {.name = "v6 to v7",  .func = do_metadata_migration_v6_v7},
     // the terminator of this array
     {.name = NULL, .func = NULL}
 };
@@ -243,13 +243,34 @@ DATABASE_FUNC_MIGRATION_LIST context_migration_action[] = {
     {.name = NULL, .func = NULL}
 };
 
+DATABASE_FUNC_MIGRATION_LIST health_migration_action[] = {
+    {.name = "v0 to v1",  .func = do_migration_noop},
+    // the terminator of this array
+    {.name = NULL, .func = NULL}
+};
+
+DATABASE_FUNC_MIGRATION_LIST aclk_migration_action[] = {
+    {.name = "v0 to v1",  .func = do_migration_noop},
+    // the terminator of this array
+    {.name = NULL, .func = NULL}
+};
 
 int perform_database_migration(sqlite3 *database, int target_version)
 {
-    return migrate_database(database, target_version, "metadata", migration_action);
+    return migrate_database(database, target_version, "metadata", metadata_migration_action);
 }
 
 int perform_context_database_migration(sqlite3 *database, int target_version)
 {
     return migrate_database(database, target_version, "context", context_migration_action);
+}
+
+int perform_health_database_migration(sqlite3 *database, int target_version)
+{
+    return migrate_database(database, target_version, "health", health_migration_action);
+}
+
+int perform_aclk_database_migration(sqlite3 *database, int target_version)
+{
+    return migrate_database(database, target_version, "aclk", aclk_migration_action);
 }

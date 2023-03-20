@@ -2,21 +2,23 @@
 
 #ifndef NETDATA_SQLITE_ACLK_H
 #define NETDATA_SQLITE_ACLK_H
+#include "sqlite_db_migration.h"
 
-#include "sqlite3.h"
-
-
-#ifndef ACLK_MAX_CHART_BATCH
-#define ACLK_MAX_CHART_BATCH    (200)
-#endif
-#ifndef ACLK_MAX_CHART_BATCH_COUNT
-#define ACLK_MAX_CHART_BATCH_COUNT (10)
-#endif
 #define ACLK_MAX_ALERT_UPDATES  (5)
 #define ACLK_DATABASE_CLEANUP_FIRST  (1200)
 #define ACLK_DATABASE_CLEANUP_INTERVAL (3600)
 #define ACLK_DELETE_ACK_ALERTS_INTERNAL (86400)
 #define ACLK_SYNC_QUERY_SIZE 512
+
+// return a node list
+struct node_instance_list {
+    uuid_t  node_id;
+    uuid_t  host_id;
+    char *hostname;
+    int live;
+    int queryable;
+    int hops;
+};
 
 static inline void uuid_unparse_lower_fix(uuid_t *uuid, char *out)
 {
@@ -31,7 +33,6 @@ static inline int claimed()
 {
     return localhost->aclk_state.claimed_id != NULL;
 }
-
 
 #define TABLE_ACLK_ALERT "CREATE TABLE IF NOT EXISTS aclk_alert_%s (sequence_id INTEGER PRIMARY KEY, " \
         "alert_unique_id, date_created, date_submitted, date_cloud_ack, filtered_alert_unique_id NOT NULL, " \
@@ -81,11 +82,22 @@ struct aclk_sync_host_config {
     char *alerts_snapshot_uuid;        // will contain the snapshot_uuid value if snapshot was requested
 };
 
-extern sqlite3 *db_meta;
+extern sqlite3 *db_health;
+extern sqlite3 *db_aclk;
 
 int aclk_database_enq_cmd_noblock(struct aclk_database_cmd *cmd);
 void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id);
 void sql_aclk_sync_init(void);
+
+// Helpers
+int update_node_id(uuid_t *host_id, uuid_t *node_id);
+int get_node_id(uuid_t *host_id, uuid_t *node_id);
+int get_host_id(uuid_t *node_id, uuid_t *host_id);
+struct node_instance_list *get_node_list(void);
+void sql_load_node_id(RRDHOST *host);
+
+// Open and close
+int sql_init_aclk_database(int memory);
 void aclk_push_alert_config(const char *node_id, const char *config_hash);
 void aclk_push_node_alert_snapshot(const char *node_id);
 void aclk_push_node_health_log(const char *node_id);

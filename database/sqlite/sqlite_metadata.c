@@ -1,6 +1,268 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "sqlite_metadata.h"
+#include "sqlite_db_migration.h"
+
+#define DB_METADATA_VERSION 7
+
+sqlite3 *db_meta = NULL;
+
+const char *database_config[] = {
+    "CREATE TABLE IF NOT EXISTS host(host_id BLOB PRIMARY KEY, hostname TEXT NOT NULL, "
+    "registry_hostname TEXT NOT NULL default 'unknown', update_every INT NOT NULL default 1, "
+    "os TEXT NOT NULL default 'unknown', timezone TEXT NOT NULL default 'unknown', tags TEXT NOT NULL default '',"
+    "hops INT NOT NULL DEFAULT 0,"
+    "memory_mode INT DEFAULT 0, abbrev_timezone TEXT DEFAULT '', utc_offset INT NOT NULL DEFAULT 0,"
+    "program_name TEXT NOT NULL DEFAULT 'unknown', program_version TEXT NOT NULL DEFAULT 'unknown', "
+    "entries INT NOT NULL DEFAULT 0,"
+    "health_enabled INT NOT NULL DEFAULT 0);",
+
+    "CREATE TABLE IF NOT EXISTS chart(chart_id blob PRIMARY KEY, host_id blob, type text, id text, name text, "
+    "family text, context text, title text, unit text, plugin text, module text, priority int, update_every int, "
+    "chart_type int, memory_mode int, history_entries);",
+    "CREATE TABLE IF NOT EXISTS dimension(dim_id blob PRIMARY KEY, chart_id blob, id text, name text, "
+    "multiplier int, divisor int , algorithm int, options text);",
+
+    "CREATE TABLE IF NOT EXISTS metadata_migration(filename text, file_size, date_created int);",
+    "CREATE INDEX IF NOT EXISTS ind_d2 on dimension (chart_id);",
+    "CREATE INDEX IF NOT EXISTS ind_c3 on chart (host_id);",
+    "CREATE TABLE IF NOT EXISTS chart_label(chart_id blob, source_type int, label_key text, "
+    "label_value text, date_created int, PRIMARY KEY (chart_id, label_key));",
+    "CREATE TABLE IF NOT EXISTS node_instance (host_id blob PRIMARY KEY, claim_id, node_id, date_created);",
+
+    "CREATE TABLE IF NOT EXISTS host_info(host_id blob, system_key text NOT NULL, system_value text NOT NULL, "
+    "date_created INT, PRIMARY KEY(host_id, system_key));",
+
+    "CREATE TABLE IF NOT EXISTS host_label(host_id blob, source_type int, label_key text NOT NULL, "
+    "label_value text NOT NULL, date_created INT, PRIMARY KEY (host_id, label_key));",
+
+    "CREATE TRIGGER IF NOT EXISTS ins_host AFTER INSERT ON host BEGIN INSERT INTO node_instance (host_id, date_created)"
+    " SELECT new.host_id, unixepoch() WHERE new.host_id NOT IN (SELECT host_id FROM node_instance); END;",
+
+    NULL
+};
+
+const char *database_cleanup[] = {
+    "DELETE FROM chart WHERE chart_id NOT IN (SELECT chart_id FROM dimension);",
+    "DELETE FROM host WHERE host_id NOT IN (SELECT host_id FROM chart);",
+    "DELETE FROM chart_label WHERE chart_id NOT IN (SELECT chart_id FROM chart);",
+    "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);",
+    "DELETE FROM host_info WHERE host_id NOT IN (SELECT host_id FROM host);",
+    "DELETE FROM host_label WHERE host_id NOT IN (SELECT host_id FROM host);",
+    "DROP TABLE IF EXISTS alert_hash;",
+    "DROP TRIGGER IF EXISTS tr_dim_del;",
+    "DROP INDEX IF EXISTS ind_d1;",
+    "DROP INDEX IF EXISTS ind_c1;",
+    "DROP INDEX IF EXISTS ind_c2;",
+    NULL
+};
+
+const char *rebuild_chart_commands[] = {
+    "BEGIN TRANSACTION;",
+    "DROP INDEX IF EXISTS ind_c1;" ,
+    "DROP TABLE IF EXISTS chart_backup;" ,
+    "CREATE TABLE chart_backup AS SELECT * FROM chart;" ,
+    "DROP TABLE chart;",
+    "CREATE TABLE IF NOT EXISTS chart(chart_id blob PRIMARY KEY, host_id blob, type text, id text, "
+    "name text, family text, context text, title text, unit text, plugin text, "
+    "module text, priority int, update_every int, chart_type int, memory_mode int, history_entries);" ,
+    "INSERT INTO chart SELECT DISTINCT * FROM chart_backup; ",
+    "DROP TABLE chart_backup;  " ,
+    "CREATE INDEX IF NOT EXISTS ind_c3 on chart (host_id)",
+    "COMMIT TRANSACTION;",
+    NULL
+};
+
+static void rebuild_chart()
+{
+    int rc;
+    char *err_msg = NULL;
+    info("Rebuilding chart table");
+    for (int i = 0; rebuild_chart_commands[i]; i++) {
+        info("Executing %s", rebuild_chart_commands[i]);
+        rc = sqlite3_exec_monitored(db_meta, rebuild_chart_commands[i], 0, 0, &err_msg);
+        if (rc != SQLITE_OK) {
+            error_report("SQLite error during database setup, rc = %d (%s)", rc, err_msg);
+            error_report("SQLite failed statement %s", rebuild_chart_commands[i]);
+            sqlite3_free(err_msg);
+        }
+    }
+}
+
+const char *rebuild_dimension_commands[] = {
+    "BEGIN TRANSACTION; ",
+    "DROP INDEX IF EXISTS ind_d1;" ,
+    "DROP TABLE IF EXISTS dimension_backup; " ,
+    "CREATE TABLE dimension_backup AS SELECT * FROM dimension; " ,
+    "DROP TABLE dimension; " ,
+    "CREATE TABLE IF NOT EXISTS dimension(dim_id blob PRIMARY KEY, chart_id blob, id text, name text, "
+    "multiplier int, divisor int , algorithm int, options text);" ,
+    "INSERT INTO dimension SELECT distinct * FROM dimension_backup; " ,
+    "DROP TABLE dimension_backup;  " ,
+    "CREATE INDEX IF NOT EXISTS ind_d2 on dimension (chart_id);",
+    "COMMIT TRANSACTION;",
+    NULL
+};
+
+void rebuild_dimension()
+{
+    int rc;
+    char *err_msg = NULL;
+
+    info("Rebuilding dimension table");
+    for (int i = 0; rebuild_dimension_commands[i]; i++) {
+        info("Executing %s", rebuild_dimension_commands[i]);
+        rc = sqlite3_exec_monitored(db_meta, rebuild_dimension_commands[i], 0, 0, &err_msg);
+        if (rc != SQLITE_OK) {
+            error_report("SQLite error during database setup, rc = %d (%s)", rc, err_msg);
+            error_report("SQLite failed statement %s", rebuild_dimension_commands[i]);
+            sqlite3_free(err_msg);
+        }
+    }
+}
+
+static int attempt_database_fix()
+{
+    info("Closing database and attempting to fix it");
+    int rc = sqlite3_close(db_meta);
+    if (rc != SQLITE_OK)
+        error_report("Failed to close database, rc = %d", rc);
+    info("Attempting to fix database");
+    db_meta = NULL;
+    return sql_init_metadata_database(DB_CHECK_FIX_DB | DB_CHECK_CONT, 0);
+}
+
+int init_database_batch(sqlite3 *database, const char *batch[])
+{
+    int rc;
+    char *err_msg = NULL;
+    for (int i = 0; batch[i]; i++) {
+        rc = sqlite3_exec_monitored(database, batch[i], 0, 0, &err_msg);
+        if (rc != SQLITE_OK) {
+            error_report("SQLite error during database setup, rc = %d (%s)", rc, err_msg);
+            error_report("SQLite failed statement %s", batch[i]);
+            sqlite3_free(err_msg);
+            return rc;
+        }
+    }
+    return 0;
+}
+
+// SQLITE user defined function
+static void sqlite_uuid_parse(sqlite3_context *context, int argc, sqlite3_value **argv)
+{
+    uuid_t  uuid;
+
+    if ( argc != 1 ){
+        sqlite3_result_null(context);
+        return ;
+    }
+    int rc = uuid_parse((const char *) sqlite3_value_text(argv[0]), uuid);
+    if (rc == -1)  {
+        sqlite3_result_null(context);
+        return ;
+    }
+    sqlite3_result_blob(context, &uuid, sizeof(uuid_t), SQLITE_TRANSIENT);
+}
+
+/*
+ * Initialize the metadata database
+ * Return 0 on success
+ */
+int sql_init_metadata_database(db_check_action_type_t rebuild, int memory)
+{
+    char *err_msg = NULL;
+    char sqlite_database[FILENAME_MAX + 128 + 1];
+    int rc;
+
+    if (likely(!memory))
+        snprintfz(sqlite_database, FILENAME_MAX, "%s/netdata-meta.db", netdata_configured_cache_dir);
+    else
+        strcpy(sqlite_database, ":memory:");
+
+    rc = sqlite3_open(sqlite_database, &db_meta);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to initialize database at %s, due to \"%s\"", sqlite_database, sqlite3_errstr(rc));
+        sqlite3_close(db_meta);
+        db_meta = NULL;
+        return 1;
+    }
+
+    if (rebuild & (DB_CHECK_INTEGRITY | DB_CHECK_FIX_DB)) {
+        int errors_detected = 0;
+        if (!(rebuild & DB_CHECK_CONT))
+            info("Running database check on %s", sqlite_database);
+
+        if (check_table_integrity(db_meta, "chart")) {
+            errors_detected++;
+            if (rebuild & DB_CHECK_FIX_DB)
+                rebuild_chart();
+            else
+                error_report("Errors reported -- run with -W sqlite-fix");
+        }
+
+        if (check_table_integrity(db_meta, "dimension")) {
+            errors_detected++;
+            if (rebuild & DB_CHECK_FIX_DB)
+                rebuild_dimension();
+            else
+                error_report("Errors reported -- run with -W sqlite-fix");
+        }
+
+        if (!errors_detected) {
+            if (check_table_integrity(db_meta, NULL))
+                error_report("Errors reported");
+        }
+    }
+
+    if (rebuild & DB_CHECK_RECLAIM_SPACE) {
+        if (!(rebuild & DB_CHECK_CONT))
+            info("Reclaiming space of %s", sqlite_database);
+        rc = sqlite3_exec_monitored(db_meta, "VACUUM;", 0, 0, &err_msg);
+        if (rc != SQLITE_OK) {
+            error_report("Failed to execute VACUUM rc = %d (%s)", rc, err_msg);
+            sqlite3_free(err_msg);
+        }
+    }
+
+    if (rebuild && !(rebuild & DB_CHECK_CONT))
+        return 1;
+
+    info("SQLite database %s initialization", sqlite_database);
+
+    int target_version = DB_METADATA_VERSION;
+    if (likely(!memory))
+        target_version = perform_database_migration(db_meta, DB_METADATA_VERSION);
+
+    rc = init_database_batch(db_meta, &database_config[0]);
+
+    if (rc) {
+        if (SQLITE_CORRUPT == rc) {
+            error_report("Metadata database is corrupted. Attempting to fix");
+            if (DB_CHECK_NONE == rebuild)
+                return attempt_database_fix();
+            rc = check_table_integrity(db_meta, NULL);
+            if (rc)
+                error_report("Database integrity errors reported");
+        }
+    }
+
+    if (init_database_batch(db_meta, &database_cleanup[0]))
+        return 1;
+
+    if (configure_database_params(db_meta, target_version))
+        return 1;
+
+    info("SQLite database initialization completed");
+
+    init_sqlite_thread_key_pool();
+
+    rc = sqlite3_create_function(db_meta, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC, 0, sqlite_uuid_parse, 0, 0);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to register internal u2h function");
+
+    return 0;
+}
 
 // SQL statements
 
@@ -10,11 +272,9 @@
 
 #define SQL_DELETE_HOST_LABELS  "DELETE FROM host_label WHERE host_id = @uuid;"
 
-#define STORE_HOST_LABEL                                                                                               \
-    "INSERT OR REPLACE INTO host_label (host_id, source_type, label_key, label_value, date_created) VALUES "
+#define STORE_HOST_LABEL "INSERT OR REPLACE INTO host_label (host_id, source_type, label_key, label_value, date_created) VALUES "
 
-#define STORE_CHART_LABEL                                                                                              \
-    "INSERT OR REPLACE INTO chart_label (chart_id, source_type, label_key, label_value, date_created) VALUES "
+#define STORE_CHART_LABEL "INSERT OR REPLACE INTO chart_label (chart_id, source_type, label_key, label_value, date_created) VALUES "
 
 #define STORE_HOST_OR_CHART_LABEL_VALUE "(u2h('%s'), %d,'%s','%s', unixepoch())"
 
@@ -56,6 +316,74 @@
 
 #define MAX_METADATA_CLEANUP (500)                  // Maximum metadata write operations (e.g  deletes before retrying)
 #define METADATA_MAX_BATCH_SIZE (512)               // Maximum commands to execute before running the event loop
+
+#define SELECT_HOST_INFO "SELECT system_key, system_value FROM host_info WHERE host_id = @host_id;"
+
+void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_info *system_info)
+{
+    int rc;
+
+    sqlite3_stmt *res = NULL;
+
+    rc = sqlite3_prepare_v2(db_meta, SELECT_HOST_INFO, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to read host information");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host parameter host information");
+        goto skip;
+    }
+
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+        rrdhost_set_system_info_variable(system_info, (char *) sqlite3_column_text(res, 0),
+                                         (char *) sqlite3_column_text(res, 1));
+    }
+
+skip:
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when reading host information");
+}
+
+#define SELECT_HOST_LABELS "SELECT label_key, label_value, source_type FROM host_label WHERE host_id = @host_id " \
+    "AND label_key IS NOT NULL AND label_value IS NOT NULL;"
+
+DICTIONARY *sql_load_host_labels(uuid_t *host_id)
+{
+    int rc;
+
+    DICTIONARY *labels = NULL;
+    sqlite3_stmt *res = NULL;
+
+    rc = sqlite3_prepare_v2(db_meta, SELECT_HOST_LABELS, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to read host information");
+        return NULL;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host parameter host information");
+        goto skip;
+    }
+
+    labels = rrdlabels_create();
+
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+        rrdlabels_add(
+            labels,
+            (const char *)sqlite3_column_text(res, 0),
+            (const char *)sqlite3_column_text(res, 1),
+            sqlite3_column_int(res, 2));
+    }
+
+skip:
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when reading host information");
+    return labels;
+}
 
 enum metadata_opcode {
     METADATA_DATABASE_NOOP = 0,
@@ -169,7 +497,7 @@ static void clean_old_chart_labels(RRDSET *st)
     else
         snprintfz(sql, 511,SQL_DELETE_CHART_LABEL_HISTORY, first_time_s);
 
-    int rc = exec_statement_with_uuid(sql, &st->chart_uuid);
+    int rc = exec_statement_with_uuid(db_meta, sql, &st->chart_uuid);
     if (unlikely(rc))
         error_report("METADATA: 'host:%s' Failed to clean old labels for chart %s", rrdhost_hostname(st->rrdhost), rrdset_name(st));
 }
@@ -188,6 +516,7 @@ static int check_and_update_chart_labels(RRDSET *st, BUFFER *work_buffer, size_t
     int rc = db_execute(db_meta, buffer_tostring(work_buffer));
     if (likely(!rc)) {
         st->rrdlabels_last_saved_version = new_version;
+        db_execute(db_meta, buffer_tostring(work_buffer));
         (*query_counter)++;
     }
 
@@ -200,9 +529,9 @@ void migrate_localhost(uuid_t *host_uuid)
 {
     int rc;
 
-    rc = exec_statement_with_uuid(MIGRATE_LOCALHOST_TO_NEW_MACHINE_GUID, host_uuid);
+    rc = exec_statement_with_uuid(db_meta, MIGRATE_LOCALHOST_TO_NEW_MACHINE_GUID, host_uuid);
     if (!rc)
-        rc = exec_statement_with_uuid(DELETE_NON_EXISTING_LOCALHOST, host_uuid);
+        rc = exec_statement_with_uuid(db_meta, DELETE_NON_EXISTING_LOCALHOST, host_uuid);
     if (!rc) {
         if (unlikely(db_execute(db_meta, DELETE_MISSING_NODE_INSTANCES)))
             error_report("Failed to remove deleted hosts from node instances");
@@ -441,7 +770,7 @@ static bool build_host_system_info_statements(RRDHOST *host, BUFFER *work_buffer
 static int store_chart_metadata(RRDSET *st)
 {
     static __thread sqlite3_stmt *res = NULL;
-    int rc, param = 0, store_rc = 0;
+    int rc, param = 0, store_rc;
 
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
@@ -1113,26 +1442,25 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
     BUFFER *work_buffer = data->work_buffer;
     usec_t all_started_ut = now_monotonic_usec(); (void)all_started_ut;
     internal_error(true, "METADATA: checking all hosts...");
-    usec_t started_ut = now_monotonic_usec(); (void)started_ut;
 
     bool run_again = false;
     worker_is_busy(UV_EVENT_METADATA_STORE);
 
     if (!data->max_count)
-        transaction_started = !db_execute(db_meta, "BEGIN TRANSACTION;");
-
+        transaction_started = db_execute(db_meta, "BEGIN TRANSACTION;");
     dfe_start_reentrant(rrdhost_root_index, host) {
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) || !rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_UPDATE))
             continue;
 
         size_t query_counter = 0; (void)query_counter;
+        usec_t started_ut = now_monotonic_usec(); (void)started_ut;
 
         rrdhost_flag_clear(host,RRDHOST_FLAG_METADATA_UPDATE);
 
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_LABELS))) {
             rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_LABELS);
 
-            int rc = exec_statement_with_uuid(SQL_DELETE_HOST_LABELS, &host->host_uuid);
+            int rc = exec_statement_with_uuid(db_meta, SQL_DELETE_HOST_LABELS, &host->host_uuid);
             if (likely(!rc)) {
                 query_counter++;
 
@@ -1533,6 +1861,23 @@ void metadata_queue_load_host_context(RRDHOST *host)
     if (unlikely(!metasync_worker.loop))
         return;
     queue_metadata_cmd(METADATA_LOAD_HOST_CONTEXT, host, NULL);
+}
+
+int sql_metadata_cache_stats(int op)
+{
+    int count, dummy;
+
+    if (unlikely(!db_meta))
+        return 0;
+
+    netdata_thread_disable_cancelability();
+    int rc = sqlite3_db_status(db_meta, op, &count, &dummy, 0);
+    netdata_thread_enable_cancelability();
+    if (likely(SQLITE_OK == rc))
+        return count;
+
+    error_report("METADATA: SQLITE statistics failed with rc = %d, %s", rc, sqlite3_errstr(rc));
+    return 0;
 }
 
 //
