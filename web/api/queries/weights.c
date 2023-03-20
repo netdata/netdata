@@ -63,6 +63,7 @@ struct register_result {
     RRDMETRIC_ACQUIRED *rma;
     NETDATA_DOUBLE value;
     STORAGE_POINT highlighted;
+    STORAGE_POINT baseline;
 };
 
 static DICTIONARY *register_result_init() {
@@ -82,7 +83,7 @@ static void register_result(DICTIONARY *results,
                             NETDATA_DOUBLE value,
                             RESULT_FLAGS flags,
                             STORAGE_POINT *highlighted,
-                            STORAGE_POINT *baseline __maybe_unused,
+                            STORAGE_POINT *baseline,
                             WEIGHTS_STATS *stats,
                             bool register_zero) {
 
@@ -110,6 +111,9 @@ static void register_result(DICTIONARY *results,
 
     if(highlighted)
         t.highlighted = *highlighted;
+
+    if(baseline)
+        t.baseline = *baseline;
 
     // we can use the pointer address or RMA as a unique key for each metric
     char buf[20 + 1];
@@ -301,39 +305,153 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
     return total_dimensions;
 }
 
-static void storage_point_to_json(BUFFER *wb, NETDATA_DOUBLE weight, STORAGE_POINT *sp, const char *key, RRDR_OPTIONS options __maybe_unused) {
-    if(storage_point_is_unset(*sp) || storage_point_is_gap(*sp))
-        return;
+typedef enum {
+    WPT_DIMENSION = 0,
+    WPT_INSTANCE = 1,
+    WPT_CONTEXT = 2,
+    WPT_NODE = 3,
+} WEIGHTS_POINT_TYPE;
 
-    buffer_json_member_add_array(wb, key);
+static inline void storage_point_to_json(BUFFER *wb, WEIGHTS_POINT_TYPE type, ssize_t di, ssize_t ii, ssize_t ci, ssize_t ni, NETDATA_DOUBLE weight, STORAGE_POINT *highlighted_sp, STORAGE_POINT *baseline_sp, RRDR_OPTIONS options __maybe_unused, bool baseline) {
+    buffer_json_add_array_item_array(wb);
 
+    buffer_json_add_array_item_uint64(wb, type); // "type"
+    buffer_json_add_array_item_array(wb);
+    if(type == WPT_DIMENSION)
+        buffer_json_add_array_item_int64(wb, di);
+    if(type == WPT_DIMENSION || type == WPT_INSTANCE)
+        buffer_json_add_array_item_int64(wb, ii);
+    if(type == WPT_CONTEXT)
+        buffer_json_add_array_item_int64(wb, ci);
+    buffer_json_add_array_item_int64(wb, ni);
+    buffer_json_array_close(wb);
     buffer_json_add_array_item_double(wb, weight); // "weight"
-    buffer_json_add_array_item_double(wb, sp->min); // "min"
-    buffer_json_add_array_item_double(wb, (sp->count) ? sp->sum / (NETDATA_DOUBLE) sp->count : 0.0); // "avg"
-    buffer_json_add_array_item_double(wb, sp->max); // "max"
-    buffer_json_add_array_item_double(wb, sp->sum); // "sum"
-    buffer_json_add_array_item_uint64(wb, sp->count); // "count"
-    buffer_json_add_array_item_uint64(wb, sp->anomaly_count); // "anomaly_count"
-//    buffer_json_add_array_item_double(wb, storage_point_anomaly_rate(*sp)); // "anomaly_rate"
+
+    buffer_json_add_array_item_array(wb);
+    buffer_json_add_array_item_double(wb, highlighted_sp->min); // "min"
+    buffer_json_add_array_item_double(wb, (highlighted_sp->count) ? highlighted_sp->sum / (NETDATA_DOUBLE) highlighted_sp->count : 0.0); // "avg"
+    buffer_json_add_array_item_double(wb, highlighted_sp->max); // "max"
+    buffer_json_add_array_item_double(wb, highlighted_sp->sum); // "sum"
+    buffer_json_add_array_item_uint64(wb, highlighted_sp->count); // "count"
+    buffer_json_add_array_item_uint64(wb, highlighted_sp->anomaly_count); // "anomaly_count"
+    buffer_json_array_close(wb);
+
+    if(baseline) {
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_double(wb, baseline_sp->min); // "min"
+        buffer_json_add_array_item_double(wb, (baseline_sp->count) ? baseline_sp->sum / (NETDATA_DOUBLE) baseline_sp->count : 0.0); // "avg"
+        buffer_json_add_array_item_double(wb, baseline_sp->max); // "max"
+        buffer_json_add_array_item_double(wb, baseline_sp->sum); // "sum"
+        buffer_json_add_array_item_uint64(wb, baseline_sp->count); // "count"
+        buffer_json_add_array_item_uint64(wb, baseline_sp->anomaly_count); // "anomaly_count"
+        buffer_json_array_close(wb);
+    }
 
     buffer_json_array_close(wb); // key
 }
 
-static void storage_point_info_to_json(BUFFER *wb, RRDR_OPTIONS options __maybe_unused, const char *key) {
-    buffer_json_member_add_object(wb, key);
-
+static void multinode_data_schema(BUFFER *wb, RRDR_OPTIONS options __maybe_unused, const char *key, bool baseline) {
     size_t idx = 0;
+    buffer_json_member_add_object(wb, key); // schema
+
+    buffer_json_member_add_object(wb, "type");
+    buffer_json_member_add_uint64(wb, "idx", idx++);
+    buffer_json_object_close(wb); // type
+
+    buffer_json_member_add_object(wb, "link");
+    buffer_json_member_add_uint64(wb, "idx", idx++);
+    buffer_json_member_add_object(wb, "dimension");
+    {
+        buffer_json_member_add_uint64(wb, "type", WPT_DIMENSION);
+        size_t pidx = 0;
+        buffer_json_member_add_uint64(wb, "di", pidx++);
+        buffer_json_member_add_uint64(wb, "ii", pidx++);
+        buffer_json_member_add_uint64(wb, "ni", pidx++);
+    }
+    buffer_json_object_close(wb); // dimension
+    buffer_json_member_add_object(wb, "instance");
+    {
+        buffer_json_member_add_uint64(wb, "type", WPT_INSTANCE);
+        size_t pidx = 0;
+        buffer_json_member_add_uint64(wb, "ii", pidx++);
+        buffer_json_member_add_uint64(wb, "ni", pidx++);
+    }
+    buffer_json_object_close(wb); // context
+    buffer_json_member_add_object(wb, "context");
+    {
+        buffer_json_member_add_uint64(wb, "type", WPT_CONTEXT);
+        size_t pidx = 0;
+        buffer_json_member_add_uint64(wb, "ci", pidx++);
+        buffer_json_member_add_uint64(wb, "ni", pidx++);
+    }
+    buffer_json_object_close(wb); // context
+    buffer_json_member_add_object(wb, "node");
+    {
+        buffer_json_member_add_uint64(wb, "type", WPT_NODE);
+        size_t pidx = 0;
+        buffer_json_member_add_uint64(wb, "ni", pidx++);
+    }
+    buffer_json_object_close(wb); // node
+    buffer_json_object_close(wb); // link
 
     buffer_json_member_add_uint64(wb, "weight", idx++);
-    buffer_json_member_add_uint64(wb, "min", idx++);
-    buffer_json_member_add_uint64(wb, "avg", idx++);
-    buffer_json_member_add_uint64(wb, "max", idx++);
-    buffer_json_member_add_uint64(wb, "sum", idx++);
-    buffer_json_member_add_uint64(wb, "count", idx++);
-    buffer_json_member_add_uint64(wb, "anomaly_count", idx++);
-//    buffer_json_member_add_uint64(wb, "anomaly_rate", idx++);
 
-    buffer_json_object_close(wb);
+    for(size_t i = 0; i < ((baseline) ? 2 : 1) ; i++) {
+        if(i == 0)
+            buffer_json_member_add_object(wb, "highlighted");
+        else
+            buffer_json_member_add_object(wb, "baseline");
+
+        buffer_json_member_add_uint64(wb, "idx", idx++);
+        size_t pidx = 0;
+        buffer_json_member_add_uint64(wb, "min", pidx++);
+        buffer_json_member_add_uint64(wb, "avg", pidx++);
+        buffer_json_member_add_uint64(wb, "max", pidx++);
+        buffer_json_member_add_uint64(wb, "sum", pidx++);
+        buffer_json_member_add_uint64(wb, "count", pidx++);
+        buffer_json_member_add_uint64(wb, "anomaly_count", pidx++);
+        buffer_json_object_close(wb); // point
+    }
+
+    buffer_json_object_close(wb); // schema
+}
+
+struct dict_unique_name {
+    bool existing;
+    uint32_t i;
+};
+
+struct dict_unique_id_name {
+    bool existing;
+    uint32_t i;
+    const char *id;
+    const char *name;
+};
+
+static inline ssize_t dict_unique_name_add(DICTIONARY *dict, const char *name, ssize_t *max_id) {
+    struct dict_unique_name *dun = dictionary_set(dict, name, NULL, sizeof(struct dict_unique_name));
+    if(!dun->existing) {
+        dun->existing = true;
+        dun->i = *max_id;
+        (*max_id)++;
+    }
+
+    return (ssize_t)dun->i;
+}
+
+static inline ssize_t dict_unique_id_name_add(DICTIONARY *dict, const char *id, const char *name, ssize_t *max_id) {
+    char key[1024 + 1];
+    snprintfz(key, 1024, "%s:%s", id, name);
+    struct dict_unique_id_name *dun = dictionary_set(dict, key, NULL, sizeof(struct dict_unique_id_name));
+    if(!dun->existing) {
+        dun->existing = true;
+        dun->i = *max_id;
+        (*max_id)++;
+        dun->id = id;
+        dun->name = name;
+    }
+
+    return (ssize_t)dun->i;
 }
 
 static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *wb,
@@ -348,98 +466,91 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
                            points, method, group, options, shifts, examined_dimensions, duration, stats);
 
     version_hashes_api_v2(wb, versions);
-    storage_point_info_to_json(wb, options, "point");
 
-    buffer_json_member_add_object(wb, "nodes");
+    bool baseline = method == WEIGHTS_METHOD_MC_KS2 || method == WEIGHTS_METHOD_MC_VOLUME;
+    multinode_data_schema(wb, options, "schema", baseline);
+
+    DICTIONARY *dict_nodes = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dict_unique_name));
+    DICTIONARY *dict_contexts = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dict_unique_name));
+    DICTIONARY *dict_instances = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dict_unique_id_name));
+    DICTIONARY *dict_dimensions = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dict_unique_id_name));
+
+    buffer_json_member_add_array(wb, "points");
 
     size_t total_dimensions = 0, node_dims = 0, context_dims = 0, instance_dims = 0;
     NETDATA_DOUBLE context_total_weight = 0.0, instance_total_weight = 0.0, node_total_weight = 0.0;
-    STORAGE_POINT context_sp = STORAGE_POINT_UNSET, instance_sp = STORAGE_POINT_UNSET, node_sp = STORAGE_POINT_UNSET;
+    STORAGE_POINT context_hsp = STORAGE_POINT_UNSET, instance_hsp = STORAGE_POINT_UNSET, node_hsp = STORAGE_POINT_UNSET;
+    STORAGE_POINT context_bsp = STORAGE_POINT_UNSET, instance_bsp = STORAGE_POINT_UNSET, node_bsp = STORAGE_POINT_UNSET;
     struct register_result *t;
     RRDHOST *last_host = NULL;
     RRDCONTEXT_ACQUIRED *last_rca = NULL;
     RRDINSTANCE_ACQUIRED *last_ria = NULL;
+    ssize_t di = -1, ii = -1, ci = -1, ni = -1;
+    ssize_t di_max = 0, ii_max = 0, ci_max = 0, ni_max = 0;
     dfe_start_read(results, t) {
 
         // close instance
         if(t->ria != last_ria && last_ria) {
-            buffer_json_object_close(wb); // dimensions
-            storage_point_to_json(wb, instance_total_weight / (double) instance_dims, &instance_sp, "p", options);
-            buffer_json_object_close(wb); // instance:id
+            storage_point_to_json(wb, WPT_INSTANCE, di, ii, ci, ni, instance_total_weight / (double) instance_dims, &instance_hsp, &instance_bsp, options, baseline);
 
             last_ria = NULL;
             instance_dims = 0;
             instance_total_weight = 0.0;
-            instance_sp = STORAGE_POINT_UNSET;
+            instance_hsp = instance_bsp = STORAGE_POINT_UNSET;
         }
 
         // close context
         if(t->rca != last_rca && last_rca) {
-            buffer_json_object_close(wb); // instances
-            storage_point_to_json(wb, context_total_weight / (double) context_dims, &context_sp, "p", options);
-            buffer_json_object_close(wb); // context:id
+            storage_point_to_json(wb, WPT_CONTEXT, di, ii, ci, ni, context_total_weight / (double) context_dims, &context_hsp, &instance_bsp, options, baseline);
             last_rca = NULL;
             context_dims = 0;
             context_total_weight = 0.0;
-            context_sp = STORAGE_POINT_UNSET;
+            context_hsp = context_bsp = STORAGE_POINT_UNSET;
         }
 
         // close node
         if(t->host != last_host && last_host) {
-            buffer_json_object_close(wb); // contexts
-            storage_point_to_json(wb, node_total_weight / (double) node_dims, &node_sp, "p", options);
-            buffer_json_object_close(wb); // host:hostname
+            storage_point_to_json(wb, WPT_NODE, di, ii, ci, ni, node_total_weight / (double) node_dims, &node_hsp, &node_bsp, options, baseline);
             last_host = NULL;
             node_dims = 0;
             node_total_weight = 0.0;
-            node_sp = STORAGE_POINT_UNSET;
+            node_hsp = node_bsp = STORAGE_POINT_UNSET;
         }
 
         // open node
         if(t->host != last_host) {
             last_host = t->host;
-
-            buffer_json_member_add_object(wb, t->host->machine_guid);
-//            if(t->host->node_id)
-//                buffer_json_member_add_uuid(wb, "nd", t->host->node_id);
-//            buffer_json_member_add_string(wb, "nm", rrdhost_hostname(t->host));
-            buffer_json_member_add_object(wb, "contexts");
+            ni = dict_unique_name_add(dict_nodes, t->host->machine_guid, &ni_max);
         }
 
         // open context
         if(t->rca != last_rca) {
             last_rca = t->rca;
-
-            buffer_json_member_add_object(wb, rrdcontext_acquired_id(t->rca));
-//            buffer_json_member_add_string(wb, "units", rrdcontext_acquired_units(t->rca));
-//            buffer_json_member_add_string(wb, "title", rrdcontext_acquired_title(t->rca));
-//            buffer_json_member_add_string(wb, "chart_type", rrdset_type_name(rrdcontext_acquired_chart_type(t->rca)));
-            buffer_json_member_add_object(wb, "i");
+            ci = dict_unique_name_add(dict_contexts, rrdcontext_acquired_id(t->rca), &ci_max);
         }
 
         // open instance
         if(t->ria != last_ria) {
             last_ria = t->ria;
-
-            buffer_json_member_add_object(wb, rrdinstance_acquired_id(t->ria));
-            if(rrdinstance_acquired_has_name(t->ria))
-                buffer_json_member_add_string(wb, "nm", rrdinstance_acquired_name(t->ria));
-            buffer_json_member_add_object(wb, "d");
+            ii = dict_unique_id_name_add(dict_instances, rrdinstance_acquired_id(t->ria), rrdinstance_acquired_name(t->ria), &ii_max);
         }
 
-        buffer_json_member_add_object(wb, rrdmetric_acquired_id(t->rma));
-        if(rrdmetric_acquired_has_name(t->rma))
-            buffer_json_member_add_string(wb, "nm", rrdmetric_acquired_name(t->rma));
-        storage_point_to_json(wb, t->value, &t->highlighted, "p", options);
-        buffer_json_object_close(wb);
+        di = dict_unique_id_name_add(dict_dimensions, rrdmetric_acquired_id(t->rma), rrdmetric_acquired_name(t->rma), &di_max);
+        storage_point_to_json(wb, WPT_DIMENSION, di, ii, ci, ni, t->value, &t->highlighted, &t->baseline, options, baseline);
 
         instance_total_weight += t->value;
         context_total_weight += t->value;
         node_total_weight += t->value;
 
-        storage_point_merge_to(instance_sp, t->highlighted);
-        storage_point_merge_to(context_sp, t->highlighted);
-        storage_point_merge_to(node_sp, t->highlighted);
+        storage_point_merge_to(instance_hsp, t->highlighted);
+        storage_point_merge_to(context_hsp, t->highlighted);
+        storage_point_merge_to(node_hsp, t->highlighted);
+
+        if(baseline) {
+            storage_point_merge_to(instance_bsp, t->baseline);
+            storage_point_merge_to(context_bsp, t->baseline);
+            storage_point_merge_to(node_bsp, t->baseline);
+        }
 
         instance_dims++;
         context_dims++;
@@ -449,31 +560,83 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
     dfe_done(t);
 
     // close instance
-    if(last_ria) {
-        buffer_json_object_close(wb); // dimensions
-        storage_point_to_json(wb, instance_total_weight / (double) instance_dims, &instance_sp, "p", options);
-        buffer_json_object_close(wb); // instance:id
-    }
+    if(last_ria)
+        storage_point_to_json(wb, WPT_INSTANCE, di, ii, ci, ni, instance_total_weight / (double) instance_dims, &instance_hsp, &instance_bsp, options, baseline);
 
     // close context
-    if(last_rca) {
-        buffer_json_object_close(wb); // instances
-        storage_point_to_json(wb, context_total_weight / (double) context_dims, &context_sp, "p", options);
-        buffer_json_object_close(wb); // context:id
-    }
+    if(last_rca)
+        storage_point_to_json(wb, WPT_CONTEXT, di, ii, ci, ni, context_total_weight / (double) context_dims, &context_hsp, &instance_bsp, options, baseline);
 
     // close node
-    if(last_host) {
-        buffer_json_object_close(wb); // contexts
-        storage_point_to_json(wb, node_total_weight / (double) node_dims, &node_sp, "p", options);
-        buffer_json_object_close(wb); // host:hostname
-    }
+    if(last_host)
+        storage_point_to_json(wb, WPT_NODE, di, ii, ci, ni, node_total_weight / (double) node_dims, &node_hsp, &node_bsp, options, baseline);
 
-    buffer_json_object_close(wb); // nodes
+    buffer_json_array_close(wb); // points
+
+    buffer_json_member_add_array(wb, "nodes");
+    {
+        struct dict_unique_name *dun;
+        dfe_start_read(dict_nodes, dun) {
+                    buffer_json_add_array_item_object(wb);
+                    buffer_json_member_add_string(wb, "mg", dun_dfe.name);
+                    buffer_json_member_add_int64(wb, "ni", dun->i);
+                    buffer_json_object_close(wb);
+        }
+        dfe_done(dun);
+    }
+    buffer_json_array_close(wb);
+
+    buffer_json_member_add_array(wb, "contexts");
+    {
+        struct dict_unique_name *dun;
+        dfe_start_read(dict_contexts, dun) {
+                    buffer_json_add_array_item_object(wb);
+                    buffer_json_member_add_string(wb, "id", dun_dfe.name);
+                    buffer_json_member_add_int64(wb, "ci", dun->i);
+                    buffer_json_object_close(wb);
+                }
+        dfe_done(dun);
+    }
+    buffer_json_array_close(wb);
+
+    buffer_json_member_add_array(wb, "instances");
+    {
+        struct dict_unique_id_name *dun;
+        dfe_start_read(dict_instances, dun) {
+                    buffer_json_add_array_item_object(wb);
+                    buffer_json_member_add_string(wb, "id", dun->id);
+                    if(dun->id != dun->name)
+                        buffer_json_member_add_string(wb, "nm", dun->name);
+                    buffer_json_member_add_int64(wb, "ii", dun->i);
+                    buffer_json_object_close(wb);
+                }
+        dfe_done(dun);
+    }
+    buffer_json_array_close(wb);
+
+    buffer_json_member_add_array(wb, "dimensions");
+    {
+        struct dict_unique_id_name *dun;
+        dfe_start_read(dict_instances, dun) {
+                    buffer_json_add_array_item_object(wb);
+                    buffer_json_member_add_string(wb, "id", dun->id);
+                    if(dun->id != dun->name)
+                        buffer_json_member_add_string(wb, "nm", dun->name);
+                    buffer_json_member_add_int64(wb, "di", dun->i);
+                    buffer_json_object_close(wb);
+                }
+        dfe_done(dun);
+    }
+    buffer_json_array_close(wb);
 
     buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
     buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
     buffer_json_finalize(wb);
+
+    dictionary_destroy(dict_nodes);
+    dictionary_destroy(dict_contexts);
+    dictionary_destroy(dict_instances);
+    dictionary_destroy(dict_dimensions);
 
     return total_dimensions;
 }
@@ -1070,6 +1233,25 @@ static ssize_t weights_do_context_callback(void *data, RRDCONTEXT_ACQUIRED *rca,
         return false;
 
     struct query_weights_data *qwd = data;
+
+    bool has_retention = false;
+    switch(qwd->qwr->method) {
+        case WEIGHTS_METHOD_VALUE:
+        case WEIGHTS_METHOD_ANOMALY_RATE:
+            has_retention = rrdcontext_retention_match(rca, qwd->qwr->after, qwd->qwr->before);
+            break;
+
+        case WEIGHTS_METHOD_MC_KS2:
+        case WEIGHTS_METHOD_MC_VOLUME:
+            has_retention = rrdcontext_retention_match(rca, qwd->qwr->after, qwd->qwr->before);
+            if(has_retention)
+                has_retention = rrdcontext_retention_match(rca, qwd->qwr->baseline_after, qwd->qwr->baseline_before);
+            break;
+    }
+
+    if(!has_retention)
+        return 0;
+
     ssize_t ret = weights_foreach_rrdmetric_in_context(rca,
                                             qwd->instances_sp,
                                             NULL,
@@ -1102,7 +1284,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
     // if the user didn't give a timeout
     // assume 60 seconds
     if(!qwr->timeout)
-        qwr->timeout = 60 * MSEC_PER_SEC;
+        qwr->timeout = 5 * 60 * MSEC_PER_SEC;
 
     // if the timeout is less than 1 second
     // make it at least 1 second

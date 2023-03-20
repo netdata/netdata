@@ -151,10 +151,6 @@ void query_target_free(void) {
     qt->nodes.size = 0;
 }
 
-#define query_target_retention_matches_query(qt, first_entry_s, last_entry_s, update_every_s) \
-    (((first_entry_s) - ((update_every_s) * 2) <= (qt)->window.before) &&                     \
-     ((last_entry_s)  + ((update_every_s) * 2) >= (qt)->window.after))
-
 struct storage_engine *query_metric_storage_engine(QUERY_TARGET *qt, QUERY_METRIC *qm, size_t tier) {
     QUERY_NODE *qn = query_node(qt, qm->link.query_node_id);
     return qn->rrdhost->db[tier].eng;
@@ -242,7 +238,7 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
 
     bool timeframe_matches =
             (tiers_added &&
-            query_target_retention_matches_query(qt, common_first_time_s, common_last_time_s, common_update_every_s))
+             query_matches_retention(qt->window.after, qt->window.before, common_first_time_s, common_last_time_s, common_update_every_s))
             ? true : false;
 
     if(timeframe_matches) {
@@ -297,7 +293,7 @@ static inline bool rrdmetric_retention_matches_query(QUERY_TARGET *qt, RRDMETRIC
     time_t first_time_s = rm->first_time_s;
     time_t last_time_s = rrd_flag_is_collected(rm) ? now_s : rm->last_time_s;
     time_t update_every_s = rm->ri->update_every_s;
-    return query_target_retention_matches_query(qt, first_time_s, last_time_s, update_every_s);
+    return query_matches_retention(qt->window.after, qt->window.before, first_time_s, last_time_s, update_every_s);
 }
 
 static inline void query_dimension_release(QUERY_DIMENSION *qd) {

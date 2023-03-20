@@ -512,5 +512,12 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                                             size_t version,
                                             weights_add_metric_t cb,
                                             void *data);
+
+bool rrdcontext_retention_match(RRDCONTEXT_ACQUIRED *rca, time_t after, time_t before);
+
+#define query_matches_retention(after, before, first_entry_s, last_entry_s, update_every_s) \
+    (((first_entry_s) - ((update_every_s) * 2) <= (before)) &&                     \
+     ((last_entry_s)  + ((update_every_s) * 2) >= (after)))
+
 #endif // NETDATA_RRDCONTEXT_H
 

@@ -311,3 +311,14 @@ void rrdcontext_hub_stop_streaming_command(void *ptr) {
     internal_error(true, "RRDCONTEXT: host '%s' disabling streaming of contexts", rrdhost_hostname(host));
     rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
 }
+
+bool rrdcontext_retention_match(RRDCONTEXT_ACQUIRED *rca, time_t after, time_t before) {
+    if(unlikely(!rca)) return false;
+
+    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+
+    if(rrd_flag_is_collected(rc))
+        return query_matches_retention(after, before, rc->first_time_s, before > rc->last_time_s ? before : rc->last_time_s, 1);
+    else
+        return query_matches_retention(after, before, rc->first_time_s, rc->last_time_s, 1);
+}
