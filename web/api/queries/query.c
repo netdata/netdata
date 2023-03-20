@@ -2551,7 +2551,7 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         else {
             if (qt->request.group_by & RRDR_GROUP_BY_DIMENSION) {
                 buffer_fast_strcat(key, "|", 1);
-                buffer_strcat(key, query_metric_id(qt, qm));
+                buffer_strcat(key, query_metric_name(qt, qm));
             }
 
             if (qt->request.group_by & RRDR_GROUP_BY_INSTANCE) {
@@ -2604,7 +2604,7 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             }
             else {
                 if (qt->request.group_by & RRDR_GROUP_BY_DIMENSION) {
-                    buffer_strcat(key, query_metric_id(qt, qm));
+                    buffer_strcat(key, query_metric_name(qt, qm));
                 }
 
                 if (qt->request.group_by & RRDR_GROUP_BY_INSTANCE) {

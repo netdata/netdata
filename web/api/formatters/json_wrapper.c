@@ -401,15 +401,24 @@ static void query_target_summary_dimensions_v12(BUFFER *wb, QUERY_TARGET *qt, co
             qm = tqm;
         }
 
-        snprintfz(name, RRD_ID_LENGTH_MAX * 2 + 1, "%s:%s",
-                  rrdmetric_acquired_id(rma),
-                  rrdmetric_acquired_name(rma));
+        if(v2) {
+            z = dictionary_set(dict, rrdmetric_acquired_name(rma), NULL, sizeof(*z));
+            if(!z->id)
+                z->id = rrdmetric_acquired_name(rma);
+            if(!z->name)
+                z->name = rrdmetric_acquired_name(rma);
+        }
+        else {
+            snprintfz(name, RRD_ID_LENGTH_MAX * 2 + 1, "%s:%s",
+                      rrdmetric_acquired_id(rma),
+                      rrdmetric_acquired_name(rma));
 
-        z = dictionary_set(dict, name, NULL, sizeof(*z));
-        if(!z->id)
-            z->id = rrdmetric_acquired_id(rma);
-        if(!z->name)
-            z->name = rrdmetric_acquired_name(rma);
+            z = dictionary_set(dict, name, NULL, sizeof(*z));
+            if (!z->id)
+                z->id = rrdmetric_acquired_id(rma);
+            if (!z->name)
+                z->name = rrdmetric_acquired_name(rma);
+        }
 
         if(qm) {
             z->metrics.selected += (qm->status & RRDR_DIMENSION_SELECTED) ? 1 : 0;
@@ -427,7 +436,9 @@ static void query_target_summary_dimensions_v12(BUFFER *wb, QUERY_TARGET *qt, co
                 if(v2) {
                     buffer_json_add_array_item_object(wb);
                     buffer_json_member_add_string(wb, "id", z->id);
-                    buffer_json_member_add_string(wb, "nm", z->name);
+                    if(z->id != z->name)
+                        buffer_json_member_add_string(wb, "nm", z->name);
+
                     query_target_metric_counts(wb, &z->metrics);
                     query_target_data_statistics(wb, qt, &z->query_stats);
                     buffer_json_object_close(wb);
