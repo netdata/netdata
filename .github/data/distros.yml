@@ -76,7 +76,7 @@ include:
 
   - distro: amazonlinux
     version: "2"
-    eol_check: false
+    eol_check: 'amazon-linux'
     packages:
       type: rpm
       repo_distro: amazonlinux/2
