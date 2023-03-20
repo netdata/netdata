@@ -7,6 +7,7 @@
 #include <random>
 
 #include "ad_charts.h"
+#include "database/sqlite/sqlite3.h"
 
 #define WORKER_TRAIN_QUEUE_POP         0
 #define WORKER_TRAIN_ACQUIRE_DIMENSION 1
@@ -15,6 +16,9 @@
 #define WORKER_TRAIN_UPDATE_MODELS     4
 #define WORKER_TRAIN_RELEASE_DIMENSION 5
 #define WORKER_TRAIN_UPDATE_HOST       6
+#define WORKER_TRAIN_LOAD_MODELS       7
+
+static sqlite3 *db = NULL;
 
 /*
  * Functions to convert enums to strings
@@ -172,26 +176,26 @@ ml_features_preprocess(ml_features_t *features)
 */
 
 static void
-ml_kmeans_init(ml_kmeans_t *kmeans, size_t num_clusters, size_t max_iterations)
+ml_kmeans_init(ml_kmeans_t *kmeans)
 {
-    kmeans->num_clusters = num_clusters;
-    kmeans->max_iterations = max_iterations;
-
-    kmeans->cluster_centers.reserve(kmeans->num_clusters);
+    kmeans->cluster_centers.reserve(2);
     kmeans->min_dist = std::numeric_limits<calculated_number_t>::max();
     kmeans->max_dist = std::numeric_limits<calculated_number_t>::min();
 }
 
 static void
-ml_kmeans_train(ml_kmeans_t *kmeans, const ml_features_t *features)
+ml_kmeans_train(ml_kmeans_t *kmeans, const ml_features_t *features, time_t after, time_t before)
 {
+    kmeans->after = (uint32_t) after;
+    kmeans->before = (uint32_t) before;
+
     kmeans->min_dist = std::numeric_limits<calculated_number_t>::max();
     kmeans->max_dist  = std::numeric_limits<calculated_number_t>::min();
 
     kmeans->cluster_centers.clear();
 
-    dlib::pick_initial_centers(kmeans->num_clusters, kmeans->cluster_centers, features->preprocessed_features);
-    dlib::find_clusters_using_kmeans(features->preprocessed_features, kmeans->cluster_centers, kmeans->max_iterations);
+    dlib::pick_initial_centers(2, kmeans->cluster_centers, features->preprocessed_features);
+    dlib::find_clusters_using_kmeans(features->preprocessed_features, kmeans->cluster_centers, Cfg.max_kmeans_iters);
 
     for (const auto &preprocessed_feature : features->preprocessed_features) {
         calculated_number_t mean_dist = 0.0;
@@ -200,7 +204,7 @@ ml_kmeans_train(ml_kmeans_t *kmeans, const ml_features_t *features)
             mean_dist += dlib::length(cluster_center - preprocessed_feature);
         }
 
-        mean_dist /= kmeans->num_clusters;
+        mean_dist /= kmeans->cluster_centers.size();
 
         if (mean_dist < kmeans->min_dist)
             kmeans->min_dist = mean_dist;
@@ -217,7 +221,7 @@ ml_kmeans_anomaly_score(const ml_kmeans_t *kmeans, const DSample &DS)
     for (const auto &CC: kmeans->cluster_centers)
         mean_dist += dlib::length(CC - DS);
 
-    mean_dist /= kmeans->num_clusters;
+    mean_dist /= kmeans->cluster_centers.size();
 
     if (kmeans->max_dist == kmeans->min_dist)
         return 0.0;
@@ -400,6 +404,260 @@ ml_dimension_calculated_numbers(ml_training_thread_t *training_thread, ml_dimens
     return { training_thread->training_cns, training_response };
 }
 
+const char *db_models_create_table =
+    "CREATE TABLE IF NOT EXISTS models("
+    "    dim_id BLOB, dim_str TEXT, after INT, before INT,"
+    "    min_dist REAL, max_dist REAL,"
+    "    c00 REAL, c01 REAL, c02 REAL, c03 REAL, c04 REAL, c05 REAL,"
+    "    c10 REAL, c11 REAL, c12 REAL, c13 REAL, c14 REAL, c15 REAL,"
+    "    PRIMARY KEY(dim_id, after)"
+    ");";
+
+const char *db_models_add_model =
+    "INSERT OR REPLACE INTO models("
+    "    dim_id, dim_str, after, before,"
+    "    min_dist, max_dist,"
+    "    c00, c01, c02, c03, c04, c05,"
+    "    c10, c11, c12, c13, c14, c15)"
+    "VALUES("
+    "    @dim_id, @dim_str, @after, @before,"
+    "    @min_dist, @max_dist,"
+    "    @c00, @c01, @c02, @c03, @c04, @c05,"
+    "    @c10, @c11, @c12, @c13, @c14, @c15);";
+
+const char *db_models_load =
+    "SELECT * FROM models "
+    "WHERE dim_id == @dim_id AND after >= @after ORDER BY before ASC;";
+
+const char *db_models_delete =
+    "DELETE FROM models "
+    "WHERE dim_id = @dim_id AND before < @before;";
+
+static int
+ml_dimension_add_model(ml_dimension_t *dim)
+{
+    static __thread sqlite3_stmt *res = NULL;
+    int param = 0;
+    int rc = 0;
+
+    if (unlikely(!db)) {
+        error_report("Database has not been initialized");
+        return 1;
+    }
+
+    if (unlikely(!res)) {
+        rc = prepare_statement(db, db_models_add_model, &res);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare statement to store model, rc = %d", rc);
+            return 1;
+        }
+    }
+
+    rc = sqlite3_bind_blob(res, ++param, &dim->rd->metric_uuid, sizeof(dim->rd->metric_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    char id[1024];
+    snprintfz(id, 1024 - 1, "%s.%s", rrdset_id(dim->rd->rrdset), rrddim_id(dim->rd));
+    rc = sqlite3_bind_text(res, ++param, id, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, ++param, (int) dim->kmeans.after);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, ++param, (int) dim->kmeans.before);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_double(res, ++param, dim->kmeans.min_dist);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_double(res, ++param, dim->kmeans.max_dist);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    if (dim->kmeans.cluster_centers.size() != 2)
+        fatal("Expected 2 cluster centers, got %zu", dim->kmeans.cluster_centers.size());
+
+    for (const DSample &ds : dim->kmeans.cluster_centers) {
+        if (ds.size() != 6)
+            fatal("Expected dsample with 6 dimensions, got %ld", ds.size());
+
+        for (long idx = 0; idx != ds.size(); idx++) {
+            calculated_number_t cn = ds(idx);
+            int rc = sqlite3_bind_double(res, ++param, cn);
+            if (unlikely(rc != SQLITE_OK))
+                goto bind_fail;
+        }
+    }
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to store model, rc = %d", rc);
+
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement when storing model, rc = %d", rc);
+
+    error("Added model for dimension '%s'", id);
+    return 0;
+
+bind_fail:
+    error_report("Failed to bind parameter %d to store model, rc = %d", param, rc);
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement to store model, rc = %d", rc);
+    return 1;
+}
+
+static int
+ml_dimension_delete_models(ml_dimension_t *dim)
+{
+    static __thread sqlite3_stmt *res = NULL;
+    int rc = 0;
+    int param = 0;
+
+    if (unlikely(!db)) {
+        error_report("Database has not been initialized");
+        return 1;
+    }
+
+    if (unlikely(!res)) {
+        rc = prepare_statement(db, db_models_delete, &res);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare statement to delete models, rc = %d", rc);
+            return 1;
+        }
+    }
+
+    rc = sqlite3_bind_blob(res, ++param, &dim->rd->metric_uuid, sizeof(dim->rd->metric_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, ++param, (int) dim->kmeans.before - (Cfg.num_models_to_use * Cfg.train_every));
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to delete models, rc = %d", rc);
+
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement when deleting models, rc = %d", rc);
+
+    char id[1024];
+    snprintfz(id, 1024 - 1, "%s.%s", rrdset_id(dim->rd->rrdset), rrddim_id(dim->rd));
+    error("Deleted models for dimension '%s'", id);
+
+    return 0;
+
+bind_fail:
+    error_report("Failed to bind parameter %d to delete models, rc = %d", param, rc);
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement to delete models, rc = %d", rc);
+    return 1;
+}
+
+static int
+ml_dimension_load_models(ml_dimension_t *dim) {
+    std::vector<ml_kmeans_t> V;
+
+    static __thread sqlite3_stmt *res = NULL;
+    int rc = 0;
+    int param = 0;
+
+    if (unlikely(!db)) {
+        error_report("Database has not been initialized");
+        return 1;
+    }
+
+    if (unlikely(!res)) {
+        rc = prepare_statement(db, db_models_load, &res);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare statement to load models, rc = %d", rc);
+            return 1;
+        }
+    }
+
+    rc = sqlite3_bind_blob(res, ++param, &dim->rd->metric_uuid, sizeof(dim->rd->metric_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, ++param, now_realtime_usec() - (Cfg.num_models_to_use * Cfg.max_train_samples));
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    dim->km_contexts.reserve(Cfg.num_models_to_use);
+    while ((rc = sqlite3_step_monitored(res)) == SQLITE_ROW) {
+        ml_kmeans_t km;
+
+        km.after = sqlite3_column_int(res, 2);
+        km.before = sqlite3_column_int(res, 3);
+
+        km.min_dist = sqlite3_column_int(res, 4);
+        km.max_dist = sqlite3_column_int(res, 5);
+
+        km.cluster_centers.resize(2);
+
+        km.cluster_centers[0].set_size(Cfg.lag_n + 1);
+        km.cluster_centers[0](0) = sqlite3_column_double(res, 6);
+        km.cluster_centers[0](1) = sqlite3_column_double(res, 7);
+        km.cluster_centers[0](2) = sqlite3_column_double(res, 8);
+        km.cluster_centers[0](3) = sqlite3_column_double(res, 9);
+        km.cluster_centers[0](4) = sqlite3_column_double(res, 10);
+        km.cluster_centers[0](5) = sqlite3_column_double(res, 11);
+
+        km.cluster_centers[1].set_size(Cfg.lag_n + 1);
+        km.cluster_centers[1](0) = sqlite3_column_double(res, 12);
+        km.cluster_centers[1](1) = sqlite3_column_double(res, 13);
+        km.cluster_centers[1](2) = sqlite3_column_double(res, 14);
+        km.cluster_centers[1](3) = sqlite3_column_double(res, 15);
+        km.cluster_centers[1](4) = sqlite3_column_double(res, 16);
+        km.cluster_centers[1](5) = sqlite3_column_double(res, 17);
+
+        dim->km_contexts.push_back(km);
+    }
+
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to load models, rc = %d", rc);
+
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement when loading models, rc = %d", rc);
+
+    return 0;
+
+bind_fail:
+    error_report("Failed to bind parameter %d to load models, rc = %d", param, rc);
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement to load models, rc = %d", rc);
+    return 1;
+}
+
+static int
+ml_dimension_update_models(ml_dimension_t *dim)
+{
+    int rc;
+
+    if (dim->km_contexts.empty()) {
+        rc = ml_dimension_load_models(dim);
+        if (rc)
+            return rc;
+    }
+
+    rc = ml_dimension_add_model(dim);
+    if (rc)
+        return rc;
+
+    return ml_dimension_delete_models(dim);
+}
+
 static enum ml_training_result
 ml_dimension_train_model(ml_training_thread_t *training_thread, ml_dimension_t *dim, const ml_training_request_t &training_request)
 {
@@ -446,20 +704,43 @@ ml_dimension_train_model(ml_training_thread_t *training_thread, ml_dimension_t *
         };
         ml_features_preprocess(&features);
 
-        ml_kmeans_init(&dim->kmeans, 2, 1000);
-        ml_kmeans_train(&dim->kmeans, &features);
+        ml_kmeans_init(&dim->kmeans);
+        ml_kmeans_train(&dim->kmeans, &features, training_response.query_after_t, training_response.query_before_t);
     }
 
-    // update kmeans models
-    worker_is_busy(WORKER_TRAIN_UPDATE_MODELS);
+    // update models
     {
         netdata_mutex_lock(&dim->mutex);
+
+        worker_is_busy(WORKER_TRAIN_LOAD_MODELS);
+
+        int rc = ml_dimension_update_models(dim);
+        if (rc) {
+            error("Failed to update models for %s [%u, %u]", rrddim_id(dim->rd), dim->kmeans.after, dim->kmeans.before);
+        }
+
+        worker_is_busy(WORKER_TRAIN_UPDATE_MODELS);
 
         if (dim->km_contexts.size() < Cfg.num_models_to_use) {
             dim->km_contexts.push_back(std::move(dim->kmeans));
         } else {
-            std::rotate(std::begin(dim->km_contexts), std::begin(dim->km_contexts) + 1, std::end(dim->km_contexts));
-            dim->km_contexts[dim->km_contexts.size() - 1] = std::move(dim->kmeans);
+            bool can_drop_middle_km = false;
+
+            if (Cfg.num_models_to_use > 2) {
+                const ml_kmeans_t *old_km = &dim->km_contexts[dim->km_contexts.size() - 1];
+                const ml_kmeans_t *middle_km = &dim->km_contexts[dim->km_contexts.size() - 2];
+                const ml_kmeans_t *new_km = &dim->kmeans;
+
+                can_drop_middle_km = (middle_km->after < old_km->before) &&
+                                     (middle_km->before > new_km->after);
+            }
+
+            if (can_drop_middle_km) {
+                dim->km_contexts.back() = dim->kmeans;
+            } else {
+                std::rotate(std::begin(dim->km_contexts), std::begin(dim->km_contexts) + 1, std::end(dim->km_contexts));
+                dim->km_contexts[dim->km_contexts.size() - 1] = std::move(dim->kmeans);
+            }
         }
 
         dim->mt = METRIC_TYPE_CONSTANT;
@@ -1043,7 +1324,7 @@ void ml_dimension_new(RRDDIM *rd)
 
     dim->last_training_time = 0;
 
-    ml_kmeans_init(&dim->kmeans, 2, 1000);
+    ml_kmeans_init(&dim->kmeans);
 
     if (simple_pattern_matches(Cfg.sp_charts_to_skip, rrdset_name(rd->rrdset)))
         dim->mls = MACHINE_LEARNING_STATUS_DISABLED_DUE_TO_EXCLUDED_CHART;
@@ -1095,6 +1376,7 @@ static void *ml_train_main(void *arg) {
     worker_register_job_name(WORKER_TRAIN_QUERY, "query");
     worker_register_job_name(WORKER_TRAIN_KMEANS, "kmeans");
     worker_register_job_name(WORKER_TRAIN_UPDATE_MODELS, "update models");
+    worker_register_job_name(WORKER_TRAIN_LOAD_MODELS, "load models");
     worker_register_job_name(WORKER_TRAIN_RELEASE_DIMENSION, "release");
     worker_register_job_name(WORKER_TRAIN_UPDATE_HOST, "update host");
 
@@ -1197,31 +1479,54 @@ void ml_init()
     for (size_t Idx = 0; Idx != Cfg.max_train_samples; Idx++)
         Cfg.random_nums.push_back(Gen());
 
+    // open sqlite db
+    {
+        char path[FILENAME_MAX];
+        snprintfz(path, FILENAME_MAX - 1, "%s/%s", netdata_configured_cache_dir, "ml.db");
+        int rc = sqlite3_open(path, &db);
+        if (rc != SQLITE_OK) {
+            error_report("Failed to initialize database at %s, due to \"%s\"", path, sqlite3_errstr(rc));
+            sqlite3_close(db);
+            db = NULL;
+        }
+
+        if (db) {
+            char *err = NULL;
+            int rc = sqlite3_exec(db, db_models_create_table, NULL, NULL, &err);
+            if (rc != SQLITE_OK) {
+                error_report("Failed to create models table (%s, %s)", sqlite3_errstr(rc), err ? err : "");
+                sqlite3_close(db);
+                db = NULL;
+            }
+        }
+    }
 
     // start detection & training threads
-    Cfg.detection_stop = false;
-    Cfg.training_stop = false;
+    {
+        Cfg.detection_stop = false;
+        Cfg.training_stop = false;
 
-    char tag[NETDATA_THREAD_TAG_MAX + 1];
+        char tag[NETDATA_THREAD_TAG_MAX + 1];
 
-    snprintfz(tag, NETDATA_THREAD_TAG_MAX, "%s", "PREDICT");
-    netdata_thread_create(&Cfg.detection_thread, tag, NETDATA_THREAD_OPTION_JOINABLE, ml_detect_main, NULL);
+        snprintfz(tag, NETDATA_THREAD_TAG_MAX, "%s", "PREDICT");
+        netdata_thread_create(&Cfg.detection_thread, tag, NETDATA_THREAD_OPTION_JOINABLE, ml_detect_main, NULL);
 
-    Cfg.training_threads.resize(Cfg.num_training_threads);
-    for (size_t idx = 0; idx != Cfg.num_training_threads; idx++) {
-        ml_training_thread_t *training_thread = &Cfg.training_threads[idx];
+        Cfg.training_threads.resize(Cfg.num_training_threads);
+        for (size_t idx = 0; idx != Cfg.num_training_threads; idx++) {
+            ml_training_thread_t *training_thread = &Cfg.training_threads[idx];
 
 
-        size_t max_elements_needed_for_training = Cfg.max_train_samples * (Cfg.lag_n + 1);
-        training_thread->training_cns = new calculated_number_t[max_elements_needed_for_training]();
-        training_thread->scratch_training_cns = new calculated_number_t[max_elements_needed_for_training]();
+            size_t max_elements_needed_for_training = Cfg.max_train_samples * (Cfg.lag_n + 1);
+            training_thread->training_cns = new calculated_number_t[max_elements_needed_for_training]();
+            training_thread->scratch_training_cns = new calculated_number_t[max_elements_needed_for_training]();
 
-        training_thread->id = idx;
-        training_thread->training_queue = ml_queue_init();
-        netdata_mutex_init(&training_thread->nd_mutex);
+            training_thread->id = idx;
+            training_thread->training_queue = ml_queue_init();
+            netdata_mutex_init(&training_thread->nd_mutex);
 
-        snprintfz(tag, NETDATA_THREAD_TAG_MAX, "TRAIN[%zu]", training_thread->id);
-        netdata_thread_create(&training_thread->nd_thread, tag, NETDATA_THREAD_OPTION_JOINABLE, ml_train_main, training_thread);
+            snprintfz(tag, NETDATA_THREAD_TAG_MAX, "TRAIN[%zu]", training_thread->id);
+            netdata_thread_create(&training_thread->nd_thread, tag, NETDATA_THREAD_OPTION_JOINABLE, ml_train_main, training_thread);
+        }
     }
 }
 
@@ -1263,4 +1568,8 @@ void ml_fini()
         ml_queue_destroy(training_thread->training_queue);
         netdata_mutex_destroy(&training_thread->nd_mutex);
     }
+
+    int rc = sqlite3_close_v2(db);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Error %d while closing the SQLite database, %s", rc, sqlite3_errstr(rc));
 }

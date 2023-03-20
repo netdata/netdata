@@ -35,13 +35,13 @@ typedef struct {
  */
 
 typedef struct {
-    size_t num_clusters;
-    size_t max_iterations;
-
     std::vector<DSample> cluster_centers;
 
     calculated_number_t min_dist;
     calculated_number_t max_dist;
+
+    uint32_t after;
+    uint32_t before;
 } ml_kmeans_t;
 
 typedef struct machine_learning_stats_t {

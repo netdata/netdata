@@ -28,7 +28,7 @@ void ml_config_load(ml_config_t *cfg) {
     unsigned max_train_samples = config_get_number(config_section_ml, "maximum num samples to train", 4 * 3600);
     unsigned min_train_samples = config_get_number(config_section_ml, "minimum num samples to train", 1 * 900);
     unsigned train_every = config_get_number(config_section_ml, "train every", 1 * 3600);
-    unsigned num_models_to_use = config_get_number(config_section_ml, "number of models per dimension", 1);
+    unsigned num_models_to_use = config_get_number(config_section_ml, "number of models per dimension", 4);
 
     unsigned diff_n = config_get_number(config_section_ml, "num samples to diff", 1);
     unsigned smooth_n = config_get_number(config_section_ml, "num samples to smooth", 3);
