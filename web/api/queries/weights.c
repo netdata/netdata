@@ -394,7 +394,9 @@ static void multinode_data_schema(BUFFER *wb, RRDR_OPTIONS options __maybe_unuse
     buffer_json_object_close(wb); // node
     buffer_json_object_close(wb); // link
 
-    buffer_json_member_add_uint64(wb, "weight", idx++);
+    buffer_json_member_add_object(wb, "weight");
+    buffer_json_member_add_uint64(wb, "idx", idx++);
+    buffer_json_object_close(wb); // weight
 
     for(size_t i = 0; i < ((baseline) ? 2 : 1) ; i++) {
         if(i == 0)
@@ -617,7 +619,7 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
     buffer_json_member_add_array(wb, "dimensions");
     {
         struct dict_unique_id_name *dun;
-        dfe_start_read(dict_instances, dun) {
+        dfe_start_read(dict_dimensions, dun) {
                     buffer_json_add_array_item_object(wb);
                     buffer_json_member_add_string(wb, "id", dun->id);
                     if(dun->id != dun->name)
@@ -948,8 +950,8 @@ cleanup:
 // ----------------------------------------------------------------------------
 // VOLUME algorithm functions
 
-static void merge_query_value_to_stats(QUERY_VALUE *qv, WEIGHTS_STATS *stats) {
-    stats->db_queries++;
+static void merge_query_value_to_stats(QUERY_VALUE *qv, WEIGHTS_STATS *stats, size_t queries) {
+    stats->db_queries += queries;
     stats->result_points += qv->result_points;
     stats->db_points += qv->points_read;
     for(size_t tier = 0; tier < storage_tiers ; tier++)
@@ -971,7 +973,7 @@ static void rrdset_metric_correlations_volume(
     QUERY_VALUE baseline_average = rrdmetric2value(host, rca, ria, rma, baseline_after, baseline_before,
                                                    options, time_group_method, time_group_options, tier, 0,
                                                    QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS);
-    merge_query_value_to_stats(&baseline_average, stats);
+    merge_query_value_to_stats(&baseline_average, stats, 1);
 
     if(!netdata_double_isnumber(baseline_average.value)) {
         // this means no data for the baseline window, but we may have data for the highlighted one - assume zero
@@ -981,7 +983,7 @@ static void rrdset_metric_correlations_volume(
     QUERY_VALUE highlight_average = rrdmetric2value(host, rca, ria, rma, after, before,
                                                     options, time_group_method, time_group_options, tier, 0,
                                                     QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS);
-    merge_query_value_to_stats(&highlight_average, stats);
+    merge_query_value_to_stats(&highlight_average, stats, 1);
 
     if(!netdata_double_isnumber(highlight_average.value))
         return;
@@ -996,7 +998,7 @@ static void rrdset_metric_correlations_volume(
     QUERY_VALUE highlight_countif = rrdmetric2value(host, rca, ria, rma, after, before,
                                                     options, RRDR_GROUPING_COUNTIF, highlight_countif_options, tier, 0,
                                                     QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS);
-    merge_query_value_to_stats(&highlight_countif, stats);
+    merge_query_value_to_stats(&highlight_countif, stats, 1);
 
     if(!netdata_double_isnumber(highlight_countif.value)) {
         info("WEIGHTS: highlighted countif query failed, but highlighted average worked - strange...");
@@ -1040,10 +1042,109 @@ static void rrdset_weights_value(
                                      options, time_group_method, time_group_options, tier, 0,
                                      QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS);
 
-    merge_query_value_to_stats(&qv, stats);
+    merge_query_value_to_stats(&qv, stats, 1);
 
     if(netdata_double_isnumber(qv.value))
         register_result(results, host, rca, ria, rma, qv.value, 0, &qv.sp, NULL, stats, register_zero);
+}
+
+struct query_weights_data {
+    QUERY_WEIGHTS_REQUEST *qwr;
+
+    SIMPLE_PATTERN *scope_nodes_sp;
+    SIMPLE_PATTERN *scope_contexts_sp;
+    SIMPLE_PATTERN *nodes_sp;
+    SIMPLE_PATTERN *contexts_sp;
+    SIMPLE_PATTERN *instances_sp;
+    SIMPLE_PATTERN *dimensions_sp;
+    SIMPLE_PATTERN *labels_sp;
+    SIMPLE_PATTERN *alerts_sp;
+
+    usec_t now_us;
+    usec_t started_us;
+    usec_t timeout_us;
+    bool timed_out;
+    bool interrupted;
+
+    size_t examined_dimensions;
+    bool register_zero;
+
+    DICTIONARY *results;
+    WEIGHTS_STATS stats;
+
+    uint32_t shifts;
+
+    struct query_versions versions;
+};
+
+static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qwd) {
+    QUERY_TARGET_REQUEST qtr = {
+            .version = 1,
+            .scope_nodes = qwd->qwr->scope_nodes,
+            .scope_contexts = qwd->qwr->scope_contexts,
+            .nodes = qwd->qwr->nodes,
+            .contexts = qwd->qwr->contexts,
+            .instances = qwd->qwr->instances,
+            .dimensions = qwd->qwr->dimensions,
+            .labels = qwd->qwr->labels,
+            .alerts = qwd->qwr->alerts,
+            .after = qwd->qwr->after,
+            .before = qwd->qwr->before,
+            .points = 1,
+            .options = qwd->qwr->options | RRDR_OPTION_NATURAL_POINTS,
+            .time_group_method = qwd->qwr->time_group_method,
+            .time_group_options = qwd->qwr->time_group_options,
+            .tier = qwd->qwr->tier,
+            .timeout_ms = qwd->qwr->timeout_ms,
+            .query_source = QUERY_SOURCE_API_WEIGHTS,
+            .priority = STORAGE_PRIORITY_NORMAL,
+    };
+
+    ONEWAYALLOC *owa = onewayalloc_create(16 * 1024);
+    RRDR *r = rrd2rrdr(owa, query_target_create(&qtr));
+
+    if(rrdr_rows(r) != 1 || !r->d)
+        goto cleanup;
+
+    QUERY_VALUE qv = {
+            .after = r->view.after,
+            .before = r->view.before,
+            .points_read = r->stats.db_points_read,
+            .result_points = r->stats.result_points_generated,
+    };
+
+    size_t queries = 0;
+    for(size_t d = 0; d < r->d ;d++) {
+        if(!rrdr_dimension_should_be_exposed(r->od[d], qwd->qwr->options))
+            continue;
+
+        long i = 0; // only one row
+        NETDATA_DOUBLE *cn = &r->v[ i * r->d ];
+        NETDATA_DOUBLE *ar = &r->ar[ i * r->d ];
+
+        qv.value = cn[d];
+        qv.anomaly_rate = ar[d];
+        qv.sp = *r->drs;
+
+        if(netdata_double_isnumber(qv.value)) {
+            QUERY_METRIC *qm = query_metric(r->internal.qt, d);
+            QUERY_DIMENSION *qd = query_dimension(r->internal.qt, qm->link.query_dimension_id);
+            QUERY_INSTANCE *qi = query_instance(r->internal.qt, qm->link.query_instance_id);
+            QUERY_CONTEXT *qc = query_context(r->internal.qt, qm->link.query_context_id);
+            QUERY_NODE *qn = query_node(r->internal.qt, qm->link.query_node_id);
+
+            register_result(qwd->results, qn->rrdhost, qc->rca, qi->ria, qd->rma, qv.value, 0, &qv.sp,
+                            NULL, &qwd->stats, qwd->register_zero);
+        }
+
+        queries++;
+    }
+
+    merge_query_value_to_stats(&qv, &qwd->stats, queries);
+
+cleanup:
+    rrdr_free(owa, r);
+    onewayalloc_destroy(owa);
 }
 
 // ----------------------------------------------------------------------------
@@ -1132,35 +1233,6 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
 
 // ----------------------------------------------------------------------------
 // The main function
-
-struct query_weights_data {
-    QUERY_WEIGHTS_REQUEST *qwr;
-
-    SIMPLE_PATTERN *scope_nodes_sp;
-    SIMPLE_PATTERN *scope_contexts_sp;
-    SIMPLE_PATTERN *nodes_sp;
-    SIMPLE_PATTERN *contexts_sp;
-    SIMPLE_PATTERN *instances_sp;
-    SIMPLE_PATTERN *dimensions_sp;
-    SIMPLE_PATTERN *labels_sp;
-    SIMPLE_PATTERN *alerts_sp;
-
-    usec_t now_us;
-    usec_t started_us;
-    usec_t timeout_us;
-    bool timed_out;
-    bool interrupted;
-
-    size_t examined_dimensions;
-    bool register_zero;
-
-    DICTIONARY *results;
-    WEIGHTS_STATS stats;
-
-    uint32_t shifts;
-
-    struct query_versions versions;
-};
 
 static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma) {
     struct query_weights_data *qwd = data;
@@ -1283,13 +1355,13 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
 
     // if the user didn't give a timeout
     // assume 60 seconds
-    if(!qwr->timeout)
-        qwr->timeout = 5 * 60 * MSEC_PER_SEC;
+    if(!qwr->timeout_ms)
+        qwr->timeout_ms = 5 * 60 * MSEC_PER_SEC;
 
     // if the timeout is less than 1 second
     // make it at least 1 second
-    if(qwr->timeout < (long)(1 * MSEC_PER_SEC))
-        qwr->timeout = 1 * MSEC_PER_SEC;
+    if(qwr->timeout_ms < (long)(1 * MSEC_PER_SEC))
+        qwr->timeout_ms = 1 * MSEC_PER_SEC;
 
     struct query_weights_data qwd = {
             .qwr = qwr,
@@ -1302,7 +1374,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
             .dimensions_sp = string_to_simple_pattern(qwr->dimensions),
             .labels_sp = string_to_simple_pattern(qwr->labels),
             .alerts_sp = string_to_simple_pattern(qwr->alerts),
-            .timeout_us = qwr->timeout * USEC_PER_MS,
+            .timeout_us = qwr->timeout_ms * USEC_PER_MS,
             .started_us = now_realtime_usec(),
             .timed_out = false,
             .examined_dimensions = 0,
@@ -1392,11 +1464,17 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
 
     if(qwr->host && qwr->version == 1)
         weights_do_node_callback(&qwd, qwr->host, true);
-    else
-        query_scope_foreach_host(qwd.scope_nodes_sp, qwd.nodes_sp,
-                                 weights_do_node_callback, &qwd,
-                                 &qwd.versions,
-                                 NULL);
+    else {
+        if((qwd.qwr->method == WEIGHTS_METHOD_VALUE || qwd.qwr->method == WEIGHTS_METHOD_ANOMALY_RATE) && (qwd.contexts_sp || qwd.scope_contexts_sp)) {
+            rrdset_weights_multi_dimensional_value(&qwd);
+        }
+        else {
+            query_scope_foreach_host(qwd.scope_nodes_sp, qwd.nodes_sp,
+                                     weights_do_node_callback, &qwd,
+                                     &qwd.versions,
+                                     NULL);
+        }
+    }
 
     if(!qwd.register_zero) {
         // put it back, to show it in the response

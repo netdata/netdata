@@ -3194,7 +3194,7 @@ RRDR *rrd2rrdr_legacy(
         ONEWAYALLOC *owa,
         RRDSET *st, size_t points, time_t after, time_t before,
         RRDR_TIME_GROUPING group_method, time_t resampling_time, RRDR_OPTIONS options, const char *dimensions,
-        const char *group_options, time_t timeout, size_t tier, QUERY_SOURCE query_source,
+        const char *group_options, time_t timeout_ms, size_t tier, QUERY_SOURCE query_source,
         STORAGE_PRIORITY priority) {
 
     QUERY_TARGET_REQUEST qtr = {
@@ -3208,7 +3208,7 @@ RRDR *rrd2rrdr_legacy(
             .options = options,
             .dimensions = dimensions,
             .time_group_options = group_options,
-            .timeout = timeout,
+            .timeout_ms = timeout_ms,
             .tier = tier,
             .query_source = query_source,
             .priority = priority,
@@ -3256,7 +3256,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     long dimensions_used = 0, dimensions_nonzero = 0;
     struct timeval query_start_time;
     struct timeval query_current_time;
-    if (qt->request.timeout)
+    if (qt->request.timeout_ms)
         now_realtime_timeval(&query_start_time);
 
     size_t last_db_points_read = 0;
@@ -3355,7 +3355,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         last_db_points_read = r_tmp->stats.db_points_read;
         last_result_points_generated = r_tmp->stats.result_points_generated;
 
-        if (qt->request.timeout)
+        if (qt->request.timeout_ms)
             now_realtime_timeval(&query_current_time);
 
         if(qm->status & RRDR_DIMENSION_NONZERO)
@@ -3398,10 +3398,10 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             log_access("QUERY INTERRUPTED");
         }
 
-        if (qt->request.timeout && ((NETDATA_DOUBLE)dt_usec(&query_start_time, &query_current_time) / 1000.0) > (NETDATA_DOUBLE)qt->request.timeout) {
+        if (qt->request.timeout_ms && ((NETDATA_DOUBLE)dt_usec(&query_start_time, &query_current_time) / 1000.0) > (NETDATA_DOUBLE)qt->request.timeout_ms) {
             cancel = true;
             log_access("QUERY CANCELED RUNTIME EXCEEDED %0.2f ms (LIMIT %lld ms)",
-                       (NETDATA_DOUBLE)dt_usec(&query_start_time, &query_current_time) / 1000.0, (long long)qt->request.timeout);
+                       (NETDATA_DOUBLE)dt_usec(&query_start_time, &query_current_time) / 1000.0, (long long)qt->request.timeout_ms);
         }
 
         if(cancel) {

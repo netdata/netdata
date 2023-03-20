@@ -700,7 +700,7 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
             .contexts = context,
             .instances = chart,
             .dimensions = (dimensions)?buffer_tostring(dimensions):NULL,
-            .timeout = timeout,
+            .timeout_ms = timeout,
             .points = points,
             .format = format,
             .options = options,

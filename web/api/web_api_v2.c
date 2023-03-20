@@ -22,7 +22,7 @@ static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unu
         else if((options & CONTEXTS_V2_CONTEXTS) && !strcmp(name, "scope_contexts")) req.scope_contexts = value;
         else if((options & CONTEXTS_V2_CONTEXTS) && !strcmp(name, "contexts")) req.contexts = value;
         else if((options & CONTEXTS_V2_SEARCH) && !strcmp(name, "q")) req.q = value;
-        else if(!strcmp(name, "timeout")) req.timeout = str2l(value);
+        else if(!strcmp(name, "timeout")) req.timeout_ms = str2l(value);
     }
 
     options |= CONTEXTS_V2_DEBUG;
@@ -205,7 +205,7 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
             .instances = instances,
             .dimensions = dimensions,
             .alerts = alerts,
-            .timeout = timeout,
+            .timeout_ms = timeout,
             .points = points,
             .format = format,
             .options = options,

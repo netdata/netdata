@@ -1267,7 +1267,7 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb) {
             }
             buffer_json_object_close(wb); // aggregations
 
-            buffer_json_member_add_uint64(wb, "timeout", qt->request.timeout);
+            buffer_json_member_add_uint64(wb, "timeout", qt->request.timeout_ms);
         }
         buffer_json_object_close(wb); // request
     }

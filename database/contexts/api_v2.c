@@ -231,7 +231,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
     struct rrdcontext_to_json_v2_data *ctl = data;
     BUFFER *wb = ctl->wb;
 
-    if(ctl->request->timeout && now_monotonic_usec() > ctl->request->timings.received_ut + ctl->request->timeout * USEC_PER_SEC)
+    if(ctl->request->timeout_ms && now_monotonic_usec() > ctl->request->timings.received_ut + ctl->request->timeout_ms * USEC_PER_MS)
         // timed out
         return -2;
 

@@ -277,7 +277,7 @@ typedef struct query_target_request {
 
     uint32_t format;                    // DATASOURCE_FORMAT
     RRDR_OPTIONS options;
-    time_t timeout;                     // the timeout of the query in seconds
+    time_t timeout_ms;                     // the timeout of the query in milliseconds
 
     size_t tier;
     QUERY_SOURCE query_source;
@@ -468,7 +468,7 @@ struct api_v2_contexts_request {
         usec_t finished_ut;
     } timings;
 
-    time_t timeout;
+    time_t timeout_ms;
 
     qt_interrupt_callback_t interrupt_callback;
     void *interrupt_callback_data;

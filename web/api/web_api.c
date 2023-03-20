@@ -66,7 +66,7 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
     size_t points = 0;
     RRDR_OPTIONS options = 0;
     RRDR_TIME_GROUPING time_group_method = RRDR_GROUPING_AVERAGE;
-    time_t timeout = 0;
+    time_t timeout_ms = 0;
     size_t tier = 0;
     const char *time_group_options = NULL, *scope_contexts = NULL, *scope_nodes = NULL, *contexts = NULL, *nodes = NULL,
         *instances = NULL, *dimensions = NULL, *labels = NULL, *alerts = NULL;
@@ -98,7 +98,7 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
             points = str2ul(value);
 
         else if (!strcmp(name, "timeout"))
-            timeout = str2l(value);
+            timeout_ms = str2l(value);
 
         else if((api_version == 1 && !strcmp(name, "group")) || (api_version >= 2 && !strcmp(name, "time_group")))
             time_group_method = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
@@ -172,7 +172,7 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
             .points = points,
             .options = options,
             .tier = tier,
-            .timeout = timeout,
+            .timeout_ms = timeout_ms,
 
             .interrupt_callback = web_client_interrupt_callback,
             .interrupt_callback_data = w,

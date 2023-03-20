@@ -87,7 +87,7 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
             .time_group_method = time_group_method,
             .time_group_options = time_group_options,
             .tier = tier,
-            .timeout = timeout,
+            .timeout_ms = timeout,
             .query_source = query_source,
             .priority = priority,
     };

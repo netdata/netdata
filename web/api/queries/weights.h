@@ -46,7 +46,7 @@ typedef struct query_weights_request {
     size_t points;
     RRDR_OPTIONS options;
     size_t tier;
-    size_t timeout;
+    time_t timeout_ms;
 
     weights_interrupt_callback_t interrupt_callback;
     void *interrupt_callback_data;
