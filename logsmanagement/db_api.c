@@ -40,7 +40,7 @@ static char *main_db_path = NULL; /**< Path of MAIN_DB **/
 static int do_migration_noop(sqlite3 *database, const char *name){
     UNUSED(database);
     UNUSED(name);
-    info("Running database migration %s", name);
+    collector_info("Running database migration %s", name);
     return 0;
 }
 
@@ -378,7 +378,7 @@ int db_init() {
     
     if(!main_db_dir || !*main_db_dir){
         rc = -1;
-        error("main_db_dir is not set");
+        collector_error("main_db_dir is not set");
         goto return_error;
     }
     size_t main_db_path_len = strlen(main_db_dir) + sizeof(MAIN_DB) + 1;
@@ -388,10 +388,10 @@ int db_init() {
     /* Create databases directory if it doesn't exist. */
     rc = uv_fs_mkdir(NULL, &mkdir_req, main_db_dir, 0775, NULL);
     uv_fs_req_cleanup(&mkdir_req);
-    if(rc == 0) info("DB directory created: %s", main_db_dir);
-    else if (rc == UV_EEXIST) info("DB directory %s found", main_db_dir);
+    if(rc == 0) collector_info("DB directory created: %s", main_db_dir);
+    else if (rc == UV_EEXIST) collector_info("DB directory %s found", main_db_dir);
     else {
-        error("DB mkdir() %s/ error: %s", main_db_dir, uv_strerror(rc));
+        collector_error("DB mkdir() %s/ error: %s", main_db_dir, uv_strerror(rc));
         goto return_error;
     }
 
@@ -408,18 +408,18 @@ int db_init() {
                       "PRAGMA foreign_keys = ON;",
                       0, 0, &err_msg);
     if (unlikely(rc != SQLITE_OK)) {
-        error("Failed to configure database");
-        error("SQL error: %s\n", err_msg);
+        collector_error("Failed to configure database");
+        collector_error("SQL error: %s\n", err_msg);
         sqlite3_free(err_msg);
         fatal_sqlite3_err(MAIN_DB, rc, __LINE__);
     } else {
-        info("%s configured successfully", MAIN_DB);
+        collector_info("%s configured successfully", MAIN_DB);
     }
 
     /* Execute pending main database migrations */
     int main_db_ver = db_user_version(main_db, -1);
     if (likely(LOGS_MANAG_DB_VERSION == main_db_ver)) {
-        info("Logs management %s database version is %d (no migration needed)", MAIN_DB, main_db_ver);
+        collector_info("Logs management %s database version is %d (no migration needed)", MAIN_DB, main_db_ver);
     } else {
         for(int ver = main_db_ver; ver < LOGS_MANAG_DB_VERSION && migration_list_main_db[ver].func; ver++){
             rc = (migration_list_main_db[ver].func)(main_db, migration_list_main_db[ver].name);
@@ -440,8 +440,8 @@ int db_init() {
                       ");",
                       0, 0, &err_msg);
     if (unlikely(rc != SQLITE_OK)) {
-        error("Failed to create table" MAIN_COLLECTIONS_TABLE);
-        error("SQL error: %s", err_msg);
+        collector_error("Failed to create table" MAIN_COLLECTIONS_TABLE);
+        collector_error("SQL error: %s", err_msg);
         sqlite3_free(err_msg);
         fatal_sqlite3_err(MAIN_DB, rc, __LINE__);
     }
@@ -559,17 +559,17 @@ int db_init() {
                             "PRAGMA foreign_keys = ON;",
                             0, 0, &err_msg);
             if (unlikely(rc != SQLITE_OK)) {
-                error("Failed to configure database for %s", p_file_info->filename);
-                error("SQL error: %s", err_msg);
+                collector_error("Failed to configure database for %s", p_file_info->filename);
+                collector_error("SQL error: %s", err_msg);
                 sqlite3_free(err_msg);
                 fatal("Failed to configure database for %s\n, SQL error: %s\n", p_file_info->filename, err_msg);
             }
 
             /* Execute pending metadata database migrations */
-            info("About to execute %s migrations for %s", METADATA_DB_FILENAME, p_file_info->file_basename);
+            collector_info("About to execute %s migrations for %s", METADATA_DB_FILENAME, p_file_info->file_basename);
             int metadata_db_ver = db_user_version(p_file_info->db, -1);
             if (likely(LOGS_MANAG_DB_VERSION == metadata_db_ver)) {
-                info( "Logs management %s database for %s version is %d (no migration needed)", 
+                collector_info( "Logs management %s database for %s version is %d (no migration needed)", 
                     METADATA_DB_FILENAME, p_file_info->file_basename, metadata_db_ver);
             } else {
                 for(int ver = metadata_db_ver; ver < LOGS_MANAG_DB_VERSION && migration_list_metadata_db[ver].func; ver++){

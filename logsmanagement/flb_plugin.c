@@ -107,7 +107,7 @@ int flb_init(void){
     handle = dlopen(flb_lib_path, RTLD_LAZY);
     freez(flb_lib_path);
     if (unlikely(!handle)){
-        if (likely((dl_error = dlerror()) != NULL)) error("dlopen() libfluent-bit.so error: %s", dl_error);
+        if (likely((dl_error = dlerror()) != NULL)) collector_error("dlopen() libfluent-bit.so error: %s", dl_error);
         m_assert(handle, "dlopen() libfluent-bit.so error");
         return -1;
     }
@@ -116,72 +116,72 @@ int flb_init(void){
 
     *(void **) (&flb_create) = dlsym(handle, "flb_create");
     if ((dl_error = dlerror()) != NULL) {
-        error("dlerror loading flb_create: %s", dl_error);
+        collector_error("dlerror loading flb_create: %s", dl_error);
         return -1;
     }
     *(void **) (&flb_service_set) = dlsym(handle, "flb_service_set");
     if ((dl_error = dlerror()) != NULL) {
-        error("dlerror loading flb_service_set: %s", dl_error);
+        collector_error("dlerror loading flb_service_set: %s", dl_error);
         return -1;
     }
     *(void **) (&flb_start) = dlsym(handle, "flb_start");
     if ((dl_error = dlerror()) != NULL) {
-        error("dlerror loading flb_start: %s", dl_error);
+        collector_error("dlerror loading flb_start: %s", dl_error);
         return -1;
     }
     *(void **) (&flb_stop) = dlsym(handle, "flb_stop");
     if ((dl_error = dlerror()) != NULL) {
-        error("dlerror loading flb_stop: %s", dl_error);
+        collector_error("dlerror loading flb_stop: %s", dl_error);
         return -1;
     }
     *(void **) (&flb_destroy) = dlsym(handle, "flb_destroy");
     if ((dl_error = dlerror()) != NULL) {
-        error("dlerror loading flb_destroy: %s", dl_error);
+        collector_error("dlerror loading flb_destroy: %s", dl_error);
         return -1;
     }   
     *(void **) (&flb_time_pop_from_msgpack) = dlsym(handle, "flb_time_pop_from_msgpack");
     if ((dl_error = dlerror()) != NULL) {
-        error("dlerror loading flb_time_pop_from_msgpack: %s", dl_error);
+        collector_error("dlerror loading flb_time_pop_from_msgpack: %s", dl_error);
         return -1;
     } 
     *(void **) (&flb_lib_free) = dlsym(handle, "flb_lib_free");
     if ((dl_error = dlerror()) != NULL) {
-        error("dlerror loading flb_lib_free: %s", dl_error);
+        collector_error("dlerror loading flb_lib_free: %s", dl_error);
         return -1;
     }
     *(void **) (&flb_input) = dlsym(handle, "flb_input");
     if ((dl_error = dlerror()) != NULL) {
-        error("dlerror loading flb_input: %s", dl_error);
+        collector_error("dlerror loading flb_input: %s", dl_error);
         return -1;
     }  
     *(void **) (&flb_parser_create) = dlsym(handle, "flb_parser_create");
     if ((dl_error = dlerror()) != NULL) {
-        error("dlerror loading flb_parser_create: %s", dl_error);
+        collector_error("dlerror loading flb_parser_create: %s", dl_error);
         return -1;
     } 
     *(void **) (&flb_input_set) = dlsym(handle, "flb_input_set");
     if ((dl_error = dlerror()) != NULL) {
-        error("dlerror loading flb_input_set: %s", dl_error);
+        collector_error("dlerror loading flb_input_set: %s", dl_error);
         return -1;
     } 
     *(void **) (&flb_output) = dlsym(handle, "flb_output");
     if ((dl_error = dlerror()) != NULL) {
-        error("dlerror loading flb_output: %s", dl_error);
+        collector_error("dlerror loading flb_output: %s", dl_error);
         return -1;
     } 
     *(void **) (&flb_output_set) = dlsym(handle, "flb_output_set");
     if ((dl_error = dlerror()) != NULL) {
-        error("dlerror loading flb_output_set: %s", dl_error);
+        collector_error("dlerror loading flb_output_set: %s", dl_error);
         return -1;
     } 
     *(void **) (&dl_msgpack_unpack_next) = dlsym(handle, "msgpack_unpack_next");
     if ((dl_error = dlerror()) != NULL) {
-        error("dlerror loading msgpack_unpack_next: %s", dl_error);
+        collector_error("dlerror loading msgpack_unpack_next: %s", dl_error);
         return -1;
     } 
     *(void **) (&dl_msgpack_zone_free) = dlsym(handle, "msgpack_zone_free");
     if ((dl_error = dlerror()) != NULL) {
-        error("dlerror loading msgpack_zone_free: %s", dl_error);
+        collector_error("dlerror loading msgpack_zone_free: %s", dl_error);
         return -1;
     } 
 

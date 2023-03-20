@@ -566,7 +566,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
             if(verify){
                 // if(field_size >= VHOST_MAX_LEN){
                 //     #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-                //     error("VHOST is invalid");
+                //     collector_error("VHOST is invalid");
                 //     #endif
                 //     log_line_parsed->vhost[0] = '\0';
                 //     log_line_parsed->parsing_errors++;
@@ -575,7 +575,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
                 
                 if(unlikely(regexec(&vhost_regex, log_line_parsed->vhost, 0, NULL, 0) == REG_NOMATCH)){
                     #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-                    error("VHOST is invalid");
+                    collector_error("VHOST is invalid");
                     #endif
                     // log_line_parsed->vhost[0] = 'invalid';
                     snprintf(log_line_parsed->vhost, sizeof(WEB_LOG_INVALID_HOST_STR), WEB_LOG_INVALID_HOST_STR);
@@ -616,7 +616,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
                 if(verify){
                     if(unlikely(log_line_parsed->port < 80 || log_line_parsed->port > 49151)){
                         #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-                        error("PORT is invalid (<80 or >49151)");
+                        collector_error("PORT is invalid (<80 or >49151)");
                         #endif
                         log_line_parsed->port = WEB_LOG_INVALID_PORT;
                         log_line_parsed->parsing_errors++;
@@ -625,7 +625,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
             }
             else{
                 #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-                error("Error while extracting PORT from string");
+                collector_error("Error while extracting PORT from string");
                 #endif
                 log_line_parsed->port = WEB_LOG_INVALID_PORT;
                 log_line_parsed->parsing_errors++;
@@ -657,7 +657,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
                 if(unlikely( strcmp(log_line_parsed->req_scheme, "http") && 
                              strcmp(log_line_parsed->req_scheme, "https"))){
                     #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-                    error("REQ_SCHEME is invalid (must be either 'http' or 'https')");
+                    collector_error("REQ_SCHEME is invalid (must be either 'http' or 'https')");
                     #endif
                     log_line_parsed->req_scheme[0] = '\0';
                     log_line_parsed->parsing_errors++;
@@ -690,7 +690,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
                 if (likely(regex_rc == 0)) {/* do nothing */}
                 else if (unlikely(regex_rc == REG_NOMATCH)) {
                     #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-                    error("REQ_CLIENT is invalid");
+                    collector_error("REQ_CLIENT is invalid");
                     #endif
                     snprintf(log_line_parsed->req_client, REQ_CLIENT_MAX_LEN, "%s", WEB_LOG_INVALID_CLIENT_IP_STR);
                     log_line_parsed->parsing_errors++;
@@ -699,7 +699,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
                     size_t err_msg_size = regerror(regex_rc, &req_client_regex, NULL, 0);
                     char *err_msg = mallocz(err_msg_size);
                     regerror(regex_rc, &req_client_regex, err_msg, err_msg_size);
-                    error("req_client_regex error:%s", err_msg);
+                    collector_error("req_client_regex error:%s", err_msg);
                     freez(err_msg);
                     m_assert(0, "req_client_regex has failed");
                 }
@@ -775,7 +775,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
                          strcmp(log_line_parsed->req_method, "UPDATEREDIRECTREF"))) {
 
                         #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-                        error("REQ_METHOD is invalid");
+                        collector_error("REQ_METHOD is invalid");
                         #endif
                         log_line_parsed->req_method[0] = '\0';
                         log_line_parsed->parsing_errors++;
@@ -856,7 +856,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
                                 strncmp(&field[REQ_PROTO_PREF_SIZE], "2", req_proto_num_size) && 
                                 strncmp(&field[REQ_PROTO_PREF_SIZE], "2.0", req_proto_num_size)))) {
                     #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-                    error("REQ_PROTO is invalid");
+                    collector_error("REQ_PROTO is invalid");
                     #endif
                     log_line_parsed->req_proto[0] = '\0';
                     log_line_parsed->parsing_errors++;
@@ -892,7 +892,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
                 if(verify){
                     if(unlikely(log_line_parsed->req_size < 0)){
                         #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-                        error("REQ_SIZE is invalid (<0)");
+                        collector_error("REQ_SIZE is invalid (<0)");
                         #endif
                         log_line_parsed->req_size = 0;
                         log_line_parsed->parsing_errors++;
@@ -900,7 +900,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
                 }
             }
             else{
-                error("Error while extracting REQ_SIZE from string");
+                collector_error("Error while extracting REQ_SIZE from string");
                 log_line_parsed->req_size = 0;
                 log_line_parsed->parsing_errors++;
             }
@@ -935,7 +935,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
                 }
                 else { 
                     #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-                    error("Error while extracting REQ_PROC_TIME from string");
+                    collector_error("Error while extracting REQ_PROC_TIME from string");
                     #endif
                     log_line_parsed->req_proc_time = 0;
                     log_line_parsed->parsing_errors++;
@@ -944,7 +944,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
             else{ // apache time is in microseconds
                 if(unlikely(str2int(&log_line_parsed->req_proc_time, req_proc_time_d, 10) != STR2XX_SUCCESS)) {
                     #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-                    error("Error while extracting REQ_PROC_TIME from string");
+                    collector_error("Error while extracting REQ_PROC_TIME from string");
                     #endif
                     log_line_parsed->req_proc_time = 0;
                     log_line_parsed->parsing_errors++;
@@ -954,7 +954,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
             if(verify){
                 if(unlikely(log_line_parsed->req_proc_time < 0)){
                     #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-                    error("REQ_PROC_TIME is invalid (<0)");
+                    collector_error("REQ_PROC_TIME is invalid (<0)");
                     #endif
                     log_line_parsed->req_proc_time = 0;
                     log_line_parsed->parsing_errors++;
@@ -993,7 +993,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
                      * Server errors (500–599). */
                     if(unlikely(log_line_parsed->resp_code < 100 || log_line_parsed->resp_code > 599)){
                         #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-                        error("RESP_CODE is invalid (<100 or >599)");
+                        collector_error("RESP_CODE is invalid (<100 or >599)");
                         #endif
                         log_line_parsed->resp_code = 0;
                         log_line_parsed->parsing_errors++;
@@ -1002,7 +1002,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
             }
             else{ 
                 #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-                error("Error while extracting RESP_CODE from string");
+                collector_error("Error while extracting RESP_CODE from string");
                 #endif
                 log_line_parsed->resp_code = 0;
                 log_line_parsed->parsing_errors++;
@@ -1033,7 +1033,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
                 if(verify){
                     if(unlikely(log_line_parsed->resp_size < 0)){
                         #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-                        error("RESP_SIZE is invalid (<0)");
+                        collector_error("RESP_SIZE is invalid (<0)");
                         #endif
                         log_line_parsed->resp_size = 0;
                         log_line_parsed->parsing_errors++;
@@ -1042,7 +1042,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
             }
             else {
                 #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-                error("Error while extracting RESP_SIZE from string");
+                collector_error("Error while extracting RESP_SIZE from string");
                 #endif
                 log_line_parsed->resp_size = 0;
                 log_line_parsed->parsing_errors++;
@@ -1084,7 +1084,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
                 }
                 else { 
                     #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-                    error("Error while extracting UPS_RESP_TIME from string");
+                    collector_error("Error while extracting UPS_RESP_TIME from string");
                     #endif
                     log_line_parsed->ups_resp_time = 0;
                     log_line_parsed->parsing_errors++;
@@ -1092,7 +1092,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
             }
             else{ // unlike in the REQ_PROC_TIME case, apache doesn't have an equivalent here
                 #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-                error("Error while extracting UPS_RESP_TIME from string");
+                collector_error("Error while extracting UPS_RESP_TIME from string");
                 #endif
                 log_line_parsed->ups_resp_time = 0;
                 log_line_parsed->parsing_errors++;
@@ -1100,7 +1100,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
             if(verify){
                 if(unlikely(log_line_parsed->ups_resp_time < 0)){
                     #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-                    error("UPS_RESP_TIME is invalid (<0)");
+                    collector_error("UPS_RESP_TIME is invalid (<0)");
                     #endif
                     log_line_parsed->ups_resp_time = 0;
                     log_line_parsed->parsing_errors++;
@@ -1144,7 +1144,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
                      strcmp(log_line_parsed->ssl_proto, "SSLv2") &&
                      strcmp(log_line_parsed->ssl_proto, "SSLv3"))) {
                     #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-                    error("SSL_PROTO is invalid");
+                    collector_error("SSL_PROTO is invalid");
                     #endif
                     log_line_parsed->ssl_proto[0] = '\0';
                     log_line_parsed->parsing_errors++;
@@ -1181,7 +1181,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
                 if (likely(regex_rc == 0)){/* do nothing */}
                 else if (unlikely(regex_rc == REG_NOMATCH)) {
                     #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-                    error("SSL_CIPHER_SUITE is invalid");
+                    collector_error("SSL_CIPHER_SUITE is invalid");
                     #endif
                     log_line_parsed->ssl_cipher[0] = '\0';
                     log_line_parsed->parsing_errors++;
@@ -1190,7 +1190,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
                     size_t err_msg_size = regerror(regex_rc, &cipher_suite_regex, NULL, 0);
                     char *err_msg = mallocz(err_msg_size);
                     regerror(regex_rc, &cipher_suite_regex, err_msg, err_msg_size);
-                    error("cipher_suite_regex error:%s", err_msg);
+                    collector_error("cipher_suite_regex error:%s", err_msg);
                     freez(err_msg);
                     m_assert(0, "cipher_suite_regex has failed");
                 }

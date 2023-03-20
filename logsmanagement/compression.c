@@ -29,7 +29,7 @@ int decompress_text(Circ_buff_item_t *const msg, char *const out_buf) {
 
     rc = LZ4_decompress_safe(msg->text_compressed, dstBuffer, msg->text_compressed_size, msg->text_size);
     if (unlikely(rc < 0)) {
-        error("Decompression error: %d", rc);
+        collector_error("Decompression error: %d", rc);
         m_assert(0, "Decompression error");
     }
 

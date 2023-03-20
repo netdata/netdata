@@ -87,7 +87,7 @@ static void handle_UV_ENOENT_err(struct File_info *const p_file_info) {
     // Stop fs events
     int rc = uv_fs_event_stop(p_file_info->fs_event_req);
     if (unlikely(rc)){
-        error("uv_fs_event_stop() for %s failed:%s", p_file_info->filename, uv_strerror(rc));
+        collector_error("uv_fs_event_stop() for %s failed:%s", p_file_info->filename, uv_strerror(rc));
     }
     m_assert(!rc, "uv_fs_event_stop() failed");
 
@@ -122,7 +122,7 @@ static int file_close(struct File_info *const p_file_info) {
     uv_fs_t close_req;
     rc = uv_fs_close(main_loop, &close_req, p_file_info->file_handle, NULL);
     if (unlikely(rc)) {
-        error("error closing %s: %s", p_file_info->filename, uv_strerror(rc));
+        collector_error("error closing %s: %s", p_file_info->filename, uv_strerror(rc));
         m_assert(!rc, "uv_fs_close() failed");
     }
     uv_fs_req_cleanup(&close_req);
@@ -141,7 +141,7 @@ static int file_open(struct File_info *const p_file_info) {
     uv_fs_t open_req;
     rc = uv_fs_open(main_loop, &open_req, p_file_info->filename, O_RDONLY, 0, NULL);
     if (unlikely(rc < 0)) {
-        error("file_open() error: %s (%d) %s", p_file_info->filename, rc, uv_strerror(rc));
+        collector_error("file_open() error: %s (%d) %s", p_file_info->filename, rc, uv_strerror(rc));
         m_assert(rc == -2, "file_open() failed with rc != 2 (other than no such file or directory)");
     } else {
         // open_req->result of a uv_fs_t is the file descriptor in case of the uv_fs_open
@@ -168,7 +168,7 @@ static void enable_file_changed_events_timer_cb(uv_timer_t *handle) {
     // debug(D_LOGS_MANAG, "Scheduling uv_fs_event for %s\n", p_file_info->filename);
     rc = uv_fs_event_start(p_file_info->fs_event_req, file_changed_cb, p_file_info->filename, 0);
     if (unlikely(rc)) {
-        error("uv_fs_event_start() for %s failed (%d): %s\n", p_file_info->filename, rc, uv_strerror(rc));
+        collector_error("uv_fs_event_start() for %s failed (%d): %s\n", p_file_info->filename, rc, uv_strerror(rc));
         if (rc == UV_ENOENT) {
             handle_UV_ENOENT_err(p_file_info);
         } else
@@ -201,7 +201,7 @@ static int enable_file_changed_events(struct File_info *p_file_info, uint8_t for
                         (uv_timer_cb)enable_file_changed_events_timer_cb, 
                         p_file_info->update_every * MSEC_PER_SEC, 0);
     if (unlikely(rc)) {
-        error("uv_timer_start() error: (%d) %s\n", rc, uv_strerror(rc));
+        collector_error("uv_timer_start() error: (%d) %s\n", rc, uv_strerror(rc));
         m_assert(!rc, "uv_timer_start() error");
     }
     return rc;
@@ -260,12 +260,12 @@ static void read_file_cb(uv_fs_t *req) {
         goto free_access_lock;
     } 
     else if (unlikely(req->result < 0)) {
-        error("Read error: %s for %s", uv_strerror(req->result), p_file_info->filename);
+        collector_error("Read error: %s for %s", uv_strerror(req->result), p_file_info->filename);
         m_assert(0, "Read error");
         goto free_access_lock;
     } 
     else if (unlikely(req->result == 0)) {
-        error("Read error: %s for %s", uv_strerror(req->result), p_file_info->filename);
+        collector_error("Read error: %s for %s", uv_strerror(req->result), p_file_info->filename);
         m_assert(0, "Should never reach EOF");
         goto free_access_lock;
     }
@@ -301,7 +301,7 @@ static void file_changed_cb(uv_fs_event_t *handle, const char *file_basename, in
 
     rc = uv_fs_event_stop(p_file_info->fs_event_req);
     if (unlikely(rc)) {
-        error("uv_fs_event_stop() error for %s: %s", p_file_info->filename, uv_strerror(rc));
+        collector_error("uv_fs_event_stop() error for %s: %s", p_file_info->filename, uv_strerror(rc));
         if (rc == UV_ENOENT) handle_UV_ENOENT_err(p_file_info);
         else m_assert(!rc, "uv_fs_event_stop() failed");
         goto return_error;
@@ -309,7 +309,7 @@ static void file_changed_cb(uv_fs_event_t *handle, const char *file_basename, in
 
     rc = uv_fs_stat(main_loop, &stat_req, p_file_info->filename, NULL);
     if (unlikely(rc)) {
-        error("uv_fs_stat error: %s", uv_strerror(rc));
+        collector_error("uv_fs_stat error: %s", uv_strerror(rc));
         if (rc == UV_ENOENT) handle_UV_ENOENT_err(p_file_info);
         else m_assert(!rc, "uv_fs_stat error");
         goto return_error;
@@ -328,7 +328,7 @@ static void file_changed_cb(uv_fs_event_t *handle, const char *file_basename, in
         uv_fs_req_cleanup(&stat_req);
         rc = uv_fs_stat(main_loop, &stat_req, p_file_info->filename, NULL);
         if (unlikely(rc)) {
-            error("uv_fs_stat error: %s\n", uv_strerror(rc));
+            collector_error("uv_fs_stat error: %s\n", uv_strerror(rc));
             m_assert(!rc, "uv_fs_stat error");
             // TODO: Handle error in this case
         }
@@ -351,7 +351,7 @@ static void file_changed_cb(uv_fs_event_t *handle, const char *file_basename, in
         uv_fs_req_cleanup(&stat_req);
         rc = uv_fs_stat(main_loop, &stat_req, p_file_info->filename, NULL);
         if (unlikely(rc)) {
-            error("uv_fs_stat error: %s", uv_strerror(rc));
+            collector_error("uv_fs_stat error: %s", uv_strerror(rc));
             m_assert(!rc, "uv_fs_stat error");
             // TODO: Handle error in this case
         }
@@ -367,7 +367,7 @@ static void file_changed_cb(uv_fs_event_t *handle, const char *file_basename, in
 
     rc = file_open(p_file_info);
     if (unlikely(rc < 0)) {
-        error("Error in file_open() (%d): %s", rc, uv_strerror(rc));
+        collector_error("Error in file_open() (%d): %s", rc, uv_strerror(rc));
         if (rc == UV_ENOENT) handle_UV_ENOENT_err(p_file_info);
         else m_assert(0, "Error in file_open()");
         goto return_error;
@@ -381,7 +381,7 @@ static void file_changed_cb(uv_fs_event_t *handle, const char *file_basename, in
 
         if(unlikely(available_text_space == 0)){
             m_assert(available_text_space != 0, "available_text_space is 0");
-            error("Circular buff for %s out of space! Will not collect anything in this iteration!", p_file_info->file_basename);
+            collector_error("Circular buff for %s out of space! Will not collect anything in this iteration!", p_file_info->file_basename);
             goto return_error;
         }
 
@@ -392,7 +392,7 @@ static void file_changed_cb(uv_fs_event_t *handle, const char *file_basename, in
         rc = uv_fs_read(main_loop, &p_file_info->read_req, p_file_info->file_handle,
                         &p_file_info->uvBuf, 1, old_filesize, read_file_cb);
         if (unlikely(rc)) {
-            error("uv_fs_read() error for %s", p_file_info->file_basename);
+            collector_error("uv_fs_read() error for %s", p_file_info->file_basename);
             m_assert(!rc, "uv_fs_read() failed");
             goto return_error;
         }
@@ -437,7 +437,7 @@ int tail_plugin_add_input(struct File_info *const p_file_info){
     int rc = 0;
 
     if ((rc = file_open(p_file_info)) < 0) {
-        error("file_open() for %s failed during monitor_log_file_init(): (%d) %s", 
+        collector_error("file_open() for %s failed during monitor_log_file_init(): (%d) %s", 
                     p_file_info->filename, rc, uv_strerror(rc));
         m_assert(rc == -2, "file_open() failed during monitor_log_file_init() \
                             with rc != 2 (other than no such file or directory)");
@@ -449,7 +449,7 @@ int tail_plugin_add_input(struct File_info *const p_file_info){
     stat_req.data = p_file_info;
     rc = uv_fs_stat(main_loop, &stat_req, p_file_info->filename, NULL);
     if (unlikely(rc)) {
-        error("uv_fs_stat() error for %s: (%d) %s", p_file_info->filename, rc, uv_strerror(rc));
+        collector_error("uv_fs_stat() error for %s: (%d) %s", p_file_info->filename, rc, uv_strerror(rc));
         m_assert(!rc, "uv_fs_stat() failed during monitor_log_file_init()");
         uv_fs_req_cleanup(&stat_req);
         return -1;

@@ -280,7 +280,7 @@ int circ_buff_insert(Circ_buff_t *const buff){
     int full = __atomic_load_n(&buff->full, __ATOMIC_SEQ_CST);
     
     if (unlikely(( head == tail ) && full )) {
-        error("Logs circular buffer out of space! Losing data!");
+        collector_error("Logs circular buffer out of space! Losing data!");
         m_assert(0, "Buff full");
         // TODO: How to handle this case, when circular buffer is out of space?
         return -1;
