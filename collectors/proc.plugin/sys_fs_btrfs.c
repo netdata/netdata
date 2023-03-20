@@ -1152,8 +1152,8 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
 
             for(BTRFS_DEVICE *d = node->devices ; d ; d = d->next) {
-                char rd_id[RRD_ID_LENGTH_MAX + 1];
                 if(unlikely(!d->rd_write_errs)){
+                    char rd_id[RRD_ID_LENGTH_MAX + 1];
                     snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:write_errs", d->id);
                     d->rd_write_errs = rrddim_add(node->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                     snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:read_errs", d->id);
