@@ -644,12 +644,14 @@ int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash
 
     if (unlikely(!host)) {
         freez(config_hash);
+        freez(node_id);
         return 1;
     }
 
     wc = (struct aclk_sync_host_config *)host->aclk_sync_host_config;
     if (unlikely(!wc)) {
         freez(config_hash);
+        freez(node_id);
         return 1;
     }
 
@@ -734,7 +736,6 @@ int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash
     if (likely(p_alarm_config.cfg_hash)) {
         log_access("ACLK RES [%s (%s)]: Sent alert config %s.", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A", config_hash);
         aclk_send_provide_alarm_cfg(&p_alarm_config);
-        freez((char *) config_hash);
         freez(p_alarm_config.cfg_hash);
         destroy_aclk_alarm_configuration(&alarm_config);
     }
@@ -746,6 +747,8 @@ bind_fail:
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to reset statement when pushing alarm config hash, rc = %d", rc);
 
+    freez(config_hash);
+    freez(node_id);
 #endif
     return rc;
 }
