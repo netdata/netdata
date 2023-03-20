@@ -15,6 +15,7 @@ declare -a package_tree=(
   devpkg-util-linux
   devpkg-libmnl
   devpkg-json-c
+  yaml-dev
   devpkg-libuv
   devpkg-lz4
   devpkg-openssl
