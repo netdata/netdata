@@ -20,6 +20,7 @@ typedef struct btrfs_device {
     int exists;
 
     char *error_stats_filename;
+    RRDSET *st_error_stats;
     RRDDIM *rd_write_errs;
     RRDDIM *rd_read_errs;
     RRDDIM *rd_flush_errs;
@@ -115,7 +116,6 @@ typedef struct btrfs_node {
 
     BTRFS_DISK *disks;
 
-    RRDSET *st_error_stats;
     BTRFS_DEVICE *devices;
 
     struct btrfs_node *next;
@@ -229,9 +229,6 @@ static inline void btrfs_free_node(BTRFS_NODE *node) {
         rrdset_is_obsolete(node->st_commit_timings);
     }
 
-    if(node->st_error_stats)
-        rrdset_is_obsolete(node->st_error_stats);
-
     freez(node->allocation_data_bytes_used_filename);
     freez(node->allocation_data_total_bytes_filename);
 
@@ -252,6 +249,8 @@ static inline void btrfs_free_node(BTRFS_NODE *node) {
      while(node->devices) {
         BTRFS_DEVICE *d = node->devices;
         node->devices = node->devices->next;
+        if(d->st_error_stats)
+            rrdset_is_obsolete(d->st_error_stats);
         btrfs_free_device(d);
     }
 
@@ -1122,57 +1121,56 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                                                     netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
             do_error_stats = CONFIG_BOOLEAN_YES;
 
-            if(unlikely(!node->st_error_stats)) {
-                char id[RRD_ID_LENGTH_MAX + 1], name[RRD_ID_LENGTH_MAX + 1], title[200 + 1];
-
-                snprintfz(id, RRD_ID_LENGTH_MAX, "error_stats_%s", node->id);
-                snprintfz(name, RRD_ID_LENGTH_MAX, "error_stats_%s", node->label);
-                snprintfz(title, 200, "BTRFS Errors");
-
-                netdata_fix_chart_id(id);
-                netdata_fix_chart_name(name);
-
-                node->st_error_stats = rrdset_create_localhost(
-                        "btrfs"
-                        , id
-                        , name
-                        , node->label
-                        , "btrfs.errors"
-                        , title
-                        , "errors"
-                        , PLUGIN_PROC_NAME
-                        , PLUGIN_PROC_MODULE_BTRFS_NAME
-                        , NETDATA_CHART_PRIO_BTRFS_ERRORS
-                        , update_every
-                        , RRDSET_TYPE_LINE
-                );
-
-                add_labels_to_btrfs(node, node->st_error_stats);
-            }
-
-
             for(BTRFS_DEVICE *d = node->devices ; d ; d = d->next) {
-                if(unlikely(!d->rd_write_errs)){
-                    char rd_id[RRD_ID_LENGTH_MAX + 1];
-                    snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:write_errs", d->id);
-                    d->rd_write_errs = rrddim_add(node->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                    snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:read_errs", d->id);
-                    d->rd_read_errs = rrddim_add(node->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                    snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:flush_errs", d->id);
-                    d->rd_flush_errs = rrddim_add(node->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                    snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:corruption_errs", d->id);
-                    d->rd_corruption_errs = rrddim_add(node->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                    snprintfz(rd_id, RRD_ID_LENGTH_MAX, "%d:generation_errs", d->id);
-                    d->rd_generation_errs = rrddim_add(node->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                }
-                rrddim_set_by_pointer(node->st_error_stats, d->rd_write_errs, d->write_errs);
-                rrddim_set_by_pointer(node->st_error_stats, d->rd_read_errs, d->read_errs);
-                rrddim_set_by_pointer(node->st_error_stats, d->rd_flush_errs, d->flush_errs);
-                rrddim_set_by_pointer(node->st_error_stats, d->rd_corruption_errs, d->corruption_errs);
-                rrddim_set_by_pointer(node->st_error_stats, d->rd_generation_errs, d->generation_errs);
-            }
 
-            rrdset_done(node->st_error_stats);
+                if(unlikely(!d->st_error_stats)) {
+                    char id[RRD_ID_LENGTH_MAX + 1], name[RRD_ID_LENGTH_MAX + 1], title[200 + 1];
+
+                    snprintfz(id, RRD_ID_LENGTH_MAX, "error_stats_%s_dev%d", node->id, d->id);
+                    snprintfz(name, RRD_ID_LENGTH_MAX, "error_stats_%s_dev%d", node->label, d->id);
+                    snprintfz(title, 200, "BTRFS Errors");
+
+                    netdata_fix_chart_id(id);
+                    netdata_fix_chart_name(name);
+
+                    d->st_error_stats = rrdset_create_localhost(
+                            "btrfs"
+                            , id
+                            , name
+                            , node->label
+                            , "btrfs.errors"
+                            , title
+                            , "errors"
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_BTRFS_NAME
+                            , NETDATA_CHART_PRIO_BTRFS_ERRORS
+                            , update_every
+                            , RRDSET_TYPE_LINE
+                    );
+
+                    char rd_id[RRD_ID_LENGTH_MAX + 1];
+                    snprintfz(rd_id, RRD_ID_LENGTH_MAX, "write_errs");
+                    d->rd_write_errs = rrddim_add(d->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    snprintfz(rd_id, RRD_ID_LENGTH_MAX, "read_errs");
+                    d->rd_read_errs = rrddim_add(d->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    snprintfz(rd_id, RRD_ID_LENGTH_MAX, "flush_errs");
+                    d->rd_flush_errs = rrddim_add(d->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    snprintfz(rd_id, RRD_ID_LENGTH_MAX, "corruption_errs");
+                    d->rd_corruption_errs = rrddim_add(d->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    snprintfz(rd_id, RRD_ID_LENGTH_MAX, "generation_errs");
+                    d->rd_generation_errs = rrddim_add(d->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+                    add_labels_to_btrfs(node, d->st_error_stats);
+                }
+
+                rrddim_set_by_pointer(d->st_error_stats, d->rd_write_errs, d->write_errs);
+                rrddim_set_by_pointer(d->st_error_stats, d->rd_read_errs, d->read_errs);
+                rrddim_set_by_pointer(d->st_error_stats, d->rd_flush_errs, d->flush_errs);
+                rrddim_set_by_pointer(d->st_error_stats, d->rd_corruption_errs, d->corruption_errs);
+                rrddim_set_by_pointer(d->st_error_stats, d->rd_generation_errs, d->generation_errs);
+
+                rrdset_done(d->st_error_stats);
+            }           
         }
     }
 
