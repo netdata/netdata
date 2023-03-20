@@ -685,7 +685,7 @@ static inline int find_all_btrfs_pools(const char *path, int update_every) {
 }
 
 static void add_labels_to_btrfs(BTRFS_NODE *n, RRDSET *st) {
-    rrdlabels_add(st->rrdlabels, "filesystem", n->id, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "filesystem_uuid", n->id, RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "filesystem_label", n->label, RRDLABEL_SRC_AUTO);
 }
 
@@ -1138,7 +1138,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                             , id
                             , name
                             , node->label
-                            , "btrfs.errors"
+                            , "btrfs.device_errors"
                             , title
                             , "errors"
                             , PLUGIN_PROC_NAME
