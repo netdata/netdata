@@ -6457,8 +6457,8 @@ netdataDashboard.context = {
         info: 'Tracks timing information for commits. <b>last</b> dimension metrics are valid only when BTRFS commit interval is longer than Netdata\'s <b>update_every</b> interval.'
     },
 
-    'btrfs.errors': {
-        info: 'Tracks per-device error counts. Dimension names are prefixed with the device ID. Five types of errors are tracked: read errors, write errors, flush errors, corruption errors, and generation errors. Read, write, and flush errors are errors reported by the underlying block device when trying to perform the associated operations on behalf of BTRFS. Corruption errors count checksum mismatches, which usually are a result of either at-rest data corruption or hardware problems. Generation errors count generational mismatches within the internal data structures of the volume, and are also usually indicative of at-rest data corruption or hardware problems. Note that errors reported here may not trigger an associated IO error in userspace, as BTRFS has relatively robust error recovery that allows it to return correct data in most multi-device setups.'
+    'btrfs.device_errors': {
+        info: 'Tracks per-device error counts. Five types of errors are tracked: read errors, write errors, flush errors, corruption errors, and generation errors. Read, write, and flush errors are errors reported by the underlying block device when trying to perform the associated operations on behalf of BTRFS. Corruption errors count checksum mismatches, which usually are a result of either at-rest data corruption or hardware problems. Generation errors count generational mismatches within the internal data structures of the volume, and are also usually indicative of at-rest data corruption or hardware problems. Note that errors reported here may not trigger an associated IO error in userspace, as BTRFS has relatively robust error recovery that allows it to return correct data in most multi-device setups.'
     },
 
     // ------------------------------------------------------------------------
