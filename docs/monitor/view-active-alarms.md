@@ -1,6 +1,6 @@
 # View active alerts
 
-Netdata comes with hundreds of pre-configured health alerts designed to notify you when an anomaly or performance issue affects your node or the applications it runs. 
+Netdata comes with hundreds of pre-configured health alerts designed to notify you when an anomaly or performance issue affects your node or the applications it runs.
 
 ## Alerts tab
 
@@ -9,7 +9,6 @@ You can always sort the table by a certain column by clicking on the name of tha
 
 ![image](https://user-images.githubusercontent.com/70198089/226340574-7e138dc7-5eab-4c47-a4a9-5f2640e38643.png)
 
-
 ### Filter alerts
 
 From this view, you can also filter alerts with the right hand bar. More specifically you can filter:
@@ -17,14 +16,13 @@ From this view, you can also filter alerts with the right hand bar. More specifi
 - Alert status
   - Filter based on the status of the alerts (e.g. Warning, Critical)
 - Alert class
-  - Filter based on the class of the alert (e.g. Latency, Utilization, Workload etc.) 
+  - Filter based on the class of the alert (e.g. Latency, Utilization, Workload etc.)
 - Alert type & component
   - Filter based on the alert's type (e.g. System, Web Server) and component (e.g. CPU, Disk, Load)
 - Alert role
   - Filter by the role that the alert is set to notify (e.g. Sysadmin, Webmaster etc.)
 - Nodes
   - Filter the alerts based on the nodes that are online, next to each node's name you can see how many alerts the node has, "critical" colored in red and "warning" colored in yellow
-
 
 ## Clicking on a specific alert
 
@@ -33,21 +31,16 @@ By clicking on the name of an entry of the table you can access that alert's det
 - Latest and Triggered time values
 - The alert's description
 - A link to the Community forum's alert page
-- The chart at the timeframe that the alert was triggered
+- The chart at the time frame that the alert was triggered
 - The alert's information: Node name, chart ID, type, component and class
 - Configuration section
 - Instance values - Node Instances
 
-
 ![image](https://user-images.githubusercontent.com/70198089/226339928-bae60140-0293-42cf-9713-ac4901708aba.png)
 
-
-
-
-At the bottom of the panel you can click the green button "View dedicated alert page" to apen a [dynamic tab](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md#dynamic-tabs) containing all the info for this alert in a tab format, where you can also run correlations and go to the node's chart that raised the particular alert.
+At the bottom of the panel you can click the green button "View dedicated alert page" to open a [dynamic tab](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md#dynamic-tabs) containing all the info for this alert in a tab format, where you can also run correlations and go to the node's chart that raised the particular alert.
 
 ![image](https://user-images.githubusercontent.com/70198089/226339794-61896c35-0b93-4ac9-92aa-07116fe63784.png)
-
 
 <!-- 
 ## Local Netdata Agent dashboard
@@ -77,4 +70,3 @@ With the three icons beneath that and the **role** designation, you can:
 The table on the right-hand side displays information about the health entity that triggered the alarm, which you can
 use as a reference to [configure alarms](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md).
  -->
- 
