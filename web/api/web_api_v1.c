@@ -264,8 +264,8 @@ int web_client_api_request_v1_alarms_select (char *url) {
         char *value = mystrsep(&url, "&");
         if (!value || !*value) continue;
 
-        if(!strcmp(value, "all")) all = 1;
-        else if(!strcmp(value, "active")) all = 0;
+        if(!strcmp(value, "all") || !strcmp(value, "all=true")) all = 1;
+        else if(!strcmp(value, "active") || !strcmp(value, "active=true")) all = 0;
     }
 
     return all;
