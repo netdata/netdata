@@ -24,12 +24,19 @@
 #include "file_info.h"
 #include "helper.h"
 #include "query.h"
-#if defined(LOGS_MANAGEMENT_STRESS_TEST) && LOGS_MANAGEMENT_STRESS_TEST == 1
-#include "query_test.h"
-#endif  // LOGS_MANAGEMENT_STRESS_TEST
 #include "parser.h"
 #include "flb_plugin.h"
 #include "tail_plugin.h"
+
+/* Extra options and includes when building with stress test support */
+#if defined(LOGS_MANAGEMENT_STRESS_TEST) 
+#define NETDATA_CONF_ENABLE_LOGS_MANAGEMENT_DEFAULT 1
+#if LOGS_MANAGEMENT_STRESS_TEST == 1
+#include "query_test.h"
+#endif
+#else 
+#define NETDATA_CONF_ENABLE_LOGS_MANAGEMENT_DEFAULT 0
+#endif  // defined(LOGS_MANAGEMENT_STRESS_TEST)
 
 static struct config log_management_config = {
     .first_section = NULL,
@@ -142,7 +149,7 @@ static void p_file_info_destroy(struct File_info *p_file_info){
 static int logs_manag_config_load(void){
     int rc = 0;
 
-    if(config_get_boolean(CONFIG_SECTION_LOGS_MANAGEMENT, "enabled", 0) == 0){
+    if(!config_get_boolean(CONFIG_SECTION_LOGS_MANAGEMENT, "enabled", NETDATA_CONF_ENABLE_LOGS_MANAGEMENT_DEFAULT)){
         info("CONFIG: Logs management disabled due to configuration option.");
         rc = -1;
     }
