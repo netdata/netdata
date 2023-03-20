@@ -33,6 +33,26 @@ jobs:
           matrix="$(.github/scripts/gen-matrix-eol-check.py)"
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Failed to generate build matrix for platform EOL checks:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Build matrix generation for scheduled platform EOL check has failed:
+              Checkout: ${{ steps.checkout.outcome }}
+              Prepare Tools: ${{ steps.prepare.outcome }}
+              Read Build Matrix: ${{ steps.set-matrix.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name == 'schedule'
+            && github.repository == 'netdata/netdata'
+          }}
 
   eol-check:
     name: EOL Check
@@ -61,10 +81,10 @@ jobs:
               ;;
             2)
               echo "pending=false" >> "${GITHUB_OUTPUT}"
-              echo "::info::No EOL information found for ${{ matrix.distro }} ${{ matrix.release }}"
+              echo "::info::No EOL information found for ${{ matrix.full_name }}"
               ;;
             *)
-              echo "::error::Failed to check EOL date for ${{ matrix.distro }} ${{ matrix.release }}"
+              echo "::error::Failed to check EOL date for ${{ matrix.full_name }}"
               exit 1
               ;;
           esac
@@ -76,9 +96,9 @@ jobs:
         run: |
           echo "title=[Platform EOL]: ${{ matrix.full_name }} will be EOL soon." >> "${GITHUB_OUTPUT}"
       # Check if there is an existing issue in the repo for the platform EOL.
-      # The actual command line to make the check is unfortunately complicated because
-      # GitHub think that it’s sensible to exit with a status of 0 if there no results
-      # for a search.
+      # The actual command line to make the check is unfortunately
+      # complicated because GitHub thinks that it’s sensible to exit
+      # with a status of 0 if there are no results for a search.
       - name: Check for Existing Issue
         id: existing
         if: steps.check.outputs.pending == 'true'
@@ -108,3 +128,26 @@ jobs:
             - [ ] Remove platform from `.github/data/distros.yml`
             - [ ] Remove platform package builder from helper-images repo (if applicable).
             - [ ] Verify any other platform support code that needs to be cleaned up.
+      # Send a notification to Slack if a job failed.
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Platform EOL check failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: A scheduled check for the EOL status of ${{ matrix.full_name }} has failed.
+              Checkout: ${{ steps.checkout.outcome }}
+              Check EOL Status: ${{ steps.check.outcome }}
+              Generate Issue Title: ${{ steps.title.outcome }}
+              Check for Existing Issue: ${{ steps.existing.outcome }}
+              Create Issue: ${{ steps.create-issue.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name == 'schedule'
+            && github.repository == 'netdata/netdata'
+          }}
