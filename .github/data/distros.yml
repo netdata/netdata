@@ -74,10 +74,11 @@ include:
         - el/8Server
         - el/8Client
 
-  - distro: amazonlinux
+  - &amzn
+    distro: amazonlinux
     version: "2"
     eol_check: 'amazon-linux'
-    packages:
+    packages: &amzn_packages
       type: rpm
       repo_distro: amazonlinux/2
       arches:
@@ -85,6 +86,12 @@ include:
         - aarch64
     test:
       ebpf-core: false
+  - <<: *amzn
+    version: "2023"
+    packages:
+      <<: *amzn_packages
+      repo_distro: amazonlinux/2023
+
 
   - distro: centos
     version: "7"
