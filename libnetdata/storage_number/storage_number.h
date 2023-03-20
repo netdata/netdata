@@ -60,7 +60,7 @@ typedef long long collected_number;
 #define epsilonndd (NETDATA_DOUBLE)0.0000001
 #define considered_equal_ndd(a, b) (fabsndd((a) - (b)) < epsilonndd)
 
-#if defined(HAVE_DECL_ISFINITE) || defined(HAVE_ISFINITE) || defined(isfinite)
+#if defined(HAVE_ISFINITE) || defined(isfinite)
 // The isfinite() macro shall determine whether its argument has a
 // finite value (zero, subnormal, or normal, and not infinite or NaN).
 #define netdata_double_isnumber(a) (isfinite(a))
