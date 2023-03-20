@@ -958,16 +958,12 @@ void dbengine_init(char *hostname) {
 int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unittest) {
     rrdhost_init();
 
-    if (unlikely(sql_init_database(DB_CHECK_NONE, system_info ? 0 : 1))) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-            set_late_global_environment(system_info);
-            fatal("Failed to initialize SQLite");
-        }
-        info("Skipping SQLITE metadata initialization since memory mode is not dbengine");
-    }
+    if (sqlite_library_init())
+        fatal("Failed to initialize SQLite library");
 
-    if (unlikely(sql_init_context_database(system_info ? 0 : 1))) {
-        error_report("Failed to initialize context metadata database");
+    if (unlikely(sqlite_init_databases(DB_CHECK_NONE, system_info ? 0 : 1))) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            fatal("Failed to initialize SQLite");
     }
 
     if (unlikely(unittest)) {

@@ -1441,17 +1441,17 @@ int main(int argc, char **argv) {
                         char* stresstest_string = "stresstest=";
 #endif
                         if(strcmp(optarg, "sqlite-check") == 0) {
-                            sql_init_database(DB_CHECK_INTEGRITY, 0);
+                        sql_init_metadata_database(DB_CHECK_INTEGRITY, 0);
                             return 0;
                         }
 
                         if(strcmp(optarg, "sqlite-fix") == 0) {
-                            sql_init_database(DB_CHECK_FIX_DB, 0);
+                            sql_init_metadata_database(DB_CHECK_FIX_DB, 0);
                             return 0;
                         }
 
                         if(strcmp(optarg, "sqlite-compact") == 0) {
-                            sql_init_database(DB_CHECK_RECLAIM_SPACE, 0);
+                            sql_init_metadata_database(DB_CHECK_RECLAIM_SPACE, 0);
                             return 0;
                         }
 
@@ -2048,10 +2048,17 @@ int main(int argc, char **argv) {
 
     delta_startup_time("initialize RRD structures");
 
-    if(rrd_init(netdata_configured_hostname, system_info, false)) {
-        set_late_global_environment(system_info);
+    char disk_full[FILENAME_MAX + 1];
+    snprintfz(disk_full, FILENAME_MAX, "%s/.disk_full", netdata_configured_varlib_dir);
+    int disk_full_detected = (unlink(disk_full) == 0);
+
+    if (unlikely(disk_full_detected))
+        fprintf(stderr, "DISK FULL DETECTED");
+
+    // Agent was shutdown due to disk full
+
+    if(rrd_init(netdata_configured_hostname, system_info, false))
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
-    }
 
     delta_startup_time("check for incomplete shutdown");
 
