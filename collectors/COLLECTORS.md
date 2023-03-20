@@ -675,6 +675,7 @@ $ sudo systemctl restart netdata
 - [SSH](https://github.com/Yaser-Amiri/netdata-ssh-module): Monitor failed authentication requests of an SSH server.
 - [ClickHouse](https://github.com/netdata/community/tree/main/collectors/python.d.plugin/clickhouse):
   Monitor [ClickHouse](https://clickhouse.com/) database.
+- [Ethtool](https://github.com/ghanapunq/netdata_ethtool_plugin): Monitor network interface with ethtool.
 
 ## Etc
 
@@ -682,3 +683,5 @@ $ sudo systemctl restart netdata
   example `charts.d` collector.
 - [python.d example](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/example/README.md): An
   example `python.d` collector.
+- [go.d example](https://github.com/netdata/go.d.plugin/blob/master/modules/example/README.md): An
+  example `go.d` collector.

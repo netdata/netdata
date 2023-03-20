@@ -73,6 +73,8 @@ dist_noinst_DATA = \
     packaging/installer/UPDATE.md \
     packaging/jsonc.checksums \
     packaging/jsonc.version \
+    packaging/yaml.checksums \
+    packaging/yaml.version \
     packaging/libbpf.checksums \
     packaging/libbpf.version \
     packaging/protobuf.checksums \
@@ -981,6 +983,7 @@ NETDATA_COMMON_LIBS = \
     libjudy.a \
     $(OPTIONAL_SSL_LIBS) \
     $(OPTIONAL_JSONC_LIBS) \
+    $(OPTIONAL_YAML_LIBS) \
     $(OPTIONAL_ATOMIC_LIBS) \
     $(OPTIONAL_DL_LIBS) \
     $(NULL)
@@ -991,6 +994,10 @@ endif
 
 if LINK_STATIC_JSONC
     NETDATA_COMMON_LIBS += $(abs_top_srcdir)/externaldeps/jsonc/libjson-c.a
+endif
+
+if LINK_STATIC_YAML
+    NETDATA_COMMON_LIBS += $(abs_top_srcdir)/externaldeps/libyaml/libyaml.a
 endif
 
 NETDATACLI_FILES = \

@@ -519,15 +519,14 @@ int is_legacy = 1;
          , string2str(host->health.health_default_recipient)
     );
 
-    if(!archived)
+    if(!archived) {
         metaqueue_host_update_info(host);
-
-    rrdhost_load_rrdcontext_data(host);
-    if (!archived) {
+        rrdhost_load_rrdcontext_data(host);
+//        rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
         ml_host_new(host);
         ml_host_start_training_thread(host);
     } else
-        rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED | RRDHOST_FLAG_ORPHAN);
+        rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD | RRDHOST_FLAG_ARCHIVED | RRDHOST_FLAG_ORPHAN);
 
     return host;
 }
@@ -719,31 +718,30 @@ RRDHOST *rrdhost_find_or_create(
         );
     }
     else {
-
-        rrdhost_update(host
-           , hostname
-           , registry_hostname
-           , guid
-           , os
-           , timezone
-           , abbrev_timezone
-           , utc_offset
-           , tags
-           , program_name
-           , program_version
-           , update_every
-           , history
-           , mode
-           , health_enabled
-           , rrdpush_enabled
-           , rrdpush_destination
-           , rrdpush_api_key
-           , rrdpush_send_charts_matching
-           , rrdpush_enable_replication
-           , rrdpush_seconds_to_replicate
-           , rrdpush_replication_step
-           , system_info);
-
+        if (likely(!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)))
+            rrdhost_update(host
+               , hostname
+               , registry_hostname
+               , guid
+               , os
+               , timezone
+               , abbrev_timezone
+               , utc_offset
+               , tags
+               , program_name
+               , program_version
+               , update_every
+               , history
+               , mode
+               , health_enabled
+               , rrdpush_enabled
+               , rrdpush_destination
+               , rrdpush_api_key
+               , rrdpush_send_charts_matching
+               , rrdpush_enable_replication
+               , rrdpush_seconds_to_replicate
+               , rrdpush_replication_step
+               , system_info);
     }
 
     return host;
@@ -1167,21 +1165,6 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
         return;
     }
 
-#ifdef ENABLE_ACLK
-    struct aclk_database_worker_config *wc =  host->dbsync_worker;
-    if (wc && !netdata_exit) {
-        struct aclk_database_cmd cmd;
-        memset(&cmd, 0, sizeof(cmd));
-        cmd.opcode = ACLK_DATABASE_ORPHAN_HOST;
-        struct aclk_completion compl ;
-        init_aclk_completion(&compl );
-        cmd.completion = &compl ;
-        aclk_database_enq_cmd(wc, &cmd);
-        wait_for_aclk_completion(&compl );
-        destroy_aclk_completion(&compl );
-    }
-#endif
-
     // ------------------------------------------------------------------------
     // free it
 
@@ -1218,10 +1201,6 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     string_freez(host->hostname);
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(RRDHOST), __ATOMIC_RELAXED);
     freez(host);
-#ifdef ENABLE_ACLK
-    if (wc)
-        wc->is_orphan = 0;
-#endif
 }
 
 void rrdhost_free_all(void) {

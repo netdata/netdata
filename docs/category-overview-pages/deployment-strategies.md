@@ -36,13 +36,16 @@ is a complete monitoring solution out of the box, having all these features enab
 We suggest to do the following configuration changes for production deployments:
 
 1. [Downsize Netdata Agents running on weak IoT devices](https://github.com/netdata/netdata/edit/master/docs/guides/configure/performance.md)
+
    To save valuable system resources.
 
-2. Offload Netdata Agents running on production systems, using Netdata Parents to take over most of their functions
-   To free system resources for the production applications running on them and to isolate production systems from the rest 
-   of the world, while at the same time providing increased data retention, data high availability and security.
+2. Set up [streaming and replication](https://github.com/netdata/netdata/blob/master/streaming/README.md) to:
 
-   See [streaming and replication](https://github.com/netdata/netdata/blob/master/streaming/README.md)
+   - Offload Netdata Agents running on production systems and free system resources for the production applications running on them.
+   - Isolate production systems from the rest of the world and improve security.
+   - Increase data retention.
+   - Make your data highly available.
 
-3. Use Netdata Cloud to access the dashboards
+3. [Use Netdata Cloud to access the dashboards](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md)
+
    For increased security, user management and access to our latest tools for advanced dashboarding and troubleshooting.

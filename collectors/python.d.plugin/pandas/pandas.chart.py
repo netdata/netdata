@@ -53,10 +53,10 @@ class Service(SimpleService):
         """ensure charts and dims all configured and that we can get data"""
 
         if not HAS_REQUESTS:
-            self.warn('requests library could not be imported')
+            self.warning('requests library could not be imported')
 
         if not HAS_SQLALCHEMY:
-            self.warn('sqlalchemy library could not be imported')
+            self.warning('sqlalchemy library could not be imported')
 
         if not self.chart_configs:
             self.error('chart_configs must be defined')

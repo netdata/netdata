@@ -123,6 +123,7 @@ system/initd/init.d/netdata
 system/launchd/netdata.plist
 system/lsb/init.d/netdata
 system/openrc/init.d/netdata
+system/runit/run
 system/systemd/netdata.service
 system/systemd/netdata.service.*
 system/systemd/netdata-updater.service

@@ -11,6 +11,7 @@ CLEANFILES = \
     lsb/init.d/netdata \
     openrc/conf.d/netdata \
     openrc/init.d/netdata \
+    runit/run \
     systemd/netdata.service \
     systemd/netdata.service.v235 \
     systemd/netdata-updater.service \
@@ -40,6 +41,7 @@ libsyslsbinitddir=$(libsyslsbdir)/init.d
 libsysopenrcdir=$(libsysdir)/openrc
 libsysopenrcinitddir=$(libsysopenrcdir)/init.d
 libsysopenrcconfddir=$(libsysopenrcdir)/conf.d
+libsysrunitdir=$(libsysdir)/runit
 libsyssystemddir=$(libsysdir)/systemd
 
 # Explicitly install directories to avoid permission issues due to umask
@@ -55,6 +57,7 @@ install-exec-local:
 	$(INSTALL) -d $(DESTDIR)$(libsyssystemddir)
 	$(INSTALL) -d $(DESTDIR)$(libsysopenrcinitddir)
 	$(INSTALL) -d $(DESTDIR)$(libsysopenrcconfddir)
+	$(INSTALL) -d $(DESTDIR)$(libsysrunitdir)
 	$(INSTALL) -d $(DESTDIR)$(libconfigvnodesdir)
 
 dist_libconfigvnodes_DATA = \
@@ -98,6 +101,10 @@ nodist_libsysopenrcconfd_DATA = \
     openrc/conf.d/netdata \
     $(NULL)
 
+nodist_libsysrunit_DATA = \
+    runit/run \
+    $(NULL)
+
 nodist_libsyssystemd_DATA = \
     systemd/netdata.service \
     systemd/netdata.service.v235 \
@@ -119,6 +126,7 @@ dist_noinst_DATA = \
     lsb/init.d/netdata.in \
     openrc/conf.d/netdata.in \
     openrc/init.d/netdata.in \
+    runit/run.in \
     systemd/netdata.service.in \
     systemd/netdata.service.v235.in \
     systemd/netdata-updater.service.in \

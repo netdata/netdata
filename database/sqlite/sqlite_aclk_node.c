@@ -25,12 +25,17 @@ DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
 
     return dict;
 }
-#endif
 
-void sql_build_node_collectors(struct aclk_database_worker_config *wc)
+static void build_node_collectors(char *node_id __maybe_unused)
 {
-#ifdef ENABLE_ACLK
-    if (!wc->host)
+
+    RRDHOST *host = find_host_by_node_id(node_id);
+
+    if (unlikely(!host))
+        return;
+
+    struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *) host->aclk_sync_host_config;
+    if (unlikely(!wc))
         return;
 
     struct update_node_collectors upd_node_collectors;
@@ -39,46 +44,49 @@ void sql_build_node_collectors(struct aclk_database_worker_config *wc)
     upd_node_collectors.node_id = wc->node_id;
     upd_node_collectors.claim_id = get_agent_claimid();
 
-    upd_node_collectors.node_collectors = collectors_from_charts(wc->host, dict);
+    upd_node_collectors.node_collectors = collectors_from_charts(host, dict);
     aclk_update_node_collectors(&upd_node_collectors);
 
     dictionary_destroy(dict);
     freez(upd_node_collectors.claim_id);
 
-    log_access("ACLK RES [%s (%s)]: NODE COLLECTORS SENT", wc->node_id, rrdhost_hostname(wc->host));
-#else
-    UNUSED(wc);
-#endif
+    log_access("ACLK RES [%s (%s)]: NODE COLLECTORS SENT", node_id, rrdhost_hostname(host));
+
+    freez(node_id);
 }
 
-void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
+static void build_node_info(char *node_id __maybe_unused)
 {
-    UNUSED(cmd);
-
-#ifdef ENABLE_ACLK
     struct update_node_info node_info;
 
-    char *claim_id = get_agent_claimid();
-    if (!wc->host || !claim_id) {
-        wc->node_info_send = 1;
-        freez(claim_id);
+    RRDHOST *host = find_host_by_node_id(node_id);
+
+    if (unlikely((!host))) {
+        freez(node_id);
         return;
     }
 
-    wc->node_info_send = 0;
+    struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *) host->aclk_sync_host_config;
+
+    if (unlikely(!wc)) {
+        freez(node_id);
+        return;
+    }
+
+    wc->node_info_send = 1;
+
     rrd_rdlock();
     node_info.node_id = wc->node_id;
-    node_info.claim_id = claim_id;
-    node_info.machine_guid = wc->host_guid;
+    node_info.claim_id = get_agent_claimid();
+    node_info.machine_guid = host->machine_guid;
     node_info.child = (wc->host != localhost);
-    node_info.ml_info.ml_capable = ml_capable(localhost);
+    node_info.ml_info.ml_capable = ml_capable();
     node_info.ml_info.ml_enabled = ml_enabled(wc->host);
 
     node_info.node_instance_capabilities = aclk_get_node_instance_capas(wc->host);
 
     now_realtime_timeval(&node_info.updated_at);
 
-    RRDHOST *host = wc->host;
     char *host_version = NULL;
     if (host != localhost) {
         netdata_mutex_lock(&host->receiver_lock);
@@ -103,7 +111,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.data.virtualization_type = host->system_info->virtualization ? host->system_info->virtualization : "unknown";
     node_info.data.container_type = host->system_info->container ? host->system_info->container : "unknown";
     node_info.data.custom_info = config_get(CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
-    node_info.data.machine_guid = wc->host_guid;
+    node_info.data.machine_guid = host->machine_guid;
 
     struct capability node_caps[] = {
         { .name = "ml", .version = host->system_info->ml_capable, .enabled = host->system_info->ml_enabled },
@@ -118,7 +126,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.data.host_labels_ptr = host->rrdlabels;
 
     aclk_update_node_info(&node_info);
-    log_access("ACLK RES [%s (%s)]: NODE INFO SENT for guid [%s] (%s)", wc->node_id, rrdhost_hostname(wc->host), wc->host_guid, wc->host == localhost ? "parent" : "child");
+    log_access("ACLK RES [%s (%s)]: NODE INFO SENT for guid [%s] (%s)", wc->node_id, rrdhost_hostname(wc->host), host->machine_guid, wc->host == localhost ? "parent" : "child");
 
     rrd_unlock();
     freez(node_info.claim_id);
@@ -126,7 +134,43 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     freez(host_version);
 
     wc->node_collectors_send = now_realtime_sec();
-#else
-    UNUSED(wc);
-#endif
+    freez(node_id);
+
 }
+
+
+void aclk_check_node_info_and_collectors(void)
+{
+    RRDHOST *host;
+
+    if (unlikely(!aclk_connected))
+        return;
+
+    dfe_start_reentrant(rrdhost_root_index, host) {
+
+        if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
+            info("ACLK: 'host:%s' not sending node info, context load is pending", rrdhost_hostname(host));
+            continue;
+        }
+
+        struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
+
+        if (unlikely(!wc))
+            continue;
+
+        if (wc->node_info_send) {
+            build_node_info(strdupz(wc->node_id));
+            internal_error(true, "ACLK SYNC: Sending node info for %s", rrdhost_hostname(host));
+            wc->node_info_send = 0;
+        }
+
+        if (wc->node_collectors_send && wc->node_collectors_send + 30 < now_realtime_sec()) {
+            build_node_collectors(strdupz(wc->node_id));
+            internal_error(true, "ACLK SYNC: Sending collectors for %s", rrdhost_hostname(host));
+            wc->node_collectors_send = 0;
+        }
+    }
+    dfe_done(host);
+}
+
+#endif
