@@ -101,7 +101,7 @@ static void logsmanagement_plugin_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    info("cleaning up...");
+    collector_info("cleaning up...");
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
@@ -242,7 +242,7 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
             query_params.data_format = LOGS_QUERY_DATA_FORMAT_NEW_LINE;
         }
         else {
-            error("functions: logsmanagement invalid parameter");
+            collector_error("functions: logsmanagement invalid parameter");
             return HTTP_RESP_BAD_REQUEST;
         }
     }
