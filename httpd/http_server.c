@@ -567,6 +567,20 @@ int h2o_stream_write(void *ctx, const char *data, size_t data_len)
     uv_async_send(event);
 }
 
+size_t h2o_stream_read(void *ctx, char *buf, size_t read_bytes)
+{
+    h2o_stream_conn_t *conn = (h2o_stream_conn_t *)ctx;
+
+    size_t avail = rbuf_bytes_available(conn->rx);
+
+    if (!avail)
+        return 0;
+
+    avail = MIN(avail, read_bytes);
+
+    return rbuf_pop(conn->rx, buf, avail);
+}
+
 static int hdl_stream(h2o_handler_t *self, h2o_req_t *req)
 {
     h2o_stream_conn_t *conn = mallocz(sizeof(*conn));
