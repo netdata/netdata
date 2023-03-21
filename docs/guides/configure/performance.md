@@ -10,6 +10,21 @@ real-time, has health monitoring enabled to evaluate alerts and trains Machine L
 
 This document describes the resources required for the various default capabilities and the strategies to optimize Netdata for production use. 
 
+## Summary of performance optimizations
+
+The following table summarizes the effect of each optimization on the CPU, RAM and Disk IO utilization in production.
+
+Optimization | CPU | RAM | Disk IO
+-- | -- | -- |--
+[Use streaming and replication](#use-streaming-and-replication) | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:
+[Disable unneeded plugins or collectors](#disable-unneeded-plugins-or-collectors) | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:
+[Reduce data collection frequency](#reduce-collection-frequency) | :heavy_check_mark: | | :heavy_check_mark:
+[Change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md) | | :heavy_check_mark: | :heavy_check_mark:
+[Use a different metric storage database](https://github.com/netdata/netdata/blob/master/database/README.md) | | :heavy_check_mark: | :heavy_check_mark:
+[Disable machine learning](#disable-machine-learning) | :heavy_check_mark: | | 
+[Use a reverse proxy](#run-netdata-behind-a-proxy) | :heavy_check_mark: | | 
+[Disable/lower gzip compression for the agent dashboard](#disablelower-gzip-compression-for-the-dashboard) | :heavy_check_mark: | | 
+
 ## Resources required by a default Netdata installation
 
 Netdata's performance is primarily affected by **data collection/retention** and **clients accessing data**. 
@@ -54,21 +69,6 @@ Netdata spreads I/O operations across time. For typical standalone installations
 To configure retention, you can [change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md).
 To control disk I/O [use a different metric storage database](https://github.com/netdata/netdata/blob/master/database/README.md), avoid querying the 
 production system [using streaming and replication](#use-streaming-and-replication), [reduce the data collection frequency](#reduce-collection-frequency), and [disable unneeded plugins or collectors](#disable-unneeded-plugins-or-collectors).
-
-## Summary of performance optimizations
-
-The following table summarizes the effect of each optimization on the CPU, RAM and Disk IO utilization in production.
-
-Optimization | CPU | RAM | Disk IO
--- | -- | -- |--
-[Use streaming and replication](#use-streaming-and-replication) | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:
-[Disable unneeded plugins or collectors](#disable-unneeded-plugins-or-collectors) | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:
-[Reduce data collection frequency](#reduce-collection-frequency) | :heavy_check_mark: | | :heavy_check_mark:
-[Change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md) | | :heavy_check_mark: | :heavy_check_mark:
-[Use a different metric storage database](https://github.com/netdata/netdata/blob/master/database/README.md) | | :heavy_check_mark: | :heavy_check_mark:
-[Disable machine learning](#disable-machine-learning) | :heavy_check_mark: | | 
-[Use a reverse proxy](#run-netdata-behind-a-proxy) | :heavy_check_mark: | | 
-[Disable/lower gzip compression for the agent dashboard](#disablelower-gzip-compression-for-the-dashboard) | :heavy_check_mark: | | 
 
 ## Use streaming and replication
 
