@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- minor addition to distros matrix [\#14767](https://github.com/netdata/netdata/pull/14767) ([tkatsoulas](https://github.com/tkatsoulas))
+- Update "View active alerts" documentation [\#14766](https://github.com/netdata/netdata/pull/14766) ([Ancairon](https://github.com/Ancairon))
+- Accept all=true for alarms api v1 call [\#14762](https://github.com/netdata/netdata/pull/14762) ([MrZammler](https://github.com/MrZammler))
+- fix /sys/block/zram in docker [\#14759](https://github.com/netdata/netdata/pull/14759) ([ilyam8](https://github.com/ilyam8))
 - bump go.d.plugin to v0.51.4 [\#14756](https://github.com/netdata/netdata/pull/14756) ([ilyam8](https://github.com/ilyam8))
 - Add ethtool in third party collectors [\#14753](https://github.com/netdata/netdata/pull/14753) ([ghanapunq](https://github.com/ghanapunq))
 - Update sign-in.md [\#14751](https://github.com/netdata/netdata/pull/14751) ([cakrit](https://github.com/cakrit))
@@ -34,6 +38,7 @@
 - fix system info disk size detection on raspberry pi  [\#14711](https://github.com/netdata/netdata/pull/14711) ([ilyam8](https://github.com/ilyam8))
 - /api/v2 part 4 [\#14706](https://github.com/netdata/netdata/pull/14706) ([ktsaou](https://github.com/ktsaou))
 - Don’t try to use tput in edit-config unless it’s installed. [\#14705](https://github.com/netdata/netdata/pull/14705) ([Ferroin](https://github.com/Ferroin))
+- Bundle libyaml [\#14704](https://github.com/netdata/netdata/pull/14704) ([MrZammler](https://github.com/MrZammler))
 - Revert "Handle conffiles for DEB packages explicitly instead of automatically." [\#14700](https://github.com/netdata/netdata/pull/14700) ([tkatsoulas](https://github.com/tkatsoulas))
 - Fix compilation error when --disable-cloud is specified [\#14695](https://github.com/netdata/netdata/pull/14695) ([stelfrag](https://github.com/stelfrag))
 - fix: detect the host os in k8s on non-docker cri [\#14694](https://github.com/netdata/netdata/pull/14694) ([witalisoft](https://github.com/witalisoft))
@@ -377,11 +382,6 @@
 - Add a health configuration option of which alarms to load [\#14150](https://github.com/netdata/netdata/pull/14150) ([MrZammler](https://github.com/MrZammler))
 - MQTT5 Topic Alias [\#14148](https://github.com/netdata/netdata/pull/14148) ([underhood](https://github.com/underhood))
 - Disable integration by default \(eBPF \<-\> APPS\) [\#14147](https://github.com/netdata/netdata/pull/14147) ([thiagoftsm](https://github.com/thiagoftsm))
-- Revert "MQTT 5 publish topic alias support" [\#14145](https://github.com/netdata/netdata/pull/14145) ([MrZammler](https://github.com/MrZammler))
-- rename "Pid" to "PID" in functions [\#14144](https://github.com/netdata/netdata/pull/14144) ([andrewm4894](https://github.com/andrewm4894))
-- Document memory mode alloc [\#14142](https://github.com/netdata/netdata/pull/14142) ([cakrit](https://github.com/cakrit))
-- fix\(packaging\): add setuid for cgroup-network and ebpf.plugin in RPM [\#14140](https://github.com/netdata/netdata/pull/14140) ([ilyam8](https://github.com/ilyam8))
-- use chart labels in portcheck alarms [\#14137](https://github.com/netdata/netdata/pull/14137) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
