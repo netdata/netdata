@@ -520,7 +520,7 @@ void sql_create_aclk_table(RRDHOST *host __maybe_unused, uuid_t *host_uuid __may
     wc->host = host;
     strcpy(wc->uuid_str, uuid_str);
     wc->alert_updates = 0;
-    wc->node_info_send = 1;
+    wc->node_info_send_time = now_realtime_sec();
 #endif
 }
 

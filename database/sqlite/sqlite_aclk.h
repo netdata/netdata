@@ -72,7 +72,7 @@ struct aclk_database_cmdqueue {
 struct aclk_sync_host_config {
     RRDHOST *host;
     int alert_updates;
-    int node_info_send;
+    time_t node_info_send_time;
     time_t node_collectors_send;
     char uuid_str[UUID_STR_LEN];
     char node_id[UUID_STR_LEN];
