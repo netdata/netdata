@@ -584,7 +584,7 @@ void aclk_push_alert_config(const char *node_id, const char *config_hash)
     if (unlikely(!aclk_sync_config.initialized))
         return;
 
-    queue_aclk_sync_cmd(ACLK_DATABASE_PUSH_ALERT_CONFIG, node_id, config_hash);
+    queue_aclk_sync_cmd(ACLK_DATABASE_PUSH_ALERT_CONFIG, strdupz(node_id), strdupz(config_hash));
 }
 
 void aclk_push_node_alert_snapshot(const char *node_id)
