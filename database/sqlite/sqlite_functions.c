@@ -779,7 +779,7 @@ struct node_instance_list *get_node_list(void)
             node_list[row].live = (host && (host == localhost || host->receiver
                                             || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)))) ? 1 : 0;
             node_list[row].hops = (host && host->system_info) ? host->system_info->hops :
-                                  uuid_compare(*host_id, localhost->host_uuid) ? 1 : 0;
+                                  uuid_memcmp(host_id, &localhost->host_uuid) ? 1 : 0;
             node_list[row].hostname =
                 sqlite3_column_bytes(res, 2) ? strdupz((char *)sqlite3_column_text(res, 2)) : NULL;
         }

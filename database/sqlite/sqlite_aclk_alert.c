@@ -133,7 +133,7 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
         goto done;
     }
 
-    if (uuid_compare(ae->config_hash_id, config_hash_id)) {
+    if (uuid_memcmp(&ae->config_hash_id, &config_hash_id)) {
         send = 1;
         goto done;
     }

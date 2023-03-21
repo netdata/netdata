@@ -927,11 +927,6 @@ struct uuid_first_time_s {
     size_t df_index_oldest;
 };
 
-static int journal_metric_compare(const void *key, const void *metric)
-{
-    return uuid_compare(*(uuid_t *) key, ((struct journal_metric_list *) metric)->uuid);
-}
-
 struct rrdengine_datafile *datafile_release_and_acquire_next_for_retention(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile) {
 
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
@@ -987,7 +982,10 @@ void find_uuid_first_time(
             if (uuid_original_entry->df_matched > 3 || uuid_original_entry->pages_found > 5)
                 continue;
 
-            struct journal_metric_list *live_entry = bsearch(uuid_original_entry->uuid,uuid_list,journal_metric_count,sizeof(*uuid_list), journal_metric_compare);
+            struct journal_metric_list *live_entry =
+                    bsearch(uuid_original_entry->uuid,uuid_list,journal_metric_count,
+                            sizeof(*uuid_list), journal_metric_uuid_compare);
+
             if (!live_entry) {
                 // Not found in this journal
                 not_matching_bsearches++;

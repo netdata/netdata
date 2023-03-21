@@ -161,7 +161,7 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(uuid_compare(rd->metric_uuid, *mrg_metric_uuid(main_mrg, metric)) != 0) {
+    if(uuid_memcmp(&rd->metric_uuid, mrg_metric_uuid(main_mrg, metric)) != 0) {
         char uuid1[UUID_STR_LEN + 1];
         char uuid2[UUID_STR_LEN + 1];
 

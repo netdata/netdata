@@ -510,4 +510,8 @@ static inline int read_single_signed_number_file(const char *filename, long long
     return 0;
 }
 
+static inline int uuid_memcmp(const uuid_t *uu1, const uuid_t *uu2) {
+    return memcmp(uu1, uu2, sizeof(uuid_t));
+}
+
 #endif //NETDATA_INLINED_H
