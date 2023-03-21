@@ -61,14 +61,14 @@ static inline int health_parse_delay(
 
         if(!strcasecmp(key, "up")) {
             if (!config_parse_duration(value, delay_up_duration)) {
-                error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
+                log_health("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                         line, filename, value, key);
             }
             else given_up = 1;
         }
         else if(!strcasecmp(key, "down")) {
             if (!config_parse_duration(value, delay_down_duration)) {
-                error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
+                log_health("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                         line, filename, value, key);
             }
             else given_down = 1;
@@ -76,20 +76,20 @@ static inline int health_parse_delay(
         else if(!strcasecmp(key, "multiplier")) {
             *delay_multiplier = strtof(value, NULL);
             if(isnan(*delay_multiplier) || isinf(*delay_multiplier) || islessequal(*delay_multiplier, 0)) {
-                error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
+                log_health("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                         line, filename, value, key);
             }
             else given_multiplier = 1;
         }
         else if(!strcasecmp(key, "max")) {
             if (!config_parse_duration(value, delay_max_duration)) {
-                error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
+                log_health("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                         line, filename, value, key);
             }
             else given_max = 1;
         }
         else {
-            error("Health configuration at line %zu of file '%s': unknown keyword '%s'",
+            log_health("Health configuration at line %zu of file '%s': unknown keyword '%s'",
                     line, filename, key);
         }
     }
@@ -136,7 +136,7 @@ static inline uint32_t health_parse_options(const char *s) {
             if(!strcasecmp(buf, "no-clear-notification") || !strcasecmp(buf, "no-clear"))
                 options |= RRDCALC_OPTION_NO_CLEAR_NOTIFICATION;
             else
-                error("Ignoring unknown alarm option '%s'", buf);
+                log_health("Ignoring unknown alarm option '%s'", buf);
         }
     }
 
@@ -171,13 +171,13 @@ static inline int health_parse_repeat(
         }
         if(!strcasecmp(key, "warning")) {
             if (!config_parse_duration(value, (int*)warn_repeat_every)) {
-                error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
+                log_health("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                       line, file, value, key);
             }
         }
         else if(!strcasecmp(key, "critical")) {
             if (!config_parse_duration(value, (int*)crit_repeat_every)) {
-                error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
+                log_health("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                       line, file, value, key);
             }
         }
@@ -899,11 +899,13 @@ void health_create_alert_from_config(struct alert_config *doc_cfg, struct alert_
         }
     }
     if (sec_cfg->delay) {
+        char *delay = strdupz(string2str(sec_cfg->delay));
         if (rc) {
-            health_parse_delay(line, filename, (char *)string2str(sec_cfg->delay), &rc->delay_up_duration, &rc->delay_down_duration, &rc->delay_max_duration, &rc->delay_multiplier);
+            health_parse_delay(line, filename, delay, &rc->delay_up_duration, &rc->delay_down_duration, &rc->delay_max_duration, &rc->delay_multiplier);
         } else if (rt) {
-            health_parse_delay(line, filename, (char *)string2str(sec_cfg->delay), &rt->delay_up_duration, &rt->delay_down_duration, &rt->delay_max_duration, &rt->delay_multiplier);
+            health_parse_delay(line, filename, delay, &rt->delay_up_duration, &rt->delay_down_duration, &rt->delay_max_duration, &rt->delay_multiplier);
         }
+        freez(delay);
     }
     if (sec_cfg->options) {
         if (rc) {
@@ -1807,6 +1809,7 @@ void health_yaml_config_handle_document(yaml_document_t *document_p, RRDHOST *ho
 
 	health_yaml_config_parse_node(document_p, node, doc_alert_cfg, sec_alert_cfg, NULL, host);
     health_create_alert_from_config(doc_alert_cfg, sec_alert_cfg, host, "todo", 1);
+
     alert_config_free(sec_alert_cfg);
     alert_config_free(doc_alert_cfg);
     freez(sec_alert_cfg);
