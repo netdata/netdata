@@ -10,9 +10,9 @@ void kernel_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_m
     /* Number of collected logs - initialise */
     chart_data->st_lines = rrdset_create_localhost(
             (char *) p_file_info->chart_name
-            , "collected logs"
+            , "collected_logs"
             , NULL
-            , "collected logs"
+            , "collected_logs"
             , NULL
             , "Collected log records"
             , "records"
@@ -29,7 +29,7 @@ void kernel_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_m
     if(p_file_info->parser_config->chart_config & CHART_SYSLOG_SEVER){
         chart_data->st_sever = rrdset_create_localhost(
                 (char *) p_file_info->chart_name
-                , "severity levels"
+                , "severity_levels"
                 , NULL
                 , "severity"
                 , NULL

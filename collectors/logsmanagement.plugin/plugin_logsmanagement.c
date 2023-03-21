@@ -462,7 +462,7 @@ void *logsmanagement_plugin_main(void *ptr){
     /* Circular buffer total memory stats - initialise */
     stats_chart_data->st_circ_buff_mem_total = rrdset_create_localhost(
             stats_chart_data->rrd_type
-            , "circular buffer memory total"
+            , "circular_buffer_memory_total"
             , NULL
             , "logsmanagement.plugin"
             , NULL
@@ -480,7 +480,7 @@ void *logsmanagement_plugin_main(void *ptr){
     /* Circular buffer uncompressed buffered items memory stats - initialise */
     stats_chart_data->st_circ_buff_mem_uncompressed = rrdset_create_localhost(
             stats_chart_data->rrd_type
-            , "circular buffer uncompressed buffered total"
+            , "circular_buffer_uncompressed_buffered_total"
             , NULL
             , "logsmanagement.plugin"
             , NULL
@@ -498,7 +498,7 @@ void *logsmanagement_plugin_main(void *ptr){
     /* Circular buffer compressed buffered items memory stats - initialise */
     stats_chart_data->st_circ_buff_mem_compressed = rrdset_create_localhost(
             stats_chart_data->rrd_type
-            , "circular buffer compressed buffered total"
+            , "circular_buffer_compressed_buffered_total"
             , NULL
             , "logsmanagement.plugin"
             , NULL
@@ -516,7 +516,7 @@ void *logsmanagement_plugin_main(void *ptr){
     /* Compression stats - initialise */
     stats_chart_data->st_compression_ratio = rrdset_create_localhost(
             stats_chart_data->rrd_type
-            , "average compression ratio"
+            , "average_compression_ratio"
             , NULL
             , "logsmanagement.plugin"
             , NULL
@@ -534,7 +534,7 @@ void *logsmanagement_plugin_main(void *ptr){
     /* DB disk usage stats - initialise */
     stats_chart_data->st_disk_usage = rrdset_create_localhost(
             stats_chart_data->rrd_type
-            , "database disk usage"
+            , "database_disk_usage"
             , NULL
             , "logsmanagement.plugin"
             , NULL
@@ -600,7 +600,7 @@ void *logsmanagement_plugin_main(void *ptr){
                         (char *) p_file_info->chart_name
                         , p_file_info->parser_cus_config[cus_off]->chart_name
                         , NULL
-                        , "custom charts"
+                        , "custom_charts"
                         , NULL
                         , p_file_info->parser_cus_config[cus_off]->chart_name
                         , "matches"

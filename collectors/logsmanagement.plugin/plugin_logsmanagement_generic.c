@@ -10,9 +10,9 @@ void generic_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
     /* Number of collected logs - initialise */
     chart_data->st_lines = rrdset_create_localhost(
             (char *) p_file_info->chart_name
-            , "collected logs"
+            , "collected_logs"
             , NULL
-            , "collected logs"
+            , "collected_logs"
             , NULL
             , "Collected log records"
             , "records"

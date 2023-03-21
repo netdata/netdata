@@ -10,9 +10,9 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
     /* Number of collected logs - initialise */
     chart_data->st_lines = rrdset_create_localhost(
             (char *) p_file_info->chart_name
-            , "collected logs"
+            , "collected_logs"
             , NULL
-            , "collected logs"
+            , "collected_logs"
             , NULL
             , "Collected log records"
             , "records"
@@ -65,9 +65,9 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
     if(p_file_info->parser_config->chart_config & CHART_IP_VERSION){
         chart_data->st_ip_ver = rrdset_create_localhost(
                 (char *) p_file_info->chart_name
-                , "ip version"
+                , "ip_version"
                 , NULL
-                , "ip version"
+                , "ip_version"
                 , NULL
                 , "Requests by IP version"
                 , "requests"
@@ -106,7 +106,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
     if(p_file_info->parser_config->chart_config & CHART_REQ_CLIENT_ALL_TIME){
         chart_data->st_req_client_all_time = rrdset_create_localhost(
                 (char *) p_file_info->chart_name
-                , "clients all"
+                , "clients_all"
                 , NULL
                 , "clients"
                 , NULL
@@ -126,9 +126,9 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
     if(p_file_info->parser_config->chart_config & CHART_REQ_METHODS){
         chart_data->st_req_methods = rrdset_create_localhost(
                 (char *) p_file_info->chart_name
-                , "http methods"
+                , "http_methods"
                 , NULL
-                , "http methods"
+                , "http_methods"
                 , NULL
                 , "Requests Per HTTP Method"
                 , "requests"
@@ -147,9 +147,9 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
     if(p_file_info->parser_config->chart_config & CHART_REQ_PROTO){
         chart_data->st_req_proto = rrdset_create_localhost(
                 (char *) p_file_info->chart_name
-                , "http versions"
+                , "http_versions"
                 , NULL
-                , "http versions"
+                , "http_versions"
                 , NULL
                 , "Requests Per HTTP Version"
                 , "requests"
@@ -234,7 +234,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
     if(p_file_info->parser_config->chart_config & CHART_RESP_CODE){
         chart_data->st_resp_code = rrdset_create_localhost(
                 (char *) p_file_info->chart_name
-                , "detailed responses"
+                , "detailed_responses"
                 , NULL
                 , "responses"
                 , NULL
@@ -255,7 +255,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
     if(p_file_info->parser_config->chart_config & CHART_RESP_CODE_TYPE){
         chart_data->st_resp_code_type = rrdset_create_localhost(
                 (char *) p_file_info->chart_name
-                , "response types"
+                , "response_types"
                 , NULL
                 , "responses"
                 , NULL
@@ -278,9 +278,9 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
     if(p_file_info->parser_config->chart_config & CHART_SSL_PROTO){
         chart_data->st_ssl_proto = rrdset_create_localhost(
                 (char *) p_file_info->chart_name
-                , "ssl protocol"
+                , "ssl_protocol"
                 , NULL
-                , "ssl protocol"
+                , "ssl_protocol"
                 , NULL
                 , "Requests Per SSL Protocol"
                 , "requests"
@@ -303,9 +303,9 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
     if(p_file_info->parser_config->chart_config & CHART_SSL_CIPHER){
         chart_data->st_ssl_cipher = rrdset_create_localhost(
                 (char *) p_file_info->chart_name
-                , "ssl cipher suite"
+                , "ssl_cipher_suite"
                 , NULL
-                , "ssl cipher suite"
+                , "ssl_cipher_suite"
                 , NULL
                 , "Requests by SSL cipher suite"
                 , "requests"

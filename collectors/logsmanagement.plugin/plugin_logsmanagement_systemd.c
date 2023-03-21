@@ -10,9 +10,9 @@ void systemd_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
     /* Number of collected logs - initialise */
     chart_data->st_lines = rrdset_create_localhost(
             (char *) p_file_info->chart_name
-            , "collected logs"
+            , "collected_logs"
             , NULL
-            , "collected logs"
+            , "collected_logs"
             , NULL
             , "Collected log records"
             , "records"
@@ -29,7 +29,7 @@ void systemd_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
     if(p_file_info->parser_config->chart_config & CHART_SYSLOG_PRIOR){
         chart_data->st_prior = rrdset_create_localhost(
                 (char *) p_file_info->chart_name
-                , "priority value"
+                , "priority_value"
                 , NULL
                 , "priority"
                 , NULL
@@ -48,7 +48,7 @@ void systemd_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
     if(p_file_info->parser_config->chart_config & CHART_SYSLOG_SEVER){
         chart_data->st_sever = rrdset_create_localhost(
                 (char *) p_file_info->chart_name
-                , "severity levels"
+                , "severity_levels"
                 , NULL
                 , "priority"
                 , NULL
@@ -75,7 +75,7 @@ void systemd_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
     if(p_file_info->parser_config->chart_config & CHART_SYSLOG_FACIL){
         chart_data->st_facil = rrdset_create_localhost(
                 (char *) p_file_info->chart_name
-                , "facility levels"
+                , "facility_levels"
                 , NULL
                 , "priority"
                 , NULL
