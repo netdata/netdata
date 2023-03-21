@@ -1103,7 +1103,7 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
     ONEWAYALLOC *owa = onewayalloc_create(16 * 1024);
     RRDR *r = rrd2rrdr(owa, query_target_create(&qtr));
 
-    if(rrdr_rows(r) != 1 || !r->d)
+    if(rrdr_rows(r) != 1 || !r->d || r->d != r->internal.qt->query.used)
         goto cleanup;
 
     QUERY_VALUE qv = {
