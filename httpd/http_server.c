@@ -8,6 +8,8 @@
 
 #include "h2o_utils.h"
 
+#include "mqtt_websockets/c-rbuf/include/ringbuffer.h"
+
 static h2o_globalconf_t config;
 static h2o_context_t ctx;
 static h2o_accept_ctx_t accept_ctx;
@@ -340,9 +342,89 @@ static inline int is_streaming_handshake(h2o_req_t *req)
     return 0;
 }
 
+typedef enum {
+    HTTP_STREAM = 0,
+    HTTP_URL,
+    HTTP_PROTO,
+    HTTP_HDR,
+    HTTP_DONE
+} http_stream_parse_state_t;
+
 typedef struct {
     h2o_socket_t *sock;
 } h2o_stream_conn_t;
+
+
+#define PARSE_DONE 1
+#define PARSE_ERROR -1
+#define GIMME_MORE_OF_DEM_SWEET_BYTEZ 0
+
+#define STREAM_METHOD "STREAM "
+#define HTTP_1_1 " HTTP/1.1"
+#define HTTP_HDR_END "\r\n\r\n"
+
+#define NEED_MIN_BYTES(buf, bytes)       \
+if (rbuf_bytes_available(buf) < bytes)   \
+    return GIMME_MORE_OF_DEM_SWEET_BYTEZ;
+
+// TODO check in streaming code this is problaby defined somewhere already
+#define MAX_LEN_STREAM_HELLO (1024*2)
+
+static int process_STREAM_X_HTTP_1_1(http_stream_parse_state_t *parser_state, rbuf_t buf, char **url)
+{
+    int idx;
+    switch(*parser_state) {
+        case HTTP_STREAM:
+            NEED_MIN_BYTES(buf, strlen(STREAM_METHOD));
+            if (rbuf_memcmp_n(buf, H2O_STRLIT(STREAM_METHOD))) {
+                error_report("Expected \"%s\"", STREAM_METHOD);
+                return PARSE_ERROR;
+            }
+            rbuf_bump_tail(buf, strlen(STREAM_METHOD));
+            *parser_state = HTTP_URL;
+            /* FALLTROUGH */
+        case HTTP_URL:
+            if (!rbuf_find_bytes(buf, " ", 1, &idx)) {
+                if (rbuf_bytes_available(buf) >= MAX_LEN_STREAM_HELLO) {
+                    error_report("The initial \"STREAM [URL] HTTP/1.1\" over max of %d", MAX_LEN_STREAM_HELLO);
+                    return PARSE_ERROR;
+                }
+            }
+            *url = mallocz(idx + 1);
+            rbuf_pop(buf, *url, idx);
+            (*url)[idx] = 0;
+
+            *parser_state = HTTP_PROTO;
+            /* FALLTROUGH */
+        case HTTP_PROTO:
+            NEED_MIN_BYTES(buf, strlen(HTTP_1_1));
+            if (rbuf_memcmp_n(buf, H2O_STRLIT(HTTP_1_1))) {
+                error_report("Expected \"%s\"", HTTP_1_1);
+                return PARSE_ERROR;
+            }
+            rbuf_bump_tail(buf, strlen(HTTP_1_1));
+            *parser_state = HTTP_HDR;
+            /* FALLTROUGH */
+        case HTTP_HDR:
+            if (!rbuf_find_bytes(buf, HTTP_HDR_END, strlen(HTTP_HDR_END), &idx)) {
+                if (rbuf_bytes_available(buf) >= (size_t)(rbuf_get_capacity(buf) * 0.9)) {
+                    error_report("The initial \"STREAM [URL] HTTP/1.1\" over max of %d", MAX_LEN_STREAM_HELLO);
+                    return PARSE_ERROR;
+                }
+                return GIMME_MORE_OF_DEM_SWEET_BYTEZ;
+            }
+            rbuf_bump_tail(buf, idx + strlen(HTTP_HDR_END));
+
+            *parser_state = HTTP_DONE;
+            return PARSE_DONE;
+        case HTTP_DONE:
+            error_report("Parsing is done. No need to call again.");
+            return PARSE_DONE;
+        default:
+            error_report("Unknown parser state %d", *parser_state);
+            return PARSE_ERROR;
+    }
+}
 
 static void stream_on_complete(void *user_data, h2o_socket_t *sock, size_t reqsize)
 {
