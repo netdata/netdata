@@ -140,7 +140,7 @@ visualizations](https://user-images.githubusercontent.com/1153921/109049195-349f
 
 ### Health map
 
-The first visualization is the [health map](https://learn.netdata.cloud/docs/cloud/visualize/kubernetes#health-map),
+The first visualization is the [health map](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md#health-map),
 which places each container into its own box, then varies the intensity of their color to visualize the resource
 utilization. By default, the health map shows the **average CPU utilization as a percentage of the configured limit**
 for every container in your cluster.

@@ -67,7 +67,7 @@ When you use the database engine to store your metrics, you can always perform a
 Netdata Cloud does not store metric values.
 
 To enable certain features, such as [viewing active alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alarms.md)
-or [filtering by hostname/service](https://learn.netdata.cloud/docs/cloud/war-rooms#node-filter), Netdata Cloud does
+or [filtering by hostname/service](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md), Netdata Cloud does
 store configured alarms, their status, and a list of active collectors.
 
 Netdata does not and never will sell your personal data or data about your deployment.

@@ -648,7 +648,7 @@ $ sudo echo "clickhouse: yes" >> /etc/netdata/python.d.conf
 $ sudo vi /etc/netdata/python.d/clickhouse.conf
 
 # restart netdata 
-# see docs for more information: https://learn.netdata.cloud/docs/configure/start-stop-restart
+# see docs for more information: https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md
 $ sudo systemctl restart netdata
 ```
 

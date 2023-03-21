@@ -55,7 +55,7 @@ After an initial failed payment, we will attempt to process your payment every w
 
 For the next 24 hours, you will be able to use all your current notification method configurations. After 24 hours, any of the notification method configurations that aren't available on your space's plan will be automatically disabled.
 
-Cancellation might affect users in your Space. Please check what roles are available on the [Community plan](https://learn.netdata.cloud/docs/nightly/concepts/netdata-plans#areas-impacted-by-plans). Users with unavailable roles on the Community plan will immediately have restricted access to the Space.
+Cancellation might affect users in your Space. Please check what roles are available on the [Community plan](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md#areas-impacted-by-plans). Users with unavailable roles on the Community plan will immediately have restricted access to the Space.
 
  #### 3. Which currencies do you support?
 

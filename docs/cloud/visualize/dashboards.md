@@ -50,8 +50,7 @@ node. If you select **All Nodes**, you will add a [composite chart](/docs/cloud/
 your new dashboard. Next, select the context. You'll see a preview of the chart before you finish adding it.
 
 The charts you add to any dashboard are fully interactive, just like the charts in an Agent dashboard or a single node's
-dashboard in Cloud. Zoom in and out, highlight timeframes, and more. See our 
-[Agent dashboard docs](https://learn.netdata.cloud/docs/agent/web#using-charts) for all the shortcuts.
+dashboard in Cloud. Zoom in and out, highlight timeframes, and more.
 
 Charts also synchronize as you interact with them, even across contexts _or_ nodes.
 
