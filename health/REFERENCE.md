@@ -14,7 +14,7 @@ node_ via individual Netdata Agents. If you want to deploy a new alarm across yo
 files.
 
 ## Edit health configuration files
-https://learn.netdata.cloud/docs/agent/ml 
+
 You can configure the Agent's health watchdog service by editing files in two locations:
 
 -   The `[health]` section in `netdata.conf`. By editing the daemon's behavior, you can disable health monitoring
@@ -1152,7 +1152,7 @@ template: ml_5min_node
     info: rolling 5min anomaly rate for all ML enabled dims
 ```
 
-The `lookup` line will use the `anomaly_rate` dimension of the `anomaly_detection.anomaly_rate` ML chart to calculate the average [node level anomaly rate](https://learn.netdata.cloud/docs/agent/ml#node-anomaly-rate) over the last 5 minues.
+The `lookup` line will use the `anomaly_rate` dimension of the `anomaly_detection.anomaly_rate` ML chart to calculate the average [node level anomaly rate](https://github.com/netdata/netdata/blob/master/ml/README.md#node-anomaly-rate) over the last 5 minues.
 
 ## Use dimension templates to create dynamic alarms
 

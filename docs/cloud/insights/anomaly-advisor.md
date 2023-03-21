@@ -32,7 +32,7 @@ To enable ML on your Netdata Agent, you need to edit the `[ml]` section in your 
     enabled = yes
 ```
 
-At a minimum you just need to set `enabled = yes` to enable ML with default params. More details about configuration can be found in the [Netdata Agent ML docs](https://learn.netdata.cloud/docs/agent/ml#configuration).
+At a minimum you just need to set `enabled = yes` to enable ML with default params. More details about configuration can be found in the [Netdata Agent ML docs](https://github.com/netdata/netdata/blob/master/ml/README.md#configuration).
 
 When you have finished your configuration, restart Netdata with a command like `sudo systemctl restart netdata` for the config changes to take effect. You can find more info on restarting Netdata [here](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md).
 
