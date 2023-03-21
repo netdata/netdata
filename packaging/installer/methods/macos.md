@@ -34,8 +34,6 @@ curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/n
 The Netdata Agent is installed under `/usr/local/netdata`. Dependencies are handled via Homebrew.
 
 **Automatically connect to Netdata Cloud during installation**
-<!-- Potential reuse: https://learn.netdata.cloud/docs/agent/claim#connect-an-agent-running-in-macos-->
-<!--Potential reuse https://learn.netdata.cloud/docs/agent/packaging/installer/methods/kickstart#connect-node-to-netdata-cloud-during-installation The following information is copied from this link.-->
 
 The `kickstart.sh` script accepts additional parameters to automatically [connect](https://github.com/netdata/netdata/blob/master/claim/README.md) your node to Netdata
 Cloud immediately after installation. Find the `token` and `rooms` strings by [signing in to Netdata
@@ -102,11 +100,3 @@ We don't recommend installing Netdata from source on macOS, as it can be difficu
 > Your Netdata configuration directory will be at `/usr/local/netdata/`. 
 > Your stock configuration directory will be at `/usr/local/lib/netdata/conf.d/`.
 > The installer will also install a startup plist to start Netdata when your macOS system boots.
-
-## What's next?
-
-When you're finished with installation, check out [how to monitor your infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md), or skip straight to [configuring the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md).
-
-Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
-solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to
-external databases, and more.

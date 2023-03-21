@@ -87,7 +87,7 @@ the `zscores.conf` files alone to begin with. Then you can return to it later if
 more once the collector is running for a while.
 
 Edit the `python.d/zscores.conf` configuration file using `edit-config` from the your
-agent's [config directory](https://learn.netdata.cloud/guides/step-by-step/step-04#find-your-netdataconf-file), which is
+agent's [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory), which is
 usually at `/etc/netdata`.
 
 ```bash

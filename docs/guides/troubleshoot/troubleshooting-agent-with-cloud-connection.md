@@ -65,7 +65,7 @@ Read more about [Starting, Stopping and Restarting the Agent](https://github.com
 
 ## Claiming on an older, deprecated version of the Agent
 
-Make sure that you are using the latest version of Netdata if you are using the [Claiming script](https://learn.netdata.cloud/docs/agent/claim#claiming-script).
+Make sure that you are using the latest version of Netdata if you are using the [Claiming script](https://github.com/netdata/netdata/blob/master/claim/README.md#claiming-script).
 
 With the introduction of our new architecture, Agents running versions lower than `v1.32.0` can face claiming problems, so we recommend you [update the Netdata Agent](https://github.com/netdata/netdata/blob/master/packaging/installer/UPDATE.md) to the latest stable version.
 
