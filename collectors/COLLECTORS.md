@@ -1,12 +1,3 @@
-<!--
-title: "Monitor anything with Netdata"
-description: "Netdata gathers real-time metrics from hundreds of data sources using collectors. Most require zero configuration and are pre-configured out of the box."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/COLLECTORS.md"
-sidebar_label: "Monitor"
-learn_status: "Published"
-learn_rel_path: "Integrations/Monitor"
--->
-
 # Monitor anything with Netdata
 
 Netdata uses collectors to help you gather metrics from your favorite applications and services and view them in
@@ -47,12 +38,12 @@ If you don't see the app/service you'd like to monitor in this list:
   a [feature request](https://github.com/netdata/netdata/issues/new/choose) on GitHub.
 
 - If you have basic software development skills, you can add your own plugin
-  in [Go](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin#how-to-develop-a-collector)
+  in [Go](https://github.com/netdata/go.d.plugin/blob/master/README.md#how-to-develop-a-collector)
   or [Python](https://github.com/netdata/netdata/blob/master/docs/guides/python-collector.md)
 
 ## Available Collectors
 
-- [Supported collectors list](#supported-collectors-list)
+- [Monitor anything with Netdata](#monitor-anything-with-netdata)
   - [Add your application to Netdata](#add-your-application-to-netdata)
   - [Available Collectors](#available-collectors)
   - [Service and application collectors](#service-and-application-collectors)
