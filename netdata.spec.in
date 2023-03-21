@@ -46,37 +46,6 @@ AutoReqProv: yes
 %undefine	with_netns
 %endif
 
-%if 0%{?suse_version}
-%global netdata_initd_buildrequires \
-BuildRequires: systemd-rpm-macros \
-%{nil}
-%global netdata_initd_requires \
-%{?systemd_requires} \
-%{nil}
-%global netdata_init_post %service_add_post netdata.service \
-/sbin/service netdata restart > /dev/null 2>&1 \
-%{nil}
-%global netdata_init_preun %service_del_preun netdata.service \
-/sbin/service netdata stop > /dev/null 2>&1 \
-%{nil}
-%global netdata_init_postun %service_del_postun netdata.service
-%else
-%global netdata_initd_buildrequires \
-BuildRequires: systemd
-%global netdata_initd_requires \
-Requires(preun):  systemd-units \
-Requires(postun): systemd-units \
-Requires(post):   systemd-units \
-%{nil}
-%global netdata_init_post %systemd_post netdata.service \
-/usr/bin/systemctl enable netdata.service \
-/usr/bin/systemctl daemon-reload \
-/usr/bin/systemctl restart netdata.service \
-%{nil}
-%global netdata_init_preun %systemd_preun netdata.service
-%global netdata_init_postun %systemd_postun_with_restart netdata.service
-%endif
-
 Summary:	Real-time performance monitoring, done right!
 Name:		netdata
 Version:	%{version}
@@ -141,7 +110,11 @@ BuildRequires: libyaml-devel
 %endif
 
 # Core build requirements for service install
-%{netdata_initd_buildrequires}
+%if 0%{?suse_version}
+BuildRequires: systemd-rpm-macros
+%else
+BuildRequires: systemd
+%endif
 
 # Runtime dependencies
 #
@@ -158,8 +131,6 @@ Requires: python3
 # Core requirements for the install to succeed
 Requires(pre): /usr/sbin/groupadd
 Requires(pre): /usr/sbin/useradd
-
-%{netdata_initd_requires}
 
 # #####################################################################
 # Functionality-dependent package dependencies
@@ -436,13 +407,25 @@ for item in docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C; do
 done
 
 %post
-%{netdata_init_post}
+%if 0%{?suse_version}
+%service_add_post netdata.service
+%else
+%systemd_post netdata.service
+%endif
 
 %preun
-%{netdata_init_preun}
+%if 0%{?suse_version}
+%service_del_preun netdata.service
+%else
+%systemd_preun netdata.service
+%endif
 
 %postun
-%{netdata_init_postun}
+%if 0%{?suse_version}
+%service_del_postun netdata.service
+%else
+%systemd_postun_with_restart netdata.service
+%endif
 
 %clean
 rm -rf "${RPM_BUILD_ROOT}"
@@ -550,6 +533,9 @@ are sensor monitoring, system event monitoring, power control, and serial-over-L
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 
 %changelog
+* Tue Mar 21 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-18
+- Fix systemd handling to follow BCP.
+- Drop pre-systemd init support.
 * Thu Feb 16 2023 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-17
 - Added eBPF build dependency
 * Fri Feb 03 2022 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-16
