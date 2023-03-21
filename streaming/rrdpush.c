@@ -725,7 +725,7 @@ int rrdpush_receiver_too_busy_now(struct web_client *w) {
 }
 
 void *rrdpush_receiver_thread(void *ptr);
-int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
+int rrdpush_receiver_thread_spawn(struct web_client *w, char *url, void* h2o_ctx) {
 
     if(!service_running(ABILITY_STREAMING_CONNECTIONS))
         return rrdpush_receiver_too_busy_now(w);
@@ -734,6 +734,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     rpt->last_msg_t = now_realtime_sec();
     rpt->capabilities = STREAM_CAP_INVALID;
     rpt->hops = 1;
+
+    rpt->h2o_ctx = h2o_ctx;
 
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_receivers, sizeof(*rpt), __ATOMIC_RELAXED);
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
@@ -1034,7 +1036,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
 
         close(rpt->fd);
         receiver_state_free(rpt);
-        return web_client_socket_is_now_used_for_streaming(w);
+        return web_client_socket_is_now_used_for_streaming(w, (h2o_ctx != NULL));
     }
 
     if(unlikely(web_client_streaming_rate_t > 0)) {
@@ -1154,7 +1156,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     }
 
     // prevent the caller from closing the streaming socket
-    return web_client_socket_is_now_used_for_streaming(w);
+    return web_client_socket_is_now_used_for_streaming(w, (h2o_ctx != NULL));
 }
 
 static void stream_capabilities_to_string(BUFFER *wb, STREAM_CAPABILITIES caps) {

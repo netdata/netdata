@@ -10,6 +10,8 @@
 
 #include "mqtt_websockets/c-rbuf/include/ringbuffer.h"
 
+uv_loop_t httpd_loop;
+
 static h2o_globalconf_t config;
 static h2o_context_t ctx;
 static h2o_accept_ctx_t accept_ctx;
@@ -343,6 +345,13 @@ static inline int is_streaming_handshake(h2o_req_t *req)
 }
 
 typedef enum {
+    STREAM_X_HTTP_1_1 = 0,
+    STREAM_X_HTTP_1_1_DONE,
+    STREAM_ACTIVE,
+    STREAM_CLOSE
+} h2o_stream_state_t;
+
+typedef enum {
     HTTP_STREAM = 0,
     HTTP_URL,
     HTTP_PROTO,
@@ -352,8 +361,49 @@ typedef enum {
 
 typedef struct {
     h2o_socket_t *sock;
+    h2o_stream_state_t state;
+    rbuf_t rx;
+    rbuf_t tx;
+    h2o_iovec_t tx_buf;
+    http_stream_parse_state_t parse_state;
+    char *url;
 } h2o_stream_conn_t;
 
+#define H2O2STREAM_BUF_SIZE (1024 * 4)
+
+static void h2o_stream_conn_t_init(h2o_stream_conn_t *conn)
+{
+    memset(conn, 0, sizeof(*conn));
+    conn->rx = rbuf_create(H2O2STREAM_BUF_SIZE);
+    conn->tx = rbuf_create(H2O2STREAM_BUF_SIZE);
+    // no need to check for NULL as rbuf_create uses mallocz internally
+}
+
+void stream_process(h2o_stream_conn_t *conn);
+
+static void on_recv(h2o_socket_t *sock, const char *err)
+{
+    h2o_stream_conn_t *conn = sock->data;
+
+    if (err != NULL) {
+//        on_close(conn);
+        error_report("Streaming connection error \"%s\"", err);
+        return;
+    }
+    stream_process(conn);
+}
+
+void on_write_complete(h2o_socket_t *sock, const char *err)
+{
+    h2o_stream_conn_t *conn = sock->data;
+
+    rbuf_bump_tail(conn->tx, conn->tx_buf.len);
+
+    conn->tx_buf.base = NULL;
+    conn->tx_buf.len = 0;
+
+    stream_process(conn);
+}
 
 #define PARSE_DONE 1
 #define PARSE_ERROR -1
@@ -426,6 +476,63 @@ static int process_STREAM_X_HTTP_1_1(http_stream_parse_state_t *parser_state, rb
     }
 }
 
+void stream_process(h2o_stream_conn_t *conn)
+{
+    if (conn->sock->input->size) {
+        size_t insert_max;
+        char *insert_loc = rbuf_get_linear_insert_range(conn->rx, &insert_max);
+        insert_max = MIN(insert_max, conn->sock->input->size);
+        memcpy(insert_loc, conn->sock->input->bytes, insert_max);
+        rbuf_bump_head(conn->rx, insert_max);
+
+        if (!rbuf_bytes_available(conn->rx))
+            h2o_socket_read_start(conn->sock, on_recv);
+
+        h2o_buffer_consume(&conn->sock->input, insert_max);
+    }
+
+    switch (conn->state) {
+        case STREAM_X_HTTP_1_1:
+            int rc = process_STREAM_X_HTTP_1_1(&conn->parse_state, conn->rx, &conn->url);
+            if (rc == PARSE_ERROR) {
+                error_report("error parsing the STREAM hello");
+                break;
+            }
+            if (rc != PARSE_DONE)
+                break;
+            conn->state = STREAM_X_HTTP_1_1_DONE;
+            /* FALLTROUGH */
+        case STREAM_X_HTTP_1_1_DONE:
+            struct web_client w;
+            memset(&w, 0, sizeof(w));
+            w.response.data = buffer_create(1024, NULL);
+            // TODO fill this properly to be able to check ACLs
+            memcpy(&w.client_ip, "127.0.0.1", strlen("127.0.0.1"));
+            w.client_ip[strlen("127.0.0.1")] = 0;
+            int http_code = rrdpush_receiver_thread_spawn(&w, conn->url, conn);
+            // http_code is ignored as there is nobody to get it after HTTP upgrade
+            // so it lost any sense with h2o streaming mode
+            freez(conn->url);
+            buffer_free(w.response.data);
+            conn->state = STREAM_ACTIVE;
+            /* FALLTROUGH */
+        case STREAM_ACTIVE:
+            break;
+        default:
+            error_report("Unknown conn->state");
+    }
+
+    if (rbuf_bytes_available(conn->tx) && !conn->tx_buf.base) {
+        /* write */
+        conn->tx_buf.base = rbuf_get_linear_read_range(conn->tx, &conn->tx_buf.len);
+        if (conn->tx_buf.base)
+            h2o_socket_write(conn->sock, &conn->tx_buf, 1, on_write_complete);
+        
+    }
+
+    h2o_socket_read_start(conn->sock, on_recv);
+}
+
 static void stream_on_complete(void *user_data, h2o_socket_t *sock, size_t reqsize)
 {
     h2o_stream_conn_t *conn = user_data;
@@ -439,13 +546,31 @@ static void stream_on_complete(void *user_data, h2o_socket_t *sock, size_t reqsi
     conn->sock = sock;
     sock->data = conn;
     h2o_buffer_consume(&sock->input, reqsize);
-//    stream_process(conn);
+    stream_process(conn);
+}
+
+void write_async_cb(uv_async_t *handle) {
+    stream_process((h2o_stream_conn_t *)handle->data);
+}
+
+int h2o_stream_write(void *ctx, const char *data, size_t data_len)
+{
+    h2o_stream_conn_t *conn = (h2o_stream_conn_t *)ctx;
+
+    rbuf_push(conn->tx, data, data_len);
+
+    // wake up the uv loop to notify HTTPD thread
+    // of the fact we have new data on the line
+    uv_async_t *event = mallocz(sizeof(uv_async_t));
+    event->data = (void*)ctx;
+    uv_async_init(&httpd_loop, event, write_async_cb);
+    uv_async_send(event);
 }
 
 static int hdl_stream(h2o_handler_t *self, h2o_req_t *req)
 {
     h2o_stream_conn_t *conn = mallocz(sizeof(*conn));
-    memset(conn, 0, sizeof(*conn));
+    h2o_stream_conn_t_init(conn);
 
     if (is_streaming_handshake(req)) {
         return 1;
@@ -486,9 +611,8 @@ void *httpd_main(void *ptr) {
     handler->on_req = netdata_uberhandler;
     h2o_file_register(pathconf, netdata_configured_web_dir, NULL, NULL, H2O_FILE_FLAG_SEND_COMPRESSED);
 
-    uv_loop_t loop;
-    uv_loop_init(&loop);
-    h2o_context_init(&ctx, &loop, &config);
+    uv_loop_init(&httpd_loop);
+    h2o_context_init(&ctx, &httpd_loop, &config);
 
     if(ssl_init()) {
         error_report("SSL was requested but could not be properly initialized. Aborting.");

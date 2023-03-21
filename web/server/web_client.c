@@ -1474,7 +1474,7 @@ void web_client_process_request(struct web_client *w) {
                         return;
                     }
 
-                    w->response.code = rrdpush_receiver_thread_spawn(w, w->decoded_url);
+                    w->response.code = rrdpush_receiver_thread_spawn(w, w->decoded_url, NULL);
                     return;
 
                 case WEB_CLIENT_MODE_OPTIONS:
@@ -1974,7 +1974,7 @@ ssize_t web_client_receive(struct web_client *w)
 }
 
 
-int web_client_socket_is_now_used_for_streaming(struct web_client *w) {
+int web_client_socket_is_now_used_for_streaming(struct web_client *w, int h2o_mode) {
     // prevent the web_client from closing the streaming socket
 
     WEB_CLIENT_IS_DEAD(w);
@@ -1989,7 +1989,8 @@ int web_client_socket_is_now_used_for_streaming(struct web_client *w) {
             w->ifd = -1;
     }
 
-    buffer_flush(w->response.data);
+    if (!h2o_mode)
+        buffer_flush(w->response.data);
 
     return HTTP_RESP_OK;
 }

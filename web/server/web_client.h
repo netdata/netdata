@@ -201,7 +201,7 @@ int mysendfile(struct web_client *w, char *filename);
 void web_client_build_http_header(struct web_client *w);
 char *strip_control_characters(char *url);
 
-int web_client_socket_is_now_used_for_streaming(struct web_client *w);
+int web_client_socket_is_now_used_for_streaming(struct web_client *w, int h2o_mode);
 
 #include "web/api/web_api_v1.h"
 #include "web/api/web_api_v2.h"

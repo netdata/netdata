@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdpush.h"
+#include "httpd/http_server.h"
 
 // IMPORTANT: to add workers, you have to edit WORKER_PARSER_FIRST_JOB accordingly
 #define WORKER_RECEIVER_JOB_BYTES_READ (WORKER_PARSER_FIRST_JOB - 1)
@@ -31,7 +32,7 @@ void receiver_state_free(struct receiver_state *rpt) {
     freez(rpt->program_version);
 
 #ifdef ENABLE_HTTPS
-    if(rpt->ssl.conn)
+    if(rpt->ssl.conn && !is_h2o_rrdpush(rpt))
         SSL_free(rpt->ssl.conn);
 #endif
 
@@ -776,15 +777,19 @@ static int rrdpush_receive(struct receiver_state *rpt)
         }
 
         debug(D_STREAM, "Initial response to %s: %s", rpt->client_ip, initial_response);
-        if(send_timeout(
+        if (is_h2o_rrdpush(rpt)) {
+            h2o_stream_write(rpt->h2o_ctx, initial_response, strlen(initial_response));
+        } else {
+            if(send_timeout(
 #ifdef ENABLE_HTTPS
-                &rpt->ssl,
+                    &rpt->ssl,
 #endif
-                rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
+                    rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
 
-            rrdpush_receive_log_status(rpt, "cannot reply back", "CANT REPLY DROPPING CONNECTION");
-            close(rpt->fd);
-            return 0;
+                rrdpush_receive_log_status(rpt, "cannot reply back", "CANT REPLY DROPPING CONNECTION");
+                close(rpt->fd);
+                return 0;
+            }
         }
     }
 

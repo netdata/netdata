@@ -5,6 +5,8 @@
 
 void *httpd_main(void * ptr);
 
+int h2o_stream_write(void *ctx, const char *data, size_t data_len);
+
 int httpd_is_enabled();
 
 #endif /* HTTP_SERVER_H */
