@@ -14,16 +14,16 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
             , NULL
             , "collected logs"
             , NULL
-            , "Collected log rows"
-            , "rows"
+            , "Collected log records"
+            , "records"
             , "logsmanagement.plugin"
             , NULL
             , ++chart_prio
             , p_file_info->update_every
             , RRDSET_TYPE_AREA
     );
-    chart_data->dim_lines_total = rrddim_add(chart_data->st_lines, "Total rows", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    chart_data->dim_lines_rate = rrddim_add(chart_data->st_lines, "New rows", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    chart_data->dim_lines_total = rrddim_add(chart_data->st_lines, "Total records", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    chart_data->dim_lines_rate = rrddim_add(chart_data->st_lines, "New records", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
     /* Vhost - initialise */
     if(p_file_info->parser_config->chart_config & CHART_VHOST){
