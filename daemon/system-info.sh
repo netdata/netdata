@@ -474,7 +474,7 @@ if [ "${VIRTUALIZATION}" != "none" ] && command -v curl > /dev/null 2>&1; then
     # Try Azure IMDS
     if [ "${CLOUD_TYPE}" = "unknown" ]; then
       AZURE_IMDS_DATA="$(curl --fail -s --connect-timeout 1 -m 3 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=2021-10-01")"
-      if [ -n "${AZURE_IMDS_DATA}" ]; then
+      if [ -n "${AZURE_IMDS_DATA}" ] && echo "${AZURE_IMDS_DATA}" | grep -sq azEnvironment; then
         CLOUD_TYPE="Azure"
         CLOUD_INSTANCE_TYPE="$(curl --fail -s --connect-timeout 1 -m 3 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance/compute/vmSize?api-version=2021-10-01&format=text")"
         CLOUD_INSTANCE_REGION="$(curl --fail -s --connect-timeout 1 -m 3 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance/compute/location?api-version=2021-10-01&format=text")"
