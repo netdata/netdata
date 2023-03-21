@@ -669,17 +669,17 @@ void rrdcalc_add_from_rrdcalctemplate(RRDHOST *host, RRDCALCTEMPLATE *rt, RRDSET
 
 int rrdcalc_add_from_config(RRDHOST *host, RRDCALC *rc) {
     if(!rc->chart) {
-        error("Health configuration for alarm '%s' does not have a chart", rrdcalc_name(rc));
+        log_health("Health configuration for alarm '%s' does not have a chart", rrdcalc_name(rc));
         return 0;
     }
 
     if(!rc->update_every) {
-        error("Health configuration for alarm '%s.%s' has no frequency (parameter 'every'). Ignoring it.", rrdcalc_chart_name(rc), rrdcalc_name(rc));
+        log_health("Health configuration for alarm '%s.%s' has no frequency (parameter 'every'). Ignoring it.", rrdcalc_chart_name(rc), rrdcalc_name(rc));
         return 0;
     }
 
     if(!RRDCALC_HAS_DB_LOOKUP(rc) && !rc->calculation && !rc->warning && !rc->critical) {
-        error("Health configuration for alarm '%s.%s' is useless (no db lookup, no calculation, no warning and no critical expressions)", rrdcalc_chart_name(rc), rrdcalc_name(rc));
+        log_health("Health configuration for alarm '%s.%s' is useless (no db lookup, no calculation, no warning and no critical expressions)", rrdcalc_chart_name(rc), rrdcalc_name(rc));
         return 0;
     }
 
