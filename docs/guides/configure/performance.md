@@ -12,6 +12,10 @@ This document describes the resources required for the various default capabilit
 
 ## Resources required by a default Netdata installation
 
+Netdata's performance is primarily affected by **data collection/retention** and **clients accessing data**. 
+
+You can configure almost all aspects of data collection/retention, and certain aspects of clients accessing data. 
+
 ### CPU consumption
 
 Expect about:
@@ -26,38 +30,103 @@ As a general rule, for modern hardware and VMs, the total CPU consumption of a s
 should be below 5 - 15% of a single core. For example, on 8 core server it will use only 0.6% - 1.8% of a total CPU capacity, depending on 
 the CPU characteristics.
 
+The Netdata Agent runs with the lowest possible [process scheduling policy](https://github.com/netdata/netdata/blob/master/daemon/README.md#netdata-process-scheduling-policy), which is `nice 19`, and uses the `idle` process scheduler.
+Together, these settings ensure that the Agent only gets CPU resources when the node has CPU resources to space. If the
+node reaches 100% CPU utilization, the Agent is stopped first to ensure your applications get any available resources.
+
+To reduce CPU usage you can [disable machine learning](#disable-machine-learning), 
+[use streaming and replication](#use-streaming-and-replication),
+[reduce the data collection frequency](#reduce-collection-frequency), [disable unneeded plugins or collectors](#disable-unneeded-plugins-or-collectors), [use a reverse proxy](#run-netdata-behind-a-proxy), and [disable/lower gzip compression for the agent dashboard](#disablelower-gzip-compression-for-the-dashboard).
+
 ### Memory consumption
 
 The memory footprint of Netdata is mainly influenced by the number of metrics concurrently being collected. Expect about 150MB of RAM for a typical 64-bit server collecting about 2000 to 3000 metrics.
 
-To estimate and control memory consumption, you can [change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md), or [use a different metric storage database](https://github.com/netdata/netdata/blob/master/database/README.md).
+To estimate and control memory consumption, you can [disable unneeded plugins or collectors](#disable-unneeded-plugins-or-collectors), [change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md), or [use a different metric storage database](https://github.com/netdata/netdata/blob/master/database/README.md).
+
 
 ### Disk footprint and I/O
 
 By default, Netdata should not use more than 1GB of disk space, most of which is dedicated for storing metric data and metadata. For typical installations collecting 2000 - 3000 metrics, this storage should provide a few days of high-resolution retention (per second), about a month of mid-resolution retention (per minute) and more than a year of low-resolution retention (per hour).
 
-Netdata spreads I/O operations across time. For typical standalone installations there should be a few write operations every 5-10 seconds of a few kilobytes each, occasionally up to 1MB.
+Netdata spreads I/O operations across time. For typical standalone installations there should be a few write operations every 5-10 seconds of a few kilobytes each, occasionally up to 1MB. In addition, under heavy load, collectors that require disk I/O may stop and show gaps in charts.
 
 To configure retention, you can [change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md).
 To control disk I/O [use a different metric storage database](https://github.com/netdata/netdata/blob/master/database/README.md), avoid querying the 
-production system using a [streaming and replication](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md), [reduce the data collection frequency](#reduce-collection-frequency).
+production system [using streaming and replication](#use-streaming-and-replication), [reduce the data collection frequency](#reduce-collection-frequency), and [disable unneeded plugins or collectors](#disable-unneeded-plugins-or-collectors).
 
-## What affects Netdata's performance?
+## Summary of performance optimizations
 
-Netdata's performance is primarily affected by **data collection/retention** and **clients accessing data**. 
+The following table summarizes the effect of each optimization on the CPU, RAM and Disk IO utilization in production.
 
-You can configure almost all aspects of data collection/retention, and certain aspects of clients accessing data. For
-example, you can't control how many users might be viewing a local Agent dashboard, [viewing an
-infrastructure](https://github.com/netdata/netdata/blob/master/docs/visualize/overview-infrastructure.md) in real-time with Netdata Cloud, or running [Metric
-Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md).
+Optimization | CPU | RAM | Disk IO
+-- | -- | -- |--
+[Use streaming and replication](#use-streaming-and-replication) | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:
+[Disable unneeded plugins or collectors](#disable-unneeded-plugins-or-collectors) | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:
+[Reduce data collection frequency](#reduce-collection-frequency) | :heavy_check_mark: | | :heavy_check_mark:
+[Change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md) | | :heavy_check_mark: | :heavy_check_mark:
+[Use a different metric storage database](https://github.com/netdata/netdata/blob/master/database/README.md) | | :heavy_check_mark: | :heavy_check_mark:
+[Disable machine learning](#disable-machine-learning) | :heavy_check_mark: | | 
+[Use a reverse proxy](#run-netdata-behind-a-proxy) | :heavy_check_mark: | | 
+[Disable/lower gzip compression for the agent dashboard](#disablelower-gzip-compression-for-the-dashboard) | :heavy_check_mark: | | 
 
-The Netdata Agent runs with the lowest possible [process scheduling
-policy](https://github.com/netdata/netdata/blob/master/daemon/README.md#netdata-process-scheduling-policy), which is `nice 19`, and uses the `idle` process scheduler.
-Together, these settings ensure that the Agent only gets CPU resources when the node has CPU resources to space. If the
-node reaches 100% CPU utilization, the Agent is stopped first to ensure your applications get any available resources.
-In addition, under heavy load, collectors that require disk I/O may stop and show gaps in charts.
+## Use streaming and replication
 
-Let's walk through the best ways to improve the Netdata Agent's performance.
+For all production environments, parent Netdata nodes outside the production infrastructure should be receiving all 
+collected data from children Netdata nodes running on the production infrastructure, using [streaming and replication](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md).
+
+### Disable health checks on the child nodes
+
+When you set up streaming, we recommend you run your health checks on the parent. This saves resources on the children 
+and makes it easier to configure or disable alerts and agent notifications.
+
+The parents by default run health checks for each child, as long as the child is connected (the details are in `stream.conf`). 
+On the child nodes you should add to `netdata.conf` the following:
+
+```conf
+[health]
+   enabled = no
+```
+
+### Use memory mode ram or save for the child nodes
+
+See [using a different metric storage database](https://github.com/netdata/netdata/blob/master/database/README.md).
+
+## Disable unneeded plugins or collectors
+
+If you know that you don't need an [entire plugin or a specific
+collector](https://github.com/netdata/netdata/blob/master/collectors/README.md#collector-architecture-and-terminology), you can disable any of them.
+Keep in mind that if a plugin/collector has nothing to do, it simply shuts down and does not consume system resources.
+You will only improve the Agent's performance by disabling plugins/collectors that are actively collecting metrics.
+
+Open `netdata.conf` and scroll down to the `[plugins]` section. To disable any plugin, uncomment it and set the value to
+`no`. For example, to explicitly keep the `proc` and `go.d` plugins enabled while disabling `python.d` and `charts.d`.
+
+```conf
+[plugins]
+    proc = yes
+	python.d = no
+	charts.d = no
+	go.d = yes
+```
+
+Disable specific collectors by opening their respective plugin configuration files, uncommenting the line for the
+collector, and setting its value to `no`.
+
+```bash
+sudo ./edit-config go.d.conf
+sudo ./edit-config python.d.conf
+sudo ./edit-config charts.d.conf
+```
+
+For example, to disable a few Python collectors:
+
+```conf
+modules:
+  apache: no
+	dockerd: no
+	fail2ban: no
+```
 
 ## Reduce collection frequency
 
@@ -105,45 +174,14 @@ run `sudo ./edit-config go.d/nginx.conf`:
 update_every: 10
 ```
 
-## Disable unneeded plugins or collectors
-
-If you know that you don't need an [entire plugin or a specific
-collector](https://github.com/netdata/netdata/blob/master/collectors/README.md#collector-architecture-and-terminology), you can disable any of them.
-Keep in mind that if a plugin/collector has nothing to do, it simply shuts down and does not consume system resources.
-You will only improve the Agent's performance by disabling plugins/collectors that are actively collecting metrics.
-
-Open `netdata.conf` and scroll down to the `[plugins]` section. To disable any plugin, uncomment it and set the value to
-`no`. For example, to explicitly keep the `proc` and `go.d` plugins enabled while disabling `python.d` and `charts.d`.
-
-```conf
-[plugins]
-    proc = yes
-	python.d = no
-	charts.d = no
-	go.d = yes
-```
-
-Disable specific collectors by opening their respective plugin configuration files, uncommenting the line for the
-collector, and setting its value to `no`.
-
-```bash
-sudo ./edit-config go.d.conf
-sudo ./edit-config python.d.conf
-sudo ./edit-config charts.d.conf
-```
-
-For example, to disable a few Python collectors:
-
-```conf
-modules:
-  apache: no
-	dockerd: no
-	fail2ban: no
-```
-
 ## Lower memory usage for metrics retention
 
 See how to [change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md).
+
+## Use a different metric storage database
+
+Consider [using a different metric storage database](https://github.com/netdata/netdata/blob/master/database/README.md) when running Netdata on IoT devices,
+and for children in a parent-child set up based on [streaming and replication](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md).
 
 ## Disable machine learning
 
@@ -156,34 +194,12 @@ with the following:
    enabled = no
 ```
    
-## Run Netdata behind Nginx
+## Run Netdata behind a proxy
 
-A dedicated web server like Nginx provides far more robustness than the Agent's internal [web server](https://github.com/netdata/netdata/blob/master/web/README.md).
+A dedicated web server like nginx provides more robustness than the Agent's internal [web server](https://github.com/netdata/netdata/blob/master/web/README.md).
 Nginx can handle more concurrent connections, reuse idle connections, and use fast gzip compression to reduce payloads.
 
-For details on installing Nginx as a proxy for the local Agent dashboard, see our [Nginx
-doc](https://github.com/netdata/netdata/blob/master/docs/Running-behind-nginx.md).
-
-After you complete Nginx setup according to the doc linked above, we recommend setting `keepalive` to `1024`, and using
-gzip compression with the following options in the `location /` block:
-
-```conf
-  location / {
-		...
-		gzip on;
-		gzip_proxied any;
-		gzip_types *;
-	}
-```
-
-Finally, edit `netdata.conf` with the following settings:
-
-```conf
-[global]
-    bind socket to IP = 127.0.0.1
-    disconnect idle web clients after seconds = 3600
-    enable web responses gzip compression = no
-```
+For details on installing another web server as a proxy for the local Agent dashboard, see [reverse proxies](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/reverse-proxies.md).
 
 ## Disable/lower gzip compression for the dashboard
 
@@ -206,27 +222,3 @@ Or to lower the default compression level:
     gzip compression level = 1
 ```
 
-## Disable logs
-
-If you installation is working correctly, and you're not actively auditing Netdata's logs, disable them in
-`netdata.conf`.
-
-```conf
-[logs]
-    debug log = none
-    error log = none
-    access log = none
-```
-
-## Disable health checks
-
-If you are streaming metrics to parent nodes, we recommend you run your health checks on the parent, for all the metrics collected 
-by the children nodes. This saves resources on the children and makes it easier to configure or disable alerts and agent notifications.
-
-The parents by default run health checks for each child, as long as it is connected (the details are in `stream.conf`). 
-On the child nodes you should add to `netdata.conf` the following:
-
-```conf
-[health]
-   enabled = no
-```
