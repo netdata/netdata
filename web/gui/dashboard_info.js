@@ -787,6 +787,12 @@ netdataDashboard.menu = {
         title: 'Apache access.log',
         icon: '<i class="fas fa-book"></i>',
         info: 'Performance metrics exctracted from the Apache server <b>access.log</b>. If Go plugins are enabled, see also <a href="#menu_web_log_apache" target="_blank">the web log apache collector</a>.'
+    },
+
+    'Netdata error.log': {
+        title: 'Netdata error.log',
+        icon: '<i class="fas fa-book"></i>',
+        info: 'Metrics extracted from Netdata\'s error.log.'
     }
 };
 

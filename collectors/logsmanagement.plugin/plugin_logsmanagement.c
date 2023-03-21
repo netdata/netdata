@@ -600,7 +600,7 @@ void *logsmanagement_plugin_main(void *ptr){
                         (char *) p_file_info->chart_name
                         , p_file_info->parser_cus_config[cus_off]->chart_name
                         , NULL
-                        , "regex charts"
+                        , "custom charts"
                         , NULL
                         , p_file_info->parser_cus_config[cus_off]->chart_name
                         , "matches"

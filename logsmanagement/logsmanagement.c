@@ -293,7 +293,19 @@ static void logs_management_init(struct section *config_section){
         switch(p_file_info->log_type){
             case GENERIC:
             case FLB_GENERIC:
-                if(!strcmp(p_file_info->chart_name, "Auth.log tail") || !strcmp(p_file_info->chart_name, "auth.log tail")){
+                if(!strcmp(p_file_info->chart_name, "Netdata error.log")){
+                    const char * const netdata_error_path_default[] = {
+                        "/var/log/netdata/error.log",
+                        "/opt/netdata/var/log/netdata/error.log", /* error.log of static builds */
+                        NULL
+                    };
+                    int i = 0;
+                    while(netdata_error_path_default[i] && access(netdata_error_path_default[i], R_OK)){i++;};
+                    if(!netdata_error_path_default[i]){
+                        collector_error("[%s]: Netdata error.log path invalid, unknown or needs permissions", p_file_info->chart_name);
+                        return p_file_info_destroy(p_file_info);
+                    } else p_file_info->filename = strdupz(netdata_error_path_default[i]);
+                } else if(!strcasecmp(p_file_info->chart_name, "Auth.log tail")){
                     const char * const auth_path_default[] = {
                         "/var/log/auth.log",
                         NULL
@@ -304,7 +316,7 @@ static void logs_management_init(struct section *config_section){
                         collector_error("[%s]: auth.log path invalid, unknown or needs permissions", p_file_info->chart_name);
                         return p_file_info_destroy(p_file_info);
                     } else p_file_info->filename = strdupz(auth_path_default[i]);
-                } else if(!strcmp(p_file_info->chart_name, "syslog tail")){
+                } else if(!strcasecmp(p_file_info->chart_name, "syslog tail")){
                     const char * const syslog_path_default[] = {
                         "/var/log/syslog",   /* Debian, Ubuntu */
                         "/var/log/messages", /* RHEL, Red Hat, CentOS, Fedora */
@@ -320,7 +332,7 @@ static void logs_management_init(struct section *config_section){
                 break;
             case WEB_LOG:
             case FLB_WEB_LOG:
-                if(!strcmp(p_file_info->chart_name, "Apache access.log")){
+                if(!strcasecmp(p_file_info->chart_name, "Apache access.log")){
                     const char * const apache_access_path_default[] = {
                         "/var/log/apache/access.log",
                         "/var/log/apache2/access.log", /* Debian, Ubuntu */
@@ -334,7 +346,7 @@ static void logs_management_init(struct section *config_section){
                         collector_error("[%s]: Apache access.log path invalid, unknown or needs permissions", p_file_info->chart_name);
                         return p_file_info_destroy(p_file_info);
                     } else p_file_info->filename = strdupz(apache_access_path_default[i]);
-                } else if(!strcmp(p_file_info->chart_name, "Nginx access.log")){
+                } else if(!strcasecmp(p_file_info->chart_name, "Nginx access.log")){
                     const char * const nginx_access_path_default[] = {
                         "/var/log/nginx/access.log",
                         NULL
