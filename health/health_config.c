@@ -1778,16 +1778,14 @@ void health_yaml_config_parse_node(yaml_document_t *document_p, yaml_node_t *nod
                 health_config_store_key(doc_cfg, (const char *)key->data.scalar.value, (const char *)node->data.scalar.value);
 			break;
 		case YAML_SEQUENCE_NODE:
-			yaml_node_item_t *i_node;
-			for (i_node = node->data.sequence.items.start; i_node < node->data.sequence.items.top; i_node++) {
+			for (yaml_node_item_t *i_node = node->data.sequence.items.start; i_node < node->data.sequence.items.top; i_node++) {
 				next_node_p = yaml_document_get_node(document_p, *i_node);
 				if (next_node_p)
 					health_yaml_config_parse_node(document_p, next_node_p, doc_cfg, sec_cfg, key, host);
 			}
 			break;
 		case YAML_MAPPING_NODE:
-			yaml_node_pair_t *i_node_p;
-			for (i_node_p = node->data.mapping.pairs.start; i_node_p < node->data.mapping.pairs.top; i_node_p++) {
+			for (yaml_node_pair_t *i_node_p = node->data.mapping.pairs.start; i_node_p < node->data.mapping.pairs.top; i_node_p++) {
 				key_node_p = yaml_document_get_node(document_p, i_node_p->key);
 				next_node_p = yaml_document_get_node(document_p, i_node_p->value);
                 health_yaml_config_parse_node(document_p, next_node_p, doc_cfg, sec_cfg, key_node_p, host);
