@@ -22,13 +22,13 @@ accompanying configuration file.
 
 If you don't see the app/service you'd like to monitor in this list:
 
-- If your application has a Prometheus endpoint, Netdata can monitor it! Look at our 
+- If your application has a Prometheus endpoint, Netdata can monitor it! Look at our
   [generic Prometheus collector](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/README.md).
 
-- If your application is instrumented to expose [StatsD](https://blog.netdata.cloud/introduction-to-statsd/) metrics, 
+- If your application is instrumented to expose [StatsD](https://blog.netdata.cloud/introduction-to-statsd/) metrics,
   see our [generic StatsD collector](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/README.md).
 
-- If you have data in CSV, JSON, XML or other popular formats, you may be able to use our 
+- If you have data in CSV, JSON, XML or other popular formats, you may be able to use our
   [generic structured data (Pandas) collector](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/pandas/README.md),
 
 - Check out our [GitHub issues](https://github.com/netdata/netdata/issues). Use the search bar to look for previous
