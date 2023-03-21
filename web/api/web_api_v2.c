@@ -22,6 +22,7 @@ static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unu
         else if((options & CONTEXTS_V2_CONTEXTS) && !strcmp(name, "scope_contexts")) req.scope_contexts = value;
         else if((options & CONTEXTS_V2_CONTEXTS) && !strcmp(name, "contexts")) req.contexts = value;
         else if((options & CONTEXTS_V2_SEARCH) && !strcmp(name, "q")) req.q = value;
+        else if(!strcmp(name, "timeout")) req.timeout_ms = str2l(value);
     }
 
     options |= CONTEXTS_V2_DEBUG;
@@ -40,7 +41,12 @@ static int web_client_api_request_v2_contexts(RRDHOST *host __maybe_unused, stru
 }
 
 static int web_client_api_request_v2_nodes(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_NODES);
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED);
+}
+
+static int web_client_api_request_v2_weights(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_weights(host, w, url, WEIGHTS_METHOD_VALUE,
+                                          WEIGHTS_FORMAT_MULTINODE, 2);
 }
 
 static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
@@ -180,11 +186,11 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
             tier = 0;
     }
 
-    long long before = (before_str && *before_str)?str2l(before_str):0;
-    long long after  = (after_str  && *after_str) ?str2l(after_str):-600;
-    int       points = (points_str && *points_str)?str2i(points_str):0;
-    int       timeout = (timeout_str && *timeout_str)?str2i(timeout_str): 0;
-    long      group_time = (resampling_time_str && *resampling_time_str) ? str2l(resampling_time_str) : 0;
+    time_t    before = (before_str && *before_str)?str2l(before_str):0;
+    time_t    after  = (after_str  && *after_str) ?str2l(after_str):-600;
+    size_t    points = (points_str && *points_str)?str2u(points_str):0;
+    time_t    timeout = (timeout_str && *timeout_str)?str2l(timeout_str): 0;
+    time_t    resampling_time = (resampling_time_str && *resampling_time_str) ? str2l(resampling_time_str) : 0;
 
     QUERY_TARGET_REQUEST qtr = {
             .version = 2,
@@ -199,7 +205,7 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
             .instances = instances,
             .dimensions = dimensions,
             .alerts = alerts,
-            .timeout = timeout,
+            .timeout_ms = timeout,
             .points = points,
             .format = format,
             .options = options,
@@ -208,7 +214,7 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
             .group_by_aggregate_function = group_by_aggregate,
             .time_group_method = time_group,
             .time_group_options = time_group_options,
-            .resampling_time = group_time,
+            .resampling_time = resampling_time,
             .tier = tier,
             .chart_label_key = NULL,
             .labels = labels,
@@ -300,6 +306,7 @@ static struct web_api_command api_commands_v2[] = {
         {"data", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_data},
         {"nodes", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_nodes},
         {"contexts", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_contexts},
+        {"weights", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_weights},
         {"q", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_q},
 
         // terminator

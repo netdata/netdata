@@ -812,6 +812,7 @@ static void garbage_collect_pending_deletes(DICTIONARY *dict) {
 }
 
 void dictionary_garbage_collect(DICTIONARY *dict) {
+    if(!dict) return;
     garbage_collect_pending_deletes(dict);
 }
 
@@ -2277,7 +2278,7 @@ void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw) {
     dfe->counter = 0;
     dfe->dict = dict;
     dfe->rw = rw;
-
+    dfe->locked = true;
     ll_recursive_lock(dict, dfe->rw);
 
     DICTIONARY_STATS_TRAVERSALS_PLUS1(dict);
@@ -2300,8 +2301,10 @@ void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw) {
         dfe->value = NULL;
     }
 
-    if(unlikely(dfe->rw == DICTIONARY_LOCK_REENTRANT))
+    if(unlikely(dfe->rw == DICTIONARY_LOCK_REENTRANT)) {
         ll_recursive_unlock(dfe->dict, dfe->rw);
+        dfe->locked = false;
+    }
 
     return dfe->value;
 }
@@ -2317,8 +2320,10 @@ void *dictionary_foreach_next(DICTFE *dfe) {
         return NULL;
     }
 
-    if(unlikely(dfe->rw == DICTIONARY_LOCK_REENTRANT))
+    if(unlikely(dfe->rw == DICTIONARY_LOCK_REENTRANT) || !dfe->locked) {
         ll_recursive_lock(dfe->dict, dfe->rw);
+        dfe->locked = true;
+    }
 
     // the item we just did
     DICTIONARY_ITEM *item = dfe->item;
@@ -2348,10 +2353,19 @@ void *dictionary_foreach_next(DICTFE *dfe) {
         dfe->value = NULL;
     }
 
-    if(unlikely(dfe->rw == DICTIONARY_LOCK_REENTRANT))
+    if(unlikely(dfe->rw == DICTIONARY_LOCK_REENTRANT)) {
         ll_recursive_unlock(dfe->dict, dfe->rw);
+        dfe->locked = false;
+    }
 
     return dfe->value;
+}
+
+void dictionary_foreach_unlock(DICTFE *dfe) {
+    if(dfe->locked) {
+        ll_recursive_unlock(dfe->dict, dfe->rw);
+        dfe->locked = false;
+    }
 }
 
 void dictionary_foreach_done(DICTFE *dfe) {
@@ -2371,8 +2385,10 @@ void dictionary_foreach_done(DICTFE *dfe) {
         // item_release(dfe->dict, item);
     }
 
-    if(likely(dfe->rw != DICTIONARY_LOCK_REENTRANT))
+    if(likely(dfe->rw != DICTIONARY_LOCK_REENTRANT) && dfe->locked) {
         ll_recursive_unlock(dfe->dict, dfe->rw);
+        dfe->locked = false;
+    }
 
     dfe->dict = NULL;
     dfe->item = NULL;

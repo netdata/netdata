@@ -117,21 +117,6 @@ struct storage_engine_query_handle {
     STORAGE_QUERY_HANDLE* handle;
 };
 
-typedef struct storage_point {
-    NETDATA_DOUBLE min;     // when count > 1, this is the minimum among them
-    NETDATA_DOUBLE max;     // when count > 1, this is the maximum among them
-    NETDATA_DOUBLE sum;     // the point sum - divided by count gives the average
-
-    // end_time - start_time = point duration
-    time_t start_time_s;    // the time the point starts
-    time_t end_time_s;      // the time the point ends
-
-    size_t count;           // the number of original points aggregated
-    size_t anomaly_count;   // the number of original points found anomalous
-
-    SN_FLAGS flags;         // flags stored with the point
-} STORAGE_POINT;
-
 // ----------------------------------------------------------------------------
 // chart types
 
@@ -425,31 +410,6 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
 size_t rrddim_memory_file_header_size(void);
 
 void rrddim_memory_file_save(RRDDIM *rd);
-
-// ----------------------------------------------------------------------------
-
-#define storage_point_unset(x)                     do { \
-    (x).min = (x).max = (x).sum = NAN;                  \
-    (x).count = 0;                                      \
-    (x).anomaly_count = 0;                              \
-    (x).flags = SN_FLAG_NONE;                           \
-    (x).start_time_s = 0;                               \
-    (x).end_time_s = 0;                                 \
-    } while(0)
-
-#define storage_point_empty(x, start_s, end_s)     do { \
-    (x).min = (x).max = (x).sum = NAN;                  \
-    (x).count = 1;                                      \
-    (x).anomaly_count = 0;                              \
-    (x).flags = SN_FLAG_NONE;                           \
-    (x).start_time_s = start_s;                         \
-    (x).end_time_s = end_s;                             \
-    } while(0)
-
-#define STORAGE_POINT_UNSET { .min = NAN, .max = NAN, .sum = NAN, .count = 0, .anomaly_count = 0, .flags = SN_FLAG_NONE, .start_time_s = 0, .end_time_s = 0 }
-
-#define storage_point_is_unset(x) (!(x).count)
-#define storage_point_is_gap(x) (!netdata_double_isnumber((x).sum))
 
 // ------------------------------------------------------------------------
 // function pointers that handle data collection
@@ -1065,6 +1025,7 @@ struct rrdhost {
     uint32_t health_last_processed_id;              // the last processed health id from the log
     uint32_t health_max_unique_id;                  // the max alarm log unique id given for the host
     uint32_t health_max_alarm_id;                   // the max alarm id given for the host
+    size_t health_transitions;                      // the number of times an alert changed state
 
     // ------------------------------------------------------------------------
     // locks

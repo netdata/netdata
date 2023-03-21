@@ -61,7 +61,6 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
     }
 
     // for each line in the array
-    NETDATA_DOUBLE total = 1;
     for(i = start; i != end ;i += step) {
         NETDATA_DOUBLE *cn = &r->v[ i * r->d ];
         RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
@@ -84,22 +83,6 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
             buffer_date(wb, tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
         }
 
-        if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
-            total = 0;
-            for(c = 0; c < used ;c++) {
-                if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
-
-                NETDATA_DOUBLE n = cn[c];
-
-                if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
-                    n = -n;
-
-                total += n;
-            }
-            // prevent a division by zero
-            if(total == 0) total = 1;
-        }
-
         // for each dimension
         for(c = 0; c < used ;c++) {
             if(!rrdr_dimension_should_be_exposed(r->od[c], options))
@@ -115,24 +98,8 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
                 else
                     buffer_strcat(wb, "null");
             }
-            else {
-                if(unlikely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
-                    n = -n;
-
-                if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
-                    n = n * 100 / total;
-
-                    if(unlikely(i == start && c == 0)) {
-                        r->view.min = r->view.max = n;
-                    }
-                    else {
-                        if (n < r->view.min) r->view.min = n;
-                        if (n > r->view.max) r->view.max = n;
-                    }
-                }
-
+            else
                 buffer_print_netdata_double(wb, n);
-            }
         }
 
         buffer_strcat(wb, endline);

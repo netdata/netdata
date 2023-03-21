@@ -755,6 +755,14 @@ static inline void buffer_json_add_array_item_double(BUFFER *wb, NETDATA_DOUBLE 
     wb->json.stack[wb->json.depth].count++;
 }
 
+static inline void buffer_json_add_array_item_int64(BUFFER *wb, int64_t value) {
+    if(wb->json.stack[wb->json.depth].count)
+        buffer_fast_strcat(wb, ",", 1);
+
+    buffer_print_int64(wb, value);
+    wb->json.stack[wb->json.depth].count++;
+}
+
 static inline void buffer_json_add_array_item_uint64(BUFFER *wb, uint64_t value) {
     if(wb->json.stack[wb->json.depth].count)
         buffer_fast_strcat(wb, ",", 1);

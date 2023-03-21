@@ -388,6 +388,7 @@ paths:
           in: query
           description: |
             The aggregation function to apply when grouping metrics together.
+            When option `raw` is given, `average` and `avg` behave like `sum` and the caller is expected to calculate the average.
           required: false
           schema:
             type: string
@@ -2414,6 +2415,10 @@ components:
             Hashes that allow the caller to detect important database changes of Netdata agents.
           type: object
           properties:
+            nodes_hard_hash:
+              description: |
+                An auto-increment value that reflects the number of changes to the number of nodes maintained by the server. Everytime a node is added or removed, this number gets incremented.
+              type: integer
             contexts_hard_hash:
               description: |
                 An auto-increment value that reflects the number of changes to the number of contexts maintained by the server. Everytime a context is added or removed, this number gets incremented.
@@ -2421,6 +2426,14 @@ components:
             contexts_soft_hash:
               description: |
                 An auto-increment value that reflects the number of changes to the queue that sends contexts updates to Netdata Cloud. Everytime the contents of a context are updated, this number gets incremented.
+              type: integer
+            alerts_hard_hash:
+              description: |
+                An auto-increment value that reflects the number of changes to the number of alerts. Everytime an alert is added or removed, this number gets incremented.
+              type: integer
+            alerts_soft_hash:
+              description: |
+                An auto-increment value that reflects the number of alerts transitions. Everytime an alert transitions to a new state, this number gets incremented.
               type: integer
         summary:
           description: |
@@ -2747,6 +2760,18 @@ components:
                   type: array
                   items:
                     type: integer
+                view_minimum_values:
+                  description: |
+                    An array of the minimum value of each dimension across the entire query.
+                  type: array
+                  items:
+                    type: number
+                view_maximum_values:
+                  description: |
+                    An array of the maximum value of each dimension across the entire query.
+                  type: array
+                  items:
+                    type: number
                 view_average_values:
                   description: |
                     An array of the average value of each dimension across the entire query.
@@ -2837,6 +2862,12 @@ components:
         Statistical values
       type: object
       properties:
+        min:
+          description: The minimum value of all metrics aggregated
+          type: number
+        max:
+          description: The maximum value of all metrics aggregated
+          type: number
         avg:
           description: The average value of all metrics aggregated
           type: number
@@ -2851,6 +2882,12 @@ components:
         Statistical values when `raw` option is given.
       type: object
       properties:
+        min:
+          description: The minimum value of all metrics aggregated
+          type: number
+        max:
+          description: The maximum value of all metrics aggregated
+          type: number
         sum:
           description: The sum value of all metrics aggregated
           type: number

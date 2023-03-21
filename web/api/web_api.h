@@ -29,6 +29,8 @@ static inline void fix_google_param(char *s) {
     }
 }
 
+int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *url, WEIGHTS_METHOD method, WEIGHTS_FORMAT format, size_t api_version);
+
 bool web_client_interrupt_callback(void *data);
 
 #include "web_api_v1.h"

@@ -312,68 +312,13 @@ void rrdcontext_hub_stop_streaming_command(void *ptr) {
     rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
 }
 
-// ----------------------------------------------------------------------------
-// weights API
+bool rrdcontext_retention_match(RRDCONTEXT_ACQUIRED *rca, time_t after, time_t before) {
+    if(unlikely(!rca)) return false;
 
-static void metric_entry_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
-    struct metric_entry *t = value;
-    t->rca = rrdcontext_acquired_dup(t->rca);
-    t->ria = rrdinstance_acquired_dup(t->ria);
-    t->rma = rrdmetric_acquired_dup(t->rma);
-}
-static void metric_entry_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
-    struct metric_entry *t = value;
-    rrdcontext_release(t->rca);
-    rrdinstance_release(t->ria);
-    rrdmetric_release(t->rma);
-}
-static bool metric_entry_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value __maybe_unused, void *new_value __maybe_unused, void *data __maybe_unused) {
-    internal_fatal("RRDCONTEXT: %s() detected a conflict on a metric pointer!", __FUNCTION__);
-    return false;
-}
+    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
 
-DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contexts) {
-    if(!host || !host->rrdctx.contexts)
-        return NULL;
-
-    DICTIONARY *dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_rrdcontext, 0);
-    dictionary_register_insert_callback(dict, metric_entry_insert_callback, NULL);
-    dictionary_register_delete_callback(dict, metric_entry_delete_callback, NULL);
-    dictionary_register_conflict_callback(dict, metric_entry_conflict_callback, NULL);
-
-    RRDCONTEXT *rc;
-    dfe_start_reentrant(host->rrdctx.contexts, rc) {
-        if(rrd_flag_is_deleted(rc))
-            continue;
-
-        if(contexts && !simple_pattern_matches_string(contexts, rc->id))
-            continue;
-
-        RRDINSTANCE *ri;
-        dfe_start_read(rc->rrdinstances, ri) {
-            if(rrd_flag_is_deleted(ri))
-                continue;
-
-            RRDMETRIC *rm;
-            dfe_start_read(ri->rrdmetrics, rm) {
-                if(rrd_flag_is_deleted(rm))
-                    continue;
-
-                struct metric_entry tmp = {
-                    .rca = (RRDCONTEXT_ACQUIRED *)rc_dfe.item,
-                    .ria = (RRDINSTANCE_ACQUIRED *)ri_dfe.item,
-                    .rma = (RRDMETRIC_ACQUIRED *)rm_dfe.item,
-                };
-
-                char buffer[20 + 1];
-                ssize_t len = snprintfz(buffer, 20, "%p", rm);
-                dictionary_set_advanced(dict, buffer, len + 1, &tmp, sizeof(struct metric_entry), NULL);
-            }
-            dfe_done(rm);
-        }
-        dfe_done(ri);
-    }
-    dfe_done(rc);
-
-    return dict;
+    if(rrd_flag_is_collected(rc))
+        return query_matches_retention(after, before, rc->first_time_s, before > rc->last_time_s ? before : rc->last_time_s, 1);
+    else
+        return query_matches_retention(after, before, rc->first_time_s, rc->last_time_s, 1);
 }

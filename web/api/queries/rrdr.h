@@ -105,7 +105,10 @@ typedef struct rrdresult {
     uint32_t *dgbc;           // array of d dimension units - NOT ALLOCATED when RRDR is created
     uint32_t *dp;             // array of d dimension priority - NOT ALLOCATED when RRDR is created
     NETDATA_DOUBLE *dv;       // array of d dimension averages - NOT ALLOCATED when RRDR is created
+    NETDATA_DOUBLE *dmin;     // array of d dimension minimums - NOT ALLOCATED when RRDR is created
+    NETDATA_DOUBLE *dmax;     // array of d dimension maximums - NOT ALLOCATED when RRDR is created
     DICTIONARY **dl;          // array of d dimension labels - NOT ALLOCATED when RRDR is created
+    STORAGE_POINT *drs;       // array of d dimensions raw statistics (storage points)
 
     DICTIONARY *label_keys;
 
@@ -183,7 +186,7 @@ RRDR *rrd2rrdr_legacy(
         ONEWAYALLOC *owa,
         RRDSET *st, size_t points, time_t after, time_t before,
         RRDR_TIME_GROUPING group_method, time_t resampling_time, RRDR_OPTIONS options, const char *dimensions,
-        const char *group_options, time_t timeout, size_t tier, QUERY_SOURCE query_source,
+        const char *group_options, time_t timeout_ms, size_t tier, QUERY_SOURCE query_source,
         STORAGE_PRIORITY priority);
 
 RRDR *rrd2rrdr(ONEWAYALLOC *owa, struct query_target *qt);

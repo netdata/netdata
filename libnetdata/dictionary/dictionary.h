@@ -263,19 +263,20 @@ void dictionary_write_lock(DICTIONARY *dict);
 void dictionary_write_unlock(DICTIONARY *dict);
 
 typedef DICTFE_CONST struct dictionary_foreach {
-    DICTIONARY *dict;           // the dictionary upon we work
+    DICTIONARY *dict; // the dictionary upon we work
 
     DICTIONARY_ITEM *item;      // the item we work on, to remember the position we are at
                                 // this can be used with dictionary_acquired_item_dup() to
                                 // acquire the currently working item.
 
-    DICTFE_CONST char *name;    // the dictionary name of the last item used
+    const char *name;           // the dictionary name of the last item used
     void *value;                // the dictionary value of the last item used
                                 // same as the return value of dictfe_start() and dictfe_next()
 
     size_t counter;             // counts the number of iterations made, starting from zero
 
     char rw;                    // the lock mode 'r' or 'w'
+    bool locked;                // true when the dictionary is locked
 } DICTFE;
 
 #define dfe_start_read(dict, value) dfe_start_rw(dict, value, DICTIONARY_LOCK_READ)
@@ -296,9 +297,12 @@ typedef DICTFE_CONST struct dictionary_foreach {
             dictionary_foreach_done(&value ## _dfe);                                                \
         } while(0)
 
+#define dfe_unlock(value) dictionary_foreach_unlock(&value ## _dfe);
+
 void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw);
 void *dictionary_foreach_next(DICTFE *dfe);
 void  dictionary_foreach_done(DICTFE *dfe);
+void  dictionary_foreach_unlock(DICTFE *dfe);
 
 // ----------------------------------------------------------------------------
 // Get statistics about the dictionary
