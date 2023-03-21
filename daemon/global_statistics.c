@@ -827,7 +827,33 @@ static void global_statistics_charts(void) {
         rrdset_done(st_points_stored);
     }
 
-    ml_update_global_statistics_charts(gs.ml_models_consulted);
+    {
+        static RRDSET *st = NULL;
+        static RRDDIM *rd = NULL;
+
+        if (unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    "netdata" // type
+                    , "ml_models_consulted" // id
+                    , NULL // name
+                    , NETDATA_ML_CHART_FAMILY // family
+                    , NULL // context
+                    , "KMeans models used for prediction" // title
+                    , "models" // units
+                    , NETDATA_ML_PLUGIN // plugin
+                    , NETDATA_ML_MODULE_DETECTION // module
+                    , NETDATA_ML_CHART_PRIO_MACHINE_LEARNING_STATUS // priority
+                    , localhost->rrd_update_every // update_every
+                    , RRDSET_TYPE_AREA // chart_type
+            );
+
+            rd = rrddim_add(st, "num_models_consulted", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+
+        rrddim_set_by_pointer(st, rd, (collected_number) gs.ml_models_consulted);
+
+        rrdset_done(st);
+    }
 }
 
 // ----------------------------------------------------------------------------
