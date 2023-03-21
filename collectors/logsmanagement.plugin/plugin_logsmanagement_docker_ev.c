@@ -10,10 +10,10 @@ void docker_ev_chart_init(struct File_info *p_file_info, struct Chart_meta *char
     /* Number of collected logs - initialise */
     chart_data->st_lines = rrdset_create_localhost(
             (char *) p_file_info->chart_name
-            , "collected logs"
+            , "collected_logs"
             , NULL
-            , "collected logs"
-            , NULL
+            , "collected_logs"
+            , "docker_events_logs.collected_logs"
             , "Collected log records"
             , "records"
             , "logsmanagement.plugin"
@@ -29,10 +29,10 @@ void docker_ev_chart_init(struct File_info *p_file_info, struct Chart_meta *char
     if(p_file_info->parser_config->chart_config & CHART_DOCKER_EV_TYPE){
         chart_data->st_dock_ev_type = rrdset_create_localhost(
                 (char *) p_file_info->chart_name
-                , "events type"
-                , NULL
-                , "docker events"
-                , NULL
+                , "events_type"
+                , "events_type"
+                , "docker_events"
+                , "docker_events_logs.events_type"
                 , "Events type"
                 , "events types"
                 , "logsmanagement.plugin"
