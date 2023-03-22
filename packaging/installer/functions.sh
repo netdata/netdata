@@ -845,13 +845,7 @@ restart_netdata() {
 # install netdata logrotate
 
 install_netdata_logrotate() {
-  prefix="${1}"
-
-  if [ -n "${prefix}" ]; then
-    src="${prefix}/system/logrotate/netdata"
-  else
-    src="system/logrotate/netdata"
-  fi
+  src="${NETDATA_PREFIX}/usr/lib/netdata/system/logrotate/netdata"
 
   if [ "${UID}" -eq 0 ]; then
     if [ -d /etc/logrotate.d ]; then
