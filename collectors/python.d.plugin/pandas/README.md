@@ -1,12 +1,3 @@
-<!--
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/pandas/README.md
-title: "Ingest structured data (Pandas)"
-sidebar_label: "Ingest structured data (Pandas)"
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Integrations/Monitor/Anything"
--->
-
 # Ingest structured data (Pandas)
 
 <a href="https://pandas.pydata.org/" target="_blank">
@@ -80,12 +71,11 @@ temperature:
 
 `chart_configs` is a list of dictionary objects where each one defines the sequence of `df_steps` to be run using [`pandas`](https://pandas.pydata.org/), 
 and the `name`, `title` etc to define the 
-[CHART variables](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin#global-variables-order-and-chart) 
+[CHART variables](https://github.com/netdata/netdata/blob/master/docs/guides/python-collector.md#create-charts) 
 that will control how the results will look in netdata.
 
 The example configuration above would result in a `data` dictionary like the below being collected by Netdata 
-at each time step. They keys in this dictionary will be the 
-[dimension](https://learn.netdata.cloud/docs/agent/web#dimensions) names on the chart.
+at each time step. They keys in this dictionary will be the "dimensions" of the chart.
 
 ```javascript
 {'athens_max': 26.2, 'athens_mean': 19.45952380952381, 'athens_min': 12.2, 'berlin_max': 17.4, 'berlin_mean': 10.764285714285714, 'berlin_min': 5.7, 'dublin_max': 15.3, 'dublin_mean': 12.008928571428571, 'dublin_min': 6.6, 'london_max': 18.9, 'london_mean': 12.510714285714286, 'london_min': 5.2, 'paris_max': 19.4, 'paris_mean': 12.054166666666665, 'paris_min': 4.8}
