@@ -19,6 +19,8 @@ bool ml_streaming_enabled() {
 
 void ml_init(void) {}
 
+void ml_fini(void) {}
+
 void ml_host_new(RRDHOST *rh) {
     UNUSED(rh);
 }
@@ -84,6 +86,10 @@ bool ml_dimension_is_anomalous(RRDDIM *rd, time_t curr_time, double value, bool 
     UNUSED(value);
     UNUSED(exists);
     return false;
+}
+
+void ml_update_global_statistics_charts(uint64_t models_consulted) {
+    UNUSED(models_consulted);
 }
 
 #endif
