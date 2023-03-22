@@ -3679,7 +3679,7 @@ void update_cgroup_charts(int update_every) {
                 snprintfz(
                     title,
                     CHART_TITLE_MAX,
-                    k8s_is_kubepod(cg) ? "CPU Usage (100%% = 1000 mCores)" : "CPU Usage (100%% = 1 core)");
+                    k8s_is_kubepod(cg) ? "CPU Usage (100%% = 1000 mCPU)" : "CPU Usage (100%% = 1 core)");
 
                 cg->st_cpu = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3885,7 +3885,7 @@ void update_cgroup_charts(int update_every) {
                 snprintfz(
                     title,
                     CHART_TITLE_MAX,
-                    k8s_is_kubepod(cg) ? "CPU Usage (100%% = 1000 mCores) Per Core" :
+                    k8s_is_kubepod(cg) ? "CPU Usage (100%% = 1000 mCPU) Per Core" :
                                          "CPU Usage (100%% = 1 core) Per Core");
 
                 cg->st_cpu_per_core = rrdset_create_localhost(
