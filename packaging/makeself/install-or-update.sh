@@ -138,7 +138,7 @@ fi
 # -----------------------------------------------------------------------------
 progress "Install logrotate configuration for netdata"
 
-install_netdata_logrotate || run_failed "Cannot install logrotate file for netdata."
+install_netdata_logrotate "${NETDATA_PREFIX}" || run_failed "Cannot install logrotate file for netdata."
 
 # -----------------------------------------------------------------------------
 progress "Telemetry configuration"
