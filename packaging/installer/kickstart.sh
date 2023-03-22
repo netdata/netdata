@@ -1396,21 +1396,9 @@ try_package_install() {
       uninstall_subcmd="remove"
       ;;
     amzn)
-      if command -v dnf > /dev/null; then
-        pm_cmd="dnf"
-        repo_subcmd="makecache"
-      else
-        pm_cmd="yum"
-      fi
+      common_rpm_opts
+      common_dnf_opts
       repo_prefix="amazonlinux/${SYSVERSION}"
-      pkg_type="rpm"
-      pkg_suffix=".noarch"
-      pkg_vsep="-"
-      pkg_install_opts="${interactive_opts}"
-      repo_update_opts="${interactive_opts}"
-      uninstall_subcmd="remove"
-      INSTALL_TYPE="binpkg-rpm"
-      NATIVE_VERSION="${INSTALL_VERSION:+"-${INSTALL_VERSION}.${SYSARCH}"}"
       ;;
     *)
       warning "We do not provide native packages for ${DISTRO}."
