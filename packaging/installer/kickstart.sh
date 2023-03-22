@@ -678,11 +678,6 @@ get_system_info() {
 
       case "${DISTRO_COMPAT_NAME}" in
         centos|ol) SYSVERSION=$(echo "$SYSVERSION" | cut -d'.' -f1) ;;
-        ubuntu|debian)
-          if [ -z "${SYSCODENAME}" ]; then
-            fatal "Could not determine ${DISTRO} release code name. This is required information on these systems." F0511
-          fi
-          ;;
       esac
       ;;
     Darwin)
