@@ -91,7 +91,7 @@ static inline RRDHOST *find_host_by_node_id(char *node_id)
     rrd_rdlock();
     RRDHOST *host, *ret = NULL;
     rrdhost_foreach_read(host) {
-        if (host->node_id && !(uuid_compare(*host->node_id, node_uuid))) {
+        if (host->node_id && !(uuid_memcmp(host->node_id, &node_uuid))) {
             ret = host;
             break;
         }
