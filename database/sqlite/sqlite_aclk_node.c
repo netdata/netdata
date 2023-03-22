@@ -155,9 +155,6 @@ void aclk_check_node_info_and_collectors(void)
             continue;
         }
 
-        if (wc->node_info_send_time && wc->node_info_send_time + 5 > now_realtime_sec())
-            internal_error(true, "ACLK SYNC: NOT TIME YET TO SEND info for %s, %ld", rrdhost_hostname(host), now_realtime_sec() - wc->node_info_send_time);
-
         if (wc->node_info_send_time && wc->node_info_send_time + 30 < now_realtime_sec()) {
             wc->node_info_send_time = 0;
             build_node_info(strdupz(wc->node_id));
