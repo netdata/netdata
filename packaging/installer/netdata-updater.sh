@@ -715,7 +715,7 @@ update_binpkg() {
 
   DISTRO="${ID}"
 
-  supported_compat_names="debian ubuntu centos fedora opensuse ol"
+  supported_compat_names="debian ubuntu centos fedora opensuse ol amzn"
 
   if str_in_list "${DISTRO}" "${supported_compat_names}"; then
     DISTRO_COMPAT_NAME="${DISTRO}"
@@ -751,7 +751,7 @@ update_binpkg() {
       pkg_installed_check="dpkg -s"
       INSTALL_TYPE="binpkg-deb"
       ;;
-    centos|fedora|ol)
+    centos|fedora|ol|amzn)
       if command -v dnf > /dev/null; then
         pm_cmd="dnf"
         repo_subcmd="makecache"
