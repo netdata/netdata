@@ -35,5 +35,5 @@ need to configure those nodes to collect from additional data sources. See our [
 to learn how to use dozens of pre-installed collectors that can instantly collect from your favorite services and applications.
 
 If you want to see up to 30 days of historical metrics in Cloud (and more on individual node dashboards), read about [changing how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md). Also, see our
-[calculator](/docs/store/change-metrics-storage#calculate-the-system-resources-RAM-disk-space-needed-to-store-metrics)
+[calculator](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
 for finding the disk and RAM you need to store metrics for a certain period of time.
