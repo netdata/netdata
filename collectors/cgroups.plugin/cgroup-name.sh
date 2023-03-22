@@ -74,7 +74,7 @@ function docker_like_get_name_api() {
     warning "No ${host_var} is set"
     return 1
   fi
-  if ! command -v jq >/dev/null 2>&1; then
+  if ! command >/dev/null 2>&1 && ! type jq >/dev/null 2>&1; then
     warning "Can't find jq command line tool. jq is required for netdata to retrieve container name using ${host} API, falling back to docker ps"
     return 1
   fi
