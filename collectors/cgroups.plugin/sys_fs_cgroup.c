@@ -3676,7 +3676,10 @@ void update_cgroup_charts(int update_every) {
 
         if(likely(cg->cpuacct_stat.updated && cg->cpuacct_stat.enabled == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_cpu)) {
-                snprintfz(title, CHART_TITLE_MAX, "CPU Usage (100%% = 1 core)");
+                snprintfz(
+                    title,
+                    CHART_TITLE_MAX,
+                    k8s_is_kubepod(cg) ? "CPU Usage (100%% = 1000 mCPU)" : "CPU Usage (100%% = 1 core)");
 
                 cg->st_cpu = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3879,7 +3882,11 @@ void update_cgroup_charts(int update_every) {
             unsigned int i;
 
             if(unlikely(!cg->st_cpu_per_core)) {
-                snprintfz(title, CHART_TITLE_MAX, "CPU Usage (100%% = 1 core) Per Core");
+                snprintfz(
+                    title,
+                    CHART_TITLE_MAX,
+                    k8s_is_kubepod(cg) ? "CPU Usage (100%% = 1000 mCPU) Per Core" :
+                                         "CPU Usage (100%% = 1 core) Per Core");
 
                 cg->st_cpu_per_core = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
