@@ -477,7 +477,7 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
     DICTIONARY *dict_instances = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dict_unique_id_name));
     DICTIONARY *dict_dimensions = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dict_unique_id_name));
 
-    buffer_json_member_add_array(wb, "points");
+    buffer_json_member_add_array(wb, "result");
 
     size_t total_dimensions = 0, node_dims = 0, context_dims = 0, instance_dims = 0;
     NETDATA_DOUBLE context_total_weight = 0.0, instance_total_weight = 0.0, node_total_weight = 0.0;
