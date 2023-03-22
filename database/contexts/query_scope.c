@@ -72,6 +72,9 @@ ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN 
 
 ssize_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, SIMPLE_PATTERN *scope_contexts_sp,
                                    SIMPLE_PATTERN *contexts_sp, foreach_context_cb_t cb, bool queryable_host, void *data) {
+    if(unlikely(!host->rrdctx.contexts))
+        return 0;
+
     ssize_t added = 0;
 
     RRDCONTEXT_ACQUIRED *rca = NULL;
