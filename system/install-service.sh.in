@@ -237,6 +237,8 @@ get_systemd_service_dir() {
 
 install_systemd_service() {
   SRCFILE="${SVC_SOURCE}/systemd/netdata.service"
+  PRESET_FILE="${SVC_SOURCE}/systemd/50-netdata.preset"
+  SVCDIR="$(get_systemd_service_dir)"
 
   if [ "$(systemctl --version | head -n 1 | cut -f 2 -d ' ')" -le 235 ]; then
     SRCFILE="${SVC_SOURCE}/systemd/netdata.service.v235"
@@ -255,18 +257,24 @@ install_systemd_service() {
   fi
 
   info "Installing systemd service..."
-  if ! install -p -m 0644 -o 0 -g 0 "${SRCFILE}" "$(get_systemd_service_dir)/netdata.service"; then
+  if ! install -p -m 0644 -o 0 -g 0 "${SRCFILE}" "${SVCDIR}/netdata.service"; then
     error "Failed to install systemd service file."
     exit 4
   fi
 
+  if [ -f "${PRESET_FILE}" ]; then
+    if ! install -p -m 0644 -o 0 -g 0 "${PRESET_FILE}" "${SVCDIR}-preset/50-netdata.preset"; then
+      warning "Failed to install netdata preset file."
+    fi
+  fi
+
   if [ "$(check_systemd)" = "YES" ]; then
     if ! systemctl daemon-reload; then
-        warning "Failed to reload systemd unit files."
+      warning "Failed to reload systemd unit files."
     fi
 
     if ! systemctl "${ENABLE}" netdata; then
-        warning "Failed to ${ENABLE} Netdata service."
+      warning "Failed to ${ENABLE} Netdata service."
     fi
   fi
 }
