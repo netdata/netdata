@@ -369,6 +369,7 @@ typedef struct {
 
     rbuf_t tx;
     h2o_iovec_t tx_buf;
+    pthread_mutex_t tx_buf_lock;
 
     http_stream_parse_state_t parse_state;
     char *url;
@@ -381,6 +382,10 @@ static void h2o_stream_conn_t_init(h2o_stream_conn_t *conn)
     memset(conn, 0, sizeof(*conn));
     conn->rx = rbuf_create(H2O2STREAM_BUF_SIZE);
     conn->tx = rbuf_create(H2O2STREAM_BUF_SIZE);
+
+    pthread_mutex_init(&conn->rx_buf_lock, NULL);
+    pthread_mutex_init(&conn->tx_buf_lock, NULL);
+    pthread_cond_init(&conn->rx_buf_cond, NULL);
     // no need to check for NULL as rbuf_create uses mallocz internally
 }
 
@@ -402,10 +407,14 @@ void on_write_complete(h2o_socket_t *sock, const char *err)
 {
     h2o_stream_conn_t *conn = sock->data;
 
+    pthread_mutex_lock(&conn->tx_buf_lock);
+
     rbuf_bump_tail(conn->tx, conn->tx_buf.len);
 
     conn->tx_buf.base = NULL;
     conn->tx_buf.len = 0;
+
+    pthread_mutex_unlock(&conn->tx_buf_lock);
 
     stream_process(conn);
 }
@@ -528,13 +537,14 @@ void stream_process(h2o_stream_conn_t *conn)
             error_report("Unknown conn->state");
     }
 
+    pthread_mutex_lock(&conn->tx_buf_lock);
     if (rbuf_bytes_available(conn->tx) && !conn->tx_buf.base) {
         /* write */
         conn->tx_buf.base = rbuf_get_linear_read_range(conn->tx, &conn->tx_buf.len);
         if (conn->tx_buf.base)
             h2o_socket_write(conn->sock, &conn->tx_buf, 1, on_write_complete);
-        
     }
+    pthread_mutex_unlock(&conn->tx_buf_lock);
 
     h2o_socket_read_start(conn->sock, on_recv);
 }
