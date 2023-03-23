@@ -418,6 +418,12 @@ static void multinode_data_schema(BUFFER *wb, RRDR_OPTIONS options __maybe_unuse
     buffer_json_object_close(wb); // schema
 }
 
+struct dict_unique_node {
+    bool existing;
+    uint32_t i;
+    RRDHOST *host;
+};
+
 struct dict_unique_name {
     bool existing;
     uint32_t i;
@@ -429,6 +435,18 @@ struct dict_unique_id_name {
     const char *id;
     const char *name;
 };
+
+static inline ssize_t dict_unique_node_add(DICTIONARY *dict, RRDHOST *host, ssize_t *max_id) {
+    struct dict_unique_node *dun = dictionary_set(dict, host->machine_guid, NULL, sizeof(struct dict_unique_node));
+    if(!dun->existing) {
+        dun->existing = true;
+        dun->host = host;
+        dun->i = *max_id;
+        (*max_id)++;
+    }
+
+    return (ssize_t)dun->i;
+}
 
 static inline ssize_t dict_unique_name_add(DICTIONARY *dict, const char *name, ssize_t *max_id) {
     struct dict_unique_name *dun = dictionary_set(dict, name, NULL, sizeof(struct dict_unique_name));
@@ -472,7 +490,7 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
     bool baseline = method == WEIGHTS_METHOD_MC_KS2 || method == WEIGHTS_METHOD_MC_VOLUME;
     multinode_data_schema(wb, options, "schema", baseline);
 
-    DICTIONARY *dict_nodes = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dict_unique_name));
+    DICTIONARY *dict_nodes = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dict_unique_node));
     DICTIONARY *dict_contexts = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dict_unique_name));
     DICTIONARY *dict_instances = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dict_unique_id_name));
     DICTIONARY *dict_dimensions = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dict_unique_id_name));
@@ -522,7 +540,7 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
         // open node
         if(t->host != last_host) {
             last_host = t->host;
-            ni = dict_unique_name_add(dict_nodes, t->host->machine_guid, &ni_max);
+            ni = dict_unique_node_add(dict_nodes, t->host, &ni_max);
         }
 
         // open context
@@ -577,10 +595,12 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
 
     buffer_json_member_add_array(wb, "nodes");
     {
-        struct dict_unique_name *dun;
+        struct dict_unique_node *dun;
         dfe_start_read(dict_nodes, dun) {
                     buffer_json_add_array_item_object(wb);
                     buffer_json_member_add_string(wb, "mg", dun_dfe.name);
+                    if(dun->host->node_id)
+                        buffer_json_member_add_uuid(wb, "nd", dun->host->node_id);
                     buffer_json_member_add_int64(wb, "ni", dun->i);
                     buffer_json_object_close(wb);
         }
