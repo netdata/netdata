@@ -796,7 +796,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
         }
     }
 
-    {
+    unless_h2o_rrdpush(rpt) {
         // remove the non-blocking flag from the socket
         if(sock_delnonblock(rpt->fd) < 0)
             error("STREAM '%s' [receive from [%s]:%s]: "

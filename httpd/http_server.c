@@ -362,9 +362,14 @@ typedef enum {
 typedef struct {
     h2o_socket_t *sock;
     h2o_stream_state_t state;
+
     rbuf_t rx;
+    pthread_cond_t  rx_buf_cond;
+    pthread_mutex_t rx_buf_lock;
+
     rbuf_t tx;
     h2o_iovec_t tx_buf;
+
     http_stream_parse_state_t parse_state;
     char *url;
 } h2o_stream_conn_t;
@@ -480,15 +485,16 @@ void stream_process(h2o_stream_conn_t *conn)
 {
     if (conn->sock->input->size) {
         size_t insert_max;
+        pthread_mutex_lock(&conn->rx_buf_lock);
         char *insert_loc = rbuf_get_linear_insert_range(conn->rx, &insert_max);
         insert_max = MIN(insert_max, conn->sock->input->size);
         memcpy(insert_loc, conn->sock->input->bytes, insert_max);
         rbuf_bump_head(conn->rx, insert_max);
 
-        if (!rbuf_bytes_available(conn->rx))
-            h2o_socket_read_start(conn->sock, on_recv);
-
         h2o_buffer_consume(&conn->sock->input, insert_max);
+
+        pthread_cond_broadcast(&conn->rx_buf_cond);
+        pthread_mutex_unlock(&conn->rx_buf_lock);
     }
 
     switch (conn->state) {
@@ -569,16 +575,26 @@ int h2o_stream_write(void *ctx, const char *data, size_t data_len)
 
 size_t h2o_stream_read(void *ctx, char *buf, size_t read_bytes)
 {
+    int ret;
     h2o_stream_conn_t *conn = (h2o_stream_conn_t *)ctx;
 
+    pthread_mutex_lock(&conn->rx_buf_lock);
     size_t avail = rbuf_bytes_available(conn->rx);
 
-    if (!avail)
-        return 0;
+    if (!avail) {
+        pthread_cond_wait(&conn->rx_buf_cond, &conn->rx_buf_lock);
+        avail = rbuf_bytes_available(conn->rx);
+        if (!avail)
+            pthread_mutex_unlock(&conn->rx_buf_lock);
+            return 0;
+    }
 
     avail = MIN(avail, read_bytes);
 
-    return rbuf_pop(conn->rx, buf, avail);
+    ret = rbuf_pop(conn->rx, buf, avail);
+    pthread_mutex_unlock(&conn->rx_buf_lock);
+
+    return ret;
 }
 
 static int hdl_stream(h2o_handler_t *self, h2o_req_t *req)

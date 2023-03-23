@@ -279,6 +279,7 @@ struct receiver_state {
 };
 
 #define is_h2o_rrdpush(x) ((x)->h2o_ctx != NULL)
+#define unless_h2o_rrdpush(x) if(!is_h2o_rrdpush(x))
 
 struct rrdpush_destinations {
     STRING *destination;
