@@ -1221,9 +1221,9 @@ void add_aclk_host_labels(void) {
 #endif
 }
 
-void aclk_queue_node_info(RRDHOST *host) {
+void aclk_queue_node_info(RRDHOST *host, bool immediate)
+{
     struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *) host->aclk_sync_host_config;
-    if (likely(wc)) {
-        wc->node_info_send = 1;
-    }
+    if (likely(wc))
+        wc->node_info_send_time = (host == localhost || immediate) ? 1 : now_realtime_sec();
 }
