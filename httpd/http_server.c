@@ -584,9 +584,10 @@ size_t h2o_stream_read(void *ctx, char *buf, size_t read_bytes)
     if (!avail) {
         pthread_cond_wait(&conn->rx_buf_cond, &conn->rx_buf_lock);
         avail = rbuf_bytes_available(conn->rx);
-        if (!avail)
+        if (!avail) {
             pthread_mutex_unlock(&conn->rx_buf_lock);
             return 0;
+        }
     }
 
     avail = MIN(avail, read_bytes);
