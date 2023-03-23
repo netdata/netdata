@@ -1160,6 +1160,9 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                     snprintfz(rd_id, RRD_ID_LENGTH_MAX, "generation_errs");
                     d->rd_generation_errs = rrddim_add(d->st_error_stats, rd_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
+                    char dev_id[5];
+                    snprintfz(dev_id, 4, "%d", d->id);
+                    rrdlabels_add(d->st_error_stats->rrdlabels, "device_id", dev_id, RRDLABEL_SRC_AUTO);
                     add_labels_to_btrfs(node, d->st_error_stats);
                 }
 
