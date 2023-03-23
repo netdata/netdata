@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- Fix links in README.md [\#14794](https://github.com/netdata/netdata/pull/14794) ([cakrit](https://github.com/cakrit))
+- Fix capitalization on readme [\#14793](https://github.com/netdata/netdata/pull/14793) ([cakrit](https://github.com/cakrit))
+- use mCPU in k8s cgroup cpu charts title [\#14791](https://github.com/netdata/netdata/pull/14791) ([ilyam8](https://github.com/ilyam8))
+- uuid\_compare\(\) replaced with uuid\_memcmp\(\) [\#14787](https://github.com/netdata/netdata/pull/14787) ([ktsaou](https://github.com/ktsaou))
+- /api/v2/X part 6 [\#14785](https://github.com/netdata/netdata/pull/14785) ([ktsaou](https://github.com/ktsaou))
 - Update dashboard to version v2.30.1. [\#14784](https://github.com/netdata/netdata/pull/14784) ([netdatabot](https://github.com/netdatabot))
 - Revert "Use static thread-pool for training. \(\#14702\)" [\#14782](https://github.com/netdata/netdata/pull/14782) ([vkalintiris](https://github.com/vkalintiris))
 - Replace hardcoded links pointing to "learn.netdata.cloud" with github absolute links [\#14779](https://github.com/netdata/netdata/pull/14779) ([Ancairon](https://github.com/Ancairon))
@@ -381,10 +386,6 @@
 - fix logrotate postrotate [\#14180](https://github.com/netdata/netdata/pull/14180) ([ilyam8](https://github.com/ilyam8))
 - docs: explicitly set the `nofile` limit for Netdata container and document the reason for this [\#14178](https://github.com/netdata/netdata/pull/14178) ([ilyam8](https://github.com/ilyam8))
 - remove interface name from cgroup net family [\#14174](https://github.com/netdata/netdata/pull/14174) ([ilyam8](https://github.com/ilyam8))
-- use specific charts labels instead of family in alarms [\#14173](https://github.com/netdata/netdata/pull/14173) ([ilyam8](https://github.com/ilyam8))
-- Revert "Refactor ML code and add support for multiple KMeans models. … [\#14172](https://github.com/netdata/netdata/pull/14172) ([vkalintiris](https://github.com/vkalintiris))
-- fix a typo in debian postinst [\#14171](https://github.com/netdata/netdata/pull/14171) ([ilyam8](https://github.com/ilyam8))
-- feat\(packaging\): add netdata to www-data group on Proxmox [\#14168](https://github.com/netdata/netdata/pull/14168) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
