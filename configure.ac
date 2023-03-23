@@ -1295,6 +1295,7 @@ AM_CONDITIONAL([ENABLE_LOGSMANAGEMENT], [test "${build_logsmanagement}" = "yes"]
 if test "${build_logsmanagement}" = "yes"; then
     AC_DEFINE([ENABLE_LOGSMANAGEMENT], [1], [enable logs management functionality])
     OPTIONAL_LOGSMANAGEMENT_CFLAGS=" \
+    -I \$(abs_top_srcdir)/fluent-bit/include/fluent-bit/ \
     -I \$(abs_top_srcdir)/fluent-bit/build/lib/c-ares-809d5e84/ \
     -I \$(abs_top_srcdir)/fluent-bit/lib/c-ares-809d5e84/include/ \
     -I \$(abs_top_srcdir)/fluent-bit/lib/mbedtls-2.28.0/include/ \
