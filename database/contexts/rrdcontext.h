@@ -336,8 +336,8 @@ typedef struct query_target {
         time_t query_granularity;
         size_t points;                        // the number of points the query will return (maybe different from the request)
         size_t group;
-        RRDR_TIME_GROUPING group_method;
-        const char *group_options;
+        RRDR_TIME_GROUPING time_group_method;
+        const char *time_group_options;
         size_t resampling_group;
         NETDATA_DOUBLE resampling_divisor;
         RRDR_OPTIONS options;

@@ -279,12 +279,12 @@ static size_t query_target_summary_contexts_v2(BUFFER *wb, QUERY_TARGET *qt, con
         struct query_instances_counts instances;
         struct query_metrics_counts metrics;
         struct query_alerts_counts alerts;
-    } x = { 0 }, *z;
+    } *z;
 
     for (long c = 0; c < (long) qt->contexts.used; c++) {
         QUERY_CONTEXT *qc = query_context(qt, c);
 
-        z = dictionary_set(dict, rrdcontext_acquired_id(qc->rca), &x, sizeof(x));
+        z = dictionary_set(dict, rrdcontext_acquired_id(qc->rca), NULL, sizeof(*z));
 
         z->instances.selected += qc->instances.selected;
         z->instances.excluded += qc->instances.selected;
@@ -334,8 +334,7 @@ static void query_target_summary_instances_v1(BUFFER *wb, QUERY_TARGET *qt, cons
                   rrdinstance_acquired_id(qi->ria),
                   rrdinstance_acquired_name(qi->ria));
 
-        bool existing = 0;
-        bool *set = dictionary_set(dict, name, &existing, sizeof(bool));
+        bool *set = dictionary_set(dict, name, NULL, sizeof(*set));
         if (!*set) {
             *set = true;
             buffer_json_add_array_item_array(wb);
@@ -480,24 +479,20 @@ struct rrdlabels_key_value_dict_entry {
 static int rrdlabels_formatting_v2(const char *name, const char *value, RRDLABEL_SRC ls __maybe_unused, void *data) {
     struct rrdlabels_formatting_v2 *t = data;
 
-    struct rrdlabels_keys_dict_entry k = {
-            .name = name,
-            .values = NULL,
-            .metrics = (struct query_metrics_counts){ 0 },
-    }, *d = dictionary_set(t->keys, name, &k, sizeof(k));
-
-    if(!d->values)
+    struct rrdlabels_keys_dict_entry *d = dictionary_set(t->keys, name, NULL, sizeof(*d));
+    if(!d->values) {
+        d->name = name;
         d->values = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
+    }
 
     char n[RRD_ID_LENGTH_MAX * 2 + 2];
     snprintfz(n, RRD_ID_LENGTH_MAX * 2, "%s:%s", name, value);
 
-    struct rrdlabels_key_value_dict_entry x = {
-            .key = name,
-            .value = value,
-            .query_stats = (struct query_data_statistics) { 0 },
-            .metrics = (struct query_metrics_counts){ 0 },
-    }, *z = dictionary_set(d->values, n, &x, sizeof(x));
+    struct rrdlabels_key_value_dict_entry *z = dictionary_set(d->values, n, NULL, sizeof(*z));
+    if(!z->key) {
+        z->key = name;
+        z->value = value;
+    }
 
     if(t->v2) {
         QUERY_INSTANCE *qi = t->qi;
@@ -571,7 +566,7 @@ static void query_target_summary_labels_v12(BUFFER *wb, QUERY_TARGET *qt, const 
 
 static void query_target_summary_alerts_v2(BUFFER *wb, QUERY_TARGET *qt, const char *key) {
     buffer_json_member_add_array(wb, key);
-    struct query_alerts_counts x = { 0 }, *z;
+    struct query_alerts_counts *z;
 
     DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
     for (long c = 0; c < (long) qt->instances.used; c++) {
@@ -581,7 +576,7 @@ static void query_target_summary_alerts_v2(BUFFER *wb, QUERY_TARGET *qt, const c
             netdata_rwlock_rdlock(&st->alerts.rwlock);
             if (st->alerts.base) {
                 for (RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
-                    z = dictionary_set(dict, string2str(rc->name), &x, sizeof(x));
+                    z = dictionary_set(dict, string2str(rc->name), NULL, sizeof(*z));
 
                     switch(rc->status) {
                         case RRDCALC_STATUS_CLEAR:
@@ -784,7 +779,7 @@ static void rrdr_timings_v12(BUFFER *wb, const char *key, RRDR *r) {
 void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb) {
     QUERY_TARGET *qt = r->internal.qt;
     DATASOURCE_FORMAT format = qt->request.format;
-    RRDR_OPTIONS options = qt->request.options;
+    RRDR_OPTIONS options = qt->window.options;
 
     long rows = rrdr_rows(r);
 
@@ -812,7 +807,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb) {
     buffer_json_member_add_time_t(wb, "after", r->view.after);
     buffer_json_member_add_time_t(wb, "before", r->view.before);
     buffer_json_member_add_string(wb, "group", time_grouping_tostring(qt->request.time_group_method));
-    web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", r->view.options);
+    web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", options);
 
     if(!rrdr_dimension_names(wb, "dimension_names", r, options))
         rows = 0;
@@ -820,7 +815,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb) {
     if(!rrdr_dimension_ids(wb, "dimension_ids", r, options))
         rows = 0;
 
-    if (r->view.options & RRDR_OPTION_ALL_DIMENSIONS) {
+    if (options & RRDR_OPTION_ALL_DIMENSIONS) {
         query_target_summary_instances_v1(wb, qt, "full_chart_list");
         query_target_summary_dimensions_v12(wb, qt, "full_dimension_list", false, NULL);
         query_target_summary_labels_v12(wb, qt, "full_chart_labels", false, NULL, NULL);
@@ -1006,8 +1001,7 @@ static void query_target_title(BUFFER *wb, QUERY_TARGET *qt, size_t contexts) {
 
         size_t added = 0;
         for(size_t c = 0; c < qt->contexts.used ;c++) {
-            bool old = false;
-            bool *set = dictionary_set(dict, rrdcontext_acquired_id(qt->contexts.array[c].rca), &old, sizeof(old));
+            bool *set = dictionary_set(dict, rrdcontext_acquired_id(qt->contexts.array[c].rca), NULL, sizeof(*set));
             if(!*set) {
                 *set = true;
                 if(added)
@@ -1190,7 +1184,7 @@ void version_hashes_api_v2(BUFFER *wb, struct query_versions *versions) {
 
 void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb) {
     QUERY_TARGET *qt = r->internal.qt;
-    RRDR_OPTIONS options = qt->request.options;
+    RRDR_OPTIONS options = qt->window.options;
 
     char kq[2] = "\"",                    // key quote
          sq[2] = "\"";                    // string quote
@@ -1416,13 +1410,13 @@ void rrdr_json_wrapper_end(RRDR *r, BUFFER *wb) {
 void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
     QUERY_TARGET *qt = r->internal.qt;
     DATASOURCE_FORMAT format = qt->request.format;
-    RRDR_OPTIONS options = qt->request.options;
+    RRDR_OPTIONS options = qt->window.options;
 
     buffer_json_member_add_object(wb, "view");
     {
         query_target_title(wb, qt, r->internal.contexts);
         buffer_json_member_add_string(wb, "format", rrdr_format_to_string(format));
-        web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", r->view.options);
+        web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", options);
         buffer_json_member_add_string(wb, "time_group", time_grouping_tostring(qt->request.time_group_method));
         buffer_json_member_add_time_t(wb, "update_every", r->view.update_every);
         buffer_json_member_add_time_t(wb, "after", r->view.after);

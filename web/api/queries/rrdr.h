@@ -126,7 +126,6 @@ typedef struct rrdresult {
         NETDATA_DOUBLE min;
         NETDATA_DOUBLE max;
         RRDR_RESULT_FLAGS flags; // RRDR_RESULT_FLAG_*
-        RRDR_OPTIONS options; // RRDR_OPTION_* (as run by the query)
     } view;
 
     struct {
