@@ -5,7 +5,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/export/ena
 sidebar_label: "Enable an exporting connector"
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "Setup"
+learn_rel_path: "Configuration"
 -->
 
 # Enable an exporting connector
@@ -92,8 +92,8 @@ details.
 If you want to further configure your exporting connectors, see
 the [exporting engine reference](https://github.com/netdata/netdata/blob/master/exporting/README.md#configuration).
 
-For a comprehensive example of using the Graphite connector, read our guide:
-[_Export and visualize Netdata metrics in Graphite_](https://github.com/netdata/netdata/blob/master/docs/guides/export/export-netdata-metrics-graphite.md). Or, start
+For a comprehensive example of using the Graphite connector, read our documentation on 
+[exporting metrics to Graphite providers](https://github.com/netdata/netdata/blob/master/exporting/graphite/README.md). Or, start
 [using host labels](https://github.com/netdata/netdata/blob/master/docs/guides/using-host-labels.md) on exported metrics.
 
 ### Related reference documentation

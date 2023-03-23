@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-typedef enum rrdr_grouping {
+typedef enum rrdr_time_grouping {
     RRDR_GROUPING_UNDEFINED = 0,
     RRDR_GROUPING_AVERAGE,
     RRDR_GROUPING_MIN,
@@ -45,12 +45,41 @@ typedef enum rrdr_grouping {
     RRDR_GROUPING_SES,
     RRDR_GROUPING_DES,
     RRDR_GROUPING_COUNTIF,
-} RRDR_GROUPING;
+} RRDR_TIME_GROUPING;
 
-const char *group_method2string(RRDR_GROUPING group);
-void web_client_api_v1_init_grouping(void);
-RRDR_GROUPING web_client_api_request_v1_data_group(const char *name, RRDR_GROUPING def);
-const char *web_client_api_request_v1_data_group_to_string(RRDR_GROUPING group);
+const char *time_grouping_method2string(RRDR_TIME_GROUPING group);
+void time_grouping_init(void);
+RRDR_TIME_GROUPING time_grouping_parse(const char *name, RRDR_TIME_GROUPING def);
+const char *time_grouping_tostring(RRDR_TIME_GROUPING group);
+
+typedef enum rrdr_group_by {
+    RRDR_GROUP_BY_NONE      = 0,
+    RRDR_GROUP_BY_SELECTED  = (1 << 0),
+    RRDR_GROUP_BY_DIMENSION = (1 << 1),
+    RRDR_GROUP_BY_NODE      = (1 << 2),
+    RRDR_GROUP_BY_INSTANCE  = (1 << 3),
+    RRDR_GROUP_BY_LABEL     = (1 << 4),
+    RRDR_GROUP_BY_CONTEXT   = (1 << 5),
+    RRDR_GROUP_BY_UNITS     = (1 << 6),
+} RRDR_GROUP_BY;
+
+struct web_buffer;
+
+RRDR_GROUP_BY group_by_parse(char *s);
+void buffer_json_group_by_to_array(struct web_buffer *wb, RRDR_GROUP_BY group_by);
+
+typedef enum rrdr_group_by_function {
+    RRDR_GROUP_BY_FUNCTION_AVERAGE,
+    RRDR_GROUP_BY_FUNCTION_MIN,
+    RRDR_GROUP_BY_FUNCTION_MAX,
+    RRDR_GROUP_BY_FUNCTION_SUM,
+} RRDR_GROUP_BY_FUNCTION;
+
+RRDR_GROUP_BY_FUNCTION group_by_aggregate_function_parse(const char *s);
+const char *group_by_aggregate_function_to_string(RRDR_GROUP_BY_FUNCTION group_by_function);
+
+struct query_data_statistics;
+void query_target_merge_data_statistics(struct query_data_statistics *d, struct query_data_statistics *s);
 
 #ifdef __cplusplus
 }

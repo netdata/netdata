@@ -2,10 +2,10 @@
 title: "Install Netdata with kickstart.sh"
 description: "The kickstart.sh script installs Netdata from source, including all dependencies required to connect to Netdata Cloud, with a single command."
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/kickstart.md"
-sidebar_label: "Install Netdata with kickstart.sh"
+sidebar_label: "One line installer (kickstart.sh)"
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Installation"
+learn_rel_path: "Installation/Installation methods"
+sidebar_position: 10
 -->
 
 import { OneLineInstallWget, OneLineInstallCurl } from '@site/src/components/OneLineInstall/'
@@ -82,30 +82,34 @@ The `kickstart.sh` script accepts a number of optional parameters to control how
 - `--auto-update`: Enable automatic updates (this is the default).
 - `--no-updates`: Disable automatic updates.
 - `--disable-telemetry`: Disable anonymous statistics.
-- `--repositories-only`: Only install appropriate repository configuration packages (only for native install).
 - `--native-only`: Only install if native binary packages are available.
 - `--static-only`: Only install if a static build is available.
 - `--build-only`: Only install using a local build.
-- `--reinstall`: If an existing install is found, reinstall instead of trying to update it in place.
-- `--reinstall-even-if-unsafe`: Even try to reinstall if we don't think we can do so safely (implies `--reinstall`).
 - `--disable-cloud`: For local builds, don’t build any of the cloud code at all. For native packages and static builds,
     use runtime configuration to disable cloud support.
 - `--require-cloud`: Only install if Netdata Cloud can be enabled. Overrides `--disable-cloud`.
 - `--install-prefix`: Specify an installation prefix for local builds (by default, we use a sane prefix based on the type of system).
 - `--install-version`: Specify the version of Netdata to install.
 - `--old-install-prefix`: Specify the custom local build's installation prefix that should be removed.
-- `--uninstall`: Uninstall an existing installation of Netdata.
-- `--reinstall-clean`: Performs an uninstall of Netdata and clean installation.
 - `--local-build-options`: Specify additional options to pass to the installer code when building locally. Only valid if `--build-only` is also specified.
 - `--static-install-options`: Specify additional options to pass to the static installer code. Only valid if --static-only is also specified.
-- `--prepare-offline-install-source`: Instead of installing the agent, prepare a directory that can be used to install on another system without needing to download anything. See our [offline installation documentation](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/offline.md) for more info.
 - `--claim-token`: Specify a unique claiming token associated with your Space in Netdata Cloud to be used to connect to the node
   after the install.
 - `--claim-rooms`: Specify a comma-separated list of tokens for each War Room this node should appear in.
 - `--claim-proxy`: Specify a proxy to use when connecting to the cloud in the form of `http://[user:pass@]host:ip` for an HTTP(S) proxy.
   See [connecting through a proxy](https://github.com/netdata/netdata/blob/master/claim/README.md#connect-through-a-proxy) for details.
 - `--claim-url`: Specify a URL to use when connecting to the cloud. Defaults to `https://api.netdata.cloud`.
+- `--override-distro`: Override the distro detection logic and assume the system is using a specific Linux distribution and release. Takes a single argument consisting of the values of the `ID`, `VERSION_ID`, and `VERSION_CODENAME` fields from `/etc/os-release` for the desired distribution.
 
+The following options are mutually exclusive and specifiy special operations other than trying to install Netdata normally or update an existing install:
+
+- `--reinstall`: If there is an existing install, reinstall it instead of trying to update it. If there is not an existing install, install netdata normally.
+- `--reinstall-even-if-unsafe`: If there is an existing install, reinstall it instead of trying to update it, even if doing so is known to potentially break things (for example, if we cannot detect what tyep of installation it is). If there is not an existing install, install Netdata normally.
+- `--reinstall-clean`: If there is an existing install, uninstall it before trying to install Netdata. Fails if there is no existing install.
+- `--uninstall`: Uninstall an existing installation of Netdata. Fails if there is no existing install.
+- `--claim-only`: If there is an existing install, only try to claim it without attempting to update it. If there is no existing install, install and claim Netdata normally.
+- `--repositories-only`: Only install repository configuration packages instead of doing a full install of Netdata. Automatically sets --native-only.
+- `--prepare-offline-install-source`: Instead of insallling the agent, prepare a directory that can be used to install on another system without needing to download anything. See our [offline installation documentation](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/offline.md) for more info.
 
 Additionally, the following environment variables may be used to further customize how the script runs (most users
 should not need to use special values for any of these):
@@ -163,11 +167,8 @@ If the script is valid, this command will return `OK, VALID`.
 
 ## What's next?
 
-When you're finished with installation, check out our [single-node](https://github.com/netdata/netdata/blob/master/docs/quickstart/single-node.md) or
-[infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md) monitoring quickstart guides based on your use case.
+When you're finished with installation, check out [how to monitor your infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md), or skip straight to [configuring the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md).
 
-Or, skip straight to [configuring the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md).
-
-Read through Netdata's [documentation](https://learn.netdata.cloud/), which is structured based on actions and
+Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
 solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to
 external databases, and more.

@@ -1,23 +1,14 @@
-<!--
-title: "Netdata style guide"
-description: "The Netdata style guide establishes editorial guidelines for all of Netdata's writing, including documentation, blog posts, in-product UX copy, and more."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/contributing/style-guide.md
-sidebar_label: "Netdata style guide"
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Contribute"
--->
-
 # Netdata style guide
 
-The _Netdata style guide_ establishes editorial guidelines for any writing produced by the Netdata team or the Netdata
-community, including documentation, articles, in-product UX copy, and more. Both internal Netdata teams and external
-contributors to any of Netdata's open-source projects should reference and adhere to this style guide as much as
-possible.
+The _Netdata style guide_ establishes editorial guidelines for any writing produced by the Netdata team or the Netdata community, including documentation, articles, in-product UX copy, and more.
 
-Netdata's writing should **empower** and **educate**. You want to help people understand Netdata's value, encourage them
-to learn more, and ultimately use Netdata's products to democratize monitoring in their organizations. To achieve these
-goals, your writing should be:
+> ### Note
+> This document is meant to be accompanied by the [Documentation Guidelines](https://github.com/netdata/netdata/blob/master/docs/guidelines.md). If you want to contribute to Netdata's documentation, please read it too.
+
+Both internal Netdata teams and external contributors to any of Netdata's open-source projects should reference and adhere to this style guide as much as possible.
+
+Netdata's writing should **empower** and **educate**. You want to help people understand Netdata's value, encourage them to learn more, and ultimately use Netdata's products to democratize monitoring in their organizations.
+To achieve these goals, your writing should be:
 
 - **Clear**. Use simple words and sentences. Use strong, direct, and active language that encourages readers to action.
 - **Concise**. Provide solutions and answers as quickly as possible. Give users the information they need right now,
@@ -357,45 +348,6 @@ The Netdata team uses [`remark-lint`](https://github.com/remarkjs/remark-lint) f
 If you want to see all the settings, open the
 [`remarkrc.js`](https://github.com/netdata/netdata/blob/master/.remarkrc.js) file in the `netdata/netdata` repository.
 
-### Frontmatter
-
-Every document must begin with frontmatter, followed by an H1 (`#`) heading.
-
-Unlike typical Markdown frontmatter, Netdata uses HTML comments (`<!--`, `-->`) to begin and end the frontmatter block.
-These HTML comments are later converted into typical frontmatter syntax when building [Netdata
-Learn](https://learn.netdata.cloud).
-
-Frontmatter _must_ contain the following variables:
-
-- A `title` that quickly and distinctly describes the document's content.
-- A `description` that elaborates on the purpose or goal of the document using no less than 100 characters and no more
-  than 155 characters.
-- A `custom_edit_url` that links directly to the GitHub URL where another user could suggest additional changes to the
-  published document.
-
-Some documents, like the Ansible guide and others in the `/docs/guides` folder, require an `image` variable as well. In
-this case, replace `/docs` with `/img/seo`, and then rebuild the remainder of the path to the document in question. End
-the path with `.png`. A member of the Netdata team will assist in creating the image when publishing the content.
-
-For example, here is the frontmatter for the guide
-about [deploying the Netdata Agent with Ansible](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/ansible.md).
-
-<img width="751" alt="image" src="https://user-images.githubusercontent.com/43294513/217607958-ef0f270d-7947-4d91-a9a5-56b17b4255ee.png"/>
-
-Questions about frontmatter in
-documentation? [Ask on our community forum](https://community.netdata.cloud/c/blog-posts-and-articles/6).
-
-### Linking between documentation
-
-Documentation should link to relevant pages whenever it's relevant and provides valuable context to the reader.
-
-Links should always reference the full path to the document, beginning at the root of the Netdata Agent repository
-(`/`), and ending with the `.md` file extension. Avoid relative links or traversing up directories using `../`.
-
-For example, if you want to link to our node configuration document, link
-to `https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md`. To reference
-the guide for deploying the Netdata Agent with Ansible, link to `/packaging/installer/methods/ansible.md`.
-
 ### References to UI elements
 
 When referencing a user interface (UI) element in Netdata, reference the label text of the link/button with Markdown's
@@ -457,6 +409,58 @@ inline char *health_stock_config_dir(void) {
 Prism also supports titles and line highlighting. See
 the [Docusaurus documentation](https://v2.docusaurus.io/docs/markdown-features#code-blocks) for more information.
 
+### Adding Notes
+
+Notes inside files should render properly both in GitHub and in Learn, to do that, it is best to use the format listed below:
+
+```
+> ### Note
+> This is an info or a note block.
+
+> ### Tip, Best Practice
+> This is a tip or a best practice block.
+
+> ### Warning, Caution
+> This is a warning or a caution block.
+```
+
+Which renders into:
+
+
+> ### Note
+> This is an info or a note block.
+
+> ### Tip, Best Practice
+> This is a tip or a best practice block.
+
+> ### Warning, Caution
+> This is a warning or a caution block.
+
+### Tabs
+
+Docusaurus allows for Tabs to be used, but we have to ensure that a user accessing the file from GitHub doesn't notice any weird artifacts while reading. So, we use tabs only when necessary in this format:
+
+```
+
+<Tabs>
+<TabItem value="tab1" label="tab1">
+  
+<h3> Header for tab1 </h3>
+  
+text for tab1, both visible in GitHub and Docusaurus
+    
+    
+</TabItem>
+<TabItem value="tab2" label="tab2">
+    
+<h3> Header for tab2 </h3>
+    
+text for tab2, both visible in GitHub and Docusaurus
+
+</TabItem>
+</Tabs>
+```
+
 ## Word list
 
 The following tables describe the standard spelling, capitalization, and usage of words found in Netdata's writing.
@@ -469,7 +473,6 @@ The following tables describe the standard spelling, capitalization, and usage o
 | **Netdata**                 | The company behind the open-source Netdata Agent and the Netdata Cloud web application. Never use _netdata_ or _NetData_. <br /><br />In general, focus on the user's goals, actions, and solutions rather than what the company provides. For example, write _Learn more about enabling alarm notifications on your preferred platforms_ instead of _Netdata sends alarm notifications to your preferred platforms_. |
 | **Netdata Agent**           | The free and open source [monitoring agent](https://github.com/netdata/netdata) that you can install on all of your distributed systems, whether they're physical, virtual, containerized, ephemeral, and more. The Agent monitors systems running Linux, Docker, Kubernetes, macOS, FreeBSD, and more, and collects metrics from hundreds of popular services and applications.                                      |
 | **Netdata Cloud**           | The web application hosted at [https://app.netdata.cloud](https://app.netdata.cloud) that helps you monitor an entire infrastructure of distributed systems in real time. <br /><br />Never use _Cloud_ without the preceding _Netdata_ to avoid ambiguity.                                                                                                                                                           |
-| **Netdata community**       | Contributors to any of Netdata's [open-source projects](https://github.com/netdata/learn/blob/master/contribute/projects.mdx), members of the [community forum](https://community.netdata.cloud/).                                                                                                                                                                                                                                         |
 | **Netdata community forum** | The Discourse-powered forum for feature requests, Netdata Cloud technical support, and conversations about Netdata's monitoring and troubleshooting products.                                                                                                                                                                                                                                                         |
 | **node**                    | A system on which the Netdata Agent is installed. The system can be physical, virtual, in a Docker container, and more. Depending on your infrastructure, you may have one, dozens, or hundreds of nodes. Some nodes are _ephemeral_, in that they're created/destroyed automatically by an orchestrator service.                                                                                                     |
 | **Space**                   | The highest level container within Netdata Cloud for a user to organize their team members and nodes within their infrastructure. A Space likely represents an entire organization or a large team. <br /><br />_Space_ is always capitalized.                                                                                                                                                                        |
@@ -482,7 +485,5 @@ The following tables describe the standard spelling, capitalization, and usage o
 | Term                        | Definition                                                                                                                                                                                                                      |
 |-----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **filesystem**              | Use instead of _file system_.                                                                                                                                                                                                   |
-| **preconfigured**           | The concept that many of Netdata's features come with sane defaults that users don't need to configure to find [immediate value](https://github.com/netdata/netdata/blob/master/docs/overview/why-netdata.md#simple-to-deploy). |
+| **preconfigured**           | The concept that many of Netdata's features come with sane defaults that users don't need to configure to find immediate value. |
 | **real time**/**real-time** | Use _real time_ as a noun phrase, most often with _in_: _Netdata collects metrics in real time_. Use _real-time_ as an adjective: _Netdata collects real-time metrics from hundreds of supported applications and services.     |
-
-

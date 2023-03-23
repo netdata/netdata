@@ -20,6 +20,7 @@ declare -a package_tree=(
   util-linux
   libmnl
   json-c
+  libyaml
   libuv
   lz4
   openssl

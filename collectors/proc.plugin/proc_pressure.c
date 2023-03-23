@@ -114,7 +114,7 @@ static void proc_pressure_do_resource(procfile *ff, int res_idx, int some) {
         pcs->total_time.rdtotal = rrddim_add(pcs->total_time.st, "time", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    pcs->total_time.value_total = str2ull(procfile_lineword(ff, some ? 0 : 1, 8)) / 1000;
+    pcs->total_time.value_total = str2ull(procfile_lineword(ff, some ? 0 : 1, 8), NULL) / 1000;
 }
 
 static void proc_pressure_do_resource_some(procfile *ff, int res_idx) {

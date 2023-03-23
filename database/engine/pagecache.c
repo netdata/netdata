@@ -310,7 +310,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
             pd->first_time_s = page_start_time_s;
             pd->last_time_s = page_end_time_s;
             pd->page_length = page_length;
-            pd->update_every_s = page_update_every_s;
+            pd->update_every_s = (uint32_t) page_update_every_s;
             pd->page = (open_cache_mode) ? NULL : page;
             pd->status |= tags;
 
@@ -581,7 +581,7 @@ static size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METR
                         .metric_id = metric_id,
                         .start_time_s = page_first_time_s,
                         .end_time_s = page_last_time_s,
-                        .update_every_s = page_update_every_s,
+                        .update_every_s = (uint32_t) page_update_every_s,
                         .data = datafile,
                         .size = 0,
                         .custom_data = (uint8_t *) &ei,
@@ -635,7 +635,7 @@ void add_page_details_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
     pd->last_time_s = pgc_page_end_time_s(page);
     pd->datafile.ptr = datafile;
     pd->page_length = ei->page_length;
-    pd->update_every_s = pgc_page_update_every_s(page);
+    pd->update_every_s = (uint32_t) pgc_page_update_every_s(page);
     pd->metric_id = metric_id;
     pd->status |= PDC_PAGE_DISK_PENDING | PDC_PAGE_SOURCE_JOURNAL_V2 | PDC_PAGE_DATAFILE_ACQUIRED;
 }
@@ -785,10 +785,10 @@ void rrdeng_prep_query(PDC *pdc) {
     if (pages_to_load && pdc->page_list_JudyL) {
         pdc_acquire(pdc); // we get 1 for the 1st worker in the chain: do_read_page_list_work()
         usec_t start_ut = now_monotonic_usec();
-//        if(likely(priority == STORAGE_PRIORITY_BEST_EFFORT))
-//            dbengine_load_page_list_directly(ctx, handle->pdc);
-//        else
-        pdc_route_asynchronously(pdc->ctx, pdc);
+        if(likely(pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS))
+            pdc_route_synchronously(pdc->ctx, pdc);
+        else
+            pdc_route_asynchronously(pdc->ctx, pdc);
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.prep_time_to_route, now_monotonic_usec() - start_ut, __ATOMIC_RELAXED);
     }
     else
@@ -827,7 +827,11 @@ void pg_cache_preload(struct rrdeng_query_handle *handle) {
 
     if(ctx_is_available_for_queries(handle->ctx)) {
         handle->pdc->refcount++; // we get 1 for the query thread and 1 for the prep thread
-        rrdeng_enq_cmd(handle->ctx, RRDENG_OPCODE_QUERY, handle->pdc, NULL, handle->priority, NULL, NULL);
+
+        if(unlikely(handle->pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS))
+            rrdeng_prep_query(handle->pdc);
+        else
+            rrdeng_enq_cmd(handle->ctx, RRDENG_OPCODE_QUERY, handle->pdc, NULL, handle->priority, NULL, NULL);
     }
     else {
         completion_mark_complete(&handle->pdc->prep_completion);
@@ -924,7 +928,8 @@ struct pgc_page *pg_cache_lookup_next(
         else {
             if (unlikely(page_update_every_s <= 0 || page_update_every_s > 86400)) {
                 __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_invalid_update_every_fixed, 1, __ATOMIC_RELAXED);
-                pd->update_every_s = page_update_every_s = pgc_page_fix_update_every(page, last_update_every_s);
+                page_update_every_s = pgc_page_fix_update_every(page, last_update_every_s);
+                pd->update_every_s = (uint32_t) page_update_every_s;
             }
 
             size_t entries_by_size = page_entries_by_size(page_length, CTX_POINT_SIZE_BYTES(ctx));
@@ -1009,7 +1014,7 @@ void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s
             .metric_id = metric_id,
             .start_time_s = start_time_s,
             .end_time_s =  end_time_s,
-            .update_every_s = update_every_s,
+            .update_every_s = (uint32_t) update_every_s,
             .size = 0,
             .data = datafile,
             .custom_data = (uint8_t *) &ext_io_data,

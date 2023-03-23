@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdpush.h"
-#include "parser/parser.h"
 
 /*
  * rrdpush
@@ -67,6 +66,23 @@ static void load_stream_conf() {
             info("CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
     }
     freez(filename);
+}
+
+STREAM_CAPABILITIES stream_our_capabilities() {
+    return  STREAM_CAP_V1               |
+            STREAM_CAP_V2               |
+            STREAM_CAP_VN               |
+            STREAM_CAP_VCAPS            |
+            STREAM_CAP_HLABELS          |
+            STREAM_CAP_CLAIM            |
+            STREAM_CAP_CLABELS          |
+            STREAM_CAP_FUNCTIONS        |
+            STREAM_CAP_REPLICATION      |
+            STREAM_CAP_BINARY           |
+            STREAM_CAP_INTERPOLATED     |
+            STREAM_HAS_COMPRESSION      |
+            (ieee754_doubles ? STREAM_CAP_IEEE754 : 0) |
+            0;
 }
 
 bool rrdpush_receiver_needs_dbengine() {
@@ -174,8 +190,8 @@ static inline bool should_send_chart_matching(RRDSET *st, RRDSET_FLAGS flags) {
             else
                 rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_IGNORE);
         }
-        else if(simple_pattern_matches(host->rrdpush_send_charts_matching, rrdset_id(st)) ||
-            simple_pattern_matches(host->rrdpush_send_charts_matching, rrdset_name(st)))
+        else if(simple_pattern_matches_string(host->rrdpush_send_charts_matching, st->id) ||
+            simple_pattern_matches_string(host->rrdpush_send_charts_matching, st->name))
 
             rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_SEND);
         else
@@ -327,7 +343,7 @@ static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_sta
     buffer_fast_strcat(wb, "\" ", 2);
 
     if(st->last_collected_time.tv_sec > st->upstream_resync_time_s)
-        buffer_print_llu(wb, st->usec_since_last_update);
+        buffer_print_uint64(wb, st->usec_since_last_update);
     else
         buffer_fast_strcat(wb, "0", 1);
 
@@ -342,7 +358,7 @@ static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_sta
             buffer_fast_strcat(wb, "SET \"", 5);
             buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
             buffer_fast_strcat(wb, "\" = ", 4);
-            buffer_print_ll(wb, rd->collected_value);
+            buffer_print_int64(wb, rd->collected_value);
             buffer_fast_strcat(wb, "\n", 1);
         }
         else {
@@ -387,6 +403,8 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
     if(!rsb->wb || !rsb->v2 || !netdata_double_isnumber(n) || !does_storage_number_exist(flags))
         return;
 
+    NUMBER_ENCODING integer_encoding = stream_has_capability(rsb, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_HEX;
+    NUMBER_ENCODING doubles_encoding = stream_has_capability(rsb, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
     BUFFER *wb = rsb->wb;
     time_t point_end_time_s = (time_t)(point_end_time_ut / USEC_PER_SEC);
     if(unlikely(rsb->last_point_end_time_s != point_end_time_s)) {
@@ -397,14 +415,14 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
         buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2 " '", sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1 + 2);
         buffer_fast_strcat(wb, rrdset_id(rd->rrdset), string_strlen(rd->rrdset->id));
         buffer_fast_strcat(wb, "' ", 2);
-        buffer_print_llu_hex(wb, rd->rrdset->update_every);
+        buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdset->update_every);
         buffer_fast_strcat(wb, " ", 1);
-        buffer_print_llu_hex(wb, point_end_time_s);
+        buffer_print_uint64_encoded(wb, integer_encoding, point_end_time_s);
         buffer_fast_strcat(wb, " ", 1);
         if(point_end_time_s == rsb->wall_clock_time)
             buffer_fast_strcat(wb, "#", 1);
         else
-            buffer_print_llu_hex(wb, rsb->wall_clock_time);
+            buffer_print_uint64_encoded(wb, integer_encoding, rsb->wall_clock_time);
         buffer_fast_strcat(wb, "\n", 1);
 
         rsb->last_point_end_time_s = point_end_time_s;
@@ -414,13 +432,13 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET_V2 " '", sizeof(PLUGINSD_KEYWORD_SET_V2) - 1 + 2);
     buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
     buffer_fast_strcat(wb, "' ", 2);
-    buffer_print_ll_hex(wb, rd->last_collected_value);
+    buffer_print_int64_encoded(wb, integer_encoding, rd->last_collected_value);
     buffer_fast_strcat(wb, " ", 1);
 
     if((NETDATA_DOUBLE)rd->last_collected_value == n)
         buffer_fast_strcat(wb, "#", 1);
     else
-        buffer_rrd_value(wb, n);
+        buffer_print_netdata_double_encoded(wb, doubles_encoding, n);
 
     buffer_fast_strcat(wb, " ", 1);
     buffer_print_sn_flags(wb, flags, true);
@@ -485,6 +503,7 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
         return (RRDSET_STREAM_BUFFER) { .wb = NULL, };
 
     return (RRDSET_STREAM_BUFFER) {
+        .capabilities = host->sender->capabilities,
         .v2 = stream_has_capability(host->sender, STREAM_CAP_INTERPOLATED),
         .rrdset_flags = rrdset_flags,
         .wb = sender_start(host->sender),
@@ -922,7 +941,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     {
         SIMPLE_PATTERN *key_allow_from = simple_pattern_create(
                 appconfig_get(&stream_config, rpt->key, "allow from", "*"),
-                NULL, SIMPLE_PATTERN_EXACT);
+                NULL, SIMPLE_PATTERN_EXACT, true);
 
         if(key_allow_from) {
             if(!simple_pattern_matches(key_allow_from, w->client_ip)) {
@@ -969,7 +988,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     {
         SIMPLE_PATTERN *machine_allow_from = simple_pattern_create(
                 appconfig_get(&stream_config, rpt->machine_guid, "allow from", "*"),
-                NULL, SIMPLE_PATTERN_EXACT);
+                NULL, SIMPLE_PATTERN_EXACT, true);
 
         if(machine_allow_from) {
             if(!simple_pattern_matches(machine_allow_from, w->client_ip)) {
@@ -1149,6 +1168,7 @@ static void stream_capabilities_to_string(BUFFER *wb, STREAM_CAPABILITIES caps) 
     if(caps & STREAM_CAP_REPLICATION) buffer_strcat(wb, "REPLICATION ");
     if(caps & STREAM_CAP_BINARY) buffer_strcat(wb, "BINARY ");
     if(caps & STREAM_CAP_INTERPOLATED) buffer_strcat(wb, "INTERPOLATED ");
+    if(caps & STREAM_CAP_IEEE754) buffer_strcat(wb, "IEEE754 ");
 }
 
 void log_receiver_capabilities(struct receiver_state *rpt) {
@@ -1190,7 +1210,7 @@ STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version) {
     if(caps & STREAM_CAP_V2)
         caps &= ~(STREAM_CAP_V1);
 
-    return caps & STREAM_OUR_CAPABILITIES;
+    return caps & stream_our_capabilities();
 }
 
 int32_t stream_capabilities_to_vn(uint32_t caps) {

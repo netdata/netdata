@@ -28,6 +28,9 @@
 #define NETDATA_SYSTEMD_DC_NOT_CACHE_CONTEXT "services.dc_not_cache"
 #define NETDATA_SYSTEMD_DC_NOT_FOUND_CONTEXT "services.dc_not_found"
 
+// ARAL name
+#define NETDATA_EBPF_DCSTAT_ARAL_NAME "ebpf_dcstat"
+
 enum directory_cache_indexes {
     NETDATA_DCSTAT_IDX_RATIO,
     NETDATA_DCSTAT_IDX_REFERENCE,
@@ -75,6 +78,7 @@ typedef struct netdata_publish_dcstat {
 
 void *ebpf_dcstat_thread(void *ptr);
 void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr);
+void ebpf_dcstat_release(netdata_publish_dcstat_t *stat);
 extern struct config dcstat_config;
 extern netdata_ebpf_targets_t dc_targets[];
 extern ebpf_local_maps_t dcstat_maps[];

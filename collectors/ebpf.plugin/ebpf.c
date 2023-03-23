@@ -435,9 +435,6 @@ ebpf_sync_syscalls_t local_syscalls[] = {
 };
 
 
-// Link with apps.plugin
-ebpf_process_stat_t *global_process_stat = NULL;
-
 // Link with cgroup.plugin
 netdata_ebpf_cgroup_shm_t shm_ebpf_cgroup = {NULL, NULL};
 int shm_fd_ebpf_cgroup = -1;
@@ -449,7 +446,8 @@ ebpf_network_viewer_options_t network_viewer_opt;
 
 // Statistic
 ebpf_plugin_stats_t plugin_statistics = {.core = 0, .legacy = 0, .running = 0, .threads = 0, .tracepoints = 0,
-                                         .probes = 0, .retprobes = 0, .trampolines = 0};
+                                         .probes = 0, .retprobes = 0, .trampolines = 0, .memlock_kern = 0,
+                                         .hash_tables = 0};
 
 #ifdef LIBBPF_MAJOR_VERSION
 struct btf *default_btf = NULL;
@@ -457,6 +455,35 @@ struct btf *default_btf = NULL;
 void *default_btf = NULL;
 #endif
 char *btf_path = NULL;
+
+/*****************************************************************
+ *
+ *  FUNCTIONS USED TO ALLOCATE APPS/CGROUP MEMORIES (ARAL)
+ *
+ *****************************************************************/
+
+/**
+ * Allocate PID ARAL
+ *
+ * Allocate memory using ARAL functions to speed up processing.
+ *
+ * @param name the internal name used for allocated region.
+ * @param size size of each element inside allocated space
+ *
+ * @return It returns the address on success and NULL otherwise.
+ */
+ARAL *ebpf_allocate_pid_aral(char *name, size_t size)
+{
+    static size_t max_elements = NETDATA_EBPF_ALLOC_MAX_PID;
+    if (max_elements < NETDATA_EBPF_ALLOC_MIN_ELEMENTS) {
+        error("Number of elements given is too small, adjusting it for %d", NETDATA_EBPF_ALLOC_MIN_ELEMENTS);
+        max_elements = NETDATA_EBPF_ALLOC_MIN_ELEMENTS;
+    }
+
+    return aral_create(name, size,
+        0, max_elements,
+        NULL, NULL, NULL, false, false);
+}
 
 /*****************************************************************
  *
@@ -876,9 +903,9 @@ void ebpf_create_chart(char *type,
  * @param module    chart module name, this is the eBPF thread.
  */
 void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family, char *charttype, int order,
-                                char *algorithm, struct target *root, int update_every, char *module)
+                                char *algorithm, struct ebpf_target *root, int update_every, char *module)
 {
-    struct target *w;
+    struct ebpf_target *w;
     ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, title, units, family, charttype, NULL, order,
                          update_every, module);
 
@@ -911,6 +938,79 @@ void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, 
     write_end_chart();
 
     fflush(stdout);
+}
+
+/**
+ * ARAL Charts
+ *
+ * Add chart to monitor ARAL usage
+ * Caller must call this function with mutex locked.
+ *
+ * @param name    the name used to create aral
+ * @param em      a pointer to the structure with the default values.
+ */
+void ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em)
+{
+    static int priority = 140100;
+    char *mem = { NETDATA_EBPF_STAT_DIMENSION_MEMORY };
+    char *aral = { NETDATA_EBPF_STAT_DIMENSION_ARAL };
+
+    snprintfz(em->memory_usage, NETDATA_EBPF_CHART_MEM_LENGTH -1, "aral_%s_size", name);
+    snprintfz(em->memory_allocations, NETDATA_EBPF_CHART_MEM_LENGTH -1, "aral_%s_alloc", name);
+
+    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
+                         em->memory_usage,
+                         "Bytes allocated for ARAL.",
+                         "bytes",
+                         NETDATA_EBPF_FAMILY,
+                         NETDATA_EBPF_CHART_TYPE_STACKED,
+                         "netdata.ebpf_aral_stat_size",
+                         priority++,
+                         em->update_every,
+                         NETDATA_EBPF_MODULE_NAME_PROCESS);
+
+    ebpf_write_global_dimension(mem,
+                                mem,
+                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+
+    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
+                         em->memory_allocations,
+                         "Calls to allocate memory.",
+                         "calls",
+                         NETDATA_EBPF_FAMILY,
+                         NETDATA_EBPF_CHART_TYPE_STACKED,
+                         "netdata.ebpf_aral_stat_alloc",
+                         priority++,
+                         em->update_every,
+                         NETDATA_EBPF_MODULE_NAME_PROCESS);
+
+    ebpf_write_global_dimension(aral,
+                                aral,
+                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+}
+
+/**
+ * Send data from aral chart
+ *
+ * Send data for eBPF plugin
+ *
+ * @param memory  a pointer to the allocated address
+ * @param em      a pointer to the structure with the default values.
+ */
+void ebpf_send_data_aral_chart(ARAL *memory, ebpf_module_t *em)
+{
+    char *mem = { NETDATA_EBPF_STAT_DIMENSION_MEMORY };
+    char *aral = { NETDATA_EBPF_STAT_DIMENSION_ARAL };
+
+    struct aral_statistics *stats = aral_statistics(memory);
+
+    write_begin_chart(NETDATA_MONITORING_FAMILY, em->memory_usage);
+    write_chart_dimension(mem, (long long)stats->structures.allocated_bytes);
+    write_end_chart();
+
+    write_begin_chart(NETDATA_MONITORING_FAMILY, em->memory_allocations);
+    write_chart_dimension(aral, (long long)stats->structures.allocations);
+    write_end_chart();
 }
 
 /*****************************************************************
@@ -1386,8 +1486,8 @@ static void ebpf_allocate_common_vectors()
         return;
     }
 
-    all_pids = callocz((size_t)pid_max, sizeof(struct pid_stat *));
-    global_process_stat = callocz((size_t)ebpf_nprocs, sizeof(ebpf_process_stat_t));
+    ebpf_all_pids = callocz((size_t)pid_max, sizeof(struct ebpf_pid_stat *));
+    ebpf_aral_init();
 }
 
 /**
@@ -2088,7 +2188,7 @@ static pid_t ebpf_read_previous_pid(char *filename)
             length = 63;
 
         buffer[length] = '\0';
-        old_pid = (pid_t)str2uint32_t(buffer);
+        old_pid = (pid_t) str2uint32_t(buffer, NULL);
     }
     fclose(fp);
 

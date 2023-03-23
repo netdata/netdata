@@ -1,20 +1,24 @@
 <!--
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/pandas/README.md
-title: "Pandas Netdata Collector"
-sidebar_label: "Pandas Netdata Collector"
+title: "Ingest structured data (Pandas)"
+sidebar_label: "Ingest structured data (Pandas)"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references"
+learn_rel_path: "Integrations/Monitor/Anything"
 -->
 
-# Pandas Netdata Collector
+# Ingest structured data (Pandas)
 
 <a href="https://pandas.pydata.org/" target="_blank">
   <img src="https://pandas.pydata.org/docs/_static/pandas.svg" alt="Pandas" width="100px" height="50px" />
  </a>
 
-A python collector using [pandas](https://pandas.pydata.org/) to pull data and do pandas based 
-preprocessing before feeding to Netdata.
+[Pandas](https://pandas.pydata.org/) is a de-facto standard in reading and processing most types of structured data in Python.
+If you have metrics appearing in a CSV, JSON, XML, HTML, or [other supported format](https://pandas.pydata.org/docs/user_guide/io.html), 
+either locally or via some HTTP endpoint, you can easily ingest and present those metrics in Netdata, by leveraging the Pandas collector.
+
+The collector uses [pandas](https://pandas.pydata.org/) to pull data and do pandas-based 
+preprocessing, before feeding to Netdata.
 
 ## Requirements
 
@@ -22,6 +26,12 @@ This collector depends on some Python (Python 3 only) packages that can usually 
 
 ```bash
 sudo pip install pandas requests
+```
+
+Note: If you would like to use [`pandas.read_sql`](https://pandas.pydata.org/docs/reference/api/pandas.read_sql.html) to query a database, you will need to install the below packages as well.
+
+```bash
+sudo pip install 'sqlalchemy<2.0' psycopg2-binary
 ```
 
 ## Configuration

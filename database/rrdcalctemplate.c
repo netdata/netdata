@@ -34,26 +34,29 @@ bool rrdcalctemplate_check_rrdset_conditions(RRDCALCTEMPLATE *rt, RRDSET *st, RR
     if(rt->foreach_dimension_pattern && !rrdset_number_of_dimensions(st))
         return false;
 
-    if (rt->charts_pattern && !simple_pattern_matches(rt->charts_pattern, rrdset_name(st)) && !simple_pattern_matches(rt->charts_pattern, rrdset_id(st)))
+    if (rt->charts_pattern && !simple_pattern_matches_string(rt->charts_pattern, st->name) && !simple_pattern_matches_string(rt->charts_pattern, st->id))
         return false;
 
-    if (rt->family_pattern && !simple_pattern_matches(rt->family_pattern, rrdset_family(st)))
+    if (rt->family_pattern && !simple_pattern_matches_string(rt->family_pattern, st->family))
         return false;
 
-    if (rt->module_pattern && !simple_pattern_matches(rt->module_pattern, rrdset_module_name(st)))
+    if (rt->module_pattern && !simple_pattern_matches_string(rt->module_pattern, st->module_name))
         return false;
 
-    if (rt->plugin_pattern && !simple_pattern_matches(rt->plugin_pattern, rrdset_plugin_name(st)))
+    if (rt->plugin_pattern && !simple_pattern_matches_string(rt->plugin_pattern, st->plugin_name))
         return false;
 
-    if(host->rrdlabels && rt->host_labels_pattern && !rrdlabels_match_simple_pattern_parsed(host->rrdlabels, rt->host_labels_pattern, '='))
+    if(host->rrdlabels && rt->host_labels_pattern && !rrdlabels_match_simple_pattern_parsed(host->rrdlabels,
+                                                                                            rt->host_labels_pattern,
+                                                                                            '=', NULL))
         return false;
 
     return true;
 }
 
 void rrdcalctemplate_check_rrddim_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, RRDDIM *rd, RRDHOST *host) {
-    if (simple_pattern_matches(rt->foreach_dimension_pattern, rrddim_id(rd)) || simple_pattern_matches(rt->foreach_dimension_pattern, rrddim_name(rd))) {
+    if (simple_pattern_matches_string(rt->foreach_dimension_pattern, rd->id) ||
+        simple_pattern_matches_string(rt->foreach_dimension_pattern, rd->name)) {
         char *overwrite_alert_name = rrdcalc_alert_name_with_dimension(
             rrdcalctemplate_name(rt), string_strlen(rt->name), rrddim_name(rd), string_strlen(rd->name));
         rrdcalc_add_from_rrdcalctemplate(host, rt, st, overwrite_alert_name, rrddim_name(rd));

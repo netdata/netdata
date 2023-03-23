@@ -1,13 +1,4 @@
-<!--
-title: "Introduction"
-sidebar_label: "Introduction"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/getting-started/introduction.md"
-learn_status: "Published"
-sidebar_position: "1"
-learn_topic_type: "Getting started"
-learn_rel_path: "Getting started"
-learn_docs_purpose: "Present netdata in a nutshell"
--->
+# Getting started
 
 ## What is Netdata ?
 
@@ -95,7 +86,7 @@ functionality](https://user-images.githubusercontent.com/1153921/95367248-5f7559
 
 You can even visit this slightly dated [interactive infographic](https://my-netdata.io/infographic.html) and get lost in a rabbit hole. 
 
-But the best way to get under the hood or in the steering wheel of our highly efficient, low-latency system (supporting multiple readers and one writer on each metric) is to read the rest of our docs, or just to jump in and [get started](app.netdata.com). But here's a good breakdown:
+But the best way to get under the hood or in the steering wheel of our highly efficient, low-latency system (supporting multiple readers and one writer on each metric) is to read the rest of our docs, or just to jump in and [get started](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md). But here's a good breakdown:
 
 ### Netdata Agent
 

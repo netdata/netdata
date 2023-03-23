@@ -1406,7 +1406,7 @@ static inline size_t rrdset_done_interpolate(
             time_t current_time_s = (time_t) (next_store_ut / USEC_PER_SEC);
 
             if(unlikely(!store_this_entry)) {
-                (void) ml_is_anomalous(rd, current_time_s, 0, false);
+                (void) ml_dimension_is_anomalous(rd, current_time_s, 0, false);
 
                 if(rsb->wb && rsb->v2)
                     rrddim_push_metrics_v2(rsb, rd, next_store_ut, NAN, SN_FLAG_NONE);
@@ -1418,7 +1418,7 @@ static inline size_t rrdset_done_interpolate(
             if(likely(rd->updated && rd->collections_counter > 1 && iterations < gap_when_lost_iterations_above)) {
                 uint32_t dim_storage_flags = storage_flags;
 
-                if (ml_is_anomalous(rd, current_time_s, new_value, true)) {
+                if (ml_dimension_is_anomalous(rd, current_time_s, new_value, true)) {
                     // clear anomaly bit: 0 -> is anomalous, 1 -> not anomalous
                     dim_storage_flags &= ~((storage_number)SN_FLAG_NOT_ANOMALOUS);
                 }
@@ -1430,7 +1430,7 @@ static inline size_t rrdset_done_interpolate(
                 rd->last_stored_value = new_value;
             }
             else {
-                (void) ml_is_anomalous(rd, current_time_s, 0, false);
+                (void) ml_dimension_is_anomalous(rd, current_time_s, 0, false);
 
                 rrdset_debug(st, "%s: STORE[%ld] = NON EXISTING ", rrddim_name(rd), current_entry);
 
@@ -1543,9 +1543,6 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
         // calculate the proper last_collected_time, using usec_since_last_update
         last_collect_ut = rrdset_update_last_collected_time(st);
     }
-    if (unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_NONE)) {
-        goto after_first_database_work;
-    }
 
     // if this set has not been updated in the past
     // we fake the last_update time to be = now - usec_since_last_update
@@ -1608,7 +1605,6 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
         }
     }
 
-after_first_database_work:
     st->counter_done++;
 
     if(stream_buffer.wb && !stream_buffer.v2)
@@ -1669,9 +1665,6 @@ after_first_database_work:
     }
     rrddim_foreach_done(rd);
     rda_slots = dimensions;
-
-    if (unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_NONE))
-        goto after_second_database_work;
 
     rrdset_debug(st, "last_collect_ut = %0.3" NETDATA_DOUBLE_MODIFIER " (last collection time)", (NETDATA_DOUBLE)last_collect_ut/USEC_PER_SEC);
     rrdset_debug(st, "now_collect_ut  = %0.3" NETDATA_DOUBLE_MODIFIER " (current collection time)", (NETDATA_DOUBLE)now_collect_ut/USEC_PER_SEC);
@@ -1886,7 +1879,6 @@ after_first_database_work:
             , has_reset_value
     );
 
-after_second_database_work:
     for(dim_id = 0, rda = rda_base ; dim_id < rda_slots ; ++dim_id, ++rda) {
         rd = rda->rd;
         if(unlikely(!rd)) continue;
@@ -1981,8 +1973,8 @@ time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
     internal_error(true, "RRDSET '%s' switching update every from %d to %d",
                    rrdset_id(st), (int)st->update_every, (int)update_every_s);
 
-    time_t prev_update_every_s = st->update_every;
-    st->update_every = update_every_s;
+    time_t prev_update_every_s = (time_t) st->update_every;
+    st->update_every = (int) update_every_s;
 
     // switch update every to the storage engine
     RRDDIM *rd;
@@ -1992,7 +1984,7 @@ time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
                 rd->tiers[tier].collect_ops->change_collection_frequency(rd->tiers[tier].db_collection_handle, (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
         }
 
-        assert(rd->update_every == prev_update_every_s &&
+        assert(rd->update_every == (int) prev_update_every_s &&
                "chart's update every differs from the update every of its dimensions");
         rd->update_every = st->update_every;
     }

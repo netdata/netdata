@@ -870,6 +870,11 @@ void aclk_send_node_instances()
             uuid_unparse_lower(list->host_id, host_id);
 
             RRDHOST *host = rrdhost_find_by_guid(host_id);
+            if (unlikely(!host)) {
+                freez((void*)node_state_update.node_id);
+                freez(query);
+                continue;
+            }
             node_state_update.capabilities = aclk_get_node_instance_capas(host);
 
             rrdhost_aclk_state_lock(localhost);
@@ -1217,7 +1222,7 @@ void add_aclk_host_labels(void) {
 }
 
 void aclk_queue_node_info(RRDHOST *host) {
-    struct aclk_database_worker_config *wc = (struct aclk_database_worker_config *) host->dbsync_worker;
+    struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *) host->aclk_sync_host_config;
     if (likely(wc)) {
         wc->node_info_send = 1;
     }

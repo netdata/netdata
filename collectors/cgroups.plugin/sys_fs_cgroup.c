@@ -449,70 +449,70 @@ void read_cgroup_plugin_configuration() {
             config_get("plugin:cgroups", "enable by default cgroups matching",
             // ----------------------------------------------------------------
 
-                    " !*/init.scope "                      // ignore init.scope
-                    " !/system.slice/run-*.scope "         // ignore system.slice/run-XXXX.scope
-                    " *.scope "                            // we need all other *.scope for sure
+                       " !*/init.scope "                      // ignore init.scope
+                       " !/system.slice/run-*.scope "         // ignore system.slice/run-XXXX.scope
+                       " *.scope "                            // we need all other *.scope for sure
 
-            // ----------------------------------------------------------------
+                       // ----------------------------------------------------------------
 
-                    " /machine.slice/*.service "           // #3367 systemd-nspawn
+                       " /machine.slice/*.service "           // #3367 systemd-nspawn
 
-            // ----------------------------------------------------------------
+                       // ----------------------------------------------------------------
 
-                    " */kubepods/pod*/* "                   // k8s containers
-                    " */kubepods/*/pod*/* "                 // k8s containers
-                    " */*-kubepods-pod*/* "                 // k8s containers
-                    " */*-kubepods-*-pod*/* "               // k8s containers
-                    " !*kubepods* !*kubelet* "              // all other k8s cgroups
+                       " */kubepods/pod*/* "                   // k8s containers
+                       " */kubepods/*/pod*/* "                 // k8s containers
+                       " */*-kubepods-pod*/* "                 // k8s containers
+                       " */*-kubepods-*-pod*/* "               // k8s containers
+                       " !*kubepods* !*kubelet* "              // all other k8s cgroups
 
-            // ----------------------------------------------------------------
+                       // ----------------------------------------------------------------
 
-                    " !*/vcpu* "                           // libvirtd adds these sub-cgroups
-                    " !*/emulator "                        // libvirtd adds these sub-cgroups
-                    " !*.mount "
-                    " !*.partition "
-                    " !*.service "
-                    " !*.socket "
-                    " !*.slice "
-                    " !*.swap "
-                    " !*.user "
-                    " !/ "
-                    " !/docker "
-                    " !*/libvirt "
-                    " !/lxc "
-                    " !/lxc/*/* "                          //  #1397 #2649
-                    " !/lxc.monitor* "
-                    " !/lxc.pivot "
-                    " !/lxc.payload "
-                    " !/machine "
-                    " !/qemu "
-                    " !/system "
-                    " !/systemd "
-                    " !/user "
-                    " * "                                  // enable anything else
-            ), NULL, SIMPLE_PATTERN_EXACT);
+                       " !*/vcpu* "                           // libvirtd adds these sub-cgroups
+                       " !*/emulator "                        // libvirtd adds these sub-cgroups
+                       " !*.mount "
+                       " !*.partition "
+                       " !*.service "
+                       " !*.socket "
+                       " !*.slice "
+                       " !*.swap "
+                       " !*.user "
+                       " !/ "
+                       " !/docker "
+                       " !*/libvirt "
+                       " !/lxc "
+                       " !/lxc/*/* "                          //  #1397 #2649
+                       " !/lxc.monitor* "
+                       " !/lxc.pivot "
+                       " !/lxc.payload "
+                       " !/machine "
+                       " !/qemu "
+                       " !/system "
+                       " !/systemd "
+                       " !/user "
+                       " * "                                  // enable anything else
+            ), NULL, SIMPLE_PATTERN_EXACT, true);
 
     enabled_cgroup_names = simple_pattern_create(
             config_get("plugin:cgroups", "enable by default cgroups names matching",
-                    " * "
-            ), NULL, SIMPLE_PATTERN_EXACT);
+                       " * "
+            ), NULL, SIMPLE_PATTERN_EXACT, true);
 
     search_cgroup_paths = simple_pattern_create(
             config_get("plugin:cgroups", "search for cgroups in subpaths matching",
-                    " !*/init.scope "                      // ignore init.scope
-                    " !*-qemu "                            //  #345
-                    " !*.libvirt-qemu "                    //  #3010
-                    " !/init.scope "
-                    " !/system "
-                    " !/systemd "
-                    " !/user "
-                    " !/user.slice "
-                    " !/lxc/*/* "                          //  #2161 #2649
-                    " !/lxc.monitor "
-                    " !/lxc.payload/*/* "
-                    " !/lxc.payload.* "
-                    " * "
-            ), NULL, SIMPLE_PATTERN_EXACT);
+                       " !*/init.scope "                      // ignore init.scope
+                       " !*-qemu "                            //  #345
+                       " !*.libvirt-qemu "                    //  #3010
+                       " !/init.scope "
+                       " !/system "
+                       " !/systemd "
+                       " !/user "
+                       " !/user.slice "
+                       " !/lxc/*/* "                          //  #2161 #2649
+                       " !/lxc.monitor "
+                       " !/lxc.payload/*/* "
+                       " !/lxc.payload.* "
+                       " * "
+            ), NULL, SIMPLE_PATTERN_EXACT, true);
 
     snprintfz(filename, FILENAME_MAX, "%s/cgroup-name.sh", netdata_configured_primary_plugins_dir);
     cgroups_rename_script = config_get("plugin:cgroups", "script to get cgroup names", filename);
@@ -522,37 +522,37 @@ void read_cgroup_plugin_configuration() {
 
     enabled_cgroup_renames = simple_pattern_create(
             config_get("plugin:cgroups", "run script to rename cgroups matching",
-                    " !/ "
-                    " !*.mount "
-                    " !*.socket "
-                    " !*.partition "
-                    " /machine.slice/*.service "          // #3367 systemd-nspawn
-                    " !*.service "
-                    " !*.slice "
-                    " !*.swap "
-                    " !*.user "
-                    " !init.scope "
-                    " !*.scope/vcpu* "                    // libvirtd adds these sub-cgroups
-                    " !*.scope/emulator "                 // libvirtd adds these sub-cgroups
-                    " *.scope "
-                    " *docker* "
-                    " *lxc* "
-                    " *qemu* "
-                    " */kubepods/pod*/* "                   // k8s containers
-                    " */kubepods/*/pod*/* "                 // k8s containers
-                    " */*-kubepods-pod*/* "                 // k8s containers
-                    " */*-kubepods-*-pod*/* "               // k8s containers
-                    " !*kubepods* !*kubelet* "              // all other k8s cgroups
-                    " *.libvirt-qemu "                    // #3010
-                    " * "
-            ), NULL, SIMPLE_PATTERN_EXACT);
+                       " !/ "
+                       " !*.mount "
+                       " !*.socket "
+                       " !*.partition "
+                       " /machine.slice/*.service "          // #3367 systemd-nspawn
+                       " !*.service "
+                       " !*.slice "
+                       " !*.swap "
+                       " !*.user "
+                       " !init.scope "
+                       " !*.scope/vcpu* "                    // libvirtd adds these sub-cgroups
+                       " !*.scope/emulator "                 // libvirtd adds these sub-cgroups
+                       " *.scope "
+                       " *docker* "
+                       " *lxc* "
+                       " *qemu* "
+                       " */kubepods/pod*/* "                   // k8s containers
+                       " */kubepods/*/pod*/* "                 // k8s containers
+                       " */*-kubepods-pod*/* "                 // k8s containers
+                       " */*-kubepods-*-pod*/* "               // k8s containers
+                       " !*kubepods* !*kubelet* "              // all other k8s cgroups
+                       " *.libvirt-qemu "                    // #3010
+                       " * "
+            ), NULL, SIMPLE_PATTERN_EXACT, true);
 
     if(cgroup_enable_systemd_services) {
         systemd_services_cgroups = simple_pattern_create(
                 config_get("plugin:cgroups", "cgroups to match as systemd services",
-                        " !/system.slice/*/*.service "
-                        " /system.slice/*.service "
-                ), NULL, SIMPLE_PATTERN_EXACT);
+                           " !/system.slice/*/*.service "
+                           " /system.slice/*.service "
+                ), NULL, SIMPLE_PATTERN_EXACT, true);
     }
 
     mountinfo_free_all(root);
@@ -1089,10 +1089,10 @@ static inline void cgroup_read_cpuacct_stat(struct cpuacct_stat *cp) {
             uint32_t hash = simple_hash(s);
 
             if(unlikely(hash == user_hash && !strcmp(s, "user")))
-                cp->user = str2ull(procfile_lineword(ff, i, 1));
+                cp->user = str2ull(procfile_lineword(ff, i, 1), NULL);
 
             else if(unlikely(hash == system_hash && !strcmp(s, "system")))
-                cp->system = str2ull(procfile_lineword(ff, i, 1));
+                cp->system = str2ull(procfile_lineword(ff, i, 1), NULL);
         }
 
         cp->updated = 1;
@@ -1138,11 +1138,11 @@ static inline void cgroup_read_cpuacct_cpu_stat(struct cpuacct_cpu_throttling *c
         uint32_t hash = simple_hash(s);
 
         if (unlikely(hash == nr_periods_hash && !strcmp(s, "nr_periods"))) {
-            cp->nr_periods = str2ull(procfile_lineword(ff, i, 1));
+            cp->nr_periods = str2ull(procfile_lineword(ff, i, 1), NULL);
         } else if (unlikely(hash == nr_throttled_hash && !strcmp(s, "nr_throttled"))) {
-            cp->nr_throttled = str2ull(procfile_lineword(ff, i, 1));
+            cp->nr_throttled = str2ull(procfile_lineword(ff, i, 1), NULL);
         } else if (unlikely(hash == throttled_time_hash && !strcmp(s, "throttled_time"))) {
-            cp->throttled_time = str2ull(procfile_lineword(ff, i, 1));
+            cp->throttled_time = str2ull(procfile_lineword(ff, i, 1), NULL);
         }
     }
     cp->nr_throttled_perc =
@@ -1195,15 +1195,15 @@ static inline void cgroup2_read_cpuacct_cpu_stat(struct cpuacct_stat *cp, struct
         uint32_t hash = simple_hash(s);
 
         if (unlikely(hash == user_usec_hash && !strcmp(s, "user_usec"))) {
-            cp->user = str2ull(procfile_lineword(ff, i, 1));
+            cp->user = str2ull(procfile_lineword(ff, i, 1), NULL);
         } else if (unlikely(hash == system_usec_hash && !strcmp(s, "system_usec"))) {
-            cp->system = str2ull(procfile_lineword(ff, i, 1));
+            cp->system = str2ull(procfile_lineword(ff, i, 1), NULL);
         } else if (unlikely(hash == nr_periods_hash && !strcmp(s, "nr_periods"))) {
-            cpt->nr_periods = str2ull(procfile_lineword(ff, i, 1));
+            cpt->nr_periods = str2ull(procfile_lineword(ff, i, 1), NULL);
         } else if (unlikely(hash == nr_throttled_hash && !strcmp(s, "nr_throttled"))) {
-            cpt->nr_throttled = str2ull(procfile_lineword(ff, i, 1));
+            cpt->nr_throttled = str2ull(procfile_lineword(ff, i, 1), NULL);
         } else if (unlikely(hash == throttled_usec_hash && !strcmp(s, "throttled_usec"))) {
-            cpt->throttled_time = str2ull(procfile_lineword(ff, i, 1)) * 1000; // usec -> ns
+            cpt->throttled_time = str2ull(procfile_lineword(ff, i, 1), NULL) * 1000; // usec -> ns
         }
     }
     cpt->nr_throttled_perc =
@@ -1289,7 +1289,7 @@ static inline void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
 
         unsigned long long total = 0;
         for(i = 0; i < ca->cpus ;i++) {
-            unsigned long long n = str2ull(procfile_lineword(ff, 0, i));
+            unsigned long long n = str2ull(procfile_lineword(ff, 0, i), NULL);
             ca->cpu_percpu[i] = n;
             total += n;
         }
@@ -1346,10 +1346,10 @@ static inline void cgroup_read_blkio(struct blkio *io) {
             uint32_t hash = simple_hash(s);
 
             if(unlikely(hash == Read_hash && !strcmp(s, "Read")))
-                io->Read += str2ull(procfile_lineword(ff, i, 2));
+                io->Read += str2ull(procfile_lineword(ff, i, 2), NULL);
 
             else if(unlikely(hash == Write_hash && !strcmp(s, "Write")))
-                io->Write += str2ull(procfile_lineword(ff, i, 2));
+                io->Write += str2ull(procfile_lineword(ff, i, 2), NULL);
 
 /*
             else if(unlikely(hash == Sync_hash && !strcmp(s, "Sync")))
@@ -1409,8 +1409,8 @@ static inline void cgroup2_read_blkio(struct blkio *io, unsigned int word_offset
             io->Write = 0;
 
             for (i = 0; i < lines; i++) {
-                io->Read += str2ull(procfile_lineword(ff, i, 2 + word_offset));
-                io->Write += str2ull(procfile_lineword(ff, i, 4 + word_offset));
+                io->Read += str2ull(procfile_lineword(ff, i, 2 + word_offset), NULL);
+                io->Write += str2ull(procfile_lineword(ff, i, 4 + word_offset), NULL);
             }
 
             io->updated = 1;
@@ -1452,13 +1452,13 @@ static inline void cgroup2_read_pressure(struct pressure *res) {
         res->some.share_time.value10 = strtod(procfile_lineword(ff, 0, 2), NULL);
         res->some.share_time.value60 = strtod(procfile_lineword(ff, 0, 4), NULL);
         res->some.share_time.value300 = strtod(procfile_lineword(ff, 0, 6), NULL);
-        res->some.total_time.value_total = str2ull(procfile_lineword(ff, 0, 8)) / 1000; // us->ms
+        res->some.total_time.value_total = str2ull(procfile_lineword(ff, 0, 8), NULL) / 1000; // us->ms
 
         if (lines > 2) {
             res->full.share_time.value10 = strtod(procfile_lineword(ff, 1, 2), NULL);
             res->full.share_time.value60 = strtod(procfile_lineword(ff, 1, 4), NULL);
             res->full.share_time.value300 = strtod(procfile_lineword(ff, 1, 6), NULL);
-            res->full.total_time.value_total = str2ull(procfile_lineword(ff, 1, 8)) / 1000; // us->ms
+            res->full.total_time.value_total = str2ull(procfile_lineword(ff, 1, 8), NULL) / 1000; // us->ms
         }
 
         res->updated = 1;
@@ -2784,10 +2784,10 @@ void cgroup_discovery_worker(void *ptr)
     worker_register_job_name(WORKER_DISCOVERY_LOCK,               "lock");
 
     entrypoint_parent_process_comm = simple_pattern_create(
-        " runc:[* " // http://terenceli.github.io/%E6%8A%80%E6%9C%AF/2021/12/28/runc-internals-3)
-        " exe ", // https://github.com/falcosecurity/falco/blob/9d41b0a151b83693929d3a9c84f7c5c85d070d3a/rules/falco_rules.yaml#L1961
-        NULL,
-        SIMPLE_PATTERN_EXACT);
+            " runc:[* " // http://terenceli.github.io/%E6%8A%80%E6%9C%AF/2021/12/28/runc-internals-3)
+            " exe ", // https://github.com/falcosecurity/falco/blob/9d41b0a151b83693929d3a9c84f7c5c85d070d3a/rules/falco_rules.yaml#L1961
+            NULL,
+            SIMPLE_PATTERN_EXACT, true);
 
     while (service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
@@ -3566,14 +3566,14 @@ static inline void update_cpu_limits2(struct cgroup *cg) {
             return;
         }
 
-        cg->cpu_cfs_period = str2ull(procfile_lineword(ff, 0, 1));
+        cg->cpu_cfs_period = str2ull(procfile_lineword(ff, 0, 1), NULL);
         cg->cpuset_cpus = get_system_cpus();
 
         char *s = "max\n\0";
         if(strcmp(s, procfile_lineword(ff, 0, 0)) == 0){
             cg->cpu_cfs_quota = cg->cpu_cfs_period * cg->cpuset_cpus;
         } else {
-            cg->cpu_cfs_quota = str2ull(procfile_lineword(ff, 0, 0));
+            cg->cpu_cfs_quota = str2ull(procfile_lineword(ff, 0, 0), NULL);
         }
         debug(D_CGROUP, "CPU limits values: %llu %llu %llu", cg->cpu_cfs_period, cg->cpuset_cpus, cg->cpu_cfs_quota);
         return;
@@ -3623,7 +3623,7 @@ static inline int update_memory_limits(char **filename, const RRDSETVAR_ACQUIRED
                     rrdsetvar_custom_chart_variable_set(cg->st_mem_usage, *chart_var, (NETDATA_DOUBLE)(*value / (1024 * 1024)));
                     return 1;
                 }
-                *value = str2ull(buffer);
+                *value = str2ull(buffer, NULL);
                 rrdsetvar_custom_chart_variable_set(cg->st_mem_usage, *chart_var, (NETDATA_DOUBLE)(*value / (1024 * 1024)));
                 return 1;
             }
@@ -4111,7 +4111,7 @@ void update_cgroup_charts(int update_every) {
                     if(likely(ff))
                         ff = procfile_readall(ff);
                     if(likely(ff && procfile_lines(ff) && !strncmp(procfile_word(ff, 0), "MemTotal", 8)))
-                        ram_total = str2ull(procfile_word(ff, 1)) * 1024;
+                        ram_total = str2ull(procfile_word(ff, 1), NULL) * 1024;
                     else {
                         collector_error("Cannot read file %s. Will not update cgroup %s RAM limit anymore.", filename, cg->id);
                         freez(cg->filename_memory_limit);

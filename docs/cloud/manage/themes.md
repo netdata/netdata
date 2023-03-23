@@ -1,12 +1,4 @@
-<!--
-title: "Choose your Netdata Cloud theme"
-description: "Switch between Light and Dark themes in Netdata Cloud to match your personal visualization preferences."
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/manage/themes.md"
-sidebar_label: "Choose your Netdata Cloud theme"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Operations"
--->
+# Choose your Netdata Cloud theme
 
 The Dark theme is the default for all new Netdata Cloud accounts.
 

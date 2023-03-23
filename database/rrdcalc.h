@@ -31,7 +31,7 @@ typedef enum {
 typedef enum {
     // This list uses several other options from RRDR_OPTIONS for db lookups.
     // To add an item here, you need to reserve a bit in RRDR_OPTIONS.
-    RRDCALC_OPTION_NO_CLEAR_NOTIFICATION    = 0x80000000,
+    RRDCALC_OPTION_NO_CLEAR_NOTIFICATION    = RRDR_OPTION_HEALTH_RSRVD1,
 } RRDCALC_OPTIONS;
 
 #define RRDCALC_ALL_OPTIONS_EXCLUDING_THE_RRDR_ONES (RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)
@@ -77,7 +77,7 @@ struct rrdcalc {
     STRING *dimensions;             // the chart dimensions
     STRING *foreach_dimension;      // the group of dimensions that the `foreach` will be applied.
     SIMPLE_PATTERN *foreach_dimension_pattern; // used if and only if there is a simple pattern for the chart.
-    RRDR_GROUPING group;            // grouping method: average, max, etc.
+    RRDR_TIME_GROUPING group;            // grouping method: average, max, etc.
     int before;                     // ending point in time-series
     int after;                      // starting point in time-series
     RRDCALC_OPTIONS options;        // configuration options

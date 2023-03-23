@@ -12,11 +12,7 @@
 
 #define RRDENG_FD_BUDGET_PER_INSTANCE (50)
 
-extern int db_engine_use_malloc;
-extern int default_rrdeng_page_fetch_timeout;
-extern int default_rrdeng_page_fetch_retries;
 extern int default_rrdeng_page_cache_mb;
-extern int db_engine_journal_indexing;
 extern int db_engine_journal_check;
 extern int default_rrdeng_disk_quota_mb;
 extern int default_multidb_disk_quota_mb;
@@ -27,9 +23,6 @@ extern size_t tier_page_size[];
 #define CTX_POINT_SIZE_BYTES(ctx) page_type_size[(ctx)->config.page_type]
 
 void rrdeng_generate_legacy_uuid(const char *dim_id, const char *chart_id, uuid_t *ret_uuid);
-void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN + 1], uuid_t *legacy_uuid,
-                                                    uuid_t *ret_uuid);
-
 
 STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *db_instance);
 STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid);

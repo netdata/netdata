@@ -4,10 +4,10 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/pyth
 sidebar_label: "Memcached"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/Databases"
+learn_rel_path: "Integrations/Monitor/Databases"
 -->
 
-# Memcached monitoring with Netdata
+# Memcached collector
 
 Collects memory-caching system performance metrics. It reads server response to stats command ([stats interface](https://github.com/memcached/memcached/wiki/Commands#stats)).
 
@@ -97,6 +97,26 @@ localtcpip:
 
 If no configuration is given, module will attempt to connect to memcached instance on `127.0.0.1:11211` address.
 
----
 
+
+
+### Troubleshooting
+
+To troubleshoot issues with the `memcached` module, run the `python.d.plugin` with the debug option enabled. The 
+output will give you the output of the data collection job or error messages on why the collector isn't working.
+
+First, navigate to your plugins directory, usually they are located under `/usr/libexec/netdata/plugins.d/`. If that's 
+not the case on your system, open `netdata.conf` and look for the setting `plugins directory`. Once you're in the 
+plugin's directory, switch to the `netdata` user.
+
+```bash
+cd /usr/libexec/netdata/plugins.d/
+sudo su -s /bin/bash netdata
+```
+
+Now you can manually run the `memcached` module in debug mode:
+
+```bash
+./python.d.plugin memcached debug trace
+```
 

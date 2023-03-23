@@ -344,7 +344,7 @@ size_t dictionary_version(DICTIONARY *dict) {
     if(unlikely(!dict)) return 0;
 
     // this is required for views to return the right number
-    garbage_collect_pending_deletes(dict);
+    // garbage_collect_pending_deletes(dict);
 
     return __atomic_load_n(&dict->version, __ATOMIC_RELAXED);
 }
@@ -352,11 +352,10 @@ size_t dictionary_entries(DICTIONARY *dict) {
     if(unlikely(!dict)) return 0;
 
     // this is required for views to return the right number
-    garbage_collect_pending_deletes(dict);
+    // garbage_collect_pending_deletes(dict);
 
     long int entries = __atomic_load_n(&dict->entries, __ATOMIC_RELAXED);
-    if(entries < 0)
-        fatal("DICTIONARY: entries is negative: %ld", entries);
+    internal_fatal(entries < 0, "DICTIONARY: entries is negative: %ld", entries);
 
     return entries;
 }
@@ -810,6 +809,10 @@ static void garbage_collect_pending_deletes(DICTIONARY *dict) {
                           "examined %zu items, deleted %zu items, still pending %zu items",
                           dict->creation_function, dict->creation_line, dict->creation_file,
                           examined, deleted, pending);
+}
+
+void dictionary_garbage_collect(DICTIONARY *dict) {
+    garbage_collect_pending_deletes(dict);
 }
 
 // ----------------------------------------------------------------------------
@@ -2149,6 +2152,8 @@ DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_view_set_and_acquire_item_advanced(D
 
     if(unlikely(is_master_dictionary(dict)))
         fatal("DICTIONARY: this dictionary is a master, you cannot add items from other dictionaries.");
+
+    garbage_collect_pending_deletes(dict);
 
     dictionary_acquired_item_dup(dict->master, master_item);
     DICTIONARY_ITEM *item = dict_item_add_or_reset_value_and_acquire(dict, name, name_len, NULL, 0, NULL, master_item);
@@ -3505,7 +3510,7 @@ size_t dictionary_unittest_views(void) {
 
     fprintf(stderr, "\nPASS 2: Deleting master item:\n");
     dictionary_del(master, "KEY 1");
-    dictionary_version(view);
+    garbage_collect_pending_deletes(view);
     errors += unittest_check_dictionary("master", master, 0, 0, 1, 1, 0);
     errors += unittest_check_dictionary("view", view, 0, 0, 1, 1, 0);
     errors += unittest_check_item("master", master, item1_on_master, "KEY 1", item1_on_master->shared->value, 1, ITEM_FLAG_DELETED, false, false, true);

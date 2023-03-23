@@ -40,7 +40,7 @@ static void update_metric_retention_and_granularity_by_uuid(
                 .section = (Word_t) ctx,
                 .first_time_s = first_time_s,
                 .last_time_s = last_time_s,
-                .latest_update_every_s = update_every_s
+                .latest_update_every_s = (uint32_t) update_every_s
         };
         uuid_copy(entry.uuid, *uuid);
         metric = mrg_metric_add_and_acquire(main_mrg, entry, &added);
@@ -617,7 +617,7 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
                     .section = (Word_t)ctx,
                     .first_time_s = vd.start_time_s,
                     .last_time_s = vd.end_time_s,
-                    .latest_update_every_s = vd.update_every_s,
+                    .latest_update_every_s = (uint32_t) vd.update_every_s,
             };
             uuid_copy(entry.uuid, *temp_id);
 
@@ -894,6 +894,16 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
     return 0;
 }
 
+static inline time_t get_metric_latest_update_every(struct journal_page_header *metric_list_header)
+{
+    struct journal_page_list *metric_page =
+        (struct journal_page_list *)((uint8_t *)metric_list_header + sizeof(*metric_list_header));
+    uint32_t entries = metric_list_header->entries;
+    if (unlikely(!entries))
+        return 0;
+    return (time_t)metric_page[entries - 1].update_every_s;
+}
+
 void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile) {
     usec_t started_ut = now_monotonic_usec();
 
@@ -911,7 +921,7 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
     for (size_t i=0; i < entries; i++) {
         time_t start_time_s = header_start_time_s + metric->delta_start_s;
         time_t end_time_s = header_start_time_s + metric->delta_end_s;
-        time_t update_every_s = (metric->entries > 1) ? ((end_time_s - start_time_s) / (entries - 1)) : 0;
+        time_t update_every_s = get_metric_latest_update_every((struct journal_page_header *) (data_start + metric->page_offset));
         update_metric_retention_and_granularity_by_uuid(
                 ctx, &metric->uuid, start_time_s, end_time_s, update_every_s, now_s);
 
@@ -1128,7 +1138,7 @@ void *journalfile_v2_write_data_page(struct journal_v2_header *j2_header, void *
     data_page->delta_end_s = (uint32_t) (page_info->end_time_s - (time_t) (j2_header->start_time_ut) / USEC_PER_SEC);
     data_page->extent_index = page_info->extent_index;
 
-    data_page->update_every_s = page_info->update_every_s;
+    data_page->update_every_s = (uint32_t) page_info->update_every_s;
     data_page->page_length = (uint16_t) (ei ? ei->page_length : page_info->page_length);
     data_page->type = 0;
 

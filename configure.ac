@@ -496,6 +496,17 @@ PKG_CHECK_MODULES([JSON],[json-c],AC_CHECK_LIB(
 OPTIONAL_JSONC_LIBS="${JSONC_LIBS}"
 
 # -----------------------------------------------------------------------------
+# YAML library
+
+AC_CHECK_LIB(
+    [yaml],
+    [yaml_parser_initialize],
+    [YAML_LIBS="-lyaml"]
+)
+
+OPTIONAL_YAML_LIBS="${YAML_LIBS}"
+
+# -----------------------------------------------------------------------------
 # DB engine and HTTPS
 test "${enable_dbengine}" = "yes" -a -z "${LZ4_LIBS}" && \
     AC_MSG_ERROR([liblz4 required but not found. Try installing 'liblz4-dev' or 'lz4-devel'.])
@@ -623,6 +634,38 @@ else
 fi
 AC_MSG_RESULT([${enable_jsonc}])
 AM_CONDITIONAL([ENABLE_JSONC], [test "${enable_jsonc}" = "yes"])
+
+# -----------------------------------------------------------------------------
+# YAML
+
+if test -z "${YAML_LIBS}"; then
+    # Try and detect manual static build presence (from netdata-installer.sh)
+    AC_MSG_CHECKING([if statically built libyaml is present])
+    HAVE_libyaml_a="no"
+    if test -f "externaldeps/libyaml/libyaml.a"; then
+        LIBS_BKP="${LIBS}"
+        LIBS="externaldeps/libyaml/libyaml.a"
+        AC_LINK_IFELSE([AC_LANG_SOURCE([[#include "externaldeps/libyaml/yaml.h"
+                                         int main (int argc, char **argv) {
+                                             yaml_parser_t parser;
+                                             yaml_parser_initialize(&parser);
+                                         }]])],
+                                        [HAVE_libyaml_a="yes"],
+                                        [HAVE_libyaml_a="no"])
+        LIBS="${LIBS_BKP}"
+    fi
+
+	if test "${HAVE_libyaml_a}" = "yes"; then
+		AC_DEFINE([LINK_STATIC_YAML], [1], [static yaml should be used])
+		YAML_LIBS="static"
+		OPTIONAL_YAML_STATIC_CFLAGS="-I \$(abs_top_srcdir)/externaldeps/libyaml"
+	fi
+	AC_MSG_RESULT([${HAVE_libyaml_a}])
+fi
+AM_CONDITIONAL([LINK_STATIC_YAML], [test "${YAML_LIBS}" = "static"])
+
+test -z "${YAML_LIBS}" && \
+    AC_MSG_ERROR([LIBYAML required but not found. Try installing 'libyaml-dev'.])
 
 # -----------------------------------------------------------------------------
 # compiler options
@@ -986,17 +1029,8 @@ AC_CHECK_HEADER(
     [have_nfnetlink_conntrack=no]
 )
 
-PKG_CHECK_MODULES(
-    [NFACCT],
-    [libnetfilter_acct],
-    [AC_CHECK_LIB(
-        [netfilter_acct],
-        [nfacct_alloc],
-        [have_libnetfilter_acct=yes],
-        [have_libnetfilter_acct=no]
-    )],
-    [have_libnetfilter_acct=no]
-)
+LIBS_BAK="${LIBS}"
+LIBS="${LIBS} -lmnl"
 
 PKG_CHECK_MODULES(
     [LIBMNL],
@@ -1009,6 +1043,24 @@ PKG_CHECK_MODULES(
     )],
     [have_libmnl=no]
 )
+
+
+LIBS="${LIBS}"
+
+PKG_CHECK_MODULES(
+    [NFACCT],
+    [libnetfilter_acct],
+    AC_SEARCH_LIBS(
+        [nfacct_alloc],
+        [netfilter_acct libnetfilter_acct],
+        [have_libnetfilter_acct=yes],
+        [have_libnetfilter_acct=no],
+        [${LIBS} -L/libnetfilter-acct-static/lib/libnetfilter_acct.a]
+    )],
+    [have_libnetfilter_acct=no]
+)
+
+LIBS="${LIBS_BAK}"
 
 test "${enable_plugin_nfacct}" = "yes" -a "${have_nfnetlink_conntrack}" != "yes" && \
     AC_MSG_ERROR([nfnetlink_conntrack.h required but not found or too old])
@@ -1165,7 +1217,7 @@ fi
 
 # Check if submodules have not been fetched. Fail if ML was explicitly requested.
 AC_MSG_CHECKING([if git submodules are present for machine learning functionality])
-if test -f "ml/dlib/dlib/all/source.cpp" -a -f "ml/json/single_include/nlohmann/json.hpp"; then
+if test -f "ml/dlib/dlib/all/source.cpp"; then
     AC_MSG_RESULT([yes])
     have_ml_submodules="yes"
 else
@@ -1663,7 +1715,7 @@ CFLAGS="${originalCFLAGS} ${OPTIONAL_LTO_CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${O
     ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
     ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PUBSUB_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} \
-    ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${JUDY_CFLAGS} \
+    ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_YAML_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${JUDY_CFLAGS} \
     ${OPTIONAL_ACLK_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_LOGSMANAGEMENT_CFLAGS} ${OPTIONAL_OS_DEP_CFLAGS}"
 
 CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
@@ -1685,6 +1737,7 @@ AC_SUBST([OPTIONAL_UV_LIBS])
 AC_SUBST([OPTIONAL_LZ4_LIBS])
 AC_SUBST([OPTIONAL_SSL_LIBS])
 AC_SUBST([OPTIONAL_JSONC_LIBS])
+AC_SUBST([OPTIONAL_YAML_LIBS])
 AC_SUBST([OPTIONAL_NFACCT_CFLAGS])
 AC_SUBST([OPTIONAL_NFACCT_LIBS])
 AC_SUBST([OPTIONAL_ZLIB_CFLAGS])
@@ -1782,6 +1835,7 @@ AC_CONFIG_FILES([
     collectors/perf.plugin/Makefile
     daemon/Makefile
     database/Makefile
+    database/contexts/Makefile
     database/engine/Makefile
     database/ram/Makefile
     database/sqlite/Makefile
@@ -1814,6 +1868,7 @@ AC_CONFIG_FILES([
     libnetdata/locks/Makefile
     libnetdata/log/Makefile
     libnetdata/onewayalloc/Makefile
+    libnetdata/parser/Makefile
     libnetdata/popen/Makefile
     libnetdata/procfile/Makefile
     libnetdata/simple_pattern/Makefile
@@ -1862,7 +1917,6 @@ AC_CONFIG_FILES([
     web/server/static/Makefile
     claim/Makefile
     spawn/Makefile
-    parser/Makefile
     logsmanagement/Makefile
 ])
 

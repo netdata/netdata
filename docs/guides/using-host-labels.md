@@ -3,8 +3,7 @@ title: "Use host labels to organize systems, metrics, and alarms"
 sidebar_label: "Use host labels to organize systems, metrics, and alarms"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/using-host-labels.md
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Guides"
+learn_rel_path: "Operations"
 -->
 
 # Use host labels to organize systems, metrics, and alarms
@@ -188,29 +187,5 @@ send automatic labels = yes
 
 By applying labels to exported metrics, you can more easily parse historical metrics with the labels applied. To learn
 more about exporting, read the [documentation](https://github.com/netdata/netdata/blob/master/exporting/README.md).
-
-## What's next?
-
-Host labels are a brand-new feature to Netdata, and yet they've already propagated deeply into some of its core
-functionality. We're just getting started with labels, and will keep the community apprised of additional functionality
-as it's made available. You can also track [issue #6503](https://github.com/netdata/netdata/issues/6503), which is where
-the Netdata team first kicked off this work.
-
-It should be noted that while the Netdata dashboard does not expose either user-configured or automatic host labels, API
-queries _do_ showcase this information. As always, we recommend you secure Netdata 
-
--   [Expose Netdata only in a private LAN](https://github.com/netdata/netdata/blob/master/docs/netdata-security.md#expose-netdata-only-in-a-private-lan)
--   [Enable TLS/SSL for web/API requests](https://github.com/netdata/netdata/blob/master/web/server/README.md#enabling-tls-support)
--   Put Netdata behind a proxy
-    -   [Use an authenticating web server in proxy
-        mode](https://github.com/netdata/netdata/blob/master/docs/netdata-security.md#use-an-authenticating-web-server-in-proxy-mode)
-    -   [Nginx proxy](https://github.com/netdata/netdata/blob/master/docs/Running-behind-nginx.md)
-    -   [Apache proxy](https://github.com/netdata/netdata/blob/master/docs/Running-behind-apache.md)
-    -   [Lighttpd](https://github.com/netdata/netdata/blob/master/docs/Running-behind-lighttpd.md)
-    -   [Caddy](https://github.com/netdata/netdata/blob/master/docs/Running-behind-caddy.md)
-
-If you have issues or questions around using host labels, don't hesitate to [file an
-issue](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml) on GitHub. We're
-excited to make host labels even more valuable to our users, which we can only do with your input.
 
 

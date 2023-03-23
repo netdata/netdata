@@ -51,7 +51,9 @@ RUN mkdir -p /app/usr/sbin/ \
     mv /usr/sbin/netdatacli    /app/usr/sbin/ && \
     mv packaging/docker/run.sh        /app/usr/sbin/ && \
     mv packaging/docker/health.sh     /app/usr/sbin/ && \
-    cp -rp /deps/* /app/usr/local/ && \
+    mkdir -p /deps/etc && \
+    cp -rp /deps/etc /app/usr/local/etc && \
+    chmod -R o+rX /app && \
     chmod +x /app/usr/sbin/run.sh
 
 #####################################################################
@@ -106,6 +108,9 @@ RUN chown -R root:root \
     if [ -f /usr/libexec/netdata/plugins.d/freeipmi.plugin ]; then \
         chmod 4755 /usr/libexec/netdata/plugins.d/freeipmi.plugin; \
     fi && \
+    if [ -f /usr/libexec/netdata/plugins.d/go.d.plugin ] && command -v setcap 1>/dev/null 2>&1; then \
+        setcap "cap_net_raw=eip" /usr/libexec/netdata/plugins.d/go.d.plugin 2>/dev/null; \
+    fi && \
     # Group write permissions due to: https://github.com/netdata/netdata/pull/6543
     find /var/lib/netdata /var/cache/netdata -type d -exec chmod 0770 {} \; && \
     find /var/lib/netdata /var/cache/netdata -type f -exec chmod 0660 {} \; && \
@@ -113,6 +118,8 @@ RUN chown -R root:root \
 
 ENV NETDATA_LISTENER_PORT 19999
 EXPOSE $NETDATA_LISTENER_PORT
+
+ENV NETDATA_EXTRA_APK_PACKAGES=""
 
 ENTRYPOINT ["/usr/sbin/run.sh"]
 

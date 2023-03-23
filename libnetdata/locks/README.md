@@ -4,8 +4,10 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/libnetdata/locks
 sidebar_label: "Locks"
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "Developers/libnetdata libraries"
+learn_rel_path: "Developers/libnetdata"
 -->
+
+# Locks
 
 ## How to trace netdata locks
 

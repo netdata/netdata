@@ -34,17 +34,6 @@ static struct rrdengine_datafile *datafile_alloc_and_init(struct rrdengine_insta
     return datafile;
 }
 
-void datafile_acquire_dup(struct rrdengine_datafile *df) {
-    netdata_spinlock_lock(&df->users.spinlock);
-
-    if(!df->users.lockers)
-        fatal("DBENGINE: datafile is not acquired to duplicate");
-
-    df->users.lockers++;
-
-    netdata_spinlock_unlock(&df->users.spinlock);
-}
-
 bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason) {
     bool ret;
 
@@ -390,8 +379,8 @@ static int scan_data_files_cmp(const void *a, const void *b)
 /* Returns number of datafiles that were loaded or < 0 on error */
 static int scan_data_files(struct rrdengine_instance *ctx)
 {
-    int ret;
-    unsigned tier, no, matched_files, i,failed_to_load;
+    int ret, matched_files, failed_to_load, i;
+    unsigned tier, no;
     uv_fs_t req;
     uv_dirent_t dent;
     struct rrdengine_datafile **datafiles, *datafile;

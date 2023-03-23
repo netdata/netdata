@@ -112,7 +112,7 @@ struct dictionary_stats {
 #define dictionary_create_advanced(options, stats, fixed_size) dictionary_create_advanced_with_trace(options, stats, fixed_size, __FUNCTION__, __LINE__, __FILE__)
 DICTIONARY *dictionary_create_advanced_with_trace(DICT_OPTIONS options, struct dictionary_stats *stats, size_t fixed_size, const char *function, size_t line, const char *file);
 #else
-#define dictionary_create(options) dictionary_create_advanced(options, NULL, 0);
+#define dictionary_create(options) dictionary_create_advanced(options, NULL, 0)
 DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_stats *stats, size_t fixed_size);
 #endif
 
@@ -155,6 +155,8 @@ size_t dictionary_destroy(DICTIONARY *dict);
 void dictionary_flush(DICTIONARY *dict);
 
 void dictionary_version_increment(DICTIONARY *dict);
+
+void dictionary_garbage_collect(DICTIONARY *dict);
 
 // ----------------------------------------------------------------------------
 // Set an item in the dictionary

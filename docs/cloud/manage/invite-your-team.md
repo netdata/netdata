@@ -1,14 +1,4 @@
-<!--
-title: "Invite your team"
-description: >-
-    "Invite your entire SRE, DevOPs, or ITOps team to Netdata Cloud to give everyone insights into your
-    infrastructure from a single pane of glass."
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/manage/invite-your-team.md"
-sidebar_label: "Invite your team"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Operations"
--->
+# Invite your team
 
 Invite new users to your Space by clicking on **Invite Users** in
 the [Space](https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md) management area.
@@ -22,7 +12,7 @@ Next, choose the War Rooms you want to invite these users to. Once logged in, th
 these War Rooms. They can be invited to others, or join any that are public.
 
 Click the **Send** button to send an email invitation, which will prompt them
-to [sign up](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.mdx) and join your Space.
+to [sign up](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.md) and join your Space.
 
 ![The invitation panel in Netdata Cloud](https://user-images.githubusercontent.com/1153921/97762959-53b33680-1ac7-11eb-8e9d-f3f4a14c0028.png)
 
@@ -32,6 +22,6 @@ time by clicking the trash can icon.
 ## What's next?
 
 If your team members have trouble signing in, direct them to
-the [sign in guide](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.mdx). Once your
+the [sign in guide](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.md). Once your
 team is onboarded to Netdata Cloud, they can view shared assets, such
 as [new dashboards](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md).

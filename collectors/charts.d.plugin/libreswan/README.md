@@ -4,10 +4,10 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/char
 sidebar_label: "Libreswan IPSec tunnels"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/Networking"
+learn_rel_path: "Integrations/Monitor/Networking"
 -->
 
-# Libreswan IPSec tunnel monitoring with Netdata
+# Libreswan IPSec tunnel collector
 
 Collects bytes-in, bytes-out and uptime for all established libreswan IPSEC tunnels.
 

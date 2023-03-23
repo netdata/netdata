@@ -1189,6 +1189,9 @@ premature_exit:
 }
 
 static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
+    internal_fatal(entry->start_time_s < 0 || entry->end_time_s < 0,
+                   "DBENGINE CACHE: timestamps are negative");
+
     __atomic_add_fetch(&cache->stats.workers_add, 1, __ATOMIC_RELAXED);
 
     size_t partition = pgc_indexing_partition(cache, entry->metric_id);
@@ -1198,6 +1201,12 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
 #endif
     PGC_PAGE *page;
     size_t spins = 0;
+
+    if(unlikely(entry->start_time_s < 0))
+        entry->start_time_s = 0;
+
+    if(unlikely(entry->end_time_s < 0))
+        entry->end_time_s = 0;
 
     do {
         if(++spins > 1)
@@ -1755,7 +1764,7 @@ PGC *pgc_create(const char *name,
     cache->config.max_dirty_pages_per_call = max_dirty_pages_per_flush;
     cache->config.pgc_save_init_cb = pgc_save_init_cb;
     cache->config.pgc_save_dirty_cb = pgc_save_dirty_cb;
-    cache->config.max_pages_per_inline_eviction = (max_pages_per_inline_eviction < 2) ? 2 : max_pages_per_inline_eviction;
+    cache->config.max_pages_per_inline_eviction = max_pages_per_inline_eviction;
     cache->config.max_skip_pages_per_inline_eviction = (max_skip_pages_per_inline_eviction < 2) ? 2 : max_skip_pages_per_inline_eviction;
     cache->config.max_flushes_inline = (max_flushes_inline < 1) ? 1 : max_flushes_inline;
     cache->config.partitions = partitions < 1 ? (size_t)get_netdata_cpus() : partitions;
@@ -1946,7 +1955,7 @@ time_t pgc_page_update_every_s(PGC_PAGE *page) {
 
 time_t pgc_page_fix_update_every(PGC_PAGE *page, time_t update_every_s) {
     if(page->update_every_s == 0)
-        page->update_every_s = update_every_s;
+        page->update_every_s = (uint32_t) update_every_s;
 
     return page->update_every_s;
 }
@@ -2083,7 +2092,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
 
     struct section_pages *sp = *section_pages_pptr;
     if(!netdata_spinlock_trylock(&sp->migration_to_v2_spinlock)) {
-        internal_fatal(true, "DBENGINE: migration to journal v2 is already running for this section");
+        info("DBENGINE: migration to journal v2 for datafile %u is postponed, another jv2 indexer is already running for this section", datafile_fileno);
         pgc_ll_unlock(cache, &cache->hot);
         return;
     }

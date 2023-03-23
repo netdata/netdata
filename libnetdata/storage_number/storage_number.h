@@ -13,6 +13,7 @@ typedef long double NETDATA_DOUBLE;
 #define NETDATA_DOUBLE_FORMAT_ZERO "%0.0Lf"
 #define NETDATA_DOUBLE_FORMAT_AUTO "%Lf"
 #define NETDATA_DOUBLE_MODIFIER "Lf"
+#define NETDATA_DOUBLE_FORMAT_G "%0.19Le"
 
 #define NETDATA_DOUBLE_MAX LDBL_MAX
 
@@ -24,6 +25,9 @@ typedef long double NETDATA_DOUBLE;
 #define copysignndd(x, y) copysignl(x, y)
 #define modfndd(x, y) modfl(x, y)
 #define fabsndd(x) fabsl(x)
+#define floorndd(x) floorl(x)
+#define ceilndd(x) ceill(x)
+#define log10ndd(x) log10l(x)
 
 #else // NETDATA_WITH_LONG_DOUBLE
 
@@ -32,6 +36,7 @@ typedef double NETDATA_DOUBLE;
 #define NETDATA_DOUBLE_FORMAT_ZERO "%0.0f"
 #define NETDATA_DOUBLE_FORMAT_AUTO "%f"
 #define NETDATA_DOUBLE_MODIFIER "f"
+#define NETDATA_DOUBLE_FORMAT_G "%0.19e"
 
 #define NETDATA_DOUBLE_MAX DBL_MAX
 
@@ -43,6 +48,9 @@ typedef double NETDATA_DOUBLE;
 #define copysignndd(x, y) copysign(x, y)
 #define modfndd(x, y) modf(x, y)
 #define fabsndd(x) fabs(x)
+#define floorndd(x) floor(x)
+#define ceilndd(x) ceil(x)
+#define log10ndd(x) log10(x)
 
 #endif // NETDATA_WITH_LONG_DOUBLE
 
@@ -104,8 +112,6 @@ typedef enum {
 storage_number pack_storage_number(NETDATA_DOUBLE value, SN_FLAGS flags) __attribute__((const));
 static inline NETDATA_DOUBLE unpack_storage_number(storage_number value) __attribute__((const));
 
-int print_netdata_double(char *str, NETDATA_DOUBLE value);
-
 //                                                          sign       div/mul      <--- multiplier / divider --->     10/100       RESET      EXISTS     VALUE
 #define STORAGE_NUMBER_POSITIVE_MAX_RAW (storage_number)( (0 << 31) | (1 << 30) | (1 << 29) | (1 << 28) | (1 << 27) | (1 << 26) | (0 << 25) | (1 << 24) | 0x00ffffff )
 #define STORAGE_NUMBER_POSITIVE_MIN_RAW (storage_number)( (0 << 31) | (0 << 30) | (1 << 29) | (1 << 28) | (1 << 27) | (0 << 26) | (0 << 25) | (1 << 24) | 0x00000001 )
@@ -158,79 +164,12 @@ static inline NETDATA_DOUBLE unpack_storage_number(storage_number value) {
     return sign * unpack_storage_number_lut10x[(factor * 16) + (exp * 8) + mul] * n;
 }
 
-static inline NETDATA_DOUBLE str2ndd(const char *s, char **endptr) {
-    int negative = 0;
-    const char *start = s;
-    unsigned long long integer_part = 0;
-    unsigned long decimal_part = 0;
-    size_t decimal_digits = 0;
+// all these prefixes should use characters that are not allowed in the numbers they represent
+#define HEX_PREFIX "0x"               // we check 2 characters when parsing
+#define IEEE754_UINT64_B64_PREFIX "#" // we check the 1st character during parsing
+#define IEEE754_DOUBLE_B64_PREFIX "@" // we check the 1st character during parsing
+#define IEEE754_DOUBLE_HEX_PREFIX "%" // we check the 1st character during parsing
 
-    switch(*s) {
-        case '-':
-            s++;
-            negative = 1;
-            break;
-
-        case '+':
-            s++;
-            break;
-
-        case 'n':
-            if(s[1] == 'a' && s[2] == 'n') {
-                if(endptr) *endptr = (char *)&s[3];
-                return NAN;
-            }
-            if(s[1] == 'u' && s[2] == 'l' && s[3] == 'l') {
-                if(endptr) *endptr = (char *)&s[3];
-                return NAN;
-            }
-            break;
-
-        case 'i':
-            if(s[1] == 'n' && s[2] == 'f') {
-                if(endptr) *endptr = (char *)&s[3];
-                return INFINITY;
-            }
-            break;
-
-        default:
-            break;
-    }
-
-    while (*s >= '0' && *s <= '9') {
-        integer_part = (integer_part * 10) + (*s - '0');
-        s++;
-    }
-
-    if(unlikely(*s == '.')) {
-        decimal_part = 0;
-        s++;
-
-        while (*s >= '0' && *s <= '9') {
-            decimal_part = (decimal_part * 10) + (*s - '0');
-            s++;
-            decimal_digits++;
-        }
-    }
-
-    if(unlikely(*s == 'e' || *s == 'E'))
-        return strtondd(start, endptr);
-
-    if(unlikely(endptr))
-        *endptr = (char *)s;
-
-    if(unlikely(negative)) {
-        if(unlikely(decimal_digits))
-            return -((NETDATA_DOUBLE)integer_part + (NETDATA_DOUBLE)decimal_part / powndd(10.0, decimal_digits));
-        else
-            return -((NETDATA_DOUBLE)integer_part);
-    }
-    else {
-        if(unlikely(decimal_digits))
-            return (NETDATA_DOUBLE)integer_part + (NETDATA_DOUBLE)decimal_part / powndd(10.0, decimal_digits);
-        else
-            return (NETDATA_DOUBLE)integer_part;
-    }
-}
+bool is_system_ieee754_double(void);
 
 #endif /* NETDATA_STORAGE_NUMBER_H */

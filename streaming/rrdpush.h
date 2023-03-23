@@ -42,6 +42,7 @@ typedef enum {
     STREAM_CAP_REPLICATION      = (1 << 12), // replication supported
     STREAM_CAP_BINARY           = (1 << 13), // streaming supports binary data
     STREAM_CAP_INTERPOLATED     = (1 << 14), // streaming supports interpolated streaming of values
+    STREAM_CAP_IEEE754          = (1 << 15), // streaming supports binary/hex transfer of double values
 
     STREAM_CAP_INVALID          = (1 << 30), // used as an invalid value for capabilities when this is set
     // this must be signed int, so don't use the last bit
@@ -54,13 +55,9 @@ typedef enum {
 #define STREAM_HAS_COMPRESSION 0
 #endif  // ENABLE_COMPRESSION
 
-#define STREAM_OUR_CAPABILITIES ( \
-    STREAM_CAP_V1 | STREAM_CAP_V2 | STREAM_CAP_VN | STREAM_CAP_VCAPS |  \
-    STREAM_CAP_HLABELS | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS | \
-    STREAM_HAS_COMPRESSION | STREAM_CAP_FUNCTIONS | STREAM_CAP_REPLICATION | STREAM_CAP_BINARY | \
-    STREAM_CAP_INTERPOLATED)
+STREAM_CAPABILITIES stream_our_capabilities();
 
-#define stream_has_capability(rpt, capability) ((rpt) && ((rpt)->capabilities & (capability)))
+#define stream_has_capability(rpt, capability) ((rpt) && ((rpt)->capabilities & (capability)) == (capability))
 
 // ----------------------------------------------------------------------------
 // stream handshake
@@ -189,11 +186,16 @@ struct sender_state {
     } replication;
 
     struct {
+        bool pending_data;
         size_t buffer_used_percentage;          // the current utilization of the sending buffer
         usec_t last_flush_time_ut;              // the last time the sender flushed the sending buffer in USEC
         time_t last_buffer_recreate_s;          // true when the sender buffer should be re-created
     } atomic;
 };
+
+#define rrdpush_sender_pipe_has_pending_data(sender) __atomic_load_n(&(sender)->atomic.pending_data, __ATOMIC_RELAXED)
+#define rrdpush_sender_pipe_set_pending_data(sender) __atomic_store_n(&(sender)->atomic.pending_data, true, __ATOMIC_RELAXED)
+#define rrdpush_sender_pipe_clear_pending_data(sender) __atomic_store_n(&(sender)->atomic.pending_data, false, __ATOMIC_RELAXED)
 
 #define rrdpush_sender_last_buffer_recreate_get(sender) __atomic_load_n(&(sender)->atomic.last_buffer_recreate_s, __ATOMIC_RELAXED)
 #define rrdpush_sender_last_buffer_recreate_set(sender, value) __atomic_store_n(&(sender)->atomic.last_buffer_recreate_s, value, __ATOMIC_RELAXED)
@@ -307,6 +309,7 @@ bool rrdpush_receiver_needs_dbengine();
 int configured_as_parent();
 
 typedef struct rrdset_stream_buffer {
+    STREAM_CAPABILITIES capabilities;
     bool v2;
     bool begin_v2_added;
     time_t wall_clock_time;

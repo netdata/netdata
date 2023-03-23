@@ -51,15 +51,18 @@ fi
 
 if [ -n "${CONFIG_PATH}" ]; then
   GREP='grep'
+  CAT='cat'
 
   if echo "${CONFIG_PATH}" | grep -q '.gz'; then
-    GREP='zgrep'
+    CAT='zcat'
   fi
 
   REQUIRED_CONFIG="KPROBES KPROBES_ON_FTRACE HAVE_KPROBES BPF BPF_SYSCALL BPF_JIT"
 
   for required_config in ${REQUIRED_CONFIG}; do
-    if ! "${GREP}" -q "CONFIG_${required_config}=y" "${CONFIG_PATH}"; then
+    # Fix issue https://github.com/netdata/netdata/issues/14668
+    # if ! "${GREP}" -q "CONFIG_${required_config}=y" "${CONFIG_PATH}"; then
+    if ! { "${CAT}" "${CONFIG_PATH}" | "${GREP}" -q "CONFIG_${required_config}=y" >&2 >/dev/null; } ;then
       echo >&2 " Missing Kernel Config: ${required_config}"
       exit 1
     fi

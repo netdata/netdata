@@ -86,13 +86,13 @@ jobs:
           max_attempts: 3
           retry_wait_seconds: 30
           timeout_seconds: 900
-          command: docker pull --platform ${{ matrix.platform }} ${{ matrix.base_image }}:${{ matrix.version }}
+          command: docker pull --platform ${{ matrix.platform }} ${{ matrix.base_image }}
       - name: Build Packages
         id: build
         shell: bash
         run: |
           docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 --platform ${{ matrix.platform }} \
-              -v "$PWD":/netdata ${{ matrix.base_image }}:${{ matrix.version }} \
+              -v "$PWD":/netdata ${{ matrix.base_image }} \
               /netdata/packaging/repoconfig/build-${{ matrix.format }}.sh
       - name: SSH setup
         id: ssh-setup

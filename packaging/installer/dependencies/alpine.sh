@@ -34,6 +34,7 @@ package_tree="
   musl-fts-dev
   bison
   flex
+  yaml-dev
   "
 
 usage() {

@@ -3,13 +3,9 @@ title: "Kubernetes monitoring with Netdata: Overview and visualizations"
 sidebar_label: "Kubernetes monitoring with Netdata: Overview and visualizations"
 description: "Learn how to navigate Netdata's Kubernetes monitoring features for visualizing the health and performance of a Kubernetes cluster with per-second granularity."
 image: /img/seo/guides/monitor/kubernetes-k8s-netdata.png
-author: "Joel Hans"
-author_title: "Editorial Director, Technical & Educational Resources"
-author_img: "/img/authors/joel-hans.jpg"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/kubernetes-k8s-netdata.md
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Guides/Monitor"
+learn_rel_path: "Miscellaneous"
 -->
 
 # Kubernetes monitoring with Netdata: Overview and visualizations

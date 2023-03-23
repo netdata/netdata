@@ -87,7 +87,7 @@ get_os_key() {
 valid_types() {
   case "${PLATFORM}" in
     Linux)
-      echo "detect systemd openrc lsb initd"
+      echo "detect ${LINUX_INIT_TYPES}"
       ;;
     FreeBSD)
       echo "detect freebsd"
@@ -102,7 +102,7 @@ valid_types() {
 }
 
 install_generic_service() {
-  svc_type="${1}"
+  svc_path="${1}"
   svc_type_name="${2}"
   svc_file="${3}"
   svc_enable_hook="${4}"
@@ -113,7 +113,7 @@ install_generic_service() {
     ENABLE="enable"
   fi
 
-  if ! install -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/netdata-${svc_type}" "${svc_file}"; then
+  if ! install -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/${svc_path}/netdata" "${svc_file}"; then
     error "Failed to install service file."
     exit 4
   fi
@@ -236,10 +236,10 @@ get_systemd_service_dir() {
 }
 
 install_systemd_service() {
-  SRCFILE="${SVC_SOURCE}/netdata.service"
+  SRCFILE="${SVC_SOURCE}/systemd/netdata.service"
 
   if [ "$(systemctl --version | head -n 1 | cut -f 2 -d ' ')" -le 235 ]; then
-    SRCFILE="${SVC_SOURCE}/netdata.service.v235"
+    SRCFILE="${SVC_SOURCE}/systemd/netdata.service.v235"
   fi
 
   if [ "${ENABLE}" = "auto" ]; then
@@ -265,7 +265,7 @@ install_systemd_service() {
         warning "Failed to reload systemd unit files."
     fi
 
-    if ! systemctl ${ENABLE} netdata; then
+    if ! systemctl "${ENABLE}" netdata; then
         warning "Failed to ${ENABLE} Netdata service."
     fi
   fi
@@ -289,6 +289,9 @@ _check_openrc() {
 
   # if there is no /etc/init.d, it's not OpenRC
   [ ! -d /etc/init.d ] && echo "NO" && return 0
+
+  # if there is no /etc/conf.d, it's not OpenRC
+  [ ! -d /etc/conf.d ] && echo "NO" && return 0
 
   # if there is no rc-update command, it's not OpenRC
   [ -z "$(command -v rc-update 2>/dev/null || true)" ] && echo "NO" && return 0
@@ -341,7 +344,15 @@ disable_openrc() {
 }
 
 install_openrc_service() {
-  install_generic_service openrc OpenRC /etc/init.d/netdata enable_openrc disable_openrc
+  install_generic_service openrc/init.d OpenRC /etc/init.d/netdata enable_openrc disable_openrc
+
+  if [ ! -f /etc/conf.d/netdata ]; then
+    info "Installing OpenRC configuration file."
+
+    if ! install -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/openrc/conf.d/netdata" "/etc/conf.d/netdata"; then
+        warning "Failed to install configuration file, however the service will still work."
+    fi
+  fi
 }
 
 openrc_cmds() {
@@ -399,7 +410,7 @@ disable_lsb() {
 }
 
 install_lsb_service() {
-  install_generic_service lsb LSB /etc/init.d/netdata enable_lsb disable_lsb
+  install_generic_service lsb/init.d LSB /etc/init.d/netdata enable_lsb disable_lsb
 }
 
 lsb_cmds() {
@@ -454,7 +465,7 @@ disable_initd() {
 }
 
 install_initd_service() {
-  install_generic_service init-d init.d /etc/init.d/netdata enable_initd disable_initd
+  install_generic_service initd/init.d init.d /etc/init.d/netdata enable_initd disable_initd
 }
 
 initd_cmds() {
@@ -464,8 +475,6 @@ initd_cmds() {
 
 # =====================================================================
 # runit support functions
-#
-# Currently not supported, this exists to provide useful error messages.
 
 _check_runit() {
   # if there is no runsvdir command, then it's not runit
@@ -492,19 +501,61 @@ check_runit() {
 }
 
 install_runit_service() {
-  error "Detected runit, which we do not currently support."
-  exit 3
+  if [ -d /etc/sv ]; then
+    svc_dir="/etc/sv/netdata"
+  elif [ -d /etc/runit/sv ]; then
+    svc_dir="/etc/runit/sv/netdata"
+  else
+    error "Failed to locate service directory"
+    exit 4
+  fi
+
+  if [ -d /service ]; then
+    live_svc_dir="/service"
+  elif [ -d /var/service ]; then
+    live_svc_dir="/var/service"
+  elif [ -d /run/runit/service ]; then
+    live_svc_dir="/run/runit/service"
+  elif [ -d /etc/runit/runsvdir/default ]; then
+    live_svc_dir="/etc/runit/runsvdir/default"
+  else
+    error "Failed to locate live service directory"
+    exit 4
+  fi
+
+  svc_file="${svc_dir}/run"
+
+  info "Installing runit service file."
+  if [ ! -f "${svc_file}" ] && [ "${ENABLE}" = "auto" ]; then
+    ENABLE="enable"
+  fi
+
+  if ! install -D -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/runit/run" "${svc_file}"; then
+    error "Failed to install service file."
+    exit 4
+  fi
+
+  case ${ENABLE} in
+    enable)
+      if ! ln -s "${svc_dir}" "${live_svc_dir}"; then
+        warning "Failed to enable the Netdata service."
+      fi
+      ;;
+    disable)
+      if ! rm "${live_svc_dir}/netdata"; then
+        warning "Failed to disable the Netdata service."
+      fi
+      ;;
+  esac
 }
 
 runit_cmds() {
-  error "Detected runit, which we do not currently support."
-  exit 3
+  NETDATA_START_CMD="sv start netdata"
+  NETDATA_STOP_CMD="sv stop netdata"
 }
 
 # =====================================================================
 # WSL support functions
-#
-# Cannot be supported, this exists to provide useful error messages.
 
 _check_wsl() {
   # If uname -r contains the string WSL, then it's WSL.
@@ -552,7 +603,7 @@ disable_freebsd() {
 }
 
 install_freebsd_service() {
-  install_generic_service freebsd "FreeBSD rc.d" /usr/local/etc/rc.d/netdata enable_freebsd disable_freebsd
+  install_generic_service freebsd/rc.d "FreeBSD rc.d" /usr/local/etc/rc.d/netdata enable_freebsd disable_freebsd
 }
 
 freebsd_cmds() {
@@ -566,7 +617,7 @@ freebsd_cmds() {
 
 install_darwin_service() {
   info "Installing macOS plist file for launchd."
-  if ! install -C -S -p -m 0644 -o 0 -g 0 system/netdata.plist /Library/LaunchDaemons/com.github.netdata.plist; then
+  if ! install -C -S -p -m 0644 -o 0 -g 0 system/launchd/netdata.plist /Library/LaunchDaemons/com.github.netdata.plist; then
     error "Failed to copy plist file."
     exit 4
   fi
@@ -633,7 +684,7 @@ detect_linux_svc_type() {
 install_linux_service() {
   t="$(detect_linux_svc_type)"
 
-  if [ -z "${t}" ]; then
+  if [ -z "${t}" ] || [ "${t}" = 'detect' ]; then
     exit 2
   fi
 
@@ -643,7 +694,7 @@ install_linux_service() {
 linux_cmds() {
   t="$(detect_linux_svc_type)"
 
-  if [ -z "${t}" ]; then
+  if [ -z "${t}" ] || [ "${t}" = 'detect' ]; then
     exit 2
   fi
 

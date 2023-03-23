@@ -4,8 +4,7 @@ description: "The local Netdata Agent dashboard is the heart of health monitorin
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/gui/README.md
 sidebar_label: "Local Agent dashboard"
 learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "References"
+learn_rel_path: "Operations"
 -->
 
 # Local Agent dashboard
@@ -106,9 +105,6 @@ a War Room's name to jump to the Netdata Cloud web interface.
 
 ![A screenshot of the Cloud
 menus](https://user-images.githubusercontent.com/1153921/80837210-3f8b8c80-8bab-11ea-9c75-128c2d823ef8.png)
-
-If you want to know more about how Cloud populates this menu, and the Agent-Cloud integration at a high level, see our
-document on [using the Agent with Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/agent-cloud.md).
 
 ## Customizing the local dashboard
 

@@ -73,6 +73,8 @@ dist_noinst_DATA = \
     packaging/installer/UPDATE.md \
     packaging/jsonc.checksums \
     packaging/jsonc.version \
+    packaging/yaml.checksums \
+    packaging/yaml.version \
     packaging/libbpf.checksums \
     packaging/libbpf.version \
     packaging/protobuf.checksums \
@@ -107,7 +109,6 @@ SUBDIRS += \
     streaming \
     web \
     claim \
-    parser \
     spawn \
     logsmanagement \
     $(NULL)
@@ -161,6 +162,8 @@ LIBNETDATA_FILES = \
     libnetdata/log/log.h \
     libnetdata/onewayalloc/onewayalloc.c \
     libnetdata/onewayalloc/onewayalloc.h \
+    libnetdata/parser/parser.c \
+    libnetdata/parser/parser.h \
     libnetdata/popen/popen.c \
     libnetdata/popen/popen.h \
     libnetdata/procfile/procfile.c \
@@ -235,37 +238,18 @@ ML_FILES = \
 if ENABLE_ML
 
 ML_FILES += \
-    ml/ADCharts.h \
-    ml/ADCharts.cc \
-    ml/Config.h \
+    ml/ad_charts.h \
+    ml/ad_charts.cc \
     ml/Config.cc \
-    ml/Chart.cc \
-    ml/Chart.h \
-    ml/Stats.h \
-    ml/Dimension.cc \
-    ml/Dimension.h \
-    ml/Host.h \
-    ml/Host.cc \
-    ml/Mutex.h \
-    ml/Queue.h \
-    ml/Query.h \
-    ml/KMeans.h \
-    ml/KMeans.cc \
-    ml/SamplesBuffer.h \
-    ml/SamplesBuffer.cc \
     ml/dlib/dlib/all/source.cpp \
-    ml/json/single_include/nlohmann/json.hpp \
-    ml/ml.cc \
     ml/ml-private.h \
+    ml/ml.cc \
     $(NULL)
 
 # Disable warnings from dlib library
 ml/dlib/dlib/all/source.$(OBJEXT) : CXXFLAGS += -Wno-sign-compare -Wno-type-limits -Wno-aggressive-loop-optimizations -Wno-stringop-overflow -Wno-psabi
 
 # Disable ml warnings
-ml/Dimension.$(OBJEXT) : CXXFLAGS += -Wno-psabi
-ml/Host.$(OBJEXT) : CXXFLAGS += -Wno-psabi
-ml/KMeans.$(OBJEXT) : CXXFLAGS += -Wno-psabi
 ml/ml.$(OBJEXT) : CXXFLAGS += -Wno-psabi
 
 endif
@@ -444,12 +428,21 @@ PLUGINSD_PLUGIN_FILES = \
     $(NULL)
 
 RRD_PLUGIN_FILES = \
+    database/contexts/rrdcontext.c \
+    database/contexts/rrdcontext.h \
+    database/contexts/metric.c \
+    database/contexts/instance.c \
+    database/contexts/context.c \
+    database/contexts/worker.c \
+    database/contexts/query_target.c \
+    database/contexts/query_scope.c \
+    database/contexts/api_v1.c \
+    database/contexts/api_v2.c \
+    database/contexts/internal.h \
     database/rrdcalc.c \
     database/rrdcalc.h \
     database/rrdcalctemplate.c \
     database/rrdcalctemplate.h \
-    database/rrdcontext.c \
-    database/rrdcontext.h \
     database/rrddim.c \
     database/rrddimvar.c \
     database/rrddimvar.h \
@@ -645,8 +638,12 @@ API_PLUGIN_FILES = \
     web/api/formatters/rrdset2json.h \
     web/api/health/health_cmdapi.c \
     web/api/health/health_cmdapi.h \
+    web/api/web_api.c \
+    web/api/web_api.h \
     web/api/web_api_v1.c \
     web/api/web_api_v1.h \
+    web/api/web_api_v2.c \
+    web/api/web_api_v2.h \
     $(NULL)
 
 STREAMING_PLUGIN_FILES = \
@@ -693,11 +690,6 @@ WEB_PLUGIN_FILES = \
 CLAIM_FILES = \
     claim/claim.c \
     claim/claim.h \
-    $(NULL)
-
-PARSER_FILES = \
-    parser/parser.c \
-    parser/parser.h \
     $(NULL)
 
 if ENABLE_ACLK
@@ -1000,7 +992,6 @@ NETDATA_FILES = \
     $(STATSD_PLUGIN_FILES) \
     $(WEB_PLUGIN_FILES) \
     $(CLAIM_FILES) \
-    $(PARSER_FILES) \
     $(ACLK_ALWAYS_BUILD_FILES) \
     $(ACLK_FILES) \
     $(SPAWN_PLUGIN_FILES) \
@@ -1045,6 +1036,7 @@ NETDATA_COMMON_LIBS = \
     libjudy.a \
     $(OPTIONAL_SSL_LIBS) \
     $(OPTIONAL_JSONC_LIBS) \
+    $(OPTIONAL_YAML_LIBS) \
     $(OPTIONAL_ATOMIC_LIBS) \
     $(OPTIONAL_DL_LIBS) \
     $(NULL)
@@ -1055,6 +1047,10 @@ endif
 
 if LINK_STATIC_JSONC
     NETDATA_COMMON_LIBS += $(abs_top_srcdir)/externaldeps/jsonc/libjson-c.a
+endif
+
+if LINK_STATIC_YAML
+    NETDATA_COMMON_LIBS += $(abs_top_srcdir)/externaldeps/libyaml/libyaml.a
 endif
 
 NETDATACLI_FILES = \

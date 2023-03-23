@@ -239,15 +239,18 @@ if [ -x "$(command -v apt-get)" ] && [ "${INSTALL_TYPE}" = "binpkg-deb" ]; then
   if dpkg -s netdata > /dev/null; then
     echo "Found netdata native installation"
     if user_input "Do you want to remove netdata? "; then
+      # shellcheck disable=SC2086
       apt-get remove netdata ${FLAG}
     fi
     if dpkg -s netdata-repo-edge > /dev/null; then
       if user_input "Do you want to remove netdata-repo-edge? "; then
+        # shellcheck disable=SC2086
         apt-get remove netdata-repo-edge ${FLAG}
       fi
     fi
     if dpkg -s netdata-repo > /dev/null; then
       if user_input "Do you want to remove netdata-repo? "; then
+        # shellcheck disable=SC2086
         apt-get remove netdata-repo ${FLAG}
       fi
     fi
@@ -257,15 +260,18 @@ elif [ -x "$(command -v dnf)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
   if rpm -q netdata > /dev/null; then
     echo "Found netdata native installation."
     if user_input "Do you want to remove netdata? "; then
+      # shellcheck disable=SC2086
       dnf remove netdata ${FLAG}
     fi
     if rpm -q netdata-repo-edge > /dev/null; then
       if user_input "Do you want to remove netdata-repo-edge? "; then
+        # shellcheck disable=SC2086
         dnf remove netdata-repo-edge ${FLAG}
       fi
     fi
     if rpm -q netdata-repo > /dev/null; then
       if user_input "Do you want to remove netdata-repo? "; then
+        # shellcheck disable=SC2086
         dnf remove netdata-repo ${FLAG}
       fi
     fi
@@ -275,15 +281,18 @@ elif [ -x "$(command -v yum)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
   if rpm -q netdata > /dev/null; then
     echo "Found netdata native installation."
     if user_input "Do you want to remove netdata? "; then
+      # shellcheck disable=SC2086
       yum remove netdata ${FLAG}
     fi
     if rpm -q netdata-repo-edge > /dev/null; then
       if user_input "Do you want to remove netdata-repo-edge? "; then
+        # shellcheck disable=SC2086
         yum remove netdata-repo-edge ${FLAG}
       fi
     fi
     if rpm -q netdata-repo > /dev/null; then
       if user_input "Do you want to remove netdata-repo? "; then
+        # shellcheck disable=SC2086
         yum remove netdata-repo ${FLAG}
       fi
     fi
@@ -296,15 +305,18 @@ elif [ -x "$(command -v zypper)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
   if zypper search -i netdata > /dev/null; then
     echo "Found netdata native installation."
     if user_input "Do you want to remove netdata? "; then
+      # shellcheck disable=SC2086
       zypper ${FLAG} remove netdata
     fi
     if zypper search -i netdata-repo-edge > /dev/null; then
       if user_input "Do you want to remove netdata-repo-edge? "; then
+        # shellcheck disable=SC2086
         zypper ${FLAG} remove netdata-repo-edge
       fi
     fi
     if zypper search -i netdata-repo > /dev/null; then
       if user_input "Do you want to remove netdata-repo? "; then
+        # shellcheck disable=SC2086
         zypper ${FLAG} remove netdata-repo
       fi
     fi

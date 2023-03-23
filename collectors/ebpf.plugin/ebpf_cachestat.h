@@ -33,6 +33,9 @@
 #define NETDATA_SYSTEMD_CACHESTAT_HIT_FILE_CONTEXT "services.cachestat_hits"
 #define NETDATA_SYSTEMD_CACHESTAT_MISS_FILES_CONTEXT "services.cachestat_misses"
 
+// ARAL Name
+#define NETDATA_EBPF_CACHESTAT_ARAL_NAME "ebpf_cachestat"
+
 // variables
 enum cachestat_counters {
     NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU,
@@ -82,6 +85,7 @@ typedef struct netdata_publish_cachestat {
 } netdata_publish_cachestat_t;
 
 void *ebpf_cachestat_thread(void *ptr);
+void ebpf_cachestat_release(netdata_publish_cachestat_t *stat);
 
 extern struct config cachestat_config;
 extern netdata_ebpf_targets_t cachestat_targets[];

@@ -5,6 +5,10 @@
 #include "ebpf.h"
 #include "ebpf_vfs.h"
 
+// ----------------------------------------------------------------------------
+// ARAL vectors used to speed up processing
+ARAL *ebpf_aral_vfs_pid = NULL;
+
 static char *vfs_dimension_names[NETDATA_KEY_PUBLISH_VFS_END] = { "delete",  "read",  "write",
                                                                   "fsync", "open", "create" };
 static char *vfs_id_names[NETDATA_KEY_PUBLISH_VFS_END] = { "vfs_unlink", "vfs_read", "vfs_write",
@@ -384,6 +388,46 @@ static inline int ebpf_vfs_load_and_attach(struct vfs_bpf *obj, ebpf_module_t *e
 
 /*****************************************************************
  *
+ *  ARAL FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * eBPF VFS Aral init
+ *
+ * Initiallize array allocator that will be used when integration with apps is enabled.
+ */
+static inline void ebpf_vfs_aral_init()
+{
+    ebpf_aral_vfs_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_VFS_ARAL_NAME, sizeof(netdata_publish_vfs_t));
+}
+
+/**
+ * eBPF publish VFS get
+ *
+ * Get a netdata_publish_vfs_t entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+netdata_publish_vfs_t *ebpf_vfs_get(void)
+{
+    netdata_publish_vfs_t *target = aral_mallocz(ebpf_aral_vfs_pid);
+    memset(target, 0, sizeof(netdata_publish_vfs_t));
+    return target;
+}
+
+/**
+ * eBPF VFS release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_vfs_release(netdata_publish_vfs_t *stat)
+{
+    aral_freez(ebpf_aral_vfs_pid, stat);
+}
+
+/*****************************************************************
+ *
  *  FUNCTIONS TO CLOSE THE THREAD
  *
  *****************************************************************/
@@ -540,7 +584,7 @@ static void ebpf_vfs_read_global_table()
  * @param swap output structure
  * @param root link list with structure to be used
  */
-static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, struct pid_on_target *root)
+static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, struct ebpf_pid_on_target *root)
 {
     netdata_publish_vfs_t accumulator;
     memset(&accumulator, 0, sizeof(accumulator));
@@ -606,9 +650,9 @@ static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, struct pid_on_target *
  * @param em   the structure with thread information
  * @param root the target list.
  */
-void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct target *root)
+void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
 {
-    struct target *w;
+    struct ebpf_target *w;
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             ebpf_vfs_sum_pids(&w->vfs, w->root_pid);
@@ -775,7 +819,7 @@ static void vfs_fill_pid(uint32_t current_pid, netdata_publish_vfs_t *publish)
 {
     netdata_publish_vfs_t *curr = vfs_pid[current_pid];
     if (!curr) {
-        curr = callocz(1, sizeof(netdata_publish_vfs_t));
+        curr = ebpf_vfs_get();
         vfs_pid[current_pid] = curr;
     }
 
@@ -787,7 +831,7 @@ static void vfs_fill_pid(uint32_t current_pid, netdata_publish_vfs_t *publish)
  */
 static void ebpf_vfs_read_apps()
 {
-    struct pid_stat *pids = root_of_pids;
+    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     netdata_publish_vfs_t *vv = vfs_vector;
     int fd = vfs_maps[NETDATA_VFS_PID].map_fd;
     size_t length = sizeof(netdata_publish_vfs_t) * ebpf_nprocs;
@@ -1484,6 +1528,11 @@ static void vfs_collector(ebpf_module_t *em)
         if (apps)
             ebpf_vfs_read_apps();
 
+#ifdef NETDATA_DEV_MODE
+        if (ebpf_aral_vfs_pid)
+            ebpf_send_data_aral_chart(ebpf_aral_vfs_pid, em);
+#endif
+
         if (cgroups)
             read_update_vfs_cgroup();
 
@@ -1683,7 +1732,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
  **/
 void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    struct target *root = ptr;
+    struct ebpf_target *root = ptr;
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_DELETED,
                                "Files deleted",
@@ -1825,14 +1874,16 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
  */
 static void ebpf_vfs_allocate_global_vectors(int apps)
 {
+    if (apps) {
+        ebpf_vfs_aral_init();
+        vfs_pid = callocz((size_t)pid_max, sizeof(netdata_publish_vfs_t *));
+        vfs_vector = callocz(ebpf_nprocs, sizeof(netdata_publish_vfs_t));
+    }
+
     memset(vfs_aggregated_data, 0, sizeof(vfs_aggregated_data));
     memset(vfs_publish_aggregated, 0, sizeof(vfs_publish_aggregated));
 
     vfs_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
-    vfs_vector = callocz(ebpf_nprocs, sizeof(netdata_publish_vfs_t));
-
-    if (apps)
-        vfs_pid = callocz((size_t)pid_max, sizeof(netdata_publish_vfs_t *));
 }
 
 /*****************************************************************
@@ -1910,6 +1961,12 @@ void *ebpf_vfs_thread(void *ptr)
     pthread_mutex_lock(&lock);
     ebpf_create_global_charts(em);
     ebpf_update_stats(&plugin_statistics, em);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
+#ifdef NETDATA_DEV_MODE
+    if (ebpf_aral_vfs_pid)
+        ebpf_statistic_create_aral_chart(NETDATA_EBPF_VFS_ARAL_NAME, em);
+#endif
+
     pthread_mutex_unlock(&lock);
 
     vfs_collector(em);

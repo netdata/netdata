@@ -7,7 +7,7 @@ static int return_int_cb(void *data, int argc, char **argv, char **column)
     int *status = data;
     UNUSED(argc);
     UNUSED(column);
-    *status = str2uint32_t(argv[0]);
+    *status = str2uint32_t(argv[0], NULL);
     return 0;
 }
 
@@ -49,7 +49,7 @@ static int column_exists_in_table(const char *table, const char *column)
 }
 
 const char *database_migrate_v1_v2[] = {
-    "ALTER TABLE host ADD hops INTEGER;",
+    "ALTER TABLE host ADD hops INTEGER NOT NULL DEFAULT 0;",
     NULL
 };
 

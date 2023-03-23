@@ -27,6 +27,7 @@ package_tree="
   uuid-dev
   libmnl-dev
   libjson-c-dev
+  libyaml-dev
   libuv1-dev
   liblz4-dev
   libssl-dev

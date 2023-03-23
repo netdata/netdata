@@ -41,6 +41,7 @@ enum event_loop_job {
     UV_EVENT_DBENGINE_SHUTDOWN,
 
     // metadata
+    UV_EVENT_HOST_CONTEXT_LOAD,
     UV_EVENT_METADATA_STORE,
     UV_EVENT_METADATA_CLEANUP,
 

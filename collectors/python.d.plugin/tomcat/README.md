@@ -4,10 +4,10 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/pyth
 sidebar_label: "Tomcat"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/Webapps"
+learn_rel_path: "Integrations/Monitor/Webapps"
 -->
 
-# Apache Tomcat monitoring with Netdata
+# Apache Tomcat collector
 
 Presents memory utilization of tomcat containers.
 
@@ -51,6 +51,26 @@ localhost:
 Without configuration, module attempts to connect to `http://localhost:8080/manager/status?XML=true`, without any credentials.
 So it will probably fail.
 
----
 
+
+
+### Troubleshooting
+
+To troubleshoot issues with the `tomcat` module, run the `python.d.plugin` with the debug option enabled. The 
+output will give you the output of the data collection job or error messages on why the collector isn't working.
+
+First, navigate to your plugins directory, usually they are located under `/usr/libexec/netdata/plugins.d/`. If that's 
+not the case on your system, open `netdata.conf` and look for the setting `plugins directory`. Once you're in the 
+plugin's directory, switch to the `netdata` user.
+
+```bash
+cd /usr/libexec/netdata/plugins.d/
+sudo su -s /bin/bash netdata
+```
+
+Now you can manually run the `tomcat` module in debug mode:
+
+```bash
+./python.d.plugin tomcat debug trace
+```
 

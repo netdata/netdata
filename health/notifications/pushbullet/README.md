@@ -1,14 +1,14 @@
 <!--
-title: "PushBullet"
+title: "PushBullet agent alert notifications"
 sidebar_label: "PushBullet"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/pushbullet/README.md"
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "Setup/Notification/Agent"
+learn_rel_path: "Integrations/Notify/Agent alert notifications"
 learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
-# PushBullet
+# PushBullet agent alert notifications
 
 Will look like this on your browser:
 ![image](https://cloud.githubusercontent.com/assets/4300670/19109636/278b1c0c-8aee-11e6-8a09-7fc94fdbfec8.png)

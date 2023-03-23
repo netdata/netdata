@@ -1,15 +1,15 @@
 <!--
-title: "Netdata platform support policy"
-sidebar_label: "Supported platforms"
+title: "Platform support policy"
+sidebar_label: "Platform support policy"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/PLATFORM_SUPPORT.md"
 learn_status: "Published"
-sidebar_position: "30"
-learn_topic_type: "Getting started"
-learn_rel_path: "Getting started"
+sidebar_position: "1"
+learn_topic_type: "Tasks"
+learn_rel_path: "Installation"
 learn_docs_purpose: "Present all the supported platform in the Netdata solution"
 -->
 
-# Netdata platform support policy
+# Platform support policy
 
 Netdata defines three tiers of official support:
 
@@ -63,8 +63,10 @@ to work on these platforms with minimal user effort.
 | Alma Linux               | 8.x            | x86\_64, AArch64                       | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                                                    |
 | CentOS                   | 7.x            | x86\_64                                |                                                                                                                                                    |
 | Docker                   | 19.03 or newer | x86\_64, i386, ARMv7, AArch64, POWER8+ | See our [Docker documentation](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md) for more info on using Netdata on Docker |
+| Debian                   | 12.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                                                    |
 | Debian                   | 11.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                                                    |
 | Debian                   | 10.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                                                    |
+| Fedora                   | 38             | x86\_64, AArch64                       |                                                                                                                                                    |
 | Fedora                   | 37             | x86\_64, AArch64                       |                                                                                                                                                    |
 | Fedora                   | 36             | x86\_64, AArch64                       |                                                                                                                                                    |
 | openSUSE                 | Leap 15.4      | x86\_64, AArch64                       |                                                                                                                                                    |
@@ -73,6 +75,7 @@ to work on these platforms with minimal user effort.
 | Red Hat Enterprise Linux | 9.x            | x86\_64, AArch64                       |                                                                                                                                                    |
 | Red Hat Enterprise Linux | 8.x            | x86\_64, AArch64                       |                                                                                                                                                    |
 | Red Hat Enterprise Linux | 7.x            | x86\_64                                |                                                                                                                                                    |
+| Ubuntu                   | 23.04          | x86\_64, AArch64, ARMv7                |                                                                                                                                                    |
 | Ubuntu                   | 22.10          | x86\_64, ARMv7, AArch64                |                                                                                                                                                    |
 | Ubuntu                   | 22.04          | x86\_64, ARMv7, AArch64                |                                                                                                                                                    |
 | Ubuntu                   | 20.04          | x86\_64, ARMv7, AArch64                |                                                                                                                                                    |
@@ -87,13 +90,14 @@ platforms that we officially support ourselves to the intermediate tier. Our [st
 expected to work on these platforms if available. Source-based installs are expected to work on these platforms
 with minimal user effort.
 
-| Platform      | Version | Official Native Packages | Notes                                                                   |
-|---------------|---------|--------------------------|-------------------------------------------------------------------------|
-| Alpine Linux  | 3.16    | No                       |                                                                         |
-| Alpine Linux  | 3.15    | No                       |                                                                         |
-| Alpine Linux  | 3.14    | No                       |                                                                         |
-| Arch Linux    | Latest  | No                       | We officially recommend the community packages available for Arch Linux |
-| Manjaro Linux | Latest  | No                       | We officially recommend the community packages available for Arch Linux |
+| Platform      | Version | Official Native Packages | Notes                                                                                                |
+|---------------|---------|--------------------------|------------------------------------------------------------------------------------------------------|
+| Alpine Linux  | 3.16    | No                       |                                                                                                      |
+| Alpine Linux  | 3.15    | No                       |                                                                                                      |
+| Alpine Linux  | 3.14    | No                       |                                                                                                      |
+| Amazon Linux  | 2       | x86\_64, AArch64         | Scheduled for promotion to Core tier at some point after the release of v1.39.0 of the Netdata Agent |
+| Arch Linux    | Latest  | No                       | We officially recommend the community packages available for Arch Linux                              |
+| Manjaro Linux | Latest  | No                       | We officially recommend the community packages available for Arch Linux                              |
 
 ### Community
 

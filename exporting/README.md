@@ -1,11 +1,10 @@
 <!--
 title: "Exporting reference"
 description: "With the exporting engine, you can archive your Netdata metrics to multiple external databases for long-term storage or further analysis."
-sidebar_label: "Exporting reference"
+sidebar_label: "Export"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/exporting/README.md"
 learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "References/Configuration"
+learn_rel_path: "Integrations/Export"
 learn_doc_purpose: "Explain the exporting engine options and all of our the exporting connectors options"
 -->
 
@@ -45,7 +44,7 @@ connector to enable and configure for your database of choice.
 -   [**Graphite**](https://github.com/netdata/netdata/blob/master/exporting/graphite/README.md): A plaintext interface. Metrics are sent to the database server as
     `prefix.hostname.chart.dimension`. `prefix` is configured below, `hostname` is the hostname of the machine (can
     also be configured). Learn more in our guide to [export and visualize Netdata metrics in
-    Graphite](https://github.com/netdata/netdata/blob/master/docs/guides/export/export-netdata-metrics-graphite.md).
+    Graphite](https://github.com/netdata/netdata/blob/master/exporting/graphite/README.md).
 -   [**JSON** document databases](https://github.com/netdata/netdata/blob/master/exporting/json/README.md)
 -   [**OpenTSDB**](https://github.com/netdata/netdata/blob/master/exporting/opentsdb/README.md): Use a plaintext or HTTP interfaces. Metrics are sent to
     OpenTSDB as `prefix.chart.dimension` with tag `host=hostname`.

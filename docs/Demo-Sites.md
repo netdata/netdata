@@ -5,10 +5,11 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Demo-Sites.
 sidebar_label: "Live demos"
 learn_status: "Published"
 learn_topic_type: "Getting started"
-sidebar_position: "300"
+learn_rel_path: "Getting started"
+sidebar_position: "90"
 -->
 
-# Demo sites
+# Live demos
 
 See the live Netdata Cloud demo with rooms for specific use cases at **https://app.netdata.cloud/spaces/netdata-demo**
 

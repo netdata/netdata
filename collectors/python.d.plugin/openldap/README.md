@@ -4,10 +4,10 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/pyth
 sidebar_label: "OpenLDAP"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/Networking"
+learn_rel_path: "Integrations/Monitor/Networking"
 -->
 
-# OpenLDAP monitoring with Netdata
+# OpenLDAP collector
 
 Provides statistics information from openldap (slapd) server.
 Statistics are taken from LDAP monitoring interface. Manual page, slapd-monitor(5) is available.
@@ -77,6 +77,26 @@ openldap:
   port     : 389
 ```
 
----
 
+
+
+### Troubleshooting
+
+To troubleshoot issues with the `openldap` module, run the `python.d.plugin` with the debug option enabled. The 
+output will give you the output of the data collection job or error messages on why the collector isn't working.
+
+First, navigate to your plugins directory, usually they are located under `/usr/libexec/netdata/plugins.d/`. If that's 
+not the case on your system, open `netdata.conf` and look for the setting `plugins directory`. Once you're in the 
+plugin's directory, switch to the `netdata` user.
+
+```bash
+cd /usr/libexec/netdata/plugins.d/
+sudo su -s /bin/bash netdata
+```
+
+Now you can manually run the `openldap` module in debug mode:
+
+```bash
+./python.d.plugin openldap debug trace
+```
 

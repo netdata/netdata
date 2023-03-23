@@ -3,6 +3,10 @@
 #include "ebpf.h"
 #include "ebpf_cachestat.h"
 
+// ----------------------------------------------------------------------------
+// ARAL vectors used to speed up processing
+ARAL *ebpf_aral_cachestat_pid = NULL;
+
 netdata_publish_cachestat_t **cachestat_pid;
 
 static char *cachestat_counter_dimension_name[NETDATA_CACHESTAT_END] = { "ratio", "dirty", "hit",
@@ -366,6 +370,46 @@ static void ebpf_cachestat_exit(void *ptr)
 
 /*****************************************************************
  *
+ *  ARAL FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * eBPF Cachestat Aral init
+ *
+ * Initiallize array allocator that will be used when integration with apps is enabled.
+ */
+static inline void ebpf_cachestat_aral_init()
+{
+    ebpf_aral_cachestat_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_CACHESTAT_ARAL_NAME, sizeof(netdata_publish_cachestat_t));
+}
+
+/**
+ * eBPF publish cachestat get
+ *
+ * Get a netdata_publish_cachestat_t entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+netdata_publish_cachestat_t *ebpf_publish_cachestat_get(void)
+{
+    netdata_publish_cachestat_t *target = aral_mallocz(ebpf_aral_cachestat_pid);
+    memset(target, 0, sizeof(netdata_publish_cachestat_t));
+    return target;
+}
+
+/**
+ * eBPF cachestat release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_cachestat_release(netdata_publish_cachestat_t *stat)
+{
+    aral_freez(ebpf_aral_cachestat_pid, stat);
+}
+
+/*****************************************************************
+ *
  *  COMMON FUNCTIONS
  *
  *****************************************************************/
@@ -502,7 +546,7 @@ static void cachestat_fill_pid(uint32_t current_pid, netdata_cachestat_pid_t *pu
 {
     netdata_publish_cachestat_t *curr = cachestat_pid[current_pid];
     if (!curr) {
-        curr = callocz(1, sizeof(netdata_publish_cachestat_t));
+        curr = ebpf_publish_cachestat_get();
         cachestat_pid[current_pid] = curr;
 
         cachestat_save_pid_values(curr, publish);
@@ -521,7 +565,7 @@ static void read_apps_table()
 {
     netdata_cachestat_pid_t *cv = cachestat_vector;
     uint32_t key;
-    struct pid_stat *pids = root_of_pids;
+    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     int fd = cachestat_maps[NETDATA_CACHESTAT_PID_STATS].map_fd;
     size_t length = sizeof(netdata_cachestat_pid_t)*ebpf_nprocs;
     while (pids) {
@@ -589,7 +633,7 @@ static void ebpf_update_cachestat_cgroup()
  */
 void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    struct target *root = ptr;
+    struct ebpf_target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_CACHESTAT_HIT_RATIO_CHART,
                                "Hit ratio",
                                EBPF_COMMON_DIMENSION_PERCENTAGE,
@@ -694,7 +738,7 @@ static void cachestat_send_global(netdata_publish_cachestat_t *publish)
  * @param publish  output structure.
  * @param root     structure with listed IPs
  */
-void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct pid_on_target *root)
+void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_pid_on_target *root)
 {
     memcpy(&publish->prev, &publish->current,sizeof(publish->current));
     memset(&publish->current, 0, sizeof(publish->current));
@@ -720,9 +764,9 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct pid_on
  *
  * @param root the target list.
 */
-void ebpf_cache_send_apps_data(struct target *root)
+void ebpf_cache_send_apps_data(struct ebpf_target *root)
 {
-    struct target *w;
+    struct ebpf_target *w;
     collected_number value;
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_CACHESTAT_HIT_RATIO_CHART);
@@ -1092,6 +1136,11 @@ static void cachestat_collector(ebpf_module_t *em)
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_cache_send_apps_data(apps_groups_root_target);
 
+#ifdef NETDATA_DEV_MODE
+        if (ebpf_aral_cachestat_pid)
+            ebpf_send_data_aral_chart(ebpf_aral_cachestat_pid, em);
+#endif
+
         if (cgroups)
             ebpf_cachestat_send_cgroup_data(update_every);
 
@@ -1167,10 +1216,11 @@ static void ebpf_create_memory_charts(ebpf_module_t *em)
  */
 static void ebpf_cachestat_allocate_global_vectors(int apps)
 {
-    if (apps)
+    if (apps) {
         cachestat_pid = callocz((size_t)pid_max, sizeof(netdata_publish_cachestat_t *));
-
-    cachestat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_cachestat_pid_t));
+        ebpf_cachestat_aral_init();
+        cachestat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_cachestat_pid_t));
+    }
 
     cachestat_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
@@ -1289,7 +1339,13 @@ void *ebpf_cachestat_thread(void *ptr)
 
     pthread_mutex_lock(&lock);
     ebpf_update_stats(&plugin_statistics, em);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
     ebpf_create_memory_charts(em);
+#ifdef NETDATA_DEV_MODE
+    if (ebpf_aral_cachestat_pid)
+        ebpf_statistic_create_aral_chart(NETDATA_EBPF_CACHESTAT_ARAL_NAME, em);
+#endif
+
     pthread_mutex_unlock(&lock);
 
     cachestat_collector(em);

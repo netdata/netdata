@@ -5,6 +5,10 @@
 #include "ebpf.h"
 #include "ebpf_socket.h"
 
+// ----------------------------------------------------------------------------
+// ARAL vectors used to speed up processing
+ARAL *ebpf_aral_socket_pid = NULL;
+
 /*****************************************************************
  *
  *  GLOBAL VARIABLES
@@ -428,6 +432,46 @@ static inline int ebpf_socket_load_and_attach(struct socket_bpf *obj, ebpf_modul
     return ret;
 }
 #endif
+
+/*****************************************************************
+ *
+ *  ARAL FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * eBPF socket Aral init
+ *
+ * Initiallize array allocator that will be used when integration with apps is enabled.
+ */
+static inline void ebpf_socket_aral_init()
+{
+    ebpf_aral_socket_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_SOCKET_ARAL_NAME, sizeof(ebpf_socket_publish_apps_t));
+}
+
+/**
+ * eBPF socket get
+ *
+ * Get a ebpf_socket_publish_apps_t entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+ebpf_socket_publish_apps_t *ebpf_socket_stat_get(void)
+{
+    ebpf_socket_publish_apps_t *target = aral_mallocz(ebpf_aral_socket_pid);
+    memset(target, 0, sizeof(ebpf_socket_publish_apps_t));
+    return target;
+}
+
+/**
+ * eBPF socket release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_socket_release(ebpf_socket_publish_apps_t *stat)
+{
+    aral_freez(ebpf_aral_socket_pid, stat);
+}
 
 /*****************************************************************
  *
@@ -958,7 +1002,7 @@ static void ebpf_socket_send_data(ebpf_module_t *em)
  *
  * @return it returns the sum of all PIDs
  */
-long long ebpf_socket_sum_values_for_pids(struct pid_on_target *root, size_t offset)
+long long ebpf_socket_sum_values_for_pids(struct ebpf_pid_on_target *root, size_t offset)
 {
     long long ret = 0;
     while (root) {
@@ -980,11 +1024,11 @@ long long ebpf_socket_sum_values_for_pids(struct pid_on_target *root, size_t off
  * @param em   the structure with thread information
  * @param root the target list.
  */
-void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
+void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
 {
     UNUSED(em);
 
-    struct target *w;
+    struct ebpf_target *w;
     collected_number value;
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_CONNECTION_TCP_V4);
@@ -1217,7 +1261,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
  */
 void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    struct target *root = ptr;
+    struct ebpf_target *root = ptr;
     int order = 20080;
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_CONNECTION_TCP_V4,
                                "Calls to tcp_v4_connection", EBPF_COMMON_DIMENSION_CONNECTIONS,
@@ -2227,7 +2271,7 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
 {
     ebpf_socket_publish_apps_t *curr = socket_bandwidth_curr[current_pid];
     if (!curr) {
-        curr = callocz(1, sizeof(ebpf_socket_publish_apps_t));
+        curr = ebpf_socket_stat_get();
         socket_bandwidth_curr[current_pid] = curr;
     }
 
@@ -2275,7 +2319,7 @@ static void ebpf_socket_update_apps_data()
     int fd = socket_maps[NETDATA_SOCKET_TABLE_BANDWIDTH].map_fd;
     ebpf_bandwidth_t *eb = bandwidth_vector;
     uint32_t key;
-    struct pid_stat *pids = root_of_pids;
+    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     while (pids) {
         key = pids->pid;
 
@@ -2904,6 +2948,11 @@ static void socket_collector(ebpf_module_t *em)
         if (socket_apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_socket_send_apps_data(em, apps_groups_root_target);
 
+#ifdef NETDATA_DEV_MODE
+        if (ebpf_aral_socket_pid)
+            ebpf_send_data_aral_chart(ebpf_aral_socket_pid, em);
+#endif
+
         if (cgroups)
             ebpf_socket_send_cgroup_data(update_every);
 
@@ -2947,10 +2996,11 @@ static void ebpf_socket_allocate_global_vectors(int apps)
     memset(socket_publish_aggregated, 0 ,NETDATA_MAX_SOCKET_VECTOR * sizeof(netdata_publish_syscall_t));
     socket_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
 
-    if (apps)
+    if (apps) {
+        ebpf_socket_aral_init();
         socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
-
-    bandwidth_vector = callocz((size_t)ebpf_nprocs, sizeof(ebpf_bandwidth_t));
+        bandwidth_vector = callocz((size_t)ebpf_nprocs, sizeof(ebpf_bandwidth_t));
+    }
 
     socket_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_socket_t));
     if (network_viewer_opt.enabled) {
@@ -3722,7 +3772,7 @@ static void link_hostnames(char *parse)
         ebpf_network_viewer_hostname_list_t *hostname = callocz(1 , sizeof(ebpf_network_viewer_hostname_list_t));
         hostname->value = strdupz(parse);
         hostname->hash = simple_hash(parse);
-        hostname->value_pattern = simple_pattern_create(parse, NULL, SIMPLE_PATTERN_EXACT);
+        hostname->value_pattern = simple_pattern_create(parse, NULL, SIMPLE_PATTERN_EXACT, true);
 
         link_hostname((!neg)?&network_viewer_opt.included_hostnames:&network_viewer_opt.excluded_hostnames,
                       hostname);
@@ -3964,6 +4014,12 @@ void *ebpf_socket_thread(void *ptr)
     ebpf_create_global_charts(em);
 
     ebpf_update_stats(&plugin_statistics, em);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
+
+#ifdef NETDATA_DEV_MODE
+    if (ebpf_aral_socket_pid)
+        ebpf_statistic_create_aral_chart(NETDATA_EBPF_SOCKET_ARAL_NAME, em);
+#endif
 
     pthread_mutex_unlock(&lock);
 

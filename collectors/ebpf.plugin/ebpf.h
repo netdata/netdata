@@ -143,6 +143,8 @@ enum ebpf_threads_status {
 // Statistics charts
 #define NETDATA_EBPF_THREADS "ebpf_threads"
 #define NETDATA_EBPF_LOAD_METHOD "ebpf_load_methods"
+#define NETDATA_EBPF_KERNEL_MEMORY "ebpf_kernel_memory"
+#define NETDATA_EBPF_HASH_TABLES_LOADED "ebpf_hash_tables_count"
 
 // Log file
 #define NETDATA_DEVELOPER_LOG_FILE "developer.log"
@@ -235,7 +237,7 @@ void ebpf_create_charts_on_apps(char *name,
                                        char *charttype,
                                        int order,
                                        char *algorithm,
-                                       struct target *root,
+                                       struct ebpf_target *root,
                                        int update_every,
                                        char *module);
 
@@ -264,16 +266,15 @@ void ebpf_pid_file(char *filename, size_t length);
 
 // Common variables
 extern int debug_enabled;
-extern struct pid_stat *root_of_pids;
+extern struct ebpf_pid_stat *ebpf_root_of_pids;
 extern ebpf_cgroup_target_t *ebpf_cgroup_pids;
 extern char *ebpf_algorithms[];
 extern struct config collector_config;
-extern ebpf_process_stat_t *global_process_stat;
 extern netdata_ebpf_cgroup_shm_t shm_ebpf_cgroup;
 extern int shm_fd_ebpf_cgroup;
 extern sem_t *shm_sem_ebpf_cgroup;
 extern pthread_mutex_t mutex_cgroup_shm;
-extern size_t all_pids_count;
+extern size_t ebpf_all_pids_count;
 extern ebpf_plugin_stats_t plugin_statistics;
 #ifdef LIBBPF_MAJOR_VERSION
 extern struct btf *default_btf;
@@ -293,6 +294,7 @@ void ebpf_write_chart_obsolete(char *type, char *id, char *title, char *units, c
                                       char *charttype, char *context, int order, int update_every);
 void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, char **dimensions, uint32_t end);
 void ebpf_update_disabled_plugin_stats(ebpf_module_t *em);
+ARAL *ebpf_allocate_pid_aral(char *name, size_t size);
 extern ebpf_filesystem_partitions_t localfs[];
 extern ebpf_sync_syscalls_t local_syscalls[];
 extern int ebpf_exit_plugin;

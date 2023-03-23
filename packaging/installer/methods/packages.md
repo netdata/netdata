@@ -2,13 +2,13 @@
 title: "Install Netdata using native DEB/RPM packages."
 description: "Instructions for how to install Netdata using native DEB or RPM packages."
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/packages.md"
-sidebar_label: "Install Netdata using native DEB/RPM packages."
+sidebar_label: "Native DEB/RPM packages"
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Installation"
+learn_rel_path: "Installation/Installation methods"
+sidebar_position: 20
 -->
 
-# Installing Netdata using native DEB or RPM packages.
+# Install Netdata using native DEB/RPM packages.
 
 For most common Linux distributions that use either DEB or RPM packages, Netdata provides pre-built native packages
 for current releases in-line with
@@ -41,7 +41,7 @@ Under each of those directories is a directory for each supported release of tha
 directory for each supported CPU architecture which contains the actual repository.
 
 For example, for stable release packages for RHEL 9 on 64-bit x86, the full URL for the repository would be
-https://repo.netdata.cloud/repos/stable/el/9/x86\_64/
+https://repo.netdata.cloud/repos/stable/el/9/x86_64/
 
 Our RPM packages and repository metadata are signed using a GPG key with a user name of ‘Netdatabot’. The
 current key fingerprint is `6588FDD7B14721FE7C3115E6F9177B5265F56346`. The associated public key can be fetched from

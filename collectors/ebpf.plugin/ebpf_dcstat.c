@@ -3,6 +3,10 @@
 #include "ebpf.h"
 #include "ebpf_dcstat.h"
 
+// ----------------------------------------------------------------------------
+// ARAL vectors used to speed up processing
+ARAL *ebpf_aral_dcstat_pid = NULL;
+
 static char *dcstat_counter_dimension_name[NETDATA_DCSTAT_IDX_END] = { "ratio", "reference", "slow", "miss" };
 static netdata_syscall_stat_t dcstat_counter_aggregated_data[NETDATA_DCSTAT_IDX_END];
 static netdata_publish_syscall_t dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_END];
@@ -329,6 +333,46 @@ static void ebpf_dcstat_exit(void *ptr)
 
 /*****************************************************************
  *
+ *  ARAL FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * eBPF directory cache Aral init
+ *
+ * Initiallize array allocator that will be used when integration with apps is enabled.
+ */
+static inline void ebpf_dcstat_aral_init()
+{
+    ebpf_aral_dcstat_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_DCSTAT_ARAL_NAME, sizeof(netdata_publish_dcstat_t));
+}
+
+/**
+ * eBPF publish dcstat get
+ *
+ * Get a netdata_publish_dcstat_t entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+netdata_publish_dcstat_t *ebpf_publish_dcstat_get(void)
+{
+    netdata_publish_dcstat_t *target = aral_mallocz(ebpf_aral_dcstat_pid);
+    memset(target, 0, sizeof(netdata_publish_dcstat_t));
+    return target;
+}
+
+/**
+ * eBPF dcstat release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_dcstat_release(netdata_publish_dcstat_t *stat)
+{
+    aral_freez(ebpf_aral_dcstat_pid, stat);
+}
+
+/*****************************************************************
+ *
  *  APPS
  *
  *****************************************************************/
@@ -342,7 +386,7 @@ static void ebpf_dcstat_exit(void *ptr)
  */
 void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    struct target *root = ptr;
+    struct ebpf_target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_DC_HIT_CHART,
                                "Percentage of files inside directory cache",
                                EBPF_COMMON_DIMENSION_PERCENTAGE,
@@ -432,7 +476,7 @@ static void dcstat_fill_pid(uint32_t current_pid, netdata_dcstat_pid_t *publish)
 {
     netdata_publish_dcstat_t *curr = dcstat_pid[current_pid];
     if (!curr) {
-        curr = callocz(1, sizeof(netdata_publish_dcstat_t));
+        curr = ebpf_publish_dcstat_get();
         dcstat_pid[current_pid] = curr;
     }
 
@@ -448,7 +492,7 @@ static void read_apps_table()
 {
     netdata_dcstat_pid_t *cv = dcstat_vector;
     uint32_t key;
-    struct pid_stat *pids = root_of_pids;
+    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     int fd = dcstat_maps[NETDATA_DCSTAT_PID_STATS].map_fd;
     size_t length = sizeof(netdata_dcstat_pid_t)*ebpf_nprocs;
     while (pids) {
@@ -540,7 +584,7 @@ static void ebpf_dc_read_global_table()
  * @param publish  output structure.
  * @param root     structure with listed IPs
  */
-void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct pid_on_target *root)
+void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct ebpf_pid_on_target *root)
 {
     memset(&publish->curr, 0, sizeof(netdata_dcstat_pid_t));
     netdata_dcstat_pid_t *dst = &publish->curr;
@@ -563,9 +607,9 @@ void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct pid_on_targe
  *
  * @param root the target list.
 */
-void ebpf_dcache_send_apps_data(struct target *root)
+void ebpf_dcache_send_apps_data(struct ebpf_target *root)
 {
-    struct target *w;
+    struct ebpf_target *w;
     collected_number value;
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_HIT_CHART);
@@ -1009,6 +1053,11 @@ static void dcstat_collector(ebpf_module_t *em)
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_dcache_send_apps_data(apps_groups_root_target);
 
+#ifdef NETDATA_DEV_MODE
+        if (ebpf_aral_dcstat_pid)
+            ebpf_send_data_aral_chart(ebpf_aral_dcstat_pid, em);
+#endif
+
         if (cgroups)
             ebpf_dc_send_cgroup_data(update_every);
 
@@ -1064,10 +1113,12 @@ static void ebpf_create_filesystem_charts(int update_every)
  */
 static void ebpf_dcstat_allocate_global_vectors(int apps)
 {
-    if (apps)
+    if (apps) {
+        ebpf_dcstat_aral_init();
         dcstat_pid = callocz((size_t)pid_max, sizeof(netdata_publish_dcstat_t *));
+        dcstat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_dcstat_pid_t));
+    }
 
-    dcstat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_dcstat_pid_t));
     dcstat_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
     memset(dcstat_counter_aggregated_data, 0, NETDATA_DCSTAT_IDX_END * sizeof(netdata_syscall_stat_t));
@@ -1155,6 +1206,12 @@ void *ebpf_dcstat_thread(void *ptr)
     pthread_mutex_lock(&lock);
     ebpf_create_filesystem_charts(em->update_every);
     ebpf_update_stats(&plugin_statistics, em);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
+#ifdef NETDATA_DEV_MODE
+    if (ebpf_aral_dcstat_pid)
+        ebpf_statistic_create_aral_chart(NETDATA_EBPF_DCSTAT_ARAL_NAME, em);
+#endif
+
     pthread_mutex_unlock(&lock);
 
     dcstat_collector(em);

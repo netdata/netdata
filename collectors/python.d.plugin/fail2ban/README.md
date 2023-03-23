@@ -4,10 +4,10 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/pyth
 sidebar_label: "Fail2ban"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/Apps"
+learn_rel_path: "Integrations/Monitor/Apps"
 -->
 
-# Fail2ban monitoring with Netdata
+# Fail2ban collector
 
 Monitors the fail2ban log file to show all bans for all active jails.
 
@@ -80,6 +80,26 @@ local:
 If no configuration is given, module will attempt to read log file at `/var/log/fail2ban.log` and conf file
 at `/etc/fail2ban/jail.local`. If conf file is not found default jail is `ssh`.
 
----
 
+
+
+### Troubleshooting
+
+To troubleshoot issues with the `fail2ban` module, run the `python.d.plugin` with the debug option enabled. The 
+output will give you the output of the data collection job or error messages on why the collector isn't working.
+
+First, navigate to your plugins directory, usually they are located under `/usr/libexec/netdata/plugins.d/`. If that's 
+not the case on your system, open `netdata.conf` and look for the setting `plugins directory`. Once you're in the 
+plugin's directory, switch to the `netdata` user.
+
+```bash
+cd /usr/libexec/netdata/plugins.d/
+sudo su -s /bin/bash netdata
+```
+
+Now you can manually run the `fail2ban` module in debug mode:
+
+```bash
+./python.d.plugin fail2ban debug trace
+```
 

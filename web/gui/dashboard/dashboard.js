@@ -1468,7 +1468,7 @@ NETDATA.options = {
 
         sync_selection: true,       // enable or disable selection sync
 
-        pan_and_zoom_delay: 50,     // when panning or zooming, how ofter to update the chart
+        pan_and_zoom_delay: 50,     // when panning or zooming, how often to update the chart
 
         sync_pan_and_zoom: true,    // enable or disable pan and zoom sync
 

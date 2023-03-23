@@ -58,7 +58,7 @@
 #include "exporting/exporting_engine.h"
 
 // the netdata API
-#include "web/api/web_api_v1.h"
+#include "web/server/web_client.h"
 
 // all data collection plugins
 #include "collectors/all.h"

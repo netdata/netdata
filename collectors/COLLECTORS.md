@@ -1,46 +1,61 @@
 <!--
-title: "Supported collectors list"
+title: "Monitor anything with Netdata"
 description: "Netdata gathers real-time metrics from hundreds of data sources using collectors. Most require zero configuration and are pre-configured out of the box."
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/COLLECTORS.md"
-sidebar_label: "Supported collectors list"
+sidebar_label: "Monitor"
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "References/Collectors"
+learn_rel_path: "Integrations/Monitor"
 -->
 
-# Supported collectors list
+# Monitor anything with Netdata
 
 Netdata uses collectors to help you gather metrics from your favorite applications and services and view them in
 real-time, interactive charts. The following list includes collectors for both external services/applications and
 internal system metrics.
 
 Learn more
-about [how collectors work](https://github.com/netdata/netdata/blob/master/docs/collect/how-collectors-work.md), and
+about [how collectors work](https://github.com/netdata/netdata/blob/master/collectors/README.md), and
 then learn how to [enable or
-configure](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md) any of the below collectors using the same process.
+configure](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md#enable-and-disable-a-specific-collection-module) any of the below collectors using the same process.
 
 Some collectors have both Go and Python versions as we continue our effort to migrate all collectors to Go. In these
 cases, _Netdata always prioritizes the Go version_, and we highly recommend you use the Go versions for the best
 experience.
 
 If you want to use a Python version of a collector, you need to
-explicitly [disable the Go version](https://github.com/netdata/netdata/blob/masterhttps://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md),
+explicitly [disable the Go version](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md#enable-and-disable-a-specific-collection-module),
 and enable the Python version. Netdata then skips the Go version and attempts to load the Python version and its
 accompanying configuration file.
 
+## Add your application to Netdata
+
 If you don't see the app/service you'd like to monitor in this list:
+
+- If your application has a Prometheus endpoint, Netdata can monitor it! Look at our 
+  [generic Prometheus collector](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/README.md).
+
+- If your application is instrumented to expose [StatsD](https://blog.netdata.cloud/introduction-to-statsd/) metrics, 
+  see our [generic StatsD collector](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/README.md).
+
+- If you have data in CSV, JSON, XML or other popular formats, you may be able to use our 
+  [generic structured data (Pandas) collector](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/pandas/README.md),
 
 - Check out our [GitHub issues](https://github.com/netdata/netdata/issues). Use the search bar to look for previous
   discussions about that collector—we may be looking for assistance from users such as yourself!
+
 - If you don't see the collector there, you can make
   a [feature request](https://github.com/netdata/netdata/issues/new/choose) on GitHub.
+
 - If you have basic software development skills, you can add your own plugin
   in [Go](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin#how-to-develop-a-collector)
   or [Python](https://github.com/netdata/netdata/blob/master/docs/guides/python-collector.md)
 
-Supported Collectors List:
+## Available Collectors
 
-- [Service and application collectors](#service-and-application-collectors)
+- [Supported collectors list](#supported-collectors-list)
+  - [Add your application to Netdata](#add-your-application-to-netdata)
+  - [Available Collectors](#available-collectors)
+  - [Service and application collectors](#service-and-application-collectors)
     - [Generic](#generic)
     - [APM (application performance monitoring)](#apm-application-performance-monitoring)
     - [Containers and VMs](#containers-and-vms)
@@ -56,7 +71,7 @@ Supported Collectors List:
     - [Search](#search)
     - [Storage](#storage)
     - [Web](#web)
-- [System collectors](#system-collectors)
+  - [System collectors](#system-collectors)
     - [Applications](#applications)
     - [Disks and filesystems](#disks-and-filesystems)
     - [eBPF](#ebpf)
@@ -67,10 +82,10 @@ Supported Collectors List:
     - [Processes](#processes)
     - [Resources](#resources)
     - [Users](#users)
-- [Netdata collectors](#netdata-collectors)
-- [Orchestrators](#orchestrators)
-- [Third-party collectors](#third-party-collectors)
-- [Etc](#etc)
+  - [Netdata collectors](#netdata-collectors)
+  - [Orchestrators](#orchestrators)
+  - [Third-party collectors](#third-party-collectors)
+  - [Etc](#etc)
 
 ## Service and application collectors
 
@@ -193,7 +208,7 @@ configure any of these collectors according to your setup and infrastructure.
   operations, and more.
 - [kube-proxy](https://github.com/netdata/go.d.plugin/blob/master/modules/k8s_kubeproxy/README.md): Collect
   metrics, such as syncing proxy rules and REST client requests, from one or more instances of `kube-proxy`.
-- [Service discovery](https://github.com/netdata/agent-service-discovery/README.md): Find what services are running on a
+- [Service discovery](https://github.com/netdata/agent-service-discovery/blob/master/README.md): Find what services are running on a
   cluster's pods, converts that into configuration files, and exports them so they can be monitored by Netdata.
 
 ### Logs
@@ -206,8 +221,7 @@ configure any of these collectors according to your setup and infrastructure.
   server log files and provide summary (client, traffic) metrics.
 - [Squid web server logs](https://github.com/netdata/go.d.plugin/blob/master/modules/squidlog/README.md): Tail Squid
   access logs to return the volume of requests, types of requests, bandwidth, and much more.
-- [Web server logs (Go version for Apache,
-  NGINX)](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md/): Tail access logs and provide
+- [Web server logs (Go version for Apache, NGINX)](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md): Tail access logs and provide
   very detailed web server performance statistics. This module is able to parse 200k+ rows in less than half a second.
 - [Web server logs (Apache, NGINX)](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md): Tail
   access log
@@ -260,7 +274,7 @@ configure any of these collectors according to your setup and infrastructure.
 - [NSD](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/nsd/README.md): Monitor nameserver
   performance metrics using the `nsd-control`
   tool.
-- [NTP daemon](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/ntpd): Monitor the system variables
+- [NTP daemon](https://github.com/netdata/go.d.plugin/blob/master/modules/ntpd/README.md): Monitor the system variables
   of the local `ntpd` daemon (optionally including variables of the polled peers) using the NTP Control Message Protocol
   via a UDP socket.
 - [OpenSIPS](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/opensips/README.md): Collect
@@ -273,7 +287,7 @@ configure any of these collectors according to your setup and infrastructure.
   API.
 - [PowerDNS Authoritative Server](https://github.com/netdata/go.d.plugin/blob/master/modules/powerdns/README.md):
   Monitor one or more instances of the nameserver software to collect questions, events, and latency metrics.
-- [PowerDNS Recursor](https://github.com/netdata/go.d.plugin/blob/master/modules/powerdns/README.md_recursor):
+- [PowerDNS Recursor](https://github.com/netdata/go.d.plugin/blob/master/modules/powerdns/README.md#recursor):
   Gather incoming/outgoing questions, drops, timeouts, and cache usage from any number of DNS recursor instances.
 - [RetroShare](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/retroshare/README.md): Monitor
   application bandwidth, peers, and DHT
@@ -385,19 +399,18 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
 - [Monit](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/monit/README.md): Monitor statuses
   of targets (service-checks) using the XML
   stats interface.
-- [WMI (Windows Management Instrumentation)
-  exporter](https://github.com/netdata/go.d.plugin/blob/master/modules/wmi/README.md): Collect CPU, memory,
-  network, disk, OS, system, and log-in metrics scraping `wmi_exporter`.
+- [Windows](https://github.com/netdata/go.d.plugin/blob/master/modules/windows/README.md): Collect CPU, memory,
+  network, disk, OS, system, and log-in metrics scraping [windows_exporter](https://github.com/prometheus-community/windows_exporter).
 
 ### Disks and filesystems
 
 - [BCACHE](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Monitor BCACHE statistics
-  with the the `proc.plugin` collector.
+  with the `proc.plugin` collector.
 - [Block devices](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Gather metrics about
   the health and performance of block
-  devices using the the `proc.plugin` collector.
+  devices using the `proc.plugin` collector.
 - [Btrfs](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Monitors Btrfs filesystems
-  with the the `proc.plugin` collector.
+  with the `proc.plugin` collector.
 - [Device mapper](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Gather metrics about
   the Linux device mapper with the proc
   collector.
@@ -411,10 +424,9 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
   read/write latency.
 - [NFS file servers and clients](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md):
   Gather operations, utilization, and space usage
-  using the the `proc.plugin` collector.
+  using the `proc.plugin` collector.
 - [RAID arrays](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Collect health, disk
-  status, operation status, and more with the
-  the `proc.plugin` collector.
+  status, operation status, and more with the `proc.plugin` collector.
 - [Veritas Volume Manager](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Gather
   metrics about the Veritas Volume Manager (VVM).
 - [ZFS](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Monitor bandwidth and
@@ -462,8 +474,7 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
 ### Memory
 
 - [Available memory](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Tracks changes in
-  available RAM using the the `proc.plugin`
-  collector.
+  available RAM using the `proc.plugin` collector.
 - [Committed memory](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Monitor committed
   memory using the `proc.plugin` collector.
 - [Huge pages](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Gather metrics about
@@ -664,6 +675,7 @@ $ sudo systemctl restart netdata
 - [SSH](https://github.com/Yaser-Amiri/netdata-ssh-module): Monitor failed authentication requests of an SSH server.
 - [ClickHouse](https://github.com/netdata/community/tree/main/collectors/python.d.plugin/clickhouse):
   Monitor [ClickHouse](https://clickhouse.com/) database.
+- [Ethtool](https://github.com/ghanapunq/netdata_ethtool_plugin): Monitor network interface with ethtool.
 
 ## Etc
 
@@ -671,3 +683,5 @@ $ sudo systemctl restart netdata
   example `charts.d` collector.
 - [python.d example](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/example/README.md): An
   example `python.d` collector.
+- [go.d example](https://github.com/netdata/go.d.plugin/blob/master/modules/example/README.md): An
+  example `go.d` collector.

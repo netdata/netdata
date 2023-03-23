@@ -5,15 +5,13 @@
 
 void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const char *startline, const char *separator, const char *endline, const char *betweenlines) {
     //info("RRD2CSV(): %s: BEGIN", r->st->id);
-    QUERY_TARGET *qt = r->internal.qt;
     long c, i;
-    const long used = qt->query.used;
+    const long used = (long)r->d;
 
     // print the csv header
     for(c = 0, i = 0; c < used ; c++) {
-        if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
-        if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
-        if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
+        if(!rrdr_dimension_should_be_exposed(r->od[c], options))
+            continue;
 
         if(!i) {
             buffer_strcat(wb, startline);
@@ -23,7 +21,7 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
         }
         buffer_strcat(wb, separator);
         if(options & RRDR_OPTION_LABEL_QUOTES) buffer_strcat(wb, "\"");
-        buffer_strcat(wb, string2str(qt->query.array[c].dimension.name));
+        buffer_strcat(wb, string2str(r->dn[c]));
         if(options & RRDR_OPTION_LABEL_QUOTES) buffer_strcat(wb, "\"");
         i++;
     }
@@ -32,9 +30,8 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
     if(format == DATASOURCE_CSV_MARKDOWN) {
         // print the --- line after header
         for(c = 0, i = 0; c < used ;c++) {
-            if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
-            if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
-            if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
+            if(!rrdr_dimension_should_be_exposed(r->od[c], options))
+                continue;
 
             if(!i) {
                 buffer_strcat(wb, startline);
@@ -76,7 +73,7 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
 
         if((options & RRDR_OPTION_SECONDS) || (options & RRDR_OPTION_MILLISECONDS)) {
             // print the timestamp of the line
-            buffer_rrd_value(wb, (NETDATA_DOUBLE)now);
+            buffer_print_netdata_double(wb, (NETDATA_DOUBLE) now);
             // in ms
             if(options & RRDR_OPTION_MILLISECONDS) buffer_strcat(wb, "000");
         }
@@ -87,7 +84,6 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
             buffer_date(wb, tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
         }
 
-        int set_min_max = 0;
         if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
             total = 0;
             for(c = 0; c < used ;c++) {
@@ -102,14 +98,12 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
             }
             // prevent a division by zero
             if(total == 0) total = 1;
-            set_min_max = 1;
         }
 
         // for each dimension
         for(c = 0; c < used ;c++) {
-            if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
-            if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
-            if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
+            if(!rrdr_dimension_should_be_exposed(r->od[c], options))
+                continue;
 
             buffer_strcat(wb, separator);
 
@@ -128,16 +122,16 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
                 if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
                     n = n * 100 / total;
 
-                    if(unlikely(set_min_max)) {
-                        r->min = r->max = n;
-                        set_min_max = 0;
+                    if(unlikely(i == start && c == 0)) {
+                        r->view.min = r->view.max = n;
                     }
-
-                    if(n < r->min) r->min = n;
-                    if(n > r->max) r->max = n;
+                    else {
+                        if (n < r->view.min) r->view.min = n;
+                        if (n > r->view.max) r->view.max = n;
+                    }
                 }
 
-                buffer_rrd_value(wb, n);
+                buffer_print_netdata_double(wb, n);
             }
         }
 

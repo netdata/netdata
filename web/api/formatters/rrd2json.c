@@ -3,67 +3,71 @@
 #include "web/api/web_api_v1.h"
 #include "database/storage_engine.h"
 
+inline bool query_target_has_percentage_units(struct query_target *qt) {
+    if(qt->request.options & RRDR_OPTION_PERCENTAGE ||
+       qt->request.time_group_method == RRDR_GROUPING_CV)
+        return true;
+
+    return false;
+}
+
+bool query_target_aggregatable(struct query_target *qt) {
+    return (qt->request.options & RRDR_OPTION_RETURN_RAW);
+}
+
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb) {
     rrdset2json(st, wb, NULL, NULL, 0);
 }
 
-void rrdr_buffer_print_format(BUFFER *wb, uint32_t format)  {
+const char *rrdr_format_to_string(DATASOURCE_FORMAT format)  {
     switch(format) {
         case DATASOURCE_JSON:
-            buffer_strcat(wb, DATASOURCE_FORMAT_JSON);
-            break;
+            return DATASOURCE_FORMAT_JSON;
+
+        case DATASOURCE_JSON2:
+            return DATASOURCE_FORMAT_JSON2;
 
         case DATASOURCE_DATATABLE_JSON:
-            buffer_strcat(wb, DATASOURCE_FORMAT_DATATABLE_JSON);
-            break;
+            return DATASOURCE_FORMAT_DATATABLE_JSON;
 
         case DATASOURCE_DATATABLE_JSONP:
-            buffer_strcat(wb, DATASOURCE_FORMAT_DATATABLE_JSONP);
-            break;
+            return DATASOURCE_FORMAT_DATATABLE_JSONP;
 
         case DATASOURCE_JSONP:
-            buffer_strcat(wb, DATASOURCE_FORMAT_JSONP);
-            break;
+            return DATASOURCE_FORMAT_JSONP;
 
         case DATASOURCE_SSV:
-            buffer_strcat(wb, DATASOURCE_FORMAT_SSV);
-            break;
+            return DATASOURCE_FORMAT_SSV;
 
         case DATASOURCE_CSV:
-            buffer_strcat(wb, DATASOURCE_FORMAT_CSV);
-            break;
+            return DATASOURCE_FORMAT_CSV;
 
         case DATASOURCE_TSV:
-            buffer_strcat(wb, DATASOURCE_FORMAT_TSV);
-            break;
+            return DATASOURCE_FORMAT_TSV;
 
         case DATASOURCE_HTML:
-            buffer_strcat(wb, DATASOURCE_FORMAT_HTML);
-            break;
+            return DATASOURCE_FORMAT_HTML;
 
         case DATASOURCE_JS_ARRAY:
-            buffer_strcat(wb, DATASOURCE_FORMAT_JS_ARRAY);
-            break;
+            return DATASOURCE_FORMAT_JS_ARRAY;
 
         case DATASOURCE_SSV_COMMA:
-            buffer_strcat(wb, DATASOURCE_FORMAT_SSV_COMMA);
-            break;
+            return DATASOURCE_FORMAT_SSV_COMMA;
 
         default:
-            buffer_strcat(wb, "unknown");
-            break;
+            return "unknown";
     }
 }
 
 int rrdset2value_api_v1(
-          RRDSET *st
+        RRDSET *st
         , BUFFER *wb
         , NETDATA_DOUBLE *n
         , const char *dimensions
         , size_t points
         , time_t after
         , time_t before
-        , RRDR_GROUPING group_method
+        , RRDR_TIME_GROUPING group_method
         , const char *group_options
         , time_t resampling_time
         , uint32_t options
@@ -105,15 +109,15 @@ int rrdset2value_api_v1(
     }
 
     if(db_points_read)
-        *db_points_read += r->internal.db_points_read;
+        *db_points_read += r->stats.db_points_read;
 
     if(db_points_per_tier) {
         for(size_t t = 0; t < storage_tiers ;t++)
-            db_points_per_tier[t] += r->internal.tier_points_read[t];
+            db_points_per_tier[t] += r->internal.qt->db.tiers[t].points;
     }
 
     if(result_points_generated)
-        *result_points_generated += r->internal.result_points_generated;
+        *result_points_generated += r->stats.result_points_generated;
 
     if(rrdr_rows(r) == 0) {
         if(db_after)  *db_after  = 0;
@@ -125,14 +129,14 @@ int rrdset2value_api_v1(
     }
 
     if(wb) {
-        if (r->result_options & RRDR_RESULT_OPTION_RELATIVE)
+        if (r->view.flags & RRDR_RESULT_FLAG_RELATIVE)
             buffer_no_cacheable(wb);
-        else if (r->result_options & RRDR_RESULT_OPTION_ABSOLUTE)
+        else if (r->view.flags & RRDR_RESULT_FLAG_ABSOLUTE)
             buffer_cacheable(wb);
     }
 
-    if(db_after)  *db_after  = r->after;
-    if(db_before) *db_before = r->before;
+    if(db_after)  *db_after  = r->view.after;
+    if(db_before) *db_before = r->view.before;
 
     long i = (!(options & RRDR_OPTION_REVERSED))?(long)rrdr_rows(r) - 1:0;
     *n = rrdr2value(r, i, options, value_is_null, anomaly_rate);
@@ -144,108 +148,144 @@ cleanup:
     return ret;
 }
 
+static inline void buffer_json_member_add_key_only(BUFFER *wb, const char *key) {
+    buffer_print_json_comma_newline_spacing(wb);
+    buffer_print_json_key(wb, key);
+    buffer_fast_strcat(wb, ":", 1);
+    wb->json.stack[wb->json.depth].count++;
+}
+
+static inline void buffer_json_member_add_string_open(BUFFER *wb, const char *key) {
+    buffer_json_member_add_key_only(wb, key);
+    buffer_strcat(wb, wb->json.value_quote);
+}
+
+static inline void buffer_json_member_add_string_close(BUFFER *wb) {
+    buffer_strcat(wb, wb->json.value_quote);
+}
+
 int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *latest_timestamp) {
+    wrapper_begin_t wrapper_begin = rrdr_json_wrapper_begin;
+    wrapper_end_t wrapper_end = rrdr_json_wrapper_end;
+
+    if(qt->request.version == 2) {
+        wrapper_begin = rrdr_json_wrapper_begin2;
+        wrapper_end = rrdr_json_wrapper_end2;
+    }
 
     RRDR *r = rrd2rrdr(owa, qt);
+    qt->timings.executed_ut = now_monotonic_usec();
+
     if(!r) {
         buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
 
-    if (r->result_options & RRDR_RESULT_OPTION_CANCEL) {
+    if (r->view.flags & RRDR_RESULT_FLAG_CANCEL) {
         rrdr_free(owa, r);
         return HTTP_RESP_BACKEND_FETCH_FAILED;
     }
 
-    if(r->result_options & RRDR_RESULT_OPTION_RELATIVE)
+    if(r->view.flags & RRDR_RESULT_FLAG_RELATIVE)
         buffer_no_cacheable(wb);
-    else if(r->result_options & RRDR_RESULT_OPTION_ABSOLUTE)
+    else if(r->view.flags & RRDR_RESULT_FLAG_ABSOLUTE)
         buffer_cacheable(wb);
 
     if(latest_timestamp && rrdr_rows(r) > 0)
-        *latest_timestamp = r->before;
+        *latest_timestamp = r->view.before;
 
     DATASOURCE_FORMAT format = qt->request.format;
     RRDR_OPTIONS options = qt->request.options;
-    RRDR_GROUPING group_method = qt->request.group_method;
+
+    qt->timings.group_by_ut = now_monotonic_usec();
 
     switch(format) {
     case DATASOURCE_SSV:
         if(options & RRDR_OPTION_JSON_WRAP) {
-            wb->contenttype = CT_APPLICATION_JSON;
-            rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method);
+            wb->content_type = CT_APPLICATION_JSON;
+            wrapper_begin(r, wb);
+            buffer_json_member_add_string_open(wb, "result");
             rrdr2ssv(r, wb, options, "", " ", "");
-            rrdr_json_wrapper_end(r, wb, format, options, 1);
+            buffer_json_member_add_string_close(wb);
+            wrapper_end(r, wb);
         }
         else {
-            wb->contenttype = CT_TEXT_PLAIN;
+            wb->content_type = CT_TEXT_PLAIN;
             rrdr2ssv(r, wb, options, "", " ", "");
         }
         break;
 
     case DATASOURCE_SSV_COMMA:
         if(options & RRDR_OPTION_JSON_WRAP) {
-            wb->contenttype = CT_APPLICATION_JSON;
-            rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method);
+            wb->content_type = CT_APPLICATION_JSON;
+            wrapper_begin(r, wb);
+            buffer_json_member_add_string_open(wb, "result");
             rrdr2ssv(r, wb, options, "", ",", "");
-            rrdr_json_wrapper_end(r, wb, format, options, 1);
+            buffer_json_member_add_string_close(wb);
+            wrapper_end(r, wb);
         }
         else {
-            wb->contenttype = CT_TEXT_PLAIN;
+            wb->content_type = CT_TEXT_PLAIN;
             rrdr2ssv(r, wb, options, "", ",", "");
         }
         break;
 
     case DATASOURCE_JS_ARRAY:
         if(options & RRDR_OPTION_JSON_WRAP) {
-            wb->contenttype = CT_APPLICATION_JSON;
-            rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method);
-            rrdr2ssv(r, wb, options, "[", ",", "]");
-            rrdr_json_wrapper_end(r, wb, format, options, 0);
+            wb->content_type = CT_APPLICATION_JSON;
+            wrapper_begin(r, wb);
+            buffer_json_member_add_array(wb, "result");
+            rrdr2ssv(r, wb, options, "", ",", "");
+            buffer_json_array_close(wb);
+            wrapper_end(r, wb);
         }
         else {
-            wb->contenttype = CT_APPLICATION_JSON;
+            wb->content_type = CT_APPLICATION_JSON;
             rrdr2ssv(r, wb, options, "[", ",", "]");
         }
         break;
 
     case DATASOURCE_CSV:
         if(options & RRDR_OPTION_JSON_WRAP) {
-            wb->contenttype = CT_APPLICATION_JSON;
-            rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method);
+            wb->content_type = CT_APPLICATION_JSON;
+            wrapper_begin(r, wb);
+            buffer_json_member_add_string_open(wb, "result");
             rrdr2csv(r, wb, format, options, "", ",", "\\n", "");
-            rrdr_json_wrapper_end(r, wb, format, options, 1);
+            buffer_json_member_add_string_close(wb);
+            wrapper_end(r, wb);
         }
         else {
-            wb->contenttype = CT_TEXT_PLAIN;
+            wb->content_type = CT_TEXT_PLAIN;
             rrdr2csv(r, wb, format, options, "", ",", "\r\n", "");
         }
         break;
 
     case DATASOURCE_CSV_MARKDOWN:
         if(options & RRDR_OPTION_JSON_WRAP) {
-            wb->contenttype = CT_APPLICATION_JSON;
-            rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method);
+            wb->content_type = CT_APPLICATION_JSON;
+            wrapper_begin(r, wb);
+            buffer_json_member_add_string_open(wb, "result");
             rrdr2csv(r, wb, format, options, "", "|", "\\n", "");
-            rrdr_json_wrapper_end(r, wb, format, options, 1);
+            buffer_json_member_add_string_close(wb);
+            wrapper_end(r, wb);
         }
         else {
-            wb->contenttype = CT_TEXT_PLAIN;
+            wb->content_type = CT_TEXT_PLAIN;
             rrdr2csv(r, wb, format, options, "", "|", "\r\n", "");
         }
         break;
 
     case DATASOURCE_CSV_JSON_ARRAY:
-        wb->contenttype = CT_APPLICATION_JSON;
+        wb->content_type = CT_APPLICATION_JSON;
         if(options & RRDR_OPTION_JSON_WRAP) {
-            rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method);
-            buffer_strcat(wb, "[\n");
+            wrapper_begin(r, wb);
+            buffer_json_member_add_array(wb, "result");
             rrdr2csv(r, wb, format, options + RRDR_OPTION_LABEL_QUOTES, "[", ",", "]", ",\n");
-            buffer_strcat(wb, "\n]");
-            rrdr_json_wrapper_end(r, wb, format, options, 0);
+            buffer_json_array_close(wb);
+            wrapper_end(r, wb);
         }
         else {
-            wb->contenttype = CT_APPLICATION_JSON;
+            wb->content_type = CT_APPLICATION_JSON;
             buffer_strcat(wb, "[\n");
             rrdr2csv(r, wb, format, options + RRDR_OPTION_LABEL_QUOTES, "[", ",", "]", ",\n");
             buffer_strcat(wb, "\n]");
@@ -254,28 +294,32 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
 
     case DATASOURCE_TSV:
         if(options & RRDR_OPTION_JSON_WRAP) {
-            wb->contenttype = CT_APPLICATION_JSON;
-            rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method);
+            wb->content_type = CT_APPLICATION_JSON;
+            wrapper_begin(r, wb);
+            buffer_json_member_add_string_open(wb, "result");
             rrdr2csv(r, wb, format, options, "", "\t", "\\n", "");
-            rrdr_json_wrapper_end(r, wb, format, options, 1);
+            buffer_json_member_add_string_close(wb);
+            wrapper_end(r, wb);
         }
         else {
-            wb->contenttype = CT_TEXT_PLAIN;
+            wb->content_type = CT_TEXT_PLAIN;
             rrdr2csv(r, wb, format, options, "", "\t", "\r\n", "");
         }
         break;
 
     case DATASOURCE_HTML:
         if(options & RRDR_OPTION_JSON_WRAP) {
-            wb->contenttype = CT_APPLICATION_JSON;
-            rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method);
+            wb->content_type = CT_APPLICATION_JSON;
+            wrapper_begin(r, wb);
+            buffer_json_member_add_string_open(wb, "result");
             buffer_strcat(wb, "<html>\\n<center>\\n<table border=\\\"0\\\" cellpadding=\\\"5\\\" cellspacing=\\\"5\\\">\\n");
             rrdr2csv(r, wb, format, options, "<tr><td>", "</td><td>", "</td></tr>\\n", "");
             buffer_strcat(wb, "</table>\\n</center>\\n</html>\\n");
-            rrdr_json_wrapper_end(r, wb, format, options, 1);
+            buffer_json_member_add_string_close(wb);
+            wrapper_end(r, wb);
         }
         else {
-            wb->contenttype = CT_TEXT_HTML;
+            wb->content_type = CT_TEXT_HTML;
             buffer_strcat(wb, "<html>\n<center>\n<table border=\"0\" cellpadding=\"5\" cellspacing=\"5\">\n");
             rrdr2csv(r, wb, format, options, "<tr><td>", "</td><td>", "</td></tr>\n", "");
             buffer_strcat(wb, "</table>\n</center>\n</html>\n");
@@ -283,56 +327,74 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         break;
 
     case DATASOURCE_DATATABLE_JSONP:
-        wb->contenttype = CT_APPLICATION_X_JAVASCRIPT;
+        wb->content_type = CT_APPLICATION_X_JAVASCRIPT;
 
-        if(options & RRDR_OPTION_JSON_WRAP)
-            rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method);
+        if(options & RRDR_OPTION_JSON_WRAP) {
+            wrapper_begin(r, wb);
+            buffer_json_member_add_key_only(wb, "result");
+        }
 
         rrdr2json(r, wb, options, 1);
 
         if(options & RRDR_OPTION_JSON_WRAP)
-            rrdr_json_wrapper_end(r, wb, format, options, 0);
+            wrapper_end(r, wb);
+
         break;
 
     case DATASOURCE_DATATABLE_JSON:
-        wb->contenttype = CT_APPLICATION_JSON;
+        wb->content_type = CT_APPLICATION_JSON;
 
-        if(options & RRDR_OPTION_JSON_WRAP)
-            rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method);
+        if(options & RRDR_OPTION_JSON_WRAP) {
+            wrapper_begin(r, wb);
+            buffer_json_member_add_key_only(wb, "result");
+        }
 
         rrdr2json(r, wb, options, 1);
 
         if(options & RRDR_OPTION_JSON_WRAP)
-            rrdr_json_wrapper_end(r, wb, format, options, 0);
+            wrapper_end(r, wb);
+
         break;
 
     case DATASOURCE_JSONP:
-        wb->contenttype = CT_APPLICATION_X_JAVASCRIPT;
-        if(options & RRDR_OPTION_JSON_WRAP)
-            rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method);
+        wb->content_type = CT_APPLICATION_X_JAVASCRIPT;
+        if(options & RRDR_OPTION_JSON_WRAP) {
+            wrapper_begin(r, wb);
+            buffer_json_member_add_key_only(wb, "result");
+        }
 
         rrdr2json(r, wb, options, 0);
 
         if(options & RRDR_OPTION_JSON_WRAP)
-            rrdr_json_wrapper_end(r, wb, format, options, 0);
+            wrapper_end(r, wb);
+
         break;
 
     case DATASOURCE_JSON:
     default:
-        wb->contenttype = CT_APPLICATION_JSON;
+        wb->content_type = CT_APPLICATION_JSON;
 
-        if(options & RRDR_OPTION_JSON_WRAP)
-            rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method);
+        if(options & RRDR_OPTION_JSON_WRAP) {
+            wrapper_begin(r, wb);
+            buffer_json_member_add_key_only(wb, "result");
+        }
 
         rrdr2json(r, wb, options, 0);
 
         if(options & RRDR_OPTION_JSON_WRAP) {
-            if(options & RRDR_OPTION_RETURN_JWAR) {
-                rrdr_json_wrapper_anomaly_rates(r, wb, format, options, 0);
-                rrdr2json(r, wb, options | RRDR_OPTION_INTERNAL_AR, 0);
+            if (options & RRDR_OPTION_RETURN_JWAR) {
+                buffer_json_member_add_key_only(wb, "anomaly_rates");
+                rrdr2json(r, wb, options | RRDR_OPTION_INTERNAL_AR, false);
             }
-            rrdr_json_wrapper_end(r, wb, format, options, 0);
+            wrapper_end(r, wb);
         }
+        break;
+
+    case DATASOURCE_JSON2:
+        wb->content_type = CT_APPLICATION_JSON;
+        wrapper_begin(r, wb);
+        rrdr2json_v2(r, wb);
+        wrapper_end(r, wb);
         break;
     }
 

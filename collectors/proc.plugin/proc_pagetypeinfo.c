@@ -120,10 +120,8 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
         do_global = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_PAGETYPEINFO, "enable system summary", CONFIG_BOOLEAN_YES);
         do_detail = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_PAGETYPEINFO, "enable detail per-type", CONFIG_BOOLEAN_AUTO);
         filter_types = simple_pattern_create(
-                config_get(CONFIG_SECTION_PLUGIN_PROC_PAGETYPEINFO, "hide charts id matching", "")
-                , NULL
-                , SIMPLE_PATTERN_SUFFIX
-        );
+                config_get(CONFIG_SECTION_PLUGIN_PROC_PAGETYPEINFO, "hide charts id matching", ""), NULL,
+                SIMPLE_PATTERN_SUFFIX, true);
 
         pagelines_cnt = 0;
 
@@ -188,7 +186,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
             pgl->type = typename;
             pgl->zone = zonename;
             for (o = 0; o < pageorders_cnt; o++)
-                pgl->free_pages_size[o] = str2uint64_t(procfile_lineword(ff, l, o+6)) * 1 << o;
+                pgl->free_pages_size[o] = str2uint64_t(procfile_lineword(ff, l, o + 6), NULL) * 1 << o;
 
             p++;
         }
@@ -302,7 +300,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
                 systemorders[o].size = 0;
 
             // Update orders of the current line
-            pagelines[p].free_pages_size[o] = str2uint64_t(procfile_lineword(ff, l, o+6)) * 1 << o;
+            pagelines[p].free_pages_size[o] = str2uint64_t(procfile_lineword(ff, l, o + 6), NULL) * 1 << o;
 
             // Update sum by order
             systemorders[o].size += pagelines[p].free_pages_size[o];

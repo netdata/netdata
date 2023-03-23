@@ -4,10 +4,10 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/cups
 sidebar_label: "cups.plugin"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/Remotes/Devices"
+learn_rel_path: "Integrations/Monitor/Remotes/Devices"
 -->
 
-# cups.plugin
+# Printers (cups.plugin)
 
 `cups.plugin` collects Common Unix Printing System (CUPS) metrics.
 

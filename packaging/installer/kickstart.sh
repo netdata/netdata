@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F050F
+# Next unused error code: F0512
 
 # ======================================================================
 # Constants
@@ -44,7 +44,6 @@ SELECTED_INSTALL_METHOD="none"
 INSTALL_TYPE="unknown"
 INSTALL_PREFIX=""
 NETDATA_AUTO_UPDATES="default"
-NETDATA_CLAIM_ONLY=0
 NETDATA_CLAIM_URL="https://api.netdata.cloud"
 NETDATA_COMMAND="default"
 NETDATA_DISABLE_CLOUD=0
@@ -78,6 +77,8 @@ else
   INTERACTIVE=1
 fi
 
+CURL="$(PATH="${PATH}:/opt/netdata/bin" command -v curl 2>/dev/null && true)"
+
 # ======================================================================
 # Shared messages used in multiple places throughout the script.
 
@@ -103,7 +104,7 @@ main() {
       uninstall
       cleanup
 
-      ACTION=
+      ACTION=''
       INSTALL_PREFIX="${NEW_INSTALL_PREFIX}"
       # shellcheck disable=SC2086
       main
@@ -175,12 +176,9 @@ USAGE: kickstart.sh [options]
   --auto-update                    Enable automatic updates.
   --auto-update-type               Specify a particular scheduling type for auto-updates (valid types: systemd, interval, crontab)
   --disable-telemetry              Opt-out of anonymous statistics.
-  --repositories-only              Only install appropriate repository configuration packages (only for native install).
   --native-only                    Only install if native binary packages are available.
   --static-only                    Only install if a static build is available.
   --build-only                     Only install using a local build.
-  --reinstall                      Explicitly reinstall instead of updating any existing install.
-  --reinstall-even-if-unsafe       Even try to reinstall if we don't think we can do so safely (implies --reinstall).
   --disable-cloud                  Disable support for Netdata Cloud (default: detect)
   --require-cloud                  Only install if Netdata Cloud can be enabled. Overrides --disable-cloud.
   --install-prefix <path>          Specify an installation prefix for local builds (default: autodetect based on system type).
@@ -188,13 +186,19 @@ USAGE: kickstart.sh [options]
   --install-version <version>      Specify the version of Netdata to install.
   --claim-token                    Use a specified token for claiming to Netdata Cloud.
   --claim-rooms                    When claiming, add the node to the specified rooms.
-  --claim-only                     If there is an existing install, only try to claim it, not update it.
   --claim-*                        Specify other options for the claiming script.
   --no-cleanup                     Don't do any cleanup steps. This is intended to help with debugging the installer.
-  --uninstall                      Uninstall an existing installation of Netdata.
-  --reinstall-clean                Clean reinstall Netdata.
   --local-build-options            Specify additional options to pass to the installer code when building locally. Only valid if --build-only is also specified.
   --static-install-options         Specify additional options to pass to the static installer code. Only valid if --static-only is also specified.
+
+The following options are mutually exclusive and specifiy special operations other than trying to install Netdata normally or update an existing install:
+
+  --reinstall                      If there is an existing install, reinstall it instead of trying to update it. If there is no existing install, install netdata normally.
+  --reinstall-even-if-unsafe       If there is an existing install, reinstall it instead of trying to update it, even if doing so is known to potentially break things. If there is no existing install, install Netdata normally.
+  --reinstall-clean                If there is an existing install, uninstall it before trying to install Netdata. Fails if there is no existing install.
+  --uninstall                      Uninstall an existing installation of Netdata. Fails if there is no existing install.
+  --claim-only                     If there is an existing install, only try to claim it without attempting to update it. If there is no existing install, install and claim Netdata normally.
+  --repositories-only              Only install repository configuration packages instead of doing a full install of Netdata. Automatically sets --native-only.
   --prepare-offline-install-source Instead of installing the agent, prepare a directory that can be used to install on another system without needing to download anything.
 
 Additionally, this script may use the following environment variables:
@@ -299,8 +303,8 @@ telemetry_event() {
 EOF
 )"
 
-  if command -v curl > /dev/null 2>&1; then
-    curl --silent -o /dev/null -X POST --max-time 2 --header "Content-Type: application/json" -d "${REQ_BODY}" "${TELEMETRY_URL}" > /dev/null
+  if [ -n "${CURL}" ]; then
+    "${CURL}" --silent -o /dev/null -X POST --max-time 2 --header "Content-Type: application/json" -d "${REQ_BODY}" "${TELEMETRY_URL}" > /dev/null
   elif command -v wget > /dev/null 2>&1; then
     if wget --help 2>&1 | grep BusyBox > /dev/null 2>&1; then
       # BusyBox-compatible version of wget, there is no --no-check-certificate option
@@ -581,8 +585,8 @@ check_for_remote_file() {
 
   if echo "${url}" | grep -Eq "^file:///"; then
     [ -e "${url#file://}" ] || return 1
-  elif command -v curl > /dev/null 2>&1; then
-    curl --output /dev/null --silent --head --fail "${url}" || return 1
+  elif [ -n "${CURL}" ]; then
+    "${CURL}" --output /dev/null --silent --head --fail "${url}" || return 1
   elif command -v wget > /dev/null 2>&1; then
     wget -S --spider "${url}" 2>&1 | grep -q 'HTTP/1.1 200 OK' || return 1
   else
@@ -596,8 +600,8 @@ download() {
 
   if echo "${url}" | grep -Eq "^file:///"; then
     run cp "${url#file://}" "${dest}" || return 1
-  elif command -v curl > /dev/null 2>&1; then
-    run curl --fail -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}" || return 1
+  elif [ -n "${CURL}" ]; then
+    run "${CURL}" --fail -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}" || return 1
   elif command -v wget > /dev/null 2>&1; then
     run wget -T 15 -O "${dest}" "${url}" || return 1
   else
@@ -608,8 +612,8 @@ download() {
 get_redirect() {
   url="${1}"
 
-  if command -v curl > /dev/null 2>&1; then
-    run sh -c "curl ${url} -s -L -I -o /dev/null -w '%{url_effective}' | grep -o '[^/]*$'" || return 1
+  if [ -n "${CURL}" ]; then
+    run sh -c "${CURL} ${url} -s -L -I -o /dev/null -w '%{url_effective}' | grep -o '[^/]*$'" || return 1
   elif command -v wget > /dev/null 2>&1; then
     run sh -c "wget -S -O /dev/null ${url} 2>&1 | grep -m 1 Location | grep -o '[^/]*$'" || return 1
   else
@@ -630,71 +634,73 @@ safe_sha256sum() {
 }
 
 get_system_info() {
+  SYSARCH="$(uname -m)"
+
   case "$(uname -s)" in
     Linux)
       SYSTYPE="Linux"
 
-      os_release_file=
-      if [ -s "/etc/os-release" ] && [ -r "/etc/os-release" ]; then
-        os_release_file="/etc/os-release"
-      elif [ -s "/usr/lib/os-release" ] && [ -r "/usr/lib/os-release" ]; then
-        os_release_file="/usr/lib/os-release"
-      else
-        warning "Cannot find usable OS release information. Native packages will not be available for this install."
-      fi
-
-      if [ -n "${os_release_file}" ]; then
-        # shellcheck disable=SC1090
-        . "${os_release_file}"
-
-        DISTRO="${ID}"
-        SYSVERSION="${VERSION_ID}"
-        SYSCODENAME="${VERSION_CODENAME}"
-        SYSARCH="$(uname -m)"
-
-        supported_compat_names="debian ubuntu centos fedora opensuse ol arch"
-
-        if str_in_list "${DISTRO}" "${supported_compat_names}"; then
-            DISTRO_COMPAT_NAME="${DISTRO}"
+      if [ -z "${SKIP_DISTRO_DETECTION}" ]; then
+        os_release_file=
+        if [ -s "/etc/os-release" ] && [ -r "/etc/os-release" ]; then
+          os_release_file="/etc/os-release"
+        elif [ -s "/usr/lib/os-release" ] && [ -r "/usr/lib/os-release" ]; then
+          os_release_file="/usr/lib/os-release"
         else
-            case "${DISTRO}" in
-            opensuse-leap)
-                DISTRO_COMPAT_NAME="opensuse"
-                ;;
-            cloudlinux|almalinux|rocky|rhel)
-                DISTRO_COMPAT_NAME="centos"
-                ;;
-            artix|manjaro|obarun)
-                DISTRO_COMPAT_NAME="arch"
-                ;;
-            *)
-                DISTRO_COMPAT_NAME="unknown"
-                ;;
-            esac
+          warning "Cannot find usable OS release information. Native packages will not be available for this install."
         fi
 
-        case "${DISTRO_COMPAT_NAME}" in
-          centos|ol)
-            SYSVERSION=$(echo "$SYSVERSION" | cut -d'.' -f1)
-            ;;
-        esac
+        if [ -n "${os_release_file}" ]; then
+          # shellcheck disable=SC1090
+          . "${os_release_file}"
+
+          DISTRO="${ID}"
+          SYSVERSION="${VERSION_ID}"
+          SYSCODENAME="${VERSION_CODENAME}"
+        else
+          DISTRO="unknown"
+          DISTRO_COMPAT_NAME="unknown"
+          SYSVERSION="unknown"
+          SYSCODENAME="unknown"
+        fi
       else
-        DISTRO="unknown"
-        DISTRO_COMPAT_NAME="unknown"
-        SYSVERSION="unknown"
-        SYSCODENAME="unknown"
-        SYSARCH="$(uname -m)"
+        warning "Distribution auto-detection overridden by user. This is not guaranteed to work, and is not officially supported."
       fi
+
+      supported_compat_names="debian ubuntu centos fedora opensuse ol amzn arch"
+
+      if str_in_list "${DISTRO}" "${supported_compat_names}"; then
+          DISTRO_COMPAT_NAME="${DISTRO}"
+      else
+          case "${DISTRO}" in
+          opensuse-leap)
+              DISTRO_COMPAT_NAME="opensuse"
+              ;;
+          cloudlinux|almalinux|rocky|rhel)
+              DISTRO_COMPAT_NAME="centos"
+              ;;
+          artix|manjaro|obarun)
+              DISTRO_COMPAT_NAME="arch"
+              ;;
+          *)
+              DISTRO_COMPAT_NAME="unknown"
+              ;;
+          esac
+      fi
+
+      case "${DISTRO_COMPAT_NAME}" in
+        centos|ol)
+          SYSVERSION=$(echo "$SYSVERSION" | cut -d'.' -f1)
+          ;;
+      esac
       ;;
     Darwin)
       SYSTYPE="Darwin"
       SYSVERSION="$(sw_vers -buildVersion)"
-      SYSARCH="$(uname -m)"
       ;;
     FreeBSD)
       SYSTYPE="FreeBSD"
       SYSVERSION="$(uname -K)"
-      SYSARCH="$(uname -m)"
       ;;
     *)
       fatal "Unsupported system type detected. Netdata cannot be installed on this system using this script." F0200
@@ -915,7 +921,7 @@ handle_existing_install() {
         progress "Found an existing netdata install at ${ndprefix}, with installation type '${INSTALL_TYPE}'."
       fi
 
-      if [ -n "${NETDATA_REINSTALL}" ] || [ -n "${NETDATA_UNSAFE_REINSTALL}" ]; then
+      if [ "${ACTION}" = "reinstall" ] || [ "${ACTION}" = "unsafe-reinstall" ]; then
         progress "Found an existing netdata install at ${ndprefix}, but user requested reinstall, continuing."
 
         case "${INSTALL_TYPE}" in
@@ -923,7 +929,7 @@ handle_existing_install() {
           *-build) NETDATA_ONLY_BUILD=1 ;;
           *-static) NETDATA_ONLY_STATIC=1 ;;
           *)
-            if [ -n "${NETDATA_UNSAFE_REINSTALL}" ]; then
+            if [ "${ACTION}" = "unsafe-reinstall" ]; then
               warning "Reinstalling over top of a ${INSTALL_TYPE} installation may be unsafe, but the user has requested we proceed."
             elif [ "${INTERACTIVE}" -eq 0 ]; then
               fatal "User requested reinstall, but we cannot safely reinstall over top of a ${INSTALL_TYPE} installation, exiting." F0104
@@ -953,9 +959,9 @@ handle_existing_install() {
           failmsg="We do not support trying to update or claim installations when we cannot determine the install type. You will need to uninstall the existing install using the same method you used to install it to proceed. ${claimonly_notice}"
           promptmsg="Attempting to update an existing install is not officially supported. It may work, but it also might break your system. ${claimonly_notice} Are you sure you want to continue?"
         fi
-        if [ "${INTERACTIVE}" -eq 0 ] && [ "${NETDATA_CLAIM_ONLY}" -eq 0 ]; then
+        if [ "${INTERACTIVE}" -eq 0 ] && [ "${ACTION}" != "claim" ]; then
           fatal "${failmsg}" F0106
-        elif [ "${INTERACTIVE}" -eq 1 ] && [ "${NETDATA_CLAIM_ONLY}" -eq 0 ]; then
+        elif [ "${INTERACTIVE}" -eq 1 ] && [ "${ACTION}" != "claim" ]; then
           if confirm "${promptmsg}"; then
             progress "OK, continuing"
           else
@@ -966,7 +972,7 @@ handle_existing_install() {
 
       ret=0
 
-      if [ "${NETDATA_CLAIM_ONLY}" -eq 0 ]; then
+      if [ "${ACTION}" != "claim" ]; then
         if ! update; then
           warning "Failed to update existing Netdata install at ${ndprefix}."
         else
@@ -981,7 +987,7 @@ handle_existing_install() {
         INSTALL_PREFIX="${ndprefix}"
         claim
         ret=$?
-      elif [ "${NETDATA_CLAIM_ONLY}" -eq 1 ]; then
+      elif [ "${ACTION}" = "claim" ]; then
         fatal "User asked to claim, but did not proide a claiming token." F0202
       else
         progress "Not attempting to claim existing install at ${ndprefix} (no claiming token provided)."
@@ -997,8 +1003,8 @@ handle_existing_install() {
       fatal "This is an OCI container, use the regular container lifecycle management commands for your container tools instead of this script for managing it." F0203
       ;;
     *)
-      if [ -n "${NETDATA_REINSTALL}" ] || [ -n "${NETDATA_UNSAFE_REINSTALL}" ]; then
-        if [ -n "${NETDATA_UNSAFE_REINSTALL}" ]; then
+      if [ "${ACTION}" = "reinstall" ] || [ "${ACTION}" = "unsafe-reinstall" ]; then
+        if [ "${ACTION}" = "unsafe-reinstall" ]; then
           warning "Reinstalling over top of a ${INSTALL_TYPE} installation may be unsafe, but the user has requested we proceed."
         elif [ "${INTERACTIVE}" -eq 0 ]; then
           fatal "User requested reinstall, but we cannot safely reinstall over top of a ${INSTALL_TYPE} installation, exiting." F0104
@@ -1019,7 +1025,7 @@ handle_existing_install() {
           cleanup
           trap - EXIT
           exit $ret
-        elif [ "${NETDATA_CLAIM_ONLY}" -eq 1 ]; then
+        elif [ "${ACTION}" = "claim" ]; then
           fatal "User asked to claim, but did not proide a claiming token." F0202
         else
           fatal "Found an existing netdata install at ${ndprefix}, but the install type is '${INSTALL_TYPE}', which is not supported by this script, refusing to proceed." F0103
@@ -1263,7 +1269,7 @@ pkg_installed() {
           dpkg-query --show --showformat '${Status}' "${1}" 2>&1 | cut -f 1 -d ' ' | grep -q '^install$'
           return $?
           ;;
-        centos|fedora|opensuse|ol)
+        centos|fedora|opensuse|ol|amzn)
           rpm -q "${1}" > /dev/null 2>&1
           return $?
           ;;
@@ -1307,7 +1313,7 @@ netdata_avail_check() {
       env DEBIAN_FRONTEND=noninteractive apt-cache policy netdata | grep -q repo.netdata.cloud/repos/;
       return $?
       ;;
-    centos|fedora|ol)
+    centos|fedora|ol|amzn)
       # shellcheck disable=SC2086
       ${pm_cmd} search --nogpgcheck -v netdata | grep -qE 'Repo *: netdata(-edge)?$'
       return $?
@@ -1349,9 +1355,16 @@ check_special_native_deps() {
 try_package_install() {
   failed_refresh_msg="Failed to refresh repository metadata. ${BADNET_MSG} or by misconfiguration of one or more rpackage repositories in the system package manager configuration."
 
-  if [ -z "${DISTRO}" ] || [ "${DISTRO}" = "unknown" ]; then
+  if [ -z "${DISTRO_COMPAT_NAME}" ] || [ "${DISTRO_COMPAT_NAME}" = "unknown" ]; then
     warning "Unable to determine Linux distribution for native packages."
     return 2
+  elif [ -z "${SYSCODENAME}" ]; then
+    case "${DISTRO_COMPAT_NAME}" in
+      debian|ubuntu)
+        warning "Release codename not set. Unable to check availability of native packages for this system."
+        return 2
+        ;;
+    esac
   fi
 
   set_tmpdir
@@ -1469,11 +1482,32 @@ try_package_install() {
       INSTALL_TYPE="binpkg-rpm"
       NATIVE_VERSION="${INSTALL_VERSION:+"-${INSTALL_VERSION}.${SYSARCH}"}"
       ;;
+    amzn)
+      if command -v dnf > /dev/null; then
+        pm_cmd="dnf"
+        repo_subcmd="makecache"
+      else
+        pm_cmd="yum"
+      fi
+      repo_prefix="amazonlinux/${SYSVERSION}"
+      pkg_type="rpm"
+      pkg_suffix=".noarch"
+      pkg_vsep="-"
+      pkg_install_opts="${interactive_opts}"
+      repo_update_opts="${interactive_opts}"
+      uninstall_subcmd="remove"
+      INSTALL_TYPE="binpkg-rpm"
+      NATIVE_VERSION="${INSTALL_VERSION:+"-${INSTALL_VERSION}.${SYSARCH}"}"
+      ;;
     *)
       warning "We do not provide native packages for ${DISTRO}."
       return 2
       ;;
   esac
+
+  if [ -n "${SKIP_DISTRO_DETECTION}" ]; then
+    warning "Attempting to use native packages with a distro override. This is not officially supported, but may work in some cases. If your system requires a distro override to use native packages, please open an feature request at ${AGENT_BUG_REPORT_URL} about it so that we can update the installer to auto-detect this."
+  fi
 
   if [ -n "${INSTALL_VERSION}" ]; then
     if echo "${INSTALL_VERSION}" | grep -q "nightly"; then
@@ -1537,8 +1571,8 @@ try_package_install() {
     progress "Repository configuration is already present, attempting to install netdata."
   fi
 
-  if [ "${REPO_ACTION}" = "repositories-only" ]; then
-    progress "Successfully installed repository configuration package."
+  if [ "${ACTION}" = "repositories-only" ]; then
+    progress "Successfully installed repository configuraion package."
     deferred_warnings
     cleanup
     trap - EXIT
@@ -2050,6 +2084,10 @@ install_on_freebsd() {
 validate_args() {
   check_claim_opts
 
+  if [ "${ACTION}" = "repositories-only" ] && [ "${NETDATA_ONLY_NATIVE}" -eq 1 ]; then
+    fatal "Repositories can only be installed for native installs." F050D
+  fi
+
   if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
     if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ] || [ "${NETDATA_ONLY_BUILD}" -eq 1 ]; then
       fatal "Offline installs are only supported for static builds currently." F0502
@@ -2107,6 +2145,17 @@ validate_args() {
   fi
 }
 
+set_action() {
+  new_action="${1}"
+
+  if [ -n "${ACTION}" ]; then
+    warning "Ignoring previously specified '${ACTION}' operation in favor of '${new_action}' specified later on the command line."
+  fi
+
+  ACTION="${new_action}"
+  NETDATA_COMMAND="${new_action}"
+}
+
 parse_args() {
   while [ -n "${1}" ]; do
     case "${1}" in
@@ -2134,6 +2183,11 @@ parse_args() {
         ;;
       "--stable-channel") RELEASE_CHANNEL="stable" ;;
       "--nightly-channel") RELEASE_CHANNEL="nightly" ;;
+      "--reinstall") set_action 'reinstall' ;;
+      "--reinstall-even-if-unsafe") set_action 'unsafe-reinstall' ;;
+      "--reinstall-clean") set_action 'reinstall-clean' ;;
+      "--uninstall") set_action 'uninstall' ;;
+      "--claim-only") set_action 'claim' ;;
       "--no-updates") NETDATA_AUTO_UPDATES=0 ;;
       "--auto-update") NETDATA_AUTO_UPDATES="1" ;;
       "--auto-update-method")
@@ -2147,18 +2201,6 @@ parse_args() {
             exit 1
             ;;
         esac
-        ;;
-      "--reinstall")
-        NETDATA_REINSTALL=1
-        NETDATA_COMMAND="reinstall"
-        ;;
-      "--reinstall-even-if-unsafe")
-        NETDATA_UNSAFE_REINSTALL=1
-        NETDATA_COMMAND="unsafe-reinstall"
-        ;;
-      "--claim-only")
-        NETDATA_CLAIM_ONLY=1
-        NETDATA_COMMAND="claim-only"
         ;;
       "--disable-cloud")
         NETDATA_DISABLE_CLOUD=1
@@ -2189,19 +2231,30 @@ parse_args() {
         AUTO_UPDATE=0
         shift 1
         ;;
-      "--uninstall")
-        ACTION="uninstall"
-        NETDATA_COMMAND="uninstall"
-        ;;
-      "--reinstall-clean")
-        ACTION="reinstall-clean"
-        NETDATA_COMMAND="reinstall-clean"
-        ;;
-      "--repositories-only")
-        REPO_ACTION="repositories-only"
-        NETDATA_COMMAND="repositories"
+      "--distro-override")
+        if [ -n "${2}" ]; then
+          SKIP_DISTRO_DETECTION=1
+          DISTRO="$(echo "${2}" | cut -f 1 -d ':' | tr '[:upper:]' '[:lower:]')"
+          SYSVERSION="$(echo "${2}" | cut -f 2 -d ':')"
+          SYSCODENAME="$(echo "${2}" | cut -f 3 -d ':' | tr '[:upper:]' '[:lower:]')"
+
+          if [ -z "${SYSVERSION}" ]; then
+            fatal "You must specify a release as well as a distribution name." F0510
+          fi
+
+          shift 1
+        else
+          fatal "A distribution name and release must be specified for the --distro-override option." F050F
+        fi
         ;;
       "--native-only")
+        NETDATA_ONLY_NATIVE=1
+        NETDATA_ONLY_STATIC=0
+        NETDATA_ONLY_BUILD=0
+        SELECTED_INSTALL_METHOD="native"
+        ;;
+      "--repositories-only")
+        set_action 'repositories-only'
         NETDATA_ONLY_NATIVE=1
         NETDATA_ONLY_STATIC=0
         NETDATA_ONLY_BUILD=0
@@ -2256,8 +2309,7 @@ parse_args() {
         ;;
       "--prepare-offline-install-source")
         if [ -n "${2}" ]; then
-          ACTION="prepare-offline"
-          NETDATA_COMMAND="prepare-offline"
+          set_action 'prepare-offline'
           OFFLINE_TARGET="${2}"
           shift 1
         else

@@ -1,6 +1,6 @@
 # This defines the full set of distros we run CI on.
 ---
-platform_map: # map packaging architectures to docker platforms
+platform_map:  # map packaging architectures to docker platforms
   aarch64: linux/arm64/v8
   amd64: linux/amd64
   arm64: linux/arm64/v8
@@ -8,7 +8,7 @@ platform_map: # map packaging architectures to docker platforms
   armhfp: linux/arm/v7
   i386: linux/i386
   x86_64: linux/amd64
-arch_order: # sort order for per-architecture jobs in CI
+arch_order:  # sort order for per-architecture jobs in CI
   - amd64
   - x86_64
   - i386
@@ -20,6 +20,7 @@ include:
   - &alpine
     distro: alpine
     version: edge
+    eol_check: false
     env_prep: |
       apk add -U bash
     jsonc_removal: |
@@ -28,15 +29,20 @@ include:
       ebpf-core: true
   - <<: *alpine
     version: "3.17"
+    eol_check: true
   - <<: *alpine
     version: "3.16"
+    eol_check: true
   - <<: *alpine
     version: "3.15"
+    eol_check: true
   - <<: *alpine
     version: "3.14"
+    eol_check: true
 
   - distro: archlinux
     version: latest
+    eol_check: false
     env_prep: |
       pacman --noconfirm -Syu && pacman --noconfirm -Sy grep libffi
     test:
@@ -45,9 +51,9 @@ include:
   - &alma
     distro: almalinux
     version: "9"
-    base_image: almalinux
     jsonc_removal: |
       dnf remove -y json-c-devel
+    eol_check: true
     packages: &alma_packages
       type: rpm
       repo_distro: el/9
@@ -68,8 +74,21 @@ include:
         - el/8Server
         - el/8Client
 
+  - distro: amazonlinux
+    version: "2"
+    eol_check: false
+    packages:
+      type: rpm
+      repo_distro: amazonlinux/2
+      arches:
+        - x86_64
+        - aarch64
+    test:
+      ebpf-core: false
+
   - distro: centos
     version: "7"
+    eol_check: false
     packages:
       type: rpm
       repo_distro: el/7
@@ -83,14 +102,16 @@ include:
 
   - &debian
     distro: debian
-    version: "11"
+    version: "12"
+    base_image: debian:bookworm
+    eol_check: true
     env_prep: |
       apt-get update
     jsonc_removal: |
       apt-get purge -y libjson-c-dev
     packages: &debian_packages
       type: deb
-      repo_distro: debian/bullseye
+      repo_distro: debian/bookworm
       arches:
         - i386
         - amd64
@@ -99,7 +120,16 @@ include:
     test:
       ebpf-core: true
   - <<: *debian
+    version: "11"
+    base_image: debian:bullseye
+    packages:
+      <<: *debian_packages
+      repo_distro: debian/bullseye
+    test:
+      ebpf-core: false
+  - <<: *debian
     version: "10"
+    base_image: debian:buster
     packages:
       <<: *debian_packages
       repo_distro: debian/buster
@@ -108,15 +138,23 @@ include:
 
   - &fedora
     distro: fedora
-    version: "37"
+    version: "38"
+    eol_check: true
     jsonc_removal: |
       dnf remove -y json-c-devel
     packages: &fedora_packages
       type: rpm
-      repo_distro: fedora/37
+      repo_distro: fedora/38
       arches:
         - x86_64
         - aarch64
+    test:
+      ebpf-core: true
+  - <<: *fedora
+    version: "37"
+    packages:
+      <<: *fedora_packages
+      repo_distro: fedora/37
     test:
       ebpf-core: true
   - <<: *fedora
@@ -130,7 +168,8 @@ include:
   - &opensuse
     distro: opensuse
     version: "15.4"
-    base_image: opensuse/leap
+    eol_check: true
+    base_image: opensuse/leap:15.4
     jsonc_removal: |
       zypper rm -y libjson-c-devel
     packages: &opensuse_packages
@@ -145,6 +184,7 @@ include:
   - &oracle
     distro: oraclelinux
     version: "8"
+    eol_check: true
     jsonc_removal: |
       dnf remove -y json-c-devel
     packages: &oracle_packages
@@ -164,6 +204,7 @@ include:
   - &ubuntu
     distro: ubuntu
     version: "22.10"
+    eol_check: true
     env_prep: |
       rm -f /etc/apt/apt.conf.d/docker && apt-get update
     jsonc_removal: |
@@ -177,6 +218,11 @@ include:
         - arm64
     test:
       ebpf-core: true
+  - <<: *ubuntu
+    version: "23.04"
+    packages:
+      <<: *ubuntu_packages
+      repo_distro: ubuntu/lunar
   - <<: *ubuntu
     version: "22.04"
     packages:

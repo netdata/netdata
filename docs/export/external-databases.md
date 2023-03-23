@@ -22,7 +22,7 @@ Based on your needs and resources you allocated to your external time-series dat
 that metrics are exported or export only certain charts with filtering. You can also choose whether metrics are exported
 as-collected, a normalized average, or the sum/volume of metrics values over the configured interval.
 
-Exporting is an important part of Netdata's effort to be [interoperable](https://github.com/netdata/netdata/blob/master/docs/overview/netdata-monitoring-stack.md)
+Exporting is an important part of Netdata's effort to be interoperable
 with other monitoring software. You can use an external time-series database for long-term metrics retention, further
 analysis, or correlation with other tools, such as application tracing.
 
@@ -75,19 +75,3 @@ documentation and the [enabling a connector](https://github.com/netdata/netdata/
 Can't find your preferred external time-series database? Ask our [community](https://community.netdata.cloud/) for
 solutions, or file an [issue on
 GitHub](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml).
-
-## What's next?
-
-We recommend you read our document on [enabling a connector](https://github.com/netdata/netdata/blob/master/docs/export/enable-connector.md) to learn about the
-process and discover important configuration options. If you would rather skip ahead, click on any of the above links to
-connectors for their reference documentation, which outline any prerequisites to install for that connector, along with
-connector-specific configuration options.
-
-Read about one possible use case for exporting metrics in our guide: [_Export and visualize Netdata metrics in
-Graphite_](https://github.com/netdata/netdata/blob/master/docs/guides/export/export-netdata-metrics-graphite.md).
-
-### Related reference documentation
-
--   [Exporting engine reference](https://github.com/netdata/netdata/blob/master/exporting/README.md)
-
-

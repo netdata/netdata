@@ -20,12 +20,12 @@ void rrdr2ssv(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, const char *prefix, con
         NETDATA_DOUBLE v = rrdr2value(r, i, options, &all_values_are_null, NULL);
 
         if(likely(i != start)) {
-            if(r->min > v) r->min = v;
-            if(r->max < v) r->max = v;
+            if(r->view.min > v) r->view.min = v;
+            if(r->view.max < v) r->view.max = v;
         }
         else {
-            r->min = v;
-            r->max = v;
+            r->view.min = v;
+            r->view.max = v;
         }
 
         if(likely(i != start))
@@ -38,7 +38,7 @@ void rrdr2ssv(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, const char *prefix, con
                 buffer_strcat(wb, "null");
         }
         else
-            buffer_rrd_value(wb, v);
+            buffer_print_netdata_double(wb, v);
     }
     buffer_strcat(wb, suffix);
     //info("RRD2SSV(): %s: END", r->st->id);

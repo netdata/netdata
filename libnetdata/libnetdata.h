@@ -32,6 +32,9 @@ extern "C" {
 #define OS_FREEBSD 2
 #define OS_MACOS   3
 
+#define MALLOC_ALIGNMENT (sizeof(uintptr_t) * 2)
+#define size_t_atomic_count(op, var, size) __atomic_## op ##_fetch(&(var), size, __ATOMIC_RELAXED)
+#define size_t_atomic_bytes(op, var, size) __atomic_## op ##_fetch(&(var), ((size) % MALLOC_ALIGNMENT)?((size) + MALLOC_ALIGNMENT - ((size) % MALLOC_ALIGNMENT)):(size), __ATOMIC_RELAXED)
 
 // ----------------------------------------------------------------------------
 // system include files for all netdata C programs
@@ -485,8 +488,8 @@ void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value);
 int config_isspace(char c);
 int pluginsd_space(char c);
 
-size_t quoted_strings_splitter(char *str, char **words, size_t max_words, int (*custom_isspace)(char), char *recover_input, char **recover_location, int max_recover);
-size_t pluginsd_split_words(char *str, char **words, size_t max_words, char *recover_string, char **recover_location, int max_recover);
+size_t quoted_strings_splitter(char *str, char **words, size_t max_words, int (*custom_isspace)(char));
+size_t pluginsd_split_words(char *str, char **words, size_t max_words);
 
 static inline char *get_word(char **words, size_t num_words, size_t index) {
     if (index >= num_words)
@@ -547,6 +550,8 @@ extern char *netdata_configured_host_prefix;
 #include "libnetdata/aral/aral.h"
 #include "onewayalloc/onewayalloc.h"
 #include "worker_utilization/worker_utilization.h"
+#include "parser/parser.h"
+#include "yaml.h"
 
 // BEWARE: Outside of the C code this also exists in alarm-notify.sh
 #define DEFAULT_CLOUD_BASE_URL "https://api.netdata.cloud"
@@ -607,58 +612,6 @@ static inline PPvoid_t JudyLLastThenPrev(Pcvoid_t PArray, Word_t * PIndex, bool 
     }
 
     return JudyLPrev(PArray, PIndex, PJE0);
-}
-
-static inline size_t indexing_partition_old(Word_t ptr, Word_t modulo) {
-    size_t total = 0;
-
-    total += (ptr & 0xff) >> 0;
-    total += (ptr & 0xff00) >> 8;
-    total += (ptr & 0xff0000) >> 16;
-    total += (ptr & 0xff000000) >> 24;
-
-    if(sizeof(Word_t) > 4) {
-        total += (ptr & 0xff00000000) >> 32;
-        total += (ptr & 0xff0000000000) >> 40;
-        total += (ptr & 0xff000000000000) >> 48;
-        total += (ptr & 0xff00000000000000) >> 56;
-    }
-
-    return (total % modulo);
-}
-
-static uint32_t murmur32(uint32_t h) __attribute__((const));
-static inline uint32_t murmur32(uint32_t h) {
-    h ^= h >> 16;
-    h *= 0x85ebca6b;
-    h ^= h >> 13;
-    h *= 0xc2b2ae35;
-    h ^= h >> 16;
-
-    return h;
-}
-
-static uint64_t murmur64(uint64_t h) __attribute__((const));
-static inline uint64_t murmur64(uint64_t k) {
-    k ^= k >> 33;
-    k *= 0xff51afd7ed558ccdUL;
-    k ^= k >> 33;
-    k *= 0xc4ceb9fe1a85ec53UL;
-    k ^= k >> 33;
-
-    return k;
-}
-
-static inline size_t indexing_partition(Word_t ptr, Word_t modulo) __attribute__((const));
-static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
-    if(sizeof(Word_t) == 8) {
-        uint64_t hash = murmur64(ptr);
-        return hash % modulo;
-    }
-    else {
-        uint32_t hash = murmur32(ptr);
-        return hash % modulo;
-    }
 }
 
 typedef enum {

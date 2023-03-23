@@ -717,6 +717,70 @@ bundle_jsonc() {
 bundle_jsonc
 
 # -----------------------------------------------------------------------------
+build_yaml() {
+  env_cmd=''
+
+  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
+    env_cmd="env CFLAGS='-fPIC -pipe -Wno-unused-value' CXXFLAGS='-fPIC -pipe' LDFLAGS="
+  fi
+
+  cd "${1}" > /dev/null || return 1
+  run eval "${env_cmd} ./configure --disable-shared --disable-dependency-tracking --with-pic"
+  run eval "${env_cmd} ${make} ${MAKEOPTS}"
+  cd - > /dev/null || return 1
+}
+
+copy_yaml() {
+  target_dir="${PWD}/externaldeps/libyaml"
+
+  run mkdir -p "${target_dir}" || return 1
+
+  run cp "${1}/src/.libs/libyaml.a" "${target_dir}/libyaml.a" || return 1
+  run cp "${1}/include/yaml.h" "${target_dir}/" || return 1
+}
+
+bundle_yaml() {
+  if pkg-config yaml-0.1; then
+    return 0
+  fi
+
+  if [ -z "$(command -v cmake)" ]; then
+    run_failed "Could not find cmake, which is required to build YAML. Critical error."
+    return 0
+  fi
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling YAML."
+
+  progress "Prepare YAML"
+
+  YAML_PACKAGE_VERSION="$(cat packaging/yaml.version)"
+
+  tmp="$(mktemp -d -t netdata-yaml-XXXXXX)"
+  YAML_PACKAGE_BASENAME="yaml-${YAML_PACKAGE_VERSION}.tar.gz"
+
+  if fetch_and_verify "yaml" \
+    "https://github.com/yaml/libyaml/releases/download/${YAML_PACKAGE_VERSION}/${YAML_PACKAGE_BASENAME}" \
+    "${YAML_PACKAGE_BASENAME}" \
+    "${tmp}" \
+    "${NETDATA_LOCAL_TARBALL_OVERRIDE_YAML}"; then
+    if run tar --no-same-owner -xf "${tmp}/${YAML_PACKAGE_BASENAME}" -C "${tmp}" &&
+      build_yaml "${tmp}/yaml-${YAML_PACKAGE_VERSION}" &&
+      copy_yaml "${tmp}/yaml-${YAML_PACKAGE_VERSION}" &&
+      rm -rf "${tmp}"; then
+      run_ok "YAML built and prepared."
+    else
+      run_failed "Failed to build YAML, critical error."
+    fi
+  else
+    run_failed "Unable to fetch sources for YAML, critical error."
+  fi
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
+}
+
+bundle_yaml
+
+# -----------------------------------------------------------------------------
 
 get_kernel_version() {
   r="$(uname -r | cut -f 1 -d '-')"
@@ -795,7 +859,7 @@ copy_libbpf() {
 }
 
 bundle_libbpf() {
-  if { [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 1 ]; } || [ "$(uname -s)" != Linux ]; then
+  if { [ -n "${NETDATA_DISABLE_EBPF}" ] && [ "${NETDATA_DISABLE_EBPF}" = 1 ]; } || [ "$(uname -s)" != Linux ]; then
     return 0
   fi
 
@@ -829,14 +893,14 @@ bundle_libbpf() {
       rm -rf "${tmp}"; then
       run_ok "libbpf built and prepared."
     else
-      if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 0 ]; then
+      if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ "${NETDATA_DISABLE_EBPF}" = 0 ]; then
         fatal "failed to build libbpf." I0005
       else
         run_failed "Failed to build libbpf. eBPF support will be disabled"
       fi
     fi
   else
-    if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 0 ]; then
+    if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ "${NETDATA_DISABLE_EBPF}" = 0 ]; then
       fatal "Failed to fetch sources for libbpf." I0006
     else
       run_failed "Unable to fetch sources for libbpf. eBPF support will be disabled"
@@ -853,7 +917,7 @@ copy_co_re() {
 }
 
 bundle_ebpf_co_re() {
-  if { [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 1 ]; } || [ "$(uname -s)" != Linux ]; then
+  if { [ -n "${NETDATA_DISABLE_EBPF}" ] && [ "${NETDATA_DISABLE_EBPF}" = 1 ]; } || [ "$(uname -s)" != Linux ]; then
     return 0
   fi
 
@@ -876,7 +940,7 @@ bundle_ebpf_co_re() {
       rm -rf "${tmp}"; then
       run_ok "libbpf built and prepared."
     else
-      if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 0 ]; then
+      if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ "${NETDATA_DISABLE_EBPF}" = 0 ]; then
         fatal "Failed to get eBPF CO-RE files." I0007
       else
         run_failed "Failed to get eBPF CO-RE files. eBPF support will be disabled"
@@ -885,7 +949,7 @@ bundle_ebpf_co_re() {
       fi
     fi
   else
-    if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 0 ]; then
+    if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ "${NETDATA_DISABLE_EBPF}" = 0 ]; then
       fatal "Failed to fetch eBPF CO-RE files." I0008
     else
       run_failed "Failed to fetch eBPF CO-RE files. eBPF support will be disabled"
@@ -1100,13 +1164,14 @@ if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-don
   (find -L "${NETDATA_PREFIX}/etc/netdata" -type f -not -path '*/\.*' -not -path "${NETDATA_PREFIX}/etc/netdata/orig/*" \( -name '*.conf.old' -o -name '*.conf' -o -name '*.conf.orig' -o -name '*.conf.installer_backup.*' \)) | while IFS= read -r  x; do
     if [ -f "${x}" ]; then
       # find it relative filename
-      f=$("$x" | sed "${NETDATA_PREFIX}/etc/netdata/")
+      p="$(echo "${NETDATA_PREFIX}/etc/netdata" | sed -e 's/\//\\\//')"
+      f="$(echo "${x}" | sed -e "s/${p}//")"
 
       # find the stock filename
-      t=$("${f}" | sed ".conf.installer_backup.*/.conf")
-      t=$("${t}" | sed ".conf.old/.conf")
-      t=$("${t}" | sed ".conf.orig/.conf")
-      t=$("${t}" | sed "orig//")
+      t="$(echo "${f}" | sed -e 's/\.conf\.installer_backup\..*/\.conf/')"
+      t="$(echo "${t}" | sed -e 's/\.conf\.old/\.conf/')"
+      t="$(echo "${t}" | sed -e 's/\.conf\.orig/\.conf/')"
+      t="$(echo "${t}" | sed -e 's/orig//')"
 
       if [ -z "${md5sum}" ] || [ ! -x "${md5sum}" ]; then
         # we don't have md5sum - keep it
@@ -1141,7 +1206,7 @@ fi
 # -----------------------------------------------------------------------------
 progress "Fix generated files permissions"
 
-run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name \*.conf -a \! -name \*.service -a \! -name \*.timer -a \! -name \*.logrotate -a \! -name \.install-type -exec chmod 755 {} \;
+run chmod 755 ./system/*/init.d/netdata ./system/*/rc.d/netdata ./system/runit/run ./system/install-service.sh
 
 # -----------------------------------------------------------------------------
 progress "Creating standard user and groups for netdata"
@@ -1516,15 +1581,18 @@ install_go() {
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
   fi
   run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
-  if command -v setcap 1>/dev/null 2>&1; then
-    run setcap "cap_net_admin+epi cap_net_raw=eip" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
-  fi
   rm -rf "${tmp}"
 
   [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 }
 
 install_go
+
+if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin" ]; then
+  if command -v setcap 1>/dev/null 2>&1; then
+    run setcap "cap_net_admin+epi cap_net_raw=eip" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+  fi
+fi
 
 should_install_ebpf() {
   if [ "${NETDATA_DISABLE_EBPF:=0}" -eq 1 ]; then

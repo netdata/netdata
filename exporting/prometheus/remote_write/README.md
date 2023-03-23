@@ -4,11 +4,10 @@ description: "Send Netdata metrics to your choice of more than 20 external stora
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/exporting/prometheus/remote_write/README.md"
 sidebar_label: "Prometheus remote write"
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Setup/Exporting connectors"
+learn_rel_path: "Integrations/Export"
 -->
 
-# Prometheus remote write exporting connector
+# Export metrics to Prometheus remote write providers
 
 The Prometheus remote write exporting connector uses the exporting engine to send Netdata metrics to your choice of more
 than 20 external storage providers for long-term archiving and further analysis.

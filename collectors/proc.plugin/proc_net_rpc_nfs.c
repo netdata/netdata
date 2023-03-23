@@ -187,10 +187,10 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
                 continue;
             }
 
-            net_count = str2ull(procfile_lineword(ff, l, 1));
-            net_udp_count = str2ull(procfile_lineword(ff, l, 2));
-            net_tcp_count = str2ull(procfile_lineword(ff, l, 3));
-            net_tcp_connections = str2ull(procfile_lineword(ff, l, 4));
+            net_count = str2ull(procfile_lineword(ff, l, 1), NULL);
+            net_udp_count = str2ull(procfile_lineword(ff, l, 2), NULL);
+            net_tcp_count = str2ull(procfile_lineword(ff, l, 3), NULL);
+            net_tcp_connections = str2ull(procfile_lineword(ff, l, 4), NULL);
 
             unsigned long long sum = net_count + net_udp_count + net_tcp_count + net_tcp_connections;
             if(sum == 0ULL) do_net = -1;
@@ -202,9 +202,9 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
                 continue;
             }
 
-            rpc_calls = str2ull(procfile_lineword(ff, l, 1));
-            rpc_retransmits = str2ull(procfile_lineword(ff, l, 2));
-            rpc_auth_refresh = str2ull(procfile_lineword(ff, l, 3));
+            rpc_calls = str2ull(procfile_lineword(ff, l, 1), NULL);
+            rpc_retransmits = str2ull(procfile_lineword(ff, l, 2), NULL);
+            rpc_auth_refresh = str2ull(procfile_lineword(ff, l, 3), NULL);
 
             unsigned long long sum = rpc_calls + rpc_retransmits + rpc_auth_refresh;
             if(sum == 0ULL) do_rpc = -1;
@@ -217,7 +217,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
             unsigned long long sum = 0;
             unsigned int i, j;
             for(i = 0, j = 2; j < words && nfs_proc2_values[i].name[0] ; i++, j++) {
-                nfs_proc2_values[i].value = str2ull(procfile_lineword(ff, l, j));
+                nfs_proc2_values[i].value = str2ull(procfile_lineword(ff, l, j), NULL);
                 nfs_proc2_values[i].present = 1;
                 sum += nfs_proc2_values[i].value;
             }
@@ -238,7 +238,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
             unsigned long long sum = 0;
             unsigned int i, j;
             for(i = 0, j = 2; j < words && nfs_proc3_values[i].name[0] ; i++, j++) {
-                nfs_proc3_values[i].value = str2ull(procfile_lineword(ff, l, j));
+                nfs_proc3_values[i].value = str2ull(procfile_lineword(ff, l, j), NULL);
                 nfs_proc3_values[i].present = 1;
                 sum += nfs_proc3_values[i].value;
             }
@@ -259,7 +259,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
             unsigned long long sum = 0;
             unsigned int i, j;
             for(i = 0, j = 2; j < words && nfs_proc4_values[i].name[0] ; i++, j++) {
-                nfs_proc4_values[i].value = str2ull(procfile_lineword(ff, l, j));
+                nfs_proc4_values[i].value = str2ull(procfile_lineword(ff, l, j), NULL);
                 nfs_proc4_values[i].present = 1;
                 sum += nfs_proc4_values[i].value;
             }

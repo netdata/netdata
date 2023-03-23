@@ -352,8 +352,7 @@ ENDIF()
 # Detect ml dependencies
 file(STRINGS "${CMAKE_SOURCE_DIR}/config.h" DEFINE_ENABLE_ML REGEX "^#define ENABLE_ML 1$")
 IF(DEFINE_ENABLE_ML MATCHES ".+" AND
-   EXISTS "${CMAKE_SOURCE_DIR}/ml/dlib/dlib/all/source.cpp" AND
-   EXISTS "${CMAKE_SOURCE_DIR}/ml/json/single_include/nlohmann/json.hpp")
+   EXISTS "${CMAKE_SOURCE_DIR}/ml/dlib/dlib/all/source.cpp")
     set(ENABLE_ML True)
     list(APPEND NETDATA_COMMON_CFLAGS "-DDLIB_NO_GUI_SUPPORT")
     list(APPEND NETDATA_COMMON_INCLUDE_DIRS "ml/dlib")
@@ -512,6 +511,8 @@ set(LIBNETDATA_FILES
         libnetdata/string/utf8.h
         libnetdata/worker_utilization/worker_utilization.c
         libnetdata/worker_utilization/worker_utilization.h
+		libnetdata/parser/parser.h
+		libnetdata/parser/parser.c
         )
 
 IF(ENABLE_PLUGIN_EBPF)
@@ -695,11 +696,6 @@ set(PLUGINSD_PLUGIN_FILES
         collectors/plugins.d/pluginsd_parser.h
         )
 
-set(PARSER_PLUGIN_FILES
-        parser/parser.c
-        parser/parser.h
-        )
-
 set(REGISTRY_PLUGIN_FILES
         registry/registry.c
         registry/registry.h
@@ -721,12 +717,21 @@ set(STATSD_PLUGIN_FILES
         )
 
 set(RRD_PLUGIN_FILES
+        database/contexts/api_v1.c
+        database/contexts/api_v2.c
+        database/contexts/context.c
+        database/contexts/instance.c
+        database/contexts/internal.h
+        database/contexts/metric.c
+        database/contexts/query_scope.c
+        database/contexts/query_target.c
+        database/contexts/rrdcontext.c
+        database/contexts/rrdcontext.h
+        database/contexts/worker.c
         database/rrdcalc.c
         database/rrdcalc.h
         database/rrdcalctemplate.c
         database/rrdcalctemplate.h
-        database/rrdcontext.c
-        database/rrdcontext.h
         database/rrddim.c
         database/rrddimvar.c
         database/rrddimvar.h
@@ -750,7 +755,7 @@ set(RRD_PLUGIN_FILES
         database/sqlite/sqlite_metadata.h
         database/sqlite/sqlite_functions.c
         database/sqlite/sqlite_functions.h
-		database/sqlite/sqlite_context.c
+        database/sqlite/sqlite_context.c
         database/sqlite/sqlite_context.h
         database/sqlite/sqlite_db_migration.c
         database/sqlite/sqlite_db_migration.h
@@ -799,8 +804,12 @@ set(WEB_PLUGIN_FILES
         )
 
 set(API_PLUGIN_FILES
+        web/api/web_api.c
+        web/api/web_api.h
         web/api/web_api_v1.c
         web/api/web_api_v1.h
+        web/api/web_api_v2.c
+        web/api/web_api_v2.h
         web/api/badges/web_buffer_svg.c
         web/api/badges/web_buffer_svg.h
         web/api/exporters/allmetrics.c
@@ -1036,24 +1045,10 @@ set(ML_FILES
 IF(ENABLE_ML)
     message(STATUS "ML: enabled")
     list(APPEND ML_FILES
-            ml/ADCharts.h
-            ml/ADCharts.cc
-            ml/Chart.h
-            ml/Chart.cc
-            ml/Config.h
+            ml/ad_charts.h
+            ml/ad_charts.cc
             ml/Config.cc
-            ml/Dimension.h
-            ml/Dimension.cc
-            ml/Host.h
-            ml/Host.cc
-            ml/Mutex.h
-            ml/Query.h
-            ml/KMeans.h
-            ml/KMeans.cc
-            ml/SamplesBuffer.h
-            ml/SamplesBuffer.cc
             ml/dlib/dlib/all/source.cpp
-            ml/json/single_include/nlohmann/json.hpp
             ml/ml.cc
             ml/ml-private.h
     )
@@ -1112,7 +1107,6 @@ set(NETDATA_FILES
         ${WEB_PLUGIN_FILES}
         ${CLAIM_PLUGIN_FILES}
         ${SPAWN_PLUGIN_FILES}
-        ${PARSER_PLUGIN_FILES}
 )
 
 set(NETDATACLI_FILES

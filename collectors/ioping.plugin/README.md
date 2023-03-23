@@ -4,10 +4,10 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/iopi
 sidebar_label: "Latency monitoring (ioping.plugin)"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/QoS"
+learn_rel_path: "Integrations/Monitor/QoS"
 -->
 
-# ioping.plugin
+# Monitor latency for directories/files/devices (ioping.plugin)
 
 The ioping plugin supports monitoring latency for any number of directories/files/devices,
 by pinging them with `ioping`.

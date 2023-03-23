@@ -468,7 +468,7 @@ static inline bool rrdeng_cmd_has_waiting_opcodes_in_lower_priorities(STORAGE_PR
 static inline struct rrdeng_cmd rrdeng_deq_cmd(void) {
     struct rrdeng_cmd *cmd = NULL;
 
-    STORAGE_PRIORITY max_priority = work_request_full() ? STORAGE_PRIORITY_INTERNAL_DBENGINE : STORAGE_PRIORITY_BEST_EFFORT;
+    STORAGE_PRIORITY max_priority = work_request_full() ? STORAGE_PRIORITY_INTERNAL_DBENGINE : STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE - 1;
 
     // find an opcode to execute from the queue
     netdata_spinlock_lock(&rrdeng_main.cmd_queue.unsafe.spinlock);
@@ -1087,13 +1087,20 @@ void find_uuid_first_time(
 }
 
 static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile_to_delete, struct rrdengine_datafile *first_datafile_remaining, bool worker) {
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.metrics_retention_started, 1, __ATOMIC_RELAXED);
-
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_FIND_ROTATED_METRICS);
 
     struct rrdengine_journalfile *journalfile = datafile_to_delete->journalfile;
     struct journal_v2_header *j2_header = journalfile_v2_data_acquire(journalfile, NULL, 0, 0);
+
+    if (unlikely(!j2_header)) {
+        if (worker)
+            worker_is_idle();
+        return;
+    }
+
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.metrics_retention_started, 1, __ATOMIC_RELAXED);
+
     struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) j2_header + j2_header->metric_offset);
 
     size_t count = j2_header->metric_count;
@@ -1435,20 +1442,27 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __mayb
     worker_is_busy(UV_EVENT_DBENGINE_JOURNAL_INDEX);
     count = 0;
     while (datafile && datafile->fileno != ctx_last_fileno_get(ctx) && datafile->fileno != ctx_last_flush_fileno_get(ctx)) {
+        if(journalfile_v2_data_available(datafile->journalfile)) {
+            // journal file v2 is already there for this datafile
+            datafile = datafile->next;
+            continue;
+        }
 
         netdata_spinlock_lock(&datafile->writers.spinlock);
         bool available = (datafile->writers.running || datafile->writers.flushed_to_open_running) ? false : true;
         netdata_spinlock_unlock(&datafile->writers.spinlock);
 
-        if(!available)
+        if(!available) {
+            info("DBENGINE: journal file %u needs to be indexed, but it has writers working on it - skipping it for now", datafile->fileno);
+            datafile = datafile->next;
             continue;
-
-        if (unlikely(!journalfile_v2_data_available(datafile->journalfile))) {
-            info("DBENGINE: journal file %u is ready to be indexed", datafile->fileno);
-            pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->config.page_type,
-                                         journalfile_migrate_to_v2_callback, (void *) datafile->journalfile);
-            count++;
         }
+
+        info("DBENGINE: journal file %u is ready to be indexed", datafile->fileno);
+        pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->config.page_type,
+                                     journalfile_migrate_to_v2_callback, (void *) datafile->journalfile);
+
+        count++;
 
         datafile = datafile->next;
 

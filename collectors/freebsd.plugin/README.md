@@ -4,10 +4,10 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/free
 sidebar_label: "FreeBSD system metrics (freebsd.plugin)"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/System metrics"
+learn_rel_path: "Integrations/Monitor/System metrics"
 -->
 
-# freebsd.plugin
+# FreeBSD system metrics (freebsd.plugin)
 
 Collects resource usage and performance data on FreeBSD systems
 

@@ -13,6 +13,7 @@ int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
 
 int libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
+bool ieee754_doubles = false;
 
 struct netdata_static_thread *static_threads;
 
@@ -347,6 +348,7 @@ void netdata_cleanup_and_exit(int ret) {
             | ABILITY_WEB_REQUESTS
             | ABILITY_STREAMING_CONNECTIONS
             | SERVICE_ACLK
+            | SERVICE_ACLKSYNC
             );
 
     delta_shutdown_time("stop replication, exporters, ML training, health and web servers threads");
@@ -386,11 +388,6 @@ void netdata_cleanup_and_exit(int ret) {
     delta_shutdown_time("prepare metasync shutdown");
 
     metadata_sync_shutdown_prepare();
-
-#ifdef ENABLE_ACLK
-    delta_shutdown_time("signal aclk sync to stop");
-    aclk_sync_exit_all();
-#endif
 
     delta_shutdown_time("stop aclk threads");
 
@@ -529,38 +526,41 @@ void web_server_config_options(void)
         web_x_frame_options = NULL;
 
     web_allow_connections_from =
-        simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow connections from", "localhost *"),
-                              NULL, SIMPLE_PATTERN_EXACT);
+            simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow connections from", "localhost *"),
+                                  NULL, SIMPLE_PATTERN_EXACT, true);
     web_allow_connections_dns  =
         make_dns_decision(CONFIG_SECTION_WEB, "allow connections by dns", "heuristic", web_allow_connections_from);
     web_allow_dashboard_from   =
-        simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow dashboard from", "localhost *"),
-                              NULL, SIMPLE_PATTERN_EXACT);
+            simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow dashboard from", "localhost *"),
+                                  NULL, SIMPLE_PATTERN_EXACT, true);
     web_allow_dashboard_dns    =
         make_dns_decision(CONFIG_SECTION_WEB, "allow dashboard by dns", "heuristic", web_allow_dashboard_from);
     web_allow_badges_from      =
-        simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow badges from", "*"), NULL, SIMPLE_PATTERN_EXACT);
+            simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow badges from", "*"), NULL, SIMPLE_PATTERN_EXACT,
+                                  true);
     web_allow_badges_dns       =
         make_dns_decision(CONFIG_SECTION_WEB, "allow badges by dns", "heuristic", web_allow_badges_from);
     web_allow_registry_from    =
-        simple_pattern_create(config_get(CONFIG_SECTION_REGISTRY, "allow from", "*"), NULL, SIMPLE_PATTERN_EXACT);
+            simple_pattern_create(config_get(CONFIG_SECTION_REGISTRY, "allow from", "*"), NULL, SIMPLE_PATTERN_EXACT,
+                                  true);
     web_allow_registry_dns     = make_dns_decision(CONFIG_SECTION_REGISTRY, "allow by dns", "heuristic",
                                                    web_allow_registry_from);
     web_allow_streaming_from   = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow streaming from", "*"),
-                                                       NULL, SIMPLE_PATTERN_EXACT);
+                                                       NULL, SIMPLE_PATTERN_EXACT, true);
     web_allow_streaming_dns    = make_dns_decision(CONFIG_SECTION_WEB, "allow streaming by dns", "heuristic",
                                                    web_allow_streaming_from);
     // Note the default is not heuristic, the wildcards could match DNS but the intent is ip-addresses.
     web_allow_netdataconf_from = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow netdata.conf from",
-                                                       "localhost fd* 10.* 192.168.* 172.16.* 172.17.* 172.18.*"
-                                                       " 172.19.* 172.20.* 172.21.* 172.22.* 172.23.* 172.24.*"
-                                                       " 172.25.* 172.26.* 172.27.* 172.28.* 172.29.* 172.30.*"
-                                                       " 172.31.* UNKNOWN"), NULL, SIMPLE_PATTERN_EXACT);
+                                                                  "localhost fd* 10.* 192.168.* 172.16.* 172.17.* 172.18.*"
+                                                                  " 172.19.* 172.20.* 172.21.* 172.22.* 172.23.* 172.24.*"
+                                                                  " 172.25.* 172.26.* 172.27.* 172.28.* 172.29.* 172.30.*"
+                                                                  " 172.31.* UNKNOWN"), NULL, SIMPLE_PATTERN_EXACT,
+                                                       true);
     web_allow_netdataconf_dns  =
         make_dns_decision(CONFIG_SECTION_WEB, "allow netdata.conf by dns", "no", web_allow_netdataconf_from);
     web_allow_mgmt_from        =
-        simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow management from", "localhost"),
-                              NULL, SIMPLE_PATTERN_EXACT);
+            simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow management from", "localhost"),
+                                  NULL, SIMPLE_PATTERN_EXACT, true);
     web_allow_mgmt_dns         =
         make_dns_decision(CONFIG_SECTION_WEB, "allow management by dns","heuristic",web_allow_mgmt_from);
 
@@ -655,9 +655,14 @@ void cancel_main_threads() {
     int i, found = 0;
     usec_t max = 5 * USEC_PER_SEC, step = 100000;
     for (i = 0; static_threads[i].name != NULL ; i++) {
-        if(static_threads[i].enabled == NETDATA_MAIN_THREAD_RUNNING) {
-            info("EXIT: Stopping main thread: %s", static_threads[i].name);
-            netdata_thread_cancel(*static_threads[i].thread);
+        if (static_threads[i].enabled == NETDATA_MAIN_THREAD_RUNNING) {
+            if (static_threads[i].thread) {
+                info("EXIT: Stopping main thread: %s", static_threads[i].name);
+                netdata_thread_cancel(*static_threads[i].thread);
+            } else {
+                info("EXIT: No thread running (marking as EXITED): %s", static_threads[i].name);
+                static_threads[i].enabled = NETDATA_MAIN_THREAD_EXITED;
+            }
             found++;
         }
     }
@@ -1314,9 +1319,12 @@ void post_conf_load(char **user)
         prev_msg = msg;                                 \
     }
 
+int buffer_unittest(void);
 int pgc_unittest(void);
 int mrg_unittest(void);
 int julytest(void);
+int pluginsd_parser_unittest(void);
+void replication_initialize(void);
 
 int main(int argc, char **argv) {
     // initialize the system clocks
@@ -1437,11 +1445,16 @@ int main(int argc, char **argv) {
                         if(strcmp(optarg, "unittest") == 0) {
                             unittest_running = true;
 
+                            if (pluginsd_parser_unittest())
+                                return 1;
+
                             if (unit_test_static_threads())
                                 return 1;
                             if (unit_test_buffer())
                                 return 1;
                             if (unit_test_str2ld())
+                                return 1;
+                            if (buffer_unittest())
                                 return 1;
                             if (unit_test_bitmap256())
                                 return 1;
@@ -1484,15 +1497,6 @@ int main(int argc, char **argv) {
                             return test_logs_management(argc, argv);
                         }
 #endif
-#ifdef ENABLE_DBENGINE
-                        else if(strcmp(optarg, "mctest") == 0) {
-                            unittest_running = true;
-                            return mc_unittest();
-                        }
-                        else if(strcmp(optarg, "ctxtest") == 0) {
-                            unittest_running = true;
-                            return ctx_unittest();
-                        }
                         else if(strcmp(optarg, "dicttest") == 0) {
                             unittest_running = true;
                             return dictionary_unittest(10000);
@@ -1508,6 +1512,19 @@ int main(int argc, char **argv) {
                         else if(strcmp(optarg, "rrdlabelstest") == 0) {
                             unittest_running = true;
                             return rrdlabels_unittest();
+                        }
+                        else if(strcmp(optarg, "buffertest") == 0) {
+                            unittest_running = true;
+                            return buffer_unittest();
+                        }
+#ifdef ENABLE_DBENGINE
+                        else if(strcmp(optarg, "mctest") == 0) {
+                            unittest_running = true;
+                            return mc_unittest();
+                        }
+                        else if(strcmp(optarg, "ctxtest") == 0) {
+                            unittest_running = true;
+                            return ctx_unittest();
                         }
                         else if(strcmp(optarg, "metatest") == 0) {
                             unittest_running = true;
@@ -1528,6 +1545,14 @@ int main(int argc, char **argv) {
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
                             unsigned history_seconds = strtoul(optarg, NULL, 0);
+                            post_conf_load(&user);
+                            get_netdata_configured_variables();
+                            default_rrd_update_every = 1;
+                            registry_init();
+                            if(rrd_init("dbengine-dataset", NULL, true)) {
+                                fprintf(stderr, "rrd_init failed for unittest\n");
+                                return 1;
+                            }
                             generate_dbengine_dataset(history_seconds);
                             return 0;
                         }
@@ -1592,12 +1617,16 @@ int main(int argc, char **argv) {
                             size_t len = strlen(needle) + 1;
                             char wildcarded[len];
 
-                            SIMPLE_PATTERN *p = simple_pattern_create(haystack, NULL, SIMPLE_PATTERN_EXACT);
-                            int ret = simple_pattern_matches_extract(p, needle, wildcarded, len);
+                            SIMPLE_PATTERN *p = simple_pattern_create(haystack, NULL, SIMPLE_PATTERN_EXACT, true);
+                            SIMPLE_PATTERN_RESULT ret = simple_pattern_matches_extract(p, needle, wildcarded, len);
                             simple_pattern_free(p);
 
-                            if(ret) {
-                                fprintf(stdout, "RESULT: MATCHED - pattern '%s' matches '%s', wildcarded '%s'\n", haystack, needle, wildcarded);
+                            if(ret == SP_MATCHED_POSITIVE) {
+                                fprintf(stdout, "RESULT: POSITIVE MATCHED - pattern '%s' matches '%s', wildcarded '%s'\n", haystack, needle, wildcarded);
+                                return 0;
+                            }
+                            else if(ret == SP_MATCHED_NEGATIVE) {
+                                fprintf(stdout, "RESULT: NEGATIVE MATCHED - pattern '%s' matches '%s', wildcarded '%s'\n", haystack, needle, wildcarded);
                                 return 0;
                             }
                             else {
@@ -1871,9 +1900,13 @@ int main(int argc, char **argv) {
         // initialize the log files
         open_all_log_files();
 
+        ieee754_doubles = is_system_ieee754_double();
+
         aral_judy_init();
 
         get_system_timezone();
+
+        replication_initialize();
 
         // --------------------------------------------------------------------
         // get the certificate and start security
