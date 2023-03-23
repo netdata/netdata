@@ -193,7 +193,7 @@ following:
 :::
 
 For more details on each, you can refer to our Agent's HTTP API details
-on [Data Queries - Data Grouping](/docs/agent/web/api/queries#data-grouping).
+on [Data Queries - Data Grouping](https://github.com/netdata/netdata/blob/master/web/api/queries/README.md#data-grouping).
 
 ### Reset to defaults
 

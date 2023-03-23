@@ -53,7 +53,7 @@ Behind the scenes, Netdata will aggregate the raw data as needed such that arbit
 
 ### Data
 
-Netdata is different from typical observability agents since, in addition to just collecting raw metric values, it will by default also assign an "[Anomaly Bit](/docs/agent/ml#anomaly-bit)" related to each collected metric each second. This bit will be 0 for "normal" and 1 for "anomalous". This means that each metric also natively has an "[Anomaly Rate](/docs/agent/ml#anomaly-rate)" associated with it and, as such, MC can be run against the raw metric values or their corresponding anomaly rates.
+Netdata is different from typical observability agents since, in addition to just collecting raw metric values, it will by default also assign an "[Anomaly Bit](https://github.com/netdata/netdata/tree/master/ml#anomaly-bit---100--anomalous-0--normal)" related to each collected metric each second. This bit will be 0 for "normal" and 1 for "anomalous". This means that each metric also natively has an "[Anomaly Rate](https://github.com/netdata/netdata/tree/master/ml#anomaly-rate---averageanomaly-bit)" associated with it and, as such, MC can be run against the raw metric values or their corresponding anomaly rates.
 
 **Note**: Read more [here](https://github.com/netdata/netdata/blob/master/ml/README.md) to learn more about the native anomaly detection features within netdata.
 
