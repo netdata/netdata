@@ -350,6 +350,8 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
     PARSER *parser = parser_init(&user, NULL, NULL, fd,
                                  PARSER_INPUT_SPLIT, ssl);
 
+    parser->h2o_ctx = rpt->h2o_ctx;
+
     pluginsd_keywords_init(parser, PARSER_INIT_STREAMING);
 
     rrd_collector_started();
