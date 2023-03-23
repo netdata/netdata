@@ -763,6 +763,104 @@ static inline void rrdr_dimension_view_maximum_values(BUFFER *wb, const char *ke
     buffer_json_array_close(wb);
 }
 
+static inline void rrdr_dimension_view_db_statistics(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
+    if(unlikely(!r->drs))
+        return;
+
+    buffer_json_member_add_object(wb, key);
+
+    buffer_json_member_add_array(wb, "min");
+    for(size_t c = 0; c < r->d ; c++) {
+        if (!rrdr_dimension_should_be_exposed(r->od[c], options))
+            continue;
+
+        buffer_json_add_array_item_double(wb, r->drs[c].min);
+    }
+    buffer_json_array_close(wb);
+
+    buffer_json_member_add_array(wb, "max");
+    for(size_t c = 0; c < r->d ; c++) {
+        if (!rrdr_dimension_should_be_exposed(r->od[c], options))
+            continue;
+
+        buffer_json_add_array_item_double(wb, r->drs[c].max);
+    }
+    buffer_json_array_close(wb);
+
+    if(options & RRDR_OPTION_RETURN_RAW) {
+        buffer_json_member_add_array(wb, "sum");
+        for(size_t c = 0; c < r->d ; c++) {
+            if (!rrdr_dimension_should_be_exposed(r->od[c], options))
+                continue;
+
+            buffer_json_add_array_item_double(wb, r->drs[c].sum);
+        }
+        buffer_json_array_close(wb);
+
+        buffer_json_member_add_array(wb, "cnt");
+        for(size_t c = 0; c < r->d ; c++) {
+            if (!rrdr_dimension_should_be_exposed(r->od[c], options))
+                continue;
+
+            buffer_json_add_array_item_uint64(wb, r->drs[c].count);
+        }
+        buffer_json_array_close(wb);
+
+        buffer_json_member_add_array(wb, "ars");
+        for(size_t c = 0; c < r->d ; c++) {
+            if (!rrdr_dimension_should_be_exposed(r->od[c], options))
+                continue;
+
+            buffer_json_add_array_item_uint64(wb, r->drs[c].anomaly_count * 100);
+        }
+        buffer_json_array_close(wb);
+    }
+    else {
+        NETDATA_DOUBLE sum = 0.0;
+        for(size_t c = 0; c < r->d ; c++) {
+            if(!rrdr_dimension_should_be_exposed(r->od[c], options))
+                continue;
+
+            sum += ABS(r->drs[c].sum);
+        }
+
+        buffer_json_member_add_array(wb, "avg");
+        for(size_t c = 0; c < r->d ; c++) {
+            if (!rrdr_dimension_should_be_exposed(r->od[c], options))
+                continue;
+
+            STORAGE_POINT *sp = &r->drs[c];
+            NETDATA_DOUBLE avg = (sp->count) ? sp->sum / (NETDATA_DOUBLE)sp->count : 0.0;
+            buffer_json_add_array_item_double(wb, avg);
+        }
+        buffer_json_array_close(wb);
+
+        buffer_json_member_add_array(wb, "arp");
+        for(size_t c = 0; c < r->d ; c++) {
+            if (!rrdr_dimension_should_be_exposed(r->od[c], options))
+                continue;
+
+            STORAGE_POINT *sp = &r->drs[c];
+            NETDATA_DOUBLE arp = (sp->count) ? (NETDATA_DOUBLE)sp->anomaly_count * 100.0 / (NETDATA_DOUBLE)sp->count : 0.0;
+            buffer_json_add_array_item_double(wb, arp);
+        }
+        buffer_json_array_close(wb);
+
+        buffer_json_member_add_array(wb, "con");
+        for(size_t c = 0; c < r->d ; c++) {
+            if (!rrdr_dimension_should_be_exposed(r->od[c], options))
+                continue;
+
+            STORAGE_POINT *sp = &r->drs[c];
+            NETDATA_DOUBLE con = (sum > 0.0) ? ABS(sp->sum) * 100.0 / sum : 0.0;
+            buffer_json_add_array_item_double(wb, con);
+        }
+        buffer_json_array_close(wb);
+    }
+
+    buffer_json_object_close(wb);
+}
+
 static void rrdr_timings_v12(BUFFER *wb, const char *key, RRDR *r) {
     QUERY_TARGET *qt = r->internal.qt;
 
@@ -1444,6 +1542,7 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
             rrdr_dimension_view_average_values(wb, "view_average_values", r, options);
             size_t dims = rrdr_dimension_view_latest_values(wb, "view_latest_values", r, options);
             buffer_json_member_add_uint64(wb, "count", dims);
+            rrdr_dimension_view_db_statistics(wb, "sts", r, options);
             rrdr_json_group_by_labels(wb, "labels", r, options);
         }
         buffer_json_object_close(wb); // dimensions
