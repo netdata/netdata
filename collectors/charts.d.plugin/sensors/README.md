@@ -1,7 +1,7 @@
 # Linux machine sensors collector
 
-Use this collector when `lm-sensors` doesn't work on your device (e.g. for RPi temperatures). 
-For all other cases use the [Python collector](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/sensors), which supports multiple 
+Use this collector when `lm-sensors` doesn't work on your device (e.g. for RPi temperatures).
+For all other cases use the [Python collector](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/sensors), which supports multiple
 jobs, is more efficient and performs calculations on top of the kernel provided values.
 
 This plugin will provide charts for all configured system sensors, by reading sensors directly from the kernel.
@@ -26,6 +26,7 @@ The `sensors` collector is disabled by default.
 To enable the collector, you need to edit the configuration file of `charts.d/sensors.conf`. You can do so by using the `edit config` script.  
 
 > ### Note
+>
 > To edit configuration files in a safe way, we provide the [`edit config` script](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) located in your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) (typically is `/etc/netdata`) that creates the proper file and opens it in an editor automatically.  
 > It is recommended to use this way for configuring Netdata.
 
@@ -33,7 +34,8 @@ To enable the collector, you need to edit the configuration file of `charts.d/se
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
 sudo ./edit-config charts.d.conf
 ```
-You need to uncomment the regarding `sensors`, and set the valie to `force`.
+
+You need to uncomment the regarding `sensors`, and set the value to `force`.
 
 ```shell
 # example=force
@@ -74,4 +76,4 @@ sensors_excluded=()
 
 ---
 
-After this operation, yopu should be able to see the new data under the "Sensors" family of charts.
+After this operation, you should be able to see the new data under the "Sensors" family of charts.
