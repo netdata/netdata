@@ -178,6 +178,7 @@ typedef struct query_node {
     uint32_t slot;
     RRDHOST *rrdhost;
     char node_id[UUID_STR_LEN];
+    usec_t duration_ut;
 
     struct query_data_statistics query_stats;
     struct query_instances_counts instances;
@@ -245,6 +246,7 @@ typedef struct query_metric {
         STRING *units;
     } grouped_as;
 
+    usec_t duration_ut;
 } QUERY_METRIC;
 
 #define MAX_QUERY_TARGET_ID_LENGTH 255
@@ -404,7 +406,6 @@ typedef struct query_target {
         usec_t received_ut;
         usec_t preprocessed_ut;
         usec_t executed_ut;
-        usec_t group_by_ut;
         usec_t finished_ut;
     } timings;
 } QUERY_TARGET;
@@ -486,7 +487,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
 RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o);
 void buffer_json_agents_array_v2(BUFFER *wb, time_t now_s);
-void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni);
+void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t duration_ut);
 
 // ----------------------------------------------------------------------------
 // scope

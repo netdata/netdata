@@ -223,7 +223,7 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
     return 1;
 }
 
-void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni) {
+void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t duration_ut) {
     buffer_json_member_add_string(wb, "mg", host->machine_guid);
     if(host->node_id)
         buffer_json_member_add_uuid(wb, "nd", host->node_id);
@@ -233,6 +233,8 @@ void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni) {
     buffer_json_member_add_uint64(wb, "ai", 0);
     buffer_json_member_add_uint64(wb, "code", 200);
     buffer_json_member_add_string(wb, "msg", NULL);
+    if(duration_ut)
+        buffer_json_member_add_double(wb, "ms", (NETDATA_DOUBLE)duration_ut / 1000.0);
     buffer_json_object_close(wb);
 }
 
@@ -293,7 +295,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
 
     if(host_matched && (ctl->options & (CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED | CONTEXTS_V2_DEBUG))) {
         buffer_json_add_array_item_object(wb);
-        buffer_json_node_add_v2(wb, host, ctl->nodes.ni++);
+        buffer_json_node_add_v2(wb, host, ctl->nodes.ni++, 0);
 
         if(ctl->options & CONTEXTS_V2_NODES_DETAILED) {
             buffer_json_member_add_string(wb, "version", rrdhost_program_version(host));

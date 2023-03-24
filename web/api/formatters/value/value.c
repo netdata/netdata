@@ -107,7 +107,8 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
                         .max = NAN,
                         .sum = NAN,
                         .anomaly_count = 0,
-                }
+                },
+                .duration_ut = (r) ? r->internal.qt->timings.executed_ut - r->internal.qt->timings.received_ut : 0,
         };
     }
     else {
@@ -118,7 +119,8 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
                 .result_points = r->stats.result_points_generated,
                 .sp = {
                         .count = 0,
-                }
+                },
+                .duration_ut = r->internal.qt->timings.executed_ut - r->internal.qt->timings.received_ut,
         };
 
         for(size_t d = 0; d < r->d ;d++)

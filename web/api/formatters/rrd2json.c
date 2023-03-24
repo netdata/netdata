@@ -170,7 +170,6 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
     }
 
     RRDR *r = rrd2rrdr(owa, qt);
-    qt->timings.executed_ut = now_monotonic_usec();
 
     if(!r) {
         buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
@@ -192,8 +191,6 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
 
     DATASOURCE_FORMAT format = qt->request.format;
     RRDR_OPTIONS options = qt->window.options;
-
-    qt->timings.group_by_ut = now_monotonic_usec();
 
     switch(format) {
     case DATASOURCE_SSV:

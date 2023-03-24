@@ -14,6 +14,7 @@ typedef struct storage_value {
     size_t storage_points_per_tier[RRD_STORAGE_TIERS];
     size_t result_points;
     STORAGE_POINT sp;
+    usec_t duration_ut;
 } QUERY_VALUE;
 
 struct rrdmetric_acquired;

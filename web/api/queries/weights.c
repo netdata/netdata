@@ -64,6 +64,7 @@ struct register_result {
     NETDATA_DOUBLE value;
     STORAGE_POINT highlighted;
     STORAGE_POINT baseline;
+    usec_t duration_ut;
 };
 
 static DICTIONARY *register_result_init() {
@@ -75,17 +76,10 @@ static void register_result_destroy(DICTIONARY *results) {
     dictionary_destroy(results);
 }
 
-static void register_result(DICTIONARY *results,
-                            RRDHOST *host,
-                            RRDCONTEXT_ACQUIRED *rca,
-                            RRDINSTANCE_ACQUIRED *ria,
-                            RRDMETRIC_ACQUIRED *rma,
-                            NETDATA_DOUBLE value,
-                            RESULT_FLAGS flags,
-                            STORAGE_POINT *highlighted,
-                            STORAGE_POINT *baseline,
-                            WEIGHTS_STATS *stats,
-                            bool register_zero) {
+static void register_result(DICTIONARY *results, RRDHOST *host, RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria,
+                            RRDMETRIC_ACQUIRED *rma, NETDATA_DOUBLE value, RESULT_FLAGS flags,
+                            STORAGE_POINT *highlighted, STORAGE_POINT *baseline, WEIGHTS_STATS *stats,
+                            bool register_zero, usec_t duration_ut) {
 
     if(!netdata_double_isnumber(value)) return;
 
@@ -107,6 +101,7 @@ static void register_result(DICTIONARY *results,
         .ria = ria,
         .rma = rma,
         .value = v,
+        .duration_ut = duration_ut,
     };
 
     if(highlighted)
@@ -425,6 +420,7 @@ struct dict_unique_node {
     bool existing;
     uint32_t i;
     RRDHOST *host;
+    usec_t duration_ut;
 };
 
 struct dict_unique_name {
@@ -439,7 +435,7 @@ struct dict_unique_id_name {
     const char *name;
 };
 
-static inline ssize_t dict_unique_node_add(DICTIONARY *dict, RRDHOST *host, ssize_t *max_id) {
+static inline struct dict_unique_node *dict_unique_node_add(DICTIONARY *dict, RRDHOST *host, ssize_t *max_id) {
     struct dict_unique_node *dun = dictionary_set(dict, host->machine_guid, NULL, sizeof(struct dict_unique_node));
     if(!dun->existing) {
         dun->existing = true;
@@ -448,7 +444,7 @@ static inline ssize_t dict_unique_node_add(DICTIONARY *dict, RRDHOST *host, ssiz
         (*max_id)++;
     }
 
-    return (ssize_t)dun->i;
+    return dun;
 }
 
 static inline ssize_t dict_unique_name_add(DICTIONARY *dict, const char *name, ssize_t *max_id) {
@@ -512,6 +508,7 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
     RRDHOST *last_host = NULL;
     RRDCONTEXT_ACQUIRED *last_rca = NULL;
     RRDINSTANCE_ACQUIRED *last_ria = NULL;
+    struct dict_unique_node *node_dun;
     ssize_t di = -1, ii = -1, ci = -1, ni = -1;
     ssize_t di_max = 0, ii_max = 0, ci_max = 0, ni_max = 0;
     dfe_start_read(results, t) {
@@ -547,7 +544,8 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
         // open node
         if(t->host != last_host) {
             last_host = t->host;
-            ni = dict_unique_node_add(dict_nodes, t->host, &ni_max);
+            node_dun = dict_unique_node_add(dict_nodes, t->host, &ni_max);
+            ni = node_dun->i;
         }
 
         // open context
@@ -568,6 +566,8 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
         instance_total_weight += t->value;
         context_total_weight += t->value;
         node_total_weight += t->value;
+
+        node_dun->duration_ut += t->duration_ut;
 
         storage_point_merge_to(instance_hsp, t->highlighted);
         storage_point_merge_to(context_hsp, t->highlighted);
@@ -605,7 +605,7 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
         struct dict_unique_node *dun;
         dfe_start_read(dict_nodes, dun) {
                     buffer_json_add_array_item_object(wb);
-                    buffer_json_node_add_v2(wb, dun->host, dun->i);
+                    buffer_json_node_add_v2(wb, dun->host, dun->i, dun->duration_ut);
                     buffer_json_object_close(wb);
         }
         dfe_done(dun);
@@ -927,6 +927,7 @@ static void rrdset_metric_correlations_ks2(
 
     options |= RRDR_OPTION_NATURAL_POINTS;
 
+    usec_t started_ut = now_monotonic_usec();
     ONEWAYALLOC *owa = onewayalloc_create(16 * 1024);
 
     size_t high_points = 0;
@@ -962,9 +963,12 @@ static void rrdset_metric_correlations_ks2(
             prob = 1.0;
         }
 
+        usec_t ended_ut = now_monotonic_usec();
+
         // to spread the results evenly, 0.0 needs to be the less correlated and 1.0 the most correlated
         // so, we flip the result of kstwo()
-        register_result(results, host, rca, ria, rma, 1.0 - prob, RESULT_IS_BASE_HIGH_RATIO, &highlighted_sp, &baseline_sp, stats, register_zero);
+        register_result(results, host, rca, ria, rma, 1.0 - prob, RESULT_IS_BASE_HIGH_RATIO, &highlighted_sp,
+                        &baseline_sp, stats, register_zero, ended_ut - started_ut);
     }
 
 cleanup:
@@ -1045,7 +1049,8 @@ static void rrdset_metric_correlations_volume(
         pcent = highlight_countif.value;
     }
 
-    register_result(results, host, rca, ria, rma, pcent, flags, &highlight_average.sp, &baseline_average.sp, stats, register_zero);
+    register_result(results, host, rca, ria, rma, pcent, flags, &highlight_average.sp, &baseline_average.sp, stats,
+                    register_zero, baseline_average.duration_ut + highlight_average.duration_ut + highlight_countif.duration_ut);
 }
 
 // ----------------------------------------------------------------------------
@@ -1069,7 +1074,7 @@ static void rrdset_weights_value(
     merge_query_value_to_stats(&qv, stats, 1);
 
     if(netdata_double_isnumber(qv.value))
-        register_result(results, host, rca, ria, rma, qv.value, 0, &qv.sp, NULL, stats, register_zero);
+        register_result(results, host, rca, ria, rma, qv.value, 0, &qv.sp, NULL, stats, register_zero, qv.duration_ut);
 }
 
 struct query_weights_data {
@@ -1158,7 +1163,7 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
             QUERY_NODE *qn = query_node(r->internal.qt, qm->link.query_node_id);
 
             register_result(qwd->results, qn->rrdhost, qc->rca, qi->ria, qd->rma, qv.value, 0, &qv.sp,
-                            NULL, &qwd->stats, qwd->register_zero);
+                            NULL, &qwd->stats, qwd->register_zero, qm->duration_ut);
         }
 
         queries++;
@@ -1262,7 +1267,7 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
     struct query_weights_data *qwd = data;
     QUERY_WEIGHTS_REQUEST *qwr = qwd->qwr;
 
-    qwd->now_us = now_realtime_usec();
+    qwd->now_us = now_monotonic_usec();
     if(qwd->now_us - qwd->started_us > qwd->timeout_us) {
         qwd->timed_out = true;
         return -1;
@@ -1399,7 +1404,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
             .labels_sp = string_to_simple_pattern(qwr->labels),
             .alerts_sp = string_to_simple_pattern(qwr->alerts),
             .timeout_us = qwr->timeout_ms * USEC_PER_MS,
-            .started_us = now_realtime_usec(),
+            .started_us = now_monotonic_usec(),
             .timed_out = false,
             .examined_dimensions = 0,
             .register_zero = true,
@@ -1523,7 +1528,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
     if(!(qwr->options & RRDR_OPTION_RETURN_RAW) && qwr->method != WEIGHTS_METHOD_VALUE)
         spread_results_evenly(qwd.results, &qwd.stats);
 
-    usec_t ended_usec = now_realtime_usec();
+    usec_t ended_usec = now_monotonic_usec();
 
     // generate the json output we need
     buffer_flush(wb);

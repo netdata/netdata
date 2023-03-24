@@ -3238,11 +3238,6 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     size_t max_rows = 0;
 
     long dimensions_used = 0, dimensions_nonzero = 0;
-    struct timeval query_start_time;
-    struct timeval query_current_time;
-    if (qt->request.timeout_ms)
-        now_realtime_timeval(&query_start_time);
-
     size_t last_db_points_read = 0;
     size_t last_result_points_generated = 0;
 
@@ -3261,12 +3256,25 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         queries_prepared++;
     }
 
+    QUERY_NODE *last_qn = NULL;
+    usec_t last_ut = now_monotonic_usec();
+    usec_t last_qn_ut = last_ut;
+
     for(size_t d = 0; d < qt->query.used ; d++) {
         QUERY_METRIC *qm = query_metric(qt, d);
         QUERY_DIMENSION *qd = query_dimension(qt, qm->link.query_dimension_id);
         QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
         QUERY_CONTEXT *qc = query_context(qt, qm->link.query_context_id);
         QUERY_NODE *qn = query_node(qt, qm->link.query_node_id);
+
+        usec_t now_ut = last_ut;
+        if(qn != last_qn) {
+            if(last_qn)
+                last_qn->duration_ut = now_ut - last_qn_ut;
+
+            last_qn = qn;
+            last_qn_ut = now_ut;
+        }
 
         if(queries_prepared < qt->query.used) {
             // preload another query
@@ -3285,6 +3293,10 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         if(ops[d]) {
             rrd2rrdr_query_execute(r_tmp, dim_in_rrdr_tmp, ops[d]);
             r_tmp->od[dim_in_rrdr_tmp] |= RRDR_DIMENSION_QUERIED;
+
+            now_ut = now_monotonic_usec();
+            qm->duration_ut = now_ut - last_ut;
+            last_ut = now_ut;
 
             if(r_tmp != r) {
                 // copy back whatever got updated from the temporary r
@@ -3339,9 +3351,6 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         last_db_points_read = r_tmp->stats.db_points_read;
         last_result_points_generated = r_tmp->stats.result_points_generated;
 
-        if (qt->request.timeout_ms)
-            now_realtime_timeval(&query_current_time);
-
         if(qm->status & RRDR_DIMENSION_NONZERO)
             dimensions_nonzero++;
 
@@ -3382,10 +3391,10 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             log_access("QUERY INTERRUPTED");
         }
 
-        if (qt->request.timeout_ms && ((NETDATA_DOUBLE)dt_usec(&query_start_time, &query_current_time) / 1000.0) > (NETDATA_DOUBLE)qt->request.timeout_ms) {
+        if (qt->request.timeout_ms && ((NETDATA_DOUBLE)(now_ut - qt->timings.received_ut) / 1000.0) > (NETDATA_DOUBLE)qt->request.timeout_ms) {
             cancel = true;
             log_access("QUERY CANCELED RUNTIME EXCEEDED %0.2f ms (LIMIT %lld ms)",
-                       (NETDATA_DOUBLE)dt_usec(&query_start_time, &query_current_time) / 1000.0, (long long)qt->request.timeout_ms);
+                       (NETDATA_DOUBLE)(now_ut - qt->timings.received_ut) / 1000.0, (long long)qt->request.timeout_ms);
         }
 
         if(cancel) {
@@ -3467,6 +3476,8 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     if(likely(dimensions_used && (qt->window.options & RRDR_OPTION_NONZERO) && !dimensions_nonzero))
         // when all the dimensions are zero, we should return all of them
         qt->window.options &= ~RRDR_OPTION_NONZERO;
+
+    qt->timings.executed_ut = now_monotonic_usec();
 
     return r;
 }
