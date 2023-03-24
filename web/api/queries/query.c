@@ -2744,28 +2744,6 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                                        rrdlabels_traversal_cb_to_group_by_label_key, entries[pos].dl);
     }
 
-    // check if we have multiple units
-    bool multiple_units = false;
-    for(int i = 1; i < added ; i++) {
-        if(entries[i].units != entries[0].units) {
-            multiple_units = true;
-            break;
-        }
-    }
-
-    if(multiple_units) {
-        // include the units into the id and name of the dimensions
-        for(int i = 0; i < added ; i++) {
-            buffer_flush(key);
-            buffer_strcat(key, string2str(entries[i].id));
-            buffer_fast_strcat(key, ",", 1);
-            buffer_strcat(key, string2str(entries[i].units));
-            STRING *u = string_strdupz(buffer_tostring(key));
-            string_freez(entries[i].id);
-            entries[i].id = u;
-        }
-    }
-
     RRDR *r = rrdr_create(owa, qt, added, qt->window.points);
     if(!r) {
         internal_error(true, "QUERY: cannot create group by RRDR for %s, after=%ld, before=%ld, dimensions=%d, points=%zu",

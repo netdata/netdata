@@ -132,7 +132,6 @@ static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *w
                                    size_t examined_dimensions __maybe_unused, usec_t duration,
                                    WEIGHTS_STATS *stats) {
 
-    buffer_json_initialize(wb, "\"", "\"", 0, true, options & RRDR_OPTION_MINIFY);
     buffer_json_member_add_time_t(wb, "after", after);
     buffer_json_member_add_time_t(wb, "before", before);
     buffer_json_member_add_time_t(wb, "duration", before - after);
@@ -174,6 +173,8 @@ static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
                                                 RRDR_TIME_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
                                                 size_t examined_dimensions, usec_t duration,
                                                 WEIGHTS_STATS *stats) {
+
+    buffer_json_initialize(wb, "\"", "\"", 0, true, options & RRDR_OPTION_MINIFY);
 
     results_header_to_json(results, wb, after, before, baseline_after, baseline_before,
                            points, method, group, options, shifts, examined_dimensions, duration, stats);
@@ -224,6 +225,8 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
                                                   RRDR_TIME_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
                                                   size_t examined_dimensions, usec_t duration,
                                                   WEIGHTS_STATS *stats) {
+
+    buffer_json_initialize(wb, "\"", "\"", 0, true, options & RRDR_OPTION_MINIFY);
 
     results_header_to_json(results, wb, after, before, baseline_after, baseline_before,
                            points, method, group, options, shifts, examined_dimensions, duration, stats);
@@ -482,6 +485,10 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
                                                   size_t examined_dimensions, usec_t duration,
                                                   WEIGHTS_STATS *stats,
                                                   struct query_versions *versions) {
+    buffer_json_initialize(wb, "\"", "\"", 0, true, options & RRDR_OPTION_MINIFY);
+    buffer_json_member_add_uint64(wb, "api", 2);
+    buffer_json_agents_array_v2(wb, 0);
+
     results_header_to_json(results, wb, after, before, baseline_after, baseline_before,
                            points, method, group, options, shifts, examined_dimensions, duration, stats);
 
@@ -598,10 +605,7 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
         struct dict_unique_node *dun;
         dfe_start_read(dict_nodes, dun) {
                     buffer_json_add_array_item_object(wb);
-                    buffer_json_member_add_string(wb, "mg", dun_dfe.name);
-                    if(dun->host->node_id)
-                        buffer_json_member_add_uuid(wb, "nd", dun->host->node_id);
-                    buffer_json_member_add_int64(wb, "ni", dun->i);
+                    buffer_json_node_add_v2(wb, dun->host, dun->i);
                     buffer_json_object_close(wb);
         }
         dfe_done(dun);

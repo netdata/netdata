@@ -485,6 +485,8 @@ typedef enum __attribute__ ((__packed__)) {
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_OPTIONS options);
 
 RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o);
+void buffer_json_agents_array_v2(BUFFER *wb, time_t now_s);
+void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni);
 
 // ----------------------------------------------------------------------------
 // scope

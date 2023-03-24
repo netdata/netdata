@@ -254,11 +254,7 @@ static void query_target_summary_nodes_v2(BUFFER *wb, QUERY_TARGET *qt, const ch
         QUERY_NODE *qn = query_node(qt, c);
         RRDHOST *host = qn->rrdhost;
         buffer_json_add_array_item_object(wb);
-        buffer_json_member_add_uint64(wb, "ni", qn->slot);
-        buffer_json_member_add_string(wb, "mg", host->machine_guid);
-        if(qn->node_id[0])
-            buffer_json_member_add_string(wb, "nd", qn->node_id);
-        buffer_json_member_add_string(wb, "nm", rrdhost_hostname(host));
+        buffer_json_node_add_v2(wb, host, qn->slot);
         query_target_instance_counts(wb, &qn->instances);
         query_target_metric_counts(wb, &qn->metrics);
         query_target_alerts_counts(wb, &qn->alerts, NULL, false);
@@ -1293,8 +1289,8 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb) {
     }
 
     buffer_json_initialize(wb, kq, sq, 0, true, options & RRDR_OPTION_MINIFY);
-
     buffer_json_member_add_uint64(wb, "api", 2);
+    buffer_json_agents_array_v2(wb, 0);
 
     if(options & RRDR_OPTION_DEBUG) {
         buffer_json_member_add_string(wb, "id", qt->id);
