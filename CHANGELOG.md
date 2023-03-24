@@ -6,9 +6,13 @@
 
 **Merged pull requests:**
 
+- add validation step before using GCP metadata [\#14801](https://github.com/netdata/netdata/pull/14801) ([ilyam8](https://github.com/ilyam8))
+- Replace `/docs` links with GitHub links [\#14796](https://github.com/netdata/netdata/pull/14796) ([Ancairon](https://github.com/Ancairon))
 - Fix links in README.md [\#14794](https://github.com/netdata/netdata/pull/14794) ([cakrit](https://github.com/cakrit))
 - Fix capitalization on readme [\#14793](https://github.com/netdata/netdata/pull/14793) ([cakrit](https://github.com/cakrit))
+- Fix handling of logrotate on static installs. [\#14792](https://github.com/netdata/netdata/pull/14792) ([Ferroin](https://github.com/Ferroin))
 - use mCPU in k8s cgroup cpu charts title [\#14791](https://github.com/netdata/netdata/pull/14791) ([ilyam8](https://github.com/ilyam8))
+- Schedule node info to the cloud after child connection [\#14790](https://github.com/netdata/netdata/pull/14790) ([stelfrag](https://github.com/stelfrag))
 - uuid\_compare\(\) replaced with uuid\_memcmp\(\) [\#14787](https://github.com/netdata/netdata/pull/14787) ([ktsaou](https://github.com/ktsaou))
 - /api/v2/X part 6 [\#14785](https://github.com/netdata/netdata/pull/14785) ([ktsaou](https://github.com/ktsaou))
 - Update dashboard to version v2.30.1. [\#14784](https://github.com/netdata/netdata/pull/14784) ([netdatabot](https://github.com/netdatabot))
@@ -383,9 +387,6 @@
 - add `telegraf` to `apps_groups.conf` monitoring section [\#14188](https://github.com/netdata/netdata/pull/14188) ([andrewm4894](https://github.com/andrewm4894))
 - bump go.d.plugin to v0.47.0 [\#14182](https://github.com/netdata/netdata/pull/14182) ([ilyam8](https://github.com/ilyam8))
 - remove mqtt-c from websockets [\#14181](https://github.com/netdata/netdata/pull/14181) ([underhood](https://github.com/underhood))
-- fix logrotate postrotate [\#14180](https://github.com/netdata/netdata/pull/14180) ([ilyam8](https://github.com/ilyam8))
-- docs: explicitly set the `nofile` limit for Netdata container and document the reason for this [\#14178](https://github.com/netdata/netdata/pull/14178) ([ilyam8](https://github.com/ilyam8))
-- remove interface name from cgroup net family [\#14174](https://github.com/netdata/netdata/pull/14174) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
