@@ -13,7 +13,6 @@
 #include "libnetdata/libnetdata.h"
 #include "../fluent-bit/lib/msgpack-c/include/msgpack/unpack.h"
 #include "../fluent-bit/lib/monkey/include/monkey/mk_core/mk_list.h"
-#include "../fluent-bit/include/fluent-bit/flb_macros.h"
 #include <dlfcn.h>
 
 #define LOG_REC_KEY "msg" /**< key to represent log message field **/
@@ -22,6 +21,13 @@
 
 
 extern uv_loop_t *main_loop; 
+
+/* Including "../fluent-bit/include/fluent-bit/flb_macros.h" causes issues 
+ * with CI, as it requires mk_core/mk_core_info.h which is generated only 
+ * after Fluent Bit has been built. We can instead just redefined a couple 
+ * of macros here: */
+#define FLB_FALSE  0
+#define FLB_TRUE   !FLB_FALSE
 
 /* Following structs are the same as defined in fluent-bit/flb_lib.h and 
  * fluent-bit/flb_time.h, but need to be redefined due to use of dlsym().  */
