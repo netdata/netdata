@@ -29,6 +29,8 @@ To enable the collector, you need to edit the configuration file of `charts.d/se
 >
 > To edit configuration files in a safe way, we provide the [`edit config` script](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) located in your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) (typically is `/etc/netdata`) that creates the proper file and opens it in an editor automatically.  
 > It is recommended to use this way for configuring Netdata.
+>
+> Please also note that after most configuration changes you will need to [restart the Agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for the changes to take effect.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
@@ -75,5 +77,3 @@ sensors_excluded=()
 ```
 
 ---
-
-After this operation, you should be able to see the new data under the "Sensors" family of charts.
