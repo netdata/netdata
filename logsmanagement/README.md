@@ -4,11 +4,17 @@
 
 - [Summary](#summary)  
     - [Types of available collectors](#collector-types)  
-- [Requirements](#requirements)
-    - [systemd collector](#requirements-systemd-collector)
+- [Package Requirements](#package-requirements)
+    - [systemd](#requirements-systemd)
 - [General Configuration](#general-configuration)
 - [Collector-specific Configuration](#collector-configuration)
+    - [systemd](#collector-configuration-systemd)
+	- [docker events](#collector-configuration-docker-events)
+	- [web log](#collector-configuration-web-log)
+	- [syslog](#collector-configuration-syslog)
+	- [serial](#collector-configuration-serial)
 - [Custom Charts](#custom-charts)
+- [Troubleshooting](#troubleshooting)
 
 <a name="summary"/>
 
@@ -50,19 +56,22 @@ The following log collectors are supported at the moment. The table will be upda
 | syslog        | `flb_syslog`  | Collection of RFC-3164 syslog logs by creating listening sockets
 | serial        | `flb_serial`  | Collection of logs from a serial interface
 
-<a name="requirements"/>
+<a name="package-requirements"/>
 
-## Requirements
+## Package Requirements
 
 </a>
 
-Logs management introduces minimal extra package dependencies: `flex` and `bison` packages are required to build Fluent Bit and that's it! 
+Netdata logs management introduces minimal additional package dependencies and those are actually [Fluent Bit dependencies](https://docs.fluentbit.io/manual/installation/requirements). The only extra build-time dependencies are:
+ - `flex` 
+ - `bison` 
+ - `musl-fts-dev` (Alpine Linux only)
 
-However, there may be some exceptions to this rule as more collectors are added to the logs management engine, so if a specific collector is disabled due to missing dependencies, refer to this section.
+However, there may be some exceptions to this rule as more collectors are added to the logs management engine, so if a specific collector is disabled due to missing dependencies, please refer to this section.
 
-<a name="requirements-systemd-collector"/>
+<a name="requirements-systemd"/>
 
-### systemd collector
+### systemd
 
 </a>
 
@@ -73,7 +82,7 @@ Debian / Ubuntu:
 ```
 apt install libsystemd-dev
 ```
-or Centos / Fedora:
+Centos / Fedora:
 ```
 yum install systemd-devel
 ```
@@ -116,12 +125,69 @@ There are also two settings that cannot be set per log source, but can only be d
 
 </a>
 
-If /dev/kmsg permission denied for normal user (non-root):
+<a name="collector-configuration-systemd"/>
+
+### systemd
+
+</a>
+
+`priority value chart` : Enable chart showing Syslog Priority values (PRIVAL) of collected logs. The Priority value ranges from 0 to 191 and represents both the Facility and Severity. It is calculated by first multiplying the Facility number by 8 and then adding the numerical value of the Severity. Please see the [rfc5424: Syslog Protocol](https://www.rfc-editor.org/rfc/rfc5424#section-6.2.1) document for more information.
+
+`severity chart` : Enable chart showing Syslog Severity values of collected logs. Severity values are in the range of 0 to 7 inclusive.
+
+`facility chart` : Enable chart showing Syslog Facility values of collected logs. Facility values show which subsystem generated the log and are in the range of 0 to 23 inclusive.
+
+<a name="collector-configuration-docker-events"/>
+
+### docker events
+
+</a>
+
+`event type chart` : Enable chart showing the Docker object type of the collected logs.
+
+<a name="collector-configuration-web-log"/>
+
+### web log
+
+</a>
+
+**TODO**
+
+<a name="collector-configuration-syslog"/>
+
+### syslog
+
+</a>
+
+`mode` : Type of socket to be created to listen for incoming syslog messages. Supported modes are: `unix_tcp`, `unix_udp`, `tcp` and `udp`. See also documentation of [Fluent Bit syslog input plugin](https://docs.fluentbit.io/manual/v/1.9-pre/pipeline/inputs/syslog).
+
+`log path` : If `mode == unix_tcp` or `mode == unix_udp`, Netdata will create a UNIX socket on this path to listen for syslog messages. Otherwise, this option is not used.
+
+`unix_perm` : If `mode == unix_tcp` or `mode == unix_udp`, this sets the permissions of the generated UNIX socket. Otherwise, this option is not used.
+
+`listen` : If `mode == tcp` or `mode == udp`, this sets the network interface to bind.
+
+`port` : If `mode == tcp` or `mode == udp`, this specifies the port to listen for incoming connections.
+
+`log format` : This is a Ruby Regular Expression to define the expected syslog format, for example:
 ```
-sudo sysctl kernel.dmesg_restrict=0
+/^\<(?<PRIVAL>[0-9]+)\>(?<SYSLOG_TIMESTAMP>[^ ]* {1,2}[^ ]* [^ ]* )(?<HOSTNAME>[^ ]*) (?<SYSLOG_IDENTIFIER>[a-zA-Z0-9_\/\.\-]*)(?:\[(?<PID>[0-9]+)\])?(?:[^\:]*\:)? *(?<MESSAGE>.*)$/
 ```
 
-For kmsg, pay attention to `KERNEL_LOGS_COLLECT_INIT_WAIT`.
+ For the parsing to work properly, please ensure that fields `<PRIVAL>`, `<SYSLOG_TIMESTAMP>`, `<HOSTNAME>`, `<SYSLOG_IDENTIFIER>`, `<PID>` and `<MESSAGE>` are defined.
+
+
+ `priority value chart` : Please see the respective [systemd](#collector-configuration-systemd) configuration.
+
+`severity chart` : Please see the respective [systemd](#collector-configuration-systemd) configuration.
+
+`facility chart` : Please see the respective [systemd](#collector-configuration-systemd) configuration.
+
+<a name="collector-configuration-serial"/>
+
+### serial
+
+</a>
 
 <a name="custom-charts"/>
 
@@ -186,3 +252,27 @@ Example of configuration for a generic log source collection with custom regex-b
 And the generated charts based on this configuration:
 
 ![Auth.log](https://user-images.githubusercontent.com/5953192/197003292-13cf2285-c614-42a1-ad5a-896370c22883.PNG)
+
+<a name="troubleshooting"/>
+
+## Troubleshooting
+
+</a>
+
+1. I am building Netdata from source but the `FLB_SYSTEMD` plugin is not  available / does not work: 
+
+If during the Fluent Bit build step you are seeing the following message: 
+```
+-- Could NOT find Journald (missing: JOURNALD_LIBRARY JOURNALD_INCLUDE_DIR)
+``` 
+it means that the systemd development libraries are missing from your system. Please see [systemd collector](#requirements-systemd-collector).
+
+2. Logs management does not work at all and I am seeing the following error in the logs:
+```
+[2020/10/20 10:39:06] [error] [plugins/in_kmsg/in_kmsg.c:291 errno=1] Operation not permitted
+[2020/10/20 10:39:06] [error] Failed initialize input kmsg.0
+```
+Netdata is executed without root permissions, so the kernel ring buffer logs may not be accessible from normal users. Please try executing:
+```
+sudo sysctl kernel.dmesg_restrict=0
+```
