@@ -138,7 +138,7 @@ static void db_writer_db_mode_none(void *arg){
     
     while(1){
         do{ item = circ_buff_read_item(p_file_info->circ_buff);} while(item);
-        uv_sleep(p_file_info->buff_flush_to_db_interval * MSEC_PER_SEC);
+        sleep_usec(p_file_info->buff_flush_to_db_interval * USEC_PER_SEC);
     }
 }
 
@@ -363,7 +363,7 @@ static void db_writer_db_mode_full(void *arg){
 
         // TODO: Can uv_mutex_unlock(p_file_info->db_mut) be moved before if(blob_filesize > p_file_info-> blob_max_size) ?
         uv_mutex_unlock(p_file_info->db_mut);
-        uv_sleep(p_file_info->buff_flush_to_db_interval * MSEC_PER_SEC);
+        sleep_usec(p_file_info->buff_flush_to_db_interval * USEC_PER_SEC);
     }
 }
 

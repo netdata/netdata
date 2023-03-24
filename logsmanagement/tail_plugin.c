@@ -51,7 +51,7 @@ static void fs_events_reenable_thread(void *arg) {
         uv_mutex_unlock(&p_file_infos_arr->fs_events_reenable_lock);
 
         // Give it some time for the file that wasn't found to be created
-        uv_sleep(FS_EVENTS_REENABLE_INTERVAL);  
+        sleep_usec(FS_EVENTS_REENABLE_INTERVAL * USEC_PER_SEC);
 
         debug(D_LOGS_MANAG, "fs_events_reenable_list pending: %" PRIu64, fs_events_reenable_list_local);
         for (int offset = 0; offset < p_file_infos_arr->count; offset++) {

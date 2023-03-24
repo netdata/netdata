@@ -76,7 +76,7 @@ typedef enum {
 /*                                Tail Plugin                                 */
 /* -------------------------------------------------------------------------- */
 
-#define FS_EVENTS_REENABLE_INTERVAL 1000U               /**< Interval to wait for before attempting to re-register a certain log file, after it was not found (due to rotation or other reason). **/
+#define FS_EVENTS_REENABLE_INTERVAL 1U                 /**< Interval (in sec) to wait for before attempting to re-register a certain log file, after it was not found (due to rotation or other reason). **/
 
 /* -------------------------------------------------------------------------- */
 
