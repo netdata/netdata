@@ -1508,20 +1508,27 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
     buffer_json_member_add_object(wb, "view");
     {
         query_target_title(wb, qt, r->internal.contexts);
-        buffer_json_member_add_string(wb, "format", rrdr_format_to_string(format));
-        web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", options);
-        buffer_json_member_add_string(wb, "time_group", time_grouping_tostring(qt->request.time_group_method));
         buffer_json_member_add_time_t(wb, "update_every", r->view.update_every);
         buffer_json_member_add_time_t(wb, "after", r->view.after);
         buffer_json_member_add_time_t(wb, "before", r->view.before);
 
-        buffer_json_member_add_object(wb, "partial_data_trimming");
-        buffer_json_member_add_time_t(wb, "max_update_every", r->partial_data_trimming.max_update_every);
-        buffer_json_member_add_time_t(wb, "expected_after", r->partial_data_trimming.expected_after);
-        buffer_json_member_add_time_t(wb, "trimmed_after", r->partial_data_trimming.trimmed_after);
-        buffer_json_object_close(wb);
+        if(options & RRDR_OPTION_DEBUG) {
+            buffer_json_member_add_string(wb, "format", rrdr_format_to_string(format));
+            web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", options);
+            buffer_json_member_add_string(wb, "time_group", time_grouping_tostring(qt->request.time_group_method));
+        }
 
-        buffer_json_member_add_uint64(wb, "points", rrdr_rows(r));
+        if(options & RRDR_OPTION_DEBUG) {
+            buffer_json_member_add_object(wb, "partial_data_trimming");
+            buffer_json_member_add_time_t(wb, "max_update_every", r->partial_data_trimming.max_update_every);
+            buffer_json_member_add_time_t(wb, "expected_after", r->partial_data_trimming.expected_after);
+            buffer_json_member_add_time_t(wb, "trimmed_after", r->partial_data_trimming.trimmed_after);
+            buffer_json_object_close(wb);
+        }
+
+        if(options & RRDR_OPTION_RETURN_RAW)
+            buffer_json_member_add_uint64(wb, "points", rrdr_rows(r));
+
         query_target_combined_units_v2(wb, qt, r->internal.contexts);
         query_target_combined_chart_type(wb, qt, r->internal.contexts);
         buffer_json_member_add_object(wb, "dimensions");
@@ -1532,11 +1539,9 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
             rrdr_dimension_units_array_v2(wb, "units", r, options);
             rrdr_dimension_priority_array_v2(wb, "priorities", r, options);
             rrdr_dimension_aggregated_array_v2(wb, "aggregated", r, options);
-            rrdr_dimension_view_minimum_values(wb, "view_minimum_values", r, options);
-            rrdr_dimension_view_maximum_values(wb, "view_maximum_values", r, options);
-            rrdr_dimension_view_average_values(wb, "view_average_values", r, options);
-            size_t dims = rrdr_dimension_view_latest_values(wb, "view_latest_values", r, options);
-            buffer_json_member_add_uint64(wb, "count", dims);
+            rrdr_dimension_view_minimum_values(wb, "min", r, options);
+            rrdr_dimension_view_maximum_values(wb, "max", r, options);
+            rrdr_dimension_view_average_values(wb, "avg", r, options);
             rrdr_dimension_view_db_statistics(wb, "sts", r, options);
             rrdr_json_group_by_labels(wb, "labels", r, options);
         }
