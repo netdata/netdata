@@ -10,6 +10,10 @@ info:
   license:
     name: GPL v3+
     url: https://github.com/netdata/netdata/blob/master/LICENSE
+servers:
+  - url: https://registry.my-netdata.io
+  - url: http://registry.my-netdata.io
+  - url: http://localhost:19999
 tags:
   - name: nodes
     description: Everything related to monitored nodes
@@ -17,25 +21,25 @@ tags:
     description: Everything related to chart instances - DO NOT USE IN NEW CODE - use contexts instead
   - name: contexts
     description: Everything related contexts - in new code, use this instead of charts
-  - name: alerts
-    description: Everything related to alerts
   - name: data
     description: Everything related to data queries
-  - name: weights
-    description: Everything related to scoring / weighting metrics
   - name: badges
     description: Everything related to dynamic badges based on metric data
-  - name: management
-    description: Everything related to managing netdata agents
+  - name: weights
+    description: Everything related to scoring / weighting metrics
   - name: functions
     description: Everything related to functions
+  - name: alerts
+    description: Everything related to alerts
+  - name: management
+    description: Everything related to managing netdata agents
 paths:
   /api/v1/info:
     get:
       operationId: getNodeInfo1
       tags:
         - nodes
-      summary: Get netdata basic information
+      summary: Node Info v1
       description: |
         The info endpoint returns basic information about netdata. It provides:
         * netdata version
@@ -62,7 +66,7 @@ paths:
       operationId: getNodeCharts1
       tags:
         - charts
-      summary: Get a list of all charts available at the server
+      summary: List all charts v1 - EOL
       description: The charts endpoint returns a summary about all charts stored in the
         netdata server.
       responses:
@@ -77,7 +81,7 @@ paths:
       operationId: getNodeChart1
       tags:
         - charts
-      summary: Get info about a specific chart
+      summary: Get one chart v1 - EOL
       description: The chart endpoint returns detailed information about a chart.
       parameters:
         - name: chart
@@ -104,7 +108,7 @@ paths:
       operationId: getNodeContexts1
       tags:
         - contexts
-      summary: Get a list of all contexts available at the server
+      summary: Get a list of all node contexts available v1
       description: The contexts endpoint returns a summary about all contexts stored in the
         netdata server.
       parameters:
@@ -130,20 +134,8 @@ paths:
                 - deepscan
             default:
               - full
-        - name: after
-          in: query
-          description: limit the results on context having data after this timestamp.
-          required: false
-          schema:
-            type: number
-            format: integer
-        - name: before
-          in: query
-          description: limit the results on context having data before this timestamp.
-          required: false
-          schema:
-            type: number
-            format: integer
+        - $ref: '#/components/parameters/after'
+        - $ref: '#/components/parameters/before'
         - name: chart_label_key
           in: query
           description: a simple pattern matching charts label keys (use comma or pipe as separator)
@@ -211,20 +203,8 @@ paths:
                 - deepscan
             default:
               - full
-        - name: after
-          in: query
-          description: limit the results on context having data after this timestamp.
-          required: false
-          schema:
-            type: number
-            format: integer
-        - name: before
-          in: query
-          description: limit the results on context having data before this timestamp.
-          required: false
-          schema:
-            type: number
-            format: integer
+        - $ref: '#/components/parameters/after'
+        - $ref: '#/components/parameters/before'
         - name: chart_label_key
           in: query
           description: a simple pattern matching charts label keys (use comma or pipe as separator)
@@ -234,8 +214,9 @@ paths:
             type: string
         - name: chart_labels_filter
           in: query
-          description: "a simple pattern matching charts label key and values (use colon for equality, comma or pipe
-            as separator)"
+          description: |
+            A simple pattern matching charts label key and values (use colon for equality, comma or pipe
+            as separator).
           required: false
           allowEmptyValue: true
           schema:
@@ -258,39 +239,6 @@ paths:
           description: No context id was supplied in the request.
         "404":
           description: No context with the given id is found.
-  /api/v1/alarm_variables:
-    get:
-      operationId: getNodeAlertVariables1
-      tags:
-        - alerts
-      summary: List variables available to configure alarms for a chart
-      description: Returns the basic information of a chart and all the variables that can
-        be used in alarm and template health configurations for the particular
-        chart or family.
-      parameters:
-        - name: chart
-          in: query
-          description: The id of the chart as returned by the /charts call.
-          required: true
-          schema:
-            type: string
-            format: as returned by /charts
-            default: system.cpu
-      responses:
-        "200":
-          description: A javascript object with information about the chart and the
-            available variables.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/alarm_variables"
-        "400":
-          description: Bad request - the body will include a message stating what is wrong.
-        "404":
-          description: No chart with the given id is found.
-        "500":
-          description: Internal server error. This usually means the server is out of
-            memory.
   /api/v2/data:
     get:
       operationId: dataQuery2
@@ -300,107 +248,6 @@ paths:
       description: |
         Multi-node, multi-context, multi-instance, multi-dimension data queries, with time and metric aggregation.
       parameters:
-        - name: scope_nodes
-          in: query
-          description: |
-            A simple pattern limiting the nodes scope of the query. The scope controls both data and metadata response. The simple pattern is checked against the nodes' machine guid, node id, hostname. The default nodes scope is all nodes for which this agent has data for. Usually the nodes scope is used to slice the entire dashboard (e.g. the Global Nodes Selector at the Netdata Cloud overview dashboard). Both positive and negative simple pattern expressions are supported.
-          required: false
-          schema:
-            type: string
-            format: simple pattern
-            default: "*"
-        - name: scope_contexts
-          in: query
-          description: |
-            A simple pattern limiting the contexts scope of the query. The scope controls both data and metadata response. The default contexts scope is all contexts for which this agent has data for. Usually the contexts scope is used to slice charts of the dashboard (e.g. each context based chart has its own contexts scope, limiting the chart to all the instances of the selected contexts). Both positive and negative simple pattern expressions are supported.
-          required: false
-          schema:
-            type: string
-            format: simple pattern
-            default: "*"
-        - name: nodes
-          in: query
-          description: |
-            A simple pattern matching the nodes to be queried. This only controls the data response, not the metadata. The simple pattern is checked against the nodes' machine guid, node id, hostname. The default nodes selector is all the nodes matched by the nodes scope. Both positive and negative simple pattern expressions are supported.
-          required: false
-          schema:
-            type: string
-            format: simple pattern
-            default: "*"
-        - name: contexts
-          in: query
-          description: |
-            A simple pattern matching the contexts to be queried. This only controls the data response, not the metadata. Both positive and negative simple pattern expressions are supported.
-          required: false
-          schema:
-            type: string
-            format: simple pattern
-            default: "*"
-        - name: instances
-          in: query
-          description: |
-            A simple pattern matching the instances to be queried. The simple pattern is checked against the instance `id`, the instance `name`, the fully qualified name of the instance `id` and `name`, like `instance@machine_guid`, where `instance` is either its `id` or `name`. Both positive and negative simple pattern expressions are supported.
-          required: false
-          schema:
-            type: string
-            format: simple pattern
-            default: "*"
-        - name: labels
-          in: query
-          description: |
-            A simple pattern matching the labels to be queried. The simple pattern is checked against `name:value` of all the labels of all the eligible instances (as filtered by all the above: scope nodes, scope contexts, nodes, contexts and instances). Negative simple patterns should not be used in this filter.
-          required: false
-          schema:
-            type: string
-            format: simple pattern
-            default: "*"
-        - name: alerts
-          in: query
-          description: |
-            A simple pattern matching the alerts to be queried. The simple pattern is checked against the `name` of alerts and the combination of `name:status`, when status is one of `CLEAR`, `WARNING`, `CRITICAL`, `REMOVED`, `UNDEFINED`, `UNINITIALIZED`, of all the alerts of all the eligible instances (as filtered by all the above). A negative simple pattern will exclude the instances having the labels matched.
-          required: false
-          schema:
-            type: string
-            format: simple pattern
-            default: "*"
-        - name: dimensions
-          in: query
-          description: |
-            A simple patterns matching the dimensions to be queried. The simple pattern is checked against and `id` and the `name` of the dimensions of the eligible instances (as filtered by all the above). Both positive and negative simple pattern expressions are supported.
-          required: false
-          schema:
-            type: string
-            format: simple pattern
-            default: "*"
-        - name: before
-          in: query
-          description: |
-            The end timestamp (unix epoch) of the data query, or a negative number specifying the number of seconds
-            in the past relative now.
-          required: false
-          schema:
-            type: number
-            format: integer
-            default: 0
-        - name: after
-          in: query
-          description: |
-            The start timestamp (unix epoch) of the data query, or a negative number specifying the number of seconds
-            in the past relative to parameter `before`.
-          required: false
-          schema:
-            type: number
-            format: integer
-            default: 0
-        - name: points
-          in: query
-          description: |
-            The number of points to be returned. If not given, or it is <= 0, or it is bigger than the points stored in the database for the given duration, all the available collected values for the given duration will be returned.
-          required: false
-          schema:
-            type: number
-            format: integer
-            default: 0
         - name: group_by
           in: query
           description: |
@@ -446,20 +293,24 @@ paths:
               - average
               - sum
             default: average
+        - $ref: '#/components/parameters/scopeNodes'
+        - $ref: '#/components/parameters/scopeContexts'
+        - $ref: '#/components/parameters/filterNodes'
+        - $ref: '#/components/parameters/filterContexts'
+        - $ref: '#/components/parameters/filterInstances'
+        - $ref: '#/components/parameters/filterLabels'
+        - $ref: '#/components/parameters/filterAlerts'
+        - $ref: '#/components/parameters/filterDimensions'
+        - $ref: '#/components/parameters/after'
+        - $ref: '#/components/parameters/before'
+        - $ref: '#/components/parameters/points'
+        - $ref: '#/components/parameters/tier'
+        - $ref: '#/components/parameters/dataQueryOptions'
         - $ref: '#/components/parameters/dataTimeGroup2'
         - $ref: '#/components/parameters/dataTimeGroupOptions2'
         - $ref: '#/components/parameters/dataTimeResampling2'
         - $ref: '#/components/parameters/dataFormat2'
         - $ref: '#/components/parameters/timeoutMS'
-        - $ref: '#/components/parameters/dataQueryOptions'
-        - name: tier
-          in: query
-          description: |
-            Use only the specified database tier.
-          required: false
-          schema:
-            type: number
-            format: integer
         - name: callback
           in: query
           description: |
@@ -533,47 +384,16 @@ paths:
             items:
               type: string
               format: as returned by /charts
-        - name: after
-          in: query
-          description: "This parameter can either be an absolute timestamp specifying the
-            starting point of the data to be returned, or a relative number of
-            seconds (negative, relative to parameter: before). Netdata will
-            assume it is a relative number if it is less that 3 years (in seconds).
-            If not specified the default is -600 seconds. Netdata will adapt this
-            parameter to the boundaries of the round robin database unless the allow_past
-            option is specified."
-          required: true
-          allowEmptyValue: false
-          schema:
-            type: number
-            format: integer
-            default: -600
-        - name: before
-          in: query
-          description: This parameter can either be an absolute timestamp specifying the
-            ending point of the data to be returned, or a relative number of
-            seconds (negative), relative to the last collected timestamp.
-            Netdata will assume it is a relative number if it is less than 3
-            years (in seconds). Netdata will adapt this parameter to the
-            boundaries of the round robin database. The default is zero (i.e.
-            the timestamp of the last value collected).
-          required: false
-          schema:
-            type: number
-            format: integer
-            default: 0
-        - name: points
-          in: query
-          description: The number of points to be returned. If not given, or it is <= 0, or
-            it is bigger than the points stored in the round robin database for
-            this chart for the given duration, all the available collected
-            values for the given duration will be returned.
-          required: true
-          allowEmptyValue: false
-          schema:
-            type: number
-            format: integer
-            default: 20
+        - $ref: '#/components/parameters/after'
+        - $ref: '#/components/parameters/before'
+        - $ref: '#/components/parameters/points'
+        - $ref: '#/components/parameters/tier'
+        - $ref: '#/components/parameters/dataQueryOptions'
+        - $ref: '#/components/parameters/dataFormat1'
+        - $ref: '#/components/parameters/dataTimeGroup1'
+        - $ref: '#/components/parameters/dataTimeGroupOptions1'
+        - $ref: '#/components/parameters/dataTimeResampling1'
+        - $ref: '#/components/parameters/timeoutMS'
         - name: chart_label_key
           in: query
           description: Specify the chart label keys that need to match for context queries as comma separated values.
@@ -592,12 +412,6 @@ paths:
           schema:
             type: string
             format: key1:value1,key2:value2,key3:value3
-        - $ref: '#/components/parameters/dataQueryOptions'
-        - $ref: '#/components/parameters/dataFormat1'
-        - $ref: '#/components/parameters/dataTimeGroup1'
-        - $ref: '#/components/parameters/dataTimeGroupOptions1'
-        - $ref: '#/components/parameters/dataTimeResampling1'
-        - $ref: '#/components/parameters/timeoutMS'
         - name: callback
           in: query
           description: For JSONP responses, the callback function name.
@@ -641,6 +455,144 @@ paths:
         "500":
           description: Internal server error. This usually means the server is out of
             memory.
+  /api/v1/allmetrics:
+    get:
+      operationId: allMetrics1
+      tags:
+        - data
+      summary: All Metrics v1 - Fetch latest value for all metrics
+      description: |
+        The `allmetrics` endpoint returns the latest value of all metrics maintained for a netdata node.
+      parameters:
+        - name: format
+          in: query
+          description: The format of the response to be returned.
+          required: true
+          schema:
+            type: string
+            enum:
+              - shell
+              - prometheus
+              - prometheus_all_hosts
+              - json
+            default: shell
+        - name: filter
+          in: query
+          description: Allows to filter charts out using simple patterns.
+          required: false
+          schema:
+            type: string
+            format: any text
+        - name: variables
+          in: query
+          description: |
+            When enabled, netdata will expose various system configuration variables.
+          required: false
+          schema:
+            type: string
+            enum:
+              - yes
+              - no
+            default: no
+        - name: help
+          in: query
+          description: |
+            Enable or disable HELP lines in prometheus output.
+          required: false
+          schema:
+            type: string
+            enum:
+              - yes
+              - no
+            default: no
+        - name: types
+          in: query
+          description: |
+            Enable or disable TYPE lines in prometheus output.
+          required: false
+          schema:
+            type: string
+            enum:
+              - yes
+              - no
+            default: no
+        - name: timestamps
+          in: query
+          description: |
+            Enable or disable timestamps in prometheus output.
+          required: false
+          schema:
+            type: string
+            enum:
+              - yes
+              - no
+            default: yes
+        - name: names
+          in: query
+          description: |
+            When enabled netdata will report dimension names. When disabled netdata will report dimension IDs. The default is controlled in netdata.conf.
+          required: false
+          schema:
+            type: string
+            enum:
+              - yes
+              - no
+            default: yes
+        - name: oldunits
+          in: query
+          description: |
+            When enabled, netdata will show metric names for the default `source=average` as they appeared before 1.12, by using the legacy unit naming conventions.
+          required: false
+          schema:
+            type: string
+            enum:
+              - yes
+              - no
+            default: yes
+        - name: hideunits
+          in: query
+          description: |
+            When enabled, netdata will not include the units in the metric names, for the default `source=average`.
+          required: false
+          schema:
+            type: string
+            enum:
+              - yes
+              - no
+            default: yes
+        - name: server
+          in: query
+          description: |
+            Set a distinct name of the client querying prometheus metrics. Netdata will use the client IP if this is not set.
+          required: false
+          schema:
+            type: string
+            format: any text
+        - name: prefix
+          in: query
+          description: |
+            Prefix all prometheus metrics with this string.
+          required: false
+          schema:
+            type: string
+            format: any text
+        - name: data
+          in: query
+          description: |
+            Select the prometheus response data source. There is a setting in netdata.conf for the default.
+          required: false
+          schema:
+            type: string
+            enum:
+              - as-collected
+              - average
+              - sum
+            default: average
+      responses:
+        "200":
+          description: All the metrics returned in the format requested.
+        "400":
+          description: The format requested is not supported.
   /api/v1/badge.svg:
     get:
       operationId: badge1
@@ -676,37 +628,8 @@ paths:
             items:
               type: string
               format: as returned by /charts
-        - name: after
-          in: query
-          description: This parameter can either be an absolute timestamp specifying the
-            starting point of the data to be returned, or a relative number of
-            seconds, to the last collected timestamp. Netdata will assume it is
-            a relative number if it is smaller than the duration of the round
-            robin database for this chart. So, if the round robin database is
-            3600 seconds, any value from -3600 to 3600 will trigger relative
-            arithmetics. Netdata will adapt this parameter to the boundaries of
-            the round robin database.
-          required: true
-          allowEmptyValue: false
-          schema:
-            type: number
-            format: integer
-            default: -600
-        - name: before
-          in: query
-          description: This parameter can either be an absolute timestamp specifying the
-            ending point of the data to be returned, or a relative number of
-            seconds, to the last collected timestamp. Netdata will assume it is
-            a relative number if it is smaller than the duration of the round
-            robin database for this chart. So, if the round robin database is
-            3600 seconds, any value from -3600 to 3600 will trigger relative
-            arithmetics. Netdata will adapt this parameter to the boundaries of
-            the round robin database.
-          required: false
-          schema:
-            type: number
-            format: integer
-            default: 0
+        - $ref: '#/components/parameters/after'
+        - $ref: '#/components/parameters/before'
         - $ref: '#/components/parameters/dataTimeGroup1'
         - $ref: '#/components/parameters/dataQueryOptions'
         - name: label
@@ -838,12 +761,8 @@ paths:
             format: integer
         - name: fixed_width_lbl
           in: query
-          description: "This parameter overrides auto-sizing of badge and creates it with fixed width.
-            This parameter determines the size of the label's left side *(label/name)*.
-            You must set this parameter together with `fixed_width_val` otherwise it will be ignored.
-            You should set the label/value widths wide enough to provide space for all the possible values/contents of
-            the badge you're requesting. In case the text cannot fit the space given it will be clipped.
-            The `scale` parameter still applies on the values you give to `fixed_width_lbl` and `fixed_width_val`."
+          description: |
+            This parameter overrides auto-sizing of badge and creates it with fixed width. This parameter determines the size of the label's left side *(label/name)*. You must set this parameter together with `fixed_width_val` otherwise it will be ignored. You should set the label/value widths wide enough to provide space for all the possible values/contents of the badge you're requesting. In case the text cannot fit the space given it will be clipped. The `scale` parameter still applies on the values you give to `fixed_width_lbl` and `fixed_width_val`.
           required: false
           allowEmptyValue: false
           schema:
@@ -851,12 +770,8 @@ paths:
             format: integer
         - name: fixed_width_val
           in: query
-          description: "This parameter overrides auto-sizing of badge and creates it with fixed width. This parameter
-            determines the size of the label's right side *(value)*. You must set this parameter together with
-            `fixed_width_lbl` otherwise it will be ignored. You should set the label/value widths wide enough to
-            provide space for all the possible values/contents of the badge you're requesting. In case the text cannot
-            fit the space given it will be clipped. The `scale` parameter still applies on the values you give to
-            `fixed_width_lbl` and `fixed_width_val`."
+          description: |
+            This parameter overrides auto-sizing of badge and creates it with fixed width. This parameter determines the size of the label's right side *(value)*. You must set this parameter together with `fixed_width_lbl` otherwise it will be ignored. You should set the label/value widths wide enough to provide space for all the possible values/contents of the badge you're requesting. In case the text cannot fit the space given it will be clipped. The `scale` parameter still applies on the values you give to `fixed_width_lbl` and `fixed_width_val`.
           required: false
           allowEmptyValue: false
           schema:
@@ -872,152 +787,158 @@ paths:
         "500":
           description: Internal server error. This usually means the server is out of
             memory.
-  /api/v1/allmetrics:
+  /api/v1/metric_correlations:
     get:
-      operationId: allMetrics1
+      operationId: metricCorrelations1
       tags:
-        - data
-      summary: All Metrics v1
-      description: The allmetrics endpoint returns the latest value of all charts and
-        dimensions stored in the netdata server.
+        - weights
+      summary: "Analyze all the metrics to find their correlations"
+      description: "THIS ENDPOINT IS OBSOLETE. Use the /weights endpoint.
+        Given two time-windows (baseline, highlight), it goes
+        through all the available metrics, querying both windows and tries to find
+        how these two windows relate to each other. It supports
+        multiple algorithms to do so. The result is a list of all
+        metrics evaluated, weighted for 0.0 (the two windows are
+        more different) to 1.0 (the two windows are similar).
+        The algorithm adjusts automatically the baseline window to be
+        a power of two multiple of the highlighted (1, 2, 4, 8, etc)."
       parameters:
-        - name: format
+        - name: method
           in: query
-          description: The format of the response to be returned.
-          required: true
-          schema:
-            type: string
-            enum:
-              - shell
-              - prometheus
-              - prometheus_all_hosts
-              - json
-            default: shell
-        - name: filter
-          in: query
-          description: Allows to filter charts out using simple patterns.
-          required: false
-          schema:
-            type: string
-            format: any text
-        - name: variables
-          in: query
-          description: When enabled, netdata will expose various system
-            configuration metrics.
+          description: the algorithm to run
           required: false
           schema:
             type: string
             enum:
-              - yes
-              - no
-            default: no
-        - name: help
-          in: query
-          description: Enable or disable HELP lines in prometheus output.
-          required: false
-          schema:
-            type: string
-            enum:
-              - yes
-              - no
-            default: no
-        - name: types
-          in: query
-          description: Enable or disable TYPE lines in prometheus output.
-          required: false
-          schema:
-            type: string
-            enum:
-              - yes
-              - no
-            default: no
-        - name: timestamps
-          in: query
-          description: Enable or disable timestamps in prometheus output.
-          required: false
-          schema:
-            type: string
-            enum:
-              - yes
-              - no
-            default: yes
-        - name: names
-          in: query
-          description: When enabled netdata will report dimension names. When disabled
-            netdata will report dimension IDs. The default is controlled in
-            netdata.conf.
-          required: false
-          schema:
-            type: string
-            enum:
-              - yes
-              - no
-            default: yes
-        - name: oldunits
-          in: query
-          description: When enabled, netdata will show metric names for the default
-            source=average as they appeared before 1.12, by using the legacy
-            unit naming conventions.
-          required: false
-          schema:
-            type: string
-            enum:
-              - yes
-              - no
-            default: yes
-        - name: hideunits
-          in: query
-          description: When enabled, netdata will not include the units in the metric
-            names, for the default source=average.
-          required: false
-          schema:
-            type: string
-            enum:
-              - yes
-              - no
-            default: yes
-        - name: server
-          in: query
-          description: Set a distinct name of the client querying prometheus metrics.
-            Netdata will use the client IP if this is not set.
-          required: false
-          schema:
-            type: string
-            format: any text
-        - name: prefix
-          in: query
-          description: Prefix all prometheus metrics with this string.
-          required: false
-          schema:
-            type: string
-            format: any text
-        - name: data
-          in: query
-          description: Select the prometheus response data source. There is a setting in
-            netdata.conf for the default.
-          required: false
-          schema:
-            type: string
-            enum:
-              - as-collected
-              - average
-              - sum
-            default: average
+              - ks2
+              - volume
+            default: ks2
+        - $ref: '#/components/parameters/baselineAfter'
+        - $ref: '#/components/parameters/baselineBefore'
+        - $ref: '#/components/parameters/after'
+        - $ref: '#/components/parameters/before'
+        - $ref: '#/components/parameters/points'
+        - $ref: '#/components/parameters/tier'
+        - $ref: '#/components/parameters/timeoutMS'
+        - $ref: '#/components/parameters/dataQueryOptions'
+        - $ref: '#/components/parameters/dataTimeGroup1'
+        - $ref: '#/components/parameters/dataTimeGroupOptions1'
       responses:
         "200":
-          description: All the metrics returned in the format requested.
+          description: JSON object with weights for each chart and dimension.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/metric_correlations"
         "400":
-          description: The format requested is not supported.
+          description: The given parameters are invalid.
+        "403":
+          description: metrics correlations are not enabled on this Netdata Agent.
+        "404":
+          description: No charts could be found, or the method
+            that correlated the metrics did not produce any result.
+        "504":
+          description: Timeout - the query took too long and has been cancelled.
+  /api/v1/weights:
+    get:
+      operationId: weights1
+      tags:
+        - weights
+      summary: "Analyze all the metrics using an algorithm and score them accordingly"
+      description: "This endpoint goes through all metrics and scores them according to an algorithm."
+      parameters:
+        - name: context
+          in: query
+          description: A simple pattern matching the contexts to evaluate.
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: string
+        - name: method
+          in: query
+          description: the algorithm to run
+          required: false
+          schema:
+            type: string
+            enum:
+              - ks2
+              - volume
+              - anomaly-rate
+            default: anomaly-rate
+        - $ref: '#/components/parameters/baselineAfter'
+        - $ref: '#/components/parameters/baselineBefore'
+        - $ref: '#/components/parameters/after'
+        - $ref: '#/components/parameters/before'
+        - $ref: '#/components/parameters/tier'
+        - $ref: '#/components/parameters/points'
+        - $ref: '#/components/parameters/timeoutMS'
+        - $ref: '#/components/parameters/dataQueryOptions'
+        - $ref: '#/components/parameters/dataTimeGroup1'
+        - $ref: '#/components/parameters/dataTimeGroupOptions1'
+      responses:
+        "200":
+          description: JSON object with weights for each context, chart and dimension.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/weights"
+        "400":
+          description: The given parameters are invalid.
+        "403":
+          description: metrics correlations are not enabled on this Netdata Agent.
+        "404":
+          description: No charts could be found, or the method
+            that correlated the metrics did not produce any result.
+        "504":
+          description: Timeout - the query took too long and has been cancelled.
+  /api/v1/function:
+    get:
+      operationId: function1
+      tags:
+        - functions
+      description: "Execute a collector function."
+      parameters:
+        - name: function
+          in: query
+          description: The name of the function, as returned by the collector.
+          required: true
+          allowEmptyValue: false
+          schema:
+            type: string
+        - $ref: '#/components/parameters/timeoutSecs'
+      responses:
+        "200":
+          description: The collector function has been executed successfully. Each collector may return a different type of content.
+        "400":
+          description: The request was rejected by the collector.
+        "404":
+          description: The requested function is not found.
+        "500":
+          description: Other internal error, getting this error means there is a bug in Netdata.
+        "503":
+          description: The collector to execute the function is not currently available.
+        "504":
+          description: Timeout while waiting for the collector to execute the function.
+        "591":
+          description: The collector sent a response, but it was invalid or corrupted.
+  /api/v1/functions:
+    get:
+      operationId: functions1
+      tags:
+        - functions
+      summary: Get a list of all registered collector functions.
+      description: Collector functions are programs that can be executed on demand.
+      responses:
+        "200":
+          description: A JSON object containing one object per supported function.
   /api/v1/alarms:
     get:
       operationId: alerts1
       tags:
         - alerts
       summary: Get a list of active or raised alarms on the server
-      description: The alarms endpoint returns the list of all raised or enabled alarms on
-        the netdata server. Called without any parameters, the raised alarms in
-        state WARNING or CRITICAL are returned. By passing "?all", all the
-        enabled alarms are returned.
+      description: |
+        The alarms endpoint returns the list of all raised or enabled alarms on the netdata server. Called without any parameters, the raised alarms in state WARNING or CRITICAL are returned. By passing "?all", all the enabled alarms are returned.
       parameters:
         - name: all
           in: query
@@ -1151,6 +1072,38 @@ paths:
         "500":
           description: Internal server error. This usually means the server is out of
             memory.
+  /api/v1/alarm_variables:
+    get:
+      operationId: getNodeAlertVariables1
+      tags:
+        - alerts
+      summary: List variables available to configure alarms for a chart
+      description: |
+        Returns the basic information of a chart and all the variables that can be used in alarm and template health configurations for the particular chart or family.
+      parameters:
+        - name: chart
+          in: query
+          description: The id of the chart as returned by the /charts call.
+          required: true
+          schema:
+            type: string
+            format: as returned by /charts
+            default: system.cpu
+      responses:
+        "200":
+          description: A javascript object with information about the chart and the
+            available variables.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/alarm_variables"
+        "400":
+          description: Bad request - the body will include a message stating what is wrong.
+        "404":
+          description: No chart with the given id is found.
+        "500":
+          description: Internal server error. This usually means the server is out of
+            memory.
   /api/v1/manage/health:
     get:
       operationId: health1
@@ -1231,273 +1184,89 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/aclk_state"
-  /api/v1/metric_correlations:
-    get:
-      operationId: metricCorrelations1
-      tags:
-        - weights
-      summary: "Analyze all the metrics to find their correlations"
-      description: "THIS ENDPOINT IS OBSOLETE. Use the /weights endpoint.
-        Given two time-windows (baseline, highlight), it goes
-        through all the available metrics, querying both windows and tries to find
-        how these two windows relate to each other. It supports
-        multiple algorithms to do so. The result is a list of all
-        metrics evaluated, weighted for 0.0 (the two windows are
-        more different) to 1.0 (the two windows are similar).
-        The algorithm adjusts automatically the baseline window to be
-        a power of two multiple of the highlighted (1, 2, 4, 8, etc)."
-      parameters:
-        - name: baseline_after
-          in: query
-          description: This parameter can either be an absolute timestamp specifying the
-            starting point of baseline window, or a relative number of
-            seconds (negative, relative to parameter baseline_before). Netdata will
-            assume it is a relative number if it is less that 3 years (in seconds).
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: number
-            format: integer
-            default: -300
-        - name: baseline_before
-          in: query
-          description: This parameter can either be an absolute timestamp specifying the
-            ending point of the baseline window, or a relative number of
-            seconds (negative), relative to the last collected timestamp.
-            Netdata will assume it is a relative number if it is less than 3
-            years (in seconds).
-          required: false
-          schema:
-            type: number
-            format: integer
-            default: -60
-        - name: after
-          in: query
-          description: This parameter can either be an absolute timestamp specifying the
-            starting point of highlighted window, or a relative number of
-            seconds (negative, relative to parameter highlight_before). Netdata will
-            assume it is a relative number if it is less that 3 years (in seconds).
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: number
-            format: integer
-            default: -60
-        - name: before
-          in: query
-          description: This parameter can either be an absolute timestamp specifying the
-            ending point of the highlighted window, or a relative number of
-            seconds (negative), relative to the last collected timestamp.
-            Netdata will assume it is a relative number if it is less than 3
-            years (in seconds).
-          required: false
-          schema:
-            type: number
-            format: integer
-            default: 0
-        - name: points
-          in: query
-          description: The number of points to be evaluated for the highlighted window.
-            The baseline window will be adjusted automatically to receive a proportional
-            amount of points.
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: number
-            format: integer
-            default: 500
-        - name: method
-          in: query
-          description: the algorithm to run
-          required: false
-          schema:
-            type: string
-            enum:
-              - ks2
-              - volume
-            default: ks2
-        - $ref: '#/components/parameters/timeoutMS'
-        - $ref: '#/components/parameters/dataQueryOptions'
-        - $ref: '#/components/parameters/dataTimeGroup1'
-        - $ref: '#/components/parameters/dataTimeGroupOptions1'
-      responses:
-        "200":
-          description: JSON object with weights for each chart and dimension.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/metric_correlations"
-        "400":
-          description: The given parameters are invalid.
-        "403":
-          description: metrics correlations are not enabled on this Netdata Agent.
-        "404":
-          description: No charts could be found, or the method
-            that correlated the metrics did not produce any result.
-        "504":
-          description: Timeout - the query took too long and has been cancelled.
-  /api/v1/function:
-    get:
-      operationId: function1
-      tags:
-        - functions
-      description: "Execute a collector function."
-      parameters:
-        - name: function
-          in: query
-          description: The name of the function, as returned by the collector.
-          required: true
-          allowEmptyValue: false
-          schema:
-            type: string
-        - $ref: '#/components/parameters/timeoutSecs'
-      responses:
-        "200":
-          description: The collector function has been executed successfully. Each collector may return a different type of content.
-        "400":
-          description: The request was rejected by the collector.
-        "404":
-          description: The requested function is not found.
-        "500":
-          description: Other internal error, getting this error means there is a bug in Netdata.
-        "503":
-          description: The collector to execute the function is not currently available.
-        "504":
-          description: Timeout while waiting for the collector to execute the function.
-        "591":
-          description: The collector sent a response, but it was invalid or corrupted.
-  /api/v1/functions:
-    get:
-      operationId: functions1
-      tags:
-        - functions
-      summary: Get a list of all registered collector functions.
-      description: Collector functions are programs that can be executed on demand.
-      responses:
-        "200":
-          description: A JSON object containing one object per supported function.
-  /api/v1/weights:
-    get:
-      operationId: weights1
-      tags:
-        - weights
-      summary: "Analyze all the metrics using an algorithm and score them accordingly"
-      description: "This endpoint goes through all metrics and scores them according to an algorithm."
-      parameters:
-        - name: baseline_after
-          in: query
-          description: This parameter can either be an absolute timestamp specifying the
-            starting point of baseline window, or a relative number of
-            seconds (negative, relative to parameter baseline_before). Netdata will
-            assume it is a relative number if it is less that 3 years (in seconds).
-            This parameter is used in KS2 and VOLUME algorithms.
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: number
-            format: integer
-            default: -300
-        - name: baseline_before
-          in: query
-          description: This parameter can either be an absolute timestamp specifying the
-            ending point of the baseline window, or a relative number of
-            seconds (negative), relative to the last collected timestamp.
-            Netdata will assume it is a relative number if it is less than 3
-            years (in seconds).
-            This parameter is used in KS2 and VOLUME algorithms.
-          required: false
-          schema:
-            type: number
-            format: integer
-            default: -60
-        - name: after
-          in: query
-          description: This parameter can either be an absolute timestamp specifying the
-            starting point of highlighted window, or a relative number of
-            seconds (negative, relative to parameter highlight_before). Netdata will
-            assume it is a relative number if it is less that 3 years (in seconds).
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: number
-            format: integer
-            default: -60
-        - name: before
-          in: query
-          description: This parameter can either be an absolute timestamp specifying the
-            ending point of the highlighted window, or a relative number of
-            seconds (negative), relative to the last collected timestamp.
-            Netdata will assume it is a relative number if it is less than 3
-            years (in seconds).
-          required: false
-          schema:
-            type: number
-            format: integer
-            default: 0
-        - name: context
-          in: query
-          description: A simple pattern matching the contexts to evaluate.
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: string
-        - name: points
-          in: query
-          description: The number of points to be evaluated for the highlighted window.
-            The baseline window will be adjusted automatically to receive a proportional
-            amount of points.
-            This parameter is only used by the KS2 algorithm.
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: number
-            format: integer
-            default: 500
-        - name: method
-          in: query
-          description: the algorithm to run
-          required: false
-          schema:
-            type: string
-            enum:
-              - ks2
-              - volume
-              - anomaly-rate
-            default: anomaly-rate
-        - name: tier
-          in: query
-          description: Use the specified database tier
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: number
-            format: integer
-        - $ref: '#/components/parameters/timeoutMS'
-        - $ref: '#/components/parameters/dataQueryOptions'
-        - $ref: '#/components/parameters/dataTimeGroup1'
-        - $ref: '#/components/parameters/dataTimeGroupOptions1'
-      responses:
-        "200":
-          description: JSON object with weights for each context, chart and dimension.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/weights"
-        "400":
-          description: The given parameters are invalid.
-        "403":
-          description: metrics correlations are not enabled on this Netdata Agent.
-        "404":
-          description: No charts could be found, or the method
-            that correlated the metrics did not produce any result.
-        "504":
-          description: Timeout - the query took too long and has been cancelled.
-servers:
-  - url: https://registry.my-netdata.io
-  - url: http://registry.my-netdata.io
-  - url: http://localhost:19999
 components:
   parameters:
+    scopeNodes:
+      name: scope_nodes
+      in: query
+      description: |
+        A simple pattern limiting the nodes scope of the query. The scope controls both data and metadata response. The simple pattern is checked against the nodes' machine guid, node id and hostname. The default nodes scope is all nodes for which this agent has data for. Usually the nodes scope is used to slice the entire dashboard (e.g. the Global Nodes Selector at the Netdata Cloud overview dashboard). Both positive and negative simple pattern expressions are supported.
+      required: false
+      schema:
+        type: string
+        format: simple pattern
+        default: "*"
+    scopeContexts:
+      name: scope_contexts
+      in: query
+      description: |
+        A simple pattern limiting the contexts scope of the query. The scope controls both data and metadata response. The default contexts scope is all contexts for which this agent has data for. Usually the contexts scope is used to slice data on the dashboard (e.g. each context based chart has its own contexts scope, limiting the chart to all the instances of the selected context). Both positive and negative simple pattern expressions are supported.
+      required: false
+      schema:
+        type: string
+        format: simple pattern
+        default: "*"
+    filterNodes:
+      name: nodes
+      in: query
+      description: |
+        A simple pattern matching the nodes to be queried. This only controls the data response, not the metadata. The simple pattern is checked against the nodes' machine guid, node id, hostname. The default nodes selector is all the nodes matched by the nodes scope. Both positive and negative simple pattern expressions are supported.
+      required: false
+      schema:
+        type: string
+        format: simple pattern
+        default: "*"
+    filterContexts:
+      name: contexts
+      in: query
+      description: |
+        A simple pattern matching the contexts to be queried. This only controls the data response, not the metadata. Both positive and negative simple pattern expressions are supported.
+      required: false
+      schema:
+        type: string
+        format: simple pattern
+        default: "*"
+    filterInstances:
+      name: instances
+      in: query
+      description: |
+        A simple pattern matching the instances to be queried. The simple pattern is checked against the instance `id`, the instance `name`, the fully qualified name of the instance `id` and `name`, like `instance@machine_guid`, where `instance` is either its `id` or `name`. Both positive and negative simple pattern expressions are supported.
+      required: false
+      schema:
+        type: string
+        format: simple pattern
+        default: "*"
+    filterLabels:
+      name: labels
+      in: query
+      description: |
+        A simple pattern matching the labels to be queried. The simple pattern is checked against `name:value` of all the labels of all the eligible instances (as filtered by all the above: scope nodes, scope contexts, nodes, contexts and instances). Negative simple patterns should not be used in this filter.
+      required: false
+      schema:
+        type: string
+        format: simple pattern
+        default: "*"
+    filterAlerts:
+      name: alerts
+      in: query
+      description: |
+        A simple pattern matching the alerts to be queried. The simple pattern is checked against the `name` of alerts and the combination of `name:status`, when status is one of `CLEAR`, `WARNING`, `CRITICAL`, `REMOVED`, `UNDEFINED`, `UNINITIALIZED`, of all the alerts of all the eligible instances (as filtered by all the above). A negative simple pattern will exclude the instances having the labels matched.
+      required: false
+      schema:
+        type: string
+        format: simple pattern
+        default: "*"
+    filterDimensions:
+      name: dimensions
+      in: query
+      description: |
+        A simple patterns matching the dimensions to be queried. The simple pattern is checked against and `id` and the `name` of the dimensions of the eligible instances (as filtered by all the above). Both positive and negative simple pattern expressions are supported.
+      required: false
+      schema:
+        type: string
+        format: simple pattern
+        default: "*"
+
     dataFormat1:
       name: format
       in: query
@@ -1771,6 +1540,61 @@ components:
         type: number
         format: integer
         default: 0
+    before:
+      name: before
+      in: query
+      description: |
+        `after` and `before` define the time-frame of a query. `before` can be a negative number of seconds, up to 3 years (-94608000), relative to current clock. If not set, it is assumed to be the current clock time. When `before` is positive, it is assumed to be a unix epoch timestamp. When non-data endpoints support the `after` and `before`, they use the time-frame to limit their response for objects having data retention within the time-frame given.
+      required: false
+      schema:
+        type: integer
+        default: 0
+    after:
+      name: after
+      in: query
+      description: |
+        `after` and `before` define the time-frame of a query. `after` can be a negative number of seconds, up to 3 years (-94608000), relative to `before`. If not set, it is usually assumed to be -600. When non-data endpoints support the `after` and `before`, they use the time-frame to limit their response for objects having data retention within the time-frame given.
+      required: false
+      schema:
+        type: integer
+        default: -600
+    baselineBefore:
+      name: baseline_before
+      in: query
+      description: |
+        `baseline_after` and `baseline_before` define the baseline time-frame of a comparative query. `baseline_before` can be a negative number of seconds, up to 3 years (-94608000), relative to current clock. If not set, it is assumed to be the current clock time. When `baseline_before` is positive, it is assumed to be a unix epoch timestamp.
+      required: false
+      schema:
+        type: integer
+        default: 0
+    baselineAfter:
+      name: baseline_after
+      in: query
+      description: |
+        `baseline_after` and `baseline_before` define the baseline time-frame of a comparative query. `baseline_after` can be a negative number of seconds, up to 3 years (-94608000), relative to `baseline_before`. If not set, it is usually assumed to be -300.
+      required: false
+      schema:
+        type: integer
+        default: -600
+    points:
+      name: points
+      in: query
+      description: |
+        The number of points to be returned. If not given, or it is <= 0, or it is bigger than the points stored in the database for the given duration, all the available collected values for the given duration will be returned. For `weights` endpoints that do statistical analysis, the `points` define the detail of this analysis (the default is 500).
+      required: false
+      schema:
+        type: number
+        format: integer
+        default: 0
+    tier:
+      name: tier
+      in: query
+      description: |
+        Use only the given dbengine tier for executing the query. Setting this parameters automatically sets the option `selected-tier` for the query.
+      required: false
+      schema:
+        type: number
+        format: integer
   schemas:
     info:
       type: object
