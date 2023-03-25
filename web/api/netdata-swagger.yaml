@@ -84,14 +84,7 @@ paths:
       summary: Get one chart v1 - EOL
       description: The chart endpoint returns detailed information about a chart.
       parameters:
-        - name: chart
-          in: query
-          description: The id of the chart as returned by the /charts call.
-          required: true
-          schema:
-            type: string
-            format: as returned by /charts
-            default: system.cpu
+        - $ref: '#/components/parameters/chart'
       responses:
         "200":
           description: A javascript object with detailed information about the chart.
@@ -112,52 +105,12 @@ paths:
       description: The contexts endpoint returns a summary about all contexts stored in the
         netdata server.
       parameters:
-        - name: options
-          in: query
-          description: Options that affect data generation.
-          required: false
-          allowEmptyValue: true
-          schema:
-            type: array
-            items:
-              type: string
-              enum:
-                - full
-                - all
-                - charts
-                - dimensions
-                - labels
-                - uuids
-                - queue
-                - flags
-                - deleted
-                - deepscan
-            default:
-              - full
+        - $ref: '#/components/parameters/dimensions'
+        - $ref: '#/components/parameters/chart_label_key'
+        - $ref: '#/components/parameters/chart_labels_filter'
+        - $ref: '#/components/parameters/contextOptions1'
         - $ref: '#/components/parameters/after'
         - $ref: '#/components/parameters/before'
-        - name: chart_label_key
-          in: query
-          description: a simple pattern matching charts label keys (use comma or pipe as separator)
-          required: false
-          allowEmptyValue: true
-          schema:
-            type: string
-        - name: chart_labels_filter
-          in: query
-          description: "a simple pattern matching charts label key and values (use colon for equality, comma or pipe
-           as separator)"
-          required: false
-          allowEmptyValue: true
-          schema:
-            type: string
-        - name: dimensions
-          in: query
-          description: a simple pattern matching dimensions (use comma or pipe as separator)
-          required: false
-          allowEmptyValue: true
-          schema:
-            type: string
       responses:
         "200":
           description: An array of contexts.
@@ -171,63 +124,17 @@ paths:
       tags:
         - contexts
       summary: Get info about a specific context
-      description: The context endpoint returns detailed information about a given context.
+      description: |
+        The context endpoint returns detailed information about a given context.
+        The `context` parameter is required for this call.
       parameters:
-        - name: context
-          in: query
-          description: The id of the context as returned by the /contexts call.
-          required: true
-          schema:
-            type: string
-            format: as returned by /contexts
-            default: system.cpu
-        - name: options
-          in: query
-          description: Options that affect data generation.
-          required: false
-          allowEmptyValue: true
-          schema:
-            type: array
-            items:
-              type: string
-              enum:
-                - full
-                - all
-                - charts
-                - dimensions
-                - labels
-                - uuids
-                - queue
-                - flags
-                - deleted
-                - deepscan
-            default:
-              - full
+        - $ref: '#/components/parameters/context'
+        - $ref: '#/components/parameters/dimensions'
+        - $ref: '#/components/parameters/chart_label_key'
+        - $ref: '#/components/parameters/chart_labels_filter'
+        - $ref: '#/components/parameters/contextOptions1'
         - $ref: '#/components/parameters/after'
         - $ref: '#/components/parameters/before'
-        - name: chart_label_key
-          in: query
-          description: a simple pattern matching charts label keys (use comma or pipe as separator)
-          required: false
-          allowEmptyValue: true
-          schema:
-            type: string
-        - name: chart_labels_filter
-          in: query
-          description: |
-            A simple pattern matching charts label key and values (use colon for equality, comma or pipe
-            as separator).
-          required: false
-          allowEmptyValue: true
-          schema:
-            type: string
-        - name: dimensions
-          in: query
-          description: a simple pattern matching dimensions (use comma or pipe as separator)
-          required: false
-          allowEmptyValue: true
-          schema:
-            type: string
       responses:
         "200":
           description: A javascript object with detailed information about the context.
@@ -311,35 +218,31 @@ paths:
         - $ref: '#/components/parameters/dataTimeResampling2'
         - $ref: '#/components/parameters/dataFormat2'
         - $ref: '#/components/parameters/timeoutMS'
-        - name: callback
-          in: query
-          description: |
-            For JSONP responses, the callback function name.
-          required: false
-          schema:
-            type: string
-        - name: filename
-          in: query
-          description: |
-            Add `Content-Disposition: attachment; filename=` header to the response, that will instruct the browser to save the response with the given filename."
-          required: false
-          schema:
-            type: string
-        - name: tqx
-          in: query
-          description: |
-            [Google Visualization API](https://developers.google.com/chart/interactive/docs/dev/implementing_data_source?hl=en) formatted parameter.
-          required: false
-          schema:
-            type: string
+        - $ref: '#/components/parameters/callback'
+        - $ref: '#/components/parameters/filename'
+        - $ref: '#/components/parameters/tqx'
       responses:
         "200":
           description: |
-            The call was successful. The response includes the data in the format requested. Swagger2.0 does not process the discriminator field to show polymorphism. The response will be one of the sub-types of the data-schema according to the chosen format, e.g. json -> data_json.
+            The call was successful. The response includes the data in the format requested.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/data_json2"
+                oneOf:
+                  - $ref: '#/components/schemas/jsonwrap2'
+                  - $ref: '#/components/schemas/data_json_formats2'
+            text/plain:
+              schema:
+                type: string
+                format: according to the format requested.
+            text/html:
+              schema:
+                type: string
+                format: html
+            application/x-javascript:
+              schema:
+                type: string
+                format: javascript
         "400":
           description: |
             Bad request - the body will include a message stating what is wrong.
@@ -351,39 +254,17 @@ paths:
       operationId: dataQuery1
       tags:
         - data
-      summary: Data Query v1
-      description: The data endpoint returns data stored in the round robin database of a
-        chart.
+      summary: Data Query v1 - Single node, single chart or context queries. without group-by.
+      description: |
+        Query metric data of a chart or context of a node and return a dataset having time-series data for all dimensions available.
+        For group-by functionality, use `/api/v2/data`.
+        At least a `chart` or a `context` have to be given for the data query to be executed.
       parameters:
-        - name: chart
-          in: query
-          description: The id of the chart as returned by the /charts call. Note chart or context must be specified
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: string
-            format: as returned by /charts
-            default: system.cpu
-        - name: context
-          in: query
-          description: The context of the chart as returned by the /charts call. Note chart or context must be specified
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: string
-            format: as returned by /charts
-        - name: dimension
-          in: query
-          description: Zero, one or more dimension ids or names, as returned by the /chart
-            call, separated with comma or pipe. Netdata simple patterns are
-            supported.
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: array
-            items:
-              type: string
-              format: as returned by /charts
+        - $ref: '#/components/parameters/chart'
+        - $ref: '#/components/parameters/context'
+        - $ref: '#/components/parameters/dimension'
+        - $ref: '#/components/parameters/chart_label_key'
+        - $ref: '#/components/parameters/chart_labels_filter'
         - $ref: '#/components/parameters/after'
         - $ref: '#/components/parameters/before'
         - $ref: '#/components/parameters/points'
@@ -394,60 +275,31 @@ paths:
         - $ref: '#/components/parameters/dataTimeGroupOptions1'
         - $ref: '#/components/parameters/dataTimeResampling1'
         - $ref: '#/components/parameters/timeoutMS'
-        - name: chart_label_key
-          in: query
-          description: Specify the chart label keys that need to match for context queries as comma separated values.
-            At least one matching key is needed to match the corresponding chart.
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: string
-            format: key1,key2,key3
-        - name: chart_labels_filter
-          in: query
-          description: Specify the chart label keys and values to match for context queries. All keys/values need to
-            match for the chart to be included in the query. The labels are specified as key1:value1,key2:value2
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: string
-            format: key1:value1,key2:value2,key3:value3
-        - name: callback
-          in: query
-          description: For JSONP responses, the callback function name.
-          required: false
-          allowEmptyValue: true
-          schema:
-            type: string
-        - name: filename
-          in: query
-          description: "Add Content-Disposition: attachment; filename= header to
-            the response, that will instruct the browser to save the response
-            with the given filename."
-          required: false
-          allowEmptyValue: true
-          schema:
-            type: string
-        - name: tqx
-          in: query
-          description: "[Google Visualization
-            API](https://developers.google.com/chart/interactive/docs/dev/imple\
-            menting_data_source?hl=en) formatted parameter."
-          required: false
-          allowEmptyValue: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/callback'
+        - $ref: '#/components/parameters/filename'
+        - $ref: '#/components/parameters/tqx'
       responses:
         "200":
-          description: The call was successful. The response includes the data in the
-            format requested. Swagger2.0 does not process the discriminator
-            field to show polymorphism. The response will be one of the
-            sub-types of the data-schema according to the chosen format, e.g.
-            json -> data_json.
+          description: |
+            The call was successful. The response includes the data in the format requested.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/data"
+                oneOf:
+                  - $ref: '#/components/schemas/jsonwrap1'
+                  - $ref: '#/components/schemas/data_json_formats1'
+            text/plain:
+              schema:
+                type: string
+                format: according to the format requested.
+            text/html:
+              schema:
+                type: string
+                format: html
+            application/x-javascript:
+              schema:
+                type: string
+                format: javascript
         "400":
           description: Bad request - the body will include a message stating what is wrong.
         "404":
@@ -601,15 +453,12 @@ paths:
       summary: Generate a badge in form of SVG image for a chart (or dimension)
       description: Successful responses are SVG images.
       parameters:
-        - name: chart
-          in: query
-          description: The id of the chart as returned by the /charts call.
-          required: true
-          allowEmptyValue: false
-          schema:
-            type: string
-            format: as returned by /charts
-            default: system.cpu
+        - $ref: '#/components/parameters/chart'
+        - $ref: '#/components/parameters/dimension'
+        - $ref: '#/components/parameters/after'
+        - $ref: '#/components/parameters/before'
+        - $ref: '#/components/parameters/dataTimeGroup1'
+        - $ref: '#/components/parameters/dataQueryOptions'
         - name: alarm
           in: query
           description: The name of an alarm linked to the chart.
@@ -618,20 +467,6 @@ paths:
           schema:
             type: string
             format: any text
-        - name: dimension
-          in: query
-          description: Zero, one or more dimension ids, as returned by the /chart call.
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: array
-            items:
-              type: string
-              format: as returned by /charts
-        - $ref: '#/components/parameters/after'
-        - $ref: '#/components/parameters/before'
-        - $ref: '#/components/parameters/dataTimeGroup1'
-        - $ref: '#/components/parameters/dataQueryOptions'
         - name: label
           in: query
           description: A text to be used as the label.
@@ -650,9 +485,8 @@ paths:
             format: any text
         - name: label_color
           in: query
-          description: "A color to be used for the background of the label side(left side) of the badge.
-            One of predefined colors or specific color in hex `RGB` or `RRGGBB` format (without preceding `#` character).
-            If value wrong or not given default color will be used."
+          description: |
+            A color to be used for the background of the label side(left side) of the badge. One of predefined colors or specific color in hex `RGB` or `RRGGBB` format (without preceding `#` character). If value wrong or not given default color will be used.
           required: false
           allowEmptyValue: true
           schema:
@@ -674,12 +508,8 @@ paths:
                 format: ^([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$
         - name: value_color
           in: query
-          description: "A color to be used for the background of the value *(right)* part of badge. You can set
-            multiple using a pipe with a condition each, like this:
-            `color<value|color:null` The following operators are
-            supported: >, <, >=, <=, =, :null (to check if no value exists).
-            Each color can be specified in same manner as for `label_color` parameter.
-            Currently only integers are supported as values."
+          description: |
+            A color to be used for the background of the value *(right)* part of badge. You can set multiple using a pipe with a condition each, like this: `color<value|color:null` The following operators are supported: >, <, >=, <=, =, :null (to check if no value exists). Each color can be specified in same manner as for `label_color` parameter. Currently only integers are supported as values.
           required: false
           allowEmptyValue: true
           schema:
@@ -687,9 +517,8 @@ paths:
             format: any text
         - name: text_color_lbl
           in: query
-          description: "Font color for label *(left)* part of the badge. One of predefined colors or as HTML hexadecimal
-            color without preceding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value given default
-            color will be used."
+          description: |
+            Font color for label *(left)* part of the badge. One of predefined colors or as HTML hexadecimal color without preceding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value given default color will be used.
           required: false
           allowEmptyValue: true
           schema:
@@ -711,9 +540,8 @@ paths:
                 format: ^([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$
         - name: text_color_val
           in: query
-          description: "Font color for value *(right)* part of the badge. One of predefined colors or as HTML
-            hexadecimal color without preceding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value
-            given default color will be used."
+          description: |
+            Font color for value *(right)* part of the badge. One of predefined colors or as HTML hexadecimal color without preceding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value given default color will be used.
           required: false
           allowEmptyValue: true
           schema:
@@ -787,56 +615,48 @@ paths:
         "500":
           description: Internal server error. This usually means the server is out of
             memory.
-  /api/v1/metric_correlations:
+  /api/v2/weights:
     get:
-      operationId: metricCorrelations1
+      operationId: weights2
       tags:
         - weights
-      summary: "Analyze all the metrics to find their correlations"
-      description: "THIS ENDPOINT IS OBSOLETE. Use the /weights endpoint.
-        Given two time-windows (baseline, highlight), it goes
-        through all the available metrics, querying both windows and tries to find
-        how these two windows relate to each other. It supports
-        multiple algorithms to do so. The result is a list of all
-        metrics evaluated, weighted for 0.0 (the two windows are
-        more different) to 1.0 (the two windows are similar).
-        The algorithm adjusts automatically the baseline window to be
-        a power of two multiple of the highlighted (1, 2, 4, 8, etc)."
+      summary: Score or weight all or some of the metrics, across all nodes, according to various algorithms.
+      description: |
+        This endpoint goes through all metrics and scores them according to an algorithm.
       parameters:
-        - name: method
-          in: query
-          description: the algorithm to run
-          required: false
-          schema:
-            type: string
-            enum:
-              - ks2
-              - volume
-            default: ks2
+        - $ref: '#/components/parameters/weightMethods'
+        - $ref: '#/components/parameters/scopeNodes'
+        - $ref: '#/components/parameters/scopeContexts'
+        - $ref: '#/components/parameters/filterNodes'
+        - $ref: '#/components/parameters/filterContexts'
+        - $ref: '#/components/parameters/filterInstances'
+        - $ref: '#/components/parameters/filterLabels'
+        - $ref: '#/components/parameters/filterAlerts'
+        - $ref: '#/components/parameters/filterDimensions'
         - $ref: '#/components/parameters/baselineAfter'
         - $ref: '#/components/parameters/baselineBefore'
         - $ref: '#/components/parameters/after'
         - $ref: '#/components/parameters/before'
-        - $ref: '#/components/parameters/points'
         - $ref: '#/components/parameters/tier'
+        - $ref: '#/components/parameters/points'
         - $ref: '#/components/parameters/timeoutMS'
         - $ref: '#/components/parameters/dataQueryOptions'
-        - $ref: '#/components/parameters/dataTimeGroup1'
-        - $ref: '#/components/parameters/dataTimeGroupOptions1'
+        - $ref: '#/components/parameters/dataTimeGroup2'
+        - $ref: '#/components/parameters/dataTimeGroupOptions2'
       responses:
         "200":
-          description: JSON object with weights for each chart and dimension.
+          description: JSON object with weights for each context, chart and dimension.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/metric_correlations"
+                $ref: "#/components/schemas/weights2"
         "400":
           description: The given parameters are invalid.
         "403":
           description: metrics correlations are not enabled on this Netdata Agent.
         "404":
-          description: No charts could be found, or the method
-            that correlated the metrics did not produce any result.
+          description: |
+            No charts could be found, or the method that correlated the metrics did not produce any result.
         "504":
           description: Timeout - the query took too long and has been cancelled.
   /api/v1/weights:
@@ -844,27 +664,12 @@ paths:
       operationId: weights1
       tags:
         - weights
-      summary: "Analyze all the metrics using an algorithm and score them accordingly"
-      description: "This endpoint goes through all metrics and scores them according to an algorithm."
+      summary: Score or weight all or some of the metrics of a single node, according to various algorithms.
+      description: |
+        This endpoint goes through all metrics and scores them according to an algorithm.
       parameters:
-        - name: context
-          in: query
-          description: A simple pattern matching the contexts to evaluate.
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: string
-        - name: method
-          in: query
-          description: the algorithm to run
-          required: false
-          schema:
-            type: string
-            enum:
-              - ks2
-              - volume
-              - anomaly-rate
-            default: anomaly-rate
+        - $ref: '#/components/parameters/weightMethods'
+        - $ref: '#/components/parameters/context'
         - $ref: '#/components/parameters/baselineAfter'
         - $ref: '#/components/parameters/baselineBefore'
         - $ref: '#/components/parameters/after'
@@ -882,6 +687,42 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/weights"
+        "400":
+          description: The given parameters are invalid.
+        "403":
+          description: metrics correlations are not enabled on this Netdata Agent.
+        "404":
+          description: No charts could be found, or the method
+            that correlated the metrics did not produce any result.
+        "504":
+          description: Timeout - the query took too long and has been cancelled.
+  /api/v1/metric_correlations:
+    get:
+      operationId: metricCorrelations1
+      tags:
+        - weights
+      summary: Analyze all the metrics to find their correlations - EOL
+      description: |
+        THIS ENDPOINT IS OBSOLETE. Use the /weights endpoint. Given two time-windows (baseline, highlight), it goes through all the available metrics, querying both windows and tries to find how these two windows relate to each other. It supports multiple algorithms to do so. The result is a list of all metrics evaluated, weighted for 0.0 (the two windows are more different) to 1.0 (the two windows are similar). The algorithm adjusts automatically the baseline window to be a power of two multiple of the highlighted (1, 2, 4, 8, etc).
+      parameters:
+        - $ref: '#/components/parameters/weightMethods'
+        - $ref: '#/components/parameters/baselineAfter'
+        - $ref: '#/components/parameters/baselineBefore'
+        - $ref: '#/components/parameters/after'
+        - $ref: '#/components/parameters/before'
+        - $ref: '#/components/parameters/points'
+        - $ref: '#/components/parameters/tier'
+        - $ref: '#/components/parameters/timeoutMS'
+        - $ref: '#/components/parameters/dataQueryOptions'
+        - $ref: '#/components/parameters/dataTimeGroup1'
+        - $ref: '#/components/parameters/dataTimeGroupOptions1'
+      responses:
+        "200":
+          description: JSON object with weights for each chart and dimension.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/metric_correlations"
         "400":
           description: The given parameters are invalid.
         "403":
@@ -967,12 +808,8 @@ paths:
       tags:
         - alerts
       summary: Get a list of active or raised alarms on the server
-      description: "The alarms_values endpoint returns the list of all raised or enabled alarms on
-        the netdata server. Called without any parameters, the raised alarms in
-        state WARNING or CRITICAL are returned. By passing '?all', all the
-        enabled alarms are returned.
-        This option output differs from `/alarms` in the number of variables delivered. This endpoint gives
-        to user `id`, `value`, `last_updated` time, and alarm `status`."
+      description: |
+        The alarms_values endpoint returns the list of all raised or enabled alarms on the netdata server. Called without any parameters, the raised alarms in state WARNING or CRITICAL are returned. By passing '?all', all the enabled alarms are returned. This option output differs from `/alarms` in the number of variables delivered. This endpoint gives to user `id`, `value`, `last_updated` time, and alarm `status`.
       parameters:
         - name: all
           in: query
@@ -1001,16 +838,13 @@ paths:
       tags:
         - alerts
       summary: Retrieves the entries of the alarm log
-      description: Returns an array of alarm_log entries, with historical information on
-        raised and cleared alarms.
+      description: |
+        Returns an array of alarm_log entries, with historical information on raised and cleared alarms.
       parameters:
         - name: after
           in: query
-          description: Passing the parameter after=UNIQUEID returns all the events in the
-            alarm log that occurred after UNIQUEID. An automated series of calls
-            would call the interface once without after=, store the last
-            UNIQUEID of the returned set, and give it back to get incrementally
-            the next events.
+          description: |
+            Passing the parameter after=UNIQUEID returns all the events in the alarm log that occurred after UNIQUEID. An automated series of calls would call the interface once without after=, store the last UNIQUEID of the returned set, and give it back to get incrementally the next events.
           required: false
           schema:
             type: integer
@@ -1029,22 +863,12 @@ paths:
       tags:
         - alerts
       summary: Get an overall status of the chart
-      description: Checks multiple charts with the same context and counts number of alarms
-        with given status.
+      description: |
+        Checks multiple charts with the same context and counts number of alarms with given status.
       parameters:
-        - in: query
-          name: context
-          description: Specify context which should be checked.
-          required: false
-          allowEmptyValue: true
-          schema:
-            type: array
-            items:
-              type: string
-            default:
-              - system.cpu
-        - in: query
-          name: status
+        - $ref: '#/components/parameters/context'
+        - name: status
+          in: query
           description: Specify alarm status to count.
           required: false
           allowEmptyValue: true
@@ -1109,24 +933,15 @@ paths:
       operationId: health1
       tags:
         - management
-      summary: "Accesses the health management API to control health checks and
-        notifications at runtime."
-      description: "Available from Netdata v1.12 and above, protected via bearer
-        authorization. Especially useful for maintenance periods, the API allows
-        you to disable health checks completely, silence alarm notifications, or
-        Disable/Silence specific alarms that match selectors on alarm/template
-        name, chart, context, host and family. For the simple disable/silence
-        all scenarios, only the cmd parameter is required. The other parameters
-        are used to define alarm selectors. For more information and examples,
-        refer to the netdata documentation."
+      summary: |
+        Accesses the health management API to control health checks and notifications at runtime.
+      description: |
+        Available from Netdata v1.12 and above, protected via bearer authorization. Especially useful for maintenance periods, the API allows you to disable health checks completely, silence alarm notifications, or Disable/Silence specific alarms that match selectors on alarm/template name, chart, context, host and family. For the simple disable/silence all scenarios, only the cmd parameter is required. The other parameters are used to define alarm selectors. For more information and examples, refer to the netdata documentation.
       parameters:
         - name: cmd
           in: query
-          description: "DISABLE ALL: No alarm criteria are evaluated, nothing is written in
-            the alarm log. SILENCE ALL: No notifications are sent. RESET: Return
-            to the default state. DISABLE/SILENCE: Set the mode to be used for
-            the alarms matching the criteria of the alarm selectors. LIST: Show
-            active configuration."
+          description: |
+            DISABLE ALL: No alarm criteria are evaluated, nothing is written in the alarm log. SILENCE ALL: No notifications are sent. RESET: Return to the default state. DISABLE/SILENCE: Set the mode to be used for the alarms matching the criteria of the alarm selectors. LIST: Show active configuration.
           required: false
           schema:
             type: string
@@ -1175,8 +990,8 @@ paths:
       tags:
         - management
       summary: Get information about current ACLK state
-      description: "ACLK endpoint returns detailed information
-        about current state of ACLK (Agent to Cloud communication)."
+      description: |
+        ACLK endpoint returns detailed information about current state of ACLK (Agent to Cloud communication).
       responses:
         "200":
           description: JSON object with ACLK information.
@@ -1595,6 +1410,121 @@ components:
       schema:
         type: number
         format: integer
+    callback:
+      name: callback
+      in: query
+      description: |
+        For JSONP responses, the callback function name.
+      required: false
+      schema:
+        type: string
+    filename:
+      name: filename
+      in: query
+      description: |
+        Add `Content-Disposition: attachment; filename=` header to the response, that will instruct the browser to save the response with the given filename."
+      required: false
+      schema:
+        type: string
+    tqx:
+      name: tqx
+      in: query
+      description: |
+        [Google Visualization API](https://developers.google.com/chart/interactive/docs/dev/implementing_data_source?hl=en) formatted parameter.
+      required: false
+      schema:
+        type: string
+    contextOptions1:
+      name: options
+      in: query
+      description: Options that affect data generation.
+      required: false
+      schema:
+        type: array
+        items:
+          type: string
+          enum:
+            - full
+            - all
+            - charts
+            - dimensions
+            - labels
+            - uuids
+            - queue
+            - flags
+            - deleted
+            - deepscan
+    chart:
+      name: chart
+      in: query
+      description: The id of the chart as returned by the `/api/v1/charts` call.
+      required: false
+      allowEmptyValue: false
+      schema:
+        type: string
+        format: as returned by `/api/v1/charts`
+    context:
+      name: context
+      in: query
+      description: The context of the chart as returned by the /charts call.
+      required: false
+      allowEmptyValue: false
+      schema:
+        type: string
+        format: as returned by /charts
+    dimension:
+      name: dimension
+      in: query
+      description: Zero, one or more dimension ids or names, as returned by the /chart
+        call, separated with comma or pipe. Netdata simple patterns are
+        supported.
+      required: false
+      allowEmptyValue: false
+      schema:
+        type: array
+        items:
+          type: string
+          format: as returned by /charts
+    dimensions:
+      name: dimensions
+      in: query
+      description: a simple pattern matching dimensions (use comma or pipe as separator)
+      required: false
+      allowEmptyValue: true
+      schema:
+        type: string
+    chart_label_key:
+      name: chart_label_key
+      in: query
+      description: |
+        Specify the chart label keys that need to match for context queries as comma separated values. At least one matching key is needed to match the corresponding chart.
+      required: false
+      allowEmptyValue: false
+      schema:
+        type: string
+        format: key1,key2,key3
+    chart_labels_filter:
+      name: chart_labels_filter
+      in: query
+      description: |
+        Specify the chart label keys and values to match for context queries. All keys/values need to match for the chart to be included in the query. The labels are specified as key1:value1,key2:value2
+      required: false
+      allowEmptyValue: false
+      schema:
+        type: string
+        format: key1:value1,key2:value2,key3:value3
+    weightMethods:
+      name: method
+      in: query
+      description: The weighting / scoring algorithm.
+      required: false
+      schema:
+        type: string
+        enum:
+          - ks2
+          - volume
+          - anomaly-rate
+          - value
   schemas:
     info:
       type: object
@@ -1854,10 +1784,8 @@ components:
             amount of time is kept in the round robin database.
         dimensions:
           type: object
-          description: "An object containing all the chart dimensions available for the
-            chart. This is used as an indexed array. For each pair in the
-            dictionary: the key is the id of the dimension and the value is a
-            dictionary containing the name."
+          description: |
+            An object containing all the chart dimensions available for the chart. This is used as an indexed array. For each pair in the dictionary: the key is the id of the dimension and the value is a dictionary containing the name."
           additionalProperties:
             type: object
             properties:
@@ -1995,90 +1923,7 @@ components:
         varname2:
           type: number
           format: float
-    data:
-      type: object
-      discriminator:
-        propertyName: format
-      description: Response will contain the appropriate subtype, e.g. data_json depending
-        on the requested format.
-      properties:
-        api:
-          type: number
-          description: The API version this conforms to, currently 1.
-        id:
-          type: string
-          description: The unique id of the chart.
-        name:
-          type: string
-          description: The name of the chart.
-        update_every:
-          type: number
-          description: The update frequency of this chart, in seconds. One value every this
-            amount of time is kept in the round robin database (independently of
-            the current view).
-        view_update_every:
-          type: number
-          description: The current view appropriate update frequency of this chart, in
-            seconds. There is no point to request chart refreshes, using the
-            same settings, more frequently than this.
-        first_entry:
-          type: number
-          description: The UNIX timestamp of the first entry (the oldest) in the round
-            robin database (independently of the current view).
-        last_entry:
-          type: number
-          description: The UNIX timestamp of the latest entry in the round robin database
-            (independently of the current view).
-        after:
-          type: number
-          description: The UNIX timestamp of the first entry (the oldest) returned in this
-            response.
-        before:
-          type: number
-          description: The UNIX timestamp of the latest entry returned in this response.
-        min:
-          type: number
-          description: The minimum value returned in the current view. This can be used to
-            size the y-series of the chart.
-        max:
-          type: number
-          description: The maximum value returned in the current view. This can be used to
-            size the y-series of the chart.
-        dimension_names:
-          description: The dimension names of the chart as returned in the current view.
-          type: array
-          items:
-            type: string
-        dimension_ids:
-          description: The dimension IDs of the chart as returned in the current view.
-          type: array
-          items:
-            type: string
-        latest_values:
-          description: The latest values collected for the chart (independently of the
-            current view).
-          type: array
-          items:
-            type: string
-        view_latest_values:
-          description: The latest values returned with this response.
-          type: array
-          items:
-            type: string
-        dimensions:
-          type: number
-          description: The number of dimensions returned.
-        points:
-          type: number
-          description: The number of rows / points returned.
-        format:
-          type: string
-          description: The format of the result returned.
-        chart_variables:
-          type: object
-          additionalProperties:
-            $ref: "#/components/schemas/chart_variables"
-    data_json2:
+    jsonwrap2:
       description: |
         Data response with `format=json2`
       type: object
@@ -2179,15 +2024,15 @@ components:
                         description: the time in milliseconds this node took to respond, or if the local agent responded for this node, the time it needed to execute the query.
                         type: number
                   is:
-                    $ref: "#/components/schemas/data_json2_items_count"
+                    $ref: "#/components/schemas/jsonwrap2_items_count"
                   ds:
-                    $ref: "#/components/schemas/data_json2_items_count"
+                    $ref: "#/components/schemas/jsonwrap2_items_count"
                   al:
-                    $ref: "#/components/schemas/data_json2_alerts_count"
+                    $ref: "#/components/schemas/jsonwrap2_alerts_count"
                   sts:
                     oneOf:
-                      - $ref: "#/components/schemas/data_json2_sts"
-                      - $ref: "#/components/schemas/data_json2_sts_raw"
+                      - $ref: "#/components/schemas/jsonwrap2_sts"
+                      - $ref: "#/components/schemas/jsonwrap2_sts_raw"
             contexts:
               type: array
               items:
@@ -2199,15 +2044,15 @@ components:
                     description: the context id.
                     type: string
                   is:
-                    $ref: "#/components/schemas/data_json2_items_count"
+                    $ref: "#/components/schemas/jsonwrap2_items_count"
                   ds:
-                    $ref: "#/components/schemas/data_json2_items_count"
+                    $ref: "#/components/schemas/jsonwrap2_items_count"
                   al:
-                    $ref: "#/components/schemas/data_json2_alerts_count"
+                    $ref: "#/components/schemas/jsonwrap2_alerts_count"
                   sts:
                     oneOf:
-                      - $ref: "#/components/schemas/data_json2_sts"
-                      - $ref: "#/components/schemas/data_json2_sts_raw"
+                      - $ref: "#/components/schemas/jsonwrap2_sts"
+                      - $ref: "#/components/schemas/jsonwrap2_sts_raw"
             instances:
               type: array
               items:
@@ -2224,13 +2069,13 @@ components:
                   ni:
                     description: the node index id this instance belongs to. The UI uses this to compone the fully qualified name of the instance, using the node hostname to present it to users and its machine guid to add it to filters.
                   ds:
-                    $ref: "#/components/schemas/data_json2_items_count"
+                    $ref: "#/components/schemas/jsonwrap2_items_count"
                   al:
-                    $ref: "#/components/schemas/data_json2_alerts_count"
+                    $ref: "#/components/schemas/jsonwrap2_alerts_count"
                   sts:
                     oneOf:
-                      - $ref: "#/components/schemas/data_json2_sts"
-                      - $ref: "#/components/schemas/data_json2_sts_raw"
+                      - $ref: "#/components/schemas/jsonwrap2_sts"
+                      - $ref: "#/components/schemas/jsonwrap2_sts_raw"
             dimensions:
               type: array
               items:
@@ -2245,11 +2090,11 @@ components:
                     description: the name of the dimension (may be absent when it is the same with the id)
                     type: string
                   ds:
-                    $ref: "#/components/schemas/data_json2_items_count"
+                    $ref: "#/components/schemas/jsonwrap2_items_count"
                   sts:
                     oneOf:
-                      - $ref: "#/components/schemas/data_json2_sts"
-                      - $ref: "#/components/schemas/data_json2_sts_raw"
+                      - $ref: "#/components/schemas/jsonwrap2_sts"
+                      - $ref: "#/components/schemas/jsonwrap2_sts_raw"
             labels:
               type: array
               items:
@@ -2261,11 +2106,11 @@ components:
                     description: the key of the label.
                     type: string
                   ds:
-                    $ref: "#/components/schemas/data_json2_items_count"
+                    $ref: "#/components/schemas/jsonwrap2_items_count"
                   sts:
                     oneOf:
-                      - $ref: "#/components/schemas/data_json2_sts"
-                      - $ref: "#/components/schemas/data_json2_sts_raw"
+                      - $ref: "#/components/schemas/jsonwrap2_sts"
+                      - $ref: "#/components/schemas/jsonwrap2_sts_raw"
                   vl:
                     description: |
                       An array of values for this key.
@@ -2277,32 +2122,32 @@ components:
                           description: The value string
                           type: string
                         ds:
-                          $ref: "#/components/schemas/data_json2_items_count"
+                          $ref: "#/components/schemas/jsonwrap2_items_count"
                         sts:
                           oneOf:
-                            - $ref: "#/components/schemas/data_json2_sts"
-                            - $ref: "#/components/schemas/data_json2_sts_raw"
+                            - $ref: "#/components/schemas/jsonwrap2_sts"
+                            - $ref: "#/components/schemas/jsonwrap2_sts_raw"
             alerts:
               description: |
                 An array of all the unique alerts running, grouped by alert name (`nm` is available here)
               type: array
               items:
-                $ref: "#/components/schemas/data_json2_alerts_count"
+                $ref: "#/components/schemas/jsonwrap2_alerts_count"
         totals:
           type: object
           properties:
             nodes:
-              $ref: "#/components/schemas/data_json2_items_count"
+              $ref: "#/components/schemas/jsonwrap2_items_count"
             contexts:
-              $ref: "#/components/schemas/data_json2_items_count"
+              $ref: "#/components/schemas/jsonwrap2_items_count"
             instances:
-              $ref: "#/components/schemas/data_json2_items_count"
+              $ref: "#/components/schemas/jsonwrap2_items_count"
             dimensions:
-              $ref: "#/components/schemas/data_json2_items_count"
+              $ref: "#/components/schemas/jsonwrap2_items_count"
             label_keys:
-              $ref: "#/components/schemas/data_json2_items_count"
+              $ref: "#/components/schemas/jsonwrap2_items_count"
             label_key_values:
-              $ref: "#/components/schemas/data_json2_items_count"
+              $ref: "#/components/schemas/jsonwrap2_items_count"
         functions:
           type: array
           items:
@@ -2580,51 +2425,10 @@ components:
                 The maximum value of all points included in the `result`.
               type: number
         result:
-          description: |
-            The result of the query.
-            The format explained here is `json2`.
-          type: object
-          properties:
-            labels:
-              description: |
-                The IDs of the dimensions returned. The first is always `time`.
-              type: array
-              items:
-                type: string
-            point:
-              description: |
-                The format of each point returned.
-              type: object
-              properties:
-                value:
-                  description: |
-                    The index of the value in each point.
-                  type: integer
-                ar:
-                  description: |
-                    The index of the anomaly rate in each point.
-                  type: integer
-                pa:
-                  description: |
-                    The index of the point annotations in each point.
-                    This is a bitmap. `EMPTY = 1`, `RESET = 2`, `PARTIAL = 4`.
-                    `EMPTY` means the point has no value.
-                    `RESET` means that at least one metric aggregated experienced an overflow (a counter that wrapped).
-                    `PARTIAL` means that this point should have more metrics aggregated into it, but not all metrics had data.
-                  type: integer
-                count:
-                  description: |
-                    The number of metrics aggregated into this point. This exists only when the option `raw` is given to the query.
-                  type: integer
-            data:
-              type: array
-              items:
-                allOf:
-                  - type: integer
-                  - type: array
+          $ref: '#/components/schemas/data_json_formats2'
         timings:
           type: object
-    data_json2_sts:
+    jsonwrap2_sts:
       description: |
         Statistical values
       type: object
@@ -2644,7 +2448,7 @@ components:
         con:
           description: The contribution percentage of all the metrics aggregated
           type: number
-    data_json2_sts_raw:
+    jsonwrap2_sts_raw:
       description: |
         Statistical values when `raw` option is given.
       type: object
@@ -2667,7 +2471,7 @@ components:
         cnt:
           description: The count of all metrics aggregated
           type: integer
-    data_json2_items_count:
+    jsonwrap2_items_count:
       description: |
         Depending on the placement of this object, `items` may be `nodes`, `contexts`, `instances`, `dimensions`, `label keys`, `label key-value pairs`. Furthermore, if the whole object is missing it should be assumed that all its members are zero.
       type: object
@@ -2684,7 +2488,7 @@ components:
         fl:
           description: The number of items (from `selected`) that `failed` to be queried.  If absent it is zero.
           type: integer
-    data_json2_alerts_count:
+    jsonwrap2_alerts_count:
       description: |
         Counters about alert statuses. If this object is missing, it is assumed that all its members are zero.
       type: object
@@ -2705,99 +2509,214 @@ components:
           description: |
             The number of alerts that are not CLEAR, WARNING, CRITICAL (so, they are "other").  If absent, it is zero.
           type: integer
+    jsonwrap1:
+      type: object
+      discriminator:
+        propertyName: format
+      description: Response will contain the appropriate subtype, e.g. data_json depending
+        on the requested format.
+      properties:
+        api:
+          type: number
+          description: The API version this conforms to.
+        id:
+          type: string
+          description: The unique id of the chart.
+        name:
+          type: string
+          description: The name of the chart.
+        update_every:
+          type: number
+          description: The update frequency of this chart, in seconds. One value every this
+            amount of time is kept in the round robin database (independently of
+            the current view).
+        view_update_every:
+          type: number
+          description: The current view appropriate update frequency of this chart, in
+            seconds. There is no point to request chart refreshes, using the
+            same settings, more frequently than this.
+        first_entry:
+          type: number
+          description: The UNIX timestamp of the first entry (the oldest) in the round
+            robin database (independently of the current view).
+        last_entry:
+          type: number
+          description: The UNIX timestamp of the latest entry in the round robin database
+            (independently of the current view).
+        after:
+          type: number
+          description: The UNIX timestamp of the first entry (the oldest) returned in this
+            response.
+        before:
+          type: number
+          description: The UNIX timestamp of the latest entry returned in this response.
+        min:
+          type: number
+          description: The minimum value returned in the current view. This can be used to
+            size the y-series of the chart.
+        max:
+          type: number
+          description: The maximum value returned in the current view. This can be used to
+            size the y-series of the chart.
+        dimension_names:
+          description: The dimension names of the chart as returned in the current view.
+          type: array
+          items:
+            type: string
+        dimension_ids:
+          description: The dimension IDs of the chart as returned in the current view.
+          type: array
+          items:
+            type: string
+        latest_values:
+          description: The latest values collected for the chart (independently of the
+            current view).
+          type: array
+          items:
+            type: string
+        view_latest_values:
+          description: The latest values returned with this response.
+          type: array
+          items:
+            type: string
+        dimensions:
+          type: number
+          description: The number of dimensions returned.
+        points:
+          type: number
+          description: The number of rows / points returned.
+        format:
+          type: string
+          description: The format of the result returned.
+        chart_variables:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/chart_variables'
+        result:
+          $ref: '#/components/schemas/data_json_formats1'
+    data_json_formats1:
+      description: |
+        Depending on the `format` given to a data query, any of the following may be returned.
+      oneOf:
+        - $ref: '#/components/schemas/data_json'
+        - $ref: '#/components/schemas/data_datatable'
+        - $ref: '#/components/schemas/data_csvjsonarray'
+        - $ref: '#/components/schemas/data_array'
+        - $ref: '#/components/schemas/data_txt'
+    data_json_formats2:
+      description: |
+        Depending on the `format` given to a data query, any of the following may be returned.
+      oneOf:
+        - $ref: '#/components/schemas/data_json2'
+        - $ref: '#/components/schemas/data_json_formats1'
+    data_json2:
+      type: object
+      properties:
+        labels:
+          description: |
+            The IDs of the dimensions returned. The first is always `time`.
+          type: array
+          items:
+            type: string
+        point:
+          description: |
+            The format of each point returned.
+          type: object
+          properties:
+            value:
+              description: |
+                The index of the value in each point.
+              type: integer
+            ar:
+              description: |
+                The index of the anomaly rate in each point.
+              type: integer
+            pa:
+              description: |
+                The index of the point annotations in each point.
+                This is a bitmap. `EMPTY = 1`, `RESET = 2`, `PARTIAL = 4`.
+                `EMPTY` means the point has no value.
+                `RESET` means that at least one metric aggregated experienced an overflow (a counter that wrapped).
+                `PARTIAL` means that this point should have more metrics aggregated into it, but not all metrics had data.
+              type: integer
+            count:
+              description: |
+                The number of metrics aggregated into this point. This exists only when the option `raw` is given to the query.
+              type: integer
+        data:
+          type: array
+          items:
+            allOf:
+              - type: integer
+              - type: array
     data_json:
-      description: Data response in json format.
-      allOf:
-        - $ref: "#/components/schemas/data"
-        - properties:
-            result:
-              type: object
-              properties:
-                labels:
-                  description: The dimensions retrieved from the chart.
-                  type: array
-                  items:
-                    type: string
-                data:
-                  description: |
-                    The data requested, one element per sample with each element containing the values of the dimensions described in the labels value.
-                  type: array
-                  items:
-                    type: number
-              description: The result requested, in the format requested.
-    data_flat:
-      description: Data response in csv / tsv / tsv-excel / ssv / ssv-comma / markdown /
-        html formats.
-      allOf:
-        - $ref: "#/components/schemas/data"
-        - properties:
-            result:
-              type: string
+      description: Data response in `json` format.
+      type: object
+      properties:
+        labels:
+          description: The dimensions retrieved from the chart.
+          type: array
+          items:
+            type: string
+        data:
+          description: |
+            The data requested, one element per sample with each element containing the values of the dimensions described in the labels value.
+          type: array
+          items:
+            type: number
+    data_txt:
+      description: |
+        Data response in `csv`, `tsv`, `tsv-excel`, `ssv`, `ssv-comma`, `markdown`, `html` formats.
+      type: string
     data_array:
-      description: Data response in array format.
-      allOf:
-        - $ref: "#/components/schemas/data"
-        - properties:
-            result:
-              type: array
-              items:
-                type: number
+      description: Data response in `array` format.
+      type: array
+      items:
+        type: number
     data_csvjsonarray:
-      description: Data response in csvjsonarray format.
-      allOf:
-        - $ref: "#/components/schemas/data"
-        - properties:
-            result:
-              description: The first inner array contains strings showing the labels of
-                each column, each subsequent array contains the values for each
-                point in time.
-              type: array
-              items:
-                type: array
-                items: {}
+      description: |
+        The first inner array contains strings showing the labels of each column, each subsequent array contains the values for each point in time.
+      type: array
+      items:
+        type: array
+        items: {}
     data_datatable:
-      description: Data response in datatable / datasource formats (suitable for Google
-        Charts).
-      allOf:
-        - $ref: "#/components/schemas/data"
-        - properties:
-            result:
-              type: object
-              properties:
-                cols:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      id:
-                        description: Always empty - for future use.
-                      label:
-                        description: The dimension returned from the chart.
-                      pattern:
-                        description: Always empty - for future use.
-                      type:
-                        description: The type of data in the column / chart-dimension.
-                      p:
-                        description: Contains any annotations for the column.
-                    required:
-                      - id
-                      - label
-                      - pattern
-                      - type
-                rows:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      c:
-                        type: array
-                        items:
-                          properties:
-                            v:
-                              description: "Each value in the row is represented by an
-                                object named `c` with five v fields: data, null,
-                                null, 0, the value. This format is fixed by the
-                                Google Charts API."
+      description: |
+        Data response in datatable / datasource formats (suitable for Google Charts).
+      type: object
+      properties:
+        cols:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                description: Always empty - for future use.
+              label:
+                description: The dimension returned from the chart.
+              pattern:
+                description: Always empty - for future use.
+              type:
+                description: The type of data in the column / chart-dimension.
+              p:
+                description: Contains any annotations for the column.
+            required:
+              - id
+              - label
+              - pattern
+              - type
+        rows:
+          type: array
+          items:
+            type: object
+            properties:
+              c:
+                type: array
+                items:
+                  properties:
+                    v:
+                      description: |
+                        Each value in the row is represented by an object named `c` with five v fields: data, null, null, 0, the value. This format is fixed by the Google Charts API."
     alarms:
       type: object
       properties:
@@ -3042,9 +2961,8 @@ components:
       properties:
         aclk-available:
           type: string
-          description: "Describes whether this agent is capable of connection to the Cloud.
-            False means agent has been built without ACLK component either on purpose (user choice)
-            or due to missing dependency."
+          description: |
+            Describes whether this agent is capable of connection to the Cloud. False means agent has been built without ACLK component either on purpose (user choice) or due to missing dependency.
         aclk-version:
           type: integer
           description: Describes which ACLK version is currently used.
@@ -3152,6 +3070,8 @@ components:
                       type: number
                     dimension2-name:
                       type: number
+    weights2:
+      type: object
     weights:
       type: object
       properties:
