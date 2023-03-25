@@ -296,7 +296,7 @@ paths:
       operationId: dataQuery2
       tags:
         - data
-      summary: Query metrics data
+      summary: Data Query v2
       description: |
         Multi-node, multi-context, multi-instance, multi-dimension data queries, with time and metric aggregation.
       parameters:
@@ -446,135 +446,12 @@ paths:
               - average
               - sum
             default: average
-        - name: time_group
-          in: query
-          description: |
-            Time aggregation function. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods supported "min", "max", "average", "sum", "incremental-sum". "max" is actually calculated on the absolute value collected (so it works for both positive and negative dimensions to return the most extreme value in either direction).
-          required: true
-          schema:
-            type: string
-            enum:
-              - min
-              - max
-              - avg
-              - average
-              - median
-              - stddev
-              - sum
-              - incremental-sum
-              - ses
-              - des
-              - cv
-              - countif
-              - percentile
-              - percentile25
-              - percentile50
-              - percentile75
-              - percentile80
-              - percentile90
-              - percentile95
-              - percentile97
-              - percentile98
-              - percentile99
-              - trimmed-mean
-              - trimmed-mean1
-              - trimmed-mean2
-              - trimmed-mean3
-              - trimmed-mean5
-              - trimmed-mean10
-              - trimmed-mean15
-              - trimmed-mean20
-              - trimmed-mean25
-              - trimmed-median
-              - trimmed-median1
-              - trimmed-median2
-              - trimmed-median3
-              - trimmed-median5
-              - trimmed-median10
-              - trimmed-median15
-              - trimmed-median20
-              - trimmed-median25
-            default: average
-        - name: time_group_options
-          in: query
-          description: |
-            When the group function supports additional parameters, this field can be used to pass them to it. Currently `countif`, `trimmed-mean`, `trimmed-median` and `percentile` support this. For `countif` the string may start with `<`, `<=`, `<:`, `<>`, `!=`, `>`, `>=`, `>:`. For all others just a number is expected.
-          required: false
-          schema:
-            type: string
-        - name: time_resampling
-          in: query
-          description: |
-            For incremental values that are "per second", this value is used to resample them to "per minute` (60) or "per hour" (3600). It can only be used in conjunction with group=average.
-          required: false
-          schema:
-            type: number
-            format: integer
-            default: 0
-        - name: timeout
-          in: query
-          description: |
-            Specify a timeout value in milliseconds after which the agent will abort the query and return a 503 error. A value of 0 indicates no timeout.
-          required: false
-          schema:
-            type: number
-            format: integer
-            default: 0
-        - name: format
-          in: query
-          description: |
-            The format of the data to be returned.
-          required: true
-          allowEmptyValue: false
-          schema:
-            type: string
-            enum:
-              - json
-              - json2
-              - jsonp
-              - csv
-              - tsv
-              - tsv-excel
-              - ssv
-              - ssvcomma
-              - datatable
-              - datasource
-              - html
-              - markdown
-              - array
-              - csvjsonarray
-            default: json2
-        - name: options
-          in: query
-          description: |
-            Options that affect data generation.
-            `raw` changes the output so that the values can be aggregated across multiple such queries.
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: array
-            items:
-              type: string
-              enum:
-                - raw
-                - nonzero
-                - flip
-                - min2max
-                - seconds
-                - milliseconds
-                - abs
-                - absolute
-                - null2zero
-                - percentage
-                - unaligned
-                - match-ids
-                - match-names
-                - anomaly-bit
-                - group-by-labels
-                - jsonwrap
-            default:
-              - seconds
-              - jsonwrap
+        - $ref: '#/components/parameters/dataTimeGroup2'
+        - $ref: '#/components/parameters/dataTimeGroupOptions2'
+        - $ref: '#/components/parameters/dataTimeResampling2'
+        - $ref: '#/components/parameters/dataFormat2'
+        - $ref: '#/components/parameters/timeoutMS'
+        - $ref: '#/components/parameters/dataQueryOptions'
         - name: tier
           in: query
           description: |
@@ -623,7 +500,7 @@ paths:
       operationId: dataQuery1
       tags:
         - data
-      summary: Get collected data for a specific chart
+      summary: Data Query v1
       description: The data endpoint returns data stored in the round robin database of a
         chart.
       parameters:
@@ -715,141 +592,12 @@ paths:
           schema:
             type: string
             format: key1:value1,key2:value2,key3:value3
-        - name: group
-          in: query
-          description: The grouping method. If multiple collected values are to be grouped
-            in order to return fewer points, this parameters defines the method
-            of grouping. methods supported "min", "max", "average", "sum",
-            "incremental-sum". "max" is actually calculated on the absolute
-            value collected (so it works for both positive and negative
-            dimensions to return the most extreme value in either direction).
-          required: true
-          allowEmptyValue: false
-          schema:
-            type: string
-            enum:
-              - min
-              - max
-              - average
-              - median
-              - stddev
-              - sum
-              - incremental-sum
-              - ses
-              - des
-              - cv
-              - countif
-              - percentile
-              - percentile25
-              - percentile50
-              - percentile75
-              - percentile80
-              - percentile90
-              - percentile95
-              - percentile97
-              - percentile98
-              - percentile99
-              - trimmed-mean
-              - trimmed-mean1
-              - trimmed-mean2
-              - trimmed-mean3
-              - trimmed-mean5
-              - trimmed-mean10
-              - trimmed-mean15
-              - trimmed-mean20
-              - trimmed-mean25
-              - trimmed-median
-              - trimmed-median1
-              - trimmed-median2
-              - trimmed-median3
-              - trimmed-median5
-              - trimmed-median10
-              - trimmed-median15
-              - trimmed-median20
-              - trimmed-median25
-            default: average
-        - name: group_options
-          in: query
-          description: When the group function supports additional parameters, this field
-            can be used to pass them to it. Currently only "countif" supports this.
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: string
-        - name: gtime
-          in: query
-          description: The grouping number of seconds. This is used in conjunction with
-            group=average to change the units of metrics (ie when the data is
-            per-second, setting gtime=60 will turn them to per-minute).
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: number
-            format: integer
-            default: 0
-        - name: timeout
-          in: query
-          description: Specify a timeout value in milliseconds after which the agent will
-            abort the query and return a 503 error. A value of 0 indicates no timeout.
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: number
-            format: integer
-            default: 0
-        - name: format
-          in: query
-          description: The format of the data to be returned.
-          required: true
-          allowEmptyValue: false
-          schema:
-            type: string
-            enum:
-              - json
-              - jsonp
-              - csv
-              - tsv
-              - tsv-excel
-              - ssv
-              - ssvcomma
-              - datatable
-              - datasource
-              - html
-              - markdown
-              - array
-              - csvjsonarray
-            default: json
-        - name: options
-          in: query
-          description: Options that affect data generation.
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: array
-            items:
-              type: string
-              enum:
-                - nonzero
-                - flip
-                - jsonwrap
-                - min2max
-                - seconds
-                - milliseconds
-                - abs
-                - absolute
-                - absolute-sum
-                - null2zero
-                - objectrows
-                - google_json
-                - percentage
-                - unaligned
-                - match-ids
-                - match-names
-                - allow_past
-                - anomaly-bit
-            default:
-              - seconds
-              - jsonwrap
+        - $ref: '#/components/parameters/dataQueryOptions'
+        - $ref: '#/components/parameters/dataFormat1'
+        - $ref: '#/components/parameters/dataTimeGroup1'
+        - $ref: '#/components/parameters/dataTimeGroupOptions1'
+        - $ref: '#/components/parameters/dataTimeResampling1'
+        - $ref: '#/components/parameters/timeoutMS'
         - name: callback
           in: query
           description: For JSONP responses, the callback function name.
@@ -959,79 +707,8 @@ paths:
             type: number
             format: integer
             default: 0
-        - name: group
-          in: query
-          description: The grouping method. If multiple collected values are to be grouped
-            in order to return fewer points, this parameters defines the method
-            of grouping. methods are supported "min", "max", "average", "sum",
-            "incremental-sum". "max" is actually calculated on the absolute
-            value collected (so it works for both positive and negative
-            dimensions to return the most extreme value in either direction).
-          required: true
-          allowEmptyValue: false
-          schema:
-            type: string
-            enum:
-              - min
-              - max
-              - average
-              - median
-              - stddev
-              - sum
-              - incremental-sum
-              - ses
-              - des
-              - cv
-              - countif
-              - percentile
-              - percentile25
-              - percentile50
-              - percentile75
-              - percentile80
-              - percentile90
-              - percentile95
-              - percentile97
-              - percentile98
-              - percentile99
-              - trimmed-mean
-              - trimmed-mean1
-              - trimmed-mean2
-              - trimmed-mean3
-              - trimmed-mean5
-              - trimmed-mean10
-              - trimmed-mean15
-              - trimmed-mean20
-              - trimmed-mean25
-              - trimmed-median
-              - trimmed-median1
-              - trimmed-median2
-              - trimmed-median3
-              - trimmed-median5
-              - trimmed-median10
-              - trimmed-median15
-              - trimmed-median20
-              - trimmed-median25
-            default: average
-        - name: options
-          in: query
-          description: Options that affect data generation.
-          required: false
-          allowEmptyValue: true
-          schema:
-            type: array
-            items:
-              type: string
-              enum:
-                - abs
-                - absolute
-                - display-absolute
-                - absolute-sum
-                - null2zero
-                - percentage
-                - unaligned
-                - anomaly-bit
-            default:
-              - absolute
+        - $ref: '#/components/parameters/dataTimeGroup1'
+        - $ref: '#/components/parameters/dataQueryOptions'
         - name: label
           in: query
           description: A text to be used as the label.
@@ -1200,7 +877,7 @@ paths:
       operationId: allMetrics1
       tags:
         - data
-      summary: Get a value of all the metrics maintained by netdata
+      summary: All Metrics v1
       description: The allmetrics endpoint returns the latest value of all charts and
         dimensions stored in the netdata server.
       parameters:
@@ -1639,102 +1316,10 @@ paths:
               - ks2
               - volume
             default: ks2
-        - name: timeout
-          in: query
-          description: Cancel the query if to takes more that this amount of milliseconds.
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: number
-            format: integer
-            default: 60000
-        - name: options
-          in: query
-          description: Options that affect data generation.
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: array
-            items:
-              type: string
-              enum:
-                - min2max
-                - abs
-                - absolute
-                - absolute-sum
-                - null2zero
-                - percentage
-                - unaligned
-                - allow_past
-                - nonzero
-                - anomaly-bit
-                - raw
-            default:
-              - null2zero
-              - allow_past
-              - nonzero
-              - unaligned
-        - name: group
-          in: query
-          description: The grouping method. If multiple collected values are to be grouped
-            in order to return fewer points, this parameters defines the method
-            of grouping. methods supported "min", "max", "average", "sum",
-            "incremental-sum". "max" is actually calculated on the absolute
-            value collected (so it works for both positive and negative
-            dimensions to return the most extreme value in either direction).
-          required: true
-          allowEmptyValue: false
-          schema:
-            type: string
-            enum:
-              - min
-              - max
-              - average
-              - median
-              - stddev
-              - sum
-              - incremental-sum
-              - ses
-              - des
-              - cv
-              - countif
-              - percentile
-              - percentile25
-              - percentile50
-              - percentile75
-              - percentile80
-              - percentile90
-              - percentile95
-              - percentile97
-              - percentile98
-              - percentile99
-              - trimmed-mean
-              - trimmed-mean1
-              - trimmed-mean2
-              - trimmed-mean3
-              - trimmed-mean5
-              - trimmed-mean10
-              - trimmed-mean15
-              - trimmed-mean20
-              - trimmed-mean25
-              - trimmed-median
-              - trimmed-median1
-              - trimmed-median2
-              - trimmed-median3
-              - trimmed-median5
-              - trimmed-median10
-              - trimmed-median15
-              - trimmed-median20
-              - trimmed-median25
-            default: average
-        - name: group_options
-          in: query
-          description: When the group function supports additional parameters, this field
-            can be used to pass them to it. Currently only "countif" supports this.
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: string
+        - $ref: '#/components/parameters/timeoutMS'
+        - $ref: '#/components/parameters/dataQueryOptions'
+        - $ref: '#/components/parameters/dataTimeGroup1'
+        - $ref: '#/components/parameters/dataTimeGroupOptions1'
       responses:
         "200":
           description: JSON object with weights for each chart and dimension.
@@ -1765,14 +1350,7 @@ paths:
           allowEmptyValue: false
           schema:
             type: string
-        - name: timeout
-          in: query
-          description: The timeout in seconds to wait for the function to complete.
-          required: false
-          schema:
-            type: number
-            format: integer
-            default: 10
+        - $ref: '#/components/parameters/timeoutSecs'
       responses:
         "200":
           description: The collector function has been executed successfully. Each collector may return a different type of content.
@@ -1894,100 +1472,10 @@ paths:
           schema:
             type: number
             format: integer
-        - name: timeout
-          in: query
-          description: Cancel the query if to takes more that this amount of milliseconds.
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: number
-            format: integer
-            default: 60000
-        - name: options
-          in: query
-          description: Options that affect data generation.
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: array
-            items:
-              type: string
-              enum:
-                - min2max
-                - abs
-                - absolute
-                - absolute-sum
-                - null2zero
-                - percentage
-                - unaligned
-                - nonzero
-                - anomaly-bit
-                - raw
-            default:
-              - null2zero
-              - nonzero
-              - unaligned
-        - name: group
-          in: query
-          description: The grouping method. If multiple collected values are to be grouped
-            in order to return fewer points, this parameters defines the method
-            of grouping. methods supported "min", "max", "average", "sum",
-            "incremental-sum". "max" is actually calculated on the absolute
-            value collected (so it works for both positive and negative
-            dimensions to return the most extreme value in either direction).
-          required: true
-          allowEmptyValue: false
-          schema:
-            type: string
-            enum:
-              - min
-              - max
-              - average
-              - median
-              - stddev
-              - sum
-              - incremental-sum
-              - ses
-              - des
-              - cv
-              - countif
-              - percentile
-              - percentile25
-              - percentile50
-              - percentile75
-              - percentile80
-              - percentile90
-              - percentile95
-              - percentile97
-              - percentile98
-              - percentile99
-              - trimmed-mean
-              - trimmed-mean1
-              - trimmed-mean2
-              - trimmed-mean3
-              - trimmed-mean5
-              - trimmed-mean10
-              - trimmed-mean15
-              - trimmed-mean20
-              - trimmed-mean25
-              - trimmed-median
-              - trimmed-median1
-              - trimmed-median2
-              - trimmed-median3
-              - trimmed-median5
-              - trimmed-median10
-              - trimmed-median15
-              - trimmed-median20
-              - trimmed-median25
-            default: average
-        - name: group_options
-          in: query
-          description: When the group function supports additional parameters, this field
-            can be used to pass them to it. Currently only "countif" supports this.
-          required: false
-          allowEmptyValue: false
-          schema:
-            type: string
+        - $ref: '#/components/parameters/timeoutMS'
+        - $ref: '#/components/parameters/dataQueryOptions'
+        - $ref: '#/components/parameters/dataTimeGroup1'
+        - $ref: '#/components/parameters/dataTimeGroupOptions1'
       responses:
         "200":
           description: JSON object with weights for each context, chart and dimension.
@@ -2009,6 +1497,280 @@ servers:
   - url: http://registry.my-netdata.io
   - url: http://localhost:19999
 components:
+  parameters:
+    dataFormat1:
+      name: format
+      in: query
+      description: The format of the data to be returned.
+      allowEmptyValue: false
+      schema:
+        type: string
+        enum:
+          - json
+          - jsonp
+          - csv
+          - tsv
+          - tsv-excel
+          - ssv
+          - ssvcomma
+          - datatable
+          - datasource
+          - html
+          - markdown
+          - array
+          - csvjsonarray
+        default: json
+    dataFormat2:
+      name: format
+      in: query
+      description: The format of the data to be returned.
+      allowEmptyValue: false
+      schema:
+        type: string
+        enum:
+          - json
+          - json2
+          - jsonp
+          - csv
+          - tsv
+          - tsv-excel
+          - ssv
+          - ssvcomma
+          - datatable
+          - datasource
+          - html
+          - markdown
+          - array
+          - csvjsonarray
+        default: json2
+    dataQueryOptions:
+      name: options
+      in: query
+      description: |
+        Options that affect data generation.
+        * `jsonwrap` - Wrap the output in a JSON object with metadata about the query.
+        * `raw` - change the output so that it is aggregatable across multiple such queries. Supported by `/api/v2` data queries and `json2` format.
+        * `minify` - Remove unnecessary spaces and newlines from the output.
+        * `debug` - Provide additional information in `jsonwrap` output to help tracing issues.
+        * `nonzero` - Do not return dimensions that all their values are zero, to improve the visual appearance of charts. They will still be returned if all the dimensions are entirely zero.
+        * `null2zero` - Replace `null` values with `0`.
+        * `absolute` or `abs` - Traditionally Netdata returns select dimensions negative to improve visual appearance. This option turns this feature off.
+        * `display-absolute` - Only used by badges, to do color calculation using the signed value, but render the value without a sign.
+        * `flip` or `reversed` - Order the timestamps array in reverse order (newest to oldest).
+        * `min2max` - When flattening multi-dimensional data into a single metric format, use `max - min` instead of `sum`. This is EOL - use `/api/v2` to control aggregation across dimensions.
+        * `percentage` - Convert all values into a percentage vs the row total. When enabled, Netdata will query all dimensions, even the ones that have not been selected or are hidden, to find the row total, in order to calculate the percentage of each dimension selected.
+        * `seconds` - Output timestamps in seconds instead of dates.
+        * `milliseconds` or `ms` - Output timestamps in milliseconds instead of dates.
+        * `unaligned` - by default queries are aligned to the the view, so that as time passes past data returned do not change. When a data query will not be used for visualization, `unaligned` can be given to avoid aligning the query time-frame for visual precision.
+        * `match-ids`, `match-names`. By default filters match both IDs and names when they are available. Setting either of the two options will disable the other.
+        * `anomaly-bit` - query the anomaly information instead of metric values. This is EOL, use `/api/v2` and `json2` format which always returns this information and many more.
+        * `jw-anomaly-rates` - return anomaly rates as a separate result set in the same `json` format response. This is EOL, use `/api/v2` and `json2` format which always returns information and many more. 
+        * `details` - `/api/v2/data` returns in `jsonwrap` the full tree of dimensions that have been matched by the query.
+        * `group-by-labels` - `/api/v2/data` returns in `jsonwrap` flattened labels per output dimension. These are used to identify the instances that have been aggregated into each dimension, making it possible to provide a map, like Netdata does for Kubernetes.
+        * `natural-points` - return timestamps as found in the database. The result is again fixed-step, but the query engine attempts to align them with the timestamps found in the database.
+        * `virtual-points` - return timestamps independent of the database alignment. This is needed aggregating data across multiple Netdata agents, to ensure that their outputs do not need to be interpolated to be merged.
+        * `selected-tier` - use data exclusively from the selected tier given with the `tier` parameter. This option is set automatically when the `tier` parameter is set.
+        * `all-dimensions` - In `/api/v1` `jsonwrap` include metadata for all candidate metrics examined. In `/api/v2` this is standard behavior and no option is needed.
+        * `label-quotes` - In `csv` output format, enclose each header label in quotes.
+        * `objectrows` - Each row of value should be an object, not an array (only for `json` format).
+        * `google_json` - Comply with google JSON/JSONP specs (only for `json` format).
+      required: false
+      allowEmptyValue: false
+      schema:
+        type: array
+        items:
+          type: string
+          enum:
+            - jsonwrap
+            - raw
+            - minify
+            - debug
+            - nonzero
+            - null2zero
+            - abs
+            - absolute
+            - display-absolute
+            - flip
+            - reversed
+            - min2max
+            - percentage
+            - seconds
+            - ms
+            - milliseconds
+            - unaligned
+            - match-ids
+            - match-names
+            - anomaly-bit
+            - jw-anomaly-rates
+            - details
+            - group-by-labels
+            - natural-points
+            - virtual-points
+            - selected-tier
+            - all-dimensions
+            - label-quotes
+            - objectrows
+            - google_json
+        default:
+          - seconds
+          - jsonwrap
+    dataTimeGroup1:
+      name: group
+      in: query
+      description: |
+        Time aggregation function. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. If the `absolute` option is set, the values are turned positive before applying this calculation.
+      required: false
+      schema:
+        type: string
+        enum:
+          - min
+          - max
+          - avg
+          - average
+          - median
+          - stddev
+          - sum
+          - incremental-sum
+          - ses
+          - des
+          - cv
+          - countif
+          - percentile
+          - percentile25
+          - percentile50
+          - percentile75
+          - percentile80
+          - percentile90
+          - percentile95
+          - percentile97
+          - percentile98
+          - percentile99
+          - trimmed-mean
+          - trimmed-mean1
+          - trimmed-mean2
+          - trimmed-mean3
+          - trimmed-mean5
+          - trimmed-mean10
+          - trimmed-mean15
+          - trimmed-mean20
+          - trimmed-mean25
+          - trimmed-median
+          - trimmed-median1
+          - trimmed-median2
+          - trimmed-median3
+          - trimmed-median5
+          - trimmed-median10
+          - trimmed-median15
+          - trimmed-median20
+          - trimmed-median25
+        default: average
+    dataTimeGroup2:
+      name: time_group
+      in: query
+      description: |
+        Time aggregation function. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. If the `absolute` option is set, the values are turned positive before applying this calculation.
+      required: false
+      schema:
+        type: string
+        enum:
+          - min
+          - max
+          - avg
+          - average
+          - median
+          - stddev
+          - sum
+          - incremental-sum
+          - ses
+          - des
+          - cv
+          - countif
+          - percentile
+          - percentile25
+          - percentile50
+          - percentile75
+          - percentile80
+          - percentile90
+          - percentile95
+          - percentile97
+          - percentile98
+          - percentile99
+          - trimmed-mean
+          - trimmed-mean1
+          - trimmed-mean2
+          - trimmed-mean3
+          - trimmed-mean5
+          - trimmed-mean10
+          - trimmed-mean15
+          - trimmed-mean20
+          - trimmed-mean25
+          - trimmed-median
+          - trimmed-median1
+          - trimmed-median2
+          - trimmed-median3
+          - trimmed-median5
+          - trimmed-median10
+          - trimmed-median15
+          - trimmed-median20
+          - trimmed-median25
+        default: average
+    dataTimeGroupOptions1:
+      name: group_options
+      in: query
+      description: |
+        When the time grouping function supports additional parameters, this field can be used to pass them to it. Currently `countif`, `trimmed-mean`, `trimmed-median` and `percentile` support this. For `countif` the string may start with `<`, `<=`, `<:`, `<>`, `!=`, `>`, `>=`, `>:`. For all others just a number is expected.
+      required: false
+      schema:
+        type: string
+    dataTimeGroupOptions2:
+      name: time_group_options
+      in: query
+      description: |
+        When the time grouping function supports additional parameters, this field can be used to pass them to it. Currently `countif`, `trimmed-mean`, `trimmed-median` and `percentile` support this. For `countif` the string may start with `<`, `<=`, `<:`, `<>`, `!=`, `>`, `>=`, `>:`. For all others just a number is expected.
+      required: false
+      schema:
+        type: string
+    dataTimeResampling1:
+      name: gtime
+      in: query
+      description: |
+        The grouping number of seconds. This is used in conjunction with group=average to change the units of metrics (ie when the data is per-second, setting gtime=60 will turn them to per-minute).
+      required: false
+      allowEmptyValue: false
+      schema:
+        type: number
+        format: integer
+        default: 0
+    dataTimeResampling2:
+      name: time_resampling
+      in: query
+      description: |
+        For incremental values that are "per second", this value is used to resample them to "per minute` (60) or "per hour" (3600). It can only be used in conjunction with group=average.
+      required: false
+      schema:
+        type: number
+        format: integer
+        default: 0
+    timeoutMS:
+      name: timeout
+      in: query
+      description: |
+        Specify a timeout value in milliseconds after which the agent will abort the query and return a 503 error. A value of 0 indicates no timeout.
+      required: false
+      schema:
+        type: number
+        format: integer
+        default: 0
+    timeoutSecs:
+      name: timeout
+      in: query
+      description: |
+        Specify a timeout value in seconds after which the agent will abort the query and return a 504 error. A value of 0 indicates no timeout, but some endpoints, like `weights`, do not accept infinite timeouts (they have a predefined default), so to disable the timeout it must be set to a really high value.
+      required: false
+      schema:
+        type: number
+        format: integer
+        default: 0
   schemas:
     info:
       type: object
