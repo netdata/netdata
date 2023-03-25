@@ -377,8 +377,8 @@ typedef struct storage_point {
     time_t start_time_s;    // the time the point starts
     time_t end_time_s;      // the time the point ends
 
-    size_t count;           // the number of original points aggregated
-    size_t anomaly_count;   // the number of original points found anomalous
+    uint32_t count;         // the number of original points aggregated
+    uint32_t anomaly_count; // the number of original points found anomalous
 
     SN_FLAGS flags;         // flags stored with the point
 } STORAGE_POINT;
@@ -481,6 +481,9 @@ typedef struct storage_point {
 
 #define storage_point_anomaly_rate(sp) \
     (NETDATA_DOUBLE)(storage_point_is_unset(sp) ? 0.0 : (NETDATA_DOUBLE)((sp).anomaly_count) * 100.0 / (NETDATA_DOUBLE)((sp).count))
+
+#define storage_point_average_value(sp) \
+    ((sp).count ? (sp).sum / (NETDATA_DOUBLE)((sp).count) : 0.0)
 
 // ---------------------------------------------------------------------------------------------
 

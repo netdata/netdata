@@ -78,9 +78,6 @@ typedef enum rrdr_group_by_function {
 RRDR_GROUP_BY_FUNCTION group_by_aggregate_function_parse(const char *s);
 const char *group_by_aggregate_function_to_string(RRDR_GROUP_BY_FUNCTION group_by_function);
 
-struct query_data_statistics;
-void query_target_merge_data_statistics(struct query_data_statistics *d, struct query_data_statistics *s);
-
 #ifdef __cplusplus
 }
 #endif

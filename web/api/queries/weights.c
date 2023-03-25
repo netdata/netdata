@@ -880,8 +880,9 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
     for(size_t tr = 0; tr < storage_tiers ; tr++)
         stats->db_points_per_tier[tr] += r->internal.qt->db.tiers[tr].points;
 
-    if(r->d != 1) {
-        error("WEIGHTS: on query '%s' expected 1 dimension in RRDR but got %zu", r->internal.qt->id, r->d);
+    if(r->d != 1 || r->internal.qt->query.used != 1) {
+        error("WEIGHTS: on query '%s' expected 1 dimension in RRDR but got %zu r->d and %zu qt->query.used",
+              r->internal.qt->id, r->d, (size_t)r->internal.qt->query.used);
         goto cleanup;
     }
 
@@ -901,7 +902,7 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
     ret = onewayalloc_mallocz(owa, sizeof(NETDATA_DOUBLE) * rrdr_rows(r));
 
     if(sp)
-        *sp = r->drs[0];
+        *sp = r->internal.qt->query.array[0].query_points;
 
     // copy the points of the dimension to a contiguous array
     // there is no need to check for empty values, since empty values are already zero
@@ -1153,7 +1154,7 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
 
         qv.value = cn[d];
         qv.anomaly_rate = ar[d];
-        qv.sp = *r->drs;
+        storage_point_merge_to(qv.sp, r->internal.qt->query.array[d].query_points);
 
         if(netdata_double_isnumber(qv.value)) {
             QUERY_METRIC *qm = query_metric(r->internal.qt, d);

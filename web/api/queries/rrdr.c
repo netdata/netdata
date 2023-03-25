@@ -77,10 +77,8 @@ inline void rrdr_free(ONEWAYALLOC *owa, RRDR *r) {
     onewayalloc_freez(owa, r->dn);
     onewayalloc_freez(owa, r->du);
     onewayalloc_freez(owa, r->dp);
-    onewayalloc_freez(owa, r->dv);
-    onewayalloc_freez(owa, r->dmin);
-    onewayalloc_freez(owa, r->dmax);
-    onewayalloc_freez(owa, r->drs);
+    onewayalloc_freez(owa, r->dview);
+    onewayalloc_freez(owa, r->dqp);
     onewayalloc_freez(owa, r->ar);
     onewayalloc_freez(owa, r->gbc);
     onewayalloc_freez(owa, r->dgbc);
@@ -137,7 +135,6 @@ RRDR *rrdr_create(ONEWAYALLOC *owa, QUERY_TARGET *qt, size_t dimensions, size_t 
         r->di = onewayalloc_callocz(owa, dimensions, sizeof(STRING *));
         r->dn = onewayalloc_callocz(owa, dimensions, sizeof(STRING *));
         r->du = onewayalloc_callocz(owa, dimensions, sizeof(STRING *));
-        r->drs = onewayalloc_callocz(owa, dimensions, sizeof(STORAGE_POINT));
     }
 
     r->view.group = 1;

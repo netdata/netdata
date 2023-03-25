@@ -1034,6 +1034,7 @@ typedef struct query_engine_ops {
     size_t group_points_non_zero;
     size_t group_points_added;
     STORAGE_POINT group_point;          // aggregates min, max, sum, count, anomaly count for each group point
+    STORAGE_POINT query_point;          // aggregates min, max, sum, count, anomaly count across the whole query
     RRDR_VALUE_FLAGS group_value_flags;
 
     // statistics
@@ -1374,8 +1375,9 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
                                                                         \
         (ops)->grouping_add(r, (point).value);                          \
                                                                         \
+        storage_point_merge_to((ops)->group_point, (point).sp);         \
         if(!(point).added)                                              \
-            storage_point_merge_to((ops)->group_point, (point).sp);     \
+            storage_point_merge_to((ops)->query_point, (point).sp);     \
     }                                                                   \
                                                                         \
     (ops)->group_points_added++;                                        \
@@ -1440,8 +1442,8 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
     QUERY_TARGET *qt = r->internal.qt;
     QUERY_METRIC *qm = ops->qm;
 
-    r->drs[dim_id_in_rrdr] = STORAGE_POINT_UNSET;
     ops->group_point = STORAGE_POINT_UNSET;
+    ops->query_point = STORAGE_POINT_UNSET;
 
     RRDR_OPTIONS options = qt->window.options;
     size_t points_wanted = qt->window.points;
@@ -1762,7 +1764,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
             NETDATA_DOUBLE group_value = ops->grouping_flush(r, rrdr_value_options_ptr);
             r->v[rrdr_o_v_index] = group_value;
 
-            NETDATA_DOUBLE group_ar = r->ar[rrdr_o_v_index] = storage_point_anomaly_rate(ops->group_point);
+            r->ar[rrdr_o_v_index] = storage_point_anomaly_rate(ops->group_point);
 
             if(likely(points_added || r->internal.queries_count)) {
                 // find the min/max across all dimensions
@@ -1777,32 +1779,10 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                 min = max = group_value;
             }
 
-            // for volume contribution calculation we need the absolute value
-            NETDATA_DOUBLE stats_value = group_value < 0 ? -group_value : group_value;
-
-            if(unlikely(!points_added)) {
-                qm->query_stats.min = stats_value;
-                qm->query_stats.max = stats_value;
-            }
-            else {
-                if(stats_value < qm->query_stats.min)
-                    qm->query_stats.min = stats_value;
-
-                if(stats_value > qm->query_stats.max)
-                    qm->query_stats.max = stats_value;
-            }
-
-            qm->query_stats.anomaly_sum += group_ar;
-            qm->query_stats.sum += stats_value;
-            qm->query_stats.volume += stats_value * (NETDATA_DOUBLE)ops->view_update_every;
-            qm->query_stats.group_points++;
-
             points_added++;
             ops->group_points_added = 0;
             ops->group_value_flags = RRDR_VALUE_NOTHING;
             ops->group_points_non_zero = 0;
-
-            storage_point_merge_to(r->drs[dim_id_in_rrdr], ops->group_point);
             ops->group_point = STORAGE_POINT_UNSET;
 
             now_end_time += ops->view_update_every;
@@ -1814,6 +1794,8 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
         now_end_time -= ops->view_update_every;
     }
     query_planer_finalize_remaining_plans(ops);
+
+    qm->query_points = ops->query_point;
 
     // fill the rest of the points with empty values
     while (points_added < points_wanted) {
@@ -2348,23 +2330,6 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     return true;
 }
 
-void query_target_merge_data_statistics(struct query_data_statistics *d, struct query_data_statistics *s) {
-    if(!d->group_points)
-        *d = *s;
-    else if(s->group_points) {
-        d->group_points += s->group_points;
-        d->sum += s->sum;
-        d->anomaly_sum += s->anomaly_sum;
-        d->volume += s->volume;
-
-        if(s->min < d->min)
-            d->min = s->min;
-
-        if(s->max > d->max)
-            d->max = s->max;
-    }
-}
-
 // ----------------------------------------------------------------------------
 // group by
 
@@ -2442,7 +2407,7 @@ static void rrd2rrdr_set_timestamps(RRDR *r) {
     internal_fatal(qt->window.points != r->n, "QUERY: mismatch to the number of points in qt and r");
 
     r->view.group = qt->window.group;
-    r->view.update_every = (int) (qt->window.group * qt->window.query_granularity);
+    r->view.update_every = (int) query_view_update_every(qt);
     r->view.before = qt->window.before;
     r->view.after = qt->window.after;
 
@@ -2762,11 +2727,10 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     rrd2rrdr_set_timestamps(r->group_by.r);
 
     r->dp = onewayalloc_callocz(r->internal.owa, r->d, sizeof(*r->dp));
-    r->dv = onewayalloc_callocz(r->internal.owa, r->d, sizeof(*r->dv));
-    r->dmin = onewayalloc_callocz(r->internal.owa, r->d, sizeof(*r->dmin));
-    r->dmax = onewayalloc_callocz(r->internal.owa, r->d, sizeof(*r->dmax));
+    r->dview = onewayalloc_callocz(r->internal.owa, r->d, sizeof(*r->dview));
     r->dgbc = onewayalloc_callocz(r->internal.owa, r->d, sizeof(*r->dgbc));
     r->gbc = onewayalloc_callocz(r->internal.owa, r->n * r->d, sizeof(*r->gbc));
+    r->dqp = onewayalloc_callocz(r->internal.owa, r->d, sizeof(STORAGE_POINT));
 
     if(options & RRDR_OPTION_GROUP_BY_LABELS) {
         r->dl = onewayalloc_callocz(r->internal.owa, r->d, sizeof(DICTIONARY *));
@@ -2904,23 +2868,7 @@ static void rrd2rrdr_group_by_add_metric(RRDR *r, size_t query_metric_id) {
         }
     }
 
-    for(size_t d_tmp = 0; d_tmp < r_tmp->d ; d_tmp++) {
-        if (unlikely(!(r_tmp->od[d_tmp] & RRDR_DIMENSION_QUERIED)))
-            continue;
-
-        switch(qt->request.group_by_aggregate_function) {
-            case RRDR_GROUP_BY_FUNCTION_SUM:
-                storage_point_add_to(r->drs[d], r_tmp->drs[d_tmp]);
-                break;
-
-            default:
-            case RRDR_GROUP_BY_FUNCTION_AVERAGE:
-            case RRDR_GROUP_BY_FUNCTION_MIN:
-            case RRDR_GROUP_BY_FUNCTION_MAX:
-                storage_point_merge_to(r->drs[d], r_tmp->drs[d_tmp]);
-                break;
-        }
-    }
+    storage_point_merge_to(r->dqp[d], qm->query_points);
 }
 
 static void rrdr2rrdr_group_by_partial_trimming(RRDR *r) {
@@ -2993,7 +2941,7 @@ static void rrd2rrdr_convert_to_percentage(RRDR *r) {
     r->view.min = global_min;
     r->view.max = global_max;
 
-    if(!r->dv || !r->dmin || !r->dmax)
+    if(!r->dview)
         // v1 query
         return;
 
@@ -3004,7 +2952,7 @@ static void rrd2rrdr_convert_to_percentage(RRDR *r) {
             continue;
 
         size_t count = 0;
-        NETDATA_DOUBLE min = 0, max = 0, sum = 0;
+        NETDATA_DOUBLE min = 0.0, max = 0.0, sum = 0.0, ars = 0.0;
         for(size_t i = 0; i != r->rows ;i++) { // we use r->rows to respect trimming
             size_t idx = i * r->d + d;
 
@@ -3012,6 +2960,9 @@ static void rrd2rrdr_convert_to_percentage(RRDR *r) {
 
             if (o & RRDR_VALUE_EMPTY)
                 continue;
+
+            NETDATA_DOUBLE ar = r->ar[ idx ];
+            ars += ar;
 
             NETDATA_DOUBLE n = r->v[ idx ];
             sum += n;
@@ -3026,9 +2977,13 @@ static void rrd2rrdr_convert_to_percentage(RRDR *r) {
             }
         }
 
-        r->dv[d] = (count) ? sum / (NETDATA_DOUBLE )count : 0.0;
-        r->dmin[d] = min;
-        r->dmax[d] = max;
+        r->dview[d] = (STORAGE_POINT) {
+            .sum = sum,
+            .count = count,
+            .min = min,
+            .max = max,
+            .anomaly_count = (size_t)(ars * (NETDATA_DOUBLE)count),
+        };
     }
 }
 
@@ -3061,7 +3016,7 @@ static void rrd2rrdr_group_by_finalize(RRDR *r) {
             continue;
 
         size_t points_nonzero = 0;
-        NETDATA_DOUBLE min = 0, max = 0, sum = 0;
+        NETDATA_DOUBLE min = 0, max = 0, sum = 0, ars = 0;
         size_t count = 0;
 
         for(size_t i = 0; i != r->n ;i++) {
@@ -3081,6 +3036,7 @@ static void rrd2rrdr_group_by_finalize(RRDR *r) {
                 NETDATA_DOUBLE n;
 
                 sum += *cn;
+                ars += *ar;
 
                 if(qt->request.group_by_aggregate_function == RRDR_GROUP_BY_FUNCTION_AVERAGE && !query_target_aggregatable(qt))
                     n = (*cn /= gbc);
@@ -3122,9 +3078,13 @@ static void rrd2rrdr_group_by_finalize(RRDR *r) {
             dimensions_nonzero++;
         }
 
-        r->dv[d] = (count) ? sum / (NETDATA_DOUBLE)count : 0.0;
-        r->dmin[d] = min;
-        r->dmax[d] = max;
+        r->dview[d] = (STORAGE_POINT) {
+                .sum = sum,
+                .count = count,
+                .min = min,
+                .max = max,
+                .anomaly_count = (size_t)(ars * RRDR_DVIEW_ANOMALY_COUNT_MULTIPLIER / 100.0),
+        };
     }
 
     r->view.min = global_min;
@@ -3325,10 +3285,13 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             qm->status |= RRDR_DIMENSION_QUERIED;
 
             if(qt->request.version >= 2) {
-                query_target_merge_data_statistics(&qi->query_stats, &qm->query_stats);
-                query_target_merge_data_statistics(&qc->query_stats, &qm->query_stats);
-                query_target_merge_data_statistics(&qn->query_stats, &qm->query_stats);
-                query_target_merge_data_statistics(&qt->query_stats, &qm->query_stats);
+                // we need to make the query points positive now
+                // since we will aggregate it across multiple dimensions
+                storage_point_make_positive(qm->query_points);
+                storage_point_merge_to(qi->query_points, qm->query_points);
+                storage_point_merge_to(qc->query_points, qm->query_points);
+                storage_point_merge_to(qn->query_points, qm->query_points);
+                storage_point_merge_to(qt->query_points, qm->query_points);
             }
         }
         else {
@@ -3431,7 +3394,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                                                    qt->request.points, qt->window.points, /*after_slot, before_slot,*/
                                                    "got 'points' is not wanted 'points'");
 
-        if(qt->window.aligned && (r->view.before % (qt->window.group * qt->window.query_granularity)) != 0)
+        if(qt->window.aligned && (r->view.before % query_view_update_every(qt)) != 0)
             rrd2rrdr_log_request_response_metadata(r, qt->window.options, qt->window.time_group_method, qt->window.aligned, qt->window.group, qt->request.resampling_time, qt->window.resampling_group,
                                                    qt->window.after, qt->request.after, qt->window.before, qt->request.before,
                                                    qt->request.points, qt->window.points, /*after_slot, before_slot,*/
