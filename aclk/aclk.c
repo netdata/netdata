@@ -64,6 +64,8 @@ struct aclk_shared_state aclk_shared_state = {
 #ifdef MQTT_WSS_DEBUG
 #if defined(OPENSSL_VERSION_NUMBER)
 #include <openssl/ssl.h>
+#elif defined(WOLFSSL_VERSION)
+#include <wolfssl/openssl/ssl.h>
 #endif
 #define DEFAULT_SSKEYLOGFILE_NAME "SSLKEYLOGFILE"
 const char *ssl_log_filename = NULL;
