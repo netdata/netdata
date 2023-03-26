@@ -172,6 +172,12 @@ AC_ARG_ENABLE(
     [enable_compression="detect"]
 )
 AC_ARG_ENABLE(
+    [wolfssl],
+    [AS_HELP_STRING([--enable-wolfssl], [Enable WolfSSL support with WolfSSL @<:@default no@:>@])],
+    [enable_wolfssl="yes"],
+    [enable_wolfssl="no"]
+)
+AC_ARG_ENABLE(
     [dbengine],
     [AS_HELP_STRING([--disable-dbengine], [disable netdata dbengine @<:@default autodetect@:>@])],
     ,
@@ -502,6 +508,18 @@ OPTIONAL_UUID_CFLAGS="${UUID_CFLAGS}"
 OPTIONAL_UUID_LIBS="${UUID_LIBS}"
 
 # -----------------------------------------------------------------------------
+# WolfSSL Cryptography and SSL/TLS Toolkit
+
+AC_CHECK_LIB(
+    [wolfssl],
+    [wolfSSL_Init],
+    [WOLFSSL_LIBS="-lwolfssl"]
+)
+
+test -z "${WOLFSSL_LIBS}" -a "${enable_wolfssl}" = "yes" || \
+    AC_DEFINE([HAVE_WOLFSSL], [1], [libwolfssl availability])
+
+# -----------------------------------------------------------------------------
 # OpenSSL Cryptography and SSL/TLS Toolkit
 
 AC_CHECK_LIB(
@@ -574,11 +592,11 @@ AC_SUBST([LIBJUDY_CFLAGS])
 
 JUDY_CFLAGS="-I \$(abs_top_srcdir)/libnetdata/libjudy/src"
 
-test "${enable_https}" = "yes" -a -z "${SSL_LIBS}" && \
-    AC_MSG_ERROR([OpenSSL required for HTTPS but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
+test "${enable_https}" = "yes" -a -z "${SSL_LIBS}" -a -z "${WOLFSSL_LIBS}" && \
+    AC_MSG_ERROR([OpenSSL or WolfSSL are required for HTTPS but not found. Try installing 'libssl-dev', 'openssl-devel', or 'libwolfssl-dev'.])
 
-test "${enable_dbengine}" = "yes" -a -z "${SSL_LIBS}" && \
-    AC_MSG_ERROR([OpenSSL required for DBENGINE but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
+test "${enable_dbengine}" = "yes" -a -z "${SSL_LIBS}" -a -z "${WOLFSSL_LIBS}" && \
+    AC_MSG_ERROR([OpenSSL or WolfSSL are required for HTTPS but not found. Try installing 'libssl-dev', 'openssl-devel', or 'libwolfssl-dev'.])
 
 AC_MSG_CHECKING([if netdata dbengine should be used])
 if test "${enable_dbengine}" != "no" -a "${UV_LIBS}" -a "${LZ4_LIBS}" -a "${SSL_LIBS}"; then
@@ -595,12 +613,17 @@ AC_MSG_RESULT([${enable_dbengine}])
 AM_CONDITIONAL([ENABLE_DBENGINE], [test "${enable_dbengine}" = "yes"])
 
 AC_MSG_CHECKING([if netdata https should be used])
-if test "${enable_https}" != "no" -a "${SSL_LIBS}"; then
+if test "${enable_https}" = "yes" -a "${SSL_LIBS}" -o "${WOLFSSL_LIBS}"; then
     enable_https="yes"
     AC_DEFINE([ENABLE_HTTPS], [1], [netdata HTTPS usability])
-    AC_DEFINE([ENABLE_HTTPS_WITH_OPENSSL], [1], [netdata HTTPS linked with OpenSSL])
     OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
-    OPTIONAL_SSL_LIBS="${SSL_LIBS}"
+    if test "${enable_wolfssl}" = "no"; then
+        AC_DEFINE([ENABLE_HTTPS_WITH_OPENSSL], [1], [netdata HTTPS linked with OpenSSL])
+        OPTIONAL_SSL_LIBS="${SSL_LIBS}"
+    else
+        AC_DEFINE([ENABLE_HTTPS_WITH_WOLFSSL], [1], [netdata HTTPS linked with WolfSSL])
+        OPTIONAL_SSL_LIBS="${WOLFSSL_LIBS}"
+    fi
 else
     enable_https="no"
 fi
@@ -872,10 +895,14 @@ if test "$enable_cloud" != "no"; then
         can_enable_ng="no"
     fi
     AC_MSG_CHECKING([if SSL available for ACLK])
-    if test -n "${SSL_LIBS}"; then
+    if test -n "${SSL_LIBS}" -o -n "${WOLFSSL_LIBS}"; then
         AC_MSG_RESULT([yes])
         OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
-        OPTIONAL_SSL_LIBS="${SSL_LIBS}"
+        if test "${enable_wolfssl}" = "no"; then
+            OPTIONAL_SSL_LIBS="${SSL_LIBS}"
+        else
+            OPTIONAL_SSL_LIBS="${WOLFSSL_LIBS}"
+        fi
     else
         AC_MSG_RESULT([no])
     fi
