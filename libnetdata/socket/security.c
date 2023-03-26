@@ -1,6 +1,6 @@
 #include "../libnetdata.h"
 
-#ifdef ENABLE_HTTPS
+#if defined(ENABLE_HTTPS) || defined(ENABLE_HTTPS_WITH_OPENSSL)
 
 SSL_CTX *netdata_ssl_exporting_ctx =NULL;
 SSL_CTX *netdata_ssl_client_ctx =NULL;
@@ -34,22 +34,24 @@ static void security_info_callback(const SSL *ssl, int where, int ret __maybe_un
  */
 void security_openssl_library()
 {
+#if defined(OPENSSL_VERSION_NUMBER)
 #if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
-# if (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097)
+# if defined(SSLEAY_VERSION_NUMBER) && (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097)
     OPENSSL_config(NULL);
-# endif
+# endif // defined(SSLEAY_VERSION_NUMBER)
 
     SSL_load_error_strings();
 
     SSL_library_init();
-#else
+#else // OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
     if (OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG, NULL) != 1) {
         error("SSL library cannot be initialized.");
     }
-#endif
+#endif // OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+#endif // defined(ENABLE_HTTPS_WITH_OPENSSL)
 }
 
-#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_110
+#if defined(OPENSSL_VERSION_NUMBER) && (OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_110)
 /**
  * TLS version
  *
@@ -88,11 +90,11 @@ int tls_select_version(const char *lversion) {
  * @param side 0 means server, and 1 client.
  */
 void security_openssl_common_options(SSL_CTX *ctx, int side) {
-#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_110
     if (!side) {
+#if defined(OPENSSL_VERSION_NUMBER) && (OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_110)
         int version =  tls_select_version(tls_version) ;
 #endif
-#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+#if defined(OPENSSL_VERSION_NUMBER) && (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
         SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
 #else
         SSL_CTX_set_min_proto_version(ctx, TLS1_VERSION);
@@ -103,8 +105,8 @@ void security_openssl_common_options(SSL_CTX *ctx, int side) {
                 error("SSL error. cannot set the cipher list");
             }
         }
-    }
 #endif
+    }
 
     SSL_CTX_set_mode(ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
 }
@@ -118,13 +120,13 @@ void security_openssl_common_options(SSL_CTX *ctx, int side) {
  */
 SSL_CTX * security_initialize_openssl_client() {
     SSL_CTX *ctx;
-#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+#if defined(OPENSSL_VERSION_NUMBER) && (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
     ctx = SSL_CTX_new(SSLv23_client_method());
 #else
     ctx = SSL_CTX_new(TLS_client_method());
 #endif
     if(ctx) {
-#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+#if defined(OPENSSL_VERSION_NUMBER) && (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
         SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
 #else
         SSL_CTX_set_min_proto_version(ctx, TLS1_VERSION);
@@ -135,7 +137,7 @@ SSL_CTX * security_initialize_openssl_client() {
 # elif defined(TLS1_2_VERSION)
         SSL_CTX_set_max_proto_version(ctx, TLS1_2_VERSION);
 # endif
-#endif
+#endif // defined(OPENSSL_VERSION_NUMBER)
     }
 
     return ctx;
@@ -154,7 +156,7 @@ static SSL_CTX * security_initialize_openssl_server() {
 	static int netdata_id_context = 1;
 
     //TO DO: Confirm the necessity to check return for other OPENSSL function
-#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+#if defined(OPENSSL_VERSION_NUMBER) && (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
 	ctx = SSL_CTX_new(SSLv23_server_method());
     if (!ctx) {
 		error("Cannot create a new SSL context, netdata won't encrypt communication");
@@ -170,7 +172,7 @@ static SSL_CTX * security_initialize_openssl_server() {
     }
 
     SSL_CTX_use_certificate_chain_file(ctx, netdata_ssl_security_cert);
-#endif
+#endif // defined(OPENSSL_VERSION_NUMBER)
     security_openssl_common_options(ctx, 0);
 
     SSL_CTX_use_PrivateKey_file(ctx, netdata_ssl_security_key,SSL_FILETYPE_PEM);
@@ -262,7 +264,7 @@ void security_clean_openssl()
         SSL_CTX_free(netdata_ssl_exporting_ctx);
     }
 
-#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+#if defined(OPENSSL_VERSION_NUMBER) && (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
     ERR_free_strings();
 #endif
 }
@@ -387,4 +389,4 @@ int ssl_security_location_for_context(SSL_CTX *ctx, char *file, char *path) {
 
     return 0;
 }
-#endif
+#endif // defined(ENABLE_HTTPS)
