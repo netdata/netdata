@@ -37,6 +37,10 @@
 #include <openssl/core_names.h>
 #include <openssl/decoder.h>
 #endif // OPENSSL_VERSION_NUMBER
+#elif defined(ENABLE_HTTPS_WITH_WOLFSSL)
+#include <wolfssl/options.h>
+#include <wolfssl/ssl.h>
+#include <wolfssl/openssl/ssl.h>
 #endif // ENABLE_HTTPS_WITH_OPENSSL
 
 struct netdata_ssl {
