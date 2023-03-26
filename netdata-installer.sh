@@ -213,6 +213,7 @@ USAGE: ${PROGRAM} [options]
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
   --disable-plugin-freeipmi  Explicitly disable the FreeIPMI plugin.
   --disable-https            Explicitly disable TLS support.
+  --enable-wolfssl           Explicitly use WolfSSL instead the default (OpenSSL).
   --disable-dbengine         Explicitly disable DB engine support.
   --enable-plugin-nfacct     Enable nfacct plugin. Default: enable it when libmnl and libnetfilter_acct are available.
   --disable-plugin-nfacct    Explicitly disable the nfacct plugin.
@@ -358,6 +359,10 @@ while [ -n "${1}" ]; do
       ;;
     "--build-json-c")
       NETDATA_BUILD_JSON_C=1
+      ;;
+    "--enable-wolfssl")
+      NETDATA_ENABLE_WOLFSSL=1
+      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-wolfssl/} --enable-wolfssl"
       ;;
     "--install-prefix")
       NETDATA_PREFIX="${2}/netdata"
