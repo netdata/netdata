@@ -12,6 +12,9 @@
 #if defined(OPENSSL_VERSION_NUMBER)
 #include <openssl/sha.h>
 #include <openssl/evp.h>
+#elif defined(WOLFSSL_VERSION)
+#include <wolfssl/openssl/sha.h>
+#include <wolfssl/openssl/evp.h>
 #endif
 #include "daemon/common.h"
 #include "../rrd.h"
