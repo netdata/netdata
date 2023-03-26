@@ -598,6 +598,7 @@ AC_MSG_CHECKING([if netdata https should be used])
 if test "${enable_https}" != "no" -a "${SSL_LIBS}"; then
     enable_https="yes"
     AC_DEFINE([ENABLE_HTTPS], [1], [netdata HTTPS usability])
+    AC_DEFINE([ENABLE_HTTPS_WITH_OPENSSL], [1], [netdata HTTPS linked with OpenSSL])
     OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
     OPTIONAL_SSL_LIBS="${SSL_LIBS}"
 else
