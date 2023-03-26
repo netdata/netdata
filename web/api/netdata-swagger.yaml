@@ -34,6 +34,86 @@ tags:
   - name: management
     description: Everything related to managing netdata agents
 paths:
+  /api/v2/nodes:
+    get:
+      operationId: getNodes2
+      tags:
+        - nodes
+      summary: Nodes Info v2
+      description: |
+        Get a list of all nodes hosted by this Netdata agent.
+      parameters:
+        - $ref: '#/components/parameters/scopeNodes'
+        - $ref: '#/components/parameters/scopeContexts'
+        - $ref: '#/components/parameters/filterNodes'
+        - $ref: '#/components/parameters/filterContexts'
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                description: |
+                  `/api/v2/nodes` response for all nodes hosted by a Netdata agent.
+                type: object
+                properties:
+                  api:
+                    $ref: '#/components/schemas/api'
+                  agents:
+                    $ref: '#/components/schemas/agents'
+                  versions:
+                    $ref: '#/components/schemas/versions'
+                  nodes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/nodeFull'
+  /api/v2/contexts:
+    get:
+      operationId: getContexts2
+      tags:
+        - contexts
+      summary: Contexts Info v2
+      description: |
+        Get a list of all contexts, across all nodes, hosted by this Netdata agent.
+      parameters:
+        - $ref: '#/components/parameters/scopeNodes'
+        - $ref: '#/components/parameters/scopeContexts'
+        - $ref: '#/components/parameters/filterNodes'
+        - $ref: '#/components/parameters/filterContexts'
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/contexts2'
+  /api/v2/q:
+    get:
+      operationId: q2
+      tags:
+        - contexts
+      summary: Full Text Search v2
+      description: |
+        Get a list of contexts, across all nodes, hosted by this Netdata agent, matching a string expression
+      parameters:
+        - name: q
+          in: query
+          description: The strings to search for, formatted as a simple pattern
+          required: true
+          schema:
+            type: string
+            format: simple pattern
+        - $ref: '#/components/parameters/scopeNodes'
+        - $ref: '#/components/parameters/scopeContexts'
+        - $ref: '#/components/parameters/filterNodes'
+        - $ref: '#/components/parameters/filterContexts'
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/contexts2'
   /api/v1/info:
     get:
       operationId: getNodeInfo1
@@ -1929,58 +2009,11 @@ components:
       type: object
       properties:
         api:
-          description: |
-            The version of the API used.
-          type: integer
+          $ref: '#/components/schemas/api'
         agents:
-          description: |
-            An array of agent definitions consulted to compose this response.
-          type: array
-          items:
-            type: object
-            properties:
-              mg:
-                description: The agent machine GUID.
-                type: string
-                format: uuid
-              nd:
-                description: The agent cloud node ID.
-                type: string
-                format: uuid
-              nm:
-                description: The agent hostname.
-                type: string
-              ai:
-                description: The agent index ID for this agent, in this response.
-                type: integer
-              now:
-                description: The current unix epoch timestamp of this agent.
-                type: integer
+          $ref: '#/components/schemas/agents'
         versions:
-          description: |
-            Hashes that allow the caller to detect important database changes of Netdata agents.
-          type: object
-          properties:
-            nodes_hard_hash:
-              description: |
-                An auto-increment value that reflects the number of changes to the number of nodes maintained by the server. Everytime a node is added or removed, this number gets incremented.
-              type: integer
-            contexts_hard_hash:
-              description: |
-                An auto-increment value that reflects the number of changes to the number of contexts maintained by the server. Everytime a context is added or removed, this number gets incremented.
-              type: integer
-            contexts_soft_hash:
-              description: |
-                An auto-increment value that reflects the number of changes to the queue that sends contexts updates to Netdata Cloud. Everytime the contents of a context are updated, this number gets incremented.
-              type: integer
-            alerts_hard_hash:
-              description: |
-                An auto-increment value that reflects the number of changes to the number of alerts. Everytime an alert is added or removed, this number gets incremented.
-              type: integer
-            alerts_soft_hash:
-              description: |
-                An auto-increment value that reflects the number of alerts transitions. Everytime an alert transitions to a new state, this number gets incremented.
-              type: integer
+          $ref: '#/components/schemas/versions'
         summary:
           description: |
             Summarized information about nodes, contexts, instances, labels, alerts, and dimensions. The items returned are determined by the scope of the query only, however the statistical data in them are influenced by the filters of the query. Using this information the dashboard allows users to slice and dice the data by filtering and grouping.
@@ -1989,50 +2022,7 @@ components:
             nodes:
               type: array
               items:
-                type: object
-                description: |
-                  An object describing a node. `is` stands for instances, `ds` for dimensions, `al` for alerts, `sts` for statistics.
-                properties:
-                  ni:
-                    description: the node index id, a number that uniquely identifies this node for this query.
-                    type: integer
-                  mg:
-                    description: the machine guid of the node.
-                    type: string
-                    format: UUID
-                  nd:
-                    description: the node id of the node.
-                    type: string
-                    format: UUID
-                  nm:
-                    description: the name (hostname) of the node.
-                    type: string
-                  st:
-                    description: status information about the communication with this node.
-                    type: object
-                    properties:
-                      ai:
-                        description: the agent index id that has been contacted for this node.
-                        type: integer
-                      code:
-                        description: the HTTP response code of the response for this node. When working directly with an agent, this is always 200.
-                        type: integer
-                      msg:
-                        description: a human readable description of the error, if any.
-                        type: string
-                      ms:
-                        description: the time in milliseconds this node took to respond, or if the local agent responded for this node, the time it needed to execute the query.
-                        type: number
-                  is:
-                    $ref: "#/components/schemas/jsonwrap2_items_count"
-                  ds:
-                    $ref: "#/components/schemas/jsonwrap2_items_count"
-                  al:
-                    $ref: "#/components/schemas/jsonwrap2_alerts_count"
-                  sts:
-                    oneOf:
-                      - $ref: "#/components/schemas/jsonwrap2_sts"
-                      - $ref: "#/components/schemas/jsonwrap2_sts_raw"
+                $ref: '#/components/schemas/nodeWithDataStatistics'
             contexts:
               type: array
               items:
@@ -2509,6 +2499,157 @@ components:
           description: |
             The number of alerts that are not CLEAR, WARNING, CRITICAL (so, they are "other").  If absent, it is zero.
           type: integer
+    api:
+      description: The version of the API used.
+      type: integer
+    agents:
+      description: |
+        An array of agent definitions consulted to compose this response.
+      type: array
+      items:
+        type: object
+        properties:
+          mg:
+            description: The agent machine GUID.
+            type: string
+            format: uuid
+          nd:
+            description: The agent cloud node ID.
+            type: string
+            format: uuid
+          nm:
+            description: The agent hostname.
+            type: string
+          ai:
+            description: The agent index ID for this agent, in this response.
+            type: integer
+          now:
+            description: The current unix epoch timestamp of this agent.
+            type: integer
+    versions:
+      description: |
+        Hashes that allow the caller to detect important database changes of Netdata agents.
+      type: object
+      properties:
+        nodes_hard_hash:
+          description: |
+            An auto-increment value that reflects the number of changes to the number of nodes maintained by the server. Everytime a node is added or removed, this number gets incremented.
+          type: integer
+        contexts_hard_hash:
+          description: |
+            An auto-increment value that reflects the number of changes to the number of contexts maintained by the server. Everytime a context is added or removed, this number gets incremented.
+          type: integer
+        contexts_soft_hash:
+          description: |
+            An auto-increment value that reflects the number of changes to the queue that sends contexts updates to Netdata Cloud. Everytime the contents of a context are updated, this number gets incremented.
+          type: integer
+        alerts_hard_hash:
+          description: |
+            An auto-increment value that reflects the number of changes to the number of alerts. Everytime an alert is added or removed, this number gets incremented.
+          type: integer
+        alerts_soft_hash:
+          description: |
+            An auto-increment value that reflects the number of alerts transitions. Everytime an alert transitions to a new state, this number gets incremented.
+          type: integer
+    nodeBasic:
+      type: object
+      description: Basic information about a node.
+      required:
+        - ni
+        - st
+      properties:
+        mg:
+          description: The machine guid of the node. May not be available if the request is served by the Netdata Cloud.
+          type: string
+          format: UUID
+        nd:
+          description: The node id of the node. May not be available if the node is not registered to Netdata Cloud.
+          type: string
+          format: UUID
+        nm:
+          description: The name (hostname) of the node.
+          type: string
+        ni:
+          description: The node index id, a number that uniquely identifies this node for this query.
+          type: integer
+        st:
+          description: Status information about the communication with this node.
+          type: object
+          properties:
+            ai:
+              description: The agent index id that has been contacted for this node.
+              type: integer
+            code:
+              description: The HTTP response code of the response for this node. When working directly with an agent, this is always 200. If the `code` is missing, it should be assumed to be 200.
+              type: integer
+            msg:
+              description: A human readable description of the error, if any. If `msg` is missing, or is the empty string `""` or is `null`, there is no description associated with the current status.
+              type: string
+            ms:
+              description: The time in milliseconds this node took to respond, or if the local agent responded for this node, the time it needed to execute the query. If `ms` is missing, the time that was required to query this node is unknown.
+              type: number
+    nodeWithDataStatistics:
+      allOf:
+        - $ref: '#/components/schemas/nodeBasic'
+        - type: object
+          description: |
+            `is` stands for instances, `ds` for dimensions, `al` for alerts, `sts` for statistics.
+          properties:
+            is:
+              $ref: "#/components/schemas/jsonwrap2_items_count"
+            ds:
+              $ref: "#/components/schemas/jsonwrap2_items_count"
+            al:
+              $ref: "#/components/schemas/jsonwrap2_alerts_count"
+            sts:
+              oneOf:
+                - $ref: "#/components/schemas/jsonwrap2_sts"
+                - $ref: "#/components/schemas/jsonwrap2_sts_raw"
+    nodeFull:
+      allOf:
+        - $ref: '#/components/schemas/nodeBasic'
+        - type: object
+          properties:
+            version:
+              description: The version of the Netdata Agent the node runs.
+              type: string
+            hops:
+              description: How many hops away from the origin node, the queried one is. 0 means the agent itself is the origin node.
+              type: integer
+            state:
+              description: The current state of the node on this agent.
+              type: string
+              enum:
+                - reachable
+                - stale
+                - offline
+    context2Basic:
+      type: object
+      properties:
+        family:
+          type: string
+        priority:
+          type: integer
+        first_entry:
+          type: integer
+        last_entry:
+          type: integer
+        live:
+          type: boolean
+    contexts2:
+      description: |
+        `/api/v2/contexts` and `/api/v2/q` response about multi-node contexts hosted by a Netdata agent.
+      type: object
+      properties:
+        api:
+          $ref: '#/components/schemas/api'
+        agents:
+          $ref: '#/components/schemas/agents'
+        versions:
+          $ref: '#/components/schemas/versions'
+        contexts:
+          additionalProperties:
+            $ref: '#/components/schemas/context2Basic'
     jsonwrap1:
       type: object
       discriminator:
