@@ -268,7 +268,7 @@ void rrdr2json_v2(RRDR *r, BUFFER *wb) {
 
     buffer_json_member_add_object(wb, "point");
     buffer_json_member_add_uint64(wb, "value", 0);
-    buffer_json_member_add_uint64(wb, "ar", 1);
+    buffer_json_member_add_uint64(wb, "arp", 1);
     buffer_json_member_add_uint64(wb, "pa", 2);
     if(expose_gbc)
         buffer_json_member_add_uint64(wb, "count", 3);

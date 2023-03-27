@@ -3715,7 +3715,7 @@
                 "description": "The index of the value in each point.\n",
                 "type": "integer"
               },
-              "ar": {
+              "arp": {
                 "description": "The index of the anomaly rate in each point.\n",
                 "type": "integer"
               },
