@@ -70,6 +70,7 @@ run "${NETDATA_MAKESELF_PATH}/makeself.sh" \
   --complevel 9 \
   --notemp \
   --needroot \
+  --untar-extra "-z" \
   --target "${NETDATA_INSTALL_PATH}" \
   --header "${NETDATA_MAKESELF_PATH}/makeself-header.sh" \
   --lsm "${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp" \
