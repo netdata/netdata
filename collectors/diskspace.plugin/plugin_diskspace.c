@@ -6,7 +6,7 @@
 
 #define DEFAULT_EXCLUDED_PATHS "/proc/* /sys/* /var/run/user/* /run/user/* /snap/* /var/lib/docker/*"
 #define DEFAULT_EXCLUDED_FILESYSTEMS "*gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl autofs"
-#define DEFAULT_EXCLUDED_FILESYSTEMS_INODES "msdosfs"
+#define DEFAULT_EXCLUDED_FILESYSTEMS_INODES "msdosfs msdos vfat overlayfs aufs* *unionfs"
 #define CONFIG_SECTION_DISKSPACE "plugin:proc:diskspace"
 
 #define MAX_STAT_USEC 10000LU
