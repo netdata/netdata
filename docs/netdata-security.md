@@ -1,4 +1,4 @@
-# Security design
+# Security and privacy design
 
 This document serves as the relevant Annex to the [Terms of Service](http://netdata.cloud/service-terms/) and
 the Data Processing Addendum, when applicable. It provides more information regarding Netdata’s technical and organizational security and privacy measures.
@@ -13,26 +13,6 @@ Dashboard data you view and alert notifications do travel
 over Netdata Cloud, as they also travel over third party networks, to reach your web browser or the notification integrations you have configured, 
 but Netdata Cloud does not store metric data. It only transforms them as they pass through it, aggregating them from multiple Agents and Parents, 
 to appear as one data source on your browser.
-
-**Table of Contents**
-- [Cloud design](#cloud-design)
-  - [User identification and authorization](#user-identification-and-authorization)
-  - [Personal Data stored](#personal-data-stored)
-  - [Infrastructure data stored](#infrastructure-data-stored)
-  - [Data transfer](#data-transfer)
-  - [Data retention](#data-retention)
-  - [Data portability and erasure](#data-portability-and-erasure)
-- [Agent design](#agent-design)
-  - [Your data is safe with Netdata](#your-data-is-safe-with-netdata)
-  - [Your systems are safe with Netdata](#your-systems-are-safe-with-netdata)
-  - [Netdata is read-only](#netdata-is-read-only)
-  - [Protect Netdata from the internet](#protect-netdata-from-the-internet)
-  - [Anonymous Statistics](#anonymous-statistics)
-  - [Netdata directories](#netdata-directories)
-- [Organization processes](#organization-processes)
-  - [Employee identification and authorization](#employee-identification-and-authorization)
-  - [Systems security](#systems-security)
-
 
 ## Cloud design
 
@@ -180,6 +160,9 @@ about the information collected and learn how to opt-out, on our
 
 ### Netdata directories
 
+The agent stores data in 6 different directories on your system. 
+<details>
+<summary>See more</summary>
 | path|owner|permissions|Netdata|comments|
 |:---|:----|:----------|:------|:-------|
 | `/etc/netdata`|user `root`<br/>group `netdata`|dirs `0755`<br/>files `0640`|reads|**Netdata config files**<br/>may contain sensitive information, so group `netdata` is allowed to read them.|
@@ -188,7 +171,8 @@ about the information collected and learn how to opt-out, on our
 | `/var/cache/netdata`|user `netdata`<br/>group `netdata`|dirs `0750`<br/>files `0660`|reads, writes, creates, deletes|**Netdata ephemeral database files**<br/>Netdata stores its ephemeral real-time database here.|
 | `/var/lib/netdata`|user `netdata`<br/>group `netdata`|dirs `0750`<br/>files `0660`|reads, writes, creates, deletes|**Netdata permanent database files**<br/>Netdata stores here the registry data, health alarm log db, etc.|
 | `/var/log/netdata`|user `netdata`<br/>group `root`|dirs `0755`<br/>files `0644`|writes, creates|**Netdata log files**<br/>all the Netdata applications, logs their errors or other informational messages to files in this directory. These files should be log rotated.|
-
+</details>
+  
 ## Organization processes
 
 ### Employee identification and authorization
