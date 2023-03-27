@@ -45,11 +45,14 @@ int sql_init_context_database(int memory)
 
     info("SQLite database %s initialization", sqlite_database);
 
+    if (configure_database_params(db_context_meta, 0))
+        return 1;
+
     int target_version = DB_CONTEXT_METADATA_VERSION;
     if (likely(!memory))
         target_version = perform_context_database_migration(db_context_meta, DB_CONTEXT_METADATA_VERSION);
 
-    if (configure_database_params(db_context_meta, target_version))
+    if (database_set_version(db_context_meta, target_version))
         return 1;
 
     if (attach_database(db_context_meta, memory ? NULL : "netdata-meta.db", "meta"))
@@ -64,15 +67,6 @@ int sql_init_context_database(int memory)
     info("SQLite database %s initialization completed", sqlite_database);
     return 0;
 }
-
-/*
- * Close the sqlite database
- */
-
-//void sql_close_context_database(void)
-//{
-//    sql_close_database(db_context_meta,"CONTEXT");
-//}
 
 //
 // Fetching data
@@ -525,8 +519,6 @@ int ctx_unittest(void)
     ctx_get_context_list(&host_uuid, dict_ctx_get_context_list_cb, NULL);
     info("List context end after delete");
 
-//    sql_close_context_database();
-//    sql_close_database(db_context_meta,"CONTEXT");
     rc = sqlite3_close_v2(db_context_meta);
     if (unlikely(rc != SQLITE_OK))
         error_report("%s: Error while closing the sqlite database: rc %d, error \"%s\"", "CONTEXT", rc, sqlite3_errstr(rc));

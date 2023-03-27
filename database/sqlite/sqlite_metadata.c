@@ -230,6 +230,9 @@ int sql_init_metadata_database(db_check_action_type_t rebuild, int memory)
 
     info("SQLite database %s initialization", sqlite_database);
 
+    if (configure_database_params(db_meta, 0))
+        return 1;
+
     int target_version = DB_METADATA_VERSION;
     if (likely(!memory))
         target_version = perform_database_migration(db_meta, DB_METADATA_VERSION);
@@ -250,7 +253,7 @@ int sql_init_metadata_database(db_check_action_type_t rebuild, int memory)
     if (init_database_batch(db_meta, &database_cleanup[0]))
         return 1;
 
-    if (configure_database_params(db_meta, target_version))
+    if (database_set_version(db_meta, target_version))
         return 1;
 
     info("SQLite database initialization completed");

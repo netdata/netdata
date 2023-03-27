@@ -203,6 +203,14 @@ int configure_database_params(sqlite3 *database, int target_version)
     snprintfz(buf, 1024, "PRAGMA cache_size=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "cache size", -2000));
     if(init_database_batch(database, list)) return 1;
 
+    return 0;
+}
+
+int database_set_version(sqlite3 *database, int target_version)
+{
+    char buf[1024 + 1] = "";
+    const char *list[2] = { buf, NULL };
+
     snprintfz(buf, 1024, "PRAGMA user_version=%d;", target_version);
     if(init_database_batch(database, list)) return 1;
 

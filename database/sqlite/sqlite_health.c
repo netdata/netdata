@@ -43,6 +43,9 @@ int sql_init_health_database(int memory)
 
     info("SQLite health database %s initialization", sqlite_database);
 
+    if (configure_database_params(db_health, 0))
+        return 1;
+
     if (attach_database(db_health, "netdata-meta.db", "meta"))
         return 1;
 
@@ -50,7 +53,7 @@ int sql_init_health_database(int memory)
     if (likely(!memory))
         target_version = perform_health_database_migration(db_health, DB_HEALTH_VERSION);
 
-    if (configure_database_params(db_health, target_version))
+    if (database_set_version(db_health, target_version))
         return 1;
 
     if (init_database_batch(db_health, &database_health_config[0]))
