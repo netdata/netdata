@@ -50,7 +50,7 @@ minutes.
 ## Download and configure the playbook
 
 First, download the
-[playbook](https://github.com/netdata/community/tree/main/netdata-agent-deployment/ansible-quickstart), move it to the
+[playbook](https://github.com/netdata/community/tree/main/configuration-management/ansible-quickstart/), move it to the
 current directory, and remove the rest of the cloned repository, as it's not required for using the Ansible playbook.
 
 ```bash
