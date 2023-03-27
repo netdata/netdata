@@ -58,12 +58,6 @@ int execute_insert(sqlite3_stmt *res)
         }
     }
 
-    if (unlikely(SQLITE_FULL == rc)) {
-        // Disk full -- lets try extreme things
-//        rrdeng_enq_cmd(multidb_ctx[0], RRDENG_OPCODE_DATABASE_ROTATE,
-//                       NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
-        datafile_delete(multidb_ctx[0], multidb_ctx[0]->datafiles.first, ctx_is_available_for_queries(multidb_ctx[0]), false);
-    }
     return rc;
 }
 

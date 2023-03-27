@@ -5,6 +5,8 @@
 
 #include "sqlite_aclk_node.h"
 
+#define DB_ACLK_VERSION 2
+
 struct aclk_sync_config_s {
     uv_thread_t thread;
     uv_loop_t loop;
@@ -24,8 +26,6 @@ void sanity_check(void) {
     // make sure the compiler will stop on misconfigurations
     BUILD_BUG_ON(WORKER_UTILIZATION_MAX_JOB_TYPES < ACLK_MAX_ENUMERATIONS_DEFINED);
 }
-
-#define DB_ACLK_VERSION 1
 
 const char *database_aclk_config[] = {
     "VACUUM;",
@@ -65,20 +65,20 @@ int sql_init_aclk_database(int memory)
 
     info("SQLite aclk database %s initialization", sqlite_database);
 
+    if (attach_database(db_aclk, "netdata-meta.db", "meta"))
+        return 1;
+
+    if (attach_database(db_aclk, "netdata-health.db", "health"))
+        return 1;
+
     int target_version = DB_ACLK_VERSION;
     if (likely(!memory))
-        target_version = perform_aclk_database_migration(db_health, DB_ACLK_VERSION);
+        target_version = perform_aclk_database_migration(db_aclk, DB_ACLK_VERSION);
 
     if (configure_database_params(db_aclk, target_version))
         return 1;
 
     if (init_database_batch(db_aclk, &database_aclk_config[0]))
-        return 1;
-
-    if (attach_database(db_aclk, "netdata-meta.db", "meta"))
-        return 1;
-
-    if (attach_database(db_aclk, "netdata-health.db", "health"))
         return 1;
 
     info("SQLite aclk database initialization completed");
