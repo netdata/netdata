@@ -1348,7 +1348,7 @@ void rrdhost_set_is_parent_label(int count) {
         //queue a node info
 #ifdef ENABLE_ACLK
         if (netdata_cloud_setting) {
-            aclk_queue_node_info(localhost);
+            aclk_queue_node_info(localhost, false);
         }
 #endif
     }

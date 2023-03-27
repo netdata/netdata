@@ -90,7 +90,7 @@ enum {
 
 static int create_host_callback(void *data, int argc, char **argv, char **column)
 {
-    UNUSED(data);
+    int *number_of_chidren = data;
     UNUSED(argc);
     UNUSED(column);
 
@@ -131,6 +131,8 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
     );
     if (likely(host))
         host->rrdlabels = sql_load_host_labels((uuid_t *)argv[IDX_HOST_ID]);
+
+    (*number_of_chidren)++;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     char node_str[UUID_STR_LEN] = "<none>";
@@ -520,7 +522,8 @@ void sql_create_aclk_table(RRDHOST *host __maybe_unused, uuid_t *host_uuid __may
     wc->host = host;
     strcpy(wc->uuid_str, uuid_str);
     wc->alert_updates = 0;
-    wc->node_info_send = 1;
+    time_t now = now_realtime_sec();
+    wc->node_info_send_time = (host == localhost || NULL == localhost) ? now - 25 : now;
 #endif
 }
 
@@ -544,16 +547,22 @@ void sql_aclk_sync_init(void)
     }
 
     info("Creating archived hosts");
-    rc = sqlite3_exec_monitored(db_meta, SQL_FETCH_ALL_HOSTS, create_host_callback, NULL, &err_msg);
+    int number_of_children = 0;
+    rc = sqlite3_exec_monitored(db_meta, SQL_FETCH_ALL_HOSTS, create_host_callback, &number_of_children, &err_msg);
 
     if (rc != SQLITE_OK) {
         error_report("SQLite error when loading archived hosts, rc = %d (%s)", rc, err_msg);
         sqlite3_free(err_msg);
     }
+
+    info("Created %d archived hosts", number_of_children);
     // Trigger host context load for hosts that have been created
     metadata_queue_load_host_context(NULL);
 
 #ifdef ENABLE_ACLK
+    if (!number_of_children)
+        aclk_queue_node_info(localhost, true);
+
     rc = sqlite3_exec_monitored(db_meta, SQL_FETCH_ALL_INSTANCES,aclk_config_parameters, NULL,&err_msg);
 
     if (rc != SQLITE_OK) {

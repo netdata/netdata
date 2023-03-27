@@ -27,7 +27,7 @@ dashboards](https://user-images.githubusercontent.com/1153921/108529360-a2145d00
 In the modal, give your new dashboard a name, and click **+ Add**.
 
 Click the **Add Chart** button to add your first chart card. From the dropdown, select either *All Nodes** or a specific
-node. If you select **All Nodes**, you will add a [composite chart](/docs/cloud/visualize/overview#composite-charts) to
+node. If you select **All Nodes**, you will add a [composite chart](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md) to
 your new dashboard. Next, select the context. You'll see a preview of the chart before you finish adding it.
 
 The **Add Text** button creates a new card with user-defined text, which you can use to describe or document a
@@ -46,7 +46,7 @@ of any number of **cards**, which can contain charts or text.
 ### Chart cards
 
 Click the **Add Chart** button to add your first chart card. From the dropdown, select either *All Nodes** or a specific
-node. If you select **All Nodes**, you will add a [composite chart](/docs/cloud/visualize/overview#composite-charts) to
+node. If you select **All Nodes**, you will add a [composite chart](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md) to
 your new dashboard. Next, select the context. You'll see a preview of the chart before you finish adding it.
 
 The charts you add to any dashboard are fully interactive, just like the charts in an Agent dashboard or a single node's

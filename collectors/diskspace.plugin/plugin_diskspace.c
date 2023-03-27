@@ -6,6 +6,7 @@
 
 #define DEFAULT_EXCLUDED_PATHS "/proc/* /sys/* /var/run/user/* /run/user/* /snap/* /var/lib/docker/*"
 #define DEFAULT_EXCLUDED_FILESYSTEMS "*gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl autofs"
+#define DEFAULT_EXCLUDED_FILESYSTEMS_INODES "msdosfs msdos vfat overlayfs aufs* *unionfs"
 #define CONFIG_SECTION_DISKSPACE "plugin:proc:diskspace"
 
 #define MAX_STAT_USEC 10000LU
@@ -294,6 +295,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
     static SIMPLE_PATTERN *excluded_mountpoints = NULL;
     static SIMPLE_PATTERN *excluded_filesystems = NULL;
+    static SIMPLE_PATTERN *excluded_filesystems_inodes = NULL;
 
     usec_t slow_timeout = MAX_STAT_USEC * update_every;
 
@@ -308,12 +310,22 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         }
 
         excluded_mountpoints = simple_pattern_create(
-                config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths", DEFAULT_EXCLUDED_PATHS), NULL,
-                mode, true);
+            config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths", DEFAULT_EXCLUDED_PATHS),
+            NULL,
+            mode,
+            true);
 
         excluded_filesystems = simple_pattern_create(
-                config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on filesystems",
-                           DEFAULT_EXCLUDED_FILESYSTEMS), NULL, SIMPLE_PATTERN_EXACT, true);
+            config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on filesystems", DEFAULT_EXCLUDED_FILESYSTEMS),
+            NULL,
+            SIMPLE_PATTERN_EXACT,
+            true);
+
+        excluded_filesystems_inodes = simple_pattern_create(
+            config_get(CONFIG_SECTION_DISKSPACE, "exclude inode metrics on filesystems", DEFAULT_EXCLUDED_FILESYSTEMS_INODES),
+            NULL,
+            SIMPLE_PATTERN_EXACT,
+            true);
 
         dict_mountpoints = dictionary_create_advanced(DICT_OPTION_NONE, &dictionary_stats_category_collectors, 0);
     }
@@ -334,6 +346,9 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
         if(unlikely(simple_pattern_matches(excluded_filesystems, mi->filesystem))) {
             def_space = CONFIG_BOOLEAN_NO;
+            def_inodes = CONFIG_BOOLEAN_NO;
+        }
+        if (unlikely(simple_pattern_matches(excluded_filesystems_inodes, mi->filesystem))) {
             def_inodes = CONFIG_BOOLEAN_NO;
         }
 

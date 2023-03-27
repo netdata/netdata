@@ -34,71 +34,19 @@ AutoReqProv: yes
 %define _libexecdir /usr/libexec
 %define _libdir /usr/lib
 
+# Fedora doesn’t define this, but other distros do
+%{!?_presetdir:%global _presetdir %{_libdir}/systemd/system-preset}
+
 # Redefine centos_ver to standardize on a single macro
 %{?rhel:%global centos_ver %rhel}
 
 #
 # Conditional build:
-%bcond_without  systemd  # systemd
 %bcond_without  netns    # build with netns support (cgroup-network)
 
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
 %else
-%undefine	with_systemd
 %undefine	with_netns
-%endif
-
-%if %{with systemd}
-%if 0%{?suse_version}
-%global netdata_initd_buildrequires \
-BuildRequires: systemd-rpm-macros \
-%{nil}
-%global netdata_initd_requires \
-%{?systemd_requires} \
-%{nil}
-%global netdata_init_post %service_add_post netdata.service \
-/sbin/service netdata restart > /dev/null 2>&1 \
-%{nil}
-%global netdata_init_preun %service_del_preun netdata.service \
-/sbin/service netdata stop > /dev/null 2>&1 \
-%{nil}
-%global netdata_init_postun %service_del_postun netdata.service
-%else
-%global netdata_initd_buildrequires \
-BuildRequires: systemd
-%global netdata_initd_requires \
-Requires(preun):  systemd-units \
-Requires(postun): systemd-units \
-Requires(post):   systemd-units \
-%{nil}
-%global netdata_init_post %systemd_post netdata.service \
-/usr/bin/systemctl enable netdata.service \
-/usr/bin/systemctl daemon-reload \
-/usr/bin/systemctl restart netdata.service \
-%{nil}
-%global netdata_init_preun %systemd_preun netdata.service
-%global netdata_init_postun %systemd_postun_with_restart netdata.service
-%endif
-%else
-%global netdata_initd_buildrequires %{nil}
-%global netdata_initd_requires \
-Requires(post):   chkconfig \
-%{nil}
-%global netdata_init_post \
-/sbin/chkconfig --add netdata \
-/sbin/service netdata restart > /dev/null 2>&1 \
-%{nil}
-%global netdata_init_preun %{nil} \
-if [ $1 = 0 ]; then \
-        /sbin/service netdata stop > /dev/null 2>&1 \
-        /sbin/chkconfig --del netdata \
-fi \
-%{nil}
-%global netdata_init_postun %{nil} \
-if [ $1 != 0 ]; then \
-        /sbin/service netdata condrestart 2>&1 > /dev/null \
-fi \
-%{nil}
 %endif
 
 Summary:	Real-time performance monitoring, done right!
@@ -165,7 +113,11 @@ BuildRequires: libyaml-devel
 %endif
 
 # Core build requirements for service install
-%{netdata_initd_buildrequires}
+%if 0%{?suse_version}
+BuildRequires: systemd-rpm-macros
+%else
+BuildRequires: systemd
+%endif
 
 # Runtime dependencies
 #
@@ -182,8 +134,6 @@ Requires: python3
 # Core requirements for the install to succeed
 Requires(pre): /usr/sbin/groupadd
 Requires(pre): /usr/sbin/useradd
-
-%{netdata_initd_requires}
 
 # #####################################################################
 # Functionality-dependent package dependencies
@@ -341,15 +291,10 @@ install -m 755 -d "${RPM_BUILD_ROOT}%{_localstatedir}/lib/%{name}/registry"
 
 # ###########################################################
 # Install netdata service
-%if %{with systemd}
 install -m 755 -d "${RPM_BUILD_ROOT}%{_unitdir}"
 install -m 644 -p system/systemd/netdata.service "${RPM_BUILD_ROOT}%{_unitdir}/netdata.service"
-%else
-# install SYSV init stuff
-install -d "${RPM_BUILD_ROOT}/etc/rc.d/init.d"
-install -m 755 system/initd/init.d/netdata \
-        "${RPM_BUILD_ROOT}/etc/rc.d/init.d/netdata"
-%endif
+install -m 755 -d "${RPM_BUILD_ROOT}%{_presetdir}"
+install -m 644 -p system/systemd/50-netdata.preset "${RPM_BUILD_ROOT}%{_presetdir}/50-netdata.preset"
 
 # ############################################################
 # Package Go within netdata (TBD: Package it separately)
@@ -467,13 +412,25 @@ for item in docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C; do
 done
 
 %post
-%{netdata_init_post}
+%if 0%{?suse_version}
+%service_add_post netdata.service
+%else
+%systemd_post netdata.service
+%endif
 
 %preun
-%{netdata_init_preun}
+%if 0%{?suse_version}
+%service_del_preun netdata.service
+%else
+%systemd_preun netdata.service
+%endif
 
 %postun
-%{netdata_init_postun}
+%if 0%{?suse_version}
+%service_del_postun netdata.service
+%else
+%systemd_postun_with_restart netdata.service
+%endif
 
 %clean
 rm -rf "${RPM_BUILD_ROOT}"
@@ -492,11 +449,8 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_sbindir}/netdatacli
 %{_sbindir}/netdata-claim.sh
 
-%if %{with systemd}
 %{_unitdir}/netdata.service
-%else
-%{_sysconfdir}/rc.d/init.d/netdata
-%endif
+%{_presetdir}/50-netdata.preset
 
 %defattr(0750,root,netdata,0750)
 
@@ -585,6 +539,9 @@ are sensor monitoring, system event monitoring, power control, and serial-over-L
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 
 %changelog
+* Tue Mar 21 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-18
+- Fix systemd handling to follow BCP.
+- Drop pre-systemd init support.
 * Thu Feb 16 2023 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-17
 - Added eBPF build dependency
 * Fri Feb 03 2022 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-16
