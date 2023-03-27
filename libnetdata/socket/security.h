@@ -58,7 +58,7 @@ extern const char *tls_ciphers;
 extern int netdata_ssl_validate_server;
 int ssl_security_location_for_context(SSL_CTX *ctx,char *file,char *path);
 
-void security_openssl_library();
+void security_start_ssl_library();
 void security_clean_openssl();
 void security_start_ssl(int selector);
 int security_process_accept(SSL *ssl,int msg);

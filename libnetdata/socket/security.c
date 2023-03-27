@@ -32,7 +32,7 @@ static void security_info_callback(const SSL *ssl, int where, int ret __maybe_un
  *
  * Starts the openssl library for the Netdata.
  */
-void security_openssl_library()
+void security_start_ssl_library()
 {
 #if defined(OPENSSL_VERSION_NUMBER)
 #if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
@@ -48,6 +48,9 @@ void security_openssl_library()
         error("SSL library cannot be initialized.");
     }
 #endif // OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+#elif defined(LIBWOLFSSL_VERSION_STRING)
+    if (wolfSSL_Init() != SSL_SUCCESS)
+        error("Cannot initialize WolfSSL library.");
 #endif // defined(ENABLE_HTTPS_WITH_OPENSSL)
 }
 

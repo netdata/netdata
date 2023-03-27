@@ -834,7 +834,7 @@ static void security_init(){
     tls_version    = config_get(CONFIG_SECTION_WEB, "tls version",  "1.3");
     tls_ciphers    = config_get(CONFIG_SECTION_WEB, "tls ciphers",  "none");
 
-    security_openssl_library();
+    security_start_ssl_library();
 }
 #endif
 
