@@ -528,7 +528,7 @@ int https_request(https_req_t *request, https_req_response_t *response) {
     }
     ctx->request = request;
 
-    ctx->ssl_ctx = security_initialize_openssl_client();
+    ctx->ssl_ctx = security_initialize_ssl_client();
     if (ctx->ssl_ctx==NULL) {
         error("Cannot allocate SSL context");
         goto exit_sock;

@@ -121,7 +121,7 @@ void security_openssl_common_options(SSL_CTX *ctx, int side) {
  *
  * @return It returns the context on success or NULL otherwise
  */
-SSL_CTX * security_initialize_openssl_client() {
+SSL_CTX *security_initialize_ssl_client() {
     SSL_CTX *ctx;
 #if defined(OPENSSL_VERSION_NUMBER) && (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
     ctx = SSL_CTX_new(SSLv23_client_method());
@@ -132,6 +132,10 @@ SSL_CTX * security_initialize_openssl_client() {
 #if defined(OPENSSL_VERSION_NUMBER) && (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
         SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
 #else
+#if defined(LIBWOLFSSL_VERSION_STRING)
+        if (netdata_validate_server == NETDATA_SSL_INVALID_CERTIFICATE)
+            wolfSSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, 0);
+#endif
         SSL_CTX_set_min_proto_version(ctx, TLS1_VERSION);
 # if defined(TLS_MAX_VERSION)
         SSL_CTX_set_max_proto_version(ctx, TLS_MAX_VERSION);
@@ -228,7 +232,7 @@ void security_start_ssl(int selector) {
 
         case NETDATA_SSL_CONTEXT_STREAMING: {
             if(!netdata_ssl_client_ctx) {
-                netdata_ssl_client_ctx = security_initialize_openssl_client();
+                netdata_ssl_client_ctx = security_initialize_ssl_client();
                 //This is necessary for the stream, because it is working sometimes with nonblock socket.
                 //It returns the bitmask after to change, there is not any description of errors in the documentation
                 SSL_CTX_set_mode(netdata_ssl_client_ctx,
@@ -240,7 +244,7 @@ void security_start_ssl(int selector) {
 
         case NETDATA_SSL_CONTEXT_EXPORTING: {
             if(!netdata_ssl_exporting_ctx)
-                netdata_ssl_exporting_ctx = security_initialize_openssl_client();
+                netdata_ssl_exporting_ctx = security_initialize_ssl_client();
             break;
         }
     }
