@@ -3,7 +3,7 @@
 #include "sqlite_health.h"
 #include "sqlite_db_migration.h"
 
-#define DB_HEALTH_VERSION 1
+#define DB_HEALTH_VERSION 2
 
 const char *database_health_config[] = {
     "CREATE TABLE IF NOT EXISTS alert_hash(hash_id blob PRIMARY KEY, date_updated int, alarm text, template text, "
@@ -43,6 +43,9 @@ int sql_init_health_database(int memory)
 
     info("SQLite health database %s initialization", sqlite_database);
 
+    if (attach_database(db_health, "netdata-meta.db", "meta"))
+        return 1;
+
     int target_version = DB_HEALTH_VERSION;
     if (likely(!memory))
         target_version = perform_health_database_migration(db_health, DB_HEALTH_VERSION);
@@ -51,9 +54,6 @@ int sql_init_health_database(int memory)
         return 1;
 
     if (init_database_batch(db_health, &database_health_config[0]))
-        return 1;
-
-    if (attach_database(db_health, "netdata-meta.db", "meta"))
         return 1;
 
     info("SQLite health database initialization completed");
