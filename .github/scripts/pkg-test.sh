@@ -28,6 +28,10 @@ install_fedora_like() {
 
   pkg_version="$(echo "${VERSION}" | tr - .)"
 
+  if [ "${PKGMGR}" = "dnf" ]; then
+    opts="--allowerasing"
+  fi
+
   # Install Netdata
   # Strange quoting is required here so that glob matching works.
   "$PKGMGR" install -y /netdata/artifacts/netdata-"${pkg_version}"-*.rpm || exit 1
@@ -64,6 +68,10 @@ install_amazon_linux() {
   PKGMGR="$( (command -v dnf > /dev/null && echo "dnf") || echo "yum")"
 
   pkg_version="$(echo "${VERSION}" | tr - .)"
+
+  if [ "${PKGMGR}" = "dnf" ]; then
+    opts="--allowerasing"
+  fi
 
   # Install Netdata
   # Strange quoting is required here so that glob matching works.
