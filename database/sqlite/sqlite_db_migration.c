@@ -187,12 +187,12 @@ static int do_aclk_migration_v1_v2(sqlite3 *database, const char *name)
     UNUSED(name);
     info("Running ACLK migration %s", name);
 
-    char sql[1024];
+    char sql[ACLK_SYNC_QUERY_SIZE * 2];
 
     int rc;
     sqlite3_stmt *res = NULL;
 
-    snprintfz(sql, 1023, " SELECT \"CREATE TABLE IF NOT EXISTS \"||name||\" AS SELECT * FROM meta.\"||name||\";\", \"DROP TABLE IF EXISTS meta.\"||name||\";\"  " \
+    snprintfz(sql, ACLK_SYNC_QUERY_SIZE * 2 - 1, "SELECT \"INSERT INTO \"||name||\" SELECT * FROM meta.\"||name||\";\", \"DROP TABLE IF EXISTS meta.\"||name||\";\", SUBSTR(name, 12) " \
                          "FROM meta.sqlite_schema WHERE name LIKE \"aclk_alert_%%\" AND type = \"table\";");
     rc = sqlite3_prepare_v2(database, sql, -1, &res, 0);
     if (rc != SQLITE_OK) {
@@ -203,19 +203,34 @@ static int do_aclk_migration_v1_v2(sqlite3 *database, const char *name)
     BUFFER *sql_drop = buffer_create(1024, NULL);
 
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-        rc = sqlite3_exec_monitored(database, (char *) sqlite3_column_text(res, 0), 0, 0, NULL);
-        if (SQLITE_OK == rc)
-             buffer_strcat(sql_drop, (char *)sqlite3_column_text(res, 1));
+        char *uuid_str = (char *)sqlite3_column_text(res, 2);
+
+        // Create table
+        snprintfz(sql, ACLK_SYNC_QUERY_SIZE * 2 - 1, TABLE_ACLK_ALERT, uuid_str);
+        rc = db_execute(db_aclk, sql);
+        if (rc == SQLITE_OK) {
+             snprintfz(sql, ACLK_SYNC_QUERY_SIZE * 2 - 1, INDEX_ACLK_ALERT, uuid_str, uuid_str);
+             rc = db_execute(db_aclk, sql);
+             if (rc == SQLITE_OK) {
+                 // Move data from meta to aclk
+                 rc = sqlite3_exec_monitored(database, (char *)sqlite3_column_text(res, 0), 0, 0, NULL);
+                 if (SQLITE_OK == rc)
+                     buffer_strcat(sql_drop, (char *)sqlite3_column_text(res, 1));
+             }
+        }
     }
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement when migrating aclk_alert tables, rc = %d", rc);
 
-    info("DEBUG: %s", buffer_tostring(sql_drop));
     rc = db_execute(database, buffer_tostring(sql_drop));
     if (rc != SQLITE_OK)
         error_report("Failed drop aclk tables from netdata-meta.db, rc = %d", rc);
     buffer_free(sql_drop);
+
+    rc = db_execute(database, "VACUUM meta");
+    if (rc != SQLITE_OK)
+        error_report("Failed to vacuum netdata-meta.db, rc = %d", rc);
 
     return 0;
 }
@@ -254,6 +269,10 @@ static int do_health_migration_v1_v2(sqlite3 *database, const char *name)
     if (rc != SQLITE_OK)
         error_report("Failed drop health tables from netdata-meta.db, rc = %d", rc);
     buffer_free(sql_drop);
+
+    rc = db_execute(database, "VACUUM meta");
+    if (rc != SQLITE_OK)
+        error_report("Failed to vacuum netdata-meta.db, rc = %d", rc);
 
     return 0;
 }
