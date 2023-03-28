@@ -30,7 +30,7 @@ struct rrdeng_cmd {
     } queue;
 };
 
-static inline struct rrdeng_cmd rrdeng_deq_cmd(enum rrdeng_opcode opcode);
+static inline struct rrdeng_cmd rrdeng_deq_cmd(bool from_worker);
 static inline void worker_dispatch_extent_read(struct rrdeng_cmd cmd, bool from_worker);
 static inline void worker_dispatch_query_prep(struct rrdeng_cmd cmd, bool from_worker);
 
@@ -149,8 +149,22 @@ static void work_request_init(void) {
     );
 }
 
-static inline bool work_request_full(void) {
-    return __atomic_load_n(&rrdeng_main.work_cmd.atomics.dispatched, __ATOMIC_RELAXED) >= (size_t)(libuv_worker_threads - RESERVED_LIBUV_WORKER_THREADS);
+enum LIBUV_WORKERS_STATUS {
+    LIBUV_WORKERS_RELAXED,
+    LIBUV_WORKERS_STRESSED,
+    LIBUV_WORKERS_CRITICAL,
+};
+
+static inline enum LIBUV_WORKERS_STATUS work_request_full(void) {
+    size_t dispatched = __atomic_load_n(&rrdeng_main.work_cmd.atomics.dispatched, __ATOMIC_RELAXED);
+
+    if(dispatched >= (size_t)(libuv_worker_threads))
+        return LIBUV_WORKERS_CRITICAL;
+
+    else if(dispatched >= (size_t)(libuv_worker_threads - RESERVED_LIBUV_WORKER_THREADS))
+        return LIBUV_WORKERS_STRESSED;
+
+    return LIBUV_WORKERS_RELAXED;
 }
 
 static inline void work_done(struct rrdeng_work *work_request) {
@@ -163,7 +177,6 @@ static void work_standard_worker(uv_work_t *req) {
     register_libuv_worker_jobs();
     worker_is_busy(UV_EVENT_WORKER_INIT);
 
-    size_t count = 1;
     struct rrdeng_work *work_request = req->data;
 
     work_request->data = work_request->work_cb(work_request->ctx, work_request->data, work_request->completion, req);
@@ -173,7 +186,7 @@ static void work_standard_worker(uv_work_t *req) {
         internal_fatal(work_request->after_work_cb != NULL, "DBENGINE: opcodes with a callback should not boosted");
 
         while(1) {
-            struct rrdeng_cmd cmd = rrdeng_deq_cmd(work_request->opcode);
+            struct rrdeng_cmd cmd = rrdeng_deq_cmd(true);
             if (cmd.opcode == RRDENG_OPCODE_NOOP)
                 break;
 
@@ -502,20 +515,20 @@ static inline bool rrdeng_cmd_has_waiting_opcodes_in_lower_priorities(STORAGE_PR
     .data = NULL,                               \
 }
 
-static inline struct rrdeng_cmd rrdeng_deq_cmd(enum rrdeng_opcode opcode) {
+static inline struct rrdeng_cmd rrdeng_deq_cmd(bool from_worker) {
     struct rrdeng_cmd *cmd = NULL;
+    enum LIBUV_WORKERS_STATUS status = work_request_full();
 
     STORAGE_PRIORITY min_priority, max_priority;
-    if(opcode == RRDENG_OPCODE_QUERY) {
-        min_priority = max_priority = STORAGE_PRIORITY_INTERNAL_QUERY_PREP;
-    }
-    else if(opcode == RRDENG_OPCODE_EXTENT_READ) {
-        min_priority = STORAGE_PRIORITY_HIGH;
+    min_priority = STORAGE_PRIORITY_INTERNAL_DBENGINE;
+    max_priority = (status != LIBUV_WORKERS_RELAXED) ? STORAGE_PRIORITY_INTERNAL_DBENGINE : STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE - 1;
+
+    if(from_worker) {
+        if(status == LIBUV_WORKERS_CRITICAL)
+            return opcode_empty;
+
+        min_priority = STORAGE_PRIORITY_INTERNAL_QUERY_PREP;
         max_priority = STORAGE_PRIORITY_BEST_EFFORT;
-    }
-    else {
-        min_priority = STORAGE_PRIORITY_INTERNAL_DBENGINE;
-        max_priority = work_request_full() ? STORAGE_PRIORITY_INTERNAL_DBENGINE : STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE - 1;
     }
 
     // find an opcode to execute from the queue
