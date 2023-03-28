@@ -59,7 +59,7 @@ extern int netdata_ssl_validate_server;
 int ssl_security_location_for_context(SSL_CTX *ctx,char *file,char *path);
 
 void security_start_ssl_library();
-void security_clean_openssl();
+void security_clean_ssl();
 void security_start_ssl(int selector);
 int security_process_accept(SSL *ssl,int msg);
 int security_test_certificate(SSL *ssl);

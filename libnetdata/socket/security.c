@@ -257,7 +257,7 @@ void security_start_ssl(int selector) {
  *
  * Clean all the allocated contexts from netdata.
  */
-void security_clean_openssl()
+void security_clean_ssl()
 {
     if (netdata_ssl_srv_ctx) {
         SSL_CTX_free(netdata_ssl_srv_ctx);
@@ -273,6 +273,8 @@ void security_clean_openssl()
 
 #if defined(OPENSSL_VERSION_NUMBER) && (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
     ERR_free_strings();
+#elif defined(LIBWOLFSSL_VERSION_STRING)
+    wolfSSL_Cleanup();
 #endif
 }
 

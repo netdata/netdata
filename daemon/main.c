@@ -479,7 +479,7 @@ void netdata_cleanup_and_exit(int ret) {
 
 #ifdef ENABLE_HTTPS
     delta_shutdown_time("free openssl structures");
-    security_clean_openssl();
+    security_clean_ssl();
 #endif
 
     delta_shutdown_time("remove incomplete shutdown file");
