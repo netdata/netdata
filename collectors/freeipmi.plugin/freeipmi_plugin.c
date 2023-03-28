@@ -57,7 +57,7 @@ unsigned int register_spacing = 0; /* not used if probing */
 char *driver_device = NULL;     /* not used if probing */
 
 /* Out-of-band Communication Configuration */
-int protocol_version = -1; //IPMI_MONITORING_PROTOCOL_VERSION_1_5; /* or -1 for default */
+int impi_mon_protocol_version = -1; //IPMI_MONITORING_PROTOCOL_VERSION_1_5; /* or -1 for default */
 char *username = "foousername";
 char *password = "foopassword";
 unsigned char *ipmi_k_g = NULL;
@@ -134,7 +134,7 @@ _init_ipmi_config (struct ipmi_monitoring_ipmi_config *ipmi_config)
     ipmi_config->register_spacing = register_spacing;
     ipmi_config->driver_device = driver_device;
 
-    ipmi_config->protocol_version = protocol_version;
+    ipmi_config->protocol_version = impi_mon_protocol_version;
     ipmi_config->username = username;
     ipmi_config->password = password;
     ipmi_config->k_g = ipmi_k_g;
@@ -1734,8 +1734,8 @@ int main (int argc, char **argv) {
         }
         else if(strcmp("driver-type", argv[i]) == 0) {
             if (hostname) {
-                protocol_version=parse_outofband_driver_type(argv[++i]);
-                if(debug) fprintf(stderr, "freeipmi.plugin: outband protocol version set to '%d'\n", protocol_version);
+                impi_mon_protocol_version =parse_outofband_driver_type(argv[++i]);
+                if(debug) fprintf(stderr, "freeipmi.plugin: outband protocol version set to '%d'\n", impi_mon_protocol_version);
             }
             else {
                 driver_type=parse_inband_driver_type(argv[++i]);
@@ -1748,7 +1748,7 @@ int main (int argc, char **argv) {
                     fprintf(
                         stderr,
                         "freeipmi.plugin: noauthcodecheck workaround flag is ignored for inband configuration\n");
-            } else if (protocol_version < 0 || protocol_version == IPMI_MONITORING_PROTOCOL_VERSION_1_5) {
+            } else if (impi_mon_protocol_version < 0 || impi_mon_protocol_version == IPMI_MONITORING_PROTOCOL_VERSION_1_5) {
                 workaround_flags |= IPMI_MONITORING_WORKAROUND_FLAGS_PROTOCOL_VERSION_1_5_NO_AUTH_CODE_CHECK;
                 if (debug)
                     fprintf(stderr, "freeipmi.plugin: noauthcodecheck workaround flag enabled\n");
