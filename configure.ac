@@ -1384,6 +1384,18 @@ PKG_CHECK_MODULES(
 )
 
 PKG_CHECK_MODULES(
+    [LIBWOLFSSL],
+    [libwolfssl],
+    [AC_CHECK_LIB(
+        [wolfssl],
+        [wolfSSL_connect],
+        [have_libwolfssl=yes],
+        [have_libwolfssl=no]
+    )],
+    [have_libwolfssl=no]
+)
+
+PKG_CHECK_MODULES(
     [LIBCURL],
     [libcurl],
     [AC_CHECK_LIB(
@@ -1418,7 +1430,7 @@ test "${enable_exporting_kinesis}" = "yes" -a "${have_libaws_cpp_sdk_core}" != "
 test "${enable_exporting_kinesis}" = "yes" -a "${have_libcurl}" != "yes" && \
     AC_MSG_ERROR([libcurl required but not found])
 
-test "${enable_exporting_kinesis}" = "yes" -a "${have_libssl}" != "yes" && \
+test "${enable_exporting_kinesis}" = "yes" -a "${have_libssl}" != "yes" -a "${have_libwolfssl}" != "yes" && \
     AC_MSG_ERROR([libssl required but not found])
 
 test "${enable_exporting_kinesis}" = "yes" -a "${have_libcrypto}" != "yes" && \
@@ -1428,14 +1440,21 @@ AC_MSG_CHECKING([if kinesis exporting connector should be enabled])
 if test "${enable_exporting_kinesis}" != "no" -a "${have_libaws_cpp_sdk_kinesis}" = "yes" \
                                             -a "${have_libaws_cpp_sdk_core}" = "yes" \
                                             -a "${have_libcurl}" = "yes" \
-                                            -a "${have_libssl}" = "yes" \
+                                            -a \("${have_libssl}" = "yes" \
+                                            -o "${have_libwolfssl}" = "yes"\) \
                                             -a "${have_libcrypto}" = "yes"; then
     enable_exporting_kinesis="yes"
     AC_DEFINE([HAVE_KINESIS], [1], [libaws-cpp-sdk-kinesis usability])
-    OPTIONAL_KINESIS_CFLAGS="${LIBCRYPTO_CFLAGS} ${LIBSSL_CFLAGS} ${LIBCURL_CFLAGS}"
     OPTIONAL_KINESIS_CXXFLAGS="${AWS_CPP_SDK_KINESIS_CFLAGS} ${AWS_CPP_SDK_CORE_CFLAGS}"
-    OPTIONAL_KINESIS_LIBS="${AWS_CPP_SDK_KINESIS_LIBS} ${AWS_CPP_SDK_CORE_LIBS} \
-                           ${LIBCRYPTO_LIBS} ${LIBSSL_LIBS} ${LIBCURL_LIBS}"
+    OPTIONAL_KINESIS_CFLAGS="${LIBCURL_CFLAGS}"
+    OPTIONAL_KINESIS_LIBS="${AWS_CPP_SDK_KINESIS_LIBS} ${AWS_CPP_SDK_CORE_LIBS}"
+    if test "${enable_wolfssl}" = "no"; then
+        OPTIONAL_KINESIS_CFLAGS="${LIBCRYPTO_CFLAGS} ${LIBSSL_CFLAGS} ${OPTIONAL_KINESIS_CFLAGS} "
+        OPTIONAL_KINESIS_LIBS="${OPTIONAL_KINESIS_LIBS} ${LIBCRYPTO_LIBS} ${LIBSSL_LIBS} ${LIBCURL_LIBS}"
+    else
+        OPTIONAL_KINESIS_CFLAGS="${LIBWOLFSSL_CFLAGS} ${OPTIONAL_KINESIS_CFLAGS} "
+        OPTIONAL_KINESIS_LIBS="${OPTIONAL_KINESIS_LIBS} ${LIBWOLFSSL_LIBS} ${LIBCURL_LIBS}"
+    fi
 else
     enable_exporting_kinesis="no"
 fi
