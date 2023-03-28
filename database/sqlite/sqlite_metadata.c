@@ -230,7 +230,7 @@ int sql_init_metadata_database(db_check_action_type_t rebuild, int memory)
 
     info("SQLite database %s initialization", sqlite_database);
 
-    if (configure_database_params(db_meta, 0))
+    if (configure_database_params(db_meta))
         return 1;
 
     int target_version = DB_METADATA_VERSION;

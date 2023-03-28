@@ -55,7 +55,7 @@ int prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **state
 int execute_insert(sqlite3_stmt *res);
 int exec_statement_with_uuid(sqlite3 *database, const char *sql, uuid_t(*uuid));
 int db_execute(sqlite3 *database, const char *cmd);
-int configure_database_params(sqlite3 *database, int target_version);
+int configure_database_params(sqlite3 *database);
 int database_set_version(sqlite3 *database, int target_version);
 int attach_database(sqlite3 *database, const char *database_path, const char *alias);
 void add_stmt_to_list(sqlite3_stmt *res);

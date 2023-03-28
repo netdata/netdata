@@ -75,7 +75,7 @@ int sql_init_aclk_database(int memory)
     if (likely(!memory))
         target_version = perform_aclk_database_migration(db_aclk, DB_ACLK_VERSION);
 
-    if (configure_database_params(db_aclk, target_version))
+    if (configure_database_params(db_aclk))
         return 1;
 
     if (init_database_batch(db_aclk, &database_aclk_config[0]))

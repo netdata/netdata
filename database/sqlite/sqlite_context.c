@@ -45,7 +45,7 @@ int sql_init_context_database(int memory)
 
     info("SQLite database %s initialization", sqlite_database);
 
-    if (configure_database_params(db_context_meta, 0))
+    if (configure_database_params(db_context_meta))
         return 1;
 
     int target_version = DB_CONTEXT_METADATA_VERSION;

@@ -167,7 +167,7 @@ int attach_database(sqlite3 *database, const char *database_path, const char *al
     return init_database_batch(database, list);
 }
 
-int configure_database_params(sqlite3 *database, int target_version)
+int configure_database_params(sqlite3 *database)
 {
     char buf[1024 + 1] = "";
     const char *list[2] = { buf, NULL };

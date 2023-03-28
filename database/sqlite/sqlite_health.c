@@ -43,7 +43,7 @@ int sql_init_health_database(int memory)
 
     info("SQLite health database %s initialization", sqlite_database);
 
-    if (configure_database_params(db_health, 0))
+    if (configure_database_params(db_health))
         return 1;
 
     if (attach_database(db_health, "netdata-meta.db", "meta"))
