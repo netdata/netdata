@@ -25,6 +25,7 @@ static struct {
     const char *name;
     uint32_t hash;
     RRDR_TIME_GROUPING value;
+    RRDR_TIME_GROUPING add_flush;
 
     // One time initialization for the module.
     // This is called once, when netdata starts.
@@ -59,408 +60,445 @@ static struct {
         {.name = "average",
                 .hash  = 0,
                 .value = RRDR_GROUPING_AVERAGE,
+                .add_flush = RRDR_GROUPING_AVERAGE,
                 .init  = NULL,
-                .create= grouping_create_average,
-                .reset = grouping_reset_average,
-                .free  = grouping_free_average,
-                .add   = grouping_add_average,
-                .flush = grouping_flush_average,
+                .create= tg_average_create,
+                .reset = tg_average_reset,
+                .free  = tg_average_free,
+                .add   = tg_average_add,
+                .flush = tg_average_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "avg",                             // alias on 'average'
                 .hash  = 0,
                 .value = RRDR_GROUPING_AVERAGE,
+                .add_flush = RRDR_GROUPING_AVERAGE,
                 .init  = NULL,
-                .create= grouping_create_average,
-                .reset = grouping_reset_average,
-                .free  = grouping_free_average,
-                .add   = grouping_add_average,
-                .flush = grouping_flush_average,
+                .create= tg_average_create,
+                .reset = tg_average_reset,
+                .free  = tg_average_free,
+                .add   = tg_average_add,
+                .flush = tg_average_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "mean",                            // alias on 'average'
                 .hash  = 0,
                 .value = RRDR_GROUPING_AVERAGE,
+                .add_flush = RRDR_GROUPING_AVERAGE,
                 .init  = NULL,
-                .create= grouping_create_average,
-                .reset = grouping_reset_average,
-                .free  = grouping_free_average,
-                .add   = grouping_add_average,
-                .flush = grouping_flush_average,
+                .create= tg_average_create,
+                .reset = tg_average_reset,
+                .free  = tg_average_free,
+                .add   = tg_average_add,
+                .flush = tg_average_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "trimmed-mean1",
                 .hash  = 0,
                 .value = RRDR_GROUPING_TRIMMED_MEAN1,
+                .add_flush = RRDR_GROUPING_TRIMMED_MEAN,
                 .init  = NULL,
-                .create= grouping_create_trimmed_mean1,
-                .reset = grouping_reset_trimmed_mean,
-                .free  = grouping_free_trimmed_mean,
-                .add   = grouping_add_trimmed_mean,
-                .flush = grouping_flush_trimmed_mean,
+                .create= tg_trimmed_mean_create_1,
+                .reset = tg_trimmed_mean_reset,
+                .free  = tg_trimmed_mean_free,
+                .add   = tg_trimmed_mean_add,
+                .flush = tg_trimmed_mean_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "trimmed-mean2",
                 .hash  = 0,
                 .value = RRDR_GROUPING_TRIMMED_MEAN2,
+                .add_flush = RRDR_GROUPING_TRIMMED_MEAN,
                 .init  = NULL,
-                .create= grouping_create_trimmed_mean2,
-                .reset = grouping_reset_trimmed_mean,
-                .free  = grouping_free_trimmed_mean,
-                .add   = grouping_add_trimmed_mean,
-                .flush = grouping_flush_trimmed_mean,
+                .create= tg_trimmed_mean_create_2,
+                .reset = tg_trimmed_mean_reset,
+                .free  = tg_trimmed_mean_free,
+                .add   = tg_trimmed_mean_add,
+                .flush = tg_trimmed_mean_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "trimmed-mean3",
                 .hash  = 0,
                 .value = RRDR_GROUPING_TRIMMED_MEAN3,
+                .add_flush = RRDR_GROUPING_TRIMMED_MEAN,
                 .init  = NULL,
-                .create= grouping_create_trimmed_mean3,
-                .reset = grouping_reset_trimmed_mean,
-                .free  = grouping_free_trimmed_mean,
-                .add   = grouping_add_trimmed_mean,
-                .flush = grouping_flush_trimmed_mean,
+                .create= tg_trimmed_mean_create_3,
+                .reset = tg_trimmed_mean_reset,
+                .free  = tg_trimmed_mean_free,
+                .add   = tg_trimmed_mean_add,
+                .flush = tg_trimmed_mean_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "trimmed-mean5",
                 .hash  = 0,
-                .value = RRDR_GROUPING_TRIMMED_MEAN5,
+                .value = RRDR_GROUPING_TRIMMED_MEAN,
+                .add_flush = RRDR_GROUPING_TRIMMED_MEAN,
                 .init  = NULL,
-                .create= grouping_create_trimmed_mean5,
-                .reset = grouping_reset_trimmed_mean,
-                .free  = grouping_free_trimmed_mean,
-                .add   = grouping_add_trimmed_mean,
-                .flush = grouping_flush_trimmed_mean,
+                .create= tg_trimmed_mean_create_5,
+                .reset = tg_trimmed_mean_reset,
+                .free  = tg_trimmed_mean_free,
+                .add   = tg_trimmed_mean_add,
+                .flush = tg_trimmed_mean_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "trimmed-mean10",
                 .hash  = 0,
                 .value = RRDR_GROUPING_TRIMMED_MEAN10,
+                .add_flush = RRDR_GROUPING_TRIMMED_MEAN,
                 .init  = NULL,
-                .create= grouping_create_trimmed_mean10,
-                .reset = grouping_reset_trimmed_mean,
-                .free  = grouping_free_trimmed_mean,
-                .add   = grouping_add_trimmed_mean,
-                .flush = grouping_flush_trimmed_mean,
+                .create= tg_trimmed_mean_create_10,
+                .reset = tg_trimmed_mean_reset,
+                .free  = tg_trimmed_mean_free,
+                .add   = tg_trimmed_mean_add,
+                .flush = tg_trimmed_mean_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "trimmed-mean15",
                 .hash  = 0,
                 .value = RRDR_GROUPING_TRIMMED_MEAN15,
+                .add_flush = RRDR_GROUPING_TRIMMED_MEAN,
                 .init  = NULL,
-                .create= grouping_create_trimmed_mean15,
-                .reset = grouping_reset_trimmed_mean,
-                .free  = grouping_free_trimmed_mean,
-                .add   = grouping_add_trimmed_mean,
-                .flush = grouping_flush_trimmed_mean,
+                .create= tg_trimmed_mean_create_15,
+                .reset = tg_trimmed_mean_reset,
+                .free  = tg_trimmed_mean_free,
+                .add   = tg_trimmed_mean_add,
+                .flush = tg_trimmed_mean_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "trimmed-mean20",
                 .hash  = 0,
                 .value = RRDR_GROUPING_TRIMMED_MEAN20,
+                .add_flush = RRDR_GROUPING_TRIMMED_MEAN,
                 .init  = NULL,
-                .create= grouping_create_trimmed_mean20,
-                .reset = grouping_reset_trimmed_mean,
-                .free  = grouping_free_trimmed_mean,
-                .add   = grouping_add_trimmed_mean,
-                .flush = grouping_flush_trimmed_mean,
+                .create= tg_trimmed_mean_create_20,
+                .reset = tg_trimmed_mean_reset,
+                .free  = tg_trimmed_mean_free,
+                .add   = tg_trimmed_mean_add,
+                .flush = tg_trimmed_mean_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "trimmed-mean25",
                 .hash  = 0,
                 .value = RRDR_GROUPING_TRIMMED_MEAN25,
+                .add_flush = RRDR_GROUPING_TRIMMED_MEAN,
                 .init  = NULL,
-                .create= grouping_create_trimmed_mean25,
-                .reset = grouping_reset_trimmed_mean,
-                .free  = grouping_free_trimmed_mean,
-                .add   = grouping_add_trimmed_mean,
-                .flush = grouping_flush_trimmed_mean,
+                .create= tg_trimmed_mean_create_25,
+                .reset = tg_trimmed_mean_reset,
+                .free  = tg_trimmed_mean_free,
+                .add   = tg_trimmed_mean_add,
+                .flush = tg_trimmed_mean_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "trimmed-mean",
                 .hash  = 0,
-                .value = RRDR_GROUPING_TRIMMED_MEAN5,
+                .value = RRDR_GROUPING_TRIMMED_MEAN,
+                .add_flush = RRDR_GROUPING_TRIMMED_MEAN,
                 .init  = NULL,
-                .create= grouping_create_trimmed_mean5,
-                .reset = grouping_reset_trimmed_mean,
-                .free  = grouping_free_trimmed_mean,
-                .add   = grouping_add_trimmed_mean,
-                .flush = grouping_flush_trimmed_mean,
+                .create= tg_trimmed_mean_create_5,
+                .reset = tg_trimmed_mean_reset,
+                .free  = tg_trimmed_mean_free,
+                .add   = tg_trimmed_mean_add,
+                .flush = tg_trimmed_mean_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name  = "incremental_sum",
                 .hash  = 0,
                 .value = RRDR_GROUPING_INCREMENTAL_SUM,
+                .add_flush = RRDR_GROUPING_INCREMENTAL_SUM,
                 .init  = NULL,
-                .create= grouping_create_incremental_sum,
-                .reset = grouping_reset_incremental_sum,
-                .free  = grouping_free_incremental_sum,
-                .add   = grouping_add_incremental_sum,
-                .flush = grouping_flush_incremental_sum,
+                .create= tg_incremental_sum_create,
+                .reset = tg_incremental_sum_reset,
+                .free  = tg_incremental_sum_free,
+                .add   = tg_incremental_sum_add,
+                .flush = tg_incremental_sum_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "incremental-sum",
                 .hash  = 0,
                 .value = RRDR_GROUPING_INCREMENTAL_SUM,
+                .add_flush = RRDR_GROUPING_INCREMENTAL_SUM,
                 .init  = NULL,
-                .create= grouping_create_incremental_sum,
-                .reset = grouping_reset_incremental_sum,
-                .free  = grouping_free_incremental_sum,
-                .add   = grouping_add_incremental_sum,
-                .flush = grouping_flush_incremental_sum,
+                .create= tg_incremental_sum_create,
+                .reset = tg_incremental_sum_reset,
+                .free  = tg_incremental_sum_free,
+                .add   = tg_incremental_sum_add,
+                .flush = tg_incremental_sum_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "median",
                 .hash  = 0,
                 .value = RRDR_GROUPING_MEDIAN,
+                .add_flush = RRDR_GROUPING_MEDIAN,
                 .init  = NULL,
-                .create= grouping_create_median,
-                .reset = grouping_reset_median,
-                .free  = grouping_free_median,
-                .add   = grouping_add_median,
-                .flush = grouping_flush_median,
+                .create= tg_median_create,
+                .reset = tg_median_reset,
+                .free  = tg_median_free,
+                .add   = tg_median_add,
+                .flush = tg_median_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "trimmed-median1",
                 .hash  = 0,
                 .value = RRDR_GROUPING_TRIMMED_MEDIAN1,
+                .add_flush = RRDR_GROUPING_MEDIAN,
                 .init  = NULL,
-                .create= grouping_create_trimmed_median1,
-                .reset = grouping_reset_median,
-                .free  = grouping_free_median,
-                .add   = grouping_add_median,
-                .flush = grouping_flush_median,
+                .create= tg_median_create_trimmed_1,
+                .reset = tg_median_reset,
+                .free  = tg_median_free,
+                .add   = tg_median_add,
+                .flush = tg_median_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "trimmed-median2",
                 .hash  = 0,
                 .value = RRDR_GROUPING_TRIMMED_MEDIAN2,
+                .add_flush = RRDR_GROUPING_MEDIAN,
                 .init  = NULL,
-                .create= grouping_create_trimmed_median2,
-                .reset = grouping_reset_median,
-                .free  = grouping_free_median,
-                .add   = grouping_add_median,
-                .flush = grouping_flush_median,
+                .create= tg_median_create_trimmed_2,
+                .reset = tg_median_reset,
+                .free  = tg_median_free,
+                .add   = tg_median_add,
+                .flush = tg_median_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "trimmed-median3",
                 .hash  = 0,
                 .value = RRDR_GROUPING_TRIMMED_MEDIAN3,
+                .add_flush = RRDR_GROUPING_MEDIAN,
                 .init  = NULL,
-                .create= grouping_create_trimmed_median3,
-                .reset = grouping_reset_median,
-                .free  = grouping_free_median,
-                .add   = grouping_add_median,
-                .flush = grouping_flush_median,
+                .create= tg_median_create_trimmed_3,
+                .reset = tg_median_reset,
+                .free  = tg_median_free,
+                .add   = tg_median_add,
+                .flush = tg_median_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "trimmed-median5",
                 .hash  = 0,
                 .value = RRDR_GROUPING_TRIMMED_MEDIAN5,
+                .add_flush = RRDR_GROUPING_MEDIAN,
                 .init  = NULL,
-                .create= grouping_create_trimmed_median5,
-                .reset = grouping_reset_median,
-                .free  = grouping_free_median,
-                .add   = grouping_add_median,
-                .flush = grouping_flush_median,
+                .create= tg_median_create_trimmed_5,
+                .reset = tg_median_reset,
+                .free  = tg_median_free,
+                .add   = tg_median_add,
+                .flush = tg_median_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "trimmed-median10",
                 .hash  = 0,
                 .value = RRDR_GROUPING_TRIMMED_MEDIAN10,
+                .add_flush = RRDR_GROUPING_MEDIAN,
                 .init  = NULL,
-                .create= grouping_create_trimmed_median10,
-                .reset = grouping_reset_median,
-                .free  = grouping_free_median,
-                .add   = grouping_add_median,
-                .flush = grouping_flush_median,
+                .create= tg_median_create_trimmed_10,
+                .reset = tg_median_reset,
+                .free  = tg_median_free,
+                .add   = tg_median_add,
+                .flush = tg_median_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "trimmed-median15",
                 .hash  = 0,
                 .value = RRDR_GROUPING_TRIMMED_MEDIAN15,
+                .add_flush = RRDR_GROUPING_MEDIAN,
                 .init  = NULL,
-                .create= grouping_create_trimmed_median15,
-                .reset = grouping_reset_median,
-                .free  = grouping_free_median,
-                .add   = grouping_add_median,
-                .flush = grouping_flush_median,
+                .create= tg_median_create_trimmed_15,
+                .reset = tg_median_reset,
+                .free  = tg_median_free,
+                .add   = tg_median_add,
+                .flush = tg_median_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "trimmed-median20",
                 .hash  = 0,
                 .value = RRDR_GROUPING_TRIMMED_MEDIAN20,
+                .add_flush = RRDR_GROUPING_MEDIAN,
                 .init  = NULL,
-                .create= grouping_create_trimmed_median20,
-                .reset = grouping_reset_median,
-                .free  = grouping_free_median,
-                .add   = grouping_add_median,
-                .flush = grouping_flush_median,
+                .create= tg_median_create_trimmed_20,
+                .reset = tg_median_reset,
+                .free  = tg_median_free,
+                .add   = tg_median_add,
+                .flush = tg_median_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "trimmed-median25",
                 .hash  = 0,
                 .value = RRDR_GROUPING_TRIMMED_MEDIAN25,
+                .add_flush = RRDR_GROUPING_MEDIAN,
                 .init  = NULL,
-                .create= grouping_create_trimmed_median25,
-                .reset = grouping_reset_median,
-                .free  = grouping_free_median,
-                .add   = grouping_add_median,
-                .flush = grouping_flush_median,
+                .create= tg_median_create_trimmed_25,
+                .reset = tg_median_reset,
+                .free  = tg_median_free,
+                .add   = tg_median_add,
+                .flush = tg_median_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "trimmed-median",
                 .hash  = 0,
                 .value = RRDR_GROUPING_TRIMMED_MEDIAN5,
+                .add_flush = RRDR_GROUPING_MEDIAN,
                 .init  = NULL,
-                .create= grouping_create_trimmed_median5,
-                .reset = grouping_reset_median,
-                .free  = grouping_free_median,
-                .add   = grouping_add_median,
-                .flush = grouping_flush_median,
+                .create= tg_median_create_trimmed_5,
+                .reset = tg_median_reset,
+                .free  = tg_median_free,
+                .add   = tg_median_add,
+                .flush = tg_median_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "percentile25",
                 .hash  = 0,
                 .value = RRDR_GROUPING_PERCENTILE25,
+                .add_flush = RRDR_GROUPING_PERCENTILE,
                 .init  = NULL,
-                .create= grouping_create_percentile25,
-                .reset = grouping_reset_percentile,
-                .free  = grouping_free_percentile,
-                .add   = grouping_add_percentile,
-                .flush = grouping_flush_percentile,
+                .create= tg_percentile_create_25,
+                .reset = tg_percentile_reset,
+                .free  = tg_percentile_free,
+                .add   = tg_percentile_add,
+                .flush = tg_percentile_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "percentile50",
                 .hash  = 0,
                 .value = RRDR_GROUPING_PERCENTILE50,
+                .add_flush = RRDR_GROUPING_PERCENTILE,
                 .init  = NULL,
-                .create= grouping_create_percentile50,
-                .reset = grouping_reset_percentile,
-                .free  = grouping_free_percentile,
-                .add   = grouping_add_percentile,
-                .flush = grouping_flush_percentile,
+                .create= tg_percentile_create_50,
+                .reset = tg_percentile_reset,
+                .free  = tg_percentile_free,
+                .add   = tg_percentile_add,
+                .flush = tg_percentile_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "percentile75",
                 .hash  = 0,
                 .value = RRDR_GROUPING_PERCENTILE75,
+                .add_flush = RRDR_GROUPING_PERCENTILE,
                 .init  = NULL,
-                .create= grouping_create_percentile75,
-                .reset = grouping_reset_percentile,
-                .free  = grouping_free_percentile,
-                .add   = grouping_add_percentile,
-                .flush = grouping_flush_percentile,
+                .create= tg_percentile_create_75,
+                .reset = tg_percentile_reset,
+                .free  = tg_percentile_free,
+                .add   = tg_percentile_add,
+                .flush = tg_percentile_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "percentile80",
                 .hash  = 0,
                 .value = RRDR_GROUPING_PERCENTILE80,
+                .add_flush = RRDR_GROUPING_PERCENTILE,
                 .init  = NULL,
-                .create= grouping_create_percentile80,
-                .reset = grouping_reset_percentile,
-                .free  = grouping_free_percentile,
-                .add   = grouping_add_percentile,
-                .flush = grouping_flush_percentile,
+                .create= tg_percentile_create_80,
+                .reset = tg_percentile_reset,
+                .free  = tg_percentile_free,
+                .add   = tg_percentile_add,
+                .flush = tg_percentile_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "percentile90",
                 .hash  = 0,
                 .value = RRDR_GROUPING_PERCENTILE90,
+                .add_flush = RRDR_GROUPING_PERCENTILE,
                 .init  = NULL,
-                .create= grouping_create_percentile90,
-                .reset = grouping_reset_percentile,
-                .free  = grouping_free_percentile,
-                .add   = grouping_add_percentile,
-                .flush = grouping_flush_percentile,
+                .create= tg_percentile_create_90,
+                .reset = tg_percentile_reset,
+                .free  = tg_percentile_free,
+                .add   = tg_percentile_add,
+                .flush = tg_percentile_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "percentile95",
                 .hash  = 0,
-                .value = RRDR_GROUPING_PERCENTILE95,
+                .value = RRDR_GROUPING_PERCENTILE,
+                .add_flush = RRDR_GROUPING_PERCENTILE,
                 .init  = NULL,
-                .create= grouping_create_percentile95,
-                .reset = grouping_reset_percentile,
-                .free  = grouping_free_percentile,
-                .add   = grouping_add_percentile,
-                .flush = grouping_flush_percentile,
+                .create= tg_percentile_create_95,
+                .reset = tg_percentile_reset,
+                .free  = tg_percentile_free,
+                .add   = tg_percentile_add,
+                .flush = tg_percentile_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "percentile97",
                 .hash  = 0,
                 .value = RRDR_GROUPING_PERCENTILE97,
+                .add_flush = RRDR_GROUPING_PERCENTILE,
                 .init  = NULL,
-                .create= grouping_create_percentile97,
-                .reset = grouping_reset_percentile,
-                .free  = grouping_free_percentile,
-                .add   = grouping_add_percentile,
-                .flush = grouping_flush_percentile,
+                .create= tg_percentile_create_97,
+                .reset = tg_percentile_reset,
+                .free  = tg_percentile_free,
+                .add   = tg_percentile_add,
+                .flush = tg_percentile_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "percentile98",
                 .hash  = 0,
                 .value = RRDR_GROUPING_PERCENTILE98,
+                .add_flush = RRDR_GROUPING_PERCENTILE,
                 .init  = NULL,
-                .create= grouping_create_percentile98,
-                .reset = grouping_reset_percentile,
-                .free  = grouping_free_percentile,
-                .add   = grouping_add_percentile,
-                .flush = grouping_flush_percentile,
+                .create= tg_percentile_create_98,
+                .reset = tg_percentile_reset,
+                .free  = tg_percentile_free,
+                .add   = tg_percentile_add,
+                .flush = tg_percentile_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "percentile99",
                 .hash  = 0,
                 .value = RRDR_GROUPING_PERCENTILE99,
+                .add_flush = RRDR_GROUPING_PERCENTILE,
                 .init  = NULL,
-                .create= grouping_create_percentile99,
-                .reset = grouping_reset_percentile,
-                .free  = grouping_free_percentile,
-                .add   = grouping_add_percentile,
-                .flush = grouping_flush_percentile,
+                .create= tg_percentile_create_99,
+                .reset = tg_percentile_reset,
+                .free  = tg_percentile_free,
+                .add   = tg_percentile_add,
+                .flush = tg_percentile_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "percentile",
                 .hash  = 0,
-                .value = RRDR_GROUPING_PERCENTILE95,
+                .value = RRDR_GROUPING_PERCENTILE,
+                .add_flush = RRDR_GROUPING_PERCENTILE,
                 .init  = NULL,
-                .create= grouping_create_percentile95,
-                .reset = grouping_reset_percentile,
-                .free  = grouping_free_percentile,
-                .add   = grouping_add_percentile,
-                .flush = grouping_flush_percentile,
+                .create= tg_percentile_create_95,
+                .reset = tg_percentile_reset,
+                .free  = tg_percentile_free,
+                .add   = tg_percentile_add,
+                .flush = tg_percentile_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "min",
                 .hash  = 0,
                 .value = RRDR_GROUPING_MIN,
+                .add_flush = RRDR_GROUPING_MIN,
                 .init  = NULL,
-                .create= grouping_create_min,
-                .reset = grouping_reset_min,
-                .free  = grouping_free_min,
-                .add   = grouping_add_min,
-                .flush = grouping_flush_min,
+                .create= tg_min_create,
+                .reset = tg_min_reset,
+                .free  = tg_min_free,
+                .add   = tg_min_add,
+                .flush = tg_min_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_MIN
         },
         {.name = "max",
                 .hash  = 0,
                 .value = RRDR_GROUPING_MAX,
+                .add_flush = RRDR_GROUPING_MAX,
                 .init  = NULL,
-                .create= grouping_create_max,
-                .reset = grouping_reset_max,
-                .free  = grouping_free_max,
-                .add   = grouping_add_max,
-                .flush = grouping_flush_max,
+                .create= tg_max_create,
+                .reset = tg_max_reset,
+                .free  = tg_max_free,
+                .add   = tg_max_add,
+                .flush = tg_max_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_MAX
         },
         {.name = "sum",
                 .hash  = 0,
                 .value = RRDR_GROUPING_SUM,
+                .add_flush = RRDR_GROUPING_SUM,
                 .init  = NULL,
-                .create= grouping_create_sum,
-                .reset = grouping_reset_sum,
-                .free  = grouping_free_sum,
-                .add   = grouping_add_sum,
-                .flush = grouping_flush_sum,
+                .create= tg_sum_create,
+                .reset = tg_sum_reset,
+                .free  = tg_sum_free,
+                .add   = tg_sum_add,
+                .flush = tg_sum_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_SUM
         },
 
@@ -468,97 +506,75 @@ static struct {
         {.name = "stddev",
                 .hash  = 0,
                 .value = RRDR_GROUPING_STDDEV,
+                .add_flush = RRDR_GROUPING_STDDEV,
                 .init  = NULL,
-                .create= grouping_create_stddev,
-                .reset = grouping_reset_stddev,
-                .free  = grouping_free_stddev,
-                .add   = grouping_add_stddev,
-                .flush = grouping_flush_stddev,
+                .create= tg_stddev_create,
+                .reset = tg_stddev_reset,
+                .free  = tg_stddev_free,
+                .add   = tg_stddev_add,
+                .flush = tg_stddev_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "cv",                           // coefficient variation is calculated by stddev
                 .hash  = 0,
                 .value = RRDR_GROUPING_CV,
+                .add_flush = RRDR_GROUPING_CV,
                 .init  = NULL,
-                .create= grouping_create_stddev, // not an error, stddev calculates this too
-                .reset = grouping_reset_stddev,  // not an error, stddev calculates this too
-                .free  = grouping_free_stddev,   // not an error, stddev calculates this too
-                .add   = grouping_add_stddev,    // not an error, stddev calculates this too
-                .flush = grouping_flush_coefficient_of_variation,
+                .create= tg_stddev_create, // not an error, stddev calculates this too
+                .reset = tg_stddev_reset,  // not an error, stddev calculates this too
+                .free  = tg_stddev_free,   // not an error, stddev calculates this too
+                .add   = tg_stddev_add,    // not an error, stddev calculates this too
+                .flush = tg_stddev_coefficient_of_variation_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "rsd",                          // alias of 'cv'
                 .hash  = 0,
                 .value = RRDR_GROUPING_CV,
+                .add_flush = RRDR_GROUPING_CV,
                 .init  = NULL,
-                .create= grouping_create_stddev, // not an error, stddev calculates this too
-                .reset = grouping_reset_stddev,  // not an error, stddev calculates this too
-                .free  = grouping_free_stddev,   // not an error, stddev calculates this too
-                .add   = grouping_add_stddev,    // not an error, stddev calculates this too
-                .flush = grouping_flush_coefficient_of_variation,
+                .create= tg_stddev_create, // not an error, stddev calculates this too
+                .reset = tg_stddev_reset,  // not an error, stddev calculates this too
+                .free  = tg_stddev_free,   // not an error, stddev calculates this too
+                .add   = tg_stddev_add,    // not an error, stddev calculates this too
+                .flush = tg_stddev_coefficient_of_variation_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
-
-        /*
-        {.name = "mean",                        // same as average, no need to define it again
-                .hash  = 0,
-                .value = RRDR_GROUPING_MEAN,
-                .setup = NULL,
-                .create= grouping_create_stddev,
-                .reset = grouping_reset_stddev,
-                .free  = grouping_free_stddev,
-                .add   = grouping_add_stddev,
-                .flush = grouping_flush_mean,
-                .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
-        },
-        */
-
-        /*
-        {.name = "variance",                    // meaningless to offer
-                .hash  = 0,
-                .value = RRDR_GROUPING_VARIANCE,
-                .setup = NULL,
-                .create= grouping_create_stddev,
-                .reset = grouping_reset_stddev,
-                .free  = grouping_free_stddev,
-                .add   = grouping_add_stddev,
-                .flush = grouping_flush_variance,
-                .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
-        },
-        */
 
         // single exponential smoothing
         {.name = "ses",
                 .hash  = 0,
                 .value = RRDR_GROUPING_SES,
-                .init  = grouping_init_ses,
-                .create= grouping_create_ses,
-                .reset = grouping_reset_ses,
-                .free  = grouping_free_ses,
-                .add   = grouping_add_ses,
-                .flush = grouping_flush_ses,
+                .add_flush = RRDR_GROUPING_SES,
+                .init  = tg_ses_init,
+                .create= tg_ses_create,
+                .reset = tg_ses_reset,
+                .free  = tg_ses_free,
+                .add   = tg_ses_add,
+                .flush = tg_ses_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "ema",                         // alias for 'ses'
                 .hash  = 0,
                 .value = RRDR_GROUPING_SES,
+                .add_flush = RRDR_GROUPING_SES,
                 .init  = NULL,
-                .create= grouping_create_ses,
-                .reset = grouping_reset_ses,
-                .free  = grouping_free_ses,
-                .add   = grouping_add_ses,
-                .flush = grouping_flush_ses,
+                .create= tg_ses_create,
+                .reset = tg_ses_reset,
+                .free  = tg_ses_free,
+                .add   = tg_ses_add,
+                .flush = tg_ses_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "ewma",                        // alias for ses
                 .hash  = 0,
                 .value = RRDR_GROUPING_SES,
+                .add_flush = RRDR_GROUPING_SES,
                 .init  = NULL,
-                .create= grouping_create_ses,
-                .reset = grouping_reset_ses,
-                .free  = grouping_free_ses,
-                .add   = grouping_add_ses,
-                .flush = grouping_flush_ses,
+                .create= tg_ses_create,
+                .reset = tg_ses_reset,
+                .free  = tg_ses_free,
+                .add   = tg_ses_add,
+                .flush = tg_ses_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
 
@@ -566,24 +582,26 @@ static struct {
         {.name = "des",
                 .hash  = 0,
                 .value = RRDR_GROUPING_DES,
-                .init  = grouping_init_des,
-                .create= grouping_create_des,
-                .reset = grouping_reset_des,
-                .free  = grouping_free_des,
-                .add   = grouping_add_des,
-                .flush = grouping_flush_des,
+                .add_flush = RRDR_GROUPING_DES,
+                .init  = tg_des_init,
+                .create= tg_des_create,
+                .reset = tg_des_reset,
+                .free  = tg_des_free,
+                .add   = tg_des_add,
+                .flush = tg_des_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
 
         {.name = "countif",
                 .hash  = 0,
                 .value = RRDR_GROUPING_COUNTIF,
+                .add_flush = RRDR_GROUPING_COUNTIF,
                 .init = NULL,
-                .create= grouping_create_countif,
-                .reset = grouping_reset_countif,
-                .free  = grouping_free_countif,
-                .add   = grouping_add_countif,
-                .flush = grouping_flush_countif,
+                .create= tg_countif_create,
+                .reset = tg_countif_reset,
+                .free  = tg_countif_free,
+                .add   = tg_countif_add,
+                .flush = tg_countif_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
 
@@ -591,12 +609,13 @@ static struct {
         {.name = NULL,
                 .hash  = 0,
                 .value = RRDR_GROUPING_UNDEFINED,
+                .add_flush = RRDR_GROUPING_AVERAGE,
                 .init = NULL,
-                .create= grouping_create_average,
-                .reset = grouping_reset_average,
-                .free  = grouping_free_average,
-                .add   = grouping_add_average,
-                .flush = grouping_flush_average,
+                .create= tg_average_create,
+                .reset = tg_average_reset,
+                .free  = tg_average_free,
+                .add   = tg_average_add,
+                .flush = tg_average_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         }
 };
@@ -655,18 +674,123 @@ static void rrdr_set_grouping_function(RRDR *r, RRDR_TIME_GROUPING group_method)
             r->time_grouping.add     = api_v1_data_groups[i].add;
             r->time_grouping.flush   = api_v1_data_groups[i].flush;
             r->time_grouping.tier_query_fetch = api_v1_data_groups[i].tier_query_fetch;
+            r->time_grouping.add_flush = api_v1_data_groups[i].add_flush;
             found = 1;
         }
     }
     if(!found) {
         errno = 0;
         internal_error(true, "QUERY: grouping method %u not found. Using 'average'", (unsigned int)group_method);
-        r->time_grouping.create  = grouping_create_average;
-        r->time_grouping.reset   = grouping_reset_average;
-        r->time_grouping.free    = grouping_free_average;
-        r->time_grouping.add     = grouping_add_average;
-        r->time_grouping.flush   = grouping_flush_average;
+        r->time_grouping.create  = tg_average_create;
+        r->time_grouping.reset   = tg_average_reset;
+        r->time_grouping.free    = tg_average_free;
+        r->time_grouping.add     = tg_average_add;
+        r->time_grouping.flush   = tg_average_flush;
         r->time_grouping.tier_query_fetch = TIER_QUERY_FETCH_AVERAGE;
+        r->time_grouping.add_flush = RRDR_GROUPING_AVERAGE;
+    }
+}
+
+static inline void time_grouping_add(RRDR *r, NETDATA_DOUBLE value) {
+    switch(r->time_grouping.add_flush) {
+        case RRDR_GROUPING_AVERAGE:
+            tg_average_add(r, value);
+            break;
+
+        case RRDR_GROUPING_MAX:
+            tg_max_add(r, value);
+            break;
+
+        case RRDR_GROUPING_MIN:
+            tg_min_add(r, value);
+            break;
+
+        case RRDR_GROUPING_MEDIAN:
+            tg_median_add(r, value);
+            break;
+
+        case RRDR_GROUPING_STDDEV:
+        case RRDR_GROUPING_CV:
+            tg_stddev_add(r, value);
+            break;
+
+        case RRDR_GROUPING_SUM:
+            tg_sum_add(r, value);
+            break;
+
+        case RRDR_GROUPING_COUNTIF:
+            tg_countif_add(r, value);
+            break;
+
+        case RRDR_GROUPING_TRIMMED_MEAN:
+            tg_trimmed_mean_add(r, value);
+            break;
+
+        case RRDR_GROUPING_PERCENTILE:
+            tg_percentile_add(r, value);
+            break;
+
+        case RRDR_GROUPING_SES:
+            tg_ses_add(r, value);
+            break;
+
+        case RRDR_GROUPING_DES:
+            tg_des_add(r, value);
+            break;
+
+        case RRDR_GROUPING_INCREMENTAL_SUM:
+            tg_incremental_sum_add(r, value);
+            break;
+
+        default:
+            r->time_grouping.add(r, value);
+            break;
+    }
+}
+
+static inline NETDATA_DOUBLE time_grouping_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
+    switch(r->time_grouping.add_flush) {
+        case RRDR_GROUPING_AVERAGE:
+            return tg_average_flush(r, rrdr_value_options_ptr);
+
+        case RRDR_GROUPING_MAX:
+            return tg_max_flush(r, rrdr_value_options_ptr);
+
+        case RRDR_GROUPING_MIN:
+            return tg_min_flush(r, rrdr_value_options_ptr);
+
+        case RRDR_GROUPING_MEDIAN:
+            return tg_median_flush(r, rrdr_value_options_ptr);
+
+        case RRDR_GROUPING_STDDEV:
+            return tg_stddev_flush(r, rrdr_value_options_ptr);
+
+        case RRDR_GROUPING_CV:
+            return tg_stddev_coefficient_of_variation_flush(r, rrdr_value_options_ptr);
+
+        case RRDR_GROUPING_SUM:
+            return tg_sum_flush(r, rrdr_value_options_ptr);
+
+        case RRDR_GROUPING_COUNTIF:
+            return tg_countif_flush(r, rrdr_value_options_ptr);
+
+        case RRDR_GROUPING_TRIMMED_MEAN:
+            return tg_trimmed_mean_flush(r, rrdr_value_options_ptr);
+
+        case RRDR_GROUPING_PERCENTILE:
+            return tg_percentile_flush(r, rrdr_value_options_ptr);
+
+        case RRDR_GROUPING_SES:
+            return tg_ses_flush(r, rrdr_value_options_ptr);
+
+        case RRDR_GROUPING_DES:
+            return tg_des_flush(r, rrdr_value_options_ptr);
+
+        case RRDR_GROUPING_INCREMENTAL_SUM:
+            return tg_incremental_sum_flush(r, rrdr_value_options_ptr);
+
+        default:
+            return r->time_grouping.flush(r, rrdr_value_options_ptr);
     }
 }
 
@@ -1029,8 +1153,6 @@ typedef struct query_engine_ops {
     void (*finalize)(struct storage_engine_query_handle *handle);
 
     // aggregating points over time
-    void (*grouping_add)(struct rrdresult *r, NETDATA_DOUBLE value);
-    NETDATA_DOUBLE (*grouping_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
     size_t group_points_non_zero;
     size_t group_points_added;
     STORAGE_POINT group_point;          // aggregates min, max, sum, count, anomaly count for each group point
@@ -1373,7 +1495,7 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
         if(unlikely((point).sp.flags & SN_FLAG_RESET))                  \
             (ops)->group_value_flags |= RRDR_VALUE_RESET;               \
                                                                         \
-        (ops)->grouping_add(r, (point).value);                          \
+        time_grouping_add(r, (point).value);                            \
                                                                         \
         storage_point_merge_to((ops)->group_point, (point).sp);         \
         if(!(point).added)                                              \
@@ -1422,8 +1544,6 @@ static QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, size_t query_metric_id
     *ops = (QUERY_ENGINE_OPS) {
             .r = r,
             .qm = query_metric(qt, query_metric_id),
-            .grouping_add = r->time_grouping.add,
-            .grouping_flush = r->time_grouping.flush,
             .tier_query_fetch = r->time_grouping.tier_query_fetch,
             .view_update_every = r->view.update_every,
             .query_granularity = (time_t)(r->view.update_every / r->view.group),
@@ -1761,7 +1881,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
             *rrdr_value_options_ptr = ops->group_value_flags;
 
             // store the group value
-            NETDATA_DOUBLE group_value = ops->grouping_flush(r, rrdr_value_options_ptr);
+            NETDATA_DOUBLE group_value = time_grouping_flush(r, rrdr_value_options_ptr);
             r->v[rrdr_o_v_index] = group_value;
 
             r->ar[rrdr_o_v_index] = storage_point_anomaly_rate(ops->group_point);

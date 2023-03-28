@@ -137,6 +137,7 @@ typedef struct rrdresult {
         void *data;                         // the internal data of the grouping function
 
         // grouping function pointers
+        RRDR_TIME_GROUPING add_flush;
         void (*create)(struct rrdresult *r, const char *options);
         void (*reset)(struct rrdresult *r);
         void (*free)(struct rrdresult *r);
