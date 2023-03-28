@@ -758,6 +758,7 @@ ACLK_PROTO_DEFINITIONS = \
     aclk/aclk-schemas/proto/aclk/v1/lib.proto \
     aclk/aclk-schemas/proto/agent/v1/disconnect.proto \
     aclk/aclk-schemas/proto/agent/v1/connection.proto \
+    aclk/aclk-schemas/proto/agent/v1/cmds.proto \
     aclk/aclk-schemas/proto/alarm/v1/config.proto \
     aclk/aclk-schemas/proto/alarm/v1/stream.proto \
     aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.proto \
@@ -771,6 +772,8 @@ dist_noinst_DATA += $(ACLK_PROTO_DEFINITIONS)
 
 ACLK_PROTO_BUILT_FILES = aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
     aclk/aclk-schemas/proto/agent/v1/connection.pb.h \
+    aclk/aclk-schemas/proto/agent/v1/cmds.pb.cc \
+    aclk/aclk-schemas/proto/agent/v1/cmds.pb.h \
     aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.cc \
     aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.h \
     aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.cc \
@@ -813,6 +816,10 @@ aclk/aclk-schemas/proto/aclk/v1/lib.pb.h: aclk/aclk-schemas/proto/aclk/v1/lib.pr
 
 aclk/aclk-schemas/proto/agent/v1/disconnect.pb.cc \
 aclk/aclk-schemas/proto/agent/v1/disconnect.pb.h: aclk/aclk-schemas/proto/agent/v1/disconnect.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
+aclk/aclk-schemas/proto/agent/v1/cmds.pb.cc \
+aclk/aclk-schemas/proto/agent/v1/cmds.pb.h: aclk/aclk-schemas/proto/agent/v1/cmds.proto
 	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
 
 aclk/aclk-schemas/proto/alarm/v1/config.pb.cc \
