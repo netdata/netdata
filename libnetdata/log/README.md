@@ -12,13 +12,3 @@ learn_rel_path: "Developers/libnetdata"
 The netdata log library supports debug, info, error and fatal error logging. 
 By default we have an access log, an error log and a collectors log. 
 
-## Configuration
-
-Netata allows users to configure the severity level they want store inside `error.log` and `collector.log`:
-
-```
-[logs]
-    severity level = info
-```
-
-The `severity level`  accepts as values `info` and `error`.
