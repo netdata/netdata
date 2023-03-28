@@ -16,6 +16,24 @@ unsigned rrdeng_pages_per_extent = MAX_PAGES_PER_EXTENT;
 #error Please increase WORKER_UTILIZATION_MAX_JOB_TYPES to at least (RRDENG_MAX_OPCODE + 2)
 #endif
 
+struct rrdeng_cmd {
+    struct rrdengine_instance *ctx;
+    enum rrdeng_opcode opcode;
+    void *data;
+    struct completion *completion;
+    enum storage_priority priority;
+    dequeue_callback_t dequeue_cb;
+
+    struct {
+        struct rrdeng_cmd *prev;
+        struct rrdeng_cmd *next;
+    } queue;
+};
+
+static inline struct rrdeng_cmd rrdeng_deq_cmd(enum rrdeng_opcode opcode);
+static inline void worker_dispatch_extent_read(struct rrdeng_cmd *cmd, bool synchronous);
+static inline void worker_dispatch_query_prep(struct rrdeng_cmd *cmd, bool synchronous);
+
 struct rrdeng_main {
     uv_thread_t thread;
     uv_loop_t loop;
@@ -45,7 +63,6 @@ struct rrdeng_main {
         struct {
             size_t dispatched;
             size_t executing;
-            size_t pending_cb;
         } atomics;
     } work_cmd;
 
@@ -146,13 +163,38 @@ static void work_standard_worker(uv_work_t *req) {
     register_libuv_worker_jobs();
     worker_is_busy(UV_EVENT_WORKER_INIT);
 
+    size_t count = 1;
     struct rrdeng_work *work_request = req->data;
+
     work_request->data = work_request->work_cb(work_request->ctx, work_request->data, work_request->completion, req);
     worker_is_idle();
 
-    __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.dispatched, 1, __ATOMIC_RELAXED);
-    __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.executing, 1, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&rrdeng_main.work_cmd.atomics.pending_cb, 1, __ATOMIC_RELAXED);
+    if(work_request->opcode == RRDENG_OPCODE_EXTENT_READ || work_request->opcode == RRDENG_OPCODE_QUERY) {
+        for(; count < 10 ;count++) {
+            struct rrdeng_cmd cmd = rrdeng_deq_cmd(work_request->opcode);
+            if (cmd.opcode == RRDENG_OPCODE_NOOP)
+                break;
+
+            worker_is_busy(UV_EVENT_WORKER_INIT);
+            switch (cmd.opcode) {
+                case RRDENG_OPCODE_EXTENT_READ:
+                    worker_dispatch_extent_read(&cmd, true);
+                    break;
+
+                case RRDENG_OPCODE_QUERY:
+                    worker_dispatch_query_prep(&cmd, true);
+                    break;
+
+                default:
+                    fatal("DBENGINE: Opcode should not be executed synchronously");
+                    break;
+            }
+            worker_is_idle();
+        }
+    }
+
+    __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.dispatched, count, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.executing, count, __ATOMIC_RELAXED);
 
     // signal the event loop a worker is available
     fatal_assert(0 == uv_async_send(&rrdeng_main.async));
@@ -167,7 +209,6 @@ static void after_work_standard_callback(uv_work_t* req, int status) {
         work_request->after_work_cb(work_request->ctx, work_request->data, work_request->completion, req, status);
 
     work_done(work_request);
-    __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.pending_cb, 1, __ATOMIC_RELAXED);
 
     worker_is_idle();
 }
@@ -369,20 +410,6 @@ void wal_release(WAL *wal) {
 // ----------------------------------------------------------------------------
 // command queue cache
 
-struct rrdeng_cmd {
-    struct rrdengine_instance *ctx;
-    enum rrdeng_opcode opcode;
-    void *data;
-    struct completion *completion;
-    enum storage_priority priority;
-    dequeue_callback_t dequeue_cb;
-
-    struct {
-        struct rrdeng_cmd *prev;
-        struct rrdeng_cmd *next;
-    } queue;
-};
-
 static void rrdeng_cmd_queue_init(void) {
     rrdeng_main.cmd_queue.ar = aral_create("dbengine-opcodes",
                                            sizeof(struct rrdeng_cmd),
@@ -465,14 +492,33 @@ static inline bool rrdeng_cmd_has_waiting_opcodes_in_lower_priorities(STORAGE_PR
     return false;
 }
 
-static inline struct rrdeng_cmd rrdeng_deq_cmd(void) {
+#define opcode_empty (struct rrdeng_cmd) {      \
+    .ctx = NULL,                                \
+    .opcode = RRDENG_OPCODE_NOOP,               \
+    .priority = STORAGE_PRIORITY_BEST_EFFORT,   \
+    .completion = NULL,                         \
+    .data = NULL,                               \
+}
+
+static inline struct rrdeng_cmd rrdeng_deq_cmd(enum rrdeng_opcode opcode) {
     struct rrdeng_cmd *cmd = NULL;
 
-    STORAGE_PRIORITY max_priority = work_request_full() ? STORAGE_PRIORITY_INTERNAL_DBENGINE : STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE - 1;
+    STORAGE_PRIORITY min_priority, max_priority;
+    if(opcode == RRDENG_OPCODE_QUERY) {
+        min_priority = max_priority = STORAGE_PRIORITY_INTERNAL_QUERY_PREP;
+    }
+    else if(opcode == RRDENG_OPCODE_EXTENT_READ) {
+        min_priority = STORAGE_PRIORITY_HIGH;
+        max_priority = STORAGE_PRIORITY_BEST_EFFORT;
+    }
+    else {
+        min_priority = STORAGE_PRIORITY_INTERNAL_DBENGINE;
+        max_priority = work_request_full() ? STORAGE_PRIORITY_INTERNAL_DBENGINE : STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE - 1;
+    }
 
     // find an opcode to execute from the queue
     netdata_spinlock_lock(&rrdeng_main.cmd_queue.unsafe.spinlock);
-    for(STORAGE_PRIORITY priority = STORAGE_PRIORITY_INTERNAL_DBENGINE; priority <= max_priority ; priority++) {
+    for(STORAGE_PRIORITY priority = min_priority; priority <= max_priority ; priority++) {
         cmd = rrdeng_main.cmd_queue.unsafe.waiting_items_by_priority[priority];
         if(cmd) {
 
@@ -508,13 +554,7 @@ static inline struct rrdeng_cmd rrdeng_deq_cmd(void) {
         aral_freez(rrdeng_main.cmd_queue.ar, cmd);
     }
     else
-        ret = (struct rrdeng_cmd) {
-                .ctx = NULL,
-                .opcode = RRDENG_OPCODE_NOOP,
-                .priority = STORAGE_PRIORITY_BEST_EFFORT,
-                .completion = NULL,
-                .data = NULL,
-        };
+        ret = opcode_empty;
 
     return ret;
 }
@@ -1353,10 +1393,6 @@ static void *cache_evict_tp_worker(struct rrdengine_instance *ctx __maybe_unused
     return data;
 }
 
-static void after_prep_query(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
-    ;
-}
-
 static void *query_prep_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *req __maybe_unused) {
     worker_is_busy(UV_EVENT_DBENGINE_QUERY);
     PDC *pdc = data;
@@ -1482,10 +1518,6 @@ static void after_do_cache_flush(struct rrdengine_instance *ctx __maybe_unused, 
 
 static void after_do_cache_evict(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
     rrdeng_main.evictions_running--;
-}
-
-static void after_extent_read(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
-    ;
 }
 
 static void after_journal_v2_indexing(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
@@ -1616,6 +1648,26 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
     return true;
 }
 
+static inline void worker_dispatch_extent_read(struct rrdeng_cmd *cmd, bool synchronous) {
+    struct rrdengine_instance *ctx = cmd->ctx;
+    EPDL *epdl = cmd->data;
+
+    if(synchronous)
+        epdl_find_extent_and_populate_pages(ctx, epdl, true);
+    else
+        work_dispatch(ctx, epdl, NULL, cmd->opcode, extent_read_tp_worker, NULL);
+}
+
+static inline void worker_dispatch_query_prep(struct rrdeng_cmd *cmd, bool synchronous) {
+    struct rrdengine_instance *ctx = cmd->ctx;
+    PDC *pdc = cmd->data;
+
+    if(synchronous)
+        rrdeng_prep_query(pdc);
+    else
+        work_dispatch(ctx, pdc, NULL, cmd->opcode, query_prep_tp_worker, NULL);
+}
+
 void dbengine_event_loop(void* arg) {
     sanity_check();
     uv_thread_set_name_np(pthread_self(), "DBENGINE");
@@ -1673,25 +1725,19 @@ void dbengine_event_loop(void* arg) {
         /* wait for commands */
         do {
             worker_is_busy(RRDENG_OPCODE_MAX);
-            cmd = rrdeng_deq_cmd();
+            cmd = rrdeng_deq_cmd(RRDENG_OPCODE_NOOP);
             opcode = cmd.opcode;
 
             worker_is_busy(opcode);
 
             switch (opcode) {
-                case RRDENG_OPCODE_EXTENT_READ: {
-                    struct rrdengine_instance *ctx = cmd.ctx;
-                    EPDL *epdl = cmd.data;
-                    work_dispatch(ctx, epdl, NULL, opcode, extent_read_tp_worker, after_extent_read);
+                case RRDENG_OPCODE_EXTENT_READ:
+                    worker_dispatch_extent_read(&cmd, false);
                     break;
-                }
 
-                case RRDENG_OPCODE_QUERY: {
-                    struct rrdengine_instance *ctx = cmd.ctx;
-                    PDC *pdc = cmd.data;
-                    work_dispatch(ctx, pdc, NULL, opcode, query_prep_tp_worker, after_prep_query);
+                case RRDENG_OPCODE_QUERY:
+                    worker_dispatch_query_prep(&cmd, false);
                     break;
-                }
 
                 case RRDENG_OPCODE_EXTENT_WRITE: {
                     struct rrdengine_instance *ctx = cmd.ctx;
