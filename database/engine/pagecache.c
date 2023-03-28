@@ -1069,6 +1069,8 @@ void pgc_and_mrg_initialize(void)
         main_cache_size = target_cache_size - extent_cache_size;
     }
 
+    extent_cache_size += (size_t)(default_rrdeng_extent_cache_mb * 1024ULL * 1024ULL);
+
     main_cache = pgc_create(
             "main_cache",
             main_cache_size,
