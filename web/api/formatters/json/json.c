@@ -247,7 +247,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
 
 void rrdr2json_v2(RRDR *r, BUFFER *wb) {
     QUERY_TARGET *qt = r->internal.qt;
-    RRDR_OPTIONS options = qt->request.options;
+    RRDR_OPTIONS options = qt->window.options;
 
     bool expose_gbc = query_target_aggregatable(qt);
 
@@ -268,7 +268,7 @@ void rrdr2json_v2(RRDR *r, BUFFER *wb) {
 
     buffer_json_member_add_object(wb, "point");
     buffer_json_member_add_uint64(wb, "value", 0);
-    buffer_json_member_add_uint64(wb, "ar", 1);
+    buffer_json_member_add_uint64(wb, "arp", 1);
     buffer_json_member_add_uint64(wb, "pa", 2);
     if(expose_gbc)
         buffer_json_member_add_uint64(wb, "count", 3);

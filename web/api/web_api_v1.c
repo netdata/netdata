@@ -46,6 +46,7 @@ static struct {
         , {"plan"              , 0    , RRDR_OPTION_DEBUG}
         , {"minify"            , 0    , RRDR_OPTION_MINIFY}
         , {"group-by-labels"   , 0    , RRDR_OPTION_GROUP_BY_LABELS}
+        , {"label-quotes"      , 0    , RRDR_OPTION_LABEL_QUOTES}
         , {NULL                , 0    , 0}
 };
 

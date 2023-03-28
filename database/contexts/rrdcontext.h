@@ -144,55 +144,47 @@ typedef struct query_plan_entry {
 
 #define QUERY_PLANS_MAX (RRD_STORAGE_TIERS)
 
-struct query_metrics_counts {
-    size_t selected;
-    size_t excluded;
-    size_t queried;
-    size_t failed;
-};
+typedef struct query_metrics_counts {   // counts the number of metrics related to an object
+    size_t selected;                    // selected to be queried
+    size_t excluded;                    // not selected to be queried
+    size_t queried;                     // successfully queried
+    size_t failed;                      // failed to be queried
+} QUERY_METRICS_COUNTS;
 
-struct query_instances_counts {
-    size_t selected;
-    size_t excluded;
-    size_t queried;
-    size_t failed;
-};
+typedef struct query_instances_counts { // counts the number of instances related to an object
+    size_t selected;                    // selected to be queried
+    size_t excluded;                    // not selected to be queried
+    size_t queried;                     // successfully queried
+    size_t failed;                      // failed to be queried
+} QUERY_INSTANCES_COUNTS;
 
-struct query_alerts_counts {
-    size_t clear;
-    size_t warning;
-    size_t critical;
-    size_t other;
-};
-
-struct query_data_statistics {      // time-aggregated (group points) statistics
-    size_t group_points;            // the number of group points the query generated
-    NETDATA_DOUBLE min;             // the min value of the group points
-    NETDATA_DOUBLE max;             // the max value of the group points
-    NETDATA_DOUBLE sum;             // the sum of the group points
-    NETDATA_DOUBLE volume;          // the volume of the group points
-    NETDATA_DOUBLE anomaly_sum;     // the anomaly sum of the group points
-};
+typedef struct query_alerts_counts {    // counts the number of alerts related to an object
+    size_t clear;                       // number of alerts in clear state
+    size_t warning;                     // number of alerts in warning state
+    size_t critical;                    // number of alerts in critical state
+    size_t other;                       // number of alerts in any other state
+} QUERY_ALERTS_COUNTS;
 
 typedef struct query_node {
     uint32_t slot;
     RRDHOST *rrdhost;
     char node_id[UUID_STR_LEN];
+    usec_t duration_ut;
 
-    struct query_data_statistics query_stats;
-    struct query_instances_counts instances;
-    struct query_metrics_counts metrics;
-    struct query_alerts_counts alerts;
+    STORAGE_POINT query_points;
+    QUERY_INSTANCES_COUNTS instances;
+    QUERY_METRICS_COUNTS metrics;
+    QUERY_ALERTS_COUNTS alerts;
 } QUERY_NODE;
 
 typedef struct query_context {
     uint32_t slot;
     RRDCONTEXT_ACQUIRED *rca;
 
-    struct query_data_statistics query_stats;
-    struct query_instances_counts instances;
-    struct query_metrics_counts metrics;
-    struct query_alerts_counts alerts;
+    STORAGE_POINT query_points;
+    QUERY_INSTANCES_COUNTS instances;
+    QUERY_METRICS_COUNTS metrics;
+    QUERY_ALERTS_COUNTS alerts;
 } QUERY_CONTEXT;
 
 typedef struct query_instance {
@@ -202,9 +194,9 @@ typedef struct query_instance {
     STRING *id_fqdn;        // never access this directly - it is created on demand via query_instance_id_fqdn()
     STRING *name_fqdn;      // never access this directly - it is created on demand via query_instance_name_fqdn()
 
-    struct query_data_statistics query_stats;
-    struct query_metrics_counts metrics;
-    struct query_alerts_counts alerts;
+    STORAGE_POINT query_points;
+    QUERY_METRICS_COUNTS metrics;
+    QUERY_ALERTS_COUNTS alerts;
 } QUERY_INSTANCE;
 
 typedef struct query_dimension {
@@ -236,7 +228,7 @@ typedef struct query_metric {
         uint32_t query_dimension_id;
     } link;
 
-    struct query_data_statistics query_stats;
+    STORAGE_POINT query_points;
 
     struct {
         size_t slot;
@@ -245,6 +237,7 @@ typedef struct query_metric {
         STRING *units;
     } grouped_as;
 
+    usec_t duration_ut;
 } QUERY_METRIC;
 
 #define MAX_QUERY_TARGET_ID_LENGTH 255
@@ -320,6 +313,8 @@ struct query_versions {
     uint64_t alerts_soft_hash;
 };
 
+#define query_view_update_every(qt) ((qt)->window.group * (qt)->window.query_granularity)
+
 typedef struct query_target {
     char id[MAX_QUERY_TARGET_ID_LENGTH + 1]; // query identifier (for logging)
     QUERY_TARGET_REQUEST request;
@@ -334,10 +329,10 @@ typedef struct query_target {
         time_t after;                       // the absolute timestamp this query is about
         time_t before;                      // the absolute timestamp this query is about
         time_t query_granularity;
-        size_t points;                        // the number of points the query will return (maybe different from the request)
+        size_t points;                      // the number of points the query will return (maybe different from the request)
         size_t group;
-        RRDR_TIME_GROUPING group_method;
-        const char *group_options;
+        RRDR_TIME_GROUPING time_group_method;
+        const char *time_group_options;
         size_t resampling_group;
         NETDATA_DOUBLE resampling_divisor;
         RRDR_OPTIONS options;
@@ -396,7 +391,7 @@ typedef struct query_target {
         char *label_keys[GROUP_BY_MAX_LABEL_KEYS];
     } group_by;
 
-    struct query_data_statistics query_stats;
+    STORAGE_POINT query_points;
 
     struct query_versions versions;
 
@@ -404,7 +399,6 @@ typedef struct query_target {
         usec_t received_ut;
         usec_t preprocessed_ut;
         usec_t executed_ut;
-        usec_t group_by_ut;
         usec_t finished_ut;
     } timings;
 } QUERY_TARGET;
@@ -485,6 +479,8 @@ typedef enum __attribute__ ((__packed__)) {
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_OPTIONS options);
 
 RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o);
+void buffer_json_agents_array_v2(BUFFER *wb, time_t now_s);
+void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t duration_ut);
 
 // ----------------------------------------------------------------------------
 // scope

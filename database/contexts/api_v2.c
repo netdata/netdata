@@ -97,6 +97,7 @@ struct rrdcontext_to_json_v2_data {
     struct {
         SIMPLE_PATTERN *scope_pattern;
         SIMPLE_PATTERN *pattern;
+        size_t ni;
     } nodes;
 
     struct {
@@ -222,6 +223,21 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
     return 1;
 }
 
+void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t duration_ut) {
+    buffer_json_member_add_string(wb, "mg", host->machine_guid);
+    if(host->node_id)
+        buffer_json_member_add_uuid(wb, "nd", host->node_id);
+    buffer_json_member_add_string(wb, "nm", rrdhost_hostname(host));
+    buffer_json_member_add_uint64(wb, "ni", ni);
+    buffer_json_member_add_object(wb, "st");
+    buffer_json_member_add_uint64(wb, "ai", 0);
+    buffer_json_member_add_uint64(wb, "code", 200);
+    buffer_json_member_add_string(wb, "msg", "");
+    if(duration_ut)
+        buffer_json_member_add_double(wb, "ms", (NETDATA_DOUBLE)duration_ut / 1000.0);
+    buffer_json_object_close(wb);
+}
+
 static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool queryable_host) {
     if(!queryable_host || !host->rrdctx.contexts)
         // the host matches the 'scope_host' but does not match the 'host' patterns
@@ -279,9 +295,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
 
     if(host_matched && (ctl->options & (CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED | CONTEXTS_V2_DEBUG))) {
         buffer_json_add_array_item_object(wb);
-        buffer_json_member_add_string(wb, "mg", host->machine_guid);
-        buffer_json_member_add_uuid(wb, "nd", host->node_id);
-        buffer_json_member_add_string(wb, "nm", rrdhost_hostname(host));
+        buffer_json_node_add_v2(wb, host, ctl->nodes.ni++, 0);
 
         if(ctl->options & CONTEXTS_V2_NODES_DETAILED) {
             buffer_json_member_add_string(wb, "version", rrdhost_program_version(host));
@@ -372,6 +386,21 @@ static void buffer_json_contexts_v2_options_to_array(BUFFER *wb, CONTEXTS_V2_OPT
         buffer_json_add_array_item_string(wb, "search");
 }
 
+void buffer_json_agents_array_v2(BUFFER *wb, time_t now_s) {
+    if(!now_s)
+        now_s = now_realtime_sec();
+
+    buffer_json_member_add_array(wb, "agents");
+    buffer_json_add_array_item_object(wb);
+    buffer_json_member_add_string(wb, "mg", localhost->machine_guid);
+    buffer_json_member_add_uuid(wb, "nd", localhost->node_id);
+    buffer_json_member_add_string(wb, "nm", rrdhost_hostname(localhost));
+    buffer_json_member_add_time_t(wb, "now", now_s);
+    buffer_json_member_add_uint64(wb, "ai", 0);
+    buffer_json_object_close(wb);
+    buffer_json_array_close(wb);
+}
+
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_OPTIONS options) {
     int resp = HTTP_RESP_OK;
 
@@ -398,17 +427,10 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
     time_t now_s = now_realtime_sec();
     buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_member_add_uint64(wb, "api", 2);
+    buffer_json_agents_array_v2(wb, now_s);
 
     if(options & CONTEXTS_V2_DEBUG) {
-        buffer_json_member_add_object(wb, "agent");
-        buffer_json_member_add_string(wb, "mg", localhost->machine_guid);
-        buffer_json_member_add_uuid(wb, "nd", localhost->node_id);
-        buffer_json_member_add_string(wb, "nm", rrdhost_hostname(localhost));
-        if (req->q)
-            buffer_json_member_add_string(wb, "q", req->q);
-        buffer_json_member_add_time_t(wb, "now", now_s);
-        buffer_json_object_close(wb);
-
         buffer_json_member_add_object(wb, "request");
 
         buffer_json_member_add_object(wb, "scope");

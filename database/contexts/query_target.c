@@ -977,7 +977,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
         qtr->scope_contexts = qtr->contexts;
 
     memset(&qt->db, 0, sizeof(qt->db));
-    memset(&qt->query_stats, 0, sizeof(qt->query_stats));
+    qt->query_points = STORAGE_POINT_UNSET;
 
     // copy the request into query_thread_target
     qt->request = *qtr;
@@ -985,6 +985,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     query_target_generate_name(qt);
     qt->window.after = qt->request.after;
     qt->window.before = qt->request.before;
+    qt->window.options = qt->request.options;
     rrdr_relative_window_to_absolute(&qt->window.after, &qt->window.before, &qt->window.now);
 
     // prepare our local variables - we need these across all these functions
