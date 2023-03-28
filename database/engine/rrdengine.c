@@ -172,7 +172,7 @@ static void work_standard_worker(uv_work_t *req) {
     if(work_request->opcode == RRDENG_OPCODE_EXTENT_READ || work_request->opcode == RRDENG_OPCODE_QUERY) {
         internal_fatal(work_request->after_work_cb != NULL, "DBENGINE: opcodes with a callback should not boosted");
 
-        for(; count < 10 ;count++) {
+        while(1) {
             struct rrdeng_cmd cmd = rrdeng_deq_cmd(work_request->opcode);
             if (cmd.opcode == RRDENG_OPCODE_NOOP)
                 break;
