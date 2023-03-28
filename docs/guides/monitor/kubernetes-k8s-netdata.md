@@ -1,14 +1,6 @@
-<!--
-title: "Kubernetes monitoring with Netdata: Overview and visualizations"
-sidebar_label: "Kubernetes monitoring with Netdata: Overview and visualizations"
-description: "Learn how to navigate Netdata's Kubernetes monitoring features for visualizing the health and performance of a Kubernetes cluster with per-second granularity."
-image: /img/seo/guides/monitor/kubernetes-k8s-netdata.png
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/kubernetes-k8s-netdata.md
-learn_status: "Published"
-learn_rel_path: "Miscellaneous"
--->
+# Kubernetes monitoring with Netdata
 
-# Kubernetes monitoring with Netdata: Overview and visualizations
+This document gives an overview of what visualizations Netdata provides on Kubernetes deployments.
 
 At Netdata, we've built Kubernetes monitoring tools that add visibility without complexity while also helping you
 actively troubleshoot anomalies or outages. This guide walks you through each of the visualizations and offers best
