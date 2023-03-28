@@ -31,8 +31,8 @@ struct rrdeng_cmd {
 };
 
 static inline struct rrdeng_cmd rrdeng_deq_cmd(enum rrdeng_opcode opcode);
-static inline void worker_dispatch_extent_read(struct rrdeng_cmd *cmd, bool synchronous);
-static inline void worker_dispatch_query_prep(struct rrdeng_cmd *cmd, bool synchronous);
+static inline void worker_dispatch_extent_read(struct rrdeng_cmd cmd, bool from_worker);
+static inline void worker_dispatch_query_prep(struct rrdeng_cmd cmd, bool from_worker);
 
 struct rrdeng_main {
     uv_thread_t thread;
@@ -170,6 +170,8 @@ static void work_standard_worker(uv_work_t *req) {
     worker_is_idle();
 
     if(work_request->opcode == RRDENG_OPCODE_EXTENT_READ || work_request->opcode == RRDENG_OPCODE_QUERY) {
+        internal_fatal(work_request->after_work_cb != NULL, "DBENGINE: opcodes with a callback should not boosted");
+
         for(; count < 10 ;count++) {
             struct rrdeng_cmd cmd = rrdeng_deq_cmd(work_request->opcode);
             if (cmd.opcode == RRDENG_OPCODE_NOOP)
@@ -178,11 +180,11 @@ static void work_standard_worker(uv_work_t *req) {
             worker_is_busy(UV_EVENT_WORKER_INIT);
             switch (cmd.opcode) {
                 case RRDENG_OPCODE_EXTENT_READ:
-                    worker_dispatch_extent_read(&cmd, true);
+                    worker_dispatch_extent_read(cmd, true);
                     break;
 
                 case RRDENG_OPCODE_QUERY:
-                    worker_dispatch_query_prep(&cmd, true);
+                    worker_dispatch_query_prep(cmd, true);
                     break;
 
                 default:
@@ -193,8 +195,8 @@ static void work_standard_worker(uv_work_t *req) {
         }
     }
 
-    __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.dispatched, count, __ATOMIC_RELAXED);
-    __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.executing, count, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.dispatched, 1, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.executing, 1, __ATOMIC_RELAXED);
 
     // signal the event loop a worker is available
     fatal_assert(0 == uv_async_send(&rrdeng_main.async));
@@ -1648,24 +1650,24 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
     return true;
 }
 
-static inline void worker_dispatch_extent_read(struct rrdeng_cmd *cmd, bool synchronous) {
-    struct rrdengine_instance *ctx = cmd->ctx;
-    EPDL *epdl = cmd->data;
+static inline void worker_dispatch_extent_read(struct rrdeng_cmd cmd, bool from_worker) {
+    struct rrdengine_instance *ctx = cmd.ctx;
+    EPDL *epdl = cmd.data;
 
-    if(synchronous)
+    if(from_worker)
         epdl_find_extent_and_populate_pages(ctx, epdl, true);
     else
-        work_dispatch(ctx, epdl, NULL, cmd->opcode, extent_read_tp_worker, NULL);
+        work_dispatch(ctx, epdl, NULL, cmd.opcode, extent_read_tp_worker, NULL);
 }
 
-static inline void worker_dispatch_query_prep(struct rrdeng_cmd *cmd, bool synchronous) {
-    struct rrdengine_instance *ctx = cmd->ctx;
-    PDC *pdc = cmd->data;
+static inline void worker_dispatch_query_prep(struct rrdeng_cmd cmd, bool from_worker) {
+    struct rrdengine_instance *ctx = cmd.ctx;
+    PDC *pdc = cmd.data;
 
-    if(synchronous)
+    if(from_worker)
         rrdeng_prep_query(pdc);
     else
-        work_dispatch(ctx, pdc, NULL, cmd->opcode, query_prep_tp_worker, NULL);
+        work_dispatch(ctx, pdc, NULL, cmd.opcode, query_prep_tp_worker, NULL);
 }
 
 void dbengine_event_loop(void* arg) {
@@ -1732,11 +1734,11 @@ void dbengine_event_loop(void* arg) {
 
             switch (opcode) {
                 case RRDENG_OPCODE_EXTENT_READ:
-                    worker_dispatch_extent_read(&cmd, false);
+                    worker_dispatch_extent_read(cmd, false);
                     break;
 
                 case RRDENG_OPCODE_QUERY:
-                    worker_dispatch_query_prep(&cmd, false);
+                    worker_dispatch_query_prep(cmd, false);
                     break;
 
                 case RRDENG_OPCODE_EXTENT_WRITE: {
