@@ -41,8 +41,10 @@ int default_multidb_disk_quota_mb = 256;
 
 #if defined(ENV32BIT)
 int default_rrdeng_page_cache_mb = 16;
+int default_rrdeng_extent_cache_mb = 0;
 #else
 int default_rrdeng_page_cache_mb = 32;
+int default_rrdeng_extent_cache_mb = 0;
 #endif
 
 // ----------------------------------------------------------------------------
