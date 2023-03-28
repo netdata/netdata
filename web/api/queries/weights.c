@@ -554,7 +554,7 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
     RRDHOST *last_host = NULL;
     RRDCONTEXT_ACQUIRED *last_rca = NULL;
     RRDINSTANCE_ACQUIRED *last_ria = NULL;
-    struct dict_unique_node *node_dun;
+    struct dict_unique_node *node_dun = NULL;
     ssize_t di = -1, ii = -1, ci = -1, ni = -1;
     ssize_t di_max = 0, ii_max = 0, ci_max = 0, ni_max = 0;
     dfe_start_read(results, t) {

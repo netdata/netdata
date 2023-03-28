@@ -772,7 +772,7 @@ static inline NETDATA_DOUBLE *UNUSED_FUNCTION(rrdr_line_values)(RRDR *r, long rr
     return &r->v[ rrdr_line * r->d ];
 }
 
-static inline long rrdr_line_init(RRDR *r, time_t t, long rrdr_line) {
+static inline long rrdr_line_init(RRDR *r __maybe_unused, time_t t __maybe_unused, long rrdr_line) {
     rrdr_line++;
 
     internal_fatal(rrdr_line >= (long)r->n,
@@ -2419,7 +2419,7 @@ static void rrd2rrdr_set_timestamps(RRDR *r) {
 
     size_t points_wanted = qt->window.points;
     time_t after_wanted = qt->window.after;
-    time_t before_wanted = qt->window.before;
+    time_t before_wanted = qt->window.before; (void)before_wanted;
 
     time_t view_update_every = r->view.update_every;
     time_t query_granularity = (time_t)(r->view.update_every / r->view.group);
