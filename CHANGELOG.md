@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- Minor improvements to netdata-security.md [\#14815](https://github.com/netdata/netdata/pull/14815) ([cakrit](https://github.com/cakrit))
+- Update privacy link in aclk doc [\#14813](https://github.com/netdata/netdata/pull/14813) ([cakrit](https://github.com/cakrit))
+- Consolidate security and privacy documents [\#14812](https://github.com/netdata/netdata/pull/14812) ([cakrit](https://github.com/cakrit))
+- Update role-based-access.md [\#14811](https://github.com/netdata/netdata/pull/14811) ([cakrit](https://github.com/cakrit))
+- diskspace: don't collect inodes on msdosfs [\#14809](https://github.com/netdata/netdata/pull/14809) ([ilyam8](https://github.com/ilyam8))
+- Address Learn feedback from users [\#14802](https://github.com/netdata/netdata/pull/14802) ([Ancairon](https://github.com/Ancairon))
 - add validation step before using GCP metadata [\#14801](https://github.com/netdata/netdata/pull/14801) ([ilyam8](https://github.com/ilyam8))
 - Replace `/docs` links with GitHub links [\#14796](https://github.com/netdata/netdata/pull/14796) ([Ancairon](https://github.com/Ancairon))
 - Fix links in README.md [\#14794](https://github.com/netdata/netdata/pull/14794) ([cakrit](https://github.com/cakrit))
@@ -17,6 +23,7 @@
 - /api/v2/X part 6 [\#14785](https://github.com/netdata/netdata/pull/14785) ([ktsaou](https://github.com/ktsaou))
 - Update dashboard to version v2.30.1. [\#14784](https://github.com/netdata/netdata/pull/14784) ([netdatabot](https://github.com/netdatabot))
 - Revert "Use static thread-pool for training. \(\#14702\)" [\#14782](https://github.com/netdata/netdata/pull/14782) ([vkalintiris](https://github.com/vkalintiris))
+- Fix how we are handling system services in RPM packages. [\#14781](https://github.com/netdata/netdata/pull/14781) ([Ferroin](https://github.com/Ferroin))
 - Replace hardcoded links pointing to "learn.netdata.cloud" with github absolute links [\#14779](https://github.com/netdata/netdata/pull/14779) ([Ancairon](https://github.com/Ancairon))
 - Improve performance.md [\#14778](https://github.com/netdata/netdata/pull/14778) ([cakrit](https://github.com/cakrit))
 - Update reverse-proxies.md [\#14777](https://github.com/netdata/netdata/pull/14777) ([cakrit](https://github.com/cakrit))
@@ -383,10 +390,6 @@
 - Add few alarms for elasticsearch [\#14197](https://github.com/netdata/netdata/pull/14197) ([ilyam8](https://github.com/ilyam8))
 - chore\(packaging\): remove python-pymongo [\#14196](https://github.com/netdata/netdata/pull/14196) ([ilyam8](https://github.com/ilyam8))
 - bump go.d.plugin to v0.48.0 [\#14195](https://github.com/netdata/netdata/pull/14195) ([ilyam8](https://github.com/ilyam8))
-- Fix typos [\#14194](https://github.com/netdata/netdata/pull/14194) ([rex4539](https://github.com/rex4539))
-- add `telegraf` to `apps_groups.conf` monitoring section [\#14188](https://github.com/netdata/netdata/pull/14188) ([andrewm4894](https://github.com/andrewm4894))
-- bump go.d.plugin to v0.47.0 [\#14182](https://github.com/netdata/netdata/pull/14182) ([ilyam8](https://github.com/ilyam8))
-- remove mqtt-c from websockets [\#14181](https://github.com/netdata/netdata/pull/14181) ([underhood](https://github.com/underhood))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
