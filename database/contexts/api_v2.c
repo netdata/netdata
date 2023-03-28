@@ -232,7 +232,7 @@ void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t durati
     buffer_json_member_add_object(wb, "st");
     buffer_json_member_add_uint64(wb, "ai", 0);
     buffer_json_member_add_uint64(wb, "code", 200);
-    buffer_json_member_add_string(wb, "msg", NULL);
+    buffer_json_member_add_string(wb, "msg", "");
     if(duration_ut)
         buffer_json_member_add_double(wb, "ms", (NETDATA_DOUBLE)duration_ut / 1000.0);
     buffer_json_object_close(wb);
