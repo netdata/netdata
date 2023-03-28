@@ -173,5 +173,5 @@ else
   --timeout=1 \
   --header 'Content-Type: application/json' \
   --body-data "${REQ_BODY}" \
-   'https://posthog.netdata.cloud/capture/' 2>&1 | awk '/^  HTTP/{print $2}'
+   'https://app.posthog.com/capture/' 2>&1 | awk '/^  HTTP/{print $2}'
 fi
