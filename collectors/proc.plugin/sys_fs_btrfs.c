@@ -10,9 +10,7 @@ typedef struct btrfs_disk {
     int exists;
 
     char *size_filename;
-    char *hw_sector_size_filename;
     unsigned long long size;
-    unsigned long long hw_sector_size;
 
     struct btrfs_disk *next;
 } BTRFS_DISK;
@@ -85,7 +83,6 @@ static BTRFS_NODE *nodes = NULL;
 static inline void btrfs_free_disk(BTRFS_DISK *d) {
     freez(d->name);
     freez(d->size_filename);
-    freez(d->hw_sector_size_filename);
     freez(d);
 }
 
@@ -175,19 +172,6 @@ static inline int find_btrfs_disks(BTRFS_NODE *node, const char *path) {
             snprintfz(filename, FILENAME_MAX, "%s/%s/size", path, de->d_name);
             d->size_filename = strdupz(filename);
 
-            // for bcache
-            snprintfz(filename, FILENAME_MAX, "%s/%s/bcache/../queue/hw_sector_size", path, de->d_name);
-            struct stat sb;
-            if(stat(filename, &sb) == -1) {
-                // for disks
-                snprintfz(filename, FILENAME_MAX, "%s/%s/queue/hw_sector_size", path, de->d_name);
-                if(stat(filename, &sb) == -1)
-                    // for partitions
-                    snprintfz(filename, FILENAME_MAX, "%s/%s/../queue/hw_sector_size", path, de->d_name);
-            }
-
-            d->hw_sector_size_filename = strdupz(filename);
-
             // link it
             d->next = node->disks;
             node->disks = d;
@@ -205,13 +189,11 @@ static inline int find_btrfs_disks(BTRFS_NODE *node, const char *path) {
             continue;
         }
 
-        if(read_single_number_file(d->hw_sector_size_filename, &d->hw_sector_size) != 0) {
-            collector_error("BTRFS: failed to read '%s'", d->hw_sector_size_filename);
-            d->exists = 0;
-            continue;
-        }
-
-        node->all_disks_total += d->size * d->hw_sector_size;
+        // /sys/block/<name>/size is in fixed-size sectors of 512 bytes
+        // https://github.com/torvalds/linux/blob/v6.2/block/genhd.c#L946-L950
+        // https://github.com/torvalds/linux/blob/v6.2/include/linux/types.h#L120-L121
+        // (also see #3481, #3483)
+        node->all_disks_total += d->size * 512;
     }
     closedir(dir);
 
