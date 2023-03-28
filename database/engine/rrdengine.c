@@ -1409,9 +1409,8 @@ static void *cache_evict_tp_worker(struct rrdengine_instance *ctx __maybe_unused
 }
 
 static void *query_prep_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *req __maybe_unused) {
-    worker_is_busy(UV_EVENT_DBENGINE_QUERY);
     PDC *pdc = data;
-    rrdeng_prep_query(pdc);
+    rrdeng_prep_query(pdc, true);
     return data;
 }
 
@@ -1678,7 +1677,7 @@ static inline void worker_dispatch_query_prep(struct rrdeng_cmd cmd, bool from_w
     PDC *pdc = cmd.data;
 
     if(from_worker)
-        rrdeng_prep_query(pdc);
+        rrdeng_prep_query(pdc, true);
     else
         work_dispatch(ctx, pdc, NULL, cmd.opcode, query_prep_tp_worker, NULL);
 }
