@@ -691,8 +691,8 @@ static void rrdr_set_grouping_function(RRDR *r, RRDR_TIME_GROUPING group_method)
     }
 }
 
-static inline void time_grouping_add(RRDR *r, NETDATA_DOUBLE value) {
-    switch(r->time_grouping.add_flush) {
+static inline void time_grouping_add(RRDR *r, NETDATA_DOUBLE value, const RRDR_TIME_GROUPING add_flush) {
+    switch(add_flush) {
         case RRDR_GROUPING_AVERAGE:
             tg_average_add(r, value);
             break;
@@ -748,8 +748,8 @@ static inline void time_grouping_add(RRDR *r, NETDATA_DOUBLE value) {
     }
 }
 
-static inline NETDATA_DOUBLE time_grouping_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    switch(r->time_grouping.add_flush) {
+static inline NETDATA_DOUBLE time_grouping_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr, const RRDR_TIME_GROUPING add_flush) {
+    switch(add_flush) {
         case RRDR_GROUPING_AVERAGE:
             return tg_average_flush(r, rrdr_value_options_ptr);
 
@@ -1487,7 +1487,7 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
         }                                                               \
 } while(0)
 
-#define query_add_point_to_group(r, point, ops)                   do {  \
+#define query_add_point_to_group(r, point, ops, add_flush)        do {  \
     if(likely(netdata_double_isnumber((point).value))) {                \
         if(likely(fpclassify((point).value) != FP_ZERO))                \
             (ops)->group_points_non_zero++;                             \
@@ -1495,7 +1495,7 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
         if(unlikely((point).sp.flags & SN_FLAG_RESET))                  \
             (ops)->group_value_flags |= RRDR_VALUE_RESET;               \
                                                                         \
-        time_grouping_add(r, (point).value);                            \
+        time_grouping_add(r, (point).value, add_flush);                 \
                                                                         \
         storage_point_merge_to((ops)->group_point, (point).sp);         \
         if(!(point).added)                                              \
@@ -1561,6 +1561,8 @@ static QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, size_t query_metric_id
 static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_OPS *ops) {
     QUERY_TARGET *qt = r->internal.qt;
     QUERY_METRIC *qm = ops->qm;
+
+    const RRDR_TIME_GROUPING add_flush = r->time_grouping.add_flush;
 
     ops->group_point = STORAGE_POINT_UNSET;
     ops->query_point = STORAGE_POINT_UNSET;
@@ -1757,7 +1759,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                 if(likely(new_point.sp.end_time_s >= now_start_time)) { // likely to favor tier0
                     // this db point ends after our now_start time
 
-                    query_add_point_to_group(r, new_point, ops);
+                    query_add_point_to_group(r, new_point, ops, add_flush);
                     new_point.added = true;
                 }
                 else {
@@ -1865,7 +1867,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                 current_point = QUERY_POINT_EMPTY;
             }
 
-            query_add_point_to_group(r, current_point, ops);
+            query_add_point_to_group(r, current_point, ops, add_flush);
 
             rrdr_line = rrdr_line_init(r, now_end_time, rrdr_line);
             size_t rrdr_o_v_index = rrdr_line * r->d + dim_id_in_rrdr;
@@ -1881,7 +1883,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
             *rrdr_value_options_ptr = ops->group_value_flags;
 
             // store the group value
-            NETDATA_DOUBLE group_value = time_grouping_flush(r, rrdr_value_options_ptr);
+            NETDATA_DOUBLE group_value = time_grouping_flush(r, rrdr_value_options_ptr, add_flush);
             r->v[rrdr_o_v_index] = group_value;
 
             r->ar[rrdr_o_v_index] = storage_point_anomaly_rate(ops->group_point);
