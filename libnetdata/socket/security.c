@@ -23,7 +23,11 @@ int netdata_ssl_validate_server =  NETDATA_SSL_VALID_CERTIFICATE;
 static void security_info_callback(const SSL *ssl, int where, int ret __maybe_unused) {
     (void)ssl;
     if (where & SSL_CB_ALERT) {
+#if defined(ENABLE_HTTPS_WITH_OPENSSL)
         debug(D_WEB_CLIENT,"SSL INFO CALLBACK %s %s", SSL_alert_type_string(ret), SSL_alert_desc_string_long(ret));
+#else
+        debug(D_WEB_CLIENT,"SSL INFO CALLBACK %s", SSL_alert_desc_string_long(ret));
+#endif
     }
 }
 
@@ -133,7 +137,7 @@ SSL_CTX *security_initialize_ssl_client() {
         SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
 #else
 #if defined(LIBWOLFSSL_VERSION_STRING)
-        if (netdata_validate_server == NETDATA_SSL_INVALID_CERTIFICATE)
+        if (netdata_ssl_validate_server == NETDATA_SSL_INVALID_CERTIFICATE)
             wolfSSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, 0);
 #endif
         SSL_CTX_set_min_proto_version(ctx, TLS1_VERSION);
