@@ -28,7 +28,6 @@ run cp \
   packaging/makeself/post-installer.sh \
   packaging/makeself/install-or-update.sh \
   packaging/installer/functions.sh \
-  configs.signatures \
   "${NETDATA_INSTALL_PATH}/system/"
 
 # -----------------------------------------------------------------------------
