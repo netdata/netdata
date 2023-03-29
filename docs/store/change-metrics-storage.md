@@ -158,3 +158,35 @@ Save the file and restart the Agent with `sudo systemctl restart netdata`, or
 the [appropriate method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) 
 for your system, to change the database engine's size.
 
+## Legacy configuration
+
+### v1.35.1 and prior
+
+These versions of the Agent do not support tiers. You could change the metric retention for the parent and
+all of its children only with the `dbengine multihost disk space MB` setting. This setting accounts the space allocation
+for the parent node and all of its children.
+
+To configure the database engine, look for the `page cache size MB` and `dbengine multihost disk space MB` settings in
+the `[db]` section of your `netdata.conf`.
+
+```conf
+[db]
+    dbengine page cache size MB = 32
+    dbengine multihost disk space MB = 256
+```
+
+### v1.23.2 and prior
+
+_For Netdata Agents earlier than v1.23.2_, the Agent on the parent node uses one dbengine instance for itself, and another instance for every child node it receives metrics from. If you had four streaming nodes, you would have five instances in total (`1 parent + 4 child nodes = 5 instances`).
+
+The Agent allocates resources for each instance separately using the `dbengine disk space MB` (**deprecated**) setting. If `dbengine disk space MB`(**deprecated**) is set to the default `256`, each instance is given 256 MiB in disk space, which means the total disk space required to store all instances is, roughly, `256 MiB * 1 parent * 4 child nodes = 1280 MiB`.
+
+#### Backward compatibility
+
+All existing metrics belonging to child nodes are automatically converted to legacy dbengine instances and the localhost
+metrics are transferred to the multihost dbengine instance.
+
+All new child nodes are automatically transferred to the multihost dbengine instance and share its page cache and disk
+space. If you want to migrate a child node from its legacy dbengine instance to the multihost dbengine instance, you
+must delete the instance's directory, which is located in `/var/cache/netdata/MACHINE_GUID/dbengine`, after stopping the
+Agent.
