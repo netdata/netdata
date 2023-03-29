@@ -327,7 +327,7 @@ int update_node_id(uuid_t *host_id, uuid_t *node_id)
         error_report("Failed to store node instance information, rc = %d", rc);
     rc = sqlite3_changes(db_meta);
 
-    char host_guid[GUID_LEN + 1];
+    char host_guid[UUID_STR_LEN];
     uuid_unparse_lower(*host_id, host_guid);
     rrd_wrlock();
     host = rrdhost_find_by_guid(host_guid);
@@ -660,7 +660,7 @@ static void sql_maint_aclk_sync_database_all(void)
 
 static int aclk_config_parameters(void *data __maybe_unused, int argc __maybe_unused, char **argv, char **column __maybe_unused)
 {
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower(*((uuid_t *) argv[0]), uuid_str);
 
     RRDHOST *host = rrdhost_find_by_guid(uuid_str);
@@ -826,8 +826,8 @@ static void aclk_synchronization_init(void)
 void sql_create_aclk_table(RRDHOST *host __maybe_unused, uuid_t *host_uuid __maybe_unused, uuid_t *node_id __maybe_unused)
 {
 #ifdef ENABLE_ACLK
-    char uuid_str[GUID_LEN + 1];
-    char host_guid[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
+    char host_guid[UUID_STR_LEN];
     int rc;
 
     uuid_unparse_lower_fix(host_uuid, uuid_str);
