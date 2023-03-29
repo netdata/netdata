@@ -667,6 +667,10 @@ $ sudo systemctl restart netdata
 - [ClickHouse](https://github.com/netdata/community/tree/main/collectors/python.d.plugin/clickhouse):
   Monitor [ClickHouse](https://clickhouse.com/) database.
 - [Ethtool](https://github.com/ghanapunq/netdata_ethtool_plugin): Monitor network interface with ethtool.
+- [netdata-needrestart](https://github.com/nodiscc/netdata-needrestart) - Check/graph the number of processes/services/kernels that should be restarted after upgrading packages.
+- [netdata-debsecan](https://github.com/nodiscc/netdata-debsecan) - Check/graph the number of CVEs in currently installed packages.
+- [netdata-logcount](https://github.com/nodiscc/netdata-logcount) - Check/graph the number of syslog messages, by level over time.
+- [netdata-apt](https://github.com/nodiscc/netdata-apt) - Check/graph and alert on the number of upgradeable packages, and available distribution upgrades.
 
 ## Etc
 
