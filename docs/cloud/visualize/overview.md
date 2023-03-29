@@ -1,6 +1,6 @@
 # Home, overview and single node views
 
-The Home view has details for the War Room, the Overview uses charts from all the nodes in the War Room and the Single Node view has charts for a specific Node.
+Learn how to use the Home, Overview, and Single Node tabs in Netdata Cloud, to explore your infrastructure and troubleshoot issues.
 
 ## Home
 
