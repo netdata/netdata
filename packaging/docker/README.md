@@ -338,10 +338,31 @@ endpoint.
 The reason it's safer to expose the socket to the proxy is because Netdata has a TCP port exposed outside the Docker
 network. Access to the proxy container is limited to only within the network.
 
-Below is an example using CetusGuard, a tool that provides a proxy to the socket and can filter the API calls.
+Here are two examples, the first using [a Docker image based on HAProxy](https://github.com/Tecnativa/docker-socket-proxy)
+and the second using [CetusGuard](https://github.com/hectorm/cetusguard).
 
-You can run the socket proxy in its own Docker Compose file and leave it on a private network that you can add to
-other services that require access.
+##### Docker Socket Proxy (HAProxy)
+
+```yaml
+version: '3'
+services:
+  netdata:
+    image: netdata/netdata
+    # ... rest of your config ...
+    ports:
+      - 19999:19999
+    environment:
+      - DOCKER_HOST=proxy:2375
+  proxy:
+    image: tecnativa/docker-socket-proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - CONTAINERS=1
+```
+**Note:** Replace `2375` with the port of your proxy.
+
+##### CetusGuard
 
 ```yaml
 version: '3'
@@ -359,14 +380,15 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      CETUSGUARD_BACKEND_ADDR: "unix:///var/run/docker.sock"
-      CETUSGUARD_FRONTEND_ADDR: "tcp://:2375"
+      CETUSGUARD_BACKEND_ADDR: unix:///var/run/docker.sock
+      CETUSGUARD_FRONTEND_ADDR: tcp://:2375
       CETUSGUARD_RULES: |
         ! Inspect a container
         GET %API_PREFIX_CONTAINERS%/%CONTAINER_ID_OR_NAME%/json
-
 ```
-**Note:** Replace `2375` with the port of your proxy.
+
+You can run the socket proxy in its own Docker Compose file and leave it on a private network that you can add to
+other services that require access.
 
 #### Giving group access to the Docker socket (less safe)
 
