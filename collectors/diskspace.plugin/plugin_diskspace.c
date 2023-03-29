@@ -17,6 +17,7 @@ static netdata_thread_t *diskspace_slow_thread = NULL;
 static struct mountinfo *disk_mountinfo_root = NULL;
 static int check_for_new_mountpoints_every = 15;
 static int cleanup_mount_points = 1;
+static int ignore_duplicate_dev_and_bind = 1;
 
 static inline void mountinfo_reload(int force) {
     static time_t last_loaded = 0;
@@ -634,6 +635,8 @@ void *diskspace_main(void *ptr) {
     if(check_for_new_mountpoints_every < update_every)
         check_for_new_mountpoints_every = update_every;
 
+    ignore_duplicate_dev_and_bind = config_get_boolean(CONFIG_SECTION_DISKSPACE, "ignore duplicate devices and binds", ignore_duplicate_dev_and_bind);
+
     netdata_mutex_init(&slow_mountinfo_mutex);
 
     diskspace_slow_thread = mallocz(sizeof(netdata_thread_t));
@@ -671,7 +674,10 @@ void *diskspace_main(void *ptr) {
 
         struct mountinfo *mi;
         for(mi = disk_mountinfo_root; mi; mi = mi->next) {
-            if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY | MOUNTINFO_IS_BIND)))
+            if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY)))
+                continue;
+
+            if (unlikely(ignore_duplicate_dev_and_bind && mi->flags & (MOUNTINFO_IS_SAME_DEV | MOUNTINFO_IS_BIND)))
                 continue;
 
             // exclude mounts made by ProtectHome and ProtectSystem systemd hardening options

@@ -360,6 +360,12 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
             else {
                 mi->st_dev = 0;
             }
+
+            struct mountinfo *mt;
+            for(mt = root; mt; mt = mt->next) {
+                if(unlikely(mt->major == mi->major && mt->minor == mi->minor && !(mi->flags & MOUNTINFO_IS_BIND)))
+                    mi->flags |= MOUNTINFO_IS_BIND;
+            }
         }
         else {
             mi->filesystem = NULL;
