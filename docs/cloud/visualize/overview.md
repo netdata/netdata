@@ -1,15 +1,15 @@
-# Home, overview and single node views
+# Home, overview and single node tabs
 
 Learn how to use the Home, Overview, and Single Node tabs in Netdata Cloud, to explore your infrastructure and troubleshoot issues.
 
 ## Home
 
-The Home view provides a predefined dashboard of relevant information about entities in the War Room.
+The Home tab provides a predefined dashboard of relevant information about entities in the War Room.
 
-This view will automatically present summarized information in an easily digestible display. You can see information about your
+This tab will automatically present summarized information in an easily digestible display. You can see information about your
 nodes, data collection and retention stats, alerts, users and dashboards.
 
-## Overview and single node view
+## Overview and single node tab
 
 The Overview tab is another great way to monitor infrastructure using Netdata Cloud. While the interface might look
 similar to local dashboards served by an Agent Overview uses **composite charts**.
@@ -18,7 +18,7 @@ These charts display real-time aggregated metrics from all the nodes (or a filte
 When you [interact with composite charts](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md)
 you can see your infrastructure from a single pane of glass, discover trends or anomalies, and perform root cause analysis.
 
-The Single Node view dashboard is exactly the same as the Overview, but with a hard-coded filter to only show a single node.
+The Single Node tab dashboard is exactly the same as the Overview, but with a hard-coded filter to only show a single node.
 
 ### Chart navigation Menu
 
@@ -42,7 +42,7 @@ The aggregation applies to disks, network devices, and other metric types that i
 
 ## Persistence of composite chart settings
 
-Of course you can [change the filtering or grouping](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md) of metrics in the composite charts that aggregate all these instances, to see only the information you are interested in, and save that view in a custom dashboard.
+Of course you can [change the filtering or grouping](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md) of metrics in the composite charts that aggregate all these instances, to see only the information you are interested in, and save that tab in a custom dashboard.
 
 When you change a composite chart via its definition bar, Netdata Cloud persists these settings in a query string attached to the URL in your browser.
 You can "save" these settings by bookmarking this particular URL, or share it with colleagues by having them copy-paste it into their browser.
