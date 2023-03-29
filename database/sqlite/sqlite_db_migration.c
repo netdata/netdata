@@ -228,6 +228,19 @@ static int do_aclk_migration_v1_v2(sqlite3 *database, const char *name)
         error_report("Failed drop aclk tables from netdata-meta.db, rc = %d", rc);
     buffer_free(sql_drop);
 
+    // create and migrate node_instance tableMove nid
+    rc = db_execute(db_aclk,"CREATE TABLE IF NOT EXISTS node_instance (host_id blob PRIMARY KEY, claim_id, node_id, date_created);");
+    if (rc == SQLITE_OK) {
+        rc = db_execute(db_aclk, "INSERT INTO node_instance SELECT * FROM meta.node_instance m WHERE m.host_id NOT IN (SELECT host_id FROM node_instance);");
+        if (rc == SQLITE_OK) {
+            rc = db_execute(db_aclk, "DROP TABLE IF EXISTS meta.node_instance;");
+            if (rc != SQLITE_OK)
+                error_report("Failed to drop meta.node_instance table, rc = %d", rc);
+        }
+        else
+            error_report("Failed migrate node instance entries, rc = %d", rc);
+    }
+
     rc = db_execute(database, "VACUUM meta");
     if (rc != SQLITE_OK)
         error_report("Failed to vacuum netdata-meta.db, rc = %d", rc);

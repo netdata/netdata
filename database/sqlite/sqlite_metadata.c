@@ -28,16 +28,12 @@ const char *database_config[] = {
     "CREATE INDEX IF NOT EXISTS ind_c3 on chart (host_id);",
     "CREATE TABLE IF NOT EXISTS chart_label(chart_id blob, source_type int, label_key text, "
     "label_value text, date_created int, PRIMARY KEY (chart_id, label_key));",
-    "CREATE TABLE IF NOT EXISTS node_instance (host_id blob PRIMARY KEY, claim_id, node_id, date_created);",
 
     "CREATE TABLE IF NOT EXISTS host_info(host_id blob, system_key text NOT NULL, system_value text NOT NULL, "
     "date_created INT, PRIMARY KEY(host_id, system_key));",
 
     "CREATE TABLE IF NOT EXISTS host_label(host_id blob, source_type int, label_key text NOT NULL, "
     "label_value text NOT NULL, date_created INT, PRIMARY KEY (host_id, label_key));",
-
-    "CREATE TRIGGER IF NOT EXISTS ins_host AFTER INSERT ON host BEGIN INSERT INTO node_instance (host_id, date_created)"
-    " SELECT new.host_id, unixepoch() WHERE new.host_id NOT IN (SELECT host_id FROM node_instance); END;",
 
     NULL
 };
@@ -46,7 +42,6 @@ const char *database_cleanup[] = {
     "DELETE FROM chart WHERE chart_id NOT IN (SELECT chart_id FROM dimension);",
     "DELETE FROM host WHERE host_id NOT IN (SELECT host_id FROM chart);",
     "DELETE FROM chart_label WHERE chart_id NOT IN (SELECT chart_id FROM chart);",
-    "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);",
     "DELETE FROM host_info WHERE host_id NOT IN (SELECT host_id FROM host);",
     "DELETE FROM host_label WHERE host_id NOT IN (SELECT host_id FROM host);",
     "DROP TABLE IF EXISTS alert_hash;",

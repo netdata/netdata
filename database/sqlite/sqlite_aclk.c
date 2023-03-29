@@ -28,6 +28,8 @@ void sanity_check(void) {
 }
 
 const char *database_aclk_config[] = {
+    "CREATE TABLE IF NOT EXISTS node_instance (host_id blob PRIMARY KEY, claim_id, node_id, date_created);",
+    "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);",
     "VACUUM;",
     NULL
 };
@@ -76,6 +78,9 @@ int sql_init_aclk_database(int memory)
         target_version = perform_aclk_database_migration(db_aclk, DB_ACLK_VERSION);
 
     if (configure_database_params(db_aclk))
+        return 1;
+
+    if (database_set_version(db_aclk, target_version))
         return 1;
 
     if (init_database_batch(db_aclk, &database_aclk_config[0]))

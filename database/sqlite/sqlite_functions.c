@@ -333,6 +333,17 @@ int sqlite_init_databases(db_check_action_type_t mode, bool memory_mode)
         error_report("Failed to initialize context metadata database");
     }
 
+#ifdef ENABLE_ACLK
+    if (attach_database(db_meta, "netdata-aclk.db", "aclk"))
+        return 1;
+
+    char buf[1024 + 1] = "";
+    const char *list[2] = { buf, NULL };
+    snprintfz(buf, 1024, "CREATE TEMP TRIGGER IF NOT EXISTS ins_host_1 AFTER INSERT ON host BEGIN INSERT INTO node_instance (host_id, date_created) " \
+        "SELECT new.host_id, unixepoch() WHERE new.host_id NOT IN (SELECT host_id FROM node_instance); END;");
+    if(init_database_batch(db_meta, list)) return 1;
+#endif
+
     return 0;
 }
 
