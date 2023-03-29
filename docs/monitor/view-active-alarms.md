@@ -1,13 +1,13 @@
 # View active alerts
 
-Netdata comes with hundreds of pre-configured health alerts designed to notify you when an anomaly or performance issue affects your node or the applications it runs.
+Netdata comes with hundreds of pre-configured health alerts designed to notify you when an anomaly or performance issue affects your node or its applications.
 
 From the Alerts tab you can see all the active alerts in your War Room. You will be presented with a table having information about each alert that is in warning and critical state.
 You can always sort the table by a certain column by clicking on the name of that column, and use the gear icon on the top right to control which columns are visible at any given time.
 
 ![image](https://user-images.githubusercontent.com/70198089/226340574-7e138dc7-5eab-4c47-a4a9-5f2640e38643.png)
 
-### Filter alerts
+## Filter alerts
 
 From this view, you can also filter alerts with the right hand bar. More specifically you can filter:
 
@@ -22,7 +22,7 @@ From this view, you can also filter alerts with the right hand bar. More specifi
 - Nodes
   - Filter the alerts based on the nodes that are online, next to each node's name you can see how many alerts the node has, "critical" colored in red and "warning" colored in yellow
 
-### View alert details
+## View alert details
 
 By clicking on the name of an entry of the table you can access that alert's details page, providing you with:
 

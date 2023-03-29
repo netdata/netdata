@@ -1,7 +1,6 @@
-# War rooms
+# Netdata Cloud War rooms
 
-War Rooms organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and
-visualizations.
+Netdata Cloud uses War Rooms to organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and visualizations.
 
 Once you add nodes to a Space, all of your nodes will be visible in the **All nodes** War Room. This is a special War Room
 which gives you an overview of all of your nodes in this particular Space. Then you can create functional separations of

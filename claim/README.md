@@ -1,5 +1,7 @@
 # Connect Agent to Cloud
 
+This page will guide you through connecting a Netdata Agent to Netdata Cloud securely, via the encrypted Agent-Cloud link (ACLK).
+
 You can securely connect a Netdata Agent, running on a distributed node, to Netdata Cloud. A Space's
 administrator creates a **claiming token**, which is used to add an Agent to their Space via the [Agent-Cloud link
 (ACLK)](https://github.com/netdata/netdata/blob/master/aclk/README.md).
@@ -564,7 +566,7 @@ using the [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md).
 
 | setting        | default                   | info                                                                                                                                   |
 |:-------------- |:------------------------- |:-------------------------------------------------------------------------------------------------------------------------------------- |
-| cloud base url | https://api.netdata.cloud | The URL for the Netdata Cloud web application. You should not change this. If you want to disable Cloud, change the `enabled` setting. |
+| cloud base url | <https://api.netdata.cloud> | The URL for the Netdata Cloud web application. You should not change this. If you want to disable Cloud, change the `enabled` setting. |
 | enabled        | yes                       | The runtime option to disable the [Agent-Cloud link](https://github.com/netdata/netdata/blob/master/aclk/README.md) and prevent your Agent from connecting to Netdata Cloud.         |
 
 ### Claiming script

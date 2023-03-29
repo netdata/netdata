@@ -1,14 +1,6 @@
-<!--
-title: "Troubleshoot Agent-Cloud connectivity issues"
-sidebar_label: "Troubleshoot Agent-Cloud connectivity issues"
-description: "A simple guide to troubleshoot occurrences where the Agent is showing as offline after claiming."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/troubleshoot/troubleshooting-agent-with-cloud-connection.md
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Operations"
--->
-
 # Troubleshoot Agent-Cloud connectivity issues
+
+Learn how to troubleshoot the Netdata Agent showing as offline after claiming, so you can connect the Agent to Netdata Cloud.
 
 When you are claiming a node, you might not be able to immediately see it online in Netdata Cloud.  
 This could be due to an error in the claiming process or a temporary outage of some services.
