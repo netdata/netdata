@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- configure extent cache size [\#14821](https://github.com/netdata/netdata/pull/14821) ([ktsaou](https://github.com/ktsaou))
 - Minor improvements to netdata-security.md [\#14815](https://github.com/netdata/netdata/pull/14815) ([cakrit](https://github.com/cakrit))
 - Update privacy link in aclk doc [\#14813](https://github.com/netdata/netdata/pull/14813) ([cakrit](https://github.com/cakrit))
 - Consolidate security and privacy documents [\#14812](https://github.com/netdata/netdata/pull/14812) ([cakrit](https://github.com/cakrit))
@@ -13,6 +14,7 @@
 - diskspace: don't collect inodes on msdosfs [\#14809](https://github.com/netdata/netdata/pull/14809) ([ilyam8](https://github.com/ilyam8))
 - Address Learn feedback from users [\#14802](https://github.com/netdata/netdata/pull/14802) ([Ancairon](https://github.com/Ancairon))
 - add validation step before using GCP metadata [\#14801](https://github.com/netdata/netdata/pull/14801) ([ilyam8](https://github.com/ilyam8))
+- /api/v2/X part 7 [\#14797](https://github.com/netdata/netdata/pull/14797) ([ktsaou](https://github.com/ktsaou))
 - Replace `/docs` links with GitHub links [\#14796](https://github.com/netdata/netdata/pull/14796) ([Ancairon](https://github.com/Ancairon))
 - Fix links in README.md [\#14794](https://github.com/netdata/netdata/pull/14794) ([cakrit](https://github.com/cakrit))
 - Fix capitalization on readme [\#14793](https://github.com/netdata/netdata/pull/14793) ([cakrit](https://github.com/cakrit))
@@ -386,10 +388,6 @@
 - Use brackets around info variables [\#14206](https://github.com/netdata/netdata/pull/14206) ([MrZammler](https://github.com/MrZammler))
 - Dont call worker\_utilization\_finish\(\) twice [\#14204](https://github.com/netdata/netdata/pull/14204) ([MrZammler](https://github.com/MrZammler))
 - Switch to actions/labeler@v4 for labeling PRs. [\#14203](https://github.com/netdata/netdata/pull/14203) ([Ferroin](https://github.com/Ferroin))
-- Refactor ML code and add support for multiple KMeans models [\#14198](https://github.com/netdata/netdata/pull/14198) ([vkalintiris](https://github.com/vkalintiris))
-- Add few alarms for elasticsearch [\#14197](https://github.com/netdata/netdata/pull/14197) ([ilyam8](https://github.com/ilyam8))
-- chore\(packaging\): remove python-pymongo [\#14196](https://github.com/netdata/netdata/pull/14196) ([ilyam8](https://github.com/ilyam8))
-- bump go.d.plugin to v0.48.0 [\#14195](https://github.com/netdata/netdata/pull/14195) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
