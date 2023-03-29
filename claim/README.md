@@ -1,6 +1,6 @@
 # Connect Agent to Cloud
 
-This page will guide you through connecting a Netdata Agent, running on a distributed node, to Netdata Cloud securely via the encrypted Agent-Cloud link (ACLK).
+This page will guide you through connecting a Netdata Agent to Netdata Cloud securely, via the encrypted Agent-Cloud link (ACLK).
 
 You can securely connect a Netdata Agent, running on a distributed node, to Netdata Cloud. A Space's
 administrator creates a **claiming token**, which is used to add an Agent to their Space via the [Agent-Cloud link

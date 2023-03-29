@@ -1,6 +1,6 @@
 # Distributed data architecture
 
-Netdata's distributed data architecture stores metrics on individual nodes for high performance and scalability using all your granular metrics.
+Learn how Netdata's distributed data architecture enables us to store metrics on the edge nodes for security, high performance and scalability.
 
 This way, it helps you collect and store per-second metrics from any number of nodes.
 Every node in your infrastructure, whether it's one or a thousand, stores the metrics it collects.

@@ -2,7 +2,7 @@
 
 Netdata's dashboard features powerful date visualization controls that include a time control, a timezone selector and a rich date and timeframe selector.
 
-They come with useful defaults and rich customization, to help you narrow your focus when troubleshooting issues or anomalies.
+The controls come with useful defaults and rich customization, to help you narrow your focus when troubleshooting issues or anomalies.
 
 ## Time controls
 

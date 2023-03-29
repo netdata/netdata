@@ -1,6 +1,6 @@
 # Netdata Cloud Spaces
 
-Organize your infrastructure monitoring on Netdata Cloud by creating Spaces, then grouping your Agent-monitored nodes.
+Organize your multi-organization infrastructure monitoring on Netdata Cloud by creating Spaces to completely isolate access to your Agent-monitored nodes.
 
 A Space is a high-level container. It's a collaboration space where you can organize team members, access levels and the
 nodes you want to monitor.

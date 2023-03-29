@@ -1,6 +1,6 @@
 # Getting started with Netdata
 
-This section includes everything needed to have a basic Netdata setup running, including overview of configuration, installing an agent, and Cloud basics.
+Learn how Netdata can get you monitoring your infrastructure in minutes.
 
 ## What is Netdata ?
 
@@ -41,7 +41,6 @@ Netdata is:
 
 - **Distributed data architecture**  so fast and efficient, there’s no limit to the number of metrics you can follow.
 - Because your data is **stored at the edge**, security is ensured.
--
 
 ### Comparison with other monitoring solutions
 

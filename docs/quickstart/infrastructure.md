@@ -3,7 +3,7 @@ import { RiExternalLinkLine } from 'react-icons/ri'
 
 # Monitor your infrastructure
 
-Real-time infrastructure monitoring with Netdata Cloud. View key metrics, insightful charts, and active alarms from all your nodes.
+Learn how to view key metrics, insightful charts, and active alarms from all your nodes, with Netdata Cloud's real-time infrastructure monitoring.
 
 [Netdata Cloud](https://app.netdata.cloud) provides scalable infrastructure monitoring for any number of distributed
 nodes running the Netdata Agent. A node is any system in your infrastructure that you want to monitor, whether it's a

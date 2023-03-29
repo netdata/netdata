@@ -1,6 +1,6 @@
 # Sign in to Netdata
 
-This page will guide you through on how to sign in to Netdata with email, Google or GitHub, plus provide some tips if you're having trouble signing in.
+This page explains how to sign in to Netdata with your email, Google account, or GitHub account, and provides some tips if you're having trouble signing in.
 
 You can [sign in to Netdata](https://app.netdata.cloud/sign-in?cloudRoute=spaces?utm_source=docs&utm_content=sign_in_button_first_section) through one of three methods: email, Google, or GitHub. Email uses a
 time-sensitive link that authenticates your browser, and Google/GitHub both use OAuth to associate your email address
