@@ -980,7 +980,7 @@ void aclk_push_alert_snapshot_event(struct aclk_database_worker_config *wc, stru
 
     RRDHOST *host = wc->host;
     uint32_t cnt = 0;
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
