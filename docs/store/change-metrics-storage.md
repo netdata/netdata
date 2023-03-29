@@ -9,7 +9,7 @@ on the maximum retention and the memory used by Netdata is described in detail, 
 
 ## Calculate the system resources (RAM, disk space) needed to store metrics
 
-### Disk space allocated to each tier
+### Effect of storage tiers and disk space on retention
 
 3 tiers are enabled by default in Netdata, with the following configuration:
 
@@ -52,19 +52,19 @@ about **1 byte per data point on disk for tier 0**, and **4 bytes per data point
 So, for 1000 metrics collected per second and 256 MB for tier 0, Netdata will store about:
 
 ```
-256MB on disk / 1 byte per point / 1000 metrics => 256k points per metric / 86400 seconds per day = about 3 days
+256MB on disk / 1 byte per point / 1000 metrics => 256k points per metric / 86400 sec per day ~= 3 days
 ```
 
 At tier 1 (per minute):
 
 ```
-128MB on disk / 4 bytes per point / 1000 metrics => 32k points per metric / (24 hours * 60 minutes) = about 22 days
+128MB on disk / 4 bytes per point / 1000 metrics => 32k points per metric / (24 hr * 60 min) ~= 22 days
 ```
 
 At tier 2 (per hour):
 
 ```
-64MB on disk / 4 bytes per point / 1000 metrics => 16k points per metric / 24 hours per day = about 2 years 
+64MB on disk / 4 bytes per point / 1000 metrics => 16k points per metric / 24 hr per day ~= 2 years 
 ```
 
 Of course double the metrics, half the retention. There are more factors that affect retention. The number 
@@ -74,7 +74,7 @@ through time (because it has to break pages prematurely, increasing the metadata
 numbers should not deviate significantly from the above. 
 
 
-### Memory for concurrently collected metrics
+### Effect of storage tiers and retention on memory usage
 
 The total memory Netdata uses is heavily influenced by the memory consumed by the DBENGINE.
 The DBENGINE memory is related to the number of metrics concurrently being collected, the retention of the metrics 
