@@ -1,55 +1,73 @@
-<!--
-title: "Alerta agent alert notifications"
-sidebar_label: "Alerta"
-description: "Send alarm notifications to Alerta to see the latest health status updates from multiple nodes in a single interface."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/alerta/README.md"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Integrations/Notify/Agent alert notifications"
-learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
--->
+# Alerta Agent alert notifications
 
-# Alerta agent alert notifications
+Send alarm notifications to Alerta to see the latest health status updates from multiple nodes in a single interface.
 
-The [Alerta](https://alerta.io) monitoring system is a tool used to
-consolidate and de-duplicate alerts from multiple sources for quick
-‘at-a-glance’ visualisation. With just one system you can monitor
-alerts from many other monitoring tools on a single screen.
+> ### Note
+>
+> This file assumes you have read the [landing page of this section](https://github.com/netdata/netdata/blob/master/health/notifications/README.md), detailing how the Netdata Agent's alerting method works.
+
+The [Alerta](https://alerta.io) monitoring system is a tool used to consolidate and de-duplicate alerts from multiple sources for quick ‘at-a-glance’ visualization.
+With just one system you can monitor alerts from many other monitoring tools on a single screen.
 
 ![Alerta dashboard](https://docs.alerta.io/_images/alerta-screen-shot-3.png "Alerta dashboard showing several alerts.")
 
-Alerta's advantage is the main view, where you can see all active alarms with the most recent state. You can also view an alert history. You can send Netdata alerts to Alerta to see alerts coming from many Netdata hosts or also from a multi-host
-Netdata configuration. 
+Alerta's advantage is the main view, where you can see all active alarms with the most recent state.
+You can also view an alert history. You can send Netdata alerts to Alerta to see alerts coming from many Netdata hosts or also from a multi-host Netdata configuration.
+
+## Prerequisites
+
+You will need to:
+
+- Create an Alerta API key (if authentication in Alerta is enabled)
+- Have terminal access to the Agent you wish to configure
 
 ## Deploying Alerta
 
-The recommended setup is using a dedicated server, VM or container. If you have other NGINX or Apache servers in your organization,
-it is recommended to proxy to this new server.
+The recommended setup is using a dedicated server, VM or container.
+If you have other NGINX or Apache servers in your organization, it is recommended to proxy to this new server.
 
 You can install Alerta in several ways:
+
 - **Docker**: Alerta provides a [Docker image](https://hub.docker.com/r/alerta/alerta-web/) to get you started quickly.
-- **Deployment on Ubuntu server**: Alerta's [getting started tutorial](https://docs.alerta.io/gettingstarted/tutorial-1-deploy-alerta.html) walks you through this process. 
+- **Deployment on Ubuntu server**: Alerta's [getting started tutorial](https://docs.alerta.io/gettingstarted/tutorial-1-deploy-alerta.html) walks you through this process.
 - **Advanced deployment scenarios**: More ways to install and deploy Alerta are documented on the [Alerta docs](http://docs.alerta.io/en/latest/deployment.html).
 
 ## Sending alerts to Alerta
 
-### Step 1. Create an API key (if authentication in Alerta is enabled)
+> ### Info
+>
+> This file mentions editing configuration files.  
+>
+> - To edit configuration files in a safe way, we provide the [`edit config` script](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) located in your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) (typically is `/etc/netdata`) that creates the proper file and opens it in an editor automatically.  
+> Note that to run the script you need to be inside your Netdata config directory.
+>
+> - Please also note that after most configuration changes you will need to [restart the Agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for the changes to take effect.
+>
+> It is recommended to use this way for configuring Netdata.
+
+### Create an API key (if authentication in Alerta is enabled)
 
 You will need an API key to send messages from any source, if
-Alerta is configured to use authentication (recommended). 
+Alerta is configured to use authentication (recommended).
 
-Create a new API key in Alerta: 
-1. Go to *Configuration* > *API Keys* 
+Create a new API key in Alerta:
+
+1. Go to *Configuration* > *API Keys*
 2. Create a new API key called "netdata" with `write:alerts` permission.
 
-### Step 2. Configure Netdata to send alerts to Alerta
-1. Edit the `health_alarm_notify.conf` by running:
-```sh
-/etc/netdata/edit-config health_alarm_notify.conf
-```
+### Configure Netdata to send alerts to Alerta
 
-2. Modify the file as below:
-```
+Edit `health_alarm_notify.conf`:
+
+1. Set `SEND_ALERTA` to `YES`
+2. set `ALERTA_WEBHOOK_URL` to the API url you defined when you installed the Alerta server
+3. Set `ALERTA_API_KEY` to the API key you created previously
+4. Set `DEFAULT_RECIPIENT_ALERTA` to the default recipient environment you want to alert to  
+   All roles will default to this environment if left unconfigured.
+
+An example working configuration would be:
+
+```conf
 # enable/disable sending alerta notifications
 SEND_ALERTA="YES"
 
@@ -69,18 +87,10 @@ ALERTA_API_KEY="INSERT_YOUR_API_KEY_HERE"
 DEFAULT_RECIPIENT_ALERTA="Production"
 ```
 
-## Test alarms
+## Test the alert
 
-We can test alarms using the standard approach:
+To test this alert refer to the ["Testing Alert Notifications"](https://github.com/netdata/netdata/blob/master/health/notifications/README.md#testing-alert-notifications) section of the Agent alert notifications page.
 
-```sh
-/opt/netdata/netdata-plugins/plugins.d/alarm-notify.sh test
-```
+## More information
 
-> **Note** This script will send 3 alarms. 
-> Alerta will not show the alerts in the main page, because last alarm is "CLEAR".
-> To see the test alarms, you need to select "closed" alarms in the top-right lookup. 
-
-For more information see the [Alerta documentation](https://docs.alerta.io)
-
-
+For more information see the [Alerta documentation](https://docs.alerta.io).

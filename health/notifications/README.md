@@ -14,7 +14,7 @@ The default script is `alarm-notify.sh`.
 > Note that to run the script you need to be inside your Netdata config directory.
 >
 > - Please also note that after most configuration changes you will need to [restart the Agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for the changes to take effect.
-> 
+>
 > It is recommended to use this way for configuring Netdata.
 
 You can change the default script globally by editing `netdata.conf` and changing the `script to execute on alarm` in the `[health]` section.
@@ -95,7 +95,7 @@ You can edit `health_alarm_notify.conf` using the `edit-config` script to config
 
      Here you can change the `${DEFAULT_...}` values to the values of the recipients you want, separated by a space if you have multiple recipients.
 
-## Testing Notifications
+## Testing Alert Notifications
 
 You can run the following command by hand, to test alerts configuration:
 
