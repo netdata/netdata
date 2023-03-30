@@ -6,8 +6,7 @@ Learn how to send notifications through Amazon SNS using Netdata's Agent alert n
 >
 > This file assumes you have read the [landing page of this section](https://github.com/netdata/netdata/blob/master/health/notifications/README.md), detailing how the Netdata Agent's alert notification method works.
 
-As part of its AWS suite, Amazon provides a notification broker service called 'Simple Notification Service' (SNS). Amazon SNS works similarly to Netdata's own notification system, allowing to dispatch a single notification to multiple subscribers of different types. While Amazon SNS supports sending differently formatted messages for different delivery methods, Netdata does not currently support this functionality.
-Among other things, SNS supports sending notifications to:
+As part of its AWS suite, Amazon provides a notification broker service called 'Simple Notification Service' (SNS). Amazon SNS works similarly to Netdata's own notification system, allowing to dispatch a single notification to multiple subscribers of different types. Among other things, SNS supports sending notifications to:
 
 - Email addresses.
 - Mobile Phones via SMS.
@@ -15,6 +14,10 @@ Among other things, SNS supports sending notifications to:
 - AWS Lambda functions.
 - AWS SQS queues.
 - Mobile applications via push notifications.
+
+> ### Note
+>
+> While Amazon SNS supports sending differently formatted messages for different delivery methods, Netdata does not currently support this functionality.
 
 For email notification support, we recommend using Netdata's email notifications, as it is has the following benefits:
 
@@ -32,6 +35,7 @@ Before you can enable SNS, you need:
 - An actual home directory for the user you run Netdata as, instead of just using `/` as a home directory. The setup depends on the distribution, but `/var/lib/netdata` is the recommended directory. If you are using Netdata as a dedicated user, the permissions will already be correct.
 - An Amazon SNS topic to send notifications to with one or more subscribers. The [Getting Started](https://docs.aws.amazon.com/sns/latest/dg/sns-getting-started.html) section of the Amazon SNS documentation covers the basics of how to set this up. Make note of the **Topic ARN** when you create the topic.
 - While not mandatory, it is highly recommended to create a dedicated IAM user on your account for Netdata to send notifications. This user needs to have programmatic access, and should only allow access to SNS. For an additional layer of security, you can create one for each system or group of systems.
+- Terminal access to the Agent you wish to configure
 
 ## Sending Alerts to Amazon SNS
 
@@ -67,8 +71,7 @@ Edit `health_alarm_notify.conf`:
 1. Set `SEND_AWSNS` to `YES`
 2. Set `AWSSNS_MESSAGE_FORMAT` to the string that you want the alert to be sent into
 
-   <details>
-   <summary>Supported variables</summary>
+   The supported variables are:
 
    | Variable name               | Description                                                                      |
    |:---------------------------:|:---------------------------------------------------------------------------------|
@@ -109,9 +112,19 @@ Edit `health_alarm_notify.conf`:
    | `${total_warnings}`         | The total number of alarms in WARNING state on the host                          |
    | `${total_critical}`         | The total number of alarms in CRITICAL state on the host                         |
 
-</details>
+3. Set `DEFAULT_RECIPIENT_AWSSNS` to the Topic ARN you noted down upon creating the Topic  
+   All roles will default to this variable if left unconfigured.
 
-3. Set `DEFAULT_RECIPIENT_AWSSNS` to the Topic ARN you noted down upon creating the Topic.
+You can then have different recipient Topics per **role**, by editing `DEFAULT_RECIPIENT_AWSSNS` with the Topic ARN you want, in the following entries at the bottom of the same file:
+
+```conf
+role_recipients_awssns[sysadmin]="arn:aws:sns:us-east-2:123456789012:Systems"
+role_recipients_awssns[domainadmin]="arn:aws:sns:us-east-2:123456789012:Domains"
+role_recipients_awssns[dba]="arn:aws:sns:us-east-2:123456789012:Databases"
+role_recipients_awssns[webmaster]="arn:aws:sns:us-east-2:123456789012:Development"
+role_recipients_awssns[proxyadmin]="arn:aws:sns:us-east-2:123456789012:Proxy"
+role_recipients_awssns[sitemgr]="arn:aws:sns:us-east-2:123456789012:Sites"
+```
 
 An example working configuration would be:
 

@@ -1,38 +1,75 @@
-<!--
-title: "Discord agent alert notifications"
-sidebar_label: "Discord"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/discord/README.md"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Integrations/Notify/Agent alert notifications"
-learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
--->
+# Discord Agent alert notifications
 
-# Discord agent alert notifications
+Learn how to send notifications to Discord using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+
+> ### Note
+>
+> This file assumes you have read the [landing page of this section](https://github.com/netdata/netdata/blob/master/health/notifications/README.md), detailing how the Netdata Agent's alert notification method works.
 
 This is what you will get:
 
 ![image](https://cloud.githubusercontent.com/assets/7321975/22215935/b49ede7e-e162-11e6-98d0-ae8541e6b92e.png)
 
-You need:
+## Prerequisites
 
-1.  The **incoming webhook URL** as given by Discord. Create a webhook by following the official [Discord documentation](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks). You can use the same on all your Netdata servers (or you can have multiple if you like - your decision).
-2.  One or more Discord channels to post the messages to.
+You will need
 
-Set them in `/etc/netdata/health_alarm_notify.conf` (to edit it on your system run `/etc/netdata/edit-config health_alarm_notify.conf`), like this:
+- The **incoming webhook URL** as given by Discord. Create a webhook by following the official [Discord documentation](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks). You can use the same on all your Netdata servers (or you can have multiple if you like - your decision).
+- One or more Discord channels to post the messages to.
+- Terminal access to the Agent you wish to configure
 
+## Configure Netdata to send alerts to Discord
+
+> ### Info
+>
+> This file mentions editing configuration files.  
+>
+> - To edit configuration files in a safe way, we provide the [`edit config` script](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) located in your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) (typically is `/etc/netdata`) that creates the proper file and opens it in an editor automatically.  
+> Note that to run the script you need to be inside your Netdata config directory.
+>
+> - Please also note that after most configuration changes you will need to [restart the Agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for the changes to take effect.
+>
+> It is recommended to use this way for configuring Netdata.
+
+Edit `health_alarm_notify.conf`:
+
+1. Set `SEND_DISCORD` to `YES`
+2. Set `DISCORD_WEBHOOK_URL` to your webhook URL
+3. Set `DEFAULT_RECIPIENT_DISCORD` to the channel you want the alert to be sent  
+   You can define multiple channels like this: `alarms systems`.  
+   All roles will default to this variable if left unconfigured.
+   
+   > ### Note
+   >
+   > You don't have to include the hashtag "#" of the channel, just its name.
+
+You can then have different channels per **role**, by editing `DEFAULT_RECIPIENT_DISCORD` with the channel you want, in the following entries at the bottom of the same file:
+
+```conf
+role_recipients_discord[sysadmin]="systems"
+role_recipients_discord[domainadmin]="domains"
+role_recipients_discord[dba]="databases systems"
+role_recipients_discord[webmaster]="marketing development"
+role_recipients_discord[proxyadmin]="proxy-admin"
+role_recipients_discord[sitemgr]="sites"
 ```
-###############################################################################
-# sending discord notifications
 
-# note: multiple recipients can be given like this:
+The values you provide should already exist as Discord channels in your server.
+
+An example of a working configuration would be:
+
+```conf
+#------------------------------------------------------------------------------
+# discord (discordapp.com) global notification options
+
+# multiple recipients can be given like this:
 #                  "CHANNEL1 CHANNEL2 ..."
 
 # enable/disable sending discord notifications
 SEND_DISCORD="YES"
 
 # Create a webhook by following the official documentation -
-# https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks
+# https://support.discordapp.com/hc/en-us/articles/228383668-Intro-to-Webhooks
 DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/XXXXXXXXXXXXX/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 
 # if a role's recipients are not configured, a notification will be send to
@@ -41,13 +78,6 @@ DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/XXXXXXXXXXXXX/XXXXXXXXXXXX
 DEFAULT_RECIPIENT_DISCORD="alarms"
 ```
 
-You can define multiple channels like this: `alarms systems`.
-You can give different channels per **role** using these (at the same file):
+## Test the alert
 
-```
-role_recipients_discord[sysadmin]="systems"
-role_recipients_discord[dba]="databases systems"
-role_recipients_discord[webmaster]="marketing development"
-```
-
-The keywords `systems`, `databases`, `marketing`, `development` are discord.com channels (they should already exist within your discord server).
+To test this alert refer to the ["Testing Alert Notifications"](https://github.com/netdata/netdata/blob/master/health/notifications/README.md#testing-alert-notifications) section of the Agent alert notifications page.

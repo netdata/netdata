@@ -16,10 +16,10 @@ You can also view an alert history. You can send Netdata alerts to Alerta to see
 
 ## Prerequisites
 
-You will need to:
+You need:
 
-- Create an Alerta API key (if authentication in Alerta is enabled)
-- Have terminal access to the Agent you wish to configure
+- An Alerta API key (if authentication in Alerta is enabled)
+- Terminal access to the Agent you wish to configure
 
 ## Deploying Alerta
 
@@ -63,7 +63,20 @@ Edit `health_alarm_notify.conf`:
 2. set `ALERTA_WEBHOOK_URL` to the API url you defined when you installed the Alerta server
 3. Set `ALERTA_API_KEY` to the API key you created previously
 4. Set `DEFAULT_RECIPIENT_ALERTA` to the default recipient environment you want to alert to  
-   All roles will default to this environment if left unconfigured.
+   All roles will default to this variable if left unconfigured.
+
+You can then have different recipient environments per **role**, by editing `DEFAULT_RECIPIENT_CUSTOM` with the environment name you want, in the following entries at the bottom of the same file:
+
+```conf
+role_recipients_alerta[sysadmin]="Systems"
+role_recipients_alerta[domainadmin]="Domains"
+role_recipients_alerta[dba]="Databases Systems"
+role_recipients_alerta[webmaster]="Marketing Development"
+role_recipients_alerta[proxyadmin]="Proxy"
+role_recipients_alerta[sitemgr]="Sites"
+```
+
+The values you provide should be defined as environments in `/etc/alertad.conf` option `ALLOWED_ENVIRONMENTS`
 
 An example working configuration would be:
 
