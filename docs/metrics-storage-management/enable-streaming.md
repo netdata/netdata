@@ -59,33 +59,41 @@ Here are a few example streaming configurations:
     metrics to parent `B`.
   - Any node with a database can generate alarms.
 
-### A basic auto-scaling setup
+### A basic parent child setup without Netdata cloud
 
-If your nodes are ephemeral, a Netdata parent with persistent storage outside your production infrastructure can be used to
-store all the metrics from the Netdata children running on the ephemeral nodes.
+![Simple parent child no cloud](https://user-images.githubusercontent.com/43294513/228891897-aec7f7e1-172f-4ff1-b52d-209f59dc7125.jpg)
 
-![A diagram of an auto-scaling setup with Netdata](https://user-images.githubusercontent.com/1153921/84290043-0c1c1600-aaf8-11ea-9757-dd8dd8a8ec6c.png)
+For a predictable number of  non-ephemeral nodes, with sufficient RAM and disk IO on each node, 
+you can have a Netdata agent with the default settings running on each node and replicate its data to  
+a Netdata parent, preferrably on a management/admin node outside your production infrastructure. 
 
-### Archiving to a time-series database
+[Secure your nodes](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/secure-nodes.md) to 
+protect them from the internet by making their UI accessible only via an nginx proxy, with potentially different subdomains
+for the parent and even each child, if necessary. 
 
-The parent Netdata node can also archive metrics, for all its child nodes, to an external time-series database.
+This setup is simple, does not involve Netdata Cloud, but you are limited to seeing metrics from one node at a time. 
 
-Check the Netdata [exporting documentation](https://github.com/netdata/netdata/blob/master/docs/export/external-databases.md) for configuring this.
+### A basic parent child setup with Netdata cloud
 
-This is how such a solution will work:
+![Simple parent child](https://user-images.githubusercontent.com/43294513/228891775-0465ffab-1210-406b-b733-d626fd0c10d0.jpg)
 
-![Diagram showing an example configuration for archiving to a time-series
-database](https://user-images.githubusercontent.com/1153921/84291308-c2ccc600-aaf9-11ea-98a9-89ccbf3a62dd.png)
+This setup replaces the nginx proxy with Netdata Cloud, in order to provide 
+[infrastructure monitoring](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md),
+instead of single node monitoring. The agent dashboards can be completely disabled, for increased security.
+
+We have both children and the parent connected to the cloud, so that requests can be served by either of them.
+When both a child and a parent is available, the cloud will always prefer to request the data to display to the user 
+from the parent.
 
 ### An advanced setup
 
-Netdata also supports `proxies` with and without a local database, and data retention can be different between all nodes.
+![Ephemeral nodes with two parents](https://user-images.githubusercontent.com/43294513/228891974-590bf0de-4e5a-46b2-a07a-7bb3dffde2bf.jpg)
 
-This means a setup like the following is also possible:
+When the nodes are ephemeral, we recommend using two parents in an active-active setup, and having the children not store data at all.
 
-<p align="center">
-<img src="https://cloud.githubusercontent.com/assets/2662304/23629551/bb1fd9c2-02c0-11e7-90f5-cab5a3ed4c53.png"/>
-</p>
+Both parents are configured on each child, so that if one is not available, they connect to the other.
+
+The children in this set up are not connected to Netdata Cloud at all, as high availability is achieved with the second parent.
 
 ## Enable streaming between nodes
 
