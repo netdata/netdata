@@ -2,6 +2,7 @@
 
 #include "internal.h"
 
+#include "aclk/aclk_capas.h"
 
 // ----------------------------------------------------------------------------
 // /api/v2/contexts API
@@ -306,23 +307,20 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
             buffer_json_member_add_array(wb, "services");
             buffer_json_array_close(wb);
 
-            buffer_json_member_add_array(wb, "capabilities");
-            buffer_json_add_array_item_object(wb);
-            buffer_json_member_add_string(wb, "name", "funcs");
-            buffer_json_member_add_uint64(wb, "version", 1);
-            buffer_json_member_add_boolean(wb, "enabled", true);
-            buffer_json_object_close(wb);
-            buffer_json_add_array_item_object(wb);
-            buffer_json_member_add_string(wb, "name", "mc");
-            buffer_json_member_add_uint64(wb, "version", 1);
-            buffer_json_member_add_boolean(wb, "enabled", true);
-            buffer_json_object_close(wb);
-            buffer_json_add_array_item_object(wb);
-            buffer_json_member_add_string(wb, "name", "ml");
-            buffer_json_member_add_uint64(wb, "version", 1);
-            buffer_json_member_add_boolean(wb, "enabled", true);
-            buffer_json_object_close(wb);
+            buffer_json_member_add_array(wb, "nodeInstanceCapabilities");
+
+            struct capability *capas = aclk_get_node_instance_capas(host);
+            struct capability *capa = capas;
+            while(capa->name != NULL) {
+                buffer_json_add_array_item_object(wb);
+                buffer_json_member_add_string(wb, "name", capa->name);
+                buffer_json_member_add_uint64(wb, "version", capa->version);
+                buffer_json_member_add_boolean(wb, "enabled", capa->enabled);
+                buffer_json_object_close(wb);
+                capa++;
+            }
             buffer_json_array_close(wb);
+            freez(capas);
 
             web_client_api_request_v1_info_summary_alarm_statuses(host, wb, "alarmCounters");
 
