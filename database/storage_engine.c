@@ -8,10 +8,6 @@
 
 #define im_collect_ops {                                                            \
     .init = rrddim_collect_init,                                                    \
-    .store_metric = rrddim_collect_store_metric,                                    \
-    .flush = rrddim_store_metric_flush,                                             \
-    .finalize = rrddim_collect_finalize,                                            \
-    .change_collection_frequency = rrddim_store_metric_change_collection_frequency, \
     .metrics_group_get = rrddim_metrics_group_get,                                  \
     .metrics_group_release = rrddim_metrics_group_release,                          \
 }
@@ -100,10 +96,6 @@ static STORAGE_ENGINE engines[] = {
             .metric_retention_by_uuid = rrdeng_metric_retention_by_uuid,
             .collect_ops = {
                 .init = rrdeng_store_metric_init,
-                .store_metric = rrdeng_store_metric_next,
-                .flush = rrdeng_store_metric_flush_current_page,
-                .finalize = rrdeng_store_metric_finalize,
-                .change_collection_frequency = rrdeng_store_metric_change_collection_frequency,
                 .metrics_group_get = rrdeng_metrics_group_get,
                 .metrics_group_release = rrdeng_metrics_group_release,
             },

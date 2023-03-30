@@ -307,7 +307,9 @@ bool exporting_labels_filter_callback(const char *name, const char *value, RRDLA
 
 // ----------------------------------------------------------------------------
 // engine-specific iterator state for dimension data collection
-typedef struct storage_collect_handle STORAGE_COLLECT_HANDLE;
+typedef struct storage_collect_handle {
+    STORAGE_ENGINE_BACKEND backend;
+} STORAGE_COLLECT_HANDLE;
 
 // ----------------------------------------------------------------------------
 // Storage tier data for every dimension
@@ -423,22 +425,73 @@ struct storage_engine_collect_ops {
     // an initialization function to run before starting collection
     STORAGE_COLLECT_HANDLE *(*init)(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every, STORAGE_METRICS_GROUP *smg);
 
-    // run this to store each metric into the database
-    void (*store_metric)(STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time, NETDATA_DOUBLE number, NETDATA_DOUBLE min_value,
-                         NETDATA_DOUBLE max_value, uint16_t count, uint16_t anomaly_count, SN_FLAGS flags);
-
-    // run this to flush / reset the current data collection sequence
-    void (*flush)(STORAGE_COLLECT_HANDLE *collection_handle);
-
-    // a finalization function to run after collection is over
-    // returns 1 if it's safe to delete the dimension
-    int (*finalize)(STORAGE_COLLECT_HANDLE *collection_handle);
-
-    void (*change_collection_frequency)(STORAGE_COLLECT_HANDLE *collection_handle, int update_every);
-
     STORAGE_METRICS_GROUP *(*metrics_group_get)(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
     void (*metrics_group_release)(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *sa);
 };
+
+void rrdeng_store_metric_next(
+        STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time_ut,
+        NETDATA_DOUBLE n, NETDATA_DOUBLE min_value, NETDATA_DOUBLE max_value,
+        uint16_t count, uint16_t anomaly_count, SN_FLAGS flags);
+
+void rrddim_collect_store_metric(
+        STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time_ut,
+        NETDATA_DOUBLE n, NETDATA_DOUBLE min_value, NETDATA_DOUBLE max_value,
+        uint16_t count, uint16_t anomaly_count, SN_FLAGS flags);
+
+static inline void storage_engine_store_metric(
+        STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time_ut,
+        NETDATA_DOUBLE n, NETDATA_DOUBLE min_value, NETDATA_DOUBLE max_value,
+        uint16_t count, uint16_t anomaly_count, SN_FLAGS flags) {
+#ifdef ENABLE_DBENGINE
+    if(likely(collection_handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_store_metric_next(collection_handle, point_in_time_ut,
+                                        n, min_value, max_value,
+                                        count, anomaly_count, flags);
+#endif
+    return rrddim_collect_store_metric(collection_handle, point_in_time_ut,
+                                       n, min_value, max_value,
+                                       count, anomaly_count, flags);
+}
+
+void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_handle);
+void rrddim_store_metric_flush(STORAGE_COLLECT_HANDLE *collection_handle);
+static inline void storage_engine_store_flush(STORAGE_COLLECT_HANDLE *collection_handle) {
+    if(unlikely(!collection_handle))
+        return;
+
+#ifdef ENABLE_DBENGINE
+    if(likely(collection_handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        rrdeng_store_metric_flush_current_page(collection_handle);
+    else
+#endif
+        rrddim_store_metric_flush(collection_handle);
+}
+
+int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle);
+int rrddim_collect_finalize(STORAGE_COLLECT_HANDLE *collection_handle);
+// a finalization function to run after collection is over
+// returns 1 if it's safe to delete the dimension
+static inline int storage_engine_store_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
+#ifdef ENABLE_DBENGINE
+    if(likely(collection_handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_store_metric_finalize(collection_handle);
+#endif
+
+    return rrddim_collect_finalize(collection_handle);
+}
+
+void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every);
+void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every);
+static inline void storage_engine_store_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every) {
+#ifdef ENABLE_DBENGINE
+    if(likely(collection_handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        rrdeng_store_metric_change_collection_frequency(collection_handle, update_every);
+    else
+#endif
+        rrddim_store_metric_change_collection_frequency(collection_handle, update_every);
+}
+
 
 // ----------------------------------------------------------------------------
 

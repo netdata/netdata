@@ -175,7 +175,7 @@ bool rrddim_finalize_collection_and_check_retention(RRDDIM *rd) {
 
         tiers_available++;
 
-        if(rd->tiers[tier].collect_ops->finalize(rd->tiers[tier].db_collection_handle))
+        if(storage_engine_store_finalize(rd->tiers[tier].db_collection_handle))
             tiers_said_no_retention++;
 
         rd->tiers[tier].db_collection_handle = NULL;
