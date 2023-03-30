@@ -2895,78 +2895,58 @@ cleanup:
     return r;
 }
 
-static void rrd2rrdr_group_by_add_metric(RRDR *r, size_t query_metric_id) {
-    if(!r->group_by.r)
+static void rrd2rrdr_group_by_add_metric(RRDR *r_dst, size_t d_dst, RRDR *r_tmp, size_t d_tmp,
+                                         RRDR_GROUP_BY_FUNCTION group_by_aggregate_function,
+                                         STORAGE_POINT *query_points) {
+    if(!r_tmp || r_dst == r_tmp || !(r_tmp->od[d_tmp] & RRDR_DIMENSION_QUERIED))
         return;
 
-    QUERY_TARGET *qt = r->internal.qt;
-    RRDR_OPTIONS options = qt->window.options;
-    RRDR *r_tmp = r->group_by.r;
-
-    QUERY_METRIC *qm = query_metric(qt, query_metric_id);
-    size_t d = qm->grouped_as.slot;
+    internal_fatal(d_dst >= r_dst->d, "QUERY: destination dimension exceeds RRDR size");
+    internal_fatal(d_tmp >= r_tmp->d, "QUERY: source dimension exceeds RRDR size");
 
     // do the group_by
     for(size_t i = 0; i != rrdr_rows(r_tmp) ; i++) {
 
-        size_t idx_tmp = i * r_tmp->d;
-        NETDATA_DOUBLE *cn_tmp_base = &r_tmp->v[ idx_tmp ];
-        RRDR_VALUE_FLAGS *co_tmp_base = &r_tmp->o[ idx_tmp ];
-        NETDATA_DOUBLE *ar_tmp_base = &r_tmp->ar[ idx_tmp ];
+        size_t idx_tmp = i * r_tmp->d + d_tmp;
+        NETDATA_DOUBLE n_tmp = r_tmp->v[ idx_tmp ];
+        RRDR_VALUE_FLAGS o_tmp = r_tmp->o[ idx_tmp ];
+        NETDATA_DOUBLE ar_tmp = r_tmp->ar[ idx_tmp ];
 
-        size_t idx = i * r->d;
-        NETDATA_DOUBLE *cn_base = &r->v[ idx ];
-        RRDR_VALUE_FLAGS *co_base = &r->o[ idx ];
-        NETDATA_DOUBLE *ar_base = &r->ar[ idx ];
-        uint32_t *gbc_base = &r->gbc[ idx ];
+        if(o_tmp & RRDR_VALUE_EMPTY)
+            continue;
 
-        for(size_t d_tmp = 0; d_tmp < r_tmp->d ; d_tmp++) {
-            if(unlikely(!(r_tmp->od[d_tmp] & RRDR_DIMENSION_QUERIED)))
-                continue;
+        r_dst->od[d_dst] |= RRDR_DIMENSION_QUERIED;
 
-            NETDATA_DOUBLE n_tmp = cn_tmp_base[d_tmp];
-            RRDR_VALUE_FLAGS o_tmp = co_tmp_base[d_tmp];
-            NETDATA_DOUBLE ar_tmp = ar_tmp_base[d_tmp];
+        size_t idx_dst = i * r_dst->d + d_dst;
+        NETDATA_DOUBLE *cn = &r_dst->v[ idx_dst ];
+        RRDR_VALUE_FLAGS *co = &r_dst->o[ idx_dst ];
+        NETDATA_DOUBLE *ar = &r_dst->ar[ idx_dst ];
+        uint32_t *gbc = &r_dst->gbc[ idx_dst ];
 
-            if(o_tmp & RRDR_VALUE_EMPTY) {
-                if(options & RRDR_OPTION_NULL2ZERO)
-                    n_tmp = 0.0;
-                else
-                    continue;
-            }
+        switch(group_by_aggregate_function) {
+            default:
+            case RRDR_GROUP_BY_FUNCTION_AVERAGE:
+            case RRDR_GROUP_BY_FUNCTION_SUM:
+                *cn += n_tmp;
+                break;
 
-            r->od[d] |= RRDR_DIMENSION_QUERIED;
+            case RRDR_GROUP_BY_FUNCTION_MIN:
+                if(!*gbc || n_tmp < *cn)
+                    *cn = n_tmp;
+                break;
 
-            NETDATA_DOUBLE *cn = &cn_base[d];
-            RRDR_VALUE_FLAGS *co = &co_base[d];
-            NETDATA_DOUBLE *ar = &ar_base[d];
-            uint32_t *gbc = &gbc_base[d];
-
-            switch(qt->request.group_by_aggregate_function) {
-                default:
-                case RRDR_GROUP_BY_FUNCTION_AVERAGE:
-                case RRDR_GROUP_BY_FUNCTION_SUM:
-                    *cn += n_tmp;
-                    break;
-
-                case RRDR_GROUP_BY_FUNCTION_MIN:
-                    if(!*gbc || n_tmp < *cn)
-                        *cn = n_tmp;
-                    break;
-
-                case RRDR_GROUP_BY_FUNCTION_MAX:
-                    if(!*gbc || n_tmp > *cn)
-                        *cn = n_tmp;
-                    break;
-            }
-
-            *co |= (o_tmp & (RRDR_VALUE_RESET | RRDR_VALUE_PARTIAL));
-            *ar += ar_tmp;
-            (*gbc)++;
+            case RRDR_GROUP_BY_FUNCTION_MAX:
+                if(!*gbc || n_tmp > *cn)
+                    *cn = n_tmp;
+                break;
         }
+
+        *co |= (o_tmp & (RRDR_VALUE_RESET | RRDR_VALUE_PARTIAL));
+        *ar += ar_tmp;
+        (*gbc)++;
     }
 
-    storage_point_merge_to(r->dqp[d], qm->query_points);
+    storage_point_merge_to(r_dst->dqp[d_dst], *query_points);
 }
 
 static void rrdr2rrdr_group_by_partial_trimming(RRDR *r) {
@@ -3369,7 +3349,8 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                 r->view.before = r_tmp->view.before;
                 r->rows = r_tmp->rows;
 
-                rrd2rrdr_group_by_add_metric(r, d);
+                rrd2rrdr_group_by_add_metric(r, qm->grouped_as.slot, r_tmp, dim_in_rrdr_tmp,
+                                             qt->request.group_by_aggregate_function, &qm->query_points);
             }
 
             rrd2rrdr_query_ops_release(ops[d]); // reuse this ops allocation
