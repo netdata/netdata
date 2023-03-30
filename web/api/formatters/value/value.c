@@ -13,25 +13,7 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
     NETDATA_DOUBLE sum = 0, min = 0, max = 0, v;
     int all_null = 1, init = 1;
 
-    NETDATA_DOUBLE total = 1;
     NETDATA_DOUBLE total_anomaly_rate = 0;
-
-    int set_min_max = 0;
-    if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
-        total = 0;
-        for (c = 0; c < r->d ; c++) {
-            if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
-            NETDATA_DOUBLE n = cn[c];
-
-            if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
-                n = -n;
-
-            total += n;
-        }
-        // prevent a division by zero
-        if(total == 0) total = 1;
-        set_min_max = 1;
-    }
 
     // for each dimension
     for (c = 0; c < r->d ; c++) {
@@ -39,21 +21,6 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
             continue;
 
         NETDATA_DOUBLE n = cn[c];
-
-        if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
-            n = -n;
-
-        if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
-            n = n * 100 / total;
-
-            if(unlikely(set_min_max)) {
-                r->view.min = r->view.max = n;
-                set_min_max = 0;
-            }
-
-            if(n < r->view.min) r->view.min = n;
-            if(n > r->view.max) r->view.max = n;
-        }
 
         if(unlikely(init)) {
             if(n > 0) {
@@ -104,7 +71,7 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
 QUERY_VALUE rrdmetric2value(RRDHOST *host,
                             struct rrdcontext_acquired *rca, struct rrdinstance_acquired *ria, struct rrdmetric_acquired *rma,
                             time_t after, time_t before,
-                            RRDR_OPTIONS options, RRDR_TIME_GROUPING group_method, const char *group_options,
+                            RRDR_OPTIONS options, RRDR_TIME_GROUPING time_group_method, const char *time_group_options,
                             size_t tier, time_t timeout, QUERY_SOURCE query_source, STORAGE_PRIORITY priority
 ) {
     QUERY_TARGET_REQUEST qtr = {
@@ -117,10 +84,10 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
             .before = before,
             .points = 1,
             .options = options,
-            .time_group_method = group_method,
-            .time_group_options = group_options,
+            .time_group_method = time_group_method,
+            .time_group_options = time_group_options,
             .tier = tier,
-            .timeout = timeout,
+            .timeout_ms = timeout,
             .query_source = query_source,
             .priority = priority,
     };
@@ -134,6 +101,14 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
         qv = (QUERY_VALUE) {
                 .value = NAN,
                 .anomaly_rate = NAN,
+                .sp = {
+                        .count = 0,
+                        .min = NAN,
+                        .max = NAN,
+                        .sum = NAN,
+                        .anomaly_count = 0,
+                },
+                .duration_ut = (r) ? r->internal.qt->timings.executed_ut - r->internal.qt->timings.received_ut : 0,
         };
     }
     else {
@@ -142,7 +117,18 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
                 .before = r->view.before,
                 .points_read = r->stats.db_points_read,
                 .result_points = r->stats.result_points_generated,
+                .sp = {
+                        .count = 0,
+                },
+                .duration_ut = r->internal.qt->timings.executed_ut - r->internal.qt->timings.received_ut,
         };
+
+        for(size_t d = 0; d < r->internal.qt->query.used ;d++) {
+            if(!rrdr_dimension_should_be_exposed(r->internal.qt->query.array[d].status, options))
+                continue;
+
+            storage_point_merge_to(qv.sp, r->internal.qt->query.array[d].query_points);
+        }
 
         for(size_t t = 0; t < storage_tiers ;t++)
             qv.storage_points_per_tier[t] = r->internal.qt->db.tiers[t].points;

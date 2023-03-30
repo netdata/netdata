@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Webapps"
 -->
 
-# HAProxy monitoring with Netdata
+# HAProxy collector
 
 Monitors frontend and backend metrics such as bytes in, bytes out, sessions current, sessions in queue current.
 And health metrics such as backend servers status (server check should be used).

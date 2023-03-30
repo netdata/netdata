@@ -72,8 +72,8 @@ static struct web_client *web_client_alloc(void) {
     struct web_client *w = callocz(1, sizeof(struct web_client));
     __atomic_add_fetch(&netdata_buffers_statistics.buffers_web, sizeof(struct web_client), __ATOMIC_RELAXED);
     w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, &netdata_buffers_statistics.buffers_web);
-    w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE, &netdata_buffers_statistics.buffers_web);
-    w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE, &netdata_buffers_statistics.buffers_web);
+    w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE, &netdata_buffers_statistics.buffers_web);
+    w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE, &netdata_buffers_statistics.buffers_web);
     return w;
 }
 

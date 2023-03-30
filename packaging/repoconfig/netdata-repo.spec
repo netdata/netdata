@@ -16,6 +16,8 @@ Source4:        netdata.repo.centos
 Source5:        netdata-edge.repo.centos
 Source6:        netdata.repo.ol
 Source7:        netdata-edge.repo.ol
+Source8:        netdata.repo.al
+Source9:        netdata-edge.repo.al
 
 BuildArch:      noarch
 
@@ -43,8 +45,14 @@ install -pm 644 %{SOURCE3} ./netdata-edge.repo
 %endif
 
 %if 0%{?centos_ver}
+# Amazon Linux 2 looks like CentOS, but with extra macros.
+%if 0%{?amzn2}
+install -pm 644 %{SOURCE8} ./netdata.repo
+install -pm 644 %{SOURCE9} ./netdata-edge.repo
+%else
 install -pm 644 %{SOURCE4} ./netdata.repo
 install -pm 644 %{SOURCE5} ./netdata-edge.repo
+%endif
 %endif
 
 %if 0%{?oraclelinux}

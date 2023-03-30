@@ -348,6 +348,7 @@ void netdata_cleanup_and_exit(int ret) {
             | ABILITY_WEB_REQUESTS
             | ABILITY_STREAMING_CONNECTIONS
             | SERVICE_ACLK
+            | SERVICE_ACLKSYNC
             );
 
     delta_shutdown_time("stop replication, exporters, ML training, health and web servers threads");
@@ -387,11 +388,6 @@ void netdata_cleanup_and_exit(int ret) {
     delta_shutdown_time("prepare metasync shutdown");
 
     metadata_sync_shutdown_prepare();
-
-#ifdef ENABLE_ACLK
-    delta_shutdown_time("signal aclk sync to stop");
-    aclk_sync_exit_all();
-#endif
 
     delta_shutdown_time("stop aclk threads");
 
@@ -1116,7 +1112,11 @@ static void get_netdata_configured_variables() {
     // get default Database Engine page cache size in MiB
 
     default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page cache size MB", default_rrdeng_page_cache_mb);
+    default_rrdeng_extent_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine extent cache size MB", default_rrdeng_extent_cache_mb);
     db_engine_journal_check = config_get_boolean(CONFIG_SECTION_DB, "dbengine enable journal integrity check", CONFIG_BOOLEAN_NO);
+
+    if(default_rrdeng_extent_cache_mb < 0)
+        default_rrdeng_extent_cache_mb = 0;
 
     if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
         error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
@@ -1617,11 +1617,15 @@ int main(int argc, char **argv) {
                             char wildcarded[len];
 
                             SIMPLE_PATTERN *p = simple_pattern_create(haystack, NULL, SIMPLE_PATTERN_EXACT, true);
-                            int ret = simple_pattern_matches_extract(p, needle, wildcarded, len);
+                            SIMPLE_PATTERN_RESULT ret = simple_pattern_matches_extract(p, needle, wildcarded, len);
                             simple_pattern_free(p);
 
-                            if(ret) {
-                                fprintf(stdout, "RESULT: MATCHED - pattern '%s' matches '%s', wildcarded '%s'\n", haystack, needle, wildcarded);
+                            if(ret == SP_MATCHED_POSITIVE) {
+                                fprintf(stdout, "RESULT: POSITIVE MATCHED - pattern '%s' matches '%s', wildcarded '%s'\n", haystack, needle, wildcarded);
+                                return 0;
+                            }
+                            else if(ret == SP_MATCHED_NEGATIVE) {
+                                fprintf(stdout, "RESULT: NEGATIVE MATCHED - pattern '%s' matches '%s', wildcarded '%s'\n", haystack, needle, wildcarded);
                                 return 0;
                             }
                             else {

@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Remotes/Devices"
 -->
 
-# APC UPS monitoring with Netdata
+# APC UPS collector
 
 Monitors different APC UPS models and retrieves status information using `apcaccess` tool.
 

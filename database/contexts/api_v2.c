@@ -92,12 +92,12 @@ struct rrdcontext_to_json_v2_data {
     DICTIONARY *ctx;
 
     CONTEXTS_V2_OPTIONS options;
-    uint64_t hard_hash;
-    uint64_t soft_hash;
+    struct query_versions versions;
 
     struct {
         SIMPLE_PATTERN *scope_pattern;
         SIMPLE_PATTERN *pattern;
+        size_t ni;
     } nodes;
 
     struct {
@@ -177,7 +177,7 @@ static FTS_MATCH rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_jso
     return matched;
 }
 
-static bool rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context __maybe_unused) {
+static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context __maybe_unused) {
     struct rrdcontext_to_json_v2_data *ctl = data;
 
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
@@ -187,7 +187,7 @@ static bool rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED *r
         match = rrdcontext_to_json_v2_full_text_search(ctl, rc, ctl->q.pattern);
 
         if(match == FTS_MATCHED_NONE)
-            return false;
+            return 0;
     }
 
     struct rrdcontext_to_json_v2_entry t = {
@@ -220,17 +220,40 @@ static bool rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED *r
             z->last_time_s = rc->last_time_s;
     }
 
-    return true;
+    return 1;
 }
 
-static bool rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool queryable_host) {
+void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t duration_ut) {
+    buffer_json_member_add_string(wb, "mg", host->machine_guid);
+    if(host->node_id)
+        buffer_json_member_add_uuid(wb, "nd", host->node_id);
+    buffer_json_member_add_string(wb, "nm", rrdhost_hostname(host));
+    buffer_json_member_add_uint64(wb, "ni", ni);
+    buffer_json_member_add_object(wb, "st");
+    buffer_json_member_add_uint64(wb, "ai", 0);
+    buffer_json_member_add_uint64(wb, "code", 200);
+    buffer_json_member_add_string(wb, "msg", "");
+    if(duration_ut)
+        buffer_json_member_add_double(wb, "ms", (NETDATA_DOUBLE)duration_ut / 1000.0);
+    buffer_json_object_close(wb);
+}
+
+static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool queryable_host) {
     if(!queryable_host || !host->rrdctx.contexts)
         // the host matches the 'scope_host' but does not match the 'host' patterns
         // or the host does not have any contexts
-        return false;
+        return 0;
 
     struct rrdcontext_to_json_v2_data *ctl = data;
     BUFFER *wb = ctl->wb;
+
+    if(ctl->request->timeout_ms && now_monotonic_usec() > ctl->request->timings.received_ut + ctl->request->timeout_ms * USEC_PER_MS)
+        // timed out
+        return -2;
+
+    if(ctl->request->interrupt_callback && ctl->request->interrupt_callback(ctl->request->interrupt_callback_data))
+        // interrupted
+        return -1;
 
     bool host_matched = (ctl->options & CONTEXTS_V2_NODES);
     bool do_contexts = (ctl->options & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH));
@@ -255,7 +278,7 @@ static bool rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool query
             // do not do pattern matching on contexts - we matched the host itself
             ctl->q.pattern = NULL;
 
-        size_t added = query_scope_foreach_context(
+        ssize_t added = query_scope_foreach_context(
                 host, ctl->request->scope_contexts,
                 ctl->contexts.scope_pattern, ctl->contexts.pattern,
                 rrdcontext_to_json_v2_add_context, queryable_host, ctl);
@@ -263,26 +286,97 @@ static bool rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool query
         // restore it
         ctl->q.pattern = old_q;
 
+        if(added == -1)
+            return -1;
+
         if(added)
             host_matched = true;
     }
 
-    if(host_matched && (ctl->options & (CONTEXTS_V2_NODES | CONTEXTS_V2_DEBUG))) {
+    if(host_matched && (ctl->options & (CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED | CONTEXTS_V2_DEBUG))) {
         buffer_json_add_array_item_object(wb);
-        buffer_json_member_add_string(wb, "mg", host->machine_guid);
-        buffer_json_member_add_uuid(wb, "nd", host->node_id);
-        buffer_json_member_add_string(wb, "nm", rrdhost_hostname(host));
+        buffer_json_node_add_v2(wb, host, ctl->nodes.ni++, 0);
+
+        if(ctl->options & CONTEXTS_V2_NODES_DETAILED) {
+            buffer_json_member_add_string(wb, "version", rrdhost_program_version(host));
+            buffer_json_member_add_uint64(wb, "hops", host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
+            buffer_json_member_add_string(wb, "state", (host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)) ? "reachable" : "stale");
+            buffer_json_member_add_boolean(wb, "isDeleted", false);
+
+            buffer_json_member_add_array(wb, "services");
+            buffer_json_array_close(wb);
+
+            buffer_json_member_add_array(wb, "capabilities");
+            buffer_json_add_array_item_object(wb);
+            buffer_json_member_add_string(wb, "name", "funcs");
+            buffer_json_member_add_uint64(wb, "version", 1);
+            buffer_json_member_add_boolean(wb, "enabled", true);
+            buffer_json_object_close(wb);
+            buffer_json_add_array_item_object(wb);
+            buffer_json_member_add_string(wb, "name", "mc");
+            buffer_json_member_add_uint64(wb, "version", 1);
+            buffer_json_member_add_boolean(wb, "enabled", true);
+            buffer_json_object_close(wb);
+            buffer_json_add_array_item_object(wb);
+            buffer_json_member_add_string(wb, "name", "ml");
+            buffer_json_member_add_uint64(wb, "version", 1);
+            buffer_json_member_add_boolean(wb, "enabled", true);
+            buffer_json_object_close(wb);
+            buffer_json_array_close(wb);
+
+            web_client_api_request_v1_info_summary_alarm_statuses(host, wb, "alarmCounters");
+
+            host_labels2json(host, wb, "hostLabels");
+
+            buffer_json_member_add_object(wb, "mlInfo");
+            buffer_json_member_add_boolean(wb, "mlCapable", ml_capable(host));
+            buffer_json_member_add_boolean(wb, "mlEnabled", ml_enabled(host));
+            buffer_json_object_close(wb);
+
+            if(host->system_info) {
+                buffer_json_member_add_string_or_empty(wb, "architecture", host->system_info->architecture);
+                buffer_json_member_add_string_or_empty(wb, "kernelName", host->system_info->kernel_name);
+                buffer_json_member_add_string_or_empty(wb, "kernelVersion", host->system_info->kernel_version);
+                buffer_json_member_add_string_or_empty(wb, "cpuFrequency", host->system_info->host_cpu_freq);
+                buffer_json_member_add_string_or_empty(wb, "cpus", host->system_info->host_cores);
+                buffer_json_member_add_string_or_empty(wb, "memory", host->system_info->host_ram_total);
+                buffer_json_member_add_string_or_empty(wb, "diskSpace", host->system_info->host_disk_space);
+                buffer_json_member_add_string_or_empty(wb, "container", host->system_info->container);
+                buffer_json_member_add_string_or_empty(wb, "virtualization", host->system_info->virtualization);
+                buffer_json_member_add_string_or_empty(wb, "os", host->system_info->host_os_id);
+                buffer_json_member_add_string_or_empty(wb, "osName", host->system_info->host_os_name);
+                buffer_json_member_add_string_or_empty(wb, "osVersion", host->system_info->host_os_version);
+            }
+
+            buffer_json_member_add_object(wb, "status");
+
+            size_t receiver_hops = host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1;
+            buffer_json_member_add_object(wb, "collection");
+            buffer_json_member_add_uint64(wb, "hops", receiver_hops);
+            buffer_json_member_add_boolean(wb, "online", host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED));
+            buffer_json_member_add_boolean(wb, "replicating", rrdhost_receiver_replicating_charts(host));
+            buffer_json_object_close(wb); // collection
+
+            buffer_json_member_add_object(wb, "streaming");
+            buffer_json_member_add_uint64(wb, "hops", host->sender ? host->sender->hops : receiver_hops + 1);
+            buffer_json_member_add_boolean(wb, "online", rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED));
+            buffer_json_member_add_boolean(wb, "replicating", rrdhost_sender_replicating_charts(host));
+            buffer_json_object_close(wb); // streaming
+
+            buffer_json_object_close(wb); // status
+        }
+
         buffer_json_object_close(wb);
     }
 
-    return host_matched;
+    return host_matched ? 1 : 0;
 }
 
 static void buffer_json_contexts_v2_options_to_array(BUFFER *wb, CONTEXTS_V2_OPTIONS options) {
     if(options & CONTEXTS_V2_DEBUG)
         buffer_json_add_array_item_string(wb, "debug");
 
-    if(options & CONTEXTS_V2_NODES)
+    if(options & (CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED))
         buffer_json_add_array_item_string(wb, "nodes");
 
     if(options & CONTEXTS_V2_CONTEXTS)
@@ -292,7 +386,24 @@ static void buffer_json_contexts_v2_options_to_array(BUFFER *wb, CONTEXTS_V2_OPT
         buffer_json_add_array_item_string(wb, "search");
 }
 
+void buffer_json_agents_array_v2(BUFFER *wb, time_t now_s) {
+    if(!now_s)
+        now_s = now_realtime_sec();
+
+    buffer_json_member_add_array(wb, "agents");
+    buffer_json_add_array_item_object(wb);
+    buffer_json_member_add_string(wb, "mg", localhost->machine_guid);
+    buffer_json_member_add_uuid(wb, "nd", localhost->node_id);
+    buffer_json_member_add_string(wb, "nm", rrdhost_hostname(localhost));
+    buffer_json_member_add_time_t(wb, "now", now_s);
+    buffer_json_member_add_uint64(wb, "ai", 0);
+    buffer_json_object_close(wb);
+    buffer_json_array_close(wb);
+}
+
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_OPTIONS options) {
+    int resp = HTTP_RESP_OK;
+
     req->timings.processing_ut = now_monotonic_usec();
 
     if(options & CONTEXTS_V2_SEARCH)
@@ -303,8 +414,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
             .request = req,
             .ctx = NULL,
             .options = options,
-            .hard_hash = 0,
-            .soft_hash = 0,
+            .versions = { 0 },
             .nodes.scope_pattern = string_to_simple_pattern(req->scope_nodes),
             .nodes.pattern = string_to_simple_pattern(req->nodes),
             .contexts.pattern = string_to_simple_pattern(req->contexts),
@@ -317,17 +427,10 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
     time_t now_s = now_realtime_sec();
     buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_member_add_uint64(wb, "api", 2);
+    buffer_json_agents_array_v2(wb, now_s);
 
     if(options & CONTEXTS_V2_DEBUG) {
-        buffer_json_member_add_object(wb, "agent");
-        buffer_json_member_add_string(wb, "mg", localhost->machine_guid);
-        buffer_json_member_add_uuid(wb, "nd", localhost->node_id);
-        buffer_json_member_add_string(wb, "nm", rrdhost_hostname(localhost));
-        if (req->q)
-            buffer_json_member_add_string(wb, "q", req->q);
-        buffer_json_member_add_time_t(wb, "now", now_s);
-        buffer_json_object_close(wb);
-
         buffer_json_member_add_object(wb, "request");
 
         buffer_json_member_add_object(wb, "scope");
@@ -348,20 +451,32 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         buffer_json_object_close(wb);
     }
 
-    if(options & (CONTEXTS_V2_NODES | CONTEXTS_V2_DEBUG))
+    if(options & (CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED | CONTEXTS_V2_DEBUG))
         buffer_json_member_add_array(wb, "nodes");
 
-    query_scope_foreach_host(ctl.nodes.scope_pattern, ctl.nodes.pattern,
-                                              rrdcontext_to_json_v2_add_host, &ctl, &ctl.hard_hash, &ctl.soft_hash,
-                                              ctl.q.host_uuid_buffer);
-    if(options & (CONTEXTS_V2_NODES | CONTEXTS_V2_DEBUG))
+    ssize_t ret = query_scope_foreach_host(ctl.nodes.scope_pattern, ctl.nodes.pattern,
+                             rrdcontext_to_json_v2_add_host, &ctl,
+                             &ctl.versions, ctl.q.host_uuid_buffer);
+
+    if(unlikely(ret < 0)) {
+        buffer_flush(wb);
+
+        if(ret == -2) {
+            buffer_strcat(wb, "query timeout");
+            resp = HTTP_RESP_GATEWAY_TIMEOUT;
+        }
+        else {
+            buffer_strcat(wb, "query interrupted");
+            resp = HTTP_RESP_BACKEND_FETCH_FAILED;
+        }
+        goto cleanup;
+    }
+
+    if(options & (CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED | CONTEXTS_V2_DEBUG))
         buffer_json_array_close(wb);
 
     req->timings.output_ut = now_monotonic_usec();
-    buffer_json_member_add_object(wb, "versions");
-    buffer_json_member_add_uint64(wb, "contexts_hard_hash", ctl.hard_hash);
-    buffer_json_member_add_uint64(wb, "contexts_soft_hash", ctl.soft_hash);
-    buffer_json_object_close(wb);
+    version_hashes_api_v2(wb, &ctl.versions);
 
     if(options & CONTEXTS_V2_CONTEXTS) {
         buffer_json_member_add_object(wb, "contexts");
@@ -402,6 +517,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     buffer_json_object_close(wb);
     buffer_json_finalize(wb);
 
+cleanup:
     dictionary_destroy(ctl.ctx);
     simple_pattern_free(ctl.nodes.scope_pattern);
     simple_pattern_free(ctl.nodes.pattern);
@@ -409,6 +525,6 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     simple_pattern_free(ctl.contexts.scope_pattern);
     simple_pattern_free(ctl.q.pattern);
 
-    return HTTP_RESP_OK;
+    return resp;
 }
 

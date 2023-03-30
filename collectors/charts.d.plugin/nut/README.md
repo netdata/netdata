@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Remotes/Devices"
 -->
 
-# UPS/PDU monitoring with Netdata
+# UPS/PDU collector
 
 Collects UPS data for all power devices configured in the system.
 

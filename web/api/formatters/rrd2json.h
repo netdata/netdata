@@ -17,6 +17,7 @@ typedef enum {
     DATASOURCE_SSV_COMMA        = 9,
     DATASOURCE_CSV_JSON_ARRAY   = 10,
     DATASOURCE_CSV_MARKDOWN     = 11,
+    DATASOURCE_JSON2            = 12,
 } DATASOURCE_FORMAT;
 
 #include "web/api/web_api_v1.h"
@@ -40,6 +41,7 @@ typedef enum {
 #define API_RELATIVE_TIME_MAX (3 * 365 * 86400)
 
 #define DATASOURCE_FORMAT_JSON "json"
+#define DATASOURCE_FORMAT_JSON2 "json2"
 #define DATASOURCE_FORMAT_DATATABLE_JSON "datatable"
 #define DATASOURCE_FORMAT_DATATABLE_JSONP "datasource"
 #define DATASOURCE_FORMAT_JSONP "jsonp"
@@ -57,8 +59,11 @@ const char *rrdr_format_to_string(DATASOURCE_FORMAT format);
 
 int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, struct query_target *qt, time_t *latest_timestamp);
 
+void rrdr_json_group_by_labels(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options);
+
 struct query_target;
 bool query_target_has_percentage_units(struct query_target *qt);
+#define query_target_aggregatable(qt) ((qt)->window.options & RRDR_OPTION_RETURN_RAW)
 
 int rrdset2value_api_v1(
         RRDSET *st
@@ -86,9 +91,13 @@ int rrdset2value_api_v1(
 );
 
 static inline bool rrdr_dimension_should_be_exposed(RRDR_DIMENSION_FLAGS rrdr_dim_flags, RRDR_OPTIONS options) {
+    if(unlikely(options & RRDR_OPTION_RETURN_RAW))
+        return true;
+
     if(unlikely(rrdr_dim_flags & RRDR_DIMENSION_HIDDEN)) return false;
     if(unlikely(!(rrdr_dim_flags & RRDR_DIMENSION_QUERIED))) return false;
     if(unlikely((options & RRDR_OPTION_NONZERO) && !(rrdr_dim_flags & RRDR_DIMENSION_NONZERO))) return false;
+
     return true;
 }
 

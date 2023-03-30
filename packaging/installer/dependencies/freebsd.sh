@@ -21,6 +21,7 @@ package_tree="
   lzlib
   e2fsprogs-libuuid
   json-c
+  libyaml
   libuv
   liblz4
   openssl

@@ -5,7 +5,7 @@
 
 // ----------------------------------------------------------------------------
 // ARAL vectors used to speed up processing
-ARAL *ebpf_aral_fd_pid;
+ARAL *ebpf_aral_fd_pid = NULL;
 
 static char *fd_dimension_names[NETDATA_FD_SYSCALL_END] = { "open", "close" };
 static char *fd_id_names[NETDATA_FD_SYSCALL_END] = { "do_sys_open",  "__close_fd" };
@@ -411,7 +411,7 @@ static void ebpf_fd_exit(void *ptr)
  */
 static inline void ebpf_fd_aral_init()
 {
-    ebpf_aral_fd_pid = ebpf_allocate_pid_aral("ebpf-fd", sizeof(netdata_fd_stat_t));
+    ebpf_aral_fd_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_FD_ARAL_NAME, sizeof(netdata_fd_stat_t));
 }
 
 /**
@@ -983,6 +983,11 @@ static void fd_collector(ebpf_module_t *em)
         if (apps)
             read_apps_table();
 
+#ifdef NETDATA_DEV_MODE
+        if (ebpf_aral_fd_pid)
+            ebpf_send_data_aral_chart(ebpf_aral_fd_pid, em);
+#endif
+
         if (cgroups)
             ebpf_update_fd_cgroup();
 
@@ -1193,6 +1198,12 @@ void *ebpf_fd_thread(void *ptr)
     pthread_mutex_lock(&lock);
     ebpf_create_fd_global_charts(em);
     ebpf_update_stats(&plugin_statistics, em);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
+#ifdef NETDATA_DEV_MODE
+    if (ebpf_aral_fd_pid)
+        ebpf_statistic_create_aral_chart(NETDATA_EBPF_FD_ARAL_NAME, em);
+#endif
+
     pthread_mutex_unlock(&lock);
 
     fd_collector(em);

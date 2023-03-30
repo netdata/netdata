@@ -265,7 +265,7 @@ static inline bool match_pattern(struct simple_pattern *m, const char *str, size
     return false;
 }
 
-static inline int simple_pattern_matches_extract_with_length(SIMPLE_PATTERN *list, const char *str, size_t len, char *wildcarded, size_t wildcarded_size) {
+static inline SIMPLE_PATTERN_RESULT simple_pattern_matches_extract_with_length(SIMPLE_PATTERN *list, const char *str, size_t len, char *wildcarded, size_t wildcarded_size) {
     struct simple_pattern *m, *root = (struct simple_pattern *)list;
 
     for(m = root; m ; m = m->next) {
@@ -274,31 +274,31 @@ static inline int simple_pattern_matches_extract_with_length(SIMPLE_PATTERN *lis
         if(unlikely(ws)) *ws = '\0';
 
         if (match_pattern(m, str, len, ws, &wss)) {
-            if (m->negative) return 0;
-            return 1;
+            if (m->negative) return SP_MATCHED_NEGATIVE;
+            return SP_MATCHED_POSITIVE;
         }
     }
 
-    return 0;
+    return SP_NOT_MATCHED;
 }
 
-int simple_pattern_matches_buffer_extract(SIMPLE_PATTERN *list, BUFFER *str, char *wildcarded, size_t wildcarded_size) {
-    if(!list || !str || buffer_strlen(str)) return 0;
+SIMPLE_PATTERN_RESULT simple_pattern_matches_buffer_extract(SIMPLE_PATTERN *list, BUFFER *str, char *wildcarded, size_t wildcarded_size) {
+    if(!list || !str || buffer_strlen(str)) return SP_NOT_MATCHED;
     return simple_pattern_matches_extract_with_length(list, buffer_tostring(str), buffer_strlen(str), wildcarded, wildcarded_size);
 }
 
-int simple_pattern_matches_string_extract(SIMPLE_PATTERN *list, STRING *str, char *wildcarded, size_t wildcarded_size) {
-    if(!list || !str) return 0;
+SIMPLE_PATTERN_RESULT simple_pattern_matches_string_extract(SIMPLE_PATTERN *list, STRING *str, char *wildcarded, size_t wildcarded_size) {
+    if(!list || !str) return SP_NOT_MATCHED;
     return simple_pattern_matches_extract_with_length(list, string2str(str), string_strlen(str), wildcarded, wildcarded_size);
 }
 
-int simple_pattern_matches_extract(SIMPLE_PATTERN *list, const char *str, char *wildcarded, size_t wildcarded_size) {
-    if(!list || !str || !*str) return 0;
+SIMPLE_PATTERN_RESULT simple_pattern_matches_extract(SIMPLE_PATTERN *list, const char *str, char *wildcarded, size_t wildcarded_size) {
+    if(!list || !str || !*str) return SP_NOT_MATCHED;
     return simple_pattern_matches_extract_with_length(list, str, strlen(str), wildcarded, wildcarded_size);
 }
 
-int simple_pattern_matches_length_extract(SIMPLE_PATTERN *list, const char *str, size_t len, char *wildcarded, size_t wildcarded_size) {
-    if(!list || !str || !*str || !len) return 0;
+SIMPLE_PATTERN_RESULT simple_pattern_matches_length_extract(SIMPLE_PATTERN *list, const char *str, size_t len, char *wildcarded, size_t wildcarded_size) {
+    if(!list || !str || !*str || !len) return SP_NOT_MATCHED;
     return simple_pattern_matches_extract_with_length(list, str, len, wildcarded, wildcarded_size);
 }
 

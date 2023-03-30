@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Remotes/Devices"
 -->
 
-# Access point monitoring with Netdata
+# Access point collector
 
 The `ap` collector visualizes data related to access points.
 

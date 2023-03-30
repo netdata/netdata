@@ -228,11 +228,14 @@ extern netdata_publish_dcstat_t **dcstat_pid;
 
 extern void ebpf_aral_init(void);
 
-extern struct ebpf_pid_stat *ebpf_target_get(void);
-
 extern ebpf_process_stat_t *ebpf_process_stat_get(void);
 extern void ebpf_process_stat_release(ebpf_process_stat_t *stat);
 
 #include "libnetdata/threads/threads.h"
+
+// ARAL variables
+extern ARAL *ebpf_aral_apps_pid_stat;
+extern ARAL *ebpf_aral_process_stat;
+#define NETDATA_EBPF_PROC_ARAL_NAME "ebpf_proc_stat"
 
 #endif /* NETDATA_EBPF_APPS_H */

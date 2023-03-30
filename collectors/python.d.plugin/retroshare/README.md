@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Apm"
 -->
 
-# RetroShare monitoring with Netdata
+# RetroShare collector
 
 Monitors application bandwidth, peers and DHT metrics. 
 

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "nml.h"
+#include "ml-private.h"
 
 /*
  * Global configuration instance to be shared between training and
  * prediction threads.
  */
-nml_config_t Cfg;
+ml_config_t Cfg;
 
 template <typename T>
 static T clamp(const T& Value, const T& Min, const T& Max) {
@@ -16,7 +16,7 @@ static T clamp(const T& Value, const T& Min, const T& Max) {
 /*
  * Initialize global configuration variable.
  */
-void nml_config_load(nml_config_t *cfg) {
+void ml_config_load(ml_config_t *cfg) {
     const char *config_section_ml = CONFIG_SECTION_ML;
 
     bool enable_anomaly_detection = config_get_boolean(config_section_ml, "enabled", true);

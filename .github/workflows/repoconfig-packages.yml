@@ -94,32 +94,10 @@ jobs:
           docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 --platform ${{ matrix.platform }} \
               -v "$PWD":/netdata ${{ matrix.base_image }} \
               /netdata/packaging/repoconfig/build-${{ matrix.format }}.sh
-      - name: SSH setup
-        id: ssh-setup
-        if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
-        continue-on-error: true
-        uses: shimataro/ssh-key-action@v2
-        with:
-          key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
-          name: id_ecdsa
-          known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
-      - name: Upload to packages.netdata.cloud
-        id: package-upload
-        continue-on-error: true
-        if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
-        run: |
-          for arch in ${{ matrix.arches }}; do
-            for suffix in '' -edge -repoconfig ; do
-              .github/scripts/package-upload.sh \
-              ${{ matrix.pkgclouddistro }} \
-              ${arch} \
-              ${{ matrix.format }} \
-              netdata/netdata${suffix}
-            done
-          done
       - name: Upload Packages
         id: publish
         if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
+        continue-on-error: true
         shell: bash
         env:
           PKG_CLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_API_KEY }}
@@ -136,6 +114,27 @@ jobs:
                 "$(basename "${pkgfile}")" || true
             .github/scripts/package_cloud_wrapper.sh push "${REPO_PREFIX}-repoconfig/${{ matrix.pkgclouddistro }}" "${pkgfile}"
           done
+      - name: SSH setup
+        id: ssh-setup
+        if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
+          name: id_ecdsa
+          known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
+      - name: Upload to packages.netdata.cloud
+        id: package-upload
+        if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
+        run: |
+          for arch in ${{ matrix.arches }}; do
+            for suffix in '' -edge -repoconfig ; do
+              .github/scripts/package-upload.sh \
+              ${{ matrix.pkgclouddistro }} \
+              ${arch} \
+              ${{ matrix.format }} \
+              netdata/netdata${suffix}
+            done
+          done
       - name: Failure Notification
         if: ${{ failure() && github.repository == 'netdata/netdata' }}
         uses: rtCamp/action-slack-notify@v2
@@ -150,7 +149,7 @@ jobs:
               Checkout: ${{ steps.checkout.outcome }}
               Fetch images: ${{ steps.fetch-images.outcome }}
               Build: ${{ steps.build.outcome }}
+              Publish to PackageCloud: ${{ steps.publish.outcome }}
               Import SSH Key: ${{ steps.ssh-setup.outcome }}
               Publish to packages.netdata.cloud: ${{ steps.package-upload.outcome }}
-              Publish to PackageCloud: ${{ steps.publish.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -33,6 +33,9 @@
 #define NETDATA_SYSTEMD_CACHESTAT_HIT_FILE_CONTEXT "services.cachestat_hits"
 #define NETDATA_SYSTEMD_CACHESTAT_MISS_FILES_CONTEXT "services.cachestat_misses"
 
+// ARAL Name
+#define NETDATA_EBPF_CACHESTAT_ARAL_NAME "ebpf_cachestat"
+
 // variables
 enum cachestat_counters {
     NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU,

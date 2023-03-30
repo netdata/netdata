@@ -30,9 +30,9 @@ typedef struct rrdhost_acquired RRDHOST_ACQUIRED;
 typedef struct rrdset_acquired RRDSET_ACQUIRED;
 typedef struct rrddim_acquired RRDDIM_ACQUIRED;
 
-typedef struct ml_host ml_host_t;
-typedef struct ml_chart ml_chart_t;
-typedef struct ml_dimension ml_dimension_t;
+typedef struct ml_host rrd_ml_host_t;
+typedef struct ml_chart rrd_ml_chart_t;
+typedef struct ml_dimension rrd_ml_dimension_t;
 
 typedef enum __attribute__ ((__packed__)) {
     QUERY_SOURCE_UNKNOWN = 0,
@@ -117,21 +117,6 @@ struct storage_engine_query_handle {
     STORAGE_QUERY_HANDLE* handle;
 };
 
-typedef struct storage_point {
-    NETDATA_DOUBLE min;     // when count > 1, this is the minimum among them
-    NETDATA_DOUBLE max;     // when count > 1, this is the maximum among them
-    NETDATA_DOUBLE sum;     // the point sum - divided by count gives the average
-
-    // end_time - start_time = point duration
-    time_t start_time_s;    // the time the point starts
-    time_t end_time_s;      // the time the point ends
-
-    size_t count;           // the number of original points aggregated
-    size_t anomaly_count;   // the number of original points found anomalous
-
-    SN_FLAGS flags;         // flags stored with the point
-} STORAGE_POINT;
-
 // ----------------------------------------------------------------------------
 // chart types
 
@@ -188,7 +173,7 @@ extern time_t rrdset_free_obsolete_time_s;
 extern int libuv_worker_threads;
 extern bool ieee754_doubles;
 
-#define RRD_ID_LENGTH_MAX 200
+#define RRD_ID_LENGTH_MAX 1000
 
 typedef long long total_number;
 #define TOTAL_NUMBER_FORMAT "%lld"
@@ -363,7 +348,7 @@ struct rrddim {
     // ------------------------------------------------------------------------
     // operational state members
 
-    ml_dimension_t *ml_dimension;                   // machine learning data about this dimension
+    rrd_ml_dimension_t *ml_dimension;                   // machine learning data about this dimension
 
     // ------------------------------------------------------------------------
     // linking to siblings and parents
@@ -425,31 +410,6 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
 size_t rrddim_memory_file_header_size(void);
 
 void rrddim_memory_file_save(RRDDIM *rd);
-
-// ----------------------------------------------------------------------------
-
-#define storage_point_unset(x)                     do { \
-    (x).min = (x).max = (x).sum = NAN;                  \
-    (x).count = 0;                                      \
-    (x).anomaly_count = 0;                              \
-    (x).flags = SN_FLAG_NONE;                           \
-    (x).start_time_s = 0;                               \
-    (x).end_time_s = 0;                                 \
-    } while(0)
-
-#define storage_point_empty(x, start_s, end_s)     do { \
-    (x).min = (x).max = (x).sum = NAN;                  \
-    (x).count = 1;                                      \
-    (x).anomaly_count = 0;                              \
-    (x).flags = SN_FLAG_NONE;                           \
-    (x).start_time_s = start_s;                         \
-    (x).end_time_s = end_s;                             \
-    } while(0)
-
-#define STORAGE_POINT_UNSET { .min = NAN, .max = NAN, .sum = NAN, .count = 0, .anomaly_count = 0, .flags = SN_FLAG_NONE, .start_time_s = 0, .end_time_s = 0 }
-
-#define storage_point_is_unset(x) (!(x).count)
-#define storage_point_is_gap(x) (!netdata_double_isnumber((x).sum))
 
 // ------------------------------------------------------------------------
 // function pointers that handle data collection
@@ -626,7 +586,7 @@ struct rrdset {
     DICTIONARY *rrddimvar_root_index;               // dimension variables
                                                     // we use this dictionary to manage their allocation
 
-    ml_chart_t *ml_chart;
+    rrd_ml_chart_t *ml_chart;
 
     // ------------------------------------------------------------------------
     // operational state members
@@ -773,35 +733,41 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st_on_file, RRD_MEMORY_MODE m
 // and may lead to missing information.
 
 typedef enum __attribute__ ((__packed__)) rrdhost_flags {
+
+    // Careful not to overlap with rrdhost_options to avoid bugs if
+    // rrdhost_flags_xxx is used instead of rrdhost_option_xxx or vice-versa
     // Orphan, Archived and Obsolete flags
-    RRDHOST_FLAG_ORPHAN                         = (1 << 10), // this host is orphan (not receiving data)
-    RRDHOST_FLAG_ARCHIVED                       = (1 << 11), // The host is archived, no collected charts yet
-    RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS        = (1 << 12), // the host has pending chart obsoletions
-    RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS    = (1 << 13), // the host has pending dimension obsoletions
+    RRDHOST_FLAG_ORPHAN                         = (1 << 8), // this host is orphan (not receiving data)
+    RRDHOST_FLAG_ARCHIVED                       = (1 << 9), // The host is archived, no collected charts yet
+    RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS        = (1 << 10), // the host has pending chart obsoletions
+    RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS    = (1 << 11), // the host has pending dimension obsoletions
 
     // Streaming sender
-    RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED     = (1 << 14), // the host has initialized rrdpush structures
-    RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN           = (1 << 15), // When set, the sender thread is running
-    RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED       = (1 << 16), // When set, the host is connected to a parent
-    RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS = (1 << 17), // when set, rrdset_done() should push metrics to parent
-    RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS   = (1 << 18), // when set, we have logged the status of metrics streaming
+    RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED     = (1 << 12), // the host has initialized rrdpush structures
+    RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN           = (1 << 13), // When set, the sender thread is running
+    RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED       = (1 << 14), // When set, the host is connected to a parent
+    RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS = (1 << 15), // when set, rrdset_done() should push metrics to parent
+    RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS   = (1 << 16), // when set, we have logged the status of metrics streaming
 
     // Health
-    RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION  = (1 << 20), // contains charts and dims with uninitialized variables
-    RRDHOST_FLAG_INITIALIZED_HEALTH             = (1 << 21), // the host has initialized health structures
+    RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION  = (1 << 17), // contains charts and dims with uninitialized variables
+    RRDHOST_FLAG_INITIALIZED_HEALTH             = (1 << 18), // the host has initialized health structures
 
     // Exporting
-    RRDHOST_FLAG_EXPORTING_SEND                 = (1 << 22), // send it to external databases
-    RRDHOST_FLAG_EXPORTING_DONT_SEND            = (1 << 23), // don't send it to external databases
+    RRDHOST_FLAG_EXPORTING_SEND                 = (1 << 19), // send it to external databases
+    RRDHOST_FLAG_EXPORTING_DONT_SEND            = (1 << 20), // don't send it to external databases
 
     // ACLK
-    RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 24), // when set, we should send ACLK stream context updates
+    RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 21), // when set, we should send ACLK stream context updates
+    RRDHOST_FLAG_ACLK_STREAM_ALERTS             = (1 << 22), // set when the receiver part is disconnected
     // Metadata
-    RRDHOST_FLAG_METADATA_UPDATE                = (1 << 25), // metadata needs to be stored in the database
-    RRDHOST_FLAG_METADATA_LABELS                = (1 << 26), // metadata needs to be stored in the database
-    RRDHOST_FLAG_METADATA_INFO                  = (1 << 27), // metadata needs to be stored in the database
-    RRDHOST_FLAG_METADATA_CLAIMID               = (1 << 28), // metadata needs to be stored in the database
+    RRDHOST_FLAG_METADATA_UPDATE                = (1 << 23), // metadata needs to be stored in the database
+    RRDHOST_FLAG_METADATA_LABELS                = (1 << 24), // metadata needs to be stored in the database
+    RRDHOST_FLAG_METADATA_INFO                  = (1 << 25), // metadata needs to be stored in the database
+    RRDHOST_FLAG_PENDING_CONTEXT_LOAD           = (1 << 26), // metadata needs to be stored in the database
+    RRDHOST_FLAG_CONTEXT_LOAD_IN_PROGRESS       = (1 << 27), // metadata needs to be stored in the database
 
+    RRDHOST_FLAG_METADATA_CLAIMID               = (1 << 28), // metadata needs to be stored in the database
     RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED  = (1 << 29), // set when the receiver part is disconnected
 } RRDHOST_FLAGS;
 
@@ -1028,7 +994,7 @@ struct rrdhost {
     struct sender_state *sender;
     netdata_thread_t rrdpush_sender_thread;         // the sender thread
     size_t rrdpush_sender_replicating_charts;       // the number of charts currently being replicated to a parent
-    void *dbsync_worker;
+    void *aclk_sync_host_config;
 
     // ------------------------------------------------------------------------
     // streaming of data from remote hosts - rrdpush receiver
@@ -1059,6 +1025,7 @@ struct rrdhost {
     uint32_t health_last_processed_id;              // the last processed health id from the log
     uint32_t health_max_unique_id;                  // the max alarm log unique id given for the host
     uint32_t health_max_alarm_id;                   // the max alarm id given for the host
+    size_t health_transitions;                      // the number of times an alert changed state
 
     // ------------------------------------------------------------------------
     // locks
@@ -1067,7 +1034,7 @@ struct rrdhost {
 
     // ------------------------------------------------------------------------
     // ML handle
-    ml_host_t *ml_host;
+    rrd_ml_host_t *ml_host;
 
     // ------------------------------------------------------------------------
     // Support for host-level labels
@@ -1358,12 +1325,12 @@ void rrdset_delete_files(RRDSET *st);
 void rrdset_save(RRDSET *st);
 void rrdset_free(RRDSET *st);
 
+void rrddim_free(RRDSET *st, RRDDIM *rd);
+
 #ifdef NETDATA_RRD_INTERNALS
 
 char *rrdhost_cache_dir_for_rrdset_alloc(RRDHOST *host, const char *id);
 const char *rrdset_cache_dir(RRDSET *st);
-
-void rrddim_free(RRDSET *st, RRDDIM *rd);
 
 void rrdset_reset(RRDSET *st);
 void rrdset_delete_obsolete_dimensions(RRDSET *st);

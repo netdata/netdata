@@ -894,16 +894,6 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
     return 0;
 }
 
-static inline time_t get_metric_latest_update_every(struct journal_page_header *metric_list_header)
-{
-    struct journal_page_list *metric_page =
-        (struct journal_page_list *)((uint8_t *)metric_list_header + sizeof(*metric_list_header));
-    uint32_t entries = metric_list_header->entries;
-    if (unlikely(!entries))
-        return 0;
-    return (time_t)metric_page[entries - 1].update_every_s;
-}
-
 void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile) {
     usec_t started_ut = now_monotonic_usec();
 
@@ -921,15 +911,10 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
     for (size_t i=0; i < entries; i++) {
         time_t start_time_s = header_start_time_s + metric->delta_start_s;
         time_t end_time_s = header_start_time_s + metric->delta_end_s;
-        time_t update_every_s = get_metric_latest_update_every((struct journal_page_header *) (data_start + metric->page_offset));
-        update_metric_retention_and_granularity_by_uuid(
-                ctx, &metric->uuid, start_time_s, end_time_s, update_every_s, now_s);
 
-#ifdef NETDATA_INTERNAL_CHECKS
-        struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
-        fatal_assert(uuid_compare(metric_list_header->uuid, metric->uuid) == 0);
-        fatal_assert(metric->entries == metric_list_header->entries);
-#endif
+        update_metric_retention_and_granularity_by_uuid(
+                ctx, &metric->uuid, start_time_s, end_time_s, (time_t) metric->update_every_s, now_s);
+
         metric++;
     }
 
@@ -1048,7 +1033,7 @@ static int journalfile_metric_compare (const void *item1, const void *item2)
     const struct jv2_metrics_info *metric1 = ((struct journal_metric_list_to_sort *) item1)->metric_info;
     const struct jv2_metrics_info *metric2 = ((struct journal_metric_list_to_sort *) item2)->metric_info;
 
-    return uuid_compare(*(metric1->uuid), *(metric2->uuid));
+    return memcmp(metric1->uuid, metric2->uuid, sizeof(uuid_t));
 }
 
 
@@ -1094,6 +1079,7 @@ void *journalfile_v2_write_metric_page(struct journal_v2_header *j2_header, void
     metric->page_offset = pages_offset;
     metric->delta_start_s = (uint32_t)(metric_info->first_time_s - (time_t)(j2_header->start_time_ut / USEC_PER_SEC));
     metric->delta_end_s = (uint32_t)(metric_info->last_time_s - (time_t)(j2_header->start_time_ut / USEC_PER_SEC));
+    metric->update_every_s = 0;
 
     return ++metric;
 }
@@ -1146,7 +1132,8 @@ void *journalfile_v2_write_data_page(struct journal_v2_header *j2_header, void *
 }
 
 // Must be recorded in metric_info->entries
-void *journalfile_v2_write_descriptors(struct journal_v2_header *j2_header, void *data, struct jv2_metrics_info *metric_info)
+static void *journalfile_v2_write_descriptors(struct journal_v2_header *j2_header, void *data, struct jv2_metrics_info *metric_info,
+        struct journal_metric_list *current_metric)
 {
     Pvoid_t *PValue;
 
@@ -1158,13 +1145,16 @@ void *journalfile_v2_write_descriptors(struct journal_v2_header *j2_header, void
     Word_t index_time = 0;
     bool first = true;
     struct jv2_page_info *page_info;
+    uint32_t update_every_s = 0;
     while ((PValue = JudyLFirstThenNext(JudyL_array, &index_time, &first))) {
         page_info = *PValue;
         // Write one descriptor and return the next data page location
         data_page = journalfile_v2_write_data_page(j2_header, (void *) data_page, page_info);
+        update_every_s = (uint32_t) page_info->update_every_s;
         if (NULL == data_page)
             break;
     }
+    current_metric->update_every_s = update_every_s;
     return data_page;
 }
 
@@ -1301,6 +1291,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
         // Calculate current UUID offset from start of file. We will store this in the data page header
         uint32_t uuid_offset = data - data_start;
 
+        struct journal_metric_list *current_metric = (void *) data;
         // Write the UUID we are processing
         data  = (void *) journalfile_v2_write_metric_page(&j2_header, data, metric_info, pages_offset);
         if (unlikely(!data))
@@ -1318,7 +1309,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
                                                                   uuid_offset);
 
         // Start writing descr @ time
-        void *page_trailer = journalfile_v2_write_descriptors(&j2_header, metric_page, metric_info);
+        void *page_trailer = journalfile_v2_write_descriptors(&j2_header, metric_page, metric_info, current_metric);
         if (unlikely(!page_trailer))
             break;
 

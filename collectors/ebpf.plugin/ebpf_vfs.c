@@ -7,7 +7,7 @@
 
 // ----------------------------------------------------------------------------
 // ARAL vectors used to speed up processing
-ARAL *ebpf_aral_vfs_pid;
+ARAL *ebpf_aral_vfs_pid = NULL;
 
 static char *vfs_dimension_names[NETDATA_KEY_PUBLISH_VFS_END] = { "delete",  "read",  "write",
                                                                   "fsync", "open", "create" };
@@ -399,7 +399,7 @@ static inline int ebpf_vfs_load_and_attach(struct vfs_bpf *obj, ebpf_module_t *e
  */
 static inline void ebpf_vfs_aral_init()
 {
-    ebpf_aral_vfs_pid = ebpf_allocate_pid_aral("ebpf-vfs", sizeof(netdata_publish_vfs_t));
+    ebpf_aral_vfs_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_VFS_ARAL_NAME, sizeof(netdata_publish_vfs_t));
 }
 
 /**
@@ -1528,6 +1528,11 @@ static void vfs_collector(ebpf_module_t *em)
         if (apps)
             ebpf_vfs_read_apps();
 
+#ifdef NETDATA_DEV_MODE
+        if (ebpf_aral_vfs_pid)
+            ebpf_send_data_aral_chart(ebpf_aral_vfs_pid, em);
+#endif
+
         if (cgroups)
             read_update_vfs_cgroup();
 
@@ -1956,6 +1961,12 @@ void *ebpf_vfs_thread(void *ptr)
     pthread_mutex_lock(&lock);
     ebpf_create_global_charts(em);
     ebpf_update_stats(&plugin_statistics, em);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
+#ifdef NETDATA_DEV_MODE
+    if (ebpf_aral_vfs_pid)
+        ebpf_statistic_create_aral_chart(NETDATA_EBPF_VFS_ARAL_NAME, em);
+#endif
+
     pthread_mutex_unlock(&lock);
 
     vfs_collector(em);

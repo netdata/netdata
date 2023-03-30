@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Distributed computing"
 -->
 
-# Gearman monitoring with Netdata
+# Gearman collector
 
 Monitors Gearman worker statistics. A chart is shown for each job as well as one showing a summary of all workers.
 

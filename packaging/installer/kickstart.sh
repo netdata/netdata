@@ -667,7 +667,7 @@ get_system_info() {
         warning "Distribution auto-detection overridden by user. This is not guaranteed to work, and is not officially supported."
       fi
 
-      supported_compat_names="debian ubuntu centos fedora opensuse ol arch"
+      supported_compat_names="debian ubuntu centos fedora opensuse ol amzn arch"
 
       if str_in_list "${DISTRO}" "${supported_compat_names}"; then
           DISTRO_COMPAT_NAME="${DISTRO}"
@@ -1269,7 +1269,7 @@ pkg_installed() {
           dpkg-query --show --showformat '${Status}' "${1}" 2>&1 | cut -f 1 -d ' ' | grep -q '^install$'
           return $?
           ;;
-        centos|fedora|opensuse|ol)
+        centos|fedora|opensuse|ol|amzn)
           rpm -q "${1}" > /dev/null 2>&1
           return $?
           ;;
@@ -1313,7 +1313,7 @@ netdata_avail_check() {
       env DEBIAN_FRONTEND=noninteractive apt-cache policy netdata | grep -q repo.netdata.cloud/repos/;
       return $?
       ;;
-    centos|fedora|ol)
+    centos|fedora|ol|amzn)
       # shellcheck disable=SC2086
       ${pm_cmd} search --nogpgcheck -v netdata | grep -qE 'Repo *: netdata(-edge)?$'
       return $?
@@ -1473,6 +1473,23 @@ try_package_install() {
         pm_cmd="yum"
       fi
       repo_prefix="ol/${SYSVERSION}"
+      pkg_type="rpm"
+      pkg_suffix=".noarch"
+      pkg_vsep="-"
+      pkg_install_opts="${interactive_opts}"
+      repo_update_opts="${interactive_opts}"
+      uninstall_subcmd="remove"
+      INSTALL_TYPE="binpkg-rpm"
+      NATIVE_VERSION="${INSTALL_VERSION:+"-${INSTALL_VERSION}.${SYSARCH}"}"
+      ;;
+    amzn)
+      if command -v dnf > /dev/null; then
+        pm_cmd="dnf"
+        repo_subcmd="makecache"
+      else
+        pm_cmd="yum"
+      fi
+      repo_prefix="amazonlinux/${SYSVERSION}"
       pkg_type="rpm"
       pkg_suffix=".noarch"
       pkg_vsep="-"

@@ -1,16 +1,6 @@
-<!--
-title: "zscores"
-description: "Use statistical anomaly detection to narrow your focus and shorten root cause analysis."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/zscores/README.md"
-sidebar_label: "zscores"
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Integrations/Monitor/Netdata"
--->
+# Basic anomaly detection using Z-scores
 
-# Z-Scores - basic anomaly detection for your key metrics and charts
-
-Smoothed, rolling [Z-Scores](https://en.wikipedia.org/wiki/Standard_score) for selected metrics or charts.
+By using smoothed, rolling [Z-Scores](https://en.wikipedia.org/wiki/Standard_score) for selected metrics or charts you can narrow down your focus and shorten root cause analysis.
 
 This collector uses the [Netdata rest api](https://github.com/netdata/netdata/blob/master/web/api/README.md) to get the `mean` and `stddev`
 for each dimension on specified charts over a time range (defined by `train_secs` and `offset_secs`). For each dimension
@@ -87,7 +77,7 @@ the `zscores.conf` files alone to begin with. Then you can return to it later if
 more once the collector is running for a while.
 
 Edit the `python.d/zscores.conf` configuration file using `edit-config` from the your
-agent's [config directory](https://learn.netdata.cloud/guides/step-by-step/step-04#find-your-netdataconf-file), which is
+agent's [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory), which is
 usually at `/etc/netdata`.
 
 ```bash

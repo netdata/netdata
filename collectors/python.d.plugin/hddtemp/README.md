@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Hardware"
 -->
 
-# Hard drive temperature monitoring with Netdata
+# Hard drive temperature collector
 
 Monitors disk temperatures from one or more `hddtemp` daemons.
 

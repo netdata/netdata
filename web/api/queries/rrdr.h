@@ -41,20 +41,22 @@ typedef enum rrdr_options {
     RRDR_OPTION_RETURN_JWAR     = (1 << 20), // Return anomaly rates in jsonwrap
     RRDR_OPTION_SELECTED_TIER   = (1 << 21), // Use the selected tier for the query
     RRDR_OPTION_ALL_DIMENSIONS  = (1 << 22), // Return the full dimensions list
-    RRDR_OPTION_SHOW_PLAN       = (1 << 23), // Return the query plan in jsonwrap
-    RRDR_OPTION_SHOW_DETAILS    = (1 << 24), // v2 returns detailed object tree
-    RRDR_OPTION_DEBUG           = (1 << 25), // v2 returns request description
-    RRDR_OPTION_MINIFY          = (1 << 26), // remove JSON spaces and newlines from JSON output
-    RRDR_OPTION_JW_ANNOTATIONS  = (1 << 27), // add annotation array to the JSON output
+    RRDR_OPTION_SHOW_DETAILS    = (1 << 23), // v2 returns detailed object tree
+    RRDR_OPTION_DEBUG           = (1 << 24), // v2 returns request description
+    RRDR_OPTION_MINIFY          = (1 << 25), // remove JSON spaces and newlines from JSON output
+    RRDR_OPTION_GROUP_BY_LABELS = (1 << 26), // v2 returns flattened labels per dimension of the chart
 
     // internal ones - not to be exposed to the API
-    RRDR_OPTION_HEALTH_RSRVD1        = (1 << 28), // reserved for RRDCALC_OPTION_NO_CLEAR_NOTIFICATION
-    RRDR_OPTION_INTERNAL_ANNOTATIONS = (1 << 29), // internal use only, to let the formatters know we want to render the annotations
-    RRDR_OPTION_INTERNAL_AR          = (1 << 30), // internal use only, to let the formatters know we want to render the anomaly rate
-    RRDR_OPTION_INTERNAL_GBC         = (1 << 31), // internal use only, to let the formatters know we want to render the group by count
+    RRDR_OPTION_HEALTH_RSRVD1        = (1 << 30), // reserved for RRDCALC_OPTION_NO_CLEAR_NOTIFICATION
+    RRDR_OPTION_INTERNAL_AR          = (1 << 31), // internal use only, to let the formatters know we want to render the anomaly rate
 } RRDR_OPTIONS;
 
 typedef enum __attribute__ ((__packed__)) rrdr_value_flag {
+
+    // IMPORTANT:
+    // THIS IS AN AGREED BIT MAP BETWEEN AGENT, CLOUD FRONT-END AND CLOUD BACK-END
+    // DO NOT CHANGE THE MAPPINGS !
+
     RRDR_VALUE_NOTHING      = 0,            // no flag set (a good default)
     RRDR_VALUE_EMPTY        = (1 << 0),     // the database value is empty
     RRDR_VALUE_RESET        = (1 << 1),     // the database value is marked as reset (overflown)
@@ -80,6 +82,18 @@ typedef enum __attribute__ ((__packed__)) rrdr_result_flags {
     RRDR_RESULT_FLAG_CANCEL        = (1 << 2), // the query needs to be cancelled
 } RRDR_RESULT_FLAGS;
 
+struct rrdr_group_by_entry {
+    size_t priority;
+    size_t count;
+    STRING *id;
+    STRING *name;
+    STRING *units;
+    RRDR_DIMENSION_FLAGS od;
+    DICTIONARY *dl;
+};
+
+#define RRDR_DVIEW_ANOMALY_COUNT_MULTIPLIER 1000.0
+
 typedef struct rrdresult {
     size_t d;                 // the number of dimensions
     size_t n;                 // the number of values in the arrays (number of points per dimension)
@@ -92,6 +106,11 @@ typedef struct rrdresult {
     STRING **du;              // array of d dimension units
     uint32_t *dgbc;           // array of d dimension units - NOT ALLOCATED when RRDR is created
     uint32_t *dp;             // array of d dimension priority - NOT ALLOCATED when RRDR is created
+    DICTIONARY **dl;          // array of d dimension labels - NOT ALLOCATED when RRDR is created
+    STORAGE_POINT *dqp;       // array of d dimensions query points - NOT ALLOCATED when RRDR is created
+    STORAGE_POINT *dview;     // array of d dimensions group by view - NOT ALLOCATED when RRDR is created
+
+    DICTIONARY *label_keys;
 
     time_t *t;                // array of n timestamps
     NETDATA_DOUBLE *v;        // array n x d values
@@ -107,7 +126,6 @@ typedef struct rrdresult {
         NETDATA_DOUBLE min;
         NETDATA_DOUBLE max;
         RRDR_RESULT_FLAGS flags; // RRDR_RESULT_FLAG_*
-        RRDR_OPTIONS options; // RRDR_OPTION_* (as run by the query)
     } view;
 
     struct {
@@ -130,11 +148,23 @@ typedef struct rrdresult {
         size_t points_wanted;               // used by SES and DES
         size_t resampling_group;            // used by AVERAGE
         NETDATA_DOUBLE resampling_divisor;  // used by AVERAGE
-    } grouping;
+    } time_grouping;
+
+    struct {
+        struct rrdresult *r;
+    } group_by;
+
+    struct {
+        time_t max_update_every;
+        time_t expected_after;
+        time_t trimmed_after;
+    } partial_data_trimming;
 
     struct {
         ONEWAYALLOC *owa;           // the allocator used
         struct query_target *qt;    // the QUERY_TARGET
+        size_t contexts;            // temp needed between json_wrapper_begin2() and json_wrapper_end2()
+        size_t queries_count;       // temp needed to know if a query is the first executed
 
 #ifdef NETDATA_INTERNAL_CHECKS
         const char *log;
@@ -155,13 +185,13 @@ RRDR *rrd2rrdr_legacy(
         ONEWAYALLOC *owa,
         RRDSET *st, size_t points, time_t after, time_t before,
         RRDR_TIME_GROUPING group_method, time_t resampling_time, RRDR_OPTIONS options, const char *dimensions,
-        const char *group_options, time_t timeout, size_t tier, QUERY_SOURCE query_source,
+        const char *group_options, time_t timeout_ms, size_t tier, QUERY_SOURCE query_source,
         STORAGE_PRIORITY priority);
 
 RRDR *rrd2rrdr(ONEWAYALLOC *owa, struct query_target *qt);
 bool query_target_calculate_window(struct query_target *qt);
 
-bool rrdr_relative_window_to_absolute(time_t *after, time_t *before);
+bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t *now_ptr);
 
 #ifdef __cplusplus
 }

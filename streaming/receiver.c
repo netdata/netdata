@@ -437,7 +437,7 @@ static void rrdpush_receiver_replication_reset(RRDHOST *host) {
     rrdhost_receiver_replicating_charts_zero(host);
 }
 
-bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
+static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
     bool signal_rrdcontext = false;
     bool set_this = false;
 
@@ -472,6 +472,7 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         rrdpush_receiver_replication_reset(host);
 
         rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
+        aclk_queue_node_info(rpt->host, true);
 
         set_this = true;
     }
@@ -688,6 +689,12 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
         if(!host) {
             rrdpush_receive_log_status(rpt, "failed to find/create host structure", "INTERNAL ERROR DROPPING CONNECTION");
+            close(rpt->fd);
+            return 1;
+        }
+
+        if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
+            rrdpush_receive_log_status(rpt, "host is initializing", "INITIALIZATION IN PROGRESS RETRY LATER");
             close(rpt->fd);
             return 1;
         }

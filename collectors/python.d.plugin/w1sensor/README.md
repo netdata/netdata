@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Remotes/Devices"
 -->
 
-# 1-Wire Sensors monitoring with Netdata
+# 1-Wire Sensors collector
 
 Monitors sensor temperature.
 

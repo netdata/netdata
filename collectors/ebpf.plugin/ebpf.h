@@ -143,6 +143,8 @@ enum ebpf_threads_status {
 // Statistics charts
 #define NETDATA_EBPF_THREADS "ebpf_threads"
 #define NETDATA_EBPF_LOAD_METHOD "ebpf_load_methods"
+#define NETDATA_EBPF_KERNEL_MEMORY "ebpf_kernel_memory"
+#define NETDATA_EBPF_HASH_TABLES_LOADED "ebpf_hash_tables_count"
 
 // Log file
 #define NETDATA_DEVELOPER_LOG_FILE "developer.log"

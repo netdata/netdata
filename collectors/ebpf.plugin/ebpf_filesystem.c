@@ -182,6 +182,9 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
                 return -1;
             }
             efp->flags |= NETDATA_FILESYSTEM_FLAG_HAS_PARTITION;
+            pthread_mutex_lock(&lock);
+            ebpf_update_kernel_memory(&plugin_statistics, &fs_maps[i], EBPF_ACTION_STAT_ADD);
+            pthread_mutex_unlock(&lock);
 
             // Nedeed for filesystems like btrfs
             if ((efp->flags & NETDATA_FILESYSTEM_FILL_ADDRESS_TABLE) && (efp->addresses.function)) {

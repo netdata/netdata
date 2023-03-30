@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Networking"
 -->
 
-# OpenLDAP monitoring with Netdata
+# OpenLDAP collector
 
 Provides statistics information from openldap (slapd) server.
 Statistics are taken from LDAP monitoring interface. Manual page, slapd-monitor(5) is available.

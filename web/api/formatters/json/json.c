@@ -149,12 +149,10 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
                       );
 
     // for each line in the array
-    NETDATA_DOUBLE total = 1;
     for(i = start; i != end ;i += step) {
         NETDATA_DOUBLE *cn = &r->v[ i * r->d ];
         RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
         NETDATA_DOUBLE *ar = &r->ar[ i * r->d ];
-        uint32_t *gbc = &r->gbc [ i * r->d ];
 
         time_t now = r->t[i];
 
@@ -211,39 +209,13 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
             buffer_fast_strcat(wb, post_date, post_date_len);
         }
 
-        int set_min_max = 0;
-        if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
-            total = 0;
-            for(c = 0; c < used ;c++) {
-                if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
-
-                NETDATA_DOUBLE n;
-                if(unlikely(options & RRDR_OPTION_INTERNAL_GBC))
-                    n = gbc[c];
-                else if(unlikely(options & RRDR_OPTION_INTERNAL_AR))
-                    n = ar[c];
-                else
-                    n = cn[c];
-
-                if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
-                    n = -n;
-
-                total += n;
-            }
-            // prevent a division by zero
-            if(total == 0) total = 1;
-            set_min_max = 1;
-        }
-
         // for each dimension
         for(c = 0; c < used ;c++) {
             if(!rrdr_dimension_should_be_exposed(r->od[c], options))
                 continue;
 
             NETDATA_DOUBLE n;
-            if(unlikely(options & RRDR_OPTION_INTERNAL_GBC))
-                n = gbc[c];
-            else if(unlikely(options & RRDR_OPTION_INTERNAL_AR))
+            if(unlikely(options & RRDR_OPTION_INTERNAL_AR))
                 n = ar[c];
             else
                 n = cn[c];
@@ -253,30 +225,14 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
             if(unlikely( options & RRDR_OPTION_OBJECTSROWS ))
                 buffer_sprintf(wb, "%s%s%s: ", kq, string2str(r->dn[c]), kq);
 
-            if(co[c] & RRDR_VALUE_EMPTY && !(options & (RRDR_OPTION_INTERNAL_AR | RRDR_OPTION_INTERNAL_GBC))) {
+            if(co[c] & RRDR_VALUE_EMPTY && !(options & (RRDR_OPTION_INTERNAL_AR))) {
                 if(unlikely(options & RRDR_OPTION_NULL2ZERO))
                     buffer_fast_strcat(wb, "0", 1);
                 else
                     buffer_fast_strcat(wb, "null", 4);
             }
-            else {
-                if(unlikely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
-                    n = -n;
-
-                if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
-                    n = n * 100 / total;
-
-                    if(unlikely(set_min_max)) {
-                        r->view.min = r->view.max = n;
-                        set_min_max = 0;
-                    }
-
-                    if(n < r->view.min) r->view.min = n;
-                    if(n > r->view.max) r->view.max = n;
-                }
-
+            else
                 buffer_print_netdata_double(wb, n);
-            }
 
             buffer_fast_strcat(wb, post_value, post_value_len);
         }
@@ -286,4 +242,100 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
 
     buffer_strcat(wb, finish);
     //info("RRD2JSON(): %s: END", r->st->id);
+}
+
+
+void rrdr2json_v2(RRDR *r, BUFFER *wb) {
+    QUERY_TARGET *qt = r->internal.qt;
+    RRDR_OPTIONS options = qt->window.options;
+
+    bool expose_gbc = query_target_aggregatable(qt);
+
+    buffer_json_member_add_object(wb, "result");
+
+    buffer_json_member_add_array(wb, "labels");
+    buffer_json_add_array_item_string(wb, "time");
+    long d, i;
+    const long used = (long)r->d;
+    for(d = 0, i = 0; d < used ; d++) {
+        if(!rrdr_dimension_should_be_exposed(r->od[d], options))
+            continue;
+
+        buffer_json_add_array_item_string(wb, string2str(r->dn[d]));
+        i++;
+    }
+    buffer_json_array_close(wb); // labels
+
+    buffer_json_member_add_object(wb, "point");
+    buffer_json_member_add_uint64(wb, "value", 0);
+    buffer_json_member_add_uint64(wb, "arp", 1);
+    buffer_json_member_add_uint64(wb, "pa", 2);
+    if(expose_gbc)
+        buffer_json_member_add_uint64(wb, "count", 3);
+    buffer_json_object_close(wb);
+
+    buffer_json_member_add_array(wb, "data");
+    if(i) {
+        long start = 0, end = rrdr_rows(r), step = 1;
+        if (!(options & RRDR_OPTION_REVERSED)) {
+            start = rrdr_rows(r) - 1;
+            end = -1;
+            step = -1;
+        }
+
+        // for each line in the array
+        for (i = start; i != end; i += step) {
+            NETDATA_DOUBLE *cn = &r->v[ i * r->d ];
+            RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
+            NETDATA_DOUBLE *ar = &r->ar[ i * r->d ];
+            uint32_t *gbc = &r->gbc [ i * r->d ];
+            time_t now = r->t[i];
+
+            buffer_json_add_array_item_array(wb); // row
+
+            if (options & RRDR_OPTION_MILLISECONDS)
+                buffer_json_add_array_item_time_ms(wb, now); // the time
+            else
+                buffer_json_add_array_item_time_t(wb, now); // the time
+
+            for (d = 0; d < used; d++) {
+                if (!rrdr_dimension_should_be_exposed(r->od[d], options))
+                    continue;
+
+                RRDR_VALUE_FLAGS o = co[d];
+
+                buffer_json_add_array_item_array(wb); // point
+
+                // add the value
+                NETDATA_DOUBLE n = cn[d];
+
+                if(o & RRDR_VALUE_EMPTY) {
+                    if (unlikely(options & RRDR_OPTION_NULL2ZERO))
+                        buffer_json_add_array_item_double(wb, 0);
+                    else
+                        buffer_json_add_array_item_double(wb, NAN);
+                }
+                else
+                    buffer_json_add_array_item_double(wb, n);
+
+                // add the anomaly
+                buffer_json_add_array_item_double(wb, ar[d]);
+
+                // add the point annotations
+                buffer_json_add_array_item_uint64(wb, o);
+
+                // add the count
+                if(expose_gbc)
+                    buffer_json_add_array_item_uint64(wb, gbc[d]);
+
+                buffer_json_array_close(wb); // point
+            }
+
+            buffer_json_array_close(wb); // row
+        }
+    }
+
+    buffer_json_array_close(wb); // data
+
+    buffer_json_object_close(wb); // annotations
 }

@@ -377,13 +377,4 @@ uint64_t rrdcontext_version_hash_with_callback(
 
 void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe_unused, void *bundle __maybe_unused);
 
-// ----------------------------------------------------------------------------
-// scope
-
-typedef bool (*foreach_host_cb_t)(void *data, RRDHOST *host, bool queryable);
-uint64_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hosts_sp, foreach_host_cb_t cb, void *data, uint64_t *hard_hash, uint64_t *soft_hash, char *host_uuid_buffer);
-
-typedef bool (*foreach_context_cb_t)(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context);
-size_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, SIMPLE_PATTERN *scope_contexts_sp, SIMPLE_PATTERN *contexts_sp, foreach_context_cb_t cb, bool queryable_host, void *data);
-
 #endif //NETDATA_RRDCONTEXT_INTERNAL_H

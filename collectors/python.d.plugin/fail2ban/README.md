@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Apps"
 -->
 
-# Fail2ban monitoring with Netdata
+# Fail2ban collector
 
 Monitors the fail2ban log file to show all bans for all active jails.
 

@@ -5,7 +5,7 @@
 
 // ----------------------------------------------------------------------------
 // ARAL vectors used to speed up processing
-ARAL *ebpf_aral_shm_pid;
+ARAL *ebpf_aral_shm_pid = NULL;
 
 static char *shm_dimension_name[NETDATA_SHM_END] = { "get", "at", "dt", "ctl" };
 static netdata_syscall_stat_t shm_aggregated_data[NETDATA_SHM_END];
@@ -336,7 +336,7 @@ static void ebpf_shm_exit(void *ptr)
  */
 static inline void ebpf_shm_aral_init()
 {
-    ebpf_aral_shm_pid = ebpf_allocate_pid_aral("ebpf-shm", sizeof(netdata_publish_shm_t));
+    ebpf_aral_shm_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_SHM_ARAL_NAME, sizeof(netdata_publish_shm_t));
 }
 
 /**
@@ -917,6 +917,11 @@ static void shm_collector(ebpf_module_t *em)
             ebpf_shm_send_apps_data(apps_groups_root_target);
         }
 
+#ifdef NETDATA_DEV_MODE
+        if (ebpf_aral_shm_pid)
+            ebpf_send_data_aral_chart(ebpf_aral_shm_pid, em);
+#endif
+
         if (cgroups) {
             ebpf_shm_send_cgroup_data(update_every);
         }
@@ -1110,6 +1115,12 @@ void *ebpf_shm_thread(void *ptr)
     pthread_mutex_lock(&lock);
     ebpf_create_shm_charts(em->update_every);
     ebpf_update_stats(&plugin_statistics, em);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
+#ifdef NETDATA_DEV_MODE
+    if (ebpf_aral_shm_pid)
+        ebpf_statistic_create_aral_chart(NETDATA_EBPF_SHM_ARAL_NAME, em);
+#endif
+
     pthread_mutex_unlock(&lock);
 
     shm_collector(em);

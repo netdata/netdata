@@ -32,6 +32,7 @@ chartsd_cleanup() {
 		[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: cleaning up temporary directory $TMP_DIR ..."
 		rm -rf "$TMP_DIR"
 	fi
+	echo "EXIT"
 	exit 0
 }
 trap chartsd_cleanup EXIT QUIT HUP INT TERM

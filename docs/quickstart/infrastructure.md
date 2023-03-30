@@ -1,7 +1,9 @@
-# Monitor your infrastructure
-
 import { Grid, Box, BoxList, BoxListItemRegexLink } from '@site/src/components/Grid/'
 import { RiExternalLinkLine } from 'react-icons/ri'
+
+# Monitor your infrastructure
+
+Learn how to view key metrics, insightful charts, and active alarms from all your nodes, with Netdata Cloud's real-time infrastructure monitoring.
 
 [Netdata Cloud](https://app.netdata.cloud) provides scalable infrastructure monitoring for any number of distributed
 nodes running the Netdata Agent. A node is any system in your infrastructure that you want to monitor, whether it's a
@@ -10,7 +12,7 @@ physical or virtual machine (VM), container, cloud deployment, or edge/IoT devic
 The Netdata Agent uses zero-configuration collectors to gather metrics from every application and container instantly,
 and uses Netdata's [distributed data architecture](https://github.com/netdata/netdata/blob/master/docs/store/distributed-data-architecture.md) to store metrics
 locally. Without a slow and troublesome centralized data lake for your infrastructure's metrics, you reduce the
-resources you need to invest in, and the complexity of, monitoring your infrastructure. 
+resources you need to invest in, and the complexity of, monitoring your infrastructure.
 
 Netdata Cloud unifies infrastructure monitoring by _centralizing the interface_ you use to query and visualize your
 nodes' metrics, not the data. By streaming metrics values to your browser, with Netdata Cloud acting as the secure proxy
@@ -22,7 +24,7 @@ composite charts, and alarm viewing. You'll then learn about the most critical w
 your nodes to maximize the value you get from Netdata.
 
 This quickstart assumes you've [installed Netdata](https://github.com/netdata/netdata/edit/master/packaging/installer/README.md)
-on more than one node in your infrastructure, and connected those nodes to your Space in Netdata Cloud. 
+on more than one node in your infrastructure, and connected those nodes to your Space in Netdata Cloud.
 
 ## Set up your Netdata Cloud experience
 
@@ -61,18 +63,35 @@ in](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.md)
 
 ### See an overview of your infrastructure
 
-The default way to visualize the health and performance of an infrastructure with Netdata Cloud is the
-[**Overview**](https://github.com/netdata/netdata/blob/master/docs/visualize/overview-infrastructure.md), which is the default interface of every War Room. The
-Overview features composite charts, which display aggregated metrics from every node in a given War Room. These metrics
-are streamed on-demand from individual nodes and composited onto a single, familiar dashboard.
+Netdata Cloud utilizes "tabs" in order to provide you with informative sections based on your infrastructure.  
+These tabs can be separated into "static", meaning they are by default presented, and "non-static" which are tabs that get presented by user action (e.g clicking on a custom dashboard)
 
-![The War Room
-Overview](https://user-images.githubusercontent.com/1153921/108732681-09791980-74eb-11eb-9ba2-98cb1b6608de.png)
+#### Static tabs
 
-Read more about the Overview in the [infrastructure overview](https://github.com/netdata/netdata/blob/master/docs/visualize/overview-infrastructure.md) doc.
+- The default view for any War Room is the [Home tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md#home), which gives you an overview of this Space.  
+  Here you can see the number of Nodes claimed, data retention statics, users by role, alerts and more.
 
-Netdata Cloud also features the [**Nodes view**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md), which you can
-use to configure and see a few key metrics from every node in the War Room, view health status, and more.
+- The second and most important view is the [Overview tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md#overview-and-single-node-view) which uses composite charts to display real-time metrics from every available node in a given War Room.
+
+- The [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md) gives you the ability to see the status (offline or online), host details, alarm status and also a short overview of some key metrics from all your nodes at a glance.
+
+- [Kubernetes tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md) is a logical grouping of charts regarding your Kubernetes clusters. It contains a subset of the charts available in the **Overview tab**.
+
+- The [Dashboards tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md) gives you the ability to have tailored made views of specific/targeted interfaces for your infrastructure using any number of charts from any number of nodes.
+
+- The [Alerts tab](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alarms.md) provides you with an overview for all the active alerts you receive for the nodes in this War Room, you can also see all the alerts that are configured to be triggered in any given moment.
+
+- The [Anomalies tab](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.md) is dedicated to the Anomaly Advisor tool.
+
+- The [Functions tab](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md) gives you the ability to visualize functions that the Netdata Agent collectors are able to expose.
+
+- The [Feed & events](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md) tab lets you investigate events that occurred in the past, which is invaluable for troubleshooting.
+
+#### Dynamic tabs
+
+If you open a [new dashboard](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md), jump to a single-node dashboard, or navigate to a dedicated alert page, a new tab will open in War Room bar.
+
+Tabs can be rearranged with drag-and-drop or closed with the **X** button. Open tabs persist between sessions, so you can always come right back to your preferred setup.
 
 ### Drill down to specific nodes
 

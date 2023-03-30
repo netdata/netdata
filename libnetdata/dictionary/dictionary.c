@@ -811,6 +811,11 @@ static void garbage_collect_pending_deletes(DICTIONARY *dict) {
                           examined, deleted, pending);
 }
 
+void dictionary_garbage_collect(DICTIONARY *dict) {
+    if(!dict) return;
+    garbage_collect_pending_deletes(dict);
+}
+
 // ----------------------------------------------------------------------------
 // reference counters
 
@@ -2149,6 +2154,8 @@ DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_view_set_and_acquire_item_advanced(D
     if(unlikely(is_master_dictionary(dict)))
         fatal("DICTIONARY: this dictionary is a master, you cannot add items from other dictionaries.");
 
+    garbage_collect_pending_deletes(dict);
+
     dictionary_acquired_item_dup(dict->master, master_item);
     DICTIONARY_ITEM *item = dict_item_add_or_reset_value_and_acquire(dict, name, name_len, NULL, 0, NULL, master_item);
     dictionary_acquired_item_release(dict->master, master_item);
@@ -2271,7 +2278,7 @@ void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw) {
     dfe->counter = 0;
     dfe->dict = dict;
     dfe->rw = rw;
-
+    dfe->locked = true;
     ll_recursive_lock(dict, dfe->rw);
 
     DICTIONARY_STATS_TRAVERSALS_PLUS1(dict);
@@ -2294,8 +2301,10 @@ void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw) {
         dfe->value = NULL;
     }
 
-    if(unlikely(dfe->rw == DICTIONARY_LOCK_REENTRANT))
+    if(unlikely(dfe->rw == DICTIONARY_LOCK_REENTRANT)) {
         ll_recursive_unlock(dfe->dict, dfe->rw);
+        dfe->locked = false;
+    }
 
     return dfe->value;
 }
@@ -2311,8 +2320,10 @@ void *dictionary_foreach_next(DICTFE *dfe) {
         return NULL;
     }
 
-    if(unlikely(dfe->rw == DICTIONARY_LOCK_REENTRANT))
+    if(unlikely(dfe->rw == DICTIONARY_LOCK_REENTRANT) || !dfe->locked) {
         ll_recursive_lock(dfe->dict, dfe->rw);
+        dfe->locked = true;
+    }
 
     // the item we just did
     DICTIONARY_ITEM *item = dfe->item;
@@ -2342,10 +2353,19 @@ void *dictionary_foreach_next(DICTFE *dfe) {
         dfe->value = NULL;
     }
 
-    if(unlikely(dfe->rw == DICTIONARY_LOCK_REENTRANT))
+    if(unlikely(dfe->rw == DICTIONARY_LOCK_REENTRANT)) {
         ll_recursive_unlock(dfe->dict, dfe->rw);
+        dfe->locked = false;
+    }
 
     return dfe->value;
+}
+
+void dictionary_foreach_unlock(DICTFE *dfe) {
+    if(dfe->locked) {
+        ll_recursive_unlock(dfe->dict, dfe->rw);
+        dfe->locked = false;
+    }
 }
 
 void dictionary_foreach_done(DICTFE *dfe) {
@@ -2365,8 +2385,10 @@ void dictionary_foreach_done(DICTFE *dfe) {
         // item_release(dfe->dict, item);
     }
 
-    if(likely(dfe->rw != DICTIONARY_LOCK_REENTRANT))
+    if(likely(dfe->rw != DICTIONARY_LOCK_REENTRANT) && dfe->locked) {
         ll_recursive_unlock(dfe->dict, dfe->rw);
+        dfe->locked = false;
+    }
 
     dfe->dict = NULL;
     dfe->item = NULL;

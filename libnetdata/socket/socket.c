@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE // for POLLRDHUP
+#endif
+
+#ifndef __BSD_VISIBLE
+#define __BSD_VISIBLE // for POLLRDHUP
+#endif
+
 #include "../libnetdata.h"
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -10,6 +18,46 @@
 #else
 #define LARGE_SOCK_SIZE 4096
 #endif
+
+bool fd_is_socket(int fd) {
+    int type;
+    socklen_t len = sizeof(type);
+    if (getsockopt(fd, SOL_SOCKET, SO_TYPE, &type, &len) == -1)
+        return false;
+
+    return true;
+}
+
+bool sock_has_output_error(int fd) {
+    if(fd < 0) {
+        //internal_error(true, "invalid socket %d", fd);
+        return false;
+    }
+
+//    if(!fd_is_socket(fd)) {
+//        //internal_error(true, "fd %d is not a socket", fd);
+//        return false;
+//    }
+
+    short int errors = POLLERR | POLLHUP | POLLNVAL;
+
+#ifdef POLLRDHUP
+    errors |= POLLRDHUP;
+#endif
+
+    struct pollfd pfd = {
+            .fd = fd,
+            .events = POLLOUT | errors,
+            .revents = 0,
+    };
+
+    if(poll(&pfd, 1, 0) == -1) {
+        //internal_error(true, "poll() failed");
+        return false;
+    }
+
+    return ((pfd.revents & errors) || !(pfd.revents & POLLOUT));
+}
 
 int sock_setnonblock(int fd) {
     int flags;

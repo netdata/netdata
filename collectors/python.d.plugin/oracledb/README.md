@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Databases"
 -->
 
-# OracleDB monitoring with Netdata
+# OracleDB collector
 
 Monitors the performance and health metrics of the Oracle database.
 

@@ -399,7 +399,7 @@ size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_si
 
             // find how big this character is (2-4 bytes)
             size_t utf_character_size = 2;
-            while(utf_character_size <= 4 && src[utf_character_size] && IS_UTF8_BYTE(src[utf_character_size]) && !IS_UTF8_STARTBYTE(src[utf_character_size]))
+            while(utf_character_size < 4 && src[utf_character_size] && IS_UTF8_BYTE(src[utf_character_size]) && !IS_UTF8_STARTBYTE(src[utf_character_size]))
                 utf_character_size++;
 
             if(utf) {
@@ -875,7 +875,7 @@ static int simple_pattern_match_name_and_value_callback(const DICTIONARY_ITEM *i
     *dst = '\0';
 
     t->searches++;
-    if(simple_pattern_matches_length_extract(t->pattern, tmp, dst - tmp, NULL, 0))
+    if(simple_pattern_matches_length_extract(t->pattern, tmp, dst - tmp, NULL, 0) == SP_MATCHED_POSITIVE)
         return -1;
 
     return 0;

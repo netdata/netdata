@@ -1,13 +1,14 @@
 # Netdata style guide
 
-The _Netdata style guide_ establishes editorial guidelines for any writing produced by the Netdata team or the Netdata
-community, including documentation, articles, in-product UX copy, and more. Both internal Netdata teams and external
-contributors to any of Netdata's open-source projects should reference and adhere to this style guide as much as
-possible.
+The _Netdata style guide_ establishes editorial guidelines for any writing produced by the Netdata team or the Netdata community, including documentation, articles, in-product UX copy, and more.
 
-Netdata's writing should **empower** and **educate**. You want to help people understand Netdata's value, encourage them
-to learn more, and ultimately use Netdata's products to democratize monitoring in their organizations. To achieve these
-goals, your writing should be:
+> ### Note
+> This document is meant to be accompanied by the [Documentation Guidelines](https://github.com/netdata/netdata/blob/master/docs/guidelines.md). If you want to contribute to Netdata's documentation, please read it too.
+
+Both internal Netdata teams and external contributors to any of Netdata's open-source projects should reference and adhere to this style guide as much as possible.
+
+Netdata's writing should **empower** and **educate**. You want to help people understand Netdata's value, encourage them to learn more, and ultimately use Netdata's products to democratize monitoring in their organizations.
+To achieve these goals, your writing should be:
 
 - **Clear**. Use simple words and sentences. Use strong, direct, and active language that encourages readers to action.
 - **Concise**. Provide solutions and answers as quickly as possible. Give users the information they need right now,
@@ -347,17 +348,6 @@ The Netdata team uses [`remark-lint`](https://github.com/remarkjs/remark-lint) f
 If you want to see all the settings, open the
 [`remarkrc.js`](https://github.com/netdata/netdata/blob/master/.remarkrc.js) file in the `netdata/netdata` repository.
 
-### Linking between documentation
-
-Documentation should link to relevant pages whenever it's relevant and provides valuable context to the reader.
-
-Links should always reference the full path to the document, beginning at the root of the Netdata Agent repository
-(`/`), and ending with the `.md` file extension. Avoid relative links or traversing up directories using `../`.
-
-For example, if you want to link to our node configuration document, link
-to `https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md`. To reference
-the guide for deploying the Netdata Agent with Ansible, link to `/packaging/installer/methods/ansible.md`.
-
 ### References to UI elements
 
 When referencing a user interface (UI) element in Netdata, reference the label text of the link/button with Markdown's
@@ -419,6 +409,58 @@ inline char *health_stock_config_dir(void) {
 Prism also supports titles and line highlighting. See
 the [Docusaurus documentation](https://v2.docusaurus.io/docs/markdown-features#code-blocks) for more information.
 
+### Adding Notes
+
+Notes inside files should render properly both in GitHub and in Learn, to do that, it is best to use the format listed below:
+
+```
+> ### Note
+> This is an info or a note block.
+
+> ### Tip, Best Practice
+> This is a tip or a best practice block.
+
+> ### Warning, Caution
+> This is a warning or a caution block.
+```
+
+Which renders into:
+
+
+> ### Note
+> This is an info or a note block.
+
+> ### Tip, Best Practice
+> This is a tip or a best practice block.
+
+> ### Warning, Caution
+> This is a warning or a caution block.
+
+### Tabs
+
+Docusaurus allows for Tabs to be used, but we have to ensure that a user accessing the file from GitHub doesn't notice any weird artifacts while reading. So, we use tabs only when necessary in this format:
+
+```
+
+<Tabs>
+<TabItem value="tab1" label="tab1">
+  
+<h3> Header for tab1 </h3>
+  
+text for tab1, both visible in GitHub and Docusaurus
+    
+    
+</TabItem>
+<TabItem value="tab2" label="tab2">
+    
+<h3> Header for tab2 </h3>
+    
+text for tab2, both visible in GitHub and Docusaurus
+
+</TabItem>
+</Tabs>
+```
+
 ## Word list
 
 The following tables describe the standard spelling, capitalization, and usage of words found in Netdata's writing.
@@ -445,5 +487,3 @@ The following tables describe the standard spelling, capitalization, and usage o
 | **filesystem**              | Use instead of _file system_.                                                                                                                                                                                                   |
 | **preconfigured**           | The concept that many of Netdata's features come with sane defaults that users don't need to configure to find immediate value. |
 | **real time**/**real-time** | Use _real time_ as a noun phrase, most often with _in_: _Netdata collects metrics in real time_. Use _real-time_ as an adjective: _Netdata collects real-time metrics from hundreds of supported applications and services.     |
-
-

@@ -515,4 +515,8 @@ static inline time_t max_acceptable_collected_time(void) {
 
 void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, bool update_retention, bool worker);
 
+static inline int journal_metric_uuid_compare(const void *key, const void *metric) {
+    return uuid_memcmp((uuid_t *)key, &(((struct journal_metric_list *) metric)->uuid));
+}
+
 #endif /* NETDATA_RRDENGINE_H */

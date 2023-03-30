@@ -41,11 +41,12 @@ static struct {
         , {"natural-points"    , 0    , RRDR_OPTION_NATURAL_POINTS}
         , {"virtual-points"    , 0    , RRDR_OPTION_VIRTUAL_POINTS}
         , {"all-dimensions"    , 0    , RRDR_OPTION_ALL_DIMENSIONS}
-        , {"plan"              , 0    , RRDR_OPTION_SHOW_PLAN}
         , {"details"           , 0    , RRDR_OPTION_SHOW_DETAILS}
         , {"debug"             , 0    , RRDR_OPTION_DEBUG}
+        , {"plan"              , 0    , RRDR_OPTION_DEBUG}
         , {"minify"            , 0    , RRDR_OPTION_MINIFY}
-        , {"annotations"       , 0    , RRDR_OPTION_JW_ANNOTATIONS}
+        , {"group-by-labels"   , 0    , RRDR_OPTION_GROUP_BY_LABELS}
+        , {"label-quotes"      , 0    , RRDR_OPTION_LABEL_QUOTES}
         , {NULL                , 0    , 0}
 };
 
@@ -57,6 +58,7 @@ static struct {
         {  DATASOURCE_FORMAT_DATATABLE_JSON , 0 , DATASOURCE_DATATABLE_JSON}
         , {DATASOURCE_FORMAT_DATATABLE_JSONP, 0 , DATASOURCE_DATATABLE_JSONP}
         , {DATASOURCE_FORMAT_JSON           , 0 , DATASOURCE_JSON}
+        , {DATASOURCE_FORMAT_JSON2          , 0 , DATASOURCE_JSON2}
         , {DATASOURCE_FORMAT_JSONP          , 0 , DATASOURCE_JSONP}
         , {DATASOURCE_FORMAT_SSV            , 0 , DATASOURCE_SSV}
         , {DATASOURCE_FORMAT_CSV            , 0 , DATASOURCE_CSV}
@@ -67,7 +69,9 @@ static struct {
         , {DATASOURCE_FORMAT_SSV_COMMA      , 0 , DATASOURCE_SSV_COMMA}
         , {DATASOURCE_FORMAT_CSV_JSON_ARRAY , 0 , DATASOURCE_CSV_JSON_ARRAY}
         , {DATASOURCE_FORMAT_CSV_MARKDOWN   , 0 , DATASOURCE_CSV_MARKDOWN}
-        , {                                 NULL, 0, 0}
+
+        // terminator
+        , {NULL, 0, 0}
 };
 
 static struct {
@@ -261,8 +265,8 @@ int web_client_api_request_v1_alarms_select (char *url) {
         char *value = mystrsep(&url, "&");
         if (!value || !*value) continue;
 
-        if(!strcmp(value, "all")) all = 1;
-        else if(!strcmp(value, "active")) all = 0;
+        if(!strcmp(value, "all") || !strcmp(value, "all=true")) all = 1;
+        else if(!strcmp(value, "active") || !strcmp(value, "active=true")) all = 0;
     }
 
     return all;
@@ -697,7 +701,7 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
             .contexts = context,
             .instances = chart,
             .dimensions = (dimensions)?buffer_tostring(dimensions):NULL,
-            .timeout = timeout,
+            .timeout_ms = timeout,
             .points = points,
             .format = format,
             .options = options,
@@ -974,8 +978,8 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     }
 }
 
-static inline void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host, BUFFER *wb) {
-    buffer_json_member_add_object(wb, "alarms");
+void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host, BUFFER *wb, const char *key) {
+    buffer_json_member_add_object(wb, key);
 
     size_t normal = 0, warning = 0, critical = 0;
     RRDCALC *rc;
@@ -1045,8 +1049,8 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
     rrd_unlock();
 }
 
-static inline void host_labels2json(RRDHOST *host, BUFFER *wb) {
-    buffer_json_member_add_object(wb, "host_labels");
+void host_labels2json(RRDHOST *host, BUFFER *wb, const char *key) {
+    buffer_json_member_add_object(wb, key);
     rrdlabels_to_buffer_json_members(host->rrdlabels, wb);
     buffer_json_object_close(wb);
 }
@@ -1093,7 +1097,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_json_member_add_uint64(wb, "hosts-available", rrdhost_hosts_available());
     web_client_api_request_v1_info_mirrored_hosts(wb);
 
-    web_client_api_request_v1_info_summary_alarm_statuses(host, wb);
+    web_client_api_request_v1_info_summary_alarm_statuses(host, wb, "alarms");
 
     buffer_json_member_add_string_or_empty(wb, "os_name", host->system_info->host_os_name);
     buffer_json_member_add_string_or_empty(wb, "os_id", host->system_info->host_os_id);
@@ -1126,7 +1130,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_json_member_add_string_or_omit(wb, "cloud_instance_type", host->system_info->cloud_instance_type);
     buffer_json_member_add_string_or_omit(wb, "cloud_instance_region", host->system_info->cloud_instance_region);
 
-    host_labels2json(host, wb);
+    host_labels2json(host, wb, "host_labels");
     host_functions2json(host, wb);
     host_collectors(host, wb);
 
@@ -1191,7 +1195,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
 #if defined(ENABLE_ML)
     buffer_json_member_add_object(wb, "ml-info");
-    ml_get_host_info(host, wb);
+    ml_host_get_info(host, wb);
     buffer_json_object_close(wb);
 #endif
 
@@ -1206,17 +1210,16 @@ int web_client_api_request_v1_ml_info(RRDHOST *host, struct web_client *w, char 
     if (!netdata_ready)
         return HTTP_RESP_BACKEND_FETCH_FAILED;
 
-    char *s = ml_get_host_runtime_info(host);
-    if (!s)
-        s = strdupz("{\"error\": \"json string is empty\" }\n");
-
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
-    buffer_strcat(wb, s);
+
+    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    ml_host_get_detection_info(host, wb);
+    buffer_json_finalize(wb);
+
     buffer_no_cacheable(wb);
 
-    freez(s);
     return HTTP_RESP_OK;
 }
 
@@ -1226,20 +1229,15 @@ int web_client_api_request_v1_ml_models(RRDHOST *host, struct web_client *w, cha
     if (!netdata_ready)
         return HTTP_RESP_BACKEND_FETCH_FAILED;
 
-    char *s = ml_get_host_models(host);
-    if (!s)
-        s = strdupz("{\"error\": \"json string is empty\" }\n");
-
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
-    buffer_strcat(wb, s);
+    ml_host_get_models(host, wb);
     buffer_no_cacheable(wb);
 
-    freez(s);
     return HTTP_RESP_OK;
 }
-#endif
+#endif // ENABLE_ML
 
 inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
@@ -1271,90 +1269,14 @@ static int web_client_api_request_v1_aclk_state(RRDHOST *host, struct web_client
     return HTTP_RESP_OK;
 }
 
-static int web_client_api_request_v1_weights_internal(RRDHOST *host, struct web_client *w, char *url, WEIGHTS_METHOD method, WEIGHTS_FORMAT format) {
-    if (!netdata_ready)
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
-
-    long long baseline_after = 0, baseline_before = 0, after = 0, before = 0, points = 0;
-    RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO | RRDR_OPTION_NULL2ZERO;
-    int options_count = 0;
-    RRDR_TIME_GROUPING group = RRDR_GROUPING_AVERAGE;
-    int timeout = 0;
-    size_t tier = 0;
-    const char *group_options = NULL, *contexts_str = NULL;
-
-    while (url) {
-        char *value = mystrsep(&url, "&");
-        if (!value || !*value)
-            continue;
-
-        char *name = mystrsep(&value, "=");
-        if (!name || !*name)
-            continue;
-        if (!value || !*value)
-            continue;
-
-        if (!strcmp(name, "baseline_after"))
-            baseline_after = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "baseline_before"))
-            baseline_before = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "after") || !strcmp(name, "highlight_after"))
-            after = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "before") || !strcmp(name, "highlight_before"))
-            before = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "points") || !strcmp(name, "max_points"))
-            points = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "timeout"))
-            timeout = (int) strtoul(value, NULL, 0);
-
-        else if(!strcmp(name, "group"))
-            group = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
-
-        else if(!strcmp(name, "options")) {
-            if(!options_count) options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NULL2ZERO;
-            options |= web_client_api_request_v1_data_options(value);
-            options_count++;
-        }
-
-        else if(!strcmp(name, "method"))
-            method = weights_string_to_method(value);
-
-        else if(!strcmp(name, "context") || !strcmp(name, "contexts"))
-            contexts_str = value;
-
-        else if(!strcmp(name, "tier")) {
-            tier = str2ul(value);
-            if(tier < storage_tiers)
-                options |= RRDR_OPTION_SELECTED_TIER;
-            else
-                tier = 0;
-        }
-    }
-
-    BUFFER *wb = w->response.data;
-    buffer_flush(wb);
-    wb->content_type = CT_APPLICATION_JSON;
-
-    SIMPLE_PATTERN *contexts = (contexts_str) ? simple_pattern_create(contexts_str, ",|\t\r\n\f\v",
-                                                                      SIMPLE_PATTERN_EXACT, true) : NULL;
-
-    int ret = web_api_v1_weights(host, wb, method, format, group, group_options, baseline_after, baseline_before, after, before, points, options, contexts, tier, timeout);
-
-    simple_pattern_free(contexts);
-    return ret;
-}
-
 int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_client *w, char *url) {
-    return web_client_api_request_v1_weights_internal(host, w, url, default_metric_correlations_method, WEIGHTS_FORMAT_CHARTS);
+    return web_client_api_request_weights(host, w, url, default_metric_correlations_method,
+                                          WEIGHTS_FORMAT_CHARTS, 1);
 }
 
 int web_client_api_request_v1_weights(RRDHOST *host, struct web_client *w, char *url) {
-    return web_client_api_request_v1_weights_internal(host, w, url, WEIGHTS_METHOD_ANOMALY_RATE, WEIGHTS_FORMAT_CONTEXTS);
+    return web_client_api_request_weights(host, w, url, WEIGHTS_METHOD_ANOMALY_RATE,
+                                          WEIGHTS_FORMAT_CONTEXTS, 1);
 }
 
 int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char *url) {

@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Networking"
 -->
 
-# NSD monitoring with Netdata
+# NSD collector
 
 Uses the `nsd-control stats_noreset` command to provide `nsd` statistics.
 
