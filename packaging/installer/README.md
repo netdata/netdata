@@ -1,9 +1,11 @@
-# Install Netdata
-
 import { OneLineInstallWget, OneLineInstallCurl } from '@site/src/components/OneLineInstall/'
 import { InstallRegexLink, InstallBoxRegexLink } from '@site/src/components/InstallRegexLink/'
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
+
+# Install Netdata
+
+This document will guide you through installing the open-source Netdata monitoring Agent on Linux, Docker, Kubernetes, and many others, often with one command.
 
 ## Get started
 
@@ -19,7 +21,7 @@ Docker), and many other operating systems (FreeBSD, macOS), with no `sudo` requi
 
 To install Netdata in minutes on your platform:
 
-1. Sign up to https://app.netdata.cloud/
+1. Sign up to <https://app.netdata.cloud/>
 2. You will be presented with an empty space, and a prompt to "Connect Nodes" with the install command for each platform
 3. Select the platform you want to install Netdata to, copy and paste the script into your node's terminal, and run it
 
@@ -184,16 +186,16 @@ the community helps fix any bugs that might have been introduced in previous rel
 
 **Pros of using nightly releases:**
 
--   Get the latest features and bug fixes as soon as they're available
--   Receive security-related fixes immediately
--   Use stable, fully-tested code that's always improving
--   Leverage the same Netdata experience our community is using
+- Get the latest features and bug fixes as soon as they're available
+- Receive security-related fixes immediately
+- Use stable, fully-tested code that's always improving
+- Leverage the same Netdata experience our community is using
 
 **Pros of using stable releases:**
 
--   Protect yourself from the rare instance when major bugs slip through our testing and negatively affect a Netdata
+- Protect yourself from the rare instance when major bugs slip through our testing and negatively affect a Netdata
     installation
--   Retain more control over the Netdata version you use
+- Retain more control over the Netdata version you use
 
 ### Anonymous statistics
 
@@ -256,5 +258,3 @@ both.
 Our current build process has some issues when using certain configurations of the `clang` C compiler on Linux. See [the
 section on `nonrepresentable section on output`
 errors](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md#nonrepresentable-section-on-output-errors) for a workaround.
-
-

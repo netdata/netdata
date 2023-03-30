@@ -95,6 +95,7 @@ with minimal user effort.
 | Alpine Linux  | 3.16    | No                       |                                                                                                      |
 | Alpine Linux  | 3.15    | No                       |                                                                                                      |
 | Alpine Linux  | 3.14    | No                       |                                                                                                      |
+| Amazon Linux  | 2023    | x86\_64, AArch64         | Scheduled for promotion to Core tier at some point after the release of v1.39.0 of the Netdata Agent |
 | Amazon Linux  | 2       | x86\_64, AArch64         | Scheduled for promotion to Core tier at some point after the release of v1.39.0 of the Netdata Agent |
 | Arch Linux    | Latest  | No                       | We officially recommend the community packages available for Arch Linux                              |
 | Manjaro Linux | Latest  | No                       | We officially recommend the community packages available for Arch Linux                              |

@@ -1,18 +1,12 @@
-<!--
-title: "Use host labels to organize systems, metrics, and alarms"
-sidebar_label: "Use host labels to organize systems, metrics, and alarms"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/using-host-labels.md
-learn_status: "Published"
-learn_rel_path: "Operations"
--->
+# Using host labels to organize your metrics
 
-# Use host labels to organize systems, metrics, and alarms
+When you use Netdata to monitor and troubleshoot an entire infrastructure, you need sophisticated ways of keeping everything organized.
 
-When you use Netdata to monitor and troubleshoot an entire infrastructure, whether that's dozens or hundreds of systems,
-you need sophisticated ways of keeping everything organized. You need alarms that adapt to the system's purpose, or
-whether the parent or child in a streaming setup. You need properly-labeled metrics archiving so you can sort,
-correlate, and mash-up your data to your heart's content. You need to keep tabs on ephemeral Docker containers in a
-Kubernetes cluster.
+Some of the scenarios that host labels can be extremely useful are:
+
+- You need alarms that adapt to the system's purpose
+- You need properly-labeled metrics archiving so you can sort, correlate, and mash-up your data to your heart's content.
+- You need to keep tabs on ephemeral Docker containers in a Kubernetes cluster.
 
 You need **host labels**: a powerful new way of organizing your Netdata-monitored systems. We introduced host labels in
 [v1.20 of Netdata](https://blog.netdata.cloud/posts/release-1.20/), and they come pre-configured out of the box.

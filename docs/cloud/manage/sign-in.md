@@ -1,4 +1,6 @@
-# Sign in with email, Google, or GitHub
+# Sign in to Netdata
+
+This page explains how to sign in to Netdata with your email, Google account, or GitHub account, and provides some tips if you're having trouble signing in.
 
 You can [sign in to Netdata](https://app.netdata.cloud/sign-in?cloudRoute=spaces?utm_source=docs&utm_content=sign_in_button_first_section) through one of three methods: email, Google, or GitHub. Email uses a
 time-sensitive link that authenticates your browser, and Google/GitHub both use OAuth to associate your email address
@@ -6,7 +8,6 @@ with a Netdata Cloud account.
 
 No matter the method, your Netdata Cloud account is based around your email address. Netdata Cloud does not store
 passwords.
-
 
 ## Email
 
@@ -31,22 +32,22 @@ quickstart](https://github.com/netdata/netdata/blob/master/packaging/installer/R
 
 ### Troubleshooting
 
-You should receive your sign in email in less than a minute. The subject is **Verify your email!** for new sign-ups, **Sign in to Netdata** for sign ins. 
+You should receive your sign in email in less than a minute. The subject is **Verify your email!** for new sign-ups, **Sign in to Netdata** for sign ins.
 The sender is `no-reply@netdata.cloud` via `sendgrid.net`.
 
 If you don't see the email, try the following:
 
--   Check your spam folder.
--   In Gmail, check the **Updates** category.
--   Check [Netdata Cloud status](https://status.netdata.cloud) for ongoing issues with our infrastructure.
--   Request another sign in email via the [sign in page](https://app.netdata.cloud/sign-in?cloudRoute=spaces?utm_source=docs&utm_content=sign_in_button_troubleshooting_section).
+- Check your spam folder.
+- In Gmail, check the **Updates** category.
+- Check [Netdata Cloud status](https://status.netdata.cloud) for ongoing issues with our infrastructure.
+- Request another sign in email via the [sign in page](https://app.netdata.cloud/sign-in?cloudRoute=spaces?utm_source=docs&utm_content=sign_in_button_troubleshooting_section).
 
 You may also want to add `no-reply@netdata.cloud` to your address book or contacts list, especially if you're using
 a public email service, such as Gmail. You may also want to whitelist/allowlist either the specific email or the entire
 `netdata.cloud` domain.
 
 In some cases, temporary issues with your mail server or email account may result in your email address being added to a Bounce list by Sendgrid.
-If you are added to that list, no Netdata cloud email can reach you, including alarm notifications. Let us know in Discord that you have trouble receiving 
+If you are added to that list, no Netdata cloud email can reach you, including alarm notifications. Let us know in Discord that you have trouble receiving
 any email from us and someone will ask you to provide your email address privately, so we can check if you are on the Bounce list.
 
 ## Google and GitHub OAuth
@@ -56,7 +57,7 @@ receives via OAuth.
 
 To sign in with Google or GitHub OAuth, visit [Netdata Cloud](https://app.netdata.cloud/sign-in?cloudRoute=spaces?utm_source=docs&utm_content=sign_in_button_google_github_section) and click the
 **Continue with Google/GitHub** or button. Enter your Google/GitHub username and your password. Complete two-factor
-authentication if you or your organization has it enabled. 
+authentication if you or your organization has it enabled.
 
 You are then signed in to Netdata Cloud or directed to the new-user onboarding if you have not signed up previously.
 
