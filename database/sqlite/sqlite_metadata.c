@@ -39,7 +39,6 @@ const char *database_config[] = {
 };
 
 const char *database_cleanup[] = {
-    "DELETE FROM chart WHERE chart_id NOT IN (SELECT chart_id FROM dimension);",
     "DELETE FROM host WHERE host_id NOT IN (SELECT host_id FROM chart);",
     "DELETE FROM chart_label WHERE chart_id NOT IN (SELECT chart_id FROM chart);",
     "DELETE FROM host_info WHERE host_id NOT IN (SELECT host_id FROM host);",
@@ -304,7 +303,8 @@ int sql_init_metadata_database(db_check_action_type_t rebuild, int memory)
 #define DELETE_MISSING_NODE_INSTANCES "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);"
 
 #define METADATA_CMD_Q_MAX_SIZE (1024)              // Max queue size; callers will block until there is room
-#define METADATA_MAINTENANCE_FIRST_CHECK (1800)     // Maintenance first run after agent startup in seconds
+#define METADATA_MAINTENANCE_FIRST_CHECK (5)        // Maintenance first run after agent startup in seconds
+#define METADATA_MAINTENANCE_FIRST_CLEANUP (60)   // Maintenance first run after agent startup in seconds
 #define METADATA_MAINTENANCE_RETRY (60)             // Retry run if already running or last run did actual work
 #define METADATA_MAINTENANCE_INTERVAL (3600)        // Repeat maintenance after latest successful
 
@@ -946,6 +946,29 @@ bind_fail:
     return 1;
 }
 
+static bool metric_delete_from_registry(uuid_t *dim_uuid __maybe_unused)
+{
+#ifdef ENABLE_DBENGINE
+    if(dbengine_enabled) {
+        bool deleted = false;
+        for (size_t tier = 0; tier < storage_tiers; tier++) {
+            if (!multidb_ctx[tier])
+                continue;
+
+            METRIC *metric = mrg_metric_get_and_acquire(main_mrg, dim_uuid, (Word_t) multidb_ctx[tier]);
+            if (unlikely(!metric))
+                continue;
+            deleted = mrg_metric_release_and_delete(main_mrg, metric) | deleted;
+        }
+        return deleted;
+    }
+    else
+        return false;
+#else
+    return false;
+#endif
+}
+
 static bool dimension_can_be_deleted(uuid_t *dim_uuid __maybe_unused)
 {
 #ifdef ENABLE_DBENGINE
@@ -990,6 +1013,7 @@ static void check_dimension_metadata(struct metadata_wc *wc)
 
     uint32_t total_checked = 0;
     uint32_t total_deleted= 0;
+    uint32_t registry_deleted= 0;
     uint64_t last_row_id = wc->row_id;
 
     info("METADATA: Checking dimensions starting after row %"PRIu64, wc->row_id);
@@ -1002,6 +1026,8 @@ static void check_dimension_metadata(struct metadata_wc *wc)
         rc = dimension_can_be_deleted((uuid_t *)sqlite3_column_blob(res, 0));
         if (rc == true) {
             delete_dimension_uuid((uuid_t *)sqlite3_column_blob(res, 0));
+            if (metric_delete_from_registry((uuid_t *)sqlite3_column_blob(res, 0)))
+                registry_deleted++;
             total_deleted++;
         }
         total_checked++;
@@ -1012,8 +1038,8 @@ static void check_dimension_metadata(struct metadata_wc *wc)
         wc->check_metadata_after = now + METADATA_MAINTENANCE_RETRY;
     } else
         wc->row_id = 0;
-    info("METADATA: Checked %u, deleted %u -- will resume after row %"PRIu64" in %lld seconds", total_checked, total_deleted, wc->row_id,
-         (long long)(wc->check_metadata_after - now));
+    info("METADATA: Checked %u, deleted %u, registry deleted %u -- will resume after row %"PRIu64" in %lld seconds", total_checked, total_deleted, registry_deleted,
+         wc->row_id, (long long)(wc->check_metadata_after - now));
 
 skip_run:
     rc = sqlite3_finalize(res);
@@ -1179,18 +1205,40 @@ static void after_metadata_cleanup(uv_work_t *req, int status)
     UNUSED(status);
 
     struct metadata_wc *wc = req->data;
+
+    if (unlikely(!wc->check_hosts_after)) {
+        time_t now = now_realtime_sec();
+        wc->check_hosts_after    = now + METADATA_HOST_CHECK_FIRST_CHECK;
+        wc->check_metadata_after = now + METADATA_MAINTENANCE_FIRST_CLEANUP;
+    }
     metadata_flag_clear(wc, METADATA_FLAG_CLEANUP);
 }
 
 static void start_metadata_cleanup(uv_work_t *req)
 {
+    static bool chart_cleanup_done = false;
+
     register_libuv_worker_jobs();
+    int rc;
 
     worker_is_busy(UV_EVENT_METADATA_CLEANUP);
     struct metadata_wc *wc = req->data;
-    check_dimension_metadata(wc);
-    cleanup_health_log();
-    (void) sqlite3_wal_checkpoint(db_meta, NULL);
+    if (unlikely(false == chart_cleanup_done)) {
+       usec_t started_ut = now_monotonic_usec();
+       rc = db_execute(db_meta, "DELETE FROM chart WHERE chart_id NOT IN (SELECT chart_id FROM dimension);");
+       if (unlikely(rc))
+           error_report("METADATA: Failed to cleanup charts that have no dimensions");
+       else {
+            usec_t ended_ut = now_monotonic_usec();
+            info("METADATA: Cleanup charts that have no dimensions in %0.2f ms", (double)(ended_ut - started_ut) / USEC_PER_MS);
+        }
+       chart_cleanup_done = true;
+    }
+    else {
+       check_dimension_metadata(wc);
+       cleanup_health_log();
+       (void)sqlite3_wal_checkpoint(db_meta, NULL);
+    }
     worker_is_idle();
 }
 
@@ -1574,11 +1622,11 @@ static void metadata_event_loop(void *arg)
 
     struct metadata_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
-    metadata_flag_clear(wc, METADATA_FLAG_CLEANUP);
-    metadata_flag_clear(wc, METADATA_FLAG_SCANNING_HOSTS);
+    metadata_flag_clear(wc, METADATA_FLAG_CLEANUP | METADATA_FLAG_SCANNING_HOSTS);
 
-    wc->check_metadata_after = now_realtime_sec() + METADATA_MAINTENANCE_FIRST_CHECK;
-    wc->check_hosts_after    = now_realtime_sec() + METADATA_HOST_CHECK_FIRST_CHECK;
+    time_t now = now_realtime_sec();
+    wc->check_metadata_after = now + METADATA_MAINTENANCE_FIRST_CHECK;
+    wc->check_hosts_after = 0;
 
     int shutdown = 0;
     wc->row_id = 0;
