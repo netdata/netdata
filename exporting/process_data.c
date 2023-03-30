@@ -126,8 +126,8 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
     size_t counter = 0;
     NETDATA_DOUBLE sum = 0;
 
-    for (rd->tiers[0].query_ops->init(rd->tiers[0].db_metric_handle, &handle, after, before, STORAGE_PRIORITY_LOW); !rd->tiers[0].query_ops->is_finished(&handle);) {
-        STORAGE_POINT sp = rd->tiers[0].query_ops->next_metric(&handle);
+    for (rd->tiers[0].query_ops->init(rd->tiers[0].db_metric_handle, &handle, after, before, STORAGE_PRIORITY_LOW); !storage_engine_query_is_finished(&handle);) {
+        STORAGE_POINT sp = storage_engine_query_next_metric(&handle);
         points_read++;
 
         if (unlikely(storage_point_is_gap(sp))) {
@@ -138,7 +138,7 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
         sum += sp.sum;
         counter += sp.count;
     }
-    rd->tiers[0].query_ops->finalize(&handle);
+    storage_engine_query_finalize(&handle);
     global_statistics_exporters_query_completed(points_read);
 
     if (unlikely(!counter)) {

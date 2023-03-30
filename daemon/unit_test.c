@@ -1994,7 +1994,7 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
                            j * REGION_POINTS[current_region] + c + k;
                     expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE)last, SN_DEFAULT_FLAGS));
 
-                    STORAGE_POINT sp = rd[i][j]->tiers[0].query_ops->next_metric(&handle);
+                    STORAGE_POINT sp = storage_engine_query_next_metric(&handle);
                     value = sp.sum;
                     time_retrieved = sp.start_time_s;
                     end_time = sp.end_time_s;
@@ -2016,7 +2016,7 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
                         errors++;
                     }
                 }
-                rd[i][j]->tiers[0].query_ops->finalize(&handle);
+                storage_engine_query_finalize(&handle);
             }
         }
     }
@@ -2450,7 +2450,7 @@ static void query_dbengine_chart(void *arg)
             generatedv = generate_dbengine_chart_value(i, j, time_now);
             expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE) generatedv, SN_DEFAULT_FLAGS));
 
-            if (unlikely(rd->tiers[0].query_ops->is_finished(&handle))) {
+            if (unlikely(storage_engine_query_is_finished(&handle))) {
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
                     fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
                         ", found data gap, ### E R R O R ###\n",
@@ -2460,7 +2460,7 @@ static void query_dbengine_chart(void *arg)
                 break;
             }
 
-            STORAGE_POINT sp = rd->tiers[0].query_ops->next_metric(&handle);
+            STORAGE_POINT sp = storage_engine_query_next_metric(&handle);
             value = sp.sum;
             time_retrieved = sp.start_time_s;
             end_time = sp.end_time_s;
@@ -2498,7 +2498,7 @@ static void query_dbengine_chart(void *arg)
                 }
             }
         }
-        rd->tiers[0].query_ops->finalize(&handle);
+        storage_engine_query_finalize(&handle);
     } while(!thread_info->done);
 
     if(value_errors)

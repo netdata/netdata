@@ -109,12 +109,18 @@ RRD_MEMORY_MODE rrd_memory_mode_id(const char *name);
 
 typedef struct storage_query_handle STORAGE_QUERY_HANDLE;
 
+typedef enum __attribute__ ((__packed__)) {
+    STORAGE_ENGINE_BACKEND_DBENGINE,
+    STORAGE_ENGINE_BACKEND_RRDDIM,
+} STORAGE_ENGINE_BACKEND;
+
 // iterator state for RRD dimension data queries
 struct storage_engine_query_handle {
     time_t start_time_s;
     time_t end_time_s;
     STORAGE_PRIORITY priority;
-    STORAGE_QUERY_HANDLE* handle;
+    STORAGE_ENGINE_BACKEND backend;
+    STORAGE_QUERY_HANDLE *handle;
 };
 
 // ----------------------------------------------------------------------------
@@ -441,27 +447,53 @@ struct storage_engine_query_ops {
     // run this before starting a series of next_metric() database queries
     void (*init)(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *handle, time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority);
 
-    // run this to load each metric number from the database
-    STORAGE_POINT (*next_metric)(struct storage_engine_query_handle *handle);
-
-    // run this to test if the series of next_metric() database queries is finished
-    int (*is_finished)(struct storage_engine_query_handle *handle);
-
-    // run this after finishing a series of load_metric() database queries
-    void (*finalize)(struct storage_engine_query_handle *handle);
-
     // get the timestamp of the last entry of this metric
     time_t (*latest_time_s)(STORAGE_METRIC_HANDLE *db_metric_handle);
 
     // get the timestamp of the first entry of this metric
     time_t (*oldest_time_s)(STORAGE_METRIC_HANDLE *db_metric_handle);
-
-    // adapt 'before' timestamp to the optimal for the query
-    // can only move 'before' ahead (to the future)
-    time_t (*align_to_optimal_before)(struct storage_engine_query_handle *handle);
 };
 
-typedef struct storage_engine STORAGE_ENGINE;
+STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim_handle);
+STORAGE_POINT rrddim_query_next_metric(struct storage_engine_query_handle *handle);
+static inline STORAGE_POINT storage_engine_query_next_metric(struct storage_engine_query_handle *handle) {
+#ifdef ENABLE_DBENGINE
+    if(likely(handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_load_metric_next(handle);
+#endif
+    return rrddim_query_next_metric(handle);
+}
+
+int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *rrddim_handle);
+int rrddim_query_is_finished(struct storage_engine_query_handle *handle);
+static inline int storage_engine_query_is_finished(struct storage_engine_query_handle *handle) {
+#ifdef ENABLE_DBENGINE
+    if(likely(handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_load_metric_is_finished(handle);
+#endif
+    return rrddim_query_is_finished(handle);
+}
+
+void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrddim_handle);
+void rrddim_query_finalize(struct storage_engine_query_handle *handle);
+static inline void storage_engine_query_finalize(struct storage_engine_query_handle *handle) {
+#ifdef ENABLE_DBENGINE
+    if(likely(handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        rrdeng_load_metric_finalize(handle);
+    else
+#endif
+        rrddim_query_finalize(handle);
+}
+
+time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *rrddim_handle);
+time_t rrddim_query_align_to_optimal_before(struct storage_engine_query_handle *rrddim_handle);
+static inline time_t storage_engine_align_to_optimal_before(struct storage_engine_query_handle *handle) {
+#ifdef ENABLE_DBENGINE
+    if(likely(handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_load_align_to_optimal_before(handle);
+#endif
+    return rrddim_query_align_to_optimal_before(handle);
+}
 
 // ------------------------------------------------------------------------
 // function pointers for all APIs provided by a storage engine
@@ -478,11 +510,12 @@ typedef struct storage_engine_api {
     struct storage_engine_query_ops query_ops;
 } STORAGE_ENGINE_API;
 
-struct storage_engine {
+typedef struct storage_engine {
     RRD_MEMORY_MODE id;
     const char* name;
     STORAGE_ENGINE_API api;
-};
+    STORAGE_ENGINE_BACKEND backend;
+} STORAGE_ENGINE;
 
 STORAGE_ENGINE* storage_engine_get(RRD_MEMORY_MODE mmode);
 STORAGE_ENGINE* storage_engine_find(const char* name);

@@ -18,12 +18,8 @@
 
 #define im_query_ops {                                                              \
     .init = rrddim_query_init,                                                      \
-    .next_metric = rrddim_query_next_metric,                                        \
-    .is_finished = rrddim_query_is_finished,                                        \
-    .finalize = rrddim_query_finalize,                                              \
     .latest_time_s = rrddim_query_latest_time_s,                                    \
     .oldest_time_s = rrddim_query_oldest_time_s,                                    \
-    .align_to_optimal_before = rrddim_query_align_to_optimal_before,                \
 }
 
 static STORAGE_ENGINE engines[] = {
@@ -113,12 +109,8 @@ static STORAGE_ENGINE engines[] = {
             },
             .query_ops = {
                 .init = rrdeng_load_metric_init,
-                .next_metric = rrdeng_load_metric_next,
-                .is_finished = rrdeng_load_metric_is_finished,
-                .finalize = rrdeng_load_metric_finalize,
                 .latest_time_s = rrdeng_metric_latest_time,
                 .oldest_time_s = rrdeng_metric_oldest_time,
-                .align_to_optimal_before = rrdeng_load_align_to_optimal_before,
             }
         }
     },

@@ -260,7 +260,7 @@ static void replication_query_finalize(BUFFER *wb, struct replication_query *q, 
         struct replication_dimension *d = &q->data[i];
         if (unlikely(!d->enabled)) continue;
 
-        q->ops->finalize(&d->handle);
+        storage_engine_query_finalize(&d->handle);
 
         dictionary_acquired_item_release(d->dict, d->rda);
 
@@ -292,7 +292,7 @@ static void replication_query_align_to_optimal_before(struct replication_query *
         struct replication_dimension *d = &q->data[i];
         if(unlikely(!d->enabled)) continue;
 
-        time_t new_before = q->ops->align_to_optimal_before(&d->handle);
+        time_t new_before = rrdeng_load_align_to_optimal_before(&d->handle);
         if (!expanded_before || new_before < expanded_before)
             expanded_before = new_before;
     }
@@ -311,7 +311,6 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
     time_t after = q->query.after;
     time_t before = q->query.before;
     size_t dimensions = q->dimensions;
-    struct storage_engine_query_ops *ops = q->ops;
     time_t wall_clock_time = q->wall_clock_time;
 
     bool finished_with_gap = false;
@@ -331,8 +330,8 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
 
             // fetch the first valid point for the dimension
             int max_skip = 1000;
-            while(d->sp.end_time_s < now && !ops->is_finished(&d->handle) && max_skip-- >= 0) {
-                d->sp = ops->next_metric(&d->handle);
+            while(d->sp.end_time_s < now && !storage_engine_query_is_finished(&d->handle) && max_skip-- >= 0) {
+                d->sp = storage_engine_query_next_metric(&d->handle);
                 points_read++;
             }
 

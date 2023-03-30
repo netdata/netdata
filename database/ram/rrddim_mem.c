@@ -340,6 +340,7 @@ void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_e
     handle->start_time_s = start_time_s;
     handle->end_time_s = end_time_s;
     handle->priority = priority;
+    handle->backend = STORAGE_ENGINE_BACKEND_RRDDIM;
     struct mem_query_handle* h = mallocz(sizeof(struct mem_query_handle));
     h->db_metric_handle = db_metric_handle;
 

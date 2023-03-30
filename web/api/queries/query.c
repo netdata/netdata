@@ -1148,9 +1148,6 @@ typedef struct query_engine_ops {
     size_t tier;
     struct query_metric_tier *tier_ptr;
     struct storage_engine_query_handle *handle;
-    STORAGE_POINT (*next_metric)(struct storage_engine_query_handle *handle);
-    int (*is_finished)(struct storage_engine_query_handle *handle);
-    void (*finalize)(struct storage_engine_query_handle *handle);
 
     // aggregating points over time
     size_t group_points_non_zero;
@@ -1167,9 +1164,6 @@ typedef struct query_engine_ops {
         time_t expanded_after;
         time_t expanded_before;
         struct storage_engine_query_handle handle;
-        STORAGE_POINT (*next_metric)(struct storage_engine_query_handle *handle);
-        int (*is_finished)(struct storage_engine_query_handle *handle);
-        void (*finalize)(struct storage_engine_query_handle *handle);
         bool initialized;
         bool finalized;
     } plans[QUERY_PLANS_MAX];
@@ -1244,9 +1238,6 @@ static void query_planer_initialize_plans(QUERY_ENGINE_OPS *ops) {
                 after, before,
                 ops->r->internal.qt->request.priority);
 
-        ops->plans[p].next_metric = eng->api.query_ops.next_metric;
-        ops->plans[p].is_finished = eng->api.query_ops.is_finished;
-        ops->plans[p].finalize = eng->api.query_ops.finalize;
         ops->plans[p].initialized = true;
         ops->plans[p].finalized = false;
     }
@@ -1256,18 +1247,9 @@ static void query_planer_finalize_plan(QUERY_ENGINE_OPS *ops, size_t plan_id) {
     // QUERY_METRIC *qm = ops->qm;
 
     if(ops->plans[plan_id].initialized && !ops->plans[plan_id].finalized) {
-        ops->plans[plan_id].finalize(&ops->plans[plan_id].handle);
+        storage_engine_query_finalize(&ops->plans[plan_id].handle);
         ops->plans[plan_id].initialized = false;
         ops->plans[plan_id].finalized = true;
-        ops->plans[plan_id].next_metric = NULL;
-        ops->plans[plan_id].is_finished = NULL;
-        ops->plans[plan_id].finalize = NULL;
-
-        if(ops->current_plan == plan_id) {
-            ops->next_metric = NULL;
-            ops->is_finished = NULL;
-            ops->finalize = NULL;
-        }
     }
 }
 
@@ -1290,9 +1272,6 @@ static void query_planer_activate_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, ti
     ops->tier = qm->plan.array[plan_id].tier;
     ops->tier_ptr = &qm->tiers[ops->tier];
     ops->handle = &ops->plans[plan_id].handle;
-    ops->next_metric = ops->plans[plan_id].next_metric;
-    ops->is_finished = ops->plans[plan_id].is_finished;
-    ops->finalize = ops->plans[plan_id].finalize;
     ops->current_plan = plan_id;
 
     if(plan_id + 1 < qm->plan.used && qm->plan.array[plan_id + 1].after < qm->plan.array[plan_id].before)
@@ -1616,7 +1595,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                 last1_point = new_point;
             }
 
-            if(unlikely(ops->is_finished(ops->handle))) {
+            if(unlikely(storage_engine_query_is_finished(ops->handle))) {
                 query_is_finished_counter++;
 
                 if(count_same_end_time != 0) {
@@ -1639,7 +1618,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                 STORAGE_POINT sp;
                 if(likely(storage_point_is_unset(next1_point))) {
                     db_points_read_since_plan_switch++;
-                    sp = ops->next_metric(ops->handle);
+                    sp = storage_engine_query_next_metric(ops->handle);
                     ops->db_points_read_per_tier[ops->tier]++;
                     ops->db_total_points_read++;
 
@@ -1665,7 +1644,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                     // A. the entire point of the previous plan is to the future of point from the next plan
                     // B. part of the point of the previous plan overlaps with the point from the next plan
 
-                    STORAGE_POINT sp2 = ops->next_metric(ops->handle);
+                    STORAGE_POINT sp2 = storage_engine_query_next_metric(ops->handle);
                     ops->db_points_read_per_tier[ops->tier]++;
                     ops->db_total_points_read++;
 
@@ -1977,9 +1956,9 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s
 
         size_t points_read = 0;
 
-        while(!tmp->query_ops->is_finished(&handle)) {
+        while(!storage_engine_query_is_finished(&handle)) {
 
-            STORAGE_POINT sp = tmp->query_ops->next_metric(&handle);
+            STORAGE_POINT sp = storage_engine_query_next_metric(&handle);
             points_read++;
 
             if(sp.end_time_s > latest_time_s) {
@@ -1988,7 +1967,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s
             }
         }
 
-        tmp->query_ops->finalize(&handle);
+        storage_engine_query_finalize(&handle);
         store_metric_collection_completed();
         global_statistics_backfill_query_completed(points_read);
 
