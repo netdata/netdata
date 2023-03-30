@@ -96,7 +96,6 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
             STORAGE_ENGINE *eng = host->db[tier].eng;
             rd->tiers[tier].backend = eng->backend;
             rd->tiers[tier].tier_grouping = host->db[tier].tier_grouping;
-            rd->tiers[tier].collect_ops = &eng->api.collect_ops;
             rd->tiers[tier].db_metric_handle = eng->api.metric_get_or_create(rd, host->db[tier].instance);
             storage_point_unset(rd->tiers[tier].virtual_point);
             initialized++;
@@ -116,7 +115,8 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         size_t initialized = 0;
         for (size_t tier = 0; tier < storage_tiers; tier++) {
             if (rd->tiers[tier].db_metric_handle) {
-                rd->tiers[tier].db_collection_handle = rd->tiers[tier].collect_ops->init(rd->tiers[tier].db_metric_handle, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->storage_metrics_groups[tier]);
+                rd->tiers[tier].db_collection_handle =
+                        storage_metric_store_init(rd->tiers[tier].backend, rd->tiers[tier].db_metric_handle, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->storage_metrics_groups[tier]);
                 initialized++;
             }
         }
@@ -253,7 +253,7 @@ static bool rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
         if (!rd->tiers[tier].db_collection_handle)
             rd->tiers[tier].db_collection_handle =
-                rd->tiers[tier].collect_ops->init(rd->tiers[tier].db_metric_handle, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->storage_metrics_groups[tier]);
+                    storage_metric_store_init(rd->tiers[tier].backend, rd->tiers[tier].db_metric_handle, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->storage_metrics_groups[tier]);
     }
 
     if(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {

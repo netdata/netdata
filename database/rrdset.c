@@ -158,7 +158,7 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
             STORAGE_ENGINE *eng = st->rrdhost->db[tier].eng;
             if(!eng) continue;
 
-            st->storage_metrics_groups[tier] = eng->api.collect_ops.metrics_group_get(host->db[tier].instance, &st->chart_uuid);
+            st->storage_metrics_groups[tier] = storage_engine_metrics_group_get(eng->backend, host->db[tier].instance, &st->chart_uuid);
         }
     }
 
@@ -203,7 +203,7 @@ void rrdset_finalize_collection(RRDSET *st, bool dimensions_too) {
         if(!eng) continue;
 
         if(st->storage_metrics_groups[tier]) {
-            eng->api.collect_ops.metrics_group_release(host->db[tier].instance, st->storage_metrics_groups[tier]);
+            storage_engine_metrics_group_release(eng->backend, host->db[tier].instance, st->storage_metrics_groups[tier]);
             st->storage_metrics_groups[tier] = NULL;
         }
     }

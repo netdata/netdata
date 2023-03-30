@@ -323,7 +323,6 @@ struct rrddim_tier {
     time_t next_point_end_time_s;
     STORAGE_METRIC_HANDLE *db_metric_handle;        // the metric handle inside the database
     STORAGE_COLLECT_HANDLE *db_collection_handle;   // the data collection handle
-    struct storage_engine_collect_ops *collect_ops;
 };
 
 void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s);
@@ -422,14 +421,44 @@ size_t rrddim_memory_file_header_size(void);
 void rrddim_memory_file_save(RRDDIM *rd);
 
 // ------------------------------------------------------------------------
-// function pointers that handle data collection
-struct storage_engine_collect_ops {
-    // an initialization function to run before starting collection
-    STORAGE_COLLECT_HANDLE *(*init)(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every, STORAGE_METRICS_GROUP *smg);
+// DATA COLLECTION STORAGE OPS
 
-    STORAGE_METRICS_GROUP *(*metrics_group_get)(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
-    void (*metrics_group_release)(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *sa);
-};
+STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
+STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
+static inline STORAGE_METRICS_GROUP *storage_engine_metrics_group_get(STORAGE_ENGINE_BACKEND backend, STORAGE_INSTANCE *db_instance, uuid_t *uuid) {
+    internal_fatal(!is_valid_backend(backend), "STORAGE: invalid backend");
+
+#ifdef ENABLE_DBENGINE
+    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_metrics_group_get(db_instance, uuid);
+#endif
+    return rrddim_metrics_group_get(db_instance, uuid);
+}
+
+void rrdeng_metrics_group_release(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *smg);
+void rrddim_metrics_group_release(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *smg);
+static inline void storage_engine_metrics_group_release(STORAGE_ENGINE_BACKEND backend, STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *smg) {
+    internal_fatal(!is_valid_backend(backend), "STORAGE: invalid backend");
+
+#ifdef ENABLE_DBENGINE
+    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        rrdeng_metrics_group_release(db_instance, smg);
+    else
+#endif
+        rrddim_metrics_group_release(db_instance, smg);
+}
+
+STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every, STORAGE_METRICS_GROUP *smg);
+STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every, STORAGE_METRICS_GROUP *smg);
+static inline STORAGE_COLLECT_HANDLE *storage_metric_store_init(STORAGE_ENGINE_BACKEND backend, STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every, STORAGE_METRICS_GROUP *smg) {
+    internal_fatal(!is_valid_backend(backend), "STORAGE: invalid backend");
+
+#ifdef ENABLE_DBENGINE
+    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_store_metric_init(db_metric_handle, update_every, smg);
+#endif
+    return rrddim_collect_init(db_metric_handle, update_every, smg);
+}
 
 void rrdeng_store_metric_next(
         STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time_ut,
@@ -610,9 +639,6 @@ typedef struct storage_engine_api {
     void (*metric_release)(STORAGE_METRIC_HANDLE *);
     STORAGE_METRIC_HANDLE *(*metric_dup)(STORAGE_METRIC_HANDLE *);
     bool (*metric_retention_by_uuid)(STORAGE_INSTANCE *db_instance, uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s);
-
-    // operations
-    struct storage_engine_collect_ops collect_ops;
 } STORAGE_ENGINE_API;
 
 typedef struct storage_engine {

@@ -6,12 +6,6 @@
 #include "engine/rrdengineapi.h"
 #endif
 
-#define im_collect_ops {                                                            \
-    .init = rrddim_collect_init,                                                    \
-    .metrics_group_get = rrddim_metrics_group_get,                                  \
-    .metrics_group_release = rrddim_metrics_group_release,                          \
-}
-
 static STORAGE_ENGINE engines[] = {
     {
         .id = RRD_MEMORY_MODE_NONE,
@@ -23,7 +17,6 @@ static STORAGE_ENGINE engines[] = {
             .metric_dup = rrddim_metric_dup,
             .metric_release = rrddim_metric_release,
             .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
-            .collect_ops = im_collect_ops,
         }
     },
     {
@@ -36,7 +29,6 @@ static STORAGE_ENGINE engines[] = {
             .metric_dup = rrddim_metric_dup,
             .metric_release = rrddim_metric_release,
             .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
-            .collect_ops = im_collect_ops,
         }
     },
     {
@@ -49,7 +41,6 @@ static STORAGE_ENGINE engines[] = {
             .metric_dup = rrddim_metric_dup,
             .metric_release = rrddim_metric_release,
             .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
-            .collect_ops = im_collect_ops,
         }
     },
     {
@@ -62,7 +53,6 @@ static STORAGE_ENGINE engines[] = {
             .metric_dup = rrddim_metric_dup,
             .metric_release = rrddim_metric_release,
             .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
-            .collect_ops = im_collect_ops,
         }
     },
     {
@@ -75,7 +65,6 @@ static STORAGE_ENGINE engines[] = {
             .metric_dup = rrddim_metric_dup,
             .metric_release = rrddim_metric_release,
             .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
-            .collect_ops = im_collect_ops,
         }
     },
 #ifdef ENABLE_DBENGINE
@@ -89,11 +78,6 @@ static STORAGE_ENGINE engines[] = {
             .metric_dup = rrdeng_metric_dup,
             .metric_release = rrdeng_metric_release,
             .metric_retention_by_uuid = rrdeng_metric_retention_by_uuid,
-            .collect_ops = {
-                .init = rrdeng_store_metric_init,
-                .metrics_group_get = rrdeng_metrics_group_get,
-                .metrics_group_release = rrdeng_metrics_group_release,
-            },
         }
     },
 #endif
