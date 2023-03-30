@@ -1,17 +1,17 @@
 # Alerta Agent alert notifications
 
-Send alarm notifications to Alerta to see the latest health status updates from multiple nodes in a single interface.
+Learn how to send notifications to Alerta using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
 > ### Note
 >
-> This file assumes you have read the [landing page of this section](https://github.com/netdata/netdata/blob/master/health/notifications/README.md), detailing how the Netdata Agent's alerting method works.
+> This file assumes you have read the [landing page of this section](https://github.com/netdata/netdata/blob/master/health/notifications/README.md), detailing how the Netdata Agent's alert notification method works.
 
 The [Alerta](https://alerta.io) monitoring system is a tool used to consolidate and de-duplicate alerts from multiple sources for quick ‘at-a-glance’ visualization.
 With just one system you can monitor alerts from many other monitoring tools on a single screen.
 
 ![Alerta dashboard](https://docs.alerta.io/_images/alerta-screen-shot-3.png "Alerta dashboard showing several alerts.")
 
-Alerta's advantage is the main view, where you can see all active alarms with the most recent state.
+Alerta's advantage is the main view, where you can see all active alert with the most recent state.
 You can also view an alert history. You can send Netdata alerts to Alerta to see alerts coming from many Netdata hosts or also from a multi-host Netdata configuration.
 
 ## Prerequisites
@@ -90,7 +90,3 @@ DEFAULT_RECIPIENT_ALERTA="Production"
 ## Test the alert
 
 To test this alert refer to the ["Testing Alert Notifications"](https://github.com/netdata/netdata/blob/master/health/notifications/README.md#testing-alert-notifications) section of the Agent alert notifications page.
-
-## More information
-
-For more information see the [Alerta documentation](https://docs.alerta.io).
