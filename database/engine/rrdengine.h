@@ -9,13 +9,6 @@
 #include <fcntl.h>
 #include <lz4.h>
 #include <Judy.h>
-#if defined(ENABLE_HTTPS_WITH_OPENSSL)
-#include <openssl/sha.h>
-#include <openssl/evp.h>
-#elif defined(ENABLE_HTTPS_WITH_WOLFSSL)
-#include <wolfssl/openssl/sha.h>
-#include <wolfssl/openssl/evp.h>
-#endif
 #include "daemon/common.h"
 #include "../rrd.h"
 #include "rrddiskprotocol.h"
