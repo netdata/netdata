@@ -94,9 +94,9 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         size_t initialized = 0;
         for(size_t tier = 0; tier < storage_tiers ; tier++) {
             STORAGE_ENGINE *eng = host->db[tier].eng;
+            rd->tiers[tier].backend = eng->backend;
             rd->tiers[tier].tier_grouping = host->db[tier].tier_grouping;
             rd->tiers[tier].collect_ops = &eng->api.collect_ops;
-            rd->tiers[tier].query_ops = &eng->api.query_ops;
             rd->tiers[tier].db_metric_handle = eng->api.metric_get_or_create(rd, host->db[tier].instance);
             storage_point_unset(rd->tiers[tier].virtual_point);
             initialized++;
@@ -416,7 +416,7 @@ time_t rrddim_last_entry_s_of_tier(RRDDIM *rd, size_t tier) {
     if(unlikely(tier > storage_tiers || !rd->tiers[tier].db_metric_handle))
         return 0;
 
-    return rd->tiers[tier].query_ops->latest_time_s(rd->tiers[tier].db_metric_handle);
+    return storage_engine_latest_time_s(rd->tiers[tier].backend, rd->tiers[tier].db_metric_handle);
 }
 
 // get the timestamp of the last entry in the round-robin database
@@ -438,7 +438,7 @@ time_t rrddim_first_entry_s_of_tier(RRDDIM *rd, size_t tier) {
     if(unlikely(tier > storage_tiers || !rd->tiers[tier].db_metric_handle))
         return 0;
 
-    return rd->tiers[tier].query_ops->oldest_time_s(rd->tiers[tier].db_metric_handle);
+    return storage_engine_oldest_time_s(rd->tiers[tier].backend, rd->tiers[tier].db_metric_handle);
 }
 
 time_t rrddim_first_entry_s(RRDDIM *rd) {

@@ -12,16 +12,11 @@
     .metrics_group_release = rrddim_metrics_group_release,                          \
 }
 
-#define im_query_ops {                                                              \
-    .init = rrddim_query_init,                                                      \
-    .latest_time_s = rrddim_query_latest_time_s,                                    \
-    .oldest_time_s = rrddim_query_oldest_time_s,                                    \
-}
-
 static STORAGE_ENGINE engines[] = {
     {
         .id = RRD_MEMORY_MODE_NONE,
         .name = RRD_MEMORY_MODE_NONE_NAME,
+        .backend = STORAGE_ENGINE_BACKEND_RRDDIM,
         .api = {
             .metric_get = rrddim_metric_get,
             .metric_get_or_create = rrddim_metric_get_or_create,
@@ -29,12 +24,12 @@ static STORAGE_ENGINE engines[] = {
             .metric_release = rrddim_metric_release,
             .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
             .collect_ops = im_collect_ops,
-            .query_ops = im_query_ops,
         }
     },
     {
         .id = RRD_MEMORY_MODE_RAM,
         .name = RRD_MEMORY_MODE_RAM_NAME,
+        .backend = STORAGE_ENGINE_BACKEND_RRDDIM,
         .api = {
             .metric_get = rrddim_metric_get,
             .metric_get_or_create = rrddim_metric_get_or_create,
@@ -42,12 +37,12 @@ static STORAGE_ENGINE engines[] = {
             .metric_release = rrddim_metric_release,
             .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
             .collect_ops = im_collect_ops,
-            .query_ops = im_query_ops,
         }
     },
     {
         .id = RRD_MEMORY_MODE_MAP,
         .name = RRD_MEMORY_MODE_MAP_NAME,
+        .backend = STORAGE_ENGINE_BACKEND_RRDDIM,
         .api = {
             .metric_get = rrddim_metric_get,
             .metric_get_or_create = rrddim_metric_get_or_create,
@@ -55,12 +50,12 @@ static STORAGE_ENGINE engines[] = {
             .metric_release = rrddim_metric_release,
             .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
             .collect_ops = im_collect_ops,
-            .query_ops = im_query_ops,
         }
     },
     {
         .id = RRD_MEMORY_MODE_SAVE,
         .name = RRD_MEMORY_MODE_SAVE_NAME,
+        .backend = STORAGE_ENGINE_BACKEND_RRDDIM,
         .api = {
             .metric_get = rrddim_metric_get,
             .metric_get_or_create = rrddim_metric_get_or_create,
@@ -68,12 +63,12 @@ static STORAGE_ENGINE engines[] = {
             .metric_release = rrddim_metric_release,
             .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
             .collect_ops = im_collect_ops,
-            .query_ops = im_query_ops,
         }
     },
     {
         .id = RRD_MEMORY_MODE_ALLOC,
         .name = RRD_MEMORY_MODE_ALLOC_NAME,
+        .backend = STORAGE_ENGINE_BACKEND_RRDDIM,
         .api = {
             .metric_get = rrddim_metric_get,
             .metric_get_or_create = rrddim_metric_get_or_create,
@@ -81,13 +76,13 @@ static STORAGE_ENGINE engines[] = {
             .metric_release = rrddim_metric_release,
             .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
             .collect_ops = im_collect_ops,
-            .query_ops = im_query_ops,
         }
     },
 #ifdef ENABLE_DBENGINE
     {
         .id = RRD_MEMORY_MODE_DBENGINE,
         .name = RRD_MEMORY_MODE_DBENGINE_NAME,
+        .backend = STORAGE_ENGINE_BACKEND_DBENGINE,
         .api = {
             .metric_get = rrdeng_metric_get,
             .metric_get_or_create = rrdeng_metric_get_or_create,
@@ -99,11 +94,6 @@ static STORAGE_ENGINE engines[] = {
                 .metrics_group_get = rrdeng_metrics_group_get,
                 .metrics_group_release = rrdeng_metrics_group_release,
             },
-            .query_ops = {
-                .init = rrdeng_load_metric_init,
-                .latest_time_s = rrdeng_metric_latest_time,
-                .oldest_time_s = rrdeng_metric_oldest_time,
-            }
         }
     },
 #endif

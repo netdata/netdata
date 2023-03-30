@@ -96,7 +96,7 @@ struct replication_query {
     size_t points_read;
     size_t points_generated;
 
-    struct storage_engine_query_ops *ops;
+    STORAGE_ENGINE_BACKEND backend;
     struct replication_request *rq;
 
     size_t dimensions;
@@ -162,7 +162,7 @@ static struct replication_query *replication_query_prepare(
         }
     }
 
-    q->ops = &st->rrdhost->db[0].eng->api.query_ops;
+    q->backend = st->rrdhost->db[0].eng->backend;
 
     // prepare our array of dimensions
     size_t count = 0;
@@ -184,7 +184,7 @@ static struct replication_query *replication_query_prepare(
         d->rda = dictionary_acquired_item_dup(rd_dfe.dict, rd_dfe.item);
         d->rd = rd;
 
-        q->ops->init(rd->tiers[0].db_metric_handle, &d->handle, q->query.after, q->query.before,
+        storage_engine_query_init(q->backend, rd->tiers[0].db_metric_handle, &d->handle, q->query.after, q->query.before,
                      q->query.locked_data_collection ? STORAGE_PRIORITY_HIGH : STORAGE_PRIORITY_LOW);
         d->enabled = true;
         d->skip = false;

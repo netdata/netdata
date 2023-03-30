@@ -341,13 +341,10 @@ ml_dimension_calculated_numbers(ml_dimension_t *dim, const ml_training_request_t
     /*
      * Execute the query
     */
-    struct storage_engine_query_ops *ops = dim->rd->tiers[0].query_ops;
     struct storage_engine_query_handle handle;
 
-    ops->init(dim->rd->tiers[0].db_metric_handle,
-              &handle,
-              training_response.query_after_t,
-              training_response.query_before_t,
+    storage_engine_query_init(dim->rd->tiers[0].backend, dim->rd->tiers[0].db_metric_handle, &handle,
+              training_response.query_after_t, training_response.query_before_t,
               STORAGE_PRIORITY_BEST_EFFORT);
 
     size_t idx = 0;
