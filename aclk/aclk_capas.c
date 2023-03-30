@@ -38,12 +38,14 @@ struct capability *aclk_get_node_instance_capas(RRDHOST *host)
         { .name = "http_api_v2", .version = 1,                     .enabled = 1 },
         { .name = NULL,          .version = 0,                     .enabled = 0 }
     };
-    if (host == localhost || (host->receiver && stream_has_capability(host->receiver, STREAM_CAP_FUNCTIONS))) {
-        ni_caps[4].version = 1;
-        ni_caps[4].enabled = 1;
-    }
 
     struct capability *ret = mallocz(sizeof(ni_caps));
     memcpy(ret, ni_caps, sizeof(ni_caps));
+
+    if (host == localhost || (host->receiver && stream_has_capability(host->receiver, STREAM_CAP_FUNCTIONS))) {
+        ret[4].version = 1;
+        ret[4].enabled = 1;
+    }
+
     return ret;
 }
