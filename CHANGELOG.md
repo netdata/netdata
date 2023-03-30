@@ -6,7 +6,17 @@
 
 **Merged pull requests:**
 
+- Update enable-notifications.md [\#14838](https://github.com/netdata/netdata/pull/14838) ([cakrit](https://github.com/cakrit))
+- Update deployment-strategies.md [\#14837](https://github.com/netdata/netdata/pull/14837) ([cakrit](https://github.com/cakrit))
+- Update database engine readme [\#14836](https://github.com/netdata/netdata/pull/14836) ([cakrit](https://github.com/cakrit))
+- Update change-metrics-storage.md [\#14835](https://github.com/netdata/netdata/pull/14835) ([cakrit](https://github.com/cakrit))
+- Update change-metrics-storage.md [\#14834](https://github.com/netdata/netdata/pull/14834) ([cakrit](https://github.com/cakrit))
+- Update netdata-security.md [\#14833](https://github.com/netdata/netdata/pull/14833) ([cakrit](https://github.com/cakrit))
+- add some third party collectors [\#14830](https://github.com/netdata/netdata/pull/14830) ([andrewm4894](https://github.com/andrewm4894))
+- Delete installation instructions specific to FreeNAS [\#14826](https://github.com/netdata/netdata/pull/14826) ([Ancairon](https://github.com/Ancairon))
+- First batch of adding descriptions to the documentation [\#14825](https://github.com/netdata/netdata/pull/14825) ([Ancairon](https://github.com/Ancairon))
 - configure extent cache size [\#14821](https://github.com/netdata/netdata/pull/14821) ([ktsaou](https://github.com/ktsaou))
+- Docs, shorten too long titles, and add a description below [\#14820](https://github.com/netdata/netdata/pull/14820) ([Ancairon](https://github.com/Ancairon))
 - Minor improvements to netdata-security.md [\#14815](https://github.com/netdata/netdata/pull/14815) ([cakrit](https://github.com/cakrit))
 - Update privacy link in aclk doc [\#14813](https://github.com/netdata/netdata/pull/14813) ([cakrit](https://github.com/cakrit))
 - Consolidate security and privacy documents [\#14812](https://github.com/netdata/netdata/pull/14812) ([cakrit](https://github.com/cakrit))
@@ -34,6 +44,7 @@
 - Create reverse-proxies.md [\#14774](https://github.com/netdata/netdata/pull/14774) ([cakrit](https://github.com/cakrit))
 - Add gzip compression info to nginx proxy readme [\#14773](https://github.com/netdata/netdata/pull/14773) ([cakrit](https://github.com/cakrit))
 - Update API [\#14772](https://github.com/netdata/netdata/pull/14772) ([cakrit](https://github.com/cakrit))
+- Add Amazon Linux 2023 to CI, packaging, and platform support. [\#14771](https://github.com/netdata/netdata/pull/14771) ([Ferroin](https://github.com/Ferroin))
 - Pass node\_id and config\_hash vars when queueing alert configurations [\#14769](https://github.com/netdata/netdata/pull/14769) ([MrZammler](https://github.com/MrZammler))
 - Assorted improvements for our platform EOL check code. [\#14768](https://github.com/netdata/netdata/pull/14768) ([Ferroin](https://github.com/Ferroin))
 - minor addition to distros matrix [\#14767](https://github.com/netdata/netdata/pull/14767) ([tkatsoulas](https://github.com/tkatsoulas))
@@ -382,12 +393,6 @@
 - readme updates [\#14224](https://github.com/netdata/netdata/pull/14224) ([andrewm4894](https://github.com/andrewm4894))
 - bump go.d v0.49.0 [\#14220](https://github.com/netdata/netdata/pull/14220) ([ilyam8](https://github.com/ilyam8))
 - remove lgtm.com [\#14216](https://github.com/netdata/netdata/pull/14216) ([ilyam8](https://github.com/ilyam8))
-- Improve file descriptor closing loops [\#14213](https://github.com/netdata/netdata/pull/14213) ([Dim-P](https://github.com/Dim-P))
-- Remove temporary allocations when preprocessing a samples buffer [\#14208](https://github.com/netdata/netdata/pull/14208) ([vkalintiris](https://github.com/vkalintiris))
-- Create ML charts on child hosts. [\#14207](https://github.com/netdata/netdata/pull/14207) ([vkalintiris](https://github.com/vkalintiris))
-- Use brackets around info variables [\#14206](https://github.com/netdata/netdata/pull/14206) ([MrZammler](https://github.com/MrZammler))
-- Dont call worker\_utilization\_finish\(\) twice [\#14204](https://github.com/netdata/netdata/pull/14204) ([MrZammler](https://github.com/MrZammler))
-- Switch to actions/labeler@v4 for labeling PRs. [\#14203](https://github.com/netdata/netdata/pull/14203) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
