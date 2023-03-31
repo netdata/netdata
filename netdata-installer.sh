@@ -1030,6 +1030,11 @@ if ! run ./configure \
   fatal "Failed to configure Netdata sources." I000A
 fi
 
+cd libdatachannel
+cmake -B build -DNO_MEDIA=1 -DCMAKE_BUILD_TYPE=Release
+cd build
+make V=1 -j8 install
+cd ../..
 
 [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 

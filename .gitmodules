@@ -9,3 +9,6 @@
 	url = https://github.com/davisking/dlib.git
 	shallow = true
 	ignore = dirty
+[submodule "libdatachannel"]
+	path = libdatachannel
+	url = https://github.com/paullouisageneau/libdatachannel.git
