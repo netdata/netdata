@@ -755,6 +755,14 @@ if MQTT_WSS_DEBUG
 libmqttwebsockets_a_CFLAGS += -DMQTT_WSS_DEBUG
 endif
 
+if ENABLE_HTTPS_WITH_OPENSSL
+libmqttwebsockets_a_CFLAGS += -DENABLE_HTTPS_WITH_OPENSSL=1
+endif
+
+if ENABLE_HTTPS_WITH_WOLFSSL
+libmqttwebsockets_a_CFLAGS += -DENABLE_HTTPS_WITH_WOLFSSL=1
+endif
+
 mqtt_websockets/src/mqtt_wss_client.$(OBJEXT) : CFLAGS += -Wno-unused-result
 
 ACLK_PROTO_DEFINITIONS = \
