@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <lz4.h>
 #include <Judy.h>
+#include "../../libnetdata/libnetdata.h"
 #include "daemon/common.h"
 #include "../rrd.h"
 #include "rrddiskprotocol.h"
