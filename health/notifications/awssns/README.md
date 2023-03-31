@@ -8,18 +8,18 @@ Learn how to send notifications through Amazon SNS using Netdata's Agent alert n
 
 As part of its AWS suite, Amazon provides a notification broker service called 'Simple Notification Service' (SNS). Amazon SNS works similarly to Netdata's own notification system, allowing to dispatch a single notification to multiple subscribers of different types. Among other things, SNS supports sending notifications to:
 
-- Email addresses.
-- Mobile Phones via SMS.
-- HTTP or HTTPS web hooks.
-- AWS Lambda functions.
-- AWS SQS queues.
-- Mobile applications via push notifications.
+- email addresses
+- mobile Phones via SMS
+- HTTP or HTTPS web hooks
+- AWS Lambda functions
+- AWS SQS queues
+- mobile applications via push notifications
 
 > ### Note
 >
 > While Amazon SNS supports sending differently formatted messages for different delivery methods, Netdata does not currently support this functionality.
 
-For email notification support, we recommend using Netdata's email notifications, as it is has the following benefits:
+For email notification support, we recommend using Netdata's [email notifications](https://github.com/netdata/netdata/blob/master/health/notifications/email/README.md), as it is has the following benefits:
 
 - In most cases, it requires less configuration.
 - Netdata's emails are nicely pre-formatted and support features like threading, which requires a lot of manual effort in SNS.
@@ -32,10 +32,13 @@ Read on to learn how to set up Amazon SNS in Netdata.
 Before you can enable SNS, you need:
 
 - The [Amazon Web Services CLI tools](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) (`awscli`).
-- An actual home directory for the user you run Netdata as, instead of just using `/` as a home directory. The setup depends on the distribution, but `/var/lib/netdata` is the recommended directory. If you are using Netdata as a dedicated user, the permissions will already be correct.
-- An Amazon SNS topic to send notifications to with one or more subscribers. The [Getting Started](https://docs.aws.amazon.com/sns/latest/dg/sns-getting-started.html) section of the Amazon SNS documentation covers the basics of how to set this up. Make note of the **Topic ARN** when you create the topic.
-- While not mandatory, it is highly recommended to create a dedicated IAM user on your account for Netdata to send notifications. This user needs to have programmatic access, and should only allow access to SNS. For an additional layer of security, you can create one for each system or group of systems.
-- Terminal access to the Agent you wish to configure
+- An actual home directory for the user you run Netdata as, instead of just using `/` as a home directory.  
+  The setup depends on the distribution, but `/var/lib/netdata` is the recommended directory. If you are using Netdata as a dedicated user, the permissions will already be correct.
+- An Amazon SNS topic to send notifications to with one or more subscribers.  
+  The [Getting Started](https://docs.aws.amazon.com/sns/latest/dg/sns-getting-started.html) section of the Amazon SNS documentation covers the basics of how to set this up. Make note of the **Topic ARN** when you create the topic.
+- While not mandatory, it is highly recommended to create a dedicated IAM user on your account for Netdata to send notifications.  
+  This user needs to have programmatic access, and should only allow access to SNS. For an additional layer of security, you can create one for each system or group of systems.
+- Terminal access to the Agent you wish to configure.
 
 ## Sending Alerts to Amazon SNS
 
@@ -45,8 +48,6 @@ Before you can enable SNS, you need:
 >
 > - To edit configuration files in a safe way, we provide the [`edit config` script](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) located in your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) (typically is `/etc/netdata`) that creates the proper file and opens it in an editor automatically.  
 > Note that to run the script you need to be inside your Netdata config directory.
->
-> - Please also note that after most configuration changes you will need to [restart the Agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for the changes to take effect.
 >
 > It is recommended to use this way for configuring Netdata.
 
@@ -66,10 +67,10 @@ To enable SNS:
 
 ### Configure Netdata to send alerts to Amazon SNS
 
-Edit `health_alarm_notify.conf`:
+Edit `health_alarm_notify.conf`, changes to this file do not require restarting Netdata:
 
-1. Set `SEND_AWSNS` to `YES`
-2. Set `AWSSNS_MESSAGE_FORMAT` to the string that you want the alert to be sent into
+1. Set `SEND_AWSNS` to `YES`.
+2. Set `AWSSNS_MESSAGE_FORMAT` to the string that you want the alert to be sent into.
 
    The supported variables are:
 
@@ -112,7 +113,7 @@ Edit `health_alarm_notify.conf`:
    | `${total_warnings}`         | The total number of alarms in WARNING state on the host                          |
    | `${total_critical}`         | The total number of alarms in CRITICAL state on the host                         |
 
-3. Set `DEFAULT_RECIPIENT_AWSSNS` to the Topic ARN you noted down upon creating the Topic  
+3. Set `DEFAULT_RECIPIENT_AWSSNS` to the Topic ARN you noted down upon creating the Topic.  
    All roles will default to this variable if left unconfigured.
 
 You can then have different recipient Topics per **role**, by editing `DEFAULT_RECIPIENT_AWSSNS` with the Topic ARN you want, in the following entries at the bottom of the same file:
