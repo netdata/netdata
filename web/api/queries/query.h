@@ -69,7 +69,7 @@ RRDR_GROUP_BY group_by_parse(char *s);
 void buffer_json_group_by_to_array(struct web_buffer *wb, RRDR_GROUP_BY group_by);
 
 typedef enum rrdr_group_by_function {
-    RRDR_GROUP_BY_FUNCTION_AVERAGE,
+    RRDR_GROUP_BY_FUNCTION_AVERAGE = 0,
     RRDR_GROUP_BY_FUNCTION_MIN,
     RRDR_GROUP_BY_FUNCTION_MAX,
     RRDR_GROUP_BY_FUNCTION_SUM,

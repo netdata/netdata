@@ -1296,9 +1296,7 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb) {
                     buffer_json_member_add_string(wb, "time_resampling", NULL);
                 buffer_json_object_close(wb); // time
 
-                buffer_json_member_add_object(wb, "metrics");
-
-                buffer_json_member_add_array(wb, "group_by");
+                buffer_json_member_add_array(wb, "metrics");
                 for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
                     if(qt->request.group_by[g].group_by == RRDR_GROUP_BY_NONE)
                         break;
@@ -1314,14 +1312,12 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb) {
                             buffer_json_add_array_item_string(wb, qt->group_by[g].label_keys[l]);
                         buffer_json_array_close(wb);
 
-                        buffer_json_member_add_string(wb, "aggregation",
-                                                      group_by_aggregate_function_to_string(
-                                                              qt->request.group_by[g].aggregation));
+                        buffer_json_member_add_string(
+                                wb, "aggregation",group_by_aggregate_function_to_string(qt->request.group_by[g].aggregation));
                     }
                     buffer_json_object_close(wb);
                 }
                 buffer_json_array_close(wb); // group_by
-                buffer_json_object_close(wb); // dimensions
             }
             buffer_json_object_close(wb); // aggregations
 

@@ -245,6 +245,12 @@ typedef struct query_metric {
 
 typedef bool (*qt_interrupt_callback_t)(void *data);
 
+struct group_by_pass {
+    RRDR_GROUP_BY group_by;
+    char *group_by_label;
+    RRDR_GROUP_BY_FUNCTION aggregation;
+};
+
 typedef struct query_target_request {
     size_t version;
 
@@ -285,11 +291,7 @@ typedef struct query_target_request {
     const char *time_group_options;
 
     // group by across multiple time-series
-    struct {
-        RRDR_GROUP_BY group_by;
-        char *group_by_label;
-        RRDR_GROUP_BY_FUNCTION aggregation;
-    } group_by[MAX_QUERY_GROUP_BY_PASSES];
+    struct group_by_pass group_by[MAX_QUERY_GROUP_BY_PASSES];
 
     usec_t received_ut;
 
