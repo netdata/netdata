@@ -278,26 +278,6 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
 
     BUFFER *sql = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
 
-    if (wc->alerts_start_seq_id != 0) {
-        buffer_sprintf(
-            sql,
-            "UPDATE aclk_alert_%s SET date_submitted = NULL, date_cloud_ack = NULL WHERE sequence_id >= %"PRIu64
-            "; UPDATE aclk_alert_%s SET date_cloud_ack = unixepoch() WHERE sequence_id < %"PRIu64
-            " and date_cloud_ack is null "
-            "; UPDATE aclk_alert_%s SET date_submitted = unixepoch() WHERE sequence_id < %"PRIu64
-            " and date_submitted is null",
-            wc->uuid_str,
-            wc->alerts_start_seq_id,
-            wc->uuid_str,
-            wc->alerts_start_seq_id,
-            wc->uuid_str,
-            wc->alerts_start_seq_id);
-        if (unlikely(db_execute(buffer_tostring(sql))))
-            error_report("Failed to reset ACLK alert entries");
-        buffer_reset(sql);
-        wc->alerts_start_seq_id = 0;
-    }
-
     int limit = ACLK_MAX_ALERT_UPDATES;
 
     sqlite3_stmt *res = NULL;
@@ -359,8 +339,8 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
         alarm_log.name = strdupz((char *)sqlite3_column_text(res, 11));
         alarm_log.family = sqlite3_column_bytes(res, 13) > 0 ? strdupz((char *)sqlite3_column_text(res, 13)) : NULL;
 
-        alarm_log.batch_id = wc->alerts_batch_id;
-        alarm_log.sequence_id = (uint64_t) sqlite3_column_int64(res, 0);
+        //alarm_log.batch_id = wc->alerts_batch_id;
+        //alarm_log.sequence_id = (uint64_t) sqlite3_column_int64(res, 0);
         alarm_log.when = (time_t) sqlite3_column_int64(res, 5);
 
         uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 3)), uuid_str);
@@ -445,12 +425,11 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
     } else {
         if (log_first_sequence_id)
             log_access(
-                "ACLK RES [%s (%s)]: ALERTS SENT from %" PRIu64 " to %" PRIu64 " batch=%" PRIu64,
+                "ACLK RES [%s (%s)]: ALERTS SENT from %" PRIu64 " to %" PRIu64 "",
                 wc->node_id,
                 wc->host ? rrdhost_hostname(wc->host) : "N/A",
                 log_first_sequence_id,
-                log_last_sequence_id,
-                wc->alerts_batch_id);
+                log_last_sequence_id);
         log_first_sequence_id = 0;
         log_last_sequence_id = 0;
     }
@@ -494,119 +473,15 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
                        "where new_status <> 0 and new_status <> -2 and config_hash_id is not null and updated_by_id = 0 " \
                        "order by unique_id asc on conflict (alert_unique_id) do nothing;", uuid_str, uuid_str, uuid_str);
 
+    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
+
     if (unlikely(db_execute(buffer_tostring(sql))))
         error_report("Failed to queue existing ACLK alert events for host %s", rrdhost_hostname(host));
 
+    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+
     buffer_free(sql);
     rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-}
-
-void aclk_send_alarm_health_log(char *node_id)
-{
-    if (unlikely(!node_id))
-        return;
-
-    struct aclk_sync_host_config *wc = NULL;
-    RRDHOST *host = find_host_by_node_id(node_id);
-
-    if (unlikely(!host))
-        return;
-
-    wc = (struct aclk_sync_host_config *)host->aclk_sync_host_config;
-    if (unlikely(!wc)) {
-        log_access("ACLK REQ [%s (N/A)]: HEALTH LOG REQUEST RECEIVED FOR INVALID NODE", node_id);
-        return;
-    }
-
-    log_access("ACLK REQ [%s (%s)]: HEALTH LOG REQUEST RECEIVED", node_id, rrdhost_hostname(host));
-
-    aclk_push_node_health_log(node_id);
-}
-
-void aclk_push_alarm_health_log(char *node_id __maybe_unused)
-{
-#ifdef ENABLE_ACLK
-    int rc;
-
-    char *claim_id = get_agent_claimid();
-    if (unlikely(!claim_id)) {
-        freez(node_id);
-        return;
-    }
-
-    RRDHOST *host = find_host_by_node_id(node_id);
-
-    if (unlikely(!host)) {
-        log_access("AC [%s (N/A)]: Node id not found", node_id);
-        freez(claim_id);
-        freez(node_id);
-        return;
-    }
-
-    struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
-
-    int64_t first_sequence = 0;
-    int64_t last_sequence = 0;
-    struct timeval first_timestamp;
-    struct timeval last_timestamp;
-
-    char sql[ACLK_SYNC_QUERY_SIZE];
-
-    sqlite3_stmt *res = NULL;
-
-    //TODO: make this better: include info from health log too
-    snprintfz(sql, ACLK_SYNC_QUERY_SIZE - 1, "SELECT MIN(sequence_id), MIN(date_created), " \
-            "MAX(sequence_id), MAX(date_created) FROM aclk_alert_%s;", wc->uuid_str);
-
-    rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement to get health log statistics from the database");
-        freez(claim_id);
-        return;
-    }
-
-    first_timestamp.tv_sec = 0;
-    first_timestamp.tv_usec = 0;
-    last_timestamp.tv_sec = 0;
-    last_timestamp.tv_usec = 0;
-
-    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-        first_sequence = sqlite3_column_bytes(res, 0) > 0 ? (int64_t) sqlite3_column_int64(res, 0) : 0;
-        if (sqlite3_column_bytes(res, 1) > 0) {
-            first_timestamp.tv_sec = sqlite3_column_int64(res, 1);
-        }
-
-        last_sequence = sqlite3_column_bytes(res, 2) > 0 ? (int64_t) sqlite3_column_int64(res, 2) : 0;
-        if (sqlite3_column_bytes(res, 3) > 0) {
-            last_timestamp.tv_sec = sqlite3_column_int64(res, 3);
-        }
-    }
-
-    struct alarm_log_entries log_entries;
-    log_entries.first_seq_id = first_sequence;
-    log_entries.first_when = first_timestamp;
-    log_entries.last_seq_id = last_sequence;
-    log_entries.last_when = last_timestamp;
-
-    struct alarm_log_health alarm_log;
-    alarm_log.claim_id = claim_id;
-    alarm_log.node_id = wc->node_id;
-    alarm_log.log_entries = log_entries;
-    alarm_log.status = wc->alert_updates == 0 ? 2 : 1;
-    alarm_log.enabled = (int)host->health.health_enabled;
-
-    aclk_send_alarm_log_health(&alarm_log);
-    log_access("ACLK RES [%s (%s)]: HEALTH LOG SENT from %ld to %ld", wc->node_id, rrdhost_hostname(host), first_sequence, last_sequence);
-
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement to get health log statistics from the database, rc = %d", rc);
-
-    freez(claim_id);
-    freez(node_id);
-
-    aclk_alert_reloaded = 1;
-#endif
 }
 
 void aclk_send_alarm_configuration(char *config_hash)
@@ -755,7 +630,7 @@ bind_fail:
 
 
 // Start streaming alerts
-void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start_seq_id)
+void aclk_start_alert_streaming(char *node_id, bool resets)
 {
     if (unlikely(!node_id))
         return;
@@ -779,13 +654,10 @@ void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start
         return;
     }
 
-    // TODO: CHECK
-    if (unlikely(batch_id == 1) && unlikely(start_seq_id == 1))
+    if (resets)
         sql_queue_existing_alerts_to_aclk(host);
 
-    log_access("ACLK REQ [%s (%s)]: ALERTS STREAM from %"PRIu64" batch=%"PRIu64, node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A", start_seq_id, batch_id);
-    wc->alerts_batch_id = batch_id;
-    wc->alerts_start_seq_id = start_seq_id;
+    log_access("ACLK REQ [%s (%s)]: STREAM ALERTS ENABLED", node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
     wc->alert_updates = 1;
 }
 
@@ -831,7 +703,7 @@ void sql_queue_removed_alerts_to_aclk(RRDHOST *host)
     aclk_push_node_removed_alerts(node_id);
 }
 
-void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id __maybe_unused, uint64_t snapshot_id, uint64_t sequence_id)
+void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id __maybe_unused, char *snapshot_uuid)
 {
     uuid_t node_uuid;
     if (unlikely(!node_id || uuid_parse(node_id, node_uuid)))
@@ -851,18 +723,17 @@ void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id __maybe_unus
     }
 
     log_access(
-            "IN [%s (%s)]: Request to send alerts snapshot, snapshot_id %" PRIu64 " and ack_sequence_id %" PRIu64,
+            "IN [%s (%s)]: Request to send alerts snapshot, snapshot_uuid %s",
             wc->node_id,
             wc->host ? rrdhost_hostname(wc->host) : "N/A",
-            snapshot_id,
-            sequence_id);
-        if (wc->alerts_snapshot_id == snapshot_id)
+            snapshot_uuid);
+        if (wc->alerts_snapshot_uuid && !strcmp(wc->alerts_snapshot_uuid,snapshot_uuid))
             return;
         __sync_synchronize();
-        wc->alerts_snapshot_id = snapshot_id;
-        wc->alerts_ack_sequence_id = sequence_id;
+        wc->alerts_snapshot_uuid = strdupz(snapshot_uuid);
         __sync_synchronize();
 
+        freez(snapshot_uuid);
         aclk_push_node_alert_snapshot(node_id);
 }
 
@@ -934,7 +805,6 @@ static int have_recent_alarm(RRDHOST *host, uint32_t alarm_id, uint32_t mark)
 #endif
 
 #define ALARM_EVENTS_PER_CHUNK 10
-#define SQL_ALERT_CLOUD_ACK   "UPDATE aclk_alert_%s SET date_cloud_ack=unixepoch() WHERE sequence_id <= %"PRIu64
 
 void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
 {
@@ -959,21 +829,14 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
         return;
     }
 
-    if (unlikely(!wc->alerts_snapshot_id))
+    if (unlikely(!wc->alerts_snapshot_uuid))
         return;
 
     char *claim_id = get_agent_claimid();
     if (unlikely(!claim_id))
         return;
 
-    log_access("ACLK REQ [%s (%s)]: Sending alerts snapshot, snapshot_id %" PRIu64, wc->node_id, rrdhost_hostname(wc->host), wc->alerts_snapshot_id);
-
-    if (wc->alerts_ack_sequence_id) {
-        char sql[512];
-        snprintfz(sql, 511, SQL_ALERT_CLOUD_ACK, wc->uuid_str, wc->alerts_ack_sequence_id);
-        if (unlikely(db_execute(sql)))
-            error_report("Failed to set ACLK alert entries cloud ACK status for host %s", rrdhost_hostname(host));
-    }
+    log_access("ACLK REQ [%s (%s)]: Sending alerts snapshot, snapshot_uuid %s", wc->node_id, rrdhost_hostname(wc->host), wc->alerts_snapshot_uuid);
 
     uint32_t cnt = 0;
 
@@ -1004,7 +867,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
         struct alarm_snapshot alarm_snap;
         alarm_snap.node_id = wc->node_id;
         alarm_snap.claim_id = claim_id;
-        alarm_snap.snapshot_id = wc->alerts_snapshot_id;
+        alarm_snap.snapshot_uuid = wc->alerts_snapshot_uuid;
         alarm_snap.chunks = chunks;
         alarm_snap.chunk = chunk;
 
@@ -1043,7 +906,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
                     struct alarm_snapshot alarm_snap;
                     alarm_snap.node_id = wc->node_id;
                     alarm_snap.claim_id = claim_id;
-                    alarm_snap.snapshot_id = wc->alerts_snapshot_id;
+                    alarm_snap.snapshot_uuid = wc->alerts_snapshot_uuid;
                     alarm_snap.chunks = chunks;
                     alarm_snap.chunk = chunk;
 
@@ -1057,7 +920,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
     }
 
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
-    wc->alerts_snapshot_id = 0;
+    wc->alerts_snapshot_uuid = NULL;
 
     freez(claim_id);
 #endif
@@ -1085,7 +948,6 @@ void sql_aclk_alert_clean_dead_entries(RRDHOST *host)
 }
 
 #define SQL_GET_MIN_MAX_ALERT_SEQ "SELECT MIN(sequence_id), MAX(sequence_id), " \
-                                  "(SELECT MAX(sequence_id) FROM aclk_alert_%s WHERE date_cloud_ack IS NOT NULL), " \
                                   "(SELECT MAX(sequence_id) FROM aclk_alert_%s WHERE date_submitted IS NOT NULL) " \
                                   "FROM aclk_alert_%s WHERE date_submitted IS NULL;"
 
@@ -1098,12 +960,11 @@ int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert
         return 1;
 
     proto_alert_status->alert_updates = wc->alert_updates;
-    proto_alert_status->alerts_batch_id = wc->alerts_batch_id;
 
     char sql[ACLK_SYNC_QUERY_SIZE];
     sqlite3_stmt *res = NULL;
 
-    snprintfz(sql, ACLK_SYNC_QUERY_SIZE - 1, SQL_GET_MIN_MAX_ALERT_SEQ, wc->uuid_str, wc->uuid_str, wc->uuid_str);
+    snprintfz(sql, ACLK_SYNC_QUERY_SIZE - 1, SQL_GET_MIN_MAX_ALERT_SEQ, wc->uuid_str, wc->uuid_str);
 
     rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
     if (rc != SQLITE_OK) {
@@ -1114,8 +975,7 @@ int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         proto_alert_status->pending_min_sequence_id = sqlite3_column_bytes(res, 0) > 0 ? (uint64_t) sqlite3_column_int64(res, 0) : 0;
         proto_alert_status->pending_max_sequence_id = sqlite3_column_bytes(res, 1) > 0 ? (uint64_t) sqlite3_column_int64(res, 1) : 0;
-        proto_alert_status->last_acked_sequence_id = sqlite3_column_bytes(res, 2) > 0 ? (uint64_t) sqlite3_column_int64(res, 2) : 0;
-        proto_alert_status->last_submitted_sequence_id = sqlite3_column_bytes(res, 3) > 0 ? (uint64_t) sqlite3_column_int64(res, 3) : 0;
+        proto_alert_status->last_submitted_sequence_id = sqlite3_column_bytes(res, 2) > 0 ? (uint64_t) sqlite3_column_int64(res, 2) : 0;
     }
 
     rc = sqlite3_finalize(res);
@@ -1123,4 +983,135 @@ int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert
         error_report("Failed to finalize statement to get alert log status from the database, rc = %d", rc);
 
     return 0;
+}
+
+void aclk_send_alarm_checkpoint(char *node_id, char *claim_id __maybe_unused)
+{
+    if (unlikely(!node_id))
+        return;
+
+    struct aclk_sync_host_config *wc = NULL;
+    RRDHOST *host = find_host_by_node_id(node_id);
+
+    if (unlikely(!host))
+        return;
+
+    wc = (struct aclk_sync_host_config *)host->aclk_sync_host_config;
+    if (unlikely(!wc)) {
+        log_access("ACLK REQ [%s (N/A)]: HEALTH CHECKPOINT REQUEST RECEIVED FOR INVALID NODE", node_id);
+        return;
+    }
+
+    log_access("ACLK REQ [%s (%s)]: HEALTH CHECKPOINT REQUEST RECEIVED", node_id, rrdhost_hostname(host));
+
+    wc->alert_checkpoint_req = SEND_CHECKPOINT_AFTER_HEALTH_LOOPS;
+}
+
+typedef struct active_alerts {
+    char *name;
+    char *chart;
+    RRDCALC_STATUS status;
+} active_alerts_t;
+
+static inline int compare_active_alerts(const void * a, const void * b) {
+    active_alerts_t *active_alerts_a = (active_alerts_t *)a;
+    active_alerts_t *active_alerts_b = (active_alerts_t *)b;
+
+
+    if( !(strcmp(active_alerts_a->name, active_alerts_b->name)) )
+        {
+            return strcmp(active_alerts_a->chart, active_alerts_b->chart);
+        }
+    else
+        return strcmp(active_alerts_a->name, active_alerts_b->name);
+}
+
+void aclk_push_alarm_checkpoint(RRDHOST *host)
+{
+    struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
+    if (unlikely(!wc)) {
+        log_access("ACLK REQ [%s (N/A)]: HEALTH CHECKPOINT REQUEST RECEIVED FOR INVALID NODE", rrdhost_hostname(host));
+        return;
+    }
+
+    //TODO: make sure all pending events are sent.
+    if (rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS)) {
+        //postpone checkpoint send
+        wc->alert_checkpoint_req++;
+        log_access("ACLK REQ [%s (N/A)]: HEALTH CHECKPOINT POSTPONED", rrdhost_hostname(host));
+        return;
+    }
+
+    //TODO: lock rc here, or make sure it's called when health decides
+    //count them
+    RRDCALC *rc;
+    uint32_t cnt = 0;
+    active_alerts_t *active_alerts = NULL;
+
+    foreach_rrdcalc_in_rrdhost_read(host, rc) {
+        if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+            continue;
+
+        if (rc->status == RRDCALC_STATUS_WARNING ||
+            rc->status == RRDCALC_STATUS_CRITICAL) {
+
+            cnt++;
+        }
+    }
+    foreach_rrdcalc_in_rrdhost_done(rc);
+
+    if (cnt) {
+        active_alerts = callocz(cnt, sizeof(active_alerts_t));
+        cnt = 0;
+        foreach_rrdcalc_in_rrdhost_read(host, rc) {
+            if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+                continue;
+
+            if (rc->status == RRDCALC_STATUS_WARNING ||
+                rc->status == RRDCALC_STATUS_CRITICAL) {
+
+                active_alerts[cnt].name = (char *)rrdcalc_name(rc);
+                active_alerts[cnt].chart = (char *)rrdcalc_chart_name(rc);
+                active_alerts[cnt].status = rc->status;
+                cnt++;
+            }
+        }
+        foreach_rrdcalc_in_rrdhost_done(rc);
+    }
+
+    BUFFER *alarms_to_hash;
+    if (cnt) {
+        qsort (active_alerts, cnt, sizeof(active_alerts_t), compare_active_alerts);
+
+        alarms_to_hash = buffer_create(16000, NULL); //TODO: make it as much as it should
+        for (uint32_t i=0;i<cnt;i++) {
+            buffer_strcat(alarms_to_hash, active_alerts[i].name);
+            buffer_strcat(alarms_to_hash, active_alerts[i].chart);
+            if (active_alerts[i].status == RRDCALC_STATUS_WARNING)
+                buffer_strcat(alarms_to_hash, "W");
+            else if (active_alerts[i].status == RRDCALC_STATUS_CRITICAL)
+                buffer_strcat(alarms_to_hash, "C");
+        }
+    } else {
+        alarms_to_hash = buffer_create(1, NULL);
+        buffer_strcat(alarms_to_hash, "");
+    }
+
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+
+    SHA256_CTX sha256;
+    SHA256_Init(&sha256);
+    SHA256_Update(&sha256, buffer_tostring(alarms_to_hash), strlen(buffer_tostring(alarms_to_hash)));
+    SHA256_Final(hash, &sha256);
+    hash[SHA256_DIGEST_LENGTH] = 0;
+
+    struct alarm_checkpoint alarm_checkpoint;
+    char *claim_id = get_agent_claimid();
+    alarm_checkpoint.claim_id = claim_id;
+    alarm_checkpoint.node_id = wc->node_id;
+    alarm_checkpoint.checksum = (char *)hash;
+
+    aclk_send_provide_alarm_checkpoint(&alarm_checkpoint);
+    log_access("ACLK RES [%s (%s)]: ALERT CHECKPOINT SENT", wc->node_id, rrdhost_hostname(host));
+    wc->alert_checkpoint_req = 0;
 }

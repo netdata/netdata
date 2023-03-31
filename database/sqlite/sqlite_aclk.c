@@ -367,12 +367,12 @@ static void aclk_synchronization(void *arg __maybe_unused)
     service_register(SERVICE_THREAD_TYPE_EVENT_LOOP, NULL, NULL, NULL, true);
 
     worker_register_job_name(ACLK_DATABASE_NOOP,                 "noop");
-    worker_register_job_name(ACLK_DATABASE_ALARM_HEALTH_LOG,     "alert log");
     worker_register_job_name(ACLK_DATABASE_CLEANUP,              "cleanup");
     worker_register_job_name(ACLK_DATABASE_DELETE_HOST,          "node delete");
     worker_register_job_name(ACLK_DATABASE_NODE_STATE,           "node state");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT,           "alert push");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_CONFIG,    "alert conf push");
+    worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_CHECKPOINT,"alert checkpoint");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_SNAPSHOT,  "alert snapshot");
     worker_register_job_name(ACLK_DATABASE_QUEUE_REMOVED_ALERTS, "alerts check");
     worker_register_job_name(ACLK_DATABASE_TIMER,                "timer");
@@ -436,9 +436,6 @@ static void aclk_synchronization(void *arg __maybe_unused)
                     break;
                 case ACLK_DATABASE_PUSH_ALERT:
                     aclk_push_alert_events_for_all_hosts();
-                    break;
-                case ACLK_DATABASE_ALARM_HEALTH_LOG:
-                    aclk_push_alarm_health_log(cmd.param[0]);
                     break;
                 case ACLK_DATABASE_PUSH_ALERT_SNAPSHOT:;
                     aclk_push_alert_snapshot_event(cmd.param[0]);
@@ -604,14 +601,6 @@ void aclk_push_node_alert_snapshot(const char *node_id)
     queue_aclk_sync_cmd(ACLK_DATABASE_PUSH_ALERT_SNAPSHOT, strdupz(node_id), NULL);
 }
 
-
-void aclk_push_node_health_log(const char *node_id)
-{
-    if (unlikely(!aclk_sync_config.initialized))
-        return;
-
-    queue_aclk_sync_cmd(ACLK_DATABASE_ALARM_HEALTH_LOG, strdupz(node_id), NULL);
-}
 
 void aclk_push_node_removed_alerts(const char *node_id)
 {
