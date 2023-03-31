@@ -27,6 +27,7 @@
 #if defined(ENABLE_HTTPS_WITH_OPENSSL)
 #  include <openssl/ssl.h>
 #  include <openssl/err.h>
+#  include <openssl/sha.h>
 #  include <openssl/evp.h>
 #  include <openssl/pem.h>
 #  if (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097) && (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
@@ -44,6 +45,9 @@
 #include <wolfssl/openssl/ssl.h>
 #include <wolfssl/ssl.h>
 #include <wolfssl/error-ssl.h>
+
+#include <wolfssl/openssl/sha.h>
+#include <wolfssl/openssl/evp.h>
 #endif // ENABLE_HTTPS_WITH_OPENSSL
 
 struct netdata_ssl {
