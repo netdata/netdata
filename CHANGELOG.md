@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Update parent child examples [\#14842](https://github.com/netdata/netdata/pull/14842) ([cakrit](https://github.com/cakrit))
+- fix double host prefix when reading ZFS pools state [\#14840](https://github.com/netdata/netdata/pull/14840) ([ilyam8](https://github.com/ilyam8))
 - Update enable-notifications.md [\#14838](https://github.com/netdata/netdata/pull/14838) ([cakrit](https://github.com/cakrit))
 - Update deployment-strategies.md [\#14837](https://github.com/netdata/netdata/pull/14837) ([cakrit](https://github.com/cakrit))
 - Update database engine readme [\#14836](https://github.com/netdata/netdata/pull/14836) ([cakrit](https://github.com/cakrit))
@@ -15,8 +17,10 @@
 - add some third party collectors [\#14830](https://github.com/netdata/netdata/pull/14830) ([andrewm4894](https://github.com/andrewm4894))
 - Delete installation instructions specific to FreeNAS [\#14826](https://github.com/netdata/netdata/pull/14826) ([Ancairon](https://github.com/Ancairon))
 - First batch of adding descriptions to the documentation [\#14825](https://github.com/netdata/netdata/pull/14825) ([Ancairon](https://github.com/Ancairon))
+- Fix Btrfs unallocated space accounting [\#14824](https://github.com/netdata/netdata/pull/14824) ([intelfx](https://github.com/intelfx))
 - configure extent cache size [\#14821](https://github.com/netdata/netdata/pull/14821) ([ktsaou](https://github.com/ktsaou))
 - Docs, shorten too long titles, and add a description below [\#14820](https://github.com/netdata/netdata/pull/14820) ([Ancairon](https://github.com/Ancairon))
+- minor - add capability signifying this agent can speak apiv2 [\#14817](https://github.com/netdata/netdata/pull/14817) ([underhood](https://github.com/underhood))
 - Minor improvements to netdata-security.md [\#14815](https://github.com/netdata/netdata/pull/14815) ([cakrit](https://github.com/cakrit))
 - Update privacy link in aclk doc [\#14813](https://github.com/netdata/netdata/pull/14813) ([cakrit](https://github.com/cakrit))
 - Consolidate security and privacy documents [\#14812](https://github.com/netdata/netdata/pull/14812) ([cakrit](https://github.com/cakrit))
@@ -391,8 +395,6 @@
 - Drop ARMv7 native packages for Fedora 36. [\#14233](https://github.com/netdata/netdata/pull/14233) ([Ferroin](https://github.com/Ferroin))
 - fix consul\_raft\_leadership\_transitions alarm units [\#14232](https://github.com/netdata/netdata/pull/14232) ([ilyam8](https://github.com/ilyam8))
 - readme updates [\#14224](https://github.com/netdata/netdata/pull/14224) ([andrewm4894](https://github.com/andrewm4894))
-- bump go.d v0.49.0 [\#14220](https://github.com/netdata/netdata/pull/14220) ([ilyam8](https://github.com/ilyam8))
-- remove lgtm.com [\#14216](https://github.com/netdata/netdata/pull/14216) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
