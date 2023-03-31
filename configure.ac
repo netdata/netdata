@@ -629,6 +629,8 @@ else
 fi
 AC_MSG_RESULT([${enable_https}])
 AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
+AM_CONDITIONAL([ENABLE_HTTPS_WITH_WOLFSSL], [test "${enable_wolfssl}" = "yes"])
+AM_CONDITIONAL([ENABLE_HTTPS_WITH_OPENSSL], [test "${enable_wolfssl}" = "no"])
 
 AC_MSG_CHECKING([if netdata compression should be used])
 if test "${enable_compression}" != "no"; then
@@ -1384,18 +1386,6 @@ PKG_CHECK_MODULES(
 )
 
 PKG_CHECK_MODULES(
-    [LIBWOLFSSL],
-    [libwolfssl],
-    [AC_CHECK_LIB(
-        [wolfssl],
-        [wolfSSL_connect],
-        [have_libwolfssl=yes],
-        [have_libwolfssl=no]
-    )],
-    [have_libwolfssl=no]
-)
-
-PKG_CHECK_MODULES(
     [LIBCURL],
     [libcurl],
     [AC_CHECK_LIB(
@@ -1430,7 +1420,7 @@ test "${enable_exporting_kinesis}" = "yes" -a "${have_libaws_cpp_sdk_core}" != "
 test "${enable_exporting_kinesis}" = "yes" -a "${have_libcurl}" != "yes" && \
     AC_MSG_ERROR([libcurl required but not found])
 
-test "${enable_exporting_kinesis}" = "yes" -a "${have_libssl}" != "yes" -a "${have_libwolfssl}" != "yes" && \
+test "${enable_exporting_kinesis}" = "yes" -a "${have_libssl}" != "yes" -a "${enable_wolfssl}" != "yes" && \
     AC_MSG_ERROR([libssl required but not found])
 
 test "${enable_exporting_kinesis}" = "yes" -a "${have_libcrypto}" != "yes" && \
@@ -1441,7 +1431,7 @@ if test "${enable_exporting_kinesis}" != "no" -a "${have_libaws_cpp_sdk_kinesis}
                                             -a "${have_libaws_cpp_sdk_core}" = "yes" \
                                             -a "${have_libcurl}" = "yes" \
                                             -a \("${have_libssl}" = "yes" \
-                                            -o "${have_libwolfssl}" = "yes"\) \
+                                            -o "${enable_wolfssl}" = "yes"\) \
                                             -a "${have_libcrypto}" = "yes"; then
     enable_exporting_kinesis="yes"
     AC_DEFINE([HAVE_KINESIS], [1], [libaws-cpp-sdk-kinesis usability])
@@ -1739,6 +1729,13 @@ CFLAGS="${originalCFLAGS} ${OPTIONAL_LTO_CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${O
     ${OPTIONAL_ACLK_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_OS_DEP_CFLAGS}"
 
 CXXFLAGS="${CFLAGS} ${OPTIONAL_KINESIS_CXXFLAGS} ${CPP_STD_FLAG}"
+if test "${enable_https}" = "yes"; then
+    if test "${enable_wolfssl}" = "no"; then
+        CFLAGS="${CFLAGS} -DENABLE_HTTPS_WITH_OPENSSL=1"
+    else
+        CFLAGS="${CFLAGS} -DENABLE_HTTPS_WITH_WOLFSSL=1"
+    fi
+fi
 
 CPPFLAGS="\
 	-DVARLIB_DIR=\"\\\"${varlibdir}\\\"\" \
