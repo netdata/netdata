@@ -1105,7 +1105,7 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
         len = 1;
     }
 
-    unsigned char hash[SHA256_DIGEST_LENGTH];
+    unsigned char hash[SHA256_DIGEST_LENGTH + 1];
 
     SHA256_CTX sha256;
     SHA256_Init(&sha256);
