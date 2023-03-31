@@ -2901,8 +2901,14 @@ static void rrd2rrdr_group_by_add_metric(RRDR *r_dst, size_t d_dst, RRDR *r_tmp,
     if(!r_tmp || r_dst == r_tmp || !(r_tmp->od[d_tmp] & RRDR_DIMENSION_QUERIED))
         return;
 
-    internal_fatal(d_dst >= r_dst->d, "QUERY: destination dimension exceeds RRDR size");
-    internal_fatal(d_tmp >= r_tmp->d, "QUERY: source dimension exceeds RRDR size");
+    internal_fatal(r_dst->n != r_tmp->n, "QUERY: group-by source and destination do not have the same number of rows");
+    internal_fatal(d_dst >= r_dst->d, "QUERY: group-by destination dimension number exceeds destination RRDR size");
+    internal_fatal(d_tmp >= r_tmp->d, "QUERY: group-by source dimension number exceeds source RRDR size");
+    internal_fatal(!r_dst->dqp, "QUERY: group-by destination is not properly prepared (missing dqp array)");
+    internal_fatal(!r_dst->gbc, "QUERY: group-by destination is not properly prepared (missing gbc array)");
+
+    r_dst->od[d_dst] |= RRDR_DIMENSION_QUERIED;
+    storage_point_merge_to(r_dst->dqp[d_dst], *query_points);
 
     // do the group_by
     for(size_t i = 0; i != rrdr_rows(r_tmp) ; i++) {
@@ -2914,8 +2920,6 @@ static void rrd2rrdr_group_by_add_metric(RRDR *r_dst, size_t d_dst, RRDR *r_tmp,
 
         if(o_tmp & RRDR_VALUE_EMPTY)
             continue;
-
-        r_dst->od[d_dst] |= RRDR_DIMENSION_QUERIED;
 
         size_t idx_dst = i * r_dst->d + d_dst;
         NETDATA_DOUBLE *cn = &r_dst->v[ idx_dst ];
@@ -2945,8 +2949,6 @@ static void rrd2rrdr_group_by_add_metric(RRDR *r_dst, size_t d_dst, RRDR *r_tmp,
         *ar += ar_tmp;
         (*gbc)++;
     }
-
-    storage_point_merge_to(r_dst->dqp[d_dst], *query_points);
 }
 
 static void rrdr2rrdr_group_by_partial_trimming(RRDR *r) {
