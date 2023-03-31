@@ -805,18 +805,6 @@ static inline void rrdr_dimension_query_points_statistics(BUFFER *wb, const char
         buffer_json_object_close(wb);
 }
 
-static void rrdr_timings_v12(BUFFER *wb, const char *key, RRDR *r) {
-    QUERY_TARGET *qt = r->internal.qt;
-
-    qt->timings.finished_ut = now_monotonic_usec();
-    buffer_json_member_add_object(wb, key);
-    buffer_json_member_add_double(wb, "prep_ms", (NETDATA_DOUBLE)(qt->timings.preprocessed_ut - qt->timings.received_ut) / USEC_PER_MS);
-    buffer_json_member_add_double(wb, "query_ms", (NETDATA_DOUBLE)(qt->timings.executed_ut - qt->timings.preprocessed_ut) / USEC_PER_MS);
-    buffer_json_member_add_double(wb, "output_ms", (NETDATA_DOUBLE)(qt->timings.finished_ut - qt->timings.executed_ut) / USEC_PER_MS);
-    buffer_json_member_add_double(wb, "total_ms", (NETDATA_DOUBLE)(qt->timings.finished_ut - qt->timings.received_ut) / USEC_PER_MS);
-    buffer_json_object_close(wb);
-}
-
 void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb) {
     QUERY_TARGET *qt = r->internal.qt;
     DATASOURCE_FORMAT format = qt->request.format;
@@ -1249,7 +1237,6 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb) {
 
     buffer_json_initialize(wb, kq, sq, 0, true, options & RRDR_OPTION_MINIFY);
     buffer_json_member_add_uint64(wb, "api", 2);
-    buffer_json_agents_array_v2(wb, 0);
 
     if(options & RRDR_OPTION_DEBUG) {
         buffer_json_member_add_string(wb, "id", qt->id);
@@ -1463,7 +1450,7 @@ void rrdr_json_wrapper_end(RRDR *r, BUFFER *wb) {
     buffer_json_member_add_double(wb, "min", r->view.min);
     buffer_json_member_add_double(wb, "max", r->view.max);
 
-    rrdr_timings_v12(wb, "timings", r);
+    buffer_json_query_timings(wb, "timings", &r->internal.qt->timings);
     buffer_json_finalize(wb);
 }
 
@@ -1516,6 +1503,6 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
     }
     buffer_json_object_close(wb); // view
 
-    rrdr_timings_v12(wb, "timings", r);
+    buffer_json_agents_array_v2(wb, &r->internal.qt->timings, 0);
     buffer_json_finalize(wb);
 }

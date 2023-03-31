@@ -318,6 +318,13 @@ struct query_versions {
     uint64_t alerts_soft_hash;
 };
 
+struct query_timings {
+    usec_t received_ut;
+    usec_t preprocessed_ut;
+    usec_t executed_ut;
+    usec_t finished_ut;
+};
+
 #define query_view_update_every(qt) ((qt)->window.group * (qt)->window.query_granularity)
 
 typedef struct query_target {
@@ -399,13 +406,7 @@ typedef struct query_target {
     STORAGE_POINT query_points;
 
     struct query_versions versions;
-
-    struct {
-        usec_t received_ut;
-        usec_t preprocessed_ut;
-        usec_t executed_ut;
-        usec_t finished_ut;
-    } timings;
+    struct query_timings timings;
 } QUERY_TARGET;
 
 static inline NEVERNULL QUERY_NODE *query_node(QUERY_TARGET *qt, size_t id) {
@@ -460,13 +461,6 @@ struct api_v2_contexts_request {
     char *contexts;
     char *q;
 
-    struct {
-        usec_t received_ut;
-        usec_t processing_ut;
-        usec_t output_ut;
-        usec_t finished_ut;
-    } timings;
-
     time_t timeout_ms;
 
     qt_interrupt_callback_t interrupt_callback;
@@ -484,8 +478,9 @@ typedef enum __attribute__ ((__packed__)) {
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_OPTIONS options);
 
 RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o);
-void buffer_json_agents_array_v2(BUFFER *wb, time_t now_s);
+void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time_t now_s);
 void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t duration_ut);
+void buffer_json_query_timings(BUFFER *wb, const char *key, struct query_timings *timings);
 
 // ----------------------------------------------------------------------------
 // scope

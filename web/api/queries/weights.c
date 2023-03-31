@@ -529,7 +529,7 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
                                                   struct query_versions *versions) {
     buffer_json_initialize(wb, "\"", "\"", 0, true, options & RRDR_OPTION_MINIFY);
     buffer_json_member_add_uint64(wb, "api", 2);
-    buffer_json_agents_array_v2(wb, 0);
+    buffer_json_agents_array_v2(wb, NULL, 0);
 
     results_header_to_json(results, wb, after, before, baseline_after, baseline_before,
                            points, method, group, options, shifts, examined_dimensions, duration, stats);

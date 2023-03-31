@@ -4,7 +4,6 @@
 
 static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unused, struct web_client *w, char *url, CONTEXTS_V2_OPTIONS options) {
     struct api_v2_contexts_request req = { 0 };
-    req.timings.received_ut = now_monotonic_usec();
 
     while(url) {
         char *value = mystrsep(&url, "&");
