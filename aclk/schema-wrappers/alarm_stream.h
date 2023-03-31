@@ -110,7 +110,6 @@ struct send_alarm_snapshot *parse_send_alarm_snapshot(const char *data, size_t l
 void destroy_send_alarm_snapshot(struct send_alarm_snapshot *ptr);
 
 struct send_alarm_checkpoint parse_send_alarm_checkpoint(const char *data, size_t len);
-void destroy_send_alarm_checkpoint(struct send_alarm_checkpoint *ptr);
 char *generate_alarm_checkpoint(size_t *len, struct alarm_checkpoint *data);
 
 alarm_snapshot_proto_ptr_t generate_alarm_snapshot_proto(struct alarm_snapshot *data);

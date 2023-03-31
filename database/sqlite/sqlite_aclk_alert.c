@@ -1049,6 +1049,7 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
     //count them
     RRDCALC *rc;
     uint32_t cnt = 0;
+    size_t len = 0;
     active_alerts_t *active_alerts = NULL;
 
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
@@ -1074,8 +1075,11 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
                 rc->status == RRDCALC_STATUS_CRITICAL) {
 
                 active_alerts[cnt].name = (char *)rrdcalc_name(rc);
+                len += strlen((char *)rrdcalc_name(rc));
                 active_alerts[cnt].chart = (char *)rrdcalc_chart_name(rc);
+                len += strlen((char *)rrdcalc_chart_name(rc));
                 active_alerts[cnt].status = rc->status;
+                len++;
                 cnt++;
             }
         }
@@ -1086,7 +1090,7 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
     if (cnt) {
         qsort (active_alerts, cnt, sizeof(active_alerts_t), compare_active_alerts);
 
-        alarms_to_hash = buffer_create(16000, NULL); //TODO: make it as much as it should
+        alarms_to_hash = buffer_create(len, NULL);
         for (uint32_t i=0;i<cnt;i++) {
             buffer_strcat(alarms_to_hash, active_alerts[i].name);
             buffer_strcat(alarms_to_hash, active_alerts[i].chart);
@@ -1098,13 +1102,14 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
     } else {
         alarms_to_hash = buffer_create(1, NULL);
         buffer_strcat(alarms_to_hash, "");
+        len = 1;
     }
 
     unsigned char hash[SHA256_DIGEST_LENGTH];
 
     SHA256_CTX sha256;
     SHA256_Init(&sha256);
-    SHA256_Update(&sha256, buffer_tostring(alarms_to_hash), strlen(buffer_tostring(alarms_to_hash)));
+    SHA256_Update(&sha256, buffer_tostring(alarms_to_hash), len);
     SHA256_Final(hash, &sha256);
     hash[SHA256_DIGEST_LENGTH] = 0;
 

@@ -350,14 +350,16 @@ int start_alarm_streaming(const char *msg, size_t msg_len)
 
 int send_alarm_checkpoint(const char *msg, size_t msg_len)
 {
-    struct send_alarm_checkpoint *sac = parse_send_alarm_checkpoint(msg, msg_len);
-    if (!sac->node_id || !sac->claim_id) {
+    struct send_alarm_checkpoint sac = parse_send_alarm_checkpoint(msg, msg_len);
+    if (!sac.node_id || !sac.claim_id) {
         error("Error parsing SendAlarmCheckpoint");
-        destroy_send_alarm_checkpoint(sac);
+        freez(sac.node_id);
+        freez(sac.claim_id);
         return 1;
     }
-    aclk_send_alarm_checkpoint(sac->node_id, sac->claim_id);
-    destroy_send_alarm_checkpoint(sac);
+    aclk_send_alarm_checkpoint(sac.node_id, sac.claim_id);
+    freez(sac.node_id);
+    freez(sac.claim_id);
     return 0;
 }
 
