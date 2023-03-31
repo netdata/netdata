@@ -2952,10 +2952,20 @@ static void rrd2rrdr_group_by_add_metric(RRDR *r_dst, size_t d_dst, RRDR *r_tmp,
 }
 
 static void rrdr2rrdr_group_by_partial_trimming(RRDR *r) {
-    // FIXME - this is not optimal, we should not traverse the entire array to go to the end of it
+    time_t trimmable_after = r->partial_data_trimming.expected_after;
+
+    // find the point just before the trimmable ones
+    ssize_t i = (ssize_t)r->n - 1;
+    for( ; i >= 0 ;i--) {
+        if (r->t[i] < trimmable_after)
+            break;
+    }
+
+    if(unlikely(i < 0))
+        return;
 
     size_t last_row_gbc = 0;
-    for (size_t i = 0; i != r->n; i++) {
+    for (; i < (ssize_t)r->n; i++) {
         size_t row_gbc = 0;
         for (size_t d = 0; d < r->d; d++) {
             if (unlikely(!(r->od[d] & RRDR_DIMENSION_QUERIED)))
@@ -2964,7 +2974,7 @@ static void rrdr2rrdr_group_by_partial_trimming(RRDR *r) {
             row_gbc += r->gbc[ i * r->d + d ];
         }
 
-        if (unlikely(r->t[i] > r->partial_data_trimming.expected_after && row_gbc < last_row_gbc)) {
+        if (unlikely(r->t[i] >= trimmable_after && row_gbc < last_row_gbc)) {
             // discard the rest of the points
             r->partial_data_trimming.trimmed_after = r->t[i];
             r->rows = i;
