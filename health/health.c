@@ -347,6 +347,15 @@ static void health_reload_host(RRDHOST *host) {
         rrdcalctemplate_link_matching_templates_to_rrdset(st);
     }
     rrdset_foreach_done(st);
+
+#ifdef ENABLE_ACLK
+    if (netdata_cloud_setting) {
+        struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *)host->aclk_sync_host_config;
+        if (likely(wc)) {
+            wc->alert_queue_removed = SEND_REMOVED_AFTER_HEALTH_LOOPS;
+        }
+    }
+#endif
 }
 
 /**
@@ -362,12 +371,6 @@ void health_reload(void) {
         health_reload_host(host);
     }
     dfe_done(host);
-
-#ifdef ENABLE_ACLK
-    if (netdata_cloud_setting) {
-        aclk_alert_reloaded = 1;
-    }
-#endif
 }
 
 // ----------------------------------------------------------------------------
@@ -977,9 +980,7 @@ void *health_main(void *ptr) {
     rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts();
 
     unsigned int loop = 0;
-#ifdef ENABLE_ACLK
-    unsigned int marked_aclk_reload_loop = 0;
-#endif
+
     while(service_running(SERVICE_HEALTH)) {
         loop++;
         debug(D_HEALTH, "Health monitoring iteration no %u started", loop);
@@ -1007,11 +1008,6 @@ void *health_main(void *ptr) {
                 logged = 1;
             }
         }
-
-#ifdef ENABLE_ACLK
-        if (aclk_alert_reloaded && !marked_aclk_reload_loop)
-            marked_aclk_reload_loop = loop;
-#endif
 
         worker_is_busy(WORKER_HEALTH_JOB_RRD_LOCK);
         dfe_start_reentrant(rrdhost_root_index, host) {
@@ -1117,7 +1113,7 @@ void *health_main(void *ptr) {
                             rc->value = NAN;
 
 #ifdef ENABLE_ACLK
-                            if (netdata_cloud_setting && likely(!aclk_alert_reloaded))
+                            if (netdata_cloud_setting)
                                 sql_queue_alarm_to_aclk(host, ae, 1);
 #endif
                         }
@@ -1488,6 +1484,26 @@ void *health_main(void *ptr) {
                 }
                 break;
             }
+#ifdef ENABLE_ACLK
+            if (netdata_cloud_setting) {
+                struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *)host->aclk_sync_host_config;
+                if (unlikely(!wc)) {
+                    continue;
+                }
+
+                if (wc->alert_queue_removed == 1) {
+                    sql_queue_removed_alerts_to_aclk(host);
+                } else if (wc->alert_queue_removed > 1) {
+                    wc->alert_queue_removed--;
+                }
+
+                if (wc->alert_checkpoint_req == 1) {
+                    aclk_push_alarm_checkpoint(host);
+                } else if (wc->alert_checkpoint_req > 1) {
+                    wc->alert_checkpoint_req--;
+                }
+            }
+#endif
         }
         dfe_done(host);
 
@@ -1499,23 +1515,6 @@ void *health_main(void *ptr) {
 
             health_alarm_wait_for_execution(ae);
         }
-
-#ifdef ENABLE_ACLK
-        if (netdata_cloud_setting && unlikely(aclk_alert_reloaded) && loop > (marked_aclk_reload_loop + 2)) {
-            dfe_start_reentrant(rrdhost_root_index, host) {
-                if(unlikely(!service_running(SERVICE_HEALTH)))
-                    break;
-
-                if (unlikely(!host->health.health_enabled))
-                    continue;
-
-                sql_queue_removed_alerts_to_aclk(host);
-            }
-            dfe_done(host);
-            aclk_alert_reloaded = 0;
-            marked_aclk_reload_loop = 0;
-        }
-#endif
 
         if(unlikely(!service_running(SERVICE_HEALTH)))
             break;

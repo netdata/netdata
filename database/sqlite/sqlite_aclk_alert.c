@@ -659,6 +659,7 @@ void aclk_start_alert_streaming(char *node_id, bool resets)
 
     log_access("ACLK REQ [%s (%s)]: STREAM ALERTS ENABLED", node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
     wc->alert_updates = 1;
+    wc->alert_queue_removed = SEND_REMOVED_AFTER_HEALTH_LOOPS;
 }
 
 #define SQL_QUEUE_REMOVE_ALERTS "INSERT INTO aclk_alert_%s (alert_unique_id, date_created, filtered_alert_unique_id) " \
@@ -686,7 +687,9 @@ void sql_process_queue_removed_alerts_to_aclk(char *node_id)
     }
     else
         log_access("ACLK STA [%s (%s)]: QUEUED REMOVED ALERTS", wc->node_id, rrdhost_hostname(wc->host));
+
     rrdhost_flag_set(wc->host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+    wc->alert_queue_removed = 0;
 }
 
 void sql_queue_removed_alerts_to_aclk(RRDHOST *host)
@@ -998,11 +1001,11 @@ void aclk_send_alarm_checkpoint(char *node_id, char *claim_id __maybe_unused)
 
     wc = (struct aclk_sync_host_config *)host->aclk_sync_host_config;
     if (unlikely(!wc)) {
-        log_access("ACLK REQ [%s (N/A)]: HEALTH CHECKPOINT REQUEST RECEIVED FOR INVALID NODE", node_id);
+        log_access("ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT REQUEST RECEIVED FOR INVALID NODE", node_id);
         return;
     }
 
-    log_access("ACLK REQ [%s (%s)]: HEALTH CHECKPOINT REQUEST RECEIVED", node_id, rrdhost_hostname(host));
+    log_access("ACLK REQ [%s (%s)]: ALERTS CHECKPOINT REQUEST RECEIVED", node_id, rrdhost_hostname(host));
 
     wc->alert_checkpoint_req = SEND_CHECKPOINT_AFTER_HEALTH_LOOPS;
 }
@@ -1030,7 +1033,7 @@ void aclk_push_alarm_checkpoint(RRDHOST *host)
 {
     struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
     if (unlikely(!wc)) {
-        log_access("ACLK REQ [%s (N/A)]: HEALTH CHECKPOINT REQUEST RECEIVED FOR INVALID NODE", rrdhost_hostname(host));
+        log_access("ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT REQUEST RECEIVED FOR INVALID NODE", rrdhost_hostname(host));
         return;
     }
 
@@ -1038,7 +1041,7 @@ void aclk_push_alarm_checkpoint(RRDHOST *host)
     if (rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS)) {
         //postpone checkpoint send
         wc->alert_checkpoint_req++;
-        log_access("ACLK REQ [%s (N/A)]: HEALTH CHECKPOINT POSTPONED", rrdhost_hostname(host));
+        log_access("ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT POSTPONED", rrdhost_hostname(host));
         return;
     }
 
@@ -1112,6 +1115,6 @@ void aclk_push_alarm_checkpoint(RRDHOST *host)
     alarm_checkpoint.checksum = (char *)hash;
 
     aclk_send_provide_alarm_checkpoint(&alarm_checkpoint);
-    log_access("ACLK RES [%s (%s)]: ALERT CHECKPOINT SENT", wc->node_id, rrdhost_hostname(host));
+    log_access("ACLK RES [%s (%s)]: ALERTS CHECKPOINT SENT", wc->node_id, rrdhost_hostname(host));
     wc->alert_checkpoint_req = 0;
 }

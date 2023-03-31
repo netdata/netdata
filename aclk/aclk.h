@@ -26,8 +26,6 @@ extern time_t aclk_block_until;
 
 extern int disconnect_req;
 
-extern int aclk_alert_reloaded;
-
 #ifdef ENABLE_ACLK
 void *aclk_main(void *ptr);
 
