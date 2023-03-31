@@ -4,6 +4,8 @@
 
 # Next unused error code: I0012
 
+CFLAGS="-Wall -Wextra -g -O0 -DNETDATA_INTERNAL_CHECKS ${CFLAGS}"
+
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 uniquepath() {
   path=""

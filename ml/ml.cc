@@ -502,7 +502,6 @@ ml_dimension_add_model(ml_dimension_t *dim)
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to reset statement when storing model, rc = %d", rc);
 
-    error("Added model for dimension '%s'", id);
     return 0;
 
 bind_fail:
@@ -548,10 +547,6 @@ ml_dimension_delete_models(ml_dimension_t *dim)
     rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to reset statement when deleting models, rc = %d", rc);
-
-    char id[1024];
-    snprintfz(id, 1024 - 1, "%s.%s", rrdset_id(dim->rd->rrdset), rrddim_id(dim->rd));
-    error("Deleted models for dimension '%s'", id);
 
     return 0;
 
