@@ -12,11 +12,12 @@ This is what you will get:
 
 ## Prerequisites
 
-You will need
+You will need:
 
-- The **incoming webhook URL** as given by Discord. Create a webhook by following the official [Discord documentation](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks). You can use the same on all your Netdata servers (or you can have multiple if you like - your decision).
-- One or more Discord channels to post the messages to.
-- Terminal access to the Agent you wish to configure
+- The **incoming webhook URL** as given by Discord.  
+  Create a webhook by following the official [Discord documentation](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks). You can use the same on all your Netdata servers (or you can have multiple if you like - your decision).
+- one or more Discord channels to post the messages to
+- terminal access to the Agent you wish to configure
 
 ## Configure Netdata to send alerts to Discord
 
@@ -27,18 +28,16 @@ You will need
 > - To edit configuration files in a safe way, we provide the [`edit config` script](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) located in your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) (typically is `/etc/netdata`) that creates the proper file and opens it in an editor automatically.  
 > Note that to run the script you need to be inside your Netdata config directory.
 >
-> - Please also note that after most configuration changes you will need to [restart the Agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for the changes to take effect.
->
 > It is recommended to use this way for configuring Netdata.
 
-Edit `health_alarm_notify.conf`:
+Edit `health_alarm_notify.conf`, changes to this file do not require restarting Netdata:
 
 1. Set `SEND_DISCORD` to `YES`
 2. Set `DISCORD_WEBHOOK_URL` to your webhook URL
 3. Set `DEFAULT_RECIPIENT_DISCORD` to the channel you want the alert to be sent  
    You can define multiple channels like this: `alarms systems`.  
    All roles will default to this variable if left unconfigured.
-   
+
    > ### Note
    >
    > You don't have to include the hashtag "#" of the channel, just its name.
