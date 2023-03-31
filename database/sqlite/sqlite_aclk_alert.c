@@ -1020,7 +1020,6 @@ static inline int compare_active_alerts(const void * a, const void * b) {
     active_alerts_t *active_alerts_a = (active_alerts_t *)a;
     active_alerts_t *active_alerts_b = (active_alerts_t *)b;
 
-
     if( !(strcmp(active_alerts_a->name, active_alerts_b->name)) )
         {
             return strcmp(active_alerts_a->chart, active_alerts_b->chart);
@@ -1029,8 +1028,9 @@ static inline int compare_active_alerts(const void * a, const void * b) {
         return strcmp(active_alerts_a->name, active_alerts_b->name);
 }
 
-void aclk_push_alarm_checkpoint(RRDHOST *host)
+void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
 {
+#ifdef ENABLE_ACLK
     struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
     if (unlikely(!wc)) {
         log_access("ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT REQUEST RECEIVED FOR INVALID NODE", rrdhost_hostname(host));
@@ -1117,4 +1117,5 @@ void aclk_push_alarm_checkpoint(RRDHOST *host)
     aclk_send_provide_alarm_checkpoint(&alarm_checkpoint);
     log_access("ACLK RES [%s (%s)]: ALERTS CHECKPOINT SENT", wc->node_id, rrdhost_hostname(host));
     wc->alert_checkpoint_req = 0;
+#endif
 }
