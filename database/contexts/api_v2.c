@@ -397,6 +397,7 @@ void buffer_json_query_timings(BUFFER *wb, const char *key, struct query_timings
     buffer_json_member_add_double(wb, "query_ms", (NETDATA_DOUBLE)(timings->executed_ut - timings->preprocessed_ut) / USEC_PER_MS);
     buffer_json_member_add_double(wb, "output_ms", (NETDATA_DOUBLE)(timings->finished_ut - timings->executed_ut) / USEC_PER_MS);
     buffer_json_member_add_double(wb, "total_ms", (NETDATA_DOUBLE)(timings->finished_ut - timings->received_ut) / USEC_PER_MS);
+    buffer_json_member_add_double(wb, "cloud_ms", (NETDATA_DOUBLE)(timings->finished_ut - timings->received_ut) / USEC_PER_MS);
     buffer_json_object_close(wb);
 }
 
@@ -417,6 +418,14 @@ void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time
 
     buffer_json_object_close(wb);
     buffer_json_array_close(wb);
+}
+
+void buffer_json_cloud_timings(BUFFER *wb, const char *key, struct query_timings *timings) {
+    buffer_json_member_add_object(wb, key);
+    buffer_json_member_add_double(wb, "routing_ms", 0.0);
+    buffer_json_member_add_double(wb, "node_max_ms", 0.0);
+    buffer_json_member_add_double(wb, "total_ms", (NETDATA_DOUBLE)(timings->finished_ut - timings->received_ut) / USEC_PER_MS);
+    buffer_json_object_close(wb);
 }
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_OPTIONS options) {
@@ -527,6 +536,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     }
 
     buffer_json_agents_array_v2(wb, &ctl.timings, now_s);
+    buffer_json_cloud_timings(wb, "timings", &ctl.timings);
     buffer_json_finalize(wb);
 
 cleanup:
