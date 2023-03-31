@@ -948,35 +948,47 @@ static void rrdr_grouped_by_array_v2(BUFFER *wb, const char *key, RRDR *r, RRDR_
 
     buffer_json_member_add_array(wb, key);
 
-    if(qt->request.group_by & RRDR_GROUP_BY_SELECTED)
+    // find the deeper group-by
+    ssize_t g = 0;
+    for(g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
+        if(qt->request.group_by[g].group_by == RRDR_GROUP_BY_NONE)
+            break;
+    }
+
+    if(g > 0)
+        g--;
+
+    RRDR_GROUP_BY group_by = qt->request.group_by[g].group_by;
+
+    if(group_by & RRDR_GROUP_BY_SELECTED)
         buffer_json_add_array_item_string(wb, "selected");
 
     else {
 
-        if(qt->request.group_by & RRDR_GROUP_BY_DIMENSION)
+        if(group_by & RRDR_GROUP_BY_DIMENSION)
             buffer_json_add_array_item_string(wb, "dimension");
 
-        if(qt->request.group_by & RRDR_GROUP_BY_INSTANCE)
+        if(group_by & RRDR_GROUP_BY_INSTANCE)
             buffer_json_add_array_item_string(wb, "instance");
 
-        if(qt->request.group_by & RRDR_GROUP_BY_LABEL) {
+        if(group_by & RRDR_GROUP_BY_LABEL) {
             BUFFER *b = buffer_create(0, NULL);
-            for (size_t l = 0; l < qt->group_by.used; l++) {
+            for (size_t l = 0; l < qt->group_by[g].used; l++) {
                 buffer_flush(b);
                 buffer_fast_strcat(b, "label:", 6);
-                buffer_strcat(b, qt->group_by.label_keys[l]);
+                buffer_strcat(b, qt->group_by[g].label_keys[l]);
                 buffer_json_add_array_item_string(wb, buffer_tostring(b));
             }
             buffer_free(b);
         }
 
-        if(qt->request.group_by & RRDR_GROUP_BY_NODE)
+        if(group_by & RRDR_GROUP_BY_NODE)
             buffer_json_add_array_item_string(wb, "node");
 
-        if(qt->request.group_by & RRDR_GROUP_BY_CONTEXT)
+        if(group_by & RRDR_GROUP_BY_CONTEXT)
             buffer_json_add_array_item_string(wb, "context");
 
-        if(qt->request.group_by & RRDR_GROUP_BY_UNITS)
+        if(group_by & RRDR_GROUP_BY_UNITS)
             buffer_json_add_array_item_string(wb, "units");
     }
 
@@ -1287,17 +1299,28 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb) {
                 buffer_json_member_add_object(wb, "metrics");
 
                 buffer_json_member_add_array(wb, "group_by");
-                buffer_json_group_by_to_array(wb, qt->request.group_by);
-                buffer_json_array_close(wb);
+                for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
+                    if(qt->request.group_by[g].group_by == RRDR_GROUP_BY_NONE)
+                        break;
 
-                buffer_json_member_add_array(wb, "group_by_label");
-                for(size_t l = 0; l < qt->group_by.used ;l++)
-                    buffer_json_add_array_item_string(wb, qt->group_by.label_keys[l]);
-                buffer_json_array_close(wb);
+                    buffer_json_add_array_item_object(wb);
+                    {
+                        buffer_json_member_add_array(wb, "group_by");
+                        buffer_json_group_by_to_array(wb, qt->request.group_by[g].group_by);
+                        buffer_json_array_close(wb);
 
-                buffer_json_member_add_string(wb, "aggregation",
-                                              group_by_aggregate_function_to_string(
-                                                      qt->request.group_by_aggregate_function));
+                        buffer_json_member_add_array(wb, "group_by_label");
+                        for (size_t l = 0; l < qt->group_by[g].used; l++)
+                            buffer_json_add_array_item_string(wb, qt->group_by[g].label_keys[l]);
+                        buffer_json_array_close(wb);
+
+                        buffer_json_member_add_string(wb, "aggregation",
+                                                      group_by_aggregate_function_to_string(
+                                                              qt->request.group_by[g].aggregation));
+                    }
+                    buffer_json_object_close(wb);
+                }
+                buffer_json_array_close(wb); // group_by
                 buffer_json_object_close(wb); // dimensions
             }
             buffer_json_object_close(wb); // aggregations

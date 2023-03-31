@@ -113,7 +113,8 @@ void query_target_release(QUERY_TARGET *qt) {
     qt->db.first_time_s = 0;
     qt->db.last_time_s = 0;
 
-    qt->group_by.used = 0;
+    for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++)
+        qt->group_by[g].used = 0;
 
     qt->id[0] = '\0';
 

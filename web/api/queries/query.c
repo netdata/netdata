@@ -2540,7 +2540,8 @@ static void rrd2rrdr_set_timestamps(RRDR *r) {
 static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     RRDR_OPTIONS options = qt->window.options;
 
-    if(qt->request.group_by == RRDR_GROUP_BY_NONE) {
+    if(qt->request.version < 2) {
+        // v1 query
         RRDR *r = rrdr_create(owa, qt, qt->query.used, qt->window.points);
          if(unlikely(!r)) {
              internal_error(true, "QUERY: cannot create RRDR for %s, after=%ld, before=%ld, dimensions=%u, points=%zu",
@@ -2560,18 +2561,28 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
          rrd2rrdr_set_timestamps(r);
          return r;
     }
+    // v2 query
 
     struct rrdr_group_by_entry *entries = onewayalloc_callocz(owa, qt->query.used, sizeof(struct rrdr_group_by_entry));
     DICTIONARY *groups = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
 
-    if(qt->request.group_by & RRDR_GROUP_BY_LABEL && qt->request.group_by_label && *qt->request.group_by_label)
-        qt->group_by.used = quoted_strings_splitter(qt->request.group_by_label, qt->group_by.label_keys, GROUP_BY_MAX_LABEL_KEYS, group_by_label_is_space);
+    for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
+        if (qt->request.group_by[g].group_by & RRDR_GROUP_BY_LABEL &&
+            qt->request.group_by[g].group_by_label && *qt->request.group_by[g].group_by_label)
+            qt->group_by[g].used = quoted_strings_splitter(
+                    qt->request.group_by[g].group_by_label, qt->group_by[g].label_keys,
+                    GROUP_BY_MAX_LABEL_KEYS, group_by_label_is_space);
 
-    if(!qt->group_by.used)
-        qt->request.group_by &= ~RRDR_GROUP_BY_LABEL;
+        if (!qt->group_by[g].used)
+            qt->request.group_by[g].group_by &= ~RRDR_GROUP_BY_LABEL;
+    }
 
-    if(!(qt->request.group_by & (RRDR_GROUP_BY_SELECTED | RRDR_GROUP_BY_DIMENSION | RRDR_GROUP_BY_INSTANCE | RRDR_GROUP_BY_LABEL | RRDR_GROUP_BY_NODE | RRDR_GROUP_BY_CONTEXT)))
-        qt->request.group_by = RRDR_GROUP_BY_DIMENSION;
+    // make sure the first group-by by has a group-by method
+    if(!(qt->request.group_by[0].group_by & (RRDR_GROUP_BY_SELECTED | RRDR_GROUP_BY_DIMENSION | RRDR_GROUP_BY_INSTANCE | RRDR_GROUP_BY_LABEL | RRDR_GROUP_BY_NODE | RRDR_GROUP_BY_CONTEXT)))
+        qt->request.group_by[0].group_by = RRDR_GROUP_BY_DIMENSION;
+
+    size_t g = 0;
+    RRDR_GROUP_BY group_by = qt->request.group_by[0].group_by;
 
     DICTIONARY *label_keys = NULL;
     if(options & RRDR_OPTION_GROUP_BY_LABELS)
@@ -2606,39 +2617,39 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         if(unlikely(qm->status & RRDR_DIMENSION_HIDDEN)) {
             buffer_strcat(key, "__hidden_dimensions__");
         }
-        else if(unlikely(qt->request.group_by & RRDR_GROUP_BY_SELECTED)) {
+        else if(unlikely(group_by & RRDR_GROUP_BY_SELECTED)) {
             buffer_strcat(key, "selected");
         }
         else {
-            if (qt->request.group_by & RRDR_GROUP_BY_DIMENSION) {
+            if (group_by & RRDR_GROUP_BY_DIMENSION) {
                 buffer_fast_strcat(key, "|", 1);
                 buffer_strcat(key, query_metric_name(qt, qm));
             }
 
-            if (qt->request.group_by & RRDR_GROUP_BY_INSTANCE) {
+            if (group_by & RRDR_GROUP_BY_INSTANCE) {
                 buffer_fast_strcat(key, "|", 1);
                 buffer_strcat(key, string2str(query_instance_id_fqdn(qi, qt->request.version)));
             }
 
-            if (qt->request.group_by & RRDR_GROUP_BY_LABEL) {
+            if (group_by & RRDR_GROUP_BY_LABEL) {
                 DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
-                for (size_t l = 0; l < qt->group_by.used; l++) {
+                for (size_t l = 0; l < qt->group_by[g].used; l++) {
                     buffer_fast_strcat(key, "|", 1);
-                    rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by.label_keys[l], "[unset]");
+                    rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by[g].label_keys[l], "[unset]");
                 }
             }
 
-            if (qt->request.group_by & RRDR_GROUP_BY_NODE) {
+            if (group_by & RRDR_GROUP_BY_NODE) {
                 buffer_fast_strcat(key, "|", 1);
                 buffer_strcat(key, qn->rrdhost->machine_guid);
             }
 
-            if (qt->request.group_by & RRDR_GROUP_BY_CONTEXT) {
+            if (group_by & RRDR_GROUP_BY_CONTEXT) {
                 buffer_fast_strcat(key, "|", 1);
                 buffer_strcat(key, rrdcontext_acquired_id(qc->rca));
             }
 
-            if (qt->request.group_by & RRDR_GROUP_BY_UNITS) {
+            if (group_by & RRDR_GROUP_BY_UNITS) {
                 buffer_fast_strcat(key, "|", 1);
                 buffer_strcat(key, query_target_has_percentage_units(qt) ? "%" : rrdinstance_acquired_units(qi->ria));
             }
@@ -2660,48 +2671,48 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             if(unlikely(qm->status & RRDR_DIMENSION_HIDDEN)) {
                 buffer_strcat(key, "__hidden_dimensions__");
             }
-            else if(unlikely(qt->request.group_by & RRDR_GROUP_BY_SELECTED)) {
+            else if(unlikely(group_by & RRDR_GROUP_BY_SELECTED)) {
                 buffer_strcat(key, "selected");
             }
             else {
-                if (qt->request.group_by & RRDR_GROUP_BY_DIMENSION) {
+                if (group_by & RRDR_GROUP_BY_DIMENSION) {
                     buffer_strcat(key, query_metric_name(qt, qm));
                 }
 
-                if (qt->request.group_by & RRDR_GROUP_BY_INSTANCE) {
+                if (group_by & RRDR_GROUP_BY_INSTANCE) {
                     if (buffer_strlen(key) != 0)
                         buffer_fast_strcat(key, ",", 1);
 
-                    if (qt->request.group_by & RRDR_GROUP_BY_NODE)
+                    if (group_by & RRDR_GROUP_BY_NODE)
                         buffer_strcat(key, rrdinstance_acquired_id(qi->ria));
                     else
                         buffer_strcat(key, string2str(query_instance_id_fqdn(qi, qt->request.version)));
                 }
 
-                if (qt->request.group_by & RRDR_GROUP_BY_LABEL) {
+                if (group_by & RRDR_GROUP_BY_LABEL) {
                     DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
-                    for (size_t l = 0; l < qt->group_by.used; l++) {
+                    for (size_t l = 0; l < qt->group_by[g].used; l++) {
                         if (buffer_strlen(key) != 0)
                             buffer_fast_strcat(key, ",", 1);
-                        rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by.label_keys[l], "[unset]");
+                        rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by[g].label_keys[l], "[unset]");
                     }
                 }
 
-                if (qt->request.group_by & RRDR_GROUP_BY_NODE) {
+                if (group_by & RRDR_GROUP_BY_NODE) {
                     if (buffer_strlen(key) != 0)
                         buffer_fast_strcat(key, ",", 1);
 
                     buffer_strcat(key, qn->rrdhost->machine_guid);
                 }
 
-                if (qt->request.group_by & RRDR_GROUP_BY_CONTEXT) {
+                if (group_by & RRDR_GROUP_BY_CONTEXT) {
                     if (buffer_strlen(key) != 0)
                         buffer_fast_strcat(key, ",", 1);
 
                     buffer_strcat(key, rrdcontext_acquired_id(qc->rca));
                 }
 
-                if (qt->request.group_by & RRDR_GROUP_BY_UNITS) {
+                if (group_by & RRDR_GROUP_BY_UNITS) {
                     if (buffer_strlen(key) != 0)
                         buffer_fast_strcat(key, ",", 1);
 
@@ -2718,48 +2729,48 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             if(unlikely(qm->status & RRDR_DIMENSION_HIDDEN)) {
                 buffer_strcat(key, "__hidden_dimensions__");
             }
-            else if(unlikely(qt->request.group_by & RRDR_GROUP_BY_SELECTED)) {
+            else if(unlikely(group_by & RRDR_GROUP_BY_SELECTED)) {
                 buffer_strcat(key, "selected");
             }
             else {
-                if (qt->request.group_by & RRDR_GROUP_BY_DIMENSION) {
+                if (group_by & RRDR_GROUP_BY_DIMENSION) {
                     buffer_strcat(key, query_metric_name(qt, qm));
                 }
 
-                if (qt->request.group_by & RRDR_GROUP_BY_INSTANCE) {
+                if (group_by & RRDR_GROUP_BY_INSTANCE) {
                     if (buffer_strlen(key) != 0)
                         buffer_fast_strcat(key, ",", 1);
 
-                    if (qt->request.group_by & RRDR_GROUP_BY_NODE)
+                    if (group_by & RRDR_GROUP_BY_NODE)
                         buffer_strcat(key, rrdinstance_acquired_name(qi->ria));
                     else
                         buffer_strcat(key, string2str(query_instance_name_fqdn(qi, qt->request.version)));
                 }
 
-                if (qt->request.group_by & RRDR_GROUP_BY_LABEL) {
+                if (group_by & RRDR_GROUP_BY_LABEL) {
                     DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
-                    for (size_t l = 0; l < qt->group_by.used; l++) {
+                    for (size_t l = 0; l < qt->group_by[g].used; l++) {
                         if (buffer_strlen(key) != 0)
                             buffer_fast_strcat(key, ",", 1);
-                        rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by.label_keys[l], "[unset]");
+                        rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by[g].label_keys[l], "[unset]");
                     }
                 }
 
-                if (qt->request.group_by & RRDR_GROUP_BY_NODE) {
+                if (group_by & RRDR_GROUP_BY_NODE) {
                     if (buffer_strlen(key) != 0)
                         buffer_fast_strcat(key, ",", 1);
 
                     buffer_strcat(key, rrdhost_hostname(qn->rrdhost));
                 }
 
-                if (qt->request.group_by & RRDR_GROUP_BY_CONTEXT) {
+                if (group_by & RRDR_GROUP_BY_CONTEXT) {
                     if (buffer_strlen(key) != 0)
                         buffer_fast_strcat(key, ",", 1);
 
                     buffer_strcat(key, rrdcontext_acquired_id(qc->rca));
                 }
 
-                if (qt->request.group_by & RRDR_GROUP_BY_UNITS) {
+                if (group_by & RRDR_GROUP_BY_UNITS) {
                     if (buffer_strlen(key) != 0)
                         buffer_fast_strcat(key, ",", 1);
 
@@ -3094,6 +3105,12 @@ static void rrd2rrdr_group_by_finalize(RRDR *r) {
         r->t[i] = r->group_by.r->t[i];
     }
 
+    // find the final aggregation
+    RRDR_GROUP_BY_FUNCTION aggregation = qt->request.group_by[0].aggregation;
+    for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++)
+        if(qt->request.group_by[g].group_by != RRDR_GROUP_BY_NONE)
+            aggregation = qt->request.group_by[g].aggregation;
+
     if(!(options & RRDR_OPTION_RETURN_RAW) && r->partial_data_trimming.expected_after < qt->window.before)
         rrdr2rrdr_group_by_partial_trimming(r);
 
@@ -3128,7 +3145,7 @@ static void rrd2rrdr_group_by_finalize(RRDR *r) {
                 sum += *cn;
                 ars += *ar;
 
-                if(qt->request.group_by_aggregate_function == RRDR_GROUP_BY_FUNCTION_AVERAGE && !query_target_aggregatable(qt))
+                if(aggregation == RRDR_GROUP_BY_FUNCTION_AVERAGE && !query_target_aggregatable(qt))
                     n = (*cn /= gbc);
                 else
                     n = *cn;
@@ -3362,7 +3379,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                 r->rows = r_tmp->rows;
 
                 rrd2rrdr_group_by_add_metric(r, qm->grouped_as.slot, r_tmp, dim_in_rrdr_tmp,
-                                             qt->request.group_by_aggregate_function, &qm->query_points);
+                                             qt->request.group_by[0].aggregation, &qm->query_points);
             }
 
             rrd2rrdr_query_ops_release(ops[d]); // reuse this ops allocation

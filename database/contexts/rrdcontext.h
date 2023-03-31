@@ -241,6 +241,7 @@ typedef struct query_metric {
 } QUERY_METRIC;
 
 #define MAX_QUERY_TARGET_ID_LENGTH 255
+#define MAX_QUERY_GROUP_BY_PASSES 2
 
 typedef bool (*qt_interrupt_callback_t)(void *data);
 
@@ -284,9 +285,11 @@ typedef struct query_target_request {
     const char *time_group_options;
 
     // group by across multiple time-series
-    RRDR_GROUP_BY group_by;
-    char *group_by_label;
-    RRDR_GROUP_BY_FUNCTION group_by_aggregate_function;
+    struct {
+        RRDR_GROUP_BY group_by;
+        char *group_by_label;
+        RRDR_GROUP_BY_FUNCTION aggregation;
+    } group_by[MAX_QUERY_GROUP_BY_PASSES];
 
     usec_t received_ut;
 
@@ -389,7 +392,7 @@ typedef struct query_target {
     struct {
         size_t used;
         char *label_keys[GROUP_BY_MAX_LABEL_KEYS];
-    } group_by;
+    } group_by[MAX_QUERY_GROUP_BY_PASSES];
 
     STORAGE_POINT query_points;
 
