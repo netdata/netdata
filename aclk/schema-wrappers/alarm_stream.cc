@@ -26,17 +26,17 @@ struct start_alarm_streaming parse_start_alarm_streaming(const char *data, size_
     return ret;
 }
 
-struct send_alarm_checkpoint *parse_send_alarm_checkpoint(const char *data, size_t len)
+struct send_alarm_checkpoint parse_send_alarm_checkpoint(const char *data, size_t len)
 {
+    struct send_alarm_checkpoint ret;
+    memset(&ret, 0, sizeof(ret));
+
     SendAlarmCheckpoint msg;
     if (!msg.ParseFromArray(data, len))
-        return NULL;
+        return ret;
 
-    struct send_alarm_checkpoint *ret = (struct send_alarm_checkpoint*)callocz(1, sizeof(struct send_alarm_checkpoint));
-    if (msg.node_id().c_str())
-        ret->node_id = strdupz(msg.node_id().c_str());
-    if (msg.claim_id().c_str())
-        ret->claim_id = strdupz(msg.claim_id().c_str());
+    ret.node_id = strdupz(msg.node_id().c_str());
+    ret.claim_id = strdupz(msg.claim_id().c_str());
 
     return ret;
 }
