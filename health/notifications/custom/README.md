@@ -19,14 +19,12 @@ You need to have terminal access to the Agent you wish to configure.
 > - To edit configuration files in a safe way, we provide the [`edit config` script](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) located in your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) (typically is `/etc/netdata`) that creates the proper file and opens it in an editor automatically.  
 > Note that to run the script you need to be inside your Netdata config directory.
 >
-> - Please also note that after most configuration changes you will need to [restart the Agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for the changes to take effect.
->
 > It is recommended to use this way for configuring Netdata.
 
-Edit `health_alarm_notify.conf`:
+Edit `health_alarm_notify.conf`, changes to this file do not require restarting Netdata:
 
-1. Set `SEND_CUSTOM` to `YES`
-2. The `DEFAULT_RECIPIENT_CUSTOM`'s value is dependent on how you handle the `${to}` variable inside the `custom_sender()` function  
+1. Set `SEND_CUSTOM` to `YES`.
+2. The `DEFAULT_RECIPIENT_CUSTOM`'s value is dependent on how you handle the `${to}` variable inside the `custom_sender()` function.  
    All roles will default to this variable if left unconfigured.
 3. Edit the `custom_sender()` function.  
    You can look at the other senders in `/usr/libexec/netdata/plugins.d/alarm-notify.sh` for examples of how to modify the function in this configuration file.
