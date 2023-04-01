@@ -361,7 +361,7 @@ static inline void query_dimension_release(QUERY_DIMENSION *qd) {
     qd->rma = NULL;
 }
 
-static QUERY_DIMENSION *query_dimension_allocate(QUERY_TARGET *qt, RRDMETRIC_ACQUIRED *rma, QUERY_STATUS status) {
+static QUERY_DIMENSION *query_dimension_allocate(QUERY_TARGET *qt, RRDMETRIC_ACQUIRED *rma, QUERY_STATUS status, size_t priority) {
     if(qt->dimensions.used == qt->dimensions.size) {
         size_t old_mem = qt->dimensions.size * sizeof(*qt->dimensions.array);
         qt->dimensions.size = query_target_realloc_size(qt->dimensions.size, 4);
@@ -376,12 +376,13 @@ static QUERY_DIMENSION *query_dimension_allocate(QUERY_TARGET *qt, RRDMETRIC_ACQ
     qd->slot = qt->dimensions.used++;
     qd->rma = rrdmetric_acquired_dup(rma);
     qd->status = status;
+    qd->priority = priority;
 
     return qd;
 }
 
 static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi,
-                                RRDMETRIC_ACQUIRED *rma, bool queryable_instance, size_t *metrics_added) {
+                                RRDMETRIC_ACQUIRED *rma, bool queryable_instance, size_t *metrics_added, size_t priority) {
     QUERY_TARGET *qt = qtl->qt;
 
     RRDMETRIC *rm = rrdmetric_acquired_value(rma);
@@ -490,7 +491,7 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
     if(undo)
         return false;
 
-    query_dimension_allocate(qt, rma, status);
+    query_dimension_allocate(qt, rma, status, priority);
     return true;
 }
 
@@ -754,17 +755,17 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
     if(queryable_instance && qt->request.version >= 2)
         query_target_eval_instance_rrdcalc(qtl, qn, qc, qi);
 
-    size_t dimensions_added = 0, metrics_added = 0;
+    size_t dimensions_added = 0, metrics_added = 0, priority = 0;
 
     if(unlikely(qt->request.rma)) {
-        if(query_dimension_add(qtl, qn, qc, qi, qt->request.rma, queryable_instance, &metrics_added))
+        if(query_dimension_add(qtl, qn, qc, qi, qt->request.rma, queryable_instance, &metrics_added, priority++))
             dimensions_added++;
     }
     else {
         RRDMETRIC *rm;
         dfe_start_read(ri->rrdmetrics, rm) {
             if(query_dimension_add(qtl, qn, qc, qi, (RRDMETRIC_ACQUIRED *) rm_dfe.item,
-                                   queryable_instance, &metrics_added))
+                                   queryable_instance, &metrics_added, priority++))
                 dimensions_added++;
         }
         dfe_done(rm);

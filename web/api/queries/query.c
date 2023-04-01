@@ -2601,20 +2601,20 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     time_t update_every_max = 0;
     for(size_t d = 0; d < qt->query.used ; d++) {
         QUERY_METRIC *qm = query_metric(qt, d);
+        QUERY_DIMENSION *qd = query_dimension(qt, qm->link.query_dimension_id);
         QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
         QUERY_CONTEXT *qc = query_context(qt, qm->link.query_context_id);
         QUERY_NODE *qn = query_node(qt, qm->link.query_node_id);
 
         if(qi != last_qi) {
-            priority = 0;
             last_qi = qi;
 
             time_t update_every = rrdinstance_acquired_update_every(qi->ria);
             if(update_every > update_every_max)
                 update_every_max = update_every;
         }
-        else
-            priority++;
+
+        priority = qd->priority;
 
         // --------------------------------------------------------------------
         // generate the group by key

@@ -201,6 +201,7 @@ typedef struct query_instance {
 
 typedef struct query_dimension {
     uint32_t slot;
+    uint32_t priority;
     RRDMETRIC_ACQUIRED *rma;
     QUERY_STATUS status;
 } QUERY_DIMENSION;

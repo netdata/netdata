@@ -368,17 +368,60 @@ static void query_target_summary_instances_v2(BUFFER *wb, QUERY_TARGET *qt, cons
     buffer_json_array_close(wb);
 }
 
+struct dimensions_sorted_walkthrough_data {
+    BUFFER *wb;
+    struct summary_total_counts *totals;
+    QUERY_TARGET *qt;
+};
+
+struct dimensions_sorted_entry {
+    const char *id;
+    const char *name;
+    STORAGE_POINT query_points;
+    QUERY_METRICS_COUNTS metrics;
+    uint32_t priority;
+};
+
+static int dimensions_sorted_walktrhough_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
+    struct dimensions_sorted_walkthrough_data *sdwd = data;
+    BUFFER *wb = sdwd->wb;
+    struct summary_total_counts *totals = sdwd->totals;
+    QUERY_TARGET *qt = sdwd->qt;
+    struct dimensions_sorted_entry *z = value;
+
+    buffer_json_add_array_item_object(wb);
+    buffer_json_member_add_string(wb, "id", z->id);
+    if (z->id != z->name && z->name)
+        buffer_json_member_add_string(wb, "nm", z->name);
+
+    query_target_metric_counts(wb, &z->metrics);
+    query_target_points_statistics(wb, qt, &z->query_points);
+    buffer_json_member_add_uint64(wb, "pri", z->priority);
+    buffer_json_object_close(wb);
+
+    aggregate_into_summary_totals(totals, &z->metrics);
+
+    return 1;
+}
+
+int dimensions_sorted_compar(const DICTIONARY_ITEM **item1, const DICTIONARY_ITEM **item2) {
+    struct dimensions_sorted_entry *z1 = dictionary_acquired_item_value(*item1);
+    struct dimensions_sorted_entry *z2 = dictionary_acquired_item_value(*item2);
+
+    if(z1->priority == z2->priority)
+        return strcmp(dictionary_acquired_item_name(*item1), dictionary_acquired_item_name(*item2));
+    else if(z1->priority < z2->priority)
+        return -1;
+    else
+        return 1;
+}
+
 static void query_target_summary_dimensions_v12(BUFFER *wb, QUERY_TARGET *qt, const char *key, bool v2, struct summary_total_counts *totals) {
-    char name[RRD_ID_LENGTH_MAX * 2 + 2];
+    char buf[RRD_ID_LENGTH_MAX * 2 + 2];
 
     buffer_json_member_add_array(wb, key);
     DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
-    struct {
-        const char *id;
-        const char *name;
-        STORAGE_POINT query_points;
-        QUERY_METRICS_COUNTS metrics;
-    } *z;
+    struct dimensions_sorted_entry *z;
     size_t q = 0;
     for (long c = 0; c < (long) qt->dimensions.used; c++) {
         QUERY_DIMENSION * qd = query_dimension(qt, c);
@@ -392,23 +435,31 @@ static void query_target_summary_dimensions_v12(BUFFER *wb, QUERY_TARGET *qt, co
             qm = tqm;
         }
 
+        const char *key, *id, *name;
+
         if(v2) {
-            z = dictionary_set(dict, rrdmetric_acquired_name(rma), NULL, sizeof(*z));
-            if(!z->id)
-                z->id = rrdmetric_acquired_name(rma);
-            if(!z->name)
-                z->name = rrdmetric_acquired_name(rma);
+            key = rrdmetric_acquired_name(rma);
+            id = key;
+            name = key;
         }
         else {
-            snprintfz(name, RRD_ID_LENGTH_MAX * 2 + 1, "%s:%s",
+            snprintfz(buf, RRD_ID_LENGTH_MAX * 2 + 1, "%s:%s",
                       rrdmetric_acquired_id(rma),
                       rrdmetric_acquired_name(rma));
+            key = buf;
+            id = rrdmetric_acquired_id(rma);
+            name = rrdmetric_acquired_name(rma);
+        }
 
-            z = dictionary_set(dict, name, NULL, sizeof(*z));
-            if (!z->id)
-                z->id = rrdmetric_acquired_id(rma);
-            if (!z->name)
-                z->name = rrdmetric_acquired_name(rma);
+        z = dictionary_set(dict, key, NULL, sizeof(*z));
+        if(!z->id) {
+            z->id = id;
+            z->name = name;
+            z->priority = qd->priority;
+        }
+        else {
+            if(qd->priority < z->priority)
+                z->priority = qd->priority;
         }
 
         if(qm) {
@@ -423,27 +474,26 @@ static void query_target_summary_dimensions_v12(BUFFER *wb, QUERY_TARGET *qt, co
         else
             z->metrics.excluded++;
     }
-    dfe_start_read(dict, z) {
-                if(v2) {
-                    buffer_json_add_array_item_object(wb);
-                    buffer_json_member_add_string(wb, "id", z->id);
-                    if(z->id != z->name)
-                        buffer_json_member_add_string(wb, "nm", z->name);
 
-                    query_target_metric_counts(wb, &z->metrics);
-                    query_target_points_statistics(wb, qt, &z->query_points);
-                    buffer_json_object_close(wb);
-
-                    aggregate_into_summary_totals(totals, &z->metrics);
-                }
-                else {
-                    buffer_json_add_array_item_array(wb);
-                    buffer_json_add_array_item_string(wb, z->id);
-                    buffer_json_add_array_item_string(wb, z->name);
-                    buffer_json_array_close(wb);
-                }
-            }
-    dfe_done(z);
+    if(v2) {
+        struct dimensions_sorted_walkthrough_data t = {
+                .wb = wb,
+                .totals = totals,
+                .qt = qt,
+        };
+        dictionary_sorted_walkthrough_rw(dict, DICTIONARY_LOCK_READ, dimensions_sorted_walktrhough_cb,
+                                         &t, dimensions_sorted_compar);
+    }
+    else {
+        // v1
+        dfe_start_read(dict, z) {
+                buffer_json_add_array_item_array(wb);
+                buffer_json_add_array_item_string(wb, z->id);
+                buffer_json_add_array_item_string(wb, z->name);
+                buffer_json_array_close(wb);
+        }
+        dfe_done(z);
+    }
     dictionary_destroy(dict);
     buffer_json_array_close(wb);
 }
