@@ -136,7 +136,7 @@ SSL_CTX *security_initialize_ssl_client() {
 #if defined(OPENSSL_VERSION_NUMBER) && (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
         SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
 #else
-#if defined(LIBWOLFSSL_VERSION_STRING)
+#if defined(ENABLE_HTTPS_WITH_WOLFSSL)
         if (netdata_ssl_validate_server == NETDATA_SSL_INVALID_CERTIFICATE)
             wolfSSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, 0);
 #endif
