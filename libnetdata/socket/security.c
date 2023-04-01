@@ -89,16 +89,16 @@ int tls_select_version(const char *lversion) {
 #endif
 
 /**
- * OpenSSL common options
+ * SSL common options
  *
  * Clients and SERVER have common options, this function is responsible to set them in the context.
  *
  * @param ctx the initialized SSL context.
  * @param side 0 means server, and 1 client.
  */
-void security_openssl_common_options(SSL_CTX *ctx, int side) {
+void security_ssl_common_options(SSL_CTX *ctx, int side) {
     if (!side) {
-#if defined(OPENSSL_VERSION_NUMBER) && (OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_110)
+#if defined(OPENSSL_VERSION_NUMBER) && (OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_110) || defined(ENABLE_HTTPS_WITH_WOLFSSL)
         int version =  tls_select_version(tls_version) ;
 #endif
 #if defined(OPENSSL_VERSION_NUMBER) && (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
@@ -184,7 +184,7 @@ static SSL_CTX * security_initialize_openssl_server() {
 
     SSL_CTX_use_certificate_chain_file(ctx, netdata_ssl_security_cert);
 #endif // defined(OPENSSL_VERSION_NUMBER)
-    security_openssl_common_options(ctx, 0);
+    security_ssl_common_options(ctx, 0);
 
     SSL_CTX_use_PrivateKey_file(ctx, netdata_ssl_security_key,SSL_FILETYPE_PEM);
 
