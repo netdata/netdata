@@ -170,6 +170,8 @@ typedef struct rrdresult {
 #ifdef NETDATA_INTERNAL_CHECKS
         const char *log;
 #endif
+
+        struct query_target *release_with_rrdr_qt;
     } internal;
 } RRDR;
 

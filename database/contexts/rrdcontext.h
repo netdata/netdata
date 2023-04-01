@@ -331,9 +331,6 @@ typedef struct query_target {
     char id[MAX_QUERY_TARGET_ID_LENGTH + 1]; // query identifier (for logging)
     QUERY_TARGET_REQUEST request;
 
-    bool used;                              // when true, this query is currently being used
-    size_t queries;                         // how many query we have done so far with this QUERY_TARGET - not related to database queries
-
     struct {
         time_t now;                         // the current timestamp, the absolute max for any query timestamp
         bool relative;                      // true when the request made with relative timestamps, true if it was absolute
@@ -404,9 +401,16 @@ typedef struct query_target {
     } group_by[MAX_QUERY_GROUP_BY_PASSES];
 
     STORAGE_POINT query_points;
-
     struct query_versions versions;
     struct query_timings timings;
+
+    struct {
+        SPINLOCK spinlock;
+        bool used;                              // when true, this query is currently being used
+        size_t queries;                         // how many query we have done so far with this QUERY_TARGET - not related to database queries
+        struct query_target *prev;
+        struct query_target *next;
+    } internal;
 } QUERY_TARGET;
 
 static inline NEVERNULL QUERY_NODE *query_node(QUERY_TARGET *qt, size_t id) {

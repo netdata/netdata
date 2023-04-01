@@ -12,42 +12,55 @@ static void query_instance_release(QUERY_INSTANCE *qi);
 static void query_context_release(QUERY_CONTEXT *qc);
 static void query_node_release(QUERY_NODE *qn);
 
-static __thread QUERY_TARGET thread_query_target = {};
+static __thread QUERY_TARGET *thread_qt = NULL;
+static struct {
+    struct {
+        SPINLOCK spinlock;
+        size_t count;
+        QUERY_TARGET *base;
+    } available;
 
-// ----------------------------------------------------------------------------
-// query API
+    struct {
+        SPINLOCK spinlock;
+        size_t count;
+        QUERY_TARGET *base;
+    } used;
+} query_target_base = {
+        .available = {
+                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                .base = NULL,
+                .count = 0,
+        },
+        .used = {
+                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                .base = NULL,
+                .count = 0,
+        },
+};
 
-typedef struct query_target_locals {
-    time_t start_s;
+static void query_target_destroy(QUERY_TARGET *qt) {
+    __atomic_sub_fetch(&netdata_buffers_statistics.query_targets_size, qt->query.size * sizeof(QUERY_METRIC), __ATOMIC_RELAXED);
+    freez(qt->query.array);
 
-    QUERY_TARGET *qt;
+    __atomic_sub_fetch(&netdata_buffers_statistics.query_targets_size, qt->dimensions.size * sizeof(RRDMETRIC_ACQUIRED *), __ATOMIC_RELAXED);
+    freez(qt->dimensions.array);
 
-    RRDSET *st;
+    __atomic_sub_fetch(&netdata_buffers_statistics.query_targets_size, qt->instances.size * sizeof(RRDINSTANCE_ACQUIRED *), __ATOMIC_RELAXED);
+    freez(qt->instances.array);
 
-    const char *scope_nodes;
-    const char *scope_contexts;
+    __atomic_sub_fetch(&netdata_buffers_statistics.query_targets_size, qt->contexts.size * sizeof(RRDCONTEXT_ACQUIRED *), __ATOMIC_RELAXED);
+    freez(qt->contexts.array);
 
-    const char *nodes;
-    const char *contexts;
-    const char *instances;
-    const char *dimensions;
-    const char *chart_label_key;
-    const char *labels;
-    const char *alerts;
+    __atomic_sub_fetch(&netdata_buffers_statistics.query_targets_size, qt->nodes.size * sizeof(RRDHOST *), __ATOMIC_RELAXED);
+    freez(qt->nodes.array);
 
-    long long after;
-    long long before;
-    bool match_ids;
-    bool match_names;
-
-    size_t metrics_skipped_due_to_not_matching_timeframe;
-
-    char host_uuid_buffer[UUID_STR_LEN];
-    QUERY_NODE *qn; // temp to pass on callbacks, ignore otherwise - no need to free
-} QUERY_TARGET_LOCALS;
+    freez(qt);
+}
 
 void query_target_release(QUERY_TARGET *qt) {
-    if(unlikely(!qt || !qt->used)) return;
+    if(unlikely(!qt)) return;
+
+    internal_fatal(!qt->internal.used, "QUERY TARGET: qt to be released is not used");
 
     simple_pattern_free(qt->nodes.scope_pattern);
     qt->nodes.scope_pattern = NULL;
@@ -118,39 +131,85 @@ void query_target_release(QUERY_TARGET *qt) {
 
     qt->id[0] = '\0';
 
-    qt->used = false;
+    netdata_spinlock_lock(&query_target_base.used.spinlock);
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(query_target_base.used.base, qt, internal.prev, internal.next);
+    query_target_base.used.count--;
+    netdata_spinlock_unlock(&query_target_base.used.spinlock);
+
+    qt->internal.used = false;
+    thread_qt = NULL;
+
+    if (qt->internal.queries > 1000) {
+        query_target_destroy(qt);
+    }
+    else {
+        netdata_spinlock_lock(&query_target_base.available.spinlock);
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(query_target_base.available.base, qt, internal.prev, internal.next);
+        query_target_base.available.count++;
+        netdata_spinlock_unlock(&query_target_base.available.spinlock);
+    }
 }
+
+static QUERY_TARGET *query_target_get(void) {
+    netdata_spinlock_lock(&query_target_base.available.spinlock);
+    QUERY_TARGET *qt = query_target_base.available.base;
+    if (qt) {
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(query_target_base.available.base, qt, internal.prev, internal.next);
+        query_target_base.available.count--;
+    }
+    netdata_spinlock_unlock(&query_target_base.available.spinlock);
+
+    if(unlikely(!qt))
+        qt = callocz(1, sizeof(*qt));
+
+    netdata_spinlock_lock(&query_target_base.used.spinlock);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(query_target_base.used.base, qt, internal.prev, internal.next);
+    query_target_base.used.count++;
+    netdata_spinlock_unlock(&query_target_base.used.spinlock);
+
+    qt->internal.used = true;
+    qt->internal.queries++;
+    thread_qt = qt;
+
+    return qt;
+}
+
+// this is used to release a query target from a cancelled thread
 void query_target_free(void) {
-    QUERY_TARGET *qt = &thread_query_target;
-
-    if(qt->used)
-        query_target_release(qt);
-
-    __atomic_sub_fetch(&netdata_buffers_statistics.query_targets_size, qt->query.size * sizeof(QUERY_METRIC), __ATOMIC_RELAXED);
-    freez(qt->query.array);
-    qt->query.array = NULL;
-    qt->query.size = 0;
-
-    __atomic_sub_fetch(&netdata_buffers_statistics.query_targets_size, qt->dimensions.size * sizeof(RRDMETRIC_ACQUIRED *), __ATOMIC_RELAXED);
-    freez(qt->dimensions.array);
-    qt->dimensions.array = NULL;
-    qt->dimensions.size = 0;
-
-    __atomic_sub_fetch(&netdata_buffers_statistics.query_targets_size, qt->instances.size * sizeof(RRDINSTANCE_ACQUIRED *), __ATOMIC_RELAXED);
-    freez(qt->instances.array);
-    qt->instances.array = NULL;
-    qt->instances.size = 0;
-
-    __atomic_sub_fetch(&netdata_buffers_statistics.query_targets_size, qt->contexts.size * sizeof(RRDCONTEXT_ACQUIRED *), __ATOMIC_RELAXED);
-    freez(qt->contexts.array);
-    qt->contexts.array = NULL;
-    qt->contexts.size = 0;
-
-    __atomic_sub_fetch(&netdata_buffers_statistics.query_targets_size, qt->nodes.size * sizeof(RRDHOST *), __ATOMIC_RELAXED);
-    freez(qt->nodes.array);
-    qt->nodes.array = NULL;
-    qt->nodes.size = 0;
+    query_target_release(thread_qt);
 }
+
+// ----------------------------------------------------------------------------
+// query API
+
+typedef struct query_target_locals {
+    time_t start_s;
+
+    QUERY_TARGET *qt;
+
+    RRDSET *st;
+
+    const char *scope_nodes;
+    const char *scope_contexts;
+
+    const char *nodes;
+    const char *contexts;
+    const char *instances;
+    const char *dimensions;
+    const char *chart_label_key;
+    const char *labels;
+    const char *alerts;
+
+    long long after;
+    long long before;
+    bool match_ids;
+    bool match_names;
+
+    size_t metrics_skipped_due_to_not_matching_timeframe;
+
+    char host_uuid_buffer[UUID_STR_LEN];
+    QUERY_NODE *qn; // temp to pass on callbacks, ignore otherwise - no need to free
+} QUERY_TARGET_LOCALS;
 
 struct storage_engine *query_metric_storage_engine(QUERY_TARGET *qt, QUERY_METRIC *qm, size_t tier) {
     QUERY_NODE *qn = query_node(qt, qm->link.query_node_id);
@@ -958,13 +1017,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     if(!service_running(ABILITY_DATA_QUERIES))
         return NULL;
 
-    QUERY_TARGET *qt = &thread_query_target;
-
-    if(qt->used)
-        fatal("QUERY TARGET: this query target is already used (%zu queries made with this QUERY_TARGET so far).", qt->queries);
-
-    qt->used = true;
-    qt->queries++;
+    QUERY_TARGET *qt = query_target_get();
 
     if(!qtr->received_ut)
         qtr->received_ut = now_monotonic_usec();

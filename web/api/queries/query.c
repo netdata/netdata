@@ -2553,7 +2553,6 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
          if(unlikely(!r)) {
              internal_error(true, "QUERY: cannot create RRDR for %s, after=%ld, before=%ld, dimensions=%u, points=%zu",
                             qt->id, qt->window.after, qt->window.before, qt->query.used, qt->window.points);
-             query_target_release(qt);
              return NULL;
          }
          r->group_by.r = NULL;
@@ -2900,7 +2899,6 @@ cleanup:
             }
         }
         dictionary_destroy(label_keys);
-        query_target_release(qt);
     }
     else if(!r->group_by.r) {
         rrdr_free(owa, r);
@@ -3272,17 +3270,20 @@ RRDR *rrd2rrdr_legacy(
             .priority = priority,
     };
 
-    return rrd2rrdr(owa, query_target_create(&qtr));
-}
-
-RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
-    if(!qt)
-        return NULL;
-
-    if(!owa) {
+    QUERY_TARGET *qt = query_target_create(&qtr);
+    RRDR *r = rrd2rrdr(owa, qt);
+    if(!r) {
         query_target_release(qt);
         return NULL;
     }
+
+    r->internal.release_with_rrdr_qt = qt;
+    return r;
+}
+
+RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
+    if(!qt || !owa)
+        return NULL;
 
     // qt.window members are the WANTED ones.
     // qt.request members are the REQUESTED ones.

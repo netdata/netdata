@@ -949,7 +949,8 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
             .priority = STORAGE_PRIORITY_SYNCHRONOUS,
     };
 
-    RRDR *r = rrd2rrdr(owa, query_target_create(&qtr));
+    QUERY_TARGET *qt = query_target_create(&qtr);
+    RRDR *r = rrd2rrdr(owa, qt);
     if(!r)
         goto cleanup;
 
@@ -990,6 +991,7 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
 
 cleanup:
     rrdr_free(owa, r);
+    query_target_release(qt);
     return ret;
 }
 
@@ -1181,9 +1183,10 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
     };
 
     ONEWAYALLOC *owa = onewayalloc_create(16 * 1024);
-    RRDR *r = rrd2rrdr(owa, query_target_create(&qtr));
+    QUERY_TARGET *qt = query_target_create(&qtr);
+    RRDR *r = rrd2rrdr(owa, qt);
 
-    if(rrdr_rows(r) != 1 || !r->d || r->d != r->internal.qt->query.used)
+    if(!r || rrdr_rows(r) != 1 || !r->d || r->d != r->internal.qt->query.used)
         goto cleanup;
 
     QUERY_VALUE qv = {
@@ -1224,6 +1227,7 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
 
 cleanup:
     rrdr_free(owa, r);
+    query_target_release(qt);
     onewayalloc_destroy(owa);
 }
 
