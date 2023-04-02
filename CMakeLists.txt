@@ -350,7 +350,7 @@ ENDIF()
 
 # -----------------------------------------------------------------------------
 # Detect ml dependencies
-file(STRINGS "${CMAKE_SOURCE_DIR}/config.h" DEFINE_ENABLE_ML REGEX "^#define ENABLE_ML 1$")
+file(STRINGS "${GENERATED_CONFIG_H}" DEFINE_ENABLE_ML REGEX "^#define ENABLE_ML 1$")
 IF(DEFINE_ENABLE_ML MATCHES ".+" AND
    EXISTS "${CMAKE_SOURCE_DIR}/ml/dlib/dlib/all/source.cpp")
     set(ENABLE_ML True)
@@ -953,6 +953,7 @@ set(MQTT_WEBSOCKETS_FILES
         mqtt_websockets/c-rbuf/src/ringbuffer.c
         mqtt_websockets/c-rbuf/include/ringbuffer.h
         mqtt_websockets/c-rbuf/src/ringbuffer_internal.h
+        mqtt_websockets/c_rhash/src/c_rhash.c
         )
 
 set(SPAWN_PLUGIN_FILES
@@ -1267,6 +1268,7 @@ list(APPEND NETDATA_FILES ${ACLK_FILES} ${ACLK_PROTO_BUILT_SRCS} ${ACLK_PROTO_BU
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/aclk/aclk-schemas)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/src/include)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include)
+include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/c_rhash/include)
 
 ADD_LIBRARY(mqttwebsockets STATIC
             ${MQTT_WEBSOCKETS_FILES})
@@ -1277,7 +1279,7 @@ target_compile_options(mqttwebsockets PUBLIC
                         -DMQTT_WSS_CPUSTATS)
 
 target_include_directories(mqttwebsockets PUBLIC
-             ${CMAKE_SOURCE_DIR}/aclk/helpers)
+             ${CMAKE_SOURCE_DIR}/aclk/helpers ${GENERATED_CONFIG_H_DIR})
 
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} mqttwebsockets)
 
