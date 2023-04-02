@@ -155,13 +155,13 @@ SSL_CTX *security_initialize_ssl_client() {
 }
 
 /**
- * Initialize OpenSSL server
+ * Initialize SSL server
  *
- * Starts the server context with TLS 1.2 and load the certificate.
+ * Starts the server context with TLS and load the certificate.
  *
  * @return It returns the context on success or NULL otherwise
  */
-static SSL_CTX * security_initialize_openssl_server() {
+static SSL_CTX *security_initialize_ssl_server() {
     SSL_CTX *ctx;
     char lerror[512];
 	static int netdata_id_context = 1;
@@ -177,7 +177,7 @@ static SSL_CTX * security_initialize_openssl_server() {
     SSL_CTX_use_certificate_file(ctx, netdata_ssl_security_cert, SSL_FILETYPE_PEM);
 #else
     ctx = SSL_CTX_new(TLS_server_method());
-    if (!ctx) {
+if (!ctx) {
 		error("Cannot create a new SSL context, netdata won't encrypt communication");
         return NULL;
     }
@@ -227,7 +227,7 @@ void security_start_ssl(int selector) {
                 if (stat(netdata_ssl_security_key, &statbuf) || stat(netdata_ssl_security_cert, &statbuf))
                     info("To use encryption it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
                 else {
-                    netdata_ssl_srv_ctx = security_initialize_openssl_server();
+                    netdata_ssl_srv_ctx = security_initialize_ssl_server();
                     SSL_CTX_set_mode(netdata_ssl_srv_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);
                 }
             }
