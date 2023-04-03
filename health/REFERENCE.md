@@ -77,7 +77,7 @@ In the `netdata.conf` `[health]` section, set `enabled` to `no`, and restart the
 
 ### Disable some alerts
 
-In the `netdata.conf` `[health]` section, set `enabled alerms` to a
+In the `netdata.conf` `[health]` section, set `enabled alarms` to a
 [simple pattern](https://github.com/netdata/netdata/edit/master/libnetdata/simple_pattern/README.md) that
 excludes one or more alerts. e.g. `enabled alarms = !oom_kill *` will load all alarms except `oom_kill`.
 
