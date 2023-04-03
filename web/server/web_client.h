@@ -24,6 +24,7 @@ extern int web_enable_gzip, web_gzip_level, web_gzip_strategy;
 #define HTTP_RESP_NOT_FOUND 404
 #define HTTP_RESP_CONFLICT 409
 #define HTTP_RESP_PRECOND_FAIL 412
+#define HTTP_RESP_CONTENT_TOO_LONG 413
 
 // HTTP_CODES 5XX Server Errors
 #define HTTP_RESP_INTERNAL_SERVER_ERROR 500
