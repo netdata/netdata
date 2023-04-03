@@ -56,12 +56,22 @@ typedef enum rrdr_group_by {
     RRDR_GROUP_BY_NONE      = 0,
     RRDR_GROUP_BY_SELECTED  = (1 << 0),
     RRDR_GROUP_BY_DIMENSION = (1 << 1),
-    RRDR_GROUP_BY_NODE      = (1 << 2),
-    RRDR_GROUP_BY_INSTANCE  = (1 << 3),
-    RRDR_GROUP_BY_LABEL     = (1 << 4),
+    RRDR_GROUP_BY_INSTANCE  = (1 << 2),
+    RRDR_GROUP_BY_LABEL     = (1 << 3),
+    RRDR_GROUP_BY_NODE      = (1 << 4),
     RRDR_GROUP_BY_CONTEXT   = (1 << 5),
     RRDR_GROUP_BY_UNITS     = (1 << 6),
 } RRDR_GROUP_BY;
+
+#define SUPPORTED_GROUP_BY_METHODS (\
+    RRDR_GROUP_BY_SELECTED  |\
+    RRDR_GROUP_BY_DIMENSION |\
+    RRDR_GROUP_BY_INSTANCE  |\
+    RRDR_GROUP_BY_LABEL     |\
+    RRDR_GROUP_BY_NODE      |\
+    RRDR_GROUP_BY_CONTEXT   |\
+    RRDR_GROUP_BY_UNITS      \
+)
 
 struct web_buffer;
 

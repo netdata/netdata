@@ -82,16 +82,6 @@ typedef enum __attribute__ ((__packed__)) rrdr_result_flags {
     RRDR_RESULT_FLAG_CANCEL        = (1 << 2), // the query needs to be cancelled
 } RRDR_RESULT_FLAGS;
 
-struct rrdr_group_by_entry {
-    size_t priority;
-    size_t count;
-    STRING *id;
-    STRING *name;
-    STRING *units;
-    RRDR_DIMENSION_FLAGS od;
-    DICTIONARY *dl;
-};
-
 #define RRDR_DVIEW_ANOMALY_COUNT_MULTIPLIER 1000.0
 
 typedef struct rrdresult {

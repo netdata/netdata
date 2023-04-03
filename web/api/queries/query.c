@@ -2544,6 +2544,16 @@ static void rrd2rrdr_set_timestamps(RRDR *r) {
                    before_wanted, r->t[points_wanted - 1]);
 }
 
+struct rrdr_group_by_entry {
+    size_t priority;
+    size_t count;
+    STRING *id;
+    STRING *name;
+    STRING *units;
+    RRDR_DIMENSION_FLAGS od;
+    DICTIONARY *dl;
+};
+
 static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     RRDR_OPTIONS options = qt->window.options;
 
@@ -2569,9 +2579,7 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     }
     // v2 query
 
-    struct rrdr_group_by_entry *entries = onewayalloc_callocz(owa, qt->query.used, sizeof(struct rrdr_group_by_entry));
-    DICTIONARY *groups = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
-
+    // parse all the group-by label keys
     for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
         if (qt->request.group_by[g].group_by & RRDR_GROUP_BY_LABEL &&
             qt->request.group_by[g].group_by_label && *qt->request.group_by[g].group_by_label)
@@ -2583,9 +2591,58 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             qt->request.group_by[g].group_by &= ~RRDR_GROUP_BY_LABEL;
     }
 
-    // make sure the first group-by by has a group-by method
-    if(!(qt->request.group_by[0].group_by & (RRDR_GROUP_BY_SELECTED | RRDR_GROUP_BY_DIMENSION | RRDR_GROUP_BY_INSTANCE | RRDR_GROUP_BY_LABEL | RRDR_GROUP_BY_NODE | RRDR_GROUP_BY_CONTEXT)))
-        qt->request.group_by[0].group_by = RRDR_GROUP_BY_DIMENSION;
+    // make sure there are valid group-by methods
+    for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES - 1 ;g++) {
+        if(!(qt->request.group_by[g].group_by & SUPPORTED_GROUP_BY_METHODS))
+            qt->request.group_by[g].group_by = (g == 0) ? RRDR_GROUP_BY_DIMENSION : RRDR_GROUP_BY_NONE;
+    }
+
+    // merge all group-by options to upper levels
+    for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES - 1 ;g++) {
+        if(qt->request.group_by[g].group_by == RRDR_GROUP_BY_NONE)
+            continue;
+
+        if(qt->request.group_by[g].group_by == RRDR_GROUP_BY_SELECTED) {
+            for (size_t r = g + 1; r < MAX_QUERY_GROUP_BY_PASSES; r++)
+                qt->request.group_by[r].group_by = RRDR_GROUP_BY_NONE;
+        }
+        else {
+            for (size_t r = g + 1; r < MAX_QUERY_GROUP_BY_PASSES; r++) {
+                if (qt->request.group_by[r].group_by == RRDR_GROUP_BY_NONE)
+                    continue;
+
+                if (qt->request.group_by[r].group_by != RRDR_GROUP_BY_SELECTED) {
+                    qt->request.group_by[g].group_by |= qt->request.group_by[r].group_by;
+
+                    if(qt->request.group_by[r].group_by & RRDR_GROUP_BY_LABEL) {
+                        for (size_t lr = 0; lr < qt->group_by[r].used; lr++) {
+                            bool found = false;
+                            for (size_t lg = 0; lg < qt->group_by[g].used; lg++) {
+                                if (strcmp(qt->group_by[g].label_keys[lg], qt->group_by[r].label_keys[lr]) == 0) {
+                                    found = true;
+                                    break;
+                                }
+                            }
+
+                            if (!found && qt->group_by[g].used < GROUP_BY_MAX_LABEL_KEYS * MAX_QUERY_GROUP_BY_PASSES)
+                                qt->group_by[g].label_keys[qt->group_by[g].used++] = qt->group_by[r].label_keys[lr];
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+//    struct {
+//        struct rrdr_group_by_entry *entries;
+//    } group_data[MAX_QUERY_GROUP_BY_PASSES];
+//
+//    for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
+//
+//    }
+
+    struct rrdr_group_by_entry *entries = onewayalloc_callocz(owa, qt->query.used, sizeof(struct rrdr_group_by_entry));
+    DICTIONARY *groups = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
 
     size_t g = 0;
     RRDR_GROUP_BY group_by = qt->request.group_by[0].group_by;

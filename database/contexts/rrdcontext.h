@@ -398,7 +398,7 @@ typedef struct query_target {
 
     struct {
         size_t used;
-        char *label_keys[GROUP_BY_MAX_LABEL_KEYS];
+        char *label_keys[GROUP_BY_MAX_LABEL_KEYS * MAX_QUERY_GROUP_BY_PASSES];
     } group_by[MAX_QUERY_GROUP_BY_PASSES];
 
     STORAGE_POINT query_points;
