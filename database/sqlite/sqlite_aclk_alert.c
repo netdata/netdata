@@ -97,9 +97,6 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
     if (unlikely(uuid_is_null(ae->config_hash_id))) 
         return 0;
 
-    if (is_event_from_alert_variable_config(ae->unique_id, uuid_str))
-        return 0;
-
     char sql[ACLK_SYNC_QUERY_SIZE];
     uuid_t config_hash_id;
     RRDCALC_STATUS status;
@@ -193,10 +190,13 @@ int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, int skip_filter)
         }
     }
 
-    sqlite3_stmt *res_alert = NULL;
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
+    if (is_event_from_alert_variable_config(ae->unique_id, uuid_str))
+        return 0;
+
+    sqlite3_stmt *res_alert = NULL;
     char sql[ACLK_SYNC_QUERY_SIZE];
 
     snprintfz(sql, ACLK_SYNC_QUERY_SIZE - 1, SQL_QUEUE_ALERT_TO_CLOUD, uuid_str);
@@ -667,7 +667,9 @@ void aclk_start_alert_streaming(char *node_id, bool resets)
 #define SQL_QUEUE_REMOVE_ALERTS "INSERT INTO aclk_alert_%s (alert_unique_id, date_created, filtered_alert_unique_id) " \
                                 "SELECT unique_id alert_unique_id, UNIXEPOCH(), unique_id alert_unique_id FROM health_log_%s " \
                                 "WHERE new_status = -2 AND updated_by_id = 0 AND unique_id NOT IN " \
-                                "(SELECT alert_unique_id FROM aclk_alert_%s) ORDER BY unique_id ASC " \
+                                "(SELECT alert_unique_id FROM aclk_alert_%s) " \
+                                "AND config_hash_id NOT IN (select hash_id from alert_hash where warn is null and crit is null) " \
+                                "ORDER BY unique_id ASC " \
                                 "ON CONFLICT (alert_unique_id) DO NOTHING;"
 
 void sql_process_queue_removed_alerts_to_aclk(char *node_id)
