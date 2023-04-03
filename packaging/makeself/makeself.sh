@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
+# shellcheck disable=SC2209,SC2006,SC2016,SC2034,SC2086,SC2003,SC2268,SC1090,SC2002,SC2046
+#
 # Makeself version 2.5.x
 #  by Stephane Peter <megastep@megastep.org>
 #
