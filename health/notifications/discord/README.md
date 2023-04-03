@@ -4,7 +4,7 @@ Learn how to send notifications to Discord using Netdata's Agent alert notificat
 
 > ### Note
 >
-> This file assumes you have read the [landing page of this section](https://github.com/netdata/netdata/blob/master/health/notifications/README.md), detailing how the Netdata Agent's alert notification method works.
+> This file assumes you have read the [Introduction to Agent alert notifications](https://github.com/netdata/netdata/blob/master/health/notifications/README.md), detailing how the Netdata Agent's alert notification method works.
 
 This is what you will get:
 
@@ -32,9 +32,9 @@ You will need:
 
 Edit `health_alarm_notify.conf`, changes to this file do not require restarting Netdata:
 
-1. Set `SEND_DISCORD` to `YES`
-2. Set `DISCORD_WEBHOOK_URL` to your webhook URL
-3. Set `DEFAULT_RECIPIENT_DISCORD` to the channel you want the alert to be sent  
+1. Set `SEND_DISCORD` to `YES`.
+2. Set `DISCORD_WEBHOOK_URL` to your webhook URL.
+3. Set `DEFAULT_RECIPIENT_DISCORD` to the channel you want the alert to be sent.  
    You can define multiple channels like this: `alarms systems`.  
    All roles will default to this variable if left unconfigured.
 
@@ -79,4 +79,4 @@ DEFAULT_RECIPIENT_DISCORD="alarms"
 
 ## Test the alert
 
-To test this alert refer to the ["Testing Alert Notifications"](https://github.com/netdata/netdata/blob/master/health/notifications/README.md#testing-alert-notifications) section of the Agent alert notifications page.
+To test this alert notification refer to the ["Testing Alert Notifications"](https://github.com/netdata/netdata/blob/master/health/notifications/README.md#testing-alert-notifications) section of the Agent alert notifications page.
