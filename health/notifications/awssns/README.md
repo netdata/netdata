@@ -131,6 +131,6 @@ AWSSNS_MESSAGE_FORMAT="${status} on ${host} at ${date}: ${chart} ${value_string}
 DEFAULT_RECIPIENT_AWSSNS="arn:aws:sns:us-east-2:123456789012:MyTopic"
 ```
 
-## Test the alert
+## Test the notification method
 
-To test this alert notification refer to the ["Testing Alert Notifications"](https://github.com/netdata/netdata/blob/master/health/notifications/README.md#testing-alert-notifications) section of the Agent alert notifications page.
+To test this alert notification method refer to the ["Testing Alert Notifications"](https://github.com/netdata/netdata/blob/master/health/notifications/README.md#testing-alert-notifications) section of the Agent alert notifications page.

@@ -100,6 +100,6 @@ IRC_NICKNAME="netdata-alarm-user"
 IRC_REALNAME="netdata-user"
 ```
 
-## Test the alert
+## Test the notification method
 
-To test this alert notification refer to the ["Testing Alert Notifications"](https://github.com/netdata/netdata/blob/master/health/notifications/README.md#testing-alert-notifications) section of the Agent alert notifications page.
+To test this alert notification method refer to the ["Testing Alert Notifications"](https://github.com/netdata/netdata/blob/master/health/notifications/README.md#testing-alert-notifications) section of the Agent alert notifications page.
