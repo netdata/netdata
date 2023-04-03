@@ -1075,9 +1075,9 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
                 rc->status == RRDCALC_STATUS_CRITICAL) {
 
                 active_alerts[cnt].name = (char *)rrdcalc_name(rc);
-                len += strlen((char *)rrdcalc_name(rc));
+                len += string_strlen(rc->name);
                 active_alerts[cnt].chart = (char *)rrdcalc_chart_name(rc);
-                len += strlen((char *)rrdcalc_chart_name(rc));
+                len += string_strlen(rc->chart);
                 active_alerts[cnt].status = rc->status;
                 len++;
                 cnt++;
@@ -1106,7 +1106,6 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
     }
 
     unsigned char hash[SHA256_DIGEST_LENGTH + 1];
-
     SHA256_CTX sha256;
     SHA256_Init(&sha256);
     SHA256_Update(&sha256, buffer_tostring(alarms_to_hash), len);
@@ -1122,5 +1121,6 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
     aclk_send_provide_alarm_checkpoint(&alarm_checkpoint);
     log_access("ACLK RES [%s (%s)]: ALERTS CHECKPOINT SENT", wc->node_id, rrdhost_hostname(host));
     wc->alert_checkpoint_req = 0;
+    buffer_free(alarms_to_hash);
 #endif
 }
