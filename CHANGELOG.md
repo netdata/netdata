@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- fix  \#14841 Exception funktion call Rados.mon\_command\(\) [\#14844](https://github.com/netdata/netdata/pull/14844) ([farax4de](https://github.com/farax4de))
 - Update parent child examples [\#14842](https://github.com/netdata/netdata/pull/14842) ([cakrit](https://github.com/cakrit))
 - fix double host prefix when reading ZFS pools state [\#14840](https://github.com/netdata/netdata/pull/14840) ([ilyam8](https://github.com/ilyam8))
 - Update enable-notifications.md [\#14838](https://github.com/netdata/netdata/pull/14838) ([cakrit](https://github.com/cakrit))
@@ -394,7 +395,6 @@
 - pre gcc v5 support and allow building without dbengine [\#14239](https://github.com/netdata/netdata/pull/14239) ([ktsaou](https://github.com/ktsaou))
 - Drop ARMv7 native packages for Fedora 36. [\#14233](https://github.com/netdata/netdata/pull/14233) ([Ferroin](https://github.com/Ferroin))
 - fix consul\_raft\_leadership\_transitions alarm units [\#14232](https://github.com/netdata/netdata/pull/14232) ([ilyam8](https://github.com/ilyam8))
-- readme updates [\#14224](https://github.com/netdata/netdata/pull/14224) ([andrewm4894](https://github.com/andrewm4894))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
