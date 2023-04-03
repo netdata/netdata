@@ -4,7 +4,7 @@ Learn how to send notifications to Alerta using Netdata's Agent alert notificati
 
 > ### Note
 >
-> This file assumes you have read the [landing page of this section](https://github.com/netdata/netdata/blob/master/health/notifications/README.md), detailing how the Netdata Agent's alert notification method works.
+> This file assumes you have read the [Introduction to Agent alert notifications](https://github.com/netdata/netdata/blob/master/health/notifications/README.md), detailing how the Netdata Agent's alert notification method works.
 
 The [Alerta](https://alerta.io) monitoring system is a tool used to consolidate and de-duplicate alerts from multiple sources for quick ‘at-a-glance’ visualization.
 With just one system you can monitor alerts from many other monitoring tools on a single screen.
@@ -20,21 +20,11 @@ You can send Netdata alerts to Alerta to see alerts coming from many Netdata hos
 
 You need:
 
+- an Alerta instance
 - an Alerta API key (if authentication in Alerta is enabled)
 - terminal access to the Agent you wish to configure
 
-## Deploying Alerta
-
-The recommended setup is using a dedicated server, VM or container.
-If you have other NGINX or Apache servers in your organization, it is recommended to proxy to this new server.
-
-You can install Alerta in several ways:
-
-- **Docker**: Alerta provides a [Docker image](https://hub.docker.com/r/alerta/alerta-web/) to get you started quickly.
-- **Deployment on Ubuntu server**: Alerta's [getting started tutorial](https://docs.alerta.io/gettingstarted/tutorial-1-deploy-alerta.html) walks you through this process.
-- **Advanced deployment scenarios**: More ways to install and deploy Alerta are documented on the [Alerta docs](http://docs.alerta.io/en/latest/deployment.html).
-
-## Sending alerts to Alerta
+## Configure Netdata to send alerts to Alerta
 
 > ### Info
 >
@@ -45,23 +35,14 @@ You can install Alerta in several ways:
 >
 > It is recommended to use this way for configuring Netdata.
 
-### Create an API key (if authentication in Alerta is enabled)
-
-You will need an API key to send messages from any source, if
-Alerta is configured to use authentication (recommended).
-
-Create a new API key in Alerta:
-
-1. Go to *Configuration* > *API Keys*.
-2. Create a new API key called "netdata" with `write:alerts` permission.
-
-### Configure Netdata to send alerts to Alerta
-
 Edit `health_alarm_notify.conf`, changes to this file do not require restarting Netdata:
 
 1. Set `SEND_ALERTA` to `YES`.
 2. set `ALERTA_WEBHOOK_URL` to the API url you defined when you installed the Alerta server.
-3. Set `ALERTA_API_KEY` to the API key you created previously.
+3. Set `ALERTA_API_KEY` to your API key.  
+   You will need an API key to send messages from any source, if Alerta is configured to use authentication (recommended). To create a new API key:  
+   1. Go to *Configuration* > *API Keys*.
+   2. Create a new API key called "netdata" with `write:alerts` permission.
 4. Set `DEFAULT_RECIPIENT_ALERTA` to the default recipient environment you want to alert to.  
    All roles will default to this variable if left unconfigured.
 
@@ -102,4 +83,4 @@ DEFAULT_RECIPIENT_ALERTA="Production"
 
 ## Test the alert
 
-To test this alert refer to the ["Testing Alert Notifications"](https://github.com/netdata/netdata/blob/master/health/notifications/README.md#testing-alert-notifications) section of the Agent alert notifications page.
+To test this alert notification refer to the ["Testing Alert Notifications"](https://github.com/netdata/netdata/blob/master/health/notifications/README.md#testing-alert-notifications) section of the Agent alert notifications page.
