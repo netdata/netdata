@@ -162,6 +162,10 @@ char *generate_alarm_checkpoint(size_t *len, struct alarm_checkpoint *data)
 
     *len = PROTO_COMPAT_MSG_SIZE(msg);
     char *bin = (char*)mallocz(*len);
+    if (!msg.SerializeToArray(bin, *len)) {
+        freez(bin);
+        return NULL;
+    }
 
     return bin;
 }

@@ -729,17 +729,16 @@ void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id __maybe_unus
 
     log_access(
             "IN [%s (%s)]: Request to send alerts snapshot, snapshot_uuid %s",
-            wc->node_id,
+            node_id,
             wc->host ? rrdhost_hostname(wc->host) : "N/A",
             snapshot_uuid);
-        if (wc->alerts_snapshot_uuid && !strcmp(wc->alerts_snapshot_uuid,snapshot_uuid))
-            return;
-        __sync_synchronize();
-        wc->alerts_snapshot_uuid = strdupz(snapshot_uuid);
-        __sync_synchronize();
+    if (wc->alerts_snapshot_uuid && !strcmp(wc->alerts_snapshot_uuid,snapshot_uuid))
+        return;
+    __sync_synchronize();
+    wc->alerts_snapshot_uuid = strdupz(snapshot_uuid);
+    __sync_synchronize();
 
-        freez(snapshot_uuid);
-        aclk_push_node_alert_snapshot(node_id);
+    aclk_push_node_alert_snapshot(node_id);
 }
 
 #ifdef ENABLE_ACLK
@@ -810,7 +809,6 @@ static int have_recent_alarm(RRDHOST *host, uint32_t alarm_id, uint32_t mark)
 #endif
 
 #define ALARM_EVENTS_PER_CHUNK 10
-
 void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
 {
 #ifdef ENABLE_ACLK
@@ -1104,7 +1102,7 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
     } else {
         alarms_to_hash = buffer_create(1, NULL);
         buffer_strcat(alarms_to_hash, "");
-        len = 1;
+        len = 0;
     }
 
     unsigned char hash[SHA256_DIGEST_LENGTH + 1];

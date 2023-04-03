@@ -51,12 +51,12 @@ static google::protobuf::Message *msg_name_to_protomsg(const char *msgname)
         return new agent::v1::SendNodeInstances;
     if (!strcmp(msgname, "StartAlarmStreaming"))
         return new alarms::v1::StartAlarmStreaming;
-    if (!strcmp(msgname, "SendAlarmLogHealth"))
-        return new alarms::v1::SendAlarmLogHealth;
-    if (!strcmp(msgname, "SendAlarmConfiguration"))
-        return new alarms::v1::SendAlarmConfiguration;
     if (!strcmp(msgname, "SendAlarmCheckpoint"))
         return new alarms::v1::SendAlarmCheckpoint;
+    if (!strcmp(msgname, "SendAlarmConfiguration"))
+        return new alarms::v1::SendAlarmConfiguration;
+    if (!strcmp(msgname, "SendAlarmSnapshot"))
+        return new alarms::v1::SendAlarmSnapshot;
     if (!strcmp(msgname, "DisconnectReq"))
         return new agent::v1::DisconnectReq;
     if (!strcmp(msgname, "ContextsCheckpoint"))
