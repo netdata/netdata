@@ -240,15 +240,3 @@ include:
     packages:
       <<: *ubuntu_packages
       repo_distro: ubuntu/focal
-  - <<: *ubuntu
-    version: "18.04"
-    packages:
-      <<: *ubuntu_packages
-      repo_distro: ubuntu/bionic
-      arches:
-        - i386
-        - amd64
-        - armhf
-        - arm64
-    test:
-      ebpf-core: false
