@@ -26,7 +26,7 @@ static usec_t aclk_web_api_request(RRDHOST *host, struct web_client *w, char *ur
     if(buffer_strlen(w->response.data) > ACLK_MAX_WEB_RESPONSE_SIZE) {
         buffer_flush(w->response.data);
         buffer_strcat(w->response.data, "response is too big");
-        w->response.data->content_type = CT_APPLICATION_JSON;
+        w->response.data->content_type = CT_TEXT_PLAIN;
         w->response.code = HTTP_RESP_CONTENT_TOO_LONG;
     }
 
