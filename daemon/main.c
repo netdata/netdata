@@ -338,6 +338,7 @@ void netdata_cleanup_and_exit(int ret) {
 
     delta_shutdown_time("disable ML detection and training threads");
 
+    ml_stop_threads();
     ml_fini();
 
     delta_shutdown_time("disable maintenance, new queries, new web requests, new streaming connections and aclk");
@@ -2083,6 +2084,7 @@ int main(int argc, char **argv) {
         }
         else debug(D_SYSTEM, "Not starting thread %s.", st->name);
     }
+    ml_start_threads();
 
     // ------------------------------------------------------------------------
     // Initialize netdata agent command serving from cli and signals

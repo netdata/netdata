@@ -1474,58 +1474,65 @@ void ml_init()
     for (size_t Idx = 0; Idx != Cfg.max_train_samples; Idx++)
         Cfg.random_nums.push_back(Gen());
 
-    // open sqlite db
-    {
-        char path[FILENAME_MAX];
-        snprintfz(path, FILENAME_MAX - 1, "%s/%s", netdata_configured_cache_dir, "ml.db");
-        int rc = sqlite3_open(path, &db);
-        if (rc != SQLITE_OK) {
-            error_report("Failed to initialize database at %s, due to \"%s\"", path, sqlite3_errstr(rc));
-            sqlite3_close(db);
-            db = NULL;
-        }
+    // init training thread-specific data
+    Cfg.training_threads.resize(Cfg.num_training_threads);
+    for (size_t idx = 0; idx != Cfg.num_training_threads; idx++) {
+        ml_training_thread_t *training_thread = &Cfg.training_threads[idx];
 
-        if (db) {
-            char *err = NULL;
-            int rc = sqlite3_exec(db, db_models_create_table, NULL, NULL, &err);
-            if (rc != SQLITE_OK) {
-                error_report("Failed to create models table (%s, %s)", sqlite3_errstr(rc), err ? err : "");
-                sqlite3_close(db);
-                db = NULL;
-            }
-        }
+        size_t max_elements_needed_for_training = Cfg.max_train_samples * (Cfg.lag_n + 1);
+        training_thread->training_cns = new calculated_number_t[max_elements_needed_for_training]();
+        training_thread->scratch_training_cns = new calculated_number_t[max_elements_needed_for_training]();
+
+        training_thread->id = idx;
+        training_thread->training_queue = ml_queue_init();
+        netdata_mutex_init(&training_thread->nd_mutex);
     }
 
-    // start detection & training threads
-    {
-        Cfg.detection_stop = false;
-        Cfg.training_stop = false;
+    // open sqlite db
+    char path[FILENAME_MAX];
+    snprintfz(path, FILENAME_MAX - 1, "%s/%s", netdata_configured_cache_dir, "ml.db");
+    int rc = sqlite3_open(path, &db);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to initialize database at %s, due to \"%s\"", path, sqlite3_errstr(rc));
+        sqlite3_close(db);
+        db = NULL;
+    }
 
-        char tag[NETDATA_THREAD_TAG_MAX + 1];
-
-        snprintfz(tag, NETDATA_THREAD_TAG_MAX, "%s", "PREDICT");
-        netdata_thread_create(&Cfg.detection_thread, tag, NETDATA_THREAD_OPTION_JOINABLE, ml_detect_main, NULL);
-
-        Cfg.training_threads.resize(Cfg.num_training_threads);
-        for (size_t idx = 0; idx != Cfg.num_training_threads; idx++) {
-            ml_training_thread_t *training_thread = &Cfg.training_threads[idx];
-
-
-            size_t max_elements_needed_for_training = Cfg.max_train_samples * (Cfg.lag_n + 1);
-            training_thread->training_cns = new calculated_number_t[max_elements_needed_for_training]();
-            training_thread->scratch_training_cns = new calculated_number_t[max_elements_needed_for_training]();
-
-            training_thread->id = idx;
-            training_thread->training_queue = ml_queue_init();
-            netdata_mutex_init(&training_thread->nd_mutex);
-
-            snprintfz(tag, NETDATA_THREAD_TAG_MAX, "TRAIN[%zu]", training_thread->id);
-            netdata_thread_create(&training_thread->nd_thread, tag, NETDATA_THREAD_OPTION_JOINABLE, ml_train_main, training_thread);
+    if (db) {
+        char *err = NULL;
+        int rc = sqlite3_exec(db, db_models_create_table, NULL, NULL, &err);
+        if (rc != SQLITE_OK) {
+            error_report("Failed to create models table (%s, %s)", sqlite3_errstr(rc), err ? err : "");
+            sqlite3_close(db);
+            db = NULL;
         }
     }
 }
 
-void ml_fini()
+void ml_fini() {
+    int rc = sqlite3_close_v2(db);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Error %d while closing the SQLite database, %s", rc, sqlite3_errstr(rc));
+}
+
+void ml_start_threads() {
+    // start detection & training threads
+    Cfg.detection_stop = false;
+    Cfg.training_stop = false;
+
+    char tag[NETDATA_THREAD_TAG_MAX + 1];
+
+    snprintfz(tag, NETDATA_THREAD_TAG_MAX, "%s", "PREDICT");
+    netdata_thread_create(&Cfg.detection_thread, tag, NETDATA_THREAD_OPTION_JOINABLE, ml_detect_main, NULL);
+
+    for (size_t idx = 0; idx != Cfg.num_training_threads; idx++) {
+        ml_training_thread_t *training_thread = &Cfg.training_threads[idx];
+        snprintfz(tag, NETDATA_THREAD_TAG_MAX, "TRAIN[%zu]", training_thread->id);
+        netdata_thread_create(&training_thread->nd_thread, tag, NETDATA_THREAD_OPTION_JOINABLE, ml_train_main, training_thread);
+    }
+}
+
+void ml_stop_threads()
 {
     Cfg.detection_stop = true;
     Cfg.training_stop = true;
@@ -1563,8 +1570,4 @@ void ml_fini()
         ml_queue_destroy(training_thread->training_queue);
         netdata_mutex_destroy(&training_thread->nd_mutex);
     }
-
-    int rc = sqlite3_close_v2(db);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Error %d while closing the SQLite database, %s", rc, sqlite3_errstr(rc));
 }
