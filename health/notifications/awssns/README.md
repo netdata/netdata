@@ -4,7 +4,7 @@ Learn how to send notifications through Amazon SNS using Netdata's Agent alert n
 
 > ### Note
 >
-> This file assumes you have read the [landing page of this section](https://github.com/netdata/netdata/blob/master/health/notifications/README.md), detailing how the Netdata Agent's alert notification method works.
+> This file assumes you have read the [Introduction to Agent alert notifications](https://github.com/netdata/netdata/blob/master/health/notifications/README.md), detailing how the Netdata Agent's alert notification method works.
 
 As part of its AWS suite, Amazon provides a notification broker service called 'Simple Notification Service' (SNS). Amazon SNS works similarly to Netdata's own notification system, allowing to dispatch a single notification to multiple subscribers of different types. Among other things, SNS supports sending notifications to:
 
@@ -40,7 +40,7 @@ Before you can enable SNS, you need:
   This user needs to have programmatic access, and should only allow access to SNS. For an additional layer of security, you can create one for each system or group of systems.
 - Terminal access to the Agent you wish to configure.
 
-## Sending Alerts to Amazon SNS
+## Configure Netdata to send alerts to Amazon SNS
 
 > ### Info
 >
@@ -50,22 +50,6 @@ Before you can enable SNS, you need:
 > Note that to run the script you need to be inside your Netdata config directory.
 >
 > It is recommended to use this way for configuring Netdata.
-
-### Enabling Amazon SNS
-
-To enable SNS:
-
-1. Run the following command as the user Netdata runs under:
-
-   ```bash
-   aws configure
-   ```
-
-2. Enter the access key and secret key for accessing Amazon SNS. The system also prompts you to enter the default region and output format, but you can leave those blank because Netdata doesn't use them.
-
-3. Specify the desired Topic ARN as a recipient, see [SNS documentation](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/US_SetupSNS.html#set-up-sns-topic-cli).
-
-### Configure Netdata to send alerts to Amazon SNS
 
 Edit `health_alarm_notify.conf`, changes to this file do not require restarting Netdata:
 
@@ -149,4 +133,4 @@ DEFAULT_RECIPIENT_AWSSNS="arn:aws:sns:us-east-2:123456789012:MyTopic"
 
 ## Test the alert
 
-To test this alert refer to the ["Testing Alert Notifications"](https://github.com/netdata/netdata/blob/master/health/notifications/README.md#testing-alert-notifications) section of the Agent alert notifications page.
+To test this alert notification refer to the ["Testing Alert Notifications"](https://github.com/netdata/netdata/blob/master/health/notifications/README.md#testing-alert-notifications) section of the Agent alert notifications page.
