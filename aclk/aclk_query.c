@@ -280,7 +280,7 @@ const char *aclk_query_get_name(aclk_query_type_t qt, int unknown_ok)
         case CHART_RESET:               return "reset_chart_messages";
         case RETENTION_UPDATED:         return "update_retention_info";
         case UPDATE_NODE_INFO:          return "update_node_info";
-        case ALARM_PROVIDE_CHECKPOINT:  return "alarm_log_health";
+        case ALARM_PROVIDE_CHECKPOINT:  return "alarm_checkpoint";
         case ALARM_PROVIDE_CFG:         return "provide_alarm_config";
         case ALARM_SNAPSHOT:            return "alarm_snapshot";
         case UPDATE_NODE_COLLECTORS:    return "update_node_collectors";

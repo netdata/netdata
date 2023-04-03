@@ -654,10 +654,12 @@ void aclk_start_alert_streaming(char *node_id, bool resets)
         return;
     }
 
-    if (resets)
+    if (resets) {
+        log_access("ACLK REQ [%s (%s)]: STREAM ALERTS ENABLED (RESET REQUESTED)", node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
         sql_queue_existing_alerts_to_aclk(host);
+    } else
+        log_access("ACLK REQ [%s (%s)]: STREAM ALERTS ENABLED", node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
 
-    log_access("ACLK REQ [%s (%s)]: STREAM ALERTS ENABLED", node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
     wc->alert_updates = 1;
     wc->alert_queue_removed = SEND_REMOVED_AFTER_HEALTH_LOOPS;
 }
