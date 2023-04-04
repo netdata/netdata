@@ -1084,16 +1084,15 @@ ml_detect_main(void *arg)
         worker_is_idle();
         heartbeat_next(&hb, USEC_PER_SEC);
 
-        void *rhp;
-        dfe_start_reentrant(rrdhost_root_index, rhp) {
-            RRDHOST *rh = (RRDHOST *) rhp;
-
+        RRDHOST *rh;
+        rrd_rdlock();
+        rrdhost_foreach_read(rh) {
             if (!rh->ml_host)
                 continue;
 
             ml_host_detect_once((ml_host_t *) rh->ml_host);
         }
-        dfe_done(rhp);
+        rrd_unlock();
 
         if (Cfg.enable_statistics_charts) {
             // collect and update training thread stats
