@@ -170,6 +170,8 @@ static void service_to_buffer(BUFFER *wb, SERVICE_TYPE service) {
         buffer_strcat(wb, "ANALYTICS ");
     if(service & SERVICE_EXPORTERS)
         buffer_strcat(wb, "EXPORTERS ");
+    if(service & SERVICE_HTTPD)
+        buffer_strcat(wb, "HTTPD ");
 }
 
 static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
@@ -365,6 +367,7 @@ void netdata_cleanup_and_exit(int ret) {
             | SERVICE_EXPORTERS
             | SERVICE_HEALTH
             | SERVICE_WEB_SERVER
+            | SERVICE_HTTPD
             , 3 * USEC_PER_SEC);
 
     delta_shutdown_time("stop collectors and streaming threads");
