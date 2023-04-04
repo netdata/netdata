@@ -8,7 +8,7 @@ Learn how to send notifications to MessageBird using Netdata's Agent alert notif
 
 This is what you will get:
 
-![image](https://cloud.githubusercontent.com/assets/17090999/20034652/620b6100-a39b-11e6-96af-4f83b8e830e2.png)
+![image](https://user-images.githubusercontent.com/70198089/229841323-6c4b1956-dd91-423e-abaf-2799000f72a8.png)
 
 ## Prerequisites
 
