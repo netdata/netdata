@@ -2787,200 +2787,240 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         }
     }
 
-//    struct {
-//        struct rrdr_group_by_entry *entries;
-//    } group_data[MAX_QUERY_GROUP_BY_PASSES];
-//
-//    for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
-//
-//    }
-
-    struct rrdr_group_by_entry *entries = onewayalloc_callocz(owa, qt->query.used, sizeof(struct rrdr_group_by_entry));
-    DICTIONARY *groups = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
-
-    size_t g = 0;
-    RRDR_GROUP_BY group_by = qt->request.group_by[0].group_by;
-
-    DICTIONARY *label_keys = NULL;
-    if(options & RRDR_OPTION_GROUP_BY_LABELS)
-        label_keys = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, 0);
-
-    int added = 0;
+    int added;
+    RRDR *first_r = NULL, *last_r = NULL;
     BUFFER *key = buffer_create(0, NULL);
-    QUERY_INSTANCE *last_qi = NULL;
-    size_t priority = 0;
-    time_t update_every_max = 0;
-    for(size_t d = 0; d < qt->query.used ; d++) {
-        QUERY_METRIC *qm = query_metric(qt, d);
-        QUERY_DIMENSION *qd = query_dimension(qt, qm->link.query_dimension_id);
-        QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
-        QUERY_CONTEXT *qc = query_context(qt, qm->link.query_context_id);
-        QUERY_NODE *qn = query_node(qt, qm->link.query_node_id);
+    struct rrdr_group_by_entry *entries = onewayalloc_mallocz(owa, qt->query.used * sizeof(struct rrdr_group_by_entry));
+    DICTIONARY *groups = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
+    DICTIONARY *label_keys = NULL;
 
-        if(qi != last_qi) {
-            last_qi = qi;
+    for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
+        RRDR_GROUP_BY group_by = qt->request.group_by[g].group_by;
 
-            time_t update_every = rrdinstance_acquired_update_every(qi->ria);
-            if(update_every > update_every_max)
-                update_every_max = update_every;
+        if(group_by == RRDR_GROUP_BY_NONE)
+            break;
+
+        memset(entries, 0, qt->query.used * sizeof(struct rrdr_group_by_entry));
+        dictionary_flush(groups);
+        added = 0;
+
+        bool final_grouping = (g == MAX_QUERY_GROUP_BY_PASSES - 1 || qt->request.group_by[g + 1].group_by == RRDR_GROUP_BY_NONE) ? true : false;
+
+        if (final_grouping && (options & RRDR_OPTION_GROUP_BY_LABELS))
+            label_keys = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, 0);
+
+        QUERY_INSTANCE *last_qi = NULL;
+        size_t priority = 0;
+        time_t update_every_max = 0;
+        for (size_t d = 0; d < qt->query.used; d++) {
+            QUERY_METRIC *qm = query_metric(qt, d);
+            QUERY_DIMENSION *qd = query_dimension(qt, qm->link.query_dimension_id);
+            QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
+            QUERY_CONTEXT *qc = query_context(qt, qm->link.query_context_id);
+            QUERY_NODE *qn = query_node(qt, qm->link.query_node_id);
+
+            if (qi != last_qi) {
+                last_qi = qi;
+
+                time_t update_every = rrdinstance_acquired_update_every(qi->ria);
+                if (update_every > update_every_max)
+                    update_every_max = update_every;
+            }
+
+            priority = qd->priority;
+
+            // --------------------------------------------------------------------
+            // generate the group by key
+
+            query_group_by_make_dimension_key(key, group_by, g, qt, qn, qc, qi, qd, qm);
+
+            // lookup the key in the dictionary
+
+            int pos = -1;
+            int *set = dictionary_set(groups, buffer_tostring(key), &pos, sizeof(pos));
+            if (*set == -1) {
+                // the key just added to the dictionary
+
+                *set = pos = added++;
+
+                // ----------------------------------------------------------------
+                // generate the dimension id
+
+                query_group_by_make_dimension_id(key, group_by, g, qt, qn, qc, qi, qd, qm);
+                entries[pos].id = string_strdupz(buffer_tostring(key));
+
+                // ----------------------------------------------------------------
+                // generate the dimension name
+
+                query_group_by_make_dimension_name(key, group_by, g, qt, qn, qc, qi, qd, qm);
+                entries[pos].name = string_strdupz(buffer_tostring(key));
+
+                // add the rest of the info
+                entries[pos].units = rrdinstance_acquired_units_dup(qi->ria);
+                entries[pos].priority = priority;
+
+                if (label_keys) {
+                    entries[pos].dl = dictionary_create_advanced(
+                            DICT_OPTION_SINGLE_THREADED | DICT_OPTION_FIXED_SIZE | DICT_OPTION_DONT_OVERWRITE_VALUE,
+                            NULL, sizeof(struct group_by_label_key));
+                    dictionary_register_insert_callback(entries[pos].dl, group_by_label_key_insert_cb, label_keys);
+                    dictionary_register_delete_callback(entries[pos].dl, group_by_label_key_delete_cb, label_keys);
+                }
+            } else {
+                // the key found in the dictionary
+                pos = *set;
+            }
+
+            entries[pos].count++;
+
+            if (unlikely(priority < entries[pos].priority))
+                entries[pos].priority = priority;
+
+            if(g > 0)
+                last_r->dgbs[qm->grouped_as.slot] = pos;
+            else
+                qm->grouped_as.first_slot = pos;
+
+            qm->grouped_as.slot = pos;
+            qm->grouped_as.id = entries[pos].id;
+            qm->grouped_as.name = entries[pos].name;
+            qm->grouped_as.units = entries[pos].units;
+
+            // copy the dimension flags decided by the query target
+            // we need this, because if a dimension is explicitly selected
+            // the query target adds to it the non-zero flag
+            qm->status |= RRDR_DIMENSION_GROUPED;
+            entries[pos].od |= qm->status;
+
+            if (entries[pos].dl)
+                rrdlabels_walkthrough_read(rrdinstance_acquired_labels(qi->ria),
+                                           rrdlabels_traversal_cb_to_group_by_label_key, entries[pos].dl);
         }
 
-        priority = qd->priority;
+        RRDR *r = rrdr_create(owa, qt, added, qt->window.points);
+        if (!r) {
+            internal_error(true,
+                           "QUERY: cannot create group by RRDR for %s, after=%ld, before=%ld, dimensions=%d, points=%zu",
+                           qt->id, qt->window.after, qt->window.before, added, qt->window.points);
+            goto cleanup;
+        }
 
-        // --------------------------------------------------------------------
-        // generate the group by key
+        // prevent double cleanup in case of error
+        added = 0;
 
-        query_group_by_make_dimension_key(key, group_by, g, qt, qn, qc, qi, qd, qm);
+        if(!last_r)
+            first_r = last_r = r;
+        else
+            last_r->group_by.r = r;
 
-        // lookup the key in the dictionary
+        last_r = r;
 
-        int pos = -1;
-        int *set = dictionary_set(groups, buffer_tostring(key), &pos, sizeof(pos));
-        if(*set == -1) {
-            // the key just added to the dictionary
+        rrd2rrdr_set_timestamps(r);
+        r->dp = onewayalloc_callocz(owa, r->d, sizeof(*r->dp));
+        r->dview = onewayalloc_callocz(owa, r->d, sizeof(*r->dview));
+        r->dgbc = onewayalloc_callocz(owa, r->d, sizeof(*r->dgbc));
+        r->gbc = onewayalloc_callocz(owa, r->n * r->d, sizeof(*r->gbc));
+        r->dqp = onewayalloc_callocz(owa, r->d, sizeof(STORAGE_POINT));
 
-            *set = pos = added++;
+        if(!final_grouping)
+            r->dgbs = onewayalloc_callocz(owa, r->d, sizeof(*r->dgbs));
 
-            // ----------------------------------------------------------------
-            // generate the dimension id
+        if (label_keys) {
+            r->dl = onewayalloc_callocz(owa, r->d, sizeof(DICTIONARY *));
+            r->label_keys = label_keys;
+            label_keys = NULL;
+        }
 
-            query_group_by_make_dimension_id(key, group_by, g, qt, qn, qc, qi, qd, qm);
-            entries[pos].id = string_strdupz(buffer_tostring(key));
+        // zero r (dimension options, names, and ids)
+        // this is required, because group-by may lead to empty dimensions
+        for (size_t d = 0; d < r->d; d++) {
+            r->di[d] = entries[d].id;
+            r->dn[d] = entries[d].name;
 
-            // ----------------------------------------------------------------
-            // generate the dimension name
+            r->od[d] = entries[d].od;
+            r->du[d] = entries[d].units;
+            r->dp[d] = entries[d].priority;
+            r->dgbc[d] = entries[d].count;
 
-            query_group_by_make_dimension_name(key, group_by, g, qt, qn, qc, qi, qd, qm);
-            entries[pos].name = string_strdupz(buffer_tostring(key));
+            if (r->dl)
+                r->dl[d] = entries[d].dl;
+        }
 
-            // add the rest of the info
-            entries[pos].units = rrdinstance_acquired_units_dup(qi->ria);
-            entries[pos].priority = priority;
+        // initialize partial trimming
+        r->partial_data_trimming.max_update_every = update_every_max;
+        r->partial_data_trimming.expected_after =
+                (!(qt->window.options & RRDR_OPTION_RETURN_RAW) &&
+                 qt->window.before >= qt->window.now - update_every_max) ?
+                qt->window.before - update_every_max :
+                qt->window.before;
+        r->partial_data_trimming.trimmed_after = qt->window.before;
 
-            if(options & RRDR_OPTION_GROUP_BY_LABELS) {
-                entries[pos].dl = dictionary_create_advanced(
-                        DICT_OPTION_SINGLE_THREADED | DICT_OPTION_FIXED_SIZE | DICT_OPTION_DONT_OVERWRITE_VALUE,
-                        NULL, sizeof(struct group_by_label_key));
-                dictionary_register_insert_callback(entries[pos].dl, group_by_label_key_insert_cb, label_keys);
-                dictionary_register_delete_callback(entries[pos].dl, group_by_label_key_delete_cb, label_keys);
+        // make all values empty
+        for (size_t i = 0; i != r->n; i++) {
+            NETDATA_DOUBLE *cn = &r->v[i * r->d];
+            RRDR_VALUE_FLAGS *co = &r->o[i * r->d];
+            NETDATA_DOUBLE *ar = &r->ar[i * r->d];
+            for (size_t d = 0; d < r->d; d++) {
+                cn[d] = 0.0;
+                ar[d] = 0.0;
+                co[d] = RRDR_VALUE_EMPTY;
             }
         }
-        else {
-            // the key found in the dictionary
-            pos = *set;
-        }
-
-        entries[pos].count++;
-
-        if(unlikely(priority < entries[pos].priority))
-            entries[pos].priority = priority;
-
-        qm->grouped_as.slot = pos;
-        qm->grouped_as.id = entries[pos].id;
-        qm->grouped_as.name = entries[pos].name;
-        qm->grouped_as.units = entries[pos].units;
-
-        // copy the dimension flags decided by the query target
-        // we need this, because if a dimension is explicitly selected
-        // the query target adds to it the non-zero flag
-        qm->status |= RRDR_DIMENSION_GROUPED;
-        entries[pos].od |= qm->status;
-
-        if(entries[pos].dl)
-            rrdlabels_walkthrough_read(rrdinstance_acquired_labels(qi->ria),
-                                       rrdlabels_traversal_cb_to_group_by_label_key, entries[pos].dl);
     }
 
-    RRDR *r = rrdr_create(owa, qt, added, qt->window.points);
-    if(!r) {
-        internal_error(true, "QUERY: cannot create group by RRDR for %s, after=%ld, before=%ld, dimensions=%d, points=%zu",
-                       qt->id, qt->window.after, qt->window.before, added, qt->window.points);
+    if(!first_r || !last_r)
         goto cleanup;
-    }
 
-    r->group_by.r = rrdr_create(owa, qt, 1, qt->window.points);
-    if(!r->group_by.r) {
-        internal_error(true, "QUERY: cannot create group by temporary RRDR for %s, after=%ld, before=%ld, dimensions=%d, points=%zu",
+    RRDR *r_tmp = rrdr_create(owa, qt, 1, qt->window.points);
+    if (!r_tmp) {
+        internal_error(true,
+                       "QUERY: cannot create group by temporary RRDR for %s, after=%ld, before=%ld, dimensions=%d, points=%zu",
                        qt->id, qt->window.after, qt->window.before, 1, qt->window.points);
         goto cleanup;
     }
-
-    rrd2rrdr_set_timestamps(r);
-    rrd2rrdr_set_timestamps(r->group_by.r);
-
-    r->dp = onewayalloc_callocz(r->internal.owa, r->d, sizeof(*r->dp));
-    r->dview = onewayalloc_callocz(r->internal.owa, r->d, sizeof(*r->dview));
-    r->dgbc = onewayalloc_callocz(r->internal.owa, r->d, sizeof(*r->dgbc));
-    r->gbc = onewayalloc_callocz(r->internal.owa, r->n * r->d, sizeof(*r->gbc));
-    r->dqp = onewayalloc_callocz(r->internal.owa, r->d, sizeof(STORAGE_POINT));
-
-    if(options & RRDR_OPTION_GROUP_BY_LABELS) {
-        r->dl = onewayalloc_callocz(r->internal.owa, r->d, sizeof(DICTIONARY *));
-        r->label_keys = label_keys;
-    }
-
-    // zero r (dimension options, names, and ids)
-    // this is required, because group-by may lead to empty dimensions
-    for(size_t d = 0; d < r->d ; d++) {
-        r->di[d] = entries[d].id;
-        r->dn[d] = entries[d].name;
-
-        r->od[d] = entries[d].od;
-        r->du[d] = entries[d].units;
-        r->dp[d] = entries[d].priority;
-        r->dgbc[d] = entries[d].count;
-
-        if(r->dl)
-            r->dl[d] = entries[d].dl;
-    }
-
-    // initialize partial trimming
-    r->partial_data_trimming.max_update_every = update_every_max;
-    r->partial_data_trimming.expected_after =
-            (!(qt->window.options & RRDR_OPTION_RETURN_RAW) && qt->window.before >= qt->window.now - update_every_max) ?
-            qt->window.before - update_every_max :
-            qt->window.before;
-    r->partial_data_trimming.trimmed_after = qt->window.before;
-
-    // make all values empty
-    for(size_t i = 0; i != r->n ;i++) {
-        NETDATA_DOUBLE *cn = &r->v[ i * r->d ];
-        RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
-        NETDATA_DOUBLE *ar = &r->ar[ i * r->d ];
-        for (size_t d = 0; d < r->d; d++) {
-            cn[d] = 0.0;
-            ar[d] = 0.0;
-            co[d] = RRDR_VALUE_EMPTY;
-        }
-    }
+    rrd2rrdr_set_timestamps(r_tmp);
+    r_tmp->group_by.r = first_r;
 
 cleanup:
-    buffer_free(key);
+    if(!first_r || !last_r || !r_tmp) {
+        if(r_tmp) {
+            r_tmp->group_by.r = NULL;
+            rrdr_free(owa, r_tmp);
+        }
 
-    if(!r) {
-        if(entries) {
-            for (int d2 = 0; d2 < added; d2++) {
-                string_freez(entries[d2].id);
-                string_freez(entries[d2].name);
-                dictionary_destroy(entries[d2].dl);
+        if(first_r) {
+            RRDR *r = first_r;
+            while (r) {
+                r_tmp = r->group_by.r;
+                r->group_by.r = NULL;
+                rrdr_free(owa, r);
+                r = r_tmp;
+            }
+        }
+
+        if(entries && added) {
+            for (int d = 0; d < added; d++) {
+                string_freez(entries[d].id);
+                string_freez(entries[d].name);
+                string_freez(entries[d].units);
+                dictionary_destroy(entries[d].dl);
             }
         }
         dictionary_destroy(label_keys);
-    }
-    else if(!r->group_by.r) {
-        rrdr_free(owa, r);
-        r = NULL;
+
+        first_r = last_r = r_tmp = NULL;
     }
 
+    buffer_free(key);
     onewayalloc_freez(owa, entries);
     dictionary_destroy(groups);
 
-    return r;
+    return r_tmp;
 }
 
 static void rrd2rrdr_group_by_add_metric(RRDR *r_dst, size_t d_dst, RRDR *r_tmp, size_t d_tmp,
                                          RRDR_GROUP_BY_FUNCTION group_by_aggregate_function,
-                                         STORAGE_POINT *query_points) {
+                                         STORAGE_POINT *query_points, size_t pass __maybe_unused) {
     if(!r_tmp || r_dst == r_tmp || !(r_tmp->od[d_tmp] & RRDR_DIMENSION_QUERIED))
         return;
 
@@ -2990,7 +3030,7 @@ static void rrd2rrdr_group_by_add_metric(RRDR *r_dst, size_t d_dst, RRDR *r_tmp,
     internal_fatal(!r_dst->dqp, "QUERY: group-by destination is not properly prepared (missing dqp array)");
     internal_fatal(!r_dst->gbc, "QUERY: group-by destination is not properly prepared (missing gbc array)");
 
-    r_dst->od[d_dst] |= RRDR_DIMENSION_QUERIED;
+    r_dst->od[d_dst] |= r_tmp->od[d_tmp];
     storage_point_merge_to(r_dst->dqp[d_dst], *query_points);
 
     // do the group_by
@@ -3028,6 +3068,7 @@ static void rrd2rrdr_group_by_add_metric(RRDR *r_dst, size_t d_dst, RRDR *r_tmp,
                 break;
         }
 
+        *co &= ~RRDR_VALUE_EMPTY;
         *co |= (o_tmp & (RRDR_VALUE_RESET | RRDR_VALUE_PARTIAL));
         *ar += ar_tmp;
         (*gbc)++;
@@ -3160,22 +3201,42 @@ static void rrd2rrdr_convert_to_percentage(RRDR *r) {
     }
 }
 
-static void rrd2rrdr_group_by_finalize(RRDR *r) {
-    QUERY_TARGET *qt = r->internal.qt;
+static RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
+    QUERY_TARGET *qt = r_tmp->internal.qt;
     RRDR_OPTIONS options = qt->window.options;
 
-    if(!r->group_by.r) {
+    if(!r_tmp->group_by.r) {
         // v1 query
         if(options & RRDR_OPTION_PERCENTAGE)
-            rrd2rrdr_convert_to_percentage(r);
-        return;
+            rrd2rrdr_convert_to_percentage(r_tmp);
+        return r_tmp;
     }
     // v2 query
 
-    // copy the timestamps
-    for(size_t i = 0; i != r->n ;i++) {
-        r->t[i] = r->group_by.r->t[i];
+    // do the additional passes on RRDRs
+    RRDR *last_r = r_tmp->group_by.r;
+    RRDR *r = last_r->group_by.r;
+    size_t pass = 0;
+    while(r) {
+        pass++;
+        for(size_t d = 0; d < last_r->d ;d++)
+            rrd2rrdr_group_by_add_metric(r, last_r->dgbs[d], last_r, d,
+                                         qt->request.group_by[pass].aggregation,
+                                         &last_r->dqp[d], pass);
+
+        last_r = r;
+        r = last_r->group_by.r;
     }
+
+    // free all RRDRs except the last one
+    r = r_tmp;
+    while(r != last_r) {
+        r_tmp = r->group_by.r;
+        r->group_by.r = NULL;
+        rrdr_free(r->internal.owa, r);
+        r = r_tmp;
+    }
+    r = last_r;
 
     // find the final aggregation
     RRDR_GROUP_BY_FUNCTION aggregation = qt->request.group_by[0].aggregation;
@@ -3308,6 +3369,8 @@ static void rrd2rrdr_group_by_finalize(RRDR *r) {
             }
         }
     }
+
+    return r;
 }
 
 // ----------------------------------------------------------------------------
@@ -3355,16 +3418,22 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     // qt.window members are the WANTED ones.
     // qt.request members are the REQUESTED ones.
 
-    RRDR *r = rrd2rrdr_group_by_initialize(owa, qt);
-    if(!r)
+    RRDR *r_tmp = rrd2rrdr_group_by_initialize(owa, qt);
+    if(!r_tmp)
         return NULL;
 
-    if(qt->window.relative)
-        r->view.flags |= RRDR_RESULT_FLAG_RELATIVE;
-    else
-        r->view.flags |= RRDR_RESULT_FLAG_ABSOLUTE;
+    // the RRDR we group-by at
+    RRDR *r = (r_tmp->group_by.r) ? r_tmp->group_by.r : r_tmp;
 
-    RRDR *r_tmp = r->group_by.r ? r->group_by.r : r;
+    // the final RRDR to return to callers
+    RRDR *last_r = r_tmp;
+    while(last_r->group_by.r)
+        last_r = last_r->group_by.r;
+
+    if(qt->window.relative)
+        last_r->view.flags |= RRDR_RESULT_FLAG_RELATIVE;
+    else
+        last_r->view.flags |= RRDR_RESULT_FLAG_ABSOLUTE;
 
     // -------------------------------------------------------------------------
     // assign the processor functions
@@ -3453,8 +3522,8 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                 r->view.before = r_tmp->view.before;
                 r->rows = r_tmp->rows;
 
-                rrd2rrdr_group_by_add_metric(r, qm->grouped_as.slot, r_tmp, dim_in_rrdr_tmp,
-                                             qt->request.group_by[0].aggregation, &qm->query_points);
+                rrd2rrdr_group_by_add_metric(r, qm->grouped_as.first_slot, r_tmp, dim_in_rrdr_tmp,
+                                             qt->request.group_by[0].aggregation, &qm->query_points, 0);
             }
 
             rrd2rrdr_query_ops_release(ops[d]); // reuse this ops allocation
@@ -3561,7 +3630,8 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     // free all resources used by the grouping method
     r_tmp->time_grouping.free(r_tmp);
 
-    rrd2rrdr_group_by_finalize(r);
+    // get the final RRDR to send to the caller
+    r = rrd2rrdr_group_by_finalize(r_tmp);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if (dimensions_used && !(r->view.flags & RRDR_RESULT_FLAG_CANCEL)) {

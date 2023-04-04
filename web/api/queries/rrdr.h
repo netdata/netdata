@@ -94,7 +94,8 @@ typedef struct rrdresult {
     STRING **di;              // array of d dimension ids
     STRING **dn;              // array of d dimension names
     STRING **du;              // array of d dimension units
-    uint32_t *dgbc;           // array of d dimension units - NOT ALLOCATED when RRDR is created
+    uint32_t *dgbs;           // array of d dimension group by slots - NOT ALLOCATED when RRDR is created
+    uint32_t *dgbc;           // array of d dimension group by counts - NOT ALLOCATED when RRDR is created
     uint32_t *dp;             // array of d dimension priority - NOT ALLOCATED when RRDR is created
     DICTIONARY **dl;          // array of d dimension labels - NOT ALLOCATED when RRDR is created
     STORAGE_POINT *dqp;       // array of d dimensions query points - NOT ALLOCATED when RRDR is created

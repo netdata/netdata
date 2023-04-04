@@ -232,7 +232,8 @@ typedef struct query_metric {
     STORAGE_POINT query_points;
 
     struct {
-        size_t slot;
+        uint32_t slot;
+        uint32_t first_slot;
         STRING *id;
         STRING *name;
         STRING *units;
