@@ -19,55 +19,40 @@ static h2o_accept_ctx_t accept_ctx;
 #define HTTPD_CONFIG_SECTION "httpd"
 #define HTTPD_ENABLED_DEFAULT false
 
-static void on_accept(uv_stream_t *listener, int status)
+static void on_accept(h2o_socket_t *listener, const char *err)
 {
-    uv_tcp_t *conn;
     h2o_socket_t *sock;
 
-    if (status != 0)
-        return;
-
-    conn = h2o_mem_alloc(sizeof(*conn));
-    uv_tcp_init(listener->loop, conn);
-
-    if (uv_accept(listener, (uv_stream_t *)conn) != 0) {
-        uv_close((uv_handle_t *)conn, (uv_close_cb)free);
+    if (err != NULL) {
         return;
     }
 
-    sock = h2o_uv_socket_create((uv_stream_t *)conn, (uv_close_cb)free);
+    if ((sock = h2o_evloop_socket_accept(listener)) == NULL)
+        return;
     h2o_accept(&accept_ctx, sock);
 }
 
 static int create_listener(const char *ip, int port)
 {
-    static uv_tcp_t listener;
     struct sockaddr_in addr;
-    struct sockaddr_in6 addr6;
-    int r, ip6 = 0;
+    int fd, reuseaddr_flag = 1;
+    h2o_socket_t *sock;
 
-    uv_tcp_init(ctx.loop, &listener);
-    if (uv_ip4_addr(ip, port, &addr)) {
-        ip6 = 1;
-        if (uv_ip6_addr(ip, port, &addr6)) {
-            error_report("Could not parse the ip address");
-            goto Error;
-        }
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = inet_addr(ip);
+    addr.sin_port = htons(port);
+
+    if ((fd = socket(AF_INET, SOCK_STREAM, 0)) == -1 ||
+        setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr_flag, sizeof(reuseaddr_flag)) != 0 ||
+        bind(fd, (struct sockaddr *)&addr, sizeof(addr)) != 0 || listen(fd, SOMAXCONN) != 0) {
+        return -1;
     }
 
-    if ((r = uv_tcp_bind(&listener, (ip6 ? (struct sockaddr *)&addr6 : (struct sockaddr *)&addr), 0)) != 0) {
-        fprintf(stderr, "uv_tcp_bind:%s\n", uv_strerror(r));
-        goto Error;
-    }
-    if ((r = uv_listen((uv_stream_t *)&listener, 128, on_accept)) != 0) {
-        fprintf(stderr, "uv_listen:%s\n", uv_strerror(r));
-        goto Error;
-    }
+    sock = h2o_evloop_socket_create(ctx.loop, fd, H2O_SOCKET_FLAG_DONT_READ);
+    h2o_socket_read_start(sock, on_accept);
 
     return 0;
-Error:
-    uv_close((uv_handle_t *)&listener, NULL);
-    return r;
 }
 
 static int ssl_init()
@@ -300,7 +285,11 @@ static int hdl_netdata_conf(h2o_handler_t *self, h2o_req_t *req)
     return 0;
 }
 
+#define POLL_INTERVAL 100
+
 void *httpd_main(void *ptr) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+
     h2o_pathconf_t *pathconf;
     h2o_hostconf_t *hostconf;
 
@@ -319,9 +308,7 @@ void *httpd_main(void *ptr) {
     handler->on_req = netdata_uberhandler;
     h2o_file_register(pathconf, netdata_configured_web_dir, NULL, NULL, H2O_FILE_FLAG_SEND_COMPRESSED);
 
-    uv_loop_t loop;
-    uv_loop_init(&loop);
-    h2o_context_init(&ctx, &loop, &config);
+    h2o_context_init(&ctx, h2o_evloop_create(), &config);
 
     if(ssl_init()) {
         error_report("SSL was requested but could not be properly initialized. Aborting.");
@@ -336,8 +323,18 @@ void *httpd_main(void *ptr) {
         return NULL;
     }
 
-    uv_run(ctx.loop, UV_RUN_DEFAULT);
+    int rc;
+    while (service_running(SERVICE_HTTPD)) {
+        rc = h2o_evloop_run(ctx.loop, POLL_INTERVAL);
+        if (rc < 0 && errno != EINTR) {
+            error("h2o_evloop_run returned (%d) with errno other than EINTR. Aborting", rc);
+            break;
+        }
+    } 
 
+    error_report("HTTPD thread exiting");
+
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
     return NULL;
 }
 
