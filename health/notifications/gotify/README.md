@@ -1,66 +1,49 @@
-<!--
-title: "Gotify agent alert notifications"
-description: "Send alerts to your Gotify instance when an alert gets triggered in Netdata."
-sidebar_label: "Gotify"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/gotify/README.md
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Integrations/Notify/Agent alert notifications"
-learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
--->
-
 # Gotify agent alert notifications
+
+Learn how to send alerts to your Gotify instance using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+
+> ### Note
+>
+> This file assumes you have read the [Introduction to Agent alert notifications](https://github.com/netdata/netdata/blob/master/health/notifications/README.md), detailing how the Netdata Agent's alert notification method works.
 
 [Gotify](https://gotify.net/) is a self-hosted push notification service created for sending and receiving messages in real time.
 
-## Configuring Gotify
+This is what you will get:
 
-### Prerequisites
+<img src="https://user-images.githubusercontent.com/103264516/162509205-1e88e5d9-96b6-4f7f-9426-182776158128.png" alt="Example alarm notifications in Gotify" width="70%">
 
-To use Gotify as your notification service, you need an application token. 
-You can generate a new token in the Gotify Web UI. 
+## Prerequisites
 
-### Configuration
+You will need:
 
-To set up Gotify in Netdata: 
+- An application token. You can generate a new token in the Gotify Web UI.
+- terminal access to the Agent you wish to configure
 
-1. Switch to your [config
-directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) and edit the file `health_alarm_notify.conf` using the edit config script.
- 
-   ```bash
-   ./edit-config health_alarm_notify.conf
-   ```
+## Configure Netdata to send alert notifications to Gotify
 
-2. Change the variable `GOTIFY_APP_TOKEN` to the application token you generated in the Gotify Web UI. Change
-`GOTIFY_APP_URL` to point to your Gotify instance.
+> ### Info
+>
+> This file mentions editing configuration files.  
+>
+> - To edit configuration files in a safe way, we provide the [`edit config` script](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) located in your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) (typically is `/etc/netdata`) that creates the proper file and opens it in an editor automatically.  
+> Note that to run the script you need to be inside your Netdata config directory.
+>
+> It is recommended to use this way for configuring Netdata.
 
-   ```conf
-   SEND_GOTIFY="YES"
+Edit `health_alarm_notify.conf`, changes to this file do not require restarting Netdata:
 
-   # Application token
-   # Gotify instance url
-   GOTIFY_APP_TOKEN=XXXXXXXXXXXXXXX
-   GOTIFY_APP_URL=https://push.example.de/
-   ```
+1. Set `SET_GOTIFY` to `YES`
+2. Set `GOTIFY_APP_TOKEN` to the app token you generated
+3. `GOTIFY_APP_URL` to point to your Gotify instance, for example `https://push.example.domain/`
 
-   Changes to `health_alarm_notify.conf` do not require a Netdata restart. 
-   
-3. Test your Gotify notifications configuration by running the following commands, replacing `ROLE` with your preferred role:
+An example of a working configuration would be:
 
-   ```sh
-   # become user netdata
-   sudo su -s /bin/bash netdata
+```conf
+SEND_GOTIFY="YES"
+GOTIFY_APP_TOKEN="XXXXXXXXXXXXXXX"
+GOTIFY_APP_URL="https://push.example.domain/"
+```
 
-   # send a test alarm
-   /usr/libexec/netdata/plugins.d/alarm-notify.sh test ROLE
-   ```
+## Test the notification method
 
-   🟢 If everything works, you'll see alarms in Gotify:
-
-   ![Example alarm notifications in Gotify](https://user-images.githubusercontent.com/103264516/162509205-1e88e5d9-96b6-4f7f-9426-182776158128.png)
-
-   🔴 If sending the test notifications fails, check `/var/log/netdata/error.log` to find the relevant error message:
-
-   ```log 
-   2020-09-03 23:07:00: alarm-notify.sh: ERROR: failed to send Gotify notification for: hades test.chart.test_alarm is CRITICAL, with HTTP error code 401.
-   ```
+To test this alert refer to the ["Testing Alert Notifications"](https://github.com/netdata/netdata/blob/master/health/notifications/README.md#testing-alert-notifications) section of the Agent alert notifications page.

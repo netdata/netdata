@@ -1,55 +1,54 @@
-<!--
-title: "Slack agent alert notifications"
-sidebar_label: "Slack"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/slack/README.md"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Integrations/Notify/Agent alert notifications"
-learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
--->
+# Slack Agent alert notifications
 
-# Slack agent alert notifications
+Learn how to send notifications to a Slack workspace using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+
+> ### Note
+>
+> This file assumes you have read the [Introduction to Agent alert notifications](https://github.com/netdata/netdata/blob/master/health/notifications/README.md), detailing how the Netdata Agent's alert notification method works.
 
 This is what you will get:
-![image](https://cloud.githubusercontent.com/assets/2662304/18407116/bbd0fee6-7710-11e6-81cf-58c0defaee2b.png)
 
-You need:
+![image](https://user-images.githubusercontent.com/70198089/229841857-77ed2562-ee62-427b-803a-cef03d08238d.png)
 
-1.  The **incoming webhook URL** as given by slack.com. You can use the same on all your Netdata servers (or you can have multiple if you like - your decision).
-2.  One or more channels to post the messages to.
 
-To get a webhook that works on multiple channels, you will need to login to your slack.com workspace and create an incoming webhook using the [Incoming Webhooks App](https://slack.com/apps/A0F7XDUAZ-incoming-webhooks).
-Do NOT use the instructions in <https://api.slack.com/incoming-webhooks#enable_webhooks>, as the particular webhooks work only for a single channel.
+## Prerequisites
 
-Set the webhook and the recipients in `/etc/netdata/health_alarm_notify.conf` (to edit it on your system run `/etc/netdata/edit-config health_alarm_notify.conf`), like this:
+You will need:
 
-```
+- a Slack app along with an incoming webhook, read Slack's guide on the topic [here](https://api.slack.com/messaging/webhooks)
+- one or more channels to post the messages to
+- terminal access to the Agent you wish to configure
+
+## Configure Netdata to send alert notifications to Slack
+
+> ### Info
+>
+> This file mentions editing configuration files.  
+>
+> - To edit configuration files in a safe way, we provide the [`edit config` script](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) located in your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) (typically is `/etc/netdata`) that creates the proper file and opens it in an editor automatically.  
+> Note that to run the script you need to be inside your Netdata config directory.
+>
+> It is recommended to use this way for configuring Netdata.
+
+Edit `health_alarm_notify.conf`, changes to this file do not require restarting Netdata:
+
+1. Set `SEND_SLACK` to `YES`.
+2. Set `SLACK_WEBHOOK_URL` to your Slack app's webhook URL.
+3. Set `DEFAULT_RECIPIENT_SLACK` to the Slack channel your Slack app is set to send messages to.  
+   The syntax for channels is `#channel` or `channel`.  
+   All roles will default to this variable if left unconfigured.
+
+An example of a working configuration would be:
+
+```conf
+#------------------------------------------------------------------------------
+# slack (slack.com) global notification options
+
 SEND_SLACK="YES"
-
-SLACK_WEBHOOK_URL="https://hooks.slack.com/services/XXXXXXXX/XXXXXXXX/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-
-# if a role's recipients are not configured, a notification will be send to:
-# - A slack channel (syntax: '#channel' or 'channel')  
-# - A slack user (syntax: '@user')
-# - The channel or user defined in slack for the webhook (syntax: '#')
-# empty = do not send a notification for unconfigured roles 
-DEFAULT_RECIPIENT_SLACK="alarms"
+SLACK_WEBHOOK_URL="https://hooks.slack.com/services/XXXXXXXX/XXXXXXXX/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" 
+DEFAULT_RECIPIENT_SLACK="#alarms"
 ```
 
-You can define multiple recipients like this: `# #alarms systems @myuser`. 
-This example will send the alarm to:
+## Test the notification method
 
--   The recipient defined in slack for the webhook (not known to Netdata)
--   The channel 'alarms'
--   The channel 'systems'
--   The user @myuser
-
-You can give different recipients per **role** using these (at the same file):
-
-```
-role_recipients_slack[sysadmin]="systems"
-role_recipients_slack[dba]="databases systems"
-role_recipients_slack[webmaster]="marketing development"
-```
-
-
+To test this alert notification method refer to the ["Testing Alert Notifications"](https://github.com/netdata/netdata/blob/master/health/notifications/README.md#testing-alert-notifications) section of the Agent alert notifications page.
