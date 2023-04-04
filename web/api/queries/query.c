@@ -2544,6 +2544,160 @@ static void rrd2rrdr_set_timestamps(RRDR *r) {
                    before_wanted, r->t[points_wanted - 1]);
 }
 
+static void query_group_by_make_dimension_key(BUFFER *key, RRDR_GROUP_BY group_by, size_t group_by_id, QUERY_TARGET *qt, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi, QUERY_DIMENSION *qd __maybe_unused, QUERY_METRIC *qm) {
+    buffer_flush(key);
+    if(unlikely(qm->status & RRDR_DIMENSION_HIDDEN)) {
+        buffer_strcat(key, "__hidden_dimensions__");
+    }
+    else if(unlikely(group_by & RRDR_GROUP_BY_SELECTED)) {
+        buffer_strcat(key, "selected");
+    }
+    else {
+        if (group_by & RRDR_GROUP_BY_DIMENSION) {
+            buffer_fast_strcat(key, "|", 1);
+            buffer_strcat(key, query_metric_name(qt, qm));
+        }
+
+        if (group_by & RRDR_GROUP_BY_INSTANCE) {
+            buffer_fast_strcat(key, "|", 1);
+            buffer_strcat(key, string2str(query_instance_id_fqdn(qi, qt->request.version)));
+        }
+
+        if (group_by & RRDR_GROUP_BY_LABEL) {
+            DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
+            for (size_t l = 0; l < qt->group_by[group_by_id].used; l++) {
+                buffer_fast_strcat(key, "|", 1);
+                rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by[group_by_id].label_keys[l], "[unset]");
+            }
+        }
+
+        if (group_by & RRDR_GROUP_BY_NODE) {
+            buffer_fast_strcat(key, "|", 1);
+            buffer_strcat(key, qn->rrdhost->machine_guid);
+        }
+
+        if (group_by & RRDR_GROUP_BY_CONTEXT) {
+            buffer_fast_strcat(key, "|", 1);
+            buffer_strcat(key, rrdcontext_acquired_id(qc->rca));
+        }
+
+        if (group_by & RRDR_GROUP_BY_UNITS) {
+            buffer_fast_strcat(key, "|", 1);
+            buffer_strcat(key, query_target_has_percentage_units(qt) ? "%" : rrdinstance_acquired_units(qi->ria));
+        }
+    }
+}
+
+static void query_group_by_make_dimension_id(BUFFER *key, RRDR_GROUP_BY group_by, size_t group_by_id, QUERY_TARGET *qt, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi, QUERY_DIMENSION *qd __maybe_unused, QUERY_METRIC *qm) {
+    buffer_flush(key);
+    if(unlikely(qm->status & RRDR_DIMENSION_HIDDEN)) {
+        buffer_strcat(key, "__hidden_dimensions__");
+    }
+    else if(unlikely(group_by & RRDR_GROUP_BY_SELECTED)) {
+        buffer_strcat(key, "selected");
+    }
+    else {
+        if (group_by & RRDR_GROUP_BY_DIMENSION) {
+            buffer_strcat(key, query_metric_name(qt, qm));
+        }
+
+        if (group_by & RRDR_GROUP_BY_INSTANCE) {
+            if (buffer_strlen(key) != 0)
+                buffer_fast_strcat(key, ",", 1);
+
+            if (group_by & RRDR_GROUP_BY_NODE)
+                buffer_strcat(key, rrdinstance_acquired_id(qi->ria));
+            else
+                buffer_strcat(key, string2str(query_instance_id_fqdn(qi, qt->request.version)));
+        }
+
+        if (group_by & RRDR_GROUP_BY_LABEL) {
+            DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
+            for (size_t l = 0; l < qt->group_by[group_by_id].used; l++) {
+                if (buffer_strlen(key) != 0)
+                    buffer_fast_strcat(key, ",", 1);
+                rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by[group_by_id].label_keys[l], "[unset]");
+            }
+        }
+
+        if (group_by & RRDR_GROUP_BY_NODE) {
+            if (buffer_strlen(key) != 0)
+                buffer_fast_strcat(key, ",", 1);
+
+            buffer_strcat(key, qn->rrdhost->machine_guid);
+        }
+
+        if (group_by & RRDR_GROUP_BY_CONTEXT) {
+            if (buffer_strlen(key) != 0)
+                buffer_fast_strcat(key, ",", 1);
+
+            buffer_strcat(key, rrdcontext_acquired_id(qc->rca));
+        }
+
+        if (group_by & RRDR_GROUP_BY_UNITS) {
+            if (buffer_strlen(key) != 0)
+                buffer_fast_strcat(key, ",", 1);
+
+            buffer_strcat(key, query_target_has_percentage_units(qt) ? "%" : rrdinstance_acquired_units(qi->ria));
+        }
+    }
+}
+
+static void query_group_by_make_dimension_name(BUFFER *key, RRDR_GROUP_BY group_by, size_t group_by_id, QUERY_TARGET *qt, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi, QUERY_DIMENSION *qd __maybe_unused, QUERY_METRIC *qm) {
+    buffer_flush(key);
+    if(unlikely(qm->status & RRDR_DIMENSION_HIDDEN)) {
+        buffer_strcat(key, "__hidden_dimensions__");
+    }
+    else if(unlikely(group_by & RRDR_GROUP_BY_SELECTED)) {
+        buffer_strcat(key, "selected");
+    }
+    else {
+        if (group_by & RRDR_GROUP_BY_DIMENSION) {
+            buffer_strcat(key, query_metric_name(qt, qm));
+        }
+
+        if (group_by & RRDR_GROUP_BY_INSTANCE) {
+            if (buffer_strlen(key) != 0)
+                buffer_fast_strcat(key, ",", 1);
+
+            if (group_by & RRDR_GROUP_BY_NODE)
+                buffer_strcat(key, rrdinstance_acquired_name(qi->ria));
+            else
+                buffer_strcat(key, string2str(query_instance_name_fqdn(qi, qt->request.version)));
+        }
+
+        if (group_by & RRDR_GROUP_BY_LABEL) {
+            DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
+            for (size_t l = 0; l < qt->group_by[group_by_id].used; l++) {
+                if (buffer_strlen(key) != 0)
+                    buffer_fast_strcat(key, ",", 1);
+                rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by[group_by_id].label_keys[l], "[unset]");
+            }
+        }
+
+        if (group_by & RRDR_GROUP_BY_NODE) {
+            if (buffer_strlen(key) != 0)
+                buffer_fast_strcat(key, ",", 1);
+
+            buffer_strcat(key, rrdhost_hostname(qn->rrdhost));
+        }
+
+        if (group_by & RRDR_GROUP_BY_CONTEXT) {
+            if (buffer_strlen(key) != 0)
+                buffer_fast_strcat(key, ",", 1);
+
+            buffer_strcat(key, rrdcontext_acquired_id(qc->rca));
+        }
+
+        if (group_by & RRDR_GROUP_BY_UNITS) {
+            if (buffer_strlen(key) != 0)
+                buffer_fast_strcat(key, ",", 1);
+
+            buffer_strcat(key, query_target_has_percentage_units(qt) ? "%" : rrdinstance_acquired_units(qi->ria));
+        }
+    }
+}
+
 struct rrdr_group_by_entry {
     size_t priority;
     size_t count;
@@ -2676,47 +2830,7 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         // --------------------------------------------------------------------
         // generate the group by key
 
-        buffer_flush(key);
-        if(unlikely(qm->status & RRDR_DIMENSION_HIDDEN)) {
-            buffer_strcat(key, "__hidden_dimensions__");
-        }
-        else if(unlikely(group_by & RRDR_GROUP_BY_SELECTED)) {
-            buffer_strcat(key, "selected");
-        }
-        else {
-            if (group_by & RRDR_GROUP_BY_DIMENSION) {
-                buffer_fast_strcat(key, "|", 1);
-                buffer_strcat(key, query_metric_name(qt, qm));
-            }
-
-            if (group_by & RRDR_GROUP_BY_INSTANCE) {
-                buffer_fast_strcat(key, "|", 1);
-                buffer_strcat(key, string2str(query_instance_id_fqdn(qi, qt->request.version)));
-            }
-
-            if (group_by & RRDR_GROUP_BY_LABEL) {
-                DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
-                for (size_t l = 0; l < qt->group_by[g].used; l++) {
-                    buffer_fast_strcat(key, "|", 1);
-                    rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by[g].label_keys[l], "[unset]");
-                }
-            }
-
-            if (group_by & RRDR_GROUP_BY_NODE) {
-                buffer_fast_strcat(key, "|", 1);
-                buffer_strcat(key, qn->rrdhost->machine_guid);
-            }
-
-            if (group_by & RRDR_GROUP_BY_CONTEXT) {
-                buffer_fast_strcat(key, "|", 1);
-                buffer_strcat(key, rrdcontext_acquired_id(qc->rca));
-            }
-
-            if (group_by & RRDR_GROUP_BY_UNITS) {
-                buffer_fast_strcat(key, "|", 1);
-                buffer_strcat(key, query_target_has_percentage_units(qt) ? "%" : rrdinstance_acquired_units(qi->ria));
-            }
-        }
+        query_group_by_make_dimension_key(key, group_by, g, qt, qn, qc, qi, qd, qm);
 
         // lookup the key in the dictionary
 
@@ -2730,117 +2844,13 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             // ----------------------------------------------------------------
             // generate the dimension id
 
-            buffer_flush(key);
-            if(unlikely(qm->status & RRDR_DIMENSION_HIDDEN)) {
-                buffer_strcat(key, "__hidden_dimensions__");
-            }
-            else if(unlikely(group_by & RRDR_GROUP_BY_SELECTED)) {
-                buffer_strcat(key, "selected");
-            }
-            else {
-                if (group_by & RRDR_GROUP_BY_DIMENSION) {
-                    buffer_strcat(key, query_metric_name(qt, qm));
-                }
-
-                if (group_by & RRDR_GROUP_BY_INSTANCE) {
-                    if (buffer_strlen(key) != 0)
-                        buffer_fast_strcat(key, ",", 1);
-
-                    if (group_by & RRDR_GROUP_BY_NODE)
-                        buffer_strcat(key, rrdinstance_acquired_id(qi->ria));
-                    else
-                        buffer_strcat(key, string2str(query_instance_id_fqdn(qi, qt->request.version)));
-                }
-
-                if (group_by & RRDR_GROUP_BY_LABEL) {
-                    DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
-                    for (size_t l = 0; l < qt->group_by[g].used; l++) {
-                        if (buffer_strlen(key) != 0)
-                            buffer_fast_strcat(key, ",", 1);
-                        rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by[g].label_keys[l], "[unset]");
-                    }
-                }
-
-                if (group_by & RRDR_GROUP_BY_NODE) {
-                    if (buffer_strlen(key) != 0)
-                        buffer_fast_strcat(key, ",", 1);
-
-                    buffer_strcat(key, qn->rrdhost->machine_guid);
-                }
-
-                if (group_by & RRDR_GROUP_BY_CONTEXT) {
-                    if (buffer_strlen(key) != 0)
-                        buffer_fast_strcat(key, ",", 1);
-
-                    buffer_strcat(key, rrdcontext_acquired_id(qc->rca));
-                }
-
-                if (group_by & RRDR_GROUP_BY_UNITS) {
-                    if (buffer_strlen(key) != 0)
-                        buffer_fast_strcat(key, ",", 1);
-
-                    buffer_strcat(key, query_target_has_percentage_units(qt) ? "%" : rrdinstance_acquired_units(qi->ria));
-                }
-            }
-
+            query_group_by_make_dimension_id(key, group_by, g, qt, qn, qc, qi, qd, qm);
             entries[pos].id = string_strdupz(buffer_tostring(key));
 
             // ----------------------------------------------------------------
             // generate the dimension name
 
-            buffer_flush(key);
-            if(unlikely(qm->status & RRDR_DIMENSION_HIDDEN)) {
-                buffer_strcat(key, "__hidden_dimensions__");
-            }
-            else if(unlikely(group_by & RRDR_GROUP_BY_SELECTED)) {
-                buffer_strcat(key, "selected");
-            }
-            else {
-                if (group_by & RRDR_GROUP_BY_DIMENSION) {
-                    buffer_strcat(key, query_metric_name(qt, qm));
-                }
-
-                if (group_by & RRDR_GROUP_BY_INSTANCE) {
-                    if (buffer_strlen(key) != 0)
-                        buffer_fast_strcat(key, ",", 1);
-
-                    if (group_by & RRDR_GROUP_BY_NODE)
-                        buffer_strcat(key, rrdinstance_acquired_name(qi->ria));
-                    else
-                        buffer_strcat(key, string2str(query_instance_name_fqdn(qi, qt->request.version)));
-                }
-
-                if (group_by & RRDR_GROUP_BY_LABEL) {
-                    DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
-                    for (size_t l = 0; l < qt->group_by[g].used; l++) {
-                        if (buffer_strlen(key) != 0)
-                            buffer_fast_strcat(key, ",", 1);
-                        rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by[g].label_keys[l], "[unset]");
-                    }
-                }
-
-                if (group_by & RRDR_GROUP_BY_NODE) {
-                    if (buffer_strlen(key) != 0)
-                        buffer_fast_strcat(key, ",", 1);
-
-                    buffer_strcat(key, rrdhost_hostname(qn->rrdhost));
-                }
-
-                if (group_by & RRDR_GROUP_BY_CONTEXT) {
-                    if (buffer_strlen(key) != 0)
-                        buffer_fast_strcat(key, ",", 1);
-
-                    buffer_strcat(key, rrdcontext_acquired_id(qc->rca));
-                }
-
-                if (group_by & RRDR_GROUP_BY_UNITS) {
-                    if (buffer_strlen(key) != 0)
-                        buffer_fast_strcat(key, ",", 1);
-
-                    buffer_strcat(key, query_target_has_percentage_units(qt) ? "%" : rrdinstance_acquired_units(qi->ria));
-                }
-            }
-
+            query_group_by_make_dimension_name(key, group_by, g, qt, qn, qc, qi, qd, qm);
             entries[pos].name = string_strdupz(buffer_tostring(key));
 
             // add the rest of the info
