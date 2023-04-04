@@ -10,7 +10,7 @@ Learn how to send notifications to Telegram using Netdata's Agent alert notifica
 
 Telegram messages look like this:
 
-<img src="https://user-images.githubusercontent.com/1153921/66612223-f07dfb80-eb75-11e9-976f-5734ffd93ecd.png" width="50%">
+<img src="https://user-images.githubusercontent.com/1153921/66612223-f07dfb80-eb75-11e9-976f-5734ffd93ecd.png" width="50%"></img>
 
 Netdata will send warning messages without vibration.
 

@@ -8,7 +8,7 @@ Learn how to send notifications via Email using Netdata's Agent alert notificati
 
 Email notifications look like this:
 
-<img src="https://user-images.githubusercontent.com/1905463/133216974-a2ca0e4f-787b-4dce-b1b2-9996a8c5f718.png" alt="Email notification screenshot" width="50%">
+<img src="https://user-images.githubusercontent.com/1905463/133216974-a2ca0e4f-787b-4dce-b1b2-9996a8c5f718.png" alt="Email notification screenshot" width="50%"></img>
 
 ## Prerequisites
 
