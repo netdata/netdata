@@ -7,11 +7,11 @@ Learn how to send notifications to Pushbullet using Netdata's Agent alert notifi
 > This file assumes you have read the [Introduction to Agent alert notifications](https://github.com/netdata/netdata/blob/master/health/notifications/README.md), detailing how the Netdata Agent's alert notification method works.
 
 This is what it will look like this on your browser:
-![image](https://cloud.githubusercontent.com/assets/4300670/19109636/278b1c0c-8aee-11e6-8a09-7fc94fdbfec8.png)
+![image](https://user-images.githubusercontent.com/70198089/229842827-e9c93e44-3c86-4ab6-9b44-d8b36a00b015.png)
 
 And this is what it will look like on your Android device:
 
-![image](https://cloud.githubusercontent.com/assets/4300670/19109635/278a1dde-8aee-11e6-9984-0bc87a13312d.png)
+![image](https://user-images.githubusercontent.com/70198089/229842936-ea7e8f92-a353-43ca-a993-b1cc08e8508b.png)
 
 ## Prerequisites
 
