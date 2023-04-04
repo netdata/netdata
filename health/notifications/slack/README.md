@@ -7,7 +7,9 @@ Learn how to send notifications to a Slack workspace using Netdata's Agent alert
 > This file assumes you have read the [Introduction to Agent alert notifications](https://github.com/netdata/netdata/blob/master/health/notifications/README.md), detailing how the Netdata Agent's alert notification method works.
 
 This is what you will get:
-![image](https://cloud.githubusercontent.com/assets/2662304/18407116/bbd0fee6-7710-11e6-81cf-58c0defaee2b.png)
+
+![image](https://user-images.githubusercontent.com/70198089/229841857-77ed2562-ee62-427b-803a-cef03d08238d.png)
+
 
 ## Prerequisites
 
