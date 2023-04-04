@@ -832,7 +832,7 @@ if test "${enable_httpd}" != "no"; then
 
     if test "${can_build_httpd}" = "yes"; then
         AC_DEFINE([ENABLE_HTTPD], [1], [HTTPD (h2o based web server)])
-        HTTPD_CFLAGS="-I\$(abs_top_srcdir)/httpd/h2o/include -I\$(abs_top_srcdir)/httpd/h2o/deps/picotls/include -I\$(abs_top_srcdir)/httpd/h2o/deps/quicly/include"
+        HTTPD_CFLAGS="-I\$(abs_top_srcdir)/httpd/h2o/include -I\$(abs_top_srcdir)/httpd/h2o/deps/picotls/include -I\$(abs_top_srcdir)/httpd/h2o/deps/quicly/include -DH2O_USE_LIBUV=0"
     fi
 fi
 AM_CONDITIONAL([ENABLE_HTTPD], [test "${can_build_httpd}" = "yes"])
