@@ -21,7 +21,7 @@ You will need:
     To ensure that the steps above are successful, just `su netdata` and execute `sendsms phone message`.
 - terminal access to the Agent you wish to configure
 
-## Configure Netdata to send alerts to SMS Server Tools 3
+## Configure Netdata to send alert notifications to SMS Server Tools 3
 
 > ### Info
 >
@@ -44,7 +44,7 @@ Edit `health_alarm_notify.conf`, changes to this file do not require restarting 
     ```
 
 2. Set `SEND_SMS` to `YES`.
-3. Set `DEFAULT_RECIPIENT_SMS` to the phone number you want the alert to be sent.  
+3. Set `DEFAULT_RECIPIENT_SMS` to the phone number you want the alert notifications to be sent to.  
     You can define multiple phone numbers like this: `PHONE1 PHONE2`.  
     All roles will default to this variable if left unconfigured.
 

@@ -19,7 +19,7 @@ You will need:
 - A working `logger` command for this to work. This is the case on pretty much every Linux system in existence, and most BSD systems.
 - terminal access to the Agent you wish to configure
 
-## Configure Netdata to send alerts to Syslog
+## Configure Netdata to send alert notifications to Syslog
 
 > ### Info
 >
@@ -33,7 +33,7 @@ You will need:
 Edit `health_alarm_notify.conf`, changes to this file do not require restarting Netdata:
 
 1. Set `SYSLOG_FACILITY` to the facility used for logging, by default this value is set to `local6`.
-2. Set `DEFAULT_RECIPIENT_SYSLOG` to the recipient you want the alert to be sent.  
+2. Set `DEFAULT_RECIPIENT_SYSLOG` to the recipient you want the alert notifications to be sent to.  
     Targets are defined as follows:
 
     ```conf

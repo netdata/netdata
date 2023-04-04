@@ -25,7 +25,7 @@ You will need:
     Alternatively, you can get the chat ID directly from the bot API. Send *your* bot a command in the chat you want to use, then check `https://api.telegram.org/bot{YourBotToken}/getUpdates`, eg.  `https://api.telegram.org/bot111122223:7OpFlFFRzRBbrUUmIjj5HF9Ox2pYJZy5/getUpdates`
 - terminal access to the Agent you wish to configure
 
-## Configure Netdata to send alerts to Telegram
+## Configure Netdata to send alert notifications to Telegram
 
 > ### Info
 >
@@ -40,7 +40,7 @@ Edit `health_alarm_notify.conf`, changes to this file do not require restarting 
 
 1. Set `SEND_TELEGRAM` to `YES`.
 2. Set `TELEGRAM_BOT_TOKEN` to your bot token.
-3. Set `DEFAULT_RECIPIENT_TELEGRAM` to the chat ID you want the alert to be sent.  
+3. Set `DEFAULT_RECIPIENT_TELEGRAM` to the chat ID you want the alert notifications to be sent to.  
     You can define multiple chat IDs like this: `49999333322 -1009999222255`.  
     All roles will default to this variable if left unconfigured.
 

@@ -17,7 +17,7 @@ You will need:
 - one or more channels to post the messages to.
 - terminal access to the Agent you wish to configure
 
-## Configure Netdata to send alerts to Rocket.Chat
+## Configure Netdata to send alert notifications to Rocket.Chat
 
 > ### Info
 >
@@ -32,7 +32,7 @@ Edit `health_alarm_notify.conf`, changes to this file do not require restarting 
 
 1. Set `SEND_ROCKETCHAT` to `YES`.
 2. Set `ROCKETCHAT_WEBHOOK_URL` to your webhook URL.
-3. Set `DEFAULT_RECIPIENT_ROCKETCHAT` to the channel you want the alert to be sent.  
+3. Set `DEFAULT_RECIPIENT_ROCKETCHAT` to the channel you want the alert notifications to be sent to.  
    You can define multiple channels like this: `alerts systems`.  
    All roles will default to this variable if left unconfigured.
 

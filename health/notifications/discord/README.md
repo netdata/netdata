@@ -19,7 +19,7 @@ You will need:
 - one or more Discord channels to post the messages to
 - terminal access to the Agent you wish to configure
 
-## Configure Netdata to send alerts to Discord
+## Configure Netdata to send alert notifications to Discord
 
 > ### Info
 >
@@ -34,7 +34,7 @@ Edit `health_alarm_notify.conf`, changes to this file do not require restarting 
 
 1. Set `SEND_DISCORD` to `YES`.
 2. Set `DISCORD_WEBHOOK_URL` to your webhook URL.
-3. Set `DEFAULT_RECIPIENT_DISCORD` to the channel you want the alert to be sent.  
+3. Set `DEFAULT_RECIPIENT_DISCORD` to the channel you want the alert notifications to be sent to.  
    You can define multiple channels like this: `alerts systems`.  
    All roles will default to this variable if left unconfigured.
 

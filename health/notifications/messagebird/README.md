@@ -17,7 +17,7 @@ You will need:
 - an access key under 'API ACCESS (REST)' (you will want a live key), you can read more [here](https://developers.messagebird.com/quickstarts/sms/test-credits-api-keys/)
 - terminal access to the Agent you wish to configure
 
-## Configure Netdata to send alerts to MessageBird
+## Configure Netdata to send alert notifications to MessageBird
 
 > ### Info
 >
@@ -33,7 +33,7 @@ Edit `health_alarm_notify.conf`, changes to this file do not require restarting 
 1. Set `SEND_MESSAGEBIRD` to `YES`.
 2. Set `MESSAGEBIRD_ACCESS_KEY` to your API access key.
 3. Set `MESSAGEBIRD_NUMBER` to the MessageBird number you want to use for the alert.
-4. Set `DEFAULT_RECIPIENT_MESSAGEBIRD` to the number you want the alert to be sent as an SMS.  
+4. Set `DEFAULT_RECIPIENT_MESSAGEBIRD` to the number you want the alert notification to be sent as an SMS.  
   You can define multiple recipients like this: `+15555555555 +17777777777`.  
   All roles will default to this variable if left unconfigured.
 

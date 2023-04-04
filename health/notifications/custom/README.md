@@ -10,7 +10,7 @@ Netdata Agent's alert notification feature allows you to send custom notificatio
 
 You need to have terminal access to the Agent you wish to configure.
 
-## Configure Netdata to send alerts to a custom endpoint
+## Configure Netdata to send alert notifications to a custom endpoint
 
 > ### Info
 >

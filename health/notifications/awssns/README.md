@@ -40,7 +40,7 @@ Before you can enable SNS, you need:
   This user needs to have programmatic access, and should only allow access to SNS. For an additional layer of security, you can create one for each system or group of systems.
 - Terminal access to the Agent you wish to configure.
 
-## Configure Netdata to send alerts to Amazon SNS
+## Configure Netdata to send alert notifications to Amazon SNS
 
 > ### Info
 >

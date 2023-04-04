@@ -20,7 +20,7 @@ You will need:
 - a Pushbullet access token that can be created in your [account settings](https://www.pushbullet.com/#settings/account)
 - terminal access to the Agent you wish to configure
 
-## Configure Netdata to send alerts to Pushbullet
+## Configure Netdata to send alert notifications to Pushbullet
 
 > ### Info
 >
@@ -35,7 +35,7 @@ Edit `health_alarm_notify.conf`, changes to this file do not require restarting 
 
 1. Set `Send_PUSHBULLET` to `YES`.
 2. Set `PUSHBULLET_ACCESS_TOKEN` to the token you generated.
-3. Set `DEFAULT_RECIPIENT_PUSHBULLET` to the email (e.g. `example@domain.com`) or the channel tag (e.g. `#channel`) you want the alert to sent.  
+3. Set `DEFAULT_RECIPIENT_PUSHBULLET` to the email (e.g. `example@domain.com`) or the channel tag (e.g. `#channel`) you want the alert notifications to be sent to.  
 
    > ### Note
    >

@@ -20,7 +20,7 @@ You will need:
 - A User token for each user you are going to send notifications to. This is the actual recipient of the notification.
 - terminal access to the Agent you wish to configure
 
-## Configure Netdata to send alerts to Pushover
+## Configure Netdata to send alert notifications to Pushover
 
 > ### Info
 >
@@ -35,7 +35,7 @@ Edit `health_alarm_notify.conf`, changes to this file do not require restarting 
 
 1. Set `SEND_PUSHOVER` to `YES`.
 2. Set `PUSHOVER_APP_TOKEN` to your Pushover Application token.
-3. Set `DEFAULT_RECIPIENT_PUSHOVER` to the Pushover User token you want the alerts to be sent.  
+3. Set `DEFAULT_RECIPIENT_PUSHOVER` to the Pushover User token you want the alert notifications to be sent to.  
    You can define multiple User tokens like this: `USERTOKEN1 USERTOKEN2`.  
    All roles will default to this variable if left unconfigured.
 

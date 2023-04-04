@@ -22,7 +22,7 @@ You will need:
    You can set the path to it, or Netdata will search for it in your system `$PATH`.
 - terminal access to the Agent you wish to configure
 
-## Configure Netdata to send alerts to IRC
+## Configure Netdata to send alert notifications to IRC
 
 > ### Info
 >

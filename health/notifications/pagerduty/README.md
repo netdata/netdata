@@ -19,7 +19,7 @@ You will need:
 - a PagerDuty `Generic API` service using either the `Events API v2` or `Events API v1`
 - terminal access to the Agent you wish to configure
 
-## Configure Netdata to send alerts to PagerDuty
+## Configure Netdata to send alert notifications to PagerDuty
 
 > ### Info
 >
@@ -37,7 +37,7 @@ creating the service, click on the **Integrations** tab to find your **Integrati
 Then, edit `health_alarm_notify.conf`, changes to this file do not require restarting Netdata:
 
 1. Set `SEND_PD` to `YES`.
-2. Set `DEFAULT_RECIPIENT_PD` to the PagerDuty service key you want the alert to be sent.  
+2. Set `DEFAULT_RECIPIENT_PD` to the PagerDuty service key you want the alert notifications to be sent to.  
    You can define multiple service keys like this: `pd_service_key_1 pd_service_key_2`.  
    All roles will default to this variable if left unconfigured.
 3. If you chose `Events API v2` during service setup on PagerDuty, change `USE_PD_VERSION` to `2`.

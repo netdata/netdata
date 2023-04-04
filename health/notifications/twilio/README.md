@@ -17,7 +17,7 @@ You will need:
 - to get your SID, and Token from <https://www.twilio.com/console>
 - terminal access to the Agent you wish to configure
 
-## Configure Netdata to send alerts to Twilio
+## Configure Netdata to send alert notifications to Twilio
 
 > ### Info
 >
@@ -34,7 +34,7 @@ Edit `health_alarm_notify.conf`, changes to this file do not require restarting 
 2. Set `TWILIO_ACCOUNT_SID` to your account SID.
 3. Set `TWILIO_ACCOUNT_TOKEN` to your account token.
 4. Set `TWILIO_NUMBER` to your account's number.
-5. Set `DEFAULT_RECIPIENT_TWILIO` to the number you want the alert to be sent.  
+5. Set `DEFAULT_RECIPIENT_TWILIO` to the number you want the alert notifications to be sent to.  
    You can define multiple numbers like this: `+15555555555 +17777777777`.  
    All roles will default to this variable if left unconfigured.
 

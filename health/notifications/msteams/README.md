@@ -17,7 +17,7 @@ You will need:
 - one or more channels to post the messages to
 - terminal access to the Agent you wish to configure
 
-## Configure Netdata to send alerts to Microsoft Teams
+## Configure Netdata to send alert notifications to Microsoft Teams
 
 > ### Info
 >
@@ -32,7 +32,7 @@ Edit `health_alarm_notify.conf`, changes to this file do not require restarting 
 
 1. Set `SEND_MSTEAMS` to `YES`.
 2. Set `MSTEAMS_WEBHOOK_URL` to the incoming webhook URL as given by Microsoft Teams.
-3. Set `DEFAULT_RECIPIENT_MSTEAMS` to the **encoded** Microsoft Teams channel name you want the alert to be sent.  
+3. Set `DEFAULT_RECIPIENT_MSTEAMS` to the **encoded** Microsoft Teams channel name you want the alert notifications to be sent to.  
     In Microsoft Teams the channel name is encoded in the URI after `/IncomingWebhook/`.  
     You can define multiple channels like this: `CHANNEL1 CHANNEL2`.  
     All roles will default to this variable if left unconfigured.

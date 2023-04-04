@@ -19,7 +19,7 @@ You will need:
 - the `APIKEY` and Sender from <http://panel.kavenegar.com/client/setting/account>
 - terminal access to the Agent you wish to configure
 
-## Configure Netdata to send alerts to Kavenegar
+## Configure Netdata to send alert notifications to Kavenegar
 
 > ### Info
 >
@@ -35,7 +35,7 @@ Edit `health_alarm_notify.conf`, changes to this file do not require restarting 
 1. Set `SEND_KAVENEGAR` to `YES`.
 2. Set `KAVENEGAR_API_KEY` to your `APIKEY`.
 3. Set `KAVENEGAR_SENDER` to the value of your Sender.
-4. Set `DEFAULT_RECIPIENT_KAVENEGAR` to the SMS recipient you want the alert to be sent.  
+4. Set `DEFAULT_RECIPIENT_KAVENEGAR` to the SMS recipient you want the alert notifications to be sent to.  
    You can define multiple recipients like this: `09155555555 09177777777`.  
    All roles will default to this variable if lest unconfigured.
 

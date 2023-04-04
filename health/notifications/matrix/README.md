@@ -14,7 +14,7 @@ You will need:
 - Credentials for connecting to the homeserver, in the form of a valid access token for your account (or for a dedicated notification account). These tokens usually don't expire.
 - The room ids that you want to sent the notification to.
 
-## Configure Netdata to send alerts to Matrix
+## Configure Netdata to send alert notifications to Matrix
 
 > ### Info
 >
@@ -36,7 +36,7 @@ Edit `health_alarm_notify.conf`, changes to this file do not require restarting 
     curl -XPOST -d '{"type":"m.login.password", "user":"example", "password":"wordpass"}' "https://homeserver:8448/_matrix/client/r0/login"
     ```
 
-4. Set `DEFAULT_RECIPIENT_MATRIX` to the rooms you want the alert to be sent.  
+4. Set `DEFAULT_RECIPIENT_MATRIX` to the rooms you want the alert notifications to be sent to.  
     The format is `!roomid:homeservername`.  
 
     The room ids are unique identifiers and can be obtained from the room settings in a Matrix client (e.g. Riot).

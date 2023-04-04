@@ -19,7 +19,7 @@ You will need:
     Read more about flock webhooks and how to get one [here](https://admin.flock.com/webhooks).
 - Terminal access to the Agent you wish to configure
 
-## Configure Netdata to send alerts to Flock
+## Configure Netdata to send alert notifications to Flock
 
 > ### Info
 >
@@ -34,7 +34,7 @@ Edit `health_alarm_notify.conf`, changes to this file do not require restarting 
 
 1. Set `SEND_FLOCK` to `YES`.
 2. Set `FLOCK_WEBHOOK_URL` to your webhook URL.
-3. Set `DEFAULT_RECIPIENT_FLOCK` to the Flock channel you want the alert to be sent.  
+3. Set `DEFAULT_RECIPIENT_FLOCK` to the Flock channel you want the alert notifications to be sent to.  
    All roles will default to this variable if left unconfigured.
 
 You can then have different channels per **role**, by editing `DEFAULT_RECIPIENT_FLOCK` with the channel you want, in the following entries at the bottom of the same file:

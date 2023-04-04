@@ -26,7 +26,7 @@ You will need:
 - a Prowl API key, which can be requested through the Prowl website after registering
 - terminal access to the Agent you wish to configure
 
-## Configure Netdata to send alerts to Prowl
+## Configure Netdata to send alert notifications to Prowl
 
 > ### Info
 >
@@ -40,7 +40,7 @@ You will need:
 Edit `health_alarm_notify.conf`, changes to this file do not require restarting Netdata:
 
 1. Set `SEND_PROWL` to `YES`.
-2. Set `DEFAULT_RECIPIENT_PROWL` to the Prowl API key you want the alert to be sent to.  
+2. Set `DEFAULT_RECIPIENT_PROWL` to the Prowl API key you want the alert notifications to be sent to.  
    You can define multiple API keys like this: `APIKEY1, APIKEY2`.  
    All roles will default to this variable if left unconfigured.
 

@@ -24,7 +24,7 @@ You need:
 - an Alerta API key (if authentication in Alerta is enabled)
 - terminal access to the Agent you wish to configure
 
-## Configure Netdata to send alerts to Alerta
+## Configure Netdata to send alert notifications to Alerta
 
 > ### Info
 >
@@ -43,7 +43,7 @@ Edit `health_alarm_notify.conf`, changes to this file do not require restarting 
    You will need an API key to send messages from any source, if Alerta is configured to use authentication (recommended). To create a new API key:  
    1. Go to *Configuration* > *API Keys*.
    2. Create a new API key called "netdata" with `write:alerts` permission.
-4. Set `DEFAULT_RECIPIENT_ALERTA` to the default recipient environment you want to alert to.  
+4. Set `DEFAULT_RECIPIENT_ALERTA` to the default recipient environment you want the alert notifications to be sent to.  
    All roles will default to this variable if left unconfigured.
 
 You can then have different recipient environments per **role**, by editing `DEFAULT_RECIPIENT_CUSTOM` with the environment name you want, in the following entries at the bottom of the same file:
