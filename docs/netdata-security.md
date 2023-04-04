@@ -61,7 +61,7 @@ Data is encrypted when in transit between a user and Netdata Cloud using TLS.
 
 ### Data retention
 
-Netdata may maintain backups of Netdata Cloud Customer Content, which would remain in place for approximately thirty 
+Netdata may maintain backups of Netdata Cloud Customer Content, which would remain in place for approximately ninety 
 (90) days following a deletion in Netdata Cloud. 
 
 ### Data portability and erasure
