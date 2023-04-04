@@ -325,9 +325,8 @@ void *httpd_main(void *ptr) {
         return NULL;
     }
 
-    int rc;
     while (service_running(SERVICE_HTTPD)) {
-        rc = h2o_evloop_run(ctx.loop, POLL_INTERVAL);
+        int rc = h2o_evloop_run(ctx.loop, POLL_INTERVAL);
         if (rc < 0 && errno != EINTR) {
             error("h2o_evloop_run returned (%d) with errno other than EINTR. Aborting", rc);
             break;
