@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- fix typo alerms -\> alarms [\#14854](https://github.com/netdata/netdata/pull/14854) ([slavox](https://github.com/slavox))
 - fix  \#14841 Exception funktion call Rados.mon\_command\(\) [\#14844](https://github.com/netdata/netdata/pull/14844) ([farax4de](https://github.com/farax4de))
 - Update parent child examples [\#14842](https://github.com/netdata/netdata/pull/14842) ([cakrit](https://github.com/cakrit))
 - fix double host prefix when reading ZFS pools state [\#14840](https://github.com/netdata/netdata/pull/14840) ([ilyam8](https://github.com/ilyam8))
@@ -21,6 +22,7 @@
 - Fix Btrfs unallocated space accounting [\#14824](https://github.com/netdata/netdata/pull/14824) ([intelfx](https://github.com/intelfx))
 - configure extent cache size [\#14821](https://github.com/netdata/netdata/pull/14821) ([ktsaou](https://github.com/ktsaou))
 - Docs, shorten too long titles, and add a description below [\#14820](https://github.com/netdata/netdata/pull/14820) ([Ancairon](https://github.com/Ancairon))
+- update posthog domain [\#14818](https://github.com/netdata/netdata/pull/14818) ([andrewm4894](https://github.com/andrewm4894))
 - minor - add capability signifying this agent can speak apiv2 [\#14817](https://github.com/netdata/netdata/pull/14817) ([underhood](https://github.com/underhood))
 - Minor improvements to netdata-security.md [\#14815](https://github.com/netdata/netdata/pull/14815) ([cakrit](https://github.com/cakrit))
 - Update privacy link in aclk doc [\#14813](https://github.com/netdata/netdata/pull/14813) ([cakrit](https://github.com/cakrit))
@@ -74,6 +76,7 @@
 - Update change-metrics-storage.md [\#14734](https://github.com/netdata/netdata/pull/14734) ([cakrit](https://github.com/cakrit))
 - Correct calc and explain how to get METRICS in RAM usage [\#14733](https://github.com/netdata/netdata/pull/14733) ([cakrit](https://github.com/cakrit))
 - Update dashboard to version v2.30.0. [\#14732](https://github.com/netdata/netdata/pull/14732) ([netdatabot](https://github.com/netdatabot))
+- remove ubuntu 18.04 from our CI [\#14731](https://github.com/netdata/netdata/pull/14731) ([tkatsoulas](https://github.com/tkatsoulas))
 - Organize information from war-rooms.md to its correct location [\#14729](https://github.com/netdata/netdata/pull/14729) ([Ancairon](https://github.com/Ancairon))
 - Update change-metrics-storage.md [\#14726](https://github.com/netdata/netdata/pull/14726) ([cakrit](https://github.com/cakrit))
 - New build\_external scenario. [\#14725](https://github.com/netdata/netdata/pull/14725) ([vkalintiris](https://github.com/vkalintiris))
@@ -393,8 +396,6 @@
 - `ml - machine learning` to just `machine learning` [\#14242](https://github.com/netdata/netdata/pull/14242) ([andrewm4894](https://github.com/andrewm4894))
 - cancel ml threads on shutdown and join them on host free [\#14240](https://github.com/netdata/netdata/pull/14240) ([ktsaou](https://github.com/ktsaou))
 - pre gcc v5 support and allow building without dbengine [\#14239](https://github.com/netdata/netdata/pull/14239) ([ktsaou](https://github.com/ktsaou))
-- Drop ARMv7 native packages for Fedora 36. [\#14233](https://github.com/netdata/netdata/pull/14233) ([Ferroin](https://github.com/Ferroin))
-- fix consul\_raft\_leadership\_transitions alarm units [\#14232](https://github.com/netdata/netdata/pull/14232) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
