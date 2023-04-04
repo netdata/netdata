@@ -86,6 +86,7 @@ static char *cgroup_blkio_base = NULL;
 static char *cgroup_memory_base = NULL;
 static char *cgroup_devices_base = NULL;
 static char *cgroup_unified_base = NULL;
+static char *docker_directory_base = NULL;
 
 static int cgroup_root_count = 0;
 static int cgroup_root_max = 1000;
@@ -407,6 +408,11 @@ void read_cgroup_plugin_configuration() {
         else s = mi->mount_point;
         set_cgroup_base_path(filename, s);
         cgroup_devices_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/devices", filename);
+
+        // https://docs.docker.com/config/daemon/#daemon-data-directory
+        s = "/var/lib/docker";
+        docker_directory_base = config_get("plugin:cgroups", "path to docker daemon",
+                                           s);
     }
     else {
         //cgroup_enable_cpuacct_stat =
