@@ -956,6 +956,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                     (d->rbytes || d->tbytes || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
             d->do_bandwidth = CONFIG_BOOLEAN_YES;
 
+        struct netdev_rename *nd_rename_values = netdev_rename_find(d->name, d->hash);
         if(d->do_bandwidth == CONFIG_BOOLEAN_YES) {
             if(unlikely(!d->st_bandwidth)) {
 
@@ -975,6 +976,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 );
 
                 rrdset_update_rrdlabels(d->st_bandwidth, d->chart_labels);
+                if (nd_rename_values)
+                    rrdlabels_add(d->st_bandwidth->rrdlabels, "cgroup_name",
+                                  nd_rename_values->container_name, RRDLABEL_SRC_AUTO);
 
                 d->rd_rbytes = rrddim_add(d->st_bandwidth, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tbytes = rrddim_add(d->st_bandwidth, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
@@ -1043,6 +1047,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                                 rrdset_flag_set(d->st_speed, RRDSET_FLAG_DETAIL);
 
                                 rrdset_update_rrdlabels(d->st_speed, d->chart_labels);
+                                if (nd_rename_values)
+                                    rrdlabels_add(d->st_speed->rrdlabels, "cgroup_name",
+                                                  nd_rename_values->container_name, RRDLABEL_SRC_AUTO);
 
                                 d->rd_speed = rrddim_add(d->st_speed, "speed",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
                             }
@@ -1083,6 +1090,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 rrdset_flag_set(d->st_duplex, RRDSET_FLAG_DETAIL);
 
                 rrdset_update_rrdlabels(d->st_duplex, d->chart_labels);
+                if (nd_rename_values)
+                    rrdlabels_add(d->st_duplex->rrdlabels, "cgroup_name",
+                                  nd_rename_values->container_name, RRDLABEL_SRC_AUTO);
 
                 d->rd_duplex_full = rrddim_add(d->st_duplex, "full", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 d->rd_duplex_half = rrddim_add(d->st_duplex, "half", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -1115,6 +1125,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 rrdset_flag_set(d->st_operstate, RRDSET_FLAG_DETAIL);
 
                 rrdset_update_rrdlabels(d->st_operstate, d->chart_labels);
+                if (nd_rename_values)
+                    rrdlabels_add(d->st_operstate->rrdlabels, "cgroup_name",
+                                  nd_rename_values->container_name, RRDLABEL_SRC_AUTO);
 
                 d->rd_operstate_up = rrddim_add(d->st_operstate, "up", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 d->rd_operstate_down = rrddim_add(d->st_operstate, "down", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -1155,6 +1168,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 rrdset_flag_set(d->st_carrier, RRDSET_FLAG_DETAIL);
 
                 rrdset_update_rrdlabels(d->st_carrier, d->chart_labels);
+                if (nd_rename_values)
+                    rrdlabels_add(d->st_carrier->rrdlabels, "cgroup_name",
+                                  nd_rename_values->container_name, RRDLABEL_SRC_AUTO);
 
                 d->rd_carrier_up = rrddim_add(d->st_carrier, "up",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
                 d->rd_carrier_down = rrddim_add(d->st_carrier, "down",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -1185,6 +1201,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 rrdset_flag_set(d->st_mtu, RRDSET_FLAG_DETAIL);
 
                 rrdset_update_rrdlabels(d->st_mtu, d->chart_labels);
+                if (nd_rename_values)
+                    rrdlabels_add(d->st_mtu->rrdlabels, "cgroup_name",
+                                  nd_rename_values->container_name, RRDLABEL_SRC_AUTO);
 
                 d->rd_mtu = rrddim_add(d->st_mtu, "mtu",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
@@ -1218,6 +1237,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 rrdset_flag_set(d->st_packets, RRDSET_FLAG_DETAIL);
 
                 rrdset_update_rrdlabels(d->st_packets, d->chart_labels);
+                if (nd_rename_values)
+                    rrdlabels_add(d->st_packets->rrdlabels, "cgroup_name",
+                                  nd_rename_values->container_name, RRDLABEL_SRC_AUTO);
 
                 d->rd_rpackets   = rrddim_add(d->st_packets, "received",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tpackets   = rrddim_add(d->st_packets, "sent",      NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1263,6 +1285,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 rrdset_flag_set(d->st_errors, RRDSET_FLAG_DETAIL);
 
                 rrdset_update_rrdlabels(d->st_errors, d->chart_labels);
+                if (nd_rename_values)
+                    rrdlabels_add(d->st_errors->rrdlabels, "cgroup_name",
+                                  nd_rename_values->container_name, RRDLABEL_SRC_AUTO);
 
                 d->rd_rerrors = rrddim_add(d->st_errors, "inbound",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_terrors = rrddim_add(d->st_errors, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1306,6 +1331,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 rrdset_flag_set(d->st_drops, RRDSET_FLAG_DETAIL);
 
                 rrdset_update_rrdlabels(d->st_drops, d->chart_labels);
+                if (nd_rename_values)
+                    rrdlabels_add(d->st_drops->rrdlabels, "cgroup_name",
+                                  nd_rename_values->container_name, RRDLABEL_SRC_AUTO);
 
                 d->rd_rdrops = rrddim_add(d->st_drops, "inbound",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tdrops = rrddim_add(d->st_drops, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1349,6 +1377,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 rrdset_flag_set(d->st_fifo, RRDSET_FLAG_DETAIL);
 
                 rrdset_update_rrdlabels(d->st_fifo, d->chart_labels);
+                if (nd_rename_values)
+                    rrdlabels_add(d->st_fifo->rrdlabels, "cgroup_name",
+                                  nd_rename_values->container_name, RRDLABEL_SRC_AUTO);
 
                 d->rd_rfifo = rrddim_add(d->st_fifo, "receive",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tfifo = rrddim_add(d->st_fifo, "transmit", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1392,6 +1423,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 rrdset_flag_set(d->st_compressed, RRDSET_FLAG_DETAIL);
 
                 rrdset_update_rrdlabels(d->st_compressed, d->chart_labels);
+                if (nd_rename_values)
+                    rrdlabels_add(d->st_compressed->rrdlabels, "cgroup_name",
+                                  nd_rename_values->container_name, RRDLABEL_SRC_AUTO);
 
                 d->rd_rcompressed = rrddim_add(d->st_compressed, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tcompressed = rrddim_add(d->st_compressed, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1435,6 +1469,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 rrdset_flag_set(d->st_events, RRDSET_FLAG_DETAIL);
 
                 rrdset_update_rrdlabels(d->st_events, d->chart_labels);
+                if (nd_rename_values)
+                    rrdlabels_add(d->st_events->rrdlabels, "cgroup_name",
+                                  nd_rename_values->container_name, RRDLABEL_SRC_AUTO);
 
                 d->rd_rframe      = rrddim_add(d->st_events, "frames",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tcollisions = rrddim_add(d->st_events, "collisions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
