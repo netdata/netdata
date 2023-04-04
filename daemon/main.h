@@ -43,7 +43,8 @@ typedef enum {
     SERVICE_CONTEXT               = (1 << 12),
     SERVICE_ANALYTICS             = (1 << 13),
     SERVICE_EXPORTERS             = (1 << 14),
-    SERVICE_ACLKSYNC              = (1 << 15)
+    SERVICE_ACLKSYNC              = (1 << 15),
+    SERVICE_HTTPD                 = (1 << 16)
 } SERVICE_TYPE;
 
 typedef enum {
