@@ -17,7 +17,7 @@ This is what you will get:
 You will need:
 
 - An application token. You can generate a new token in the Gotify Web UI.
-- Terminal access to the Agent you wish to configure
+- terminal access to the Agent you wish to configure
 
 ## Configure Netdata to send alert notifications to Gotify
 
