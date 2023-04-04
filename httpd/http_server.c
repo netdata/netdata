@@ -91,21 +91,13 @@ static int ssl_init()
     return 0;
 }
 
-static h2o_pathconf_t *register_handler(h2o_hostconf_t *hostconf, const char *path, int (*on_req)(h2o_handler_t *, h2o_req_t *))
-{
-    h2o_pathconf_t *pathconf = h2o_config_register_path(hostconf, path, 0);
-    h2o_handler_t *handler = h2o_create_handler(pathconf, sizeof(*handler));
-    handler->on_req = on_req;
-    return pathconf;
-}
-
 // I did not find a way to do wildcard paths to make common handler for urls like:
 // /api/v1/info
 // /host/child/api/v1/info
 // /host/uuid/api/v1/info
 // ideally we could do something like "/*/api/v1/info" subscription
 // so we do it "manually" here with uberhandler
-static inline int _netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req, RRDHOST **host)
+static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
 {
     if (!h2o_memis(req->method.base, req->method.len, H2O_STRLIT("GET")))
         return -1;
@@ -235,9 +227,10 @@ static inline int _netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req, RRDH
 
 static int netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req)
 {
+    UNUSED(self);
     RRDHOST *host = localhost;
 
-    int ret = _netdata_uberhandler(self, req, &host);
+    int ret = _netdata_uberhandler(req, &host);
 
     char host_uuid_str[UUID_STR_LEN];
     uuid_unparse_lower(host->host_uuid, host_uuid_str);
@@ -267,6 +260,7 @@ static int netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req)
 
 static int hdl_netdata_conf(h2o_handler_t *self, h2o_req_t *req)
 {
+    UNUSED(self);
     if (!h2o_memis(req->method.base, req->method.len, H2O_STRLIT("GET")))
         return -1;
 
