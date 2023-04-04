@@ -124,7 +124,7 @@ the only feature that routes requests back to origin Netdata Agents via Netdata 
 a request to the Netdata Agent data collection plugin running at the 
 edge, to provide additional information, such as the process tree of a server, or the long queries of a DB. 
 
-<!-- User has full control over the available functions. For more information see “Controlling Access to Functions” and “Disabling Functions”. -->
+<!-- The user has full control over the available functions. For more information see “Controlling Access to Functions” and “Disabling Functions”. -->
 
 ### Netdata is read-only
 
