@@ -115,11 +115,10 @@ role_recipients_custom[sitemgr]="sites"
 An example working configuration would be:
 
 ```conf
-# enable/disable sending custom notifications
-SEND_CUSTOM="YES"
+#------------------------------------------------------------------------------
+# custom notifications
 
-# if a role's recipients are not configured, use the following.
-# (empty = do not send a notification for unconfigured roles)
+SEND_CUSTOM="YES"
 DEFAULT_RECIPIENT_CUSTOM=""
 
 # The custom_sender() is a custom function to do whatever you need to do

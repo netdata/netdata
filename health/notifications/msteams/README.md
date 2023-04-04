@@ -54,10 +54,11 @@ The values you provide should already exist as Microsoft Teams channels in the s
 An example of a working configuration would be:
 
 ```conf
+#------------------------------------------------------------------------------
+# Microsoft Teams (office.com) global notification options
+
 SEND_MSTEAMS="YES"
-
 MSTEAMS_WEBHOOK_URL="https://outlook.office.com/webhook/XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX@XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX/IncomingWebhook/CHANNEL/XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
-
 DEFAULT_RECIPIENT_MSTEAMS="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 ```
 

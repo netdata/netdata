@@ -114,20 +114,11 @@ role_recipients_awssns[sitemgr]="arn:aws:sns:us-east-2:123456789012:Sites"
 An example working configuration would be:
 
 ```conf
-# enable/disable sending Amazon SNS notifications
+#------------------------------------------------------------------------------
+# Amazon SNS notifications
+
 SEND_AWSSNS="YES"
-
-# Specify a template for the Amazon SNS notifications.  This supports
-# the same set of variables that are usable in the `custom_sender()`
-# function in the custom notification configuration below.
-#
 AWSSNS_MESSAGE_FORMAT="${status} on ${host} at ${date}: ${chart} ${value_string}"
-
-# If a role's recipients are not configured, use the following.
-# (empty = do not send a notification for unconfigured roles)
-#
-# Recipients for AWS SNS notifications are specified as topic ARN's.
-#
 DEFAULT_RECIPIENT_AWSSNS="arn:aws:sns:us-east-2:123456789012:MyTopic"
 ```
 

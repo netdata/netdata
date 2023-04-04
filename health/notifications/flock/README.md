@@ -53,18 +53,11 @@ The values you provide should already exist as Flock channels.
 An example of a working configuration would be:
 
 ```conf
-###############################################################################
-# sending flock notifications
+#------------------------------------------------------------------------------
+# flock (flock.com) global notification options
 
-# enable/disable sending pushover notifications
 SEND_FLOCK="YES"
-
-# Login to flock.com and create an incoming webhook.
-# You need only one for all your Netdata servers.
-# Without it, Netdata cannot send flock notifications.
 FLOCK_WEBHOOK_URL="https://api.flock.com/hooks/sendMessage/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-
-# if a role recipient is not configured, no notification will be sent
 DEFAULT_RECIPIENT_FLOCK="alarms"
 ```
 

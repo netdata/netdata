@@ -60,23 +60,12 @@ role_recipients_matrix[sitemgr]="!roomid6:homeservername"
 An example of a working configuration would be:
 
 ```conf
-###############################################################################
+#------------------------------------------------------------------------------
 # Matrix notifications
 
-# enable/disable Matrix notifications
 SEND_MATRIX="YES"
-
-# The url of the Matrix homeserver
 MATRIX_HOMESERVER="https://matrix.org:8448"
-
-# A access token from a valid Matrix account. Tokens usually don't expire,
-# can be controlled from a Matrix client.
-# See https://matrix.org/docs/guides/client-server.html
 MATRIX_ACCESSTOKEN="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-
-# Specify the default rooms to receive the notification if no rooms are provided
-# in a role's recipients.
-# The format is !roomid:homeservername
 DEFAULT_RECIPIENT_MATRIX="!XXXXXXXXXXXX:matrix.org"
 ```
 

@@ -35,7 +35,7 @@ Edit `health_alarm_notify.conf`, changes to this file do not require restarting 
 1. Set `SEND_DISCORD` to `YES`.
 2. Set `DISCORD_WEBHOOK_URL` to your webhook URL.
 3. Set `DEFAULT_RECIPIENT_DISCORD` to the channel you want the alert to be sent.  
-   You can define multiple channels like this: `alarms systems`.  
+   You can define multiple channels like this: `alerts systems`.  
    All roles will default to this variable if left unconfigured.
 
    > ### Note
@@ -61,20 +61,9 @@ An example of a working configuration would be:
 #------------------------------------------------------------------------------
 # discord (discordapp.com) global notification options
 
-# multiple recipients can be given like this:
-#                  "CHANNEL1 CHANNEL2 ..."
-
-# enable/disable sending discord notifications
 SEND_DISCORD="YES"
-
-# Create a webhook by following the official documentation -
-# https://support.discordapp.com/hc/en-us/articles/228383668-Intro-to-Webhooks
 DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/XXXXXXXXXXXXX/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-
-# if a role's recipients are not configured, a notification will be send to
-# this discord channel (empty = do not send a notification for unconfigured
-# roles):
-DEFAULT_RECIPIENT_DISCORD="alarms"
+DEFAULT_RECIPIENT_DISCORD="alerts"
 ```
 
 ## Test the notification method

@@ -53,13 +53,10 @@ role_recipients_kavenegar[sitemgr]="0955555555"
 An example of a working configuration would be:
 
 ```conf
-###############################################################################
-# Kavenegar (kavenegar.com) SMS options
+#------------------------------------------------------------------------------
+# Kavenegar (Kavenegar.com) SMS options
 
-# enable/disable sending kavenegar SMS
 SEND_KAVENEGAR="YES"
-
-# Without an API key, Netdata cannot send KAVENEGAR text messages.
 KAVENEGAR_API_KEY="XXXXXXXXXXXX"
 KAVENEGAR_SENDER="YYYYYYYY"
 DEFAULT_RECIPIENT_KAVENEGAR="0912345678"

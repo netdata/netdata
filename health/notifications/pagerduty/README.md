@@ -56,6 +56,9 @@ role_recipients_pd[sitemgr]="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxf"
 An example of a working configuration would be:
 
 ```conf
+#------------------------------------------------------------------------------
+# pagerduty.com notification options
+
 SEND_PD="YES"
 DEFAULT_RECIPIENT_PD="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 USE_PD_VERSION="2"

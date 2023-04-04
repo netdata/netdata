@@ -58,6 +58,9 @@ role_recipients_prowl[sitemgr]="FFFFFFFFFF"
 An example of a working configuration would be:
 
 ```conf
+#------------------------------------------------------------------------------
+# iOS Push Notifications
+
 SEND_PROWL="YES"
 DEFAULT_RECIPIENT_PROWL="XXXXXXXXXX"
 ```

@@ -76,27 +76,10 @@ An example of a working configuration would be:
 #------------------------------------------------------------------------------
 # irc notification options
 #
-# irc notifications require only the nc utility to be installed. 
-
-# multiple recipients can be given like this:
-#              "<irc_channel_1> <irc_channel_2> ..."
-
-# enable/disable sending irc notifications
 SEND_IRC="YES"
-
-# if a role's recipients are not configured, a notification will not be sent.
-# (empty = do not send a notification for unconfigured roles):
 DEFAULT_RECIPIENT_IRC="#system-alarms"
-
-# The irc network to which the recipients belong. It must be the full network.
 IRC_NETWORK="irc.freenode.net"
-
-# The irc nickname which is required to send the notification. It must not be 
-# an already registered name as the connection's MODE is defined as a 'guest'.
 IRC_NICKNAME="netdata-alarm-user"
-
-# The irc realname which is required in order to make the connection and is an
-# extra identifier.
 IRC_REALNAME="netdata-user"
 ```
 

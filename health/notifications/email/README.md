@@ -68,14 +68,8 @@ An example of a working configuration would be:
 #------------------------------------------------------------------------------
 # email global notification options
 
-# the email address sending email notifications
-# the default is the system user netdata runs as (usually: netdata)
 EMAIL_SENDER="example@domain.com"
-
-# enable/disable sending emails
 SEND_EMAIL="YES"
-
-# if a role recipient is not configured, an email will be send to:
 DEFAULT_RECIPIENT_EMAIL="recipient@example.com"
 ```
 

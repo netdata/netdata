@@ -54,10 +54,7 @@ An example of a working configuration would be:
 #------------------------------------------------------------------------------
 # Messagebird (messagebird.com) SMS options
 
-# enable/disable sending messagebird SMS
 SEND_MESSAGEBIRD="YES"
-
-# Without an access key, Netdata cannot send Messagebird text messages.
 MESSAGEBIRD_ACCESS_KEY="XXXXXXXX"
 MESSAGEBIRD_NUMBER="XXXXXXX"
 DEFAULT_RECIPIENT_MESSAGEBIRD="+15555555555"
