@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- review usage of you to say user instead [\#14858](https://github.com/netdata/netdata/pull/14858) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- Add labels for cgroup name [\#14856](https://github.com/netdata/netdata/pull/14856) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix typo alerms -\> alarms [\#14854](https://github.com/netdata/netdata/pull/14854) ([slavox](https://github.com/slavox))
 - fix  \#14841 Exception funktion call Rados.mon\_command\(\) [\#14844](https://github.com/netdata/netdata/pull/14844) ([farax4de](https://github.com/farax4de))
 - Update parent child examples [\#14842](https://github.com/netdata/netdata/pull/14842) ([cakrit](https://github.com/cakrit))
@@ -17,6 +19,7 @@
 - Update change-metrics-storage.md [\#14834](https://github.com/netdata/netdata/pull/14834) ([cakrit](https://github.com/cakrit))
 - Update netdata-security.md [\#14833](https://github.com/netdata/netdata/pull/14833) ([cakrit](https://github.com/cakrit))
 - add some third party collectors [\#14830](https://github.com/netdata/netdata/pull/14830) ([andrewm4894](https://github.com/andrewm4894))
+- Update Agent notification methods documentation [\#14827](https://github.com/netdata/netdata/pull/14827) ([Ancairon](https://github.com/Ancairon))
 - Delete installation instructions specific to FreeNAS [\#14826](https://github.com/netdata/netdata/pull/14826) ([Ancairon](https://github.com/Ancairon))
 - First batch of adding descriptions to the documentation [\#14825](https://github.com/netdata/netdata/pull/14825) ([Ancairon](https://github.com/Ancairon))
 - Fix Btrfs unallocated space accounting [\#14824](https://github.com/netdata/netdata/pull/14824) ([intelfx](https://github.com/intelfx))
@@ -389,13 +392,6 @@
 - fix\(proc.plugin\): handle disabled IPv6 [\#14252](https://github.com/netdata/netdata/pull/14252) ([ilyam8](https://github.com/ilyam8))
 - DBENGINE v2 - improvements part 1 [\#14251](https://github.com/netdata/netdata/pull/14251) ([ktsaou](https://github.com/ktsaou))
 - Remove daemon/common.h header from libnetdata [\#14248](https://github.com/netdata/netdata/pull/14248) ([vkalintiris](https://github.com/vkalintiris))
-- allow the cache to grow when huge queries are running that exceed the cache size [\#14247](https://github.com/netdata/netdata/pull/14247) ([ktsaou](https://github.com/ktsaou))
-- Update netdata-overview.xml [\#14245](https://github.com/netdata/netdata/pull/14245) ([andrewm4894](https://github.com/andrewm4894))
-- Revert health to run in a single thread [\#14244](https://github.com/netdata/netdata/pull/14244) ([MrZammler](https://github.com/MrZammler))
-- profile startup and shutdown timings [\#14243](https://github.com/netdata/netdata/pull/14243) ([ktsaou](https://github.com/ktsaou))
-- `ml - machine learning` to just `machine learning` [\#14242](https://github.com/netdata/netdata/pull/14242) ([andrewm4894](https://github.com/andrewm4894))
-- cancel ml threads on shutdown and join them on host free [\#14240](https://github.com/netdata/netdata/pull/14240) ([ktsaou](https://github.com/ktsaou))
-- pre gcc v5 support and allow building without dbengine [\#14239](https://github.com/netdata/netdata/pull/14239) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
