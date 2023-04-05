@@ -3,14 +3,6 @@
 #include "web/api/web_api_v1.h"
 #include "database/storage_engine.h"
 
-inline bool query_target_has_percentage_units(struct query_target *qt) {
-    if(qt->window.options & RRDR_OPTION_PERCENTAGE ||
-       qt->window.time_group_method == RRDR_GROUPING_CV)
-        return true;
-
-    return false;
-}
-
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb) {
     rrdset2json(st, wb, NULL, NULL, 0);
 }

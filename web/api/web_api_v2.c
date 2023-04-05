@@ -215,8 +215,10 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
         group_by[0].group_by = RRDR_GROUP_BY_DIMENSION;
 
     for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
-        if ((group_by[g].group_by & ~(RRDR_GROUP_BY_DIMENSION)) || (options & RRDR_OPTION_PERCENTAGE))
+        if ((group_by[g].group_by & ~(RRDR_GROUP_BY_DIMENSION)) || (options & RRDR_OPTION_PERCENTAGE)) {
             options |= RRDR_OPTION_ABSOLUTE;
+            break;
+        }
     }
 
     if(options & RRDR_OPTION_DEBUG)

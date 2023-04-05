@@ -1001,6 +1001,9 @@ static void rrdr_grouped_by_array_v2(BUFFER *wb, const char *key, RRDR *r, RRDR_
     if(group_by & RRDR_GROUP_BY_SELECTED)
         buffer_json_add_array_item_string(wb, "selected");
 
+    else if(group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE)
+        buffer_json_add_array_item_string(wb, "percentage-of-instance");
+
     else {
 
         if(group_by & RRDR_GROUP_BY_DIMENSION)

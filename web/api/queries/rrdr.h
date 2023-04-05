@@ -100,6 +100,7 @@ typedef struct rrdresult {
     DICTIONARY **dl;          // array of d dimension labels - NOT ALLOCATED when RRDR is created
     STORAGE_POINT *dqp;       // array of d dimensions query points - NOT ALLOCATED when RRDR is created
     STORAGE_POINT *dview;     // array of d dimensions group by view - NOT ALLOCATED when RRDR is created
+    NETDATA_DOUBLE *vh;       // array of n x d hidden values, while grouping - NOT ALLOCATED when RRDR is created
 
     DICTIONARY *label_keys;
 

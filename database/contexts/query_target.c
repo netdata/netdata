@@ -425,7 +425,7 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
                 // the user selection does not match this dimension
                 // but, we may still need to query it
 
-                if (qt->request.options & RRDR_OPTION_PERCENTAGE) {
+                if (query_target_needs_all_dimensions(qt)) {
                     // this is percentage calculation
                     // so, we need this dimension to calculate the percentage
                     needed = true;
@@ -450,7 +450,7 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
                 status |= QUERY_STATUS_DIMENSION_HIDDEN;
                 options |= RRDR_DIMENSION_HIDDEN;
 
-                if (qt->request.options & RRDR_OPTION_PERCENTAGE) {
+                if (query_target_needs_all_dimensions(qt)) {
                     // this is percentage calculation
                     // so, we need this dimension to calculate the percentage
                     needed = true;
@@ -1040,7 +1040,11 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     query_target_generate_name(qt);
     qt->window.after = qt->request.after;
     qt->window.before = qt->request.before;
+
     qt->window.options = qt->request.options;
+    if(query_target_has_percentage_of_instance(qt))
+        qt->window.options &= ~RRDR_OPTION_PERCENTAGE;
+
     rrdr_relative_window_to_absolute(&qt->window.after, &qt->window.before, &qt->window.now);
 
     // prepare our local variables - we need these across all these functions

@@ -61,10 +61,6 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, struct query_target *qt, ti
 
 void rrdr_json_group_by_labels(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options);
 
-struct query_target;
-bool query_target_has_percentage_units(struct query_target *qt);
-#define query_target_aggregatable(qt) ((qt)->window.options & RRDR_OPTION_RETURN_RAW)
-
 int rrdset2value_api_v1(
         RRDSET *st
         , BUFFER *wb

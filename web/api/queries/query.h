@@ -61,6 +61,7 @@ typedef enum rrdr_group_by {
     RRDR_GROUP_BY_NODE      = (1 << 4),
     RRDR_GROUP_BY_CONTEXT   = (1 << 5),
     RRDR_GROUP_BY_UNITS     = (1 << 6),
+    RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE  = (1 << 7),
 } RRDR_GROUP_BY;
 
 #define SUPPORTED_GROUP_BY_METHODS (\
@@ -70,7 +71,8 @@ typedef enum rrdr_group_by {
     RRDR_GROUP_BY_LABEL     |\
     RRDR_GROUP_BY_NODE      |\
     RRDR_GROUP_BY_CONTEXT   |\
-    RRDR_GROUP_BY_UNITS      \
+    RRDR_GROUP_BY_UNITS     |\
+    RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE \
 )
 
 struct web_buffer;

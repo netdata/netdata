@@ -522,5 +522,29 @@ bool rrdcontext_retention_match(RRDCONTEXT_ACQUIRED *rca, time_t after, time_t b
     (((first_entry_s) - ((update_every_s) * 2) <= (before)) &&                     \
      ((last_entry_s)  + ((update_every_s) * 2) >= (after)))
 
+#define query_target_aggregatable(qt) ((qt)->window.options & RRDR_OPTION_RETURN_RAW)
+
+static inline bool query_target_has_percentage_of_instance(QUERY_TARGET *qt) {
+    for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++)
+        if(qt->request.group_by[g].group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE)
+            return true;
+
+    return false;
+}
+
+static inline bool query_target_needs_all_dimensions(QUERY_TARGET *qt) {
+    if(qt->request.options & RRDR_OPTION_PERCENTAGE)
+        return true;
+
+    return query_target_has_percentage_of_instance(qt);
+}
+
+static inline bool query_target_has_percentage_units(QUERY_TARGET *qt) {
+    if(qt->window.time_group_method == RRDR_GROUPING_CV || query_target_needs_all_dimensions(qt))
+        return true;
+
+    return false;
+}
+
 #endif // NETDATA_RRDCONTEXT_H
 
