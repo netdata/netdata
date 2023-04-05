@@ -1,18 +1,18 @@
 # Security and privacy design
 
-This document serves as the relevant Annex to the [Terms of Service](http://netdata.cloud/service-terms/) and
+This document serves as the relevant Annex to the [Terms of Service](http://netdata.cloud/service-terms/), the [Privacy Policy](https://www.netdata.cloud/privacy/) and
 the Data Processing Addendum, when applicable. It provides more information regarding Netdata’s technical and organizational security and privacy measures.
 
 We have given special attention to all aspects of Netdata, ensuring that everything throughout its operation is as secure as possible. Netdata has been designed with security in mind.
 
 > When running Netdata in environments requiring Payment Card Industry Data Security Standard (**PCI DSS**), Systems and Organization Controls (**SOC 2**),
 or Health Insurance Portability and Accountability Act (**HIPAA**) compliance, please keep in mind that 
-**even when you use Netdata Cloud, all collected data is always stored inside your infrastructure**. 
+**even when the user uses Netdata Cloud, all collected data is always stored inside their infrastructure**. 
 
-Dashboard data you view and alert notifications do travel 
-over Netdata Cloud, as they also travel over third party networks, to reach your web browser or the notification integrations you have configured, 
+Dashboard data a user views and alert notifications do travel 
+over Netdata Cloud, as they also travel over third party networks, to reach the user's web browser or the notification integrations the user has configured, 
 but Netdata Cloud does not store metric data. It only transforms them as they pass through it, aggregating them from multiple Agents and Parents, 
-to appear as one data source on your browser.
+to appear as one data source on the user's browser.
 
 ## Cloud design
 
@@ -38,10 +38,10 @@ cookies, the IP is also stored in the systems we use to track the usage of the a
 
 ### Infrastructure data stored
 
-The metric data that you see in the web browser when using Netdata Cloud is streamed directly from the Netdata Agent 
+The metric data that a user sees in the web browser when using Netdata Cloud is streamed directly from the Netdata Agent 
 to the Netdata Cloud dashboard, via the Agent-Cloud link (see [data transfer](#data-transfer)). The data passes through our systems, but it isn’t stored. 
 
-The metadata we do store for each node connected to your Spaces in Netdata Cloud is:
+The metadata we do store for each node connected to the user's Spaces in Netdata Cloud is:
   - Hostname (as it appears in Netdata Cloud)
   - Information shown in `/api/v1/info`. For example: [https://frankfurt.my-netdata.io/api/v1/info](https://frankfurt.my-netdata.io/api/v1/info).
   - Metric metadata information shown in `/api/v1/contexts`. For example: [https://frankfurt.my-netdata.io/api/v1/contexts](https://frankfurt.my-netdata.io/api/v1/contexts).
@@ -55,14 +55,14 @@ The infrastructure data is stored in our production database on AWS and copied t
 
 All infrastructure data visible on Netdata Cloud has to pass through the Agent-Cloud link (ACLK) mechanism, which 
 securely connects a Netdata Agent to Netdata Cloud. The Netdata agent initiates and establishes an outgoing secure 
-WebSocket (WSS) connection to Netdata Cloud. The ACLK is encrypted, safe, and is only established if you connect your node. 
+WebSocket (WSS) connection to Netdata Cloud. The ACLK is encrypted, safe, and is only established if the user connects their node. 
 
 Data is encrypted when in transit between a user and Netdata Cloud using TLS.
 
 ### Data retention
 
-Netdata may maintain backups of Netdata Cloud Customer Content, which would remain in place for approximately thirty 
-(30) days following a deletion in Netdata Cloud. 
+Netdata may maintain backups of Netdata Cloud Customer Content, which would remain in place for approximately ninety 
+(90) days following a deletion in Netdata Cloud. 
 
 ### Data portability and erasure
 
@@ -80,17 +80,17 @@ the Customer’s written request, within the timeframe specified in the DPA and 
 
 #### Delete all personal data
 
-To remove all personal info we have about you (email and activities) you need to delete your cloud account by logging into https://app.netdata.cloud and accessing your profile, at the bottom left of your screen. 
+To remove all personal info we have about a user (email and activities) they need to delete their cloud account by logging into https://app.netdata.cloud and accessing their profile, at the bottom left of the screen. 
 
 
 ## Agent design
 
-### Your data is safe with Netdata
+### User data is safe with Netdata
 
 Netdata collects raw data from many sources. For each source, Netdata uses a plugin that connects to the source (or reads the 
 relative files produced by the source), receives raw data and processes them to calculate the metrics shown on Netdata dashboards.
 
-Even if Netdata plugins connect to your database server, or read your application log file to collect raw data, the product of 
+Even if Netdata plugins connect to the user's database server, or read user's application log file to collect raw data, the product of 
 this data collection process is always a number of **chart metadata and metric values** (summarized data for dashboard visualization). 
 All Netdata plugins (internal to the Netdata daemon, and external ones written in any computer language), convert raw data collected 
 into metrics, and only these metrics are stored in Netdata databases, sent to upstream Netdata servers, or archived to external 
@@ -100,7 +100,7 @@ The **raw data** collected by Netdata does not leave the host when collected. **
 
 This means that Netdata can safely be used in environments that require the highest level of data isolation (like PCI Level 1).
 
-### Your systems are safe with Netdata
+### User systems are safe with Netdata
 
 We are very proud that **the Netdata daemon runs as a normal system user, without any special privileges**. This is quite an 
 achievement for a monitoring system that collects all kinds of system and application metrics.
@@ -124,7 +124,7 @@ the only feature that routes requests back to origin Netdata Agents via Netdata 
 a request to the Netdata Agent data collection plugin running at the 
 edge, to provide additional information, such as the process tree of a server, or the long queries of a DB. 
 
-<!-- You have full control over the available functions. For more information see “Controlling Access to Functions” and “Disabling Functions”. -->
+<!-- The user has full control over the available functions. For more information see “Controlling Access to Functions” and “Disabling Functions”. -->
 
 ### Netdata is read-only
 
@@ -137,20 +137,20 @@ application versions, host IPs, etc. are not stored and are not exposed by Netda
 ### Protect Netdata from the internet
 
 Users are responsible to take all appropriate measures to secure their Netdata agent installations and especially the Netdata web user interface and API against unauthorized access. Netdata comes with a wide range of options to 
-[secure your nodes](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/secure-nodes.md) in 
-compliance with your organization's security policy.
+[secure user nodes](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/secure-nodes.md) in 
+compliance with the user organization's security policy.
 
 ### Anonymous statistics
 
 #### Netdata registry
 
 The default configuration uses a public [registry](https://github.com/netdata/netdata/blob/master/registry/README.md) under registry.my-netdata.io. 
-If you use that public registry, you submit the following information to a third party server: 
+If the user uses that public registry, they submit the following information to a third party server: 
  - The URL of the agent's web user interface (via http request referrer)
- - The hostnames of your Netdata servers
+ - The hostnames of the user's Netdata servers
 
-If sending this information to the central Netdata registry violates your security policies, you can configure Netdata to 
-[run your own registry](https://github.com/netdata/netdata/blob/master/registry/README.md#run-your-own-registry).
+If sending this information to the central Netdata registry violates user's security policies, they can configure Netdata to 
+[run their own registry](https://github.com/netdata/netdata/blob/master/registry/README.md#run-your-own-registry).
 
 #### Anonymous telemetry events
 
@@ -160,7 +160,7 @@ about the information collected and learn how to opt-out, on our
 
 ### Netdata directories
 
-The agent stores data in 6 different directories on your system. 
+The agent stores data in 6 different directories on the user's system. 
 <details>
 <summary>Expand to see each directory's purpose, ownership and permissions</summary>
 | path|owner|permissions|Netdata|comments|

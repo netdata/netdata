@@ -1,83 +1,88 @@
-<!--
-title: "IRC agent alert notifications"
-sidebar_label: "IRC"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/irc/README.md"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Integrations/Notify/Agent alert notifications"
-learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
--->
+# IRC Agent alert notifications
 
-# IRC agent alert notifications
+Learn how to send notifications to IRC using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+
+> ### Note
+>
+> This file assumes you have read the [Introduction to Agent alert notifications](https://github.com/netdata/netdata/blob/master/health/notifications/README.md), detailing how the Netdata Agent's alert notification method works.
 
 This is what you will get:
 
-IRCCloud web client:\
+IRCCloud web client:  
 ![image](https://user-images.githubusercontent.com/31221999/36793487-3735673e-1ca6-11e8-8880-d1d8b6cd3bc0.png)
 
-Irssi terminal client:
+Irssi terminal client:  
 ![image](https://user-images.githubusercontent.com/31221999/36793486-3713ada6-1ca6-11e8-8c12-70d956ad801e.png)
 
-You need:
+## Prerequisites
 
-1.  The `nc` utility. If you do not set the path, Netdata will search for it in your system `$PATH`.
+You will need:
 
-Set the path for `nc` in `/etc/netdata/health_alarm_notify.conf` (to edit it on your system run `/etc/netdata/edit-config health_alarm_notify.conf`), like this:
+- The `nc` utility.  
+   You can set the path to it, or Netdata will search for it in your system `$PATH`.
+- terminal access to the Agent you wish to configure
 
+## Configure Netdata to send alert notifications to IRC
+
+> ### Info
+>
+> This file mentions editing configuration files.  
+>
+> - To edit configuration files in a safe way, we provide the [`edit config` script](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) located in your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) (typically is `/etc/netdata`) that creates the proper file and opens it in an editor automatically.  
+> Note that to run the script you need to be inside your Netdata config directory.
+>
+> It is recommended to use this way for configuring Netdata.
+
+Edit `health_alarm_notify.conf`, changes to this file do not require restarting Netdata:
+
+1. Set the path for `nc`, otherwise Netdata will search for it in your system `$PATH`:
+
+    ```conf
+    #------------------------------------------------------------------------------
+    # external commands
+    #
+    # The full path of the nc command.
+    # If empty, the system $PATH will be searched for it.
+    # If not found, irc notifications will be silently disabled.
+    nc="/usr/bin/nc"
+    ```
+
+2. Set `SEND_IRC` to `YES`
+3. Set `DEFAULT_RECIPIENT_IRC` to one or more channels to post the messages to.  
+   You can define multiple channels like this: `#alarms #systems`.  
+   All roles will default to this variable if left unconfigured.
+4. Set `IRC_NETWORK` to the IRC network which your preferred channels belong to.
+5. Set `IRC_PORT` to the IRC port to which a connection will occur.
+6. Set `IRC_NICKNAME` to the IRC nickname which is required to send the notification.  
+   It must not be an already registered name as the connection's `MODE` is defined as a `guest`.
+7. Set `IRC_REALNAME` to the IRC realname which is required in order to make he connection.
+
+You can then have different channels per **role**, by editing `DEFAULT_RECIPIENT_IRC` with the channel you want, in the following entries at the bottom of the same file:
+
+```conf
+role_recipients_irc[sysadmin]="#systems"
+role_recipients_irc[domainadmin]="#domains"
+role_recipients_irc[dba]="#databases #systems"
+role_recipients_irc[webmaster]="#marketing #development"
+role_recipients_irc[proxyadmin]="#proxy-admin"
+role_recipients_irc[sitemgr]="#sites"
 ```
-#------------------------------------------------------------------------------
-# external commands
-#
-# The full path of the nc command.
-# If empty, the system $PATH will be searched for it.
-# If not found, irc notifications will be silently disabled.
-nc="/usr/bin/nc"
-```
 
-2.  Αn `IRC_NETWORK` to which your preferred channels belong to.   
-3.  One or more channels ( `DEFAULT_RECIPIENT_IRC` ) to post the messages to.   
-4.  An `IRC_NICKNAME` and an `IRC_REALNAME` to identify in IRC.   
+The values you provide should be IRC channels which belong to the specified IRC network.
 
-Set them in `/etc/netdata/health_alarm_notify.conf` (to edit it on your system run `/etc/netdata/edit-config health_alarm_notify.conf`), like this:
+An example of a working configuration would be:
 
-```
+```conf
 #------------------------------------------------------------------------------
 # irc notification options
 #
-# irc notifications require only the nc utility to be installed. 
-
-# multiple recipients can be given like this:
-#              "<irc_channel_1> <irc_channel_2> ..."
-
-# enable/disable sending irc notifications
 SEND_IRC="YES"
-
-# if a role's recipients are not configured, a notification will not be sent.
-# (empty = do not send a notification for unconfigured roles):
 DEFAULT_RECIPIENT_IRC="#system-alarms"
-
-# The irc network to which the recipients belong. It must be the full network.
 IRC_NETWORK="irc.freenode.net"
-
-# The irc nickname which is required to send the notification. It must not be 
-# an already registered name as the connection's MODE is defined as a 'guest'.
 IRC_NICKNAME="netdata-alarm-user"
-
-# The irc realname which is required in order to make the connection and is an
-# extra identifier.
 IRC_REALNAME="netdata-user"
 ```
 
-You can define multiple channels like this: `#system-alarms #networking-alarms`.\
-You can also filter the notifications like this: `#system-alarms|critical`.\
-You can give different channels per **role** using these (at the same file):  
+## Test the notification method
 
-```
-role_recipients_irc[sysadmin]="#user-alarms #networking-alarms #system-alarms"
-role_recipients_irc[dba]="#databases-alarms"
-role_recipients_irc[webmaster]="#networking-alarms"
-```
-
-The keywords `#user-alarms`, `#networking-alarms`, `#system-alarms`, `#databases-alarms` are irc channels which belong to the specified IRC network.
-
-
+To test this alert notification method refer to the ["Testing Alert Notifications"](https://github.com/netdata/netdata/blob/master/health/notifications/README.md#testing-alert-notifications) section of the Agent alert notifications page.
