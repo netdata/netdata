@@ -1,5 +1,5 @@
 ---
-# Runs various ReviewDog based checks against PR with suggested changes to improve quality
+# Runs various linter checks against PR with suggested changes to improve quality
 name: Review
 on:
   pull_request:
@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       actionlint: ${{ steps.actionlint.outputs.run }}
+      clangformat: ${{ steps.clangformat.outputs.run }}
       eslint: ${{ steps.eslint.outputs.run }}
       flake8: ${{ steps.flake8.outputs.run }}
       hadolint: ${{ steps.hadolint.outputs.run }}
@@ -34,6 +35,17 @@ jobs:
           elif git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '\.github/workflows/.*' ; then
             echo "run=true" >> "${GITHUB_OUTPUT}"
             echo 'GitHub Actions workflows have changed, need to run actionlint.'
+          else
+            echo "run=false" >> "${GITHUB_OUTPUT}"
+          fi
+      - name: Check files for clang-format
+        id: clangformat
+        run: |
+          if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/clang-format') }}" = "true" ]; then
+            echo "run=true" >> "${GITHUB_OUTPUT}"
+          elif git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '.*\.\(cpp|cxx|c|hpp|hxx|h\)$' ; then
+            echo "run=true" >> "${GITHUB_OUTPUT}"
+            echo 'C/C++ code has changed, need to run clang-format.'
           else
             echo "run=false" >> "${GITHUB_OUTPUT}"
           fi
@@ -109,6 +121,39 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
+
+  clang-format:
+    name: clang-format
+    needs: prep-review
+    if: needs.prep-review.outputs.clangformat == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git clone repository
+        uses: actions/checkout@v3
+        with:
+          submodules: false
+          fetch-depth: 0
+      - name: Check for label
+        id: label
+        run: |
+          if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/clang-format') }}" = "true" ]; then
+            echo 'check-all=true' >> "${GITHUB_OUTPUT}"
+          else
+            echo 'check-all=false' >> "${GITHUB_OUTPUT}"
+          fi
+      - name: Run clang-format
+        run: |
+          if [ "${{ steps.label.outputs.check-all }}" == 'true' ]; then
+            find . -regex '.*\.\(c\|cpp\|cxx\|h\|hpp\|hxx\)$' -exec clang-format -i --style=file '{}' \;
+          else
+            git diff --name-only origin/${{ github.base_ref }} HEAD | grep -E '.*\.\(cpp|cxx|c|hpp|hxx|h\)$' | \
+            xargs -n 1 -r clang-format -i --style=file
+          fi
+          git status --porcelain=v1 > /tmp/porcelain
+          if [ -s /tmp/porcelain ]; then
+            cat /tmp/porcelain
+            exit 1
+          fi
 
   eslint:
     name: eslint
