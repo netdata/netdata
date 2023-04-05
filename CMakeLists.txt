@@ -463,6 +463,8 @@ set(LIBNETDATA_FILES
         libnetdata/locks/locks.h
         libnetdata/log/log.c
         libnetdata/log/log.h
+        libnetdata/log/event_log.c
+        libnetdata/log/event_log.h
         libnetdata/os.c
         libnetdata/os.h
         libnetdata/onewayalloc/onewayalloc.c

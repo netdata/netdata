@@ -24,6 +24,7 @@ typedef struct rrdcalctemplate RRDCALCTEMPLATE;
 typedef struct alarm_entry ALARM_ENTRY;
 
 typedef struct rrdlabels RRDLABELS;
+typedef struct event_log_entry EVENT_LOG_ENTRY;
 
 typedef struct rrdfamily_acquired RRDFAMILY_ACQUIRED;
 typedef struct rrdvar_acquired RRDVAR_ACQUIRED;
@@ -1067,6 +1068,32 @@ typedef struct health {
     bool use_summary_for_notifications;            // whether or not to use the summary field as a subject for notifications
 } HEALTH;
 
+
+// ----------------------------------------------------------------------------
+// Event log
+struct event_log_entry {
+    uint32_t unique_id;
+    time_t when;
+    STRING *name;
+    STRING *info;
+    STRING *collector;
+    STRING *plugin;
+
+    struct event_log_entry *next;
+    struct event_log_entry *next_in_progress;
+    struct event_log_entry *prev_in_progress;
+};
+
+typedef struct event_log {
+    uint32_t next_log_id;
+    uint32_t max_unique_id;
+
+    unsigned int count;
+    unsigned int max;
+    EVENT_LOG_ENTRY *events;
+    netdata_rwlock_t event_log_rwlock;
+} EVENT_LOG;
+
 // ----------------------------------------------------------------------------
 // RRD HOST
 
@@ -1204,6 +1231,8 @@ struct rrdhost {
     uint32_t health_max_unique_id;                  // the max alarm log unique id given for the host
     uint32_t health_max_alarm_id;                   // the max alarm id given for the host
     size_t health_transitions;                      // the number of times an alert changed state
+
+    EVENT_LOG event_log;
 
     // ------------------------------------------------------------------------
     // locks

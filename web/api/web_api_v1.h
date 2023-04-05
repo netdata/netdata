@@ -31,6 +31,7 @@ int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *w, char
 int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url);
 int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url_path_endpoint);
 int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb);
+int web_client_api_request_v1_events(RRDHOST *host, struct web_client *w, char *url);
 
 void web_client_api_v1_init(void);
 void web_client_api_v1_management_init(void);

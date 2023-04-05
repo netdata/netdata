@@ -62,8 +62,6 @@ static DICTIONARY *dict_mountpoints = NULL;
 #define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_is_obsolete(st); (st) = NULL; } } while(st)
 
 int mount_point_cleanup(const char *name, void *entry, int slow) {
-    (void)name;
-    
     struct mount_point_metadata *mp = (struct mount_point_metadata *)entry;
     if(!mp) return 0;
 
@@ -90,6 +88,12 @@ int mount_point_cleanup(const char *name, void *entry, int slow) {
 
         rrdset_obsolete_and_pointer_null(mp->st_space);
         rrdset_obsolete_and_pointer_null(mp->st_inodes);
+
+        char info[1024];
+        snprintfz(info, 1023, "Disk %s was unmounted", name);
+        EVENT_LOG_ENTRY *ee = event_log_create_entry("Disk", info);
+        if (ee)
+            event_log_add_entry(localhost, ee);
     }
 
     return 0;
