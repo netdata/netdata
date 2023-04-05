@@ -48,6 +48,21 @@ static int web_client_api_request_v2_weights(RRDHOST *host __maybe_unused, struc
                                           WEIGHTS_FORMAT_MULTINODE, 2);
 }
 
+#define GROUP_BY_KEY_MAX_LENGTH 30
+static struct {
+    char group_by[GROUP_BY_KEY_MAX_LENGTH + 1];
+    char aggregation[GROUP_BY_KEY_MAX_LENGTH + 1];
+    char group_by_label[GROUP_BY_KEY_MAX_LENGTH + 1];
+} group_by_keys[MAX_QUERY_GROUP_BY_PASSES];
+
+__attribute__((constructor)) void initialize_group_by_keys(void) {
+    for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
+        snprintfz(group_by_keys[g].group_by, GROUP_BY_KEY_MAX_LENGTH, "group_by[%zu]", g);
+        snprintfz(group_by_keys[g].aggregation, GROUP_BY_KEY_MAX_LENGTH, "aggregation[%zu]", g);
+        snprintfz(group_by_keys[g].group_by_label, GROUP_BY_KEY_MAX_LENGTH, "group_by_label[%zu]", g);
+    }
+}
+
 static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     usec_t received_ut = now_monotonic_usec();
 
@@ -169,6 +184,16 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
                     responseHandler = tqx_value;
                 else if(!strcmp(tqx_name, "outFileName"))
                     outFileName = tqx_value;
+            }
+        }
+        else {
+            for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
+                if(!strcmp(name, group_by_keys[g].group_by))
+                    group_by[g].group_by = group_by_parse(value);
+                else if(!strcmp(name, group_by_keys[g].group_by_label))
+                    group_by[g].group_by_label = value;
+                else if(!strcmp(name, group_by_keys[g].aggregation))
+                    group_by[g].aggregation = group_by_aggregate_function_parse(value);
             }
         }
     }
