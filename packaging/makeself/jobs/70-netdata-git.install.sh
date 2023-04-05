@@ -34,6 +34,7 @@ run ./netdata-installer.sh \
   --require-cloud \
   --use-system-protobuf \
   --dont-scrub-cflags-even-though-it-may-break-things \
+  --use-legacy-prefix-behavior-despite-it-being-incorrect \
   --one-time-build
 
 # shellcheck disable=SC2015

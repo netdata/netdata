@@ -367,6 +367,9 @@ while [ -n "${1}" ]; do
       NETDATA_PREFIX="${2}"
       shift 1
       ;;
+    "--use-legacy-prefix-behavior-despite-it-being-incorrect")
+      NETDATA_USE_LEGACY_PREFIX=1
+      ;;
     "--help" | "-h")
       usage
       exit 1
@@ -455,11 +458,19 @@ fi
 
 # Set prefix handling info correctly
 if [ -n "${NETDATA_PREFIX}" ] && [ "${NETDATA_PREFIX}" != "/" ]; then
-  NETDATA_CONFIGURE_PREFIX_ARGS="--prefix=${NETDATA_PREFIX}"
-  NETDATA_BINDIR="${NETDATA_PREFIX}/sbin"
-  NETDATA_DATADIR="${NETDATA_PREFIX}/share/netdata"
-  NETDATA_LIBDIR="${NETDATA_PREFIX}/lib/netdata"
-  NETDATA_LIBEXECDIR="${NETDATA_PREFIX}/libexec/netdata"
+  if [ -n "${NETDATA_USE_LEGACY_PREFIX}" ]; then
+    NETDATA_CONFIGURE_PREFIX_ARGS="--prefix='${NETDATA_PREFIX}/usr' --sysconfdir='${NETDATA_PREFIX}/etc' --localstatedir='${NETDATA_PREFIX}/var' --libexecdir='${NETDATA_PREFIX}/usr/libexec' --libdir='${NETDATA_PREFIX}/usr/lib'"
+    NETDATA_BINDIR="${NETDATA_PREFIX}/usr/sbin"
+    NETDATA_DATADIR="${NETDATA_PREFIX}/usr/share/netdata"
+    NETDATA_LIBDIR="${NETDATA_PREFIX}/usr/lib/netdata"
+    NETDATA_LIBEXECDIR="${NETDATA_PREFIX}/usr/libexec/netdata"
+  else
+    NETDATA_CONFIGURE_PREFIX_ARGS="--prefix=${NETDATA_PREFIX}"
+    NETDATA_BINDIR="${NETDATA_PREFIX}/sbin"
+    NETDATA_DATADIR="${NETDATA_PREFIX}/share/netdata"
+    NETDATA_LIBDIR="${NETDATA_PREFIX}/lib/netdata"
+    NETDATA_LIBEXECDIR="${NETDATA_PREFIX}/libexec/netdata"
+  fi
 else
   NETDATA_CONFIGURE_PREFIX_ARGS="--prefix=/usr --sysconfdir=/etc --localstatedir=/var"
   NETDATA_BINDIR="/usr/sbin"
