@@ -459,7 +459,7 @@ fi
 # Set prefix handling info correctly
 if [ -n "${NETDATA_PREFIX}" ] && [ "${NETDATA_PREFIX}" != "/" ]; then
   if [ -n "${NETDATA_USE_LEGACY_PREFIX}" ]; then
-    NETDATA_CONFIGURE_PREFIX_ARGS="--prefix='${NETDATA_PREFIX}/usr' --sysconfdir='${NETDATA_PREFIX}/etc' --localstatedir='${NETDATA_PREFIX}/var' --libexecdir='${NETDATA_PREFIX}/usr/libexec' --libdir='${NETDATA_PREFIX}/usr/lib'"
+    NETDATA_CONFIGURE_PREFIX_ARGS="--prefix=${NETDATA_PREFIX}/usr --sysconfdir=${NETDATA_PREFIX}/etc --localstatedir=${NETDATA_PREFIX}/var --libexecdir=${NETDATA_PREFIX}/usr/libexec --libdir=${NETDATA_PREFIX}/usr/lib"
     NETDATA_BINDIR="${NETDATA_PREFIX}/usr/sbin"
     NETDATA_DATADIR="${NETDATA_PREFIX}/usr/share/netdata"
     NETDATA_LIBDIR="${NETDATA_PREFIX}/usr/lib/netdata"
