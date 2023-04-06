@@ -15,12 +15,6 @@ typedef struct hardirq_ebpf_key {
     int irq;
 } hardirq_ebpf_key_t;
 
-typedef struct hardirq_ebpf_val {
-    uint64_t latency;
-    uint64_t ts;
-    char name[NETDATA_HARDIRQ_NAME_LEN];
-} hardirq_ebpf_val_t;
-
 enum hardirq_ebpf_static {
     HARDIRQ_EBPF_STATIC_APIC_THERMAL,
     HARDIRQ_EBPF_STATIC_APIC_THRESHOLD,

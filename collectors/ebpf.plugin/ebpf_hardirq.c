@@ -130,7 +130,7 @@ static hardirq_static_val_t hardirq_static_vals[] = {
 static avl_tree_lock hardirq_pub;
 
 // tmp store for dynamic hard IRQ values we get from a per-CPU eBPF map.
-static hardirq_ebpf_val_t *hardirq_ebpf_vals = NULL;
+static hardirq_ebpf_static_val_t *hardirq_ebpf_vals = NULL;
 
 // tmp store for static hard IRQ values we get from a per-CPU eBPF map.
 static hardirq_ebpf_static_val_t *hardirq_ebpf_static_vals = NULL;
@@ -254,6 +254,7 @@ static void hardirq_read_latency_map(int mapfd)
             total_latency += hardirq_ebpf_vals[i].latency/1000;
 
             // copy name for new IRQs.
+            /*
             if (v_is_new && !name_saved && hardirq_ebpf_vals[i].name[0] != '\0') {
                 strncpyz(
                     v->name,
@@ -262,6 +263,7 @@ static void hardirq_read_latency_map(int mapfd)
                 );
                 name_saved = true;
             }
+             */
         }
 
         // can now safely publish latency for existing IRQs.
@@ -377,7 +379,7 @@ static void hardirq_collector(ebpf_module_t *em)
 {
     hardirq_ebpf_vals = callocz(
         (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs,
-        sizeof(hardirq_ebpf_val_t)
+        sizeof(hardirq_ebpf_static_val_t)
     );
     hardirq_ebpf_static_vals = callocz(
         (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs,
