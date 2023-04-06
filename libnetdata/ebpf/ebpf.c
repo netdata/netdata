@@ -366,20 +366,22 @@ static uint32_t ebpf_select_index(uint32_t kernels, int is_rhf, uint32_t kver)
  *     V - The kernel version in string format.
  *
  *  @param out       the vector where the name will be stored
- *  @param path
  *  @param len       the size of the out vector.
+ *  @param path      where the binaries are stored
  *  @param kver      the kernel version
  *  @param name      the eBPF program name.
  *  @param is_return is return or entry ?
  */
-static void ebpf_mount_name(char *out, size_t len, char *path, uint32_t kver, const char *name, int is_return)
+static void ebpf_mount_name(char *out, size_t len, char *path, uint32_t kver, const char *name,
+                            int is_return, int is_rhf)
 {
     char *version = ebpf_select_kernel_name(kver);
-    snprintfz(out, len, "%s/ebpf.d/%cnetdata_ebpf_%s.%s.o",
+    snprintfz(out, len, "%s/ebpf.d/%cnetdata_ebpf_%s.%s%s.o",
               path,
               (is_return) ? 'r' : 'p',
               name,
-              version);
+              version,
+              (is_rhf != -1) ? ".rhf" : "");
 }
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -781,7 +783,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
 
     uint32_t idx = ebpf_select_index(em->kernels, is_rhf, kver);
 
-    ebpf_mount_name(lpath, 4095, plugins_dir, idx, em->thread_name, em->mode);
+    ebpf_mount_name(lpath, 4095, plugins_dir, idx, em->thread_name, em->mode, is_rhf);
 
     // When this function is called ebpf.plugin is using legacy code, so we should reset the variable
     em->load &= ~ NETDATA_EBPF_LOAD_METHODS;
