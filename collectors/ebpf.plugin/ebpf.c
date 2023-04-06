@@ -1820,8 +1820,9 @@ void set_global_variables()
         ebpf_configured_log_dir = LOG_DIR;
 
     ebpf_nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
-    if (ebpf_nprocs > NETDATA_MAX_PROCESSOR) {
+    if (ebpf_nprocs < 0) {
         ebpf_nprocs = NETDATA_MAX_PROCESSOR;
+        error("Cannot identify number of process, using default value %d", ebpf_nprocs);
     }
 
     isrh = get_redhat_release();
