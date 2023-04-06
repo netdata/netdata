@@ -503,6 +503,9 @@ static int process_STREAM_X_HTTP_1_1(http_stream_parse_state_t *parser_state, rb
 #define SINGLE_WRITE_MAX (1024)
 void stream_process(h2o_stream_conn_t *conn, int initial)
 {
+    int rc;
+    struct web_client w;
+
     pthread_mutex_lock(&conn->tx_buf_lock);
     if (h2o_socket_is_writing(conn->sock) || rbuf_bytes_available(conn->tx)) {
         if (rbuf_bytes_available(conn->tx) && !conn->tx_buf.base) {
@@ -543,7 +546,7 @@ void stream_process(h2o_stream_conn_t *conn, int initial)
         case STREAM_X_HTTP_1_1:
             // no conn->rx lock here as at this point we are still single threaded
             // until we call rrdpush_receiver_thread_spawn() later down
-            int rc = process_STREAM_X_HTTP_1_1(&conn->parse_state, conn->rx, &conn->url, &conn->user_agent);
+            rc = process_STREAM_X_HTTP_1_1(&conn->parse_state, conn->rx, &conn->url, &conn->user_agent);
             if (rc == PARSE_ERROR) {
                 error_report("error parsing the STREAM hello");
                 break;
@@ -553,7 +556,6 @@ void stream_process(h2o_stream_conn_t *conn, int initial)
             conn->state = STREAM_X_HTTP_1_1_DONE;
             /* FALLTHROUGH */
         case STREAM_X_HTTP_1_1_DONE:
-            struct web_client w;
             memset(&w, 0, sizeof(w));
             w.response.data = buffer_create(1024, NULL);
 
