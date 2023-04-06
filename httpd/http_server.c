@@ -348,12 +348,43 @@ static int hdl_netdata_conf(h2o_handler_t *self, h2o_req_t *req)
     return 0;
 }
 
-void stream_process(h2o_stream_conn_t *conn);
+void stream_process(h2o_stream_conn_t *conn, int initial);
+
+static void stream_on_close(h2o_stream_conn_t *conn)
+{
+    if (conn->sock != NULL)
+        h2o_socket_close(conn->sock);
+
+    pthread_mutex_lock(&conn->rx_buf_lock);
+    conn->shutdown = 1;
+    pthread_cond_broadcast(&conn->rx_buf_cond);
+    pthread_mutex_unlock(&conn->rx_buf_lock);
+
+    h2o_stream_conn_t_destroy(conn);
+    freez(conn);
+}
+
+static void stream_on_recv(h2o_socket_t *sock, const char *err)
+{
+    h2o_stream_conn_t *conn = sock->data;
+
+    if (err != NULL) {
+        stream_on_close(conn);
+        error_report("Streaming connection error \"%s\"", err);
+        return;
+    }
+    stream_process(conn, 0);
+}
 
 void on_write_complete(h2o_socket_t *sock, const char *err)
 {
-    UNUSED(err);
     h2o_stream_conn_t *conn = sock->data;
+
+    if (err != NULL) {
+        stream_on_close(conn);
+        error_report("Streaming connection error \"%s\"", err);
+        return;
+    }
 
     pthread_mutex_lock(&conn->tx_buf_lock);
 
@@ -364,7 +395,7 @@ void on_write_complete(h2o_socket_t *sock, const char *err)
 
     pthread_mutex_unlock(&conn->tx_buf_lock);
 
-    stream_process(conn);
+    stream_process(conn, 0);
 }
 
 #define PARSE_DONE 1
@@ -469,19 +500,44 @@ static int process_STREAM_X_HTTP_1_1(http_stream_parse_state_t *parser_state, rb
     }
 }
 
-void stream_process(h2o_stream_conn_t *conn)
+#define SINGLE_WRITE_MAX (1024)
+void stream_process(h2o_stream_conn_t *conn, int initial)
 {
     pthread_mutex_lock(&conn->tx_buf_lock);
     if (h2o_socket_is_writing(conn->sock) || rbuf_bytes_available(conn->tx)) {
         if (rbuf_bytes_available(conn->tx) && !conn->tx_buf.base) {
             conn->tx_buf.base = rbuf_get_linear_read_range(conn->tx, &conn->tx_buf.len);
             if (conn->tx_buf.base) {
-                conn->tx_buf.len = MIN(conn->tx_buf.len, 1024);
+                conn->tx_buf.len = MIN(conn->tx_buf.len, SINGLE_WRITE_MAX);
                 h2o_socket_write(conn->sock, &conn->tx_buf, 1, on_write_complete);
             }
         }
     }
     pthread_mutex_unlock(&conn->tx_buf_lock);
+
+    if (initial)
+        h2o_socket_read_start(conn->sock, stream_on_recv);
+
+    if (conn->sock->input->size) {
+        size_t insert_max;
+        pthread_mutex_lock(&conn->rx_buf_lock);
+        char *insert_loc = rbuf_get_linear_insert_range(conn->rx, &insert_max);
+        if (insert_loc == NULL) {
+            info("RX buffer full, temporarily stopping the reading until consumer (streaming thread) reads some data");
+            pthread_cond_broadcast(&conn->rx_buf_cond);
+            pthread_mutex_unlock(&conn->rx_buf_lock);
+            h2o_socket_read_stop(conn->sock);
+            return;
+        }
+        insert_max = MIN(insert_max, conn->sock->input->size);
+        memcpy(insert_loc, conn->sock->input->bytes, insert_max);
+        rbuf_bump_head(conn->rx, insert_max);
+
+        h2o_buffer_consume(&conn->sock->input, insert_max);
+
+        pthread_cond_broadcast(&conn->rx_buf_cond);
+        pthread_mutex_unlock(&conn->rx_buf_lock);
+    }
 
     switch (conn->state) {
         case STREAM_X_HTTP_1_1:
@@ -538,7 +594,7 @@ static void stream_on_complete(void *user_data, h2o_socket_t *sock, size_t reqsi
     sock->data = conn;
 
     h2o_buffer_consume(&sock->input, reqsize);
-    stream_process(conn);
+    stream_process(conn, 1);
 }
 
 static inline int is_streaming_handshake(h2o_req_t *req)
@@ -561,6 +617,47 @@ static inline int is_streaming_handshake(h2o_req_t *req)
     // server replies with it xored
 
     return 0;
+}
+
+int h2o_stream_write(void *ctx, const char *data, size_t data_len)
+{
+    h2o_stream_conn_t *conn = (h2o_stream_conn_t *)ctx;
+
+    pthread_mutex_lock(&conn->tx_buf_lock);
+    size_t avail = rbuf_bytes_free(conn->tx);
+    avail = MIN(avail, data_len);
+    rbuf_push(conn->tx, data, avail);
+    pthread_mutex_unlock(&conn->tx_buf_lock);
+    return avail;
+}
+
+size_t h2o_stream_read(void *ctx, char *buf, size_t read_bytes)
+{
+    int ret;
+    h2o_stream_conn_t *conn = (h2o_stream_conn_t *)ctx;
+
+    pthread_mutex_lock(&conn->rx_buf_lock);
+    size_t avail = rbuf_bytes_available(conn->rx);
+
+    if (!avail) {
+        if (conn->shutdown)
+            return -1;
+        pthread_cond_wait(&conn->rx_buf_cond, &conn->rx_buf_lock);
+        if (conn->shutdown)
+            return -1;
+        avail = rbuf_bytes_available(conn->rx);
+        if (!avail) {
+            pthread_mutex_unlock(&conn->rx_buf_lock);
+            return 0;
+        }
+    }
+
+    avail = MIN(avail, read_bytes);
+
+    ret = rbuf_pop(conn->rx, buf, avail);
+    pthread_mutex_unlock(&conn->rx_buf_lock);
+
+    return ret;
 }
 
 static int hdl_stream(h2o_handler_t *self, h2o_req_t *req)
@@ -630,11 +727,17 @@ void *httpd_main(void *ptr) {
         return NULL;
     }
 
+    usec_t last_wpoll = now_monotonic_usec();
     while (service_running(SERVICE_HTTPD)) {
         int rc = h2o_evloop_run(ctx.loop, POLL_INTERVAL);
         if (rc < 0 && errno != EINTR) {
             error("h2o_evloop_run returned (%d) with errno other than EINTR. Aborting", rc);
             break;
+        }
+        usec_t now = now_monotonic_usec();
+        if (now - last_wpoll > POLL_INTERVAL * 1000) {
+            last_wpoll = now;
+            //h2o_context_request_wakeup(&ctx);
         }
     } 
 
