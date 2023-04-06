@@ -573,7 +573,7 @@ static int rrdpush_http_upgrade_prelude(RRDHOST *host, struct sender_state *s) {
         goto err_cleanup;
     }
     if (strncmp(hdr, NETDATA_STREAM_PROTO_NAME, strlen(NETDATA_STREAM_PROTO_NAME))) {
-        error_report("");
+        error_report("Expected \"upgrade: " NETDATA_STREAM_PROTO_NAME "\"");
         goto err_cleanup;
     }
 
