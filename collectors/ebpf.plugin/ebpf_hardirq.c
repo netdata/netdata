@@ -132,9 +132,6 @@ static avl_tree_lock hardirq_pub;
 // tmp store for dynamic hard IRQ values we get from a per-CPU eBPF map.
 static hardirq_ebpf_static_val_t *hardirq_ebpf_vals = NULL;
 
-// tmp store for static hard IRQ values we get from a per-CPU eBPF map.
-static hardirq_ebpf_static_val_t *hardirq_ebpf_static_vals = NULL;
-
 /**
  * Hardirq Free
  *
@@ -152,7 +149,6 @@ static void ebpf_hardirq_free(ebpf_module_t *em)
         ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
     }
     freez(hardirq_ebpf_vals);
-    freez(hardirq_ebpf_static_vals);
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
@@ -286,7 +282,7 @@ static void hardirq_read_latency_static_map(int mapfd)
     uint32_t i;
     for (i = 0; i < HARDIRQ_EBPF_STATIC_END; i++) {
         uint32_t map_i = hardirq_static_vals[i].idx;
-        int test = bpf_map_lookup_elem(mapfd, &map_i, hardirq_ebpf_static_vals);
+        int test = bpf_map_lookup_elem(mapfd, &map_i, hardirq_ebpf_vals);
         if (unlikely(test < 0)) {
             continue;
         }
@@ -295,7 +291,7 @@ static void hardirq_read_latency_static_map(int mapfd)
         int cpu_i;
         int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
         for (cpu_i = 0; cpu_i < end; cpu_i++) {
-            total_latency += hardirq_ebpf_static_vals[cpu_i].latency/1000;
+            total_latency += hardirq_ebpf_vals[cpu_i].latency/1000;
         }
 
         hardirq_static_vals[i].latency = total_latency;
@@ -378,10 +374,6 @@ static inline void hardirq_write_static_dims()
 static void hardirq_collector(ebpf_module_t *em)
 {
     hardirq_ebpf_vals = callocz(
-        (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs,
-        sizeof(hardirq_ebpf_static_val_t)
-    );
-    hardirq_ebpf_static_vals = callocz(
         (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs,
         sizeof(hardirq_ebpf_static_val_t)
     );
