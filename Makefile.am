@@ -679,8 +679,6 @@ CLAIM_FILES = \
 
 if ENABLE_ACLK
 ACLK_FILES = \
-    aclk/aclk_util.c \
-    aclk/aclk_util.h \
     aclk/aclk_stats.c \
     aclk/aclk_stats.h \
     aclk/aclk_query.c \
@@ -693,8 +691,6 @@ ACLK_FILES = \
     aclk/aclk_tx_msgs.h \
     aclk/aclk_rx_msgs.c \
     aclk/aclk_rx_msgs.h \
-    aclk/https_client.c \
-    aclk/https_client.h \
     aclk/aclk_alarm_api.c \
     aclk/aclk_alarm_api.h \
     aclk/aclk_contexts_api.c \
@@ -740,15 +736,9 @@ libmqttwebsockets_a_SOURCES = \
     mqtt_websockets/src/common_public.c \
     mqtt_websockets/src/include/common_public.h \
     mqtt_websockets/src/include/common_internal.h \
-    mqtt_websockets/c-rbuf/src/ringbuffer.c \
-    mqtt_websockets/c-rbuf/include/ringbuffer.h \
-    mqtt_websockets/c-rbuf/src/ringbuffer_internal.h \
-    mqtt_websockets/c_rhash/src/c_rhash.c \
-    mqtt_websockets/c_rhash/include/c_rhash.h \
-    mqtt_websockets/c_rhash/src/c_rhash_internal.h \
     $(NULL)
 
-libmqttwebsockets_a_CFLAGS = $(CFLAGS) -DMQTT_WSS_CUSTOM_ALLOC -DRBUF_CUSTOM_MALLOC -DMQTT_WSS_CPUSTATS -I$(srcdir)/aclk/helpers -I$(srcdir)/mqtt_websockets/c_rhash/include
+libmqttwebsockets_a_CFLAGS = $(CFLAGS) -DMQTT_WSS_CUSTOM_ALLOC -DMQTT_WSS_CPUSTATS -I$(srcdir)/aclk/helpers -I$(srcdir)/mqtt_websockets/c_rhash/include
 
 if MQTT_WSS_DEBUG
 libmqttwebsockets_a_CFLAGS += -DMQTT_WSS_DEBUG
@@ -847,7 +837,24 @@ ACLK_ALWAYS_BUILD_FILES = \
     aclk/aclk.h \
     aclk/aclk_capas.c \
     aclk/aclk_capas.h \
+    aclk/aclk_util.c \
+    aclk/aclk_util.h \
+    aclk/https_client.c \
+    aclk/https_client.h \
     $(NULL)
+
+noinst_LIBRARIES += libcrutils.a
+
+libcrutils_a_SOURCES = \
+    mqtt_websockets/c-rbuf/src/ringbuffer.c \
+    mqtt_websockets/c-rbuf/include/ringbuffer.h \
+    mqtt_websockets/c-rbuf/src/ringbuffer_internal.h \
+    mqtt_websockets/c_rhash/src/c_rhash.c \
+    mqtt_websockets/c_rhash/include/c_rhash.h \
+    mqtt_websockets/c_rhash/src/c_rhash_internal.h \
+    $(NULL)
+
+libcrutils_a_CFLAGS = $(CFLAGS) -DRBUF_CUSTOM_MALLOC -I$(srcdir)/aclk/helpers -I$(abs_top_srcdir)/mqtt_websockets/c-rbuf/include -I$(srcdir)/mqtt_websockets/c_rhash/include
 
 SPAWN_PLUGIN_FILES = \
     spawn/spawn.c \
@@ -1102,6 +1109,7 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_UV_LIBS) \
     $(OPTIONAL_LZ4_LIBS) \
     libjudy.a \
+    libcrutils.a \
     $(OPTIONAL_SSL_LIBS) \
     $(OPTIONAL_JSONC_LIBS) \
     $(OPTIONAL_YAML_LIBS) \
