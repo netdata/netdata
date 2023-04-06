@@ -13,10 +13,6 @@ static ssize_t send_to_plugin(const char *txt, void *data) {
     if(!txt || !*txt)
         return 0;
 
-    errno = 0;
-    spinlock_lock(&parser->writer.spinlock);
-    ssize_t bytes = -1;
-
 #ifdef ENABLE_HTTPS
     NETDATA_SSL *ssl = parser->ssl_output;
     if(ssl) {

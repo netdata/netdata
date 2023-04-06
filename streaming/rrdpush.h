@@ -378,7 +378,12 @@ struct receiver_state {
         STREAM_NODE_INSTANCE *array;
     } instances;
 */
+
+    void *h2o_ctx;
 };
+
+#define is_h2o_rrdpush(x) ((x)->h2o_ctx != NULL)
+#define unless_h2o_rrdpush(x) if(!is_h2o_rrdpush(x))
 
 struct rrdpush_destinations {
     STRING *destination;
@@ -436,7 +441,7 @@ void rrdpush_send_dyncfg(RRDHOST *host);
 #define THREAD_TAG_STREAM_RECEIVER "RCVR" // "[host]" is appended
 #define THREAD_TAG_STREAM_SENDER "SNDR" // "[host]" is appended
 
-int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_string);
+int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_string, void *h2o_ctx);
 void rrdpush_sender_thread_stop(RRDHOST *host, STREAM_HANDSHAKE reason, bool wait);
 
 void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQUIRED *rva);
