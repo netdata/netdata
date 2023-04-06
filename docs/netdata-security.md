@@ -1,6 +1,6 @@
 # Security and privacy design
 
-This document serves as the relevant Annex to the [Terms of Service](http://netdata.cloud/service-terms/), the [Privacy Policy](https://www.netdata.cloud/privacy/) and
+This document serves as the relevant Annex to the [Terms of Service](https://www.netdata.cloud/service-terms/), the [Privacy Policy](https://www.netdata.cloud/privacy/) and
 the Data Processing Addendum, when applicable. It provides more information regarding Netdata’s technical and organizational security and privacy measures.
 
 We have given special attention to all aspects of Netdata, ensuring that everything throughout its operation is as secure as possible. Netdata has been designed with security in mind.
