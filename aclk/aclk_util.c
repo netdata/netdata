@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "aclk_util.h"
+
+#ifdef ENABLE_ACLK
+
 #include "aclk_proxy.h"
 
 #include "daemon/common.h"
@@ -454,6 +457,8 @@ static void EVP_ENCODE_CTX_free(EVP_ENCODE_CTX *ctx)
 	return;
 }
 #endif
+
+#endif /* ENABLE_ACLK */
 
 int base64_encode_helper(unsigned char *out, int *outl, const unsigned char *in, int in_len)
 {
