@@ -28,5 +28,10 @@ To add Opsgenie notification configurations you need
 ## Settings on Opsgenie
 
 To enable the Netdata integration on Opsgenie you need:
-1. Go to integrations tab of your team, click **Add integration** and pick **API** from available integrations. Copy your API Key and press **Save Integration**.
+1. Go to integrations tab of your team, click **Add integration**.
+
+   ![image](https://user-images.githubusercontent.com/93676586/230361479-cb73919c-452d-47ec-8066-ed99be5f05e2.png)
+
+1. Pick **API** from available integrations. Copy your API Key and press **Save Integration**.
+
 1. Paste copied API key into the corresponding field in **Integration configuration** section of Opsgenie modal window in Netdata.
