@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdpush.h"
+#include "httpd/http_server.h"
 
 // IMPORTANT: to add workers, you have to edit WORKER_PARSER_FIRST_JOB accordingly
 #define WORKER_RECEIVER_JOB_BYTES_READ (WORKER_PARSER_FIRST_JOB - 1)
@@ -103,6 +104,9 @@ static int read_stream(struct receiver_state *r, char* buffer, size_t size) {
         internal_error(true, "%s() asked to read zero bytes", __FUNCTION__);
         return 0;
     }
+
+    if (is_h2o_rrdpush(r))
+        return (int)h2o_stream_read(r->h2o_ctx, buffer, size);
 
     ssize_t bytes_read;
 
@@ -331,6 +335,8 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
 
     PARSER *parser = parser_init(&user, NULL, NULL, fd,
                                  PARSER_INPUT_SPLIT, ssl);
+
+    parser->h2o_ctx = rpt->h2o_ctx;
 
     pluginsd_keywords_init(parser, PARSER_INIT_STREAMING);
 
@@ -761,16 +767,20 @@ static void rrdpush_receive(struct receiver_state *rpt)
         }
 
         debug(D_STREAM, "Initial response to %s: %s", rpt->client_ip, initial_response);
-        ssize_t bytes_sent = send_timeout(
+        if (is_h2o_rrdpush(rpt)) {
+            h2o_stream_write(rpt->h2o_ctx, initial_response, strlen(initial_response));
+        } else {
+            ssize_t bytes_sent = send_timeout(
 #ifdef ENABLE_HTTPS
-                &rpt->ssl,
+                    &rpt->ssl,
 #endif
-                rpt->fd, initial_response, strlen(initial_response), 0, 60);
+                    rpt->fd, initial_response, strlen(initial_response), 0, 60);
 
-        if(bytes_sent != (ssize_t)strlen(initial_response)) {
-            internal_error(true, "Cannot send response, got %zd bytes, expecting %zu bytes", bytes_sent, strlen(initial_response));
-            rrdpush_receive_log_status(rpt, "cannot reply back", "CANT REPLY DROPPING CONNECTION");
-            goto cleanup;
+            if(bytes_sent != (ssize_t)strlen(initial_response)) {
+                internal_error(true, "Cannot send response, got %zd bytes, expecting %zu bytes", bytes_sent, strlen(initial_response));
+                rrdpush_receive_log_status(rpt, "cannot reply back", "CANT REPLY DROPPING CONNECTION");
+                goto cleanup;
+            }
         }
     }
 
