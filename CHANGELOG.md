@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Fix js tag in documentation [\#14862](https://github.com/netdata/netdata/pull/14862) ([Ancairon](https://github.com/Ancairon))
 - review usage of you to say user instead [\#14858](https://github.com/netdata/netdata/pull/14858) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Add labels for cgroup name [\#14856](https://github.com/netdata/netdata/pull/14856) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix typo alerms -\> alarms [\#14854](https://github.com/netdata/netdata/pull/14854) ([slavox](https://github.com/slavox))
@@ -391,7 +392,6 @@
 - fix\(pacakging\): fix cpu/memory metrics when running inside LXC container as systemd service [\#14255](https://github.com/netdata/netdata/pull/14255) ([ilyam8](https://github.com/ilyam8))
 - fix\(proc.plugin\): handle disabled IPv6 [\#14252](https://github.com/netdata/netdata/pull/14252) ([ilyam8](https://github.com/ilyam8))
 - DBENGINE v2 - improvements part 1 [\#14251](https://github.com/netdata/netdata/pull/14251) ([ktsaou](https://github.com/ktsaou))
-- Remove daemon/common.h header from libnetdata [\#14248](https://github.com/netdata/netdata/pull/14248) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
