@@ -1126,8 +1126,8 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                 if(unlikely(!d->st_error_stats)) {
                     char id[RRD_ID_LENGTH_MAX + 1], name[RRD_ID_LENGTH_MAX + 1], title[200 + 1];
 
-                    snprintfz(id, RRD_ID_LENGTH_MAX, "device_error_stats_%s_dev%d", node->id, d->id);
-                    snprintfz(name, RRD_ID_LENGTH_MAX, "device_error_stats_%s_dev%d", node->label, d->id);
+                    snprintfz(id, RRD_ID_LENGTH_MAX, "device_errors_dev%d_%s", d->id, node->id);
+                    snprintfz(name, RRD_ID_LENGTH_MAX, "device_errors_dev%d_%s", d->id, node->label);
                     snprintfz(title, 200, "BTRFS Device Errors");
 
                     netdata_fix_chart_id(id);
