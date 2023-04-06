@@ -4,8 +4,11 @@
 #include "streaming/common.h"
 #include "http_server.h"
 #include "h2o.h"
+#include "h2o/http1.h"
 
 #include "h2o_utils.h"
+
+#include "mqtt_websockets/c-rbuf/include/ringbuffer.h"
 
 static h2o_globalconf_t config;
 static h2o_context_t ctx;
@@ -19,6 +22,69 @@ static h2o_accept_ctx_t accept_ctx;
 
 #define HTTPD_CONFIG_SECTION "httpd"
 #define HTTPD_ENABLED_DEFAULT false
+
+typedef enum {
+    STREAM_X_HTTP_1_1 = 0,
+    STREAM_X_HTTP_1_1_DONE,
+    STREAM_ACTIVE,
+    STREAM_CLOSE
+} h2o_stream_state_t;
+
+typedef enum {
+    HTTP_STREAM = 0,
+    HTTP_URL,
+    HTTP_PROTO,
+    HTTP_USER_AGENT_KEY,
+    HTTP_USER_AGENT_VALUE,
+    HTTP_HDR,
+    HTTP_DONE
+} http_stream_parse_state_t;
+
+typedef struct {
+    h2o_socket_t *sock;
+    h2o_stream_state_t state;
+
+    rbuf_t rx;
+    pthread_cond_t  rx_buf_cond;
+    pthread_mutex_t rx_buf_lock;
+
+    rbuf_t tx;
+    h2o_iovec_t tx_buf;
+    pthread_mutex_t tx_buf_lock;
+
+    http_stream_parse_state_t parse_state;
+    char *url;
+    char *user_agent;
+
+    int shutdown;
+} h2o_stream_conn_t;
+
+#define H2O2STREAM_BUF_SIZE (1024 * 1024)
+
+static void h2o_stream_conn_t_init(h2o_stream_conn_t *conn)
+{
+    memset(conn, 0, sizeof(*conn));
+    conn->rx = rbuf_create(H2O2STREAM_BUF_SIZE);
+    conn->tx = rbuf_create(H2O2STREAM_BUF_SIZE);
+
+    pthread_mutex_init(&conn->rx_buf_lock, NULL);
+    pthread_mutex_init(&conn->tx_buf_lock, NULL);
+    pthread_cond_init(&conn->rx_buf_cond, NULL);
+    // no need to check for NULL as rbuf_create uses mallocz internally
+}
+
+static void h2o_stream_conn_t_destroy(h2o_stream_conn_t *conn)
+{
+    rbuf_free(conn->rx);
+    rbuf_free(conn->tx);
+
+    freez(conn->url);
+    freez(conn->user_agent);
+
+    pthread_mutex_destroy(&conn->rx_buf_lock);
+    pthread_mutex_destroy(&conn->tx_buf_lock);
+    pthread_cond_destroy(&conn->rx_buf_cond);
+}
 
 static void on_accept(h2o_socket_t *listener, const char *err)
 {
@@ -282,6 +348,244 @@ static int hdl_netdata_conf(h2o_handler_t *self, h2o_req_t *req)
     return 0;
 }
 
+void stream_process(h2o_stream_conn_t *conn);
+
+void on_write_complete(h2o_socket_t *sock, const char *err)
+{
+    UNUSED(err);
+    h2o_stream_conn_t *conn = sock->data;
+
+    pthread_mutex_lock(&conn->tx_buf_lock);
+
+    rbuf_bump_tail(conn->tx, conn->tx_buf.len);
+
+    conn->tx_buf.base = NULL;
+    conn->tx_buf.len = 0;
+
+    pthread_mutex_unlock(&conn->tx_buf_lock);
+
+    stream_process(conn);
+}
+
+#define PARSE_DONE 1
+#define PARSE_ERROR -1
+#define GIMME_MORE_OF_DEM_SWEET_BYTEZ 0
+
+#define STREAM_METHOD "STREAM "
+#define HTTP_1_1 " HTTP/1.1"
+#define HTTP_HDR_END "\r\n\r\n"
+#define USER_AGENT "User-Agent: "
+
+#define NEED_MIN_BYTES(buf, bytes)       \
+if (rbuf_bytes_available(buf) < bytes)   \
+    return GIMME_MORE_OF_DEM_SWEET_BYTEZ;
+
+// TODO check in streaming code this is probably defined somewhere already
+#define MAX_LEN_STREAM_HELLO (1024*2)
+
+static int process_STREAM_X_HTTP_1_1(http_stream_parse_state_t *parser_state, rbuf_t buf, char **url, char **user_agent)
+{
+    int idx;
+    switch(*parser_state) {
+        case HTTP_STREAM:
+            NEED_MIN_BYTES(buf, strlen(STREAM_METHOD));
+            if (rbuf_memcmp_n(buf, H2O_STRLIT(STREAM_METHOD))) {
+                error_report("Expected \"%s\"", STREAM_METHOD);
+                return PARSE_ERROR;
+            }
+            rbuf_bump_tail(buf, strlen(STREAM_METHOD));
+            *parser_state = HTTP_URL;
+            /* FALLTHROUGH */
+        case HTTP_URL:
+            if (!rbuf_find_bytes(buf, " ", 1, &idx)) {
+                if (rbuf_bytes_available(buf) >= MAX_LEN_STREAM_HELLO) {
+                    error_report("The initial \"STREAM [URL] HTTP/1.1\" over max of %d", MAX_LEN_STREAM_HELLO);
+                    return PARSE_ERROR;
+                }
+            }
+            *url = mallocz(idx + 1);
+            rbuf_pop(buf, *url, idx);
+            (*url)[idx] = 0;
+
+            *parser_state = HTTP_PROTO;
+            /* FALLTHROUGH */
+        case HTTP_PROTO:
+            NEED_MIN_BYTES(buf, strlen(HTTP_1_1));
+            if (rbuf_memcmp_n(buf, H2O_STRLIT(HTTP_1_1))) {
+                error_report("Expected \"%s\"", HTTP_1_1);
+                return PARSE_ERROR;
+            }
+            rbuf_bump_tail(buf, strlen(HTTP_1_1));
+            *parser_state = HTTP_USER_AGENT_KEY;
+            /* FALLTHROUGH */
+        case HTTP_USER_AGENT_KEY:
+            // and OF COURSE EVERYTHING is passed in URL except
+            // for user agent which we need and is passed as HTTP header
+            // not worth writing a parser for this so we manually extract
+            // just the single header we need and skip everything else
+            if (!rbuf_find_bytes(buf, USER_AGENT, strlen(USER_AGENT), &idx)) {
+                if (rbuf_bytes_available(buf) >= (size_t)(rbuf_get_capacity(buf) * 0.9)) {
+                    error_report("The initial \"STREAM [URL] HTTP/1.1\" over max of %d", MAX_LEN_STREAM_HELLO);
+                    return PARSE_ERROR;
+                }
+                return GIMME_MORE_OF_DEM_SWEET_BYTEZ;
+            }
+            rbuf_bump_tail(buf, idx + strlen(USER_AGENT));
+            *parser_state = HTTP_USER_AGENT_VALUE;
+            /* FALLTHROUGH */
+        case HTTP_USER_AGENT_VALUE:
+            if (!rbuf_find_bytes(buf, "\r\n", 2, &idx)) {
+                if (rbuf_bytes_available(buf) >= (size_t)(rbuf_get_capacity(buf) * 0.9)) {
+                    error_report("The initial \"STREAM [URL] HTTP/1.1\" over max of %d", MAX_LEN_STREAM_HELLO);
+                    return PARSE_ERROR;
+                }
+                return GIMME_MORE_OF_DEM_SWEET_BYTEZ;
+            }
+
+            *user_agent = mallocz(idx + 1);
+            rbuf_pop(buf, *user_agent, idx);
+            (*user_agent)[idx] = 0;
+
+            *parser_state = HTTP_HDR;
+            /* FALLTHROUGH */
+        case HTTP_HDR:
+            if (!rbuf_find_bytes(buf, HTTP_HDR_END, strlen(HTTP_HDR_END), &idx)) {
+                if (rbuf_bytes_available(buf) >= (size_t)(rbuf_get_capacity(buf) * 0.9)) {
+                    error_report("The initial \"STREAM [URL] HTTP/1.1\" over max of %d", MAX_LEN_STREAM_HELLO);
+                    return PARSE_ERROR;
+                }
+                return GIMME_MORE_OF_DEM_SWEET_BYTEZ;
+            }
+            rbuf_bump_tail(buf, idx + strlen(HTTP_HDR_END));
+
+            *parser_state = HTTP_DONE;
+            return PARSE_DONE;
+        case HTTP_DONE:
+            error_report("Parsing is done. No need to call again.");
+            return PARSE_DONE;
+        default:
+            error_report("Unknown parser state %d", (int)*parser_state);
+            return PARSE_ERROR;
+    }
+}
+
+void stream_process(h2o_stream_conn_t *conn)
+{
+    pthread_mutex_lock(&conn->tx_buf_lock);
+    if (h2o_socket_is_writing(conn->sock) || rbuf_bytes_available(conn->tx)) {
+        if (rbuf_bytes_available(conn->tx) && !conn->tx_buf.base) {
+            conn->tx_buf.base = rbuf_get_linear_read_range(conn->tx, &conn->tx_buf.len);
+            if (conn->tx_buf.base) {
+                conn->tx_buf.len = MIN(conn->tx_buf.len, 1024);
+                h2o_socket_write(conn->sock, &conn->tx_buf, 1, on_write_complete);
+            }
+        }
+    }
+    pthread_mutex_unlock(&conn->tx_buf_lock);
+
+    switch (conn->state) {
+        case STREAM_X_HTTP_1_1:
+            // no conn->rx lock here as at this point we are still single threaded
+            // until we call rrdpush_receiver_thread_spawn() later down
+            int rc = process_STREAM_X_HTTP_1_1(&conn->parse_state, conn->rx, &conn->url, &conn->user_agent);
+            if (rc == PARSE_ERROR) {
+                error_report("error parsing the STREAM hello");
+                break;
+            }
+            if (rc != PARSE_DONE)
+                break;
+            conn->state = STREAM_X_HTTP_1_1_DONE;
+            /* FALLTHROUGH */
+        case STREAM_X_HTTP_1_1_DONE:
+            struct web_client w;
+            memset(&w, 0, sizeof(w));
+            w.response.data = buffer_create(1024, NULL);
+
+            // get client ip from the conn->sock
+            struct sockaddr client;
+            socklen_t len = h2o_socket_getpeername(conn->sock, &client);
+            char peername[NI_MAXHOST];
+            size_t peername_len = h2o_socket_getnumerichost(&client, len, peername);
+            memcpy(w.client_ip, peername, peername_len);
+            w.client_ip[peername_len] = 0;
+            w.user_agent = conn->user_agent;
+
+            rrdpush_receiver_thread_spawn(&w, conn->url, conn);
+            // http_code returned is ignored as there is nobody to get it after HTTP upgrade
+            // so it lost any sense with h2o streaming mode
+            freez(conn->url);
+            buffer_free(w.response.data);
+            conn->state = STREAM_ACTIVE;
+            /* FALLTHROUGH */
+        case STREAM_ACTIVE:
+            break;
+        default:
+            error_report("Unknown conn->state");
+    }
+}
+
+static void stream_on_complete(void *user_data, h2o_socket_t *sock, size_t reqsize)
+{
+    h2o_stream_conn_t *conn = user_data;
+
+    /* close the connection on error */
+    if (sock == NULL) {
+// can call connection close callback here  (*conn->cb)(conn, NULL);
+        return;
+    }
+
+    conn->sock = sock;
+    sock->data = conn;
+
+    h2o_buffer_consume(&sock->input, reqsize);
+    stream_process(conn);
+}
+
+static inline int is_streaming_handshake(h2o_req_t *req)
+{
+    /* method */
+    if (!h2o_memis(req->input.method.base, req->input.method.len, H2O_STRLIT("GET")))
+        return 1;
+
+    if (!h2o_memis(req->path_normalized.base, req->path_normalized.len, H2O_STRLIT(NETDATA_STREAM_URL))) {
+        return 1;
+    }
+
+    /* upgrade header */
+    if (req->upgrade.base == NULL || !h2o_lcstris(req->upgrade.base, req->upgrade.len, H2O_STRLIT(NETDATA_STREAM_PROTO_NAME)))
+        return 1;
+
+    // TODO consider adding some key in form of random number
+    // to prevent caching on route especially if TLS is not used
+    // e.g. client sends random number
+    // server replies with it xored
+
+    return 0;
+}
+
+static int hdl_stream(h2o_handler_t *self, h2o_req_t *req)
+{
+    UNUSED(self);
+    h2o_stream_conn_t *conn = mallocz(sizeof(*conn));
+    h2o_stream_conn_t_init(conn);
+
+    if (is_streaming_handshake(req))
+        return 1;
+
+    /* build response */
+    req->res.status = 101;
+    req->res.reason = "Switching Protocols";
+    h2o_add_header(&req->pool, &req->res.headers, H2O_TOKEN_UPGRADE, NULL, H2O_STRLIT(NETDATA_STREAM_PROTO_NAME));
+
+//  TODO we should consider adding some nonce header here
+//    h2o_add_header_by_str(&req->pool, &req->res.headers, H2O_STRLIT("whatever reply"), 0, NULL, accept_key,
+//                          strlen(accept_key));
+
+    h2o_http1_upgrade(req, NULL, 0, stream_on_complete, conn);
+
+    return 0;
+}
+
 #define POLL_INTERVAL 100
 
 void *httpd_main(void *ptr) {
@@ -301,6 +605,10 @@ void *httpd_main(void *ptr) {
     pathconf = h2o_config_register_path(hostconf, "/netdata.conf", 0);
     h2o_handler_t *handler = h2o_create_handler(pathconf, sizeof(*handler));
     handler->on_req = hdl_netdata_conf;
+
+    pathconf = h2o_config_register_path(hostconf, NETDATA_STREAM_URL, 0);
+    handler = h2o_create_handler(pathconf, sizeof(*handler));
+    handler->on_req = hdl_stream;
 
     pathconf = h2o_config_register_path(hostconf, "/", 0);
     handler = h2o_create_handler(pathconf, sizeof(*handler));
