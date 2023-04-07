@@ -1543,7 +1543,7 @@ try_package_install() {
   if [ -n "${explicitly_install_native_plugins}" ]; then
     progress "Installing external plugins."
     # shellcheck disable=SC2086
-    if ! run_as_root env ${env} ${pm_cmd} install ${DEFAULT_PLUGIN_PKGS}; then
+    if ! run_as_root env ${env} ${pm_cmd} install ${DEFAULT_PLUGIN_PACKAGES}; then
       warning "Failed to install external plugin packages. Some collectors may not be available."
     fi
   fi
