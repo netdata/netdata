@@ -33,7 +33,7 @@ static int read_label_callback(const char *name, const char *value, RRDLABEL_SRC
   return 1;
 }
 
-static void test_k8s_parse_resolved_name(void **state)
+static void test_cgroup_parse_resolved_name(void **state)
 {
     UNUSED(state);
 
@@ -96,7 +96,7 @@ static void test_k8s_parse_resolved_name(void **state)
     for (int i = 0; test_data[i].data != NULL; i++) {
         char *data = strdup(test_data[i].data);
 
-        char *name = k8s_parse_resolved_name_and_labels(labels, data);
+        char *name = cgroup_parse_resolved_name_and_labels(labels, data);
 
         assert_string_equal(name, test_data[i].name);
 
@@ -122,10 +122,10 @@ static void test_k8s_parse_resolved_name(void **state)
 int main(void)
 {
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(test_k8s_parse_resolved_name),
+        cmocka_unit_test(test_cgroup_parse_resolved_name),
     };
 
-    int test_res = cmocka_run_group_tests_name("test_k8s_parse_resolved_name", tests, NULL, NULL);
+    int test_res = cmocka_run_group_tests_name("test_cgroup_parse_resolved_name", tests, NULL, NULL);
 
     return test_res;
 }

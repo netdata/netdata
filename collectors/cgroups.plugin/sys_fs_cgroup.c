@@ -1769,7 +1769,7 @@ static inline void substitute_dots_in_id(char *s) {
 // ----------------------------------------------------------------------------
 // parse k8s labels
 
-char *k8s_parse_resolved_name_and_labels(DICTIONARY *labels, char *data) {
+char *cgroup_parse_resolved_name_and_labels(DICTIONARY *labels, char *data) {
     // the first word, up to the first space is the name
     char *name = mystrsep(&data, " ");
 
@@ -1911,7 +1911,7 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
         cg->chart_labels = rrdlabels_create();
     // read the new labels and remove the obsolete ones
     rrdlabels_unmark_all(cg->chart_labels);
-    name = k8s_parse_resolved_name_and_labels(cg->chart_labels, new_name);
+    name = cgroup_parse_resolved_name_and_labels(cg->chart_labels, new_name);
     rrdlabels_remove_all_unmarked(cg->chart_labels);
 
     freez(cg->chart_title);
