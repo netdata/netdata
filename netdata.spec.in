@@ -802,9 +802,14 @@ Conflicts: netdata <= %{version}
 %endif
 
 %changelog
-* Tue Nov 01 2022 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-17
+* Fri Apr 07 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-19
 - Split additional plugins out in their own packages.
-* Wed Feb 03 2022 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-16
+* Tue Mar 21 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-18
+- Fix systemd handling to follow BCP.
+- Drop pre-systemd init support.
+* Thu Feb 16 2023 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-17
+- Added eBPF build dependency
+* Fri Feb 03 2022 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-16
 - Bundle updater script in native packages.
 * Mon Oct 11 2021 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-15
 - Remove support code for legacy ACLK implementation.
