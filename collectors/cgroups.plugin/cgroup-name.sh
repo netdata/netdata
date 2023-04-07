@@ -47,19 +47,24 @@ fatal() {
 
 function parse_docker_like_inspect_output() {
   local output="${1}"
-  eval "$(grep -E "^(NOMAD_NAMESPACE|NOMAD_JOB_NAME|NOMAD_TASK_NAME|NOMAD_SHORT_ALLOC_ID|CONT_NAME)=" <<<"$output")"
+  local name=""
+  eval "$(grep -E "^(NOMAD_NAMESPACE|NOMAD_JOB_NAME|NOMAD_TASK_NAME|NOMAD_SHORT_ALLOC_ID|CONT_NAME|IMAGE_NAME)=" <<<"$output")"
   if [ -n "$NOMAD_NAMESPACE" ] && [ -n "$NOMAD_JOB_NAME" ] && [ -n "$NOMAD_TASK_NAME" ] && [ -n "$NOMAD_SHORT_ALLOC_ID" ]; then
-    echo "${NOMAD_NAMESPACE}-${NOMAD_JOB_NAME}-${NOMAD_TASK_NAME}-${NOMAD_SHORT_ALLOC_ID}"
+    name="${NOMAD_NAMESPACE}-${NOMAD_JOB_NAME}-${NOMAD_TASK_NAME}-${NOMAD_SHORT_ALLOC_ID}"
   else
-    echo "${CONT_NAME}" | sed 's|^/||'
+    name=$(echo "${CONT_NAME}" | sed 's|^/||')
   fi
+  if [ -n "${IMAGE_NAME}" ]; then
+    name+=" image=\"${IMAGE_NAME}\""
+  fi
+  echo "$name"
 }
 
 function docker_like_get_name_command() {
   local command="${1}"
   local id="${2}"
   info "Running command: ${command} inspect --format='{{range .Config.Env}}{{println .}}{{end}}CONT_NAME={{ .Name}}' \"${id}\""
-  if OUTPUT="$(${command} inspect --format='{{range .Config.Env}}{{println .}}{{end}}CONT_NAME={{ .Name}}' "${id}")" &&
+  if OUTPUT="$(${command} inspect --format='{{range .Config.Env}}{{println .}}{{end}}CONT_NAME={{ .Name}}{{println}}IMAGE_NAME={{ .Config.Image}}' "${id}")" &&
     [ -n "$OUTPUT" ]; then
       NAME="$(parse_docker_like_inspect_output "$OUTPUT")"
   fi
@@ -85,7 +90,7 @@ function docker_like_get_name_api() {
     info "Running API command: curl \"${host}${path}\""
     JSON=$(curl -sS "${host}${path}")
   fi
-  if OUTPUT=$(echo "${JSON}" | jq -r '.Config.Env[],"CONT_NAME=\(.Name)"') && [ -n "$OUTPUT" ]; then
+  if OUTPUT=$(echo "${JSON}" | jq -r '.Config.Env[],"CONT_NAME=\(.Name)","IMAGE_NAME=\(.Config.Image)"') && [ -n "$OUTPUT" ]; then
     NAME="$(parse_docker_like_inspect_output "$OUTPUT")"
   fi
   return 0
