@@ -299,7 +299,7 @@ static void oomkill_collector(ebpf_module_t *em)
     int counter = update_every - 1;
     while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
-        if (!ebpf_exit_plugin || ++counter != update_every)
+        if (ebpf_exit_plugin || ++counter != update_every)
             continue;
 
         counter = 0;
