@@ -154,10 +154,10 @@ Recommends: netdata-plugin-ebpf
 Recommends: netdata-plugin-apps
 Recommends: netdata-plugin-pythond
 Recommends: netdata-plugin-go
-%if %{_have_freeipmi}
+%if 0%{?_have_freeipmi}
 Suggests:   netdata-plugin-freeipmi
 %endif
-%if %{_have_nfacct}
+%if 0%{?_have_nfacct}
 Suggests:   netdata-plugin-nfacct
 %endif
 Suggests:   netdata-plugin-cups
@@ -182,7 +182,7 @@ BuildRequires:  libnetfilter_acct-devel
 # end nfacct plugin dependencies
 
 # freeipmi plugin dependencies
-%if %{_have_freeipmi}
+%if 0%{?_have_freeipmi}
 BuildRequires:  freeipmi-devel
 %endif
 # end - freeipmi plugin dependencies
@@ -284,7 +284,7 @@ install -m 644 -p system/logrotate/netdata "${RPM_BUILD_ROOT}%{_sysconfdir}/logr
 
 # ###########################################################
 # Install freeipmi
-%if %{_have_freeipmi}
+%if 0%{?_have_freeipmi}
 install -m 4750 -p freeipmi.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/freeipmi.plugin"
 %endif
 
@@ -537,7 +537,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}/registry
 
 # Free IPMI belongs to a different sub-package
-%if %{_have_freeipmi}
+%if 0%{?_have_freeipmi}
 %exclude %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 %endif
 
@@ -599,7 +599,7 @@ Requires: netdata = %{version}
 %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cups.plugin
 %endif
 
-%if %{_have_freeipmi}
+%if 0%{?_have_freeipmi}
 %package plugin-freeipmi
 Summary: The FreeIPMI metrics collection plugin for the Netdata Agent
 Group: Applications/System
