@@ -39,6 +39,7 @@
 #  - Stackpulse Event by @thiagoftsm
 #  - Opsgenie by @thiaoftsm #9858
 #  - Gotify by @coffeegrind123
+#  - ntfy.sh by @Dim-P
 
 # -----------------------------------------------------------------------------
 # testing notifications
@@ -176,6 +177,7 @@ sms
 hangouts
 dynatrace
 matrix
+ntfy
 "
 
 # -----------------------------------------------------------------------------
@@ -408,6 +410,9 @@ GOTIFY_APP_TOKEN=
 
 # opsgenie configs
 OPSGENIE_API_KEY=
+
+# ntfy.sh configs
+NTFY_API_KEY=
 
 # load the stock and user configuration files
 # these will overwrite the variables above
@@ -654,6 +659,9 @@ filter_recipient_by_criticality() {
 # check gotify
 { [ -z "${GOTIFY_APP_TOKEN}" ] || [ -z "${GOTIFY_APP_URL}" ]; } && SEND_GOTIFY="NO"
 
+# check ntfy
+[ -z "${NTFY_API_KEY}" ] && SEND_NTFY="NO"
+
 # check stackpulse
 [ -z "${STACKPULSE_WEBHOOK}" ] && SEND_STACKPULSE="NO"
 
@@ -692,7 +700,8 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
   [ "${SEND_DYNATRACE}" = "YES" ] ||
   [ "${SEND_STACKPULSE}" = "YES" ] ||
   [ "${SEND_OPSGENIE}" = "YES" ] ||
-  [ "${SEND_GOTIFY}" = "YES" ]; then
+  [ "${SEND_GOTIFY}" = "YES" ] ||
+  [ "${SEND_NTFY}" = "YES" ]; then
   # if we need curl, check for the curl command
   if [ -z "${curl}" ]; then
     curl="$(command -v curl 2>/dev/null)"
@@ -723,6 +732,7 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
     SEND_STACKPULSE="NO"
     SEND_OPSGENIE="NO"
     SEND_GOTIFY="NO"
+    SEND_NTFY="NO"
   fi
 fi
 
@@ -863,7 +873,8 @@ for method in "${SEND_EMAIL}" \
   "${SEND_DYNATRACE}" \
   "${SEND_STACKPULSE}" \
   "${SEND_OPSGENIE}" \
-  "${SEND_GOTIFY}" ; do
+  "${SEND_GOTIFY}" \
+  "${SEND_NTFY}" ; do
 
   if [ "${method}" == "YES" ]; then
     proceed=1
@@ -2403,6 +2414,14 @@ EOF
 }
 
 # -----------------------------------------------------------------------------
+# ntfy sender
+
+send_ntfy() {
+
+  return 0
+}
+
+# -----------------------------------------------------------------------------
 # prepare the content of the notification
 
 # the url to send the user on click
@@ -3609,6 +3628,11 @@ send_gotify
 SENT_GOTIFY=$?
 
 # -----------------------------------------------------------------------------
+# send messages to ntfy
+send_ntfy
+SENT_NTFY=$?
+
+# -----------------------------------------------------------------------------
 # let netdata know
 for state in "${SENT_EMAIL}" \
   "${SENT_PUSHOVER}" \
@@ -3638,7 +3662,8 @@ for state in "${SENT_EMAIL}" \
   "${SENT_DYNATRACE}" \
   "${SENT_STACKPULSE}" \
   "${SENT_OPSGENIE}" \
-  "${SENT_GOTIFY}"; do
+  "${SENT_GOTIFY}" \
+  "${SENT_NTFY}"; do
   if [ "${state}" -eq 0 ]; then
     # we sent something
     exit 0
