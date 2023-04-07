@@ -1,7 +1,9 @@
-# Monitor your infrastructure
-
 import { Grid, Box, BoxList, BoxListItemRegexLink } from '@site/src/components/Grid/'
 import { RiExternalLinkLine } from 'react-icons/ri'
+
+# Monitor your infrastructure
+
+Learn how to view key metrics, insightful charts, and active alarms from all your nodes, with Netdata Cloud's real-time infrastructure monitoring.
 
 [Netdata Cloud](https://app.netdata.cloud) provides scalable infrastructure monitoring for any number of distributed
 nodes running the Netdata Agent. A node is any system in your infrastructure that you want to monitor, whether it's a
@@ -10,7 +12,7 @@ physical or virtual machine (VM), container, cloud deployment, or edge/IoT devic
 The Netdata Agent uses zero-configuration collectors to gather metrics from every application and container instantly,
 and uses Netdata's [distributed data architecture](https://github.com/netdata/netdata/blob/master/docs/store/distributed-data-architecture.md) to store metrics
 locally. Without a slow and troublesome centralized data lake for your infrastructure's metrics, you reduce the
-resources you need to invest in, and the complexity of, monitoring your infrastructure. 
+resources you need to invest in, and the complexity of, monitoring your infrastructure.
 
 Netdata Cloud unifies infrastructure monitoring by _centralizing the interface_ you use to query and visualize your
 nodes' metrics, not the data. By streaming metrics values to your browser, with Netdata Cloud acting as the secure proxy
@@ -22,7 +24,7 @@ composite charts, and alarm viewing. You'll then learn about the most critical w
 your nodes to maximize the value you get from Netdata.
 
 This quickstart assumes you've [installed Netdata](https://github.com/netdata/netdata/edit/master/packaging/installer/README.md)
-on more than one node in your infrastructure, and connected those nodes to your Space in Netdata Cloud. 
+on more than one node in your infrastructure, and connected those nodes to your Space in Netdata Cloud.
 
 ## Set up your Netdata Cloud experience
 

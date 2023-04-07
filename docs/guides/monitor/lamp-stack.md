@@ -1,15 +1,8 @@
-<!--
-title: "LAMP stack monitoring (Linux, Apache, MySQL, PHP) with Netdata"
-sidebar_label: "LAMP stack monitoring (Linux, Apache, MySQL, PHP) with Netdata"
-description: "Set up robust LAMP stack monitoring (Linux, Apache, MySQL, PHP) in just a few minutes using a free, open-source monitoring tool that collects metrics every second."
-image: /img/seo/guides/monitor/lamp-stack.png
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/lamp-stack.md
-learn_status: "Published"
-learn_rel_path: "Miscellaneous"
--->
 import { OneLineInstallWget } from '@site/src/components/OneLineInstall/'
 
-# LAMP stack monitoring (Linux, Apache, MySQL, PHP) with Netdata
+# LAMP stack monitoring with Netdata
+
+Set up robust LAMP stack monitoring (Linux, Apache, MySQL, PHP) in a few minutes using Netdata.
 
 The LAMP stack is the "hello world" for deploying dynamic web applications. It's fast, flexible, and reliable, which
 means a developer or sysadmin won't go far in their career without interacting with the stack and its services.

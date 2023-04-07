@@ -27,6 +27,20 @@ AutoReqProv: yes
 %global _have_ebpf 0
 %endif
 
+# Disable FreeIPMI on Amazon Linux
+%if 0%{?amzn}
+%global _have_freeipmi 0
+%else
+%global _have_freeipmi 1
+%endif
+
+# Disable the NFACCT plugin on Amazon Linux
+%if 0%{?amzn}
+%global _have_nfacct 0
+%else
+%global _have_nfacct 1
+%endif
+
 # Mitigate the cross-distro mayhem by strictly defining the libexec destination
 %define _prefix /usr
 %define _sysconfdir /etc
@@ -75,7 +89,7 @@ BuildRequires: git-core
 BuildRequires: autoconf
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
 BuildRequires: autoconf-archive
-%if 0%{?rhel} <= 8
+%if 0%{?rhel} <= 8 && 0%{?amzn} < 2023
 BuildRequires: autogen
 %endif
 %endif
@@ -152,15 +166,19 @@ BuildRequires:	elfutils-libelf-devel
 # end - ebpf dependencies
 
 # nfacct plugin dependencies
+%if %{_have_nfacct}
 BuildRequires:  libmnl-devel
 %if 0%{?fedora} || 0%{?suse_version} >= 1140
 BuildRequires:  libnetfilter_acct-devel
+%endif
 %endif
 
 # end nfacct plugin dependencies
 
 # freeipmi plugin dependencies
+%if %{_have_freeipmi}
 BuildRequires:  freeipmi-devel
+%endif
 # end - freeipmi plugin dependencies
 
 # CUPS plugin dependencies
@@ -254,7 +272,9 @@ install -m 644 -p system/logrotate/netdata "${RPM_BUILD_ROOT}%{_sysconfdir}/logr
 
 # ###########################################################
 # Install freeipmi
+%if %{_have_freeipmi}
 install -m 4750 -p freeipmi.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/freeipmi.plugin"
+%endif
 
 # ###########################################################
 # Install apps.plugin
@@ -484,9 +504,6 @@ rm -rf "${RPM_BUILD_ROOT}"
 # perf plugin
 %caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/slabinfo.plugin
 
-# freeipmi files
-%attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
-
 # go.d.plugin (the capability required for wireguard module)
 %caps(cap_net_admin,cap_net_raw=eip) %{_libexecdir}/%{name}/plugins.d/go.d.plugin
 
@@ -504,7 +521,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}/registry
 
 # Free IPMI belongs to a different sub-package
+%if %{_have_freeipmi}
 %exclude %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
+%endif
 
 # CUPS belongs to a different sub package
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
@@ -524,6 +543,7 @@ Use this plugin to enable metrics collection from cupsd, the daemon running when
 %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cups.plugin
 %endif
 
+%if %{_have_freeipmi}
 %package plugin-freeipmi
 Summary: FreeIPMI - The Intelligent Platform Management System
 Group: Applications/System
@@ -537,6 +557,7 @@ are sensor monitoring, system event monitoring, power control, and serial-over-L
 
 %files plugin-freeipmi
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
+%endif
 
 %changelog
 * Tue Mar 21 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-18

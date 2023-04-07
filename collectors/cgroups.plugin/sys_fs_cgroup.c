@@ -2715,6 +2715,11 @@ static inline void discovery_process_cgroup(struct cgroup *cg) {
 
     worker_is_busy(WORKER_DISCOVERY_PROCESS_NETWORK);
     read_cgroup_network_interfaces(cg);
+    if (!cg->chart_labels)
+        cg->chart_labels = rrdlabels_create();
+    if (!k8s_is_kubepod(cg)) {
+        rrdlabels_add(cg->chart_labels, "cgroup_name", cg->chart_id, RRDLABEL_SRC_AUTO);
+    }
 }
 
 static inline void discovery_find_all_cgroups() {

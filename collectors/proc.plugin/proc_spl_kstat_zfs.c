@@ -366,8 +366,7 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
                 pool->unavail = 0;
 
                 char filename[FILENAME_MAX + 1];
-                snprintfz(
-                    filename, FILENAME_MAX, "%s%s/%s/state", netdata_configured_host_prefix, dirname, de->d_name);
+                snprintfz(filename, FILENAME_MAX, "%s/%s/state", dirname, de->d_name);
 
                 char state[STATE_SIZE + 1];
                 int ret = read_file(filename, state, STATE_SIZE);

@@ -34,7 +34,7 @@ REPOCONFIG_RPM_URL_PREFIX="https://repo.netdata.cloud/repos/repoconfig"
 REPOCONFIG_RPM_VERSION="2-1"
 START_TIME="$(date +%s)"
 STATIC_INSTALL_ARCHES="x86_64 armv7l aarch64 ppc64le"
-TELEMETRY_URL="https://posthog.netdata.cloud/capture/"
+TELEMETRY_URL="https://app.posthog.com/capture/"
 
 # ======================================================================
 # Defaults for environment variables

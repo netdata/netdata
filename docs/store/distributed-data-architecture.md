@@ -1,6 +1,8 @@
 # Distributed data architecture
 
-Netdata uses a distributed data architecture to help you collect and store per-second metrics from any number of nodes.
+Learn how Netdata's distributed data architecture enables us to store metrics on the edge nodes for security, high performance and scalability.
+
+This way, it helps you collect and store per-second metrics from any number of nodes.
 Every node in your infrastructure, whether it's one or a thousand, stores the metrics it collects.
 
 Netdata Cloud bridges the gap between many distributed databases by _centralizing the interface_ you use to query and
@@ -71,6 +73,3 @@ or [filtering by hostname/service](https://github.com/netdata/netdata/blob/maste
 store configured alarms, their status, and a list of active collectors.
 
 Netdata does not and never will sell your personal data or data about your deployment.
-
-
-

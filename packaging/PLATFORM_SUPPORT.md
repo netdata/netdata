@@ -79,7 +79,7 @@ to work on these platforms with minimal user effort.
 | Ubuntu                   | 22.10          | x86\_64, ARMv7, AArch64                |                                                                                                                                                    |
 | Ubuntu                   | 22.04          | x86\_64, ARMv7, AArch64                |                                                                                                                                                    |
 | Ubuntu                   | 20.04          | x86\_64, ARMv7, AArch64                |                                                                                                                                                    |
-| Ubuntu                   | 18.04          | x86\_64, i386, ARMv7, AArch64          |                                                                                                                                                    |
+
 
 ### Intermediate
 
@@ -95,6 +95,7 @@ with minimal user effort.
 | Alpine Linux  | 3.16    | No                       |                                                                                                      |
 | Alpine Linux  | 3.15    | No                       |                                                                                                      |
 | Alpine Linux  | 3.14    | No                       |                                                                                                      |
+| Amazon Linux  | 2023    | x86\_64, AArch64         | Scheduled for promotion to Core tier at some point after the release of v1.39.0 of the Netdata Agent |
 | Amazon Linux  | 2       | x86\_64, AArch64         | Scheduled for promotion to Core tier at some point after the release of v1.39.0 of the Netdata Agent |
 | Arch Linux    | Latest  | No                       | We officially recommend the community packages available for Arch Linux                              |
 | Manjaro Linux | Latest  | No                       | We officially recommend the community packages available for Arch Linux                              |
@@ -164,6 +165,7 @@ This is a list of platforms that we have supported in the recent past but no lon
 | openSUSE     | Leap 15.3 | EOL as of 2022-12-01 |
 | Ubuntu       | 21.10     | EOL as of 2022-07-31 |
 | Ubuntu       | 21.04     | EOL as of 2022-01-01 |
+| Ubuntu       | 18.04     | EOL as of 2023-04-02 |
 
 ## Static builds
 

@@ -1,5 +1,7 @@
 # Invite your team
 
+Invite your entire SRE, DevOPs, or ITOps team to Netdata Cloud, to give everyone insights into your infrastructure from a single pane of glass.
+
 Invite new users to your Space by clicking on **Invite Users** in
 the [Space](https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md) management area.
 

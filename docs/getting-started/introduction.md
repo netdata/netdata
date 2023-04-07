@@ -1,4 +1,6 @@
-# Getting started
+# Getting started with Netdata
+
+Learn how Netdata can get you monitoring your infrastructure in minutes.
 
 ## What is Netdata ?
 
@@ -12,34 +14,34 @@ Netdata is:
 
 ### Simple to deploy
 
--   **One-line deployment** for Linux distributions, plus support for Kubernetes/Docker infrastructures.
--   **Zero configuration and maintenance** required to collect thousands of metrics, every second, from the underlying
+- **One-line deployment** for Linux distributions, plus support for Kubernetes/Docker infrastructures.
+- **Zero configuration and maintenance** required to collect thousands of metrics, every second, from the underlying
     OS and running applications.
--   **Prebuilt charts and alarms** alert you to common anomalies and performance issues without manual configuration.
--   **Distributed storage** to simplify the cost and complexity of storing metrics data from any number of nodes.
+- **Prebuilt charts and alarms** alert you to common anomalies and performance issues without manual configuration.
+- **Distributed storage** to simplify the cost and complexity of storing metrics data from any number of nodes.
 
 ### Powerful and scalable
 
--   **1% CPU utilization, a few MB of RAM, and minimal disk I/O** to run the monitoring Agent on bare metal, virtual
+- **1% CPU utilization, a few MB of RAM, and minimal disk I/O** to run the monitoring Agent on bare metal, virtual
     machines, containers, and even IoT devices.
--   **Per-second granularity** for an unlimited number of metrics based on the hardware and applications you're running
+- **Per-second granularity** for an unlimited number of metrics based on the hardware and applications you're running
     on your nodes.
--   **Interoperable exporters** let you connect Netdata's per-second metrics with an existing monitoring stack and other
+- **Interoperable exporters** let you connect Netdata's per-second metrics with an existing monitoring stack and other
     time-series databases.
 
 ### Optimized for troubleshooting
 
--   **Visual anomaly detection** with a UI/UX that emphasizes the relationships between charts.
--   **Customizable dashboards** to pinpoint correlated metrics, respond to incidents, and help you streamline your
+- **Visual anomaly detection** with a UI/UX that emphasizes the relationships between charts.
+- **Customizable dashboards** to pinpoint correlated metrics, respond to incidents, and help you streamline your
     workflows.
--   **Distributed metrics in a centralized interface** to assist users or teams trace complex issues between distributed
+- **Distributed metrics in a centralized interface** to assist users or teams trace complex issues between distributed
     nodes.
 
 ### Secure by design
 
--   **Distributed data architecture**  so fast and efficient, there’s no limit to the number of metrics you can follow. 
--   Because your data is **stored at the edge**, security is ensured.
--   
+- **Distributed data architecture**  so fast and efficient, there’s no limit to the number of metrics you can follow.
+- Because your data is **stored at the edge**, security is ensured.
+
 ### Comparison with other monitoring solutions
 
 Netdata offers many benefits over the existing monitoring landscape, whether they're expensive SaaS products or other
@@ -57,21 +59,19 @@ open-source tools.
 | **Kills the console** for tracing performance issues            | The console is always required for troubleshooting               |
 | Requires **zero dedicated resources**                           | Require large dedicated resources                                |
 
-
 Netdata works with tons of applications, notifications platforms, and other time-series databases:
 
--   **300+ system, container, and application endpoints**: Collectors autodetect metrics from default endpoints and
+- **300+ system, container, and application endpoints**: Collectors autodetect metrics from default endpoints and
     immediately visualize them into meaningful charts designed for troubleshooting. See [everything we
     support](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md).
--   **20+ notification platforms**: Netdata's health watchdog sends warning and critical alarms to your [favorite
+- **20+ notification platforms**: Netdata's health watchdog sends warning and critical alarms to your [favorite
     platform](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to inform you of anomalies just seconds
     after they affect your node.
--   **30+ external time-series databases**: Export resampled metrics as they're collected to other [local- and
+- **30+ external time-series databases**: Export resampled metrics as they're collected to other [local- and
     Cloud-based databases](https://github.com/netdata/netdata/blob/master/docs/export/external-databases.md) for best-in-class
     interoperability.
 
-
-## How it works 
+## How it works
 
 Netdata is a highly efficient, highly modular, metrics management engine. Its lockless design makes it ideal for concurrent operations on the metrics.
 
@@ -84,7 +84,7 @@ And a higher level diagram in this one.
 ![Diagram 2 of Netdata's core
 functionality](https://user-images.githubusercontent.com/1153921/95367248-5f755980-0889-11eb-827f-9b7aa02a556e.png)
 
-You can even visit this slightly dated [interactive infographic](https://my-netdata.io/infographic.html) and get lost in a rabbit hole. 
+You can even visit this slightly dated [interactive infographic](https://my-netdata.io/infographic.html) and get lost in a rabbit hole.
 
 But the best way to get under the hood or in the steering wheel of our highly efficient, low-latency system (supporting multiple readers and one writer on each metric) is to read the rest of our docs, or just to jump in and [get started](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md). But here's a good breakdown:
 
@@ -95,6 +95,7 @@ Netdata's distributed monitoring Agent collects thousands of metrics from system
 You can install Netdata on most Linux distributions (Ubuntu, Debian, CentOS, and more), container/microservice platforms (Kubernetes clusters, Docker), and many other operating systems (FreeBSD, macOS), with no sudo required.
 
 ### Netdata Cloud
+
 Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alarms from all your nodes in a single web interface. When an anomaly strikes, seamlessly navigate to any node to troubleshoot and discover the root cause with the familiar Netdata dashboard.
 
 Netdata Cloud is free! You can add an entire infrastructure of nodes, invite all your colleagues, and visualize any number of metrics, charts, and alarms entirely for free.
@@ -154,14 +155,14 @@ ask questions, find resources, and engage with passionate professionals. The tea
 
 You can also find Netdata on:
 
--   [Twitter](https://twitter.com/linuxnetdata)
--   [YouTube](https://www.youtube.com/c/Netdata)
--   [Reddit](https://www.reddit.com/r/netdata/)
--   [LinkedIn](https://www.linkedin.com/company/netdata-cloud/)
--   [StackShare](https://stackshare.io/netdata)
--   [Product Hunt](https://www.producthunt.com/posts/netdata-monitoring-agent/)
--   [Repology](https://repology.org/metapackage/netdata/versions)
--   [Facebook](https://www.facebook.com/linuxnetdata/)
+- [Twitter](https://twitter.com/linuxnetdata)
+- [YouTube](https://www.youtube.com/c/Netdata)
+- [Reddit](https://www.reddit.com/r/netdata/)
+- [LinkedIn](https://www.linkedin.com/company/netdata-cloud/)
+- [StackShare](https://stackshare.io/netdata)
+- [Product Hunt](https://www.producthunt.com/posts/netdata-monitoring-agent/)
+- [Repology](https://repology.org/metapackage/netdata/versions)
+- [Facebook](https://www.facebook.com/linuxnetdata/)
 
 ## Contribute
 

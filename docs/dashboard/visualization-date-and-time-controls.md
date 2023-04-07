@@ -1,5 +1,9 @@
 # Visualization date and time controls
 
+Netdata's dashboard features powerful date visualization controls that include a time control, a timezone selector and a rich date and timeframe selector.
+
+The controls come with useful defaults and rich customization, to help you narrow your focus when troubleshooting issues or anomalies.
+
 ## Time controls
 
 The time control provides you the following options: **Play**, **Pause** and **Force Play**.
@@ -16,7 +20,6 @@ Main use cases for **Force Play**:
 - You want to have Netdata on the background, example displayed on a TV, to constantly see metrics through dashboards or to watch the alert status
 
 ![The time control with Play, Pause and Force Play](https://user-images.githubusercontent.com/70198089/225850250-1fe12477-23f8-4b4d-b497-79b416963e10.png)
-
 
 ## Date and time selector
 
@@ -77,7 +80,6 @@ storage is 256 MiB, which should be enough for 1-3 days of historical metrics. I
 beyond stored historical metrics, you'll see this message:
 
 ![image](https://user-images.githubusercontent.com/70198089/225851033-43b95164-a651-48f2-8915-6aac9739ed93.png)
-
 
 At any time, [configure the internal TSDB's storage capacity](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md) to expand your
 depth of historical metrics.
