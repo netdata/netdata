@@ -39,10 +39,11 @@ extern int respect_web_browser_do_not_track_policy;
 extern char *web_x_frame_options;
 
 typedef enum web_client_mode {
-    WEB_CLIENT_MODE_NORMAL = 0,
-    WEB_CLIENT_MODE_FILECOPY = 1,
-    WEB_CLIENT_MODE_OPTIONS = 2,
-    WEB_CLIENT_MODE_STREAM = 3
+    WEB_CLIENT_MODE_GET = 0,
+    WEB_CLIENT_MODE_POST = 1,
+    WEB_CLIENT_MODE_FILECOPY = 2,
+    WEB_CLIENT_MODE_OPTIONS = 3,
+    WEB_CLIENT_MODE_STREAM = 4,
 } WEB_CLIENT_MODE;
 
 typedef enum {
@@ -163,7 +164,7 @@ struct web_client {
     size_t header_parse_tries;
     size_t header_parse_last_size;
 
-    int tcp_cork; // 1 = we have a cork on the socket
+    bool tcp_cork;
 
     int ifd;
     int ofd;
@@ -179,9 +180,12 @@ struct web_client {
     char last_url[NETDATA_WEB_REQUEST_URL_SIZE + 1];             // we keep a copy of the decoded URL here
     size_t url_path_length;
     char separator;        // This value can be either '?' or 'f'
-    char *url_search_path; //A pointer to the search path sent by the client
+    char *url_search_path; // A pointer to the search path sent by the client
 
     struct timeval tv_in, tv_ready;
+
+    char *post_payload;
+    size_t post_payload_size;
 
     char cookie1[NETDATA_WEB_REQUEST_COOKIE_SIZE + 1];
     char cookie2[NETDATA_WEB_REQUEST_COOKIE_SIZE + 1];

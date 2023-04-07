@@ -236,31 +236,45 @@ fail_cleanup:
     return NULL;
 }
 
-/**
- * Is request complete?
- *
- * Check whether the request is complete.
- * This function cannot check all the requests METHODS, for example, case you are working with POST, it will fail.
- *
- * @param begin is the first character of the sequence to analyse.
- * @param end is the last character of the sequence
- * @param length is the length of the total of bytes read, it is not the difference between end and begin.
- *
- * @return It returns 1 when the request is complete and 0 otherwise.
- */
-inline int url_is_request_complete(char *begin, char *end, size_t length) {
+inline bool url_is_request_complete(char *begin, char *end, size_t length, char **post_payload, size_t *post_payload_size) {
+    if (begin == end || length < 4)
+        return false;
 
-    if ( begin == end) {
-        //Message cannot be complete when first and last address are the same
-        return 0;
+    if(likely(strncmp(begin, "GET ", 4)) == 0) {
+        return strstr(end - 4, "\r\n\r\n");
     }
+    else if(unlikely(strncmp(begin, "POST ", 5) == 0)) {
+        char *cl = strstr(begin, "Content-Length: ");
+        if(!cl) return false;
+        cl = &cl[16];
 
-    //This math to verify  the last is valid, because we are discarding the POST
-    if (length > 4) {
-        begin = end - 4;
+        size_t content_length = str2ul(cl);
+
+        char *payload = strstr(cl, "\r\n\r\n");
+        if(!payload) return false;
+        payload += 4;
+
+        size_t payload_length = length - (payload - begin);
+
+        if(payload_length == content_length) {
+            if(post_payload && post_payload_size) {
+                if (*post_payload)
+                    freez(*post_payload);
+
+                *post_payload = mallocz(payload_length + 1);
+                memcpy(*post_payload, payload, payload_length);
+                (*post_payload)[payload_length] = '\0';
+
+                *post_payload_size = payload_length;
+            }
+            return true;
+        }
+
+        return false;
     }
-
-    return (strstr(begin, "\r\n\r\n"))?1:0;
+    else {
+        return strstr(end - 4, "\r\n\r\n");
+    }
 }
 
 /**

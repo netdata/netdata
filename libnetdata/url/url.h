@@ -29,7 +29,7 @@ char *url_decode_r(char *to, char *url, size_t size);
 int url_map_query_string(char **out, char *url);
 int url_parse_query_string(char *output, size_t max, char **map, int total);
 
-int url_is_request_complete(char *begin,char *end,size_t length);
+bool url_is_request_complete(char *begin, char *end, size_t length, char **post_payload, size_t *post_payload_length);
 char *url_find_protocol(char *s);
 
 #endif /* NETDATA_URL_H */

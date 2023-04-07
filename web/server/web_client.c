@@ -23,11 +23,11 @@ inline int web_client_permission_denied(struct web_client *w) {
 static inline int web_client_crock_socket(struct web_client *w) {
 #ifdef TCP_CORK
     if(likely(web_client_is_corkable(w) && !w->tcp_cork && w->ofd != -1)) {
-        w->tcp_cork = 1;
+        w->tcp_cork = true;
         if(unlikely(setsockopt(w->ofd, IPPROTO_TCP, TCP_CORK, (char *) &w->tcp_cork, sizeof(int)) != 0)) {
             error("%llu: failed to enable TCP_CORK on socket.", w->id);
 
-            w->tcp_cork = 0;
+            w->tcp_cork = false;
             return -1;
         }
     }
@@ -50,20 +50,17 @@ static inline void web_client_enable_wait_from_ssl(struct web_client *w, int byt
     }
 }
 
-static inline int web_client_uncrock_socket(struct web_client *w) {
+static inline int web_client_uncrock_socket(struct web_client *w __maybe_unused) {
 #ifdef TCP_CORK
     if(likely(w->tcp_cork && w->ofd != -1)) {
-        w->tcp_cork = 0;
+        w->tcp_cork = false;
         if(unlikely(setsockopt(w->ofd, IPPROTO_TCP, TCP_CORK, (char *) &w->tcp_cork, sizeof(int)) != 0)) {
             error("%llu: failed to disable TCP_CORK on socket.", w->id);
-            w->tcp_cork = 1;
+            w->tcp_cork = true;
             return -1;
         }
     }
-#else
-    (void)w;
 #endif /* TCP_CORK */
-
     return 0;
 }
 
@@ -123,7 +120,8 @@ void web_client_request_done(struct web_client *w) {
                 mode = "STREAM";
                 break;
 
-            case WEB_CLIENT_MODE_NORMAL:
+            case WEB_CLIENT_MODE_POST:
+            case WEB_CLIENT_MODE_GET:
                 mode = "DATA";
                 break;
 
@@ -171,14 +169,12 @@ void web_client_request_done(struct web_client *w) {
     w->origin[1] = '\0';
 
     freez(w->user_agent); w->user_agent = NULL;
-    if (w->auth_bearer_token) {
-        freez(w->auth_bearer_token);
-        w->auth_bearer_token = NULL;
-    }
+    freez(w->auth_bearer_token); w->auth_bearer_token = NULL;
+    freez(w->post_payload); w->post_payload = NULL; w->post_payload_size = 0;
 
-    w->mode = WEB_CLIENT_MODE_NORMAL;
+    w->mode = WEB_CLIENT_MODE_GET;
 
-    w->tcp_cork = 0;
+    w->tcp_cork = false;
     web_client_disable_donottrack(w);
     web_client_disable_tracking_required(w);
     web_client_disable_keepalive(w);
@@ -788,11 +784,15 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
     // is is a valid request?
     if(!strncmp(s, "GET ", 4)) {
         s = &s[4];
-        w->mode = WEB_CLIENT_MODE_NORMAL;
+        w->mode = WEB_CLIENT_MODE_GET;
     }
     else if(!strncmp(s, "OPTIONS ", 8)) {
         s = &s[8];
         w->mode = WEB_CLIENT_MODE_OPTIONS;
+    }
+    else if(!strncmp(s, "POST ", 5)) {
+        s = &s[5];
+        w->mode = WEB_CLIENT_MODE_POST;
     }
     else if(!strncmp(s, "STREAM ", 7)) {
         s = &s[7];
@@ -917,7 +917,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
         if(w->header_parse_last_size < last_pos)
             last_pos = 0;
 
-        is_it_valid = url_is_request_complete(s, &s[last_pos], w->header_parse_last_size);
+        is_it_valid = url_is_request_complete(s, &s[last_pos], w->header_parse_last_size, &w->post_payload, &w->post_payload_size);
         if(!is_it_valid) {
             if(w->header_parse_tries > HTTP_REQ_MAX_HEADER_FETCH_TRIES) {
                 info("Disabling slow client after %zu attempts to read the request (%zu bytes received)", w->header_parse_tries, buffer_strlen(w->response.data));
@@ -933,7 +933,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
         is_it_valid = 1;
     } else {
         last_pos = w->header_parse_last_size;
-        is_it_valid = url_is_request_complete(s, &s[last_pos], w->header_parse_last_size);
+        is_it_valid = url_is_request_complete(s, &s[last_pos], w->header_parse_last_size, &w->post_payload, &w->post_payload_size);
     }
 
     s = web_client_valid_method(w, s);
@@ -997,7 +997,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 *ue = '\0';
                 //This is to avoid crash in line
                 w->url_search_path = NULL;
-                if(w->mode != WEB_CLIENT_MODE_NORMAL) {
+                if(w->mode != WEB_CLIENT_MODE_GET && w->mode != WEB_CLIENT_MODE_POST) {
                     if(!url_decode_r(w->decoded_url, encoded_url, NETDATA_WEB_REQUEST_URL_SIZE + 1))
                         return HTTP_VALIDATION_MALFORMED_URL;
                 } else {
@@ -1496,7 +1496,8 @@ void web_client_process_request(struct web_client *w) {
                     break;
 
                 case WEB_CLIENT_MODE_FILECOPY:
-                case WEB_CLIENT_MODE_NORMAL:
+                case WEB_CLIENT_MODE_POST:
+                case WEB_CLIENT_MODE_GET:
                     if(unlikely(
                             !web_client_can_access_dashboard(w) &&
                             !web_client_can_access_registry(w) &&
@@ -1529,7 +1530,7 @@ void web_client_process_request(struct web_client *w) {
                 // set to normal to prevent web_server_rcv_callback
                 // from going into stream mode
                 if (w->mode == WEB_CLIENT_MODE_STREAM)
-                    w->mode = WEB_CLIENT_MODE_NORMAL;
+                    w->mode = WEB_CLIENT_MODE_GET;
                 return;
             }
             break;
@@ -1604,7 +1605,8 @@ void web_client_process_request(struct web_client *w) {
             debug(D_WEB_CLIENT, "%llu: Done preparing the OPTIONS response. Sending data (%zu bytes) to client.", w->id, w->response.data->len);
             break;
 
-        case WEB_CLIENT_MODE_NORMAL:
+        case WEB_CLIENT_MODE_POST:
+        case WEB_CLIENT_MODE_GET:
             debug(D_WEB_CLIENT, "%llu: Done preparing the response. Sending data (%zu bytes) to client.", w->id, w->response.data->len);
             break;
 
@@ -1769,7 +1771,7 @@ ssize_t web_client_send_deflate(struct web_client *w)
 
         // ask for FINISH if we have all the input
         int flush = Z_SYNC_FLUSH;
-        if(w->mode == WEB_CLIENT_MODE_NORMAL
+        if((w->mode == WEB_CLIENT_MODE_GET || w->mode == WEB_CLIENT_MODE_POST)
             || (w->mode == WEB_CLIENT_MODE_FILECOPY && !web_client_has_wait_receive(w) && w->response.data->len == w->response.rlen)) {
             flush = Z_FINISH;
             debug(D_DEFLATE, "%llu: Requesting Z_FINISH, if possible.", w->id);

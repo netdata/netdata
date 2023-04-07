@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "web_api_v2.h"
+#include "../rtc/webrtc.h"
 
 static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unused, struct web_client *w, char *url, CONTEXTS_V2_OPTIONS options) {
     struct api_v2_contexts_request req = { 0 };
@@ -347,7 +348,43 @@ cleanup:
     return ret;
 }
 
+static int web_client_api_request_v2_webrtc(RRDHOST *host __maybe_unused, struct web_client *w, char *url __maybe_unused) {
+    BUFFER *wb = w->response.data;
 
+    if(!w->post_payload) {
+        buffer_flush(wb);
+        buffer_strcat(wb, "No payload with SDP message");
+        wb->content_type = CT_TEXT_PLAIN;
+        return HTTP_RESP_BAD_REQUEST;
+    }
+
+    void *conn = webrtc_answer_to_offer(w->post_payload);
+    struct webrtc_answer *wra = webrtc_get_answer(conn);
+
+    buffer_flush(wb);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+
+    BUFFER *sdp = buffer_create(0, NULL);
+    for(size_t i = 0; i < wra->description_id ;i++) {
+        if(buffer_strlen(sdp))
+            buffer_strcat(wb, "\r\n");
+
+        buffer_strcat(sdp, wra->description[i]);
+    }
+
+    buffer_json_member_add_string(wb, "sdp", buffer_tostring(sdp));
+    buffer_free(sdp);
+
+    buffer_json_member_add_array(wb, "candidates");
+    for(size_t i = 0; i < wra->candidates_id ;i++) {
+        buffer_json_add_array_item_string(wb, wra->candidates[i]);
+    }
+    buffer_json_array_close(wb);
+    buffer_json_finalize(wb);
+
+    wb->content_type = CT_APPLICATION_JSON;
+    return 200;
+}
 
 static struct web_api_command api_commands_v2[] = {
         {"data", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_data},
@@ -355,6 +392,8 @@ static struct web_api_command api_commands_v2[] = {
         {"contexts", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_contexts},
         {"weights", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_weights},
         {"q", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_q},
+
+        {"rtc_offer", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_webrtc},
 
         // terminator
         {NULL, 0, WEB_CLIENT_ACL_NONE, NULL},

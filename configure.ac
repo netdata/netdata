@@ -337,7 +337,7 @@ AC_SEARCH_LIBS([backtrace], [execinfo], [AC_DEFINE([HAVE_BACKTRACE], [1], [backt
 # pthreads
 
 ACX_PTHREAD(, [AC_MSG_ERROR([Cannot initialize pthread environment])])
-LIBS="${PTHREAD_LIBS} ${LIBS}"
+LIBS="${PTHREAD_LIBS} ${LIBS} -ldatachannel"
 CFLAGS="${CFLAGS} ${PTHREAD_CFLAGS}"
 CC="${PTHREAD_CC}"
 
@@ -858,7 +858,7 @@ if test "$enable_cloud" != "no"; then
         AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
         OPTIONAL_ACLK_CFLAGS="-I \$(abs_top_srcdir)/mqtt_websockets/src/include -I \$(abs_top_srcdir)/mqtt_websockets/c-rbuf/include -I \$(abs_top_srcdir)/aclk/aclk-schemas"
         OPTIONAL_PROTOBUF_CFLAGS="${PROTOBUF_CFLAGS}"
-        CXX11FLAG="-std=c++11"
+        CXX11FLAG="-std=c++17"
         OPTIONAL_PROTOBUF_LIBS="${PROTOBUF_LIBS}"
     fi
 fi
@@ -1197,11 +1197,11 @@ fi
 
 # Check if C++ toolchain does not support C++11. Fail if ML was explicitly requested.
 AC_LANG_PUSH([C++])
-AX_CHECK_COMPILE_FLAG([-std=c++11], [have_cxx11=yes], [have_cxx11=no])
+AX_CHECK_COMPILE_FLAG([-std=c++17], [have_cxx11=yes], [have_cxx11=no])
 AC_LANG_POP([C++])
 
 # PPC64LE needs -std=gnu++11 in order to build dlib. However, the rest of
-# the agent's components use and have been tested only with -std=c++11.
+# the agent's components use and have been tested only with -std=c++17.
 # Skip ML compilation on that CPU until we reorganize and test the C++ flags.
 if test "${host_cpu}" = "powerpc64le"; then
     have_cxx11="no"
@@ -1210,7 +1210,7 @@ fi
 if test "${enable_ml}" = "yes" -a "${have_cxx11}" = "no"; then
     AC_MSG_ERROR([You have explicitly requested --enable-ml functionality but it cannot be built without a C++11 toolchain.])
 else
-    CXX11FLAG="$CXX11FLAG -std=c++11"
+    CXX11FLAG="$CXX11FLAG -std=c++17"
 fi
 
 # Decide if we should build ML
@@ -1411,7 +1411,7 @@ if test "${enable_exporting_pubsub}" != "no" -a "${have_pubsub_protos}" = "yes" 
     enable_exporting_pubsub="yes"
     AC_DEFINE([ENABLE_EXPORTING_PUBSUB], [1], [Pub/Sub API usability])
     OPTIONAL_PUBSUB_CFLAGS="${GRPC_CFLAGS} ${PUBSUB_CFLAGS}"
-    CXX11FLAG="-std=c++11"
+    CXX11FLAG="-std=c++17"
     OPTIONAL_PUBSUB_LIBS="${GRPC_LIBS} ${PUBSUB_LIBS}"
 else
     enable_pubsub="no"
@@ -1431,7 +1431,7 @@ AC_MSG_CHECKING([for snappy::RawCompress in -lsnappy])
     save_LIBS="${LIBS}"
     LIBS="-lsnappy"
     save_CXXFLAGS="${CXXFLAGS}"
-    CXXFLAGS="${CXXFLAGS} -std=c++11"
+    CXXFLAGS="${CXXFLAGS} -std=c++17"
 
     AC_TRY_LINK(
         [
@@ -1477,7 +1477,7 @@ if test "${enable_exporting_prometheus_remote_write}" != "no" -a "${have_libprot
     enable_exporting_prometheus_remote_write="yes"
     AC_DEFINE([ENABLE_PROMETHEUS_REMOTE_WRITE], [1], [Prometheus remote write API usability])
     OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS="${SNAPPY_CFLAGS} -I \$(abs_top_srcdir)/exporting/prometheus/remote_write"
-    CXX11FLAG="-std=c++11"
+    CXX11FLAG="-std=c++17"
     OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS="${SNAPPY_LIBS}"
     OPTIONAL_PROTOBUF_CFLAGS="${PROTOBUF_CFLAGS}"
     OPTIONAL_PROTOBUF_LIBS="${PROTOBUF_LIBS}"
@@ -1842,6 +1842,7 @@ AC_CONFIG_FILES([
     web/api/health/Makefile
     web/gui/Makefile
     web/gui/dashboard/Makefile
+    web/rtc/Makefile
     web/server/Makefile
     web/server/static/Makefile
     claim/Makefile
