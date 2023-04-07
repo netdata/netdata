@@ -157,8 +157,10 @@ Recommends: netdata-plugin-go
 %if %{_have_freeipmi}
 Suggests:   netdata-plugin-freeipmi
 %endif
-Suggests:   netdata-plugin-cups
+%if %{_have_nfacct}
 Suggests:   netdata-plugin-nfacct
+%endif
+Suggests:   netdata-plugin-cups
 Suggests:   netdata-plugin-chartsd
 Suggests:   netdata-plugin-slabinfo
 Suggests:   netdata-plugin-perf
@@ -237,6 +239,12 @@ autoreconf -ivf
 %configure \
 	%if 0%{!?_have_ebpf}
 	--disable-ebpf
+	%endif
+	%if 0%{!?_have_freeipmi}
+	--disable-plugin-freeipmi
+	%endif
+	%if 0%{!?_have_nfacct}
+	--disable-plugin-nfacct
 	%endif
 	%if 0%{?centos_ver:1}
 	%if %{centos_ver} < 8
