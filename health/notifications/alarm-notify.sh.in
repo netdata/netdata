@@ -411,9 +411,6 @@ GOTIFY_APP_TOKEN=
 # opsgenie configs
 OPSGENIE_API_KEY=
 
-# ntfy.sh configs
-NTFY_API_KEY=
-
 # load the stock and user configuration files
 # these will overwrite the variables above
 
@@ -660,7 +657,7 @@ filter_recipient_by_criticality() {
 { [ -z "${GOTIFY_APP_TOKEN}" ] || [ -z "${GOTIFY_APP_URL}" ]; } && SEND_GOTIFY="NO"
 
 # check ntfy
-[ -z "${NTFY_API_KEY}" ] && SEND_NTFY="NO"
+[ -z "${DEFAULT_RECIPIENT_NTFY}" ] && SEND_NTFY="NO"
 
 # check stackpulse
 [ -z "${STACKPULSE_WEBHOOK}" ] && SEND_STACKPULSE="NO"
@@ -2417,8 +2414,43 @@ EOF
 # ntfy sender
 
 send_ntfy() {
+  local httpcode priority recipients=${1} sent=0 msg
 
-  return 0
+  [ "${SEND_NTFY}" != "YES" ] && return 1
+
+  case "${status}" in
+    WARNING) emoji="warning" ;;
+    CRITICAL) emoji="red_circle" ;;
+    CLEAR) emoji="white_check_mark" ;;
+    *) emoji="⚪️" ;;
+  esac
+
+  case ${status} in
+    WARNING) priority="high";;
+    CRITICAL) priority="urgent";;
+    *) priority="default" ;;
+  esac
+
+  for recipient in ${recipients}; do
+    msg="${host} ${status_message}: ${alarm} - ${info}"
+    httpcode=$(docurl -X POST \
+                      -H "X-Cache: no" \
+                      -H "Title: ${host}: ${name}" \
+                      -H "Tags: ${emoji}" \
+                      -H "Priority: ${priority}" \
+                      -d "${msg}" \
+                      ${recipient})
+    if [ "${httpcode}" == "200" ]; then
+      info "sent ntfy notification for: ${host} ${chart}.${name} is ${status} to '${recipient}'"
+      sent=$((sent + 1))
+    else
+      error "failed to send ntfy notification for: ${host} ${chart}.${name} is ${status} to '${recipient}', with HTTP response status code ${httpcode}."
+    fi
+  done
+
+  [ ${sent} -gt 0 ] && return 0
+
+  return 1
 }
 
 # -----------------------------------------------------------------------------
@@ -3629,7 +3661,7 @@ SENT_GOTIFY=$?
 
 # -----------------------------------------------------------------------------
 # send messages to ntfy
-send_ntfy
+send_ntfy "${DEFAULT_RECIPIENT_NTFY}"
 SENT_NTFY=$?
 
 # -----------------------------------------------------------------------------
