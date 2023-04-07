@@ -34,11 +34,21 @@ AutoReqProv: yes
 %define _libexecdir /usr/libexec
 %define _libdir /usr/lib
 
+# Fedora doesn’t define this, but other distros do
+%{!?_presetdir:%global _presetdir %{_libdir}/systemd/system-preset}
+
 # Redefine centos_ver to standardize on a single macro
 %{?rhel:%global centos_ver %rhel}
 
-# Disable NFACCT for RHEL equivalents
-%if 0%{?centos_ver}
+# Disable FreeIPMI on Amazon Linux
+%if 0%{?amzn}
+%global _have_freeipmi 0
+%else
+%global _have_freeipmi 1
+%endif
+
+# Disable NFACCT for RHEL equivalents and Amazon Linux
+%if 0%{?centos_ver} || 0%{?amzn}
 %global _have_nfacct 0
 %else
 %global _have_nfacct 1
@@ -70,7 +80,7 @@ BuildRequires: git-core
 BuildRequires: autoconf
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
 BuildRequires: autoconf-archive
-%if 0%{?rhel} <= 8
+%if 0%{?rhel} <= 8 && 0%{?amzn} < 2023
 BuildRequires: autogen
 %endif
 %endif
@@ -88,12 +98,14 @@ BuildRequires: protobuf-devel
 BuildRequires: libprotobuf-c-devel
 BuildRequires: liblz4-devel
 BuildRequires: libjson-c-devel
+BuildRequires: libyaml-devel
 %else
 %if 0%{?fedora}
 BuildRequires: protobuf-devel
 BuildRequires: protobuf-c-devel
 BuildRequires: lz4-devel
 BuildRequires: json-c-devel
+BuildRequires: libyaml-devel
 %else
 %if 0%{?centos_ver} >= 8
 BuildRequires: protobuf-devel
@@ -101,11 +113,16 @@ BuildRequires: protobuf-c-devel
 %endif
 BuildRequires: lz4-devel
 BuildRequires: json-c-devel
+BuildRequires: libyaml-devel
 %endif
 %endif
 
 # Core build requirements for service install
-%{netdata_initd_buildrequires}
+%if 0%{?suse_version}
+BuildRequires: systemd-rpm-macros
+%else
+BuildRequires: systemd
+%endif
 
 # Runtime dependencies
 #
@@ -123,8 +140,6 @@ Requires: python3
 Requires(pre): /usr/sbin/groupadd
 Requires(pre): /usr/sbin/useradd
 
-%{netdata_initd_requires}
-
 # #####################################################################
 # External plugin package dependencies
 # #####################################################################
@@ -139,8 +154,10 @@ Recommends: netdata-plugin-ebpf
 Recommends: netdata-plugin-apps
 Recommends: netdata-plugin-pythond
 Recommends: netdata-plugin-go
-Suggests:   netdata-plugin-cups
+%if %{_have_freeipmi}
 Suggests:   netdata-plugin-freeipmi
+%endif
+Suggests:   netdata-plugin-cups
 Suggests:   netdata-plugin-nfacct
 Suggests:   netdata-plugin-chartsd
 Suggests:   netdata-plugin-slabinfo
@@ -163,7 +180,9 @@ BuildRequires:  libnetfilter_acct-devel
 # end nfacct plugin dependencies
 
 # freeipmi plugin dependencies
+%if %{_have_freeipmi}
 BuildRequires:  freeipmi-devel
+%endif
 # end - freeipmi plugin dependencies
 
 # CUPS plugin dependencies
@@ -257,7 +276,9 @@ install -m 644 -p system/logrotate/netdata "${RPM_BUILD_ROOT}%{_sysconfdir}/logr
 
 # ###########################################################
 # Install freeipmi
+%if %{_have_freeipmi}
 install -m 4750 -p freeipmi.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/freeipmi.plugin"
+%endif
 
 # ###########################################################
 # Install apps.plugin
@@ -303,15 +324,10 @@ install -m 750 -p packaging/installer/netdata-uninstaller.sh \
 
 # ###########################################################
 # Install netdata service
-%if %{with systemd}
 install -m 755 -d "${RPM_BUILD_ROOT}%{_unitdir}"
 install -m 644 -p system/systemd/netdata.service "${RPM_BUILD_ROOT}%{_unitdir}/netdata.service"
-%else
-# install SYSV init stuff
-install -d "${RPM_BUILD_ROOT}/etc/rc.d/init.d"
-install -m 755 system/initd/init.d/netdata \
-        "${RPM_BUILD_ROOT}/etc/rc.d/init.d/netdata"
-%endif
+install -m 755 -d "${RPM_BUILD_ROOT}%{_presetdir}"
+install -m 644 -p system/systemd/50-netdata.preset "${RPM_BUILD_ROOT}%{_presetdir}/50-netdata.preset"
 
 # ############################################################
 # Package Go within netdata (TBD: Package it separately)
@@ -429,13 +445,25 @@ for item in docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C; do
 done
 
 %post
-%{netdata_init_post}
+%if 0%{?suse_version}
+%service_add_post netdata.service
+%else
+%systemd_post netdata.service
+%endif
 
 %preun
-%{netdata_init_preun}
+%if 0%{?suse_version}
+%service_del_preun netdata.service
+%else
+%systemd_preun netdata.service
+%endif
 
 %postun
-%{netdata_init_postun}
+%if 0%{?suse_version}
+%service_del_postun netdata.service
+%else
+%systemd_postun_with_restart netdata.service
+%endif
 
 %clean
 rm -rf "${RPM_BUILD_ROOT}"
@@ -453,11 +481,8 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_sbindir}/netdatacli
 %{_sbindir}/netdata-claim.sh
 
-%if %{with systemd}
 %{_unitdir}/netdata.service
-%else
-%{_sysconfdir}/rc.d/init.d/netdata
-%endif
+%{_presetdir}/50-netdata.preset
 
 %dir %{_libexecdir}/%{name}
 %dir %{_libexecdir}/%{name}/plugins.d
@@ -504,7 +529,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}/registry
 
 # Free IPMI belongs to a different sub-package
+%if %{_have_freeipmi}
 %exclude %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
+%endif
 
 # NFACCT belongs to a different sub-package
 %if 0%{?_have_nfacct}
@@ -564,6 +591,7 @@ Requires: netdata = %{version}
 %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cups.plugin
 %endif
 
+%if %{_have_freeipmi}
 %package plugin-freeipmi
 Summary: The FreeIPMI metrics collection plugin for the Netdata Agent
 Group: Applications/System
@@ -575,6 +603,7 @@ Requires: netdata = %{version}
 
 %files plugin-freeipmi
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
+%endif
 
 %if 0%{?_have_nfacct}
 %package plugin-nfacct
