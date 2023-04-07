@@ -196,7 +196,79 @@ static int hardirq_val_cmp(void *a, void *b)
     }
 }
 
-static void hardirq_read_latency_map(int mapfd)
+/**
+ * Parse interrupts
+ *
+ * Parse /proc/interrupts to get names  used in metrics
+ *
+ * @param irq_name vector to store data.
+ * @param irq      irq value
+ *
+ * @return It returns 0 on success and -1 otherwise
+ */
+static int hardirq_parse_interrupts(char *irq_name, int irq)
+{
+    static procfile *ff = NULL;
+    static int cpus = -1;
+    if(unlikely(!ff)) {
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/interrupts");
+        ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
+    }
+    if(unlikely(!ff))
+        return -1;
+
+    ff = procfile_readall(ff);
+    if(unlikely(!ff))
+        return -1; // we return 0, so that we will retry to open it next time
+
+    size_t words = procfile_linewords(ff, 0);
+    if(unlikely(cpus == -1)) {
+        uint32_t w;
+        cpus = 0;
+        for(w = 0; w < words ; w++) {
+            if(likely(strncmp(procfile_lineword(ff, 0, w), "CPU", 3) == 0))
+                cpus++;
+        }
+   }
+
+    size_t lines = procfile_lines(ff), l;
+    if(unlikely(!lines)) {
+        collector_error("Cannot read /proc/interrupts, zero lines reported.");
+        return -1;
+    }
+
+    for(l = 1; l < lines ;l++) {
+        words = procfile_linewords(ff, l);
+        if(unlikely(!words)) continue;
+        const char *id = procfile_lineword(ff, l, 0);
+        if (!isdigit(id[0]))
+            continue;
+
+        int cmp = str2i(id);
+        if (cmp != irq)
+            continue;
+
+        if(unlikely((uint32_t)(cpus + 2) < words)) {
+            const char *name = procfile_lineword(ff, l, words - 1);
+            // On some motherboards IRQ can have the same name, so we append IRQ id to differentiate.
+            snprintfz(irq_name, NETDATA_HARDIRQ_NAME_LEN - 1, "%d_%s", irq, name);
+        }
+    }
+
+    return 0;
+}
+
+/**
+ * Read Latency MAP
+ *
+ * Read data from kernel ring to user ring.
+ *
+ * @param mapfd hash map id.
+ *
+ * @return it returns 0 on success and -1 otherwise
+ */
+static int hardirq_read_latency_map(int mapfd)
 {
     hardirq_ebpf_key_t key = {};
     hardirq_ebpf_key_t next_key = {};
@@ -250,16 +322,14 @@ static void hardirq_read_latency_map(int mapfd)
             total_latency += hardirq_ebpf_vals[i].latency/1000;
 
             // copy name for new IRQs.
-            /*
-            if (v_is_new && !name_saved && hardirq_ebpf_vals[i].name[0] != '\0') {
-                strncpyz(
-                    v->name,
-                    hardirq_ebpf_vals[i].name,
-                    NETDATA_HARDIRQ_NAME_LEN
-                );
+            if (v_is_new && !name_saved && v->name[0] == '\0') {
+                if (hardirq_parse_interrupts(v->name, key.irq)) {
+                    freez(v);
+                    return -1;
+                }
+
                 name_saved = true;
             }
-             */
         }
 
         // can now safely publish latency for existing IRQs.
@@ -275,6 +345,8 @@ static void hardirq_read_latency_map(int mapfd)
 
         key = next_key;
     }
+
+    return 0;
 }
 
 static void hardirq_read_latency_static_map(int mapfd)
@@ -300,11 +372,17 @@ static void hardirq_read_latency_static_map(int mapfd)
 
 /**
  * Read eBPF maps for hard IRQ.
+ *
+ * @return When it is not possible to parse /proc, it returns -1, on success it returns 0;
  */
-static void hardirq_reader()
+static int hardirq_reader()
 {
-    hardirq_read_latency_map(hardirq_maps[HARDIRQ_MAP_LATENCY].map_fd);
+    if (hardirq_read_latency_map(hardirq_maps[HARDIRQ_MAP_LATENCY].map_fd))
+        return -1;
+
     hardirq_read_latency_static_map(hardirq_maps[HARDIRQ_MAP_LATENCY_STATIC].map_fd);
+
+    return 0;
 }
 
 static void hardirq_create_charts(int update_every)
@@ -401,7 +479,9 @@ static void hardirq_collector(ebpf_module_t *em)
             continue;
 
         counter = 0;
-        hardirq_reader();
+        if (hardirq_reader())
+            break;
+
         pthread_mutex_lock(&lock);
 
         // write dims now for all hitherto discovered IRQs.
