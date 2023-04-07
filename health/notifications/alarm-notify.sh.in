@@ -2422,7 +2422,7 @@ send_ntfy() {
     WARNING) emoji="warning" ;;
     CRITICAL) emoji="red_circle" ;;
     CLEAR) emoji="white_check_mark" ;;
-    *) emoji="⚪️" ;;
+    *) emoji="white_circle" ;;
   esac
 
   case ${status} in
@@ -2435,9 +2435,11 @@ send_ntfy() {
     msg="${host} ${status_message}: ${alarm} - ${info}"
     httpcode=$(docurl -X POST \
                       -H "X-Cache: no" \
+                      -H "Icon: https://raw.githubusercontent.com/netdata/netdata/master/web/gui/dashboard/images/favicon-196x196.png" \
                       -H "Title: ${host}: ${name}" \
                       -H "Tags: ${emoji}" \
                       -H "Priority: ${priority}" \
+                      -H "Actions: view, View node, ${goto_url}, clear=true;" \
                       -d "${msg}" \
                       ${recipient})
     if [ "${httpcode}" == "200" ]; then
