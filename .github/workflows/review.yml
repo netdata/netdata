@@ -43,7 +43,7 @@ jobs:
         run: |
           if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/clang-format') }}" = "true" ]; then
             echo "run=true" >> "${GITHUB_OUTPUT}"
-          elif git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '.*\.\(cpp|cxx|c|hpp|hxx|h\)$' ; then
+          elif git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '\.cpp$|\.cxx$|\.c$|\.hpp$|\.hxx$|\.h$' ; then
             echo "run=true" >> "${GITHUB_OUTPUT}"
             echo 'C/C++ code has changed, need to run clang-format.'
           else
@@ -146,7 +146,7 @@ jobs:
           if [ "${{ steps.label.outputs.check-all }}" == 'true' ]; then
             find . -regex '.*\.\(c\|cpp\|cxx\|h\|hpp\|hxx\)$' -exec clang-format -i --style=file '{}' \;
           else
-            git diff --name-only origin/${{ github.base_ref }} HEAD | grep -E '.*\.\(cpp|cxx|c|hpp|hxx|h\)$' | \
+            git diff --name-only origin/${{ github.base_ref }} HEAD | grep -E '\.cpp$|\.cxx$|\.c$|\.hpp$|\.hxx$|\.h$' | \
             xargs -n 1 -r clang-format -i --style=file
           fi
           git status --porcelain=v1 > /tmp/porcelain
