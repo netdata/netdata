@@ -21,7 +21,7 @@
 #  - TMPDIR (set to a usable temporary directory)
 #  - NETDATA_NIGHTLIES_BASEURL (set the base url for downloading the dist tarball)
 #
-# Copyright: 2018-2020 Netdata Inc.
+# Copyright: 2018-2023 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Author: Paweł Krupa <paulfantom@gmail.com>
@@ -225,9 +225,8 @@ enable_netdata_updater() {
       ;;
     "crontab")
       if [ -d "/etc/cron.d" ]; then
-        cat > "/etc/cron.d/netdata-updater" <<-EOF
-	2 57 * * * root ${NETDATA_PREFIX}/netdata-updater.sh
-	EOF
+        [ -f "/etc/cron.d/netdata-updater" ] && rm -f "/etc/cron.d/netdata-updater"
+        install -p -m 0644 -o 0 -g 0 "${NETDATA_PREFIX}/usr/lib/system/cron/netdata-updater-daily" "/etc/cron.d/netdata-updater-daily"
 
         info "Auto-updating has been ENABLED through cron, using a crontab at /etc/cron.d/netdata-updater\n"
         info "If the update process fails and you have email notifications set up correctly for cron on this system, you should receive an email notification of the failure."
@@ -262,6 +261,7 @@ disable_netdata_updater() {
 
   if [ -d /etc/cron.d ]; then
     rm -f /etc/cron.d/netdata-updater
+    rm -f /etc/cron.d/netdata-updater-daily
   fi
 
   info "Auto-updates have been DISABLED."
@@ -715,7 +715,7 @@ update_binpkg() {
 
   DISTRO="${ID}"
 
-  supported_compat_names="debian ubuntu centos fedora opensuse"
+  supported_compat_names="debian ubuntu centos fedora opensuse ol amzn"
 
   if str_in_list "${DISTRO}" "${supported_compat_names}"; then
     DISTRO_COMPAT_NAME="${DISTRO}"
@@ -742,7 +742,7 @@ update_binpkg() {
   fi
 
   case "${DISTRO_COMPAT_NAME}" in
-    debian)
+    debian|ubuntu)
       pm_cmd="apt-get"
       repo_subcmd="update"
       upgrade_cmd="--only-upgrade install"
@@ -751,29 +751,7 @@ update_binpkg() {
       pkg_installed_check="dpkg -s"
       INSTALL_TYPE="binpkg-deb"
       ;;
-    ubuntu)
-      pm_cmd="apt-get"
-      repo_subcmd="update"
-      upgrade_cmd="--only-upgrade install"
-      pkg_install_opts="${interactive_opts}"
-      repo_update_opts="${interactive_opts}"
-      pkg_installed_check="dpkg -s"
-      INSTALL_TYPE="binpkg-deb"
-      ;;
-    centos)
-      if command -v dnf > /dev/null; then
-        pm_cmd="dnf"
-        repo_subcmd="makecache"
-      else
-        pm_cmd="yum"
-      fi
-      upgrade_cmd="upgrade"
-      pkg_install_opts="${interactive_opts}"
-      repo_update_opts="${interactive_opts}"
-      pkg_installed_check="rpm -q"
-      INSTALL_TYPE="binpkg-rpm"
-      ;;
-    fedora)
+    centos|fedora|ol|amzn)
       if command -v dnf > /dev/null; then
         pm_cmd="dnf"
         repo_subcmd="makecache"
@@ -826,11 +804,10 @@ update_binpkg() {
 # Simple function to encapsulate original updater behavior.
 update_legacy() {
   set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
-  if [ "${IS_NETDATA_STATIC_BINARY}" = "yes" ]; then
-    update_static && exit 0
-  else
-    update_build && exit 0
-  fi
+  case "${IS_NETDATA_STATIC_BINARY}" in
+    yes) update_static && exit 0 ;;
+    *) update_build && exit 0 ;;
+  esac
 }
 
 logfile=
@@ -901,9 +878,7 @@ while [ -n "${1}" ]; do
         disable_netdata_updater
         exit $?
         ;;
-    *)
-        fatal "Unrecognized option ${1}" U001A
-        ;;
+    *) fatal "Unrecognized option ${1}" U001A ;;
   esac
 
   shift 1
@@ -945,9 +920,7 @@ case "${INSTALL_TYPE}" in
       set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
       update_static && exit 0
       ;;
-    *binpkg*)
-      update_binpkg && exit 0
-      ;;
+    *binpkg*) update_binpkg && exit 0 ;;
     "") # Fallback case for no `.install-type` file. This just works like the old install type detection.
       validate_environment_file
       update_legacy
@@ -961,10 +934,6 @@ case "${INSTALL_TYPE}" in
         fatal "This script does not support updating custom installations without valid environment files." U0012
       fi
       ;;
-    oci)
-      fatal "This script does not support updating Netdata inside our official Docker containers, please instead update the container itself." U0013
-      ;;
-    *)
-      fatal "Unrecognized installation type (${INSTALL_TYPE}), unable to update." U0014
-      ;;
+    oci) fatal "This script does not support updating Netdata inside our official Docker containers, please instead update the container itself." U0013 ;;
+    *) fatal "Unrecognized installation type (${INSTALL_TYPE}), unable to update." U0014 ;;
 esac
