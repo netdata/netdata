@@ -143,6 +143,7 @@ STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *db_metric_han
     internal_fatal((uint32_t)mh->update_every_s != update_every, "RRDDIM: update requested does not match the dimension");
 
     struct mem_collect_handle *ch = callocz(1, sizeof(struct mem_collect_handle));
+    ch->common.backend = STORAGE_ENGINE_BACKEND_RRDDIM;
     ch->rd = rd;
     ch->db_metric_handle = db_metric_handle;
 
@@ -204,7 +205,7 @@ static inline void rrddim_fill_the_gap(STORAGE_COLLECT_HANDLE *collection_handle
 
 void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *collection_handle,
                                  usec_t point_in_time_ut,
-                                 NETDATA_DOUBLE number,
+                                 NETDATA_DOUBLE n,
                                  NETDATA_DOUBLE min_value __maybe_unused,
                                  NETDATA_DOUBLE max_value __maybe_unused,
                                  uint16_t count __maybe_unused,
@@ -226,7 +227,7 @@ void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *collection_handle,
     if(unlikely(mh->last_updated_s && point_in_time_s - mh->update_every_s > mh->last_updated_s))
         rrddim_fill_the_gap(collection_handle, point_in_time_s);
 
-    rd->db[mh->current_entry] = pack_storage_number(number, flags);
+    rd->db[mh->current_entry] = pack_storage_number(n, flags);
     mh->counter++;
     mh->current_entry = (mh->current_entry + 1) >= mh->entries ? 0 : mh->current_entry + 1;
     mh->last_updated_s = point_in_time_s;
@@ -340,6 +341,7 @@ void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_e
     handle->start_time_s = start_time_s;
     handle->end_time_s = end_time_s;
     handle->priority = priority;
+    handle->backend = STORAGE_ENGINE_BACKEND_RRDDIM;
     struct mem_query_handle* h = mallocz(sizeof(struct mem_query_handle));
     h->db_metric_handle = db_metric_handle;
 

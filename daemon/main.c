@@ -1834,7 +1834,7 @@ int main(int argc, char **argv) {
 #endif
 
         // set libuv worker threads
-        libuv_worker_threads = (int)get_netdata_cpus() * 2;
+        libuv_worker_threads = (int)get_netdata_cpus() * 6;
 
         if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS)
             libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;

@@ -144,6 +144,7 @@ void aclk_check_node_info_and_collectors(void)
     if (unlikely(!aclk_connected))
         return;
 
+    size_t pending = 0;
     dfe_start_reentrant(rrdhost_root_index, host) {
 
         struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
@@ -151,7 +152,8 @@ void aclk_check_node_info_and_collectors(void)
             continue;
 
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
-            info("ACLK: 'host:%s' not sending node info, context load is pending", rrdhost_hostname(host));
+            internal_error(true, "ACLK SYNC: Context still pending for %s", rrdhost_hostname(host));
+            pending++;
             continue;
         }
 
@@ -168,6 +170,9 @@ void aclk_check_node_info_and_collectors(void)
         }
     }
     dfe_done(host);
+
+    if(pending)
+        info("ACLK: %zu nodes are pending for contexts to load, skipped sending node info for them", pending);
 }
 
 #endif

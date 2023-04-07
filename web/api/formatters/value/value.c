@@ -93,7 +93,8 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
     };
 
     ONEWAYALLOC *owa = onewayalloc_create(16 * 1024);
-    RRDR *r = rrd2rrdr(owa, query_target_create(&qtr));
+    QUERY_TARGET *qt = query_target_create(&qtr);
+    RRDR *r = rrd2rrdr(owa, qt);
 
     QUERY_VALUE qv;
 
@@ -143,6 +144,7 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
     }
 
     rrdr_free(owa, r);
+    query_target_release(qt);
     onewayalloc_destroy(owa);
 
     return qv;
