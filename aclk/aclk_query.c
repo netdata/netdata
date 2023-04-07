@@ -5,6 +5,7 @@
 #include "aclk_tx_msgs.h"
 
 #define WEB_HDR_ACCEPT_ENC "Accept-Encoding:"
+#define ACLK_MAX_WEB_RESPONSE_SIZE (30 * 1024 * 1024)
 
 pthread_cond_t query_cond_wait = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
@@ -21,6 +22,13 @@ static usec_t aclk_web_api_request(RRDHOST *host, struct web_client *w, char *ur
         w->response.code = web_client_api_request_v2(host, w, url);
     else
         w->response.code = web_client_api_request_v1(host, w, url);
+
+    if(buffer_strlen(w->response.data) > ACLK_MAX_WEB_RESPONSE_SIZE) {
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "response is too big");
+        w->response.data->content_type = CT_TEXT_PLAIN;
+        w->response.code = HTTP_RESP_CONTENT_TOO_LONG;
+    }
 
     t = now_monotonic_high_precision_usec() - t;
 

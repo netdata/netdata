@@ -769,7 +769,10 @@ inline void rrdeng_prep_wait(PDC *pdc) {
     }
 }
 
-void rrdeng_prep_query(PDC *pdc) {
+void rrdeng_prep_query(struct page_details_control *pdc, bool worker) {
+    if(worker)
+        worker_is_busy(UV_EVENT_DBENGINE_QUERY);
+
     size_t pages_to_load = 0;
     pdc->page_list_JudyL = get_page_list(pdc->ctx, pdc->metric,
                                                  pdc->start_time_s * USEC_PER_SEC,
@@ -792,6 +795,9 @@ void rrdeng_prep_query(PDC *pdc) {
     completion_mark_complete(&pdc->prep_completion);
 
     pdc_release_and_destroy_if_unreferenced(pdc, true, true);
+
+    if(worker)
+        worker_is_idle();
 }
 
 /**
@@ -824,7 +830,7 @@ void pg_cache_preload(struct rrdeng_query_handle *handle) {
         handle->pdc->refcount++; // we get 1 for the query thread and 1 for the prep thread
 
         if(unlikely(handle->pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS))
-            rrdeng_prep_query(handle->pdc);
+            rrdeng_prep_query(handle->pdc, false);
         else
             rrdeng_enq_cmd(handle->ctx, RRDENG_OPCODE_QUERY, handle->pdc, NULL, handle->priority, NULL, NULL);
     }

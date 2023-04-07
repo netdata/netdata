@@ -82,16 +82,6 @@ typedef enum __attribute__ ((__packed__)) rrdr_result_flags {
     RRDR_RESULT_FLAG_CANCEL        = (1 << 2), // the query needs to be cancelled
 } RRDR_RESULT_FLAGS;
 
-struct rrdr_group_by_entry {
-    size_t priority;
-    size_t count;
-    STRING *id;
-    STRING *name;
-    STRING *units;
-    RRDR_DIMENSION_FLAGS od;
-    DICTIONARY *dl;
-};
-
 #define RRDR_DVIEW_ANOMALY_COUNT_MULTIPLIER 1000.0
 
 typedef struct rrdresult {
@@ -104,11 +94,13 @@ typedef struct rrdresult {
     STRING **di;              // array of d dimension ids
     STRING **dn;              // array of d dimension names
     STRING **du;              // array of d dimension units
-    uint32_t *dgbc;           // array of d dimension units - NOT ALLOCATED when RRDR is created
+    uint32_t *dgbs;           // array of d dimension group by slots - NOT ALLOCATED when RRDR is created
+    uint32_t *dgbc;           // array of d dimension group by counts - NOT ALLOCATED when RRDR is created
     uint32_t *dp;             // array of d dimension priority - NOT ALLOCATED when RRDR is created
     DICTIONARY **dl;          // array of d dimension labels - NOT ALLOCATED when RRDR is created
     STORAGE_POINT *dqp;       // array of d dimensions query points - NOT ALLOCATED when RRDR is created
     STORAGE_POINT *dview;     // array of d dimensions group by view - NOT ALLOCATED when RRDR is created
+    NETDATA_DOUBLE *vh;       // array of n x d hidden values, while grouping - NOT ALLOCATED when RRDR is created
 
     DICTIONARY *label_keys;
 
@@ -137,6 +129,7 @@ typedef struct rrdresult {
         void *data;                         // the internal data of the grouping function
 
         // grouping function pointers
+        RRDR_TIME_GROUPING add_flush;
         void (*create)(struct rrdresult *r, const char *options);
         void (*reset)(struct rrdresult *r);
         void (*free)(struct rrdresult *r);
@@ -169,6 +162,8 @@ typedef struct rrdresult {
 #ifdef NETDATA_INTERNAL_CHECKS
         const char *log;
 #endif
+
+        struct query_target *release_with_rrdr_qt;
     } internal;
 } RRDR;
 

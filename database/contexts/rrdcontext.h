@@ -201,6 +201,7 @@ typedef struct query_instance {
 
 typedef struct query_dimension {
     uint32_t slot;
+    uint32_t priority;
     RRDMETRIC_ACQUIRED *rma;
     QUERY_STATUS status;
 } QUERY_DIMENSION;
@@ -231,7 +232,8 @@ typedef struct query_metric {
     STORAGE_POINT query_points;
 
     struct {
-        size_t slot;
+        uint32_t slot;
+        uint32_t first_slot;
         STRING *id;
         STRING *name;
         STRING *units;
@@ -241,8 +243,15 @@ typedef struct query_metric {
 } QUERY_METRIC;
 
 #define MAX_QUERY_TARGET_ID_LENGTH 255
+#define MAX_QUERY_GROUP_BY_PASSES 2
 
 typedef bool (*qt_interrupt_callback_t)(void *data);
+
+struct group_by_pass {
+    RRDR_GROUP_BY group_by;
+    char *group_by_label;
+    RRDR_GROUP_BY_FUNCTION aggregation;
+};
 
 typedef struct query_target_request {
     size_t version;
@@ -284,9 +293,7 @@ typedef struct query_target_request {
     const char *time_group_options;
 
     // group by across multiple time-series
-    RRDR_GROUP_BY group_by;
-    char *group_by_label;
-    RRDR_GROUP_BY_FUNCTION group_by_aggregate_function;
+    struct group_by_pass group_by[MAX_QUERY_GROUP_BY_PASSES];
 
     usec_t received_ut;
 
@@ -313,14 +320,18 @@ struct query_versions {
     uint64_t alerts_soft_hash;
 };
 
+struct query_timings {
+    usec_t received_ut;
+    usec_t preprocessed_ut;
+    usec_t executed_ut;
+    usec_t finished_ut;
+};
+
 #define query_view_update_every(qt) ((qt)->window.group * (qt)->window.query_granularity)
 
 typedef struct query_target {
     char id[MAX_QUERY_TARGET_ID_LENGTH + 1]; // query identifier (for logging)
     QUERY_TARGET_REQUEST request;
-
-    bool used;                              // when true, this query is currently being used
-    size_t queries;                         // how many query we have done so far with this QUERY_TARGET - not related to database queries
 
     struct {
         time_t now;                         // the current timestamp, the absolute max for any query timestamp
@@ -388,19 +399,20 @@ typedef struct query_target {
 
     struct {
         size_t used;
-        char *label_keys[GROUP_BY_MAX_LABEL_KEYS];
-    } group_by;
+        char *label_keys[GROUP_BY_MAX_LABEL_KEYS * MAX_QUERY_GROUP_BY_PASSES];
+    } group_by[MAX_QUERY_GROUP_BY_PASSES];
 
     STORAGE_POINT query_points;
-
     struct query_versions versions;
+    struct query_timings timings;
 
     struct {
-        usec_t received_ut;
-        usec_t preprocessed_ut;
-        usec_t executed_ut;
-        usec_t finished_ut;
-    } timings;
+        SPINLOCK spinlock;
+        bool used;                              // when true, this query is currently being used
+        size_t queries;                         // how many query we have done so far with this QUERY_TARGET - not related to database queries
+        struct query_target *prev;
+        struct query_target *next;
+    } internal;
 } QUERY_TARGET;
 
 static inline NEVERNULL QUERY_NODE *query_node(QUERY_TARGET *qt, size_t id) {
@@ -455,13 +467,6 @@ struct api_v2_contexts_request {
     char *contexts;
     char *q;
 
-    struct {
-        usec_t received_ut;
-        usec_t processing_ut;
-        usec_t output_ut;
-        usec_t finished_ut;
-    } timings;
-
     time_t timeout_ms;
 
     qt_interrupt_callback_t interrupt_callback;
@@ -479,8 +484,10 @@ typedef enum __attribute__ ((__packed__)) {
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_OPTIONS options);
 
 RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o);
-void buffer_json_agents_array_v2(BUFFER *wb, time_t now_s);
+void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time_t now_s);
 void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t duration_ut);
+void buffer_json_query_timings(BUFFER *wb, const char *key, struct query_timings *timings);
+void buffer_json_cloud_timings(BUFFER *wb, const char *key, struct query_timings *timings);
 
 // ----------------------------------------------------------------------------
 // scope
@@ -514,6 +521,30 @@ bool rrdcontext_retention_match(RRDCONTEXT_ACQUIRED *rca, time_t after, time_t b
 #define query_matches_retention(after, before, first_entry_s, last_entry_s, update_every_s) \
     (((first_entry_s) - ((update_every_s) * 2) <= (before)) &&                     \
      ((last_entry_s)  + ((update_every_s) * 2) >= (after)))
+
+#define query_target_aggregatable(qt) ((qt)->window.options & RRDR_OPTION_RETURN_RAW)
+
+static inline bool query_target_has_percentage_of_instance(QUERY_TARGET *qt) {
+    for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++)
+        if(qt->request.group_by[g].group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE)
+            return true;
+
+    return false;
+}
+
+static inline bool query_target_needs_all_dimensions(QUERY_TARGET *qt) {
+    if(qt->request.options & RRDR_OPTION_PERCENTAGE)
+        return true;
+
+    return query_target_has_percentage_of_instance(qt);
+}
+
+static inline bool query_target_has_percentage_units(QUERY_TARGET *qt) {
+    if(qt->window.time_group_method == RRDR_GROUPING_CV || query_target_needs_all_dimensions(qt))
+        return true;
+
+    return false;
+}
 
 #endif // NETDATA_RRDCONTEXT_H
 

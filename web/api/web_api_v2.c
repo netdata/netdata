@@ -4,7 +4,6 @@
 
 static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unused, struct web_client *w, char *url, CONTEXTS_V2_OPTIONS options) {
     struct api_v2_contexts_request req = { 0 };
-    req.timings.received_ut = now_monotonic_usec();
 
     while(url) {
         char *value = mystrsep(&url, "&");
@@ -49,6 +48,21 @@ static int web_client_api_request_v2_weights(RRDHOST *host __maybe_unused, struc
                                           WEIGHTS_FORMAT_MULTINODE, 2);
 }
 
+#define GROUP_BY_KEY_MAX_LENGTH 30
+static struct {
+    char group_by[GROUP_BY_KEY_MAX_LENGTH + 1];
+    char aggregation[GROUP_BY_KEY_MAX_LENGTH + 1];
+    char group_by_label[GROUP_BY_KEY_MAX_LENGTH + 1];
+} group_by_keys[MAX_QUERY_GROUP_BY_PASSES];
+
+__attribute__((constructor)) void initialize_group_by_keys(void) {
+    for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
+        snprintfz(group_by_keys[g].group_by, GROUP_BY_KEY_MAX_LENGTH, "group_by[%zu]", g);
+        snprintfz(group_by_keys[g].aggregation, GROUP_BY_KEY_MAX_LENGTH, "aggregation[%zu]", g);
+        snprintfz(group_by_keys[g].group_by_label, GROUP_BY_KEY_MAX_LENGTH, "group_by_label[%zu]", g);
+    }
+}
+
 static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     usec_t received_ut = now_monotonic_usec();
 
@@ -80,13 +94,20 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
     char *alerts = NULL;
     char *time_group_options = NULL;
     char *tier_str = NULL;
-    char *group_by_label = NULL;
     size_t tier = 0;
     RRDR_TIME_GROUPING time_group = RRDR_GROUPING_AVERAGE;
-    RRDR_GROUP_BY group_by = RRDR_GROUP_BY_DIMENSION;
-    RRDR_GROUP_BY_FUNCTION group_by_aggregate = RRDR_GROUP_BY_FUNCTION_AVERAGE;
     DATASOURCE_FORMAT format = DATASOURCE_JSON2;
     RRDR_OPTIONS options = RRDR_OPTION_VIRTUAL_POINTS | RRDR_OPTION_JSON_WRAP | RRDR_OPTION_RETURN_JWAR;
+
+    struct group_by_pass group_by[MAX_QUERY_GROUP_BY_PASSES] = {
+            {
+                .group_by = RRDR_GROUP_BY_DIMENSION,
+                .group_by_label = NULL,
+                .aggregation = RRDR_GROUP_BY_FUNCTION_AVERAGE,
+            },
+    };
+
+    size_t group_by_idx = 0, group_by_label_idx = 0, aggregation_idx = 0;
 
     while(url) {
         char *value = mystrsep(&url, "&");
@@ -111,9 +132,21 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
         else if(!strcmp(name, "before")) before_str = value;
         else if(!strcmp(name, "points")) points_str = value;
         else if(!strcmp(name, "timeout")) timeout_str = value;
-        else if(!strcmp(name, "group_by")) group_by = group_by_parse(value);
-        else if(!strcmp(name, "group_by_label")) group_by_label = value;
-        else if(!strcmp(name, "aggregation")) group_by_aggregate = group_by_aggregate_function_parse(value);
+        else if(!strcmp(name, "group_by")) {
+            group_by[group_by_idx++].group_by = group_by_parse(value);
+            if(group_by_idx >= MAX_QUERY_GROUP_BY_PASSES)
+                group_by_idx = MAX_QUERY_GROUP_BY_PASSES - 1;
+        }
+        else if(!strcmp(name, "group_by_label")) {
+            group_by[group_by_label_idx++].group_by_label = value;
+            if(group_by_label_idx >= MAX_QUERY_GROUP_BY_PASSES)
+                group_by_label_idx = MAX_QUERY_GROUP_BY_PASSES - 1;
+        }
+        else if(!strcmp(name, "aggregation")) {
+            group_by[aggregation_idx++].aggregation = group_by_aggregate_function_parse(value);
+            if(aggregation_idx >= MAX_QUERY_GROUP_BY_PASSES)
+                aggregation_idx = MAX_QUERY_GROUP_BY_PASSES - 1;
+        }
         else if(!strcmp(name, "format")) format = web_client_api_request_v1_data_format(value);
         else if(!strcmp(name, "options")) options |= web_client_api_request_v1_data_options(value);
         else if(!strcmp(name, "time_group")) time_group = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
@@ -153,6 +186,16 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
                     outFileName = tqx_value;
             }
         }
+        else {
+            for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
+                if(!strcmp(name, group_by_keys[g].group_by))
+                    group_by[g].group_by = group_by_parse(value);
+                else if(!strcmp(name, group_by_keys[g].group_by_label))
+                    group_by[g].group_by_label = value;
+                else if(!strcmp(name, group_by_keys[g].aggregation))
+                    group_by[g].aggregation = group_by_aggregate_function_parse(value);
+            }
+        }
     }
 
     // validate the google parameters given
@@ -163,17 +206,20 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
     fix_google_param(responseHandler);
     fix_google_param(outFileName);
 
-    if(group_by_label && *group_by_label)
-        group_by |= RRDR_GROUP_BY_LABEL;
+    for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
+        if (group_by[g].group_by_label && *group_by[g].group_by_label)
+            group_by[g].group_by |= RRDR_GROUP_BY_LABEL;
+    }
 
-    if(group_by == RRDR_GROUP_BY_NONE)
-        group_by = RRDR_GROUP_BY_DIMENSION;
+    if(group_by[0].group_by == RRDR_GROUP_BY_NONE)
+        group_by[0].group_by = RRDR_GROUP_BY_DIMENSION;
 
-    if(group_by & RRDR_GROUP_BY_SELECTED)
-        group_by = RRDR_GROUP_BY_SELECTED; // remove all other groupings
-
-    if((group_by & ~(RRDR_GROUP_BY_DIMENSION)) || (options & RRDR_OPTION_PERCENTAGE))
-        options |= RRDR_OPTION_ABSOLUTE;
+    for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
+        if ((group_by[g].group_by & ~(RRDR_GROUP_BY_DIMENSION)) || (options & RRDR_OPTION_PERCENTAGE)) {
+            options |= RRDR_OPTION_ABSOLUTE;
+            break;
+        }
+    }
 
     if(options & RRDR_OPTION_DEBUG)
         options &= ~RRDR_OPTION_MINIFY;
@@ -209,9 +255,6 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
             .points = points,
             .format = format,
             .options = options,
-            .group_by = group_by,
-            .group_by_label = group_by_label,
-            .group_by_aggregate_function = group_by_aggregate,
             .time_group_method = time_group,
             .time_group_options = time_group_options,
             .resampling_time = resampling_time,
@@ -225,6 +268,10 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
             .interrupt_callback = web_client_interrupt_callback,
             .interrupt_callback_data = w,
     };
+
+    for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++)
+        qtr.group_by[g] = group_by[g];
+
     QUERY_TARGET *qt = query_target_create(&qtr);
     ONEWAYALLOC *owa = NULL;
 

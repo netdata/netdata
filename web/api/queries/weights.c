@@ -518,21 +518,48 @@ static inline ssize_t dict_unique_id_name_add(DICTIONARY *dict, const char *id, 
 
     return (ssize_t)dun->i;
 }
+struct query_weights_data {
+    QUERY_WEIGHTS_REQUEST *qwr;
+
+    SIMPLE_PATTERN *scope_nodes_sp;
+    SIMPLE_PATTERN *scope_contexts_sp;
+    SIMPLE_PATTERN *nodes_sp;
+    SIMPLE_PATTERN *contexts_sp;
+    SIMPLE_PATTERN *instances_sp;
+    SIMPLE_PATTERN *dimensions_sp;
+    SIMPLE_PATTERN *labels_sp;
+    SIMPLE_PATTERN *alerts_sp;
+
+    usec_t timeout_us;
+    bool timed_out;
+    bool interrupted;
+
+    struct query_timings timings;
+
+    size_t examined_dimensions;
+    bool register_zero;
+
+    DICTIONARY *results;
+    WEIGHTS_STATS stats;
+
+    uint32_t shifts;
+
+    struct query_versions versions;
+};
 
 static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *wb,
                                                   time_t after, time_t before,
                                                   time_t baseline_after, time_t baseline_before,
                                                   size_t points, WEIGHTS_METHOD method,
                                                   RRDR_TIME_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
-                                                  size_t examined_dimensions, usec_t duration,
+                                                  size_t examined_dimensions, struct query_weights_data *qwd,
                                                   WEIGHTS_STATS *stats,
                                                   struct query_versions *versions) {
     buffer_json_initialize(wb, "\"", "\"", 0, true, options & RRDR_OPTION_MINIFY);
     buffer_json_member_add_uint64(wb, "api", 2);
-    buffer_json_agents_array_v2(wb, 0);
 
     results_header_to_json(results, wb, after, before, baseline_after, baseline_before,
-                           points, method, group, options, shifts, examined_dimensions, duration, stats);
+                           points, method, group, options, shifts, examined_dimensions, qwd->timings.executed_ut - qwd->timings.received_ut, stats);
 
     version_hashes_api_v2(wb, versions);
 
@@ -706,6 +733,7 @@ static size_t registered_results_to_json_multinode(DICTIONARY *results, BUFFER *
 
     buffer_json_object_close(wb); //dictionaries
 
+    buffer_json_agents_array_v2(wb, &qwd->timings, 0);
     buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
     buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
     buffer_json_finalize(wb);
@@ -921,7 +949,8 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
             .priority = STORAGE_PRIORITY_SYNCHRONOUS,
     };
 
-    RRDR *r = rrd2rrdr(owa, query_target_create(&qtr));
+    QUERY_TARGET *qt = query_target_create(&qtr);
+    RRDR *r = rrd2rrdr(owa, qt);
     if(!r)
         goto cleanup;
 
@@ -962,6 +991,7 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
 
 cleanup:
     rrdr_free(owa, r);
+    query_target_release(qt);
     return ret;
 }
 
@@ -1129,35 +1159,6 @@ static void rrdset_weights_value(
         register_result(results, host, rca, ria, rma, qv.value, 0, &qv.sp, NULL, stats, register_zero, qv.duration_ut);
 }
 
-struct query_weights_data {
-    QUERY_WEIGHTS_REQUEST *qwr;
-
-    SIMPLE_PATTERN *scope_nodes_sp;
-    SIMPLE_PATTERN *scope_contexts_sp;
-    SIMPLE_PATTERN *nodes_sp;
-    SIMPLE_PATTERN *contexts_sp;
-    SIMPLE_PATTERN *instances_sp;
-    SIMPLE_PATTERN *dimensions_sp;
-    SIMPLE_PATTERN *labels_sp;
-    SIMPLE_PATTERN *alerts_sp;
-
-    usec_t now_us;
-    usec_t started_us;
-    usec_t timeout_us;
-    bool timed_out;
-    bool interrupted;
-
-    size_t examined_dimensions;
-    bool register_zero;
-
-    DICTIONARY *results;
-    WEIGHTS_STATS stats;
-
-    uint32_t shifts;
-
-    struct query_versions versions;
-};
-
 static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qwd) {
     QUERY_TARGET_REQUEST qtr = {
             .version = 1,
@@ -1182,9 +1183,10 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
     };
 
     ONEWAYALLOC *owa = onewayalloc_create(16 * 1024);
-    RRDR *r = rrd2rrdr(owa, query_target_create(&qtr));
+    QUERY_TARGET *qt = query_target_create(&qtr);
+    RRDR *r = rrd2rrdr(owa, qt);
 
-    if(rrdr_rows(r) != 1 || !r->d || r->d != r->internal.qt->query.used)
+    if(!r || rrdr_rows(r) != 1 || !r->d || r->d != r->internal.qt->query.used)
         goto cleanup;
 
     QUERY_VALUE qv = {
@@ -1225,6 +1227,7 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
 
 cleanup:
     rrdr_free(owa, r);
+    query_target_release(qt);
     onewayalloc_destroy(owa);
 }
 
@@ -1319,12 +1322,6 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
     struct query_weights_data *qwd = data;
     QUERY_WEIGHTS_REQUEST *qwr = qwd->qwr;
 
-    qwd->now_us = now_monotonic_usec();
-    if(qwd->now_us - qwd->started_us > qwd->timeout_us) {
-        qwd->timed_out = true;
-        return -1;
-    }
-
     if(qwd->qwr->interrupt_callback && qwd->qwr->interrupt_callback(qwd->qwr->interrupt_callback_data)) {
         qwd->interrupted = true;
         return -1;
@@ -1376,6 +1373,12 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
                     &qwd->stats, qwd->register_zero
             );
             break;
+    }
+
+    qwd->timings.executed_ut = now_monotonic_usec();
+    if(qwd->timings.executed_ut - qwd->timings.received_ut > qwd->timeout_us) {
+        qwd->timed_out = true;
+        return -1;
     }
 
     return 1;
@@ -1456,13 +1459,15 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
             .labels_sp = string_to_simple_pattern(qwr->labels),
             .alerts_sp = string_to_simple_pattern(qwr->alerts),
             .timeout_us = qwr->timeout_ms * USEC_PER_MS,
-            .started_us = now_monotonic_usec(),
             .timed_out = false,
             .examined_dimensions = 0,
             .register_zero = true,
             .results = register_result_init(),
             .stats = {},
             .shifts = 0,
+            .timings = {
+                    .received_ut = now_monotonic_usec(),
+            }
     };
 
     if(!rrdr_relative_window_to_absolute(&qwr->after, &qwr->before, NULL))
@@ -1580,7 +1585,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
     if(!(qwr->options & RRDR_OPTION_RETURN_RAW) && qwr->method != WEIGHTS_METHOD_VALUE)
         spread_results_evenly(qwd.results, &qwd.stats);
 
-    usec_t ended_usec = now_monotonic_usec();
+    usec_t ended_usec = qwd.timings.executed_ut = now_monotonic_usec();
 
     // generate the json output we need
     buffer_flush(wb);
@@ -1595,7 +1600,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
                             qwr->baseline_after, qwr->baseline_before,
                             qwr->points, qwr->method, qwr->time_group_method, qwr->options, qwd.shifts,
                             qwd.examined_dimensions,
-                            ended_usec - qwd.started_us, &qwd.stats);
+                            ended_usec - qwd.timings.received_ut, &qwd.stats);
             break;
 
         case WEIGHTS_FORMAT_CONTEXTS:
@@ -1606,7 +1611,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
                             qwr->baseline_after, qwr->baseline_before,
                             qwr->points, qwr->method, qwr->time_group_method, qwr->options, qwd.shifts,
                             qwd.examined_dimensions,
-                            ended_usec - qwd.started_us, &qwd.stats);
+                            ended_usec - qwd.timings.received_ut, &qwd.stats);
             break;
 
         default:
@@ -1618,7 +1623,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
                             qwr->baseline_after, qwr->baseline_before,
                             qwr->points, qwr->method, qwr->time_group_method, qwr->options, qwd.shifts,
                             qwd.examined_dimensions,
-                            ended_usec - qwd.started_us, &qwd.stats, &qwd.versions);
+                            &qwd, &qwd.stats, &qwd.versions);
             break;
     }
 
