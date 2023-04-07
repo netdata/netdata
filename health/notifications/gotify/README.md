@@ -32,7 +32,7 @@ You will need:
 
 Edit `health_alarm_notify.conf`, changes to this file do not require restarting Netdata:
 
-1. Set `SET_GOTIFY` to `YES`
+1. Set `SEND_GOTIFY` to `YES`
 2. Set `GOTIFY_APP_TOKEN` to the app token you generated
 3. `GOTIFY_APP_URL` to point to your Gotify instance, for example `https://push.example.domain/`
 
