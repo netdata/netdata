@@ -47,17 +47,15 @@ fatal() {
 
 function parse_docker_like_inspect_output() {
   local output="${1}"
-  local name=""
   eval "$(grep -E "^(NOMAD_NAMESPACE|NOMAD_JOB_NAME|NOMAD_TASK_NAME|NOMAD_SHORT_ALLOC_ID|CONT_NAME|IMAGE_NAME)=" <<<"$output")"
   if [ -n "$NOMAD_NAMESPACE" ] && [ -n "$NOMAD_JOB_NAME" ] && [ -n "$NOMAD_TASK_NAME" ] && [ -n "$NOMAD_SHORT_ALLOC_ID" ]; then
-    name="${NOMAD_NAMESPACE}-${NOMAD_JOB_NAME}-${NOMAD_TASK_NAME}-${NOMAD_SHORT_ALLOC_ID}"
+    NAME="${NOMAD_NAMESPACE}-${NOMAD_JOB_NAME}-${NOMAD_TASK_NAME}-${NOMAD_SHORT_ALLOC_ID}"
   else
-    name=$(echo "${CONT_NAME}" | sed 's|^/||')
+    NAME=$(echo "${CONT_NAME}" | sed 's|^/||')
   fi
   if [ -n "${IMAGE_NAME}" ]; then
-    name+=" image=\"${IMAGE_NAME}\""
+    LABELS="image=\"${IMAGE_NAME}\""
   fi
-  echo "$name"
 }
 
 function docker_like_get_name_command() {
@@ -66,7 +64,7 @@ function docker_like_get_name_command() {
   info "Running command: ${command} inspect --format='{{range .Config.Env}}{{println .}}{{end}}CONT_NAME={{ .Name}}' \"${id}\""
   if OUTPUT="$(${command} inspect --format='{{range .Config.Env}}{{println .}}{{end}}CONT_NAME={{ .Name}}{{println}}IMAGE_NAME={{ .Config.Image}}' "${id}")" &&
     [ -n "$OUTPUT" ]; then
-      NAME="$(parse_docker_like_inspect_output "$OUTPUT")"
+      parse_docker_like_inspect_output "$OUTPUT"
   fi
   return 0
 }
@@ -91,7 +89,7 @@ function docker_like_get_name_api() {
     JSON=$(curl -sS "${host}${path}")
   fi
   if OUTPUT=$(echo "${JSON}" | jq -r '.Config.Env[],"CONT_NAME=\(.Name)","IMAGE_NAME=\(.Config.Image)"') && [ -n "$OUTPUT" ]; then
-    NAME="$(parse_docker_like_inspect_output "$OUTPUT")"
+    parse_docker_like_inspect_output "$OUTPUT"
   fi
   return 0
 }
@@ -418,20 +416,25 @@ function k8s_get_name() {
   local fn="${FUNCNAME[0]}"
   local cgroup_path="${1}"
   local id="${2}"
+  local kubepod_name=""
 
-  NAME=$(k8s_get_kubepod_name "$cgroup_path" "$id")
+  kubepod_name=$(k8s_get_kubepod_name "$cgroup_path" "$id")
 
   case "$?" in
   0)
-    NAME="k8s_${NAME}"
+    kubepod_name="k8s_${kubepod_name}"
 
     local name labels
-    name=${NAME%% *}
-    labels=${NAME#* }
+    name=${kubepod_name%% *}
+    labels=${kubepod_name#* }
+
     if [ "$name" != "$labels" ]; then
       info "${fn}: cgroup '${id}' has chart name '${name}', labels '${labels}"
+      NAME="$name"
+      LABELS="$labels"
     else
       info "${fn}: cgroup '${id}' has chart name '${NAME}'"
+      NAME="$name"
     fi
     EXIT_CODE=$EXIT_SUCCESS
     ;;
@@ -517,6 +520,7 @@ EXIT_RETRY=2
 EXIT_DISABLE=3
 EXIT_CODE=$EXIT_SUCCESS
 NAME=
+LABELS=
 
 # -----------------------------------------------------------------------------
 
@@ -596,7 +600,13 @@ if [ -z "${NAME}" ]; then
   [ ${#NAME} -gt 100 ] && NAME="${NAME:0:100}"
 fi
 
-info "cgroup '${CGROUP}' is called '${NAME}'"
-echo "${NAME}"
+NAME="${NAME// /_}"
+
+info "cgroup '${CGROUP}' is called '${NAME}', labels '${LABELS}'"
+if [ -n "$LABELS" ]; then
+  echo "${NAME} ${LABELS}"
+else
+  echo "${NAME}"
+fi
 
 exit ${EXIT_CODE}
