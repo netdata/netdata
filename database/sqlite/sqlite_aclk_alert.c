@@ -1107,21 +1107,21 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
         len = 0;
     }
 
-    unsigned char hash[SHA256_DIGEST_LENGTH + 1];
-    SHA256_CTX sha256;
-    SHA256_Init(&sha256);
-    SHA256_Update(&sha256, buffer_tostring(alarms_to_hash), len);
-    SHA256_Final(hash, &sha256);
-    hash[SHA256_DIGEST_LENGTH] = 0;
+    char hash[SHA256_DIGEST_LENGTH + 1];
+    if (hash256_string((const unsigned char *)buffer_tostring(alarms_to_hash), len, hash)) {
+        hash[SHA256_DIGEST_LENGTH] = 0;
 
-    struct alarm_checkpoint alarm_checkpoint;
-    char *claim_id = get_agent_claimid();
-    alarm_checkpoint.claim_id = claim_id;
-    alarm_checkpoint.node_id = wc->node_id;
-    alarm_checkpoint.checksum = (char *)hash;
+        struct alarm_checkpoint alarm_checkpoint;
+        char *claim_id = get_agent_claimid();
+        alarm_checkpoint.claim_id = claim_id;
+        alarm_checkpoint.node_id = wc->node_id;
+        alarm_checkpoint.checksum = (char *)hash;
 
-    aclk_send_provide_alarm_checkpoint(&alarm_checkpoint);
-    log_access("ACLK RES [%s (%s)]: ALERTS CHECKPOINT SENT", wc->node_id, rrdhost_hostname(host));
+        aclk_send_provide_alarm_checkpoint(&alarm_checkpoint);
+        log_access("ACLK RES [%s (%s)]: ALERTS CHECKPOINT SENT", wc->node_id, rrdhost_hostname(host));
+    } else {
+        log_access("ACLK RES [%s (%s)]: FAILED TO CREATE ALERTS CHECKPOINT HASH", wc->node_id, rrdhost_hostname(host));
+    }
     wc->alert_checkpoint_req = 0;
     buffer_free(alarms_to_hash);
 #endif
