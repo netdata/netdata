@@ -249,6 +249,7 @@ paths:
               enum:
                 - dimension
                 - instance
+                - percentage-of-instance
                 - label
                 - node
                 - context
