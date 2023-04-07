@@ -2434,7 +2434,6 @@ send_ntfy() {
   for recipient in ${recipients}; do
     msg="${host} ${status_message}: ${alarm} - ${info}"
     httpcode=$(docurl -X POST \
-                      -H "X-Cache: no" \
                       -H "Icon: https://raw.githubusercontent.com/netdata/netdata/master/web/gui/dashboard/images/favicon-196x196.png" \
                       -H "Title: ${host}: ${name}" \
                       -H "Tags: ${emoji}" \
