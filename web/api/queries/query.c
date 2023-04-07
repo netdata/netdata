@@ -2805,7 +2805,7 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         }
     }
 
-    int added;
+    int added = 0;
     RRDR *first_r = NULL, *last_r = NULL;
     BUFFER *key = buffer_create(0, NULL);
     struct rrdr_group_by_entry *entries = onewayalloc_mallocz(owa, qt->query.used * sizeof(struct rrdr_group_by_entry));
