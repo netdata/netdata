@@ -12,7 +12,6 @@ This is what you will get:
 
 <img src="https://user-images.githubusercontent.com/5953192/230661442-a180abe2-c8bd-496e-88be-9038e62fb4f7.png" alt="Example alarm notifications in Ntfy" width="60%"></img>
 
-
 ## Prerequisites
 
 You will need:
@@ -40,6 +39,10 @@ Edit `health_alarm_notify.conf`, changes to this file do not require restarting 
     You can define multiple recipient URLs like this: `https://SERVER1/TOPIC1 https://SERVER2/TOPIC2`  
     All roles will default to this variable if left unconfigured.
 
+> ### Warning
+> All topics published on https://ntfy.sh are public, so anyone can subscribe to them and follow your notifications. To avoid that, ensure the topic is unique enough using a long, randomly generated ID, like in the following examples.
+> 
+
 An example of a working configuration with two topics as recipients, using the [https://ntfy.sh](https://ntfy.sh) server would be:
 
 ```conf
@@ -57,10 +60,6 @@ role_recipients_ntfy[webmaster]="https://SERVER4/TOPIC4"
 role_recipients_ntfy[proxyadmin]="https://SERVER5/TOPIC5"
 role_recipients_ntfy[sitemgr]="https://SERVER6/TOPIC6"
 ```
-
-> ### Warning
-> All topics published on https://ntfy.sh are public, so anyone can subscribe to them and follow your notifications. To avoid that, ensure the topic is unique enough using a long, randomly generated ID, like in the examples.
-> 
 
 ## Test the notification method
 
