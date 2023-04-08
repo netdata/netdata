@@ -132,6 +132,55 @@ static avl_tree_lock hardirq_pub;
 // tmp store for dynamic hard IRQ values we get from a per-CPU eBPF map.
 static hardirq_ebpf_static_val_t *hardirq_ebpf_vals = NULL;
 
+/*****************************************************************
+ *
+ *  ARAL SECTION
+ *
+ *****************************************************************/
+
+// ARAL vectors used to speed up processing
+ARAL *ebpf_aral_hardirq = NULL;
+
+/**
+ * eBPF hardirq Aral init
+ *
+ * Initiallize array allocator that will be used when integration with apps is enabled.
+ */
+static inline void ebpf_hardirq_aral_init()
+{
+    ebpf_aral_hardirq = ebpf_allocate_pid_aral(NETDATA_EBPF_HARDIRQ_ARAL_NAME, sizeof(hardirq_val_t));
+}
+
+/**
+ * eBPF hardirq get
+ *
+ * Get a hardirq_val_t entry to be used with a specific IRQ.
+ *
+ * @return it returns the address on success.
+ */
+hardirq_val_t *ebpf_hardirq_get(void)
+{
+    hardirq_val_t *target = aral_mallocz(ebpf_aral_hardirq);
+    memset(target, 0, sizeof(hardirq_val_t));
+    return target;
+}
+
+/**
+ * eBPF hardirq release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_hardirq_release(hardirq_val_t *stat)
+{
+    aral_freez(ebpf_aral_hardirq, stat);
+}
+
+/*****************************************************************
+ *
+ *  EXIT FUNCTIONS
+ *
+ *****************************************************************/
+
 /**
  * Hardirq Free
  *
@@ -302,7 +351,7 @@ static int hardirq_read_latency_map(int mapfd)
         if (unlikely(v == NULL)) {
             // latency/name can only be added reliably at a later time.
             // when they're added, only then will we AVL insert.
-            v = callocz(1, sizeof(hardirq_val_t));
+            v = ebpf_hardirq_get();
             v->irq = key.irq;
             v->dim_exists = false;
 
@@ -324,7 +373,7 @@ static int hardirq_read_latency_map(int mapfd)
             // copy name for new IRQs.
             if (v_is_new && !name_saved && v->name[0] == '\0') {
                 if (hardirq_parse_interrupts(v->name, key.irq)) {
-                    freez(v);
+                    ebpf_hardirq_release(v);
                     return -1;
                 }
 
@@ -457,6 +506,7 @@ static void hardirq_collector(ebpf_module_t *em)
     );
 
     avl_init_lock(&hardirq_pub, hardirq_val_cmp);
+    ebpf_hardirq_aral_init();
 
     // create chart and static dims.
     pthread_mutex_lock(&lock);
