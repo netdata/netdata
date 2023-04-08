@@ -6,8 +6,11 @@
 
 **Merged pull requests:**
 
+- Fix regex syntax for clang-format checks. [\#14871](https://github.com/netdata/netdata/pull/14871) ([Ferroin](https://github.com/Ferroin))
+- bump go.d.plugin v0.52.0 [\#14870](https://github.com/netdata/netdata/pull/14870) ([ilyam8](https://github.com/ilyam8))
 - Update link from http to https [\#14864](https://github.com/netdata/netdata/pull/14864) ([Ancairon](https://github.com/Ancairon))
 - Fix js tag in documentation [\#14862](https://github.com/netdata/netdata/pull/14862) ([Ancairon](https://github.com/Ancairon))
+- Set a default registry unique id when there is none for statistics script [\#14861](https://github.com/netdata/netdata/pull/14861) ([MrZammler](https://github.com/MrZammler))
 - review usage of you to say user instead [\#14858](https://github.com/netdata/netdata/pull/14858) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Add labels for cgroup name [\#14856](https://github.com/netdata/netdata/pull/14856) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix typo alerms -\> alarms [\#14854](https://github.com/netdata/netdata/pull/14854) ([slavox](https://github.com/slavox))
@@ -20,6 +23,7 @@
 - Update change-metrics-storage.md [\#14835](https://github.com/netdata/netdata/pull/14835) ([cakrit](https://github.com/cakrit))
 - Update change-metrics-storage.md [\#14834](https://github.com/netdata/netdata/pull/14834) ([cakrit](https://github.com/cakrit))
 - Update netdata-security.md [\#14833](https://github.com/netdata/netdata/pull/14833) ([cakrit](https://github.com/cakrit))
+- Boost dbengine [\#14832](https://github.com/netdata/netdata/pull/14832) ([ktsaou](https://github.com/ktsaou))
 - add some third party collectors [\#14830](https://github.com/netdata/netdata/pull/14830) ([andrewm4894](https://github.com/andrewm4894))
 - Add opsgenie integration docs [\#14828](https://github.com/netdata/netdata/pull/14828) ([iorvd](https://github.com/iorvd))
 - Update Agent notification methods documentation [\#14827](https://github.com/netdata/netdata/pull/14827) ([Ancairon](https://github.com/Ancairon))
@@ -129,6 +133,7 @@
 - Update change-metrics-storage.md [\#14640](https://github.com/netdata/netdata/pull/14640) ([cakrit](https://github.com/cakrit))
 - Fix broken links [\#14634](https://github.com/netdata/netdata/pull/14634) ([Ancairon](https://github.com/Ancairon))
 - Add link to native packages also on the list [\#14633](https://github.com/netdata/netdata/pull/14633) ([cakrit](https://github.com/cakrit))
+- Assorted installer code cleanup. [\#14632](https://github.com/netdata/netdata/pull/14632) ([Ferroin](https://github.com/Ferroin))
 - Re-add link from install page to DEB/RPM package documentation. [\#14631](https://github.com/netdata/netdata/pull/14631) ([Ferroin](https://github.com/Ferroin))
 - Fix broken link [\#14630](https://github.com/netdata/netdata/pull/14630) ([cakrit](https://github.com/cakrit))
 - Fix intermittent permissions issues in some Docker builds. [\#14629](https://github.com/netdata/netdata/pull/14629) ([Ferroin](https://github.com/Ferroin))
@@ -392,9 +397,6 @@
 - Fix binpkg updates on OpenSUSE [\#14260](https://github.com/netdata/netdata/pull/14260) ([Dim-P](https://github.com/Dim-P))
 - DBENGINE v2 - improvements 2 [\#14257](https://github.com/netdata/netdata/pull/14257) ([ktsaou](https://github.com/ktsaou))
 - fix\(pacakging\): fix cpu/memory metrics when running inside LXC container as systemd service [\#14255](https://github.com/netdata/netdata/pull/14255) ([ilyam8](https://github.com/ilyam8))
-- fix\(proc.plugin\): handle disabled IPv6 [\#14252](https://github.com/netdata/netdata/pull/14252) ([ilyam8](https://github.com/ilyam8))
-- DBENGINE v2 - improvements part 1 [\#14251](https://github.com/netdata/netdata/pull/14251) ([ktsaou](https://github.com/ktsaou))
-- Remove daemon/common.h header from libnetdata [\#14248](https://github.com/netdata/netdata/pull/14248) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
