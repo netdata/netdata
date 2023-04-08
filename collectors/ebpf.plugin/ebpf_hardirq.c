@@ -360,22 +360,10 @@ static int hardirq_read_latency_map(int mapfd)
         // 2. the name is unfortunately *not* available on all CPU maps - only
         //    a single map contains the name, so we must find it. we only need
         //    to copy it though if the IRQ is new for us.
-        bool name_saved = false;
         uint64_t total_latency = 0;
         int i;
-        int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
-        for (i = 0; i < end; i++) {
+        for (i = 0; i < ebpf_nprocs; i++) {
             total_latency += hardirq_ebpf_vals[i].latency/1000;
-
-            // copy name for new IRQs.
-            if (v_is_new && !name_saved && v->name[0] == '\0') {
-                if (hardirq_parse_interrupts(v->name, key.irq)) {
-                    ebpf_hardirq_release(v);
-                    return -1;
-                }
-
-                name_saved = true;
-            }
         }
 
         // can now safely publish latency for existing IRQs.
@@ -383,6 +371,11 @@ static int hardirq_read_latency_map(int mapfd)
 
         // can now safely publish new IRQ.
         if (v_is_new) {
+            if (hardirq_parse_interrupts(v->name, v->irq)) {
+                ebpf_hardirq_release(v);
+                return -1;
+            }
+
             avl_t *check = avl_insert_lock(&hardirq_pub, (avl_t *)v);
             if (check != (avl_t *)v) {
                 error("Internal error, cannot insert the AVL tree.");
