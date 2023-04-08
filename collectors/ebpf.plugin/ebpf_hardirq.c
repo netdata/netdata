@@ -129,9 +129,6 @@ static hardirq_static_val_t hardirq_static_vals[] = {
 // thread will write to netdata agent.
 static avl_tree_lock hardirq_pub;
 
-// tmp store for dynamic hard IRQ values we get from a per-CPU eBPF map.
-static hardirq_ebpf_static_val_t *hardirq_ebpf_vals = NULL;
-
 /*****************************************************************
  *
  *  ARAL SECTION
@@ -197,8 +194,6 @@ static void ebpf_hardirq_free(ebpf_module_t *em)
     for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
         ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
     }
-    freez(hardirq_ebpf_vals);
-
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
@@ -319,6 +314,8 @@ static int hardirq_parse_interrupts(char *irq_name, int irq)
  */
 static int hardirq_read_latency_map(int mapfd)
 {
+    hardirq_ebpf_static_val_t hardirq_ebpf_vals[ebpf_nprocs + 1];
+
     hardirq_ebpf_key_t key = {};
     hardirq_ebpf_key_t next_key = {};
     hardirq_val_t search_v = {};
@@ -400,10 +397,12 @@ static int hardirq_read_latency_map(int mapfd)
 
 static void hardirq_read_latency_static_map(int mapfd)
 {
+    hardirq_ebpf_static_val_t hardirq_ebpf_static_vals[ebpf_nprocs + 1];
+
     uint32_t i;
     for (i = 0; i < HARDIRQ_EBPF_STATIC_END; i++) {
         uint32_t map_i = hardirq_static_vals[i].idx;
-        int test = bpf_map_lookup_elem(mapfd, &map_i, hardirq_ebpf_vals);
+        int test = bpf_map_lookup_elem(mapfd, &map_i, hardirq_ebpf_static_vals);
         if (unlikely(test < 0)) {
             continue;
         }
@@ -412,7 +411,7 @@ static void hardirq_read_latency_static_map(int mapfd)
         int cpu_i;
         int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
         for (cpu_i = 0; cpu_i < end; cpu_i++) {
-            total_latency += hardirq_ebpf_vals[cpu_i].latency/1000;
+            total_latency += hardirq_ebpf_static_vals[cpu_i].latency/1000;
         }
 
         hardirq_static_vals[i].latency = total_latency;
@@ -500,11 +499,6 @@ static inline void hardirq_write_static_dims()
 */
 static void hardirq_collector(ebpf_module_t *em)
 {
-    hardirq_ebpf_vals = callocz(
-        (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs,
-        sizeof(hardirq_ebpf_static_val_t)
-    );
-
     avl_init_lock(&hardirq_pub, hardirq_val_cmp);
     ebpf_hardirq_aral_init();
 
