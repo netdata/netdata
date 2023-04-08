@@ -3,6 +3,9 @@
 #ifndef NETDATA_EBPF_HARDIRQ_H
 #define NETDATA_EBPF_HARDIRQ_H 1
 
+#include <stdint.h>
+#include "libnetdata/avl/avl.h"
+
 /*****************************************************************
  *  copied from kernel-collectors repo, with modifications needed
  *  for inclusion here.
@@ -39,6 +42,9 @@ typedef struct hardirq_ebpf_static_val {
 /*****************************************************************
  * below this is eBPF plugin-specific code.
  *****************************************************************/
+
+// ARAL Name
+#define NETDATA_EBPF_HARDIRQ_ARAL_NAME "ebpf_harddirq"
 
 #define NETDATA_EBPF_MODULE_NAME_HARDIRQ "hardirq"
 #define NETDATA_HARDIRQ_CONFIG_FILE "hardirq.conf"
