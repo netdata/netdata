@@ -20,7 +20,7 @@ template <class T> weak_ptr<T> make_weak_ptr(shared_ptr<T> ptr) { return ptr; }
 #define DATACHANNEL_ENTRIES_MAX 100
 
 void webrtc_initialize() {
-    rtc::InitLogger(rtc::LogLevel::Warning);
+    rtc::InitLogger(rtc::LogLevel::Debug);
 }
 
 class webRTCConnection : public std::enable_shared_from_this<webRTCConnection> {
@@ -234,6 +234,13 @@ webRTCConnection::~webRTCConnection() {
 std::vector<std::weak_ptr<webRTCConnection>> connections;
 
 int webrtc_new_connection(const char *sdp, BUFFER *wb, char **candidates, size_t *candidates_max) {
+    if(!sdp || !*sdp) {
+        buffer_flush(wb);
+        buffer_strcat(wb, "No SDP message posted with the request");
+        wb->content_type = CT_TEXT_PLAIN;
+        return HTTP_RESP_BAD_REQUEST;
+    }
+
     auto connection = std::make_shared<webRTCConnection>(sdp, wb, candidates, candidates_max);
     // The connection object will self-destruct when the last data channel closes, and the shared_ptr's reference count reaches 0.
 

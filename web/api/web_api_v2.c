@@ -349,24 +349,17 @@ cleanup:
 }
 
 static int web_client_api_request_v2_webrtc(RRDHOST *host __maybe_unused, struct web_client *w, char *url __maybe_unused) {
-    BUFFER *wb = w->response.data;
-
-    if(!w->post_payload) {
-        buffer_flush(wb);
-        buffer_strcat(wb, "No payload with SDP message");
-        wb->content_type = CT_TEXT_PLAIN;
-        return HTTP_RESP_BAD_REQUEST;
-    }
-
-    BUFFER *answer = buffer_create(0, NULL);
+    BUFFER *sdp_wb = buffer_create(0, NULL);
     char *candidates[100] = { 0 };
     size_t count = 100;
-    int ret = webrtc_new_connection(w->post_payload, answer, candidates, &count);
+    int ret = webrtc_new_connection(w->post_payload, sdp_wb, candidates, &count);
 
     if(ret == HTTP_RESP_OK) {
+        BUFFER *wb = w->response.data;
+
         buffer_flush(wb);
         buffer_json_initialize(wb, "\"", "\"", 0, true, false);
-        buffer_json_member_add_string(wb, "sdp", buffer_tostring(answer));
+        buffer_json_member_add_string(wb, "sdp", buffer_tostring(sdp_wb));
 
         buffer_json_member_add_array(wb, "candidates");
         for (size_t i = 0; i < count; i++)
@@ -378,7 +371,7 @@ static int web_client_api_request_v2_webrtc(RRDHOST *host __maybe_unused, struct
         wb->content_type = CT_APPLICATION_JSON;
     }
 
-    buffer_free(answer);
+    buffer_free(sdp_wb);
 
     return ret;
 }
