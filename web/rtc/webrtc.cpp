@@ -2,8 +2,9 @@
 
 #include "webrtc.h"
 
-#ifdef HAVE_LIBDATACHANNEL
 #include "../server/web_client.h"
+
+#ifdef HAVE_LIBDATACHANNEL
 
 #include "rtc/rtc.hpp"
 #include <chrono>
