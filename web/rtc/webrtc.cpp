@@ -30,6 +30,7 @@ public:
     void close();
 
 private:
+    size_t id;
     size_t version;
     rtc::Configuration config;
     std::shared_ptr<rtc::PeerConnection> pc;
@@ -44,14 +45,21 @@ private:
     } unsafe;
 
     void applyRemoteSDP(const char *sdp);
+    void getID();
     void increaseVersion();
 };
+
+void webRTCConnection::getID() {
+    static size_t global_id = 0;
+    id = __atomic_fetch_add(&global_id, 1, __ATOMIC_RELAXED);
+}
 
 void webRTCConnection::increaseVersion() {
     __atomic_add_fetch(&version, 1, __ATOMIC_RELAXED);
 }
 
 webRTCConnection::webRTCConnection(const char *sdp, BUFFER *wb, char **candidates, size_t *candidates_max) {
+    getID();
     version = 0;
 
     netdata_spinlock_init(&unsafe.spinlock);
@@ -68,33 +76,32 @@ webRTCConnection::webRTCConnection(const char *sdp, BUFFER *wb, char **candidate
     pc = std::make_shared<rtc::PeerConnection>(config);
 
     pc->onLocalDescription([&](rtc::Description description) {
-        internal_error(true, "WEBRTC: DESCRIPTION: %s", std::string(description).c_str());
+        internal_error(true, "WEBRTC[%zu]: DESCRIPTION: %s", id, std::string(description).c_str());
         buffer_strcat(wb, std::string(description).c_str());
     });
 
     pc->onLocalCandidate([&](rtc::Candidate candidate) {
-        internal_error(true, "WEBRTC: CANDIDATE %zu: %s", candidate_id, std::string(candidate).c_str());
+        internal_error(true, "WEBRTC[%zu]: CANDIDATE %zu: %s", id, candidate_id, std::string(candidate).c_str());
 
-        if (candidate_id < *candidates_max) {
+        if (candidate_id < *candidates_max)
             candidates[candidate_id++] = strdupz(std::string(candidate).c_str());
-        }
         else
-            internal_error(true, "WEBRTC: max candidates size reached.");
+            internal_error(true, "WEBRTC[%zu]: max candidates size of %zu reached.", id, candidate_id);
     });
 
     pc->onStateChange([&](rtc::PeerConnection::State pcstate) {
-        internal_error(true, "WEBRTC: STATE: %d", (int)pcstate);
+        internal_error(true, "WEBRTC[%zu]: STATE: %d", id, (int)pcstate);
         increaseVersion();
         state = pcstate;
     });
     pc->onGatheringStateChange([&](rtc::PeerConnection::GatheringState pcgstate) {
-        internal_error(true, "WEBRTC: GATHERING STATE: %d", (int)pcgstate);
+        internal_error(true, "WEBRTC[%zu]: GATHERING STATE: %d", id, (int)pcgstate);
         increaseVersion();
         gstate = pcgstate;
     });
 
     pc->onDataChannel([&](shared_ptr<rtc::DataChannel> _dc) {
-        internal_error(true, "WEBRTC: DATA CHANNEL '%s' OPEN", _dc->label().c_str());
+        internal_error(true, "WEBRTC[%zu]: DATA CHANNEL '%s' OPEN", id, _dc->label().c_str());
 
         increaseVersion();
         netdata_spinlock_lock(&unsafe.spinlock);
@@ -108,9 +115,9 @@ webRTCConnection::webRTCConnection(const char *sdp, BUFFER *wb, char **candidate
 
         if(!found) {
             if (unsafe.data_channel_id >= DATACHANNEL_ENTRIES_MAX)
-                internal_fatal(true, "WEBRTC: max data channels size reached.");
-
-            unsafe.dc[unsafe.data_channel_id++] = _dc;
+                internal_error(true, "WEBRTC[%zu]: max data channels size %zu reached.", id, unsafe.data_channel_id);
+            else
+                unsafe.dc[unsafe.data_channel_id++] = _dc;
         }
         netdata_spinlock_unlock(&unsafe.spinlock);
 
@@ -118,7 +125,7 @@ webRTCConnection::webRTCConnection(const char *sdp, BUFFER *wb, char **candidate
                 [&, connection = shared_from_this()]() {
                     increaseVersion();
 
-                    internal_error(true, "WEBRTC: DATA CHANNEL '%s' CLOSED", _dc->label().c_str());
+                    internal_error(true, "WEBRTC[%zu]: DATA CHANNEL '%s' CLOSED", id, _dc->label().c_str());
                     netdata_spinlock_lock(&unsafe.spinlock);
                     unsafe.active--;
                     for(size_t i = 0; i < unsafe.data_channel_id ; i++)
@@ -133,7 +140,7 @@ webRTCConnection::webRTCConnection(const char *sdp, BUFFER *wb, char **candidate
 
         _dc->onMessage([&](auto data) {
             if (std::holds_alternative<std::string>(data)) {
-                internal_error(true, "WEBRTC: DATA CHANNEL '%s' MSG: %s", _dc->label().c_str(),
+                internal_error(true, "WEBRTC[%zu]: DATA CHANNEL '%s' MSG: %s", id, _dc->label().c_str(),
                                std::get<std::string>(data).c_str());
             }
         });
@@ -143,13 +150,13 @@ webRTCConnection::webRTCConnection(const char *sdp, BUFFER *wb, char **candidate
     while(gstate != rtc::PeerConnection::GatheringState::Complete) {
         if(!logged) {
             logged = true;
-            internal_error(true, "WEBRTC: Waiting for gathering to complete");
+            internal_error(true, "WEBRTC[%zu]: Waiting for gathering to complete", id);
         }
         usleep(1000);
     }
 
     if(logged)
-        internal_error(true, "WEBRTC: Gathering complete");
+        internal_error(true, "WEBRTC[%zu]: Gathering complete", id);
 
 
     applyRemoteSDP(sdp);
@@ -185,7 +192,7 @@ void webRTCConnection::applyRemoteSDP(const char *sdp) {
         s = e;
     }
 
-    internal_error(true, "WEBRTC: setting remote sdp: %s", descr.c_str());
+    internal_error(true, "WEBRTC[%zu]: setting remote sdp: %s", id, descr.c_str());
     pc->setRemoteDescription(descr);
 
     s = candidates.c_str();
@@ -201,7 +208,7 @@ void webRTCConnection::applyRemoteSDP(const char *sdp) {
 
         std::string candidate;
         candidate.append(s, e - s);
-        internal_error(true, "WEBRTC: adding remote candidate: %s", candidate.c_str());
+        internal_error(true, "WEBRTC[%zu]: adding remote candidate: %s", id, candidate.c_str());
         pc->addRemoteCandidate(candidate);
 
         s = e;
