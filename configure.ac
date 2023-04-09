@@ -413,7 +413,7 @@ if test "${have_cxx17}" = "yes"; then
         OPTIONAL_DATACHANNEL_LIBS="-ldatachannel"
     fi
 else
-    AC_MSG_WARN([libdatachannel is not available on this system, disabling webrtc])
+    AC_MSG_WARN([c++17 is not available on this system, disabling webrtc])
 fi
 
 # -----------------------------------------------------------------------------
