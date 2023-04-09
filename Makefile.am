@@ -37,6 +37,8 @@ EXTRA_DIST = \
     build/m4/ax_c_mallopt.m4 \
     build/m4/tcmalloc.m4 \
     build/m4/ax_c__generic.m4 \
+    build/m4/ax_compiler_vendor.m4 \
+    build/m4/ax_cxx_compile_stdcxx.m4 \
     ml/dlib \
     README.md \
     LICENSE \
