@@ -519,9 +519,6 @@ static inline void netdev_rename_cgroup(struct netdev *d, struct netdev_rename *
     d->chart_family = strdupz("net");
 
     rrdlabels_copy(d->chart_labels, r->chart_labels);
-    if (strncmp(r->ctx_prefix, "k8s", 3)) {
-        rrdlabels_add(d->chart_labels, "cgroup_name", r->container_name, RRDLABEL_SRC_AUTO);
-    }
 
     d->priority = NETDATA_CHART_PRIO_CGROUP_NET_IFACE;
     d->flipped = 1;
