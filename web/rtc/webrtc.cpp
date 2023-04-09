@@ -20,22 +20,34 @@ template <class T> weak_ptr<T> make_weak_ptr(shared_ptr<T> ptr) { return ptr; }
 #define DATACHANNEL_ENTRIES_MAX 100
 
 void webrtc_initialize() {
-    rtc::InitLogger(rtc::LogLevel::Debug);
+#ifdef NETDATA_INTERNAL_CHECKS
+    rtc::InitLogger(rtc::LogLevel::Verbose);
+#else
+    rtc::InitLogger(rtc::LogLevel::Warning);
+#endif
+    rtc::Preload();
 }
 
-class webRTCConnection : public std::enable_shared_from_this<webRTCConnection> {
+class webRTCConnection {
 public:
     webRTCConnection(const char *sdp, BUFFER *wb, char **candidates, size_t *candidates_max);
     ~webRTCConnection();
     void close();
+    bool shouldBeDeleted() const {
+        internal_error(true, "WEBRTC[%zu]: should_be_deleted: %s", id, should_be_deleted ? "true" : "false");
+        return should_be_deleted;
+    };
+    size_t ID() const {
+        return id;
+    };
 
 private:
     size_t id;
     size_t version;
     rtc::Configuration config;
     std::shared_ptr<rtc::PeerConnection> pc;
-    rtc::PeerConnection::State state;
-    rtc::PeerConnection::GatheringState gstate;
+
+    bool should_be_deleted;
 
     struct {
         SPINLOCK spinlock;
@@ -61,6 +73,7 @@ void webRTCConnection::increaseVersion() {
 webRTCConnection::webRTCConnection(const char *sdp, BUFFER *wb, char **candidates, size_t *candidates_max) {
     getID();
     version = 0;
+    should_be_deleted = false;
 
     netdata_spinlock_init(&unsafe.spinlock);
     unsafe.active = 0;
@@ -73,6 +86,11 @@ webRTCConnection::webRTCConnection(const char *sdp, BUFFER *wb, char **candidate
     netdata_spinlock_init(&unsafe.spinlock);
 
     config.iceServers.emplace_back("stun.l.google.com:19302");
+    config.iceTransportPolicy = rtc::TransportPolicy::All;
+    config.enableIceTcp = true;
+    config.enableIceUdpMux = true;
+    config.maxMessageSize = 5 * 1024 * 1024;
+
     pc = std::make_shared<rtc::PeerConnection>(config);
 
     pc->onLocalDescription([&](rtc::Description description) {
@@ -90,20 +108,86 @@ webRTCConnection::webRTCConnection(const char *sdp, BUFFER *wb, char **candidate
     });
 
     pc->onStateChange([&](rtc::PeerConnection::State pcstate) {
-        internal_error(true, "WEBRTC[%zu]: STATE: %d", id, (int)pcstate);
         increaseVersion();
-        state = pcstate;
+
+        switch(pcstate) {
+            case rtc::PeerConnection::State::New:
+                internal_error(true, "WEBRTC[%zu]: STATE: New", id);
+                break;
+
+            case rtc::PeerConnection::State::Connecting:
+                internal_error(true, "WEBRTC[%zu]: STATE: Connecting", id);
+                break;
+
+            case rtc::PeerConnection::State::Connected:
+                internal_error(true, "WEBRTC[%zu]: STATE: Connected", id);
+                break;
+
+            case rtc::PeerConnection::State::Closed:
+                internal_error(true, "WEBRTC[%zu]: STATE: Closed", id);
+                should_be_deleted = true;
+                break;
+
+            case rtc::PeerConnection::State::Failed:
+                internal_error(true, "WEBRTC[%zu]: STATE: Failed", id);
+                should_be_deleted = true;
+                break;
+
+            case rtc::PeerConnection::State::Disconnected:
+                internal_error(true, "WEBRTC[%zu]: STATE: Disconnected", id);
+                should_be_deleted = true;
+                break;
+        }
     });
+
     pc->onGatheringStateChange([&](rtc::PeerConnection::GatheringState pcgstate) {
-        internal_error(true, "WEBRTC[%zu]: GATHERING STATE: %d", id, (int)pcgstate);
         increaseVersion();
-        gstate = pcgstate;
+
+        switch(pcgstate) {
+            case rtc::PeerConnection::GatheringState::New:
+                internal_error(true, "WEBRTC[%zu]: GATHERING STATE: New", id);
+                break;
+
+            case rtc::PeerConnection::GatheringState::InProgress:
+                internal_error(true, "WEBRTC[%zu]: GATHERING STATE: InProgress", id);
+                break;
+
+            case rtc::PeerConnection::GatheringState::Complete:
+                internal_error(true, "WEBRTC[%zu]: GATHERING STATE: Complete", id);
+                break;
+        }
+    });
+
+    pc->onSignalingStateChange([&](rtc::PeerConnection::SignalingState pcsstate) {
+        increaseVersion();
+
+        switch(pcsstate) {
+            case rtc::PeerConnection::SignalingState::HaveLocalOffer:
+                internal_error(true, "WEBRTC[%zu]: SIGNALING STATE: HaveLocalOffer", id);
+                break;
+
+            case rtc::PeerConnection::SignalingState::HaveRemoteOffer:
+                internal_error(true, "WEBRTC[%zu]: SIGNALING STATE: HaveRemoteOffer", id);
+                break;
+
+            case rtc::PeerConnection::SignalingState::HaveLocalPranswer:
+                internal_error(true, "WEBRTC[%zu]: SIGNALING STATE: HaveLocalPranswer", id);
+                break;
+
+            case rtc::PeerConnection::SignalingState::HaveRemotePranswer:
+                internal_error(true, "WEBRTC[%zu]: SIGNALING STATE: HaveRemotePranswer", id);
+                break;
+
+            case rtc::PeerConnection::SignalingState::Stable:
+                internal_error(true, "WEBRTC[%zu]: SIGNALING STATE: Stable", id);
+                break;
+        }
     });
 
     pc->onDataChannel([&](shared_ptr<rtc::DataChannel> _dc) {
         internal_error(true, "WEBRTC[%zu]: DATA CHANNEL '%s' OPEN", id, _dc->label().c_str());
-
         increaseVersion();
+
         netdata_spinlock_lock(&unsafe.spinlock);
         unsafe.active++;
         bool found = false;
@@ -121,33 +205,45 @@ webRTCConnection::webRTCConnection(const char *sdp, BUFFER *wb, char **candidate
         }
         netdata_spinlock_unlock(&unsafe.spinlock);
 
-        _dc->onClosed(
-                [&, connection = shared_from_this()]() {
+        _dc->onClosed([&]()  {
+                if(!should_be_deleted) {
                     increaseVersion();
 
-                    internal_error(true, "WEBRTC[%zu]: DATA CHANNEL '%s' CLOSED", id, _dc->label().c_str());
+                    internal_error(true, "WEBRTC[%zu]: DATA CHANNEL CLOSED", id);
+
                     netdata_spinlock_lock(&unsafe.spinlock);
                     unsafe.active--;
-                    for(size_t i = 0; i < unsafe.data_channel_id ; i++)
-                        if(unsafe.dc[i] == _dc)
+                    bool destroy = (unsafe.active == 0);
+
+                    for (size_t i = 0; i < unsafe.data_channel_id; i++)
+                        if (unsafe.dc[i] == _dc)
                             unsafe.dc[i] = nullptr;
 
                     netdata_spinlock_unlock(&unsafe.spinlock);
 
-                    // No need to call 'delete this' as the shared_ptr will handle object destruction.
-                    // If 'destroy' is true and this was the last reference to the object, the object will be destroyed.
-                });
+                    if (destroy)
+                        should_be_deleted = true;
+                }
+            });
 
         _dc->onMessage([&](auto data) {
             if (std::holds_alternative<std::string>(data)) {
-                internal_error(true, "WEBRTC[%zu]: DATA CHANNEL '%s' MSG: %s", id, _dc->label().c_str(),
-                               std::get<std::string>(data).c_str());
+                rtc::DataChannel *dc = _dc.get();
+
+                internal_error(true, "WEBRTC[%zu]: DATA CHANNEL '%s' MSG (max size %zu): %s", id, dc->label().c_str(),
+                               dc->maxMessageSize(), std::get<std::string>(data).c_str());
+
+                std::string response = std::get<std::string>(data);
+                response.append(" to you too");
+                dc->send(response.c_str());
             }
         });
     });
 
+    applyRemoteSDP(sdp);
+
     bool logged = false;
-    while(gstate != rtc::PeerConnection::GatheringState::Complete) {
+    while(pc->gatheringState() != rtc::PeerConnection::GatheringState::Complete) {
         if(!logged) {
             logged = true;
             internal_error(true, "WEBRTC[%zu]: Waiting for gathering to complete", id);
@@ -158,8 +254,6 @@ webRTCConnection::webRTCConnection(const char *sdp, BUFFER *wb, char **candidate
     if(logged)
         internal_error(true, "WEBRTC[%zu]: Gathering complete", id);
 
-
-    applyRemoteSDP(sdp);
     *candidates_max = candidate_id;
 }
 
@@ -216,8 +310,11 @@ void webRTCConnection::applyRemoteSDP(const char *sdp) {
 }
 
 void webRTCConnection::close() {
+    internal_error(true, "WEBRTC[%zu]: closing...", id);
+
     for (size_t i = 0; i < unsafe.data_channel_id; i++) {
         if (unsafe.dc[i]) {
+            internal_error(true, "WEBRTC[%zu]: DATA CHANNEL[%zu]: closing...", id, i);
             unsafe.dc[i]->close();
         }
     }
@@ -229,35 +326,57 @@ void webRTCConnection::close() {
 
 webRTCConnection::~webRTCConnection() {
     close();
+    internal_error(true, "WEBRTC[%zu]: freeing...", id);
 }
 
-std::vector<std::weak_ptr<webRTCConnection>> connections;
+std::vector<webRTCConnection *> connections;
+
+static void cleanupConnections() {
+    internal_error(true, "WEBRTC: cleanupConnections called, size: %zu", connections.size());
+
+    connections.erase(
+            std::remove_if(connections.begin(), connections.end(),
+                           [&](const webRTCConnection *conn) {
+                               if (conn->shouldBeDeleted()) {
+                                   delete conn;
+                                   return true;
+                               }
+                               return false;
+                           }),
+            connections.end());
+}
 
 int webrtc_new_connection(const char *sdp, BUFFER *wb, char **candidates, size_t *candidates_max) {
+
+    cleanupConnections();
+
     if(!sdp || !*sdp) {
         buffer_flush(wb);
         buffer_strcat(wb, "No SDP message posted with the request");
         wb->content_type = CT_TEXT_PLAIN;
+        *candidates_max = 0;
         return HTTP_RESP_BAD_REQUEST;
     }
 
-    auto connection = std::make_shared<webRTCConnection>(sdp, wb, candidates, candidates_max);
-    // The connection object will self-destruct when the last data channel closes, and the shared_ptr's reference count reaches 0.
+    auto connection = new webRTCConnection(sdp, wb, candidates, candidates_max);
+
+    // Log the connection object details
+    internal_error(true, "WEBRTC: Adding new connection, id: %zu, pointer: %p", connection->ID(), connection);
+
+    // Log the connections vector size before adding the connection
+    internal_error(true, "WEBRTC: connections.size() before push_back: %zu", connections.size());
 
     // Store the weak_ptr to the connection in a container.
-    // Replace "connections" with a container that suits your needs.
     connections.push_back(connection);
+
+    // Log the connections vector size after adding the connection
+    internal_error(true, "WEBRTC: connections.size() after push_back: %zu", connections.size());
 
     return HTTP_RESP_OK;
 }
 
 void webrtc_close_all_connections() {
-    for (auto &weak_connection : connections) {
-        if (auto connection = weak_connection.lock()) {
-            connection->close();
-        }
-    }
-    connections.clear();
+    rtc::Cleanup();
 }
 
 #else // ! HAVE_LIBDATACHANNEL
