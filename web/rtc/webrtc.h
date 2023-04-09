@@ -4,17 +4,13 @@
 #define NETDATA_WEBRTC_H
 
 #include "../../libnetdata/libnetdata.h"
-#include "../server/web_client.h"
-
-#define DESCRIPTION_ENTRIES_MAX 100
-#define CANDIDATES_ENTRIES_MAX 100
-#define DATACHANNEL_ENTRIES_MAX 100
 
 # ifdef __cplusplus
 extern "C" {
 # endif
 
-int webrtc_answer_to_offer(const char *sdp, BUFFER *wb, char **candidates, size_t *candidates_max);
+int webrtc_new_connection(const char *sdp, BUFFER *wb, char **candidates, size_t *candidates_max);
+void webrtc_close_all_connections();
 void webrtc_initialize();
 
 # ifdef __cplusplus

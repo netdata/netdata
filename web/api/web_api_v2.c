@@ -361,7 +361,7 @@ static int web_client_api_request_v2_webrtc(RRDHOST *host __maybe_unused, struct
     BUFFER *answer = buffer_create(0, NULL);
     char *candidates[100] = { 0 };
     size_t count = 100;
-    int ret = webrtc_answer_to_offer(w->post_payload, answer, candidates, &count);
+    int ret = webrtc_new_connection(w->post_payload, answer, candidates, &count);
 
     if(ret == HTTP_RESP_OK) {
         buffer_flush(wb);

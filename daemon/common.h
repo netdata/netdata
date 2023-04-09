@@ -59,6 +59,7 @@
 
 // the netdata API
 #include "web/server/web_client.h"
+#include "web/rtc/webrtc.h"
 
 // all data collection plugins
 #include "collectors/all.h"

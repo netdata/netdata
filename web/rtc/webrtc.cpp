@@ -3,16 +3,20 @@
 #include "webrtc.h"
 
 #ifdef HAVE_LIBDATACHANNEL
+#include "../server/web_client.h"
 
 #include "rtc/rtc.hpp"
 #include <chrono>
 #include <memory>
+#include <vector>
 #include <thread>
 
 using namespace std::chrono_literals;
 using std::shared_ptr;
 using std::weak_ptr;
 template <class T> weak_ptr<T> make_weak_ptr(shared_ptr<T> ptr) { return ptr; }
+
+#define DATACHANNEL_ENTRIES_MAX 100
 
 void webrtc_initialize() {
     rtc::InitLogger(rtc::LogLevel::Warning);
@@ -22,6 +26,7 @@ class webRTCConnection : public std::enable_shared_from_this<webRTCConnection> {
 public:
     webRTCConnection(const char *sdp, BUFFER *wb, char **candidates, size_t *candidates_max);
     ~webRTCConnection();
+    void close();
 
 private:
     size_t version;
@@ -38,7 +43,12 @@ private:
     } unsafe;
 
     void applyRemoteSDP(const char *sdp);
+    void increaseVersion();
 };
+
+void webRTCConnection::increaseVersion() {
+    __atomic_add_fetch(&version, 1, __ATOMIC_RELAXED);
+}
 
 webRTCConnection::webRTCConnection(const char *sdp, BUFFER *wb, char **candidates, size_t *candidates_max) {
     version = 0;
@@ -73,18 +83,19 @@ webRTCConnection::webRTCConnection(const char *sdp, BUFFER *wb, char **candidate
 
     pc->onStateChange([&](rtc::PeerConnection::State pcstate) {
         internal_error(true, "WEBRTC: STATE: %d", (int)pcstate);
-        version++;
+        increaseVersion();
         state = pcstate;
     });
     pc->onGatheringStateChange([&](rtc::PeerConnection::GatheringState pcgstate) {
         internal_error(true, "WEBRTC: GATHERING STATE: %d", (int)pcgstate);
-        version++;
+        increaseVersion();
         gstate = pcgstate;
     });
 
     pc->onDataChannel([&](shared_ptr<rtc::DataChannel> _dc) {
         internal_error(true, "WEBRTC: DATA CHANNEL '%s' OPEN", _dc->label().c_str());
 
+        increaseVersion();
         netdata_spinlock_lock(&unsafe.spinlock);
         unsafe.active++;
         bool found = false;
@@ -104,6 +115,8 @@ webRTCConnection::webRTCConnection(const char *sdp, BUFFER *wb, char **candidate
 
         _dc->onClosed(
                 [&, connection = shared_from_this()]() {
+                    increaseVersion();
+
                     internal_error(true, "WEBRTC: DATA CHANNEL '%s' CLOSED", _dc->label().c_str());
                     netdata_spinlock_lock(&unsafe.spinlock);
                     unsafe.active--;
@@ -194,29 +207,56 @@ void webRTCConnection::applyRemoteSDP(const char *sdp) {
     }
 }
 
-webRTCConnection::~webRTCConnection() {
-    for(size_t i = 0; i < unsafe.data_channel_id ; i++)
-        if (unsafe.dc[i])
+void webRTCConnection::close() {
+    for (size_t i = 0; i < unsafe.data_channel_id; i++) {
+        if (unsafe.dc[i]) {
             unsafe.dc[i]->close();
+        }
+    }
 
-    if (pc)
+    if (pc) {
         pc->close();
+    }
 }
 
-int webrtc_answer_to_offer(const char *sdp, BUFFER *wb, char **candidates, size_t *candidates_max) {
+webRTCConnection::~webRTCConnection() {
+    close();
+}
+
+std::vector<std::weak_ptr<webRTCConnection>> connections;
+
+int webrtc_new_connection(const char *sdp, BUFFER *wb, char **candidates, size_t *candidates_max) {
     auto connection = std::make_shared<webRTCConnection>(sdp, wb, candidates, candidates_max);
     // The connection object will self-destruct when the last data channel closes, and the shared_ptr's reference count reaches 0.
+
+    // Store the weak_ptr to the connection in a container.
+    // Replace "connections" with a container that suits your needs.
+    connections.push_back(connection);
+
     return HTTP_RESP_OK;
+}
+
+void webrtc_close_all_connections() {
+    for (auto &weak_connection : connections) {
+        if (auto connection = weak_connection.lock()) {
+            connection->close();
+        }
+    }
+    connections.clear();
 }
 
 #else // ! HAVE_LIBDATACHANNEL
 
-int webrtc_answer_to_offer(const char *sdp __maybe_unused, BUFFER *wb, char **candidates __maybe_unused, size_t *candidates_max) {
+int webrtc_new_connection(const char *sdp __maybe_unused, BUFFER *wb, char **candidates __maybe_unused, size_t *candidates_max) {
     buffer_flush(wb);
     buffer_strcat(wb, "WEBRTC is not enabled on this server");
     wb->content_type = CT_TEXT_PLAIN;
     *candidates_max = 0;
     return HTTP_RESP_BAD_REQUEST;
+}
+
+void webrtc_close_all_connections() {
+    ;
 }
 
 #endif // ! HAVE_LIBDATACHANNEL

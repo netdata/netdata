@@ -340,6 +340,10 @@ void netdata_cleanup_and_exit(int ret) {
     }
 #endif
 
+    delta_shutdown_time("close webrtc connections");
+
+    webrtc_close_all_connections();
+
     delta_shutdown_time("disable maintenance, new queries, new web requests, new streaming connections and aclk");
 
     service_signal_exit(
@@ -2133,6 +2137,11 @@ int main(int argc, char **argv) {
             close(fd);
     }
 #endif
+
+    // ------------------------------------------------------------------------
+    // initialize WebRTC
+
+    webrtc_initialize();
 
     // ------------------------------------------------------------------------
     // unblock signals
