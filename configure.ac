@@ -242,10 +242,6 @@ AX_CXX_COMPILE_STDCXX(17, noext, optional)
 if test "x$HAVE_CXX17" != "x1"; then
   # Check for C++11 support (optional)
   AX_CXX_COMPILE_STDCXX(11, noext, optional)
-
-  AM_CONDITIONAL([HAVE_CXX11], [test "x$HAVE_CXX11" = "x1"])
-else
-  AM_CONDITIONAL([HAVE_CXX11], [test "x$HAVE_CXX17" = "x1"])
 fi
 
 AC_MSG_CHECKING([c++ standard to use])
