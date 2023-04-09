@@ -412,6 +412,8 @@ if test "${have_cxx17}" = "yes"; then
         AC_DEFINE([HAVE_LIBDATACHANNEL], [1], [libdatachannel usability])
         OPTIONAL_DATACHANNEL_LIBS="-ldatachannel"
     fi
+else
+    AC_MSG_WARN([libdatachannel is not available on this system, disabling webrtc])
 fi
 
 # -----------------------------------------------------------------------------
