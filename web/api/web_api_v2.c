@@ -358,32 +358,29 @@ static int web_client_api_request_v2_webrtc(RRDHOST *host __maybe_unused, struct
         return HTTP_RESP_BAD_REQUEST;
     }
 
-    void *conn = webrtc_answer_to_offer(w->post_payload);
-    struct webrtc_answer *wra = webrtc_get_answer(conn);
+    BUFFER *answer = buffer_create(0, NULL);
+    char *candidates[100] = { 0 };
+    size_t count = 100;
+    int ret = webrtc_answer_to_offer(w->post_payload, answer, candidates, &count);
 
-    buffer_flush(wb);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    if(ret == HTTP_RESP_OK) {
+        buffer_flush(wb);
+        buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+        buffer_json_member_add_string(wb, "sdp", buffer_tostring(answer));
 
-    BUFFER *sdp = buffer_create(0, NULL);
-    for(size_t i = 0; i < wra->description_id ;i++) {
-        if(buffer_strlen(sdp))
-            buffer_strcat(wb, "\r\n");
+        buffer_json_member_add_array(wb, "candidates");
+        for (size_t i = 0; i < count; i++)
+            buffer_json_add_array_item_string(wb, candidates[i]);
 
-        buffer_strcat(sdp, wra->description[i]);
+        buffer_json_array_close(wb);
+        buffer_json_finalize(wb);
+
+        wb->content_type = CT_APPLICATION_JSON;
     }
 
-    buffer_json_member_add_string(wb, "sdp", buffer_tostring(sdp));
-    buffer_free(sdp);
+    buffer_free(answer);
 
-    buffer_json_member_add_array(wb, "candidates");
-    for(size_t i = 0; i < wra->candidates_id ;i++) {
-        buffer_json_add_array_item_string(wb, wra->candidates[i]);
-    }
-    buffer_json_array_close(wb);
-    buffer_json_finalize(wb);
-
-    wb->content_type = CT_APPLICATION_JSON;
-    return 200;
+    return ret;
 }
 
 static struct web_api_command api_commands_v2[] = {

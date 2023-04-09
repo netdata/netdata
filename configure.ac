@@ -337,7 +337,7 @@ AC_SEARCH_LIBS([backtrace], [execinfo], [AC_DEFINE([HAVE_BACKTRACE], [1], [backt
 # pthreads
 
 ACX_PTHREAD(, [AC_MSG_ERROR([Cannot initialize pthread environment])])
-LIBS="${PTHREAD_LIBS} ${LIBS} -ldatachannel"
+LIBS="${PTHREAD_LIBS} ${LIBS}"
 CFLAGS="${CFLAGS} ${PTHREAD_CFLAGS}"
 CC="${PTHREAD_CC}"
 
@@ -347,6 +347,17 @@ AC_CHECK_LIB(
 [AC_DEFINE([HAVE_PTHREAD_GETNAME_NP], [1], [Is set if pthread_getname_np is available])]
 )
 
+# -----------------------------------------------------------------------------
+# libdatachannel
+
+AC_CHECK_LIB([datachannel], [rtcCreatePeerConnection],
+             [LIBDATACHANNEL_FOUND=yes],
+             [LIBDATACHANNEL_FOUND=no])
+
+if test "x$LIBDATACHANNEL_FOUND" = "xyes"; then
+    AC_DEFINE([HAVE_LIBDATACHANNEL], [1], [libdatachannel usability])
+    OPTIONAL_DATACHANNEL_LIBS="-ldatachannel"
+fi
 
 # -----------------------------------------------------------------------------
 # libm
@@ -1663,6 +1674,7 @@ CPPFLAGS="\
 
 AC_SUBST([OPTIONAL_MATH_CFLAGS])
 AC_SUBST([OPTIONAL_MATH_LIBS])
+AC_SUBST([OPTIONAL_DATACHANNEL_LIBS])
 AC_SUBST([OPTIONAL_UV_LIBS])
 AC_SUBST([OPTIONAL_LZ4_LIBS])
 AC_SUBST([OPTIONAL_SSL_LIBS])
