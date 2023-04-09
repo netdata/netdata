@@ -248,6 +248,10 @@ void webrtc_close_all_connections() {
 
 #else // ! HAVE_LIBDATACHANNEL
 
+void webrtc_initialize() {
+    ;
+}
+
 int webrtc_new_connection(const char *sdp __maybe_unused, BUFFER *wb, char **candidates __maybe_unused, size_t *candidates_max) {
     buffer_flush(wb);
     buffer_strcat(wb, "WEBRTC is not enabled on this server");
