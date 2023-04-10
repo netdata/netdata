@@ -102,6 +102,8 @@ static struct {
 // webrtc data channel
 
 static void myOpenCallback(int id, void *user_ptr) {
+    webrtc_set_thread_name();
+
     WEBRTC_DC *chan = user_ptr;
     internal_fatal(chan->dc != id, "WEBRTC[%d],DC[%d]: dc mismatch, expected %d, got %d", chan->conn->pc, chan->dc, chan->dc, id);
 
@@ -110,6 +112,8 @@ static void myOpenCallback(int id, void *user_ptr) {
 }
 
 static void myClosedCallback(int id, void *user_ptr) {
+    webrtc_set_thread_name();
+
     WEBRTC_DC *chan = user_ptr;
     internal_fatal(chan->dc != id, "WEBRTC[%d],DC[%d]: dc mismatch, expected %d, got %d", chan->conn->pc, chan->dc, chan->dc, id);
 
@@ -125,6 +129,8 @@ static void myClosedCallback(int id, void *user_ptr) {
 }
 
 static void myErrorCallback(int id, const char *error, void *user_ptr) {
+    webrtc_set_thread_name();
+
     WEBRTC_DC *chan = user_ptr;
     internal_fatal(chan->dc != id, "WEBRTC[%d],DC[%d]: dc mismatch, expected %d, got %d", chan->conn->pc, chan->dc, chan->dc, id);
 
@@ -132,6 +138,8 @@ static void myErrorCallback(int id, const char *error, void *user_ptr) {
 }
 
 static void myMessageCallback(int id, const char *message, int size, void *user_ptr) {
+    webrtc_set_thread_name();
+
     WEBRTC_DC *chan = user_ptr;
     internal_fatal(chan->dc != id, "WEBRTC[%d],DC[%d]: dc mismatch, expected %d, got %d", chan->conn->pc, chan->dc, chan->dc, id);
 
@@ -156,6 +164,8 @@ static void myMessageCallback(int id, const char *message, int size, void *user_
 //#define WEBRTC_MAX_REQUEST_SIZE 65536
 //
 //static void myAvailableCallback(int id, void *user_ptr) {
+//    webrtc_set_thread_name();
+//
 //    WEBRTC_DC *chan = user_ptr;
 //    internal_fatal(chan->dc != id, "WEBRTC[%d],DC[%d]: dc mismatch, expected %d, got %d", chan->conn->pc, chan->dc, chan->dc, id);
 //
@@ -180,6 +190,8 @@ static void myMessageCallback(int id, const char *message, int size, void *user_
 //}
 
 static void myDataChannelCallback(int pc, int dc, void *user_ptr) {
+    webrtc_set_thread_name();
+
     WEBRTC_CONN *conn = user_ptr;
     internal_fatal(conn->pc != pc, "WEBRTC[%d]: pc mismatch, expected %d, got %d", conn->pc, conn->pc, pc);
 
@@ -220,31 +232,20 @@ static void myDataChannelCallback(int pc, int dc, void *user_ptr) {
 // ----------------------------------------------------------------------------
 // webrtc connection
 
-static void webrtc_destroy_connection_unsafe(WEBRTC_CONN *conn) {
+static inline void webrtc_destroy_connection_unsafe(WEBRTC_CONN *conn) {
     if(conn->state == RTC_CLOSED) {
-        size_t channels = 0;
-
         netdata_spinlock_lock(&conn->channels.spinlock);
         WEBRTC_DC *chan = conn->channels.head;
-        while (chan) {
-            WEBRTC_DC *chan_next = chan->link.next;
-
-            // do not close channels here
-            // they will dead-lock on conn->channels.spinlock
-
-            channels++;
-            chan = chan_next;
-        }
         netdata_spinlock_unlock(&conn->channels.spinlock);
 
-        if(!channels) {
+        if(!chan) {
             internal_error(true, "WEBRTC[%d]: destroying connection", conn->pc);
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(webrtc_base.unsafe.head, conn, link.prev, link.next);
             freez(conn->config.iceServers);
             freez(conn);
         }
         else {
-            internal_error(true, "WEBRTC[%d]: not destroying closed connection because it has %zu channels running", conn->pc, channels);
+            internal_error(true, "WEBRTC[%d]: not destroying closed connection because it has data channels running", conn->pc);
         }
     }
 }
@@ -276,6 +277,8 @@ static WEBRTC_CONN *webrtc_create_connection(int iceServersCount) {
 }
 
 static void myDescriptionCallback(int pc __maybe_unused, const char *sdp, const char *type, void *user_ptr) {
+    webrtc_set_thread_name();
+
     WEBRTC_CONN *conn = user_ptr;
     internal_fatal(conn->pc != pc, "WEBRTC[%d]: pc mismatch, expected %d, got %d", conn->pc, conn->pc, pc);
 
@@ -290,6 +293,8 @@ static void myDescriptionCallback(int pc __maybe_unused, const char *sdp, const 
 }
 
 static void myCandidateCallback(int pc __maybe_unused, const char *cand, const char *mid __maybe_unused, void *user_ptr) {
+    webrtc_set_thread_name();
+
     WEBRTC_CONN *conn = user_ptr;
     internal_fatal(conn->pc != pc, "WEBRTC[%d]: pc mismatch, expected %d, got %d", conn->pc, conn->pc, pc);
 
@@ -305,6 +310,8 @@ static void myCandidateCallback(int pc __maybe_unused, const char *cand, const c
 }
 
 static void myStateChangeCallback(int pc __maybe_unused, rtcState state, void *user_ptr) {
+    webrtc_set_thread_name();
+
     WEBRTC_CONN *conn = user_ptr;
     internal_fatal(conn->pc != pc, "WEBRTC[%d]: pc mismatch, expected %d, got %d", conn->pc, conn->pc, pc);
 
@@ -341,6 +348,8 @@ static void myStateChangeCallback(int pc __maybe_unused, rtcState state, void *u
 }
 
 static void myGatheringStateCallback(int pc __maybe_unused, rtcGatheringState state, void *user_ptr) {
+    webrtc_set_thread_name();
+
     WEBRTC_CONN *conn = user_ptr;
     internal_fatal(conn->pc != pc, "WEBRTC[%d]: pc mismatch, expected %d, got %d", conn->pc, conn->pc, pc);
 
