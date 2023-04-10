@@ -32,23 +32,6 @@ static void webrtc_log(rtcLogLevel level, const char *message) {
     }
 }
 
-void webrtc_initialize() {
-    rtcLogLevel level;
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    level = RTC_LOG_INFO;
-#else
-    level = RTC_LOG_WARNING;
-#endif
-
-    rtcInitLogger(level, webrtc_log);
-    rtcPreload();
-}
-
-void webrtc_close_all_connections() {
-    rtcCleanup();
-}
-
 typedef struct webrtc_datachannel {
     int dc;
     char *label;
@@ -85,18 +68,129 @@ typedef struct webrtc_connection {
     } link;
 } WEBRTC_CONN;
 
+#define WEBRTC_MAX_ICE_SERVERS 100
+
 static struct {
+    bool enabled;
+    char *iceServers[WEBRTC_MAX_ICE_SERVERS];
+    int iceServersCount;
+    char *proxyServer;
+    char *bindAddress;
+
     struct {
         SPINLOCK spinlock;
         WEBRTC_CONN *head;
     } unsafe;
 
 } webrtc_base = {
+        .enabled = true,
+        .iceServers = {
+                // Format:
+                // [("stun"|"turn"|"turns") (":"|"://")][username ":" password "@"]hostname[":" port]["?transport=" ("udp"|"tcp"|"tls")]
+                //
+                // Note transports TCP and TLS are only available for a TURN server with libnice as ICE backend and govern only the
+                // TURN control connection, meaning relaying is always performed over UDP.
+                //
+                // If the username or password of an URI contains reserved special characters, they must be percent-encoded.
+                // In particular, ":" must be encoded as "%3A" and "@" must by encoded as "%40".
+
+                "stun://stun.l.google.com:19302",
+                NULL, // terminator
+        },
+        .iceServersCount = 1,
+        .proxyServer = NULL, // [("http"|"socks5") (":"|"://")][username ":" password "@"]hostname["    :" port]
+        .bindAddress = NULL,
         .unsafe = {
                 .spinlock = NETDATA_SPINLOCK_INITIALIZER,
                 .head = NULL,
         },
 };
+
+static void webrtc_get_ice_servers(void) {
+    BUFFER *wb = buffer_create(0, NULL);
+
+    int i;
+    for(i = 0; i < WEBRTC_MAX_ICE_SERVERS ;i++) {
+        if (webrtc_base.iceServers[i]) {
+            if (buffer_strlen(wb))
+                buffer_strcat(wb, " ");
+
+            internal_error(true, "WEBRTC: default ice server No %d is: '%s'", i, webrtc_base.iceServers[i]);
+            buffer_strcat(wb, webrtc_base.iceServers[i]);
+        }
+        else
+            break;
+    }
+    webrtc_base.iceServersCount = i;
+    internal_error(true, "WEBRTC: there are %d default ice servers: '%s'", webrtc_base.iceServersCount, buffer_tostring(wb));
+
+    char *servers = config_get(CONFIG_SECTION_WEBRTC, "ice servers", buffer_tostring(wb));
+
+    webrtc_base.iceServersCount = 0;
+    char *s = servers, *e;
+    while(*s) {
+        if(isspace(*s))
+            s++;
+
+        e = s;
+        while(*e && !isspace(*e))
+            e++;
+
+        if(s != e && webrtc_base.iceServersCount < WEBRTC_MAX_ICE_SERVERS) {
+            char old = *e;
+            *e = '\0';
+            internal_error(true, "WEBRTC: ice server No %d is: '%s'", webrtc_base.iceServersCount, s);
+            webrtc_base.iceServers[webrtc_base.iceServersCount++] = strdupz(s);
+            *e = old;
+        }
+
+        if(*e)
+            s = e + 1;
+        else
+            break;
+    }
+
+    buffer_free(wb);
+}
+
+void webrtc_initialize() {
+    webrtc_base.enabled = config_get_boolean(CONFIG_SECTION_WEBRTC, "enabled", webrtc_base.enabled);
+    internal_error(true, "WEBRTC: is %s", webrtc_base.enabled ? "enabled" : "disabled");
+
+    webrtc_get_ice_servers();
+
+    webrtc_base.proxyServer = config_get(CONFIG_SECTION_WEBRTC, "proxy server", webrtc_base.proxyServer ? webrtc_base.proxyServer : "");
+    if(!webrtc_base.proxyServer || !*webrtc_base.proxyServer)
+        webrtc_base.proxyServer = NULL;
+
+    internal_error(true, "WEBRTC: proxy server is: '%s'", webrtc_base.proxyServer ? webrtc_base.proxyServer : "");
+
+    webrtc_base.bindAddress = config_get(CONFIG_SECTION_WEBRTC, "bind address", webrtc_base.bindAddress ? webrtc_base.bindAddress : "");
+    if(!webrtc_base.bindAddress || !*webrtc_base.bindAddress)
+        webrtc_base.bindAddress = NULL;
+
+    internal_error(true, "WEBRTC: bind address is: '%s'", webrtc_base.bindAddress ? webrtc_base.bindAddress : "");
+
+    if(!webrtc_base.enabled)
+        return;
+
+    rtcLogLevel level;
+#ifdef NETDATA_INTERNAL_CHECKS
+    level = RTC_LOG_INFO;
+#else
+    level = RTC_LOG_WARNING;
+#endif
+
+    rtcInitLogger(level, webrtc_log);
+    rtcPreload();
+}
+
+void webrtc_close_all_connections() {
+    if(!webrtc_base.enabled)
+        return;
+
+    rtcCleanup();
+}
 
 // ----------------------------------------------------------------------------
 // webrtc data channel
@@ -241,7 +335,6 @@ static inline void webrtc_destroy_connection_unsafe(WEBRTC_CONN *conn) {
         if(!chan) {
             internal_error(true, "WEBRTC[%d]: destroying connection", conn->pc);
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(webrtc_base.unsafe.head, conn, link.prev, link.next);
-            freez(conn->config.iceServers);
             freez(conn);
         }
         else {
@@ -261,11 +354,8 @@ static void cleanupConnections() {
     netdata_spinlock_unlock(&webrtc_base.unsafe.spinlock);
 }
 
-static WEBRTC_CONN *webrtc_create_connection(int iceServersCount) {
+static WEBRTC_CONN *webrtc_create_connection(void) {
     WEBRTC_CONN *conn = callocz(1, sizeof(WEBRTC_CONN));
-
-    if(iceServersCount)
-        conn->config.iceServers = callocz(iceServersCount, sizeof(char *));
 
     netdata_spinlock_init(&conn->response.spinlock);
     netdata_spinlock_init(&conn->channels.spinlock);
@@ -371,37 +461,33 @@ static void myGatheringStateCallback(int pc __maybe_unused, rtcGatheringState st
 }
 
 int webrtc_new_connection(const char *sdp, BUFFER *wb) {
+    if(unlikely(!webrtc_base.enabled)) {
+        buffer_flush(wb);
+        buffer_strcat(wb, "WebRTC is not enabled on this agent.");
+        wb->content_type = CT_TEXT_PLAIN;
+        return HTTP_RESP_BAD_REQUEST;
+    }
+
     cleanupConnections();
 
-    buffer_flush(wb);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
-    wb->content_type = CT_APPLICATION_JSON;
-
-    if(!sdp || !*sdp) {
+    if(unlikely(!sdp || !*sdp)) {
+        buffer_flush(wb);
         buffer_strcat(wb, "No SDP message posted with the request");
         wb->content_type = CT_TEXT_PLAIN;
         return HTTP_RESP_BAD_REQUEST;
     }
 
-    int iceServersCount = 1;
-    WEBRTC_CONN *conn = webrtc_create_connection(iceServersCount);
+    buffer_flush(wb);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    wb->content_type = CT_APPLICATION_JSON;
+
+    WEBRTC_CONN *conn = webrtc_create_connection();
     conn->response.wb = wb;
 
-    // Format:
-    // [("stun"|"turn"|"turns") (":"|"://")][username ":" password "@"]hostname[":" port]["?transport=" ("udp"|"tcp"|"tls")]
-    //
-    // Note transports TCP and TLS are only available for a TURN server with libnice as ICE backend and govern only the
-    // TURN control connection, meaning relaying is always performed over UDP.
-    //
-    // If the username or password of an URI contains reserved special characters, they must be percent-encoded.
-    // In particular, ":" must be encoded as "%3A" and "@" must by encoded as "%40".
-    if(iceServersCount)
-        conn->config.iceServers[iceServersCount - 1] = "stun://stun.l.google.com:19302";
-
-    conn->config.iceServersCount = iceServersCount;
-
-    conn->config.proxyServer = NULL; // [("http"|"socks5") (":"|"://")][username ":" password "@"]hostname["    :" port]
-    conn->config.bindAddress = NULL;
+    conn->config.iceServers = (const char **)webrtc_base.iceServers;
+    conn->config.iceServersCount = webrtc_base.iceServersCount;
+    conn->config.proxyServer = webrtc_base.proxyServer;
+    conn->config.bindAddress = webrtc_base.bindAddress;
     conn->config.certificateType = RTC_CERTIFICATE_DEFAULT;
     conn->config.iceTransportPolicy = RTC_TRANSPORT_POLICY_ALL;
     conn->config.enableIceTcp = true; // libnice only
