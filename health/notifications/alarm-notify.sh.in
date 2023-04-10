@@ -39,6 +39,7 @@
 #  - Stackpulse Event by @thiagoftsm
 #  - Opsgenie by @thiaoftsm #9858
 #  - Gotify by @coffeegrind123
+#  - ntfy.sh by @Dim-P
 
 # -----------------------------------------------------------------------------
 # testing notifications
@@ -176,6 +177,7 @@ sms
 hangouts
 dynatrace
 matrix
+ntfy
 "
 
 # -----------------------------------------------------------------------------
@@ -654,6 +656,9 @@ filter_recipient_by_criticality() {
 # check gotify
 { [ -z "${GOTIFY_APP_TOKEN}" ] || [ -z "${GOTIFY_APP_URL}" ]; } && SEND_GOTIFY="NO"
 
+# check ntfy
+[ -z "${DEFAULT_RECIPIENT_NTFY}" ] && SEND_NTFY="NO"
+
 # check stackpulse
 [ -z "${STACKPULSE_WEBHOOK}" ] && SEND_STACKPULSE="NO"
 
@@ -692,7 +697,8 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
   [ "${SEND_DYNATRACE}" = "YES" ] ||
   [ "${SEND_STACKPULSE}" = "YES" ] ||
   [ "${SEND_OPSGENIE}" = "YES" ] ||
-  [ "${SEND_GOTIFY}" = "YES" ]; then
+  [ "${SEND_GOTIFY}" = "YES" ] ||
+  [ "${SEND_NTFY}" = "YES" ]; then
   # if we need curl, check for the curl command
   if [ -z "${curl}" ]; then
     curl="$(command -v curl 2>/dev/null)"
@@ -723,6 +729,7 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
     SEND_STACKPULSE="NO"
     SEND_OPSGENIE="NO"
     SEND_GOTIFY="NO"
+    SEND_NTFY="NO"
   fi
 fi
 
@@ -863,7 +870,8 @@ for method in "${SEND_EMAIL}" \
   "${SEND_DYNATRACE}" \
   "${SEND_STACKPULSE}" \
   "${SEND_OPSGENIE}" \
-  "${SEND_GOTIFY}" ; do
+  "${SEND_GOTIFY}" \
+  "${SEND_NTFY}" ; do
 
   if [ "${method}" == "YES" ]; then
     proceed=1
@@ -2403,6 +2411,50 @@ EOF
 }
 
 # -----------------------------------------------------------------------------
+# ntfy sender
+
+send_ntfy() {
+  local httpcode priority recipients=${1} sent=0 msg
+
+  [ "${SEND_NTFY}" != "YES" ] && return 1
+
+  case "${status}" in
+    WARNING) emoji="warning" ;;
+    CRITICAL) emoji="red_circle" ;;
+    CLEAR) emoji="white_check_mark" ;;
+    *) emoji="white_circle" ;;
+  esac
+
+  case ${status} in
+    WARNING) priority="high";;
+    CRITICAL) priority="urgent";;
+    *) priority="default" ;;
+  esac
+
+  for recipient in ${recipients}; do
+    msg="${host} ${status_message}: ${alarm} - ${info}"
+    httpcode=$(docurl -X POST \
+                      -H "Icon: https://raw.githubusercontent.com/netdata/netdata/master/web/gui/dashboard/images/favicon-196x196.png" \
+                      -H "Title: ${host}: ${name}" \
+                      -H "Tags: ${emoji}" \
+                      -H "Priority: ${priority}" \
+                      -H "Actions: view, View node, ${goto_url}, clear=true;" \
+                      -d "${msg}" \
+                      ${recipient})
+    if [ "${httpcode}" == "200" ]; then
+      info "sent ntfy notification for: ${host} ${chart}.${name} is ${status} to '${recipient}'"
+      sent=$((sent + 1))
+    else
+      error "failed to send ntfy notification for: ${host} ${chart}.${name} is ${status} to '${recipient}', with HTTP response status code ${httpcode}."
+    fi
+  done
+
+  [ ${sent} -gt 0 ] && return 0
+
+  return 1
+}
+
+# -----------------------------------------------------------------------------
 # prepare the content of the notification
 
 # the url to send the user on click
@@ -3609,6 +3661,11 @@ send_gotify
 SENT_GOTIFY=$?
 
 # -----------------------------------------------------------------------------
+# send messages to ntfy
+send_ntfy "${DEFAULT_RECIPIENT_NTFY}"
+SENT_NTFY=$?
+
+# -----------------------------------------------------------------------------
 # let netdata know
 for state in "${SENT_EMAIL}" \
   "${SENT_PUSHOVER}" \
@@ -3638,7 +3695,8 @@ for state in "${SENT_EMAIL}" \
   "${SENT_DYNATRACE}" \
   "${SENT_STACKPULSE}" \
   "${SENT_OPSGENIE}" \
-  "${SENT_GOTIFY}"; do
+  "${SENT_GOTIFY}" \
+  "${SENT_NTFY}"; do
   if [ "${state}" -eq 0 ]; then
     # we sent something
     exit 0
