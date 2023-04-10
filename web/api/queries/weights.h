@@ -35,6 +35,13 @@ typedef struct query_weights_request {
     const char *dimensions;
     const char *labels;
     const char *alerts;
+
+    struct {
+        RRDR_GROUP_BY group_by;
+        char *group_by_label;
+        RRDR_GROUP_BY_FUNCTION aggregation;
+    } group_by;
+
     WEIGHTS_METHOD method;
     WEIGHTS_FORMAT format;
     RRDR_TIME_GROUPING time_group_method;
