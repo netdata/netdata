@@ -462,7 +462,6 @@ int webrtc_new_connection(const char *sdp __maybe_unused, BUFFER *wb) {
     buffer_flush(wb);
     buffer_strcat(wb, "WEBRTC is not enabled on this server");
     wb->content_type = CT_TEXT_PLAIN;
-    *candidates_max = 0;
     return HTTP_RESP_BAD_REQUEST;
 }
 
