@@ -26,65 +26,7 @@ cd /etc/netdata   # Replace this path with your Netdata config directory, if dif
 sudo ./edit-config python.d/w1sensor.conf
 ```
 
-An example of a working configuration is:
-
-```yaml
-# netdata python.d.plugin configuration for w1sensor
-
-# ----------------------------------------------------------------------
-# Global Variables
-# These variables set the defaults for all JOBs, however each JOB
-# may define its own, overriding the defaults.
-
-# update_every sets the default data collection frequency.
-# If unset, the python.d.plugin default is used.
-update_every: 5
-
-# priority controls the order of charts at the netdata dashboard.
-# Lower numbers move the charts towards the top of the page.
-# If unset, the default for python.d.plugin is used.
-priority: 60000
-
-# penalty indicates whether to apply penalty to update_every in case of failures.
-# Penalty will increase every 5 failed updates in a row. Maximum penalty is 10 minutes.
-penalty: yes
-
-# autodetection_retry sets the job re-check interval in seconds.
-# The job is not deleted if check fails.
-# Attempts to start the job are made once every autodetection_retry.
-# This feature is disabled by default.
-autodetection_retry: 0
-
-# ----------------------------------------------------------------------
-# JOBS (data collection sources)
-#
-# The default JOBS share the same *name*. JOBS with the same name
-# are mutually exclusive. Only one of them will be allowed running at
-# any time. This allows autodetection to try several alternatives and
-# pick the one that works.
-#
-# Any number of jobs is supported.
-#
-# All python.d.plugin JOBS (for all its modules) support a set of
-# predefined parameters. These are:
-#
-job_name:
-    name: myname            # the JOB's name as it will appear at the
-                            # dashboard (by default is the job_name)
-                            # JOBs sharing a name are mutually exclusive
-    update_every: 5         # the JOB's data collection frequency
-    priority: 60000         # the JOB's order on the dashboard
-    penalty: yes            # the JOB's penalty
-    autodetection_retry: 0  # the JOB's re-check interval in seconds
-#
-# Additionally to the above, example also supports the following:
-#
-# name_<1-Wire id>: '<human readable name>'
-# This allows associating a human readable name with a sensor's 1-Wire
-# identifier. Example:
-# name_00000022276e: 'Machine room'
-# name_00000022298f: 'Rack 12'
-```
+An example of a working configuration can be found in the default [configuration file](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/w1sensor/w1sensor.conf) of this collector.
 
 ### Troubleshooting
 
