@@ -349,31 +349,7 @@ cleanup:
 }
 
 static int web_client_api_request_v2_webrtc(RRDHOST *host __maybe_unused, struct web_client *w, char *url __maybe_unused) {
-    BUFFER *sdp_wb = buffer_create(0, NULL);
-    char *candidates[100] = { 0 };
-    size_t count = 100;
-    int ret = webrtc_new_connection(w->post_payload, sdp_wb, candidates, &count);
-
-    if(ret == HTTP_RESP_OK) {
-        BUFFER *wb = w->response.data;
-
-        buffer_flush(wb);
-        buffer_json_initialize(wb, "\"", "\"", 0, true, false);
-        buffer_json_member_add_string(wb, "sdp", buffer_tostring(sdp_wb));
-
-        buffer_json_member_add_array(wb, "candidates");
-        for (size_t i = 0; i < count; i++)
-            buffer_json_add_array_item_string(wb, candidates[i]);
-
-        buffer_json_array_close(wb);
-        buffer_json_finalize(wb);
-
-        wb->content_type = CT_APPLICATION_JSON;
-    }
-
-    buffer_free(sdp_wb);
-
-    return ret;
+    return webrtc_new_connection(w->post_payload, w->response.data);
 }
 
 static struct web_api_command api_commands_v2[] = {

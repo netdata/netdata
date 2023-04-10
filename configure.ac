@@ -237,7 +237,7 @@ fi
 # C++ version check
 
 # Check for C++17 support (optional)
-AX_CXX_COMPILE_STDCXX(17, noext, optional)
+# AX_CXX_COMPILE_STDCXX(17, noext, optional)
 
 if test "x$HAVE_CXX17" != "x1"; then
   # Check for C++11 support (optional)
@@ -399,17 +399,13 @@ AC_CHECK_LIB(
 # -----------------------------------------------------------------------------
 # libdatachannel
 
-if test "${have_cxx17}" = "yes"; then
-    AC_CHECK_LIB([datachannel], [rtcCreatePeerConnection],
-                 [LIBDATACHANNEL_FOUND=yes],
-                 [LIBDATACHANNEL_FOUND=no])
+AC_CHECK_LIB([datachannel], [rtcCreatePeerConnection],
+             [LIBDATACHANNEL_FOUND=yes],
+             [LIBDATACHANNEL_FOUND=no])
 
-    if test "x$LIBDATACHANNEL_FOUND" = "xyes"; then
-        AC_DEFINE([HAVE_LIBDATACHANNEL], [1], [libdatachannel usability])
-        OPTIONAL_DATACHANNEL_LIBS="-ldatachannel"
-    fi
-else
-    AC_MSG_WARN([c++17 is not available on this system, disabling webrtc])
+if test "x$LIBDATACHANNEL_FOUND" = "xyes"; then
+    AC_DEFINE([HAVE_LIBDATACHANNEL], [1], [libdatachannel usability])
+    OPTIONAL_DATACHANNEL_LIBS="-ldatachannel"
 fi
 
 # -----------------------------------------------------------------------------

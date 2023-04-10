@@ -662,7 +662,7 @@ STATSD_PLUGIN_FILES = \
     $(NULL)
 
 WEB_PLUGIN_FILES = \
-    web/rtc/webrtc.cpp \
+    web/rtc/webrtc.c \
     web/rtc/webrtc.h \
     web/server/web_client.c \
     web/server/web_client.h \
