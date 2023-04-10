@@ -8,8 +8,6 @@
 
 #include "rtc/rtc.h"
 
-#define WEBRTC_MAX_REQUEST_SIZE 65536
-
 static void webrtc_log(rtcLogLevel level, const char *message) {
     switch(level) {
         case RTC_LOG_NONE:
@@ -155,6 +153,8 @@ static void myMessageCallback(int id, const char *message, int size, void *user_
     buffer_free(wb);
 }
 
+//#define WEBRTC_MAX_REQUEST_SIZE 65536
+//
 //static void myAvailableCallback(int id, void *user_ptr) {
 //    WEBRTC_DC *chan = user_ptr;
 //    internal_fatal(chan->dc != id, "WEBRTC[%d],DC[%d]: dc mismatch, expected %d, got %d", chan->conn->pc, chan->dc, chan->dc, id);
