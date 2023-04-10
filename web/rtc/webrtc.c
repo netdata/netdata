@@ -139,13 +139,14 @@ static void myMessageCallback(int id, const char *message, int size, void *user_
 
     internal_fatal(!chan->open, "WEBRTC[%d],DC[%d]: received message on closed channel", chan->conn->pc, chan->dc);
 
+    bool binary = (size >= 0);
     if(size < 0)
         size = -size;
 
-    BUFFER *wb = buffer_create(size, NULL);
+    BUFFER *wb = buffer_create(size + 1, NULL);
     buffer_strncat(wb, message, size);
 
-    info("WEBRTC[%d],DC[%d]: received message of length %d: '%s'", chan->conn->pc, chan->dc, size, buffer_tostring(wb));
+    info("WEBRTC[%d],DC[%d]: received %s message of length %d: '%s'", chan->conn->pc, chan->dc, binary ? "binary" : "text", size, buffer_tostring(wb));
 
     buffer_strcat(wb, " to you too!");
     rtcSendMessage(id, buffer_tostring(wb), -(int)buffer_strlen(wb));
