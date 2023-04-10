@@ -261,7 +261,7 @@ void rrdr2json_v2(RRDR *r, BUFFER *wb) {
         if(!rrdr_dimension_should_be_exposed(r->od[d], options))
             continue;
 
-        buffer_json_add_array_item_string(wb, string2str(r->dn[d]));
+        buffer_json_add_array_item_string(wb, string2str(r->di[d]));
         i++;
     }
     buffer_json_array_close(wb); // labels
