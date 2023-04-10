@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- cgroups.plugin: add image label [\#14872](https://github.com/netdata/netdata/pull/14872) ([ilyam8](https://github.com/ilyam8))
 - Fix regex syntax for clang-format checks. [\#14871](https://github.com/netdata/netdata/pull/14871) ([Ferroin](https://github.com/Ferroin))
 - bump go.d.plugin v0.52.0 [\#14870](https://github.com/netdata/netdata/pull/14870) ([ilyam8](https://github.com/ilyam8))
 - Update link from http to https [\#14864](https://github.com/netdata/netdata/pull/14864) ([Ancairon](https://github.com/Ancairon))
@@ -396,7 +397,6 @@
 - Replace individual collector images/links on infographic [\#14262](https://github.com/netdata/netdata/pull/14262) ([cakrit](https://github.com/cakrit))
 - Fix binpkg updates on OpenSUSE [\#14260](https://github.com/netdata/netdata/pull/14260) ([Dim-P](https://github.com/Dim-P))
 - DBENGINE v2 - improvements 2 [\#14257](https://github.com/netdata/netdata/pull/14257) ([ktsaou](https://github.com/ktsaou))
-- fix\(pacakging\): fix cpu/memory metrics when running inside LXC container as systemd service [\#14255](https://github.com/netdata/netdata/pull/14255) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
