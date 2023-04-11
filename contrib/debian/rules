@@ -127,6 +127,11 @@ override_dh_installlogrotate:
 	cp system/logrotate/netdata debian/netdata.logrotate
 	dh_installlogrotate
 
+override_dh_installdeb:
+	dh_installdeb
+	@echo "Recreating conffiles without auto-adding /etc files"
+	@cp $(CURDIR)/debian/conffiles $(CURDIR)/debian/netdata/DEBIAN/conffiles
+
 override_dh_clean:
 	dh_clean
 
