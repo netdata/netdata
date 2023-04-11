@@ -509,6 +509,10 @@ static inline int find_all_btrfs_pools(const char *path, int update_every) {
             snprintfz(filename, FILENAME_MAX, "%s/%s/devices", path, de->d_name);
             find_btrfs_disks(node, filename);
 
+            // update devices
+            snprintfz(filename, FILENAME_MAX, "%s/%s/devinfo", path, de->d_name);
+            find_btrfs_devices(node, filename);  
+
             continue;
         }
 
@@ -616,7 +620,6 @@ static inline int find_all_btrfs_pools(const char *path, int update_every) {
         // find all devices related to this node
 
         snprintfz(filename, FILENAME_MAX, "%s/%s/devinfo", path, de->d_name);
-        collector_error("BTRFS: path to search for devices '%s'", filename);
         find_btrfs_devices(node, filename);  
 
         // --------------------------------------------------------------------
