@@ -209,6 +209,8 @@ static inline void btrfs_free_disk(BTRFS_DISK *d) {
 }
 
 static inline void btrfs_free_device(BTRFS_DEVICE *d) {
+    if(d->st_error_stats)
+        rrdset_is_obsolete(d->st_error_stats);
     freez(d->error_stats_filename);
     freez(d);
 }
@@ -248,8 +250,6 @@ static inline void btrfs_free_node(BTRFS_NODE *node) {
      while(node->devices) {
         BTRFS_DEVICE *d = node->devices;
         node->devices = node->devices->next;
-        if(d->st_error_stats)
-            rrdset_is_obsolete(d->st_error_stats);
         btrfs_free_device(d);
     }
 
@@ -427,11 +427,8 @@ static inline int find_btrfs_devices(BTRFS_NODE *node, const char *path) {
         // --------------------------------------------------------------------
         // update the values
 
-        if(collect_btrfs_error_stats(d)){
-            btrfs_free_node(node);
-            d->exists = 0;
-            continue;
-        }  
+        if(unlikely(collect_btrfs_error_stats(d)))
+            d->exists = 0; // 'd' will be garbaged collected in loop below
     }
     closedir(dir);
 
@@ -770,18 +767,14 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
         }
 
         if(do_error_stats != CONFIG_BOOLEAN_NO) {
-            int collection_failed = 0;
             for(BTRFS_DEVICE *d = node->devices ; d ; d = d->next) {
                 if(unlikely(collect_btrfs_error_stats(d))){
                     collector_error("BTRFS: failed to collect error stats for '%s', devid:'%d'", node->id, d->id);
-                    collection_failed = 1;
-                    break;
+                    /* make it refresh btrfs at the next iteration, 
+                     * btrfs_free_device(d) will be called in 
+                     * find_btrfs_devices() as part of the garbage collection */
+                    refresh_delta = refresh_every;
                 }
-            }
-            if(unlikely(collection_failed)){
-                // make it refresh btrfs at the next iteration
-                refresh_delta = refresh_every;
-                continue;
             }
         }
 
