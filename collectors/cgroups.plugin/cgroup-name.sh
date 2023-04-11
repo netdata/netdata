@@ -306,8 +306,14 @@ function k8s_get_kubepod_name() {
         fi
       fi
 
-      url="https://$host/api/v1/pods"
-      [ -n "$MY_NODE_NAME" ] && url+="?fieldSelector=spec.nodeName==$MY_NODE_NAME"
+      local url
+      if [ -n "${USE_KUBELET_FOR_PODS_METADATA}" ]; then
+        url="${KUBELET_URL:-https://localhost:10250}/pods"
+      else
+        url="https://$host/api/v1/pods"
+        [ -n "$MY_NODE_NAME" ] && url+="?fieldSelector=spec.nodeName==$MY_NODE_NAME"
+      fi
+
       # FIX: check HTTP response code
       if ! pods=$(curl --fail -sSk -H "$header" "$url" 2>&1); then
         warning "${fn}: error on curl '${url}': ${pods}."
@@ -404,6 +410,10 @@ function k8s_get_kubepod_name() {
   # jq filter nonexistent field and nonexistent label value is 'null'
   if [[ $name =~ _null(_|$) ]]; then
     warning "${fn}: invalid name: $name (cgroup '$id')"
+    if [ -n "${USE_KUBELET_FOR_PODS_METADATA}" ]; then
+      # local data is cached and may not contain the correct id
+      return 2
+    fi
     return 1
   fi
 
