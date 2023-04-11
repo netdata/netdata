@@ -40,7 +40,6 @@ const char *database_config[] = {
 
 const char *database_cleanup[] = {
     "DELETE FROM host WHERE host_id NOT IN (SELECT host_id FROM chart);",
-    "DELETE FROM chart_label WHERE chart_id NOT IN (SELECT chart_id FROM chart);",
     "DELETE FROM host_info WHERE host_id NOT IN (SELECT host_id FROM host);",
     "DELETE FROM host_label WHERE host_id NOT IN (SELECT host_id FROM host);",
     "DROP TABLE IF EXISTS alert_hash;",
