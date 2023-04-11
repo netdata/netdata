@@ -194,6 +194,14 @@ static inline int collect_btrfs_commits_stats(BTRFS_NODE *node, int update_every
     return 0;
 }
 
+static inline void btrfs_free_commits_stats(BTRFS_NODE *node){
+    if(node->st_commits){
+        rrdset_is_obsolete(node->st_commits);
+        rrdset_is_obsolete(node->st_commit_timings);
+    }
+    freez(node->commit_stats_filename);
+}
+
 static inline void btrfs_free_disk(BTRFS_DISK *d) {
     freez(d->name);
     freez(d->size_filename);
@@ -219,11 +227,6 @@ static inline void btrfs_free_node(BTRFS_NODE *node) {
 
     if(node->st_allocation_system)
         rrdset_is_obsolete(node->st_allocation_system);
-    
-    if(node->st_commits){
-        rrdset_is_obsolete(node->st_commits);
-        rrdset_is_obsolete(node->st_commit_timings);
-    }
 
     freez(node->allocation_data_bytes_used_filename);
     freez(node->allocation_data_total_bytes_filename);
@@ -234,7 +237,7 @@ static inline void btrfs_free_node(BTRFS_NODE *node) {
     freez(node->allocation_system_bytes_used_filename);
     freez(node->allocation_system_total_bytes_filename);
 
-    freez(node->commit_stats_filename);
+    btrfs_free_commits_stats(node);
 
     while(node->disks) {
         BTRFS_DISK *d = node->disks;
@@ -600,9 +603,9 @@ static inline int find_all_btrfs_pools(const char *path, int update_every) {
 
         snprintfz(filename, FILENAME_MAX, "%s/%s/commit_stats", path, de->d_name);
         if(!node->commit_stats_filename) node->commit_stats_filename = strdupz(filename);
-        if(collect_btrfs_commits_stats(node, update_every)){
-            btrfs_free_node(node);
-            continue;
+        if(unlikely(collect_btrfs_commits_stats(node, update_every))){
+            collector_error("BTRFS: failed to collect commit stats for '%s'", node->id);
+            btrfs_free_commits_stats(node);
         }     
 
         // --------------------------------------------------------------------
@@ -759,12 +762,10 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
             }
         }
 
-        if(do_commit_stats != CONFIG_BOOLEAN_NO) {
+        if(do_commit_stats != CONFIG_BOOLEAN_NO && node->commit_stats_filename) {
             if (unlikely(collect_btrfs_commits_stats(node, update_every))) {
                 collector_error("BTRFS: failed to collect commit stats for '%s'", node->id);
-                // make it refresh btrfs at the next iteration
-                refresh_delta = refresh_every;
-                continue;
+                btrfs_free_commits_stats(node);
             }
         }
 
@@ -772,7 +773,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
             int collection_failed = 0;
             for(BTRFS_DEVICE *d = node->devices ; d ; d = d->next) {
                 if(unlikely(collect_btrfs_error_stats(d))){
-                    collector_error("BTRFS: failed to collect error stats for '%s', devid:'%d'", node->id, d);
+                    collector_error("BTRFS: failed to collect error stats for '%s', devid:'%d'", node->id, d->id);
                     collection_failed = 1;
                     break;
                 }
@@ -981,8 +982,8 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
         // commit_stats
 
         if(do_commit_stats == CONFIG_BOOLEAN_YES || (do_commit_stats == CONFIG_BOOLEAN_AUTO &&
-                                                        (node->commits_total ||
-                                                        netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+                                                    (node->commits_total ||
+                                                    netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
             do_commit_stats = CONFIG_BOOLEAN_YES;
 
             if(unlikely(!node->st_commits)) {
