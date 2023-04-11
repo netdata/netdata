@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "daemon/common.h"
 #include "streaming/common.h"
 #include "http_server.h"
-#include "h2o.h"
+
+#include "streaming.h"
 #include "h2o/http1.h"
 
 #include "h2o_utils.h"
 
-#include "mqtt_websockets/c-rbuf/include/ringbuffer.h"
+#include "connlist.h"
 
 static h2o_globalconf_t config;
 static h2o_context_t ctx;
 static h2o_accept_ctx_t accept_ctx;
+static int pending_write_reqs = 0;
 
 #define CONTENT_JSON_UTF8 H2O_STRLIT("application/json; charset=utf-8")
 #define CONTENT_TEXT_UTF8 H2O_STRLIT("text/plain; charset=utf-8")
@@ -22,42 +23,6 @@ static h2o_accept_ctx_t accept_ctx;
 
 #define HTTPD_CONFIG_SECTION "httpd"
 #define HTTPD_ENABLED_DEFAULT false
-
-typedef enum {
-    STREAM_X_HTTP_1_1 = 0,
-    STREAM_X_HTTP_1_1_DONE,
-    STREAM_ACTIVE,
-    STREAM_CLOSE
-} h2o_stream_state_t;
-
-typedef enum {
-    HTTP_STREAM = 0,
-    HTTP_URL,
-    HTTP_PROTO,
-    HTTP_USER_AGENT_KEY,
-    HTTP_USER_AGENT_VALUE,
-    HTTP_HDR,
-    HTTP_DONE
-} http_stream_parse_state_t;
-
-typedef struct {
-    h2o_socket_t *sock;
-    h2o_stream_state_t state;
-
-    rbuf_t rx;
-    pthread_cond_t  rx_buf_cond;
-    pthread_mutex_t rx_buf_lock;
-
-    rbuf_t tx;
-    h2o_iovec_t tx_buf;
-    pthread_mutex_t tx_buf_lock;
-
-    http_stream_parse_state_t parse_state;
-    char *url;
-    char *user_agent;
-
-    int shutdown;
-} h2o_stream_conn_t;
 
 #define H2O2STREAM_BUF_SIZE (1024 * 1024)
 
@@ -355,6 +320,8 @@ static void stream_on_close(h2o_stream_conn_t *conn)
     if (conn->sock != NULL)
         h2o_socket_close(conn->sock);
 
+    conn_list_remove_conn(&conn_list, conn);
+
     pthread_mutex_lock(&conn->rx_buf_lock);
     conn->shutdown = 1;
     pthread_cond_broadcast(&conn->rx_buf_cond);
@@ -582,18 +549,30 @@ void stream_process(h2o_stream_conn_t *conn, int initial)
     }
 }
 
+void check_tx_buf(h2o_stream_conn_t *conn)
+{
+    pthread_mutex_lock(&conn->tx_buf_lock);
+    if (rbuf_bytes_available(conn->tx)) {
+        pthread_mutex_unlock(&conn->tx_buf_lock);
+        stream_process(conn, 0);
+    }
+    pthread_mutex_unlock(&conn->tx_buf_lock);
+}
+
 static void stream_on_complete(void *user_data, h2o_socket_t *sock, size_t reqsize)
 {
     h2o_stream_conn_t *conn = user_data;
 
     /* close the connection on error */
     if (sock == NULL) {
-// can call connection close callback here  (*conn->cb)(conn, NULL);
+        stream_on_close(conn);
         return;
     }
 
     conn->sock = sock;
     sock->data = conn;
+
+    conn_list_insert(&conn_list, conn);
 
     h2o_buffer_consume(&sock->input, reqsize);
     stream_process(conn, 1);
@@ -630,6 +609,7 @@ int h2o_stream_write(void *ctx, const char *data, size_t data_len)
     avail = MIN(avail, data_len);
     rbuf_push(conn->tx, data, avail);
     pthread_mutex_unlock(&conn->tx_buf_lock);
+    __atomic_add_fetch(&pending_write_reqs, 1, __ATOMIC_SEQ_CST);
     return avail;
 }
 
@@ -737,9 +717,12 @@ void *httpd_main(void *ptr) {
             break;
         }
         usec_t now = now_monotonic_usec();
-        if (now - last_wpoll > POLL_INTERVAL * 1000) {
+        if (now - last_wpoll > POLL_INTERVAL * USEC_PER_MS) {
             last_wpoll = now;
-            //h2o_context_request_wakeup(&ctx);
+
+            int _write_reqs = __atomic_exchange_n(&pending_write_reqs, 0, __ATOMIC_SEQ_CST);
+            if (_write_reqs > 0)
+                conn_list_iter_all(&conn_list, check_tx_buf);
         }
     } 
 
