@@ -199,7 +199,6 @@ static void ebpf_hardirq_free(ebpf_module_t *em)
     for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
         ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
     }
-
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
@@ -396,15 +395,7 @@ static int hardirq_read_latency_map(int mapfd)
     return 0;
 }
 
-/**
- * Read Latency Static Map
- *
- * Read data from kernel ring to plot.
- *
- * @param maps_per_core do I need to read all cores?
- */
-static void hardirq_read_latency_static_map(int mapfd, int maps_per_core,
-                                            hardirq_ebpf_static_val_t *hardirq_ebpf_static_vals)
+static void hardirq_read_latency_static_map(int mapfd)
 {
     static hardirq_ebpf_static_val_t *hardirq_ebpf_static_vals = NULL;
     if (!hardirq_ebpf_static_vals)
@@ -420,7 +411,7 @@ static void hardirq_read_latency_static_map(int mapfd, int maps_per_core,
 
         uint64_t total_latency = 0;
         int cpu_i;
-        int end = (!maps_per_core) ? 1 : ebpf_nprocs;
+        int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
         for (cpu_i = 0; cpu_i < end; cpu_i++) {
             total_latency += hardirq_ebpf_static_vals[cpu_i].latency/1000;
         }
@@ -574,7 +565,7 @@ void *ebpf_hardirq_thread(void *ptr)
     }
 
 #ifdef LIBBPF_MAJOR_VERSION
-   ebpf_define_map_type(em->maps, em->maps_per_core, running_on_kernel);
+    ebpf_define_map_type(em->maps, em->maps_per_core, running_on_kernel);
 #endif
     em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
     if (!em->probe_links) {
