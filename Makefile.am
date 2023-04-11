@@ -951,6 +951,10 @@ HTTPD_FILES = \
     httpd/http_server.h \
     httpd/h2o_utils.c \
     httpd/h2o_utils.h \
+    httpd/streaming.c \
+    httpd/streaming.h \
+    httpd/connlist.c \
+    httpd/connlist.h \
     $(NULL)
 
 libh2o_dir = httpd/h2o
