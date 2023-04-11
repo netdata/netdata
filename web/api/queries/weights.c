@@ -303,6 +303,173 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
     return total_dimensions;
 }
 
+struct query_weights_data {
+    QUERY_WEIGHTS_REQUEST *qwr;
+
+    SIMPLE_PATTERN *scope_nodes_sp;
+    SIMPLE_PATTERN *scope_contexts_sp;
+    SIMPLE_PATTERN *nodes_sp;
+    SIMPLE_PATTERN *contexts_sp;
+    SIMPLE_PATTERN *instances_sp;
+    SIMPLE_PATTERN *dimensions_sp;
+    SIMPLE_PATTERN *labels_sp;
+    SIMPLE_PATTERN *alerts_sp;
+
+    usec_t timeout_us;
+    bool timed_out;
+    bool interrupted;
+
+    struct query_timings timings;
+
+    size_t examined_dimensions;
+    bool register_zero;
+
+    DICTIONARY *results;
+    WEIGHTS_STATS stats;
+
+    uint32_t shifts;
+
+    struct query_versions versions;
+};
+
+#define AGGREGATED_WEIGHT_EMPTY (struct aggregated_weight) {        \
+    .min = NAN,                                                     \
+    .max = NAN,                                                     \
+    .sum = NAN,                                                     \
+    .count = 0,                                                     \
+    .hsp = STORAGE_POINT_UNSET,                                     \
+    .bsp = STORAGE_POINT_UNSET,                                     \
+}
+
+#define merge_into_aw(aw, t) do {                                   \
+        if(!(aw).count) {                                           \
+            (aw).count = 1;                                         \
+            (aw).min = (aw).max = (aw).sum = (t)->value;            \
+            (aw).hsp = (t)->highlighted;                            \
+            if(baseline)                                            \
+                (aw).bsp = (t)->baseline;                           \
+        }                                                           \
+        else {                                                      \
+            (aw).count++;                                           \
+            (aw).sum += (t)->value;                                 \
+            if((t)->value < (aw).min)                               \
+                (aw).min = (t)->value;                              \
+            if((t)->value > (aw).max)                               \
+                (aw).max = (t)->value;                              \
+            storage_point_merge_to((aw).hsp, (t)->highlighted);     \
+            if(baseline)                                            \
+                storage_point_merge_to((aw).bsp, (t)->baseline);    \
+        }                                                           \
+} while(0)
+
+static void results_header_to_json_v2(DICTIONARY *results __maybe_unused, BUFFER *wb, struct query_weights_data *qwd,
+                                   time_t after, time_t before,
+                                   time_t baseline_after, time_t baseline_before,
+                                   size_t points, WEIGHTS_METHOD method,
+                                   RRDR_TIME_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
+                                   size_t examined_dimensions __maybe_unused, usec_t duration,
+                                   WEIGHTS_STATS *stats, bool group_by) {
+
+    buffer_json_member_add_object(wb, "request");
+    buffer_json_member_add_string(wb, "method", weights_method_to_string(method));
+    web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", options);
+
+    buffer_json_member_add_object(wb, "scope");
+    buffer_json_member_add_string(wb, "scope_nodes", qwd->qwr->scope_nodes ? qwd->qwr->scope_nodes : "*");
+    buffer_json_member_add_string(wb, "scope_contexts", qwd->qwr->scope_contexts ? qwd->qwr->scope_contexts : "*");
+    buffer_json_object_close(wb);
+
+    buffer_json_member_add_object(wb, "selectors");
+    buffer_json_member_add_string(wb, "nodes", qwd->qwr->nodes ? qwd->qwr->nodes : "*");
+    buffer_json_member_add_string(wb, "contexts", qwd->qwr->contexts ? qwd->qwr->contexts : "*");
+    buffer_json_member_add_string(wb, "instances", qwd->qwr->instances ? qwd->qwr->instances : "*");
+    buffer_json_member_add_string(wb, "dimensions", qwd->qwr->dimensions ? qwd->qwr->dimensions : "*");
+    buffer_json_member_add_string(wb, "labels", qwd->qwr->labels ? qwd->qwr->labels : "*");
+    buffer_json_member_add_string(wb, "alerts", qwd->qwr->alerts ? qwd->qwr->alerts : "*");
+    buffer_json_object_close(wb);
+
+    buffer_json_member_add_object(wb, "window");
+    buffer_json_member_add_time_t(wb, "after", qwd->qwr->after);
+    buffer_json_member_add_time_t(wb, "before", qwd->qwr->before);
+    buffer_json_member_add_uint64(wb, "points", qwd->qwr->points);
+    if(qwd->qwr->options & RRDR_OPTION_SELECTED_TIER)
+        buffer_json_member_add_uint64(wb, "tier", qwd->qwr->tier);
+    else
+        buffer_json_member_add_string(wb, "tier", NULL);
+    buffer_json_object_close(wb);
+
+    if(method == WEIGHTS_METHOD_MC_KS2 || method == WEIGHTS_METHOD_MC_VOLUME) {
+        buffer_json_member_add_object(wb, "baseline");
+        buffer_json_member_add_time_t(wb, "baseline_after", qwd->qwr->baseline_after);
+        buffer_json_member_add_time_t(wb, "baseline_before", qwd->qwr->baseline_before);
+        buffer_json_object_close(wb);
+    }
+
+    buffer_json_member_add_object(wb, "aggregations");
+    buffer_json_member_add_object(wb, "time");
+    buffer_json_member_add_string(wb, "time_group", time_grouping_tostring(qwd->qwr->time_group_method));
+    buffer_json_member_add_string(wb, "time_group_options", qwd->qwr->time_group_options);
+    buffer_json_object_close(wb); // time
+
+    buffer_json_member_add_array(wb, "metrics");
+    buffer_json_add_array_item_object(wb);
+    {
+        buffer_json_member_add_array(wb, "group_by");
+        buffer_json_group_by_to_array(wb, qwd->qwr->group_by.group_by);
+        buffer_json_array_close(wb);
+
+//        buffer_json_member_add_array(wb, "group_by_label");
+//        buffer_json_array_close(wb);
+
+        buffer_json_member_add_string(wb, "aggregation", group_by_aggregate_function_to_string(qwd->qwr->group_by.aggregation));
+    }
+    buffer_json_object_close(wb); // 1st group by
+    buffer_json_array_close(wb); // array
+    buffer_json_object_close(wb); // aggregations
+
+    buffer_json_member_add_uint64(wb, "timeout", qwd->qwr->timeout_ms);
+    buffer_json_object_close(wb); // request
+
+    buffer_json_member_add_object(wb, "view");
+    buffer_json_member_add_string(wb, "format", (group_by)?"grouped":"full");
+    buffer_json_member_add_string(wb, "time_group", time_grouping_tostring(group));
+
+    buffer_json_member_add_object(wb, "window");
+    buffer_json_member_add_time_t(wb, "after", after);
+    buffer_json_member_add_time_t(wb, "before", before);
+    buffer_json_member_add_time_t(wb, "duration", before - after);
+    buffer_json_member_add_uint64(wb, "points", points);
+    buffer_json_object_close(wb);
+
+    if(method == WEIGHTS_METHOD_MC_KS2 || method == WEIGHTS_METHOD_MC_VOLUME) {
+        buffer_json_member_add_object(wb, "baseline");
+        buffer_json_member_add_time_t(wb, "baseline_after", baseline_after);
+        buffer_json_member_add_time_t(wb, "baseline_before", baseline_before);
+        buffer_json_member_add_time_t(wb, "baseline_duration", baseline_before - baseline_after);
+        buffer_json_member_add_uint64(wb, "baseline_points", points << shifts);
+        buffer_json_object_close(wb);
+    }
+
+    buffer_json_object_close(wb); // view
+
+    buffer_json_member_add_object(wb, "db");
+    {
+        buffer_json_member_add_double(wb, "query_time_ms", (double) duration / (double) USEC_PER_MS);
+        buffer_json_member_add_uint64(wb, "db_queries", stats->db_queries);
+        buffer_json_member_add_uint64(wb, "query_result_points", stats->result_points);
+        buffer_json_member_add_uint64(wb, "binary_searches", stats->binary_searches);
+        buffer_json_member_add_uint64(wb, "db_points_read", stats->db_points);
+
+        buffer_json_member_add_array(wb, "db_points_per_tier");
+        {
+            for (size_t tier = 0; tier < storage_tiers; tier++)
+                buffer_json_add_array_item_uint64(wb, stats->db_points_per_tier[tier]);
+        }
+        buffer_json_array_close(wb);
+    }
+    buffer_json_object_close(wb); // db
+}
+
 typedef enum {
     WPT_DIMENSION = 0,
     WPT_INSTANCE = 1,
@@ -560,65 +727,6 @@ static inline ssize_t dict_unique_id_name_add(DICTIONARY *dict, const char *id, 
 
     return (ssize_t)dun->i;
 }
-struct query_weights_data {
-    QUERY_WEIGHTS_REQUEST *qwr;
-
-    SIMPLE_PATTERN *scope_nodes_sp;
-    SIMPLE_PATTERN *scope_contexts_sp;
-    SIMPLE_PATTERN *nodes_sp;
-    SIMPLE_PATTERN *contexts_sp;
-    SIMPLE_PATTERN *instances_sp;
-    SIMPLE_PATTERN *dimensions_sp;
-    SIMPLE_PATTERN *labels_sp;
-    SIMPLE_PATTERN *alerts_sp;
-
-    usec_t timeout_us;
-    bool timed_out;
-    bool interrupted;
-
-    struct query_timings timings;
-
-    size_t examined_dimensions;
-    bool register_zero;
-
-    DICTIONARY *results;
-    WEIGHTS_STATS stats;
-
-    uint32_t shifts;
-
-    struct query_versions versions;
-};
-
-#define AGGREGATED_WEIGHT_EMPTY (struct aggregated_weight) {        \
-    .min = NAN,                                                     \
-    .max = NAN,                                                     \
-    .sum = NAN,                                                     \
-    .count = 0,                                                     \
-    .hsp = STORAGE_POINT_UNSET,                                     \
-    .bsp = STORAGE_POINT_UNSET,                                     \
-}
-
-#define merge_into_aw(aw, t) do {                                   \
-        if(!(aw).count) {                                           \
-            (aw).count = 1;                                         \
-            (aw).min = (aw).max = (aw).sum = (t)->value;            \
-            (aw).hsp = (t)->highlighted;                            \
-            if(baseline)                                            \
-                (aw).bsp = (t)->baseline;                           \
-        }                                                           \
-        else {                                                      \
-            (aw).count++;                                           \
-            (aw).sum += (t)->value;                                 \
-            if((t)->value < (aw).min)                               \
-                (aw).min = (t)->value;                              \
-            if((t)->value > (aw).max)                               \
-                (aw).max = (t)->value;                              \
-            storage_point_merge_to((aw).hsp, (t)->highlighted);     \
-            if(baseline)                                            \
-                storage_point_merge_to((aw).bsp, (t)->baseline);    \
-        }                                                           \
-} while(0)
-
 static size_t registered_results_to_json_multinode_no_group_by(
         DICTIONARY *results, BUFFER *wb,
         time_t after, time_t before,
@@ -631,8 +739,9 @@ static size_t registered_results_to_json_multinode_no_group_by(
     buffer_json_initialize(wb, "\"", "\"", 0, true, options & RRDR_OPTION_MINIFY);
     buffer_json_member_add_uint64(wb, "api", 2);
 
-    results_header_to_json(results, wb, after, before, baseline_after, baseline_before,
-                           points, method, group, options, shifts, examined_dimensions, qwd->timings.executed_ut - qwd->timings.received_ut, stats);
+    results_header_to_json_v2(results, wb, qwd, after, before, baseline_after, baseline_before,
+                           points, method, group, options, shifts, examined_dimensions,
+                           qwd->timings.executed_ut - qwd->timings.received_ut, stats, false);
 
     version_hashes_api_v2(wb, versions);
 
@@ -817,8 +926,9 @@ static size_t registered_results_to_json_multinode_group_by(
     buffer_json_initialize(wb, "\"", "\"", 0, true, options & RRDR_OPTION_MINIFY);
     buffer_json_member_add_uint64(wb, "api", 2);
 
-    results_header_to_json(results, wb, after, before, baseline_after, baseline_before,
-                           points, method, group, options, shifts, examined_dimensions, qwd->timings.executed_ut - qwd->timings.received_ut, stats);
+    results_header_to_json_v2(results, wb, qwd, after, before, baseline_after, baseline_before,
+                           points, method, group, options, shifts, examined_dimensions,
+                           qwd->timings.executed_ut - qwd->timings.received_ut, stats, true);
 
     version_hashes_api_v2(wb, versions);
 
