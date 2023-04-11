@@ -3,6 +3,8 @@
 #ifndef HTTP_SERVER_H
 #define HTTP_SERVER_H
 
+#include "libnetdata/libnetdata.h"
+
 void *httpd_main(void * ptr);
 
 int h2o_stream_write(void *ctx, const char *data, size_t data_len);
