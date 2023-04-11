@@ -96,7 +96,7 @@ int become_user(const char *username, int pid_fd) {
     uid_t uid = pw->pw_uid;
     gid_t gid = pw->pw_gid;
 
-    prepare_required_directories(uid, gid)
+    prepare_required_directories(uid, gid);
 
     if(pidfile[0]) {
         if(chown(pidfile, uid, gid) == -1)
@@ -492,7 +492,7 @@ int become_daemon(int dont_fork, const char *user)
         else debug(D_SYSTEM, "Successfully became user '%s'.", user);
     }
     else {
-        prepare_required_directories(getuid(), getgid())
+        prepare_required_directories(getuid(), getgid());
     }
 
     if(pidfd != -1)
