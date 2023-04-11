@@ -173,7 +173,7 @@ static inline int collect_btrfs_commits_stats(BTRFS_NODE *node, int update_every
         if(!strcmp(key, "commits")){
             long long commits_total_new = str2ull(val, NULL);
             if(likely(node->commits_total)){
-                if(node->commits_new = commits_total_new - node->commits_total)
+                if((node->commits_new = commits_total_new - node->commits_total))
                     node->commits_total = commits_total_new;
             } else node->commits_total = commits_total_new;
         }
@@ -200,6 +200,7 @@ static inline void btrfs_free_commits_stats(BTRFS_NODE *node){
         rrdset_is_obsolete(node->st_commit_timings);
     }
     freez(node->commit_stats_filename);
+    node->commit_stats_filename = NULL;
 }
 
 static inline void btrfs_free_disk(BTRFS_DISK *d) {
