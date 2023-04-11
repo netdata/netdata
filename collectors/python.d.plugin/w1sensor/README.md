@@ -26,8 +26,7 @@ cd /etc/netdata   # Replace this path with your Netdata config directory, if dif
 sudo ./edit-config python.d/w1sensor.conf
 ```
 
-
-
+An example of a working configuration can be found in the default [configuration file](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/w1sensor/w1sensor.conf) of this collector.
 
 ### Troubleshooting
 
