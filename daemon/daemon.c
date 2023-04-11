@@ -78,6 +78,7 @@ void prepare_required_directories(uid_t uid, gid_t gid) {
     create_needed_dir(netdata_configured_cache_dir, uid, gid);
     create_needed_dir(netdata_configured_varlib_dir, uid, gid);
     create_needed_dir(netdata_configured_lock_dir, uid, gid);
+    create_needed_dir(netdata_configured_log_dir, uid, gid);
     create_needed_dir(claimingdirectory, uid, gid);
 
     clean_directory(netdata_configured_lock_dir);
