@@ -71,6 +71,12 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
     const char *time_group_options = NULL, *scope_contexts = NULL, *scope_nodes = NULL, *contexts = NULL, *nodes = NULL,
         *instances = NULL, *dimensions = NULL, *labels = NULL, *alerts = NULL;
 
+    struct group_by_pass group_by = {
+            .group_by = RRDR_GROUP_BY_NONE,
+            .group_by_label = NULL,
+            .aggregation = RRDR_GROUP_BY_FUNCTION_AVERAGE,
+    };
+
     while (url) {
         char *value = mystrsep(&url, "&");
         if (!value || !*value)
@@ -123,6 +129,15 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
         else if(api_version >= 2 && !strcmp(name, "dimensions")) dimensions = value;
         else if(api_version >= 2 && !strcmp(name, "labels")) labels = value;
         else if(api_version >= 2 && !strcmp(name, "alerts")) alerts = value;
+        else if(api_version >= 2 && (!strcmp(name, "group_by") || !strcmp(name, "group_by[0]"))) {
+            group_by.group_by = group_by_parse(value);
+        }
+        else if(api_version >= 2 && (!strcmp(name, "group_by_label") || !strcmp(name, "group_by_label[0]"))) {
+            group_by.group_by_label = value;
+        }
+        else if(api_version >= 2 && (!strcmp(name, "aggregation") || !strcmp(name, "aggregation[0]"))) {
+            group_by.aggregation = group_by_aggregate_function_parse(value);
+        }
 
         else if(!strcmp(name, "tier")) {
             tier = str2ul(value);
@@ -161,6 +176,11 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
             .dimensions = dimensions,
             .labels = labels,
             .alerts = alerts,
+            .group_by = {
+                .group_by = group_by.group_by,
+                .group_by_label = group_by.group_by_label,
+                .aggregation = group_by.aggregation,
+            },
             .method = method,
             .format = format,
             .time_group_method = time_group_method,
