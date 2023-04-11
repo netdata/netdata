@@ -994,6 +994,10 @@ H2O_FILES = \
     web/server/h2o/http_server.h \
     web/server/h2o/h2o_utils.c \
     web/server/h2o/h2o_utils.h \
+    web/server/h2o/streaming.c \
+    web/server/h2o/streaming.h \
+    web/server/h2o/connlist.c \
+    web/server/h2o/connlist.h \
     $(NULL)
 
 libh2o_a_SOURCES = \

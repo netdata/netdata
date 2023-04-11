@@ -43,4 +43,19 @@ typedef struct {
     int shutdown;
 } h2o_stream_conn_t;
 
+// h2o_stream_conn_t related functions
+void h2o_stream_conn_t_init(h2o_stream_conn_t *conn);
+void h2o_stream_conn_t_destroy(h2o_stream_conn_t *conn);
+
+// streaming upgrade related functions
+int is_streaming_handshake(h2o_req_t *req);
+void stream_on_complete(void *user_data, h2o_socket_t *sock, size_t reqsize);
+
+// read and write functions to be used by streaming parser
+int h2o_stream_write(void *ctx, const char *data, size_t data_len);
+size_t h2o_stream_read(void *ctx, char *buf, size_t read_bytes);
+
+// call this periodically to check if there are any pending write requests
+void h2o_stream_check_pending_write_reqs(void);
+
 #endif /* HTTPD_STREAMING_H */
