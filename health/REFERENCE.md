@@ -456,9 +456,9 @@ The format is:
 lookup: METHOD AFTER [at BEFORE] [every DURATION] [OPTIONS] [of DIMENSIONS] [foreach DIMENSIONS]
 ```
 
-Everything is the same with [badges](https://github.com/netdata/netdata/blob/master/web/api/badges/README.md). In short:
+The full [database query API](https://github.com/netdata/netdata/blob/master/web/api/queries/README.md) is supported. In short:
 
-- `METHOD` is one of `average`, `min`, `max`, `sum`, `incremental-sum`.
+- `METHOD` is one of  the available [grouping methods](https://github.com/netdata/netdata/blob/master/web/api/queries/README.md#grouping-methods) such as `average`, `min`, `max` etc.
      This is required.
 
 - `AFTER` is a relative number of seconds, but it also accepts a single letter for changing
