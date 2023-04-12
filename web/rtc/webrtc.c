@@ -256,8 +256,8 @@ static void webrtc_send_in_chunks(WEBRTC_DC *chan, const char *data, size_t size
         memcpy(&send_buffer[len], s, message_size);
 
         int total_message_size = (int)(len + message_size);
-        if(binary)
-            total_message_size -= total_message_size;
+        if(!binary)
+            total_message_size = -total_message_size;
 
         if(rtcSendMessage(chan->dc, send_buffer, total_message_size) != RTC_ERR_SUCCESS)
             error("WEBRTC[%d],DC[%d]: failed to send LZ4 chunk %zu of %zu", chan->conn->pc, chan->dc, chunk, total_chunks);
