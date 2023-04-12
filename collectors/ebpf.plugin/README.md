@@ -888,6 +888,17 @@ usage (see the `system.ram` chart) has dropped significantly.
 Beginning with `v1.31`, kernel memory usage is configurable via the [`pid table size` setting](#ebpf-load-mode)
 in `ebpf.conf`.
 
+#### Threads that can overload
+
+The plugin also can monitor hardware health, but some of the disabled threads will create a high CPU usage, because events happens with a high frequency.
+The threads that can overload your system are:
+
+-  `disk`: Systems with high `I/O` events are affected by this thread that needs to store data every time an `I/O` event happens.
+-  `filesystem`: Like previous, but instead to monitor `I/O` on disks, it monitors `I/O` on specific filesystems.
+-  `hardirq`: Monitor latency for every hard IRQ present on computer
+-  `softirq`: Monitor latency for every soft IRQ present on computer
+-  `socket`: When you have an overloaded server, the plugin will store data for every socket created on host.
+
 ### SELinux
 
 When [SELinux](https://www.redhat.com/en/topics/linux/what-is-selinux) is enabled, it may prevent `ebpf.plugin` from
