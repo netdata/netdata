@@ -489,9 +489,12 @@ static inline void hardirq_write_static_dims()
 
 /**
 * Main loop for this collector.
+ *
+ * @param em the main thread structure.
 */
 static void hardirq_collector(ebpf_module_t *em)
 {
+    memset(&hardirq_pub, 0, sizeof(hardirq_pub));
     avl_init_lock(&hardirq_pub, hardirq_val_cmp);
     ebpf_hardirq_aral_init();
 
