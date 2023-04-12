@@ -7,6 +7,9 @@
 3. It communicates with Netdata via a unidirectional pipe (sending data to the `netdata` daemon)
 4. Supports any number of data collection **modules**
 
+To better understand the guidelines and the API behind our External plugins, please have a look at the [Introduction to External plugins](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md) prior to reading this page.
+
+
 `charts.d.plugin` has been designed so that the actual script that will do data collection will be permanently in
 memory, collecting data with as little overheads as possible
 (i.e. initialize once, repeatedly collect values with minimal overhead).
@@ -16,16 +19,7 @@ The scripts should have the filename suffix: `.chart.sh`.
 
 ## Configuration
 
-> ### Info
->
-> This file mentions editing configuration files.  
->
-> - To edit configuration files in a safe way, we provide the [`edit config` script](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) located in your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) (typically is `/etc/netdata`) that creates the proper file and opens it in an editor automatically.  
-> Note that to run the script you need to be inside your Netdata config directory.
->
-> It is recommended to use this way for configuring Netdata.
-
-`charts.d.plugin` itself can be configured using the configuration file `/etc/netdata/charts.d.conf`. This file is also a BASH script.
+`charts.d.plugin` itself can be [configured](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) using the configuration file `/etc/netdata/charts.d.conf`. This file is also a BASH script.
 
 In this file, you can place statements like this:
 
@@ -42,10 +36,6 @@ When set to `no`, charts.d will ignore the collector script.
 The variable `enable_all_charts` sets the default enable/disable state for all charts.
 
 ## A charts.d module
-
-> ### Note
->
-> To better understand the guidelines and the API behind our External plugins, please have a look at the [Introduction to External plugins](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md) prior to reading this page.
 
 A `charts.d.plugin` module is a BASH script defining a few functions.
 
