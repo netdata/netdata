@@ -154,6 +154,9 @@ struct response {
 #endif /* NETDATA_WITH_ZLIB */
 };
 
+struct web_client;
+typedef bool (*web_client_interrupt_t)(struct web_client *, void *data);
+
 struct web_client {
     unsigned long long id;
     size_t use_count;
@@ -215,6 +218,8 @@ struct web_client {
 #endif
 
     size_t *statistics_memory_accounting;
+    web_client_interrupt_t interrupt_callback;
+    void *interrupt_callback_data;
 };
 
 int web_client_permission_denied(struct web_client *w);
@@ -246,5 +251,9 @@ void web_client_reuse_ssl(struct web_client *w);
 #include "web/api/web_api_v1.h"
 #include "web/api/web_api_v2.h"
 #include "daemon/common.h"
+
+int web_client_api_request(RRDHOST *host, struct web_client *w, char *url);
+const char *web_content_type_to_string(HTTP_CONTENT_TYPE content_type);
+void web_client_enable_deflate(struct web_client *w, int gzip);
 
 #endif

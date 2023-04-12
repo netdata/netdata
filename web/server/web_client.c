@@ -2052,6 +2052,8 @@ void web_client_zero(struct web_client *w) {
     // zero everything
     memset(w, 0, sizeof(struct web_client));
 
+    w->ifd = w->ofd = -1;
+
     w->statistics_memory_accounting = statistics_memory_accounting;
     w->use_count = use_count;
 

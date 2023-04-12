@@ -3,10 +3,15 @@
 #include "webrtc.h"
 
 #include "../server/web_client.h"
+#include "../server/web_client_cache.h"
 
 #ifdef HAVE_LIBDATACHANNEL
 
 #include "rtc/rtc.h"
+
+#define WEBRTC_OUR_MAX_MESSAGE_SIZE (5 * 1024 * 1024)
+#define WEBRTC_DEFAULT_REMOTE_MAX_MESSAGE_SIZE (65536)
+#define WEBRTC_COMPRESSED_HEADER_SIZE 200
 
 static void webrtc_log(rtcLogLevel level, const char *message) {
     switch(level) {
@@ -36,7 +41,8 @@ typedef struct webrtc_datachannel {
     int dc;
     char *label;
     struct webrtc_connection *conn;
-    bool open;
+
+    bool open; // atomic
 
     struct {
         struct webrtc_datachannel *prev;
@@ -49,6 +55,10 @@ typedef struct webrtc_connection {
     rtcConfiguration config;
     rtcState state;
     rtcGatheringState gathering_state;
+
+    size_t max_message_size;
+    size_t local_max_message_size;
+    size_t remote_max_message_size;
 
     struct {
         SPINLOCK spinlock;
@@ -95,7 +105,7 @@ static struct {
                 // Note transports TCP and TLS are only available for a TURN server with libnice as ICE backend and govern only the
                 // TURN control connection, meaning relaying is always performed over UDP.
                 //
-                // If the username or password of an URI contains reserved special characters, they must be percent-encoded.
+                // If the username or password of a URI contains reserved special characters, they must be percent-encoded.
                 // In particular, ":" must be encoded as "%3A" and "@" must by encoded as "%40".
 
                 "stun://stun.l.google.com:19302",
@@ -109,6 +119,10 @@ static struct {
                 .head = NULL,
         },
 };
+
+static inline bool webrtc_dc_is_open(WEBRTC_DC *chan) {
+    return __atomic_load_n(&chan->open, __ATOMIC_RELAXED);
+}
 
 static void webrtc_config_ice_servers(void) {
     BUFFER *wb = buffer_create(0, NULL);
@@ -196,6 +210,137 @@ void webrtc_close_all_connections() {
     rtcCleanup();
 }
 
+size_t find_max_message_size_in_sdp(const char *sdp) {
+    char *s = strstr(sdp, "a=max-message-size:");
+    if(s)
+        return str2ul(&s[19]);
+
+    return WEBRTC_DEFAULT_REMOTE_MAX_MESSAGE_SIZE;
+}
+
+// ----------------------------------------------------------------------------
+// execute web API requests
+
+static bool web_client_stop_callback(struct web_client *w __maybe_unused, void *data) {
+    WEBRTC_DC *chan = data;
+    return !webrtc_dc_is_open(chan);
+}
+
+static void webrtc_send_in_chunks(WEBRTC_DC *chan, const char *data, size_t size, int code, const char *message_type, HTTP_CONTENT_TYPE content_type, size_t max_message_size, bool binary) {
+    size_t chunk = 0;
+    size_t total_chunks = size / max_message_size;
+    if(total_chunks * max_message_size < size)
+        total_chunks++;
+
+    char *send_buffer = mallocz(chan->conn->max_message_size);
+
+    char *s = (char *)data;
+    size_t remaining = size;
+    while(remaining > 0) {
+        chunk++;
+
+        size_t message_size = MIN(remaining, max_message_size);
+
+        int len = snprintfz(send_buffer, WEBRTC_COMPRESSED_HEADER_SIZE, "%d %s %zu %zu %zu %s\r\n",
+                            code,
+                            message_type,
+                            message_size,
+                            chunk,
+                            total_chunks,
+                            web_content_type_to_string(content_type)
+        );
+
+        internal_fatal((size_t)len != strlen(send_buffer), "WEBRTC compressed header line mismatch");
+        internal_fatal(len + message_size > chan->conn->max_message_size, "WEBRTC message exceeds max message size");
+
+        memcpy(&send_buffer[len], s, message_size);
+
+        int total_message_size = (int)(len + message_size);
+        if(binary)
+            total_message_size -= total_message_size;
+
+        if(rtcSendMessage(chan->dc, send_buffer, total_message_size) != RTC_ERR_SUCCESS)
+            error("WEBRTC[%d],DC[%d]: failed to send LZ4 chunk %zu of %zu", chan->conn->pc, chan->dc, chunk, total_chunks);
+        else
+            internal_error(true, "WEBRTC[%d],DC[%d]: sent chunk %zu of %zu, size %zu (total %d)",
+                           chan->conn->pc, chan->dc, chunk, total_chunks, message_size, total_message_size);
+
+        s = s + message_size;
+        remaining -= message_size;
+    }
+
+    internal_fatal(chunk != total_chunks, "WEBRTC number of compressed chunks mismatch");
+
+    freez(send_buffer);
+}
+
+static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, size_t size __maybe_unused, bool binary __maybe_unused) {
+    internal_error(true, "WEBRTC[%d],DC[%d]: got request '%s' of size %zu and type %s.",
+                   chan->conn->pc, chan->dc, request, size, binary?"binary":"text");
+
+    struct web_client *w = web_client_get_from_cache();
+    w->interrupt_callback = web_client_stop_callback;
+    w->interrupt_callback_data = chan;
+
+    w->acl = WEB_CLIENT_ACL_WEBRTC;
+
+    char *path = (char *)request;
+    if(strncmp(request, "POST ", 5) == 0) {
+        w->mode = WEB_CLIENT_MODE_POST;
+        path += 10;
+    }
+    else if(strncmp(request, "GET ", 4) == 0) {
+        w->mode = WEB_CLIENT_MODE_GET;
+        path += 4;
+    }
+
+    buffer_strcat(w->url_last, path);
+    if(strncmp(path, "/api/", 5) == 0)
+        path += 5;
+
+    char *query_string_start = strchr(path, '?');
+    if (query_string_start) {
+        url_decode_r(w->decoded_query_string, query_string_start, NETDATA_WEB_REQUEST_URL_SIZE + 1);
+        *query_string_start = '\0';
+    }
+
+    w->response.code = web_client_api_request(localhost, w, path);
+    if(!webrtc_dc_is_open(chan)) {
+        internal_error(true, "WEBRTC[%d],DC[%d]: ignoring API response on closed data channel.", chan->conn->pc, chan->dc);
+        goto cleanup;
+    }
+    else {
+        internal_error(true, "WEBRTC[%d],DC[%d]: prepared response with code %d, size %zu.",
+                       chan->conn->pc, chan->dc, w->response.code, buffer_strlen(w->response.data));
+    }
+
+    // send the response
+    bool send_plain = true;
+    int max_message_size = (int)chan->conn->max_message_size - WEBRTC_COMPRESSED_HEADER_SIZE;
+
+#if defined(ENABLE_COMPRESSION)
+    int max_compressed_size = LZ4_compressBound(buffer_strlen(w->response.data));
+    char *compressed = mallocz(max_compressed_size);
+
+    int compressed_size = LZ4_compress_default(buffer_tostring(w->response.data), compressed,
+                                               buffer_strlen(w->response.data), max_compressed_size);
+
+    if(compressed_size > 0) {
+        send_plain = false;
+        webrtc_send_in_chunks(chan, compressed, compressed_size,
+                              w->response.code, "LZ4", w->response.data->content_type, max_message_size, true);
+    }
+    freez(compressed);
+#endif
+
+    if(send_plain)
+        webrtc_send_in_chunks(chan, buffer_tostring(w->response.data), buffer_strlen(w->response.data),
+                              w->response.code, "PLAIN", w->response.data->content_type, max_message_size, false);
+
+cleanup:
+    web_client_release_to_cache(w);
+}
+
 // ----------------------------------------------------------------------------
 // webrtc data channel
 
@@ -215,7 +360,7 @@ static void myClosedCallback(int id, void *user_ptr) {
     WEBRTC_DC *chan = user_ptr;
     internal_fatal(chan->dc != id, "WEBRTC[%d],DC[%d]: dc mismatch, expected %d, got %d", chan->conn->pc, chan->dc, chan->dc, id);
 
-    chan->open = false;
+    __atomic_store_n(&chan->open, false, __ATOMIC_RELAXED);
     internal_error(true, "WEBRTC[%d],DC[%d]: data channel closed.", chan->conn->pc, chan->dc);
 
     netdata_spinlock_lock(&chan->conn->channels.spinlock);
@@ -241,22 +386,13 @@ static void myMessageCallback(int id, const char *message, int size, void *user_
     WEBRTC_DC *chan = user_ptr;
     internal_fatal(chan->dc != id, "WEBRTC[%d],DC[%d]: dc mismatch, expected %d, got %d", chan->conn->pc, chan->dc, chan->dc, id);
 
-    internal_fatal(!chan->open, "WEBRTC[%d],DC[%d]: received message on closed channel", chan->conn->pc, chan->dc);
+    internal_fatal(!webrtc_dc_is_open(chan), "WEBRTC[%d],DC[%d]: received message on closed channel", chan->conn->pc, chan->dc);
 
     bool binary = (size >= 0);
     if(size < 0)
         size = -size;
 
-    BUFFER *wb = buffer_create(size + 1, NULL);
-    buffer_strncat(wb, message, size);
-
-    info("WEBRTC[%d],DC[%d]: received %s message of length %d: '%s'", chan->conn->pc, chan->dc, binary ? "binary" : "text", size, buffer_tostring(wb));
-
-    buffer_strcat(wb, " to you too!");
-    rtcSendMessage(id, buffer_tostring(wb), -(int)buffer_strlen(wb));
-
-    info("WEBRTC[%d],DC[%d]: sent message of length %d: '%s'", chan->conn->pc, chan->dc, (int)buffer_strlen(wb), buffer_tostring(wb));
-    buffer_free(wb);
+    webrtc_execute_api_request(chan, message, size, binary);
 }
 
 //#define WEBRTC_MAX_REQUEST_SIZE 65536
@@ -272,18 +408,11 @@ static void myMessageCallback(int id, const char *message, int size, void *user_
 //    int size = WEBRTC_MAX_REQUEST_SIZE;
 //    char buffer[WEBRTC_MAX_REQUEST_SIZE];
 //    while(rtcReceiveMessage(id, buffer, &size) == RTC_ERR_SUCCESS) {
+//        bool binary = (size >= 0);
 //        if(size < 0)
 //            size = -size;
 //
-//        BUFFER *wb = buffer_create(size, NULL);
-//        buffer_strncat(wb, buffer, size);
-//
-//        info("WEBRTC[%d],DC[%d]: received message of length %d: '%s'", chan->conn->pc, chan->dc, size, buffer_tostring(wb));
-//
-//        buffer_strcat(wb, " to you too!");
-//        rtcSendMessage(id, buffer_tostring(wb), buffer_strlen(wb));
-//
-//        buffer_free(wb);
+//        webrtc_execute_api_request(chan, message, size, binary);
 //    }
 //}
 
@@ -384,6 +513,8 @@ static void myDescriptionCallback(int pc __maybe_unused, const char *sdp, const 
         conn->response.sdp = true;
     }
     netdata_spinlock_unlock(&conn->response.spinlock);
+
+    conn->local_max_message_size = find_max_message_size_in_sdp(sdp);
 }
 
 static void myCandidateCallback(int pc __maybe_unused, const char *cand, const char *mid __maybe_unused, void *user_ptr) {
@@ -487,6 +618,9 @@ int webrtc_new_connection(const char *sdp, BUFFER *wb) {
 
     WEBRTC_CONN *conn = webrtc_create_connection();
     conn->response.wb = wb;
+    conn->max_message_size = WEBRTC_DEFAULT_REMOTE_MAX_MESSAGE_SIZE;
+    conn->local_max_message_size = WEBRTC_OUR_MAX_MESSAGE_SIZE;
+    conn->remote_max_message_size = find_max_message_size_in_sdp(sdp);
 
     conn->config.iceServers = (const char **)webrtc_base.iceServers;
     conn->config.iceServersCount = webrtc_base.iceServersCount;
@@ -501,7 +635,7 @@ int webrtc_new_connection(const char *sdp, BUFFER *wb) {
     conn->config.portRangeBegin = 0; // 0 means automatic
     conn->config.portRangeEnd = 0; // 0 means automatic
     conn->config.mtu = 0; // <= 0 means automatic
-    conn->config.maxMessageSize = 5 * 1024 * 1024; // <= 0 means default
+    conn->config.maxMessageSize = WEBRTC_OUR_MAX_MESSAGE_SIZE; // <= 0 means default
 
     conn->pc = rtcCreatePeerConnection(&conn->config);
     rtcSetUserPointer(conn->pc, conn);
@@ -546,6 +680,10 @@ int webrtc_new_connection(const char *sdp, BUFFER *wb) {
 
     internal_fatal(!conn->response.sdp, "WEBRTC[%d]: response does not have an SDP: %s", conn->pc, buffer_tostring(conn->response.wb));
     internal_fatal(!conn->response.candidates, "WEBRTC[%d]: response does not have candidates: %s", conn->pc, buffer_tostring(conn->response.wb));
+
+    conn->max_message_size = MIN(conn->local_max_message_size, conn->remote_max_message_size);
+    if(conn->max_message_size < WEBRTC_COMPRESSED_HEADER_SIZE)
+        conn->max_message_size = WEBRTC_COMPRESSED_HEADER_SIZE;
 
     buffer_json_finalize(wb);
 
