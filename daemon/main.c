@@ -313,6 +313,8 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
         timeout = false;                                \
     }
 
+void web_client_cache_destroy(void);
+
 void netdata_cleanup_and_exit(int ret) {
     usec_t started_ut = now_monotonic_usec();
     usec_t last_ut = started_ut;
@@ -384,6 +386,10 @@ void netdata_cleanup_and_exit(int ret) {
     timeout = !service_wait_exit(
             SERVICE_MAINTENANCE
             , 3 * USEC_PER_SEC);
+
+    delta_shutdown_time("clear web client cache");
+
+    web_client_cache_destroy();
 
     delta_shutdown_time("clean rrdhost database");
 

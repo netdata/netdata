@@ -3,6 +3,7 @@
 #include "aclk_query.h"
 #include "aclk_stats.h"
 #include "aclk_tx_msgs.h"
+#include "../../web/server/web_client_cache.h"
 
 #define WEB_HDR_ACCEPT_ENC "Accept-Encoding:"
 #define ACLK_MAX_WEB_RESPONSE_SIZE (30 * 1024 * 1024)
@@ -84,7 +85,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
     char *start, *end;
 #endif
 
-    struct web_client *w = web_client_create(&netdata_buffers_statistics.buffers_aclk);
+    struct web_client *w = web_client_get_from_cache();
     w->origin[0] = '*';
     w->acl = WEB_CLIENT_ACL_ACLK;
     w->tv_in = query->created_tv;
@@ -251,7 +252,7 @@ cleanup:
         , strip_control_characters((char *)buffer_tostring(log_buffer))
     );
 
-    web_client_free(w);
+    web_client_release_to_cache(w);
 
 #ifdef NETDATA_WITH_ZLIB
     buffer_free(z_buffer);
