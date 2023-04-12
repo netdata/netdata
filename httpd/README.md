@@ -1,12 +1,15 @@
 # Netdata new H2O web server
 
-We are in process of replacing internal Netdata custom webserver with one based on [libh2o](https://github.com/h2o/h2o). As it is still in development, it is **disabled by default** (can be considered a technical preview for now).
+We are in the process of replacing the internal Netdata custom webserver with one based on [libh2o](https://github.com/h2o/h2o). 
+The new web server is disabled by default, while it is still in development.
 
-h2o will enable us to use HTTP/2 and HTTP/3 (in future) with all benefits they provide. It will also allow us to use HTTP/2 server push to send the dashboard to the browser before it requests it. It will also allow us to implement authentication and other highly requested features.
+h2o will enable us to use HTTP/2 and HTTP/3 in the future, with all the benefits these protocols provide. 
+We will also be able to use HTTP/2 server push to send the dashboard to the browser before it requests it. 
+Finally, we will be able to provide authentication and other highly requested features.
 
 ## Configuration
 
-To enable it, you need to edit `netdata.conf` and set
+To enable the h2o web server, you need edit `netdata.conf` and set
 
 ```
 [httpd]
@@ -29,7 +32,8 @@ To enable TLS (HTTPS) edit `netdata.conf` and set
     ssl = yes
 ```
 
-By default it will use the certificate and key from default path same as internal webserver. To change the path, edit `netdata.conf` and set
+By default it will use the same `ssl key` and `ssl certificate` you may have defined under the `[web]` section of `netdata.conf`. 
+To change the path, set
 
 ```
 [httpd]
@@ -42,9 +46,9 @@ When HTTPS (TLS) is enabled you need to use `https://` in the browser to access 
 
 ## HTTP/2 and HTTP/3
 
-To be able to use HTTP/2 (to realize full potential of libh2o) you need to use TLS. HTTP/2 are not supported in plain HTTP. HTTP/3 support is planned to be added with the next stable release of libh2o.
+To be able to use HTTP/2 (to realize the full potential of libh2o) you need to use TLS. HTTP/2 is not supported in plain HTTP. HTTP/3 support is planned to be added with the next stable release of libh2o.
 
 ## Streaming
 
-It is possible to stream from Child nodes to Parent trough libh2o (both plain and TLS). Currently both Child and Parent have to be updated to do that. Older Children connecting to new parent will have to connect trough internal webserver. New Children connection to old parent will be supported.
+It is possible to stream from Child nodes to a Parent through libh2o (both plain and TLS). Currently both Children and the Parent have to be updated to do that. Older Children connecting to a new parent will have to connect trough an internal webserver. New Children connecting to an old parent will be supported.
 
