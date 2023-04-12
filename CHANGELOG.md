@@ -6,11 +6,14 @@
 
 **Merged pull requests:**
 
+- /api/v2 part 9 [\#14888](https://github.com/netdata/netdata/pull/14888) ([ktsaou](https://github.com/ktsaou))
+- Add example configuration to w1sensor collector [\#14886](https://github.com/netdata/netdata/pull/14886) ([Ancairon](https://github.com/Ancairon))
 - /api/v2 part 8 [\#14885](https://github.com/netdata/netdata/pull/14885) ([ktsaou](https://github.com/ktsaou))
 - Add support for alert notifications to ntfy.sh [\#14875](https://github.com/netdata/netdata/pull/14875) ([Dim-P](https://github.com/Dim-P))
 - cgroups.plugin: add image label [\#14872](https://github.com/netdata/netdata/pull/14872) ([ilyam8](https://github.com/ilyam8))
 - Fix regex syntax for clang-format checks. [\#14871](https://github.com/netdata/netdata/pull/14871) ([Ferroin](https://github.com/Ferroin))
 - bump go.d.plugin v0.52.0 [\#14870](https://github.com/netdata/netdata/pull/14870) ([ilyam8](https://github.com/ilyam8))
+- eBPF bug fixes [\#14869](https://github.com/netdata/netdata/pull/14869) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update link from http to https [\#14864](https://github.com/netdata/netdata/pull/14864) ([Ancairon](https://github.com/Ancairon))
 - Fix js tag in documentation [\#14862](https://github.com/netdata/netdata/pull/14862) ([Ancairon](https://github.com/Ancairon))
 - Set a default registry unique id when there is none for statistics script [\#14861](https://github.com/netdata/netdata/pull/14861) ([MrZammler](https://github.com/MrZammler))
@@ -103,6 +106,7 @@
 - /api/v2 part 4 [\#14706](https://github.com/netdata/netdata/pull/14706) ([ktsaou](https://github.com/ktsaou))
 - Don’t try to use tput in edit-config unless it’s installed. [\#14705](https://github.com/netdata/netdata/pull/14705) ([Ferroin](https://github.com/Ferroin))
 - Bundle libyaml [\#14704](https://github.com/netdata/netdata/pull/14704) ([MrZammler](https://github.com/MrZammler))
+- Handle conffiles for DEB packages explicitly instead of automatically. [\#14703](https://github.com/netdata/netdata/pull/14703) ([Ferroin](https://github.com/Ferroin))
 - Use static thread-pool for training. [\#14702](https://github.com/netdata/netdata/pull/14702) ([vkalintiris](https://github.com/vkalintiris))
 - Revert "Handle conffiles for DEB packages explicitly instead of automatically." [\#14700](https://github.com/netdata/netdata/pull/14700) ([tkatsoulas](https://github.com/tkatsoulas))
 - Fix compilation error when --disable-cloud is specified [\#14695](https://github.com/netdata/netdata/pull/14695) ([stelfrag](https://github.com/stelfrag))
@@ -392,10 +396,6 @@
 - bump go.d.plugin to v0.49.1 [\#14275](https://github.com/netdata/netdata/pull/14275) ([ilyam8](https://github.com/ilyam8))
 - Improve ebpf exit [\#14270](https://github.com/netdata/netdata/pull/14270) ([thiagoftsm](https://github.com/thiagoftsm))
 - DBENGINE v2 - improvements part 3 [\#14269](https://github.com/netdata/netdata/pull/14269) ([ktsaou](https://github.com/ktsaou))
-- minor - add kaitaistruct for journal v2 files [\#14267](https://github.com/netdata/netdata/pull/14267) ([underhood](https://github.com/underhood))
-- fix\(health\): don't assume 2 cores if the number is unknown [\#14265](https://github.com/netdata/netdata/pull/14265) ([ilyam8](https://github.com/ilyam8))
-- More 32bit fixes [\#14264](https://github.com/netdata/netdata/pull/14264) ([ktsaou](https://github.com/ktsaou))
-- Store host and claim info in sqlite as soon as possible [\#14263](https://github.com/netdata/netdata/pull/14263) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
