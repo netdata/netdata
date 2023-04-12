@@ -4,7 +4,7 @@ This document explains in detail the options available to retrieve data from the
 create custom charts.
 
 The Netdata database can be queried with the `/api/v1/data` and `/api/v1/badge.svg` REST API methods. The database is also queried from the `lookup` line 
-in an [alert configuration](https://github.com/netdata/netdata/edit/master/health/REFERENCE.md).
+in an [alert configuration](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md).
 
 Every data query accepts the following parameters:
 
