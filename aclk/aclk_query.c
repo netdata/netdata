@@ -84,20 +84,15 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
     char *start, *end;
 #endif
 
-    struct web_client *w = (struct web_client *)callocz(1, sizeof(struct web_client));
-    w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, &netdata_buffers_statistics.buffers_aclk);
-    w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE, &netdata_buffers_statistics.buffers_aclk);
-    w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE, &netdata_buffers_statistics.buffers_aclk);
-    strcpy(w->origin, "*"); // Simulate web_client_create_on_fd()
-    w->cookie1[0] = 0;      // Simulate web_client_create_on_fd()
-    w->cookie2[0] = 0;      // Simulate web_client_create_on_fd()
+    struct web_client *w = web_client_create(&netdata_buffers_statistics.buffers_aclk);
+    w->origin[0] = '*';
     w->acl = WEB_CLIENT_ACL_ACLK;
+    w->tv_in = query->created_tv;
+    now_realtime_timeval(&w->tv_ready);
 
     buffer_strcat(log_buffer, query->data.http_api_v2.query);
     size_t size = 0;
     size_t sent = 0;
-    w->tv_in = query->created_tv;
-    now_realtime_timeval(&w->tv_ready);
 
     if (query->timeout) {
         int in_queue = (int) (dt_usec(&w->tv_in, &w->tv_ready) / 1000);
@@ -256,15 +251,11 @@ cleanup:
         , strip_control_characters((char *)buffer_tostring(log_buffer))
     );
 
+    web_client_free(w);
+
 #ifdef NETDATA_WITH_ZLIB
-    if(w->response.zinitialized)
-        deflateEnd(&w->response.zstream);
     buffer_free(z_buffer);
 #endif
-    buffer_free(w->response.data);
-    buffer_free(w->response.header);
-    buffer_free(w->response.header_output);
-    freez(w);
     buffer_free(local_buffer);
     buffer_free(log_buffer);
     return retval;

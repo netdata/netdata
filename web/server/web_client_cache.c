@@ -6,77 +6,6 @@
 // ----------------------------------------------------------------------------
 // allocate and free web_clients
 
-#ifdef ENABLE_HTTPS
-
-static void web_client_reuse_ssl(struct web_client *w) {
-    if (netdata_ssl_srv_ctx) {
-        if (w->ssl.conn) {
-            SSL_SESSION *session = SSL_get_session(w->ssl.conn);
-            SSL *old = w->ssl.conn;
-            w->ssl.conn = SSL_new(netdata_ssl_srv_ctx);
-            if (session) {
-#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_111
-                if (SSL_SESSION_is_resumable(session))
-#endif
-                    SSL_set_session(w->ssl.conn, session);
-            }
-            SSL_free(old);
-        }
-    }
-}
-#endif
-
-
-static void web_client_zero(struct web_client *w) {
-    // zero everything about it - but keep the buffers
-
-    // remember the pointers to the buffers
-    BUFFER *b1 = w->response.data;
-    BUFFER *b2 = w->response.header;
-    BUFFER *b3 = w->response.header_output;
-
-    // empty the buffers
-    buffer_flush(b1);
-    buffer_flush(b2);
-    buffer_flush(b3);
-
-    freez(w->user_agent);
-
-    // zero everything
-    memset(w, 0, sizeof(struct web_client));
-
-    // restore the pointers of the buffers
-    w->response.data = b1;
-    w->response.header = b2;
-    w->response.header_output = b3;
-}
-
-static void web_client_free(struct web_client *w) {
-    buffer_free(w->response.header_output);
-    buffer_free(w->response.header);
-    buffer_free(w->response.data);
-    freez(w->user_agent);
-#ifdef ENABLE_HTTPS
-    if ((!web_client_check_unix(w)) && (netdata_ssl_srv_ctx)) {
-        if (w->ssl.conn) {
-            SSL_free(w->ssl.conn);
-            w->ssl.conn = NULL;
-        }
-    }
-#endif
-    freez(w);
-    __atomic_sub_fetch(&netdata_buffers_statistics.buffers_web, sizeof(struct web_client), __ATOMIC_RELAXED);
-}
-
-static struct web_client *web_client_alloc(void) {
-    struct web_client *w = callocz(1, sizeof(struct web_client));
-    __atomic_add_fetch(&netdata_buffers_statistics.buffers_web, sizeof(struct web_client), __ATOMIC_RELAXED);
-    w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, &netdata_buffers_statistics.buffers_web);
-    w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE, &netdata_buffers_statistics.buffers_web);
-    w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE, &netdata_buffers_statistics.buffers_web);
-    return w;
-}
-
 // ----------------------------------------------------------------------------
 // web clients caching
 
@@ -190,21 +119,12 @@ struct web_client *web_client_get_from_cache_or_allocate() {
         if(w->prev) w->prev->next = w->next;
         if(w->next) w->next->prev = w->prev;
         web_clients_cache.avail_count--;
-#ifdef ENABLE_HTTPS
-        web_client_reuse_ssl(w);
-        SSL *ssl = w->ssl.conn;
-#endif
         web_client_zero(w);
         web_clients_cache.reused++;
-#ifdef ENABLE_HTTPS
-        w->ssl.conn = ssl;
-        w->ssl.flags = NETDATA_SSL_START;
-        debug(D_WEB_CLIENT_ACCESS,"Reusing SSL structure with (w->ssl = NULL, w->accepted = %u)", w->ssl.flags);
-#endif
     }
     else {
         // allocate it
-        w = web_client_alloc();
+        w = web_client_create(&netdata_buffers_statistics.buffers_web);
 #ifdef ENABLE_HTTPS
         w->ssl.flags = NETDATA_SSL_START;
         debug(D_WEB_CLIENT_ACCESS,"Starting SSL structure with (w->ssl = NULL, w->accepted = %u)", w->ssl.flags);

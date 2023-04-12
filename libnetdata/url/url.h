@@ -23,6 +23,7 @@ char *url_encode(char *str);
 /* IMPORTANT: be sure to free() the returned string after use */
 char *url_decode(char *str);
 
+char *url_decode_to_buffer(BUFFER *to, char *url, size_t size);
 char *url_decode_r(char *to, char *url, size_t size);
 
 #define WEB_FIELDS_MAX 400

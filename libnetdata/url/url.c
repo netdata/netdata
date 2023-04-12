@@ -189,6 +189,18 @@ unsigned char *utf8_check(unsigned char *s)
     return NULL;
 }
 
+char *url_decode_to_buffer(BUFFER *to, char *url, size_t size) {
+    char buf[size];
+    char *ret = url_decode_r(buf, url, size);
+    if (ret) {
+        buffer_flush(to);
+        buffer_strcat(to, ret);
+        return (char *)buffer_tostring(to);
+    }
+
+    return NULL;
+}
+
 char *url_decode_r(char *to, char *url, size_t size) {
     char *s = url,           // source
          *d = to,            // destination

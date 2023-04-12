@@ -132,6 +132,7 @@ typedef enum web_client_flags {
 #define NETDATA_WEB_RESPONSE_INITIAL_SIZE 8192
 #define NETDATA_WEB_REQUEST_INITIAL_SIZE 8192
 #define NETDATA_WEB_REQUEST_MAX_SIZE 65536
+#define NETDATA_WEB_DECODED_URL_INITIAL_SIZE 512
 
 struct response {
     BUFFER *header;        // our response header
@@ -175,9 +176,9 @@ struct web_client {
     char client_host[NI_MAXHOST];
     char forwarded_host[NI_MAXHOST]; //Used with proxy
 
-    char decoded_url[NETDATA_WEB_REQUEST_URL_SIZE + 1];          // we decode the URL in this buffer
+    BUFFER *url_decoded;
+    BUFFER *url_last;
     char decoded_query_string[NETDATA_WEB_REQUEST_URL_SIZE + 1]; // we decode the Query String in this buffer
-    char last_url[NETDATA_WEB_REQUEST_URL_SIZE + 1];             // we keep a copy of the decoded URL here
     size_t url_path_length;
     char separator;        // This value can be either '?' or 'f'
     char *url_search_path; // A pointer to the search path sent by the client
@@ -211,6 +212,8 @@ struct web_client {
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;
 #endif
+
+    size_t *statistics_memory_accounting;
 };
 
 int web_client_permission_denied(struct web_client *w);
@@ -230,6 +233,14 @@ void web_client_build_http_header(struct web_client *w);
 char *strip_control_characters(char *url);
 
 int web_client_socket_is_now_used_for_streaming(struct web_client *w);
+
+void web_client_zero(struct web_client *w);
+struct web_client *web_client_create(size_t *statistics_memory_accounting);
+void web_client_free(struct web_client *w);
+
+#ifdef ENABLE_HTTPS
+void web_client_reuse_ssl(struct web_client *w);
+#endif
 
 #include "web/api/web_api_v1.h"
 #include "web/api/web_api_v2.h"
