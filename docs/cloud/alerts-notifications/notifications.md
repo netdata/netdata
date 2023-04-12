@@ -70,7 +70,7 @@ For **System** notification methods, the destination of the channel will be a ta
 These notification methods allow for fine-grain rule settings to be done by administrators and more than one configuration can exist for them since. You can specify 
 different targets depending on Rooms or Notification level settings.
 
-Some examples of such notification methods are: Webhook, PagerDuty, slack.
+Some examples of such notification methods are: Webhook, PagerDuty, Slack.
 
 #### Service classification
 
@@ -87,7 +87,7 @@ These are: webhook
 ##### Business
 
 Notification methods classified as Business are only available for **Business** plans
-These are: PagerDuty, slack
+These are: PagerDuty, Slack, Opsgenie
 
 ## Flood protection
 

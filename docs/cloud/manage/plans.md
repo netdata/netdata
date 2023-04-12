@@ -104,7 +104,7 @@ The plan on your space will determine what type of notifications methods will be
 
 * **Community** - Email and Discord
 * **Pro** - Email, Discord and webhook
-* **Business** - Unlimited, this includes Slack, PagerDuty, etc.
+* **Business** - Unlimited, this includes Slack, PagerDuty, Opsgenie etc.
 
 For mode details check the documentation under [Alert Notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md).
 
