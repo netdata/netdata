@@ -120,6 +120,7 @@ struct web_client *web_client_get_from_cache() {
     netdata_spinlock_unlock(&web_clients_cache.used.spinlock);
 
     // initialize it
+    w->use_count++;
     w->id = global_statistics_web_client_connected();
     w->mode = WEB_CLIENT_MODE_GET;
 
@@ -136,7 +137,7 @@ void web_client_release_to_cache(struct web_client *w) {
     netdata_spinlock_unlock(&web_clients_cache.used.spinlock);
 
     netdata_spinlock_lock(&web_clients_cache.avail.spinlock);
-    if((used_count > 0 && web_clients_cache.avail.count >= 2 * (size_t)used_count) || (used_count <= 10 && web_clients_cache.avail.count >= 20)) {
+    if(w->use_count > 100 || (used_count > 0 && web_clients_cache.avail.count >= 2 * (size_t)used_count) || (used_count <= 10 && web_clients_cache.avail.count >= 20)) {
         netdata_spinlock_unlock(&web_clients_cache.avail.spinlock);
 
         // we have too many of them - free it

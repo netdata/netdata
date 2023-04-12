@@ -2046,12 +2046,14 @@ void web_client_zero(struct web_client *w) {
     SSL *ssl = w->ssl.conn;
 #endif
 
+    size_t use_count = w->use_count;
     size_t *statistics_memory_accounting = w->statistics_memory_accounting;
 
     // zero everything
     memset(w, 0, sizeof(struct web_client));
 
     w->statistics_memory_accounting = statistics_memory_accounting;
+    w->use_count = use_count;
 
 #ifdef ENABLE_HTTPS
     w->ssl.conn = ssl;
@@ -2069,6 +2071,7 @@ void web_client_zero(struct web_client *w) {
 
 struct web_client *web_client_create(size_t *statistics_memory_accounting) {
     struct web_client *w = (struct web_client *)callocz(1, sizeof(struct web_client));
+    w->use_count = 1;
     w->statistics_memory_accounting = statistics_memory_accounting;
 
     w->url_last = buffer_create(NETDATA_WEB_DECODED_URL_INITIAL_SIZE, w->statistics_memory_accounting);

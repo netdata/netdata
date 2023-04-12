@@ -156,6 +156,7 @@ struct response {
 
 struct web_client {
     unsigned long long id;
+    size_t use_count;
 
     WEB_CLIENT_FLAGS flags;  // status flags for the client
     WEB_CLIENT_MODE mode;    // the operational mode of the client
