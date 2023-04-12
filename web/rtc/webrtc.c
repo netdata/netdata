@@ -83,7 +83,11 @@ static struct {
     } unsafe;
 
 } webrtc_base = {
+#ifdef NETDATA_INTERNAL_CHECKS
         .enabled = true,
+#else
+        .enabled = false,
+#endif
         .iceServers = {
                 // Format:
                 // [("stun"|"turn"|"turns") (":"|"://")][username ":" password "@"]hostname[":" port]["?transport=" ("udp"|"tcp"|"tls")]
@@ -106,7 +110,7 @@ static struct {
         },
 };
 
-static void webrtc_get_ice_servers(void) {
+static void webrtc_config_ice_servers(void) {
     BUFFER *wb = buffer_create(0, NULL);
 
     int i;
@@ -157,7 +161,7 @@ void webrtc_initialize() {
     webrtc_base.enabled = config_get_boolean(CONFIG_SECTION_WEBRTC, "enabled", webrtc_base.enabled);
     internal_error(true, "WEBRTC: is %s", webrtc_base.enabled ? "enabled" : "disabled");
 
-    webrtc_get_ice_servers();
+    webrtc_config_ice_servers();
 
     webrtc_base.proxyServer = config_get(CONFIG_SECTION_WEBRTC, "proxy server", webrtc_base.proxyServer ? webrtc_base.proxyServer : "");
     if(!webrtc_base.proxyServer || !*webrtc_base.proxyServer)
@@ -556,7 +560,7 @@ void webrtc_initialize() {
 
 int webrtc_new_connection(const char *sdp __maybe_unused, BUFFER *wb) {
     buffer_flush(wb);
-    buffer_strcat(wb, "WEBRTC is not enabled on this server");
+    buffer_strcat(wb, "WEBRTC is not available on this server");
     wb->content_type = CT_TEXT_PLAIN;
     return HTTP_RESP_BAD_REQUEST;
 }
