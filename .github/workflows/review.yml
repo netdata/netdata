@@ -230,7 +230,10 @@ jobs:
           reporter: github-pr-check
           path: "."
           pattern: "*.sh*"
-          exclude: "./.git/*"
+          exclude: |
+            ./.git/*
+            packaging/makeself/makeself.sh
+            packaging/makeself/makeself-header.sh
 
   yamllint:
     name: yamllint
