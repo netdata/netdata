@@ -405,6 +405,7 @@ typedef struct storage_point {
 
 #define storage_point_is_unset(x) (!(x).count)
 #define storage_point_is_gap(x) (!netdata_double_isnumber((x).sum))
+#define storage_point_is_zero(x) (!(x).count || (netdata_double_is_zero((x).min) && netdata_double_is_zero((x).max) && netdata_double_is_zero((x).sum) && (x).anomaly_count == 0))
 
 #define storage_point_merge_to(dst, src) do {           \
         if(storage_point_is_unset(dst))                 \
