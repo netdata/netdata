@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- Update REFERENCE.md [\#14900](https://github.com/netdata/netdata/pull/14900) ([cakrit](https://github.com/cakrit))
+- Update README.md [\#14899](https://github.com/netdata/netdata/pull/14899) ([cakrit](https://github.com/cakrit))
+- Update README.md [\#14898](https://github.com/netdata/netdata/pull/14898) ([cakrit](https://github.com/cakrit))
+- Disable threads that update with high frequency [\#14897](https://github.com/netdata/netdata/pull/14897) ([thiagoftsm](https://github.com/thiagoftsm))
+- add opsgenie as a business level notificaiton method [\#14895](https://github.com/netdata/netdata/pull/14895) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- Remove dry run option from uninstall documentation [\#14894](https://github.com/netdata/netdata/pull/14894) ([Ancairon](https://github.com/Ancairon))
+- cgroups: add option to use Kubelet for pods metadata [\#14891](https://github.com/netdata/netdata/pull/14891) ([ilyam8](https://github.com/ilyam8))
 - /api/v2 part 9 [\#14888](https://github.com/netdata/netdata/pull/14888) ([ktsaou](https://github.com/ktsaou))
 - Add example configuration to w1sensor collector [\#14886](https://github.com/netdata/netdata/pull/14886) ([Ancairon](https://github.com/Ancairon))
 - /api/v2 part 8 [\#14885](https://github.com/netdata/netdata/pull/14885) ([ktsaou](https://github.com/ktsaou))
@@ -36,6 +43,7 @@
 - Delete installation instructions specific to FreeNAS [\#14826](https://github.com/netdata/netdata/pull/14826) ([Ancairon](https://github.com/Ancairon))
 - First batch of adding descriptions to the documentation [\#14825](https://github.com/netdata/netdata/pull/14825) ([Ancairon](https://github.com/Ancairon))
 - Fix Btrfs unallocated space accounting [\#14824](https://github.com/netdata/netdata/pull/14824) ([intelfx](https://github.com/intelfx))
+- Update the bundled version of makeself used to create static builds. [\#14822](https://github.com/netdata/netdata/pull/14822) ([Ferroin](https://github.com/Ferroin))
 - configure extent cache size [\#14821](https://github.com/netdata/netdata/pull/14821) ([ktsaou](https://github.com/ktsaou))
 - Docs, shorten too long titles, and add a description below [\#14820](https://github.com/netdata/netdata/pull/14820) ([Ancairon](https://github.com/Ancairon))
 - update posthog domain [\#14818](https://github.com/netdata/netdata/pull/14818) ([andrewm4894](https://github.com/andrewm4894))
@@ -138,6 +146,7 @@
 - Fix handling of missing release codename on DEB systems. [\#14642](https://github.com/netdata/netdata/pull/14642) ([Ferroin](https://github.com/Ferroin))
 - Update change-metrics-storage.md [\#14641](https://github.com/netdata/netdata/pull/14641) ([cakrit](https://github.com/cakrit))
 - Update change-metrics-storage.md [\#14640](https://github.com/netdata/netdata/pull/14640) ([cakrit](https://github.com/cakrit))
+- Collect additional BTRFS metrics [\#14636](https://github.com/netdata/netdata/pull/14636) ([Dim-P](https://github.com/Dim-P))
 - Fix broken links [\#14634](https://github.com/netdata/netdata/pull/14634) ([Ancairon](https://github.com/Ancairon))
 - Add link to native packages also on the list [\#14633](https://github.com/netdata/netdata/pull/14633) ([cakrit](https://github.com/cakrit))
 - Assorted installer code cleanup. [\#14632](https://github.com/netdata/netdata/pull/14632) ([Ferroin](https://github.com/Ferroin))
@@ -294,7 +303,6 @@
 - Update the "Install Netdata with kickstart.sh" doc [\#14338](https://github.com/netdata/netdata/pull/14338) ([Ancairon](https://github.com/Ancairon))
 - Misc SSL improvements 2 [\#14334](https://github.com/netdata/netdata/pull/14334) ([MrZammler](https://github.com/MrZammler))
 - Indicate what root privileges are needed for in kickstart.sh. [\#14314](https://github.com/netdata/netdata/pull/14314) ([Ferroin](https://github.com/Ferroin))
-- Use one thread for ACLK synchonization [\#14281](https://github.com/netdata/netdata/pull/14281) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
@@ -391,11 +399,6 @@
 - fix for dbengine2 improvements part 3 [\#14284](https://github.com/netdata/netdata/pull/14284) ([ktsaou](https://github.com/ktsaou))
 - Make sure variables are streamed after SENDER\_CONNECTED flag is set [\#14283](https://github.com/netdata/netdata/pull/14283) ([MrZammler](https://github.com/MrZammler))
 - Update to SQLITE version 3.40.1 [\#14282](https://github.com/netdata/netdata/pull/14282) ([stelfrag](https://github.com/stelfrag))
-- Check session variable before resuming it [\#14279](https://github.com/netdata/netdata/pull/14279) ([MrZammler](https://github.com/MrZammler))
-- Update infographic image on main README [\#14276](https://github.com/netdata/netdata/pull/14276) ([cakrit](https://github.com/cakrit))
-- bump go.d.plugin to v0.49.1 [\#14275](https://github.com/netdata/netdata/pull/14275) ([ilyam8](https://github.com/ilyam8))
-- Improve ebpf exit [\#14270](https://github.com/netdata/netdata/pull/14270) ([thiagoftsm](https://github.com/thiagoftsm))
-- DBENGINE v2 - improvements part 3 [\#14269](https://github.com/netdata/netdata/pull/14269) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
