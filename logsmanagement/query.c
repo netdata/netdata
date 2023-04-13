@@ -60,7 +60,7 @@ LOGS_QUERY_RESULT_TYPE fetch_log_sources(BUFFER *wb){
                         p_file_infos_arr->data[i]->chart_name,
                         p_file_infos_arr->data[i]->file_basename,
                         p_file_infos_arr->data[i]->filename,
-                        log_source_t_str[p_file_infos_arr->data[i]->log_type],
+                        log_src_type_t_str[p_file_infos_arr->data[i]->log_type],
                         p_file_infos_arr->data[i]->db_dir,
                         db_user_version(p_file_infos_arr->data[i]->db, -1),
                         p_file_infos_arr->data[i]->buff_flush_to_db_interval,

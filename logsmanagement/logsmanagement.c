@@ -86,6 +86,7 @@ static void p_file_info_destroy(struct File_info *p_file_info){
     freez((void *) p_file_info->chart_name);
     freez(p_file_info->filename);
     freez((void *) p_file_info->file_basename);
+    freez((void *) p_file_info->stream_guid);
 
     if(p_file_info->circ_buff) circ_buff_destroy(p_file_info->circ_buff);
     
@@ -136,6 +137,23 @@ static void p_file_info_destroy(struct File_info *p_file_info){
 
     // freez(p_file_info->parser_metrics_mut); // not yet allocated
     // freez(p_file_info->log_parser_thread); // not yet allocated
+
+    Flb_output_config_t *output_next = p_file_info->flb_outputs;
+    while(output_next){
+        Flb_output_config_t *output = output_next;
+        output_next = output_next->next;
+
+        struct flb_output_config_param *param_next = output->param;
+        while(param_next){
+            struct flb_output_config_param *param = param_next;
+            param_next = param->next;
+            freez(param->key);
+            freez(param->val);
+            freez(param);
+        }
+        freez(output->plugin);
+        freez(output);
+    }
     
     freez(p_file_info);
     p_file_info = NULL;
@@ -146,7 +164,7 @@ static void p_file_info_destroy(struct File_info *p_file_info){
  * @return 0 if success, -1 if disabled in global config, 
  * -2 if config file not found
  */
-static int logs_manag_config_load(void){
+static int logs_manag_config_load(Flb_socket_config_t **forward_in_config_p){
     int rc = 0;
 
     if(!config_get_boolean(CONFIG_SECTION_LOGS_MANAGEMENT, "enabled", NETDATA_CONF_ENABLE_LOGS_MANAGEMENT_DEFAULT)){
@@ -218,7 +236,63 @@ static int logs_manag_config_load(void){
     collector_info("CONFIG: global logs management disk_space_limit_in_mib: %d", g_logs_manag_config.disk_space_limit_in_mib);
 
 
+    /* TODO: save defaults as macros in logsmanagement_conf.h . */
+    *forward_in_config_p = (Flb_socket_config_t *) callocz(1, sizeof(Flb_socket_config_t));
+    const int fwd_enable = config_get_boolean(CONFIG_SECTION_LOGS_MANAGEMENT, "forward in enable", 0);
+    
+    (*forward_in_config_p)->unix_path = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, "forward in unix path", "");
+    collector_info("forward in unix path = %s", (*forward_in_config_p)->unix_path);
+    (*forward_in_config_p)->unix_perm = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, "forward in unix perm", "0644");
+    collector_info("forward in unix perm = %s", (*forward_in_config_p)->unix_perm);
+    // TODO: Check if listen is in valid format
+    (*forward_in_config_p)->listen = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, "forward in listen", "0.0.0.0");
+    collector_info("forward in listen = %s", (*forward_in_config_p)->listen);
+    (*forward_in_config_p)->port = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, "forward in port", "24224");
+    collector_info("forward in port = %s", (*forward_in_config_p)->port);
+
+    if(!fwd_enable){
+        // TODO: Expected minor memory leak by not freeing the following?
+        // freez((*forward_in_config_p)->unix_path);
+        // freez((*forward_in_config_p)->unix_perm);
+        // freez((*forward_in_config_p)->listen);
+        // freez((*forward_in_config_p)->port);
+        freez(*forward_in_config_p);
+        *forward_in_config_p = NULL;
+    }
+
     return rc;
+}
+
+#define FLB_OUTPUT_PLUGIN_NAME_KEY "plugin"
+
+static int flb_output_param_get_cb(void *entry, void *data){
+    struct config_option *option = (struct config_option *) entry;
+    Flb_output_config_t *flb_output = (Flb_output_config_t *) data;
+    
+    char *param_prefix = callocz(1, snprintf(NULL, 0, "output %d", MAX_OUTPUTS_PER_SOURCE) + 1);
+    sprintf(param_prefix, "output %d", flb_output->id);
+    size_t param_prefix_len = strlen(param_prefix);
+    
+    if(!strncasecmp(option->name, param_prefix, param_prefix_len)){ // param->name looks like "output 1 host"
+        char *param_key = &option->name[param_prefix_len]; // param_key should look like " host"
+        while(*param_key && *param_key == ' ') param_key++; // remove whitespace so it looks like "host"
+        
+        if(*param_key && strcasecmp(param_key, FLB_OUTPUT_PLUGIN_NAME_KEY)){ // ignore param_key "plugin" 
+            // debug(D_LOGS_MANAG, "config_option: name[%s], value[%s]", option->name, option->value);
+            // debug(D_LOGS_MANAG, "config option kv:[%s][%s]", param_key, option->value);
+
+            struct flb_output_config_param **p = &flb_output->param;
+            while((*p) != NULL) p = &((*p)->next); // Go to last param of linked list
+
+            (*p) = callocz(1, sizeof(struct flb_output_config_param));
+            (*p)->key = strdupz(param_key);
+            (*p)->val = strdupz(option->value);
+        }
+    }
+
+    freez(param_prefix);
+
+    return 0;
 }
 
 /**
@@ -244,7 +318,7 @@ static void logs_management_init(struct section *config_section){
     
 
     /* -------------------------------------------------------------------------
-     * Check if this management for this log source is enabled.
+     * Check if this log source is enabled.
      * ------------------------------------------------------------------------- */
     if(appconfig_get_boolean(&log_management_config, config_section->name, "enabled", 0)){
         collector_info("[%s]: enabled = yes", p_file_info->chart_name);
@@ -255,25 +329,44 @@ static void logs_management_init(struct section *config_section){
 
 
     /* -------------------------------------------------------------------------
-     * Check log source type.
-     * TODO: There can be only one log_type = FLB_KMSG and only one FLB_SYSTEMD, 
-     * catch this edge case.
+     * Check log type.
      * ------------------------------------------------------------------------- */
     char *type = appconfig_get(&log_management_config, config_section->name, "log type", "flb_generic");
     if(!type || !*type) p_file_info->log_type = FLB_GENERIC; // Default
     else{
-        if(!strcmp(type, "flb_generic")) p_file_info->log_type = FLB_GENERIC;
-        else if (!strcmp(type, "web_log")) p_file_info->log_type = WEB_LOG;
-        else if (!strcmp(type, "flb_web_log")) p_file_info->log_type = FLB_WEB_LOG;
-        else if (!strcmp(type, "flb_kmsg")) p_file_info->log_type = FLB_KMSG;
-        else if (!strcmp(type, "flb_systemd")) p_file_info->log_type = FLB_SYSTEMD;
-        else if (!strcmp(type, "flb_docker_events")) p_file_info->log_type = FLB_DOCKER_EV;
-        else if (!strcmp(type, "flb_syslog")) p_file_info->log_type = FLB_SYSLOG;
-        else if (!strcmp(type, "flb_serial")) p_file_info->log_type = FLB_SERIAL;
+        if(!strcasecmp(type, "flb_generic")) p_file_info->log_type = FLB_GENERIC;
+        else if (!strcasecmp(type, "web_log")) p_file_info->log_type = WEB_LOG;
+        else if (!strcasecmp(type, "flb_web_log")) p_file_info->log_type = FLB_WEB_LOG;
+        else if (!strcasecmp(type, "flb_kmsg")) p_file_info->log_type = FLB_KMSG;
+        else if (!strcasecmp(type, "flb_systemd")) p_file_info->log_type = FLB_SYSTEMD;
+        else if (!strcasecmp(type, "flb_docker_events")) p_file_info->log_type = FLB_DOCKER_EV;
+        else if (!strcasecmp(type, "flb_syslog")) p_file_info->log_type = FLB_SYSLOG;
+        else if (!strcasecmp(type, "flb_serial")) p_file_info->log_type = FLB_SERIAL;
         else p_file_info->log_type = FLB_GENERIC;
     }
     freez(type);
-    collector_info("[%s]: log type = %s", p_file_info->chart_name, log_source_t_str[p_file_info->log_type]);
+    collector_info("[%s]: log type = %s", p_file_info->chart_name, log_src_type_t_str[p_file_info->log_type]);
+
+
+    /* -------------------------------------------------------------------------
+     * Read log source.
+     * ------------------------------------------------------------------------- */
+    char *source = appconfig_get(&log_management_config, config_section->name, "log source", "local");
+    if(!source || !*source) p_file_info->log_source = LOG_SOURCE_LOCAL; // Default
+    else{
+        if(!strcasecmp(source, "forward")) p_file_info->log_source = LOG_SOURCE_FORWARD;
+        // else if (!strcasecmp(source, "tcp")) p_file_info->log_source = TCP;
+        else p_file_info->log_source = LOG_SOURCE_LOCAL;
+    }
+    freez(source);
+    collector_info("[%s]: log source = %s", p_file_info->chart_name, log_src_t_str[p_file_info->log_source]);
+
+
+    /* -------------------------------------------------------------------------
+     * Read stream uuid.
+     * ------------------------------------------------------------------------- */
+    p_file_info->stream_guid = appconfig_get(&log_management_config, config_section->name, "stream guid", "");
+    collector_info("[%s]: stream guid = %s", p_file_info->chart_name, p_file_info->stream_guid);
 
 
     /* -------------------------------------------------------------------------
@@ -281,11 +374,17 @@ static void logs_management_init(struct section *config_section){
      * ------------------------------------------------------------------------- */
     p_file_info->filename = appconfig_get(&log_management_config, config_section->name, "log path", "auto");
     m_assert(p_file_info->filename, "appconfig_get() should never return log path == NULL");
-    if( (p_file_info->log_type != FLB_SYSLOG) /* FLB_SYSLOG is a special case, may or may not require path */ &&
-        (!p_file_info->filename || /* Sanity check */
-        !*p_file_info->filename || 
-        !strcmp(p_file_info->filename, "auto") || 
-        access(p_file_info->filename, R_OK))){ 
+    if( /* path doesn't matter when log source is not local */
+        (p_file_info->log_source == LOG_SOURCE_LOCAL) &&
+        
+        /* FLB_SYSLOG is special case, may or may not require path */
+        (p_file_info->log_type != FLB_SYSLOG) &&
+        
+        (!p_file_info->filename /* Sanity check */ || 
+         !*p_file_info->filename || 
+         !strcmp(p_file_info->filename, "auto") || 
+         access(p_file_info->filename, R_OK)
+        )){ 
 
         freez(p_file_info->filename);
         p_file_info->filename = NULL;
@@ -559,39 +658,57 @@ static void logs_management_init(struct section *config_section){
             Syslog_parser_config_t *syslog_config = (Syslog_parser_config_t *) callocz(1, sizeof(Syslog_parser_config_t));
 
             /* Read syslog format */
-            syslog_config->log_format = appconfig_get(&log_management_config, config_section->name, "log format", NULL);
-            collector_info("[%s]: log format = %s", p_file_info->chart_name, syslog_config->log_format ? syslog_config->log_format : "NULL!");
-            if(!syslog_config->log_format || !*syslog_config->log_format || !strcmp(syslog_config->log_format, "auto")){
+            syslog_config->log_format = appconfig_get(  &log_management_config, 
+                                                        config_section->name, 
+                                                        "log format", NULL);
+            collector_info("[%s]: log format = %s", p_file_info->chart_name, 
+                                                    syslog_config->log_format ? syslog_config->log_format : "NULL!");
+            if(!syslog_config->log_format || !*syslog_config->log_format || !strcasecmp(syslog_config->log_format, "auto")){
                 freez(syslog_config->log_format);
                 freez(syslog_config);
                 return p_file_info_destroy(p_file_info);
             }
 
+            syslog_config->socket_config = (Flb_socket_config_t *) callocz(1, sizeof(Flb_socket_config_t));
+
             /* Read syslog socket mode
              * see also https://docs.fluentbit.io/manual/pipeline/inputs/syslog#configuration-parameters */
-            syslog_config->mode = appconfig_get(&log_management_config, config_section->name, "mode", "unix_udp");
-            collector_info("[%s]: mode = %s", p_file_info->chart_name, syslog_config->mode);
+            syslog_config->socket_config->mode = appconfig_get( &log_management_config, 
+                                                                config_section->name, 
+                                                                "mode", "unix_udp");
+            collector_info("[%s]: mode = %s", p_file_info->chart_name, syslog_config->socket_config->mode);
 
             /* Check for valid socket path if (mode == unix_udp) or 
              * (mode == unix_tcp), else read syslog network interface to bind, 
              * if (mode == udp) or (mode == tcp). */
-            if(!strcmp(syslog_config->mode, "unix_udp") || !strcmp(syslog_config->mode, "unix_tcp")){
-                if(!p_file_info->filename || !*p_file_info->filename || !strcmp(p_file_info->filename, "auto")){
+            if( !strcasecmp(syslog_config->socket_config->mode, "unix_udp") || 
+                !strcasecmp(syslog_config->socket_config->mode, "unix_tcp")){
+                if(!p_file_info->filename || !*p_file_info->filename || !strcasecmp(p_file_info->filename, "auto")){
+                    // freez(syslog_config->socket_config->mode);
+                    freez(syslog_config->socket_config);
                     freez(syslog_config->log_format);
-                    freez(syslog_config->mode);
                     freez(syslog_config);
                     return p_file_info_destroy(p_file_info);
                 }
-                syslog_config->unix_perm = appconfig_get(&log_management_config, config_section->name, "unix_perm", "0644");
-                collector_info("[%s]: unix_perm = %s", p_file_info->chart_name, syslog_config->unix_perm);
-            } else if(!strcmp(syslog_config->mode, "udp") || !strcmp(syslog_config->mode, "tcp")){
+                syslog_config->socket_config->unix_perm = appconfig_get(&log_management_config, 
+                                                                        config_section->name, 
+                                                                        "unix_perm", "0644");
+                collector_info("[%s]: unix_perm = %s", p_file_info->chart_name, syslog_config->socket_config->unix_perm);
+            } else if(  !strcasecmp(syslog_config->socket_config->mode, "udp") || 
+                        !strcasecmp(syslog_config->socket_config->mode, "tcp")){
                 // TODO: Check if listen is in valid format
-                syslog_config->listen = appconfig_get(&log_management_config, config_section->name, "listen", "0.0.0.0");
-                collector_info("[%s]: listen = %s", p_file_info->chart_name, syslog_config->listen);
-                syslog_config->port = appconfig_get(&log_management_config, config_section->name, "port", "5140");
-                collector_info("[%s]: port = %s", p_file_info->chart_name, syslog_config->port);
+                syslog_config->socket_config->listen = appconfig_get(   &log_management_config, 
+                                                                        config_section->name, 
+                                                                        "listen", "0.0.0.0");
+                collector_info("[%s]: listen = %s", p_file_info->chart_name, syslog_config->socket_config->listen);
+                syslog_config->socket_config->port = appconfig_get( &log_management_config, 
+                                                                    config_section->name, 
+                                                                    "port", "5140");
+                collector_info("[%s]: port = %s", p_file_info->chart_name, syslog_config->socket_config->port);
             } else { 
                 /* Any other modes are invalid */
+                // freez(syslog_config->socket_config->mode);
+                freez(syslog_config->socket_config);
                 freez(syslog_config->log_format);
                 freez(syslog_config);
                 return p_file_info_destroy(p_file_info);
@@ -672,7 +789,8 @@ static void logs_management_init(struct section *config_section){
         debug(D_LOGS_MANAG, "cus chart: (%s:%s)", cus_chart_k, cus_chart_v ? cus_chart_v : "NULL");
         freez(cus_chart_k);
         if(unlikely(!cus_chart_v)){
-            collector_error("[%s]: custom %d chart = NULL", p_file_info->chart_name, cus_off);
+            collector_error("[%s]: custom %d chart = NULL, custom charts for this log source will be disabled.", 
+                            p_file_info->chart_name, cus_off);
             break;
         }
 
@@ -683,7 +801,8 @@ static void logs_management_init(struct section *config_section){
         debug(D_LOGS_MANAG, "cus regex:(%s:%s)", cus_regex_k, cus_regex_v ? cus_regex_v : "NULL");
         freez(cus_regex_k);
         if(unlikely(!cus_regex_v)) {
-            collector_error("[%s]: custom %d regex = NULL", p_file_info->chart_name, cus_off);
+            collector_error("[%s]: custom %d regex = NULL, custom charts for this log source will be disabled.", 
+                            p_file_info->chart_name, cus_off);
             freez(cus_chart_v);
             break;
         }
@@ -728,7 +847,8 @@ static void logs_management_init(struct section *config_section){
             size_t regcomp_err_str_size = regerror(rc, &regex, 0, 0);
             char *regcomp_err_str = mallocz(regcomp_err_str_size);
             regerror(rc, &regex, regcomp_err_str, regcomp_err_str_size);
-            collector_error("[%s]: could not compile regex for custom %d chart: %s", p_file_info->chart_name, cus_off, cus_chart_v);
+            collector_error("[%s]: could not compile regex for custom %d chart: %s, custom charts for this log source will be disabled.", 
+                            p_file_info->chart_name, cus_off, cus_chart_v);
             freez(cus_chart_v);
             freez(cus_regex_v);
             freez(cus_regex_name_v);
@@ -755,6 +875,37 @@ static void logs_management_init(struct section *config_section){
         p_file_info->parser_metrics->parser_cus[cus_off] = NULL;
     }
 
+
+    /* -------------------------------------------------------------------------
+     * Configure (optional) Fluent Bit outputs.
+     * ------------------------------------------------------------------------- */
+    
+    Flb_output_config_t **output_next_p = &p_file_info->flb_outputs;
+    for(int out_off = 1; out_off <= MAX_OUTPUTS_PER_SOURCE; out_off++){
+
+        /* Read output plugin */
+        char *out_plugin_k = callocz(1, snprintf(NULL, 0, "output %d " FLB_OUTPUT_PLUGIN_NAME_KEY, MAX_OUTPUTS_PER_SOURCE) + 1);
+        sprintf(out_plugin_k, "output %d " FLB_OUTPUT_PLUGIN_NAME_KEY, out_off);
+        char *out_plugin_v = appconfig_get(&log_management_config, config_section->name, out_plugin_k, NULL);
+        debug(D_LOGS_MANAG, "output %d "FLB_OUTPUT_PLUGIN_NAME_KEY": %s", out_off, out_plugin_v ? out_plugin_v : "NULL");
+        freez(out_plugin_k);
+        if(unlikely(!out_plugin_v)){
+            collector_error("[%s]: output %d "FLB_OUTPUT_PLUGIN_NAME_KEY" = NULL, outputs for this log source will be disabled.", 
+                            p_file_info->chart_name, out_off);
+            break;
+        }
+
+        Flb_output_config_t *output = callocz(1, sizeof(Flb_output_config_t));
+        output->id = out_off;
+        output->plugin = out_plugin_v;
+
+        /* Read parameters for this output */
+        avl_traverse_lock(&config_section->values_index, flb_output_param_get_cb, output);
+
+        *output_next_p = output;
+        output_next_p = &output->next;
+    }
+    
     
     /* -------------------------------------------------------------------------
      * Read circular buffer configuration and initialize the buffer.
@@ -788,16 +939,18 @@ static void logs_management_init(struct section *config_section){
 
 
     /* -------------------------------------------------------------------------
-     * Initialize input plugin.
+     * Initialize input plugin for local log sources.
      * ------------------------------------------------------------------------- */
     switch(p_file_info->log_type){
         int rc;
         case GENERIC:
         case WEB_LOG: {
-            rc = tail_plugin_add_input(p_file_info);
-            if(unlikely(rc)){
-                collector_error("[%s]: tail_plugin_add_input() error: %d", p_file_info->chart_name, rc);
-                return p_file_info_destroy(p_file_info);
+            if(p_file_info->log_source == LOG_SOURCE_LOCAL){
+                rc = tail_plugin_add_input(p_file_info);
+                if(unlikely(rc)){
+                    collector_error("[%s]: tail_plugin_add_input() error: %d", p_file_info->chart_name, rc);
+                    return p_file_info_destroy(p_file_info);
+                }
             }
             break;
         }
@@ -805,15 +958,19 @@ static void logs_management_init(struct section *config_section){
         case FLB_WEB_LOG:
         case FLB_KMSG:
         case FLB_SYSTEMD:
-        case FLB_DOCKER_EV: 
-        case FLB_SYSLOG: 
+        case FLB_DOCKER_EV:
+        case FLB_SYSLOG:
         case FLB_SERIAL: {
-            rc = flb_add_input(p_file_info);
-            if(unlikely(rc)){
-                collector_error("[%s]: flb_add_input() error: %d", p_file_info->chart_name, rc);
-                return p_file_info_destroy(p_file_info);
+            if(p_file_info->log_source == LOG_SOURCE_LOCAL){
+                rc = flb_add_input(p_file_info);
+                if(unlikely(rc)){
+                    collector_error("[%s]: flb_add_input() error: %d", p_file_info->chart_name, rc);
+                    return p_file_info_destroy(p_file_info);
+                }
             }
 
+            /* flb_tmp_buff_cpy_timer_cb() is needed for 
+             * both local and non-local sources. */
             p_file_info->flb_tmp_buff_cpy_timer.data = p_file_info;
             if(unlikely(0 != uv_mutex_init(&p_file_info->flb_tmp_buff_mut))){
                 fatal("uv_mutex_init(&p_file_info->flb_tmp_buff_mut) failed");
@@ -887,7 +1044,8 @@ void *logsmanagement_main(void *ptr) {
     UNUSED(ptr);
     netdata_thread_cleanup_push(logsmanagement_main_cleanup, ptr);
 
-    if(logs_manag_config_load()) goto cleanup;
+    Flb_socket_config_t *forward_in_config = NULL;
+    if(logs_manag_config_load(&forward_in_config)) goto cleanup;
 
     main_loop = mallocz(sizeof(uv_loop_t));
     fatal_assert(uv_loop_init(main_loop) == 0);
@@ -905,7 +1063,9 @@ void *logsmanagement_main(void *ptr) {
     p_file_infos_arr = callocz(1, sizeof(struct File_infos_arr));
     *p_file_infos_arr = (struct File_infos_arr){0};
 
+#if 0
     tail_plugin_init(p_file_infos_arr);
+#endif
 
     if(flb_init()){
         collector_error("flb_init() failed - logs management will be disabled");
@@ -919,6 +1079,11 @@ void *logsmanagement_main(void *ptr) {
         config_section = config_section->next;
     } while(config_section);
     if(p_file_infos_arr->count == 0) goto cleanup; // No log sources - nothing to do
+
+    if(flb_add_fwd_input(forward_in_config)){
+        collector_error("flb_add_fwd_input() failed - logs management forward input will be disabled");
+        goto cleanup;
+    }
 
     /* Run Fluent Bit engine
      * NOTE: flb_run() ideally would be executed after db_init(), but in case of

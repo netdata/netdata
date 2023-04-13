@@ -15,7 +15,8 @@
 #include "../fluent-bit/lib/monkey/include/monkey/mk_core/mk_list.h"
 #include <dlfcn.h>
 
-#define LOG_REC_KEY "msg" /**< key to represent log message field **/
+#define LOG_REC_KEY "msg" /**< key to represent log message field in most log sources **/
+#define LOG_REC_KEY_SYSTEMD "MESSAGE" /**< key to represent log message field in systemd log source **/
 #define SYSLOG_TIMESTAMP_SIZE 16
 #define UNKNOWN "unknown"
 
@@ -97,6 +98,8 @@ static struct flb_parser *(*flb_parser_create)(const char *name, const char *for
                                                int types_len, struct mk_list *decoders, struct flb_config *config);
 static int (*flb_input)(flb_ctx_t *ctx, const char *input, void *data);
 static int (*flb_input_set)(flb_ctx_t *ctx, int ffd, ...);
+// static int (*flb_filter)(flb_ctx_t *ctx, const char *filter, void *data);
+// static int (*flb_filter_set)(flb_ctx_t *ctx, int ffd, ...);
 static int (*flb_output)(flb_ctx_t *ctx, const char *output, struct flb_lib_out_cb *cb);
 static int (*flb_output_set)(flb_ctx_t *ctx, int ffd, ...);
 static msgpack_unpack_return (*dl_msgpack_unpack_next)(msgpack_unpacked* result, const char* data, size_t len, size_t* off);
@@ -155,21 +158,31 @@ int flb_init(void){
         collector_error("dlerror loading flb_lib_free: %s", dl_error);
         return -1;
     }
+    *(void **) (&flb_parser_create) = dlsym(handle, "flb_parser_create");
+    if ((dl_error = dlerror()) != NULL) {
+        collector_error("dlerror loading flb_parser_create: %s", dl_error);
+        return -1;
+    }
     *(void **) (&flb_input) = dlsym(handle, "flb_input");
     if ((dl_error = dlerror()) != NULL) {
         collector_error("dlerror loading flb_input: %s", dl_error);
         return -1;
     }  
-    *(void **) (&flb_parser_create) = dlsym(handle, "flb_parser_create");
-    if ((dl_error = dlerror()) != NULL) {
-        collector_error("dlerror loading flb_parser_create: %s", dl_error);
-        return -1;
-    } 
     *(void **) (&flb_input_set) = dlsym(handle, "flb_input_set");
     if ((dl_error = dlerror()) != NULL) {
         collector_error("dlerror loading flb_input_set: %s", dl_error);
         return -1;
     } 
+    // *(void **) (&flb_filter) = dlsym(handle, "flb_filter");
+    // if ((dl_error = dlerror()) != NULL) {
+    //     collector_error("dlerror loading flb_filter: %s", dl_error);
+    //     return -1;
+    // }  
+    // *(void **) (&flb_filter_set) = dlsym(handle, "flb_filter_set");
+    // if ((dl_error = dlerror()) != NULL) {
+    //     collector_error("dlerror loading flb_filter_set: %s", dl_error);
+    //     return -1;
+    // } 
     *(void **) (&flb_output) = dlsym(handle, "flb_output");
     if ((dl_error = dlerror()) != NULL) {
         collector_error("dlerror loading flb_output: %s", dl_error);
@@ -307,16 +320,15 @@ void flb_tmp_buff_cpy_timer_cb(uv_timer_t *handle) {
 }
 
 static int flb_write_to_buff_cb(void *record, size_t size, void *data){
-
+    
+    /* "data" is NULL for Forward-type sources and non-NULL for local sources */
     struct File_info *p_file_info = (struct File_info *) data;
-    Circ_buff_t *buff = p_file_info->circ_buff;
+    Circ_buff_t *buff = NULL;
 
     msgpack_unpacked result;
     size_t off = 0; 
     struct flb_time tmp_time;
     msgpack_object *x;
-
-    
 
     /* FLB_KMSG case */
     static int skip_kmsg_log_buffering = 1;
@@ -366,43 +378,96 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
 
     msgpack_unpacked_init(&result);
 
-    uv_mutex_lock(&p_file_info->flb_tmp_buff_mut);
-
     int iter = 0;
     while (dl_msgpack_unpack_next(&result, record, size, &off) == MSGPACK_UNPACK_SUCCESS) {
         iter++;
         m_assert(iter == 1, "We do not expect more than one loop iteration here");
 
         flb_time_pop_from_msgpack(&tmp_time, &result, &x);
-        if(buff->in->timestamp == 0) {
-            // printf("timestamp text_size:%zu\n", buff->in->text_size);
-            // printf("timestamp text:%s\n", buff->in->text ? buff->in->text : "NULL");
-            // fflush(stdout);
-            m_assert(buff->in->text_size == 0, "buff->in->timestamp == 0 but buff->in->text_size != 0");
-            // m_assert(buff->in->data == 0 || 
-            //         *buff->in->data == 0, "buff->in->timestamp == 0 but *buff->in->text != 0");
+        
+        if(likely(x->type == MSGPACK_OBJECT_MAP && x->via.map.size != 0)){
+            msgpack_object_kv* p = x->via.map.ptr;
+            msgpack_object_kv* pend = x->via.map.ptr + x->via.map.size;
 
-            buff->in->timestamp = (msec_t) tmp_time.tm.tv_sec * MSEC_PER_SEC + (msec_t) tmp_time.tm.tv_nsec / (NSEC_PER_MSEC);
-            m_assert(TEST_MS_TIMESTAMP_VALID(buff->in->timestamp), "buff->in->timestamp is invalid"); // Timestamp within valid range up to 2050
-        }
-
-        if(likely(x->type == MSGPACK_OBJECT_MAP)){
-            if(likely(x->via.map.size != 0)) {
-                msgpack_object_kv* p = x->via.map.ptr;
-                msgpack_object_kv* const pend = x->via.map.ptr + x->via.map.size;
+            /* ================================================================ 
+             * If p_file_info == NULL, it means it is a "Forward" source, so
+             * we need to search for the associated p_file_info. This code can 
+             * be optimized further.
+             * ============================================================== */ 
+            if(p_file_info == NULL){
                 do{
-                    // if (unlikely(p->key.type != MSGPACK_OBJECT_STR || p->val.type != MSGPACK_OBJECT_STR)) {
-                    //     m_assert(0, "Remaining logs?");
-                    //     break;
-                    // }
-                    
-                    m_assert(buff->in->timestamp, "buff->in->timestamp is 0");
+                    if(!strncmp(p->key.via.str.ptr, "stream guid", (size_t) p->key.via.str.size)){
+                        char *stream_guid = (char *) p->val.via.str.ptr;
+                        size_t stream_guid_size = p->val.via.str.size;
+                        debug(D_LOGS_MANAG, "stream guid:%.*s", (int) stream_guid_size, stream_guid);
 
-                    /* FLB_GENERIC, FLB_WEB_LOG and FLB_SERIAL case */
-                    if((p_file_info->log_type == FLB_GENERIC || 
-                        p_file_info->log_type == FLB_WEB_LOG || 
-                        p_file_info->log_type == FLB_SERIAL) && 
-                       !strncmp(p->key.via.str.ptr, LOG_REC_KEY, (size_t) p->key.via.str.size)){
+                        for (int i = 0; i < p_file_infos_arr->count; i++) {
+                            if(!strncmp(p_file_infos_arr->data[i]->stream_guid, stream_guid, stream_guid_size)){
+                                p_file_info = p_file_infos_arr->data[i];
+                                // debug(D_LOGS_MANAG, "p_file_info match found: %s type[%s]", 
+                                //                      p_file_info->stream_guid, 
+                                //                      log_src_type_t_str[p_file_info->log_type]);
+                                break;
+                            }
+                        }
+                    }
+                    ++p;
+                    // continue;
+                } while(p < pend);
+            }
+            if(unlikely(p_file_info == NULL)) goto skip_collect_and_drop_logs;
+            
+
+            buff = p_file_info->circ_buff;
+            uv_mutex_lock(&p_file_info->flb_tmp_buff_mut);
+
+            if(buff->in->timestamp == 0) {
+                m_assert(buff->in->text_size == 0, "buff->in->timestamp == 0 but buff->in->text_size != 0");
+                // m_assert(buff->in->data == 0 || 
+                //         *buff->in->data == 0, "buff->in->timestamp == 0 but *buff->in->text != 0");
+
+                buff->in->timestamp = (msec_t) tmp_time.tm.tv_sec * MSEC_PER_SEC + (msec_t) tmp_time.tm.tv_nsec / (NSEC_PER_MSEC);
+                m_assert(TEST_MS_TIMESTAMP_VALID(buff->in->timestamp), "buff->in->timestamp is invalid"); // Timestamp within valid range up to 2050
+
+                // debug(D_LOGS_MANAG, "timestamp:%llu", buff->in->timestamp);
+            }
+
+            p = x->via.map.ptr;
+            pend = x->via.map.ptr + x->via.map.size;
+            do{
+                // if (unlikely(p->key.type != MSGPACK_OBJECT_STR || p->val.type != MSGPACK_OBJECT_STR)) {
+                //     m_assert(0, "Remaining logs?");
+                //     break;
+                // }
+
+                // if(!strncmp(p->key.via.str.ptr, LOG_REC_KEY, (size_t) p->key.via.str.size) ||
+                //    !strncasecmp(p->key.via.str.ptr, LOG_REC_KEY_SYSTEMD, (size_t) p->key.via.str.size)){
+                //     debug(D_LOGS_MANAG,"msg key:[%.*s]val:[%.*s]", (int) p->key.via.str.size, p->key.via.str.ptr, (int) p->val.via.str.size, p->val.via.str.ptr);
+                //     if(likely(p->val.type == MSGPACK_OBJECT_MAP && p->val.via.map.size != 0)){
+                //         msgpack_object_kv* ac = p->val.via.map.ptr;
+                //         msgpack_object_kv* const ac_pend= p->val.via.map.ptr + p->val.via.map.size;
+                //         do{
+                //             if(!strncmp(ac->key.via.str.ptr, "Type", (size_t) ac->key.via.str.size)){
+                //                 debug(D_LOGS_MANAG,"msg key:[%.*s]val:[%.*s]", (int) ac->key.via.str.size, ac->key.via.str.ptr, (int) ac->val.via.str.size, ac->val.via.str.ptr);
+                //             }
+                //             ac++;
+                //             continue;
+                //         } while(ac < ac_pend);
+                //     }
+                // }                    
+                
+                m_assert(buff->in->timestamp, "buff->in->timestamp is 0");
+
+                /* FLB_GENERIC, FLB_WEB_LOG and FLB_SERIAL case */
+                if( p_file_info->log_type == FLB_GENERIC || 
+                    p_file_info->log_type == FLB_WEB_LOG || 
+                    p_file_info->log_type == FLB_SERIAL){
+                    if( !strncmp(p->key.via.str.ptr, LOG_REC_KEY, (size_t) p->key.via.str.size) ||
+                        /* The following line is in case we collect systemd logs 
+                         * (tagged as "MESSAGE") or docker_events (tagged as
+                         * "message") via a "Forward" source to an FLB_GENERIC 
+                         * parent. */
+                        !strncasecmp(p->key.via.str.ptr, LOG_REC_KEY_SYSTEMD, (size_t) p->key.via.str.size)){
 
                         char *text = (char *) p->val.via.str.ptr;
                         size_t text_size = p->val.via.str.size;
@@ -410,266 +475,270 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
                         m_assert(text_size, "text_size is 0");
                         m_assert(text, "text is NULL");
 
+                        // debug(D_LOGS_MANAG, "msg key:[%.*s]val:[%.*s]", (int) p->key.via.str.size, p->key.via.str.ptr, 
+                        //                                                 (int) p->val.via.str.size, p->val.via.str.ptr);
+
                         new_tmp_text_size = buff->in->text_size + text_size + 1; // +1 for '\n'
                         if(unlikely(!circ_buff_prepare_write(buff, new_tmp_text_size))) goto skip_collect_and_drop_logs;
 
                         memcpy(&buff->in->data[buff->in->text_size], text, text_size);
                         buff->in->text_size = new_tmp_text_size;
                         buff->in->data[buff->in->text_size - 1] = '\n';
-
-                        ++p;
-                        continue;
                     }
-                    /* FLB_GENERIC, FLB_WEB_LOG and FLB_SERIAL case end */
+                    ++p;
+                    continue;
+                }
+                /* FLB_GENERIC, FLB_WEB_LOG and FLB_SERIAL case end */
 
-                    /* FLB_KMSG case */
-                    if(p_file_info->log_type == FLB_KMSG){
-                        if(!new_tmp_text_size){
-                            /* set new_tmp_text_size to previous size of buffer, do only once */
-                            new_tmp_text_size = buff->in->text_size; 
-                        }
-                        if( !strncmp(p->key.via.str.ptr, LOG_REC_KEY, (size_t) p->key.via.str.size) && 
-                            !skip_kmsg_log_buffering){
-                            message = (char *) p->val.via.str.ptr;
-                            message_size = p->val.via.str.size;
+                /* FLB_KMSG case */
+                if(p_file_info->log_type == FLB_KMSG){
+                    if(!new_tmp_text_size){
+                        /* set new_tmp_text_size to previous size of buffer, do only once */
+                        new_tmp_text_size = buff->in->text_size; 
+                    }
+                    if( !strncmp(p->key.via.str.ptr, LOG_REC_KEY, (size_t) p->key.via.str.size) && 
+                        !skip_kmsg_log_buffering){
+                        message = (char *) p->val.via.str.ptr;
+                        message_size = p->val.via.str.size;
 
-                            m_assert(message, "message is NULL");
-                            m_assert(message_size, "message_size is 0");
+                        m_assert(message, "message is NULL");
+                        m_assert(message_size, "message_size is 0");
 
-                            char *c;
-                            size_t bytes_remain = message_size;
+                        char *c;
+                        size_t bytes_remain = message_size;
 
-                            // see https://www.kernel.org/doc/Documentation/ABI/testing/dev-kmsg
-                            if((c = memchr(message, '\n', message_size))){
-                                /* Extract log message */
-                                message_size = c - message;
-                                bytes_remain -= message_size;
+                        // see https://www.kernel.org/doc/Documentation/ABI/testing/dev-kmsg
+                        if((c = memchr(message, '\n', message_size))){
+                            /* Extract log message */
+                            message_size = c - message;
+                            bytes_remain -= message_size;
 
-                                /* Extract machine-readable info for charts, 
-                                 * such as subsystem and device. */
-                                while(bytes_remain){
-                                    size_t sz = 0;
-                                    while(--bytes_remain && c[++sz] != '\n');
-                                    if(bytes_remain) --sz;
-                                    c++; // skip new line and space chars
+                            /* Extract machine-readable info for charts, 
+                                * such as subsystem and device. */
+                            while(bytes_remain){
+                                size_t sz = 0;
+                                while(--bytes_remain && c[++sz] != '\n');
+                                if(bytes_remain) --sz;
+                                c++; // skip new line and space chars
 
-                                    DICTIONARY *dict;
-                                    char *str = NULL;
-                                    size_t str_len;
-                                    if(!strncmp(c, subsys_str, subsys_str_len)){
-                                        dict = p_file_info->parser_metrics->kernel->subsystem;
-                                        str = &c[subsys_str_len];
-                                        str_len = (sz - subsys_str_len);
-                                    }
-                                    else if (!strncmp(c, device_str, device_str_len)){
-                                        dict = p_file_info->parser_metrics->kernel->device;
-                                        str = &c[device_str_len];
-                                        str_len = (sz - device_str_len);
-                                    }
-
-                                    if(likely(str)){
-                                        char * const key = mallocz(str_len + 1);
-                                        memcpy(key, str, str_len);
-                                        key[str_len] = '\0';
-                                        Kernel_metrics_dict_item_t item = {.dim = NULL, .num = 1};
-                                        dictionary_set_advanced(dict, key, str_len, &item, sizeof(item), NULL);
-                                    }
-                                    c = &c[sz];
+                                DICTIONARY *dict;
+                                char *str = NULL;
+                                size_t str_len;
+                                if(!strncmp(c, subsys_str, subsys_str_len)){
+                                    dict = p_file_info->parser_metrics->kernel->subsystem;
+                                    str = &c[subsys_str_len];
+                                    str_len = (sz - subsys_str_len);
                                 }
-                            }
+                                else if (!strncmp(c, device_str, device_str_len)){
+                                    dict = p_file_info->parser_metrics->kernel->device;
+                                    str = &c[device_str_len];
+                                    str_len = (sz - device_str_len);
+                                }
 
-                            new_tmp_text_size += message_size + 1; // +1 for '\n'
-                        }
-                        else if(!strncmp(p->key.via.str.ptr, "priority", (size_t) p->key.via.str.size) && 
-                                !skip_kmsg_log_buffering){
-                            p_file_info->flb_tmp_kernel_metrics.sever[p->val.via.u64]++;
-                        }
-                        ++p;
-                        continue;
-                    } /* FLB_KMSG case end */
-
-                    /* FLB_SYSTEMD or FLB_SYSLOG case */
-                    if(p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_SYSLOG){
-                        if(!new_tmp_text_size){
-                            /* set new_tmp_text_size to previous size of buffer, do only once */
-                            new_tmp_text_size = buff->in->text_size; 
-                        }
-                        if(!strncmp(p->key.via.str.ptr, "PRIVAL", (size_t) p->key.via.str.size)){
-                            m_assert(p->val.via.str.size <= 3, "p->val.via.str.size > 3");
-                            strncpy(syslog_prival, p->val.via.str.ptr, (size_t) p->val.via.str.size);
-                            syslog_prival[p->val.via.str.size] = '\0';
-                            syslog_prival_size = (size_t) p->val.via.str.size;
-                            
-                            m_assert(syslog_prival, "syslog_prival is NULL");
-                        }
-                        else if(!strncmp(p->key.via.str.ptr, "PRIORITY", (size_t) p->key.via.str.size)){
-                            m_assert(p->val.via.str.size <= 1, "p->val.via.str.size > 1");
-                            strncpy(syslog_severity, p->val.via.str.ptr, (size_t) p->val.via.str.size);
-                            syslog_severity[p->val.via.str.size] = '\0';
-                            
-                            m_assert(syslog_severity, "syslog_severity is NULL");
-                        }
-                        else if(!strncmp(p->key.via.str.ptr, "SYSLOG_FACILITY", (size_t) p->key.via.str.size)){
-                            m_assert(p->val.via.str.size <= 2, "p->val.via.str.size > 2");
-                            strncpy(syslog_facility, p->val.via.str.ptr, (size_t) p->val.via.str.size);
-                            syslog_facility[p->val.via.str.size] = '\0';
-                            
-                            m_assert(syslog_facility, "syslog_facility is NULL");
-                        }
-                        else if(!strncmp(p->key.via.str.ptr, "SYSLOG_TIMESTAMP", (size_t) p->key.via.str.size)){
-                            syslog_timestamp = (char *) p->val.via.str.ptr;
-                            syslog_timestamp_size = p->val.via.str.size;
-
-                            m_assert(syslog_timestamp, "syslog_timestamp is NULL");
-                            m_assert(syslog_timestamp_size, "syslog_timestamp_size is 0");
-                            
-                            new_tmp_text_size += syslog_timestamp_size;
-                        }
-                        else if(!strncmp(p->key.via.str.ptr, "HOSTNAME", (size_t) p->key.via.str.size)){
-                            hostname = (char *) p->val.via.str.ptr;
-                            hostname_size = p->val.via.str.size;
-
-                            m_assert(hostname, "hostname is NULL");
-                            m_assert(hostname_size, "hostname_size is 0");
-
-                            new_tmp_text_size += hostname_size + 1; // +1 for ' ' char
-                        }
-                        else if(!strncmp(p->key.via.str.ptr, "SYSLOG_IDENTIFIER", (size_t) p->key.via.str.size)){
-                            syslog_identifier = (char *) p->val.via.str.ptr;
-                            syslog_identifier_size = p->val.via.str.size;
-
-                            m_assert(syslog_identifier, "syslog_identifier is NULL");
-                            m_assert(syslog_identifier_size, "syslog_identifier_size is 0");
-
-                            new_tmp_text_size += syslog_identifier_size;
-                        }
-                        else if(!strncmp(p->key.via.str.ptr, "PID", (size_t) p->key.via.str.size)){
-                            pid = (char *) p->val.via.str.ptr;
-                            pid_size = p->val.via.str.size;
-
-                            m_assert(pid, "pid is NULL");
-                            m_assert(pid_size, "pid_size is 0");
-
-                            new_tmp_text_size += pid_size;
-                        }
-                        else if(!strncmp(p->key.via.str.ptr, "MESSAGE", (size_t) p->key.via.str.size)){
-                            message = (char *) p->val.via.str.ptr;
-                            message_size = p->val.via.str.size;
-
-                            m_assert(message, "message is NULL");
-                            m_assert(message_size, "message_size is 0");
-
-                            new_tmp_text_size += message_size;
-                        }
-                        ++p;
-                        continue;
-                    } /* FLB_SYSTEMD or FLB_SYSLOG case end */
-
-                    /* FLB_DOCKER_EV case */
-                    if(p_file_info->log_type == FLB_DOCKER_EV){ 
-
-                        if(!new_tmp_text_size){
-                            /* set new_tmp_text_size to previous size of buffer, do only once */
-                            new_tmp_text_size = buff->in->text_size; 
-                        }
-                        if(!strncmp(p->key.via.str.ptr, "time", (size_t) p->key.via.str.size)){
-                            docker_ev_time = p->val.via.i64;
-
-                            m_assert(docker_ev_time, "docker_ev_time is 0");
-
-                            // debug(D_LOGS_MANAG,"docker_ev_time: %ld", p->val.via.i64);
-                        }
-                        else if(!strncmp(p->key.via.str.ptr, "timeNano", (size_t) p->key.via.str.size)){
-                            docker_ev_timeNano = p->val.via.i64;
-
-                            m_assert(docker_ev_timeNano, "docker_ev_timeNano is 0");
-                        }
-                        else if(!strncmp(p->key.via.str.ptr, "Type", (size_t) p->key.via.str.size)){
-                            docker_ev_type = (char *) p->val.via.str.ptr;
-                            docker_ev_type_size = p->val.via.str.size;
-
-                            m_assert(docker_ev_type, "docker_ev_type is NULL");
-                            m_assert(docker_ev_type_size, "docker_ev_type_size is 0");
-
-                            // debug(D_LOGS_MANAG,"docker_ev_type: %.*s", docker_ev_type_size, docker_ev_type);
-                        }
-                        else if(!strncmp(p->key.via.str.ptr, "Action", (size_t) p->key.via.str.size)){
-                            docker_ev_action = (char *) p->val.via.str.ptr;
-                            docker_ev_action_size = p->val.via.str.size;
-
-                            m_assert(docker_ev_action, "docker_ev_action is NULL");
-                            m_assert(docker_ev_action_size, "docker_ev_action_size is 0");
-
-                            // debug(D_LOGS_MANAG,"docker_ev_action: %.*s", docker_ev_action_size, docker_ev_action);
-                        }
-                        else if(!strncmp(p->key.via.str.ptr, "id", (size_t) p->key.via.str.size)){
-                            docker_ev_id = (char *) p->val.via.str.ptr;
-                            docker_ev_id_size = p->val.via.str.size;
-
-                            m_assert(docker_ev_id, "docker_ev_id is NULL");
-                            m_assert(docker_ev_id_size, "docker_ev_id_size is 0");
-
-                            // debug(D_LOGS_MANAG,"docker_ev_id: %.*s", docker_ev_id_size, docker_ev_id);
-                        }
-                        else if(!strncmp(p->key.via.str.ptr, "Actor", (size_t) p->key.via.str.size)){
-                            if(likely(p->val.type == MSGPACK_OBJECT_MAP && p->val.via.map.size != 0)){
-                                msgpack_object_kv* ac = p->val.via.map.ptr;
-                                msgpack_object_kv* const ac_pend= p->val.via.map.ptr + p->val.via.map.size;
-                                do{
-                                    if(!strncmp(ac->key.via.str.ptr, "ID", (size_t) ac->key.via.str.size)){
-                                        docker_ev_id = (char *) ac->val.via.str.ptr;
-                                        docker_ev_id_size = ac->val.via.str.size;
-
-                                        m_assert(docker_ev_id, "docker_ev_id is NULL");
-                                        m_assert(docker_ev_id_size, "docker_ev_id_size is 0");
-
-                                        // debug(D_LOGS_MANAG,"docker_ev_id: %.*s", docker_ev_id_size, docker_ev_id);
-                                    }
-                                    else if(!strncmp(ac->key.via.str.ptr, "Attributes", (size_t) ac->key.via.str.size)){
-                                        if(likely(ac->val.type == MSGPACK_OBJECT_MAP && ac->val.via.map.size != 0)){
-                                            msgpack_object_kv* att = ac->val.via.map.ptr;
-                                            msgpack_object_kv* const att_pend = ac->val.via.map.ptr + ac->val.via.map.size;
-                                            do{
-                                                if(unlikely(++docker_ev_attr.size > docker_ev_attr.max_size)){
-                                                    docker_ev_attr.max_size = docker_ev_attr.size;
-                                                    docker_ev_attr.key = reallocz(docker_ev_attr.key, 
-                                                                                docker_ev_attr.max_size * sizeof(char*));
-                                                    docker_ev_attr.val = reallocz(docker_ev_attr.val, 
-                                                                                docker_ev_attr.max_size * sizeof(char*));   
-                                                    docker_ev_attr.key_size = reallocz(docker_ev_attr.key_size, 
-                                                                                docker_ev_attr.max_size * sizeof(size_t));    
-                                                    docker_ev_attr.val_size = reallocz(docker_ev_attr.val_size, 
-                                                                                docker_ev_attr.max_size * sizeof(size_t));                                               
-                                                }
-
-                                                docker_ev_attr.key[docker_ev_attr.size - 1] =  (char *) att->key.via.str.ptr;
-                                                docker_ev_attr.val[docker_ev_attr.size - 1] =  (char *) att->val.via.str.ptr;
-                                                docker_ev_attr.key_size[docker_ev_attr.size - 1] = att->key.via.str.size;
-                                                docker_ev_attr.val_size[docker_ev_attr.size - 1] = att->val.via.str.size;
-
-                                                debug(D_LOGS_MANAG, "att_key:%.*s, att_val:%.*s", 
-                                                (int) docker_ev_attr.key_size[docker_ev_attr.size - 1], 
-                                                docker_ev_attr.key[docker_ev_attr.size - 1],
-                                                (int) docker_ev_attr.val_size[docker_ev_attr.size - 1], 
-                                                docker_ev_attr.val[docker_ev_attr.size - 1]);
-
-                                                att++;
-                                                continue;
-                                            } while(att < att_pend);
-                                        }
-                                    }
-                                    ac++;
-                                    continue;
-                                } while(ac < ac_pend);
+                                if(likely(str)){
+                                    char * const key = mallocz(str_len + 1);
+                                    memcpy(key, str, str_len);
+                                    key[str_len] = '\0';
+                                    Kernel_metrics_dict_item_t item = {.dim = NULL, .num = 1};
+                                    dictionary_set_advanced(dict, key, str_len, &item, sizeof(item), NULL);
+                                }
+                                c = &c[sz];
                             }
                         }
-                        ++p;
-                        continue;
+
+                        new_tmp_text_size += message_size + 1; // +1 for '\n'
                     }
-                    /* FLB_DOCKER_EV case end */
+                    else if(!strncmp(p->key.via.str.ptr, "priority", (size_t) p->key.via.str.size) && 
+                            !skip_kmsg_log_buffering){
+                        p_file_info->flb_tmp_kernel_metrics.sever[p->val.via.u64]++;
+                    }
+                    ++p;
+                    continue;
+                } /* FLB_KMSG case end */
 
-                } while(p < pend);
-            }
+                /* FLB_SYSTEMD or FLB_SYSLOG case */
+                if(p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_SYSLOG){
+                    if(!new_tmp_text_size){
+                        /* set new_tmp_text_size to previous size of buffer, do only once */
+                        new_tmp_text_size = buff->in->text_size; 
+                    }
+                    if(!strncmp(p->key.via.str.ptr, "PRIVAL", (size_t) p->key.via.str.size)){
+                        m_assert(p->val.via.str.size <= 3, "p->val.via.str.size > 3");
+                        strncpy(syslog_prival, p->val.via.str.ptr, (size_t) p->val.via.str.size);
+                        syslog_prival[p->val.via.str.size] = '\0';
+                        syslog_prival_size = (size_t) p->val.via.str.size;
+                        
+                        m_assert(syslog_prival, "syslog_prival is NULL");
+                    }
+                    else if(!strncmp(p->key.via.str.ptr, "PRIORITY", (size_t) p->key.via.str.size)){
+                        m_assert(p->val.via.str.size <= 1, "p->val.via.str.size > 1");
+                        strncpy(syslog_severity, p->val.via.str.ptr, (size_t) p->val.via.str.size);
+                        syslog_severity[p->val.via.str.size] = '\0';
+                        
+                        m_assert(syslog_severity, "syslog_severity is NULL");
+                    }
+                    else if(!strncmp(p->key.via.str.ptr, "SYSLOG_FACILITY", (size_t) p->key.via.str.size)){
+                        m_assert(p->val.via.str.size <= 2, "p->val.via.str.size > 2");
+                        strncpy(syslog_facility, p->val.via.str.ptr, (size_t) p->val.via.str.size);
+                        syslog_facility[p->val.via.str.size] = '\0';
+                        
+                        m_assert(syslog_facility, "syslog_facility is NULL");
+                    }
+                    else if(!strncmp(p->key.via.str.ptr, "SYSLOG_TIMESTAMP", (size_t) p->key.via.str.size)){
+                        syslog_timestamp = (char *) p->val.via.str.ptr;
+                        syslog_timestamp_size = p->val.via.str.size;
+
+                        m_assert(syslog_timestamp, "syslog_timestamp is NULL");
+                        m_assert(syslog_timestamp_size, "syslog_timestamp_size is 0");
+                        
+                        new_tmp_text_size += syslog_timestamp_size;
+                    }
+                    else if(!strncmp(p->key.via.str.ptr, "HOSTNAME", (size_t) p->key.via.str.size)){
+                        hostname = (char *) p->val.via.str.ptr;
+                        hostname_size = p->val.via.str.size;
+
+                        m_assert(hostname, "hostname is NULL");
+                        m_assert(hostname_size, "hostname_size is 0");
+
+                        new_tmp_text_size += hostname_size + 1; // +1 for ' ' char
+                    }
+                    else if(!strncmp(p->key.via.str.ptr, "SYSLOG_IDENTIFIER", (size_t) p->key.via.str.size)){
+                        syslog_identifier = (char *) p->val.via.str.ptr;
+                        syslog_identifier_size = p->val.via.str.size;
+
+                        m_assert(syslog_identifier, "syslog_identifier is NULL");
+                        m_assert(syslog_identifier_size, "syslog_identifier_size is 0");
+
+                        new_tmp_text_size += syslog_identifier_size;
+                    }
+                    else if(!strncmp(p->key.via.str.ptr, "PID", (size_t) p->key.via.str.size)){
+                        pid = (char *) p->val.via.str.ptr;
+                        pid_size = p->val.via.str.size;
+
+                        m_assert(pid, "pid is NULL");
+                        m_assert(pid_size, "pid_size is 0");
+
+                        new_tmp_text_size += pid_size;
+                    }
+                    else if(!strncmp(p->key.via.str.ptr, LOG_REC_KEY_SYSTEMD, (size_t) p->key.via.str.size)){
+                        message = (char *) p->val.via.str.ptr;
+                        message_size = p->val.via.str.size;
+
+                        // debug(D_LOGS_MANAG,"msg key:[%.*s]val:[%.*s]", (int) p->key.via.str.size, p->key.via.str.ptr, (int) p->val.via.str.size, p->val.via.str.ptr);
+
+                        m_assert(message, "message is NULL");
+                        m_assert(message_size, "message_size is 0");
+
+                        new_tmp_text_size += message_size;
+                    }
+                    ++p;
+                    continue;
+                } /* FLB_SYSTEMD or FLB_SYSLOG case end */
+
+                /* FLB_DOCKER_EV case */
+                if(p_file_info->log_type == FLB_DOCKER_EV){ 
+
+                    if(!new_tmp_text_size){
+                        /* set new_tmp_text_size to previous size of buffer, do only once */
+                        new_tmp_text_size = buff->in->text_size; 
+                    }
+                    if(!strncmp(p->key.via.str.ptr, "time", (size_t) p->key.via.str.size)){
+                        docker_ev_time = p->val.via.i64;
+
+                        m_assert(docker_ev_time, "docker_ev_time is 0");
+
+                        // debug(D_LOGS_MANAG,"docker_ev_time: %ld", p->val.via.i64);
+                    }
+                    else if(!strncmp(p->key.via.str.ptr, "timeNano", (size_t) p->key.via.str.size)){
+                        docker_ev_timeNano = p->val.via.i64;
+
+                        m_assert(docker_ev_timeNano, "docker_ev_timeNano is 0");
+                    }
+                    else if(!strncmp(p->key.via.str.ptr, "Type", (size_t) p->key.via.str.size)){
+                        docker_ev_type = (char *) p->val.via.str.ptr;
+                        docker_ev_type_size = p->val.via.str.size;
+
+                        m_assert(docker_ev_type, "docker_ev_type is NULL");
+                        m_assert(docker_ev_type_size, "docker_ev_type_size is 0");
+
+                        // debug(D_LOGS_MANAG,"docker_ev_type: %.*s", docker_ev_type_size, docker_ev_type);
+                    }
+                    else if(!strncmp(p->key.via.str.ptr, "Action", (size_t) p->key.via.str.size)){
+                        docker_ev_action = (char *) p->val.via.str.ptr;
+                        docker_ev_action_size = p->val.via.str.size;
+
+                        m_assert(docker_ev_action, "docker_ev_action is NULL");
+                        m_assert(docker_ev_action_size, "docker_ev_action_size is 0");
+
+                        // debug(D_LOGS_MANAG,"docker_ev_action: %.*s", docker_ev_action_size, docker_ev_action);
+                    }
+                    else if(!strncmp(p->key.via.str.ptr, "id", (size_t) p->key.via.str.size)){
+                        docker_ev_id = (char *) p->val.via.str.ptr;
+                        docker_ev_id_size = p->val.via.str.size;
+
+                        m_assert(docker_ev_id, "docker_ev_id is NULL");
+                        m_assert(docker_ev_id_size, "docker_ev_id_size is 0");
+
+                        // debug(D_LOGS_MANAG,"docker_ev_id: %.*s", docker_ev_id_size, docker_ev_id);
+                    }
+                    else if(!strncmp(p->key.via.str.ptr, "Actor", (size_t) p->key.via.str.size)){
+                        // debug(D_LOGS_MANAG,"msg key:[%.*s]val:[%.*s]", (int) p->key.via.str.size, p->key.via.str.ptr, (int) p->val.via.str.size, p->val.via.str.ptr);
+                        if(likely(p->val.type == MSGPACK_OBJECT_MAP && p->val.via.map.size != 0)){
+                            msgpack_object_kv* ac = p->val.via.map.ptr;
+                            msgpack_object_kv* const ac_pend= p->val.via.map.ptr + p->val.via.map.size;
+                            do{
+                                if(!strncmp(ac->key.via.str.ptr, "ID", (size_t) ac->key.via.str.size)){
+                                    docker_ev_id = (char *) ac->val.via.str.ptr;
+                                    docker_ev_id_size = ac->val.via.str.size;
+
+                                    m_assert(docker_ev_id, "docker_ev_id is NULL");
+                                    m_assert(docker_ev_id_size, "docker_ev_id_size is 0");
+
+                                    // debug(D_LOGS_MANAG,"docker_ev_id: %.*s", docker_ev_id_size, docker_ev_id);
+                                }
+                                else if(!strncmp(ac->key.via.str.ptr, "Attributes", (size_t) ac->key.via.str.size)){
+                                    if(likely(ac->val.type == MSGPACK_OBJECT_MAP && ac->val.via.map.size != 0)){
+                                        msgpack_object_kv* att = ac->val.via.map.ptr;
+                                        msgpack_object_kv* const att_pend = ac->val.via.map.ptr + ac->val.via.map.size;
+                                        do{
+                                            if(unlikely(++docker_ev_attr.size > docker_ev_attr.max_size)){
+                                                docker_ev_attr.max_size = docker_ev_attr.size;
+                                                docker_ev_attr.key = reallocz(docker_ev_attr.key, 
+                                                                            docker_ev_attr.max_size * sizeof(char*));
+                                                docker_ev_attr.val = reallocz(docker_ev_attr.val, 
+                                                                            docker_ev_attr.max_size * sizeof(char*));   
+                                                docker_ev_attr.key_size = reallocz(docker_ev_attr.key_size, 
+                                                                            docker_ev_attr.max_size * sizeof(size_t));    
+                                                docker_ev_attr.val_size = reallocz(docker_ev_attr.val_size, 
+                                                                            docker_ev_attr.max_size * sizeof(size_t));                                               
+                                            }
+
+                                            docker_ev_attr.key[docker_ev_attr.size - 1] =  (char *) att->key.via.str.ptr;
+                                            docker_ev_attr.val[docker_ev_attr.size - 1] =  (char *) att->val.via.str.ptr;
+                                            docker_ev_attr.key_size[docker_ev_attr.size - 1] = att->key.via.str.size;
+                                            docker_ev_attr.val_size[docker_ev_attr.size - 1] = att->val.via.str.size;
+
+                                            // debug(D_LOGS_MANAG, "att_key:%.*s, att_val:%.*s", 
+                                            // (int) docker_ev_attr.key_size[docker_ev_attr.size - 1], 
+                                            // docker_ev_attr.key[docker_ev_attr.size - 1],
+                                            // (int) docker_ev_attr.val_size[docker_ev_attr.size - 1], 
+                                            // docker_ev_attr.val[docker_ev_attr.size - 1]);
+
+                                            att++;
+                                            continue;
+                                        } while(att < att_pend);
+                                    }
+                                }
+                                ac++;
+                                continue;
+                            } while(ac < ac_pend);
+                        }
+                    }
+                    ++p;
+                    continue;
+                }
+                /* FLB_DOCKER_EV case end */
+            } while(p < pend);
         } 
     }
 
@@ -894,7 +963,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
         }
 
         if(likely(docker_ev_action)){
-            debug(D_LOGS_MANAG,"docker_ev_action: %.*s", (int) docker_ev_action_size, docker_ev_action);
+            // debug(D_LOGS_MANAG,"docker_ev_action: %.*s", (int) docker_ev_action_size, docker_ev_action);
         //     int i;
         //     for(i = 0; i < NUM_OF_DOCKER_EV_TYPES - 1; i++){
         //         if(!strncmp(docker_ev_action, docker_ev_action_string[i], docker_ev_action_size)){
@@ -910,7 +979,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
         }
 
         if(likely(docker_ev_id)){
-            debug(D_LOGS_MANAG,"docker_ev_id: %.*s", (int) docker_ev_id_size, docker_ev_id);
+            // debug(D_LOGS_MANAG,"docker_ev_id: %.*s", (int) docker_ev_id_size, docker_ev_id);
         //     int i;
         //     for(i = 0; i < NUM_OF_DOCKER_EV_TYPES - 1; i++){
         //         if(!strncmp(docker_ev_action, docker_ev_action_string[i], docker_ev_action_size)){
@@ -996,7 +1065,7 @@ skip_collect_and_drop_logs:
         memset(&result.data, 0, sizeof(msgpack_object));
     }
 
-    uv_mutex_unlock(&p_file_info->flb_tmp_buff_mut);
+    if(p_file_info) uv_mutex_unlock(&p_file_info->flb_tmp_buff_mut);
     
     flb_lib_free(record);
     // FLB_OUTPUT_RETURN(FLB_OK); // Watch out! This breaks output - won't flush all pending logs
@@ -1047,8 +1116,9 @@ int flb_add_input(struct File_info *const p_file_info){
             char update_every_str[10]; 
             snprintfz(update_every_str, 10, "%d", p_file_info->update_every);
 
-            debug(D_LOGS_MANAG, "Setting up FLB_WEB_LOG tail for %s (basename:%s)", 
-                  p_file_info->filename, p_file_info->file_basename);
+            debug(  D_LOGS_MANAG, "Setting up %s tail for %s (basename:%s)", 
+                    p_file_info->log_type == FLB_GENERIC ? "FLB_GENERIC" : "FLB_WEB_LOG",
+                    p_file_info->filename, p_file_info->file_basename);
         
             /* Set up input from log source */
             p_file_info->flb_input = flb_input(ctx, "tail", NULL);
@@ -1132,7 +1202,10 @@ int flb_add_input(struct File_info *const p_file_info){
             snprintfz(parser_name, parser_name_size, "%s%u", syslog_parser_prfx, tag);
 
             Syslog_parser_config_t *syslog_config = (Syslog_parser_config_t *) p_file_info->parser_config->gen_config;
-            if(unlikely(!syslog_config || !syslog_config->mode || !p_file_info->filename)) return CONFIG_READ_ERROR;
+            if(unlikely(!syslog_config || 
+                        !syslog_config->socket_config || 
+                        !syslog_config->socket_config->mode || 
+                        !p_file_info->filename)) return CONFIG_READ_ERROR;
             if(flb_parser_create( parser_name, "regex", syslog_config->log_format,
                 FLB_TRUE, NULL, NULL, NULL, FLB_TRUE, FLB_TRUE, NULL, 0,
                 NULL, ctx->config) == NULL) return FLB_PARSER_CREATE_ERROR;
@@ -1140,27 +1213,28 @@ int flb_add_input(struct File_info *const p_file_info){
             /* Set up syslog input */
             p_file_info->flb_input = flb_input(ctx, "syslog", NULL);
             if(p_file_info->flb_input < 0 ) return FLB_INPUT_ERROR;
-            if(!strcmp(syslog_config->mode, "unix_udp") || !strcmp(syslog_config->mode, "unix_tcp")){
-                m_assert(syslog_config->unix_perm, "unix_perm is not set");
+            if( !strcmp(syslog_config->socket_config->mode, "unix_udp") || 
+                !strcmp(syslog_config->socket_config->mode, "unix_tcp")){
+                m_assert(syslog_config->socket_config->unix_perm, "unix_perm is not set");
                 if(flb_input_set(ctx, p_file_info->flb_input, 
                     "Tag", tag_s,
                     "Path", p_file_info->filename,
                     "Parser", parser_name,
-                    "Mode", syslog_config->mode,
-                    "Unix_Perm", syslog_config->unix_perm,
+                    "Mode", syslog_config->socket_config->mode,
+                    "Unix_Perm", syslog_config->socket_config->unix_perm,
                     NULL) != 0) return FLB_INPUT_SET_ERROR;
-            } else if(!strcmp(syslog_config->mode, "udp") || !strcmp(syslog_config->mode, "tcp")){
-                m_assert(syslog_config->listen, "listen is not set");
-                m_assert(syslog_config->port, "port is not set");
+            } else if(  !strcmp(syslog_config->socket_config->mode, "udp") || 
+                        !strcmp(syslog_config->socket_config->mode, "tcp")){
+                m_assert(syslog_config->socket_config->listen, "listen is not set");
+                m_assert(syslog_config->socket_config->port, "port is not set");
                 if(flb_input_set(ctx, p_file_info->flb_input, 
                     "Tag", tag_s,
                     "Parser", parser_name,
-                    "Mode", syslog_config->mode,
-                    "Listen", syslog_config->listen,
-                    "Port", syslog_config->port,
+                    "Mode", syslog_config->socket_config->mode,
+                    "Listen", syslog_config->socket_config->listen,
+                    "Port", syslog_config->socket_config->port,
                     NULL) != 0) return FLB_INPUT_SET_ERROR;
-            } else 
-            return FLB_INPUT_SET_ERROR; // should never reach this line
+            } else return FLB_INPUT_SET_ERROR; // should never reach this line
 
             break;
         }
@@ -1191,14 +1265,75 @@ int flb_add_input(struct File_info *const p_file_info){
         }
     }
 
-    /* Set up output */
+    /* Set up "lib" output */
     callback->cb = flb_write_to_buff_cb;
     callback->data = p_file_info;
-    p_file_info->flb_output = flb_output(ctx, "lib", callback);
-    if(p_file_info->flb_output < 0 ) return FLB_OUTPUT_ERROR;
-    if(flb_output_set(ctx, p_file_info->flb_output, 
+    p_file_info->flb_lib_output = flb_output(ctx, "lib", callback);
+    if(p_file_info->flb_lib_output < 0 ) return FLB_OUTPUT_ERROR;
+    if(flb_output_set(ctx, p_file_info->flb_lib_output, 
         "Match", tag_s,
         NULL) != 0) return FLB_OUTPUT_SET_ERROR; 
 
+    /* Set up user-configured outputs */
+    for(Flb_output_config_t *output = p_file_info->flb_outputs; output; output = output->next){
+        debug(D_LOGS_MANAG, "setting up user output [%s]", output->plugin);
+
+        int out = flb_output(ctx, output->plugin, NULL);
+        if(out < 0) return FLB_OUTPUT_ERROR;
+        if(flb_output_set(ctx, out, 
+            "Match", tag_s,
+            NULL) != 0) return FLB_OUTPUT_SET_ERROR; 
+        for(struct flb_output_config_param *param = output->param; param; param = param->next){
+            debug(D_LOGS_MANAG, "setting up param [%s][%s] of output [%s]", param->key, param->val, output->plugin);
+            if(flb_output_set(ctx, out, 
+                param->key, param->val,
+                NULL) != 0) return FLB_OUTPUT_SET_ERROR; 
+        }
+    }
+        
     return SUCCESS;
+}
+
+int flb_add_fwd_input(Flb_socket_config_t *forward_in_config){
+
+    if(forward_in_config == NULL){
+        debug(D_LOGS_MANAG, "forward: forward_in_config is NULL");
+        return 0;
+    }
+
+    debug(D_LOGS_MANAG, "forward: Setting up flb_add_fwd_input()");
+
+    int input = flb_input(ctx, "forward", NULL);
+    if(input < 0 ) return -1;
+    if( forward_in_config->unix_path && *forward_in_config->unix_path && 
+        forward_in_config->unix_perm && *forward_in_config->unix_perm){
+        if(flb_input_set(ctx, input, 
+            "Tag_Prefix", "fwd",
+            "Unix_Path", forward_in_config->unix_path,
+            "Unix_Perm", forward_in_config->unix_perm,
+            NULL) != 0) return -1;
+    } else if(  forward_in_config->listen && *forward_in_config->listen &&
+                forward_in_config->port && *forward_in_config->port){
+        if(flb_input_set(ctx, input, 
+            "Tag_Prefix", "fwd",
+            "Listen", forward_in_config->listen,
+            "Port", forward_in_config->port,
+            NULL) != 0) return -1;
+    } else return -1; // should never reach this line
+
+    // TODO: freez(callback) on error
+    struct flb_lib_out_cb *callback = mallocz(sizeof(struct flb_lib_out_cb));
+
+    /* Set up output */
+    callback->cb = flb_write_to_buff_cb;
+    callback->data = NULL;
+    int output = flb_output(ctx, "lib", callback);
+    if(output < 0 ) return -1;
+    if(flb_output_set(ctx, output, 
+        "Match", "fwd*",
+        NULL) != 0) return -1; 
+
+    debug(D_LOGS_MANAG, "forward: Set up flb_add_fwd_input() with success");
+
+    return 0;
 }

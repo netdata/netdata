@@ -28,7 +28,7 @@ typedef struct Chart_data_cus {
 } Chart_data_cus_t ;
 
 struct Chart_meta {
-    enum log_source_t type;
+    enum log_src_type_t type;
     long base_prio;
 
     union {

@@ -289,19 +289,6 @@ typedef struct docker_ev_metrics{
 
 
 /* -------------------------------------------------------------------------- */
-/*                       Syslog parsing configuration                         */
-/* -------------------------------------------------------------------------- */
-
-typedef struct syslog_parser_config{
-    char *log_format;
-    char *listen;
-    char *port;
-    char *mode;
-    char *unix_perm;
-} Syslog_parser_config_t;
-
-
-/* -------------------------------------------------------------------------- */
 /*                         Regex / Keyword search                             */
 /* -------------------------------------------------------------------------- */
 

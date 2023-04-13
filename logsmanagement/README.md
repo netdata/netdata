@@ -5,15 +5,21 @@
 - [Summary](#summary)  
     - [Types of available collectors](#collector-types)  
 - [Package Requirements](#package-requirements)
-    - [systemd](#requirements-systemd)
+    - [Systemd](#requirements-systemd)
 - [General Configuration](#general-configuration)
 - [Collector-specific Configuration](#collector-configuration)
-    - [systemd](#collector-configuration-systemd)
-	- [docker events](#collector-configuration-docker-events)
-	- [web log](#collector-configuration-web-log)
-	- [syslog](#collector-configuration-syslog)
-	- [serial](#collector-configuration-serial)
+	- [Kernel logs (kmsg)](#collector-configuration-kmsg)
+    - [Systemd](#collector-configuration-systemd)
+	- [Docker events](#collector-configuration-docker-events)
+	- [Web log](#collector-configuration-web-log)
+	- [Syslog socket](#collector-configuration-syslog)
+	- [Serial](#collector-configuration-serial)
 - [Custom Charts](#custom-charts)
+- [Streaming](#streaming)
+	- [Example: Systemd log streaming](#streaming-systemd)
+	- [Example: Kernel log streaming](#streaming-kmsg)
+	- [Example: Generic log streaming](#streaming-generic)
+	- [Example: Docker Events log streaming](#streaming-docker-events)
 - [Troubleshooting](#troubleshooting)
 
 <a name="summary"/>
@@ -22,19 +28,19 @@
 
 </a>
 
-The Netdata logs management engine enables collection, processing, storage and querying of logs through the Netdata agent. The following pipeline depicts a high-level overview of the different stages that the logs have to pass through for this to be achieved:
+The Netdata logs management engine enables collection, processing, storage, streaming and querying of logs through the Netdata agent. The following pipeline depicts a high-level overview of the different stages that the logs have to pass through for this to be achieved:
 
 ![Logs management pipeline](https://user-images.githubusercontent.com/5953192/191845591-fea3392c-427a-4b56-95f4-e029775378b0.jpg "Logs management pipeline")
 
 
-The [Fluent Bit](https://github.com/fluent/fluent-bit) project has been used at the logs collection engine, due to its stability and the variety of [collection (input) plugins](https://docs.fluentbit.io/manual/pipeline/inputs) that it offers. Each collected log record passes through the Fluent Bit engine first, before it gets compressed and copied to the circular buffers of the logs management engine.
+The [Fluent Bit](https://github.com/fluent/fluent-bit) project has been used at the logs collection and streaming engine, due to its stability and the variety of [collection (input) plugins](https://docs.fluentbit.io/manual/pipeline/inputs) that it offers. Each collected log record passes through the Fluent Bit engine first, before it gets compressed and copied to the circular buffers of the logs management engine. Optionally, it can be then streamed to another Netdata or Fluent Bit instance.
 
-A bespoke circular buffering implementation was used to maximize performance and optimize memory utilization. More details about it can be found [here](https://github.com/netdata/netdata/pull/13291#buffering).
+A bespoke circular buffering implementation is used to maximize performance and optimize memory utilization. More technical details about how it works can be found [here](https://github.com/netdata/netdata/pull/13291#buffering).
 
-A few important points that users should be aware of:
+To configure Netdata's logs management engine properly and to interpret results correctly, please make sure you are aware of the following points:
 
-* One collection cycle occurs per `update every` interval and any log records collected in a collection cycle are grouped and compressed together. So, a longer interval will reduce memory and disk space requirements.
-* The timestamp of each collection cycle is the epoch datetime at the moment of the collection and __not the datetime of any log records__ (although it may well be the same as them). As a result of that, some collection cycles may include log records with timestamps _preceding_ the cycle collection timestamp and this is expected.
+* One collection cycle occurs per `update every` interval and any log records collected in a collection cycle are grouped and compressed together. As expected, a longer interval will reduce memory and disk space requirements.
+* The timestamp of each collection cycle is the epoch datetime at the moment of the collection and __not the datetime of collected log records__ (although these two may well be the same if there are no delays during collection). The reason for this choice is that Netdata's metrics time-series database ([dbengine](https://learn.netdata.cloud/docs/improving-netdata---developers/metric-retention---database/database-engine)) is a [causal system](https://en.wikipedia.org/wiki/Causal_system), and while logs can be stored using past timestamps, metrics cannot. So, for logs and their extracted metrics to be aligned, the collection datetime must be used.
 
 <a name="collector-types"/>
 
@@ -45,15 +51,15 @@ A few important points that users should be aware of:
 The following log collectors are supported at the moment. The table will be updated as more collectors are added:
 
 
-|  Collector    | Log type      | Description  |
-| ------------  | ------------  | ------------ |
-| kmsg          | `flb_kmsg`    | Collection of new kernel ring buffer logs.|
-| systemd       | `flb_systemd` | Collection of journald logs.|
-| docker events | `flb_docker_events` | Collection of docker events logs, similar to executing the `docker events` command.|
-| web log       | `flb_web_log` | Collection of Apache or Nginx access logs.|
-| tail          | `flb_generic` | Collection of new logs from files by "tailing" them.|
-| syslog        | `flb_syslog`  | Collection of RFC-3164 syslog logs by creating listening sockets.|
-| serial        | `flb_serial`  | Collection of logs from a serial interface.|
+|  Collector    	| Log type      		| Description  |
+| ------------  	| ------------  		| ------------ |
+| kernel logs (kmsg)| `flb_kmsg`    		| Collection of new kernel ring buffer logs.|
+| systemd       	| `flb_systemd` 		| Collection of journald logs.|
+| docker events 	| `flb_docker_events` 	| Collection of docker events logs, similar to executing the `docker events` command.|
+| web log       	| `flb_web_log` 		| Collection of Apache or Nginx access logs.|
+| generic (tail)	| `flb_generic` 		| Collection of new logs from files by "tailing" them.|
+| syslog socket   	| `flb_syslog`  		| Collection of RFC-3164 syslog logs by creating listening sockets.|
+| serial        	| `flb_serial`  		| Collection of logs from a serial interface.|
 
 <a name="package-requirements"/>
 
@@ -70,7 +76,7 @@ However, there may be some exceptions to this rule as more collectors are added 
 
 <a name="requirements-systemd"/>
 
-### systemd
+### Systemd
 
 </a>
 
@@ -99,7 +105,7 @@ There are some fundamental configuration options that are common to all collecto
 | `enabled` | `no` 		| Whether this log source will be monitored or not.
 | `update every` 		| Equivalent value in `[logs management]` section of `netdata.conf` (or Netdata global value, if higher). | How often collected metrics will be updated.
 | `log type` 			| `flb_generic`	| Type of this log collector, see [relevant table](#collector-types) for a complete list of supported collectors.
-| `circular buffer max size` | Default: equivalent value in `[logs management]` section of `netdata.conf`. | Maximum RAM that can be used to buffer collected logs until they are saved to the disk database.
+| `circular buffer max size` | Equivalent value in `[logs management]` section of `netdata.conf`. | Maximum RAM that can be used to buffer collected logs until they are saved to the disk database.
 | `circular buffer drop logs if full` | Equivalent value in `[logs management]` section of `netdata.conf` (`no` by default). | If there are new logs pending to be collected and the circular buffer is full, enabling this setting will allow old buffered logs to be dropped in favor of new ones. If disabled, collection of new logs will be blocked until there is free space again in the buffer (no logs will be lost in this case, but logs will not be ingested in real-time).
 | `compression acceleration` | Equivalent value in `[logs management]` section of `netdata.conf` (`1` by default). | Fine-tunes tradeoff between log compression speed and compression ratio, see [here](https://github.com/lz4/lz4/blob/90d68e37093d815e7ea06b0ee3c168cccffc84b8/lib/lz4.h#L195) for more details. 
 | `db mode` | Equivalent value in `[logs management]` section of `netdata.conf` (`none` by default). | Mode of logs management database per collector. If set to `none`, logs will be collected, buffered, parsed and then discarded. If set to `full`, buffered logs will be saved to the logs management database instead of being discarded. When mode is `none`, logs management queries cannot be executed.
@@ -121,9 +127,17 @@ Also, the `log path` configuration option must be defined per log source in `log
 
 </a>
 
+<a name="collector-configuration-kmsg"/>
+
+### Kernel logs (kmsg)
+
+</a>
+
+TODO
+
 <a name="collector-configuration-systemd"/>
 
-### systemd
+### Systemd
 
 </a>
 
@@ -135,7 +149,7 @@ Also, the `log path` configuration option must be defined per log source in `log
 
 <a name="collector-configuration-docker-events"/>
 
-### docker events
+### Docker events
 
 </a>
 
@@ -145,7 +159,7 @@ Also, the `log path` configuration option must be defined per log source in `log
 
 <a name="collector-configuration-web-log"/>
 
-### web log
+### Web log
 
 </a>
 
@@ -153,13 +167,15 @@ Also, the `log path` configuration option must be defined per log source in `log
 
 <a name="collector-configuration-syslog"/>
 
-### syslog
+### Syslog socket
 
 </a>
 
+This collector will collect logs through a Unix socket server (UDP or TCP) or over the network using TCP or UDP. See also documentation of [Fluent Bit syslog input plugin](https://docs.fluentbit.io/manual/v/1.9-pre/pipeline/inputs/syslog).
+
 |  Configuration Option | Description  |
 |      :------------:  	| ------------ |
-|`mode` | Type of socket to be created to listen for incoming syslog messages. Supported modes are: `unix_tcp`, `unix_udp`, `tcp` and `udp`. See also documentation of [Fluent Bit syslog input plugin](https://docs.fluentbit.io/manual/v/1.9-pre/pipeline/inputs/syslog).|
+|`mode` | Type of socket to be created to listen for incoming syslog messages. Supported modes are: `unix_tcp`, `unix_udp`, `tcp` and `udp`.|
 | `log path` | If `mode == unix_tcp` or `mode == unix_udp`, Netdata will create a UNIX socket on this path to listen for syslog messages. Otherwise, this option is not used.|
 | `unix_perm` | If `mode == unix_tcp` or `mode == unix_udp`, this sets the permissions of the generated UNIX socket. Otherwise, this option is not used.|
 | `listen` | If `mode == tcp` or `mode == udp`, this sets the network interface to bind.|
@@ -169,7 +185,7 @@ Also, the `log path` configuration option must be defined per log source in `log
 | `severity chart` | Please see the respective [systemd](#collector-configuration-systemd) configuration.|
 | `facility chart` | Please see the respective [systemd](#collector-configuration-systemd) configuration.|
 
- For parsing to work properly, please ensure fields `<PRIVAL>`, `<SYSLOG_TIMESTAMP>`, `<HOSTNAME>`, `<SYSLOG_IDENTIFIER>`, `<PID>` and `<MESSAGE>` are defined in `log format`. For example, to parse incoming `syslog-rfc3164` logs, the following regular expression can be used:
+ For parsing and metrics extraction to work properly, please ensure fields `<PRIVAL>`, `<SYSLOG_TIMESTAMP>`, `<HOSTNAME>`, `<SYSLOG_IDENTIFIER>`, `<PID>` and `<MESSAGE>` are defined in `log format`. For example, to parse incoming `syslog-rfc3164` logs, the following regular expression can be used:
 
 ```
 /^\<(?<PRIVAL>[0-9]+)\>(?<SYSLOG_TIMESTAMP>[^ ]* {1,2}[^ ]* [^ ]* )(?<HOSTNAME>[^ ]*) (?<SYSLOG_IDENTIFIER>[a-zA-Z0-9_\/\.\-]*)(?:\[(?<PID>[0-9]+)\])?(?:[^\:]*\:)? *(?<MESSAGE>.*)$/
@@ -177,9 +193,11 @@ Also, the `log path` configuration option must be defined per log source in `log
 
 <a name="collector-configuration-serial"/>
 
-### serial
+### Serial
 
 </a>
+
+This collector will collect logs through a serial interface. See also documentation of [Fluent Bit serial interface input plugin](https://docs.fluentbit.io/manual/v/1.9-pre/pipeline/inputs/serial-interface).
 
 |  Configuration Option | Description  |
 |      :------------:  	| ------------ |
@@ -253,6 +271,223 @@ And the generated charts based on this configuration:
 
 ![Auth.log](https://user-images.githubusercontent.com/5953192/197003292-13cf2285-c614-42a1-ad5a-896370c22883.PNG)
 
+<a name="streaming"/>
+
+## Streaming
+
+</a>
+
+TODO
+
+_How to configure streaming if child is Fluent-Bit?_
+
+_How to configure streaming if child is Netdata?_
+
+_What about Fluent-Bit retries, if network is down? Logs received out of order?_
+
+_Compression via gzip_
+
+
+Netdata supports 2 streaming configurations:
+1. `syslog` messages over Unix or network sockets. 
+2. Fluent Bit's [Forward protocol](https://docs.fluentbit.io/manual/pipeline/outputs/forward).
+
+For option 1, please refer to the [syslog collector](#collector-configuration-syslog) section. This section will be focused on using option 2.
+
+A Netdata agent can be used as a logs aggregation parent to listen to `Forward` messages, using either Unix or network sockets. This option is separate to [Netdata's metrics streaming](https://learn.netdata.cloud/docs/deployment-in-production/streaming-and-replication) and can be used independently of whether that's enabled or not (and it uses a different listening socket too). 
+
+To enable this option, `forward in enable = no` must be uncommented and set to `yes`, under `[logs management]` section in `netdata.conf`:
+```
+forward in enable = yes
+# forward in unix path = 
+# forward in unix perm = 0644
+# forward in listen = 0.0.0.0
+# forward in port = 24224
+```
+
+The default settings will listen for incoming `Forward` messages on TCP port 24224. If `forward in unix path` is set to a valid path, `forward in listen` and `forward in port` will be ignored and a unix socket will be created under that path. Make sure that `forward in unix perm` has the correct permissions set for that unix socket. Please also see Fluent Bit's [Forward input plugin documentation](https://docs.fluentbit.io/manual/pipeline/inputs/forward).
+
+The Netdata agent will now listen for incoming `Forward` messages, but by default it won't process or store them. To do that, at least one log collection must be configured in `logsmanagement.conf`, to define how the incoming logs will be processed and stored. This is similar to configuring a local log source, with the difference that `log source = forward` must be set and also a `stream guid` must be defined, matching that of the children log sources. 
+
+The rest of this section contains some examples on how to configure log collections of different types, using a Netdata parent and Fluent Bit children instances. Please use the recommended settings on children instances for parsing on parents to work correctly. Also, note that `Forward` output on children supports optional `gzip` compression, by using the `-p Compress=gzip` configuration parameter, as demonstrated in some examples.
+
+<a name="streaming-systemd"/>
+
+### Example: Systemd log streaming
+
+</a>
+
+Example configuration of an `flb_docker_events` type parent log collection:
+```
+[Forward systemd]
+
+	## Required settings
+	enabled = yes
+	log type = flb_systemd
+
+	## Optional settings, common to all log source. 
+	## Uncomment to override global equivalents.
+	# update every = 1
+	# circular buffer max size MiB = 64
+	# circular buffer drop logs if full = no
+	# compression acceleration = 1
+	# db mode = none
+	# circular buffer flush to db = 6
+	# disk space limit MiB = 500
+
+	## Streaming input settings.
+	log source = forward
+	stream guid = 6ce266f5-2704-444d-a301-2423b9d30735
+
+	## Other settings specific to this log source type
+	priority value chart = yes
+	severity chart = yes
+	facility chart = yes
+```
+
+Any children can be configured as follows:
+```
+fluent-bit -i systemd -p Read_From_Tail=on -p Strip_Underscores=on -o forward -p Compress=gzip -F record_modifier -p 'Record="stream guid" 6ce266f5-2704-444d-a301-2423b9d30735' -m '*'
+```
+
+<a name="streaming-kmsg"/>
+
+### Example: Kernel log streaming
+
+</a>
+
+Example configuration of an `flb_kmsg` type parent log collection:
+```
+[Forward kmsg]
+
+	## Required settings
+	enabled = yes
+	log type = flb_kmsg
+
+	## Optional settings, common to all log source. 
+	## Uncomment to override global equivalents.
+	# update every = 1
+	# circular buffer max size MiB = 64
+	# circular buffer drop logs if full = no
+	# compression acceleration = 1
+	# db mode = none
+	# circular buffer flush to db = 6
+	# disk space limit MiB = 500
+
+	## Streaming input settings.
+	log source = forward
+	stream guid = 6ce266f5-2704-444d-a301-2423b9d30736
+
+	## Other settings specific to this log source type
+	severity chart = yes
+	subsystem chart = yes
+	device chart = yes
+```
+Any children can be configured as follows:
+```
+fluent-bit -i kmsg -o forward -p Compress=gzip -F record_modifier -p 'Record="stream guid" 6ce266f5-2704-444d-a301-2423b9d30736' -m '*'
+```
+
+> **Note**
+> Fluent Bit's `kmsg` input plugin will collect all kernel logs since boot every time it's started up. Normally, when configured as a local source in a Netdata agent, all these initially collected logs will be discarded at startup so they are not duplicated. This is not possible when streaming from a Fluent Bit child, so every time a child is restarted, all kernel logs since boot will be re-collected and streamed again.
+
+<a name="streaming-generic"/>
+
+### Example: Generic log streaming
+
+</a>
+
+This is the most flexible option for a parent log collection, as it allows aggregation of logs from multiple children Fluent Bit instances of different log types. Example configuration of a generic parent log collection:
+
+```
+[Forward collection]
+
+	## Required settings
+	enabled = yes
+	log type = flb_generic
+
+	## Optional settings, common to all log source. 
+	## Uncomment to override global equivalents.
+	# update every = 1
+	# circular buffer max size MiB = 64
+	# circular buffer drop logs if full = no
+	# compression acceleration = 1
+	db mode = full
+	# circular buffer flush to db = 6
+	# disk space limit MiB = 500
+
+	## Streaming input settings.
+	log source = forward
+	stream guid = 6ce266f5-2704-444d-a301-2423b9d30738
+```
+
+Children can be configured to `tail` local logs using Fluent Bit and stream them to the parent:
+```
+fluent-bit -i tail -p Path=/tmp/test.log -p Inotify_Watcher=true -p Refresh_Interval=1 -p Key=msg -o forward -p Compress=gzip -F record_modifier -p 'Record="stream guid" 6ce266f5-2704-444d-a301-2423b9d30738' -m '*'
+```
+
+Children instances do not have to use the `tail` input plugin specifically. Any of the supported log types can be used for the streaming child. The following configuration for example can stream `systemd` logs to the same parent as the configuration above:
+```
+fluent-bit -i systemd -p Read_From_Tail=on -p Strip_Underscores=on -o forward -p Compress=gzip -F record_modifier -p 'Record="stream guid" 6ce266f5-2704-444d-a301-2423b9d30738' -m '*'
+```
+
+The caveat is that an `flb_generic` log collection on a parent won't generate any type-specific charts by default, but [custom charts](#custom-charts) can be of course manually added by the user.
+
+<a name="streaming-docker-events"/>
+
+### Example: Docker Events log streaming
+
+</a>
+
+Example configuration of a `flb_docker_events` type parent log collection:
+```
+[Forward Docker Events]
+
+	## Required settings
+	enabled = yes
+	log type = flb_docker_events
+
+	## Optional settings, common to all log source. 
+	## Uncomment to override global equivalents.
+	# update every = 1
+	# circular buffer max size MiB = 64
+	# circular buffer drop logs if full = no
+	# compression acceleration = 1
+	# db mode = none
+	# circular buffer flush to db = 6
+	# disk space limit MiB = 500
+
+	## Streaming input settings.
+	log source = forward
+	stream guid = 6ce266f5-2704-444d-a301-2423b9d30737
+
+	## Other settings specific to this log source type
+	event type chart = yes
+```
+
+Any children streaming to this collection must be set up to use one of the [default `json` or `docker` parsers](https://github.com/fluent/fluent-bit/blob/master/conf/parsers.conf), to send the collected log as structured messages, so they can be parsed by the parent:
+
+```
+fluent-bit -R ~/fluent-bit/conf/parsers.conf -i docker_events -p Parser=json -o forward -F record_modifier -p 'Record="stream guid 6ce266f5-2704-444d-a301-2423b9d30737' -m '*'
+``` 
+or
+```
+fluent-bit -R ~/fluent-bit/conf/parsers.conf -i docker_events -p Parser=docker -o forward -F record_modifier -p 'Record="stream guid 6ce266f5-2704-444d-a301-2423b9d30737' -m '*'
+```
+
+If instead the user desires to stream to a parent that collects logs into an `flb_generic` log collection, then a parser is not necessary and the unstructured logs can also be streamed in their original JSON format:
+```
+fluent-bit -i docker_events -o forward -F record_modifier -p 'Record="stream guid 6ce266f5-2704-444d-a301-2423b9d30737' -m '*'
+```
+
+Logs will appear in the parent in their unstructured format:
+
+```
+{"status":"create","id":"de2432a4f00bd26a4899dde5633bb16090a4f367c36f440ebdfdc09020cb462d","from":"hello-world","Type":"container","Action":"create","Actor":{"ID":"de2432a4f00bd26a4899dde5633bb16090a4f367c36f440ebdfdc09020cb462d","Attributes":{"image":"hello-world","name":"lucid_yalow"}},"scope":"local","time":1680263414,"timeNano":1680263414473911042}
+```
+
+</a>
+
 <a name="troubleshooting"/>
 
 ## Troubleshooting
@@ -267,7 +502,8 @@ If during the Fluent Bit build step you are seeing the following message:
 ``` 
 it means that the systemd development libraries are missing from your system. Please see [systemd collector](#requirements-systemd-collector).
 
-2. Logs management does not work at all and I am seeing the following error in the logs:
+2. Logs management and kernel log collection do not work at all and I am seeing the following error in `collector.log`:
+
 ```
 [2020/10/20 10:39:06] [error] [plugins/in_kmsg/in_kmsg.c:291 errno=1] Operation not permitted
 [2020/10/20 10:39:06] [error] Failed initialize input kmsg.0
@@ -276,3 +512,7 @@ Netdata is executed without root permissions, so the kernel ring buffer logs may
 ```
 sudo sysctl kernel.dmesg_restrict=0
 ```
+
+<!-- 3. The timestamp of some of the collected log records is wrong.
+
+Some collection cycles may include log records with timestamps _preceding_ the cycle collection timestamp. This is expected, as the collection datetime is used instead of each log record's timestamp. -->

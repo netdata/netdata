@@ -19,6 +19,8 @@
 
 #define MAX_CUS_CHARTS_PER_SOURCE 100               /**< Hard limit of maximum custom charts per log source **/
 
+#define MAX_OUTPUTS_PER_SOURCE 100                  /**< Hard limit of maximum Fluent Bit outputs per log source **/
+
 /* -------------------------------------------------------------------------- */
 
 

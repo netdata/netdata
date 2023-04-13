@@ -13,14 +13,23 @@
 #include "parser.h"
 
 // Cool trick --> http://userpage.fu-berlin.de/~ram/pub/pub_jf47ht81Ht/c_preprocessor_applications_en
+/* WARNING: DO NOT CHANGED THE ORDER OF LOG_SRC_TYPES, ONLY APPEND NEW TYPES */
 #define LOG_SRC_TYPES   LST(GENERIC)LST(WEB_LOG)LST(FLB_GENERIC) \
                         LST(FLB_WEB_LOG)LST(FLB_KMSG)LST(FLB_SYSTEMD) \
                         LST(FLB_DOCKER_EV)LST(FLB_SYSLOG)LST(FLB_SERIAL)
 #define LST(x) x,
-enum log_source_t {LOG_SRC_TYPES};
+enum log_src_type_t {LOG_SRC_TYPES};
 #undef LST
 #define LST(x) #x,   
-static const char * const log_source_t_str[] = {LOG_SRC_TYPES};
+static const char * const log_src_type_t_str[] = {LOG_SRC_TYPES};
+#undef LST
+
+#define LOG_SRCS    LST(LOG_SOURCE_LOCAL)LST(LOG_SOURCE_FORWARD)
+#define LST(x) x,
+enum log_src_t {LOG_SRCS};
+#undef LST
+#define LST(x) #x,   
+static const char * const log_src_t_str[] = {LOG_SRCS};
 #undef LST
 
 // Forward declaration to break circular dependency
@@ -34,6 +43,30 @@ typedef struct flb_serial_config {
     char *format;
 } Flb_serial_config_t;
 
+typedef struct flb_socket_config {
+    char *mode;
+    char *unix_path;
+    char *unix_perm;
+    char *listen;
+    char *port;
+} Flb_socket_config_t;
+
+typedef struct syslog_parser_config {
+    char *log_format;
+    Flb_socket_config_t *socket_config;
+} Syslog_parser_config_t;
+
+typedef struct flb_output_config {
+    char *plugin;                                   /**< Fluent Bit output plugin name, see: https://docs.fluentbit.io/manual/pipeline/outputs **/
+    int id;                                         /**< Incremental id of plugin configuration in linked list, starting from 1 **/
+    struct flb_output_config_param {
+        char *key;                                  /**< Key of the parameter configuration **/
+        char *val;                                  /**< Value of the parameter configuration **/
+        struct flb_output_config_param *next;       /**< Next output parameter configuration in the linked list of parameters **/
+    } *param;
+    struct flb_output_config *next;                 /**< Next output plugin configuration in the linked list of output plugins **/
+} Flb_output_config_t;
+
 struct File_info {
     /* TODO: Struct needs refactoring, as a lot of members take up memory that
      * is not used, depending on the type of the log source. */
@@ -42,7 +75,9 @@ struct File_info {
     const char *chart_name;                         /**< Top level chart name for this log source on web dashboard **/ 
     char *filename;                                 /**< Full path of log source **/
     const char *file_basename;                      /**< Basename of log source **/
-    enum log_source_t log_type;                     /**< Defines type of log source - see enum log_source_t options **/
+    const char *stream_guid;                        /**< Streaming input GUID **/
+    enum log_src_t log_source;                      /**< Defines log source - see enum log_src_t for options **/
+    enum log_src_type_t log_type;                   /**< Defines type of log source - see enum log_src_type_t for options **/
     struct Circ_buff *circ_buff;                    /**< Associated circular buffer - only one should exist per log source. **/
     int compression_accel;                          /**< LZ4 compression acceleration factor for collected logs, see also: https://github.com/lz4/lz4/blob/90d68e37093d815e7ea06b0ee3c168cccffc84b8/lib/lz4.h#L195 **/
     int update_every;                               /**< Interval (in sec) of how often to collect and update charts **/
@@ -84,7 +119,7 @@ struct File_info {
     /* Struct members related to Fluent-Bit inputs, filters, buffers, outputs */
     int flb_input;                                  /**< Fluent-bit input interface property for this log source **/
     int flb_parser;                                 /**< Fluent-bit parser interface property for this log source **/
-    int flb_output;                                 /**< Fluent-bit output interface property for this log source **/
+    int flb_lib_output;                             /**< Fluent-bit "lib" output interface property for this log source **/
     void *flb_config;                               /**< Any other Fluent-Bit configuration specific to this log source only **/
     uv_mutex_t flb_tmp_buff_mut;
     uv_timer_t flb_tmp_buff_cpy_timer;
@@ -92,12 +127,17 @@ struct File_info {
     Kernel_metrics_t flb_tmp_kernel_metrics;        /**< Temporarily store Kernel log metrics after each extraction in flb_write_to_buff_cb(), until they are synced to parser_metrics->kernel **/
     Systemd_metrics_t flb_tmp_systemd_metrics;      /**< Temporarily store Systemd metrics after each extraction in flb_write_to_buff_cb(), until they are synced to parser_metrics->systemd **/
     Docker_ev_metrics_t flb_tmp_docker_ev_metrics;  /**< Temporarily store Docker Events metrics after each extraction in flb_write_to_buff_cb(), until they are synced to parser_metrics->docker_ev **/
+    Flb_output_config_t *flb_outputs;               /**< Linked list of Fluent Bit outputs for this log source **/
+
 };
 
 struct File_infos_arr {
-    // TODO: What is the maximum number of log files we can be monitoring? Currently limited only by fs_events_reenable_list
     struct File_info **data;
     uint8_t count;                                  /**< Number of items in array **/
+
+    /* Related to tail_plugin.c */
+    /* TODO: What is the maximum number of log files we can be monitoring? 
+     * Currently limited only by fs_events_reenable_list */
     uint64_t fs_events_reenable_list;               /**< Binary list indicating offset of file to attempt to reopen in File_infos_arr. Up to 64 files. **/
     uv_mutex_t fs_events_reenable_lock;             /**< Mutex for fs_events_reenable_list **/
     uv_cond_t fs_events_reenable_cond;              /**< Condition variable for fs_events_reenable_list **/

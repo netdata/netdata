@@ -432,11 +432,12 @@ int db_init() {
     /* Create new main DB LogCollections table if it doesn't exist */
     rc = sqlite3_exec(main_db,
                       "CREATE TABLE IF NOT EXISTS " MAIN_COLLECTIONS_TABLE "("
-                      "Id 					INTEGER 	PRIMARY KEY,"
-                      "Machine_GUID			TEXT		NOT NULL,"
-                      "Log_Source_Path		TEXT		NOT NULL,"
-                      "Type					INTEGER		NOT NULL,"
-                      "DB_Dir 				TEXT 		NOT NULL"
+                      "Id               INTEGER     PRIMARY KEY,"
+                      "Stream_Tag       TEXT        NOT NULL,"
+                      "Log_Source_Path  TEXT        NOT NULL,"
+                      "Type             INTEGER     NOT NULL,"
+                      "DB_Dir           TEXT        NOT NULL,"
+                      "UNIQUE(Stream_Tag, Log_Source_Path) "
                       ");",
                       0, 0, &err_msg);
     if (unlikely(rc != SQLITE_OK)) {
@@ -449,14 +450,14 @@ int db_init() {
     sqlite3_stmt *stmt_search_if_log_source_exists;
     rc = sqlite3_prepare_v2(main_db,
                             "SELECT COUNT(*), Id, DB_Dir FROM " MAIN_COLLECTIONS_TABLE
-                            " WHERE Log_Source_Path = ? ;",
+                            " WHERE Stream_Tag = ? AND Log_Source_Path = ? ;",
                             -1, &stmt_search_if_log_source_exists, NULL);
     if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(MAIN_DB, rc, __LINE__);
     
     sqlite3_stmt *stmt_insert_log_collection_metadata;
     rc = sqlite3_prepare_v2(main_db,
                             "INSERT INTO " MAIN_COLLECTIONS_TABLE
-                            " (Machine_GUID, Log_Source_Path, Type, DB_Dir) VALUES (?,?,?,?) ;",
+                            " (Stream_Tag, Log_Source_Path, Type, DB_Dir) VALUES (?,?,?,?) ;",
                             -1, &stmt_insert_log_collection_metadata, NULL);
     if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(MAIN_DB, rc, __LINE__);
     
@@ -478,7 +479,9 @@ int db_init() {
             if (unlikely(rc)) fatal_libuv_err(rc, __LINE__);
             uv_mutex_lock(p_file_info->db_mut);
 
-            rc = sqlite3_bind_text(stmt_search_if_log_source_exists, 1, p_file_info->filename, -1, NULL);
+            rc = sqlite3_bind_text(stmt_search_if_log_source_exists, 1, p_file_info->stream_guid, -1, NULL);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
+            rc = sqlite3_bind_text(stmt_search_if_log_source_exists, 2, p_file_info->filename, -1, NULL);
             if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             rc = sqlite3_step(stmt_search_if_log_source_exists);
             /* COUNT(*) query should always return SQLITE_ROW */
@@ -489,8 +492,8 @@ int db_init() {
             switch (log_source_occurences) {
                 case 0:  /* Log collection metadata not found in main DB - create a new record */
                     
-                    /* Bind machine GUID */
-                    rc = sqlite3_bind_text(stmt_insert_log_collection_metadata, 1, localhost->machine_guid, -1, NULL);
+                    /* Bind stream GUID */
+                    rc = sqlite3_bind_text(stmt_insert_log_collection_metadata, 1, p_file_info->stream_guid, -1, NULL);
                     if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
 
                     /* Bind log source path */
@@ -599,9 +602,9 @@ int db_init() {
                 /* 1. Create it */
                 rc = sqlite3_exec(p_file_info->db,
                         "CREATE TABLE IF NOT EXISTS " BLOBS_TABLE "("
-                        "Id 		INTEGER 	PRIMARY KEY,"
-                        "Filename	TEXT		NOT NULL,"
-                        "Filesize INTEGER 	NOT NULL"
+                        "Id         INTEGER     PRIMARY KEY,"
+                        "Filename   TEXT        NOT NULL,"
+                        "Filesize   INTEGER     NOT NULL"
                         ");",
                         0, 0, &err_msg);
                 if (unlikely(rc != SQLITE_OK)) {
@@ -639,12 +642,12 @@ int db_init() {
             /* If LOGS_TABLE doesn't exist, create it */
             rc = sqlite3_exec(p_file_info->db,
                         "CREATE TABLE IF NOT EXISTS " LOGS_TABLE "("
-                        "Id 					INTEGER 	PRIMARY KEY,"
-                        "FK_BLOB_Id			INTEGER		NOT NULL,"
-                        "BLOB_Offset			INTEGER		NOT NULL,"
-                        "Timestamp 			INTEGER		NOT NULL,"
-                        "Msg_compr_size 		INTEGER		NOT NULL,"
-                        "Msg_decompr_size 	INTEGER		NOT NULL,"
+                        "Id                 INTEGER     PRIMARY KEY,"
+                        "FK_BLOB_Id         INTEGER     NOT NULL,"
+                        "BLOB_Offset        INTEGER     NOT NULL,"
+                        "Timestamp          INTEGER     NOT NULL,"
+                        "Msg_compr_size     INTEGER     NOT NULL,"
+                        "Msg_decompr_size   INTEGER     NOT NULL,"
                         "FOREIGN KEY (FK_BLOB_Id) REFERENCES " BLOBS_TABLE " (Id) ON DELETE CASCADE ON UPDATE CASCADE"
                         ");",
                         0, 0, &err_msg);
