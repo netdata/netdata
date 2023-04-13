@@ -564,14 +564,11 @@ static void ebpf_stop_threads(int sig)
         return;
     }
     only_one = 1;
-    for (i = 0; ebpf_threads[i].name != NULL; i++) {
-        if (ebpf_threads[i].enabled != NETDATA_THREAD_EBPF_STOPPED)
-            netdata_thread_cancel(*ebpf_threads[i].thread);
-    }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     ebpf_exit_plugin = 1;
     usec_t max = USEC_PER_SEC, step = 100000;
+    i = EBPF_OPTION_ALL_CHARTS;
     while (i && max) {
         max -= step;
         sleep_usec(step);
