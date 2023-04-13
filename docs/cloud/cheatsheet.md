@@ -105,7 +105,7 @@ sudo ./edit-config netdata.conf
 sudo ./edit-config go.d.conf # edit a plugin's config
 ```
 
-```conf
+```yaml
 modules:
  activemq: no # disabled
  cockroachdb: yes # enabled
