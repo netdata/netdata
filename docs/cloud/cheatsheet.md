@@ -232,8 +232,8 @@ separately from similar instances. Example, disks named
 **Contexts**: A grouping of charts based on the types of metrics collected and visualized.
 **disk.io**, **disk.ops**, and **disk.backlog** are all contexts. -->
 
----
----
----
----
----
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
