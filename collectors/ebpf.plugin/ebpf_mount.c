@@ -18,8 +18,6 @@ struct config mount_config = { .first_section = NULL, .last_section = NULL, .mut
                                .index = {.avl_tree = { .root = NULL, .compar = appconfig_section_compare },
                                          .rwlock = AVL_LOCK_INITIALIZER } };
 
-static netdata_idx_t *mount_values = NULL;
-
 static netdata_idx_t mount_hash_values[NETDATA_MOUNT_END];
 
 netdata_ebpf_targets_t mount_targets[] = { {.name = "mount", .mode = EBPF_LOAD_TRAMPOLINE},
@@ -231,8 +229,6 @@ static void ebpf_mount_free(ebpf_module_t *em)
     em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-    freez(mount_values);
-
 #ifdef LIBBPF_MAJOR_VERSION
     if (bpf_obj)
         mount_bpf__destroy(bpf_obj);
@@ -269,6 +265,10 @@ static void ebpf_mount_exit(void *ptr)
  */
 static void ebpf_mount_read_global_table()
 {
+    static netdata_idx_t *mount_values = NULL;
+    if (!mount_values)
+        mount_values = callocz((size_t)ebpf_nprocs + 1, sizeof(netdata_idx_t));
+
     uint32_t idx;
     netdata_idx_t *val = mount_hash_values;
     netdata_idx_t *stored = mount_values;
@@ -311,7 +311,6 @@ static void ebpf_mount_send_data()
 */
 static void mount_collector(ebpf_module_t *em)
 {
-    mount_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
     memset(mount_hash_values, 0, sizeof(mount_hash_values));
 
     heartbeat_t hb;
