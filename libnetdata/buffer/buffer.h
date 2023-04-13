@@ -152,6 +152,35 @@ static inline void _buffer_json_depth_pop(BUFFER *wb) {
     wb->json.depth--;
 }
 
+static inline void buffer_fast_charcat(BUFFER *wb, const char c) {
+
+    buffer_need_bytes(wb, 2);
+    *(&wb->buffer[wb->len]) = c;
+    wb->len += 1;
+    wb->buffer[wb->len] = '\0';
+
+    buffer_overflow_check(wb);
+}
+
+static inline void buffer_fast_rawcat(BUFFER *wb, const char *txt, size_t len) {
+    if(unlikely(!txt || !*txt || !len)) return;
+
+    buffer_need_bytes(wb, len + 1);
+
+    const char *t = txt;
+    const char *e = &txt[len];
+
+    char *d = &wb->buffer[wb->len];
+
+    while(t != e)
+        *d++ = *t++;
+
+    wb->len += len;
+    wb->buffer[wb->len] = '\0';
+
+    buffer_overflow_check(wb);
+}
+
 static inline void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
     if(unlikely(!txt || !*txt || !len)) return;
 
