@@ -393,32 +393,30 @@ static void pipe_write_cb(uv_write_t* req, int status)
 
     uv_close((uv_handle_t *)client, pipe_close_cb);
     --clients;
-    freez(client->data);
+    buffer_free(client->data);
     info("Command Clients = %u\n", clients);
 }
 
-static inline void add_char_to_command_reply(char *reply_string, unsigned *reply_string_size, char character)
+static inline void add_char_to_command_reply(BUFFER *reply_string, unsigned *reply_string_size, char character)
 {
-    reply_string[(*reply_string_size)++] = character;
+    buffer_fast_charcat(reply_string, character);
+    *reply_string_size +=1;
 }
 
-static inline void add_string_to_command_reply(char *reply_string, unsigned *reply_string_size, char *str)
+static inline void add_string_to_command_reply(BUFFER *reply_string, unsigned *reply_string_size, char *str)
 {
     unsigned len;
 
     len = strlen(str);
-
-    if (MAX_COMMAND_LENGTH - 1 < len + *reply_string_size)
-        len = MAX_COMMAND_LENGTH - *reply_string_size - 1;
-
-    strncpyz(reply_string + *reply_string_size, str, len);
+    buffer_fast_strcat(reply_string, str, len);
     *reply_string_size += len;
 }
 
 static void send_command_reply(struct command_context *cmd_ctx, cmd_status_t status, char *message)
 {
     int ret;
-    char *reply_string = mallocz(MAX_COMMAND_LENGTH);
+    BUFFER *reply_string = buffer_create(128, NULL);
+
     char exit_status_string[MAX_EXIT_STATUS_LENGTH + 1] = {'\0', };
     unsigned reply_string_size = 0;
     uv_buf_t write_buf;
@@ -436,13 +434,12 @@ static void send_command_reply(struct command_context *cmd_ctx, cmd_status_t sta
 
     cmd_ctx->write_req.data = client;
     client->data = reply_string;
-    write_buf.base = reply_string;
+    write_buf.base = reply_string->buffer;
     write_buf.len = reply_string_size;
     ret = uv_write(&cmd_ctx->write_req, (uv_stream_t *)client, &write_buf, 1, pipe_write_cb);
     if (ret) {
         error("uv_write(): %s", uv_strerror(ret));
     }
-    info("COMMAND: Sending reply: \"%s\"", reply_string);
 }
 
 cmd_status_t execute_command(cmd_t idx, char *args, char **message)
