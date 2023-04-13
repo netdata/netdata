@@ -47,6 +47,7 @@ static cmd_status_t cmd_write_config_execute(char *args, char **message);
 static cmd_status_t cmd_ping_execute(char *args, char **message);
 static cmd_status_t cmd_aclk_state(char *args, char **message);
 static cmd_status_t cmd_version(char *args, char **message);
+static cmd_status_t cmd_dumpconfig(char *args, char **message);
 
 static command_info_t command_info_array[] = {
         {"help", cmd_help_execute, CMD_TYPE_HIGH_PRIORITY},                  // show help menu
@@ -61,7 +62,8 @@ static command_info_t command_info_array[] = {
         {"write-config", cmd_write_config_execute, CMD_TYPE_ORTHOGONAL},
         {"ping", cmd_ping_execute, CMD_TYPE_ORTHOGONAL},
         {"aclk-state", cmd_aclk_state, CMD_TYPE_ORTHOGONAL},
-        {"version", cmd_version, CMD_TYPE_ORTHOGONAL}
+        {"version", cmd_version, CMD_TYPE_ORTHOGONAL},
+        {"dumpconfig", cmd_dumpconfig, CMD_TYPE_ORTHOGONAL}
 };
 
 /* Mutexes for commands of type CMD_TYPE_ORTHOGONAL */
@@ -127,6 +129,8 @@ static cmd_status_t cmd_help_execute(char *args, char **message)
              "    Return with 'pong' if agent is alive.\n"
              "aclk-state [json]\n"
              "    Returns current state of ACLK and Cloud connection. (optionally in json).\n"
+             "dumpconfig\n"
+             "    Returns the current netdata.conf\n"
              "version\n"
              "    Returns the netdata version.\n",
              MAX_COMMAND_LENGTH - 1);
@@ -327,6 +331,17 @@ static cmd_status_t cmd_version(char *args, char **message)
 
     *message = strdupz(version);
 
+    return CMD_STATUS_SUCCESS;
+}
+
+static cmd_status_t cmd_dumpconfig(char *args, char **message)
+{
+    (void)args;
+
+    BUFFER *wb = buffer_create(1024, NULL);
+    config_generate(wb, 0);
+    *message = strdupz(buffer_tostring(wb));
+    buffer_free(wb);
     return CMD_STATUS_SUCCESS;
 }
 
