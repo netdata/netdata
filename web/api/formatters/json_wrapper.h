@@ -15,4 +15,7 @@ void rrdr_json_wrapper_end(RRDR *r, BUFFER *wb);
 void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb);
 void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb);
 
+struct query_versions;
+void version_hashes_api_v2(BUFFER *wb, struct query_versions *versions);
+
 #endif //NETDATA_API_FORMATTER_JSON_WRAPPER_H

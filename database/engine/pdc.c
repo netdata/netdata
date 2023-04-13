@@ -1151,6 +1151,9 @@ static inline void datafile_extent_read_free(void *buffer) {
 }
 
 void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *epdl, bool worker) {
+    if(worker)
+        worker_is_busy(UV_EVENT_DBENGINE_EXTENT_CACHE_LOOKUP);
+
     size_t *statistics_counter = NULL;
     PDC_PAGE_STATUS not_loaded_pages_tag = 0, loaded_pages_tag = 0;
 
@@ -1172,9 +1175,6 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
         not_loaded_pages_tag = PDC_PAGE_CANCELLED;
         goto cleanup;
     }
-
-    if(worker)
-        worker_is_busy(UV_EVENT_DBENGINE_EXTENT_CACHE_LOOKUP);
 
     bool extent_found_in_cache = false;
 

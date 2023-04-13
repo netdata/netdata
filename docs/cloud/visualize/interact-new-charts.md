@@ -1,5 +1,7 @@
 # Interact with charts
 
+Learn how to use Netdata's powerful charts to troubleshoot with real-time, per-second metric data.
+
 Netdata excels in collecting, storing, and organizing metrics in out-of-the-box dashboards.
 To make sense of all the metrics, Netdata offers an enhanced version of charts that update every second.
 
@@ -193,7 +195,7 @@ following:
 :::
 
 For more details on each, you can refer to our Agent's HTTP API details
-on [Data Queries - Data Grouping](/docs/agent/web/api/queries#data-grouping).
+on [Data Queries - Data Grouping](https://github.com/netdata/netdata/blob/master/web/api/queries/README.md#data-grouping).
 
 ### Reset to defaults
 

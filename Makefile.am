@@ -714,8 +714,6 @@ ACLK_FILES = \
     aclk/aclk_alarm_api.h \
     aclk/aclk_contexts_api.c \
     aclk/aclk_contexts_api.h \
-    aclk/aclk_capas.c \
-    aclk/aclk_capas.h \
     aclk/helpers/mqtt_wss_pal.h \
     aclk/helpers/ringbuffer_pal.h \
     aclk/schema-wrappers/connection.cc \
@@ -861,6 +859,8 @@ ACLK_ALWAYS_BUILD_FILES = \
     aclk/aclk_proxy.h \
     aclk/aclk.c \
     aclk/aclk.h \
+    aclk/aclk_capas.c \
+    aclk/aclk_capas.h \
     $(NULL)
 
 SPAWN_PLUGIN_FILES = \

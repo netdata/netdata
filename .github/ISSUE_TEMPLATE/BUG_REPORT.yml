@@ -51,12 +51,11 @@ body:
         Describe the method in the "Additional info" section if you chose "other".
       options:
         - "kickstart.sh"
-        - "kickstart-static64.sh"
-        - "native binary packages (.deb/.rpm)"
-        - "from git"
-        - "from source"
         - "docker"
         - "helmchart (kubernetes)"
+        - "manual setup of official DEB/RPM packages"
+        - "from git"
+        - "from source"
         - "other"
     validations:
       required: true

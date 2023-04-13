@@ -158,7 +158,7 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
             STORAGE_ENGINE *eng = st->rrdhost->db[tier].eng;
             if(!eng) continue;
 
-            st->storage_metrics_groups[tier] = eng->api.collect_ops.metrics_group_get(host->db[tier].instance, &st->chart_uuid);
+            st->storage_metrics_groups[tier] = storage_engine_metrics_group_get(eng->backend, host->db[tier].instance, &st->chart_uuid);
         }
     }
 
@@ -203,7 +203,7 @@ void rrdset_finalize_collection(RRDSET *st, bool dimensions_too) {
         if(!eng) continue;
 
         if(st->storage_metrics_groups[tier]) {
-            eng->api.collect_ops.metrics_group_release(host->db[tier].instance, st->storage_metrics_groups[tier]);
+            storage_engine_metrics_group_release(eng->backend, host->db[tier].instance, st->storage_metrics_groups[tier]);
             st->storage_metrics_groups[tier] = NULL;
         }
     }
@@ -741,10 +741,8 @@ void rrdset_reset(RRDSET *st) {
         rd->collections_counter = 0;
 
         if(!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-            for(size_t tier = 0; tier < storage_tiers ;tier++) {
-                if(rd->tiers[tier].db_collection_handle)
-                    rd->tiers[tier].collect_ops->flush(rd->tiers[tier].db_collection_handle);
-            }
+            for(size_t tier = 0; tier < storage_tiers ;tier++)
+                storage_engine_store_flush(rd->tiers[tier].db_collection_handle);
         }
     }
     rrddim_foreach_done(rd);
@@ -1120,7 +1118,7 @@ void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAG
 
         if (likely(!storage_point_is_unset(t->virtual_point))) {
 
-            t->collect_ops->store_metric(
+            storage_engine_store_metric(
                 t->db_collection_handle,
                 t->next_point_end_time_s * USEC_PER_SEC,
                 t->virtual_point.sum,
@@ -1131,7 +1129,7 @@ void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAG
                 t->virtual_point.flags);
         }
         else {
-            t->collect_ops->store_metric(
+            storage_engine_store_metric(
                 t->db_collection_handle,
                 t->next_point_end_time_s * USEC_PER_SEC,
                 NAN,
@@ -1203,7 +1201,10 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
 #endif // NETDATA_LOG_COLLECTION_ERRORS
 
     // store the metric on tier 0
-    rd->tiers[0].collect_ops->store_metric(rd->tiers[0].db_collection_handle, point_end_time_ut, n, 0, 0, 1, 0, flags);
+    storage_engine_store_metric(rd->tiers[0].db_collection_handle, point_end_time_ut,
+                                n, 0, 0,
+                                1, 0, flags);
+
     rrdset_done_statistics_points_stored_per_tier[0]++;
 
     time_t now_s = (time_t)(point_end_time_ut / USEC_PER_SEC);
@@ -1981,7 +1982,9 @@ time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
     rrddim_foreach_read(rd, st) {
         for (size_t tier = 0; tier < storage_tiers; tier++) {
             if (rd->tiers[tier].db_collection_handle)
-                rd->tiers[tier].collect_ops->change_collection_frequency(rd->tiers[tier].db_collection_handle, (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
+                storage_engine_store_change_collection_frequency(
+                        rd->tiers[tier].db_collection_handle,
+                        (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
         }
 
         assert(rd->update_every == (int) prev_update_every_s &&

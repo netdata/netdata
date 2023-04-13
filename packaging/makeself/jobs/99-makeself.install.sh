@@ -29,7 +29,6 @@ run cp \
   packaging/makeself/install-or-update.sh \
   packaging/installer/functions.sh \
   configs.signatures \
-  system/logrotate/netdata \
   "${NETDATA_INSTALL_PATH}/system/"
 
 # -----------------------------------------------------------------------------
@@ -60,6 +59,14 @@ run rm "${NETDATA_INSTALL_PATH}/sbin" \
   "${NETDATA_INSTALL_PATH}/usr/bin" \
   "${NETDATA_INSTALL_PATH}/usr/sbin" \
   "${NETDATA_INSTALL_PATH}/usr/local"
+
+# -----------------------------------------------------------------------------
+# ensure required directories actually exist
+
+for dir in var/lib/netdata var/cache/netdata var/log/netdata ; do
+    run mkdir -p "${NETDATA_INSTALL_PATH}/${dir}"
+    run touch "${NETDATA_INSTALL_PATH}/${dir}/.keep"
+done
 
 # -----------------------------------------------------------------------------
 # create the makeself archive

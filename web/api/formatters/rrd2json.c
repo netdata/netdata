@@ -3,18 +3,6 @@
 #include "web/api/web_api_v1.h"
 #include "database/storage_engine.h"
 
-inline bool query_target_has_percentage_units(struct query_target *qt) {
-    if(qt->request.options & RRDR_OPTION_PERCENTAGE ||
-       qt->request.time_group_method == RRDR_GROUPING_CV)
-        return true;
-
-    return false;
-}
-
-bool query_target_aggregatable(struct query_target *qt) {
-    return (qt->request.options & RRDR_OPTION_RETURN_RAW);
-}
-
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb) {
     rrdset2json(st, wb, NULL, NULL, 0);
 }
@@ -174,7 +162,6 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
     }
 
     RRDR *r = rrd2rrdr(owa, qt);
-    qt->timings.executed_ut = now_monotonic_usec();
 
     if(!r) {
         buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
@@ -195,9 +182,7 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         *latest_timestamp = r->view.before;
 
     DATASOURCE_FORMAT format = qt->request.format;
-    RRDR_OPTIONS options = qt->request.options;
-
-    qt->timings.group_by_ut = now_monotonic_usec();
+    RRDR_OPTIONS options = qt->window.options;
 
     switch(format) {
     case DATASOURCE_SSV:

@@ -437,7 +437,7 @@ static void rrdpush_receiver_replication_reset(RRDHOST *host) {
     rrdhost_receiver_replicating_charts_zero(host);
 }
 
-bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
+static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
     bool signal_rrdcontext = false;
     bool set_this = false;
 
@@ -472,6 +472,7 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         rrdpush_receiver_replication_reset(host);
 
         rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
+        aclk_queue_node_info(rpt->host, true);
 
         set_this = true;
     }

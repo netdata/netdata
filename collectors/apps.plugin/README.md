@@ -9,7 +9,8 @@ learn_rel_path: "Integrations/Monitor/System metrics"
 
 # Application monitoring (apps.plugin)
 
-`apps.plugin` breaks down system resource usage to **processes**, **users** and **user groups**.
+`apps.plugin` breaks down system resource usage to **processes**, **users** and **user groups**.  
+It is enabled by default on every Netdata installation.
 
 To achieve this task, it iterates through the whole process tree, collecting resource usage information
 for every process found running.

@@ -72,7 +72,7 @@ struct aclk_database_cmdqueue {
 struct aclk_sync_host_config {
     RRDHOST *host;
     int alert_updates;
-    int node_info_send;
+    time_t node_info_send_time;
     time_t node_collectors_send;
     char uuid_str[UUID_STR_LEN];
     char node_id[UUID_STR_LEN];
@@ -91,7 +91,7 @@ static inline RRDHOST *find_host_by_node_id(char *node_id)
     rrd_rdlock();
     RRDHOST *host, *ret = NULL;
     rrdhost_foreach_read(host) {
-        if (host->node_id && !(uuid_compare(*host->node_id, node_uuid))) {
+        if (host->node_id && !(uuid_memcmp(host->node_id, &node_uuid))) {
             ret = host;
             break;
         }

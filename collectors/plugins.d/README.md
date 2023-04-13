@@ -138,7 +138,7 @@ a single program can produce any number of charts with any number of dimensions 
 
 Charts can be added any time (not just the beginning).
 
-### command line parameters
+### Command line parameters
 
 The plugin **MUST** accept just **one** parameter: **the number of seconds it is
 expected to update the values for its charts**. The value passed by Netdata
@@ -149,7 +149,7 @@ The external plugin can overwrite the update frequency. For example, the server 
 request per second updates, but the plugin may ignore it and update its charts
 every 5 seconds.
 
-### environment variables
+### Environment variables
 
 There are a few environment variables that are set by `netdata` and are
 available for the plugin to use.

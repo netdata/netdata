@@ -73,8 +73,6 @@ static void build_node_info(char *node_id __maybe_unused)
         return;
     }
 
-    wc->node_info_send = 1;
-
     rrd_rdlock();
     node_info.node_id = wc->node_id;
     node_info.claim_id = get_agent_claimid();
@@ -146,22 +144,23 @@ void aclk_check_node_info_and_collectors(void)
     if (unlikely(!aclk_connected))
         return;
 
+    size_t pending = 0;
     dfe_start_reentrant(rrdhost_root_index, host) {
 
-        if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
-            info("ACLK: 'host:%s' not sending node info, context load is pending", rrdhost_hostname(host));
-            continue;
-        }
-
         struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
-
         if (unlikely(!wc))
             continue;
 
-        if (wc->node_info_send) {
+        if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
+            internal_error(true, "ACLK SYNC: Context still pending for %s", rrdhost_hostname(host));
+            pending++;
+            continue;
+        }
+
+        if (wc->node_info_send_time && wc->node_info_send_time + 30 < now_realtime_sec()) {
+            wc->node_info_send_time = 0;
             build_node_info(strdupz(wc->node_id));
             internal_error(true, "ACLK SYNC: Sending node info for %s", rrdhost_hostname(host));
-            wc->node_info_send = 0;
         }
 
         if (wc->node_collectors_send && wc->node_collectors_send + 30 < now_realtime_sec()) {
@@ -171,6 +170,9 @@ void aclk_check_node_info_and_collectors(void)
         }
     }
     dfe_done(host);
+
+    if(pending)
+        info("ACLK: %zu nodes are pending for contexts to load, skipped sending node info for them", pending);
 }
 
 #endif

@@ -99,11 +99,6 @@ inline TIME_RANGE_COMPARE is_page_in_time_range(time_t page_first_time_s, time_t
     return PAGE_IS_IN_RANGE;
 }
 
-static int journal_metric_uuid_compare(const void *key, const void *metric)
-{
-    return uuid_compare(*(uuid_t *) key, ((struct journal_metric_list *) metric)->uuid);
-}
-
 static inline struct page_details *pdc_find_page_for_time(
         Pcvoid_t PArray,
         time_t wanted_time_s,
@@ -774,7 +769,10 @@ inline void rrdeng_prep_wait(PDC *pdc) {
     }
 }
 
-void rrdeng_prep_query(PDC *pdc) {
+void rrdeng_prep_query(struct page_details_control *pdc, bool worker) {
+    if(worker)
+        worker_is_busy(UV_EVENT_DBENGINE_QUERY);
+
     size_t pages_to_load = 0;
     pdc->page_list_JudyL = get_page_list(pdc->ctx, pdc->metric,
                                                  pdc->start_time_s * USEC_PER_SEC,
@@ -797,6 +795,9 @@ void rrdeng_prep_query(PDC *pdc) {
     completion_mark_complete(&pdc->prep_completion);
 
     pdc_release_and_destroy_if_unreferenced(pdc, true, true);
+
+    if(worker)
+        worker_is_idle();
 }
 
 /**
@@ -829,7 +830,7 @@ void pg_cache_preload(struct rrdeng_query_handle *handle) {
         handle->pdc->refcount++; // we get 1 for the query thread and 1 for the prep thread
 
         if(unlikely(handle->pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS))
-            rrdeng_prep_query(handle->pdc);
+            rrdeng_prep_query(handle->pdc, false);
         else
             rrdeng_enq_cmd(handle->ctx, RRDENG_OPCODE_QUERY, handle->pdc, NULL, handle->priority, NULL, NULL);
     }
@@ -1073,6 +1074,8 @@ void pgc_and_mrg_initialize(void)
         extent_cache_size = 3 * 1024 * 1024;
         main_cache_size = target_cache_size - extent_cache_size;
     }
+
+    extent_cache_size += (size_t)(default_rrdeng_extent_cache_mb * 1024ULL * 1024ULL);
 
     main_cache = pgc_create(
             "main_cache",

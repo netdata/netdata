@@ -1,67 +1,69 @@
-<!--
-title: "PagerDuty agent alert notifications"
-description: "Send alerts to your PagerDuty dashboard any time an anomaly or performance issue strikes a node in your infrastructure."
-sidebar_label: "PagerDuty"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/pagerduty/README.md"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Integrations/Notify/Agent alert notifications"
-learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
--->
+# PagerDuty Agent alert notifications
 
-# PagerDuty agent alert notifications
+Learn how to send notifications to PagerDuty using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+
+> ### Note
+>
+> This file assumes you have read the [Introduction to Agent alert notifications](https://github.com/netdata/netdata/blob/master/health/notifications/README.md), detailing how the Netdata Agent's alert notification method works.
 
 [PagerDuty](https://www.pagerduty.com/company/) is an enterprise incident resolution service that integrates with ITOps
 and DevOps monitoring stacks to improve operational reliability and agility. From enriching and aggregating events to
 correlating them into incidents, PagerDuty streamlines the incident management process by reducing alert noise and
 resolution times.
 
-## What you need to get started
+## Prerequisites
 
-- An installation of the open-source [Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md) monitoring agent.
-- An installation of the [PagerDuty agent](https://www.pagerduty.com/docs/guides/agent-install-guide/) on the node
-  running Netdata.
-- A PagerDuty `Generic API` service using either the `Events API v2` or `Events API v1`.
+You will need:
 
-## Setup
+- an installation of the [PagerDuty agent](https://www.pagerduty.com/docs/guides/agent-install-guide/) on the node running the Netdata Agent
+- a PagerDuty `Generic API` service using either the `Events API v2` or `Events API v1`
+- terminal access to the Agent you wish to configure
 
-[Add a new service](https://support.pagerduty.com/docs/services-and-integrations#section-configuring-services-and-integrations)
+## Configure Netdata to send alert notifications to PagerDuty
+
+> ### Info
+>
+> This file mentions editing configuration files.  
+>
+> - To edit configuration files in a safe way, we provide the [`edit config` script](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) located in your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) (typically is `/etc/netdata`) that creates the proper file and opens it in an editor automatically.  
+> Note that to run the script you need to be inside your Netdata config directory.
+>
+> It is recommended to use this way for configuring Netdata.
+
+Firstly, [Add a new service](https://support.pagerduty.com/docs/services-and-integrations#section-configuring-services-and-integrations)
 to PagerDuty. Click **Use our API directly** and select either `Events API v2` or `Events API v1`. Once you finish
 creating the service, click on the **Integrations** tab to find your **Integration Key**.
 
-Navigate to the [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) and use
-[`edit-config`](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) to open
-`health_alarm_notify.conf`.
+Then, edit `health_alarm_notify.conf`, changes to this file do not require restarting Netdata:
 
-```bash
-cd /etc/netdata
-sudo ./edit-config health_alarm_notify.conf
-```
+1. Set `SEND_PD` to `YES`.
+2. Set `DEFAULT_RECIPIENT_PD` to the PagerDuty service key you want the alert notifications to be sent to.  
+   You can define multiple service keys like this: `pd_service_key_1 pd_service_key_2`.  
+   All roles will default to this variable if left unconfigured.
+3. If you chose `Events API v2` during service setup on PagerDuty, change `USE_PD_VERSION` to `2`.
 
-Scroll down to the `# pagerduty.com notification options` section.
-
-Ensure `SEND_PD` is set to `YES`, then copy your Integration Key into `DEFAULT_RECIPIENT_ID`. Change `USE_PD_VERSION` to
-`2` if you chose `Events API v2` during service setup on PagerDuty. Minus comments, the section should look like this:
+You can then have different PagerDuty service keys per **role**, by editing `DEFAULT_RECIPIENT_PD` with the service key you want, in the following entries at the bottom of the same file:
 
 ```conf
+role_recipients_pd[sysadmin]="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa"
+role_recipients_pd[domainadmin]="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxb"
+role_recipients_pd[dba]="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxc"
+role_recipients_pd[webmaster]="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxd"
+role_recipients_pd[proxyadmin]="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxe"
+role_recipients_pd[sitemgr]="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxf"
+```
+
+An example of a working configuration would be:
+
+```conf
+#------------------------------------------------------------------------------
+# pagerduty.com notification options
+
 SEND_PD="YES"
 DEFAULT_RECIPIENT_PD="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 USE_PD_VERSION="2"
 ```
 
-## Testing
+## Test the notification method
 
-To test alert notifications to PagerDuty, run the following:
-
-```bash
-sudo su -s /bin/bash netdata
-/usr/libexec/netdata/plugins.d/alarm-notify.sh test
-```
-
-## Configuration
-
-Aside from the three values set in `health_alarm_notify.conf`, there is no further configuration required to send alert
-notifications to PagerDuty.
-
-To configure individual alarms, read our [alert configuration](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) doc or
-the [health entity reference](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) doc.
+To test this alert notification method refer to the ["Testing Alert Notifications"](https://github.com/netdata/netdata/blob/master/health/notifications/README.md#testing-alert-notifications) section of the Agent alert notifications page.

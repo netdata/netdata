@@ -13,10 +13,15 @@ with open('.github/data/distros.yml') as f:
 
 for item in data['include']:
     if 'eol_check' in item and item['eol_check']:
+        if isinstance(item['eol_check'], str):
+            distro = item['eol_check']
+        else:
+            distro = item['distro']
+
         entries.append({
-            'distro': item['distro'],
+            'distro': distro,
             'release': item['version'],
-            'full_name': f'{ item['distro'] } { item['version'] }'
+            'full_name': f'{ item["distro"] } { item["version"] }'
         })
 
 entries.sort(key=lambda k: (k['distro'], k['release']))

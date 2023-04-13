@@ -1,14 +1,3 @@
-<!--
-title: "Agent-Cloud link (ACLK)"
-description: "The Agent-Cloud link (ACLK) is the mechanism responsible for connecting a Netdata agent to Netdata Cloud."
-date: "2020-05-11"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/aclk/README.md"
-sidebar_label: "Agent-Cloud link (ACLK)"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Configuration"
--->
-
 # Agent-Cloud link (ACLK)
 
 The Agent-Cloud link (ACLK) is the mechanism responsible for securely connecting a Netdata Agent to your web browser
@@ -32,16 +21,13 @@ For a guide to connecting a node using the ACLK, plus additional troubleshooting
 documentation](https://github.com/netdata/netdata/blob/master/claim/README.md).
 
 ## Data privacy
+
 [Data privacy](https://netdata.cloud/privacy/) is very important to us. We firmly believe that your data belongs to
 you. This is why **we don't store any metric data in Netdata Cloud**.
 
-All the data that you see in the web browser when using Netdata Cloud, is actually streamed directly from the Netdata Agent to the Netdata Cloud dashboard. 
-The data passes through our systems, but it isn't stored.
+All the data that you see in the web browser when using Netdata Cloud, is actually streamed directly from the Netdata Agent to the Netdata Cloud dashboard. The data passes through our systems, but it isn't stored.
 
-However, to be able to offer the stunning visualizations and advanced functionality of Netdata Cloud, it does store a limited number of _metadata_.
-
-Read more about [Data privacy in the Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/cloud/data-privacy.md) in the documentation.
-
+However, to be able to offer the stunning visualizations and advanced functionality of Netdata Cloud, it does store a limited number of _metadata_. Read more about our [security and privacy design](https://github.com/netdata/netdata/blob/master/docs/netdata-security.md).
 
 ## Enable and configure the ACLK
 

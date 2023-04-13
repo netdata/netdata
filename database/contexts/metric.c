@@ -14,6 +14,11 @@ inline const char *rrdmetric_acquired_name(RRDMETRIC_ACQUIRED *rma) {
     return string2str(rm->name);
 }
 
+inline bool rrdmetric_acquired_has_name(RRDMETRIC_ACQUIRED *rma) {
+    RRDMETRIC *rm = rrdmetric_acquired_value(rma);
+    return (rm->name && rm->name != rm->id);
+}
+
 inline STRING *rrdmetric_acquired_id_dup(RRDMETRIC_ACQUIRED *rma) {
     RRDMETRIC *rm = rrdmetric_acquired_value(rma);
     return string_dup(rm->id);
@@ -103,7 +108,7 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
                    "RRDMETRIC: '%s' cannot change id to '%s'",
                    string2str(rm->id), string2str(rm_new->id));
 
-    if(uuid_compare(rm->uuid, rm_new->uuid) != 0) {
+    if(uuid_memcmp(&rm->uuid, &rm_new->uuid) != 0) {
 #ifdef NETDATA_INTERNAL_CHECKS
         char uuid1[UUID_STR_LEN], uuid2[UUID_STR_LEN];
         uuid_unparse(rm->uuid, uuid1);
@@ -145,7 +150,7 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(rm->rrddim && uuid_compare(rm->uuid, rm->rrddim->metric_uuid) != 0) {
+    if(rm->rrddim && uuid_memcmp(&rm->uuid, &rm->rrddim->metric_uuid) != 0) {
         char uuid1[UUID_STR_LEN], uuid2[UUID_STR_LEN];
         uuid_unparse(rm->uuid, uuid1);
         uuid_unparse(rm_new->uuid, uuid2);

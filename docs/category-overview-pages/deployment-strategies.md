@@ -33,11 +33,12 @@ database, a query engine, health monitoring and alerts, machine learning and ano
 To help our users have a complete experience of Netdata when they install it for the first time, a Netdata Agent with default configuration 
 is a complete monitoring solution out of the box, having all these features enabled and available.
 
-We suggest to do the following configuration changes for production deployments:
+We strongly recommend the following configuration changes for production deployments:
 
-1. [Downsize Netdata Agents running on weak IoT devices](https://github.com/netdata/netdata/edit/master/docs/guides/configure/performance.md)
-
-   To save valuable system resources.
+1. Understand Netdata's [security and privacy design](https://github.com/netdata/netdata/blob/master/docs/netdata-security.md) and 
+   [secure your nodes](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/secure-nodes.md)
+   
+   To safeguard your infrastructure and comply with your organization's security policies.
 
 2. Set up [streaming and replication](https://github.com/netdata/netdata/blob/master/streaming/README.md) to:
 
@@ -46,6 +47,20 @@ We suggest to do the following configuration changes for production deployments:
    - Increase data retention.
    - Make your data highly available.
 
-3. [Use Netdata Cloud to access the dashboards](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md)
+3. [Optimize the Netdata Agents system utilization and performance](https://github.com/netdata/netdata/edit/master/docs/guides/configure/performance.md)
+
+   To save valuable system resources, especially when running on weak IoT devices.
+
+We also suggest that you:
+
+1. [Use Netdata Cloud to access the dashboards](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md)
 
    For increased security, user management and access to our latest tools for advanced dashboarding and troubleshooting.
+
+2. [Change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md)
+
+   To control Netdata's memory use, when you have a lot of ephemeral metrics. 
+   
+3. [Use host labels](https://github.com/netdata/netdata/blob/master/docs/guides/using-host-labels.md)
+   
+   To organize systems, metrics, and alarms.

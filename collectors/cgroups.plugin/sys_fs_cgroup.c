@@ -1769,7 +1769,7 @@ static inline void substitute_dots_in_id(char *s) {
 // ----------------------------------------------------------------------------
 // parse k8s labels
 
-char *k8s_parse_resolved_name_and_labels(DICTIONARY *labels, char *data) {
+char *cgroup_parse_resolved_name_and_labels(DICTIONARY *labels, char *data) {
     // the first word, up to the first space is the name
     char *name = mystrsep(&data, " ");
 
@@ -1898,19 +1898,21 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
             break;
     }
 
-    if(cg->pending_renames || cg->processed) return;
-    if(!new_name || !*new_name || *new_name == '\n') return;
-    if(!(new_name = trim(new_name))) return;
+    if (cg->pending_renames || cg->processed)
+        return;
+    if (!new_name || !*new_name || *new_name == '\n')
+        return;
+    if (!(new_name = trim(new_name)))
+        return;
 
     char *name = new_name;
-    if (!strncmp(new_name, "k8s_", 4)) {
-        if(!cg->chart_labels) cg->chart_labels = rrdlabels_create();
 
-        // read the new labels and remove the obsolete ones
-        rrdlabels_unmark_all(cg->chart_labels);
-        name = k8s_parse_resolved_name_and_labels(cg->chart_labels, new_name);
-        rrdlabels_remove_all_unmarked(cg->chart_labels);
-    }
+    if (!cg->chart_labels)
+        cg->chart_labels = rrdlabels_create();
+    // read the new labels and remove the obsolete ones
+    rrdlabels_unmark_all(cg->chart_labels);
+    name = cgroup_parse_resolved_name_and_labels(cg->chart_labels, new_name);
+    rrdlabels_remove_all_unmarked(cg->chart_labels);
 
     freez(cg->chart_title);
     cg->chart_title = cgroup_title_strdupz(name);
@@ -2711,6 +2713,16 @@ static inline void discovery_process_cgroup(struct cgroup *cg) {
         cg->enabled = 0;
         cg->options |= CGROUP_OPTIONS_DISABLED_DUPLICATE;
         return;
+    }
+
+    if (!cg->chart_labels)
+        cg->chart_labels = rrdlabels_create();
+
+    if (!k8s_is_kubepod(cg)) {
+        rrdlabels_add(cg->chart_labels, "cgroup_name", cg->chart_id, RRDLABEL_SRC_AUTO);
+        if (!dictionary_get(cg->chart_labels, "image")) {
+            rrdlabels_add(cg->chart_labels, "image", "", RRDLABEL_SRC_AUTO);
+        }
     }
 
     worker_is_busy(WORKER_DISCOVERY_PROCESS_NETWORK);
@@ -3676,7 +3688,10 @@ void update_cgroup_charts(int update_every) {
 
         if(likely(cg->cpuacct_stat.updated && cg->cpuacct_stat.enabled == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_cpu)) {
-                snprintfz(title, CHART_TITLE_MAX, "CPU Usage (100%% = 1 core)");
+                snprintfz(
+                    title,
+                    CHART_TITLE_MAX,
+                    k8s_is_kubepod(cg) ? "CPU Usage (100%% = 1000 mCPU)" : "CPU Usage (100%% = 1 core)");
 
                 cg->st_cpu = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3879,7 +3894,11 @@ void update_cgroup_charts(int update_every) {
             unsigned int i;
 
             if(unlikely(!cg->st_cpu_per_core)) {
-                snprintfz(title, CHART_TITLE_MAX, "CPU Usage (100%% = 1 core) Per Core");
+                snprintfz(
+                    title,
+                    CHART_TITLE_MAX,
+                    k8s_is_kubepod(cg) ? "CPU Usage (100%% = 1000 mCPU) Per Core" :
+                                         "CPU Usage (100%% = 1 core) Per Core");
 
                 cg->st_cpu_per_core = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)

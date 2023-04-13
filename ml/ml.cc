@@ -341,24 +341,21 @@ ml_dimension_calculated_numbers(ml_dimension_t *dim, const ml_training_request_t
     /*
      * Execute the query
     */
-    struct storage_engine_query_ops *ops = dim->rd->tiers[0].query_ops;
     struct storage_engine_query_handle handle;
 
-    ops->init(dim->rd->tiers[0].db_metric_handle,
-              &handle,
-              training_response.query_after_t,
-              training_response.query_before_t,
+    storage_engine_query_init(dim->rd->tiers[0].backend, dim->rd->tiers[0].db_metric_handle, &handle,
+              training_response.query_after_t, training_response.query_before_t,
               STORAGE_PRIORITY_BEST_EFFORT);
 
     size_t idx = 0;
     memset(tls_data.training_cns, 0, sizeof(calculated_number_t) * max_n * (Cfg.lag_n + 1));
     calculated_number_t last_value = std::numeric_limits<calculated_number_t>::quiet_NaN();
 
-    while (!ops->is_finished(&handle)) {
+    while (!storage_engine_query_is_finished(&handle)) {
         if (idx == max_n)
             break;
 
-        STORAGE_POINT sp = ops->next_metric(&handle);
+        STORAGE_POINT sp = storage_engine_query_next_metric(&handle);
 
         time_t timestamp = sp.end_time_s;
         calculated_number_t value = sp.sum / sp.count;
@@ -376,7 +373,7 @@ ml_dimension_calculated_numbers(ml_dimension_t *dim, const ml_training_request_t
 
         idx++;
     }
-    ops->finalize(&handle);
+    storage_engine_query_finalize(&handle);
 
     global_statistics_ml_query_completed(/* points_read */ idx);
 

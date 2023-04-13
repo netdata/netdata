@@ -61,10 +61,6 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, struct query_target *qt, ti
 
 void rrdr_json_group_by_labels(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options);
 
-struct query_target;
-bool query_target_has_percentage_units(struct query_target *qt);
-bool query_target_aggregatable(struct query_target *qt);
-
 int rrdset2value_api_v1(
         RRDSET *st
         , BUFFER *wb
@@ -91,9 +87,13 @@ int rrdset2value_api_v1(
 );
 
 static inline bool rrdr_dimension_should_be_exposed(RRDR_DIMENSION_FLAGS rrdr_dim_flags, RRDR_OPTIONS options) {
+    if(unlikely(options & RRDR_OPTION_RETURN_RAW))
+        return true;
+
     if(unlikely(rrdr_dim_flags & RRDR_DIMENSION_HIDDEN)) return false;
     if(unlikely(!(rrdr_dim_flags & RRDR_DIMENSION_QUERIED))) return false;
     if(unlikely((options & RRDR_OPTION_NONZERO) && !(rrdr_dim_flags & RRDR_DIMENSION_NONZERO))) return false;
+
     return true;
 }
 

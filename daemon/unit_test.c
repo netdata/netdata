@@ -1937,7 +1937,7 @@ static time_t test_dbengine_create_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS
     // feed it with the test data
     for (i = 0 ; i < CHARTS ; ++i) {
         for (j = 0 ; j < DIMS ; ++j) {
-            rd[i][j]->tiers[0].collect_ops->change_collection_frequency(rd[i][j]->tiers[0].db_collection_handle, update_every);
+            storage_engine_store_change_collection_frequency(rd[i][j]->tiers[0].db_collection_handle, update_every);
 
             rd[i][j]->last_collected_time.tv_sec =
             st[i]->last_collected_time.tv_sec = st[i]->last_updated.tv_sec = time_now;
@@ -1988,13 +1988,13 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
         time_now = time_start + (c + 1) * update_every;
         for (i = 0 ; i < CHARTS ; ++i) {
             for (j = 0; j < DIMS; ++j) {
-                rd[i][j]->tiers[0].query_ops->init(rd[i][j]->tiers[0].db_metric_handle, &handle, time_now, time_now + QUERY_BATCH * update_every, STORAGE_PRIORITY_NORMAL);
+                storage_engine_query_init(rd[i][j]->tiers[0].backend, rd[i][j]->tiers[0].db_metric_handle, &handle, time_now, time_now + QUERY_BATCH * update_every, STORAGE_PRIORITY_NORMAL);
                 for (k = 0; k < QUERY_BATCH; ++k) {
                     last = ((collected_number)i * DIMS) * REGION_POINTS[current_region] +
                            j * REGION_POINTS[current_region] + c + k;
                     expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE)last, SN_DEFAULT_FLAGS));
 
-                    STORAGE_POINT sp = rd[i][j]->tiers[0].query_ops->next_metric(&handle);
+                    STORAGE_POINT sp = storage_engine_query_next_metric(&handle);
                     value = sp.sum;
                     time_retrieved = sp.start_time_s;
                     end_time = sp.end_time_s;
@@ -2016,7 +2016,7 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
                         errors++;
                     }
                 }
-                rd[i][j]->tiers[0].query_ops->finalize(&handle);
+                storage_engine_query_finalize(&handle);
             }
         }
     }
@@ -2444,13 +2444,13 @@ static void query_dbengine_chart(void *arg)
             time_before = MIN(time_after + duration, time_max); /* up to 1 hour queries */
         }
 
-        rd->tiers[0].query_ops->init(rd->tiers[0].db_metric_handle, &handle, time_after, time_before, STORAGE_PRIORITY_NORMAL);
+        storage_engine_query_init(rd->tiers[0].backend, rd->tiers[0].db_metric_handle, &handle, time_after, time_before, STORAGE_PRIORITY_NORMAL);
         ++thread_info->queries_nr;
         for (time_now = time_after ; time_now <= time_before ; time_now += update_every) {
             generatedv = generate_dbengine_chart_value(i, j, time_now);
             expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE) generatedv, SN_DEFAULT_FLAGS));
 
-            if (unlikely(rd->tiers[0].query_ops->is_finished(&handle))) {
+            if (unlikely(storage_engine_query_is_finished(&handle))) {
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
                     fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
                         ", found data gap, ### E R R O R ###\n",
@@ -2460,7 +2460,7 @@ static void query_dbengine_chart(void *arg)
                 break;
             }
 
-            STORAGE_POINT sp = rd->tiers[0].query_ops->next_metric(&handle);
+            STORAGE_POINT sp = storage_engine_query_next_metric(&handle);
             value = sp.sum;
             time_retrieved = sp.start_time_s;
             end_time = sp.end_time_s;
@@ -2498,7 +2498,7 @@ static void query_dbengine_chart(void *arg)
                 }
             }
         }
-        rd->tiers[0].query_ops->finalize(&handle);
+        storage_engine_query_finalize(&handle);
     } while(!thread_info->done);
 
     if(value_errors)

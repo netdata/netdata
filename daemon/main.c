@@ -1112,7 +1112,11 @@ static void get_netdata_configured_variables() {
     // get default Database Engine page cache size in MiB
 
     default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page cache size MB", default_rrdeng_page_cache_mb);
+    default_rrdeng_extent_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine extent cache size MB", default_rrdeng_extent_cache_mb);
     db_engine_journal_check = config_get_boolean(CONFIG_SECTION_DB, "dbengine enable journal integrity check", CONFIG_BOOLEAN_NO);
+
+    if(default_rrdeng_extent_cache_mb < 0)
+        default_rrdeng_extent_cache_mb = 0;
 
     if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
         error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
@@ -1835,7 +1839,7 @@ int main(int argc, char **argv) {
 #endif
 
         // set libuv worker threads
-        libuv_worker_threads = (int)get_netdata_cpus() * 2;
+        libuv_worker_threads = (int)get_netdata_cpus() * 6;
 
         if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS)
             libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;

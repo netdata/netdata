@@ -892,6 +892,10 @@ static void restore_host_context(void *arg)
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD | RRDHOST_FLAG_CONTEXT_LOAD_IN_PROGRESS);
 
+#ifdef ENABLE_ACLK
+    aclk_queue_node_info(host, false);
+#endif
+
     internal_error(true, "METADATA: 'host:%s' context load in %0.2f ms", rrdhost_hostname(host),
         (double)(ended_ut - started_ut) / USEC_PER_MS);
 

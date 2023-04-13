@@ -25,7 +25,7 @@ To do so, sign in to Netdata Cloud, click the `Claim Nodes` button, choose the `
 ## Metrics collection & retention
 
 You can tweak your settings in the netdata.conf file.
-📄 [Find your netdata.conf file](https://learn.netdata.cloud/guides/step-by-step/step-04#find-your-netdataconf-file)
+📄 [Find your netdata.conf file](https://github.com/netdata/netdata/blob/master/daemon/config/README.md)
 
 Open a new terminal and navigate to the netdata.conf file. Use the edit-config script to make changes: `sudo ./edit-config netdata.conf`
 
@@ -93,7 +93,7 @@ $ sudo ./edit-config python.d/anomalies.conf
 #### The Netdata config directory: `/etc/netdata`
 
 > If you don't have such a directory:
-> 📄 [Find your netdata.conf file](https://learn.netdata.cloud/guides/step-by-step/step-04#find-your-netdataconf-file)
+> 📄 [Find your netdata.conf file](https://github.com/netdata/netdata/blob/master/daemon/config/README.md)
 > The cheatsheet assumes you’re running all commands from within the Netdata config directory!
 
 #### Edit Netdata's main config file: `$ sudo ./edit-config netdata.conf`

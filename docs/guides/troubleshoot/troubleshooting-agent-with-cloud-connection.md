@@ -1,14 +1,6 @@
-<!--
-title: "Troubleshoot Agent-Cloud connectivity issues"
-sidebar_label: "Troubleshoot Agent-Cloud connectivity issues"
-description: "A simple guide to troubleshoot occurrences where the Agent is showing as offline after claiming."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/troubleshoot/troubleshooting-agent-with-cloud-connection.md
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Operations"
--->
-
 # Troubleshoot Agent-Cloud connectivity issues
+
+Learn how to troubleshoot the Netdata Agent showing as offline after claiming, so you can connect the Agent to Netdata Cloud.
 
 When you are claiming a node, you might not be able to immediately see it online in Netdata Cloud.  
 This could be due to an error in the claiming process or a temporary outage of some services.
@@ -65,7 +57,7 @@ Read more about [Starting, Stopping and Restarting the Agent](https://github.com
 
 ## Claiming on an older, deprecated version of the Agent
 
-Make sure that you are using the latest version of Netdata if you are using the [Claiming script](https://learn.netdata.cloud/docs/agent/claim#claiming-script).
+Make sure that you are using the latest version of Netdata if you are using the [Claiming script](https://github.com/netdata/netdata/blob/master/claim/README.md#claiming-script).
 
 With the introduction of our new architecture, Agents running versions lower than `v1.32.0` can face claiming problems, so we recommend you [update the Netdata Agent](https://github.com/netdata/netdata/blob/master/packaging/installer/UPDATE.md) to the latest stable version.
 

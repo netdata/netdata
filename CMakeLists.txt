@@ -886,6 +886,8 @@ set(ACLK_ALWAYS_BUILD
         aclk/aclk_proxy.h
         aclk/aclk.c
         aclk/aclk.h
+        aclk/aclk_capas.c
+        aclk/aclk_capas.h
         )
 
 set(ACLK_FILES
@@ -909,8 +911,6 @@ set(ACLK_FILES
         aclk/aclk_alarm_api.h
         aclk/aclk_contexts_api.c
         aclk/aclk_contexts_api.h
-        aclk/aclk_capas.c
-        aclk/aclk_capas.h
         aclk/schema-wrappers/connection.cc
         aclk/schema-wrappers/connection.h
         aclk/schema-wrappers/node_connection.cc

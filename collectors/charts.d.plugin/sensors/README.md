@@ -1,16 +1,7 @@
-<!--
-title: "Linux machine sensors monitoring with Netdata"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/charts.d.plugin/sensors/README.md"
-sidebar_label: "lm-sensors"
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Integrations/Monitor/Devices"
--->
-
 # Linux machine sensors collector
 
-Use this collector when `lm-sensors` doesn't work on your device (e.g. for RPi temperatures). 
-For all other cases use the [Python collector](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/sensors), which supports multiple 
+Use this collector when `lm-sensors` doesn't work on your device (e.g. for RPi temperatures).
+For all other cases use the [Python collector](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/sensors), which supports multiple
 jobs, is more efficient and performs calculations on top of the kernel provided values.
 
 This plugin will provide charts for all configured system sensors, by reading sensors directly from the kernel.
@@ -30,15 +21,23 @@ One chart for every sensor chip found and each of the above will be created.
 
 ## Enable the collector
 
-The `sensors` collector is disabled by default. To enable it, edit the `charts.d.conf` file using `edit-config` from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+The `sensors` collector is disabled by default.
+
+To enable the collector, you need to edit the configuration file of `charts.d/sensors.conf`. You can do so by using the `edit config` script.  
+
+> ### Info
+>
+> To edit configuration files in a safe way, we provide the [`edit config` script](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) located in your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) (typically is `/etc/netdata`) that creates the proper file and opens it in an editor automatically.  
+> It is recommended to use this way for configuring Netdata.
+>
+> Please also note that after most configuration changes you will need to [restart the Agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for the changes to take effect.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
 sudo ./edit-config charts.d.conf
 ```
 
-It also needs to be set to "force" to be enabled:
+You need to uncomment the regarding `sensors`, and set the value to `force`.
 
 ```shell
 # example=force
@@ -47,8 +46,7 @@ sensors=force
 
 ## Configuration
 
-Edit the `charts.d/sensors.conf` configuration file using `edit-config` from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+Edit the `charts.d/sensors.conf` configuration file using `edit-config`:
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
@@ -79,5 +77,3 @@ sensors_excluded=()
 ```
 
 ---
-
-
