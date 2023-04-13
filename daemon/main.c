@@ -1435,6 +1435,15 @@ int main(int argc, char **argv) {
                             sql_init_database(DB_CHECK_INTEGRITY, 0);
                             return 0;
                         }
+                        if(strcmp(optarg, "dumpconfig") == 0) {
+                            BUFFER *wb = buffer_create(1024, NULL);
+                            load_netdata_conf(NULL, 0);
+                            post_conf_load(&user);
+                            config_generate(wb, 0);
+                            fprintf(stdout, "%s",buffer_tostring(wb));
+                            buffer_free(wb);
+                            return 0;
+                        }
 
                         if(strcmp(optarg, "sqlite-fix") == 0) {
                             sql_init_database(DB_CHECK_FIX_DB, 0);
