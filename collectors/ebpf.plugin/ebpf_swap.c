@@ -228,8 +228,6 @@ static void ebpf_swap_free(ebpf_module_t *em)
     em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-    ebpf_cleanup_publish_syscall(swap_publish_aggregated);
-
     freez(swap_vector);
     freez(swap_values);
 

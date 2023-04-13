@@ -340,8 +340,6 @@ static void ebpf_cachestat_free(ebpf_module_t *em)
     em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-    ebpf_cleanup_publish_syscall(cachestat_counter_publish_aggregated);
-
     freez(cachestat_vector);
     freez(cachestat_values);
 

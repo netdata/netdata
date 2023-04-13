@@ -700,7 +700,6 @@ static void ebpf_process_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    ebpf_cleanup_publish_syscall(process_publish_aggregated);
     freez(process_hash_values);
 
     ebpf_process_disable_tracepoints();

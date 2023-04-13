@@ -304,8 +304,6 @@ static void ebpf_dcstat_free(ebpf_module_t *em )
     freez(dcstat_vector);
     freez(dcstat_values);
 
-    ebpf_cleanup_publish_syscall(dcstat_counter_publish_aggregated);
-
     ebpf_dcstat_clean_names();
 
 #ifdef LIBBPF_MAJOR_VERSION

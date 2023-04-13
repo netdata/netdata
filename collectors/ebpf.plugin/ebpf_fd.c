@@ -371,7 +371,6 @@ static void ebpf_fd_free(ebpf_module_t *em)
     em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-    ebpf_cleanup_publish_syscall(fd_publish_aggregated);
     freez(fd_values);
     freez(fd_vector);
 

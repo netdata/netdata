@@ -332,8 +332,6 @@ static void ebpf_filesystem_free(ebpf_module_t *em)
     em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-    ebpf_cleanup_publish_syscall(filesystem_publish_aggregated);
-
     ebpf_filesystem_cleanup_ebpf_data();
     if (dimensions)
         ebpf_histogram_dimension_cleanup(dimensions, NETDATA_EBPF_HIST_MAX_BINS);

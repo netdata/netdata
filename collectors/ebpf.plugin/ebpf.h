@@ -243,8 +243,6 @@ void ebpf_create_charts_on_apps(char *name,
 
 void write_end_chart();
 
-void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps);
-
 int ebpf_enable_tracepoint(ebpf_tracepoint_t *tp);
 int ebpf_disable_tracepoint(ebpf_tracepoint_t *tp);
 uint32_t ebpf_enable_tracepoints(ebpf_tracepoint_t *tps);

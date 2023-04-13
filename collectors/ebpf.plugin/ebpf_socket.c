@@ -579,21 +579,6 @@ static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
 }
 
 /**
- * Cleanup publish syscall
- *
- * @param nps list of structures to clean
- */
-void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps)
-{
-    /*
-    while (nps) {
-        freez(nps->algorithm);
-        nps = nps->next;
-    }
-     */
-}
-
-/**
  * Clean port Structure
  *
  * Clean the allocated list.
@@ -650,7 +635,6 @@ static void ebpf_socket_free(ebpf_module_t *em )
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-    ebpf_cleanup_publish_syscall(socket_publish_aggregated);
     freez(socket_hash_values);
 
     freez(bandwidth_vector);

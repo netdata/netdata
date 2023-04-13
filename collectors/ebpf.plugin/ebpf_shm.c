@@ -295,8 +295,6 @@ static void ebpf_shm_free(ebpf_module_t *em)
     em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-    ebpf_cleanup_publish_syscall(shm_publish_aggregated);
-
     freez(shm_vector);
     freez(shm_values);
 
