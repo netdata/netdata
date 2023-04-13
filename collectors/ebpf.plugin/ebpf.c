@@ -1044,7 +1044,7 @@ void ebpf_global_labels(netdata_syscall_stat_t *is, netdata_publish_syscall_t *p
 
         pio[i].dimension = dim[i];
         pio[i].name = name[i];
-        pio[i].algorithm = strdupz(ebpf_algorithms[algorithm[i]]);
+        pio[i].algorithm = ebpf_algorithms[algorithm[i]];
         if (publish_prev) {
             publish_prev->next = &pio[i];
         }

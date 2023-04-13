@@ -585,10 +585,12 @@ static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
  */
 void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps)
 {
+    /*
     while (nps) {
         freez(nps->algorithm);
         nps = nps->next;
     }
+     */
 }
 
 /**
