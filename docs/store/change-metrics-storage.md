@@ -3,6 +3,8 @@
 The Netdata Agent uses a custom made time-series database (TSDB), named the 
 [`dbengine`](https://github.com/netdata/netdata/blob/master/database/engine/README.md), to store metrics.
 
+To see the number of metrics stored and the retention in days per tier, use the `/api/v1/dbengine_stats` endpoint. 
+
 To increase or decrease the metric retention time, you just [configure](#configure-metric-retention) 
 the number of storage tiers and the space allocated to each one. The effect of these two parameters 
 on the maximum retention and the memory used by Netdata is described in detail, below. 
@@ -73,6 +75,7 @@ usually constant over time (affecting compression efficiency). The number of res
 through time (because it has to break pages prematurely, increasing the metadata overhead). But the actual 
 numbers should not deviate significantly from the above. 
 
+To see the number of metrics stored and the retention in days per tier, use the `/api/v1/dbengine_stats` endpoint. 
 
 ### Effect of storage tiers and retention on memory usage
 
