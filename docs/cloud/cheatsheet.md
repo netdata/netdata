@@ -143,6 +143,9 @@ sudo ./edit-config health.d/example-alarm.conf
 
 ```bash
 sudo ./edit-config health.d/example-alarm.conf
+```
+
+```
  to: silent
 ```
 
@@ -159,9 +162,9 @@ sudo ./edit-config health.d/example-alarm.conf
 
 | Intent                      |                                                                Action |
 | :-------------------------- | --------------------------------------------------------------------: |
-| Start Netdata               |                                      `$ sudo systemctl start netdata` |
-| Stop Netdata                |                                       `$ sudo systemctl stop netdata` |
-| Restart Netdata             |                                    `$ sudo systemctl restart netdata` |
+| Start Netdata               |                                      `$ sudo service netdata start` |
+| Stop Netdata                |                                       `$ sudo service netdata stop` |
+| Restart Netdata             |                                    `$ sudo service netdata restart` |
 | Reload health configuration |           `$ sudo netdatacli reload-health` `$ killall -USR2 netdata` |
 | View error logs             |                                     `less /var/log/netdata/error.log` |
 
