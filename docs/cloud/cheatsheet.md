@@ -9,6 +9,14 @@ using charts, managing the daemon, and more.
 
 You can save/print this page by right clicking anywhere on it, and clicking "print"! We also recommend to tick the "More settings -> Background graphics" checkbox to make sure you get the proper colors and everything renders nicely.
 
+Useful links:
+
+- [Install Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md)
+- [Configure the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md)
+- [Configure alerts](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md)
+- [Start, stop, or restart the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md)
+- [Netdata API](https://learn.netdata.cloud/api)
+
 **Collapse this before printing!**
 </details>
 
