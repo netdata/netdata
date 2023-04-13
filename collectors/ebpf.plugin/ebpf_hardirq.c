@@ -314,7 +314,9 @@ static int hardirq_parse_interrupts(char *irq_name, int irq)
  */
 static int hardirq_read_latency_map(int mapfd)
 {
-    hardirq_ebpf_static_val_t hardirq_ebpf_vals[ebpf_nprocs + 1];
+    static hardirq_ebpf_static_val_t *hardirq_ebpf_vals = NULL;
+    if (!hardirq_ebpf_vals)
+        hardirq_ebpf_vals = callocz(ebpf_nprocs + 1, sizeof(hardirq_ebpf_static_val_t));
 
     hardirq_ebpf_key_t key = {};
     hardirq_ebpf_key_t next_key = {};
