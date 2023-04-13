@@ -152,7 +152,7 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
         .sanitize_keyword = 0,
         .data_format = LOGS_QUERY_DATA_FORMAT_JSON_ARRAY,
         .results_buff = buffer_create(query_params.quota, &netdata_buffers_statistics.buffers_functions),
-        .keyword_matches = 0
+        .num_lines = 0
     };
 
     unsigned int fn_off = 0, cn_off = 0;
@@ -309,12 +309,12 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
     buffer_strcat(dest_wb, "\n      ],\n");
 
     buffer_sprintf( dest_wb, 
-                    "      \"keyword_matches\": %d, \n"
+                    "      \"num_lines\": %lu, \n"
                     "      \"user_time\": %llu,\n"
                     "      \"system_time\": %llu,\n"
                     "      \"error_code\": %d,\n"
                     "      \"error\": \"",
-                    query_params.keyword_matches,
+                    query_params.num_lines,
                     end.ru_utime.tv_sec * 1000000ULL + end.ru_utime.tv_usec - 
                     start.ru_utime.tv_sec * 1000000ULL - start.ru_utime.tv_usec,
                     end.ru_stime.tv_sec * 1000000ULL + end.ru_stime.tv_usec - 

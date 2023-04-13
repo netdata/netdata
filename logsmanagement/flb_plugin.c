@@ -261,14 +261,14 @@ void flb_tmp_buff_cpy_timer_cb(uv_timer_t *handle) {
 
     // TODO: Validate compression option?
 
+    unsigned long num_lines = buff->in->num_lines;
     circ_buff_insert(buff);
 
     /* Extract kernel logs, systemd, syslog and docker events metrics */
     if(p_file_info->log_type == FLB_KMSG){
         uv_mutex_lock(p_file_info->parser_metrics_mut);
-        p_file_info->parser_metrics->num_lines_total += p_file_info->flb_tmp_kernel_metrics.num_lines;
-        p_file_info->parser_metrics->num_lines_rate = p_file_info->flb_tmp_kernel_metrics.num_lines;
-        p_file_info->flb_tmp_kernel_metrics.num_lines = 0;
+        p_file_info->parser_metrics->num_lines_total += num_lines;
+        p_file_info->parser_metrics->num_lines_rate = num_lines;
         for(int i = 0; i < SYSLOG_SEVER_ARR_SIZE; i++){
             p_file_info->parser_metrics->kernel->sever[i] = p_file_info->flb_tmp_kernel_metrics.sever[i];
             p_file_info->flb_tmp_kernel_metrics.sever[i] = 0;
@@ -277,9 +277,8 @@ void flb_tmp_buff_cpy_timer_cb(uv_timer_t *handle) {
     }
     else if(p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_SYSLOG) {
         uv_mutex_lock(p_file_info->parser_metrics_mut);
-        p_file_info->parser_metrics->num_lines_total += p_file_info->flb_tmp_systemd_metrics.num_lines;
-        p_file_info->parser_metrics->num_lines_rate = p_file_info->flb_tmp_systemd_metrics.num_lines;
-        p_file_info->flb_tmp_systemd_metrics.num_lines = 0;
+        p_file_info->parser_metrics->num_lines_total += num_lines;
+        p_file_info->parser_metrics->num_lines_rate = num_lines;
         for(int i = 0; i < SYSLOG_SEVER_ARR_SIZE; i++){
             p_file_info->parser_metrics->systemd->sever[i] = p_file_info->flb_tmp_systemd_metrics.sever[i];
             p_file_info->flb_tmp_systemd_metrics.sever[i] = 0;
@@ -295,19 +294,14 @@ void flb_tmp_buff_cpy_timer_cb(uv_timer_t *handle) {
         uv_mutex_unlock(p_file_info->parser_metrics_mut);
     } else if(p_file_info->log_type == FLB_DOCKER_EV) {
         uv_mutex_lock(p_file_info->parser_metrics_mut);
-        p_file_info->parser_metrics->num_lines_total += p_file_info->flb_tmp_docker_ev_metrics.num_lines;
-        p_file_info->parser_metrics->num_lines_rate = p_file_info->flb_tmp_docker_ev_metrics.num_lines;
-        p_file_info->flb_tmp_docker_ev_metrics.num_lines = 0;
+        p_file_info->parser_metrics->num_lines_total += num_lines;
+        p_file_info->parser_metrics->num_lines_rate = num_lines;
         for(int i = 0; i < NUM_OF_DOCKER_EV_TYPES; i++){
             p_file_info->parser_metrics->docker_ev->ev_type[i] = p_file_info->flb_tmp_docker_ev_metrics.ev_type[i];
             p_file_info->flb_tmp_docker_ev_metrics.ev_type[i] = 0;
         }
         uv_mutex_unlock(p_file_info->parser_metrics_mut);
     } 
-
-    buff->in->timestamp = 0;
-    buff->in->text_size = 0;
-    // *buff->in->data = 0;
 
     uv_mutex_unlock(&p_file_info->flb_tmp_buff_mut);
 
@@ -755,7 +749,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
         else{
             
             /* Parse number of log lines */
-            p_file_info->flb_tmp_kernel_metrics.num_lines++;
+            buff->in->num_lines++;
 
             /* Metrics extracted, now prepare circular buffer for write */
             // TODO: Fix: Metrics will still be collected if circ_buff_prepare_write() returns 0.
@@ -778,7 +772,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
     if(p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_SYSLOG){
 
         /* Parse number of log lines */
-        p_file_info->flb_tmp_systemd_metrics.num_lines++;
+        buff->in->num_lines++;
 
         int syslog_prival_d = SYSLOG_PRIOR_ARR_SIZE - 1; // Initialise to 'unknown'
         int syslog_severity_d = SYSLOG_SEVER_ARR_SIZE - 1; // Initialise to 'unknown'
@@ -925,7 +919,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
     else if(p_file_info->log_type == FLB_DOCKER_EV){ 
 
         /* Extract docker events metrics */
-        p_file_info->flb_tmp_docker_ev_metrics.num_lines++;
+        buff->in->num_lines++;
 
         const size_t docker_ev_datetime_size = sizeof "2022-08-26T15:33:20.802840200+0000";
         char docker_ev_datetime[docker_ev_datetime_size];

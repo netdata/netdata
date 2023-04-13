@@ -43,20 +43,17 @@ void generic_parser(void *arg){
                     debug(D_LOGS_MANAG,"Parsed buffer did not contain any text or was of 0 size.");
                     m_assert(0, "Parsed buffer did not contain any text or was of 0 size.");
                 }
+                item->num_lines = p_file_info->parser_metrics->num_lines_total;
                 break;
             }
             case GENERIC:
             case FLB_GENERIC: 
             case FLB_SERIAL: {
-                for(int i = 0; item->data[i]; i++){
-                    if(unlikely(item->data[i] == '\n')){
-                        p_file_info->parser_metrics->num_lines_total++;
-                        p_file_info->parser_metrics->num_lines_rate++;
-                    }
-                } 
+                for(int i = 0; item->data[i]; i++)
+                    if(unlikely(item->data[i] == '\n')) item->num_lines++;
                 /* +1 because last line is terminated by '\0' instead of '\n' */
-                p_file_info->parser_metrics->num_lines_total++;
-                p_file_info->parser_metrics->num_lines_rate++;               
+                p_file_info->parser_metrics->num_lines_total = 
+                    p_file_info->parser_metrics->num_lines_rate = item->num_lines++;           
                 break;
             }
             default: 
@@ -146,6 +143,10 @@ void circ_buff_search(Circ_buff_t *const buffs[], logs_query_params_t *const p_q
             buffer_increase(results, sizeof(res_hdr) + res_hdr.text_size); 
 
             if(!p_query_params->keyword || !*p_query_params->keyword || !strcmp(p_query_params->keyword, " ")){
+                /* NOTE: relying on items[i]->num_lines to get number of log lines
+                 * might not be 100% correct, since parsing must have taken place 
+                 * already to return correct count. Maybe an issue under heavy load. */
+                res_hdr.matches = items[i]->num_lines;
                 res_hdr.text_size--; // res_hdr.text_size-- to get rid of last '\0' or '\n' 
                 memcpy(&results->buffer[results->len + sizeof(res_hdr)], items[i]->data, res_hdr.text_size);
             }
@@ -165,7 +166,7 @@ void circ_buff_search(Circ_buff_t *const buffs[], logs_query_params_t *const p_q
             if(res_hdr.text_size){
                 memcpy(&results->buffer[results->len], &res_hdr, sizeof(res_hdr));
                 results->len += sizeof(res_hdr) + res_hdr.text_size; 
-                p_query_params->keyword_matches += res_hdr.matches;
+                p_query_params->num_lines += res_hdr.matches;
             }
 
             if(results->len >= p_query_params->quota){
@@ -298,6 +299,7 @@ int circ_buff_insert(Circ_buff_t *const buff){
     cur_item->text_compressed = buff->in->text_compressed;
     cur_item->text_compressed_size = buff->in->text_compressed_size;
     cur_item->data_max_size = buff->in->data_max_size;
+    cur_item->num_lines = buff->in->num_lines;
     
     buff->in->status = CIRC_BUFF_ITEM_STATUS_UNPROCESSED;
     buff->in->timestamp = 0;
@@ -306,6 +308,7 @@ int circ_buff_insert(Circ_buff_t *const buff){
     // buff->in->text_compressed = tmp_data;
     buff->in->text_compressed_size = 0;
     buff->in->data_max_size = tmp_data_max_size;
+    buff->in->num_lines = 0;
 
     __atomic_add_fetch(&buff->text_size_total, cur_item->text_size, __ATOMIC_SEQ_CST);
     

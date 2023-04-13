@@ -30,6 +30,7 @@ typedef struct Circ_buff_item {
     char *text_compressed;						/**< Pointer offset within *data that points to start of compressed logs **/
     size_t text_compressed_size;				/**< Size of compressed logs **/
     size_t data_max_size;						/**< Allocated size of *data **/
+    unsigned long num_lines;                    /**< Number of log records in item */
 } Circ_buff_item_t;
 
 typedef struct Circ_buff {

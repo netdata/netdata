@@ -154,8 +154,9 @@ static void db_writer_db_mode_full(void *arg){
                         "BLOB_Offset,"
                         "Timestamp,"
                         "Msg_compr_size,"
-                        "Msg_decompr_size"
-                        ") VALUES (?,?,?,?,?) ;",
+                        "Msg_decompr_size,"
+                        "Num_lines"
+                        ") VALUES (?,?,?,?,?,?) ;",
                         -1, &stmt_logs_insert, NULL);
     if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
     
@@ -245,6 +246,8 @@ static void db_writer_db_mode_full(void *arg){
             rc = sqlite3_bind_int64(stmt_logs_insert, 5, (sqlite3_int64)item->text_size);
             if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             m_assert(item->text_size != 0, "item->text_size == 0");
+            rc = sqlite3_bind_int64(stmt_logs_insert, 6, (sqlite3_int64)item->num_lines);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             rc = sqlite3_step(stmt_logs_insert);
             if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             rc = sqlite3_reset(stmt_logs_insert);
@@ -648,6 +651,7 @@ int db_init() {
                         "Timestamp          INTEGER     NOT NULL,"
                         "Msg_compr_size     INTEGER     NOT NULL,"
                         "Msg_decompr_size   INTEGER     NOT NULL,"
+                        "Num_lines          INTEGER     NOT NULL,"
                         "FOREIGN KEY (FK_BLOB_Id) REFERENCES " BLOBS_TABLE " (Id) ON DELETE CASCADE ON UPDATE CASCADE"
                         ");",
                         0, 0, &err_msg);
@@ -924,7 +928,8 @@ static void db_search(logs_query_params_t *const p_query_params, struct File_inf
     // TODO: Limit number of results returned through SQLite Query to speed up search?
     sqlite3_stmt *stmt_retrieve_log_msg_metadata;
     rc = sqlite3_prepare_v2(p_file_info->db,
-                            "SELECT Timestamp, Msg_compr_size , Msg_decompr_size, BLOB_Offset, " BLOBS_TABLE".Id "
+                            "SELECT Timestamp, Msg_compr_size , Msg_decompr_size, "
+                            "BLOB_Offset, " BLOBS_TABLE".Id, Num_lines "
                             "FROM " LOGS_TABLE " INNER JOIN " BLOBS_TABLE " "
                             "ON " LOGS_TABLE ".FK_BLOB_Id = " BLOBS_TABLE ".Id "
                             "WHERE Timestamp BETWEEN ? AND ? "
@@ -951,6 +956,7 @@ static void db_search(logs_query_params_t *const p_query_params, struct File_inf
         temp_msg.text_size = (size_t)sqlite3_column_int64(stmt_retrieve_log_msg_metadata, 2);
         int64_t blob_offset = (int64_t) sqlite3_column_int64(stmt_retrieve_log_msg_metadata, 3);
         int blob_handles_offset = sqlite3_column_int(stmt_retrieve_log_msg_metadata, 4);
+        unsigned long num_lines = (unsigned long) sqlite3_column_int64(stmt_retrieve_log_msg_metadata, 5);
 
         /* Retrieve compressed log messages from BLOB file */
         temp_msg.text_compressed = mallocz(temp_msg.text_compressed_size);
@@ -972,6 +978,7 @@ static void db_search(logs_query_params_t *const p_query_params, struct File_inf
         if(!p_query_params->keyword || !*p_query_params->keyword || !strcmp(p_query_params->keyword, " ")){
             // TODO: decompress_text does not handle or return any errors currently. How should any errors be handled?
             decompress_text(&temp_msg, &p_query_params->results_buff->buffer[p_query_params->results_buff->len + sizeof(res_hdr)]);
+            res_hdr.matches = num_lines;
             res_hdr.text_size = temp_msg.text_size - 1; // temp_msg.text_size - 1 to get rid of last '\0' or '\n' 
         } 
         else {
@@ -992,7 +999,7 @@ static void db_search(logs_query_params_t *const p_query_params, struct File_inf
         if(res_hdr.text_size){
             memcpy(&p_query_params->results_buff->buffer[p_query_params->results_buff->len], &res_hdr, sizeof(res_hdr));
             p_query_params->results_buff->len += sizeof(res_hdr) + res_hdr.text_size; 
-            p_query_params->keyword_matches += res_hdr.matches;
+            p_query_params->num_lines += res_hdr.matches;
         }
         
         freez(temp_msg.text_compressed);
@@ -1089,7 +1096,7 @@ void db_search_compound(logs_query_params_t *const p_query_params, struct File_i
     sqlite3_stmt *stmt_retrieve_log_msg_metadata;
     rc = sqlite3_prepare_v2(dbt,
                             "SELECT Timestamp, Msg_compr_size , Msg_decompr_size, "
-                            "BLOB_Offset, FK_BLOB_Id, column1 "
+                            "BLOB_Offset, FK_BLOB_Id, Num_lines, column1 "
                             "FROM " TMP_VIEW_TABLE " "
                             "WHERE Timestamp BETWEEN ? AND ? ;",
                             -1, &stmt_retrieve_log_msg_metadata, NULL);
@@ -1113,7 +1120,8 @@ void db_search_compound(logs_query_params_t *const p_query_params, struct File_i
         temp_msg.text_size = (size_t)sqlite3_column_int64(stmt_retrieve_log_msg_metadata, 2);
         int64_t blob_offset = (int64_t) sqlite3_column_int64(stmt_retrieve_log_msg_metadata, 3);
         int blob_handles_offset = sqlite3_column_int(stmt_retrieve_log_msg_metadata, 4);
-        int db_name = sqlite3_column_int(stmt_retrieve_log_msg_metadata, 5);
+        unsigned long num_lines = (unsigned long) sqlite3_column_int64(stmt_retrieve_log_msg_metadata, 5);
+        int db_name = sqlite3_column_int(stmt_retrieve_log_msg_metadata, 6);
 
         /* Retrieve compressed log messages from BLOB file */
         temp_msg.text_compressed = mallocz(temp_msg.text_compressed_size);
@@ -1135,6 +1143,7 @@ void db_search_compound(logs_query_params_t *const p_query_params, struct File_i
         if(!p_query_params->keyword || !*p_query_params->keyword || !strcmp(p_query_params->keyword, " ")){
             // TODO: decompress_text does not handle or return any errors currently. How should any errors be handled?
             decompress_text(&temp_msg, &p_query_params->results_buff->buffer[p_query_params->results_buff->len + sizeof(res_hdr)]);
+            res_hdr.matches = num_lines;
             res_hdr.text_size = temp_msg.text_size - 1; // temp_msg.text_size - 1 to get rid of last '\0' or '\n' 
         } 
         else {
@@ -1155,7 +1164,7 @@ void db_search_compound(logs_query_params_t *const p_query_params, struct File_i
         if(res_hdr.text_size){
             memcpy(&p_query_params->results_buff->buffer[p_query_params->results_buff->len], &res_hdr, sizeof(res_hdr));
             p_query_params->results_buff->len += sizeof(res_hdr) + res_hdr.text_size; 
-            p_query_params->keyword_matches += res_hdr.matches;
+            p_query_params->num_lines += res_hdr.matches;
         }
         
         freez(temp_msg.text_compressed);

@@ -1606,7 +1606,7 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
 
     
     buffer_strcat(w->response.data, "\n\t],\n");
-    buffer_sprintf(w->response.data, "\t\"keyword_matches\": %d,\n", query_params.keyword_matches);
+    buffer_sprintf(w->response.data, "\t\"num_lines\": %lu,\n", query_params.num_lines);
     getrusage(RUSAGE_THREAD, &end);
     buffer_sprintf(w->response.data, "\t\"user_time\": %llu,\n", end.ru_utime.tv_sec * 1000000ULL + 
                                                                  end.ru_utime.tv_usec - 

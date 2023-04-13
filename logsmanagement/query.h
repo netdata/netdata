@@ -67,7 +67,7 @@ typedef enum logs_query_data_format {
  * If exceeded, the query will return the results obtained so far.
  * @param[out] results_buff->len The exact size of the results matched. 
  * @param[out] results_buff->buffer String containing the results of the query.
- * @param[out] keyword_matches Number of log records that match the keyword.
+ * @param[out] num_lines Number of log records that match the keyword.
  * @warning results_buff->size argument must be <= MAX_LOG_MSG_SIZE.
  */
 typedef struct logs_query_params {
@@ -81,7 +81,7 @@ typedef struct logs_query_params {
     int sanitize_keyword;
     LOGS_QUERY_DATA_FORMAT data_format;
     BUFFER *results_buff;
-    int keyword_matches;
+    unsigned long num_lines;
 } logs_query_params_t;
 
 typedef struct logs_query_res_hdr {
