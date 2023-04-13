@@ -167,6 +167,7 @@ sudo ./edit-config health.d/example-alarm.conf
 | Restart Netdata             |                                    `$ sudo service netdata restart` |
 | Reload health configuration |           `$ sudo netdatacli reload-health` `$ killall -USR2 netdata` |
 | View error logs             |                                     `less /var/log/netdata/error.log` |
+| View collectors logs        |                               `less /var/log/netdata/collector.log` |
 
 #### Change the port Netdata listens to (example, set it to port 39999)
 
