@@ -390,7 +390,9 @@ static int hardirq_read_latency_map(int mapfd)
 
 static void hardirq_read_latency_static_map(int mapfd)
 {
-    hardirq_ebpf_static_val_t hardirq_ebpf_static_vals[ebpf_nprocs + 1];
+    static hardirq_ebpf_static_val_t *hardirq_ebpf_static_vals = NULL;
+    if (!hardirq_ebpf_static_vals)
+        hardirq_ebpf_static_vals = callocz(ebpf_nprocs + 1, sizeof(hardirq_ebpf_static_val_t));
 
     uint32_t i;
     for (i = 0; i < HARDIRQ_EBPF_STATIC_END; i++) {
