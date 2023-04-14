@@ -285,6 +285,7 @@ static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, siz
                    chan->conn->pc, chan->dc, request, size, binary?"binary":"text");
 
     struct web_client *w = web_client_get_from_cache();
+    w->statistics.received_bytes = size;
     w->interrupt.callback = web_client_stop_callback;
     w->interrupt.callback_data = chan;
 
@@ -341,6 +342,8 @@ static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, siz
         sent_bytes = webrtc_send_in_chunks(chan, buffer_tostring(w->response.data), buffer_strlen(w->response.data),
                               w->response.code, "PLAIN", w->response.data->content_type,
                               max_message_size, false);
+
+    w->statistics.sent_bytes = sent_bytes;
 
 cleanup:
     now_monotonic_high_precision_timeval(&tv);
