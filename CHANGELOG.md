@@ -6,10 +6,12 @@
 
 **Merged pull requests:**
 
+- Update change-metrics-storage.md [\#14905](https://github.com/netdata/netdata/pull/14905) ([cakrit](https://github.com/cakrit))
+- /api/v2 part 10 [\#14904](https://github.com/netdata/netdata/pull/14904) ([ktsaou](https://github.com/ktsaou))
 - Update REFERENCE.md [\#14900](https://github.com/netdata/netdata/pull/14900) ([cakrit](https://github.com/cakrit))
 - Update README.md [\#14899](https://github.com/netdata/netdata/pull/14899) ([cakrit](https://github.com/cakrit))
 - Update README.md [\#14898](https://github.com/netdata/netdata/pull/14898) ([cakrit](https://github.com/cakrit))
-- Disable threads that update with high frequency [\#14897](https://github.com/netdata/netdata/pull/14897) ([thiagoftsm](https://github.com/thiagoftsm))
+- Disable threads while we are investigating [\#14897](https://github.com/netdata/netdata/pull/14897) ([thiagoftsm](https://github.com/thiagoftsm))
 - add opsgenie as a business level notificaiton method [\#14895](https://github.com/netdata/netdata/pull/14895) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Remove dry run option from uninstall documentation [\#14894](https://github.com/netdata/netdata/pull/14894) ([Ancairon](https://github.com/Ancairon))
 - cgroups: add option to use Kubelet for pods metadata [\#14891](https://github.com/netdata/netdata/pull/14891) ([ilyam8](https://github.com/ilyam8))
@@ -52,6 +54,7 @@
 - Update privacy link in aclk doc [\#14813](https://github.com/netdata/netdata/pull/14813) ([cakrit](https://github.com/cakrit))
 - Consolidate security and privacy documents [\#14812](https://github.com/netdata/netdata/pull/14812) ([cakrit](https://github.com/cakrit))
 - Update role-based-access.md [\#14811](https://github.com/netdata/netdata/pull/14811) ([cakrit](https://github.com/cakrit))
+- Save and load ML models [\#14810](https://github.com/netdata/netdata/pull/14810) ([vkalintiris](https://github.com/vkalintiris))
 - diskspace: don't collect inodes on msdosfs [\#14809](https://github.com/netdata/netdata/pull/14809) ([ilyam8](https://github.com/ilyam8))
 - Address Learn feedback from users [\#14802](https://github.com/netdata/netdata/pull/14802) ([Ancairon](https://github.com/Ancairon))
 - add validation step before using GCP metadata [\#14801](https://github.com/netdata/netdata/pull/14801) ([ilyam8](https://github.com/ilyam8))
@@ -397,8 +400,6 @@
 - fix\(alarms\): treat 0 processors as unknown in load\_cpu\_number [\#14286](https://github.com/netdata/netdata/pull/14286) ([ilyam8](https://github.com/ilyam8))
 - DBENGINE v2 - improvements part 4 [\#14285](https://github.com/netdata/netdata/pull/14285) ([ktsaou](https://github.com/ktsaou))
 - fix for dbengine2 improvements part 3 [\#14284](https://github.com/netdata/netdata/pull/14284) ([ktsaou](https://github.com/ktsaou))
-- Make sure variables are streamed after SENDER\_CONNECTED flag is set [\#14283](https://github.com/netdata/netdata/pull/14283) ([MrZammler](https://github.com/MrZammler))
-- Update to SQLITE version 3.40.1 [\#14282](https://github.com/netdata/netdata/pull/14282) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
