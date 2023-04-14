@@ -1295,6 +1295,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
 
 RRDHOST *rrdhost_find_by_hostname(const char *hostname);
 RRDHOST *rrdhost_find_by_guid(const char *guid);
+RRDHOST *find_host_by_node_id(char *node_id);
 
 RRDHOST *rrdhost_find_or_create(
         const char *hostname

@@ -81,9 +81,9 @@ void web_client_request_done(struct web_client *w) {
 
     debug(D_WEB_CLIENT, "%llu: Resetting client.", w->id);
 
-    if(likely(buffer_strlen(w->url_last_full_encoded))) {
+    if(likely(buffer_strlen(w->url_as_received))) {
         struct timeval tv;
-        now_realtime_timeval(&tv);
+        now_monotonic_high_precision_timeval(&tv);
 
         size_t size = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->response.rlen:w->response.data->len;
         size_t sent = size;
@@ -94,14 +94,14 @@ void web_client_request_done(struct web_client *w) {
         // --------------------------------------------------------------------
         // global statistics
 
-        global_statistics_web_request_completed(dt_usec(&tv, &w->tv_in),
-                                                w->stats_received_bytes,
-                                                w->stats_sent_bytes,
+        global_statistics_web_request_completed(dt_usec(&tv, &w->timings.tv_in),
+                                                w->statistics.received_bytes,
+                                                w->statistics.sent_bytes,
                                                 size,
                                                 sent);
 
-        w->stats_received_bytes = 0;
-        w->stats_sent_bytes = 0;
+        w->statistics.received_bytes = 0;
+        w->statistics.sent_bytes = 0;
 
 
         // --------------------------------------------------------------------
@@ -140,11 +140,11 @@ void web_client_request_done(struct web_client *w) {
                    , sent
                    , size
                    , -((size > 0) ? ((double)(size - sent) / (double) size * 100.0) : 0.0)
-                   , (double)dt_usec(&w->tv_ready, &w->tv_in) / 1000.0
-                   , (double)dt_usec(&tv, &w->tv_ready) / 1000.0
-                   , (double)dt_usec(&tv, &w->tv_in) / 1000.0
+                   , (double)dt_usec(&w->timings.tv_ready, &w->timings.tv_in) / 1000.0
+                   , (double)dt_usec(&tv, &w->timings.tv_ready) / 1000.0
+                   , (double)dt_usec(&tv, &w->timings.tv_in) / 1000.0
                    , w->response.code
-                   , strip_control_characters((char *)buffer_tostring(w->url_last_full_encoded))
+                   , strip_control_characters((char *)buffer_tostring(w->url_as_received))
         );
     }
 
@@ -162,7 +162,7 @@ void web_client_request_done(struct web_client *w) {
         }
     }
 
-    buffer_reset(w->url_last_full_encoded);
+    buffer_reset(w->url_as_received);
     w->cookie1[0] = '\0';
     w->cookie2[0] = '\0';
     w->origin[0] = '*';
@@ -192,7 +192,7 @@ void web_client_request_done(struct web_client *w) {
     web_client_enable_wait_receive(w);
     web_client_disable_wait_send(w);
 
-    w->response.zoutput = 0;
+    w->response.zoutput = false;
 
     // if we had enabled compression, release it
 #ifdef NETDATA_WITH_ZLIB
@@ -205,7 +205,7 @@ void web_client_request_done(struct web_client *w) {
         w->response.zstream.avail_out = 0;
         w->response.zstream.total_in = 0;
         w->response.zstream.total_out = 0;
-        w->response.zinitialized = 0;
+        w->response.zinitialized = false;
         w->flags &= ~WEB_CLIENT_CHUNKED_TRANSFER;
     }
 #endif // NETDATA_WITH_ZLIB
@@ -433,8 +433,8 @@ void web_client_enable_deflate(struct web_client *w, int gzip) {
     }
 
     w->response.zsent = 0;
-    w->response.zoutput = 1;
-    w->response.zinitialized = 1;
+    w->response.zoutput = true;
+    w->response.zinitialized = true;
     w->flags |= WEB_CLIENT_CHUNKED_TRANSFER;
 
     debug(D_DEFLATE, "%llu: Initialized compression.", w->id);
@@ -992,9 +992,9 @@ void web_client_build_http_header(struct web_client *w) {
     // set a proper expiration date, if not already set
     if(unlikely(!w->response.data->expires)) {
         if(w->response.data->options & WB_CONTENT_NO_CACHEABLE)
-            w->response.data->expires = w->tv_ready.tv_sec + localhost->rrd_update_every;
+            w->response.data->expires = w->timings.tv_ready.tv_sec + localhost->rrd_update_every;
         else
-            w->response.data->expires = w->tv_ready.tv_sec + 86400;
+            w->response.data->expires = w->timings.tv_ready.tv_sec + 86400;
     }
 
     // prepare the HTTP response header
@@ -1021,7 +1021,7 @@ void web_client_build_http_header(struct web_client *w) {
                        "Location: https://%s%s\r\n",
                        w->response.code, code_msg,
                        w->server_host,
-                       buffer_tostring(w->url_last_full_encoded));
+                       buffer_tostring(w->url_as_received));
     }else {
         buffer_sprintf(w->response.header_output,
                        "HTTP/1.1 %d %s\r\n"
@@ -1165,7 +1165,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
 
     if(bytes != (ssize_t) buffer_strlen(w->response.header_output)) {
         if(bytes > 0)
-            w->stats_sent_bytes += bytes;
+            w->statistics.sent_bytes += bytes;
 
         if (bytes < 0) {
 
@@ -1178,12 +1178,10 @@ static inline void web_client_send_http_header(struct web_client *w) {
         }
     }
     else
-        w->stats_sent_bytes += bytes;
+        w->statistics.sent_bytes += bytes;
 }
 
-static inline int web_client_process_url(RRDHOST *host, struct web_client *w, char *decoded_url_path);
-
-static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, char *url) {
+static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, char *url, bool nodeid, int (*func)(RRDHOST *, struct web_client *, char *)) {
     static uint32_t hash_localhost = 0;
 
     if(unlikely(!hash_localhost)) {
@@ -1209,28 +1207,81 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
             protocol = "http";
 #endif
             url_host = (!w->forwarded_host[0])?w->server_host:w->forwarded_host;
-            buffer_sprintf(w->response.header, "Location: %s://%s%s/\r\n", protocol, url_host, buffer_tostring(w->url_last_full_encoded));
+            buffer_sprintf(w->response.header, "Location: %s://%s%s/\r\n", protocol, url_host, buffer_tostring(w->url_as_received));
             buffer_strcat(w->response.data, "Permanent redirect");
             return HTTP_RESP_REDIR_PERM;
         }
 
-        // copy the URL, we need it to serve files
-        buffer_flush(w->url_last_full_encoded);
-        buffer_fast_strcat(w->url_last_full_encoded, "/", 1);
+        if(nodeid) {
+            host = find_host_by_node_id(tok);
+            if(!host) {
+                host = rrdhost_find_by_hostname(tok);
+                if (!host)
+                    host = rrdhost_find_by_guid(tok);
+            }
+        }
+        else {
+            host = rrdhost_find_by_hostname(tok);
+            if(!host) {
+                host = rrdhost_find_by_guid(tok);
+                if (!host)
+                    host = find_host_by_node_id(tok);
+            }
+        }
 
-        if(url && *url)
-            buffer_strcat(w->url_last_full_encoded, url);
+        if(!host) {
+            // we didn't find it, but it may be a uuid case mismatch for MACHINE_GUID
+            // so, recreate the machine guid in lower-case.
+            uuid_t uuid;
+            char txt[UUID_STR_LEN];
+            if (uuid_parse(tok, uuid) == 0) {
+                uuid_unparse_lower(uuid, txt);
+                host = rrdhost_find_by_guid(txt);
+            }
+        }
 
-        host = rrdhost_find_by_hostname(tok);
-        if (!host)
-            host = rrdhost_find_by_guid(tok);
-        if (host) return web_client_process_url(host, w, url);
+        if (host)
+            return func(host, w, url);
     }
 
     buffer_flush(w->response.data);
     w->response.data->content_type = CT_TEXT_HTML;
     buffer_strcat(w->response.data, "This netdata does not maintain a database for host: ");
     buffer_strcat_htmlescape(w->response.data, tok?tok:"");
+    return HTTP_RESP_NOT_FOUND;
+}
+
+int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client *w, char *decoded_url_path) {
+    static uint32_t
+            hash_api = 0,
+            hash_host = 0,
+            hash_node = 0;
+
+    if(unlikely(!hash_api)) {
+        hash_api = simple_hash("api");
+        hash_host = simple_hash("host");
+        hash_node = simple_hash("node");
+    }
+
+    char *tok = strsep_skip_consecutive_separators(&decoded_url_path, "/?");
+    if(likely(tok && *tok)) {
+        uint32_t hash = simple_hash(tok);
+
+        if(unlikely(hash == hash_api && strcmp(tok, "api") == 0)) {
+            // current API
+            debug(D_WEB_CLIENT_ACCESS, "%llu: API request ...", w->id);
+            return check_host_and_call(host, w, decoded_url_path, web_client_api_request);
+        }
+        else if(unlikely((hash == hash_host && strcmp(tok, "host") == 0) || (hash == hash_node && strcmp(tok, "node") == 0))) {
+            // host switching
+            debug(D_WEB_CLIENT_ACCESS, "%llu: host switch request ...", w->id);
+            return web_client_switch_host(host, w, decoded_url_path, hash == hash_node, web_client_api_request_with_node_selection);
+        }
+    }
+
+    buffer_flush(w->response.data);
+    buffer_strcat(w->response.data, "Unknown API endpoint.");
+    w->response.data->content_type = CT_TEXT_HTML;
     return HTTP_RESP_NOT_FOUND;
 }
 
@@ -1241,7 +1292,8 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
     static uint32_t
             hash_api = 0,
             hash_netdata_conf = 0,
-            hash_host = 0;
+            hash_host = 0,
+            hash_node = 0;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     static uint32_t hash_exit = 0, hash_debug = 0, hash_mirror = 0;
@@ -1251,6 +1303,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         hash_api = simple_hash("api");
         hash_netdata_conf = simple_hash("netdata.conf");
         hash_host = simple_hash("host");
+        hash_node = simple_hash("node");
 #ifdef NETDATA_INTERNAL_CHECKS
         hash_exit = simple_hash("exit");
         hash_debug = simple_hash("debug");
@@ -1267,9 +1320,9 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             debug(D_WEB_CLIENT_ACCESS, "%llu: API request ...", w->id);
             return check_host_and_call(host, w, decoded_url_path, web_client_api_request);
         }
-        else if(unlikely(hash == hash_host && strcmp(tok, "host") == 0)) {                    // host switching
+        else if(unlikely((hash == hash_host && strcmp(tok, "host") == 0) || (hash == hash_node && strcmp(tok, "node") == 0))) { // host switching
             debug(D_WEB_CLIENT_ACCESS, "%llu: host switch request ...", w->id);
-            return web_client_switch_host(host, w, decoded_url_path);
+            return web_client_switch_host(host, w, decoded_url_path, hash == hash_node, web_client_process_url);
         }
         else if(unlikely(hash == hash_netdata_conf && strcmp(tok, "netdata.conf") == 0)) {    // netdata.conf
             if(unlikely(!web_client_can_access_netdataconf(w)))
@@ -1357,7 +1410,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
 
     char filename[FILENAME_MAX+1];
     decoded_url_path = filename;
-    strncpyz(filename, buffer_tostring(w->url_last_full_encoded), FILENAME_MAX);
+    strncpyz(filename, buffer_tostring(w->url_as_received), FILENAME_MAX);
     tok = strsep_skip_consecutive_separators(&decoded_url_path, "?");
     buffer_flush(w->response.data);
     return mysendfile(w, (tok && *tok)?tok:"/");
@@ -1366,7 +1419,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
 void web_client_process_request(struct web_client *w) {
 
     // start timing us
-    now_realtime_timeval(&w->tv_in);
+    web_client_timeout_checkpoint_init(w);
 
     switch(http_request_validate(w)) {
         case HTTP_VALIDATION_OK:
@@ -1419,8 +1472,8 @@ void web_client_process_request(struct web_client *w) {
 
         case HTTP_VALIDATION_INCOMPLETE:
             if(w->response.data->len > NETDATA_WEB_REQUEST_MAX_SIZE) {
-                buffer_flush(w->url_last_full_encoded);
-                buffer_strcat(w->url_last_full_encoded, "too big request");
+                buffer_flush(w->url_as_received);
+                buffer_strcat(w->url_as_received, "too big request");
 
                 debug(D_WEB_CLIENT_ACCESS, "%llu: Received request is too big (%zu bytes).", w->id, w->response.data->len);
 
@@ -1486,13 +1539,13 @@ void web_client_process_request(struct web_client *w) {
     }
 
     // keep track of the processing time
-    now_realtime_timeval(&w->tv_ready);
+    web_client_timeout_checkpoint_response_ready(w, NULL);
 
     w->response.sent = 0;
 
     // set a proper last modified date
     if(unlikely(!w->response.data->date))
-        w->response.data->date = w->tv_ready.tv_sec;
+        w->response.data->date = w->timings.tv_ready.tv_sec;
 
     web_client_send_http_header(w);
 
@@ -1553,7 +1606,7 @@ ssize_t web_client_send_chunk_header(struct web_client *w, size_t len)
     bytes = web_client_send_data(w,buf,strlen(buf),0);
     if(bytes > 0) {
         debug(D_DEFLATE, "%llu: Sent chunk header %zd bytes.", w->id, bytes);
-        w->stats_sent_bytes += bytes;
+        w->statistics.sent_bytes += bytes;
     }
 
     else if(bytes == 0) {
@@ -1575,7 +1628,7 @@ ssize_t web_client_send_chunk_close(struct web_client *w)
     bytes = web_client_send_data(w,"\r\n",2,0);
     if(bytes > 0) {
         debug(D_DEFLATE, "%llu: Sent chunk suffix %zd bytes.", w->id, bytes);
-        w->stats_sent_bytes += bytes;
+        w->statistics.sent_bytes += bytes;
     }
 
     else if(bytes == 0) {
@@ -1597,7 +1650,7 @@ ssize_t web_client_send_chunk_finalize(struct web_client *w)
     bytes = web_client_send_data(w,"\r\n0\r\n\r\n",7,0);
     if(bytes > 0) {
         debug(D_DEFLATE, "%llu: Sent chunk suffix %zd bytes.", w->id, bytes);
-        w->stats_sent_bytes += bytes;
+        w->statistics.sent_bytes += bytes;
     }
 
     else if(bytes == 0) {
@@ -1709,7 +1762,7 @@ ssize_t web_client_send_deflate(struct web_client *w)
 
     len = web_client_send_data(w,&w->response.zbuffer[w->response.zsent], (size_t) (w->response.zhave - w->response.zsent), MSG_DONTWAIT);
     if(len > 0) {
-        w->stats_sent_bytes += len;
+        w->statistics.sent_bytes += len;
         w->response.zsent += len;
         len += t;
         debug(D_WEB_CLIENT, "%llu: Sent %zd bytes.", w->id, len);
@@ -1764,7 +1817,7 @@ ssize_t web_client_send(struct web_client *w) {
 
     bytes = web_client_send_data(w,&w->response.data->buffer[w->response.sent], w->response.data->len - w->response.sent, MSG_DONTWAIT);
     if(likely(bytes > 0)) {
-        w->stats_sent_bytes += bytes;
+        w->statistics.sent_bytes += bytes;
         w->response.sent += bytes;
         debug(D_WEB_CLIENT, "%llu: Sent %zd bytes.", w->id, bytes);
     }
@@ -1859,7 +1912,7 @@ ssize_t web_client_receive(struct web_client *w)
 #endif
 
     if(likely(bytes > 0)) {
-        w->stats_received_bytes += bytes;
+        w->statistics.received_bytes += bytes;
 
         size_t old = w->response.data->len;
         (void)old;
@@ -1905,11 +1958,12 @@ void web_client_decode_path_and_query_string(struct web_client *w, const char *p
     buffer[0] = '?';
     buffer[0] = '\0';
 
-    buffer_flush(w->url_last_full_encoded);
     buffer_flush(w->url_path_decoded);
     buffer_flush(w->url_query_string_decoded);
 
-    buffer_strcat(w->url_last_full_encoded, path_and_query_string);
+    if(buffer_strlen(w->url_as_received) == 0)
+        // do not overwrite this if it is already filled
+        buffer_strcat(w->url_as_received, path_and_query_string);
 
     if(w->mode == WEB_CLIENT_MODE_STREAM) {
         // in stream mode, there is no path
@@ -1921,6 +1975,11 @@ void web_client_decode_path_and_query_string(struct web_client *w, const char *p
     }
     else {
         // in non-stream mode, there is a path
+
+        // FIXME - the way this is implemented, query string params never accept the symbol &, not even encoded as %26
+        // To support the symbol & in query string params, we need to turn the url_query_string_decoded into a
+        // dictionary and decode each of the parameters individually.
+        // OR: in url_query_string_decoded use as separator a control character that cannot appear in the URL.
 
         char *question_mark_start = strchr(path_and_query_string, '?');
         if (question_mark_start)
@@ -1969,7 +2028,7 @@ void web_client_zero(struct web_client *w) {
     BUFFER *b2 = w->response.header;
     BUFFER *b3 = w->response.header_output;
     BUFFER *b4 = w->url_path_decoded;
-    BUFFER *b5 = w->url_last_full_encoded;
+    BUFFER *b5 = w->url_as_received;
     BUFFER *b6 = w->url_query_string_decoded;
 
     // empty the buffers
@@ -1993,14 +2052,14 @@ void web_client_zero(struct web_client *w) {
 #endif
 
     size_t use_count = w->use_count;
-    size_t *statistics_memory_accounting = w->statistics_memory_accounting;
+    size_t *statistics_memory_accounting = w->statistics.memory_accounting;
 
     // zero everything
     memset(w, 0, sizeof(struct web_client));
 
     w->ifd = w->ofd = -1;
 
-    w->statistics_memory_accounting = statistics_memory_accounting;
+    w->statistics.memory_accounting = statistics_memory_accounting;
     w->use_count = use_count;
 
 #ifdef ENABLE_HTTPS
@@ -2014,29 +2073,29 @@ void web_client_zero(struct web_client *w) {
     w->response.header = b2;
     w->response.header_output = b3;
     w->url_path_decoded = b4;
-    w->url_last_full_encoded = b5;
+    w->url_as_received = b5;
     w->url_query_string_decoded = b6;
 }
 
 struct web_client *web_client_create(size_t *statistics_memory_accounting) {
     struct web_client *w = (struct web_client *)callocz(1, sizeof(struct web_client));
     w->use_count = 1;
-    w->statistics_memory_accounting = statistics_memory_accounting;
+    w->statistics.memory_accounting = statistics_memory_accounting;
 
-    w->url_last_full_encoded = buffer_create(NETDATA_WEB_DECODED_URL_INITIAL_SIZE, w->statistics_memory_accounting);
-    w->url_path_decoded = buffer_create(NETDATA_WEB_DECODED_URL_INITIAL_SIZE, w->statistics_memory_accounting);
-    w->url_query_string_decoded = buffer_create(NETDATA_WEB_DECODED_URL_INITIAL_SIZE, w->statistics_memory_accounting);
-    w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, w->statistics_memory_accounting);
-    w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE, w->statistics_memory_accounting);
-    w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE, w->statistics_memory_accounting);
+    w->url_as_received = buffer_create(NETDATA_WEB_DECODED_URL_INITIAL_SIZE, w->statistics.memory_accounting);
+    w->url_path_decoded = buffer_create(NETDATA_WEB_DECODED_URL_INITIAL_SIZE, w->statistics.memory_accounting);
+    w->url_query_string_decoded = buffer_create(NETDATA_WEB_DECODED_URL_INITIAL_SIZE, w->statistics.memory_accounting);
+    w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, w->statistics.memory_accounting);
+    w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE, w->statistics.memory_accounting);
+    w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE, w->statistics.memory_accounting);
 
-    __atomic_add_fetch(w->statistics_memory_accounting, sizeof(struct web_client), __ATOMIC_RELAXED);
+    __atomic_add_fetch(w->statistics.memory_accounting, sizeof(struct web_client), __ATOMIC_RELAXED);
 
     return w;
 }
 
 void web_client_free(struct web_client *w) {
-    buffer_free(w->url_last_full_encoded);
+    buffer_free(w->url_as_received);
     buffer_free(w->url_path_decoded);
     buffer_free(w->url_query_string_decoded);
     buffer_free(w->response.header_output);
@@ -2058,6 +2117,65 @@ void web_client_free(struct web_client *w) {
         deflateEnd(&w->response.zstream);
 #endif
 
-    __atomic_sub_fetch(w->statistics_memory_accounting, sizeof(struct web_client), __ATOMIC_RELAXED);
+    __atomic_sub_fetch(w->statistics.memory_accounting, sizeof(struct web_client), __ATOMIC_RELAXED);
     freez(w);
+}
+
+inline void web_client_timeout_checkpoint_init(struct web_client *w) {
+    now_monotonic_high_precision_timeval(&w->timings.tv_in);
+}
+
+inline void web_client_timeout_checkpoint_set(struct web_client *w, int timeout_ms) {
+    w->timings.timeout_ut = timeout_ms * USEC_PER_MS;
+
+    if(!w->timings.tv_in.tv_sec)
+        web_client_timeout_checkpoint_init(w);
+
+    if(!w->timings.tv_timeout_last_checkpoint.tv_sec)
+        w->timings.tv_timeout_last_checkpoint = w->timings.tv_in;
+}
+
+inline usec_t web_client_timeout_checkpoint(struct web_client *w) {
+    struct timeval now;
+    now_monotonic_high_precision_timeval(&now);
+
+    if (!w->timings.tv_timeout_last_checkpoint.tv_sec)
+        w->timings.tv_timeout_last_checkpoint = w->timings.tv_in;
+
+    usec_t since_last_check_ut = dt_usec(&w->timings.tv_timeout_last_checkpoint, &now);
+
+    w->timings.tv_timeout_last_checkpoint = now;
+
+    return since_last_check_ut;
+}
+
+inline usec_t web_client_timeout_checkpoint_response_ready(struct web_client *w, usec_t *usec_since_last_checkpoint) {
+    usec_t since_last_check_ut = web_client_timeout_checkpoint(w);
+    if(usec_since_last_checkpoint)
+        *usec_since_last_checkpoint = since_last_check_ut;
+
+    w->timings.tv_ready = w->timings.tv_timeout_last_checkpoint;
+
+    // return the total time of the query
+    return dt_usec(&w->timings.tv_in, &w->timings.tv_ready);
+}
+
+inline bool web_client_timeout_checkpoint_and_check(struct web_client *w, usec_t *usec_since_last_checkpoint) {
+
+    usec_t since_last_check_ut = web_client_timeout_checkpoint(w);
+    if(usec_since_last_checkpoint)
+        *usec_since_last_checkpoint = since_last_check_ut;
+
+    if(!w->timings.timeout_ut)
+        return false;
+
+    usec_t since_reception_ut = dt_usec(&w->timings.tv_in, &w->timings.tv_timeout_last_checkpoint);
+    if (since_reception_ut >= w->timings.timeout_ut) {
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "Query timeout exceeded");
+        w->response.code = HTTP_RESP_BACKEND_FETCH_FAILED;
+        return true;
+    }
+
+    return false;
 }

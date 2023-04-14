@@ -7,7 +7,7 @@
 #include "web_client.h"
 
 void web_client_release_to_cache(struct web_client *w);
-struct web_client *web_client_get_from_cache();
+struct web_client *web_client_get_from_cache(void);
 void web_client_cache_destroy(void);
 
 #include "web_server.h"

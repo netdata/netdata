@@ -144,13 +144,14 @@ struct response {
     size_t rlen; // if non-zero, the excepted size of ifd (input of firecopy)
     size_t sent; // current data length sent to output
 
-    int zoutput; // if set to 1, web_client_send() will send compressed data
+    bool zoutput; // if set to 1, web_client_send() will send compressed data
+
 #ifdef NETDATA_WITH_ZLIB
+    bool zinitialized;
     z_stream zstream;                                    // zlib stream for sending compressed output to client
-    Bytef zbuffer[NETDATA_WEB_RESPONSE_ZLIB_CHUNK_SIZE]; // temporary buffer for storing compressed output
     size_t zsent;                                        // the compressed bytes we have sent to the client
     size_t zhave;                                        // the compressed bytes that we have received from zlib
-    unsigned int zinitialized : 1;
+    Bytef zbuffer[NETDATA_WEB_RESPONSE_ZLIB_CHUNK_SIZE]; // temporary buffer for storing compressed output
 #endif /* NETDATA_WITH_ZLIB */
 };
 
@@ -170,7 +171,6 @@ struct web_client {
     size_t header_parse_last_size;
 
     bool tcp_cork;
-
     int ifd;
     int ofd;
 
@@ -180,11 +180,9 @@ struct web_client {
     char client_host[NI_MAXHOST];
     char forwarded_host[NI_MAXHOST]; //Used with proxy
 
-    BUFFER *url_last_full_encoded;
+    BUFFER *url_as_received;
     BUFFER *url_path_decoded;
     BUFFER *url_query_string_decoded;
-
-    struct timeval tv_in, tv_ready;
 
     char *post_payload;
     size_t post_payload_size;
@@ -194,19 +192,6 @@ struct web_client {
     char origin[NETDATA_WEB_REQUEST_ORIGIN_HEADER_SIZE + 1];
     char *user_agent;
 
-    struct response response;
-
-    size_t stats_received_bytes;
-    size_t stats_sent_bytes;
-
-    // cache of web_client allocations
-    struct web_client *prev; // maintain a linked list of web clients
-    struct web_client *next; // for the web servers that need it
-
-    // MULTI-THREADED WEB SERVER MEMBERS
-    netdata_thread_t thread; // the thread servicing this client
-    volatile int running;    // 1 when the thread runs, 0 otherwise
-
     // STATIC-THREADED WEB SERVER MEMBERS
     size_t pollinfo_slot;          // POLLINFO slot of the web client
     size_t pollinfo_filecopy_slot; // POLLINFO slot of the file read
@@ -214,9 +199,30 @@ struct web_client {
     struct netdata_ssl ssl;
 #endif
 
-    size_t *statistics_memory_accounting;
-    web_client_interrupt_t interrupt_callback;
-    void *interrupt_callback_data;
+    struct {
+        web_client_interrupt_t callback;
+        void *callback_data;
+    } interrupt;
+
+    struct {
+        size_t received_bytes;
+        size_t sent_bytes;
+        size_t *memory_accounting; // temporary pointer for constructor to use
+    } statistics;
+
+    struct {
+        usec_t timeout_ut;                          // timeout if set, or zero
+        struct timeval tv_in;                       // request received
+        struct timeval tv_ready;                    // request processed - response ready
+        struct timeval tv_timeout_last_checkpoint;  // last checkpoint
+    } timings;
+
+    struct {
+        struct web_client *prev;
+        struct web_client *next;
+    } cache;
+
+    struct response response;
 };
 
 int web_client_permission_denied(struct web_client *w);
@@ -253,5 +259,12 @@ void web_client_decode_path_and_query_string(struct web_client *w, const char *p
 int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_fragment);
 const char *web_content_type_to_string(HTTP_CONTENT_TYPE content_type);
 void web_client_enable_deflate(struct web_client *w, int gzip);
+int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client *w, char *decoded_url_path);
+
+void web_client_timeout_checkpoint_init(struct web_client *w);
+void web_client_timeout_checkpoint_set(struct web_client *w, int timeout_ms);
+usec_t web_client_timeout_checkpoint(struct web_client *w);
+bool web_client_timeout_checkpoint_and_check(struct web_client *w, usec_t *usec_since_last_checkpoint);
+usec_t web_client_timeout_checkpoint_response_ready(struct web_client *w, usec_t *usec_since_last_checkpoint);
 
 #endif

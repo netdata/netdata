@@ -722,17 +722,10 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
         goto cleanup;
     }
 
-    if (timeout) {
-        struct timeval now;
-        now_realtime_timeval(&now);
-        int inqueue = (int)dt_usec(&w->tv_in, &now) / 1000;
-        timeout -= inqueue;
-        if (timeout <= 0) {
-            buffer_flush(w->response.data);
-            buffer_strcat(w->response.data, "Query timeout exceeded");
-            ret = HTTP_RESP_BACKEND_FETCH_FAILED;
-            goto cleanup;
-        }
+    web_client_timeout_checkpoint_set(w, timeout);
+    if(web_client_timeout_checkpoint_and_check(w, NULL)) {
+        ret = w->response.code;
+        goto cleanup;
     }
 
     if(outFileName && *outFileName) {

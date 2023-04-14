@@ -236,7 +236,7 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
     time_t    before = (before_str && *before_str)?str2l(before_str):0;
     time_t    after  = (after_str  && *after_str) ?str2l(after_str):-600;
     size_t    points = (points_str && *points_str)?str2u(points_str):0;
-    time_t    timeout = (timeout_str && *timeout_str)?str2l(timeout_str): 0;
+    int       timeout = (timeout_str && *timeout_str)?str2i(timeout_str): 0;
     time_t    resampling_time = (resampling_time_str && *resampling_time_str) ? str2l(resampling_time_str) : 0;
 
     QUERY_TARGET_REQUEST qtr = {
@@ -282,17 +282,10 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
         goto cleanup;
     }
 
-    if (timeout) {
-        struct timeval now;
-        now_realtime_timeval(&now);
-        int inqueue = (int)dt_usec(&w->tv_in, &now) / 1000;
-        timeout -= inqueue;
-        if (timeout <= 0) {
-            buffer_flush(w->response.data);
-            buffer_strcat(w->response.data, "Query timeout exceeded");
-            ret = HTTP_RESP_BACKEND_FETCH_FAILED;
-            goto cleanup;
-        }
+    web_client_timeout_checkpoint_set(w, timeout);
+    if(web_client_timeout_checkpoint_and_check(w, NULL)) {
+        ret = w->response.code;
+        goto cleanup;
     }
 
     if(outFileName && *outFileName) {

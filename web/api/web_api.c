@@ -209,8 +209,8 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
 bool web_client_interrupt_callback(void *data) {
     struct web_client *w = data;
 
-    if(w->interrupt_callback)
-        return w->interrupt_callback(w, w->interrupt_callback_data);
+    if(w->interrupt.callback)
+        return w->interrupt.callback(w, w->interrupt.callback_data);
 
     return sock_has_output_error(w->ofd);
 }

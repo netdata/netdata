@@ -62,7 +62,7 @@ void web_client_cache_destroy(void) {
     w = web_clients_cache.avail.head;
     while(w) {
         t = w;
-        w = w->next;
+        w = w->cache.next;
         web_client_free(t);
     }
     web_clients_cache.avail.head = NULL;
@@ -84,12 +84,12 @@ void web_client_cache_destroy(void) {
 //    netdata_spinlock_unlock(&web_clients_cache.used.spinlock);
 }
 
-struct web_client *web_client_get_from_cache() {
+struct web_client *web_client_get_from_cache(void) {
     netdata_spinlock_lock(&web_clients_cache.avail.spinlock);
     struct web_client *w = web_clients_cache.avail.head;
     if(w) {
         // get it from avail
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(web_clients_cache.avail.head, w, prev, next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(web_clients_cache.avail.head, w, cache.prev, cache.next);
         web_clients_cache.avail.count--;
         netdata_spinlock_unlock(&web_clients_cache.avail.spinlock);
 
@@ -114,7 +114,7 @@ struct web_client *web_client_get_from_cache() {
     }
 
     // link it to used web clients
-    DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(web_clients_cache.used.head, w, prev, next);
+    DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(web_clients_cache.used.head, w, cache.prev, cache.next);
     web_clients_cache.used.count++;
     netdata_spinlock_unlock(&web_clients_cache.used.spinlock);
 
@@ -127,11 +127,9 @@ struct web_client *web_client_get_from_cache() {
 }
 
 void web_client_release_to_cache(struct web_client *w) {
-    internal_error(w->running, "%llu: releasing web client from %s port %s, but it still running.", w->id, w->client_ip, w->client_port);
-
     // unlink it from the used
     netdata_spinlock_lock(&web_clients_cache.used.spinlock);
-    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(web_clients_cache.used.head, w, prev, next);
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(web_clients_cache.used.head, w, cache.prev, cache.next);
     ssize_t used_count = (ssize_t)--web_clients_cache.used.count;
     netdata_spinlock_unlock(&web_clients_cache.used.spinlock);
 
@@ -144,7 +142,7 @@ void web_client_release_to_cache(struct web_client *w) {
     }
     else {
         // link it to the avail
-        DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(web_clients_cache.avail.head, w, prev, next);
+        DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(web_clients_cache.avail.head, w, cache.prev, cache.next);
         web_clients_cache.avail.count++;
         netdata_spinlock_unlock(&web_clients_cache.avail.spinlock);
     }

@@ -226,7 +226,8 @@ static bool web_client_stop_callback(struct web_client *w __maybe_unused, void *
     return !webrtc_dc_is_open(chan);
 }
 
-static void webrtc_send_in_chunks(WEBRTC_DC *chan, const char *data, size_t size, int code, const char *message_type, HTTP_CONTENT_TYPE content_type, size_t max_message_size, bool binary) {
+static size_t webrtc_send_in_chunks(WEBRTC_DC *chan, const char *data, size_t size, int code, const char *message_type, HTTP_CONTENT_TYPE content_type, size_t max_message_size, bool binary) {
+    size_t sent_bytes = 0;
     size_t chunk = 0;
     size_t total_chunks = size / max_message_size;
     if(total_chunks * max_message_size < size)
@@ -256,6 +257,8 @@ static void webrtc_send_in_chunks(WEBRTC_DC *chan, const char *data, size_t size
         memcpy(&send_buffer[len], s, message_size);
 
         int total_message_size = (int)(len + message_size);
+        sent_bytes += total_message_size;
+
         if(!binary)
             total_message_size = -total_message_size;
 
@@ -272,15 +275,18 @@ static void webrtc_send_in_chunks(WEBRTC_DC *chan, const char *data, size_t size
     internal_fatal(chunk != total_chunks, "WEBRTC number of compressed chunks mismatch");
 
     freez(send_buffer);
+    return sent_bytes;
 }
 
 static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, size_t size __maybe_unused, bool binary __maybe_unused) {
+    struct timeval tv;
+
     internal_error(true, "WEBRTC[%d],DC[%d]: got request '%s' of size %zu and type %s.",
                    chan->conn->pc, chan->dc, request, size, binary?"binary":"text");
 
     struct web_client *w = web_client_get_from_cache();
-    w->interrupt_callback = web_client_stop_callback;
-    w->interrupt_callback_data = chan;
+    w->interrupt.callback = web_client_stop_callback;
+    w->interrupt.callback_data = chan;
 
     w->acl = WEB_CLIENT_ACL_WEBRTC;
 
@@ -294,9 +300,17 @@ static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, siz
         path += 4;
     }
 
+    web_client_timeout_checkpoint_set(w, 0);
     web_client_decode_path_and_query_string(w, path);
-    if(strncmp(path, "/api/", 5) == 0) path += 5;
-    w->response.code = web_client_api_request(localhost, w, path);
+    path = (char *)buffer_tostring(w->url_path_decoded);
+    w->response.code = web_client_api_request_with_node_selection(localhost, w, path);
+    web_client_timeout_checkpoint_response_ready(w, NULL);
+
+    size_t sent_bytes = 0;
+    size_t response_size = buffer_strlen(w->response.data);
+
+    bool send_plain = true;
+    int max_message_size = (int)chan->conn->max_message_size - WEBRTC_COMPRESSED_HEADER_SIZE;
 
     if(!webrtc_dc_is_open(chan)) {
         internal_error(true, "WEBRTC[%d],DC[%d]: ignoring API response on closed data channel.", chan->conn->pc, chan->dc);
@@ -304,33 +318,46 @@ static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, siz
     }
     else {
         internal_error(true, "WEBRTC[%d],DC[%d]: prepared response with code %d, size %zu.",
-                       chan->conn->pc, chan->dc, w->response.code, buffer_strlen(w->response.data));
+                       chan->conn->pc, chan->dc, w->response.code, response_size);
     }
 
-    // send the response
-    bool send_plain = true;
-    int max_message_size = (int)chan->conn->max_message_size - WEBRTC_COMPRESSED_HEADER_SIZE;
-
 #if defined(ENABLE_COMPRESSION)
-    int max_compressed_size = LZ4_compressBound(buffer_strlen(w->response.data));
+    int max_compressed_size = LZ4_compressBound((int)response_size);
     char *compressed = mallocz(max_compressed_size);
 
     int compressed_size = LZ4_compress_default(buffer_tostring(w->response.data), compressed,
-                                               buffer_strlen(w->response.data), max_compressed_size);
+                                               (int)response_size, max_compressed_size);
 
     if(compressed_size > 0) {
         send_plain = false;
-        webrtc_send_in_chunks(chan, compressed, compressed_size,
-                              w->response.code, "LZ4", w->response.data->content_type, max_message_size, true);
+        sent_bytes = webrtc_send_in_chunks(chan, compressed, compressed_size,
+                                           w->response.code, "LZ4", w->response.data->content_type,
+                                           max_message_size, true);
     }
     freez(compressed);
 #endif
 
     if(send_plain)
-        webrtc_send_in_chunks(chan, buffer_tostring(w->response.data), buffer_strlen(w->response.data),
-                              w->response.code, "PLAIN", w->response.data->content_type, max_message_size, false);
+        sent_bytes = webrtc_send_in_chunks(chan, buffer_tostring(w->response.data), buffer_strlen(w->response.data),
+                              w->response.code, "PLAIN", w->response.data->content_type,
+                              max_message_size, false);
 
 cleanup:
+    now_monotonic_high_precision_timeval(&tv);
+    log_access("%llu: %d '[RTC]:%d:%d' '%s' (sent/all = %zu/%zu bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %d '%s'",
+               w->id
+            , gettid()
+            , chan->conn->pc, chan->dc
+            , "DATA"
+            , sent_bytes
+            , response_size
+            , response_size > sent_bytes ? -(((double)(response_size - sent_bytes) / (double)response_size) * 100.0) : ((response_size > 0) ? (((sent_bytes - response_size) / (double)response_size) * 100.0) : 0.0)
+            , dt_usec(&w->timings.tv_ready, &w->timings.tv_in) / 1000.0
+            , dt_usec(&tv, &w->timings.tv_ready) / 1000.0
+            , dt_usec(&tv, &w->timings.tv_in) / 1000.0
+            , w->response.code
+            , strip_control_characters((char *)buffer_tostring(w->url_as_received))
+    );
     web_client_release_to_cache(w);
 }
 
@@ -343,6 +370,7 @@ static void myOpenCallback(int id, void *user_ptr) {
     WEBRTC_DC *chan = user_ptr;
     internal_fatal(chan->dc != id, "WEBRTC[%d],DC[%d]: dc mismatch, expected %d, got %d", chan->conn->pc, chan->dc, chan->dc, id);
 
+    log_access("WEBRTC[%d],DC[%d]: %d DATA CHANNEL '%s' OPEN", chan->conn->pc, chan->dc, gettid(), chan->label);
     internal_error(true, "WEBRTC[%d],DC[%d]: data channel opened.", chan->conn->pc, chan->dc);
     chan->open = true;
 }
@@ -359,6 +387,8 @@ static void myClosedCallback(int id, void *user_ptr) {
     netdata_spinlock_lock(&chan->conn->channels.spinlock);
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(chan->conn->channels.head, chan, link.prev, link.next);
     netdata_spinlock_unlock(&chan->conn->channels.spinlock);
+
+    log_access("WEBRTC[%d],DC[%d]: %d DATA CHANNEL '%s' CLOSED", chan->conn->pc, chan->dc, gettid(), chan->label);
 
     freez(chan->label);
     freez(chan);
@@ -378,7 +408,6 @@ static void myMessageCallback(int id, const char *message, int size, void *user_
 
     WEBRTC_DC *chan = user_ptr;
     internal_fatal(chan->dc != id, "WEBRTC[%d],DC[%d]: dc mismatch, expected %d, got %d", chan->conn->pc, chan->dc, chan->dc, id);
-
     internal_fatal(!webrtc_dc_is_open(chan), "WEBRTC[%d],DC[%d]: received message on closed channel", chan->conn->pc, chan->dc);
 
     bool binary = (size >= 0);
@@ -541,22 +570,27 @@ static void myStateChangeCallback(int pc __maybe_unused, rtcState state, void *u
             break;
 
         case RTC_CONNECTING:
+            log_access("WEBRTC[%d]: %d CONNECTING", conn->pc, gettid());
             internal_error(true, "WEBRTC[%d]: connecting...", conn->pc);
             break;
 
         case RTC_CONNECTED:
+            log_access("WEBRTC[%d]: %d CONNECTED", conn->pc, gettid());
             internal_error(true, "WEBRTC[%d]: connected!", conn->pc);
             break;
 
         case RTC_DISCONNECTED:
+            log_access("WEBRTC[%d]: %d DISCONNECTED", conn->pc, gettid());
             internal_error(true, "WEBRTC[%d]: disconnected.", conn->pc);
             break;
 
         case RTC_FAILED:
+            log_access("WEBRTC[%d]: %d CONNECTION FAILED", conn->pc, gettid());
             internal_error(true, "WEBRTC[%d]: failed.", conn->pc);
             break;
 
         case RTC_CLOSED:
+            log_access("WEBRTC[%d]: %d CONNECTION CLOSED", conn->pc, gettid());
             internal_error(true, "WEBRTC[%d]: closed.", conn->pc);
             netdata_spinlock_lock(&webrtc_base.unsafe.spinlock);
             webrtc_destroy_connection_unsafe(conn);
