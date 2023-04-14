@@ -1032,8 +1032,7 @@ void ebpf_process_update_cgroup_algorithm()
     int i;
     for (i = 0; i < NETDATA_KEY_PUBLISH_PROCESS_END; i++)  {
         netdata_publish_syscall_t *ptr = &process_publish_aggregated[i];
-        freez(ptr->algorithm);
-        ptr->algorithm = strdupz(ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
+        ptr->algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX];
     }
 }
 

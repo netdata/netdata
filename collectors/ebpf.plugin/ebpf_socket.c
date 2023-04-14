@@ -2824,8 +2824,7 @@ void ebpf_socket_update_cgroup_algorithm()
     int i;
     for (i = 0; i < NETDATA_MAX_SOCKET_VECTOR; i++) {
         netdata_publish_syscall_t *ptr = &socket_publish_aggregated[i];
-        freez(ptr->algorithm);
-        ptr->algorithm = strdupz(ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
+        ptr->algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX];
     }
 }
 
