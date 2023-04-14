@@ -178,7 +178,7 @@ inline RRDR_OPTIONS web_client_api_request_v1_data_options(char *o) {
     RRDR_OPTIONS ret = 0x00000000;
     char *tok;
 
-    while(o && *o && (tok = mystrsep(&o, ", |"))) {
+    while(o && *o && (tok = strsep_skip_consecutive_separators(&o, ", |"))) {
         if(!*tok) continue;
 
         uint32_t hash = simple_hash(tok);
@@ -262,7 +262,7 @@ inline uint32_t web_client_api_request_v1_data_google_format(char *name) {
 int web_client_api_request_v1_alarms_select (char *url) {
     int all = 0;
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if (!value || !*value) continue;
 
         if(!strcmp(value, "all") || !strcmp(value, "all=true")) all = 1;
@@ -300,10 +300,10 @@ inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_clien
     buffer_sprintf(w->response.data, "[");
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -341,10 +341,10 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
     char *chart = NULL;
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if (!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -365,10 +365,10 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
     buffer_flush(w->response.data);
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -419,10 +419,10 @@ static int web_client_api_request_v1_context(RRDHOST *host, struct web_client *w
     buffer_flush(w->response.data);
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -483,10 +483,10 @@ static int web_client_api_request_v1_contexts(RRDHOST *host, struct web_client *
     buffer_flush(w->response.data);
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -579,10 +579,10 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
     RRDR_OPTIONS options = 0;
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -628,10 +628,10 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
             char *tqx_name, *tqx_value;
 
             while(value) {
-                tqx_value = mystrsep(&value, ";");
+                tqx_value = strsep_skip_consecutive_separators(&value, ";");
                 if(!tqx_value || !*tqx_value) continue;
 
-                tqx_name = mystrsep(&tqx_value, ":");
+                tqx_name = strsep_skip_consecutive_separators(&tqx_value, ":");
                 if(!tqx_name || !*tqx_name) continue;
                 if(!tqx_value || !*tqx_value) continue;
 
@@ -851,10 +851,10 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     buffer_no_cacheable(w->response.data);
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if (!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if (!name || !*name) continue;
         if (!value || !*value) continue;
 
@@ -1287,11 +1287,11 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
     const char *function = NULL;
 
     while (url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if (!value || !*value)
             continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if (!name || !*name)
             continue;
 
@@ -1465,7 +1465,7 @@ static struct web_api_command api_commands_v1[] = {
         { NULL,              0, WEB_CLIENT_ACL_NONE,      NULL },
 };
 
-inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url) {
+inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url_path_endpoint) {
     static int initialized = 0;
 
     if(unlikely(initialized == 0)) {
@@ -1475,5 +1475,5 @@ inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *
             api_commands_v1[i].hash = simple_hash(api_commands_v1[i].command);
     }
 
-    return web_client_api_request_vX(host, w, url, api_commands_v1);
+    return web_client_api_request_vX(host, w, url_path_endpoint, api_commands_v1);
 }

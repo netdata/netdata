@@ -798,7 +798,7 @@ RRDR_GROUP_BY group_by_parse(char *s) {
     RRDR_GROUP_BY group_by = RRDR_GROUP_BY_NONE;
 
     while(s) {
-        char *key = mystrsep(&s, ",| ");
+        char *key = strsep_skip_consecutive_separators(&s, ",| ");
         if (!key || !*key) continue;
 
         if (strcmp(key, "selected") == 0)

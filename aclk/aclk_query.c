@@ -13,16 +13,15 @@ pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
 #define QUERY_THREAD_LOCK pthread_mutex_lock(&query_lock_wait)
 #define QUERY_THREAD_UNLOCK pthread_mutex_unlock(&query_lock_wait)
 
-static usec_t aclk_web_api_request(RRDHOST *host, struct web_client *w, char *url, const size_t api_version)
+static usec_t aclk_web_api_request(RRDHOST *host, struct web_client *w)
 {
     usec_t t;
 
     t = now_monotonic_high_precision_usec();
 
-    if(api_version == 2)
-        w->response.code = web_client_api_request_v2(host, w, url);
-    else
-        w->response.code = web_client_api_request_v1(host, w, url);
+    char *path = (char *)buffer_tostring(w->url_path_decoded);
+    if(strncmp(path, "/api/", 5) == 0) path += 5;
+    web_client_api_request(host, w, path);
 
     if(buffer_strlen(w->response.data) > ACLK_MAX_WEB_RESPONSE_SIZE) {
         buffer_flush(w->response.data);
@@ -88,6 +87,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
     struct web_client *w = web_client_get_from_cache();
     w->origin[0] = '*';
     w->acl = WEB_CLIENT_ACL_ACLK;
+    w->mode = WEB_CLIENT_MODE_GET;
     w->tv_in = query->created_tv;
     now_realtime_timeval(&w->tv_ready);
 
@@ -128,34 +128,21 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
         }
     }
 
-    size_t api_version = 1;
-    {
-        char *s = strstr(query->data.http_api_v2.query, "/api/v");
-        if(s && s[6]) {
-            api_version = str2u(&s[6]);
-            if(api_version != 1 && api_version != 2)
-                api_version = 1;
-        }
-    }
-
-    char *mysep = strchr(query->data.http_api_v2.query, '?');
-    if (mysep) {
-        url_decode_r(w->decoded_query_string, mysep, NETDATA_WEB_REQUEST_URL_SIZE + 1);
-        *mysep = '\0';
-    } else
-        url_decode_r(w->decoded_query_string, query->data.http_api_v2.query, NETDATA_WEB_REQUEST_URL_SIZE + 1);
-
-    mysep = strrchr(query->data.http_api_v2.query, '/');
+    const char *url_path = strstr(query->data.http_api_v2.query, "/api/");
+    if(!url_path) url_path = query->data.http_api_v2.query;
+    web_client_decode_path_and_query_string(w, url_path);
 
     if (aclk_stats_enabled) {
+        char *url_path_endpoint = strrchr(buffer_tostring(w->url_path_decoded), '/');
+
         ACLK_STATS_LOCK;
-        int stat_idx = aclk_cloud_req_http_type_to_idx(mysep ? mysep + 1 : "other");
+        int stat_idx = aclk_cloud_req_http_type_to_idx(url_path_endpoint ? url_path_endpoint + 1 : "other");
         aclk_metrics_per_sample.cloud_req_http_by_type[stat_idx]++;
         ACLK_STATS_UNLOCK;
     }
 
     // execute the query
-    t = aclk_web_api_request(query_host, w, mysep ? mysep + 1 : "noop", api_version);
+    t = aclk_web_api_request(query_host, w);
     size = (w->mode == WEB_CLIENT_MODE_FILECOPY) ? w->response.rlen : w->response.data->len;
     sent = size;
 

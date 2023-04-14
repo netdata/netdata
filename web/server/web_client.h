@@ -180,12 +180,9 @@ struct web_client {
     char client_host[NI_MAXHOST];
     char forwarded_host[NI_MAXHOST]; //Used with proxy
 
-    BUFFER *url_decoded;
-    BUFFER *url_last;
-    char decoded_query_string[NETDATA_WEB_REQUEST_URL_SIZE + 1]; // we decode the Query String in this buffer
-    size_t url_path_length;
-    char separator;        // This value can be either '?' or 'f'
-    char *url_search_path; // A pointer to the search path sent by the client
+    BUFFER *url_last_full_encoded;
+    BUFFER *url_path_decoded;
+    BUFFER *url_query_string_decoded;
 
     struct timeval tv_in, tv_ready;
 
@@ -252,7 +249,8 @@ void web_client_reuse_ssl(struct web_client *w);
 #include "web/api/web_api_v2.h"
 #include "daemon/common.h"
 
-int web_client_api_request(RRDHOST *host, struct web_client *w, char *url);
+void web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string);
+int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_fragment);
 const char *web_content_type_to_string(HTTP_CONTENT_TYPE content_type);
 void web_client_enable_deflate(struct web_client *w, int gzip);
 

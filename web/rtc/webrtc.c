@@ -294,17 +294,10 @@ static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, siz
         path += 4;
     }
 
-    buffer_strcat(w->url_last, path);
-    if(strncmp(path, "/api/", 5) == 0)
-        path += 5;
-
-    char *query_string_start = strchr(path, '?');
-    if (query_string_start) {
-        url_decode_r(w->decoded_query_string, query_string_start, NETDATA_WEB_REQUEST_URL_SIZE + 1);
-        *query_string_start = '\0';
-    }
-
+    web_client_decode_path_and_query_string(w, path);
+    if(strncmp(path, "/api/", 5) == 0) path += 5;
     w->response.code = web_client_api_request(localhost, w, path);
+
     if(!webrtc_dc_is_open(chan)) {
         internal_error(true, "WEBRTC[%d],DC[%d]: ignoring API response on closed data channel.", chan->conn->pc, chan->dc);
         goto cleanup;

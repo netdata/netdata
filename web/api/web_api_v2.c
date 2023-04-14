@@ -7,10 +7,10 @@ static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unu
     struct api_v2_contexts_request req = { 0 };
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -111,10 +111,10 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
     size_t group_by_idx = 0, group_by_label_idx = 0, aggregation_idx = 0;
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -162,10 +162,10 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
             char *tqx_name, *tqx_value;
 
             while(value) {
-                tqx_value = mystrsep(&value, ";");
+                tqx_value = strsep_skip_consecutive_separators(&value, ";");
                 if(!tqx_value || !*tqx_value) continue;
 
-                tqx_name = mystrsep(&tqx_value, ":");
+                tqx_name = strsep_skip_consecutive_separators(&tqx_value, ":");
                 if(!tqx_name || !*tqx_name) continue;
                 if(!tqx_value || !*tqx_value) continue;
 
@@ -365,7 +365,7 @@ static struct web_api_command api_commands_v2[] = {
         {NULL, 0, WEB_CLIENT_ACL_NONE, NULL},
 };
 
-inline int web_client_api_request_v2(RRDHOST *host, struct web_client *w, char *url) {
+inline int web_client_api_request_v2(RRDHOST *host, struct web_client *w, char *url_path_endpoint) {
     static int initialized = 0;
 
     if(unlikely(initialized == 0)) {
@@ -375,5 +375,5 @@ inline int web_client_api_request_v2(RRDHOST *host, struct web_client *w, char *
             api_commands_v2[i].hash = simple_hash(api_commands_v2[i].command);
     }
 
-    return web_client_api_request_vX(host, w, url, api_commands_v2);
+    return web_client_api_request_vX(host, w, url_path_endpoint, api_commands_v2);
 }

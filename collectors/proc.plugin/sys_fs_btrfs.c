@@ -135,9 +135,9 @@ static inline int collect_btrfs_error_stats(BTRFS_DEVICE *device){
     
     char *p = buffer;
     while(p){
-        char *val = mystrsep(&p, "\n");
+        char *val = strsep_skip_consecutive_separators(&p, "\n");
         if(unlikely(!val || !*val)) break;
-        char *key = mystrsep(&val, " ");
+        char *key = strsep_skip_consecutive_separators(&val, " ");
 
         if(!strcmp(key, "write_errs")) device->write_errs = str2ull(val, NULL);
         else if(!strcmp(key, "read_errs")) device->read_errs = str2ull(val, NULL);
@@ -166,9 +166,9 @@ static inline int collect_btrfs_commits_stats(BTRFS_NODE *node, int update_every
     
     char *p = buffer;
     while(p){
-        char *val = mystrsep(&p, "\n");
+        char *val = strsep_skip_consecutive_separators(&p, "\n");
         if(unlikely(!val || !*val)) break;
-        char *key = mystrsep(&val, " ");
+        char *key = strsep_skip_consecutive_separators(&val, " ");
 
         if(!strcmp(key, "commits")){
             long long commits_total_new = str2ull(val, NULL);
