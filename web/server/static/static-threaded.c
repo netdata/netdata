@@ -107,9 +107,9 @@ static void web_server_file_del_callback(POLLINFO *pi) {
 
     if(unlikely(!w->pollinfo_slot)) {
         debug(D_WEB_CLIENT, "%llu: CROSS WEB CLIENT CLEANUP (iFD %d, oFD %d)", w->id, pi->fd, w->ofd);
-        web_client_release_to_cache(w);
         web_server_log_connection(w, "DISCONNECTED");
         web_client_request_done(w);
+        web_client_release_to_cache(w);
         global_statistics_web_client_disconnected();
     }
 
@@ -281,9 +281,9 @@ static void web_server_del_callback(POLLINFO *pi) {
             pi->flags |= POLLINFO_FLAG_DONT_CLOSE;
 
         debug(D_WEB_CLIENT, "%llu: CLOSING CLIENT FD %d", w->id, pi->fd);
-        web_client_release_to_cache(w);
         web_server_log_connection(w, "DISCONNECTED");
         web_client_request_done(w);
+        web_client_release_to_cache(w);
         global_statistics_web_client_disconnected();
     }
 

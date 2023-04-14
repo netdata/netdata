@@ -16,7 +16,7 @@
 // The size of the cache is adaptive. It caches the structures of 2x
 // the number of currently connected clients.
 
-struct clients_cache {
+static struct clients_cache {
     struct {
         SPINLOCK spinlock;
         struct web_client *head;    // the structures of the currently connected clients
@@ -31,9 +31,7 @@ struct clients_cache {
         struct web_client *head;    // the cached structures, available for future clients
         size_t count;               // the number of cached structures
     } avail;
-};
-
-static __thread struct clients_cache web_clients_cache = {
+} web_clients_cache = {
         .used = {
                 .spinlock = NETDATA_SPINLOCK_INITIALIZER,
                 .head = NULL,
@@ -60,19 +58,6 @@ void web_client_cache_destroy(void) {
 
     struct web_client *w, *t;
 
-    netdata_spinlock_lock(&web_clients_cache.used.spinlock);
-    w = web_clients_cache.used.head;
-    while(w) {
-        t = w;
-        w = w->next;
-        web_client_free(t);
-    }
-    web_clients_cache.used.head = NULL;
-    web_clients_cache.used.count = 0;
-    web_clients_cache.used.reused = 0;
-    web_clients_cache.used.allocated = 0;
-    netdata_spinlock_unlock(&web_clients_cache.used.spinlock);
-
     netdata_spinlock_lock(&web_clients_cache.avail.spinlock);
     w = web_clients_cache.avail.head;
     while(w) {
@@ -83,6 +68,20 @@ void web_client_cache_destroy(void) {
     web_clients_cache.avail.head = NULL;
     web_clients_cache.avail.count = 0;
     netdata_spinlock_unlock(&web_clients_cache.avail.spinlock);
+
+// DO NOT FREE THEM IF THEY ARE USED
+//    netdata_spinlock_lock(&web_clients_cache.used.spinlock);
+//    w = web_clients_cache.used.head;
+//    while(w) {
+//        t = w;
+//        w = w->next;
+//        web_client_free(t);
+//    }
+//    web_clients_cache.used.head = NULL;
+//    web_clients_cache.used.count = 0;
+//    web_clients_cache.used.reused = 0;
+//    web_clients_cache.used.allocated = 0;
+//    netdata_spinlock_unlock(&web_clients_cache.used.spinlock);
 }
 
 struct web_client *web_client_get_from_cache() {
