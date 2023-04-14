@@ -16,6 +16,8 @@ pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
 static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) {
     int retval = 0;
     BUFFER *local_buffer = NULL;
+    size_t size = 0;
+    size_t sent = 0;
 
 #ifdef NETDATA_WITH_ZLIB
     int z_ret;
@@ -69,8 +71,8 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) 
         ACLK_STATS_UNLOCK;
     }
 
-    size_t size = w->response.data->len;
-    size_t sent = size;
+    size = w->response.data->len;
+    sent = size;
 
 #ifdef NETDATA_WITH_ZLIB
     // check if gzip encoding can and should be used
