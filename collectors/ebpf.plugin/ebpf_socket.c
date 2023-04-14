@@ -498,7 +498,6 @@ static inline void clean_internal_socket_plot(netdata_socket_plot_t *ptr)
  * Clean socket plot
  *
  * Clean the allocated data for inbound and outbound vectors.
- */
 static void clean_allocated_socket_plot()
 {
     if (!network_viewer_opt.enabled)
@@ -520,12 +519,12 @@ static void clean_allocated_socket_plot()
     }
     clean_internal_socket_plot(&plot[outbound_vectors.last]);
 }
+ */
 
 /**
  * Clean network ports allocated during initialization.
  *
  * @param ptr a pointer to the link list.
- */
 static void clean_network_ports(ebpf_network_viewer_port_list_t *ptr)
 {
     if (unlikely(!ptr))
@@ -538,6 +537,7 @@ static void clean_network_ports(ebpf_network_viewer_port_list_t *ptr)
         ptr = next;
     }
 }
+ */
 
 /**
  * Clean service names
@@ -545,7 +545,6 @@ static void clean_network_ports(ebpf_network_viewer_port_list_t *ptr)
  * Clean the allocated link list that stores names.
  *
  * @param names the link list.
- */
 static void clean_service_names(ebpf_network_viewer_dim_name_t *names)
 {
     if (unlikely(!names))
@@ -558,12 +557,12 @@ static void clean_service_names(ebpf_network_viewer_dim_name_t *names)
         names = next;
     }
 }
+ */
 
 /**
  * Clean hostnames
  *
  * @param hostnames the hostnames to clean
- */
 static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
 {
     if (unlikely(!hostnames))
@@ -577,6 +576,7 @@ static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
         hostnames = next;
     }
 }
+ */
 
 /**
  * Clean port Structure
@@ -628,13 +628,11 @@ static void clean_ip_structure(ebpf_network_viewer_ip_list_t **clean)
 static void ebpf_socket_free(ebpf_module_t *em )
 {
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    if (em->thread->enabled == NETDATA_THREAD_EBPF_RUNNING) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
-        return;
-    }
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
+    /* We can have thousands of sockets to clean, so we are transferring
+     * for OS the responsibility while we do not use ARAL here
     freez(socket_hash_values);
 
     freez(bandwidth_vector);
@@ -646,13 +644,13 @@ static void ebpf_socket_free(ebpf_module_t *em )
 
     clean_port_structure(&listen_ports);
 
-    ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled = 0;
-
     clean_network_ports(network_viewer_opt.included_port);
     clean_network_ports(network_viewer_opt.excluded_port);
     clean_service_names(network_viewer_opt.names);
     clean_hostnames(network_viewer_opt.included_hostnames);
     clean_hostnames(network_viewer_opt.excluded_hostnames);
+     */
+    ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled = 0;
 
     pthread_mutex_destroy(&nv_mutex);
 
@@ -678,8 +676,10 @@ static void ebpf_socket_free(ebpf_module_t *em )
 static void ebpf_socket_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    pthread_mutex_lock(&nv_mutex);
     if (socket_threads.thread)
         netdata_thread_cancel(*socket_threads.thread);
+    pthread_mutex_unlock(&nv_mutex);
     ebpf_socket_free(em);
 }
 
@@ -692,8 +692,7 @@ static void ebpf_socket_exit(void *ptr)
  */
 void ebpf_socket_cleanup(void *ptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    ebpf_socket_free(em);
+    UNUSED(ptr);
 }
 
 /*****************************************************************
@@ -2186,10 +2185,11 @@ void *ebpf_socket_read_hash(void *ptr)
     heartbeat_init(&hb);
     int fd_ipv4 = socket_maps[NETDATA_SOCKET_TABLE_IPV4].map_fd;
     int fd_ipv6 = socket_maps[NETDATA_SOCKET_TABLE_IPV6].map_fd;
-    while (!ebpf_exit_plugin) {
+    // This thread is cancelled from another thread
+    for (;;) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_exit_plugin)
-           continue;
+           break;
 
         pthread_mutex_lock(&nv_mutex);
         ebpf_read_socket_hash_table(fd_ipv4, AF_INET);
