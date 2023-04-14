@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Revert ML changes. [\#14908](https://github.com/netdata/netdata/pull/14908) ([vkalintiris](https://github.com/vkalintiris))
 - Update change-metrics-storage.md [\#14905](https://github.com/netdata/netdata/pull/14905) ([cakrit](https://github.com/cakrit))
 - /api/v2 part 10 [\#14904](https://github.com/netdata/netdata/pull/14904) ([ktsaou](https://github.com/ktsaou))
 - Update REFERENCE.md [\#14900](https://github.com/netdata/netdata/pull/14900) ([cakrit](https://github.com/cakrit))
@@ -399,7 +400,6 @@
 - allow multiple local-build/static-install options in kickstart [\#14287](https://github.com/netdata/netdata/pull/14287) ([ilyam8](https://github.com/ilyam8))
 - fix\(alarms\): treat 0 processors as unknown in load\_cpu\_number [\#14286](https://github.com/netdata/netdata/pull/14286) ([ilyam8](https://github.com/ilyam8))
 - DBENGINE v2 - improvements part 4 [\#14285](https://github.com/netdata/netdata/pull/14285) ([ktsaou](https://github.com/ktsaou))
-- fix for dbengine2 improvements part 3 [\#14284](https://github.com/netdata/netdata/pull/14284) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
