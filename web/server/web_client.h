@@ -126,8 +126,6 @@ typedef enum web_client_flags {
 
 #define NETDATA_WEB_RESPONSE_ZLIB_CHUNK_SIZE 16384
 
-#define NETDATA_WEB_COOKIES_MAX 4
-
 #define NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE 4096
 #define NETDATA_WEB_RESPONSE_INITIAL_SIZE 8192
 #define NETDATA_WEB_REQUEST_INITIAL_SIZE 8192
@@ -135,11 +133,12 @@ typedef enum web_client_flags {
 #define NETDATA_WEB_DECODED_URL_INITIAL_SIZE 512
 
 struct response {
-    BUFFER *header;        // our response header
-    BUFFER *header_output; // internal use
-    BUFFER *data;          // our response data buffer
+    BUFFER *header;         // our response header
+    BUFFER *header_output;  // internal use
+    BUFFER *data;           // our response data buffer
 
-    int code; // the HTTP response code
+    short int code;         // the HTTP response code
+    bool has_cookies;
 
     size_t rlen; // if non-zero, the excepted size of ifd (input of firecopy)
     size_t sent; // current data length sent to output
@@ -199,11 +198,6 @@ struct web_client {
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;
 #endif
-
-    struct {                            // An array of cookies to set when responding
-                                        // call web_client_init_cookies() before setting them
-        BUFFER *array[NETDATA_WEB_COOKIES_MAX];
-    } cookies;
 
     struct {                            // A callback to check if the query should be interrupted / stopped
         web_client_interrupt_t callback;
@@ -272,7 +266,5 @@ void web_client_timeout_checkpoint_set(struct web_client *w, int timeout_ms);
 usec_t web_client_timeout_checkpoint(struct web_client *w);
 bool web_client_timeout_checkpoint_and_check(struct web_client *w, usec_t *usec_since_last_checkpoint);
 usec_t web_client_timeout_checkpoint_response_ready(struct web_client *w, usec_t *usec_since_last_checkpoint);
-
-void web_client_init_cookies(struct web_client *w);
 
 #endif

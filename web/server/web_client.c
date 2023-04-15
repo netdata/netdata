@@ -169,11 +169,6 @@ void web_client_request_done(struct web_client *w) {
     buffer_reset(w->response.header);
     buffer_reset(w->response.data);
 
-    for(size_t i = 0; i < NETDATA_WEB_COOKIES_MAX ;i++) {
-        if (w->cookies.array[i])
-            buffer_reset(w->cookies.array[i]);
-    }
-
     freez(w->server_host); w->server_host = NULL;
     freez(w->forwarded_host); w->forwarded_host = NULL;
     freez(w->origin); w->origin = NULL;
@@ -1053,17 +1048,7 @@ void web_client_build_http_header(struct web_client *w) {
     if(unlikely(web_x_frame_options))
         buffer_sprintf(w->response.header_output, "X-Frame-Options: %s\r\n", web_x_frame_options);
 
-    size_t have_cookies = 0;
-    for(size_t i = 0; i < NETDATA_WEB_COOKIES_MAX ;i++) {
-        if (w->cookies.array[i] && buffer_strlen(w->cookies.array[i])) {
-            buffer_sprintf(w->response.header_output,
-                           "Set-Cookie: %s\r\n",
-                           buffer_tostring(w->cookies.array[i]));
-            have_cookies++;
-        }
-    }
-
-    if(have_cookies) {
+    if(w->response.has_cookies) {
         if(respect_web_browser_do_not_track_policy)
             buffer_sprintf(w->response.header_output,
                            "Tk: T;cookies\r\n");
@@ -2059,14 +2044,6 @@ void web_client_zero(struct web_client *w) {
     BUFFER *b5 = w->url_as_received;
     BUFFER *b6 = w->url_query_string_decoded;
 
-    BUFFER *cookies[NETDATA_WEB_COOKIES_MAX];
-    for(size_t i = 0; i < NETDATA_WEB_COOKIES_MAX ;i++) {
-        cookies[i] = w->cookies.array[i];
-
-        if(cookies[i])
-            buffer_flush(cookies[i]);
-    }
-
     // empty the buffers
     buffer_reset(b1);
     buffer_reset(b2);
@@ -2116,9 +2093,6 @@ void web_client_zero(struct web_client *w) {
     w->url_path_decoded = b4;
     w->url_as_received = b5;
     w->url_query_string_decoded = b6;
-
-    for(size_t i = 0; i < NETDATA_WEB_COOKIES_MAX ;i++)
-        w->cookies.array[i] = cookies[i];
 }
 
 struct web_client *web_client_create(size_t *statistics_memory_accounting) {
@@ -2145,9 +2119,6 @@ void web_client_free(struct web_client *w) {
     buffer_free(w->response.header_output);
     buffer_free(w->response.header);
     buffer_free(w->response.data);
-
-    for(size_t i = 0; i < NETDATA_WEB_COOKIES_MAX ;i++)
-        buffer_free(w->cookies.array[i]);
 
     freez(w->server_host);
     freez(w->forwarded_host);
@@ -2231,13 +2202,4 @@ inline bool web_client_timeout_checkpoint_and_check(struct web_client *w, usec_t
     }
 
     return false;
-}
-
-void web_client_init_cookies(struct web_client *w) {
-    for(size_t i = 0; i < NETDATA_WEB_COOKIES_MAX ; i++) {
-        if(!w->cookies.array[i])
-            w->cookies.array[i] = buffer_create(0, w->statistics.memory_accounting);
-        else
-            buffer_flush(w->cookies.array[i]);
-    }
 }

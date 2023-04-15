@@ -28,33 +28,17 @@ static void registry_set_cookie(struct web_client *w, const char *guid) {
     struct tm etmbuf, *etm = gmtime_r(&et, &etmbuf);
     strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", etm);
 
-    web_client_init_cookies(w);
-    size_t cookie = 0;
+    buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s\r\n", guid, edate);
+    if(registry.enable_cookies_samesite_secure)
+        buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; SameSite=None; Secure\r\n", guid, edate);
 
-    buffer_sprintf(w->cookies.array[cookie], NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s", guid, edate);
-    const char *base = buffer_tostring(w->cookies.array[cookie]);
-    cookie++;
-
-    if(registry.enable_cookies_samesite_secure && cookie < NETDATA_WEB_COOKIES_MAX) {
-        buffer_strcat(w->cookies.array[cookie], base);
-        buffer_strcat(w->cookies.array[cookie], "; SameSite=None; Secure");
-        cookie++;
+    if(registry.registry_domain && *registry.registry_domain) {
+        buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; Domain=%s\r\n", guid, edate, registry.registry_domain);
+        if(registry.enable_cookies_samesite_secure)
+            buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; Domain=%s; SameSite=None; Secure\r\n", guid, edate, registry.registry_domain);
     }
 
-    if((registry.registry_domain && *registry.registry_domain && cookie < NETDATA_WEB_COOKIES_MAX)) {
-        buffer_strcat(w->cookies.array[cookie], base);
-        buffer_sprintf(w->cookies.array[cookie], "; Domain=%s", registry.registry_domain);
-        base = buffer_tostring(w->cookies.array[cookie]);
-        cookie++;
-
-        if(registry.enable_cookies_samesite_secure && cookie < NETDATA_WEB_COOKIES_MAX) {
-            buffer_strcat(w->cookies.array[cookie], base);
-            buffer_strcat(w->cookies.array[cookie], "; SameSite=None; Secure");
-            cookie++;
-        }
-    }
-
-    (void)cookie;
+    w->response.has_cookies = true;
 }
 
 static inline void registry_set_person_cookie(struct web_client *w, REGISTRY_PERSON *p) {
