@@ -126,6 +126,8 @@ typedef enum web_client_flags {
 
 #define NETDATA_WEB_RESPONSE_ZLIB_CHUNK_SIZE 16384
 
+#define NETDATA_WEB_COOKIES_MAX 4
+
 #define NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE 4096
 #define NETDATA_WEB_RESPONSE_INITIAL_SIZE 8192
 #define NETDATA_WEB_REQUEST_INITIAL_SIZE 8192
@@ -160,11 +162,10 @@ struct web_client {
     unsigned long long id;
     size_t use_count;
 
-    WEB_CLIENT_FLAGS flags;  // status flags for the client
-    WEB_CLIENT_MODE mode;    // the operational mode of the client
-    WEB_CLIENT_ACL acl;      // the access list of the client
-    int port_acl;            // the operations permitted on the port the client connected to
-    char *auth_bearer_token; // the Bearer auth token (if sent)
+    WEB_CLIENT_FLAGS flags;             // status flags for the client
+    WEB_CLIENT_MODE mode;               // the operational mode of the client
+    WEB_CLIENT_ACL acl;                 // the access list of the client
+    int port_acl;                       // the operations permitted on the port the client connected to
     size_t header_parse_tries;
     size_t header_parse_last_size;
 
@@ -172,36 +173,39 @@ struct web_client {
     int ifd;
     int ofd;
 
-    char client_ip[INET6_ADDRSTRLEN]; // Defined buffer sizes include null-terminators
+    char client_ip[INET6_ADDRSTRLEN];   // Defined buffer sizes include null-terminators
     char client_port[NI_MAXSERV];
     char client_host[NI_MAXHOST];
 
-    BUFFER *url_as_received;
-    BUFFER *url_path_decoded;
-    BUFFER *url_query_string_decoded;
+    BUFFER *url_as_received;            // the entire URL as received, used for logging - DO NOT MODIFY
+    BUFFER *url_path_decoded;           // the path, decoded - it is incrementally parsed and altered
+    BUFFER *url_query_string_decoded;   // the query string, decoded - it is incrementally parsed and altered
 
-    char *post_payload;
-    size_t post_payload_size;
+    // THESE NEED TO BE FREED
+    char *auth_bearer_token;            // the Bearer auth token (if sent)
+    char *server_host;                  // the Host: header
+    char *forwarded_host;               // the X-Forwarded-For: header
+    char *origin;                       // the Origin: header
+    char *user_agent;                   // the User-Agent: header
 
-
-    char *server_host;
-    char *forwarded_host; // proxy
-    char *origin;
-    char *user_agent;
+    char *post_payload;                 // when this request is a POST, this has the payload
+    size_t post_payload_size;           // the size of the buffer allocated for the payload
+                                        // the actual contents may be less than the size
 
     // STATIC-THREADED WEB SERVER MEMBERS
-    size_t pollinfo_slot;          // POLLINFO slot of the web client
-    size_t pollinfo_filecopy_slot; // POLLINFO slot of the file read
+    size_t pollinfo_slot;               // POLLINFO slot of the web client
+    size_t pollinfo_filecopy_slot;      // POLLINFO slot of the file read
+
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;
 #endif
 
-    struct {
-        BUFFER *c1;
-        BUFFER *c2;
+    struct {                            // An array of cookies to set when responding
+                                        // call web_client_init_cookies() before setting them
+        BUFFER *array[NETDATA_WEB_COOKIES_MAX];
     } cookies;
 
-    struct {
+    struct {                            // A callback to check if the query should be interrupted / stopped
         web_client_interrupt_t callback;
         void *callback_data;
     } interrupt;
@@ -209,14 +213,14 @@ struct web_client {
     struct {
         size_t received_bytes;
         size_t sent_bytes;
-        size_t *memory_accounting; // temporary pointer for constructor to use
+        size_t *memory_accounting;      // temporary pointer for constructor to use
     } statistics;
 
     struct {
-        usec_t timeout_ut;                          // timeout if set, or zero
-        struct timeval tv_in;                       // request received
-        struct timeval tv_ready;                    // request processed - response ready
-        struct timeval tv_timeout_last_checkpoint;  // last checkpoint
+        usec_t timeout_ut;              // timeout if set, or zero
+        struct timeval tv_in;           // request received
+        struct timeval tv_ready;        // request processed - response ready
+        struct timeval tv_timeout_last_checkpoint; // last checkpoint
     } timings;
 
     struct {
