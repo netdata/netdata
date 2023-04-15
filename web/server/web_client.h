@@ -123,8 +123,6 @@ typedef enum web_client_flags {
 #define web_client_is_corkable(w) web_client_flag_check(w, WEB_CLIENT_FLAG_TCP_CLIENT)
 
 #define NETDATA_WEB_REQUEST_URL_SIZE 65536              // static allocation
-#define NETDATA_WEB_REQUEST_COOKIE_SIZE 1024            // static allocation
-#define NETDATA_WEB_REQUEST_ORIGIN_HEADER_SIZE 1024     // static allocation
 
 #define NETDATA_WEB_RESPONSE_ZLIB_CHUNK_SIZE 16384
 
@@ -176,9 +174,7 @@ struct web_client {
 
     char client_ip[INET6_ADDRSTRLEN]; // Defined buffer sizes include null-terminators
     char client_port[NI_MAXSERV];
-    char server_host[NI_MAXHOST];
     char client_host[NI_MAXHOST];
-    char forwarded_host[NI_MAXHOST]; //Used with proxy
 
     BUFFER *url_as_received;
     BUFFER *url_path_decoded;
@@ -187,9 +183,10 @@ struct web_client {
     char *post_payload;
     size_t post_payload_size;
 
-    char cookie1[NETDATA_WEB_REQUEST_COOKIE_SIZE + 1];
-    char cookie2[NETDATA_WEB_REQUEST_COOKIE_SIZE + 1];
-    char origin[NETDATA_WEB_REQUEST_ORIGIN_HEADER_SIZE + 1];
+
+    char *server_host;
+    char *forwarded_host; // proxy
+    char *origin;
     char *user_agent;
 
     // STATIC-THREADED WEB SERVER MEMBERS
@@ -198,6 +195,11 @@ struct web_client {
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;
 #endif
+
+    struct {
+        BUFFER *c1;
+        BUFFER *c2;
+    } cookies;
 
     struct {
         web_client_interrupt_t callback;
@@ -266,5 +268,7 @@ void web_client_timeout_checkpoint_set(struct web_client *w, int timeout_ms);
 usec_t web_client_timeout_checkpoint(struct web_client *w);
 bool web_client_timeout_checkpoint_and_check(struct web_client *w, usec_t *usec_since_last_checkpoint);
 usec_t web_client_timeout_checkpoint_response_ready(struct web_client *w, usec_t *usec_since_last_checkpoint);
+
+void web_client_init_cookies(struct web_client *w);
 
 #endif

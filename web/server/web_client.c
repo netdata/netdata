@@ -163,11 +163,21 @@ void web_client_request_done(struct web_client *w) {
     }
 
     buffer_reset(w->url_as_received);
-    w->cookie1[0] = '\0';
-    w->cookie2[0] = '\0';
-    w->origin[0] = '*';
-    w->origin[1] = '\0';
+    buffer_reset(w->url_path_decoded);
 
+    buffer_reset(w->response.header_output);
+    buffer_reset(w->response.header);
+    buffer_reset(w->response.data);
+
+    if(w->cookies.c1)
+        buffer_reset(w->cookies.c1);
+
+    if(w->cookies.c2)
+        buffer_reset(w->cookies.c2);
+
+    freez(w->server_host); w->server_host = NULL;
+    freez(w->forwarded_host); w->forwarded_host = NULL;
+    freez(w->origin); w->origin = NULL;
     freez(w->user_agent); w->user_agent = NULL;
     freez(w->auth_bearer_token); w->auth_bearer_token = NULL;
     freez(w->post_payload); w->post_payload = NULL; w->post_payload_size = 0;
@@ -178,10 +188,6 @@ void web_client_request_done(struct web_client *w) {
     web_client_disable_donottrack(w);
     web_client_disable_tracking_required(w);
     web_client_disable_keepalive(w);
-    buffer_reset(w->url_path_decoded);
-    buffer_reset(w->response.header_output);
-    buffer_reset(w->response.header);
-    buffer_reset(w->response.data);
     w->response.rlen = 0;
     w->response.sent = 0;
     w->response.code = 0;
@@ -724,7 +730,7 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
     uint32_t hash = simple_uhash(s);
 
     if(hash == hash_origin && !strcasecmp(s, "Origin"))
-        strncpyz(w->origin, v, NETDATA_WEB_REQUEST_ORIGIN_HEADER_SIZE);
+        w->origin = strdupz(v);
 
     else if(hash == hash_connection && !strcasecmp(s, "Connection")) {
         if(strcasestr(v, "keep-alive"))
@@ -736,11 +742,14 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
     }
     else if(parse_useragent && hash == hash_useragent && !strcasecmp(s, "User-Agent")) {
         w->user_agent = strdupz(v);
-    } else if(hash == hash_authorization&& !strcasecmp(s, "X-Auth-Token")) {
+    }
+    else if(hash == hash_authorization&& !strcasecmp(s, "X-Auth-Token")) {
         w->auth_bearer_token = strdupz(v);
     }
-    else if(hash == hash_host && !strcasecmp(s, "Host")){
-        strncpyz(w->server_host, v, ((size_t)(ve - v) < sizeof(w->server_host)-1 ? (size_t)(ve - v) : sizeof(w->server_host)-1));
+    else if(hash == hash_host && !strcasecmp(s, "Host")) {
+        char buffer[NI_MAXHOST];
+        strncpyz(buffer, v, ((size_t)(ve - v) < sizeof(buffer) - 1 ? (size_t)(ve - v) : sizeof(buffer) - 1));
+        w->server_host = strdupz(buffer);
     }
 #ifdef NETDATA_WITH_ZLIB
     else if(hash == hash_accept_encoding && !strcasecmp(s, "Accept-Encoding")) {
@@ -760,8 +769,10 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
             w->ssl.flags |= NETDATA_SSL_PROXY_HTTPS;
     }
 #endif
-    else if(hash == hash_forwarded_host && !strcasecmp(s, "X-Forwarded-Host")){
-        strncpyz(w->forwarded_host, v, ((size_t)(ve - v) < sizeof(w->server_host)-1 ? (size_t)(ve - v) : sizeof(w->server_host)-1));
+    else if(hash == hash_forwarded_host && !strcasecmp(s, "X-Forwarded-Host")) {
+        char buffer[NI_MAXHOST];
+        strncpyz(buffer, v, ((size_t)(ve - v) < sizeof(buffer) - 1 ? (size_t)(ve - v) : sizeof(buffer) - 1));
+        w->forwarded_host = strdupz(buffer);
     }
 
     *e = ':';
@@ -1020,7 +1031,7 @@ void web_client_build_http_header(struct web_client *w) {
                        "HTTP/1.1 %d %s\r\n"
                        "Location: https://%s%s\r\n",
                        w->response.code, code_msg,
-                       w->server_host,
+                       w->server_host ? w->server_host : "",
                        buffer_tostring(w->url_as_received));
     }else {
         buffer_sprintf(w->response.header_output,
@@ -1035,7 +1046,7 @@ void web_client_build_http_header(struct web_client *w) {
                        code_msg,
                        web_client_has_keepalive(w)?"keep-alive":"close",
                        VERSION,
-                       w->origin,
+                       w->origin ? w->origin : "*",
                        content_type_string,
                        date);
     }
@@ -1043,31 +1054,31 @@ void web_client_build_http_header(struct web_client *w) {
     if(unlikely(web_x_frame_options))
         buffer_sprintf(w->response.header_output, "X-Frame-Options: %s\r\n", web_x_frame_options);
 
-    if(w->cookie1[0] || w->cookie2[0]) {
-        if(w->cookie1[0]) {
+    if((w->cookies.c1 && buffer_strlen(w->cookies.c1)) || (w->cookies.c2 && buffer_strlen(w->cookies.c2))) {
+        if(w->cookies.c1 && buffer_strlen(w->cookies.c1)) {
             buffer_sprintf(w->response.header_output,
-                    "Set-Cookie: %s\r\n",
-                    w->cookie1);
+                           "Set-Cookie: %s\r\n",
+                           buffer_tostring(w->cookies.c1));
         }
 
-        if(w->cookie2[0]) {
+        if(w->cookies.c2 && buffer_strlen(w->cookies.c2)) {
             buffer_sprintf(w->response.header_output,
-                    "Set-Cookie: %s\r\n",
-                    w->cookie2);
+                           "Set-Cookie: %s\r\n",
+                           buffer_tostring(w->cookies.c2));
         }
 
         if(respect_web_browser_do_not_track_policy)
             buffer_sprintf(w->response.header_output,
-                    "Tk: T;cookies\r\n");
+                           "Tk: T;cookies\r\n");
     }
     else {
         if(respect_web_browser_do_not_track_policy) {
             if(web_client_has_tracking_required(w))
                 buffer_sprintf(w->response.header_output,
-                        "Tk: T;cookies\r\n");
+                               "Tk: T;cookies\r\n");
             else
                 buffer_sprintf(w->response.header_output,
-                        "Tk: N\r\n");
+                               "Tk: N\r\n");
         }
     }
 
@@ -1206,7 +1217,13 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
 #else
             protocol = "http";
 #endif
-            url_host = (!w->forwarded_host[0])?w->server_host:w->forwarded_host;
+
+            url_host = w->forwarded_host;
+            if(!url_host) {
+                url_host = w->server_host;
+                if(!url_host) url_host = "";
+            }
+
             buffer_sprintf(w->response.header, "Location: %s://%s%s/\r\n", protocol, url_host, buffer_tostring(w->url_as_received));
             buffer_strcat(w->response.data, "Permanent redirect");
             return HTTP_RESP_REDIR_PERM;
@@ -2031,6 +2048,9 @@ void web_client_zero(struct web_client *w) {
     BUFFER *b5 = w->url_as_received;
     BUFFER *b6 = w->url_query_string_decoded;
 
+    BUFFER *c1 = w->cookies.c1;
+    BUFFER *c2 = w->cookies.c2;
+
     // empty the buffers
     buffer_reset(b1);
     buffer_reset(b2);
@@ -2039,7 +2059,17 @@ void web_client_zero(struct web_client *w) {
     buffer_reset(b5);
     buffer_reset(b6);
 
+    if(c1)
+        buffer_flush(c1);
+    if(c2)
+        buffer_flush(c2);
+
+    freez(w->server_host);
+    freez(w->forwarded_host);
+    freez(w->origin);
     freez(w->user_agent);
+    freez(w->auth_bearer_token);
+    freez(w->post_payload);
 
 #ifdef NETDATA_WITH_ZLIB
     if(w->response.zinitialized)
@@ -2075,6 +2105,9 @@ void web_client_zero(struct web_client *w) {
     w->url_path_decoded = b4;
     w->url_as_received = b5;
     w->url_query_string_decoded = b6;
+
+    w->cookies.c1 = c1;
+    w->cookies.c2 = c2;
 }
 
 struct web_client *web_client_create(size_t *statistics_memory_accounting) {
@@ -2101,7 +2134,16 @@ void web_client_free(struct web_client *w) {
     buffer_free(w->response.header_output);
     buffer_free(w->response.header);
     buffer_free(w->response.data);
+
+    buffer_free(w->cookies.c1);
+    buffer_free(w->cookies.c2);
+
+    freez(w->server_host);
+    freez(w->forwarded_host);
+    freez(w->origin);
     freez(w->user_agent);
+    freez(w->auth_bearer_token);
+    freez(w->post_payload);
 
 #ifdef ENABLE_HTTPS
     if ((!web_client_check_unix(w)) && (netdata_ssl_srv_ctx)) {
@@ -2178,4 +2220,16 @@ inline bool web_client_timeout_checkpoint_and_check(struct web_client *w, usec_t
     }
 
     return false;
+}
+
+void web_client_init_cookies(struct web_client *w) {
+    if(!w->cookies.c1)
+        w->cookies.c1 = buffer_create(0, w->statistics.memory_accounting);
+    else
+        buffer_flush(w->cookies.c1);
+
+    if(!w->cookies.c2)
+        w->cookies.c2 = buffer_create(0, w->statistics.memory_accounting);
+    else
+        buffer_flush(w->cookies.c2);
 }

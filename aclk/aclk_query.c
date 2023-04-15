@@ -26,7 +26,6 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) 
 #endif
 
     struct web_client *w = web_client_get_from_cache();
-    w->origin[0] = '*';
     w->acl = WEB_CLIENT_ACL_ACLK;
     w->mode = WEB_CLIENT_MODE_GET;
     w->timings.tv_in = query->created_tv;
