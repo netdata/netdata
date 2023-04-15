@@ -20,7 +20,7 @@ inline int web_client_permission_denied(struct web_client *w) {
     return HTTP_RESP_FORBIDDEN;
 }
 
-static inline int web_client_crock_socket(struct web_client *w) {
+static inline int web_client_crock_socket(struct web_client *w __maybe_unused) {
 #ifdef TCP_CORK
     if(likely(web_client_is_corkable(w) && !w->tcp_cork && w->ofd != -1)) {
         w->tcp_cork = true;
@@ -31,8 +31,6 @@ static inline int web_client_crock_socket(struct web_client *w) {
             return -1;
         }
     }
-#else
-    (void)w;
 #endif /* TCP_CORK */
 
     return 0;
@@ -53,7 +51,6 @@ static inline void web_client_enable_wait_from_ssl(struct web_client *w, int byt
 static inline int web_client_uncrock_socket(struct web_client *w __maybe_unused) {
 #ifdef TCP_CORK
     if(likely(w->tcp_cork && w->ofd != -1)) {
-        w->tcp_cork = false;
         if(unlikely(setsockopt(w->ofd, IPPROTO_TCP, TCP_CORK, (char *) &w->tcp_cork, sizeof(int)) != 0)) {
             error("%llu: failed to disable TCP_CORK on socket.", w->id);
             w->tcp_cork = true;
@@ -61,6 +58,8 @@ static inline int web_client_uncrock_socket(struct web_client *w __maybe_unused)
         }
     }
 #endif /* TCP_CORK */
+
+    w->tcp_cork = false;
     return 0;
 }
 
@@ -74,6 +73,88 @@ char *strip_control_characters(char *url) {
     }
 
     return url;
+}
+
+static void web_client_reset_allocations(struct web_client *w, bool free_all) {
+
+    if(free_all) {
+        // the web client is to be destroyed
+
+        buffer_free(w->url_as_received);
+        w->url_as_received = NULL;
+
+        buffer_free(w->url_path_decoded);
+        w->url_path_decoded = NULL;
+
+        buffer_free(w->url_query_string_decoded);
+        w->url_query_string_decoded = NULL;
+
+        buffer_free(w->response.header_output);
+        w->response.header_output = NULL;
+
+        buffer_free(w->response.header);
+        w->response.header = NULL;
+
+        buffer_free(w->response.data);
+        w->response.data = NULL;
+
+        freez(w->post_payload);
+        w->post_payload = NULL;
+        w->post_payload_size = 0;
+
+#ifdef ENABLE_HTTPS
+        if ((!web_client_check_unix(w)) && (netdata_ssl_srv_ctx)) {
+            if (w->ssl.conn) {
+                SSL_free(w->ssl.conn);
+                w->ssl.conn = NULL;
+            }
+        }
+#endif
+    }
+    else {
+        // the web client is to be re-used
+
+        buffer_reset(w->url_as_received);
+        buffer_reset(w->url_path_decoded);
+        buffer_reset(w->url_query_string_decoded);
+
+        buffer_reset(w->response.header_output);
+        buffer_reset(w->response.header);
+        buffer_reset(w->response.data);
+
+        // leave w->post_payload
+        // leave w->ssl
+    }
+
+    freez(w->server_host);
+    w->server_host = NULL;
+
+    freez(w->forwarded_host);
+    w->forwarded_host = NULL;
+
+    freez(w->origin);
+    w->origin = NULL;
+
+    freez(w->user_agent);
+    w->user_agent = NULL;
+
+    freez(w->auth_bearer_token);
+    w->auth_bearer_token = NULL;
+
+    // if we had enabled compression, release it
+#ifdef NETDATA_WITH_ZLIB
+    if(w->response.zinitialized) {
+        deflateEnd(&w->response.zstream);
+        w->response.zsent = 0;
+        w->response.zhave = 0;
+        w->response.zstream.avail_in = 0;
+        w->response.zstream.avail_out = 0;
+        w->response.zstream.total_in = 0;
+        w->response.zstream.total_out = 0;
+        w->response.zinitialized = false;
+        w->flags &= ~WEB_CLIENT_CHUNKED_TRANSFER;
+    }
+#endif // NETDATA_WITH_ZLIB
 }
 
 void web_client_request_done(struct web_client *w) {
@@ -162,23 +243,10 @@ void web_client_request_done(struct web_client *w) {
         }
     }
 
-    buffer_reset(w->url_as_received);
-    buffer_reset(w->url_path_decoded);
-
-    buffer_reset(w->response.header_output);
-    buffer_reset(w->response.header);
-    buffer_reset(w->response.data);
-
-    freez(w->server_host); w->server_host = NULL;
-    freez(w->forwarded_host); w->forwarded_host = NULL;
-    freez(w->origin); w->origin = NULL;
-    freez(w->user_agent); w->user_agent = NULL;
-    freez(w->auth_bearer_token); w->auth_bearer_token = NULL;
-    freez(w->post_payload); w->post_payload = NULL; w->post_payload_size = 0;
+    web_client_reset_allocations(w, false);
 
     w->mode = WEB_CLIENT_MODE_GET;
 
-    w->tcp_cork = false;
     web_client_disable_donottrack(w);
     web_client_disable_tracking_required(w);
     web_client_disable_keepalive(w);
@@ -194,22 +262,6 @@ void web_client_request_done(struct web_client *w) {
     w->response.sent = 0;
     w->response.code = 0;
     w->response.zoutput = false;
-
-    // if we had enabled compression, release it
-#ifdef NETDATA_WITH_ZLIB
-    if(w->response.zinitialized) {
-        debug(D_DEFLATE, "%llu: Freeing compression resources.", w->id);
-        deflateEnd(&w->response.zstream);
-        w->response.zsent = 0;
-        w->response.zhave = 0;
-        w->response.zstream.avail_in = 0;
-        w->response.zstream.avail_out = 0;
-        w->response.zstream.total_in = 0;
-        w->response.zstream.total_out = 0;
-        w->response.zinitialized = false;
-        w->flags &= ~WEB_CLIENT_CHUNKED_TRANSFER;
-    }
-#endif // NETDATA_WITH_ZLIB
 }
 
 static struct {
@@ -2037,6 +2089,8 @@ void web_client_reuse_ssl(struct web_client *w) {
 void web_client_zero(struct web_client *w) {
     // zero everything about it - but keep the buffers
 
+    web_client_reset_allocations(w, false);
+
     // remember the pointers to the buffers
     BUFFER *b1 = w->response.data;
     BUFFER *b2 = w->response.header;
@@ -2044,26 +2098,6 @@ void web_client_zero(struct web_client *w) {
     BUFFER *b4 = w->url_path_decoded;
     BUFFER *b5 = w->url_as_received;
     BUFFER *b6 = w->url_query_string_decoded;
-
-    // empty the buffers
-    buffer_reset(b1);
-    buffer_reset(b2);
-    buffer_reset(b3);
-    buffer_reset(b4);
-    buffer_reset(b5);
-    buffer_reset(b6);
-
-    freez(w->server_host);
-    freez(w->forwarded_host);
-    freez(w->origin);
-    freez(w->user_agent);
-    freez(w->auth_bearer_token);
-    freez(w->post_payload);
-
-#ifdef NETDATA_WITH_ZLIB
-    if(w->response.zinitialized)
-        deflateEnd(&w->response.zstream);
-#endif
 
 #ifdef ENABLE_HTTPS
     web_client_reuse_ssl(w);
@@ -2077,7 +2111,6 @@ void web_client_zero(struct web_client *w) {
     memset(w, 0, sizeof(struct web_client));
 
     w->ifd = w->ofd = -1;
-
     w->statistics.memory_accounting = statistics_memory_accounting;
     w->use_count = use_count;
 
@@ -2114,33 +2147,7 @@ struct web_client *web_client_create(size_t *statistics_memory_accounting) {
 }
 
 void web_client_free(struct web_client *w) {
-    buffer_free(w->url_as_received);
-    buffer_free(w->url_path_decoded);
-    buffer_free(w->url_query_string_decoded);
-    buffer_free(w->response.header_output);
-    buffer_free(w->response.header);
-    buffer_free(w->response.data);
-
-    freez(w->server_host);
-    freez(w->forwarded_host);
-    freez(w->origin);
-    freez(w->user_agent);
-    freez(w->auth_bearer_token);
-    freez(w->post_payload);
-
-#ifdef ENABLE_HTTPS
-    if ((!web_client_check_unix(w)) && (netdata_ssl_srv_ctx)) {
-        if (w->ssl.conn) {
-            SSL_free(w->ssl.conn);
-            w->ssl.conn = NULL;
-        }
-    }
-#endif
-
-#ifdef NETDATA_WITH_ZLIB
-    if(w->response.zinitialized)
-        deflateEnd(&w->response.zstream);
-#endif
+    web_client_reset_allocations(w, true);
 
     __atomic_sub_fetch(w->statistics.memory_accounting, sizeof(struct web_client), __ATOMIC_RELAXED);
     freez(w);
