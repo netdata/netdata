@@ -182,9 +182,6 @@ void web_client_request_done(struct web_client *w) {
     web_client_disable_donottrack(w);
     web_client_disable_tracking_required(w);
     web_client_disable_keepalive(w);
-    w->response.rlen = 0;
-    w->response.sent = 0;
-    w->response.code = 0;
 
     w->header_parse_tries = 0;
     w->header_parse_last_size = 0;
@@ -192,6 +189,10 @@ void web_client_request_done(struct web_client *w) {
     web_client_enable_wait_receive(w);
     web_client_disable_wait_send(w);
 
+    w->response.has_cookies = false;
+    w->response.rlen = 0;
+    w->response.sent = 0;
+    w->response.code = 0;
     w->response.zoutput = false;
 
     // if we had enabled compression, release it
