@@ -1250,7 +1250,18 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
                     if(!url_host) url_host = "";
                 }
 
-                buffer_sprintf(w->response.header, "Location: %s://%s%s/\r\n", protocol, url_host, buffer_tostring(w->url_as_received));
+                buffer_sprintf(w->response.header, "Location: %s://%s/%s/%s/%s",
+                               protocol, url_host, nodeid?"node":"host", tok, buffer_tostring(w->url_path_decoded));
+
+                if(buffer_strlen(w->url_query_string_decoded)) {
+                    const char *query_string = buffer_tostring(w->url_query_string_decoded);
+                    if(*query_string) {
+                        if(*query_string != '?')
+                            buffer_fast_strcat(w->response.header, "?", 1);
+                        buffer_strcat(w->response.header, query_string);
+                    }
+                    buffer_fast_strcat(w->response.header, "\r\n", 2);
+                }
                 buffer_strcat(w->response.data, "Permanent redirect");
                 return HTTP_RESP_REDIR_PERM;
             }
