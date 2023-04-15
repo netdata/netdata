@@ -1298,8 +1298,8 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
                             buffer_fast_strcat(w->response.header, "?", 1);
                         buffer_strcat(w->response.header, query_string);
                     }
-                    buffer_fast_strcat(w->response.header, "\r\n", 2);
                 }
+                buffer_fast_strcat(w->response.header, "\r\n", 2);
                 buffer_strcat(w->response.data, "Permanent redirect");
                 return HTTP_RESP_REDIR_PERM;
             }
@@ -1377,6 +1377,10 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         hash_mirror = simple_hash("mirror");
 #endif
     }
+
+    // keep a copy of the decoded path, in case we need to serve it as a filename
+    char filename[FILENAME_MAX + 1];
+    strncpyz(filename, buffer_tostring(w->url_path_decoded), FILENAME_MAX);
 
     char *tok = strsep_skip_consecutive_separators(&decoded_url_path, "/?");
     if(likely(tok && *tok)) {
@@ -1475,9 +1479,6 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
 #endif  /* NETDATA_INTERNAL_CHECKS */
     }
 
-    char filename[FILENAME_MAX+1];
-    decoded_url_path = filename;
-    strncpyz(filename, buffer_tostring(w->url_path_decoded), FILENAME_MAX);
     buffer_flush(w->response.data);
     return mysendfile(w, filename);
 }
