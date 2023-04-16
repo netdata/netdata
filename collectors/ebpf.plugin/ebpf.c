@@ -516,7 +516,6 @@ static void ebpf_exit()
     printf("DISABLE\n");
 
     if (shm_ebpf_cgroup.header) {
-        munmap(shm_ebpf_cgroup.header, shm_ebpf_cgroup.header->body_length);
         shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
     }
 
