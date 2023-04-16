@@ -111,7 +111,8 @@ typedef struct ebpf_tracepoint {
 enum ebpf_threads_status {
     NETDATA_THREAD_EBPF_RUNNING,
     NETDATA_THREAD_EBPF_STOPPING,
-    NETDATA_THREAD_EBPF_STOPPED
+    NETDATA_THREAD_EBPF_STOPPED,
+    NETDATA_THREAD_EBPF_NOT_RUNNING
 };
 
 // Copied from musl header
