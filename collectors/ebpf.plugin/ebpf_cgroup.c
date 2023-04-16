@@ -65,24 +65,29 @@ void ebpf_map_cgroup_shared_memory()
     }
 
     // Map only header
-    shm_ebpf_cgroup.header = (netdata_ebpf_cgroup_shm_header_t *) ebpf_cgroup_map_shm_locally(shm_fd_ebpf_cgroup,
+    netdata_ebpf_cgroup_shm_header_t *header = (netdata_ebpf_cgroup_shm_header_t *) ebpf_cgroup_map_shm_locally(shm_fd_ebpf_cgroup,
                                                                                              sizeof(netdata_ebpf_cgroup_shm_header_t));
-    if (!shm_ebpf_cgroup.header) {
+    if (!header) {
         limit_try = NETDATA_EBPF_CGROUP_MAX_TRIES + 1;
         return;
     }
 
-    size_t length =  shm_ebpf_cgroup.header->body_length;
+    size_t length =  header->body_length;
 
     munmap(shm_ebpf_cgroup.header, sizeof(netdata_ebpf_cgroup_shm_header_t));
 
-    shm_ebpf_cgroup.header = (netdata_ebpf_cgroup_shm_header_t *)ebpf_cgroup_map_shm_locally(shm_fd_ebpf_cgroup, length);
-    if (!shm_ebpf_cgroup.header) {
+    if ( length <= ((sizeof(netdata_ebpf_cgroup_shm_header_t) + sizeof(netdata_ebpf_cgroup_shm_body_t))) ) {
         limit_try = NETDATA_EBPF_CGROUP_MAX_TRIES + 1;
         return;
     }
-    shm_ebpf_cgroup.body = (netdata_ebpf_cgroup_shm_body_t *) ((char *)shm_ebpf_cgroup.header +
-                                                              sizeof(netdata_ebpf_cgroup_shm_header_t));
+
+    netdata_ebpf_cgroup_shm_t *mapped_memory = (netdata_ebpf_cgroup_shm_header_t *)ebpf_cgroup_map_shm_locally(shm_fd_ebpf_cgroup, length);
+    if (!mapped_memory) {
+        limit_try = NETDATA_EBPF_CGROUP_MAX_TRIES + 1;
+        return;
+    }
+    shm_ebpf_cgroup.header = mapped_memory->header;
+    shm_ebpf_cgroup.body = mapped_memory->body;
 
     shm_sem_ebpf_cgroup = sem_open(NETDATA_NAMED_SEMAPHORE_EBPF_CGROUP_NAME, O_CREAT, 0660, 1);
 
