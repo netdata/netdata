@@ -81,7 +81,7 @@ void ebpf_map_cgroup_shared_memory()
         return;
     }
 
-    netdata_ebpf_cgroup_shm_t *mapped_memory = (netdata_ebpf_cgroup_shm_header_t *)ebpf_cgroup_map_shm_locally(shm_fd_ebpf_cgroup, length);
+    netdata_ebpf_cgroup_shm_t *mapped_memory = (netdata_ebpf_cgroup_shm_t *)ebpf_cgroup_map_shm_locally(shm_fd_ebpf_cgroup, length);
     if (!mapped_memory) {
         limit_try = NETDATA_EBPF_CGROUP_MAX_TRIES + 1;
         return;
