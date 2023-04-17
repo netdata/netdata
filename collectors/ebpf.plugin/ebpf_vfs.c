@@ -442,7 +442,7 @@ void ebpf_vfs_release(netdata_publish_vfs_t *stat)
 static void ebpf_vfs_free(ebpf_module_t *em)
 {
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPING;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     freez(vfs_hash_values);
@@ -454,7 +454,7 @@ static void ebpf_vfs_free(ebpf_module_t *em)
 #endif
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -1946,7 +1946,7 @@ void *ebpf_vfs_thread(void *ptr)
     ebpf_adjust_thread_load(em, default_btf);
 #endif
     if (ebpf_vfs_load_bpf(em)) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endvfs;
     }
 

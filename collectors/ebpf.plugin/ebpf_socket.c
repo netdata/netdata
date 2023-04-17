@@ -628,7 +628,7 @@ static void clean_ip_structure(ebpf_network_viewer_ip_list_t **clean)
 static void ebpf_socket_free(ebpf_module_t *em )
 {
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPING;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     /* We can have thousands of sockets to clean, so we are transferring
@@ -662,7 +662,7 @@ static void ebpf_socket_free(ebpf_module_t *em )
 #endif
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -3957,7 +3957,7 @@ void *ebpf_socket_thread(void *ptr)
     parse_table_size_options(&socket_config);
 
     if (pthread_mutex_init(&nv_mutex, NULL)) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
         error("Cannot initialize local mutex");
         goto endsocket;
     }

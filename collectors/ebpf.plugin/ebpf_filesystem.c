@@ -329,7 +329,7 @@ void ebpf_filesystem_cleanup_ebpf_data()
 static void ebpf_filesystem_free(ebpf_module_t *em)
 {
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPING;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     ebpf_filesystem_cleanup_ebpf_data();
@@ -338,7 +338,7 @@ static void ebpf_filesystem_free(ebpf_module_t *em)
     freez(filesystem_hash_values);
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -568,7 +568,7 @@ void *ebpf_filesystem_thread(void *ptr)
         if (em->optional)
             info("Netdata cannot monitor the filesystems used on this host.");
 
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endfilesystem;
     }
 

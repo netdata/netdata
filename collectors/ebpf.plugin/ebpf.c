@@ -2349,6 +2349,7 @@ int main(int argc, char **argv)
         if (em->enabled || !i) {
             st->thread = mallocz(sizeof(netdata_thread_t));
             em->thread_id = i;
+            em->enabled = NETDATA_THREAD_EBPF_RUNNING;
             netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, em);
         } else {
             em->enabled = NETDATA_THREAD_EBPF_NOT_RUNNING;

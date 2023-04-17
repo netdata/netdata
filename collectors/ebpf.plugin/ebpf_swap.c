@@ -225,7 +225,7 @@ static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t 
 static void ebpf_swap_free(ebpf_module_t *em)
 {
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPING;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     freez(swap_vector);
@@ -236,7 +236,7 @@ static void ebpf_swap_free(ebpf_module_t *em)
         swap_bpf__destroy(bpf_obj);
 #endif
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -827,7 +827,7 @@ void *ebpf_swap_thread(void *ptr)
     ebpf_adjust_thread_load(em, default_btf);
 #endif
    if (ebpf_swap_load_bpf(em)) {
-       em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+       em->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endswap;
     }
 
