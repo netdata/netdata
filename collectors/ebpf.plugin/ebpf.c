@@ -528,7 +528,6 @@ static void ebpf_exit()
  *
  * @param objects       objects loaded from eBPF programs
  * @param probe_links   links from loader
- */
 static void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe_links)
 {
     if (!probe_links || !objects)
@@ -544,6 +543,7 @@ static void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link 
     if (objects)
         bpf_object__close(objects);
 }
+ */
 
 int ebpf_exit_plugin = 0;
 /**
@@ -556,7 +556,6 @@ static void ebpf_stop_threads(int sig)
     UNUSED(sig);
     static int only_one = 0;
 
-    int i;
     // Child thread should be closed by itself.
     pthread_mutex_lock(&ebpf_exit_cleanup);
     if (main_thread_id != gettid() || only_one) {
@@ -567,51 +566,6 @@ static void ebpf_stop_threads(int sig)
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     ebpf_exit_plugin = 1;
-    usec_t max = USEC_PER_SEC, step = 100000;
-    i = EBPF_OPTION_ALL_CHARTS;
-    while (i && max) {
-        max -= step;
-        sleep_usec(step);
-        i = 0;
-        int j;
-        pthread_mutex_lock(&ebpf_exit_cleanup);
-        for (j = 0; ebpf_threads[j].name != NULL; j++) {
-            if (ebpf_threads[j].enabled != NETDATA_THREAD_EBPF_STOPPED)
-                i++;
-        }
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
-    }
-
-    if (!i)  {
-        //Unload threads(except sync and filesystem)
-        pthread_mutex_lock(&ebpf_exit_cleanup);
-        for (i = 0; ebpf_threads[i].name != NULL; i++) {
-            if (ebpf_threads[i].enabled == NETDATA_THREAD_EBPF_STOPPED && i != EBPF_MODULE_FILESYSTEM_IDX &&
-                i != EBPF_MODULE_SYNC_IDX)
-                ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
-        }
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
-
-        //Unload filesystem
-        pthread_mutex_lock(&ebpf_exit_cleanup);
-        if (ebpf_threads[EBPF_MODULE_FILESYSTEM_IDX].enabled  == NETDATA_THREAD_EBPF_STOPPED) {
-            for (i = 0; localfs[i].filesystem != NULL; i++) {
-                ebpf_unload_legacy_code(localfs[i].objects, localfs[i].probe_links);
-            }
-        }
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
-
-        //Unload Sync
-        pthread_mutex_lock(&ebpf_exit_cleanup);
-        if (ebpf_threads[EBPF_MODULE_SYNC_IDX].enabled  == NETDATA_THREAD_EBPF_STOPPED) {
-            for (i = 0; local_syscalls[i].syscall != NULL; i++) {
-                ebpf_unload_legacy_code(local_syscalls[i].objects, local_syscalls[i].probe_links);
-            }
-        }
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
-
-    }
-
     ebpf_exit();
 }
 
