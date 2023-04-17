@@ -15,7 +15,7 @@
 // Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 // _________________
 
-// @(#) $Revision: 4.37 $ $Source: /judy/src/JudyCommon/JudyTables.c $
+// @(#) $Revision: 4.37.1-netdata $ $Source: JudyTables.c $
 
 #ifndef JU_WIN
 #include <unistd.h>		// unavailable on win_*.
@@ -30,7 +30,12 @@
 
 #define	TERMINATOR 999		// terminator for Alloc tables
 
-#define BPW sizeof(Word_t)	// define bytes per word
+// define bytes per word
+#ifdef JU_64BIT
+#define BPW 8UL
+#else
+#define BPW 4UL
+#endif
 
 #ifdef JUDY1
 #include "Judy1.h"
@@ -199,7 +204,7 @@ FUNCTION int main()
     }
 
 
-    fprintf(fd,"// @(#) From generation tool: $Revision: 4.37 $ $Source: /judy/src/JudyCommon/JudyTables.c $\n");
+    fprintf(fd,"// @(#) From generation tool: $Revision: 4.37.1-netdata $ $Source: JudyTables.c $\n");
     fprintf(fd,"//\n\n");
 
 
