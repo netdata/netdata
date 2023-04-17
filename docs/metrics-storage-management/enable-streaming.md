@@ -59,31 +59,30 @@ Here are a few example streaming configurations:
     metrics to parent `B`.
   - Any node with a database can generate alarms.
 
-### A basic parent child setup without Netdata cloud
 
-![Simple parent child no cloud](https://user-images.githubusercontent.com/43294513/228891897-aec7f7e1-172f-4ff1-b52d-209f59dc7125.jpg)
 
-For a predictable number of  non-ephemeral nodes, with sufficient RAM and disk IO on each node, 
-you can have a Netdata agent with the default settings running on each node and replicate its data to  
-a Netdata parent, preferrably on a management/admin node outside your production infrastructure. 
+### A basic parent child setup
+
+![simple-parent-child](https://user-images.githubusercontent.com/43294513/232492152-11886282-29bc-401f-9577-24237e43a501.jpg)
+
+For a predictable number of  non-ephemeral nodes, install a Netdata agent on each node and replicate its data to a 
+Netdata parent, preferrably on a management/admin node outside your production infrastructure.
+There are two variations of the basic setup:
+
+- When your nodes have sufficient RAM and disk IO the Netdata agents on each node can run with the default 
+  settings for data collection and retention.
+
+- When your nodes have severe RAM and disk IO limitations (e.g. Raspberry Pis), you should
+  [optimize the Netdata agent's performance](https://github.com/netdata/netdata/blob/master/docs/guides/configure/performance.md).
 
 [Secure your nodes](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/secure-nodes.md) to 
 protect them from the internet by making their UI accessible only via an nginx proxy, with potentially different subdomains
 for the parent and even each child, if necessary. 
 
-This setup is simple, does not involve Netdata Cloud, but you are limited to seeing metrics from one node at a time. 
-
-### A basic parent child setup with Netdata cloud
-
-![Simple parent child](https://user-images.githubusercontent.com/43294513/228891775-0465ffab-1210-406b-b733-d626fd0c10d0.jpg)
-
-This setup replaces the nginx proxy with Netdata Cloud, in order to provide 
-[infrastructure monitoring](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md),
-instead of single node monitoring. The agent dashboards can be completely disabled, for increased security.
-
-We have both children and the parent connected to the cloud, so that requests can be served by either of them.
-When both a child and a parent is available, the cloud will always prefer to request the data to display to the user 
-from the parent.
+Both children and the parent are connected to the cloud, to enable infrastructure observability, 
+[without transferring the collected data](https://github.com/netdata/netdata/blob/master/docs/netdata-security.md). 
+Requests for data are always serverd by a connected Netdata agent. When both a child and a parent are connected, 
+the cloud will always select the parent to query the user requested data.
 
 ### An advanced setup
 
