@@ -73,7 +73,7 @@ There are two variations of the basic setup:
   settings for data collection and retention.
 
 - When your nodes have severe RAM and disk IO limitations (e.g. Raspberry Pis), you should
-  [optimize the Netdata agent's performance](https://github.com/netdata/netdata/blob/master/docs/guides/configure/performance.md)
+  [optimize the Netdata agent's performance](https://github.com/netdata/netdata/blob/master/docs/guides/configure/performance.md).
 
 [Secure your nodes](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/secure-nodes.md) to 
 protect them from the internet by making their UI accessible only via an nginx proxy, with potentially different subdomains
