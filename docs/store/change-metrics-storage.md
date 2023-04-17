@@ -127,6 +127,8 @@ The Netdata parent in our production infrastructure at the time of writing:
  - 3 tiers are used for retention
  - The `dbengine page cache size MB` in `netdata.conf` is configured to be 4GB
 
+Netdata parents can end up collecting millions of metrics per second. See also [scaling dedicated parent nodes](#scaling-dedicated-parent-nodes).
+
 The rule of thumb calculation for this set up gives us
 ```
 DBENGINE memory = 206,000 x 16 / 1024 MiB = 3,217 MiB = about 3 GiB
@@ -193,3 +195,13 @@ All new child nodes are automatically transferred to the multihost dbengine inst
 space. If you want to migrate a child node from its legacy dbengine instance to the multihost dbengine instance, you
 must delete the instance's directory, which is located in `/var/cache/netdata/MACHINE_GUID/dbengine`, after stopping the
 Agent.
+
+## Scaling dedicated parent nodes
+
+When you use streaming in medium to large infrastructures, you can have potentially millions of metrics per second reaching each parent node.
+In the lab we have reliably collected 1 million metrics/sec with 16cores and 32GB RAM.
+
+Our suggestion for scaling parents is to have them running on dedicated VMs, using a maximum of 50% of cpu, and ensuring you have enough RAM 
+for the desired retention. When your infrastructure can lead a parent to exceed these characteristics, split the load to multiple parents that
+do not communicate with each other. With each child sending data to only one of the parents, you can still have replication, high availability,
+and infrastructure level observability via the Netdata Cloud UI. 
