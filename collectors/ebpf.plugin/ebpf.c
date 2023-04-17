@@ -515,10 +515,12 @@ static void ebpf_exit()
 #endif
     printf("DISABLE\n");
 
+    pthread_mutex_lock(&mutex_cgroup_shm);
     if (shm_ebpf_cgroup.header) {
         munmap(shm_ebpf_cgroup.header, shm_ebpf_cgroup.header->body_length);
         shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
     }
+    pthread_mutex_unlock(&mutex_cgroup_shm);
 
     exit(0);
 }

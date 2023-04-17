@@ -263,11 +263,13 @@ void ebpf_reset_updated_var()
 void ebpf_parse_cgroup_shm_data()
 {
     static int previous = 0;
+    pthread_mutex_lock(&mutex_cgroup_shm);
+    if (ebpf_exit_plugin)
+        return;
+
     if (shm_ebpf_cgroup.header) {
         sem_wait(shm_sem_ebpf_cgroup);
         int i, end = shm_ebpf_cgroup.header->cgroup_root_count;
-
-        pthread_mutex_lock(&mutex_cgroup_shm);
 
         ebpf_remove_cgroup_target_update_list();
 
@@ -285,10 +287,10 @@ void ebpf_parse_cgroup_shm_data()
 #ifdef NETDATA_DEV_MODE
         error("Updating cgroup %d (Previous: %d, Current: %d)", send_cgroup_chart, previous, shm_ebpf_cgroup.header->cgroup_root_count);
 #endif
-        pthread_mutex_unlock(&mutex_cgroup_shm);
-
         sem_post(shm_sem_ebpf_cgroup);
     }
+    pthread_mutex_unlock(&mutex_cgroup_shm);
+
 }
 
 // --------------------------------------------------------------------------------------------------------------------
