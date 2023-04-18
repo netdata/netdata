@@ -564,7 +564,26 @@ static void ebpf_stop_threads(int sig)
         return;
     }
     only_one = 1;
+    int i;
+    for (i = 0; ebpf_modules[i].thread_name != NULL; i++) {
+        if (ebpf_modules[i].enabled == NETDATA_THREAD_EBPF_RUNNING)
+            netdata_thread_cancel(*ebpf_modules[i].thread->thread);
+    }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+    usec_t max = 2*USEC_PER_SEC, step = 100000;
+    while (i && max) {
+        max -= step;
+        sleep_usec(step);
+        i = 0;
+        int j;
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        for (j = 0; ebpf_modules[j].thread_name != NULL; j++) {
+            if (ebpf_modules[j].enabled != NETDATA_THREAD_EBPF_RUNNING)
+                i++;
+        }
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
+    }
 
     ebpf_exit_plugin = 1;
     ebpf_exit();
