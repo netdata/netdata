@@ -2031,8 +2031,10 @@ int main(int argc, char **argv) {
 
     delta_startup_time("initialize RRD structures");
 
-    if(rrd_init(netdata_configured_hostname, system_info, false))
+    if(rrd_init(netdata_configured_hostname, system_info, false)) {
+        set_late_global_environment(system_info);
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
+    }
 
     delta_startup_time("check for incomplete shutdown");
 
@@ -2074,8 +2076,7 @@ int main(int argc, char **argv) {
 
     netdata_zero_metrics_enabled = config_get_boolean_ondemand(CONFIG_SECTION_DB, "enable zero metrics", CONFIG_BOOLEAN_NO);
 
-    set_late_global_environment();
-
+    set_late_global_environment(system_info);
     for (i = 0; static_threads[i].name != NULL ; i++) {
         struct netdata_static_thread *st = &static_threads[i];
 
