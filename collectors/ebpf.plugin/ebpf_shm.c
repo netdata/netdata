@@ -1049,7 +1049,6 @@ static int ebpf_shm_load_bpf(ebpf_module_t *em)
     if (em->load & EBPF_LOAD_LEGACY) {
         em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
         if (!em->probe_links) {
-            em->enabled = CONFIG_BOOLEAN_NO;
             ret = -1;
         }
     }
@@ -1089,7 +1088,6 @@ void *ebpf_shm_thread(void *ptr)
     ebpf_adjust_thread_load(em, default_btf);
 #endif
     if (ebpf_shm_load_bpf(em)) {
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endshm;
     }
 

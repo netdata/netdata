@@ -1076,7 +1076,9 @@ static void process_collector(ebpf_module_t *em)
     heartbeat_init(&hb);
     int publish_global = em->global_charts;
     int cgroups = em->cgroup_charts;
+    pthread_mutex_lock(&ebpf_exit_cleanup);
     int thread_enabled = em->enabled;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
     if (cgroups)
         ebpf_process_update_cgroup_algorithm();
 
@@ -1242,10 +1244,12 @@ void *ebpf_process_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = process_maps;
 
+    pthread_mutex_lock(&ebpf_exit_cleanup);
     if (ebpf_process_enable_tracepoints()) {
-        em->enabled = em->global_charts = em->apps_charts = em->cgroup_charts =  CONFIG_BOOLEAN_NO;
+        em->enabled = em->global_charts = em->apps_charts = em->cgroup_charts = NETDATA_THREAD_EBPF_STOPPING;
     }
     process_enabled = em->enabled;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     pthread_mutex_lock(&lock);
     ebpf_process_allocate_global_vectors(NETDATA_KEY_PUBLISH_PROCESS_END);
@@ -1255,7 +1259,6 @@ void *ebpf_process_thread(void *ptr)
     set_local_pointers();
     em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
     if (!em->probe_links) {
-        em->enabled = CONFIG_BOOLEAN_NO;
         pthread_mutex_unlock(&lock);
         goto endprocess;
     }
@@ -1287,8 +1290,10 @@ void *ebpf_process_thread(void *ptr)
     process_collector(em);
 
 endprocess:
-    if (!em->enabled)
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    if (em->enabled == NETDATA_THREAD_EBPF_RUNNING)
         ebpf_update_disabled_plugin_stats(em);
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     netdata_thread_cleanup_pop(1);
     return NULL;

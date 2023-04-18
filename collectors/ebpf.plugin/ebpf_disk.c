@@ -761,25 +761,21 @@ void *ebpf_disk_thread(void *ptr)
     em->maps = disk_maps;
 
     if (ebpf_disk_enable_tracepoints()) {
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto enddisk;
     }
 
     avl_init_lock(&disk_tree, ebpf_compare_disks);
     if (read_local_disks()) {
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto enddisk;
     }
 
     if (pthread_mutex_init(&plot_mutex, NULL)) {
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
         error("Cannot initialize local mutex");
         goto enddisk;
     }
 
     em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
     if (!em->probe_links) {
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto enddisk;
     }
 

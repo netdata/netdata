@@ -209,13 +209,11 @@ void *ebpf_softirq_thread(void *ptr)
     em->maps = softirq_maps;
 
     if (ebpf_enable_tracepoints(softirq_tracepoints) == 0) {
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endsoftirq;
     }
 
     em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
     if (!em->probe_links) {
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endsoftirq;
     }
 

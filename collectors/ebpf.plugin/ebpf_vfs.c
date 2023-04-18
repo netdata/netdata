@@ -1946,7 +1946,6 @@ void *ebpf_vfs_thread(void *ptr)
     ebpf_adjust_thread_load(em, default_btf);
 #endif
     if (ebpf_vfs_load_bpf(em)) {
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endvfs;
     }
 

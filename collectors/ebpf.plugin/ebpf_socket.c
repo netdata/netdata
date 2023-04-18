@@ -650,7 +650,6 @@ static void ebpf_socket_free(ebpf_module_t *em )
     clean_hostnames(network_viewer_opt.included_hostnames);
     clean_hostnames(network_viewer_opt.excluded_hostnames);
      */
-    ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled = 0;
 
     pthread_mutex_destroy(&nv_mutex);
 
@@ -3957,7 +3956,6 @@ void *ebpf_socket_thread(void *ptr)
     parse_table_size_options(&socket_config);
 
     if (pthread_mutex_init(&nv_mutex, NULL)) {
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
         error("Cannot initialize local mutex");
         goto endsocket;
     }
@@ -3980,7 +3978,6 @@ void *ebpf_socket_thread(void *ptr)
     ebpf_adjust_thread_load(em, default_btf);
 #endif
     if (ebpf_socket_load_bpf(em)) {
-        em->enabled = CONFIG_BOOLEAN_NO;
         pthread_mutex_unlock(&lock);
         goto endsocket;
     }

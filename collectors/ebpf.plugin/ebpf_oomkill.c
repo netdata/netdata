@@ -364,29 +364,27 @@ void *ebpf_oomkill_thread(void *ptr)
     if (unlikely(!ebpf_all_pids || !em->apps_charts)) {
         // When we are not running integration with apps, we won't fill necessary variables for this thread to run, so
         // we need to disable it.
+        pthread_mutex_lock(&ebpf_exit_cleanup);
         if (em->enabled)
             info("%s apps integration is completely disabled.", NETDATA_DEFAULT_OOM_DISABLED_MSG);
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+        goto endoomkill;
     } else if (running_on_kernel < NETDATA_EBPF_KERNEL_4_14) {
+        pthread_mutex_lock(&ebpf_exit_cleanup);
         if (em->enabled)
             info("%s kernel does not have necessary tracepoints.", NETDATA_DEFAULT_OOM_DISABLED_MSG);
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
-    }
-
-    if (em->enabled == NETDATA_THREAD_EBPF_STOPPED) {
         goto endoomkill;
     }
 
     if (ebpf_enable_tracepoints(oomkill_tracepoints) == 0) {
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endoomkill;
     }
 
     em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
     if (!em->probe_links) {
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endoomkill;
     }
 

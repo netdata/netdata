@@ -568,7 +568,6 @@ void *ebpf_filesystem_thread(void *ptr)
         if (em->optional)
             info("Netdata cannot monitor the filesystems used on this host.");
 
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endfilesystem;
     }
 

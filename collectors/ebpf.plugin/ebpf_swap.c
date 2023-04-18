@@ -827,7 +827,6 @@ void *ebpf_swap_thread(void *ptr)
     ebpf_adjust_thread_load(em, default_btf);
 #endif
    if (ebpf_swap_load_bpf(em)) {
-       em->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endswap;
     }
 

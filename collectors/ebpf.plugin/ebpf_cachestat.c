@@ -1313,7 +1313,6 @@ void *ebpf_cachestat_thread(void *ptr)
     ebpf_update_pid_table(&cachestat_maps[NETDATA_CACHESTAT_PID_STATS], em);
 
     if (ebpf_cachestat_set_internal_value()) {
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endcachestat;
     }
 
@@ -1321,7 +1320,6 @@ void *ebpf_cachestat_thread(void *ptr)
     ebpf_adjust_thread_load(em, default_btf);
 #endif
     if (ebpf_cachestat_load_bpf(em)) {
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endcachestat;
     }
 

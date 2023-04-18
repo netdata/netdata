@@ -225,10 +225,6 @@ static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_
  */
 static void ebpf_mount_free(ebpf_module_t *em)
 {
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPING;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-
 #ifdef LIBBPF_MAJOR_VERSION
     if (bpf_obj)
         mount_bpf__destroy(bpf_obj);
@@ -389,7 +385,6 @@ static int ebpf_mount_load_bpf(ebpf_module_t *em)
     if (em->load & EBPF_LOAD_LEGACY) {
         em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
         if (!em->probe_links) {
-            em->enabled = CONFIG_BOOLEAN_NO;
             ret = -1;
         }
     }
@@ -429,7 +424,6 @@ void *ebpf_mount_thread(void *ptr)
     ebpf_adjust_thread_load(em, default_btf);
 #endif
     if (ebpf_mount_load_bpf(em)) {
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endmount;
     }
 
