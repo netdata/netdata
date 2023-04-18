@@ -529,6 +529,7 @@ static void ebpf_exit()
  *
  * @param objects       objects loaded from eBPF programs
  * @param probe_links   links from loader
+ */
 static void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe_links)
 {
     if (!probe_links || !objects)
@@ -544,7 +545,34 @@ static void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link 
     if (objects)
         bpf_object__close(objects);
 }
+
+/**
+ * Unload Unique maps
+ *
+ * This function unload all BPF maps from threads using one unique BPF object.
  */
+static void ebpf_unload_unique_maps()
+{
+    int i;
+    for (i = 0; ebpf_modules[i].thread_name; i++) {
+        switch (i) {
+            case EBPF_MODULE_PROCESS_IDX:
+            case EBPF_MODULE_DISK_IDX:
+            case EBPF_MODULE_HARDIRQ_IDX:
+            case EBPF_MODULE_SOFTIRQ_IDX:
+            case EBPF_MODULE_OOMKILL_IDX:
+            case EBPF_MODULE_MDFLUSH_IDX:
+            {
+                if (ebpf_modules[i].enabled == NETDATA_THREAD_EBPF_STOPPED)
+                    ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
+                else
+                    error("Cannot unload maps for thread %s, because it is not stopped.", ebpf_modules[i].thread_name);
+            }
+            default:
+                continue;
+        }
+    }
+}
 
 int ebpf_exit_plugin = 0;
 /**
@@ -570,6 +598,7 @@ static void ebpf_stop_threads(int sig)
             netdata_thread_cancel(*ebpf_modules[i].thread->thread);
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
+    ebpf_exit_plugin = 1;
 
     usec_t max = 2*USEC_PER_SEC, step = 100000;
     while (i && max) {
@@ -585,7 +614,10 @@ static void ebpf_stop_threads(int sig)
         pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 
-    ebpf_exit_plugin = 1;
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    ebpf_unload_unique_maps();
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+
     ebpf_exit();
 }
 
