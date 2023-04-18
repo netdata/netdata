@@ -367,7 +367,7 @@ static void results_header_to_json_v2(DICTIONARY *results __maybe_unused, BUFFER
                                    time_t baseline_after, time_t baseline_before,
                                    size_t points, WEIGHTS_METHOD method,
                                    RRDR_TIME_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
-                                   size_t examined_dimensions __maybe_unused, usec_t duration,
+                                   size_t examined_dimensions __maybe_unused, usec_t duration __maybe_unused,
                                    WEIGHTS_STATS *stats, bool group_by) {
 
     buffer_json_member_add_object(wb, "request");

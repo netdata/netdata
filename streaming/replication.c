@@ -292,7 +292,7 @@ static void replication_query_align_to_optimal_before(struct replication_query *
         struct replication_dimension *d = &q->data[i];
         if(unlikely(!d->enabled)) continue;
 
-        time_t new_before = rrdeng_load_align_to_optimal_before(&d->handle);
+        time_t new_before = storage_engine_align_to_optimal_before(&d->handle);
         if (!expanded_before || new_before < expanded_before)
             expanded_before = new_before;
     }
