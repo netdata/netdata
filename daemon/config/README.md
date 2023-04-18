@@ -107,12 +107,9 @@ Please note that your data history will be lost if you have modified `history` p
 |           delete orphan hosts files           |   `yes`    | Set to `no` to disable non-responsive host removal.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 |              enable zero metrics              |    `no`    | Set to `yes` to show charts when all their metrics are zero.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
-:::info
-
-The multiplication of all the **enabled** tiers  `dbengine tier N update every iterations` values  must be less than `65535`.
-
-:::
-
+> ### Info
+>
+>The multiplication of all the **enabled** tiers  `dbengine tier N update every iterations` values  must be less than `65535`.
 
 ### [directories] section options
 
