@@ -25,8 +25,6 @@ netdata_ebpf_targets_t mount_targets[] = { {.name = "mount", .mode = EBPF_LOAD_T
                                            {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 #ifdef LIBBPF_MAJOR_VERSION
-#include "includes/mount.skel.h" // BTF code
-
 static struct mount_bpf *bpf_obj = NULL;
 
 /*****************************************************************

@@ -49,8 +49,6 @@ netdata_ebpf_targets_t dc_targets[] = { {.name = "lookup_fast", .mode = EBPF_LOA
                                         {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 #ifdef LIBBPF_MAJOR_VERSION
-#include "includes/dc.skel.h" // BTF code
-
 static struct dc_bpf *bpf_obj = NULL;
 
 /**

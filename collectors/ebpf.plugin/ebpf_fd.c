@@ -47,8 +47,6 @@ netdata_ebpf_targets_t fd_targets[] = { {.name = "open", .mode = EBPF_LOAD_TRAMP
                                         {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 #ifdef LIBBPF_MAJOR_VERSION
-#include "includes/fd.skel.h" // BTF code
-
 static struct fd_bpf *bpf_obj = NULL;
 
 /**

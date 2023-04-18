@@ -50,8 +50,6 @@ static char *account_page[NETDATA_CACHESTAT_ACCOUNT_DIRTY_END] ={ "account_page_
                                                                   "__set_page_dirty", "__folio_mark_dirty"  };
 
 #ifdef LIBBPF_MAJOR_VERSION
-#include "includes/cachestat.skel.h" // BTF code
-
 static struct cachestat_bpf *bpf_obj = NULL;
 
 /**

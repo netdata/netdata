@@ -101,8 +101,6 @@ struct netdata_static_thread socket_threads = {
 };
 
 #ifdef LIBBPF_MAJOR_VERSION
-#include "includes/socket.skel.h" // BTF code
-
 static struct socket_bpf *bpf_obj = NULL;
 
 /**

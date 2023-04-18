@@ -39,8 +39,6 @@ netdata_ebpf_targets_t swap_targets[] = { {.name = "swap_readpage", .mode = EBPF
                                            {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 #ifdef LIBBPF_MAJOR_VERSION
-#include "includes/swap.skel.h" // BTF code
-
 static struct swap_bpf *bpf_obj = NULL;
 
 /**

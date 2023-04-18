@@ -50,8 +50,6 @@ netdata_ebpf_targets_t vfs_targets[] = { {.name = "vfs_write", .mode = EBPF_LOAD
                                          {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 #ifdef LIBBPF_MAJOR_VERSION
-#include "includes/vfs.skel.h" // BTF code
-
 static struct vfs_bpf *bpf_obj = NULL;
 
 /**

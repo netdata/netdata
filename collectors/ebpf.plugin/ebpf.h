@@ -36,6 +36,17 @@
 #define NETDATA_EBPF_OLD_CONFIG_FILE "ebpf.conf"
 #define NETDATA_EBPF_CONFIG_FILE "ebpf.d.conf"
 
+#ifdef LIBBPF_MAJOR_VERSION // BTF code
+#include "includes/cachestat.skel.h"
+#include "includes/dc.skel.h"
+#include "includes/fd.skel.h"
+#include "includes/mount.skel.h"
+#include "includes/shm.skel.h"
+#include "includes/socket.skel.h"
+#include "includes/swap.skel.h"
+#include "includes/vfs.skel.h"
+#endif
+
 typedef struct netdata_syscall_stat {
     unsigned long bytes;               // total number of bytes
     uint64_t call;                     // total number of calls

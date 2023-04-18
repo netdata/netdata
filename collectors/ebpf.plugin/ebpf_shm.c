@@ -45,8 +45,6 @@ netdata_ebpf_targets_t shm_targets[] = { {.name = "shmget", .mode = EBPF_LOAD_TR
                                          {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 #ifdef LIBBPF_MAJOR_VERSION
-#include "includes/shm.skel.h"
-
 static struct shm_bpf *bpf_obj = NULL;
 
 /*****************************************************************
