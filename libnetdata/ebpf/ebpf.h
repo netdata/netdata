@@ -260,10 +260,17 @@ typedef enum netdata_apps_integration_flags {
 #define NETDATA_EBPF_STAT_DIMENSION_MEMORY "memory"
 #define NETDATA_EBPF_STAT_DIMENSION_ARAL "aral"
 
+enum ebpf_threads_status {
+    NETDATA_THREAD_EBPF_RUNNING,
+    NETDATA_THREAD_EBPF_STOPPING,
+    NETDATA_THREAD_EBPF_STOPPED,
+    NETDATA_THREAD_EBPF_NOT_RUNNING
+};
+
 typedef struct ebpf_module {
     const char *thread_name;
     const char *config_name;
-    int enabled;
+    enum ebpf_threads_status enabled;
     void *(*start_routine)(void *);
     int update_every;
     int global_charts;
