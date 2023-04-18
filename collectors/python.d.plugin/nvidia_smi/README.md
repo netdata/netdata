@@ -148,7 +148,7 @@ docker run -d --name=netdata \
   netdata/netdata
 ```
 
-### Troubleshooting
+### Docker Troubleshooting
 To troubleshoot `nvidia-smi` in a docker container, first confirm that `nvidia-smi` is working on the host system. If that is working correctly, run `docker exec -it netdata nvidia-smi` to confirm it's working within the docker container. If `nvidia-smi` is fuctioning both inside and outside of the container, confirm that `nvidia-smi: yes` is uncommented in `python.d.conf`.
 ```bash
 docker exec -it netdata bash
