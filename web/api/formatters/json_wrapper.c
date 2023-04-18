@@ -1384,6 +1384,11 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb) {
         query_target_summary_labels_v12(wb, qt, "labels", true, &label_key_totals, &label_key_value_totals);
         query_target_summary_alerts_v2(wb, qt, "alerts");
     }
+    if(options & RRDR_OPTION_RETURN_RAW) {
+        buffer_json_member_add_object(wb, "globals");
+        query_target_points_statistics(wb, qt, &qt->query_points);
+        buffer_json_object_close(wb); // globals
+    }
     buffer_json_object_close(wb); // summary
 
     buffer_json_member_add_object(wb, "totals");
