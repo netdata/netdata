@@ -1509,12 +1509,18 @@ void ml_init()
 }
 
 void ml_fini() {
+    if (!Cfg.enable_anomaly_detection)
+        return;
+
     int rc = sqlite3_close_v2(db);
     if (unlikely(rc != SQLITE_OK))
         error_report("Error %d while closing the SQLite database, %s", rc, sqlite3_errstr(rc));
 }
 
 void ml_start_threads() {
+    if (!Cfg.enable_anomaly_detection)
+        return;
+
     // start detection & training threads
     Cfg.detection_stop = false;
     Cfg.training_stop = false;
@@ -1533,6 +1539,9 @@ void ml_start_threads() {
 
 void ml_stop_threads()
 {
+    if (!Cfg.enable_anomaly_detection)
+        return;
+
     Cfg.detection_stop = true;
     Cfg.training_stop = true;
 
