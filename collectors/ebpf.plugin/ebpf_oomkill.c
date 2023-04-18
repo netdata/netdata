@@ -303,23 +303,24 @@ static void oomkill_collector(ebpf_module_t *em)
             continue;
 
         counter = 0;
-        pthread_mutex_lock(&collect_data_mutex);
-        pthread_mutex_lock(&lock);
 
         uint32_t count = oomkill_read_data(keys);
-        if (cgroups && count)
-            ebpf_update_oomkill_cgroup(keys, count);
+        if (!count)
+            continue;
 
-        // write everything from the ebpf map.
-        if (cgroups)
+        pthread_mutex_lock(&collect_data_mutex);
+        pthread_mutex_lock(&lock);
+        if (cgroups) {
+            ebpf_update_oomkill_cgroup(keys, count);
+            // write everything from the ebpf map.
             ebpf_oomkill_send_cgroup_data(update_every);
+        }
 
         if (em->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
             write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_OOMKILL_CHART);
             oomkill_write_data(keys, count);
             write_end_chart();
         }
-
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
     }
