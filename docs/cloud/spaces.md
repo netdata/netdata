@@ -62,8 +62,9 @@ will open a side tab in which you can:
 
 6. _Manage your bookmarks*_, click on the **Bookmarks** tab to add or remove bookmarks that you need.
 
-:::note \* This action requires admin rights for this space
-:::
+> ### Note
+>
+> \* This action requires admin rights for this space
 
 ## Obsoleting offline nodes from a Space
 
