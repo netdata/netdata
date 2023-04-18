@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Add windows diagram [\#14916](https://github.com/netdata/netdata/pull/14916) ([cakrit](https://github.com/cakrit))
+- Add section for scaling parent nodes [\#14915](https://github.com/netdata/netdata/pull/14915) ([cakrit](https://github.com/cakrit))
+- Update suggested replication setups [\#14914](https://github.com/netdata/netdata/pull/14914) ([cakrit](https://github.com/cakrit))
 - Revert ML changes. [\#14908](https://github.com/netdata/netdata/pull/14908) ([vkalintiris](https://github.com/vkalintiris))
 - Update change-metrics-storage.md [\#14905](https://github.com/netdata/netdata/pull/14905) ([cakrit](https://github.com/cakrit))
 - /api/v2 part 10 [\#14904](https://github.com/netdata/netdata/pull/14904) ([ktsaou](https://github.com/ktsaou))
@@ -301,6 +304,7 @@
 - update the "Install Netdata with Docker" doc [\#14385](https://github.com/netdata/netdata/pull/14385) ([Ancairon](https://github.com/Ancairon))
 - generates dual ksy for njfv2 + fix for padding after page blocks [\#14383](https://github.com/netdata/netdata/pull/14383) ([underhood](https://github.com/underhood))
 - Delete docs/cloud/get-started.mdx [\#14382](https://github.com/netdata/netdata/pull/14382) ([Ancairon](https://github.com/Ancairon))
+- fix judyltablesgen crosscompile [\#14349](https://github.com/netdata/netdata/pull/14349) ([underhood](https://github.com/underhood))
 - Update the "Kubernetes visualizations" doc [\#14347](https://github.com/netdata/netdata/pull/14347) ([Ancairon](https://github.com/Ancairon))
 - Update the "Deploy Kubernetes monitoring with Netdata" doc [\#14345](https://github.com/netdata/netdata/pull/14345) ([Ancairon](https://github.com/Ancairon))
 - Events docs [\#14341](https://github.com/netdata/netdata/pull/14341) ([hugovalente-pm](https://github.com/hugovalente-pm))
@@ -395,11 +399,6 @@
 - Fix macos struct definition. [\#14297](https://github.com/netdata/netdata/pull/14297) ([vkalintiris](https://github.com/vkalintiris))
 - Remove archivedcharts endpoint, optimize indices [\#14296](https://github.com/netdata/netdata/pull/14296) ([stelfrag](https://github.com/stelfrag))
 - track memory footprint of Netdata [\#14294](https://github.com/netdata/netdata/pull/14294) ([ktsaou](https://github.com/ktsaou))
-- Switch to self-hosted infrastructure for DEB package distribution. [\#14290](https://github.com/netdata/netdata/pull/14290) ([Ferroin](https://github.com/Ferroin))
-- DBENGINE v2 - improvements part 5 [\#14289](https://github.com/netdata/netdata/pull/14289) ([ktsaou](https://github.com/ktsaou))
-- allow multiple local-build/static-install options in kickstart [\#14287](https://github.com/netdata/netdata/pull/14287) ([ilyam8](https://github.com/ilyam8))
-- fix\(alarms\): treat 0 processors as unknown in load\_cpu\_number [\#14286](https://github.com/netdata/netdata/pull/14286) ([ilyam8](https://github.com/ilyam8))
-- DBENGINE v2 - improvements part 4 [\#14285](https://github.com/netdata/netdata/pull/14285) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 

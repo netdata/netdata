@@ -6,14 +6,12 @@ At Netdata, we believe in providing free and unrestricted access to high-quality
 
 We also provide paid subscriptions that designed to provide additional features and capabilities for businesses that need tighter and customizable integration of the free monitoring solution to their processes. These are divided into three different plans: **Pro**, **Business**, and **Enterprise**. Each plan will offers a different set of features and capabilities to meet the needs of businesses of different sizes and with different monitoring requirements.
 
-:::note
-To not disrupt current users space's access rights we will be keeping their current plan as the **Early Bird** plan. The reason for this is to allow users to
-keep using the legacy **Member** role with the exact same permissions as it has currently.
-
-If you move from the **Early Bird** plan to a paid plan, you will not be able to return to the **Early Bird** plan again. The **Community** free plan will always be available to you, but it does not allow
-you to invite or change users using the Member role. See more details on our [roles and plans](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md#what-roles-are-available) documentation.
-
-:::
+> ### Note
+> To not disrupt the existing space user's access rights we will keep them in the **Early Bird** plan. The reason for this is to allow users to
+> keep using the legacy **Member** role with the exact same permissions as it has currently.
+>
+> If you move from the **Early Bird** plan to a paid plan, you will not be able to return to the **Early Bird** plan again. The **Community** free plan will always be available to you, but it does not allow
+> you to invite or change users using the Member role. See more details on our [roles and plans](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md#what-roles-are-available) documentation.
 
 ### Plans
 

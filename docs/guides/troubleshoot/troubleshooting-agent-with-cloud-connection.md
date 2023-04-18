@@ -48,12 +48,10 @@ and you must do it manually, using the following steps:
 
 3. Retry the kickstart claiming process.
 
-:::note
-
-In some cases a simple restart of the Agent can fix the issue.  
-Read more about [Starting, Stopping and Restarting the Agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md).
-
-:::
+> ### Note
+>
+> In some cases a simple restart of the Agent can fix the issue.  
+> Read more about [Starting, Stopping and Restarting the Agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md).
 
 ## Claiming on an older, deprecated version of the Agent
 
@@ -109,9 +107,7 @@ To verify this:
     main-ingress-545609a41fcaf5d6.elb.us-east-1.amazonaws.com has address 44.196.50.41
     ```
 
-    :::info
-
-    There will be cases in which the firewall restricts network access. In those cases, you need to whitelist `api.netdata.cloud` and `mqtt.netdata.cloud` domains to be able to see your nodes in Netdata Cloud.  
-    If you can't whitelist domains in your firewall, you can whitelist the IPs that the above command will produce, but keep in mind that they can change without any notice.
-
-    :::
+    > ### Info
+    >
+    > There will be cases in which the firewall restricts network access. In those cases, you need to whitelist `api.netdata.cloud` and `mqtt.netdata.cloud` domains to be able to see your nodes in Netdata Cloud.  
+    > If you can't whitelist domains in your firewall, you can whitelist the IPs that the above command will produce, but keep in mind that they can change without any notice.
