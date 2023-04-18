@@ -249,14 +249,10 @@ void aclk_mqtt_wss_log_cb(mqtt_wss_log_type_t log_type, const char* str)
     }
 }
 
-//TODO prevent big buffer on stack
-#define RX_MSGLEN_MAX 4096
 static void msg_callback(const char *topic, const void *msg, size_t msglen, int qos)
 {
     UNUSED(qos);
     aclk_rcvd_cloud_msgs++;
-    if (msglen > RX_MSGLEN_MAX)
-        error("Incoming ACLK message was bigger than MAX of %d and got truncated.", RX_MSGLEN_MAX);
 
     debug(D_ACLK, "Got Message From Broker Topic \"%s\" QOS %d", topic, qos);
 
