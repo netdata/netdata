@@ -33,14 +33,15 @@ typedef struct {
 /*
  * KMeans
  */
-typedef struct {
-    size_t num_clusters;
-    size_t max_iterations;
 
+typedef struct {
     std::vector<DSample> cluster_centers;
 
     calculated_number_t min_dist;
     calculated_number_t max_dist;
+
+    uint32_t after;
+    uint32_t before;
 } ml_kmeans_t;
 
 typedef struct machine_learning_stats_t {
@@ -123,6 +124,7 @@ enum ml_training_result {
 
 typedef struct {
     // Chart/dimension we want to train
+    STRING *host_id;
     STRING *chart_id;
     STRING *dimension_id;
 
@@ -168,13 +170,13 @@ typedef struct {
 /*
  * Queue
 */
+
 typedef struct {
     std::queue<ml_training_request_t> internal;
     netdata_mutex_t mutex;
     pthread_cond_t cond_var;
     std::atomic<bool> exit;
 } ml_queue_t;
-
 
 typedef struct {
     RRDDIM *rd;
@@ -207,19 +209,12 @@ typedef struct {
     RRDHOST *rh;
 
     ml_machine_learning_stats_t mls;
-    ml_training_stats_t ts;
 
     calculated_number_t host_anomaly_rate;
 
-    std::atomic<bool> threads_running;
-    std::atomic<bool> threads_cancelled;
-    std::atomic<bool> threads_joined;
-
-    ml_queue_t *training_queue;
-
     netdata_mutex_t mutex;
 
-    netdata_thread_t training_thread;
+    ml_queue_t *training_queue;
 
     /*
      * bookkeeping for anomaly detection charts
@@ -249,6 +244,19 @@ typedef struct {
     RRDSET *detector_events_rs;
     RRDDIM *detector_events_above_threshold_rd;
     RRDDIM *detector_events_new_anomaly_event_rd;
+} ml_host_t;
+
+typedef struct {
+    size_t id;
+    netdata_thread_t nd_thread;
+    netdata_mutex_t nd_mutex;
+
+    ml_queue_t *training_queue;
+    ml_training_stats_t training_stats;
+
+    calculated_number_t *training_cns;
+    calculated_number_t *scratch_training_cns;
+    std::vector<DSample> training_samples;
 
     RRDSET *queue_stats_rs;
     RRDDIM *queue_stats_queue_size_rd;
@@ -265,7 +273,7 @@ typedef struct {
     RRDDIM *training_results_not_enough_collected_values_rd;
     RRDDIM *training_results_null_acquired_dimension_rd;
     RRDDIM *training_results_chart_under_replication_rd;
-} ml_host_t;
+} ml_training_thread_t;
 
 typedef struct {
     bool enable_anomaly_detection;
@@ -302,6 +310,14 @@ typedef struct {
     std::vector<uint32_t> random_nums;
 
     netdata_thread_t detection_thread;
+    std::atomic<bool> detection_stop;
+
+    size_t num_training_threads;
+
+    std::vector<ml_training_thread_t> training_threads;
+    std::atomic<bool> training_stop;
+
+    bool enable_statistics_charts;
 } ml_config_t;
 
 void ml_config_load(ml_config_t *cfg);

@@ -148,10 +148,6 @@ static void service_to_buffer(BUFFER *wb, SERVICE_TYPE service) {
         buffer_strcat(wb, "MAINTENANCE ");
     if(service & SERVICE_COLLECTORS)
         buffer_strcat(wb, "COLLECTORS ");
-    if(service & SERVICE_ML_TRAINING)
-        buffer_strcat(wb, "ML_TRAINING ");
-    if(service & SERVICE_ML_PREDICTION)
-        buffer_strcat(wb, "ML_PREDICTION ");
     if(service & SERVICE_REPLICATION)
         buffer_strcat(wb, "REPLICATION ");
     if(service & ABILITY_DATA_QUERIES)
@@ -340,6 +336,11 @@ void netdata_cleanup_and_exit(int ret) {
     }
 #endif
 
+    delta_shutdown_time("disable ML detection and training threads");
+
+    ml_stop_threads();
+    ml_fini();
+
     delta_shutdown_time("disable maintenance, new queries, new web requests, new streaming connections and aclk");
 
     service_signal_exit(
@@ -351,12 +352,11 @@ void netdata_cleanup_and_exit(int ret) {
             | SERVICE_ACLKSYNC
             );
 
-    delta_shutdown_time("stop replication, exporters, ML training, health and web servers threads");
+    delta_shutdown_time("stop replication, exporters, health and web servers threads");
 
     timeout = !service_wait_exit(
             SERVICE_REPLICATION
             | SERVICE_EXPORTERS
-            | SERVICE_ML_TRAINING
             | SERVICE_HEALTH
             | SERVICE_WEB_SERVER
             , 3 * USEC_PER_SEC);
@@ -368,11 +368,10 @@ void netdata_cleanup_and_exit(int ret) {
             | SERVICE_STREAMING
             , 3 * USEC_PER_SEC);
 
-    delta_shutdown_time("stop ML prediction and context threads");
+    delta_shutdown_time("stop context thread");
 
     timeout = !service_wait_exit(
-            SERVICE_ML_PREDICTION
-            | SERVICE_CONTEXT
+            SERVICE_CONTEXT
             , 3 * USEC_PER_SEC);
 
     delta_shutdown_time("stop maintenance thread");
@@ -2085,6 +2084,7 @@ int main(int argc, char **argv) {
         }
         else debug(D_SYSTEM, "Not starting thread %s.", st->name);
     }
+    ml_start_threads();
 
     // ------------------------------------------------------------------------
     // Initialize netdata agent command serving from cli and signals
