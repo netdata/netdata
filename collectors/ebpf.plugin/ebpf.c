@@ -32,7 +32,6 @@ int main_thread_id = 0;
 pthread_mutex_t lock;
 pthread_mutex_t ebpf_exit_cleanup;
 pthread_mutex_t collect_data_mutex;
-pthread_cond_t collect_data_cond_var;
 
 ebpf_module_t ebpf_modules[] = {
     { .thread_name = "process", .config_name = "process", .enabled = 0, .start_routine = ebpf_process_thread,
@@ -1395,21 +1394,12 @@ static void read_local_addresses()
  * Start Pthread Variable
  *
  * This function starts all pthread variables.
- *
- * @return It returns 0 on success and -1.
  */
-int ebpf_start_pthread_variables()
+void ebpf_start_pthread_variables()
 {
     pthread_mutex_init(&lock, NULL);
     pthread_mutex_init(&ebpf_exit_cleanup, NULL);
     pthread_mutex_init(&collect_data_mutex, NULL);
-
-    if (pthread_cond_init(&collect_data_cond_var, NULL)) {
-        error("Cannot start conditional variable to control Apps charts.");
-        return -1;
-    }
-
-    return 0;
 }
 
 /**
@@ -2273,10 +2263,7 @@ int main(int argc, char **argv)
     signal(SIGTERM, ebpf_stop_threads);
     signal(SIGPIPE, ebpf_stop_threads);
 
-    if (ebpf_start_pthread_variables()) {
-        error("Cannot start mutex to control overall charts.");
-        ebpf_exit();
-    }
+    ebpf_start_pthread_variables();
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     if(verify_netdata_host_prefix() == -1) ebpf_exit(6);

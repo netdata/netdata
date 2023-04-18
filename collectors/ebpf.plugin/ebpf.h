@@ -174,7 +174,6 @@ extern int isrh;
 extern char *ebpf_plugin_dir;
 
 extern pthread_mutex_t collect_data_mutex;
-extern pthread_cond_t collect_data_cond_var;
 
 // Common functions
 void ebpf_global_labels(netdata_syscall_stat_t *is,
