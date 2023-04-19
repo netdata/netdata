@@ -267,8 +267,7 @@ void flb_tmp_buff_cpy_timer_cb(uv_timer_t *handle) {
     /* Extract kernel logs, systemd, syslog and docker events metrics */
     if(p_file_info->log_type == FLB_KMSG){
         uv_mutex_lock(p_file_info->parser_metrics_mut);
-        p_file_info->parser_metrics->num_lines_total += num_lines;
-        p_file_info->parser_metrics->num_lines_rate = num_lines;
+        p_file_info->parser_metrics->num_lines += num_lines;
         for(int i = 0; i < SYSLOG_SEVER_ARR_SIZE; i++){
             p_file_info->parser_metrics->kernel->sever[i] = p_file_info->flb_tmp_kernel_metrics.sever[i];
             p_file_info->flb_tmp_kernel_metrics.sever[i] = 0;
@@ -277,8 +276,7 @@ void flb_tmp_buff_cpy_timer_cb(uv_timer_t *handle) {
     }
     else if(p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_SYSLOG) {
         uv_mutex_lock(p_file_info->parser_metrics_mut);
-        p_file_info->parser_metrics->num_lines_total += num_lines;
-        p_file_info->parser_metrics->num_lines_rate = num_lines;
+        p_file_info->parser_metrics->num_lines += num_lines;
         for(int i = 0; i < SYSLOG_SEVER_ARR_SIZE; i++){
             p_file_info->parser_metrics->systemd->sever[i] = p_file_info->flb_tmp_systemd_metrics.sever[i];
             p_file_info->flb_tmp_systemd_metrics.sever[i] = 0;
@@ -294,8 +292,7 @@ void flb_tmp_buff_cpy_timer_cb(uv_timer_t *handle) {
         uv_mutex_unlock(p_file_info->parser_metrics_mut);
     } else if(p_file_info->log_type == FLB_DOCKER_EV) {
         uv_mutex_lock(p_file_info->parser_metrics_mut);
-        p_file_info->parser_metrics->num_lines_total += num_lines;
-        p_file_info->parser_metrics->num_lines_rate = num_lines;
+        p_file_info->parser_metrics->num_lines += num_lines;
         for(int i = 0; i < NUM_OF_DOCKER_EV_TYPES; i++){
             p_file_info->parser_metrics->docker_ev->ev_type[i] = p_file_info->flb_tmp_docker_ev_metrics.ev_type[i];
             p_file_info->flb_tmp_docker_ev_metrics.ev_type[i] = 0;

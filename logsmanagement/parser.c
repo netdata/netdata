@@ -1302,8 +1302,7 @@ static inline void extract_web_log_metrics( Log_parser_config_t *parser_config,
                                             Log_parser_metrics_t *metrics){
 
     /* Extract number of parsed lines */
-    metrics->num_lines_total++;
-    metrics->num_lines_rate++;
+    metrics->num_lines++;
 
     /* Extract vhost */
     // TODO: Reduce number of reallocs

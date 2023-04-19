@@ -7,23 +7,39 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
     chart_data_web_log_t *chart_data = chart_meta->chart_data_web_log;
     long chart_prio = chart_meta->base_prio;
 
-    /* Number of collected logs - initialise */
-    chart_data->st_lines = rrdset_create_localhost(
+    /* Number of collected logs total - initialise */
+    chart_data->st_lines_total = rrdset_create_localhost(
             (char *) p_file_info->chart_name
-            , "collected_logs"
+            , "collected_logs_total"
             , NULL
             , "collected_logs"
             , NULL
-            , "Collected log records"
-            , "records"
+            , CHART_TITLE_TOTAL_COLLECTED_LOGS
+            , "log records"
             , "logsmanagement.plugin"
             , NULL
             , ++chart_prio
             , p_file_info->update_every
             , RRDSET_TYPE_AREA
     );
-    chart_data->dim_lines_total = rrddim_add(chart_data->st_lines, "Total records", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    chart_data->dim_lines_rate = rrddim_add(chart_data->st_lines, "New records", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    chart_data->dim_lines_total = rrddim_add(chart_data->st_lines_total, "total records", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    /* Number of collected logs total - initialise */
+    chart_data->st_lines_rate = rrdset_create_localhost(
+            (char *) p_file_info->chart_name
+            , "collected_logs_rate"
+            , NULL
+            , "collected_logs"
+            , NULL
+            , CHART_TITLE_RATE_COLLECTED_LOGS
+            , "log records"
+            , "logsmanagement.plugin"
+            , NULL
+            , ++chart_prio
+            , p_file_info->update_every
+            , RRDSET_TYPE_AREA
+    );
+    chart_data->dim_lines_rate = rrddim_add(chart_data->st_lines_rate, "records", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
     /* Vhost - initialise */
     if(p_file_info->parser_config->chart_config & CHART_VHOST){
@@ -323,10 +339,8 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
 void web_log_chart_collect(struct File_info *p_file_info, struct Chart_meta *chart_meta){
     chart_data_web_log_t *chart_data = chart_meta->chart_data_web_log;
 
-    /* Number of lines - collect */
-    chart_data->num_lines_total = p_file_info->parser_metrics->num_lines_total;
-    chart_data->num_lines_rate += p_file_info->parser_metrics->num_lines_rate;
-    p_file_info->parser_metrics->num_lines_rate = 0;
+    /* Number of collected logs - collect */
+    chart_data->num_lines = p_file_info->parser_metrics->num_lines;
 
     /* Vhost - collect */
     if(p_file_info->parser_config->chart_config & CHART_VHOST){
@@ -566,14 +580,17 @@ void web_log_chart_collect(struct File_info *p_file_info, struct Chart_meta *cha
 void web_log_chart_update(struct File_info *p_file_info, struct Chart_meta *chart_meta){
     chart_data_web_log_t *chart_data = chart_meta->chart_data_web_log;
 
-    /* Number of lines - update chart */
-    rrddim_set_by_pointer(  chart_data->st_lines, 
+    /* Number of collected logs total - update chart */
+    rrddim_set_by_pointer(  chart_data->st_lines_total, 
                             chart_data->dim_lines_total, 
-                            chart_data->num_lines_total);
-    rrddim_set_by_pointer(  chart_data->st_lines, 
+                            chart_data->num_lines);
+    rrdset_done(chart_data->st_lines_total);
+
+    /* Number of collected logs rate - update chart */
+    rrddim_set_by_pointer(  chart_data->st_lines_rate, 
                             chart_data->dim_lines_rate, 
-                            chart_data->num_lines_rate);
-    rrdset_done(chart_data->st_lines);
+                            chart_data->num_lines);
+    rrdset_done(chart_data->st_lines_rate);
 
     /* Vhost - update chart */
     if(p_file_info->parser_config->chart_config & CHART_VHOST){

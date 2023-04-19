@@ -217,7 +217,6 @@ typedef struct kernel_metrics_dict_item{
 } Kernel_metrics_dict_item_t;
 
 typedef struct kernel_metrics{
-    unsigned long num_lines;				            /**< Number of parsed lines **/
     unsigned int sever[SYSLOG_SEVER_ARR_SIZE];      /**< Syslog severity, 0-7 plus 1 space for 'unknown' **/
     DICTIONARY *subsystem;
     DICTIONARY *device;
@@ -234,7 +233,6 @@ typedef struct kernel_metrics{
 #define SYSLOG_PRIOR_ARR_SIZE 193       /**< Number of priority values plus 1 for 'unknown' **/
 
 typedef struct systemd_metrics{
-    unsigned long num_lines;				            /**< Number of parsed lines **/
     unsigned int sever[SYSLOG_SEVER_ARR_SIZE];      /**< Syslog severity, 0-7 plus 1 space for 'unknown' **/
     unsigned int facil[SYSLOG_FACIL_ARR_SIZE];      /**< Syslog facility, 0-23 plus 1 space for 'unknown' **/
     unsigned int prior[SYSLOG_PRIOR_ARR_SIZE];      /**< Syslog priority value, 0-191 plus 1 space for 'unknown' **/
@@ -281,7 +279,6 @@ static const char *docker_ev_type_string[] = {
 // #define NUM_OF_DOCKER_EV_ACTIONS ((int) (sizeof docker_ev_action_string / sizeof docker_ev_action_string[0]))
 
 typedef struct docker_ev_metrics{
-    unsigned long num_lines;				/**< Number of parsed lines **/
     unsigned int ev_type[NUM_OF_DOCKER_EV_TYPES];				
 } Docker_ev_metrics_t;
 
@@ -326,8 +323,7 @@ typedef struct log_parser_cus_metrics{
 /* -------------------------------------------------------------------------- */
 
 struct log_parser_metrics{
-    unsigned long long num_lines_total; /**< Number of total lines parsed in log source file. */
-    unsigned long long num_lines_rate;  /**< Number of new lines parsed. */
+    unsigned long long num_lines;
     union {
         Web_log_metrics_t *web_log;
         Kernel_metrics_t *kernel;

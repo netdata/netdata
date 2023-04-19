@@ -17,11 +17,10 @@ typedef struct Chart_data_web_log chart_data_web_log_t;
 
 struct Chart_data_web_log {
 
-    /* Number of lines */
-    RRDSET *st_lines;
-    RRDDIM *dim_lines_total;
-    RRDDIM *dim_lines_rate;
-    collected_number num_lines_total, num_lines_rate;
+    /* Number of collected log records */
+    RRDSET *st_lines_total, *st_lines_rate;
+    RRDDIM *dim_lines_total, *dim_lines_rate;
+    collected_number num_lines;
 
     /* Vhosts */
     RRDSET *st_vhost;

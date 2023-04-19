@@ -18,6 +18,9 @@ struct Chart_meta;
 #include "plugin_logsmanagement_systemd.h"
 #include "plugin_logsmanagement_docker_ev.h"
 
+#define CHART_TITLE_TOTAL_COLLECTED_LOGS "Total collected log records"
+#define CHART_TITLE_RATE_COLLECTED_LOGS "Rate of collected log records"
+
 typedef struct Chart_data_cus {
     /* See Log_parser_cus_metrics_t in parser.h for other 
      * dimensions and collected numbers to add here */

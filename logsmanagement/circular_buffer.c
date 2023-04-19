@@ -43,7 +43,7 @@ void generic_parser(void *arg){
                     debug(D_LOGS_MANAG,"Parsed buffer did not contain any text or was of 0 size.");
                     m_assert(0, "Parsed buffer did not contain any text or was of 0 size.");
                 }
-                item->num_lines = p_file_info->parser_metrics->num_lines_rate;
+                item->num_lines = p_file_info->parser_metrics->num_lines;
                 break;
             }
             case GENERIC:
@@ -52,8 +52,7 @@ void generic_parser(void *arg){
                 for(int i = 0; item->data[i]; i++)
                     if(unlikely(item->data[i] == '\n')) item->num_lines++;
                 /* +1 because last line is terminated by '\0' instead of '\n' */
-                p_file_info->parser_metrics->num_lines_total = 
-                    p_file_info->parser_metrics->num_lines_rate = item->num_lines++;           
+                p_file_info->parser_metrics->num_lines = item->num_lines++;           
                 break;
             }
             default: 

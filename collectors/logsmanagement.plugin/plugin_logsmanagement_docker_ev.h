@@ -18,11 +18,10 @@ typedef struct Chart_data_docker_ev chart_data_docker_ev_t;
 struct Chart_data_docker_ev {
     char *rrd_type;
 
-    /* Number of lines */
-    RRDSET *st_lines;
-    RRDDIM *dim_lines_total;
-    RRDDIM *dim_lines_rate;
-    collected_number num_lines_total, num_lines_rate;
+    /* Number of collected log records */
+    RRDSET *st_lines_total, *st_lines_rate;
+    RRDDIM *dim_lines_total, *dim_lines_rate;
+    collected_number num_lines;
 
     /* Docker events metrics - event type */
     RRDSET *st_dock_ev_type;
