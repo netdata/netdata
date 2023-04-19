@@ -45,8 +45,6 @@ netdata_ebpf_targets_t vfs_targets[] = { {.name = "vfs_write", .mode = EBPF_LOAD
                                          {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 #ifdef LIBBPF_MAJOR_VERSION
-static struct vfs_bpf *bpf_obj = NULL;
-
 /**
  * Disable probe
  *
@@ -394,17 +392,8 @@ static inline int ebpf_vfs_load_and_attach(struct vfs_bpf *obj, ebpf_module_t *e
  */
 static void ebpf_vfs_free(ebpf_module_t *em)
 {
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPING;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-
     freez(vfs_hash_values);
     freez(vfs_vector);
-
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        vfs_bpf__destroy(bpf_obj);
-#endif
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
@@ -1864,11 +1853,11 @@ static int ebpf_vfs_load_bpf(ebpf_module_t *em)
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else {
-        bpf_obj = vfs_bpf__open();
-        if (!bpf_obj)
+        vfs_bpf_obj = vfs_bpf__open();
+        if (!vfs_bpf_obj)
             ret = -1;
         else
-            ret = ebpf_vfs_load_and_attach(bpf_obj, em);
+            ret = ebpf_vfs_load_and_attach(vfs_bpf_obj, em);
     }
 #endif
 
