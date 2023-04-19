@@ -25,8 +25,6 @@ netdata_ebpf_targets_t mount_targets[] = { {.name = "mount", .mode = EBPF_LOAD_T
                                            {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 #ifdef LIBBPF_MAJOR_VERSION
-static struct mount_bpf *bpf_obj = NULL;
-
 /*****************************************************************
  *
  *  BTF FUNCTIONS
@@ -223,11 +221,6 @@ static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_
  */
 static void ebpf_mount_free(ebpf_module_t *em)
 {
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        mount_bpf__destroy(bpf_obj);
-#endif
-
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
@@ -388,11 +381,11 @@ static int ebpf_mount_load_bpf(ebpf_module_t *em)
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else {
-        bpf_obj = mount_bpf__open();
-        if (!bpf_obj)
+        mount_bpf_obj = mount_bpf__open();
+        if (!mount_bpf_obj)
             ret = -1;
         else
-            ret = ebpf_mount_load_and_attach(bpf_obj, em);
+            ret = ebpf_mount_load_and_attach(mount_bpf_obj, em);
     }
 #endif
 

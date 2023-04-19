@@ -454,6 +454,7 @@ struct btf *default_btf = NULL;
 struct cachestat_bpf *cachestat_bpf_obj = NULL;
 struct dc_bpf *dc_bpf_obj = NULL;
 struct fd_bpf *fd_bpf_obj = NULL;
+struct mount_bpf *mount_bpf_obj = NULL;
 #else
 void *default_btf = NULL;
 #endif
@@ -584,6 +585,13 @@ static void ebpf_unload_unique_maps()
 #ifdef LIBBPF_MAJOR_VERSION
                 if (fd_bpf_obj)
                     fd_bpf__destroy(fd_bpf_obj);
+#endif
+                break;
+            }
+            case EBPF_MODULE_MOUNT_IDX: {
+#ifdef LIBBPF_MAJOR_VERSION
+                if (mount_bpf_obj)
+                    mount_bpf__destroy(mount_bpf_obj);
 #endif
                 break;
             }
