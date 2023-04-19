@@ -3,8 +3,6 @@
 #include "ebpf.h"
 #include "ebpf_cachestat.h"
 
-netdata_publish_cachestat_t **cachestat_pid;
-
 static char *cachestat_counter_dimension_name[NETDATA_CACHESTAT_END] = { "ratio", "dirty", "hit",
                                                                          "miss" };
 static netdata_syscall_stat_t cachestat_counter_aggregated_data[NETDATA_CACHESTAT_END];

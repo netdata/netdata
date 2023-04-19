@@ -14,6 +14,8 @@ ARAL *ebpf_aral_cachestat_pid = NULL;
 // ----------------------------------------------------------------------------
 // Global vectors used with apps
 ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
+netdata_publish_cachestat_t **cachestat_pid = NULL;
+
 
 /**
  * eBPF ARAL Init
