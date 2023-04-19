@@ -1055,7 +1055,7 @@ static void process_collector(ebpf_module_t *em)
             pthread_mutex_lock(&lock);
             ebpf_send_statistic_data();
 
-            if (thread_enabled) {
+            if (thread_enabled == NETDATA_THREAD_EBPF_RUNNING) {
                 if (publish_global) {
                     ebpf_process_send_data(em);
                 }
@@ -1207,7 +1207,7 @@ void *ebpf_process_thread(void *ptr)
         process_aggregated_data, process_publish_aggregated, process_dimension_names, process_id_names,
         algorithms, NETDATA_KEY_PUBLISH_PROCESS_END);
 
-    if (process_enabled) {
+    if (process_enabled == NETDATA_THREAD_EBPF_RUNNING) {
         ebpf_create_global_charts(em);
     }
 

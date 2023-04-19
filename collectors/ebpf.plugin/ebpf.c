@@ -777,7 +777,7 @@ static void ebpf_create_apps_charts(struct ebpf_target *root)
     int counter;
     for (counter = 0; ebpf_modules[counter].thread_name; counter++) {
         ebpf_module_t *current = &ebpf_modules[counter];
-        if (current->enabled && current->apps_charts && current->apps_routine)
+        if (current->enabled == NETDATA_THREAD_EBPF_RUNNING && current->apps_charts && current->apps_routine)
             current->apps_routine(current, root);
     }
 }
@@ -2517,6 +2517,7 @@ int main(int argc, char **argv)
 
         // We are using a small heartbeat time to wake up thread,
         // but we should not update so frequently the shared memory data
+        /*
         if (++counter >=  NETDATA_EBPF_CGROUP_UPDATE) {
             counter = 0;
             if (!shm_ebpf_cgroup.header)
@@ -2524,7 +2525,7 @@ int main(int argc, char **argv)
 
             ebpf_parse_cgroup_shm_data();
         }
-
+         */
         pthread_mutex_lock(&ebpf_exit_cleanup);
         if (ebpf_modules[i].enabled == NETDATA_THREAD_EBPF_RUNNING && process_pid_fd != -1) {
             pthread_mutex_lock(&collect_data_mutex);
@@ -2532,10 +2533,11 @@ int main(int argc, char **argv)
                 update_apps_list = 0;
                 cleanup_exited_pids();
                 collect_data_for_all_processes(process_pid_fd);
+
+                pthread_mutex_lock(&lock);
+                ebpf_create_apps_charts(apps_groups_root_target);
+                pthread_mutex_unlock(&lock);
             }
-            pthread_mutex_lock(&lock);
-            ebpf_create_apps_charts(apps_groups_root_target);
-            pthread_mutex_unlock(&lock);
             pthread_mutex_unlock(&collect_data_mutex);
         }
         pthread_mutex_unlock(&ebpf_exit_cleanup);
