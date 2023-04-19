@@ -369,6 +369,7 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
                 pool->offline = 0;
                 pool->removed = 0;
                 pool->unavail = 0;
+                pool->suspended = 0;
 
                 char filename[FILENAME_MAX + 1];
                 snprintfz(filename, FILENAME_MAX, "%s/%s/state", dirname, de->d_name);
