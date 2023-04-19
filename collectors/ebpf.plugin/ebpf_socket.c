@@ -61,7 +61,6 @@ static netdata_idx_t *socket_hash_values = NULL;
 static netdata_syscall_stat_t socket_aggregated_data[NETDATA_MAX_SOCKET_VECTOR];
 static netdata_publish_syscall_t socket_publish_aggregated[NETDATA_MAX_SOCKET_VECTOR];
 
-ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
 static ebpf_bandwidth_t *bandwidth_vector = NULL;
 
 pthread_mutex_t nv_mutex;

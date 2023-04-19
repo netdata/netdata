@@ -244,6 +244,10 @@ void ebpf_cachestat_release(netdata_publish_cachestat_t *stat);
 
 // ARAL Section end
 
+// Threads integrated with apps
+extern ebpf_socket_publish_apps_t **socket_bandwidth_curr;
+// Threads integrated with apps
+
 #include "libnetdata/threads/threads.h"
 
 // ARAL variables
