@@ -218,6 +218,7 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd);
 extern ebpf_process_stat_t **global_process_stats;
 extern netdata_publish_cachestat_t **cachestat_pid;
 extern netdata_publish_dcstat_t **dcstat_pid;
+extern netdata_publish_swap_t **swap_pid;
 
 // The default value is at least 32 times smaller than maximum number of PIDs allowed on system,
 // this is only possible because we are using ARAL (https://github.com/netdata/netdata/tree/master/libnetdata/aral).

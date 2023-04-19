@@ -7,12 +7,10 @@ static char *swap_dimension_name[NETDATA_SWAP_END] = { "read", "write" };
 static netdata_syscall_stat_t swap_aggregated_data[NETDATA_SWAP_END];
 static netdata_publish_syscall_t swap_publish_aggregated[NETDATA_SWAP_END];
 
-netdata_publish_swap_t *swap_vector = NULL;
-
 static netdata_idx_t swap_hash_values[NETDATA_SWAP_END];
 static netdata_idx_t *swap_values = NULL;
 
-netdata_publish_swap_t **swap_pid = NULL;
+netdata_publish_swap_t *swap_vector = NULL;
 
 struct config swap_config = { .first_section = NULL,
     .last_section = NULL,

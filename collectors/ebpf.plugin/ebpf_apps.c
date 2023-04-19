@@ -17,6 +17,7 @@ ARAL *ebpf_aral_dcstat_pid = NULL;
 ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
 netdata_publish_cachestat_t **cachestat_pid = NULL;
 netdata_publish_dcstat_t **dcstat_pid = NULL;
+netdata_publish_swap_t **swap_pid = NULL;
 
 /**
  * eBPF ARAL Init
