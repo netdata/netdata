@@ -457,6 +457,7 @@ struct fd_bpf *fd_bpf_obj = NULL;
 struct mount_bpf *mount_bpf_obj = NULL;
 struct shm_bpf *shm_bpf_obj = NULL;
 struct socket_bpf *socket_bpf_obj = NULL;
+struct swap_bpf *bpf_obj = NULL;
 #else
 void *default_btf = NULL;
 #endif
@@ -608,6 +609,13 @@ static void ebpf_unload_unique_maps()
 #ifdef LIBBPF_MAJOR_VERSION
                 if (socket_bpf_obj)
                     socket_bpf__destroy(socket_bpf_obj);
+#endif
+                break;
+            }
+            case EBPF_MODULE_SWAP_IDX: {
+#ifdef LIBBPF_MAJOR_VERSION
+                if (bpf_obj)
+                    swap_bpf__destroy(bpf_obj);
 #endif
                 break;
             }

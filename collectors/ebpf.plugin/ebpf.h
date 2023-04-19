@@ -52,6 +52,7 @@ extern struct fd_bpf *fd_bpf_obj;
 extern struct mount_bpf *mount_bpf_obj;
 extern struct shm_bpf *shm_bpf_obj;
 extern struct socket_bpf *socket_bpf_obj;
+extern struct swap_bpf *bpf_obj;
 #endif
 
 typedef struct netdata_syscall_stat {

@@ -37,8 +37,6 @@ netdata_ebpf_targets_t swap_targets[] = { {.name = "swap_readpage", .mode = EBPF
                                            {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 #ifdef LIBBPF_MAJOR_VERSION
-static struct swap_bpf *bpf_obj = NULL;
-
 /**
  * Disable probe
  *
@@ -220,17 +218,9 @@ static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t 
  */
 static void ebpf_swap_free(ebpf_module_t *em)
 {
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPING;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-
     freez(swap_vector);
     freez(swap_values);
 
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        swap_bpf__destroy(bpf_obj);
-#endif
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
