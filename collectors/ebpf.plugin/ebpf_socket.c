@@ -99,8 +99,6 @@ struct netdata_static_thread socket_threads = {
 };
 
 #ifdef LIBBPF_MAJOR_VERSION
-static struct socket_bpf *bpf_obj = NULL;
-
 /**
  * Disable Probe
  *
@@ -583,10 +581,6 @@ static void clean_ip_structure(ebpf_network_viewer_ip_list_t **clean)
  */
 static void ebpf_socket_free(ebpf_module_t *em )
 {
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPING;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-
     /* We can have thousands of sockets to clean, so we are transferring
      * for OS the responsibility while we do not use ARAL here
     freez(socket_hash_values);
@@ -608,13 +602,6 @@ static void ebpf_socket_free(ebpf_module_t *em )
      */
 
     pthread_mutex_destroy(&nv_mutex);
-
-    freez(socket_threads.thread);
-
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        socket_bpf__destroy(bpf_obj);
-#endif
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
@@ -3878,11 +3865,11 @@ static int ebpf_socket_load_bpf(ebpf_module_t *em)
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else {
-        bpf_obj = socket_bpf__open();
-        if (!bpf_obj)
+        socket_bpf_obj = socket_bpf__open();
+        if (!socket_bpf_obj)
             ret = -1;
         else
-            ret = ebpf_socket_load_and_attach(bpf_obj, em);
+            ret = ebpf_socket_load_and_attach(socket_bpf_obj, em);
     }
 #endif
 
