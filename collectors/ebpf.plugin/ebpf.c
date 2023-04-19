@@ -565,7 +565,9 @@ static void ebpf_unload_unique_maps()
     int i;
     for (i = 0; ebpf_modules[i].thread_name; i++) {
         if (ebpf_modules[i].enabled != NETDATA_THREAD_EBPF_STOPPED) {
-            error("Cannot unload maps for thread %s, because it is not stopped.", ebpf_modules[i].thread_name);
+            if (ebpf_modules[i].enabled != NETDATA_THREAD_EBPF_NOT_RUNNING)
+                error("Cannot unload maps for thread %s, because it is not stopped.", ebpf_modules[i].thread_name);
+
             continue;
         }
 
