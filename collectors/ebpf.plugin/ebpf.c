@@ -453,6 +453,7 @@ ebpf_plugin_stats_t plugin_statistics = {.core = 0, .legacy = 0, .running = 0, .
 struct btf *default_btf = NULL;
 struct cachestat_bpf *cachestat_bpf_obj = NULL;
 struct dc_bpf *dc_bpf_obj = NULL;
+struct fd_bpf *fd_bpf_obj = NULL;
 #else
 void *default_btf = NULL;
 #endif
@@ -565,8 +566,7 @@ static void ebpf_unload_unique_maps()
 
         ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
         switch (i) {
-            case EBPF_MODULE_CACHESTAT_IDX:
-            {
+            case EBPF_MODULE_CACHESTAT_IDX: {
 #ifdef LIBBPF_MAJOR_VERSION
                 if (cachestat_bpf_obj)
                     cachestat_bpf__destroy(cachestat_bpf_obj);
@@ -577,6 +577,13 @@ static void ebpf_unload_unique_maps()
 #ifdef LIBBPF_MAJOR_VERSION
                 if (dc_bpf_obj)
                     dc_bpf__destroy(dc_bpf_obj);
+#endif
+                break;
+            }
+            case EBPF_MODULE_FD_IDX: {
+#ifdef LIBBPF_MAJOR_VERSION
+                if (fd_bpf_obj)
+                    fd_bpf__destroy(fd_bpf_obj);
 #endif
                 break;
             }

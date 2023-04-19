@@ -42,8 +42,6 @@ netdata_ebpf_targets_t fd_targets[] = { {.name = "open", .mode = EBPF_LOAD_TRAMP
                                         {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 #ifdef LIBBPF_MAJOR_VERSION
-static struct fd_bpf *bpf_obj = NULL;
-
 /**
  * Disable probe
  *
@@ -366,11 +364,6 @@ static void ebpf_fd_free(ebpf_module_t *em)
 
     freez(fd_values);
     freez(fd_vector);
-
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        fd_bpf__destroy(bpf_obj);
-#endif
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
@@ -1099,11 +1092,11 @@ static int ebpf_fd_load_bpf(ebpf_module_t *em)
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else {
-        bpf_obj = fd_bpf__open();
-        if (!bpf_obj)
+        fd_bpf_obj = fd_bpf__open();
+        if (!fd_bpf_obj)
             ret = -1;
         else
-            ret = ebpf_fd_load_and_attach(bpf_obj, em);
+            ret = ebpf_fd_load_and_attach(fd_bpf_obj, em);
     }
 #endif
 
