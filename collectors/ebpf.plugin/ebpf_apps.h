@@ -220,6 +220,7 @@ extern netdata_publish_cachestat_t **cachestat_pid;
 extern netdata_publish_dcstat_t **dcstat_pid;
 extern netdata_publish_swap_t **swap_pid;
 extern netdata_publish_vfs_t **vfs_pid;
+extern netdata_fd_stat_t **fd_pid;
 
 // The default value is at least 32 times smaller than maximum number of PIDs allowed on system,
 // this is only possible because we are using ARAL (https://github.com/netdata/netdata/tree/master/libnetdata/aral).
@@ -249,10 +250,15 @@ void ebpf_dcstat_aral_init();
 netdata_publish_dcstat_t *ebpf_publish_dcstat_get(void);
 void ebpf_dcstat_release(netdata_publish_dcstat_t *stat);
 
-ARAL *ebpf_aral_vfs_pid;
+extern ARAL *ebpf_aral_vfs_pid;
 void ebpf_vfs_aral_init();
 netdata_publish_vfs_t *ebpf_vfs_get(void);
 void ebpf_vfs_release(netdata_publish_vfs_t *stat);
+
+extern ARAL *ebpf_aral_fd_pid;
+void ebpf_fd_aral_init();
+netdata_fd_stat_t *ebpf_fd_stat_get(void);
+void ebpf_fd_release(netdata_fd_stat_t *stat);
 
 // ARAL Section end
 

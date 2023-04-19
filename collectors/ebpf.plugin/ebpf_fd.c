@@ -3,10 +3,6 @@
 #include "ebpf.h"
 #include "ebpf_fd.h"
 
-// ----------------------------------------------------------------------------
-// ARAL vectors used to speed up processing
-ARAL *ebpf_aral_fd_pid = NULL;
-
 static char *fd_dimension_names[NETDATA_FD_SYSCALL_END] = { "open", "close" };
 static char *fd_id_names[NETDATA_FD_SYSCALL_END] = { "do_sys_open",  "__close_fd" };
 
@@ -40,7 +36,6 @@ static netdata_idx_t fd_hash_values[NETDATA_FD_COUNTER];
 static netdata_idx_t *fd_values = NULL;
 
 netdata_fd_stat_t *fd_vector = NULL;
-netdata_fd_stat_t **fd_pid = NULL;
 
 netdata_ebpf_targets_t fd_targets[] = { {.name = "open", .mode = EBPF_LOAD_TRAMPOLINE},
                                         {.name = "close", .mode = EBPF_LOAD_TRAMPOLINE},
@@ -393,46 +388,6 @@ static void ebpf_fd_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     ebpf_fd_free(em);
-}
-
-/*****************************************************************
- *
- *  ARAL FUNCTIONS
- *
- *****************************************************************/
-
-/**
- * eBPF file descriptor Aral init
- *
- * Initiallize array allocator that will be used when integration with apps is enabled.
- */
-static inline void ebpf_fd_aral_init()
-{
-    ebpf_aral_fd_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_FD_ARAL_NAME, sizeof(netdata_fd_stat_t));
-}
-
-/**
- * eBPF publish file descriptor get
- *
- * Get a netdata_fd_stat_t entry to be used with a specific PID.
- *
- * @return it returns the address on success.
- */
-netdata_fd_stat_t *ebpf_fd_stat_get(void)
-{
-    netdata_fd_stat_t *target = aral_mallocz(ebpf_aral_fd_pid);
-    memset(target, 0, sizeof(netdata_fd_stat_t));
-    return target;
-}
-
-/**
- * eBPF file descriptor release
- *
- * @param stat Release a target after usage.
- */
-void ebpf_fd_release(netdata_fd_stat_t *stat)
-{
-    aral_freez(ebpf_aral_fd_pid, stat);
 }
 
 /*****************************************************************
