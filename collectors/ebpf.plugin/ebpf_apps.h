@@ -237,6 +237,11 @@ void ebpf_socket_aral_init();
 ebpf_socket_publish_apps_t *ebpf_socket_stat_get(void);
 void ebpf_socket_release(ebpf_socket_publish_apps_t *stat);
 
+extern ARAL *ebpf_aral_cachestat_pid;
+void ebpf_cachestat_aral_init();
+netdata_publish_cachestat_t *ebpf_publish_cachestat_get(void);
+void ebpf_cachestat_release(netdata_publish_cachestat_t *stat);
+
 // ARAL Section end
 
 #include "libnetdata/threads/threads.h"

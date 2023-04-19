@@ -3,10 +3,6 @@
 #include "ebpf.h"
 #include "ebpf_cachestat.h"
 
-// ----------------------------------------------------------------------------
-// ARAL vectors used to speed up processing
-ARAL *ebpf_aral_cachestat_pid = NULL;
-
 netdata_publish_cachestat_t **cachestat_pid;
 
 static char *cachestat_counter_dimension_name[NETDATA_CACHESTAT_END] = { "ratio", "dirty", "hit",
@@ -362,46 +358,6 @@ static void ebpf_cachestat_exit(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     ebpf_cachestat_free(em);
-}
-
-/*****************************************************************
- *
- *  ARAL FUNCTIONS
- *
- *****************************************************************/
-
-/**
- * eBPF Cachestat Aral init
- *
- * Initiallize array allocator that will be used when integration with apps is enabled.
- */
-static inline void ebpf_cachestat_aral_init()
-{
-    ebpf_aral_cachestat_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_CACHESTAT_ARAL_NAME, sizeof(netdata_publish_cachestat_t));
-}
-
-/**
- * eBPF publish cachestat get
- *
- * Get a netdata_publish_cachestat_t entry to be used with a specific PID.
- *
- * @return it returns the address on success.
- */
-netdata_publish_cachestat_t *ebpf_publish_cachestat_get(void)
-{
-    netdata_publish_cachestat_t *target = aral_mallocz(ebpf_aral_cachestat_pid);
-    memset(target, 0, sizeof(netdata_publish_cachestat_t));
-    return target;
-}
-
-/**
- * eBPF cachestat release
- *
- * @param stat Release a target after usage.
- */
-void ebpf_cachestat_release(netdata_publish_cachestat_t *stat)
-{
-    aral_freez(ebpf_aral_cachestat_pid, stat);
 }
 
 /*****************************************************************
