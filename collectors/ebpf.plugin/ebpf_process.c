@@ -42,8 +42,6 @@ static netdata_idx_t *process_hash_values = NULL;
 static netdata_syscall_stat_t process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_END];
 static netdata_publish_syscall_t process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_END];
 
-ebpf_process_stat_t **global_process_stats = NULL;
-
 int process_enabled = 0;
 bool publish_internal_metrics = true;
 

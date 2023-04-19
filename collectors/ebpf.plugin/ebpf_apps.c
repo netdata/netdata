@@ -24,6 +24,7 @@ netdata_publish_swap_t **swap_pid = NULL;
 netdata_publish_vfs_t **vfs_pid = NULL;
 netdata_fd_stat_t **fd_pid = NULL;
 netdata_publish_shm_t **shm_pid = NULL;
+ebpf_process_stat_t **global_process_stats = NULL;
 
 /**
  * eBPF ARAL Init
