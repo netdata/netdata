@@ -1,20 +1,81 @@
-# Using host labels to organize your metrics
+# Organize systems, metrics, and alerts
 
 When you use Netdata to monitor and troubleshoot an entire infrastructure, you need sophisticated ways of keeping everything organized.
+Netdata allows to organize your observability infrastructure with spaces, war rooms, virtual nodes, host labels, and metric labels.
 
-Some of the scenarios that host labels can be extremely useful are:
+## Spaces and war rooms
+
+[Spaces](https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md) are used for organization-level or infrastructure-level 
+grouping of nodes and people. A node can only appear in a single space, while people can have access to multiple spaces.
+
+The [war rooms](https://github.com/netdata/netdata/edit/master/docs/cloud/war-rooms.md) in a space bring together nodes and people in 
+collaboration areas. War rooms can also be used for fine-tuned 
+[role based access control](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md). 
+
+## Virtual nodes
+
+Netdata’s virtual nodes functionality allows you to define nodes in configuration files and have them be treated as regular nodes 
+in all of the UI, dashboards, tabs, filters etc. For example, you can create a virtual node each for all your Windows machines 
+and monitor them as discrete entities. Virtual nodes can help you simplify your infrastructure monitoring and focus on the 
+individual node that matters.
+
+To define your windows server as a virtual node you need to:
+
+  * Define virtual nodes in `/etc/netdata/vnodes/vnodes.conf`
+
+    ```yaml
+    - hostname: win_server1
+      guid: <value>
+    ```
+    Just remember to use a valid guid (On Linux you can use `uuidgen` command to generate one, on Windows just use the `[guid]::NewGuid()` command in PowerShell)
+    
+  * Add the vnode config to the windows monitoring job we created earlier, see higlighted line below:
+    ```yaml
+      jobs:
+        - name: win_server1
+          vnode: win_server1
+          url: http://203.0.113.10:9182/metrics
+    ```
+    
+## Host labels
+
+Host labels can be extremely useful when:
 
 - You need alarms that adapt to the system's purpose
 - You need properly-labeled metrics archiving so you can sort, correlate, and mash-up your data to your heart's content.
 - You need to keep tabs on ephemeral Docker containers in a Kubernetes cluster.
 
-You need **host labels**: a powerful new way of organizing your Netdata-monitored systems. We introduced host labels in
-[v1.20 of Netdata](https://blog.netdata.cloud/posts/release-1.20/), and they come pre-configured out of the box.
-
 Let's take a peek into how to create host labels and apply them across a few of Netdata's features to give you more
 organization power over your infrastructure.
 
-## Create unique host labels
+### Default labels
+
+When Netdata starts, it captures relevant information about the system and converts them into automatically generated
+host labels. You can use these to logically organize your systems via health entities, exporting metrics,
+parent-child status, and more.
+
+They capture the following:
+
+-   Kernel version
+-   Operating system name and version
+-   CPU architecture, system cores, CPU frequency, RAM, and disk space
+-   Whether Netdata is running inside of a container, and if so, the OS and hardware details about the container's host
+-   Whether Netdata is running inside K8s node 
+-   What virtualization layer the system runs on top of, if any
+-   Whether the system is a streaming parent or child
+
+If you want to organize your systems without manually creating host labels, try the automatic labels in some of the
+features below. You can see them under `http://HOST-IP:19999/api/v1/info`, beginning with an underscore `_`.
+```json
+{
+  ...
+  "host_labels": {
+    "_is_k8s_node": "false",
+    "_is_parent": "false",
+    ...
+```
+
+### Custom labels
 
 Host labels are defined in `netdata.conf`. To create host labels, open that file using `edit-config`.
 
@@ -65,28 +126,8 @@ read the status of your agent. For example, from a VPS system running Debian 10:
 }
 ```
 
-You may have noticed a handful of labels that begin with an underscore (`_`). These are automatic labels.
 
-### Automatic labels
-
-When Netdata starts, it captures relevant information about the system and converts them into automatically-generated
-host labels. You can use these to logically organize your systems via health entities, exporting metrics,
-parent-child status, and more.
-
-They capture the following:
-
--   Kernel version
--   Operating system name and version
--   CPU architecture, system cores, CPU frequency, RAM, and disk space
--   Whether Netdata is running inside of a container, and if so, the OS and hardware details about the container's host
--   Whether Netdata is running inside K8s node 
--   What virtualization layer the system runs on top of, if any
--   Whether the system is a streaming parent or child
-
-If you want to organize your systems without manually creating host labels, try the automatic labels in some of the
-features below.
-
-## Host labels in streaming
+### Host labels in streaming
 
 You may have noticed the `_is_parent` and `_is_child` automatic labels from above. Host labels are also now
 streamed from a child to its parent node, which concentrates an entire infrastructure's OS, hardware, container,
@@ -105,7 +146,7 @@ child system. It's a vastly simplified way of accessing critical information abo
 You can also use `_is_parent`, `_is_child`, and any other host labels in both health entities and metrics
 exporting. Speaking of which...
 
-## Host labels in health entities
+### Host labels in alerts
 
 You can use host labels to logically organize your systems by their type, purpose, or location, and then apply specific
 alarms to them.
@@ -153,7 +194,7 @@ Or when ephemeral Docker nodes are involved:
 Of course, there are many more possibilities for intuitively organizing your systems with host labels. See the [health
 documentation](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#alarm-line-host-labels) for more details, and then get creative!
 
-## Host labels in metrics exporting
+### Host labels in metrics exporting
 
 If you have enabled any metrics exporting via our experimental [exporters](https://github.com/netdata/netdata/blob/master/exporting/README.md), any new host
 labels you created manually are sent to the destination database alongside metrics. You can change this behavior by
@@ -182,4 +223,31 @@ send automatic labels = yes
 By applying labels to exported metrics, you can more easily parse historical metrics with the labels applied. To learn
 more about exporting, read the [documentation](https://github.com/netdata/netdata/blob/master/exporting/README.md).
 
+## Metric labels
 
+The Netdata aggregate charts allow you to filter and group metrics based on label name-value pairs.
+
+All go.d plugin collectors support the specification of labels at the "collection job" level. Some collectors come with out of the box 
+labels (e.g. generic Prometheus collector, Kubernetes, Docker and more). But you can also add your own custom labels, by configuring 
+the data collection jobs. 
+
+For example, suppose we have a single Netdata agent, collecting data from two remote Apache web servers, located in different data centers. 
+The web servers are load balanced and provide access to the service "Payments".
+
+You can define the following in `go.d.conf`, to be able to group the web requests by service or location:
+
+```
+jobs:
+  - name: mywebserver1
+    url: http://host1/server-status?auto
+    labels:
+      service: "Payments"
+      location: "Atlanta"
+  - name: mywebserver2
+    url: http://host2/server-status?auto
+    labels:
+      service: "Payments"
+      location: "New York"
+```
+
+Of course you may define as many custom label/value pairs as you like, in as many data collection jobs you need. 
