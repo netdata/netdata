@@ -451,6 +451,7 @@ ebpf_plugin_stats_t plugin_statistics = {.core = 0, .legacy = 0, .running = 0, .
 
 #ifdef LIBBPF_MAJOR_VERSION
 struct btf *default_btf = NULL;
+struct cachestat_bpf *cachestat_bpf_obj = NULL;
 #else
 void *default_btf = NULL;
 #endif
@@ -556,19 +557,27 @@ static void ebpf_unload_unique_maps()
 {
     int i;
     for (i = 0; ebpf_modules[i].thread_name; i++) {
+        if (ebpf_modules[i].enabled != NETDATA_THREAD_EBPF_STOPPED) {
+            error("Cannot unload maps for thread %s, because it is not stopped.", ebpf_modules[i].thread_name);
+            continue;
+        }
+
+        ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
         switch (i) {
+            case EBPF_MODULE_CACHESTAT_IDX:
+            {
+#ifdef LIBBPF_MAJOR_VERSION
+                if (cachestat_bpf_obj)
+                    cachestat_bpf__destroy(cachestat_bpf_obj);
+#endif
+                break;
+            }
             case EBPF_MODULE_PROCESS_IDX:
             case EBPF_MODULE_DISK_IDX:
             case EBPF_MODULE_HARDIRQ_IDX:
             case EBPF_MODULE_SOFTIRQ_IDX:
             case EBPF_MODULE_OOMKILL_IDX:
             case EBPF_MODULE_MDFLUSH_IDX:
-            {
-                if (ebpf_modules[i].enabled == NETDATA_THREAD_EBPF_STOPPED)
-                    ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
-                else
-                    error("Cannot unload maps for thread %s, because it is not stopped.", ebpf_modules[i].thread_name);
-            }
             default:
                 continue;
         }

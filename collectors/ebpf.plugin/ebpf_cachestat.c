@@ -44,8 +44,6 @@ static char *account_page[NETDATA_CACHESTAT_ACCOUNT_DIRTY_END] ={ "account_page_
                                                                   "__set_page_dirty", "__folio_mark_dirty"  };
 
 #ifdef LIBBPF_MAJOR_VERSION
-static struct cachestat_bpf *bpf_obj = NULL;
-
 /**
  * Disable probe
  *
@@ -335,10 +333,6 @@ static void ebpf_cachestat_free(ebpf_module_t *em)
     freez(cachestat_vector);
     freez(cachestat_values);
 
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        cachestat_bpf__destroy(bpf_obj);
-#endif
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
@@ -1232,11 +1226,11 @@ static int ebpf_cachestat_load_bpf(ebpf_module_t *em)
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else {
-        bpf_obj = cachestat_bpf__open();
-        if (!bpf_obj)
+        cachestat_bpf_obj = cachestat_bpf__open();
+        if (!cachestat_bpf_obj)
             ret = -1;
         else
-            ret = ebpf_cachestat_load_and_attach(bpf_obj, em);
+            ret = ebpf_cachestat_load_and_attach(cachestat_bpf_obj, em);
     }
 #endif
 

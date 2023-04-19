@@ -45,6 +45,8 @@
 #include "includes/socket.skel.h"
 #include "includes/swap.skel.h"
 #include "includes/vfs.skel.h"
+
+extern struct cachestat_bpf *cachestat_bpf_obj;
 #endif
 
 typedef struct netdata_syscall_stat {
