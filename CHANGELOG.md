@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- bump go.d.plugin to v0.52.1 [\#14921](https://github.com/netdata/netdata/pull/14921) ([ilyam8](https://github.com/ilyam8))
+- Fix warnings and error when compiling with --disable-dbengine [\#14919](https://github.com/netdata/netdata/pull/14919) ([stelfrag](https://github.com/stelfrag))
+- minor - remove RX\_MSGLEN\_MAX [\#14918](https://github.com/netdata/netdata/pull/14918) ([underhood](https://github.com/underhood))
+- change docusaurus admonitions to our style of admonitions [\#14917](https://github.com/netdata/netdata/pull/14917) ([Ancairon](https://github.com/Ancairon))
 - Add windows diagram [\#14916](https://github.com/netdata/netdata/pull/14916) ([cakrit](https://github.com/cakrit))
 - Add section for scaling parent nodes [\#14915](https://github.com/netdata/netdata/pull/14915) ([cakrit](https://github.com/cakrit))
 - Update suggested replication setups [\#14914](https://github.com/netdata/netdata/pull/14914) ([cakrit](https://github.com/cakrit))
@@ -22,6 +26,7 @@
 - /api/v2 part 9 [\#14888](https://github.com/netdata/netdata/pull/14888) ([ktsaou](https://github.com/ktsaou))
 - Add example configuration to w1sensor collector [\#14886](https://github.com/netdata/netdata/pull/14886) ([Ancairon](https://github.com/Ancairon))
 - /api/v2 part 8 [\#14885](https://github.com/netdata/netdata/pull/14885) ([ktsaou](https://github.com/ktsaou))
+- Fix/introduce links inside charts.d.plugin documentation  [\#14884](https://github.com/netdata/netdata/pull/14884) ([Ancairon](https://github.com/Ancairon))
 - Add support for alert notifications to ntfy.sh [\#14875](https://github.com/netdata/netdata/pull/14875) ([Dim-P](https://github.com/Dim-P))
 - cgroups.plugin: add image label [\#14872](https://github.com/netdata/netdata/pull/14872) ([ilyam8](https://github.com/ilyam8))
 - Fix regex syntax for clang-format checks. [\#14871](https://github.com/netdata/netdata/pull/14871) ([Ferroin](https://github.com/Ferroin))
@@ -60,6 +65,7 @@
 - Update role-based-access.md [\#14811](https://github.com/netdata/netdata/pull/14811) ([cakrit](https://github.com/cakrit))
 - Save and load ML models [\#14810](https://github.com/netdata/netdata/pull/14810) ([vkalintiris](https://github.com/vkalintiris))
 - diskspace: don't collect inodes on msdosfs [\#14809](https://github.com/netdata/netdata/pull/14809) ([ilyam8](https://github.com/ilyam8))
+- Document CetusGuard as a Docker socket proxy solution [\#14806](https://github.com/netdata/netdata/pull/14806) ([hectorm](https://github.com/hectorm))
 - Address Learn feedback from users [\#14802](https://github.com/netdata/netdata/pull/14802) ([Ancairon](https://github.com/Ancairon))
 - add validation step before using GCP metadata [\#14801](https://github.com/netdata/netdata/pull/14801) ([ilyam8](https://github.com/ilyam8))
 - /api/v2/X part 7 [\#14797](https://github.com/netdata/netdata/pull/14797) ([ktsaou](https://github.com/ktsaou))
@@ -396,9 +402,6 @@
 - Update kickstart script to use new DEB infrastructure. [\#14301](https://github.com/netdata/netdata/pull/14301) ([Ferroin](https://github.com/Ferroin))
 - DBENGINE v2 - improvements part 6 [\#14299](https://github.com/netdata/netdata/pull/14299) ([ktsaou](https://github.com/ktsaou))
 - add consul license expiration time alarm [\#14298](https://github.com/netdata/netdata/pull/14298) ([ilyam8](https://github.com/ilyam8))
-- Fix macos struct definition. [\#14297](https://github.com/netdata/netdata/pull/14297) ([vkalintiris](https://github.com/vkalintiris))
-- Remove archivedcharts endpoint, optimize indices [\#14296](https://github.com/netdata/netdata/pull/14296) ([stelfrag](https://github.com/stelfrag))
-- track memory footprint of Netdata [\#14294](https://github.com/netdata/netdata/pull/14294) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
