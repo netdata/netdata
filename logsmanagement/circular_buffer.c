@@ -43,7 +43,7 @@ void generic_parser(void *arg){
                     debug(D_LOGS_MANAG,"Parsed buffer did not contain any text or was of 0 size.");
                     m_assert(0, "Parsed buffer did not contain any text or was of 0 size.");
                 }
-                item->num_lines = p_file_info->parser_metrics->num_lines_total;
+                item->num_lines = p_file_info->parser_metrics->num_lines_rate;
                 break;
             }
             case GENERIC:
