@@ -21,6 +21,9 @@
 
 #define MAX_OUTPUTS_PER_SOURCE 100                  /**< Hard limit of maximum Fluent Bit outputs per log source **/
 
+#define ENABLE_COLLECTED_LOGS_TOTAL_DEFAULT 0       /**< Default value to enable (or not) metrics of total collected log records **/
+#define ENABLE_COLLECTED_LOGS_RATE_DEFAULT 1        /**< Default value to enable (or not) metrics of rate of collected log records */
+
 /* -------------------------------------------------------------------------- */
 
 
@@ -97,7 +100,7 @@ typedef enum {
 /* -------------------------------------------------------------------------- */
 
 #define LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES 10U       /**< Maximum allowed number of log sources that can be searched in a single query **/
-#define LOGS_MANAG_QUERY_START_DEFAULT 1000U            /**< Default start timestamp for logs management queries (in ms) **/
+#define LOGS_MANAG_QUERY_START_DEFAULT 1000UL           /**< Default start timestamp for logs management queries (in ms) **/
 #define LOGS_MANAG_QUERY_END_DEFAULT 99999999999999UL   /**< Default end timestamp for logs management queries (in ms) **/
 #define LOGS_MANAG_QUERY_QUOTA_DEFAULT 524288U          /**< Default logs management query quota **/
 #define LOGS_MANAG_QUERY_IGNORE_CASE_DEFAULT 0          /**< Boolean to indicate whether to ignore case for keyword or not **/

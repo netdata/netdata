@@ -462,17 +462,17 @@ void *logsmanagement_plugin_main(void *ptr){
     /* Circular buffer total memory stats - initialise */
     stats_chart_data->st_circ_buff_mem_total = rrdset_create_localhost(
             stats_chart_data->rrd_type
-            , "circular_buffer_memory_total"
+            , "circular_buffers_mem_total_cached"
             , NULL
             , "logsmanagement.plugin"
             , NULL
-            , "Circular buffers total memory"
+            , "Circular buffers total cached memory"
             , "bytes"
             , "logsmanagement.plugin"
             , NULL
             , NETDATA_CHART_PRIO_CIRC_BUFF_MEM_TOT 
             , g_logs_manag_config.update_every
-            , RRDSET_TYPE_AREA
+            , RRDSET_TYPE_STACKED
     );
     stats_chart_data->dim_circ_buff_mem_total_arr = callocz(p_file_infos_arr->count, sizeof(RRDDIM));
     stats_chart_data->num_circ_buff_mem_total_arr = callocz(p_file_infos_arr->count, sizeof(collected_number));
@@ -480,17 +480,17 @@ void *logsmanagement_plugin_main(void *ptr){
     /* Circular buffer uncompressed buffered items memory stats - initialise */
     stats_chart_data->st_circ_buff_mem_uncompressed = rrdset_create_localhost(
             stats_chart_data->rrd_type
-            , "circular_buffer_uncompressed_buffered_total"
+            , "circular_buffers_mem_uncompressed_used"
             , NULL
             , "logsmanagement.plugin"
             , NULL
-            , "Circular buffers uncompressed buffered total"
+            , "Circular buffers used memory for uncompressed logs"
             , "bytes"
             , "logsmanagement.plugin"
             , NULL
             , NETDATA_CHART_PRIO_CIRC_BUFF_MEM_UNC 
             , g_logs_manag_config.update_every
-            , RRDSET_TYPE_AREA
+            , RRDSET_TYPE_STACKED
     );
     stats_chart_data->dim_circ_buff_mem_uncompressed_arr = callocz(p_file_infos_arr->count, sizeof(RRDDIM));
     stats_chart_data->num_circ_buff_mem_uncompressed_arr = callocz(p_file_infos_arr->count, sizeof(collected_number));
@@ -498,17 +498,17 @@ void *logsmanagement_plugin_main(void *ptr){
     /* Circular buffer compressed buffered items memory stats - initialise */
     stats_chart_data->st_circ_buff_mem_compressed = rrdset_create_localhost(
             stats_chart_data->rrd_type
-            , "circular_buffer_compressed_buffered_total"
+            , "circular_buffers_mem_compressed_used"
             , NULL
             , "logsmanagement.plugin"
             , NULL
-            , "Circular buffers compressed buffered total"
+            , "Circular buffers used memory for compressed logs"
             , "bytes"
             , "logsmanagement.plugin"
             , NULL
             , NETDATA_CHART_PRIO_CIRC_BUFF_MEM_COM 
             , g_logs_manag_config.update_every
-            , RRDSET_TYPE_AREA
+            , RRDSET_TYPE_STACKED
     );
     stats_chart_data->dim_circ_buff_mem_compressed_arr = callocz(p_file_infos_arr->count, sizeof(RRDDIM));
     stats_chart_data->num_circ_buff_mem_compressed_arr = callocz(p_file_infos_arr->count, sizeof(collected_number));
@@ -526,7 +526,7 @@ void *logsmanagement_plugin_main(void *ptr){
             , NULL
             , NETDATA_CHART_PRIO_COMPR_RATIO 
             , g_logs_manag_config.update_every
-            , RRDSET_TYPE_AREA
+            , RRDSET_TYPE_LINE
     );
     stats_chart_data->dim_compression_ratio = callocz(p_file_infos_arr->count, sizeof(RRDDIM));
     stats_chart_data->num_compression_ratio_arr = callocz(p_file_infos_arr->count, sizeof(collected_number));
@@ -544,7 +544,7 @@ void *logsmanagement_plugin_main(void *ptr){
             , NULL
             , NETDATA_CHART_PRIO_DISK_USAGE 
             , g_logs_manag_config.update_every
-            , RRDSET_TYPE_AREA
+            , RRDSET_TYPE_STACKED
     );
     stats_chart_data->dim_disk_usage = callocz(p_file_infos_arr->count, sizeof(RRDDIM));
     stats_chart_data->num_disk_usage_arr = callocz(p_file_infos_arr->count, sizeof(collected_number));

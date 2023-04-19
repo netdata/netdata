@@ -21,33 +21,36 @@ typedef struct log_parser_metrics Log_parser_metrics_t;
 
 typedef enum{
 
+    CHART_COLLECTED_LOGS_TOTAL =    1 << 0,
+    CHART_COLLECTED_LOGS_RATE =     1 << 1,
+
     /* WEB_LOG or FLB_WEB_LOG charts */
-    CHART_VHOST = 1 << 0,            
-    CHART_PORT = 1 << 1,             
-    CHART_IP_VERSION = 1 << 2,
-    CHART_REQ_CLIENT_CURRENT = 1 << 3,
-    CHART_REQ_CLIENT_ALL_TIME = 1 << 4,
-    CHART_REQ_METHODS = 1 << 5,
-    CHART_REQ_PROTO = 1 << 6,
-    CHART_BANDWIDTH = 1 << 7,
-    CHART_REQ_PROC_TIME = 1 << 8,
-    CHART_RESP_CODE_FAMILY = 1 << 9,
-    CHART_RESP_CODE = 1 << 10,
-    CHART_RESP_CODE_TYPE = 1 << 11,
-    CHART_SSL_PROTO = 1 << 12,
-    CHART_SSL_CIPHER = 1 << 13,
+    CHART_VHOST =                   1 << 2,            
+    CHART_PORT =                    1 << 3,             
+    CHART_IP_VERSION =              1 << 4,
+    CHART_REQ_CLIENT_CURRENT =      1 << 5,
+    CHART_REQ_CLIENT_ALL_TIME =     1 << 6,
+    CHART_REQ_METHODS =             1 << 7,
+    CHART_REQ_PROTO =               1 << 8,
+    CHART_BANDWIDTH =               1 << 9,
+    CHART_REQ_PROC_TIME =           1 << 10,
+    CHART_RESP_CODE_FAMILY =        1 << 11,
+    CHART_RESP_CODE =               1 << 12,
+    CHART_RESP_CODE_TYPE =          1 << 13,
+    CHART_SSL_PROTO =               1 << 14,
+    CHART_SSL_CIPHER =              1 << 15,
 
     /* FLB_SYSTEMD or FLB_SYSLOG charts */
-    CHART_SYSLOG_PRIOR = 1 << 14,
-    CHART_SYSLOG_SEVER = 1 << 15,
-    CHART_SYSLOG_FACIL = 1 << 16,
+    CHART_SYSLOG_PRIOR =            1 << 16,
+    CHART_SYSLOG_SEVER =            1 << 17,
+    CHART_SYSLOG_FACIL =            1 << 18,
 
     /* FLB_KMSG */
-    CHART_KMSG_SUBSYSTEM = 1 << 17,
-    CHART_KMSG_DEVICE = 1 << 18,
+    CHART_KMSG_SUBSYSTEM =          1 << 19,
+    CHART_KMSG_DEVICE =             1 << 20,
 
     /* FLB_DOCKER_EV charts */
-    CHART_DOCKER_EV_TYPE = 1 << 19
+    CHART_DOCKER_EV_TYPE =          1 << 21
 
 } chart_type_t;
 

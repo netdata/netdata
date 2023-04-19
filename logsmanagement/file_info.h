@@ -158,6 +158,8 @@ typedef struct {
     logs_manag_db_mode_t db_mode;
     int disk_space_limit_in_mib;
     int buff_flush_to_db_interval;
+    int enable_collected_logs_total;
+    int enable_collected_logs_rate;
 } g_logs_manag_config_t;
 
 extern g_logs_manag_config_t g_logs_manag_config;

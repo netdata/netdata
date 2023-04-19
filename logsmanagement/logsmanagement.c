@@ -64,7 +64,9 @@ g_logs_manag_config_t g_logs_manag_config = {
     .compression_acceleration = COMPRESSION_ACCELERATION_DEFAULT,
     .db_mode = GLOBAL_DB_MODE_DEFAULT,
     .disk_space_limit_in_mib = DISK_SPACE_LIMIT_DEFAULT,  
-    .buff_flush_to_db_interval = SAVE_BLOB_TO_DB_DEFAULT
+    .buff_flush_to_db_interval = SAVE_BLOB_TO_DB_DEFAULT,
+    .enable_collected_logs_total = ENABLE_COLLECTED_LOGS_TOTAL_DEFAULT,
+    .enable_collected_logs_rate = ENABLE_COLLECTED_LOGS_RATE_DEFAULT
 };
 
 static logs_manag_db_mode_t db_mode_str_to_db_mode(const char *const db_mode_str){
@@ -235,6 +237,15 @@ static int logs_manag_config_load(Flb_socket_config_t **forward_in_config_p){
                                                                     g_logs_manag_config.disk_space_limit_in_mib);
     collector_info("CONFIG: global logs management disk_space_limit_in_mib: %d", g_logs_manag_config.disk_space_limit_in_mib);
 
+    g_logs_manag_config.enable_collected_logs_total = config_get_boolean(CONFIG_SECTION_LOGS_MANAGEMENT, 
+                                                                        "collected logs total chart enable", 
+                                                                        g_logs_manag_config.enable_collected_logs_total);
+    collector_info("CONFIG: global logs management collected logs total chart enable: %d", g_logs_manag_config.enable_collected_logs_total);
+
+    g_logs_manag_config.enable_collected_logs_rate = config_get_boolean(CONFIG_SECTION_LOGS_MANAGEMENT, 
+                                                                        "collected logs rate chart enable", 
+                                                                        g_logs_manag_config.enable_collected_logs_rate);
+    collector_info("CONFIG: global logs management collected logs rate chart enable: %d", g_logs_manag_config.enable_collected_logs_rate);
 
     /* TODO: save defaults as macros in logsmanagement_conf.h . */
     *forward_in_config_p = (Flb_socket_config_t *) callocz(1, sizeof(Flb_socket_config_t));
@@ -539,9 +550,31 @@ static void logs_management_init(struct section *config_section){
 
 
     /* -------------------------------------------------------------------------
-     * Deal with log-type-specific configuration options.
+     * Read collected logs chart configuration.
      * ------------------------------------------------------------------------- */
     p_file_info->parser_config = callocz(1, sizeof(Log_parser_config_t));
+
+    if(appconfig_get_boolean(&log_management_config, config_section->name, 
+                             "collected logs total chart enable",
+                             g_logs_manag_config.enable_collected_logs_total)){
+        p_file_info->parser_config->chart_config |= CHART_COLLECTED_LOGS_TOTAL;
+    }
+    collector_info( "[%s]: collected logs total chart enable = %s",  p_file_info->chart_name, 
+                    (p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_TOTAL) ? "yes" : "no");
+
+    if(appconfig_get_boolean(&log_management_config, config_section->name, 
+                             "collected logs rate chart enable",
+                             g_logs_manag_config.enable_collected_logs_rate)){
+        p_file_info->parser_config->chart_config |= CHART_COLLECTED_LOGS_RATE;
+    }
+    collector_info( "[%s]: collected logs rate chart enable = %s",  p_file_info->chart_name, 
+                    (p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_RATE) ? "yes" : "no");
+
+
+    /* -------------------------------------------------------------------------
+     * Deal with log-type-specific configuration options.
+     * ------------------------------------------------------------------------- */
+    
     if(p_file_info->log_type == GENERIC || p_file_info->log_type == FLB_GENERIC){
         // Do nothing
     }
