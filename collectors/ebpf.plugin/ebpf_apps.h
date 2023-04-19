@@ -242,6 +242,11 @@ void ebpf_cachestat_aral_init();
 netdata_publish_cachestat_t *ebpf_publish_cachestat_get(void);
 void ebpf_cachestat_release(netdata_publish_cachestat_t *stat);
 
+extern ARAL *ebpf_aral_dcstat_pid;
+void ebpf_dcstat_aral_init();
+netdata_publish_dcstat_t *ebpf_publish_dcstat_get(void);
+void ebpf_dcstat_release(netdata_publish_dcstat_t *stat);
+
 // ARAL Section end
 
 // Threads integrated with apps

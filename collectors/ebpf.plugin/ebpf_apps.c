@@ -10,12 +10,13 @@ ARAL *ebpf_aral_apps_pid_stat = NULL;
 ARAL *ebpf_aral_process_stat = NULL;
 ARAL *ebpf_aral_socket_pid = NULL;
 ARAL *ebpf_aral_cachestat_pid = NULL;
+ARAL *ebpf_aral_dcstat_pid = NULL;
 
 // ----------------------------------------------------------------------------
 // Global vectors used with apps
 ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
 netdata_publish_cachestat_t **cachestat_pid = NULL;
-
+netdata_publish_dcstat_t **dcstat_pid = NULL;
 
 /**
  * eBPF ARAL Init
@@ -171,6 +172,46 @@ netdata_publish_cachestat_t *ebpf_publish_cachestat_get(void)
 void ebpf_cachestat_release(netdata_publish_cachestat_t *stat)
 {
     aral_freez(ebpf_aral_cachestat_pid, stat);
+}
+
+/*****************************************************************
+ *
+ *  DCSTAT ARAL FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * eBPF directory cache Aral init
+ *
+ * Initiallize array allocator that will be used when integration with apps is enabled.
+ */
+void ebpf_dcstat_aral_init()
+{
+    ebpf_aral_dcstat_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_DCSTAT_ARAL_NAME, sizeof(netdata_publish_dcstat_t));
+}
+
+/**
+ * eBPF publish dcstat get
+ *
+ * Get a netdata_publish_dcstat_t entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+netdata_publish_dcstat_t *ebpf_publish_dcstat_get(void)
+{
+    netdata_publish_dcstat_t *target = aral_mallocz(ebpf_aral_dcstat_pid);
+    memset(target, 0, sizeof(netdata_publish_dcstat_t));
+    return target;
+}
+
+/**
+ * eBPF dcstat release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_dcstat_release(netdata_publish_dcstat_t *stat)
+{
+    aral_freez(ebpf_aral_dcstat_pid, stat);
 }
 
 // ----------------------------------------------------------------------------
