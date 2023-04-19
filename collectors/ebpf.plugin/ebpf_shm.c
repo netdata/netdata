@@ -39,8 +39,6 @@ netdata_ebpf_targets_t shm_targets[] = { {.name = "shmget", .mode = EBPF_LOAD_TR
                                          {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 #ifdef LIBBPF_MAJOR_VERSION
-static struct shm_bpf *bpf_obj = NULL;
-
 /*****************************************************************
  *
  *  BTF FUNCTIONS
@@ -283,17 +281,8 @@ static inline int ebpf_shm_load_and_attach(struct shm_bpf *obj, ebpf_module_t *e
  */
 static void ebpf_shm_free(ebpf_module_t *em)
 {
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPING;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-
     freez(shm_vector);
     freez(shm_values);
-
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        shm_bpf__destroy(bpf_obj);
-#endif
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
@@ -1006,11 +995,11 @@ static int ebpf_shm_load_bpf(ebpf_module_t *em)
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else {
-        bpf_obj = shm_bpf__open();
-        if (!bpf_obj)
+        shm_bpf_obj = shm_bpf__open();
+        if (!shm_bpf_obj)
             ret = -1;
         else
-            ret = ebpf_shm_load_and_attach(bpf_obj, em);
+            ret = ebpf_shm_load_and_attach(shm_bpf_obj, em);
     }
 #endif
 

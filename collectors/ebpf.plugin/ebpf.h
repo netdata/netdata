@@ -50,6 +50,7 @@ extern struct cachestat_bpf *cachestat_bpf_obj;
 extern struct dc_bpf *dc_bpf_obj;
 extern struct fd_bpf *fd_bpf_obj;
 extern struct mount_bpf *mount_bpf_obj;
+extern struct shm_bpf *shm_bpf_obj;
 #endif
 
 typedef struct netdata_syscall_stat {
