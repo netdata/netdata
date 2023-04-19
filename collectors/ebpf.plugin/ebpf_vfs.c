@@ -5,10 +5,6 @@
 #include "ebpf.h"
 #include "ebpf_vfs.h"
 
-// ----------------------------------------------------------------------------
-// ARAL vectors used to speed up processing
-ARAL *ebpf_aral_vfs_pid = NULL;
-
 static char *vfs_dimension_names[NETDATA_KEY_PUBLISH_VFS_END] = { "delete",  "read",  "write",
                                                                   "fsync", "open", "create" };
 static char *vfs_id_names[NETDATA_KEY_PUBLISH_VFS_END] = { "vfs_unlink", "vfs_read", "vfs_write",
@@ -17,7 +13,6 @@ static char *vfs_id_names[NETDATA_KEY_PUBLISH_VFS_END] = { "vfs_unlink", "vfs_re
 static netdata_idx_t *vfs_hash_values = NULL;
 static netdata_syscall_stat_t vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_END];
 static netdata_publish_syscall_t vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_END];
-netdata_publish_vfs_t **vfs_pid = NULL;
 netdata_publish_vfs_t *vfs_vector = NULL;
 
 static ebpf_local_maps_t vfs_maps[] = {{.name = "tbl_vfs_pid", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
@@ -383,46 +378,6 @@ static inline int ebpf_vfs_load_and_attach(struct vfs_bpf *obj, ebpf_module_t *e
     return ret;
 }
 #endif
-
-/*****************************************************************
- *
- *  ARAL FUNCTIONS
- *
- *****************************************************************/
-
-/**
- * eBPF VFS Aral init
- *
- * Initiallize array allocator that will be used when integration with apps is enabled.
- */
-static inline void ebpf_vfs_aral_init()
-{
-    ebpf_aral_vfs_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_VFS_ARAL_NAME, sizeof(netdata_publish_vfs_t));
-}
-
-/**
- * eBPF publish VFS get
- *
- * Get a netdata_publish_vfs_t entry to be used with a specific PID.
- *
- * @return it returns the address on success.
- */
-netdata_publish_vfs_t *ebpf_vfs_get(void)
-{
-    netdata_publish_vfs_t *target = aral_mallocz(ebpf_aral_vfs_pid);
-    memset(target, 0, sizeof(netdata_publish_vfs_t));
-    return target;
-}
-
-/**
- * eBPF VFS release
- *
- * @param stat Release a target after usage.
- */
-void ebpf_vfs_release(netdata_publish_vfs_t *stat)
-{
-    aral_freez(ebpf_aral_vfs_pid, stat);
-}
 
 /*****************************************************************
  *
