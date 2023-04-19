@@ -1,24 +1,6 @@
-# Management and configuration cheat sheet
+# Useful management and configuration actions
 
-<!--This page is optimized to render properly when viewed from our Learn site-->
-
-<details open><summary>Print this page!</summary>
-
-Use our management &amp; configuration cheat sheet to simplify your interactions with Netdata, including configuration,
-using charts, managing the daemon, and more.
-
-You can save/print this page by right clicking anywhere on it, and clicking "print"! We also recommend to tick the "More settings -> Background graphics" checkbox to make sure you get the proper colors and everything renders nicely.
-
-Useful links:
-
-- [Install Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md)
-- [Configure the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md)
-- [Configure alerts](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md)
-- [Start, stop, or restart the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md)
-- [Netdata API](https://learn.netdata.cloud/api)
-
-**Collapse this before printing!**
-</details>
+Below you will find some of the most common actions that one can take while using Netdata. You can use this page as a quick reference for installing Netdata, connecting a node to the Cloud, properly editing the configuration, accessing Netdata's API, and more!
 
 ### Install Netdata
 
@@ -231,9 +213,3 @@ separately from similar instances. Example, disks named
 
 **Contexts**: A grouping of charts based on the types of metrics collected and visualized.
 **disk.io**, **disk.ops**, and **disk.backlog** are all contexts. -->
-
-<br/>
-<br/>
-<br/>
-<br/>
-<br/>
