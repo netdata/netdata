@@ -47,6 +47,7 @@
 #include "includes/vfs.skel.h"
 
 extern struct cachestat_bpf *cachestat_bpf_obj;
+extern struct dc_bpf *dc_bpf_obj;
 #endif
 
 typedef struct netdata_syscall_stat {

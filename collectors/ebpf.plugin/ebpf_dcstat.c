@@ -44,8 +44,6 @@ netdata_ebpf_targets_t dc_targets[] = { {.name = "lookup_fast", .mode = EBPF_LOA
                                         {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 #ifdef LIBBPF_MAJOR_VERSION
-static struct dc_bpf *bpf_obj = NULL;
-
 /**
  * Disable probe
  *
@@ -298,11 +296,6 @@ static void ebpf_dcstat_free(ebpf_module_t *em )
     freez(dcstat_values);
 
     ebpf_dcstat_clean_names();
-
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        dc_bpf__destroy(bpf_obj);
-#endif
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
@@ -1101,11 +1094,11 @@ static int ebpf_dcstat_load_bpf(ebpf_module_t *em)
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else {
-        bpf_obj = dc_bpf__open();
-        if (!bpf_obj)
+        dc_bpf_obj = dc_bpf__open();
+        if (!dc_bpf_obj)
             ret = -1;
         else
-            ret = ebpf_dc_load_and_attach(bpf_obj, em);
+            ret = ebpf_dc_load_and_attach(dc_bpf_obj, em);
     }
 #endif
 
