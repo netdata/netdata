@@ -607,58 +607,6 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
     em->apps_charts |= NETDATA_EBPF_APPS_FLAG_CHART_CREATED;
 }
 
-/**
- * Create apps charts
- *
- * Call ebpf_create_chart to create the charts on apps submenu.
- *
- * @param root a pointer for the targets.
- */
-static void ebpf_create_apps_charts(struct ebpf_target *root)
-{
-    if (unlikely(!ebpf_all_pids))
-        return;
-
-    struct ebpf_target *w;
-    int newly_added = 0;
-
-    for (w = root; w; w = w->next) {
-        if (w->target)
-            continue;
-
-        if (unlikely(w->processes && (debug_enabled || w->debug_enabled))) {
-            struct ebpf_pid_on_target *pid_on_target;
-
-            fprintf(
-                stderr, "ebpf.plugin: target '%s' has aggregated %u process%s:", w->name, w->processes,
-                (w->processes == 1) ? "" : "es");
-
-            for (pid_on_target = w->root_pid; pid_on_target; pid_on_target = pid_on_target->next) {
-                fprintf(stderr, " %d", pid_on_target->pid);
-            }
-
-            fputc('\n', stderr);
-        }
-
-        if (!w->exposed && w->processes) {
-            newly_added++;
-            w->exposed = 1;
-            if (debug_enabled || w->debug_enabled)
-                debug_log_int("%s just added - regenerating charts.", w->name);
-        }
-    }
-
-    if (!newly_added)
-        return;
-
-    int counter;
-    for (counter = 0; ebpf_modules[counter].thread_name; counter++) {
-        ebpf_module_t *current = &ebpf_modules[counter];
-        if (current->enabled && current->apps_charts && current->apps_routine)
-            current->apps_routine(current, root);
-    }
-}
-
 /*****************************************************************
  *
  *  FUNCTIONS TO CLOSE THE THREAD
@@ -705,6 +653,7 @@ static void ebpf_process_exit(void *ptr)
     ebpf_process_disable_tracepoints();
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
+    process_pid_fd = -1;
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
@@ -1078,28 +1027,18 @@ static void process_collector(ebpf_module_t *em)
     int cgroups = em->cgroup_charts;
     pthread_mutex_lock(&ebpf_exit_cleanup);
     int thread_enabled = em->enabled;
+    process_pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
     if (cgroups)
         ebpf_process_update_cgroup_algorithm();
 
-    int update_apps_every = (int) EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT;
-    int pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
     int update_every = em->update_every;
     int counter = update_every - 1;
-    int update_apps_list = update_apps_every - 1;
     while (!ebpf_exit_plugin) {
         usec_t dt = heartbeat_next(&hb, USEC_PER_SEC);
         (void)dt;
         if (ebpf_exit_plugin)
             break;
-
-        pthread_mutex_lock(&collect_data_mutex);
-        if (++update_apps_list == update_apps_every) {
-            update_apps_list = 0;
-            cleanup_exited_pids();
-            collect_data_for_all_processes(pid_fd);
-        }
-        pthread_mutex_unlock(&collect_data_mutex);
 
         if (++counter == update_every) {
             counter = 0;
@@ -1109,7 +1048,6 @@ static void process_collector(ebpf_module_t *em)
             netdata_apps_integration_flags_t apps_enabled = em->apps_charts;
             pthread_mutex_lock(&collect_data_mutex);
 
-            ebpf_create_apps_charts(apps_groups_root_target);
             if (ebpf_all_pids_count > 0) {
                 if (cgroups && shm_ebpf_cgroup.header) {
                     ebpf_update_process_cgroup();

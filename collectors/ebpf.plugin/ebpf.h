@@ -183,6 +183,7 @@ extern int ebpf_nprocs;
 extern int running_on_kernel;
 extern int isrh;
 extern char *ebpf_plugin_dir;
+extern int process_pid_fd;
 
 extern pthread_mutex_t collect_data_mutex;
 
