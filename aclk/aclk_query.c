@@ -95,11 +95,9 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) 
     size_t size = 0;
     size_t sent = 0;
 
-#ifdef NETDATA_WITH_ZLIB
     int z_ret;
     BUFFER *z_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, &netdata_buffers_statistics.buffers_aclk);
     char *start, *end;
-#endif
 
     struct web_client *w = web_client_get_from_cache();
     w->acl = WEB_CLIENT_ACL_ACLK;
@@ -152,7 +150,6 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) 
     size = w->response.data->len;
     sent = size;
 
-#ifdef NETDATA_WITH_ZLIB
     // check if gzip encoding can and should be used
     if ((start = strstr((char *)query->data.http_api_v2.payload, WEB_HDR_ACCEPT_ENC))) {
         start += strlen(WEB_HDR_ACCEPT_ENC);
@@ -199,7 +196,6 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) 
         w->response.data = z_buffer;
         z_buffer = NULL;
     }
-#endif
 
     w->response.data->date = w->timings.tv_ready.tv_sec;
     web_client_build_http_header(w);
@@ -209,18 +205,14 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) 
     buffer_strcat(local_buffer, w->response.header_output->buffer);
 
     if (w->response.data->len) {
-#ifdef NETDATA_WITH_ZLIB
         if (w->response.zinitialized) {
             buffer_need_bytes(local_buffer, w->response.data->len);
             memcpy(&local_buffer->buffer[local_buffer->len], w->response.data->buffer, w->response.data->len);
             local_buffer->len += w->response.data->len;
             sent = sent - size + w->response.data->len;
         } else {
-#endif
             buffer_strcat(local_buffer, w->response.data->buffer);
-#ifdef NETDATA_WITH_ZLIB
         }
-#endif
     }
 
     // send msg.
@@ -249,9 +241,7 @@ cleanup:
 
     pending_req_list_rm(query->msg_id);
 
-#ifdef NETDATA_WITH_ZLIB
     buffer_free(z_buffer);
-#endif
     buffer_free(local_buffer);
     return retval;
 }

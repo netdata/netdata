@@ -86,7 +86,6 @@ pkg_check_modules(ZLIB REQUIRED zlib)
 set(NETDATA_COMMON_CFLAGS ${NETDATA_COMMON_CFLAGS} ${ZLIB_CFLAGS_OTHER})
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${ZLIB_LIBRARIES})
 set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${ZLIB_INCLUDE_DIRS})
-# set(NETDATA_REQUIRED_DEFINES "${NETDATA_REQUIRED_DEFINES} -DNETDATA_WITH_ZLIB=1")
 
 # -----------------------------------------------------------------------------
 # libuv multi-platform support library with a focus on asynchronous I/O

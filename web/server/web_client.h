@@ -5,9 +5,7 @@
 
 #include "libnetdata/libnetdata.h"
 
-#ifdef NETDATA_WITH_ZLIB
 extern int web_enable_gzip, web_gzip_level, web_gzip_strategy;
-#endif /* NETDATA_WITH_ZLIB */
 
 // HTTP_CODES 2XX Success
 #define HTTP_RESP_OK 200
@@ -145,13 +143,11 @@ struct response {
 
     bool zoutput; // if set to 1, web_client_send() will send compressed data
 
-#ifdef NETDATA_WITH_ZLIB
     bool zinitialized;
     z_stream zstream;                                    // zlib stream for sending compressed output to client
     size_t zsent;                                        // the compressed bytes we have sent to the client
     size_t zhave;                                        // the compressed bytes that we have received from zlib
     Bytef zbuffer[NETDATA_WEB_RESPONSE_ZLIB_CHUNK_SIZE]; // temporary buffer for storing compressed output
-#endif /* NETDATA_WITH_ZLIB */
 };
 
 struct web_client;
