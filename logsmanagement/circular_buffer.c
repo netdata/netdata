@@ -37,13 +37,14 @@ void generic_parser(void *arg){
         switch(p_file_info->log_type){
             case WEB_LOG:
             case FLB_WEB_LOG: {
+                item->num_lines = p_file_info->parser_metrics->num_lines; // old value of num_lines
                 if(unlikely(0 != parse_web_log_buf( item->data, item->text_size, 
                                                     p_file_info->parser_config, 
                                                     p_file_info->parser_metrics))) { 
                     debug(D_LOGS_MANAG,"Parsed buffer did not contain any text or was of 0 size.");
                     m_assert(0, "Parsed buffer did not contain any text or was of 0 size.");
                 }
-                item->num_lines = p_file_info->parser_metrics->num_lines;
+                item->num_lines = p_file_info->parser_metrics->num_lines - item->num_lines;
                 break;
             }
             case GENERIC:
