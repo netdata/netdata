@@ -3,10 +3,6 @@
 #include "ebpf.h"
 #include "ebpf_shm.h"
 
-// ----------------------------------------------------------------------------
-// ARAL vectors used to speed up processing
-ARAL *ebpf_aral_shm_pid = NULL;
-
 static char *shm_dimension_name[NETDATA_SHM_END] = { "get", "at", "dt", "ctl" };
 static netdata_syscall_stat_t shm_aggregated_data[NETDATA_SHM_END];
 static netdata_publish_syscall_t shm_publish_aggregated[NETDATA_SHM_END];
@@ -15,8 +11,6 @@ netdata_publish_shm_t *shm_vector = NULL;
 
 static netdata_idx_t shm_hash_values[NETDATA_SHM_END];
 static netdata_idx_t *shm_values = NULL;
-
-netdata_publish_shm_t **shm_pid = NULL;
 
 struct config shm_config = { .first_section = NULL,
     .last_section = NULL,
@@ -317,46 +311,6 @@ static void ebpf_shm_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     ebpf_shm_free(em);
-}
-
-/*****************************************************************
- *
- *  ARAL FUNCTIONS
- *
- *****************************************************************/
-
-/**
- * eBPF shared memory Aral init
- *
- * Initiallize array allocator that will be used when integration with apps is enabled.
- */
-static inline void ebpf_shm_aral_init()
-{
-    ebpf_aral_shm_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_SHM_ARAL_NAME, sizeof(netdata_publish_shm_t));
-}
-
-/**
- * eBPF shared memory get
- *
- * Get a netdata_publish_shm_t entry to be used with a specific PID.
- *
- * @return it returns the address on success.
- */
-netdata_publish_shm_t *ebpf_shm_stat_get(void)
-{
-    netdata_publish_shm_t *target = aral_mallocz(ebpf_aral_shm_pid);
-    memset(target, 0, sizeof(netdata_publish_shm_t));
-    return target;
-}
-
-/**
- * eBPF shared memory release
- *
- * @param stat Release a target after usage.
- */
-void ebpf_shm_release(netdata_publish_shm_t *stat)
-{
-    aral_freez(ebpf_aral_shm_pid, stat);
 }
 
 /*****************************************************************
