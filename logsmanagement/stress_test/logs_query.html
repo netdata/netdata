@@ -90,7 +90,7 @@ function populate_sources_checkboxes() {
       }
     }
   }
-  xmlhttp.open("GET", "http://localhost:19999/api/v1/logsmanagement_sources", true);
+  xmlhttp.open("GET", "http://" + location.host + "/api/v1/logsmanagement_sources", true);
   xmlhttp.send(null);
 }
 window.onload = populate_sources_checkboxes;
@@ -137,7 +137,7 @@ function submit_query() {
 
 
   if(document.getElementById('use_functions').checked){
-    xmlhttp_req = "http://localhost:19999/api/v1/function?function=logsmanagement" + 
+    xmlhttp_req = "http://" + location.host + "/api/v1/function?function=logsmanagement" + 
                       " from:" + req_from_value + 
                       " until:" + req_until_value + 
                       " quota:" + quota_value +
@@ -153,7 +153,7 @@ function submit_query() {
         }
     );
   } else {
-      xmlhttp_req = "http://localhost:19999/api/v1/logsmanagement?" + 
+      xmlhttp_req = "http://" +  location.host + "/api/v1/logsmanagement?" + 
                         "from=" + req_from_value + 
                         "&until=" + req_until_value + 
                         "&quota=" + quota_value +
