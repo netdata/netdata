@@ -226,10 +226,18 @@ extern netdata_publish_dcstat_t **dcstat_pid;
 #endif
 #define NETDATA_EBPF_ALLOC_MIN_ELEMENTS 256
 
+// ARAL Sectiion
 extern void ebpf_aral_init(void);
 
 extern ebpf_process_stat_t *ebpf_process_stat_get(void);
 extern void ebpf_process_stat_release(ebpf_process_stat_t *stat);
+
+extern ARAL *ebpf_aral_socket_pid;
+void ebpf_socket_aral_init();
+ebpf_socket_publish_apps_t *ebpf_socket_stat_get(void);
+void ebpf_socket_release(ebpf_socket_publish_apps_t *stat);
+
+// ARAL Section end
 
 #include "libnetdata/threads/threads.h"
 
