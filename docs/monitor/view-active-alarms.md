@@ -9,7 +9,7 @@ You can always sort the table by a certain column by clicking on the name of tha
 
 ## Filter alerts
 
-From this view, you can also filter alerts with the right hand bar. More specifically you can filter:
+From this tab, you can also filter alerts with the right hand bar. More specifically you can filter:
 
 - Alert status
   - Filter based on the status of the alerts (e.g. Warning, Critical)

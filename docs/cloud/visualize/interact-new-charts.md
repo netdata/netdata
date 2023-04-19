@@ -20,7 +20,7 @@ These charts provide a lot of useful information, so that you can:
 - Get the chart status and possible errors. On top, reload functionality
 
 These charts are available on Netdata Cloud's 
-[Overview tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md), Single Node view and
+[Overview tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md), Single Node tab and
 on your [Custom Dashboards](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md).
 
 Some of the features listed below are also available on the simpler charts that are available on each agent's user interface.
@@ -29,7 +29,7 @@ Some of the features listed below are also available on the simpler charts that 
 
 Have a look at the can see the overall look and feel of the charts for both with a composite chart from
 the [Overview tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md) and a simple chart
-from the single node view:
+from the Single Node tab:
 
 <img width="678" alt="image" src="https://user-images.githubusercontent.com/43294513/220913360-f3f2ac06-b715-4e99-a933-f3bcb776636f.png"/>
 
