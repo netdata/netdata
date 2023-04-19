@@ -2531,7 +2531,9 @@ int main(int argc, char **argv)
                 cleanup_exited_pids();
                 collect_data_for_all_processes(process_pid_fd);
             }
+            pthread_mutex_lock(&lock);
             ebpf_create_apps_charts(apps_groups_root_target);
+            pthread_mutex_unlock(&lock);
             pthread_mutex_unlock(&collect_data_mutex);
         }
         pthread_mutex_unlock(&ebpf_exit_cleanup);
