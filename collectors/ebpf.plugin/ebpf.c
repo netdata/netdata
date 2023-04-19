@@ -646,12 +646,30 @@ static void ebpf_unload_unique_maps()
  */
 static void ebpf_unload_filesystems()
 {
-    if (ebpf_modules[EBPF_MODULE_FILESYSTEM_IDX].enabled == NETDATA_THREAD_EBPF_NOT_RUNNING)
+    if (ebpf_modules[EBPF_MODULE_FILESYSTEM_IDX].enabled == NETDATA_THREAD_EBPF_NOT_RUNNING ||
+        ebpf_modules[EBPF_MODULE_SYNC_IDX].enabled == NETDATA_THREAD_EBPF_RUNNING)
         return;
 
     int i;
     for (i = 0; localfs[i].filesystem != NULL; i++) {
         ebpf_unload_legacy_code(localfs[i].objects, localfs[i].probe_links);
+    }
+}
+
+/**
+ * Unload sync maps
+ *
+ * This function unload all BPF maps from sync thread.
+ */
+static void ebpf_unload_sync()
+{
+    if (ebpf_modules[EBPF_MODULE_SYNC_IDX].enabled == NETDATA_THREAD_EBPF_NOT_RUNNING ||
+        ebpf_modules[EBPF_MODULE_SYNC_IDX].enabled == NETDATA_THREAD_EBPF_RUNNING)
+        return;
+
+    int i;
+    for (i = 0; local_syscalls[i].syscall != NULL; i++) {
+        ebpf_unload_legacy_code(local_syscalls[i].objects, local_syscalls[i].probe_links);
     }
 }
 
@@ -698,6 +716,7 @@ static void ebpf_stop_threads(int sig)
     pthread_mutex_lock(&ebpf_exit_cleanup);
     ebpf_unload_unique_maps();
     ebpf_unload_filesystems();
+    ebpf_unload_sync();
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     ebpf_exit();
