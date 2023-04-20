@@ -1,13 +1,10 @@
-<!--
-title: "OS provided metrics (proc.plugin)"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/proc.plugin/README.md"
-sidebar_label: "OS provided metrics (proc.plugin)"
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Integrations/Monitor/System metrics"
--->
-
 # OS provided metrics (proc.plugin)
+
+`proc.plugin` gathers metrics from the /proc and /sys folders in Linux systems, along with a few other endpoints, and is responsible for the bulk of the system metrics collected and visualized by Netdata.
+
+This plugin is not an external plugin, but one of Netdata's threads.
+
+In detail, it collects metrics from:
 
 -   `/proc/net/dev` (all network interfaces for all their values)
 -   `/proc/diskstats` (all disks for all their values)
