@@ -1,14 +1,3 @@
-<!--
-title: "Run-time troubleshooting with Functions"
-sidebar_label: "Run-time troubleshooting with Functions"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/runtime-troubleshooting-with-functions.md"
-learn_status: "Published"
-sidebar_position: "4"
-learn_topic_type: "Tasks"
-learn_rel_path: "Operations"
-learn_docs_purpose: "Instructions on how to use Functions"
--->
-
 # Run-time troubleshooting with Functions
 
 Netdata Functions feature allows you to execute on-demand a pre-defined routine on a node where a Netdata Agent is running. These routines are exposed by a given collector. 
@@ -21,14 +10,14 @@ The following is required to be able to run Functions from Netdata Cloud.
 * At least one of the nodes claimed to your Space should be on a Netdata agent version higher than `v1.37.1`
 * Ensure that the node has the collector that exposes the function you want enabled ([see current available functions](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md#what-functions-are-currently-available))
 
-### Execute a function (from functions view)
+### Execute a function (from the Functions tab)
 
 1. From the right-hand bar select the **Function** you want to run
 2. Still on the right-hand bar select the **Node** where you want to run it
 3. Results will be displayed in the central area for you to interact with
 4. Additional filtering capabilities, depending on the function, should be available on right-hand bar
 
-### Execute a function (from Nodes view)
+### Execute a function (from the Nodes tab)
 
 1. Click on the functions icon for a node that has this active
 2. You are directed to the **Functions** tab

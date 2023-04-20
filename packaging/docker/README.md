@@ -63,9 +63,9 @@ docker run -d --name=netdata \
   netdata/netdata
 ```
 
-> :bookmark_tabs: Note
+> ### Note
 >  
-> If you plan to Claim the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
+> If you plan to Claim the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's Nodes tab.
 
 </TabItem>
 <TabItem value="docker compose" label="docker-compose">

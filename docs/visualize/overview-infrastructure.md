@@ -87,9 +87,9 @@ investigate historical data, and see like metrics presented meaningfully to help
 All of the familiar [interactions](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md) are available, as is adding any chart
 to a [new dashboard](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md).
 
-## Nodes view
+## Nodes tab
 
-You can also use the **Nodes view** to monitor the health status and user-configurable key metrics from multiple nodes
-in a War Room. Read the [Nodes view doc](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md) for details.
+You can also use the **Nodes tab** to monitor the health status and user-configurable key metrics from multiple nodes
+in a War Room. Read the [Nodes tab documentation](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md) for details.
 
-![The Nodes view](https://user-images.githubusercontent.com/1153921/108733066-5fe65800-74eb-11eb-98e0-abaccd36deaf.png)
+![The Nodes tab](https://user-images.githubusercontent.com/1153921/108733066-5fe65800-74eb-11eb-98e0-abaccd36deaf.png)

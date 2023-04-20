@@ -52,7 +52,7 @@ Click on the gear icon of the War Room's name in the top of the page to do that.
 
 ### More actions
 
-To **view or remove nodes** in a War Room, click on **Nodes view**. To remove a node from the current War Room, click on
+To **view or remove nodes** in a War Room, click on the **Nodes tab**. To remove a node from the current War Room, click on
 the **🗑** icon.
 
 > ### Info
