@@ -695,13 +695,17 @@ static void ebpf_stop_threads(int sig)
     only_one = 1;
     int i;
     for (i = 0; ebpf_modules[i].thread_name != NULL; i++) {
-        if (ebpf_modules[i].enabled == NETDATA_THREAD_EBPF_RUNNING)
+        if (ebpf_modules[i].enabled == NETDATA_THREAD_EBPF_RUNNING) {
             netdata_thread_cancel(*ebpf_modules[i].thread->thread);
+#ifdef NETDATA_DEV_MODE
+            info("Sending cancel for thread %s", ebpf_modules[i].thread_name);
+#endif
+        }
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
     ebpf_exit_plugin = 1;
 
-    usec_t max = 2*USEC_PER_SEC, step = 100000;
+    usec_t max = USEC_PER_SEC, step = 100000;
     while (i && max) {
         max -= step;
         sleep_usec(step);
@@ -709,7 +713,7 @@ static void ebpf_stop_threads(int sig)
         int j;
         pthread_mutex_lock(&ebpf_exit_cleanup);
         for (j = 0; ebpf_modules[j].thread_name != NULL; j++) {
-            if (ebpf_modules[j].enabled != NETDATA_THREAD_EBPF_RUNNING)
+            if (ebpf_modules[j].enabled == NETDATA_THREAD_EBPF_RUNNING)
                 i++;
         }
         pthread_mutex_unlock(&ebpf_exit_cleanup);
