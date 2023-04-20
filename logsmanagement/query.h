@@ -73,7 +73,7 @@ typedef enum logs_query_data_format {
 typedef struct logs_query_params {
     msec_t start_timestamp;
     msec_t end_timestamp;
-    size_t quota;
+    unsigned long quota;
     char *chart_name[LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES];
     char *filename[LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES];
     char *keyword;

@@ -1494,7 +1494,7 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
             query_params.end_timestamp = strtoll(value, NULL, 10);
         }
         else if(!strcmp(name, LOGS_QRY_KW_QUOTA)) {
-            query_params.quota = (size_t) strtoll(value, NULL, 10);
+            query_params.quota = strtoll(value, NULL, 10);
         }
         else if(!strcmp(name, LOGS_QRY_KW_FILENAME) && fn_off < LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES) {
             query_params.filename[fn_off++] = value;
@@ -1528,7 +1528,7 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
     LOGS_QUERY_RESULT_TYPE err_code = execute_logs_manag_query(&query_params); // WARNING! query changes start_timestamp and end_timestamp 
     buffer_sprintf(w->response.data, "\t\"actual_from\": %llu,\n", query_params.start_timestamp);
     buffer_sprintf(w->response.data, "\t\"actual_until\": %llu,\n", query_params.end_timestamp);
-    buffer_sprintf(w->response.data, "\t\"quota\": %zu,\n", query_params.quota);
+    buffer_sprintf(w->response.data, "\t\"quota\": %llu,\n", query_params.quota);
     buffer_sprintf(w->response.data, "\t\"requested_filename\":[\n");
     while(query_params.filename[fn_off]) buffer_sprintf(w->response.data, "\t\t\"%s\",\n", query_params.filename[fn_off++]);
     if(query_params.filename[0])  w->response.data->len -= 2;

@@ -219,7 +219,7 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
             query_params.end_timestamp = strtoll(value, NULL, 10);
         }
         else if(!strcmp(key, LOGS_QRY_KW_QUOTA)){
-            query_params.quota = (size_t) strtoll(value, NULL, 10);
+            query_params.quota = strtoll(value, NULL, 10);
         }
         else if(!strcmp(key, LOGS_QRY_KW_FILENAME) && 
                 fn_off < LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES){
@@ -291,7 +291,7 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
     buffer_sprintf( dest_wb,
                     "      \"actual_from\": %llu,\n"
                     "      \"actual_until\": %llu,\n"
-                    "      \"quota\": %zu,\n"
+                    "      \"quota\": %llu,\n"
                     "      \"requested_filename\": [\n",
                     query_params.start_timestamp,
                     query_params.end_timestamp,
