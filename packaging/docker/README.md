@@ -331,17 +331,17 @@ your machine from within the container. Please read the following carefully.
 #### Docker socket proxy (safest option)
 
 Deploy a Docker socket proxy that accepts and filters out requests using something like
-[HAProxy](https://github.com/netdata/netdata/blob/master/docs/Running-behind-haproxy.md) so that it restricts connections to read-only access to the CONTAINERS
+[HAProxy](https://github.com/netdata/netdata/blob/master/docs/Running-behind-haproxy.md) or
+[CetusGuard](https://github.com/hectorm/cetusguard) so that it restricts connections to read-only access to the `/containers`
 endpoint.
 
 The reason it's safer to expose the socket to the proxy is because Netdata has a TCP port exposed outside the Docker
 network. Access to the proxy container is limited to only within the network.
 
-Below is [an example repository (and image)](https://github.com/Tecnativa/docker-socket-proxy) that provides a proxy to
-the socket.
+Here are two examples, the first using [a Docker image based on HAProxy](https://github.com/Tecnativa/docker-socket-proxy)
+and the second using [CetusGuard](https://github.com/hectorm/cetusguard).
 
-You run the Docker Socket Proxy in its own Docker Compose file and leave it on a private network that you can add to
-other services that require access.
+##### Docker Socket Proxy (HAProxy)
 
 ```yaml
 version: '3'
@@ -356,12 +356,39 @@ services:
   proxy:
     image: tecnativa/docker-socket-proxy
     volumes:
-     - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - CONTAINERS=1
-
 ```
 **Note:** Replace `2375` with the port of your proxy.
+
+##### CetusGuard
+
+```yaml
+version: '3'
+services:
+  netdata:
+    image: netdata/netdata
+    # ... rest of your config ...
+    ports:
+      - 19999:19999
+    environment:
+      - DOCKER_HOST=cetusguard:2375
+  cetusguard:
+    image: hectorm/cetusguard:v1
+    read_only: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      CETUSGUARD_BACKEND_ADDR: unix:///var/run/docker.sock
+      CETUSGUARD_FRONTEND_ADDR: tcp://:2375
+      CETUSGUARD_RULES: |
+        ! Inspect a container
+        GET %API_PREFIX_CONTAINERS%/%CONTAINER_ID_OR_NAME%/json
+```
+
+You can run the socket proxy in its own Docker Compose file and leave it on a private network that you can add to
+other services that require access.
 
 #### Giving group access to the Docker socket (less safe)
 
