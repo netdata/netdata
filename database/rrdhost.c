@@ -919,8 +919,10 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
     rrdhost_init();
 
     if (unlikely(sql_init_database(DB_CHECK_NONE, system_info ? 0 : 1))) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+            set_late_global_environment(system_info);
             fatal("Failed to initialize SQLite");
+        }
         info("Skipping SQLITE metadata initialization since memory mode is not dbengine");
     }
 

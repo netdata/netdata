@@ -2024,13 +2024,16 @@ int main(int argc, char **argv) {
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
     get_system_info(system_info);
+    (void) registry_get_this_machine_guid();
     system_info->hops = 0;
     get_install_type(&system_info->install_type, &system_info->prebuilt_arch, &system_info->prebuilt_dist);
 
     delta_startup_time("initialize RRD structures");
 
-    if(rrd_init(netdata_configured_hostname, system_info, false))
+    if(rrd_init(netdata_configured_hostname, system_info, false)) {
+        set_late_global_environment(system_info);
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
+    }
 
     delta_startup_time("check for incomplete shutdown");
 
@@ -2072,8 +2075,7 @@ int main(int argc, char **argv) {
 
     netdata_zero_metrics_enabled = config_get_boolean_ondemand(CONFIG_SECTION_DB, "enable zero metrics", CONFIG_BOOLEAN_NO);
 
-    set_late_global_environment();
-
+    set_late_global_environment(system_info);
     for (i = 0; static_threads[i].name != NULL ; i++) {
         struct netdata_static_thread *st = &static_threads[i];
 
