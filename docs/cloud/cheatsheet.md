@@ -1,26 +1,40 @@
-# Management and configuration cheatsheet
+# Useful management and configuration actions
 
-import {
-	OneLineInstallWget,
-	OneLineInstallCurl,
-} from '@site/src/components/OneLineInstall/';
+Below you will find some of the most common actions that one can take while using Netdata. You can use this page as a quick reference for installing Netdata, connecting a node to the Cloud, properly editing the configuration, accessing Netdata's API, and more!
 
-Use our management &amp; configuration cheatsheet to simplify your interactions with Netdata, including configuration,
-using charts, managing the daemon, and more.
+### Install Netdata
 
-## Install Netdata
+```bash
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
 
-#### Install Netdata
+# Or, if you have cURL but not wget (such as on macOS):
+curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
+```
 
-<OneLineInstallWget />
+#### Connect a node to Netdata Cloud
 
-Or, if you have cURL but not wget (such as on macOS):
+To do so, sign in to Netdata Cloud, on your Space under the Nodes tab, click `Add Nodes` and paste the provided command into your node’s terminal and run it.
+You can also copy the Claim token and pass it to the installation script with `--claim-token` and re-run it.
 
-<OneLineInstallCurl />
+### Configuration
 
-#### Claim a node to Netdata Cloud
+**Netdata's config directory** is `/etc/netdata/` but in some operating systems it might be `/opt/netdata/etc/netdata/`.  
+Look for the `# config directory =` line over at `http://NODE_IP:19999/netdata.conf` to find your config directory.
 
-To do so, sign in to Netdata Cloud, click the `Claim Nodes` button, choose the `War Rooms` to add nodes to, then click `Copy` to copy the full script to your clipboard. Paste that into your node’s terminal and run it.
+From within that directory you can run `sudo ./edit-config netdata.conf` **to edit Netdata's configuration.**  
+You can edit other config files too, by specifying their filename after `./edit-config`.  
+You are expected to use this method in all following configuration changes.
+
+<!-- #### Edit Netdata's other config files (examples):
+
+- `$ sudo ./edit-config apps_groups.conf`
+- `$ sudo ./edit-config ebpf.conf`
+- `$ sudo ./edit-config health.d/load.conf`
+- `$ sudo ./edit-config go.d/prometheus.conf`
+
+#### View the running Netdata configuration: `http://NODE:19999/netdata.conf`
+
+> Replace `NODE` with the IP address or hostname of your node. Often `localhost`.
 
 ## Metrics collection & retention
 
@@ -51,15 +65,17 @@ sudo ./edit-config netdata.conf
 ```
 [global]
  update every = 5
-```
+``` -->
+
+---
 
 #### Enable/disable plugins (groups of collectors)
 
-```
+```bash
 sudo ./edit-config netdata.conf
 ```
 
-```
+```conf
 [plugins]
  go.d = yes # enabled
  node.d = no # disabled
@@ -67,100 +83,82 @@ sudo ./edit-config netdata.conf
 
 #### Enable/disable specific collectors
 
-```
-sudo ./edit-config go.d.conf
+```bash
+sudo ./edit-config go.d.conf # edit a plugin's config
 ```
 
-> `Or python.d.conf, node.d.conf, edbpf.conf, and so on`.
-
-```
+```yaml
 modules:
  activemq: no # disabled
- bind: no # disabled
  cockroachdb: yes # enabled
 ```
 
-#### Edit a collector's config (example)
+#### Edit a collector's config
 
-```
-$ sudo ./edit-config go.d/mysql.conf
-$ sudo ./edit-config ebpf.conf
-$ sudo ./edit-config python.d/anomalies.conf
+```bash
+sudo ./edit-config go.d/mysql.conf
 ```
 
-## Configuration
+### Alarms & notifications
 
-#### The Netdata config directory: `/etc/netdata`
-
-> If you don't have such a directory:
-> 📄 [Find your netdata.conf file](https://github.com/netdata/netdata/blob/master/daemon/config/README.md)
-> The cheatsheet assumes you’re running all commands from within the Netdata config directory!
-
-#### Edit Netdata's main config file: `$ sudo ./edit-config netdata.conf`
-
-#### Edit Netdata's other config files (examples):
-
-- `$ sudo ./edit-config apps_groups.conf`
-- `$ sudo ./edit-config ebpf.conf`
-- `$ sudo ./edit-config health.d/load.conf`
-- `$ sudo ./edit-config go.d/prometheus.conf`
-
-#### View the running Netdata configuration: `http://NODE:19999/netdata.conf`
-
-> Replace `NODE` with the IP address or hostname of your node. Often `localhost`.
-
-## Alarms & notifications
-
-#### Add a new alarm
+<!-- #### Add a new alarm
 
 ```
 sudo touch health.d/example-alarm.conf
 sudo ./edit-config health.d/example-alarm.conf
+``` -->
+After any change, reload the Netdata health configuration:
+
+```bash
+netdatacli reload-health
+#or if that command doesn't work on your installation, use:
+killall -USR2 netdata
 ```
 
 #### Configure a specific alarm
 
-```
+```bash
 sudo ./edit-config health.d/example-alarm.conf
 ```
 
 #### Silence a specific alarm
 
-```
+```bash
 sudo ./edit-config health.d/example-alarm.conf
+```
+
+```
  to: silent
 ```
 
-#### Disable alarms and notifications
+<!-- #### Disable alarms and notifications
 
-```
+```conf
 [health]
  enabled = no
-```
+``` -->
 
-> After any change, reload the Netdata health configuration
+---
 
-```
-netdatacli reload-health
-```
-
-or if that command doesn't work on your installation, use:
-
-```
-killall -USR2 netdata
-```
-
-## Manage the daemon
+### Manage the daemon
 
 | Intent                      |                                                                Action |
 | :-------------------------- | --------------------------------------------------------------------: |
-| Start Netdata               |                                      `$ sudo systemctl start netdata` |
-| Stop Netdata                |                                       `$ sudo systemctl stop netdata` |
-| Restart Netdata             |                                    `$ sudo systemctl restart netdata` |
-| Reload health configuration | `$ sudo netdatacli reload-health` <br></br> `$ killall -USR2 netdata` |
+| Start Netdata               |                                      `$ sudo service netdata start` |
+| Stop Netdata                |                                       `$ sudo service netdata stop` |
+| Restart Netdata             |                                    `$ sudo service netdata restart` |
+| Reload health configuration |           `$ sudo netdatacli reload-health` `$ killall -USR2 netdata` |
 | View error logs             |                                     `less /var/log/netdata/error.log` |
+| View collectors logs        |                               `less /var/log/netdata/collector.log` |
 
-## See metrics and dashboards
+#### Change the port Netdata listens to (example, set it to port 39999)
+
+```conf
+[web]
+default port = 39999
+```
+
+### See metrics and dashboards
 
 #### Netdata Cloud: `https://app.netdata.cloud`
 
@@ -168,8 +166,11 @@ killall -USR2 netdata
 
 > Replace `NODE` with the IP address or hostname of your node. Often `localhost`.
 
-#### Access the Netdata API: `http://NODE:19999/api/v1/info`
+### Access the Netdata API
 
+You can access the API like this: `http://NODE:19999/api/VERSION/REQUEST`.  
+If you want to take a look at all the API requests, check our API page at <https://learn.netdata.cloud/api>
+<!-- 
 ## Interact with charts
 
 | Intent                                 |                                                                                                                                                                                                                                                                          Action |
@@ -179,9 +180,9 @@ killall -USR2 netdata
 | Zoom to a specific timeframe           |                                                                                                                                **Cloud**<br/>use the `select and zoom` button on any chart and then do a `mouse selection` <br/><br/> **Agent**<br/>`SHIFT` + `mouse selection` |
 | Pan forward or back in time            |                                                                                                                                                                                                                  `click` & `drag` <br/> `touch` & `drag` (touchpad/touchscreen) |
 | Select a certain timeframe             |                                                                                                                                                                                `ALT` + `mouse selection` <br/> WIP need to evaluate this `command?` + `mouse selection` (macOS) |
-| Reset to default auto refreshing state |                                                                                                                                                                                                                                                                  `double click` |
+| Reset to default auto refreshing state |                                                                                                                                                                                                                                                                  `double click` | -->
 
-## Dashboards
+<!-- ## Dashboards
 
 #### Disable the local dashboard
 
@@ -190,22 +191,15 @@ Use the `edit-config` script to edit the `netdata.conf` file.
 ```
 [web]
 mode = none
-```
+``` -->
 
-#### Change the port Netdata listens to (port 39999)
-
-```
-[web]
-default port = 39999
-```
-
-#### Opt out from anonymous statistics
+<!-- #### Opt out from anonymous statistics
 
 ```
 sudo touch .opt-out-from-anonymous-statistics
-```
+``` -->
 
-## Understanding the dashboard
+<!-- ## Understanding the dashboard
 
 **Charts**: A visualization displaying one or more collected/calculated metrics in a time series. Charts are generated
 by collectors.
@@ -218,4 +212,4 @@ separately from similar instances. Example, disks named
 **sda**, **sdb**, **sdc**, and so on.
 
 **Contexts**: A grouping of charts based on the types of metrics collected and visualized.
-**disk.io**, **disk.ops**, and **disk.backlog** are all contexts.
+**disk.io**, **disk.ops**, and **disk.backlog** are all contexts. -->
