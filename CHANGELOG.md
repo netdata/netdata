@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- bump go.d.plugin v0.52.2 [\#14933](https://github.com/netdata/netdata/pull/14933) ([ilyam8](https://github.com/ilyam8))
+- Make the document more generic [\#14932](https://github.com/netdata/netdata/pull/14932) ([cakrit](https://github.com/cakrit))
 - bump go.d.plugin to v0.52.1 [\#14921](https://github.com/netdata/netdata/pull/14921) ([ilyam8](https://github.com/ilyam8))
 - Fix warnings and error when compiling with --disable-dbengine [\#14919](https://github.com/netdata/netdata/pull/14919) ([stelfrag](https://github.com/stelfrag))
 - minor - remove RX\_MSGLEN\_MAX [\#14918](https://github.com/netdata/netdata/pull/14918) ([underhood](https://github.com/underhood))
@@ -400,8 +402,6 @@
 - bump go.d.plugin to v0.49.2 [\#14305](https://github.com/netdata/netdata/pull/14305) ([ilyam8](https://github.com/ilyam8))
 - Fixes required to make the agent work without crashes on MacOS [\#14304](https://github.com/netdata/netdata/pull/14304) ([vkalintiris](https://github.com/vkalintiris))
 - Update kickstart script to use new DEB infrastructure. [\#14301](https://github.com/netdata/netdata/pull/14301) ([Ferroin](https://github.com/Ferroin))
-- DBENGINE v2 - improvements part 6 [\#14299](https://github.com/netdata/netdata/pull/14299) ([ktsaou](https://github.com/ktsaou))
-- add consul license expiration time alarm [\#14298](https://github.com/netdata/netdata/pull/14298) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
