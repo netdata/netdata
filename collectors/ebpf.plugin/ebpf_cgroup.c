@@ -263,7 +263,7 @@ void ebpf_reset_updated_var()
 void ebpf_parse_cgroup_shm_data()
 {
     static int previous = 0;
-    if (ebpf_exit_plugin || !shm_ebpf_cgroup.header)
+    if (ebpf_exit_plugin || !shm_ebpf_cgroup.header || shm_sem_ebpf_cgroup == SEM_FAILED)
         return;
 
     struct timespec ts;
