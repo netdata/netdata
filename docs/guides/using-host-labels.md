@@ -29,7 +29,7 @@ To define your windows server as a virtual node you need to:
     ```
     Just remember to use a valid guid (On Linux you can use `uuidgen` command to generate one, on Windows just use the `[guid]::NewGuid()` command in PowerShell)
     
-  * Add the vnode config to the windows monitoring job we created earlier, see higlighted line below:
+  * Add the vnode config to the data collection job. e.g. in `go.d/windows.conf`:
     ```yaml
       jobs:
         - name: win_server1
