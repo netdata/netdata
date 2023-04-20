@@ -1771,11 +1771,11 @@ static inline void substitute_dots_in_id(char *s) {
 
 char *cgroup_parse_resolved_name_and_labels(DICTIONARY *labels, char *data) {
     // the first word, up to the first space is the name
-    char *name = mystrsep(&data, " ");
+    char *name = strsep_skip_consecutive_separators(&data, " ");
 
     // the rest are key=value pairs separated by comma
     while(data) {
-        char *pair = mystrsep(&data, ",");
+        char *pair = strsep_skip_consecutive_separators(&data, ",");
         rrdlabels_add_pair(labels, pair, RRDLABEL_SRC_AUTO| RRDLABEL_SRC_K8S);
     }
 

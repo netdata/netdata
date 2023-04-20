@@ -20,7 +20,7 @@ static struct aclk_query_queue {
 
 static inline int _aclk_queue_query(aclk_query_t query)
 {
-    now_realtime_timeval(&query->created_tv);
+    now_monotonic_high_precision_timeval(&query->created_tv);
     query->created = now_realtime_usec();
 
     ACLK_QUEUE_LOCK;

@@ -132,28 +132,3 @@ void web_client_update_acl_matches(struct web_client *w) {
 void web_server_log_connection(struct web_client *w, const char *msg) {
     log_access("%llu: %d '[%s]:%s' '%s'", w->id, gettid(), w->client_ip, w->client_port, msg);
 }
-
-// --------------------------------------------------------------------------------------
-
-void web_client_initialize_connection(struct web_client *w) {
-    int flag = 1;
-
-    if(unlikely(web_client_check_tcp(w) && setsockopt(w->ifd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0))
-        debug(D_WEB_CLIENT, "%llu: failed to enable TCP_NODELAY on socket fd %d.", w->id, w->ifd);
-
-    flag = 1;
-    if(unlikely(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0))
-        debug(D_WEB_CLIENT, "%llu: failed to enable SO_KEEPALIVE on socket fd %d.", w->id, w->ifd);
-
-    web_client_update_acl_matches(w);
-
-    w->origin[0] = '*'; w->origin[1] = '\0';
-    w->cookie1[0] = '\0'; w->cookie2[0] = '\0';
-    freez(w->user_agent); w->user_agent = NULL;
-
-    web_client_enable_wait_receive(w);
-
-    web_server_log_connection(w, "CONNECTED");
-
-    web_client_cache_verify(0);
-}

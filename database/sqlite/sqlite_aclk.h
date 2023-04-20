@@ -82,26 +82,6 @@ struct aclk_sync_host_config {
     uint64_t alerts_ack_sequence_id;    // last sequence_id ack'ed from cloud via sendsnapshot message
 };
 
-static inline RRDHOST *find_host_by_node_id(char *node_id)
-{
-    uuid_t node_uuid;
-    if (unlikely(!node_id || uuid_parse(node_id, node_uuid)))
-        return NULL;
-
-    rrd_rdlock();
-    RRDHOST *host, *ret = NULL;
-    rrdhost_foreach_read(host) {
-        if (host->node_id && !(uuid_memcmp(host->node_id, &node_uuid))) {
-            ret = host;
-            break;
-        }
-    }
-    rrd_unlock();
-
-    return ret;
-}
-
-
 extern sqlite3 *db_meta;
 
 int aclk_database_enq_cmd_noblock(struct aclk_database_cmd *cmd);

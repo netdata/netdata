@@ -491,11 +491,6 @@ typedef struct storage_point {
 void netdata_fix_chart_id(char *s);
 void netdata_fix_chart_name(char *s);
 
-void strreverse(char* begin, char* end);
-char *mystrsep(char **ptr, char *s);
-char *trim(char *s); // remove leading and trailing spaces; may return NULL
-char *trim_all(char *buffer); // like trim(), but also remove duplicate spaces inside the string; may return NULL
-
 int madvise_sequential(void *mem, size_t len);
 int madvise_random(void *mem, size_t len);
 int madvise_dontfork(void *mem, size_t len);
@@ -673,9 +668,8 @@ extern char *netdata_configured_host_prefix;
 #include "parser/parser.h"
 #include "yaml.h"
 
-// BEWARE: Outside of the C code this also exists in alarm-notify.sh
-#define DEFAULT_CLOUD_BASE_URL "https://api.netdata.cloud"
-#define DEFAULT_CLOUD_UI_URL "https://app.netdata.cloud"
+// BEWARE: this exists in alarm-notify.sh
+#define DEFAULT_CLOUD_BASE_URL "https://app.netdata.cloud"
 
 #define RRD_STORAGE_TIERS 5
 

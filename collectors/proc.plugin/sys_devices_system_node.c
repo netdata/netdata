@@ -105,7 +105,7 @@ int do_proc_sys_devices_system_node(int update_every, usec_t dt) {
                             , m->name
                             , NULL
                             , "numa"
-                            , NULL
+                            , "mem.numa_nodes"
                             , "NUMA events"
                             , "events/s"
                             , PLUGIN_PROC_NAME

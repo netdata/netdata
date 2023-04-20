@@ -1149,8 +1149,8 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
  *                        update the client_host if uninitialized - ensure the hostsize is the number
  *                        of *writable* bytes (i.e. be aware of the strdup used to compact the pollinfo).
  */
-extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsize, SIMPLE_PATTERN *access_list,
-                              const char *patname, int allow_dns)
+int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsize, SIMPLE_PATTERN *access_list,
+                       const char *patname, int allow_dns)
 {
     debug(D_LISTENER,"checking %s... (allow_dns=%d)", patname, allow_dns);
     if (!access_list)

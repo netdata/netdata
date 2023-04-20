@@ -43,6 +43,8 @@ int netdata_thread_detach(pthread_t thread);
 void uv_thread_set_name_np(uv_thread_t ut, const char* name);
 void os_thread_get_current_name_np(char threadname[NETDATA_THREAD_NAME_MAX + 1]);
 
+void webrtc_set_thread_name(void);
+
 #define netdata_thread_self pthread_self
 #define netdata_thread_testcancel pthread_testcancel
 

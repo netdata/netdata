@@ -234,6 +234,55 @@ if test "${enable_cloud}" = "no"; then
 fi
 
 # -----------------------------------------------------------------------------
+# C++ version check
+
+# Check for C++17 support (optional)
+# AX_CXX_COMPILE_STDCXX(17, noext, optional)
+
+if test "x$HAVE_CXX17" != "x1"; then
+  # Check for C++11 support (optional)
+  AX_CXX_COMPILE_STDCXX(11, noext, optional)
+fi
+
+AC_MSG_CHECKING([c++ standard to use])
+if test "x$HAVE_CXX17" = "x1"; then
+  have_cxx17="yes"
+  have_cxx11="yes"
+  CPP_STD_FLAG="-std=c++17"
+  cpp_std_to_use="c++17"
+  AM_CONDITIONAL([HAVE_CXX17], [true])
+  AM_CONDITIONAL([HAVE_CXX11], [true])
+elif test "x$HAVE_CXX11" = "x1"; then
+  have_cxx17="no"
+  have_cxx11="yes"
+  CPP_STD_FLAG="-std=c++11"
+  cpp_std_to_use="c++11"
+  AM_CONDITIONAL([HAVE_CXX17], [false])
+  AM_CONDITIONAL([HAVE_CXX11], [true])
+else
+  have_cxx17="no"
+  have_cxx11="no"
+  CPP_STD_FLAG=""
+  cpp_std_to_use="no c++"
+  AM_CONDITIONAL([HAVE_CXX17], [false])
+  AM_CONDITIONAL([HAVE_CXX11], [false])
+fi
+
+# PPC64LE needs -std=gnu++11 in order to build dlib. However, the rest of
+# the agent's components use and have been tested only with -std=c++11.
+# Skip ML compilation on that CPU until we reorganize and test the C++ flags.
+if test "${host_cpu}" = "powerpc64le"; then
+  have_cxx17="no"
+  have_cxx11="no"
+  CPP_STD_FLAG=""
+  cpp_std_to_use="no c++ on powerpc64le"
+  AM_CONDITIONAL([HAVE_CXX17], [false])
+  AM_CONDITIONAL([HAVE_CXX11], [false])
+fi
+
+AC_MSG_RESULT([${cpp_std_to_use}])
+
+# -----------------------------------------------------------------------------
 # netdata required checks
 
 # fails on centos6
@@ -347,6 +396,17 @@ AC_CHECK_LIB(
 [AC_DEFINE([HAVE_PTHREAD_GETNAME_NP], [1], [Is set if pthread_getname_np is available])]
 )
 
+# -----------------------------------------------------------------------------
+# libdatachannel
+
+AC_CHECK_LIB([datachannel], [rtcCreatePeerConnection],
+             [LIBDATACHANNEL_FOUND=yes],
+             [LIBDATACHANNEL_FOUND=no])
+
+if test "x$LIBDATACHANNEL_FOUND" = "xyes"; then
+    AC_DEFINE([HAVE_LIBDATACHANNEL], [1], [libdatachannel usability])
+    OPTIONAL_DATACHANNEL_LIBS="-ldatachannel"
+fi
 
 # -----------------------------------------------------------------------------
 # libm
@@ -858,7 +918,6 @@ if test "$enable_cloud" != "no"; then
         AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
         OPTIONAL_ACLK_CFLAGS="-I \$(abs_top_srcdir)/mqtt_websockets/src/include -I \$(abs_top_srcdir)/mqtt_websockets/c-rbuf/include -I \$(abs_top_srcdir)/aclk/aclk-schemas"
         OPTIONAL_PROTOBUF_CFLAGS="${PROTOBUF_CFLAGS}"
-        CXX11FLAG="-std=c++11"
         OPTIONAL_PROTOBUF_LIBS="${PROTOBUF_LIBS}"
     fi
 fi
@@ -1195,22 +1254,8 @@ if test "${enable_ml}" = "yes" -a "${have_ml_submodules}" = "no"; then
     AC_MSG_ERROR([You have explicitly requested --enable-ml functionality but it cannot be built because the required git submodules are missing.])
 fi
 
-# Check if C++ toolchain does not support C++11. Fail if ML was explicitly requested.
-AC_LANG_PUSH([C++])
-AX_CHECK_COMPILE_FLAG([-std=c++11], [have_cxx11=yes], [have_cxx11=no])
-AC_LANG_POP([C++])
-
-# PPC64LE needs -std=gnu++11 in order to build dlib. However, the rest of
-# the agent's components use and have been tested only with -std=c++11.
-# Skip ML compilation on that CPU until we reorganize and test the C++ flags.
-if test "${host_cpu}" = "powerpc64le"; then
-    have_cxx11="no"
-fi
-
 if test "${enable_ml}" = "yes" -a "${have_cxx11}" = "no"; then
     AC_MSG_ERROR([You have explicitly requested --enable-ml functionality but it cannot be built without a C++11 toolchain.])
-else
-    CXX11FLAG="$CXX11FLAG -std=c++11"
 fi
 
 # Decide if we should build ML
@@ -1360,7 +1405,7 @@ if test "${enable_exporting_kinesis}" != "no" -a "${have_libaws_cpp_sdk_kinesis}
     enable_exporting_kinesis="yes"
     AC_DEFINE([HAVE_KINESIS], [1], [libaws-cpp-sdk-kinesis usability])
     OPTIONAL_KINESIS_CFLAGS="${LIBCRYPTO_CFLAGS} ${LIBSSL_CFLAGS} ${LIBCURL_CFLAGS}"
-    CXX11FLAG="${AWS_CPP_SDK_KINESIS_CFLAGS} ${AWS_CPP_SDK_CORE_CFLAGS}"
+    OPTIONAL_KINESIS_CXXFLAGS="${AWS_CPP_SDK_KINESIS_CFLAGS} ${AWS_CPP_SDK_CORE_CFLAGS}"
     OPTIONAL_KINESIS_LIBS="${AWS_CPP_SDK_KINESIS_LIBS} ${AWS_CPP_SDK_CORE_LIBS} \
                            ${LIBCRYPTO_LIBS} ${LIBSSL_LIBS} ${LIBCURL_LIBS}"
 else
@@ -1411,7 +1456,6 @@ if test "${enable_exporting_pubsub}" != "no" -a "${have_pubsub_protos}" = "yes" 
     enable_exporting_pubsub="yes"
     AC_DEFINE([ENABLE_EXPORTING_PUBSUB], [1], [Pub/Sub API usability])
     OPTIONAL_PUBSUB_CFLAGS="${GRPC_CFLAGS} ${PUBSUB_CFLAGS}"
-    CXX11FLAG="-std=c++11"
     OPTIONAL_PUBSUB_LIBS="${GRPC_LIBS} ${PUBSUB_LIBS}"
 else
     enable_pubsub="no"
@@ -1431,7 +1475,7 @@ AC_MSG_CHECKING([for snappy::RawCompress in -lsnappy])
     save_LIBS="${LIBS}"
     LIBS="-lsnappy"
     save_CXXFLAGS="${CXXFLAGS}"
-    CXXFLAGS="${CXXFLAGS} -std=c++11"
+    CXXFLAGS="${CXXFLAGS} ${CPP_STD_FLAG}"
 
     AC_TRY_LINK(
         [
@@ -1477,7 +1521,6 @@ if test "${enable_exporting_prometheus_remote_write}" != "no" -a "${have_libprot
     enable_exporting_prometheus_remote_write="yes"
     AC_DEFINE([ENABLE_PROMETHEUS_REMOTE_WRITE], [1], [Prometheus remote write API usability])
     OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS="${SNAPPY_CFLAGS} -I \$(abs_top_srcdir)/exporting/prometheus/remote_write"
-    CXX11FLAG="-std=c++11"
     OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS="${SNAPPY_LIBS}"
     OPTIONAL_PROTOBUF_CFLAGS="${PROTOBUF_CFLAGS}"
     OPTIONAL_PROTOBUF_LIBS="${PROTOBUF_LIBS}"
@@ -1648,7 +1691,7 @@ CFLAGS="${originalCFLAGS} ${OPTIONAL_LTO_CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${O
     ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_YAML_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${JUDY_CFLAGS} \
     ${OPTIONAL_ACLK_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_OS_DEP_CFLAGS}"
 
-CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
+CXXFLAGS="${CFLAGS} ${OPTIONAL_KINESIS_CXXFLAGS} ${CPP_STD_FLAG}"
 
 CPPFLAGS="\
 	-DVARLIB_DIR=\"\\\"${varlibdir}\\\"\" \
@@ -1663,6 +1706,7 @@ CPPFLAGS="\
 
 AC_SUBST([OPTIONAL_MATH_CFLAGS])
 AC_SUBST([OPTIONAL_MATH_LIBS])
+AC_SUBST([OPTIONAL_DATACHANNEL_LIBS])
 AC_SUBST([OPTIONAL_UV_LIBS])
 AC_SUBST([OPTIONAL_LZ4_LIBS])
 AC_SUBST([OPTIONAL_SSL_LIBS])
@@ -1842,6 +1886,7 @@ AC_CONFIG_FILES([
     web/api/health/Makefile
     web/gui/Makefile
     web/gui/dashboard/Makefile
+    web/rtc/Makefile
     web/server/Makefile
     web/server/static/Makefile
     claim/Makefile

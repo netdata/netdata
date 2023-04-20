@@ -178,7 +178,7 @@ inline RRDR_OPTIONS web_client_api_request_v1_data_options(char *o) {
     RRDR_OPTIONS ret = 0x00000000;
     char *tok;
 
-    while(o && *o && (tok = mystrsep(&o, ", |"))) {
+    while(o && *o && (tok = strsep_skip_consecutive_separators(&o, ", |"))) {
         if(!*tok) continue;
 
         uint32_t hash = simple_hash(tok);
@@ -262,7 +262,7 @@ inline uint32_t web_client_api_request_v1_data_google_format(char *name) {
 int web_client_api_request_v1_alarms_select (char *url) {
     int all = 0;
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if (!value || !*value) continue;
 
         if(!strcmp(value, "all") || !strcmp(value, "all=true")) all = 1;
@@ -300,10 +300,10 @@ inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_clien
     buffer_sprintf(w->response.data, "[");
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -341,10 +341,10 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
     char *chart = NULL;
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if (!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -365,10 +365,10 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
     buffer_flush(w->response.data);
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -419,10 +419,10 @@ static int web_client_api_request_v1_context(RRDHOST *host, struct web_client *w
     buffer_flush(w->response.data);
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -483,10 +483,10 @@ static int web_client_api_request_v1_contexts(RRDHOST *host, struct web_client *
     buffer_flush(w->response.data);
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -579,10 +579,10 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
     RRDR_OPTIONS options = 0;
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -628,10 +628,10 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
             char *tqx_name, *tqx_value;
 
             while(value) {
-                tqx_value = mystrsep(&value, ";");
+                tqx_value = strsep_skip_consecutive_separators(&value, ";");
                 if(!tqx_value || !*tqx_value) continue;
 
-                tqx_name = mystrsep(&tqx_value, ":");
+                tqx_name = strsep_skip_consecutive_separators(&tqx_value, ":");
                 if(!tqx_name || !*tqx_name) continue;
                 if(!tqx_value || !*tqx_value) continue;
 
@@ -722,17 +722,10 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
         goto cleanup;
     }
 
-    if (timeout) {
-        struct timeval now;
-        now_realtime_timeval(&now);
-        int inqueue = (int)dt_usec(&w->tv_in, &now) / 1000;
-        timeout -= inqueue;
-        if (timeout <= 0) {
-            buffer_flush(w->response.data);
-            buffer_strcat(w->response.data, "Query timeout exceeded");
-            ret = HTTP_RESP_BACKEND_FETCH_FAILED;
-            goto cleanup;
-        }
+    web_client_timeout_checkpoint_set(w, timeout);
+    if(web_client_timeout_checkpoint_and_check(w, NULL)) {
+        ret = w->response.code;
+        goto cleanup;
     }
 
     if(outFileName && *outFileName) {
@@ -851,10 +844,10 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     buffer_no_cacheable(w->response.data);
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if (!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if (!name || !*name) continue;
         if (!value || !*value) continue;
 
@@ -1287,11 +1280,11 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
     const char *function = NULL;
 
     while (url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if (!value || !*value)
             continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if (!name || !*name)
             continue;
 
@@ -1426,46 +1419,46 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
 #endif
 
 static struct web_api_command api_commands_v1[] = {
-        { "info",            0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_info                       },
-        { "data",            0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_data                       },
-        { "chart",           0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_chart                      },
-        { "charts",          0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_charts                     },
-        { "context",         0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_context                    },
-        { "contexts",        0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_contexts                   },
+        { "info",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_info                       },
+        { "data",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_data                       },
+        { "chart",           0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_chart                      },
+        { "charts",          0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_charts                     },
+        { "context",         0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_context                    },
+        { "contexts",        0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_contexts                   },
 
         // registry checks the ACL by itself, so we allow everything
         { "registry",        0, WEB_CLIENT_ACL_NOCHECK,                         web_client_api_request_v1_registry                   },
 
         // badges can be fetched with both dashboard and badge permissions
-        { "badge.svg",       0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_badge },
+        { "badge.svg",       0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC | WEB_CLIENT_ACL_BADGE, web_client_api_request_v1_badge },
 
-        { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_alarms                     },
-        { "alarms_values",   0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_alarms_values             },
-        { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_alarm_log                 },
-        { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_alarm_variables           },
-        { "alarm_count",     0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_alarm_count               },
-        { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_allmetrics                },
+        { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarms                     },
+        { "alarms_values",   0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarms_values             },
+        { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_log                 },
+        { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_variables           },
+        { "alarm_count",     0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_count               },
+        { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_allmetrics                },
 
 #if defined(ENABLE_ML)
-        { "ml_info",         0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_ml_info            },
+        { "ml_info",         0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_ml_info            },
         { "ml_models",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_models          },
 #endif
 
         { "manage/health",       0, WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_ACLK,      web_client_api_request_v1_mgmt_health           },
-        { "aclk",                0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_aclk_state            },
-        { "metric_correlations", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_metric_correlations   },
-        { "weights",             0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_weights               },
+        { "aclk",                0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_aclk_state            },
+        { "metric_correlations", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_metric_correlations   },
+        { "weights",             0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_weights               },
 
         { "function",            0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_function },
         { "functions",            0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_functions },
 
-        { "dbengine_stats",      0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_dbengine_stats },
+        { "dbengine_stats",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_dbengine_stats },
 
         // terminator
         { NULL,              0, WEB_CLIENT_ACL_NONE,      NULL },
 };
 
-inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url) {
+inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url_path_endpoint) {
     static int initialized = 0;
 
     if(unlikely(initialized == 0)) {
@@ -1475,5 +1468,5 @@ inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *
             api_commands_v1[i].hash = simple_hash(api_commands_v1[i].command);
     }
 
-    return web_client_api_request_vX(host, w, url, api_commands_v1);
+    return web_client_api_request_vX(host, w, url_path_endpoint, api_commands_v1);
 }

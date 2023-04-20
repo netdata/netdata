@@ -2,27 +2,32 @@
 
 #include "web_api.h"
 
-int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url, struct web_api_command *api_commands) {
-    if(unlikely(!url || !*url)) {
+int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_path_endpoint, struct web_api_command *api_commands) {
+    if(unlikely(!url_path_endpoint || !*url_path_endpoint)) {
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "Which API command?");
         return HTTP_RESP_BAD_REQUEST;
     }
 
-    uint32_t hash = simple_hash(url);
+    uint32_t hash = simple_hash(url_path_endpoint);
 
     for(int i = 0; api_commands[i].command ; i++) {
-        if(unlikely(hash == api_commands[i].hash && !strcmp(url, api_commands[i].command))) {
+        if(unlikely(hash == api_commands[i].hash && !strcmp(url_path_endpoint, api_commands[i].command))) {
             if(unlikely(api_commands[i].acl != WEB_CLIENT_ACL_NOCHECK) && !(w->acl & api_commands[i].acl))
                 return web_client_permission_denied(w);
 
-            return api_commands[i].callback(host, w, (w->decoded_query_string + 1));
+            char *query_string = (char *)buffer_tostring(w->url_query_string_decoded);
+
+            if(*query_string == '?')
+                query_string = &query_string[1];
+
+            return api_commands[i].callback(host, w, query_string);
         }
     }
 
     buffer_flush(w->response.data);
     buffer_strcat(w->response.data, "Unsupported API command: ");
-    buffer_strcat_htmlescape(w->response.data, url);
+    buffer_strcat_htmlescape(w->response.data, url_path_endpoint);
     return HTTP_RESP_NOT_FOUND;
 }
 
@@ -30,7 +35,7 @@ RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o) {
     RRDCONTEXT_TO_JSON_OPTIONS options = RRDCONTEXT_OPTION_NONE;
     char *tok;
 
-    while(o && *o && (tok = mystrsep(&o, ", |"))) {
+    while(o && *o && (tok = strsep_skip_consecutive_separators(&o, ", |"))) {
         if(!*tok) continue;
 
         if(!strcmp(tok, "full") || !strcmp(tok, "all"))
@@ -78,11 +83,11 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
     };
 
     while (url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if (!value || !*value)
             continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if (!name || !*name)
             continue;
         if (!value || !*value)
@@ -203,5 +208,9 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
 
 bool web_client_interrupt_callback(void *data) {
     struct web_client *w = data;
+
+    if(w->interrupt.callback)
+        return w->interrupt.callback(w, w->interrupt.callback_data);
+
     return sock_has_output_error(w->ofd);
 }

@@ -845,13 +845,14 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
             else if(!strcmp(co->name, CONFIG_SECTION_ML))                pri = 8;
             else if(!strcmp(co->name, CONFIG_SECTION_HEALTH))            pri = 9;
             else if(!strcmp(co->name, CONFIG_SECTION_WEB))               pri = 10;
-            // by default, new sections will get pri = 11 (set at the end, below)
-            else if(!strcmp(co->name, CONFIG_SECTION_REGISTRY))          pri = 12;
-            else if(!strcmp(co->name, CONFIG_SECTION_GLOBAL_STATISTICS)) pri = 13;
-            else if(!strcmp(co->name, CONFIG_SECTION_PLUGINS))           pri = 14;
-            else if(!strcmp(co->name, CONFIG_SECTION_STATSD))            pri = 15;
-            else if(!strncmp(co->name, "plugin:", 7))                    pri = 16; // << change the loop too if you change this
-            else pri = 11; // this is used for any new (currently unknown) sections
+            else if(!strcmp(co->name, CONFIG_SECTION_WEBRTC))            pri = 11;
+            // by default, new sections will get pri = 12 (set at the end, below)
+            else if(!strcmp(co->name, CONFIG_SECTION_REGISTRY))          pri = 13;
+            else if(!strcmp(co->name, CONFIG_SECTION_GLOBAL_STATISTICS)) pri = 14;
+            else if(!strcmp(co->name, CONFIG_SECTION_PLUGINS))           pri = 15;
+            else if(!strcmp(co->name, CONFIG_SECTION_STATSD))            pri = 16;
+            else if(!strncmp(co->name, "plugin:", 7))                    pri = 17; // << change the loop too if you change this
+            else pri = 12; // this is used for any new (currently unknown) sections
 
             if(i == pri) {
                 int loaded = 0;

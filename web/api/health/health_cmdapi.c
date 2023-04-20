@@ -139,10 +139,10 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
             ret = HTTP_RESP_FORBIDDEN;
         } else {
             while (url) {
-                char *value = mystrsep(&url, "&");
+                char *value = strsep_skip_consecutive_separators(&url, "&");
                 if (!value || !*value) continue;
 
-                char *key = mystrsep(&value, "=");
+                char *key = strsep_skip_consecutive_separators(&value, "=");
                 if (!key || !*key) continue;
                 if (!value || !*value) continue;
 

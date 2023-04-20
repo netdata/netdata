@@ -37,6 +37,8 @@ EXTRA_DIST = \
     build/m4/ax_c_mallopt.m4 \
     build/m4/tcmalloc.m4 \
     build/m4/ax_c__generic.m4 \
+    build/m4/ax_compiler_vendor.m4 \
+    build/m4/ax_cxx_compile_stdcxx.m4 \
     ml/dlib \
     README.md \
     LICENSE \
@@ -119,6 +121,7 @@ AM_CFLAGS = \
     $(OPTIONAL_UUID_CFLAGS) \
     $(OPTIONAL_MQTT_CFLAGS) \
     $(OPTIONAL_LIBCAP_LIBS) \
+    $(OPTIONAL_DATACHANNEL_CFLAGS) \
     $(OPTIONAL_IPMIMONITORING_CFLAGS) \
     $(OPTIONAL_CUPS_CFLAGS) \
     $(OPTIONAL_XENSTAT_CFLAGS) \
@@ -659,6 +662,8 @@ STATSD_PLUGIN_FILES = \
     $(NULL)
 
 WEB_PLUGIN_FILES = \
+    web/rtc/webrtc.c \
+    web/rtc/webrtc.h \
     web/server/web_client.c \
     web/server/web_client.h \
     web/server/web_server.c \
@@ -980,6 +985,7 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_MQTT_LIBS) \
     $(OPTIONAL_UV_LIBS) \
     $(OPTIONAL_LZ4_LIBS) \
+    $(OPTIONAL_DATACHANNEL_LIBS) \
     libjudy.a \
     $(OPTIONAL_SSL_LIBS) \
     $(OPTIONAL_JSONC_LIBS) \

@@ -21,8 +21,63 @@ inline int netdata_thread_tag_exists(void) {
     return (netdata_thread && netdata_thread->tag && *netdata_thread->tag);
 }
 
+static const char *thread_name_get(bool recheck) {
+    static __thread char threadname[NETDATA_THREAD_NAME_MAX + 1] = "";
+
+    if(netdata_thread_tag_exists())
+        strncpyz(threadname, netdata_thread->tag, NETDATA_THREAD_NAME_MAX + 1);
+    else {
+        if(!recheck && threadname[0])
+            return threadname;
+
+#if defined(__FreeBSD__)
+        pthread_get_name_np(pthread_self(), threadname, NETDATA_THREAD_NAME_MAX + 1);
+        if(strcmp(threadname, "netdata") == 0)
+            strncpyz(threadname, "MAIN", NETDATA_THREAD_NAME_MAX + 1);
+#elif defined(__APPLE__)
+        strncpyz(threadname, "MAIN", NETDATA_THREAD_NAME_MAX + 1);
+#elif defined(HAVE_PTHREAD_GETNAME_NP)
+        pthread_getname_np(pthread_self(), threadname, NETDATA_THREAD_NAME_MAX + 1);
+        if(strcmp(threadname, "netdata") == 0)
+            strncpyz(threadname, "MAIN", NETDATA_THREAD_NAME_MAX + 1);
+#else
+        strncpyz(threadname, "MAIN", NETDATA_THREAD_NAME_MAX + 1);
+#endif
+    }
+
+    return threadname;
+}
+
 const char *netdata_thread_tag(void) {
-    return (netdata_thread_tag_exists() ? netdata_thread->tag : "MAIN");
+    return thread_name_get(false);
+}
+
+static size_t webrtc_id = 0;
+static __thread bool webrtc_name_set = false;
+void webrtc_set_thread_name(void) {
+    if(!netdata_thread && !webrtc_name_set) {
+        webrtc_name_set = true;
+        char threadname[NETDATA_THREAD_NAME_MAX + 1];
+
+#if defined(__FreeBSD__)
+        snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "WEBRTC[%zu]", __atomic_fetch_add(&webrtc_id, 1, __ATOMIC_RELAXED));
+        pthread_set_name_np(pthread_self(), threadname);
+#elif defined(__APPLE__)
+        snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "WEBRTC[%zu]", __atomic_fetch_add(&webrtc_id, 1, __ATOMIC_RELAXED));
+        pthread_setname_np(threadname);
+#elif defined(HAVE_PTHREAD_GETNAME_NP)
+        pthread_getname_np(pthread_self(), threadname, NETDATA_THREAD_NAME_MAX+1);
+        if(strcmp(threadname, "netdata") == 0) {
+            snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "WEBRTC[%zu]", __atomic_fetch_add(&webrtc_id, 1, __ATOMIC_RELAXED));
+            pthread_setname_np(pthread_self(), threadname);
+        }
+#else
+        snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "WEBRTC[%zu]", __atomic_fetch_add(&webrtc_id, 1, __ATOMIC_RELAXED));
+        pthread_setname_np(pthread_self(), threadname);
+#endif
+
+        thread_name_get(true);
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -172,6 +227,8 @@ void uv_thread_set_name_np(uv_thread_t ut, const char* name) {
 #else
     ret = pthread_setname_np(ut, threadname);
 #endif
+
+    thread_name_get(true);
 
     if (ret)
         info("cannot set libuv thread name to %s. Err: %d", threadname, ret);

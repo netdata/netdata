@@ -863,6 +863,8 @@ set(API_PLUGIN_FILES
         web/api/formatters/rrdset2json.c
         web/api/formatters/rrdset2json.h
         web/api/health/health_cmdapi.c
+        web/rtc/webrtc.c
+        web/rtc/webrtc.h
         )
 
 set(STREAMING_PLUGIN_FILES

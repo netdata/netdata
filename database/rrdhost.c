@@ -41,6 +41,22 @@ bool is_storage_engine_shared(STORAGE_INSTANCE *engine __maybe_unused) {
     return false;
 }
 
+RRDHOST *find_host_by_node_id(char *node_id) {
+    uuid_t node_uuid;
+    if (unlikely(!node_id || uuid_parse(node_id, node_uuid)))
+        return NULL;
+
+    RRDHOST *host, *ret = NULL;
+    dfe_start_read(rrdhost_root_index, host) {
+        if (host->node_id && !(uuid_memcmp(host->node_id, &node_uuid))) {
+            ret = host;
+            break;
+        }
+    }
+    dfe_done(host);
+
+    return ret;
+}
 
 // ----------------------------------------------------------------------------
 // RRDHOST indexes management

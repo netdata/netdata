@@ -798,7 +798,7 @@ RRDR_GROUP_BY group_by_parse(char *s) {
     RRDR_GROUP_BY group_by = RRDR_GROUP_BY_NONE;
 
     while(s) {
-        char *key = mystrsep(&s, ",| ");
+        char *key = strsep_skip_consecutive_separators(&s, ",| ");
         if (!key || !*key) continue;
 
         if (strcmp(key, "selected") == 0)
@@ -2720,6 +2720,7 @@ struct rrdr_group_by_entry {
 };
 
 static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
+    RRDR *r_tmp = NULL;
     RRDR_OPTIONS options = qt->window.options;
 
     if(qt->request.version < 2) {
@@ -3013,7 +3014,7 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     if(!first_r || !last_r)
         goto cleanup;
 
-    RRDR *r_tmp = rrdr_create(owa, qt, 1, qt->window.points);
+    r_tmp = rrdr_create(owa, qt, 1, qt->window.points);
     if (!r_tmp) {
         internal_error(true,
                        "QUERY: cannot create group by temporary RRDR for %s, after=%ld, before=%ld, dimensions=%d, points=%zu",

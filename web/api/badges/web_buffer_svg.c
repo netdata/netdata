@@ -898,10 +898,10 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     RRDSET *st = NULL;
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
