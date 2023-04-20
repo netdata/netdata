@@ -1,13 +1,3 @@
-<!--
-title: "Database"
-description: "The Netdata Agent leverages multiple, user-configurable time-series databases that use RAM and/or disk to store metrics on any type of node."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/database/README.md"
-sidebar_label: "Database"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Configuration"
--->
-
 # Database
 
 Netdata is fully capable of long-term metrics storage, at per-second granularity, via its default database engine
@@ -144,8 +134,30 @@ Put the above lines in your boot sequence (`/etc/rc.local` or equivalent) to hav
 
 ### Monitoring Kernel Memory de-duplication performance
 
-Netdata will create charts for kernel memory de-duplication performance, like this:
+Netdata will create charts for kernel memory de-duplication performance, the **deduper (ksm)** charts can be seen under the **Memory** section in the Netdata UI.
 
-![image](https://cloud.githubusercontent.com/assets/2662304/11998786/eb23ae54-aab6-11e5-94d4-e848e8a5c56a.png)
+#### KSM summary
 
+The summary gives you a quick idea of how much savings (in terms of bytes and in terms of percentage) KSM is able to achieve.
 
+![image](https://user-images.githubusercontent.com/24860547/199454880-123ae7c4-071a-4811-95b8-18cf4e4f60a2.png)
+
+#### KSM pages merge performance
+
+This chart indicates the performance of page merging. **Shared** indicates used shared pages, **Unshared** indicates memory no longer shared (pages are unique but repeatedly checked for merging), **Sharing** indicates memory currently shared(how many more sites are sharing the pages, i.e. how much saved) and **Volatile** indicates volatile pages (changing too fast to be placed in a tree).
+
+A high ratio of Sharing to Shared indicates good sharing, but a high ratio of Unshared to Sharing indicates wasted effort.
+
+![image](https://user-images.githubusercontent.com/24860547/199455374-d63fd2c2-e12b-4ddf-947b-35371215eb05.png)
+
+#### KSM savings
+
+This chart shows the amount of memory saved by KSM. **Savings** indicates saved memory. **Offered** indicates memory marked as mergeable.
+
+![image](https://user-images.githubusercontent.com/24860547/199455604-43cd9248-1f6e-4c31-be56-e0b9e432f48a.png)
+
+#### KSM effectiveness
+
+This chart tells you how well KSM is doing at what it is supposed to. It does this by charting the percentage of the mergeable pages that are currently merged.
+
+![image](https://user-images.githubusercontent.com/24860547/199455770-4d7991ff-6b7e-4d96-9d23-33ffc572b370.png)
