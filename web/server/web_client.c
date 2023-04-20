@@ -1304,10 +1304,15 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
                 return HTTP_RESP_REDIR_PERM;
             }
 
+            size_t len = strlen(url) + 2;
+            char buf[len];
+            buf[0] = '/';
+            strcpy(&buf[1], url);
+            buf[len - 1] = '\0';
+
             buffer_flush(w->url_path_decoded);
-            buffer_fast_strcat(w->url_path_decoded, "/", 1);
-            buffer_strcat(w->url_path_decoded, url);
-            return func(host, w, url);
+            buffer_strcat(w->url_path_decoded, buf);
+            return func(host, w, buf);
         }
     }
 
