@@ -26,7 +26,7 @@ typedef enum cmd {
     CMD_PING,
     CMD_ACLK_STATE,
     CMD_VERSION,
-    CMND_DUMPCONFIG,
+    CMD_DUMPCONFIG,
     CMD_TOTAL_COMMANDS
 } cmd_t;
 
