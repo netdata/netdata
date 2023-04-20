@@ -263,34 +263,47 @@ void ebpf_reset_updated_var()
 void ebpf_parse_cgroup_shm_data()
 {
     static int previous = 0;
-    pthread_mutex_lock(&mutex_cgroup_shm);
-    if (ebpf_exit_plugin)
+    if (ebpf_exit_plugin || !shm_ebpf_cgroup.header)
         return;
 
-    if (shm_ebpf_cgroup.header) {
-        sem_wait(shm_sem_ebpf_cgroup);
-        int i, end = shm_ebpf_cgroup.header->cgroup_root_count;
-
-        ebpf_remove_cgroup_target_update_list();
-
-        ebpf_reset_updated_var();
-
-        for (i = 0; i < end; i++) {
-            netdata_ebpf_cgroup_shm_body_t *ptr = &shm_ebpf_cgroup.body[i];
-            if (ptr->enabled) {
-                ebpf_cgroup_target_t *ect =  ebpf_cgroup_find_or_create(ptr);
-                ebpf_update_pid_link_list(ect, ptr->path);
-            }
-        }
-        send_cgroup_chart = previous != shm_ebpf_cgroup.header->cgroup_root_count;
-        previous = shm_ebpf_cgroup.header->cgroup_root_count;
-#ifdef NETDATA_DEV_MODE
-        error("Updating cgroup %d (Previous: %d, Current: %d)", send_cgroup_chart, previous, shm_ebpf_cgroup.header->cgroup_root_count);
-#endif
-        sem_post(shm_sem_ebpf_cgroup);
+    struct timespec ts;
+    if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
+        error("Cannot get system time");
+        return;
     }
-    pthread_mutex_unlock(&mutex_cgroup_shm);
+    ts.tv_sec += 5;
 
+    int test;
+    pthread_mutex_lock(&mutex_cgroup_shm);
+    while ((test = sem_timedwait(shm_sem_ebpf_cgroup, &ts)) == -1 && errno == EINTR && !ebpf_exit_plugin)
+        continue;
+
+    if (test == -1) {
+        error("Cannot lock semaphore.");
+        pthread_mutex_unlock(&mutex_cgroup_shm);
+        return;
+    }
+    int i, end = shm_ebpf_cgroup.header->cgroup_root_count;
+
+    ebpf_remove_cgroup_target_update_list();
+
+    ebpf_reset_updated_var();
+
+    for (i = 0; i < end; i++) {
+        netdata_ebpf_cgroup_shm_body_t *ptr = &shm_ebpf_cgroup.body[i];
+        if (ptr->enabled) {
+            ebpf_cgroup_target_t *ect =  ebpf_cgroup_find_or_create(ptr);
+            ebpf_update_pid_link_list(ect, ptr->path);
+        }
+    }
+    send_cgroup_chart = previous != shm_ebpf_cgroup.header->cgroup_root_count;
+    previous = shm_ebpf_cgroup.header->cgroup_root_count;
+    sem_post(shm_sem_ebpf_cgroup);
+    pthread_mutex_unlock(&mutex_cgroup_shm);
+#ifdef NETDATA_DEV_MODE
+    info("Updating cgroup %d (Previous: %d, Current: %d)",
+         send_cgroup_chart, previous, shm_ebpf_cgroup.header->cgroup_root_count);
+#endif
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -321,4 +334,55 @@ void ebpf_create_charts_on_systemd(char *id, char *title, char *units, char *fam
         if (unlikely(w->systemd) && unlikely(w->updated))
             fprintf(stdout, "DIMENSION %s '' %s 1 1\n", w->name, algorithm);
     }
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// Cgroup main thread
+
+/**
+ * CGROUP exit
+ *
+ * Clean up the main thread.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_cgroup_exit(void *ptr)
+{
+    UNUSED(ptr);
+}
+
+/**
+ * Cgroup integratin
+ *
+ * Thread responsible to call functions responsible to sync data between plugins.
+ *
+ * @param ptr It is a NULL value for this thread.
+ *
+ * @return It always returns NULL.
+ */
+void *ebpf_cgroup_integration(void *ptr)
+{
+    netdata_thread_cleanup_push(ebpf_cgroup_exit, ptr);
+
+    usec_t step = USEC_PER_SEC;
+    int counter = NETDATA_EBPF_CGROUP_UPDATE - 1;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    //Plugin will be killed when it receives a signal
+    while (!ebpf_exit_plugin) {
+        (void)heartbeat_next(&hb, step);
+
+        // We are using a small heartbeat time to wake up thread,
+        // but we should not update so frequently the shared memory data
+        if (++counter >=  NETDATA_EBPF_CGROUP_UPDATE) {
+            counter = 0;
+            if (!shm_ebpf_cgroup.header)
+                ebpf_map_cgroup_shared_memory();
+
+            ebpf_parse_cgroup_shm_data();
+        }
+    }
+
+    netdata_thread_cleanup_pop(1);
+    return NULL;
 }

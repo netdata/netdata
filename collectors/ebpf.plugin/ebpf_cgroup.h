@@ -64,6 +64,7 @@ void ebpf_map_cgroup_shared_memory();
 void ebpf_parse_cgroup_shm_data();
 void ebpf_create_charts_on_systemd(char *id, char *title, char *units, char *family, char *charttype, int order,
                                           char *algorithm, char *context, char *module, int update_every);
+void *ebpf_cgroup_integration(void *ptr);
 extern int send_cgroup_chart;
 
 #endif /* NETDATA_EBPF_CGROUP_H */

@@ -34,6 +34,17 @@ pthread_mutex_t lock;
 pthread_mutex_t ebpf_exit_cleanup;
 pthread_mutex_t collect_data_mutex;
 
+struct netdata_static_thread cgroup_integration_thread = {
+    .name = "EBPF CGROUP INT",
+    .config_section = NULL,
+    .config_name = NULL,
+    .env_name = NULL,
+    .enabled = 1,
+    .thread = NULL,
+    .init_routine = NULL,
+    .start_routine = NULL
+};
+
 ebpf_module_t ebpf_modules[] = {
     { .thread_name = "process", .config_name = "process", .enabled = 0, .start_routine = ebpf_process_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
@@ -703,6 +714,14 @@ static void ebpf_stop_threads(int sig)
         }
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+    pthread_mutex_lock(&mutex_cgroup_shm);
+    netdata_thread_cancel(*cgroup_integration_thread.thread);
+#ifdef NETDATA_DEV_MODE
+    info("Sending cancel for thread %s", cgroup_integration_thread.name);
+#endif
+    pthread_mutex_unlock(&mutex_cgroup_shm);
+
     ebpf_exit_plugin = 1;
 
     usec_t max = USEC_PER_SEC, step = 100000;
@@ -1610,6 +1629,7 @@ void ebpf_start_pthread_variables()
     pthread_mutex_init(&lock, NULL);
     pthread_mutex_init(&ebpf_exit_cleanup, NULL);
     pthread_mutex_init(&collect_data_mutex, NULL);
+    pthread_mutex_init(&mutex_cgroup_shm, NULL);
 }
 
 /**
@@ -2492,6 +2512,12 @@ int main(int argc, char **argv)
 
     ebpf_set_static_routine();
 
+    cgroup_integration_thread.thread = mallocz(sizeof(netdata_thread_t));
+    cgroup_integration_thread.start_routine = ebpf_cgroup_integration;
+
+    netdata_thread_create(cgroup_integration_thread.thread, cgroup_integration_thread.name,
+                          NETDATA_THREAD_OPTION_DEFAULT, ebpf_cgroup_integration, NULL);
+
     int i;
     for (i = 0; ebpf_threads[i].name != NULL; i++) {
         struct netdata_static_thread *st = &ebpf_threads[i];
@@ -2510,7 +2536,6 @@ int main(int argc, char **argv)
     }
 
     usec_t step = USEC_PER_SEC;
-    int counter = NETDATA_EBPF_CGROUP_UPDATE - 1;
     heartbeat_t hb;
     heartbeat_init(&hb);
     int update_apps_every = (int) EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT;
@@ -2519,17 +2544,6 @@ int main(int argc, char **argv)
     while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
 
-        // We are using a small heartbeat time to wake up thread,
-        // but we should not update so frequently the shared memory data
-        /*
-        if (++counter >=  NETDATA_EBPF_CGROUP_UPDATE) {
-            counter = 0;
-            if (!shm_ebpf_cgroup.header)
-                ebpf_map_cgroup_shared_memory();
-
-            ebpf_parse_cgroup_shm_data();
-        }
-         */
         pthread_mutex_lock(&ebpf_exit_cleanup);
         if (ebpf_modules[i].enabled == NETDATA_THREAD_EBPF_RUNNING && process_pid_fd != -1) {
             pthread_mutex_lock(&collect_data_mutex);
