@@ -201,7 +201,7 @@ static inline char *read_last_line(const char *filename, int max_line_width){
 
     if(max_line_width <= 0) max_line_width = default_max_line_width;
 
-    rc = uv_fs_stat(main_loop, &stat_req, filename, NULL);
+    rc = uv_fs_stat(NULL, &stat_req, filename, NULL);
     if (unlikely(rc)) {
         error("uv_fs_stat() error for %s: (%d) %s\n", filename, rc, uv_strerror(rc));
         m_assert(!rc, "uv_fs_stat() failed during read_last_line()");
@@ -216,7 +216,7 @@ static inline char *read_last_line(const char *filename, int max_line_width){
     start_pos = end_pos - max_line_width;
     if(start_pos < 0) start_pos = 0;
 
-    rc = uv_fs_open(main_loop, &open_req, filename, O_RDONLY, 0, NULL);
+    rc = uv_fs_open(NULL, &open_req, filename, O_RDONLY, 0, NULL);
     if (unlikely(rc < 0)) {
         error("uv_fs_open() error: %s (%d) %s\n",filename, rc, uv_strerror(rc));
         uv_fs_req_cleanup(&open_req);
@@ -227,13 +227,12 @@ static inline char *read_last_line(const char *filename, int max_line_width){
 
     buff = callocz(1, (size_t) (end_pos - start_pos + 1) * sizeof(char));
     uvBuf = uv_buf_init(buff, (unsigned int) (end_pos - start_pos + 1));
-    rc = uv_fs_read(main_loop, &read_req, file_handle, &uvBuf, 1, start_pos, NULL);
+    rc = uv_fs_read(NULL, &read_req, file_handle, &uvBuf, 1, start_pos, NULL);
+    uv_fs_req_cleanup(&read_req);
     if (unlikely(rc < 0)){ 
         error("uv_fs_read() error for %s (%d) %s\n", filename, rc, uv_strerror(rc));
-        uv_fs_req_cleanup(&read_req);
         return NULL;
     }
-    uv_fs_req_cleanup(&read_req);
 
     buff[rc] = '\0';
 

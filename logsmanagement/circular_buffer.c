@@ -341,7 +341,8 @@ Circ_buff_item_t *circ_buff_read_item(Circ_buff_t *const buff) {
     m_assert(__atomic_load_n(&item->status, __ATOMIC_RELAXED) <= CIRC_BUFF_ITEM_STATUS_DONE, "Invalid status");
 
     if( /* No more records to be retrieved from the buffer */ 
-        (buff->read % buff->num_of_items == __atomic_load_n(&buff->head, __ATOMIC_SEQ_CST) % buff->num_of_items) ||
+        ((buff->read % buff->num_of_items == (__atomic_load_n(&buff->head, __ATOMIC_SEQ_CST) % buff->num_of_items)) && 
+            __atomic_load_n(&buff->full, __ATOMIC_SEQ_CST) == 0 ) ||
         /* Current item either not parsed or streamed */
         __atomic_load_n(&item->status, __ATOMIC_RELAXED) != CIRC_BUFF_ITEM_STATUS_DONE ){
         
