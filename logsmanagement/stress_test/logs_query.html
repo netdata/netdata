@@ -49,12 +49,12 @@
   <hr>
   <div id="sources"></div>
   <h4>Set query parameters:</h4>
-  <label for="req_from">Requested from:</label>
+  <label for="req_from">Requested from (epoch in ms):</label>
   <input type="text" id="req_from" name="req_from"><br><br>
-  <label for="req_until">Requested until:</label>
+  <label for="req_until">Requested until (epoch in ms):</label>
   <input type="text" id="req_until" name="req_until" ><br><br>
-  <label for="quota">Quota in bytes:</label>
-  <input type="text" id="quota" name="quota" ><br><br>
+  <label for="req_quota">Quota in bytes:</label>
+  <input type="text" id="req_quota" name="req_quota" ><br><br>
   <label for="keyword">Keyword / regex:</label>
   <input type="text" id="keyword" name="keyword" ><br><br>
   <label for="keyword_is_regex">Keyword is a regular expression:</label>
@@ -69,9 +69,9 @@
 <div id="results"></div>
 
 <script>
-document.getElementById('req_from').value = '1';
-document.getElementById('req_until').value = '100000000000000';
-document.getElementById('quota').value = '524288';
+document.getElementById('req_from').value = '1682000000000';
+document.getElementById('req_until').value = '1782000000000';
+document.getElementById('req_quota').value = '1048576';
 document.getElementById('keyword_is_regex').checked = true;
 document.getElementById('keyword_case_sensitive').checked = false;
 
@@ -102,10 +102,16 @@ function submit_query() {
     logs_management_meta = document.getElementById('use_functions').checked ? results_obj.logs_management_meta : results_obj;
     text =  "<h3>Results</h3><hr>" +
             "<b>API version:</b> " + logs_management_meta.api_version + "<br>" +
-            "<b>Requested from:</b> " + logs_management_meta.requested_from + "<br>" +
-            "<b>Requested until:</b> " + logs_management_meta.requested_until + "<br>" +
-            "<b>Actual from:</b> " + logs_management_meta.actual_from + "<br>" +
-            "<b>Actual until:</b> " + logs_management_meta.actual_until + "<br>" +
+            "<b>Requested from (epoch in ms):</b> " + logs_management_meta.requested_from + "<br>" +
+            "<b>Requested from:</b> " + new Date(logs_management_meta.requested_from) + "<br>" +
+            "<b>Requested until (epoch in ms):</b> " + logs_management_meta.requested_until + "<br>" +
+            "<b>Requested until:</b> " + new Date(logs_management_meta.requested_until) + "<br>" +
+            "<b>Actual from (epoch in ms):</b> " + logs_management_meta.actual_from + "<br>" +
+            "<b>Actual from:</b> " + new Date(logs_management_meta.actual_from) + "<br>" +
+            "<b>Actual until (epoch in ms):</b> " + logs_management_meta.actual_until + "<br>" +
+            "<b>Actual until:</b> " + new Date(logs_management_meta.actual_until) + "<br>" +
+            "<b>Requested quota:</b> " + logs_management_meta.requested_quota + " KiB<br>" +
+            "<b>Actual quota:</b> " + logs_management_meta.actual_quota + " KiB<br>" +
             "<b>Number of distrinct log records on this page:</b> " + logs_management_meta.num_lines + "<br>" +
             "<b>User time:</b> " + logs_management_meta.user_time + "<br>" +
             "<b>System time:</b> " + logs_management_meta.system_time + "<br>" +
@@ -128,8 +134,8 @@ function submit_query() {
   req_from_value = encodeURIComponent(req_from.value);
   req_until = document.getElementById("req_until");
   req_until_value = encodeURIComponent(req_until.value);
-  quota = document.getElementById("quota");
-  quota_value = encodeURIComponent(quota.value);
+  req_quota = document.getElementById("req_quota");
+  req_quota_value = encodeURIComponent(req_quota.value);
   keyword = document.getElementById("keyword");
   keyword_value = encodeURIComponent(keyword.value);
   sanitize_keyword = document.getElementById('keyword_is_regex').checked ? "0" : "1";
@@ -140,7 +146,7 @@ function submit_query() {
     xmlhttp_req = "http://" + location.host + "/api/v1/function?function=logsmanagement" + 
                       " from:" + req_from_value + 
                       " until:" + req_until_value + 
-                      " quota:" + quota_value +
+                      " quota:" + req_quota_value +
                       " keyword:" + keyword_value +
                       " sanitize_keyword: " + sanitize_keyword +
                       " ignore_case:" + ignore_case;
@@ -156,7 +162,7 @@ function submit_query() {
       xmlhttp_req = "http://" +  location.host + "/api/v1/logsmanagement?" + 
                         "from=" + req_from_value + 
                         "&until=" + req_until_value + 
-                        "&quota=" + quota_value +
+                        "&quota=" + req_quota_value +
                         "&keyword=" + keyword_value +
                         "&sanitize_keyword=" + sanitize_keyword +
                         "&ignore_case=" + ignore_case;

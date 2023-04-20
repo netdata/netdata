@@ -249,9 +249,10 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
 
     const msec_t req_start_timestamp = query_params.start_timestamp,
                  req_end_timestamp = query_params.end_timestamp;
+    const unsigned long req_quota = query_params.quota;
     struct rusage start, end;
     getrusage(RUSAGE_THREAD, &start);
-    LOGS_QUERY_RESULT_TYPE err_code = execute_logs_manag_query(&query_params); // WARNING! query changes start_timestamp and end_timestamp
+    LOGS_QUERY_RESULT_TYPE err_code = execute_logs_manag_query(&query_params); // WARNING! query may change start_timestamp, end_timestamp and quota
     getrusage(RUSAGE_THREAD, &end);
 
     switch(err_code){
@@ -279,23 +280,25 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
                     "      \"api_version\": %s,\n"
                     "      \"requested_from\": %llu,\n"
                     "      \"requested_until\": %llu,\n"
+                    "      \"requested_quota\": %llu,\n"
                     "      \"requested_keyword\": \"%s\",\n",
                     status,
                     update_every,
                     QUERY_VERSION,
                     req_start_timestamp,
                     req_end_timestamp,
+                    req_quota / (1 KiB),
                     query_params.keyword ? query_params.keyword : ""
     );
      
     buffer_sprintf( dest_wb,
                     "      \"actual_from\": %llu,\n"
                     "      \"actual_until\": %llu,\n"
-                    "      \"quota\": %llu,\n"
+                    "      \"actual_quota\": %llu,\n"
                     "      \"requested_filename\": [\n",
                     query_params.start_timestamp,
                     query_params.end_timestamp,
-                    query_params.quota
+                    query_params.quota / (1 KiB)
     );
     while(query_params.filename[fn_off]) buffer_sprintf(dest_wb, "         \"%s\",\n", query_params.filename[fn_off++]);
     if(query_params.filename[0])  dest_wb->len -= 2;
