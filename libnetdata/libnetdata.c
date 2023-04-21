@@ -2009,3 +2009,28 @@ void timing_action(TIMING_ACTION action, TIMING_STEP step) {
         }
     }
 }
+
+int hash256_string(const unsigned char *string, size_t size, char *hash) {
+    EVP_MD_CTX *ctx;
+    ctx = EVP_MD_CTX_create();
+
+    if (!ctx)
+        return 0;
+
+    if (!EVP_DigestInit(ctx, EVP_sha256())) {
+        EVP_MD_CTX_destroy(ctx);
+        return 0;
+    }
+
+    if (!EVP_DigestUpdate(ctx, string, size)) {
+        EVP_MD_CTX_destroy(ctx);
+        return 0;
+    }
+
+    if (!EVP_DigestFinal(ctx, (unsigned char *)hash, NULL)) {
+        EVP_MD_CTX_destroy(ctx);
+        return 0;
+    }
+
+    return 1;
+}

@@ -782,6 +782,7 @@ typedef enum {
 #endif
 void timing_action(TIMING_ACTION action, TIMING_STEP step);
 
+int hash256_string(const unsigned char *string, size_t size, char *hash);
 # ifdef __cplusplus
 }
 # endif

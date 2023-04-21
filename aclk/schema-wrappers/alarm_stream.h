@@ -11,38 +11,12 @@
 extern "C" {
 #endif
 
-enum alarm_log_status_aclk {
-    ALARM_LOG_STATUS_UNSPECIFIED = 0,
-    ALARM_LOG_STATUS_RUNNING = 1,
-    ALARM_LOG_STATUS_IDLE = 2
-};
-
-struct alarm_log_entries {
-    int64_t first_seq_id;
-    struct timeval first_when;
-
-    int64_t last_seq_id;
-    struct timeval last_when;
-};
-
-struct alarm_log_health {
-    char *claim_id;
-    char *node_id;
-    int enabled;
-    enum alarm_log_status_aclk status;
-    struct alarm_log_entries log_entries;
-};
-
 struct start_alarm_streaming {
     char *node_id;
-    uint64_t batch_id;
-    uint64_t start_seq_id;
+    bool resets;
 };
 
 struct start_alarm_streaming parse_start_alarm_streaming(const char *data, size_t len);
-char *parse_send_alarm_log_health(const char *data, size_t len);
-
-char *generate_alarm_log_health(size_t *len, struct alarm_log_health *data);
 
 enum aclk_alarm_status {
     ALARM_STATUS_NULL = 0,
@@ -101,17 +75,27 @@ struct alarm_log_entry {
     char *chart_context;
 };
 
+struct send_alarm_checkpoint {
+    char *node_id;
+    char *claim_id;
+};
+
+struct alarm_checkpoint {
+    char *node_id;
+    char *claim_id;
+    char *checksum;
+};
+
 struct send_alarm_snapshot {
     char *node_id;
     char *claim_id;
-    uint64_t snapshot_id;
-    uint64_t sequence_id;
+    char *snapshot_uuid;
 };
 
 struct alarm_snapshot {
     char *node_id;
     char *claim_id;
-    uint64_t snapshot_id;
+    char *snapshot_uuid;
     uint32_t chunks;
     uint32_t chunk;
 };
@@ -124,6 +108,9 @@ char *generate_alarm_log_entry(size_t *len, struct alarm_log_entry *data);
 
 struct send_alarm_snapshot *parse_send_alarm_snapshot(const char *data, size_t len);
 void destroy_send_alarm_snapshot(struct send_alarm_snapshot *ptr);
+
+struct send_alarm_checkpoint parse_send_alarm_checkpoint(const char *data, size_t len);
+char *generate_alarm_checkpoint(size_t *len, struct alarm_checkpoint *data);
 
 alarm_snapshot_proto_ptr_t generate_alarm_snapshot_proto(struct alarm_snapshot *data);
 void add_alarm_log_entry2snapshot(alarm_snapshot_proto_ptr_t snapshot, struct alarm_log_entry *data);

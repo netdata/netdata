@@ -49,8 +49,6 @@ float last_backoff_value = 0;
 
 time_t aclk_block_until = 0;
 
-int aclk_alert_reloaded = 0; //1 on health log exchange, and again on health_reload
-
 #ifdef ENABLE_ACLK
 mqtt_wss_client mqttwss_client;
 
@@ -928,14 +926,10 @@ static void fill_alert_status_for_host(BUFFER *wb, RRDHOST *host)
     }
     buffer_sprintf(wb,
         "\n\t\tUpdates: %d"
-        "\n\t\tBatch ID: %"PRIu64
-        "\n\t\tLast Acked Seq ID: %"PRIu64
         "\n\t\tPending Min Seq ID: %"PRIu64
         "\n\t\tPending Max Seq ID: %"PRIu64
         "\n\t\tLast Submitted Seq ID: %"PRIu64,
         status.alert_updates,
-        status.alerts_batch_id,
-        status.last_acked_sequence_id,
         status.pending_min_sequence_id,
         status.pending_max_sequence_id,
         status.last_submitted_sequence_id
@@ -1042,12 +1036,6 @@ static void fill_alert_status_for_host_json(json_object *obj, RRDHOST *host)
 
     json_object *tmp = json_object_new_int(status.alert_updates);
     json_object_object_add(obj, "updates", tmp);
-
-    tmp = json_object_new_int(status.alerts_batch_id);
-    json_object_object_add(obj, "batch-id", tmp);
-
-    tmp = json_object_new_int(status.last_acked_sequence_id);
-    json_object_object_add(obj, "last-acked-seq-id", tmp);
 
     tmp = json_object_new_int(status.pending_min_sequence_id);
     json_object_object_add(obj, "pending-min-seq-id", tmp);

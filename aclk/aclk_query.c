@@ -185,19 +185,19 @@ static int send_bin_msg(struct aclk_query_thread *query_thr, aclk_query_t query)
 const char *aclk_query_get_name(aclk_query_type_t qt, int unknown_ok)
 {
     switch (qt) {
-        case HTTP_API_V2:          return "http_api_request_v2";
-        case REGISTER_NODE:        return "register_node";
-        case NODE_STATE_UPDATE:    return "node_state_update";
-        case CHART_DIMS_UPDATE:    return "chart_and_dim_update";
-        case CHART_CONFIG_UPDATED: return "chart_config_updated";
-        case CHART_RESET:          return "reset_chart_messages";
-        case RETENTION_UPDATED:    return "update_retention_info";
-        case UPDATE_NODE_INFO:     return "update_node_info";
-        case ALARM_LOG_HEALTH:     return "alarm_log_health";
-        case ALARM_PROVIDE_CFG:    return "provide_alarm_config";
-        case ALARM_SNAPSHOT:       return "alarm_snapshot";
-        case UPDATE_NODE_COLLECTORS: return "update_node_collectors";
-        case PROTO_BIN_MESSAGE:    return "generic_binary_proto_message";
+        case HTTP_API_V2:               return "http_api_request_v2";
+        case REGISTER_NODE:             return "register_node";
+        case NODE_STATE_UPDATE:         return "node_state_update";
+        case CHART_DIMS_UPDATE:         return "chart_and_dim_update";
+        case CHART_CONFIG_UPDATED:      return "chart_config_updated";
+        case CHART_RESET:               return "reset_chart_messages";
+        case RETENTION_UPDATED:         return "update_retention_info";
+        case UPDATE_NODE_INFO:          return "update_node_info";
+        case ALARM_PROVIDE_CHECKPOINT:  return "alarm_checkpoint";
+        case ALARM_PROVIDE_CFG:         return "provide_alarm_config";
+        case ALARM_SNAPSHOT:            return "alarm_snapshot";
+        case UPDATE_NODE_COLLECTORS:    return "update_node_collectors";
+        case PROTO_BIN_MESSAGE:         return "generic_binary_proto_message";
         default:
             if (!unknown_ok)
                 error_report("Unknown query type used %d", (int) qt);

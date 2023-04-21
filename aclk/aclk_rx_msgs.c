@@ -339,25 +339,27 @@ int update_chart_configs(const char *msg, size_t msg_len)
 int start_alarm_streaming(const char *msg, size_t msg_len)
 {
     struct start_alarm_streaming res = parse_start_alarm_streaming(msg, msg_len);
-    if (!res.node_id || !res.batch_id) {
+    if (!res.node_id) {
         error("Error parsing StartAlarmStreaming");
-        freez(res.node_id);
         return 1;
     }
-    aclk_start_alert_streaming(res.node_id, res.batch_id, res.start_seq_id);
+    aclk_start_alert_streaming(res.node_id, res.resets);
     freez(res.node_id);
     return 0;
 }
 
-int send_alarm_log_health(const char *msg, size_t msg_len)
+int send_alarm_checkpoint(const char *msg, size_t msg_len)
 {
-    char *node_id = parse_send_alarm_log_health(msg, msg_len);
-    if (!node_id) {
-        error("Error parsing SendAlarmLogHealth");
+    struct send_alarm_checkpoint sac = parse_send_alarm_checkpoint(msg, msg_len);
+    if (!sac.node_id || !sac.claim_id) {
+        error("Error parsing SendAlarmCheckpoint");
+        freez(sac.node_id);
+        freez(sac.claim_id);
         return 1;
     }
-    aclk_send_alarm_health_log(node_id);
-    freez(node_id);
+    aclk_send_alarm_checkpoint(sac.node_id, sac.claim_id);
+    freez(sac.node_id);
+    freez(sac.claim_id);
     return 0;
 }
 
@@ -377,12 +379,12 @@ int send_alarm_configuration(const char *msg, size_t msg_len)
 int send_alarm_snapshot(const char *msg, size_t msg_len)
 {
     struct send_alarm_snapshot *sas = parse_send_alarm_snapshot(msg, msg_len);
-    if (!sas->node_id || !sas->claim_id) {
+    if (!sas->node_id || !sas->claim_id || !sas->snapshot_uuid) {
         error("Error parsing SendAlarmSnapshot");
         destroy_send_alarm_snapshot(sas);
         return 1;
     }
-    aclk_process_send_alarm_snapshot(sas->node_id, sas->claim_id, sas->snapshot_id, sas->sequence_id);
+    aclk_process_send_alarm_snapshot(sas->node_id, sas->claim_id, sas->snapshot_uuid);
     destroy_send_alarm_snapshot(sas);
     return 0;
 }
@@ -458,7 +460,7 @@ new_cloud_rx_msg_t rx_msgs[] = {
     { .name = "ChartsAndDimensionsAck",    .name_hash = 0, .fnc = charts_and_dimensions_ack    },
     { .name = "UpdateChartConfigs",        .name_hash = 0, .fnc = update_chart_configs         },
     { .name = "StartAlarmStreaming",       .name_hash = 0, .fnc = start_alarm_streaming        },
-    { .name = "SendAlarmLogHealth",        .name_hash = 0, .fnc = send_alarm_log_health        },
+    { .name = "SendAlarmCheckpoint",       .name_hash = 0, .fnc = send_alarm_checkpoint        },
     { .name = "SendAlarmConfiguration",    .name_hash = 0, .fnc = send_alarm_configuration     },
     { .name = "SendAlarmSnapshot",         .name_hash = 0, .fnc = send_alarm_snapshot          },
     { .name = "DisconnectReq",             .name_hash = 0, .fnc = handle_disconnect_req        },

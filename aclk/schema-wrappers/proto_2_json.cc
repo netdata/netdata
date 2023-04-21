@@ -29,8 +29,8 @@ static google::protobuf::Message *msg_name_to_protomsg(const char *msgname)
         return new nodeinstance::create::v1::CreateNodeInstance;
     if (!strcmp(msgname, "UpdateNodeInfo"))
         return new nodeinstance::info::v1::UpdateNodeInfo;
-    if (!strcmp(msgname, "AlarmLogHealth"))
-        return new alarms::v1::AlarmLogHealth;
+    if (!strcmp(msgname, "AlarmCheckpoint"))
+        return new alarms::v1::AlarmCheckpoint;
     if (!strcmp(msgname, "ProvideAlarmConfiguration"))
         return new alarms::v1::ProvideAlarmConfiguration;
     if (!strcmp(msgname, "AlarmSnapshot"))
@@ -51,8 +51,8 @@ static google::protobuf::Message *msg_name_to_protomsg(const char *msgname)
         return new agent::v1::SendNodeInstances;
     if (!strcmp(msgname, "StartAlarmStreaming"))
         return new alarms::v1::StartAlarmStreaming;
-    if (!strcmp(msgname, "SendAlarmLogHealth"))
-        return new alarms::v1::SendAlarmLogHealth;
+    if (!strcmp(msgname, "SendAlarmCheckpoint"))
+        return new alarms::v1::SendAlarmCheckpoint;
     if (!strcmp(msgname, "SendAlarmConfiguration"))
         return new alarms::v1::SendAlarmConfiguration;
     if (!strcmp(msgname, "SendAlarmSnapshot"))

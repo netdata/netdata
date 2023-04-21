@@ -41,13 +41,13 @@ static inline int claimed()
 enum aclk_database_opcode {
     ACLK_DATABASE_NOOP = 0,
 
-    ACLK_DATABASE_ALARM_HEALTH_LOG,
     ACLK_DATABASE_CLEANUP,
     ACLK_DATABASE_DELETE_HOST,
     ACLK_DATABASE_NODE_STATE,
     ACLK_DATABASE_PUSH_ALERT,
     ACLK_DATABASE_PUSH_ALERT_CONFIG,
     ACLK_DATABASE_PUSH_ALERT_SNAPSHOT,
+    ACLK_DATABASE_PUSH_ALERT_CHECKPOINT,
     ACLK_DATABASE_QUEUE_REMOVED_ALERTS,
     ACLK_DATABASE_TIMER,
 
@@ -72,14 +72,13 @@ struct aclk_database_cmdqueue {
 struct aclk_sync_host_config {
     RRDHOST *host;
     int alert_updates;
+    int alert_checkpoint_req;
+    int alert_queue_removed;
     time_t node_info_send_time;
     time_t node_collectors_send;
     char uuid_str[UUID_STR_LEN];
     char node_id[UUID_STR_LEN];
-    uint64_t alerts_batch_id;           // batch id for alerts to use
-    uint64_t alerts_start_seq_id;       // cloud has asked to start streaming from
-    uint64_t alerts_snapshot_id;        // will contain the snapshot_id value if snapshot was requested
-    uint64_t alerts_ack_sequence_id;    // last sequence_id ack'ed from cloud via sendsnapshot message
+    char *alerts_snapshot_uuid;        // will contain the snapshot_uuid value if snapshot was requested
 };
 
 extern sqlite3 *db_meta;
