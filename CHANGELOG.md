@@ -6,9 +6,19 @@
 
 **Merged pull requests:**
 
+- fix 32bit segv [\#14940](https://github.com/netdata/netdata/pull/14940) ([ktsaou](https://github.com/ktsaou))
+- Update using-host-labels.md [\#14939](https://github.com/netdata/netdata/pull/14939) ([cakrit](https://github.com/cakrit))
+- Fix broken image, in database/README.md [\#14936](https://github.com/netdata/netdata/pull/14936) ([Ancairon](https://github.com/Ancairon))
+- Add a description to proc.plugin/README.md [\#14935](https://github.com/netdata/netdata/pull/14935) ([Ancairon](https://github.com/Ancairon))
+- zfspool: add suspended state [\#14934](https://github.com/netdata/netdata/pull/14934) ([ilyam8](https://github.com/ilyam8))
 - bump go.d.plugin v0.52.2 [\#14933](https://github.com/netdata/netdata/pull/14933) ([ilyam8](https://github.com/ilyam8))
 - Make the document more generic [\#14932](https://github.com/netdata/netdata/pull/14932) ([cakrit](https://github.com/cakrit))
+- Replace "XYZ view" with "XYZ tab" in documentation files [\#14930](https://github.com/netdata/netdata/pull/14930) ([Ancairon](https://github.com/Ancairon))
+- Add windows MSI installer start stop restart instructions to docs [\#14929](https://github.com/netdata/netdata/pull/14929) ([Ancairon](https://github.com/Ancairon))
+- Add Docker instructions to enable Nvidia GPUs [\#14924](https://github.com/netdata/netdata/pull/14924) ([D34DC3N73R](https://github.com/D34DC3N73R))
+- Initialize machine GUID earlier in the agent startup sequence [\#14922](https://github.com/netdata/netdata/pull/14922) ([stelfrag](https://github.com/stelfrag))
 - bump go.d.plugin to v0.52.1 [\#14921](https://github.com/netdata/netdata/pull/14921) ([ilyam8](https://github.com/ilyam8))
+- Skip ML initialization when it's been disabled in netdata.conf [\#14920](https://github.com/netdata/netdata/pull/14920) ([vkalintiris](https://github.com/vkalintiris))
 - Fix warnings and error when compiling with --disable-dbengine [\#14919](https://github.com/netdata/netdata/pull/14919) ([stelfrag](https://github.com/stelfrag))
 - minor - remove RX\_MSGLEN\_MAX [\#14918](https://github.com/netdata/netdata/pull/14918) ([underhood](https://github.com/underhood))
 - change docusaurus admonitions to our style of admonitions [\#14917](https://github.com/netdata/netdata/pull/14917) ([Ancairon](https://github.com/Ancairon))
@@ -18,6 +28,7 @@
 - Revert ML changes. [\#14908](https://github.com/netdata/netdata/pull/14908) ([vkalintiris](https://github.com/vkalintiris))
 - Update change-metrics-storage.md [\#14905](https://github.com/netdata/netdata/pull/14905) ([cakrit](https://github.com/cakrit))
 - /api/v2 part 10 [\#14904](https://github.com/netdata/netdata/pull/14904) ([ktsaou](https://github.com/ktsaou))
+- Optimize the cheat sheet to be in a printable form factor  [\#14903](https://github.com/netdata/netdata/pull/14903) ([Ancairon](https://github.com/Ancairon))
 - Update REFERENCE.md [\#14900](https://github.com/netdata/netdata/pull/14900) ([cakrit](https://github.com/cakrit))
 - Update README.md [\#14899](https://github.com/netdata/netdata/pull/14899) ([cakrit](https://github.com/cakrit))
 - Update README.md [\#14898](https://github.com/netdata/netdata/pull/14898) ([cakrit](https://github.com/cakrit))
@@ -30,6 +41,7 @@
 - /api/v2 part 8 [\#14885](https://github.com/netdata/netdata/pull/14885) ([ktsaou](https://github.com/ktsaou))
 - Fix/introduce links inside charts.d.plugin documentation  [\#14884](https://github.com/netdata/netdata/pull/14884) ([Ancairon](https://github.com/Ancairon))
 - Add support for alert notifications to ntfy.sh [\#14875](https://github.com/netdata/netdata/pull/14875) ([Dim-P](https://github.com/Dim-P))
+- WEBRTC for communication between agents and browsers [\#14874](https://github.com/netdata/netdata/pull/14874) ([ktsaou](https://github.com/ktsaou))
 - cgroups.plugin: add image label [\#14872](https://github.com/netdata/netdata/pull/14872) ([ilyam8](https://github.com/ilyam8))
 - Fix regex syntax for clang-format checks. [\#14871](https://github.com/netdata/netdata/pull/14871) ([Ferroin](https://github.com/Ferroin))
 - bump go.d.plugin v0.52.0 [\#14870](https://github.com/netdata/netdata/pull/14870) ([ilyam8](https://github.com/ilyam8))
@@ -318,7 +330,6 @@
 - Events docs [\#14341](https://github.com/netdata/netdata/pull/14341) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Update the "Install Netdata with kickstart.sh" doc [\#14338](https://github.com/netdata/netdata/pull/14338) ([Ancairon](https://github.com/Ancairon))
 - Misc SSL improvements 2 [\#14334](https://github.com/netdata/netdata/pull/14334) ([MrZammler](https://github.com/MrZammler))
-- Indicate what root privileges are needed for in kickstart.sh. [\#14314](https://github.com/netdata/netdata/pull/14314) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
@@ -394,14 +405,6 @@
 - DBENGINE v2 - improvements part 8 [\#14319](https://github.com/netdata/netdata/pull/14319) ([ktsaou](https://github.com/ktsaou))
 - Misc SSL improvements [\#14317](https://github.com/netdata/netdata/pull/14317) ([MrZammler](https://github.com/MrZammler))
 - Use "getent group" instead of reading "/etc/group" to get group information [\#14316](https://github.com/netdata/netdata/pull/14316) ([Dim-P](https://github.com/Dim-P))
-- Add nvidia smi pci bandwidth percent collector [\#14315](https://github.com/netdata/netdata/pull/14315) ([ghanapunq](https://github.com/ghanapunq))
-- minor - kaitai for netdata datafiles [\#14312](https://github.com/netdata/netdata/pull/14312) ([underhood](https://github.com/underhood))
-- Add Collector log [\#14309](https://github.com/netdata/netdata/pull/14309) ([thiagoftsm](https://github.com/thiagoftsm))
-- DBENGINE v2 - improvements part 7 [\#14307](https://github.com/netdata/netdata/pull/14307) ([ktsaou](https://github.com/ktsaou))
-- Fix Exporiting compilaton error [\#14306](https://github.com/netdata/netdata/pull/14306) ([thiagoftsm](https://github.com/thiagoftsm))
-- bump go.d.plugin to v0.49.2 [\#14305](https://github.com/netdata/netdata/pull/14305) ([ilyam8](https://github.com/ilyam8))
-- Fixes required to make the agent work without crashes on MacOS [\#14304](https://github.com/netdata/netdata/pull/14304) ([vkalintiris](https://github.com/vkalintiris))
-- Update kickstart script to use new DEB infrastructure. [\#14301](https://github.com/netdata/netdata/pull/14301) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
