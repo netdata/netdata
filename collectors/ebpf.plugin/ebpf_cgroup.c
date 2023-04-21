@@ -6,6 +6,7 @@
 #include "ebpf_cgroup.h"
 
 ebpf_cgroup_target_t *ebpf_cgroup_pids = NULL;
+static netdata_ebpf_cgroup_shm_t *ebpf_mapped_memory = NULL;
 int send_cgroup_chart = 0;
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -37,6 +38,16 @@ static inline void *ebpf_cgroup_map_shm_locally(int fd, size_t length)
 }
 
 /**
+ * Unmap Shared Memory
+ *
+ * Unmap shared memory used to integrate eBPF and cgroup plugin
+ */
+void ebpf_unmap_cgroup_shared_memory()
+{
+    munmap(ebpf_mapped_memory, shm_ebpf_cgroup.header->body_length);
+}
+
+/**
  * Map cgroup shared memory
  *
  * Map cgroup shared memory from cgroup to plugin
@@ -56,45 +67,46 @@ void ebpf_map_cgroup_shared_memory()
     limit_try++;
     next_try = curr_time + NETDATA_EBPF_CGROUP_NEXT_TRY_SEC;
 
-    shm_fd_ebpf_cgroup = shm_open(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME, O_RDWR, 0660);
     if (shm_fd_ebpf_cgroup < 0) {
-        if (limit_try == NETDATA_EBPF_CGROUP_MAX_TRIES)
-            error("Shared memory was not initialized, integration between processes won't happen.");
+        shm_fd_ebpf_cgroup = shm_open(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME, O_RDWR, 0660);
+        if (shm_fd_ebpf_cgroup < 0) {
+            if (limit_try == NETDATA_EBPF_CGROUP_MAX_TRIES)
+                error("Shared memory was not initialized, integration between processes won't happen.");
 
-        return;
+            return;
+        }
     }
 
     // Map only header
     netdata_ebpf_cgroup_shm_header_t *header = (netdata_ebpf_cgroup_shm_header_t *) ebpf_cgroup_map_shm_locally(shm_fd_ebpf_cgroup,
                                                                                              sizeof(netdata_ebpf_cgroup_shm_header_t));
     if (!header) {
-        limit_try = NETDATA_EBPF_CGROUP_MAX_TRIES + 1;
         return;
     }
 
     size_t length =  header->body_length;
 
-    munmap(shm_ebpf_cgroup.header, sizeof(netdata_ebpf_cgroup_shm_header_t));
+    munmap(header, sizeof(netdata_ebpf_cgroup_shm_header_t));
 
-    if ( length <= ((sizeof(netdata_ebpf_cgroup_shm_header_t) + sizeof(netdata_ebpf_cgroup_shm_body_t))) ) {
-        limit_try = NETDATA_EBPF_CGROUP_MAX_TRIES + 1;
+    if (length <= ((sizeof(netdata_ebpf_cgroup_shm_header_t) + sizeof(netdata_ebpf_cgroup_shm_body_t)))) {
         return;
     }
 
-    netdata_ebpf_cgroup_shm_t *mapped_memory = (netdata_ebpf_cgroup_shm_t *)ebpf_cgroup_map_shm_locally(shm_fd_ebpf_cgroup, length);
-    if (!mapped_memory) {
-        limit_try = NETDATA_EBPF_CGROUP_MAX_TRIES + 1;
+    ebpf_mapped_memory = (netdata_ebpf_cgroup_shm_t *)ebpf_cgroup_map_shm_locally(shm_fd_ebpf_cgroup, length);
+    if (!ebpf_mapped_memory) {
         return;
     }
-    shm_ebpf_cgroup.header = mapped_memory->header;
-    shm_ebpf_cgroup.body = mapped_memory->body;
+    shm_ebpf_cgroup.header = (netdata_ebpf_cgroup_shm_header_t *)&ebpf_mapped_memory->header;
+    shm_ebpf_cgroup.body = (netdata_ebpf_cgroup_shm_body_t *)&ebpf_mapped_memory->body;
 
     shm_sem_ebpf_cgroup = sem_open(NETDATA_NAMED_SEMAPHORE_EBPF_CGROUP_NAME, O_CREAT, 0660, 1);
 
     if (shm_sem_ebpf_cgroup == SEM_FAILED) {
         error("Cannot create semaphore, integration between eBPF and cgroup won't happen");
-        munmap(shm_ebpf_cgroup.header, length);
+        limit_try = NETDATA_EBPF_CGROUP_MAX_TRIES + 1;
+        munmap(ebpf_mapped_memory, length);
         shm_ebpf_cgroup.header = NULL;
+        shm_ebpf_cgroup.body = NULL;
         close(shm_fd_ebpf_cgroup);
         shm_fd_ebpf_cgroup = -1;
         shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
@@ -263,28 +275,17 @@ void ebpf_reset_updated_var()
 void ebpf_parse_cgroup_shm_data()
 {
     static int previous = 0;
-    if (ebpf_exit_plugin || !shm_ebpf_cgroup.header || shm_sem_ebpf_cgroup == SEM_FAILED)
+    if (!shm_ebpf_cgroup.header || shm_sem_ebpf_cgroup == SEM_FAILED)
         return;
 
-    struct timespec ts;
-    if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-        error("Cannot get system time");
-        return;
-    }
-    ts.tv_sec += 5;
-
-    int test;
-    pthread_mutex_lock(&mutex_cgroup_shm);
-    while ((test = sem_timedwait(shm_sem_ebpf_cgroup, &ts)) == -1 && errno == EINTR && !ebpf_exit_plugin)
-        continue;
-
-    if (test == -1) {
-        error("Cannot lock semaphore.");
-        pthread_mutex_unlock(&mutex_cgroup_shm);
-        return;
-    }
+    sem_wait(shm_sem_ebpf_cgroup);
     int i, end = shm_ebpf_cgroup.header->cgroup_root_count;
+    if (end <= 0) {
+        sem_post(shm_sem_ebpf_cgroup);
+        return;
+    }
 
+    pthread_mutex_unlock(&mutex_cgroup_shm);
     ebpf_remove_cgroup_target_update_list();
 
     ebpf_reset_updated_var();
@@ -304,6 +305,8 @@ void ebpf_parse_cgroup_shm_data()
     info("Updating cgroup %d (Previous: %d, Current: %d)",
          send_cgroup_chart, previous, shm_ebpf_cgroup.header->cgroup_root_count);
 #endif
+
+    sem_post(shm_sem_ebpf_cgroup);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -378,8 +381,8 @@ void *ebpf_cgroup_integration(void *ptr)
             counter = 0;
             if (!shm_ebpf_cgroup.header)
                 ebpf_map_cgroup_shared_memory();
-
-            ebpf_parse_cgroup_shm_data();
+            else
+                ebpf_parse_cgroup_shm_data();
         }
     }
 

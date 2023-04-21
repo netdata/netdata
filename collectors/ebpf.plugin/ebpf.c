@@ -536,6 +536,7 @@ static void ebpf_exit()
 
     pthread_mutex_lock(&mutex_cgroup_shm);
     if (shm_ebpf_cgroup.header) {
+        ebpf_unmap_cgroup_shared_memory();
         shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);

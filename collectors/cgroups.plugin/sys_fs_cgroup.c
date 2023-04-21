@@ -4790,6 +4790,7 @@ static void cgroup_main_cleanup(void *ptr) {
     }
 
     if (shm_cgroup_ebpf.header) {
+        shm_cgroup_ebpf.header->cgroup_root_count = 0;
         munmap(shm_cgroup_ebpf.header, shm_cgroup_ebpf.header->body_length);
     }
 
