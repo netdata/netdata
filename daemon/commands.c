@@ -130,7 +130,7 @@ static cmd_status_t cmd_help_execute(char *args, char **message)
              "aclk-state [json]\n"
              "    Returns current state of ACLK and Cloud connection. (optionally in json).\n"
              "dumpconfig\n"
-             "    Returns the current netdata.conf\n"
+             "    Returns the current netdata.conf on stdout.\n"
              "version\n"
              "    Returns the netdata version.\n",
              MAX_COMMAND_LENGTH - 1);
