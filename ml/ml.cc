@@ -1022,6 +1022,7 @@ ml_host_detect_once(ml_host_t *host)
 }
 
 typedef struct {
+    RRDSET_ACQUIRED *acq_rs;
     RRDDIM_ACQUIRED *acq_rd;
     ml_dimension_t *dim;
 } ml_acquired_dimension_t;
@@ -1029,24 +1030,28 @@ typedef struct {
 static ml_acquired_dimension_t
 ml_acquired_dimension_get(STRING *host_id, STRING *chart_id, STRING *dimension_id)
 {
+    RRDSET_ACQUIRED *acq_rs = NULL;
     RRDDIM_ACQUIRED *acq_rd = NULL;
     ml_dimension_t *dim = NULL;
 
     RRDHOST *rh = rrdhost_find_by_hostname(string2str(host_id));
     if (rh) {
-        RRDSET *rs = rrdset_find(rh, string2str(chart_id));
-        if (rs) {
-            acq_rd = rrddim_find_and_acquire(rs, string2str(dimension_id));
-            if (acq_rd) {
-                RRDDIM *rd = rrddim_acquired_to_rrddim(acq_rd);
-                if (rd)
-                    dim = (ml_dimension_t *) rd->ml_dimension;
+        acq_rs = rrdset_find_and_acquire(rh, string2str(chart_id));
+        if (acq_rs) {
+            RRDSET *rs = rrdset_acquired_to_rrdset(acq_rs);
+            if (rs) {
+                acq_rd = rrddim_find_and_acquire(rs, string2str(dimension_id));
+                if (acq_rd) {
+                    RRDDIM *rd = rrddim_acquired_to_rrddim(acq_rd);
+                    if (rd)
+                        dim = (ml_dimension_t *) rd->ml_dimension;
+                }
             }
         }
     }
 
     ml_acquired_dimension_t acq_dim = {
-        acq_rd, dim
+        acq_rs, acq_rd, dim
     };
 
     return acq_dim;
@@ -1055,10 +1060,11 @@ ml_acquired_dimension_get(STRING *host_id, STRING *chart_id, STRING *dimension_i
 static void
 ml_acquired_dimension_release(ml_acquired_dimension_t acq_dim)
 {
-    if (!acq_dim.acq_rd)
-        return;
+    if (acq_dim.acq_rd)
+        rrddim_acquired_release(acq_dim.acq_rd);
 
-    rrddim_acquired_release(acq_dim.acq_rd);
+    if (acq_dim.acq_rs)
+        rrdset_acquired_release(acq_dim.acq_rs);
 }
 
 static enum ml_training_result
