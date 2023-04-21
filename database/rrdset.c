@@ -480,7 +480,7 @@ inline RRDSET *rrdset_find_byname(RRDHOST *host, const char *name) {
 }
 
 RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id) {
-    debug(D_RRD_CALLS, "rrddim_find_and_acquire() for host %s, chart %s", rrdhost_name(host), id);
+    debug(D_RRD_CALLS, "rrdset_find_and_acquire() for host %s, chart %s", rrdhost_name(host), id);
 
     return (RRDSET_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdset_root_index, id);
 }
