@@ -6,7 +6,7 @@
 #include "ebpf_cgroup.h"
 
 ebpf_cgroup_target_t *ebpf_cgroup_pids = NULL;
-static netdata_ebpf_cgroup_shm_t *ebpf_mapped_memory = NULL;
+static void *ebpf_mapped_memory = NULL;
 int send_cgroup_chart = 0;
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -92,12 +92,12 @@ void ebpf_map_cgroup_shared_memory()
         return;
     }
 
-    ebpf_mapped_memory = (netdata_ebpf_cgroup_shm_t *)ebpf_cgroup_map_shm_locally(shm_fd_ebpf_cgroup, length);
+    ebpf_mapped_memory = (void *)ebpf_cgroup_map_shm_locally(shm_fd_ebpf_cgroup, length);
     if (!ebpf_mapped_memory) {
         return;
     }
-    shm_ebpf_cgroup.header = (netdata_ebpf_cgroup_shm_header_t *)&ebpf_mapped_memory->header;
-    shm_ebpf_cgroup.body = (netdata_ebpf_cgroup_shm_body_t *)&ebpf_mapped_memory->body;
+    shm_ebpf_cgroup.header = ebpf_mapped_memory;
+    shm_ebpf_cgroup.body = ebpf_mapped_memory + sizeof(netdata_ebpf_cgroup_shm_header_t);
 
     shm_sem_ebpf_cgroup = sem_open(NETDATA_NAMED_SEMAPHORE_EBPF_CGROUP_NAME, O_CREAT, 0660, 1);
 
@@ -285,7 +285,7 @@ void ebpf_parse_cgroup_shm_data()
         return;
     }
 
-    pthread_mutex_unlock(&mutex_cgroup_shm);
+    pthread_mutex_lock(&mutex_cgroup_shm);
     ebpf_remove_cgroup_target_update_list();
 
     ebpf_reset_updated_var();
