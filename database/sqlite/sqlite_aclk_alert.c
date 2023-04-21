@@ -976,6 +976,8 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
     }
 
     uint32_t cnt = 0;
+    char uuid_str[UUID_STR_LEN];
+    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
@@ -989,6 +991,9 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
             continue;
 
         if (have_recent_alarm(host, ae->alarm_id, ae->unique_id))
+            continue;
+
+        if (is_event_from_alert_variable_config(ae->unique_id, uuid_str))
             continue;
 
         cnt++;
@@ -1018,6 +1023,9 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
                 continue;
 
             if (have_recent_alarm(host, ae->alarm_id, ae->unique_id))
+                continue;
+
+            if (is_event_from_alert_variable_config(ae->unique_id, uuid_str))
                 continue;
 
             cnt++;
