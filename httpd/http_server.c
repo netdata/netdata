@@ -184,7 +184,7 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
     struct web_client w;
     w.response.data = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
     w.response.header = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
-    w.decoded_query_string[0] = 0;
+    w.url_query_string_decoded = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
     w.acl = WEB_CLIENT_ACL_DASHBOARD;
 
     char *path_c_str = iovec_to_cstr(&api_command);
@@ -196,7 +196,7 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
         char *query_c_str = iovec_to_cstr(&query_params);
         char *query_unescaped = url_unescape(query_c_str);
         freez(query_c_str);
-        strcpy(w.decoded_query_string, query_unescaped);
+        buffer_strcat(w.url_query_string_decoded, query_unescaped);
         freez(query_unescaped);
     }
 
@@ -223,6 +223,7 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
 
     buffer_free(w.response.data);
     buffer_free(w.response.header);
+    buffer_free(w.url_query_string_decoded);
 
     return 0;
 }
