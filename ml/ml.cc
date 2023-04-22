@@ -707,12 +707,16 @@ ml_dimension_train_model(ml_training_thread_t *training_thread, ml_dimension_t *
     {
         netdata_mutex_lock(&dim->mutex);
 
+        // temporarily disable sqlite operations because they interfere with
+        // training scheduling on busy parents
+        #if 0
         worker_is_busy(WORKER_TRAIN_LOAD_MODELS);
 
         int rc = ml_dimension_update_models(dim);
         if (rc) {
             error("Failed to update models for %s [%u, %u]", rrddim_id(dim->rd), dim->kmeans.after, dim->kmeans.before);
         }
+        #endif
 
         worker_is_busy(WORKER_TRAIN_UPDATE_MODELS);
 
