@@ -20,7 +20,7 @@ int send_cgroup_chart = 0;
  * @param fd       file descriptor returned after shm_open was called.
  * @param length   length of the shared memory
  *
- * @return It returns a pointer to the region mapped.
+ * @return It returns a pointer to the region mapped on success and MAP_FAILED otherwise.
  */
 static inline void *ebpf_cgroup_map_shm_locally(int fd, size_t length)
 {
@@ -78,11 +78,12 @@ void ebpf_map_cgroup_shared_memory()
     }
 
     // Map only header
-    netdata_ebpf_cgroup_shm_header_t *header = (netdata_ebpf_cgroup_shm_header_t *) ebpf_cgroup_map_shm_locally(shm_fd_ebpf_cgroup,
-                                                                                             sizeof(netdata_ebpf_cgroup_shm_header_t));
-    if (!header) {
+    void *mapped = (netdata_ebpf_cgroup_shm_header_t *) ebpf_cgroup_map_shm_locally(shm_fd_ebpf_cgroup,
+                                                                                   sizeof(netdata_ebpf_cgroup_shm_header_t));
+    if (unlikely(mapped == SEM_FAILED)) {
         return;
     }
+    netdata_ebpf_cgroup_shm_header_t *header = mapped;
 
     size_t length =  header->body_length;
 
@@ -93,7 +94,7 @@ void ebpf_map_cgroup_shared_memory()
     }
 
     ebpf_mapped_memory = (void *)ebpf_cgroup_map_shm_locally(shm_fd_ebpf_cgroup, length);
-    if (!ebpf_mapped_memory) {
+    if (unlikely(ebpf_mapped_memory == MAP_FAILED)) {
         return;
     }
     shm_ebpf_cgroup.header = ebpf_mapped_memory;
