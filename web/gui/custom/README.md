@@ -1,24 +1,10 @@
-<!--
-title: "Custom dashboards"
-description: "Build custom dashboards with key metrics from one or more nodes running the Netdata Agent and host them anywhere."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/web/gui/custom/README.md"
-sidebar_label: "Custom dashboards"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Operations"
--->
-
 # Custom dashboards
 
-You can:
+You can build custom Netdata dashboards just with some basic HTML knowledge.
 
--   create your own dashboards using simple HTML (no javascript is required for
-    basic dashboards)
--   utilize any or all of the available chart libraries, on the same dashboard
--   use data from one or more Netdata servers, on the same dashboard
--   host your dashboard HTML page on any web server, anywhere
-
-You can also add Netdata charts to existing web pages.
+Custom dashboards allow you to  utilize any or all of the available chart libraries, on the same dashboard.
+You can use data from one or more Netdata servers, on the same dashboard and host your dashboard HTML page on 
+any web server, anywhere. You can also add Netdata charts to existing web pages.
 
 Check this **[very simple working example of a custom dashboard](http://netdata.firehol.org/demo.html)**.
 
@@ -30,7 +16,8 @@ If you plan to put the dashboard on TV, check out
 [tv.html](http://netdata.firehol.org/tv.html). Here's is a screenshot of it,
 monitoring two servers on the same page:
 
-![image](https://cloud.githubusercontent.com/assets/2662304/14252187/d8d5f78e-fa8e-11e5-990d-99821d38c874.png)
+<img width="954" alt="image" src="https://user-images.githubusercontent.com/43294513/233790352-2780fd51-3293-49fe-8ad9-30ad9a362c60.png">
+
 
 
 
