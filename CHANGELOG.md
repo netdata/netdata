@@ -26,6 +26,7 @@
 - Add section for scaling parent nodes [\#14915](https://github.com/netdata/netdata/pull/14915) ([cakrit](https://github.com/cakrit))
 - Update suggested replication setups [\#14914](https://github.com/netdata/netdata/pull/14914) ([cakrit](https://github.com/cakrit))
 - Revert ML changes. [\#14908](https://github.com/netdata/netdata/pull/14908) ([vkalintiris](https://github.com/vkalintiris))
+- Remove netdatacli response size limitation [\#14906](https://github.com/netdata/netdata/pull/14906) ([stelfrag](https://github.com/stelfrag))
 - Update change-metrics-storage.md [\#14905](https://github.com/netdata/netdata/pull/14905) ([cakrit](https://github.com/cakrit))
 - /api/v2 part 10 [\#14904](https://github.com/netdata/netdata/pull/14904) ([ktsaou](https://github.com/ktsaou))
 - Optimize the cheat sheet to be in a printable form factor  [\#14903](https://github.com/netdata/netdata/pull/14903) ([Ancairon](https://github.com/Ancairon))
@@ -52,6 +53,7 @@
 - review usage of you to say user instead [\#14858](https://github.com/netdata/netdata/pull/14858) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Add labels for cgroup name [\#14856](https://github.com/netdata/netdata/pull/14856) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix typo alerms -\> alarms [\#14854](https://github.com/netdata/netdata/pull/14854) ([slavox](https://github.com/slavox))
+- Add a checkpoint message to alerts stream [\#14847](https://github.com/netdata/netdata/pull/14847) ([MrZammler](https://github.com/MrZammler))
 - fix  \#14841 Exception funktion call Rados.mon\_command\(\) [\#14844](https://github.com/netdata/netdata/pull/14844) ([farax4de](https://github.com/farax4de))
 - Update parent child examples [\#14842](https://github.com/netdata/netdata/pull/14842) ([cakrit](https://github.com/cakrit))
 - fix double host prefix when reading ZFS pools state [\#14840](https://github.com/netdata/netdata/pull/14840) ([ilyam8](https://github.com/ilyam8))
@@ -107,6 +109,7 @@
 - Assorted improvements for our platform EOL check code. [\#14768](https://github.com/netdata/netdata/pull/14768) ([Ferroin](https://github.com/Ferroin))
 - minor addition to distros matrix [\#14767](https://github.com/netdata/netdata/pull/14767) ([tkatsoulas](https://github.com/tkatsoulas))
 - Update "View active alerts" documentation [\#14766](https://github.com/netdata/netdata/pull/14766) ([Ancairon](https://github.com/Ancairon))
+- Skip alert template variables from alert snapshots [\#14763](https://github.com/netdata/netdata/pull/14763) ([MrZammler](https://github.com/MrZammler))
 - Accept all=true for alarms api v1 call [\#14762](https://github.com/netdata/netdata/pull/14762) ([MrZammler](https://github.com/MrZammler))
 - fix /sys/block/zram in docker [\#14759](https://github.com/netdata/netdata/pull/14759) ([ilyam8](https://github.com/ilyam8))
 - bump go.d.plugin to v0.51.4 [\#14756](https://github.com/netdata/netdata/pull/14756) ([ilyam8](https://github.com/ilyam8))
@@ -402,9 +405,6 @@
 - DBENGINE v2 - improvements part 9 [\#14326](https://github.com/netdata/netdata/pull/14326) ([ktsaou](https://github.com/ktsaou))
 - Don't send alert variables to the cloud [\#14325](https://github.com/netdata/netdata/pull/14325) ([MrZammler](https://github.com/MrZammler))
 - fix\(proc.plugin\): add "cpu" label to per core util% charts [\#14322](https://github.com/netdata/netdata/pull/14322) ([ilyam8](https://github.com/ilyam8))
-- DBENGINE v2 - improvements part 8 [\#14319](https://github.com/netdata/netdata/pull/14319) ([ktsaou](https://github.com/ktsaou))
-- Misc SSL improvements [\#14317](https://github.com/netdata/netdata/pull/14317) ([MrZammler](https://github.com/MrZammler))
-- Use "getent group" instead of reading "/etc/group" to get group information [\#14316](https://github.com/netdata/netdata/pull/14316) ([Dim-P](https://github.com/Dim-P))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
