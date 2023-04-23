@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Update README.md [\#14948](https://github.com/netdata/netdata/pull/14948) ([cakrit](https://github.com/cakrit))
+- Disable SQL operations in training thread [\#14947](https://github.com/netdata/netdata/pull/14947) ([vkalintiris](https://github.com/vkalintiris))
 - fix 32bit segv [\#14940](https://github.com/netdata/netdata/pull/14940) ([ktsaou](https://github.com/ktsaou))
 - Update using-host-labels.md [\#14939](https://github.com/netdata/netdata/pull/14939) ([cakrit](https://github.com/cakrit))
 - Fix broken image, in database/README.md [\#14936](https://github.com/netdata/netdata/pull/14936) ([Ancairon](https://github.com/Ancairon))
@@ -404,7 +406,6 @@
 - Revert "Misc SSL improvements" [\#14327](https://github.com/netdata/netdata/pull/14327) ([MrZammler](https://github.com/MrZammler))
 - DBENGINE v2 - improvements part 9 [\#14326](https://github.com/netdata/netdata/pull/14326) ([ktsaou](https://github.com/ktsaou))
 - Don't send alert variables to the cloud [\#14325](https://github.com/netdata/netdata/pull/14325) ([MrZammler](https://github.com/MrZammler))
-- fix\(proc.plugin\): add "cpu" label to per core util% charts [\#14322](https://github.com/netdata/netdata/pull/14322) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
