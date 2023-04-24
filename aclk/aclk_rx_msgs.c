@@ -455,6 +455,8 @@ int cancel_pending_req(const char *msg, size_t msg_len)
         return 1;
     }
 
+    log_access("ACLK CancelPendingRequest REQ: %s, cloud trace-id: %s", cmd.request_id, cmd.trace_id);
+
     aclk_cancel_query(cmd.request_id);
 
     free_cancel_pending_req(&cmd);
