@@ -13,6 +13,87 @@ pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
 #define QUERY_THREAD_LOCK pthread_mutex_lock(&query_lock_wait)
 #define QUERY_THREAD_UNLOCK pthread_mutex_unlock(&query_lock_wait)
 
+#define CANCELLATION_GC_INTERVAL_S 10
+
+struct cancellation {
+    uint64_t hash;
+    char* id;
+
+    time_t timestamp;
+
+    struct cancellation *next;
+};
+
+struct cancellation *cancellations = NULL;
+
+void aclk_cancel_query(const char *id) {
+    struct cancellation *c = callocz(1, sizeof(struct cancellation));
+    c->hash = simple_hash(id);
+    c->id = strdupz(id);
+    c->timestamp = now_monotonic_sec();
+
+    c->next = cancellations;
+    cancellations = c;
+}
+
+static int remove_cancellation(const char *id, uint64_t hash) {
+    struct cancellation *c = cancellations;
+    struct cancellation *p = NULL;
+    while(c) {
+        if(c->hash == hash && !strcmp(c->id, id)) {
+            if(p)
+                p->next = c->next;
+            else
+                cancellations = c->next;
+            freez(c->id);
+            freez(c);
+            return 1;
+        }
+        p = c;
+        c = c->next;
+    }
+    return 0;
+}
+
+static int is_cancelled(const char *id) {
+    uint64_t hash = simple_hash(id);
+    struct cancellation *c = cancellations;
+    while(c) {
+        if(c->hash == hash && !strcmp(c->id, id)) {
+            remove_cancellation(id, hash);
+            return 1;
+        }
+        c = c->next;
+    }
+    return 0;
+}
+
+void aclk_cancellation_gc() {
+    struct cancellation *c = cancellations;
+    struct cancellation *p = NULL;
+    time_t now = now_monotonic_sec();
+    while(c) {
+        if(now - c->timestamp > CANCELLATION_GC_INTERVAL_S) {
+            error_report("Canncelation request timed out. Dropping cancel request for %s", c->id);
+            if(p)
+                p->next = c->next;
+            else
+                cancellations = c->next;
+            freez(c->id);
+            freez(c);
+            c = p ? p->next : cancellations;
+        } else {
+            p = c;
+            c = c->next;
+        }
+    }
+}
+
+static bool aclk_web_client_interrupt_cb(struct web_client *w __maybe_unused, void *data)
+{
+    return is_cancelled((char *)data);
+}
+
 static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) {
     int retval = 0;
     BUFFER *local_buffer = NULL;
@@ -29,6 +110,9 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) 
     w->acl = WEB_CLIENT_ACL_ACLK;
     w->mode = WEB_CLIENT_MODE_GET;
     w->timings.tv_in = query->created_tv;
+
+    w->interrupt.callback = aclk_web_client_interrupt_cb;
+    w->interrupt.callback_data = query->msg_id;
 
     usec_t t;
     web_client_timeout_checkpoint_set(w, query->timeout);

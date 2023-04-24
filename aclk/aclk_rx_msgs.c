@@ -6,6 +6,7 @@
 #include "aclk_query_queue.h"
 #include "aclk.h"
 #include "aclk_capas.h"
+#include "aclk_query.h"
 
 #include "schema-wrappers/proto_2_json.h"
 
@@ -454,7 +455,7 @@ int cancel_pending_req(const char *msg, size_t msg_len)
         return 1;
     }
 
-    // TODO: add to list of cancellations
+    aclk_cancel_query(cmd.request_id);
 
     free_cancel_pending_req(&cmd);
     return 0;
