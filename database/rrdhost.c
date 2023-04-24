@@ -958,9 +958,6 @@ void dbengine_init(char *hostname) {
 int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unittest) {
     rrdhost_init();
 
-    if (sqlite_library_init())
-        fatal("Failed to initialize SQLite library");
-
     if (unlikely(sqlite_init_databases(DB_CHECK_NONE, system_info ? 0 : 1))) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             fatal("Failed to initialize SQLite");

@@ -1813,6 +1813,10 @@ int main(int argc, char **argv) {
         load_cloud_conf(0);
     }
 
+    if (sqlite_library_init())
+        fatal("Failed to initialize SQLite library");
+
+
     char *nd_disable_cloud = getenv("NETDATA_DISABLE_CLOUD");
     if (nd_disable_cloud && !strncmp(nd_disable_cloud, "1", 1)) {
         appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", "false");
