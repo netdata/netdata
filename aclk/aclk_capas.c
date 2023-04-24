@@ -38,7 +38,7 @@ struct capability *aclk_get_node_instance_capas(RRDHOST *host)
           .enabled = enable_metric_correlations },
         { .name = "ctx",         .version = 1,                     .enabled = 1 },
         { .name = "funcs",       .version = 0,                     .enabled = 0 },
-        { .name = "http_api_v2", .version = 1,                     .enabled = 1 },
+        { .name = "http_api_v2", .version = 2,                     .enabled = 1 },
         { .name = "health",      .version = 1,                     .enabled = host->health.health_enabled },
         { .name = NULL,          .version = 0,                     .enabled = 0 }
     };
