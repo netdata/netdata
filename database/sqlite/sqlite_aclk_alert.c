@@ -469,7 +469,7 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
 
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
-    if (unlikely(db_execute(buffer_tostring(sql))))
+    if (unlikely(db_execute(db_aclk, buffer_tostring(sql))))
         error_report("Failed to queue existing ACLK alert events for host %s", rrdhost_hostname(host));
 
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);

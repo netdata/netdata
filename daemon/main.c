@@ -464,13 +464,8 @@ void netdata_cleanup_and_exit(int ret) {
 #endif
     }
 
-    delta_shutdown_time("close SQL context db");
-
-    sql_close_context_database();
-
-    delta_shutdown_time("closed SQL main db");
-
-    sql_close_database();
+    delta_shutdown_time("closed SQL databases");
+    sqlite_close_databases();
 
     // unlink the pid
     if(pidfile[0]) {
