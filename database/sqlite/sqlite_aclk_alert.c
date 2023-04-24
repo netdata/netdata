@@ -478,7 +478,7 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
     rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
 }
 
-void aclk_send_alarm_configuration(char *config_hash)
+void aclk_send_alarm_configuration(char *config_hash __maybe_unused)
 {
 #ifdef ENABLE_ACLK
     if (unlikely(!config_hash))
@@ -692,6 +692,7 @@ void sql_process_queue_removed_alerts_to_aclk(char *node_id)
 
 void sql_queue_removed_alerts_to_aclk(RRDHOST *host __maybe_unused)
 {
+#ifdef ENABLE_ACLK
     if (unlikely(!host->aclk_sync_host_config))
         return;
 
@@ -702,9 +703,11 @@ void sql_queue_removed_alerts_to_aclk(RRDHOST *host __maybe_unused)
     uuid_unparse_lower(*host->node_id, node_id);
 
     aclk_push_node_removed_alerts(node_id);
+#endif
 }
 
-void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id __maybe_unused, char *snapshot_uuid)
+#ifdef ENABLE_ACLK
+void aclk_process_send_alarm_snapshot(char *node_id __maybe_unused, char *claim_id __maybe_unused, char *snapshot_uuid __maybe_unused)
 {
     uuid_t node_uuid;
     if (unlikely(!node_id || uuid_parse(node_id, node_uuid)))
@@ -737,7 +740,6 @@ void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id __maybe_unus
     aclk_push_node_alert_snapshot(node_id);
 }
 
-#ifdef ENABLE_ACLK
 void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_ENTRY *ae, RRDHOST *host)
 {
     char *edit_command = ae->source ? health_edit_command_from_source(ae_source(ae)) : strdupz("UNKNOWN=0=UNKNOWN");
@@ -786,9 +788,7 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
 
     freez(edit_command);
 }
-#endif
 
-#ifdef ENABLE_ACLK
 static int have_recent_alarm(RRDHOST *host, uint32_t alarm_id, uint32_t mark)
 {
     ALARM_ENTRY *ae = host->health_log.alarms;
@@ -802,12 +802,10 @@ static int have_recent_alarm(RRDHOST *host, uint32_t alarm_id, uint32_t mark)
 
     return 0;
 }
-#endif
 
 #define ALARM_EVENTS_PER_CHUNK 10
 void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
 {
-#ifdef ENABLE_ACLK
     RRDHOST *host = find_host_by_node_id(node_id);
 
     if (unlikely(!host)) {
@@ -930,8 +928,8 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
     wc->alerts_snapshot_uuid = NULL;
 
     freez(claim_id);
-#endif
 }
+#endif
 
 #define SQL_DELETE_ALERT_ENTRIES "DELETE FROM aclk_alert_%s WHERE filtered_alert_unique_id + %d < UNIXEPOCH();"
 void sql_aclk_alert_clean_dead_entries(RRDHOST *host)
@@ -988,8 +986,9 @@ int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert
     return 0;
 }
 
-void aclk_send_alarm_checkpoint(char *node_id, char *claim_id __maybe_unused)
+void aclk_send_alarm_checkpoint(char *node_id __maybe_unused, char *claim_id __maybe_unused)
 {
+#ifdef ENABLE_ACLK
     if (unlikely(!node_id))
         return;
 
@@ -1008,7 +1007,10 @@ void aclk_send_alarm_checkpoint(char *node_id, char *claim_id __maybe_unused)
     log_access("ACLK REQ [%s (%s)]: ALERTS CHECKPOINT REQUEST RECEIVED", node_id, rrdhost_hostname(host));
 
     wc->alert_checkpoint_req = SEND_CHECKPOINT_AFTER_HEALTH_LOOPS;
+#endif
 }
+
+#ifdef ENABLE_ACLK
 
 typedef struct active_alerts {
     char *name;
@@ -1110,5 +1112,5 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
     }
     wc->alert_checkpoint_req = 0;
     buffer_free(alarms_to_hash);
-#endif
 }
+#endif
