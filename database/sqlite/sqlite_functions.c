@@ -329,9 +329,16 @@ int sqlite_init_databases(db_check_action_type_t mode, bool memory_mode)
         info("Skipping SQLITE aclk initialization since memory mode is not dbengine");
     }
 
+    if (unlikely(sql_init_label_database(memory_mode))) {
+        error_report("Failed to initialize label metadata database");
+    }
+
     if (unlikely(sql_init_context_database(memory_mode))) {
         error_report("Failed to initialize context metadata database");
     }
+
+    if (attach_database(db_meta, "netdata-label.db", "label"))
+        return 1;
 
 #ifdef ENABLE_ACLK
     if (attach_database(db_meta, "netdata-aclk.db", "aclk"))
@@ -352,6 +359,7 @@ void sqlite_close_databases(void)
     add_stmt_to_list(NULL);
 
     sql_close_database(db_context_meta, "CONTEXT");
+    sql_close_database(db_label_meta, "LABEL");
     sql_close_database(db_health,"HEALTH");
     sql_close_database(db_aclk, "ACLK");
     sql_close_database(db_meta,"METADATA");

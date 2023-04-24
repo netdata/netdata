@@ -1526,6 +1526,7 @@ void store_metric_collection_completed(void);
 #include "database/engine/rrdengineapi.h"
 #endif
 #include "sqlite/sqlite_functions.h"
+#include "sqlite/sqlite_label.h"
 #include "sqlite/sqlite_context.h"
 #include "sqlite/sqlite_metadata.h"
 #include "sqlite/sqlite_aclk.h"

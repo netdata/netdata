@@ -290,6 +290,37 @@ static int do_health_migration_v1_v2(sqlite3 *database, const char *name)
     return 0;
 }
 
+static int do_label_migration_v1_v2(sqlite3 *database, const char *name)
+{
+    UNUSED(name);
+    info("Running label migration %s", name);
+    int rc;
+
+    rc = db_execute(database, "INSERT OR REPLACE INTO chart_label SELECT * FROM meta.chart_label;");
+    if (rc == SQLITE_OK) {
+        rc = db_execute(database, "DROP TABLE IF EXISTS meta.chart_label;");
+        if (rc != SQLITE_OK)
+             error_report("Failed to drop meta.chart_label table, rc = %d", rc);
+    }
+    else
+        error_report("Failed to copy chart_label table, rc = %d", rc);
+
+    rc = db_execute(database, "INSERT OR REPLACE INTO host_label SELECT * FROM meta.host_label;");
+    if (rc == SQLITE_OK) {
+        rc = db_execute(database, "DROP TABLE IF EXISTS meta.host_label;");
+        if (rc != SQLITE_OK)
+             error_report("Failed to drop meta.host_label table, rc = %d", rc);
+    }
+    else
+        error_report("Failed to copy host_label table, rc = %d", rc);
+
+    rc = db_execute(database, "VACUUM meta");
+    if (rc != SQLITE_OK)
+        error_report("Failed to vacuum netdata-meta.db, rc = %d", rc);
+
+    return 0;
+}
+
 
 static int do_migration_noop(sqlite3 *database, const char *name)
 {
@@ -365,6 +396,14 @@ DATABASE_FUNC_MIGRATION_LIST aclk_migration_action[] = {
     {.name = NULL, .func = NULL}
 };
 
+DATABASE_FUNC_MIGRATION_LIST label_migration_action[] = {
+    {.name = "v0 to v1",  .func = do_migration_noop},
+    {.name = "v1 to v2",  .func = do_label_migration_v1_v2},
+    // the terminator of this array
+    {.name = NULL, .func = NULL}
+};
+
+
 int perform_database_migration(sqlite3 *database, int target_version)
 {
     return migrate_database(database, target_version, "metadata", metadata_migration_action);
@@ -383,4 +422,9 @@ int perform_health_database_migration(sqlite3 *database, int target_version)
 int perform_aclk_database_migration(sqlite3 *database, int target_version)
 {
     return migrate_database(database, target_version, "aclk", aclk_migration_action);
+}
+
+int perform_label_database_migration(sqlite3 *database, int target_version)
+{
+    return migrate_database(database, target_version, "label", label_migration_action);
 }

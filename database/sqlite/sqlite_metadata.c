@@ -26,14 +26,9 @@ const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS metadata_migration(filename text, file_size, date_created int);",
     "CREATE INDEX IF NOT EXISTS ind_d2 on dimension (chart_id);",
     "CREATE INDEX IF NOT EXISTS ind_c3 on chart (host_id);",
-    "CREATE TABLE IF NOT EXISTS chart_label(chart_id blob, source_type int, label_key text, "
-    "label_value text, date_created int, PRIMARY KEY (chart_id, label_key));",
 
     "CREATE TABLE IF NOT EXISTS host_info(host_id blob, system_key text NOT NULL, system_value text NOT NULL, "
     "date_created INT, PRIMARY KEY(host_id, system_key));",
-
-    "CREATE TABLE IF NOT EXISTS host_label(host_id blob, source_type int, label_key text NOT NULL, "
-    "label_value text NOT NULL, date_created INT, PRIMARY KEY (host_id, label_key));",
 
     NULL
 };
@@ -41,7 +36,6 @@ const char *database_config[] = {
 const char *database_cleanup[] = {
     "DELETE FROM host WHERE host_id NOT IN (SELECT host_id FROM chart);",
     "DELETE FROM host_info WHERE host_id NOT IN (SELECT host_id FROM host);",
-    "DELETE FROM host_label WHERE host_id NOT IN (SELECT host_id FROM host);",
     "DROP TABLE IF EXISTS alert_hash;",
     "DROP TRIGGER IF EXISTS tr_dim_del;",
     "DROP INDEX IF EXISTS ind_d1;",
@@ -142,7 +136,7 @@ int init_database_batch(sqlite3 *database, const char *batch[])
 }
 
 // SQLITE user defined function
-static void sqlite_uuid_parse(sqlite3_context *context, int argc, sqlite3_value **argv)
+void sqlite_uuid_parse(sqlite3_context *context, int argc, sqlite3_value **argv)
 {
     uuid_t  uuid;
 
@@ -494,12 +488,12 @@ static void clean_old_chart_labels(RRDSET *st)
     else
         snprintfz(sql, 511,SQL_DELETE_CHART_LABEL_HISTORY, first_time_s);
 
-    int rc = exec_statement_with_uuid(db_meta, sql, &st->chart_uuid);
+    int rc = exec_statement_with_uuid(db_label_meta, sql, &st->chart_uuid);
     if (unlikely(rc))
         error_report("METADATA: 'host:%s' Failed to clean old labels for chart %s", rrdhost_hostname(st->rrdhost), rrdset_name(st));
 }
 
-static int check_and_update_chart_labels(RRDSET *st, BUFFER *work_buffer, size_t *query_counter)
+static int check_and_update_chart_labels(RRDSET *st, BUFFER *work_buffer, size_t *query_counter, bool use_transaction)
 {
     size_t old_version = st->rrdlabels_last_saved_version;
     size_t new_version = dictionary_version(st->rrdlabels);
@@ -507,17 +501,23 @@ static int check_and_update_chart_labels(RRDSET *st, BUFFER *work_buffer, size_t
     if (new_version == old_version)
         return 0;
 
+    if (use_transaction)
+        (void)db_execute(db_label_meta, "BEGIN TRANSACTION;");
+
     struct query_build tmp = {.sql = work_buffer, .count = 0};
     uuid_unparse_lower(st->chart_uuid, tmp.uuid_str);
     rrdlabels_walkthrough_read(st->rrdlabels, chart_label_store_to_sql_callback, &tmp);
-    int rc = db_execute(db_meta, buffer_tostring(work_buffer));
+    int rc = db_execute(db_label_meta, buffer_tostring(work_buffer));
     if (likely(!rc)) {
         st->rrdlabels_last_saved_version = new_version;
-        db_execute(db_meta, buffer_tostring(work_buffer));
+        db_execute(db_label_meta, buffer_tostring(work_buffer));
         (*query_counter)++;
     }
 
     clean_old_chart_labels(st);
+
+    if (use_transaction)
+        (void)db_execute(db_label_meta, "COMMIT TRANSACTION;");
     return rc;
 }
 
@@ -1401,7 +1401,7 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count, bool use_trans
             scan_count++;
 
             buffer_flush(work_buffer);
-            rc = check_and_update_chart_labels(st, work_buffer, query_counter);
+            rc = check_and_update_chart_labels(st, work_buffer, query_counter, use_transaction);
             if (unlikely(rc))
                 error_report("METADATA: 'host:%s': Failed to update labels for chart %s", rrdhost_hostname(host), rrdset_name(st));
             else
@@ -1505,7 +1505,11 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_LABELS))) {
             rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_LABELS);
 
-            int rc = exec_statement_with_uuid(db_meta, SQL_DELETE_HOST_LABELS, &host->host_uuid);
+
+            if (transaction_started)
+                db_execute(db_label_meta, "BEGIN TRANSACTION;");
+
+            int rc = exec_statement_with_uuid(db_label_meta, SQL_DELETE_HOST_LABELS, &host->host_uuid);
             if (likely(!rc)) {
                 query_counter++;
 
@@ -1513,7 +1517,7 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
                 struct query_build tmp = {.sql = work_buffer, .count = 0};
                 uuid_unparse_lower(host->host_uuid, tmp.uuid_str);
                 rrdlabels_walkthrough_read(host->rrdlabels, host_label_store_to_sql_callback, &tmp);
-                rc = db_execute(db_meta, buffer_tostring(work_buffer));
+                rc = db_execute(db_label_meta, buffer_tostring(work_buffer));
 
                 if (unlikely(rc)) {
                     error_report("METADATA: 'host:%s': failed to update metadata host labels", rrdhost_hostname(host));
@@ -1525,6 +1529,10 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
                 error_report("METADATA: 'host:%s': failed to delete old host labels", rrdhost_hostname(host));
                 rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
             }
+
+            if (transaction_started)
+                db_execute(db_label_meta, "COMMIT TRANSACTION;");
+
         }
 
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_CLAIMID))) {

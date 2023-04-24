@@ -58,6 +58,9 @@ int sql_init_context_database(int memory)
     if (attach_database(db_context_meta, memory ? NULL : "netdata-meta.db", "meta"))
         return 1;
 
+    if (attach_database(db_context_meta, memory ? NULL : "netdata-label.db", "label"))
+        return 1;
+
     if (init_database_batch(db_context_meta, &database_context_config[0]))
         return 1;
 
@@ -158,7 +161,7 @@ failed:
 }
 
 // LABEL LIST
-#define CTX_GET_LABEL_LIST  "SELECT l.label_key, l.label_value, l.source_type FROM meta.chart_label l WHERE l.chart_id = @id;"
+#define CTX_GET_LABEL_LIST  "SELECT l.label_key, l.label_value, l.source_type FROM label.chart_label l WHERE l.chart_id = @id;"
 void ctx_get_label_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_CLABEL_DATA *, void *), void *data)
 {
     int rc;

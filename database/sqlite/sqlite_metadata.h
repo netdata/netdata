@@ -28,4 +28,5 @@ void metadata_queue_load_host_context(RRDHOST *host);
 int sql_metadata_cache_stats(int op);
 // UNIT TEST
 int metadata_unittest(void);
+void sqlite_uuid_parse(sqlite3_context *context, int argc, sqlite3_value **argv);
 #endif //NETDATA_SQLITE_METADATA_H
