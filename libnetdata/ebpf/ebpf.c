@@ -441,7 +441,7 @@ void ebpf_update_stats(ebpf_plugin_stats_t *report, ebpf_module_t *em)
     report->threads++;
 
     // It is not necessary to report more information.
-    if (!em->enabled)
+    if (em->enabled != NETDATA_THREAD_EBPF_RUNNING)
         return;
 
     report->running++;

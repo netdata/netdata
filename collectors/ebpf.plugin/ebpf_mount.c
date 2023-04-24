@@ -18,8 +18,6 @@ struct config mount_config = { .first_section = NULL, .last_section = NULL, .mut
                                .index = {.avl_tree = { .root = NULL, .compar = appconfig_section_compare },
                                          .rwlock = AVL_LOCK_INITIALIZER } };
 
-static netdata_idx_t *mount_values = NULL;
-
 static netdata_idx_t mount_hash_values[NETDATA_MOUNT_END];
 
 netdata_ebpf_targets_t mount_targets[] = { {.name = "mount", .mode = EBPF_LOAD_TRAMPOLINE},
@@ -27,10 +25,6 @@ netdata_ebpf_targets_t mount_targets[] = { {.name = "mount", .mode = EBPF_LOAD_T
                                            {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 #ifdef LIBBPF_MAJOR_VERSION
-#include "includes/mount.skel.h" // BTF code
-
-static struct mount_bpf *bpf_obj = NULL;
-
 /*****************************************************************
  *
  *  BTF FUNCTIONS
@@ -228,18 +222,7 @@ static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_
 static void ebpf_mount_free(ebpf_module_t *em)
 {
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-
-    freez(mount_values);
-
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        mount_bpf__destroy(bpf_obj);
-#endif
-
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -269,6 +252,10 @@ static void ebpf_mount_exit(void *ptr)
  */
 static void ebpf_mount_read_global_table()
 {
+    static netdata_idx_t *mount_values = NULL;
+    if (!mount_values)
+        mount_values = callocz((size_t)ebpf_nprocs + 1, sizeof(netdata_idx_t));
+
     uint32_t idx;
     netdata_idx_t *val = mount_hash_values;
     netdata_idx_t *stored = mount_values;
@@ -311,7 +298,6 @@ static void ebpf_mount_send_data()
 */
 static void mount_collector(ebpf_module_t *em)
 {
-    mount_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
     memset(mount_hash_values, 0, sizeof(mount_hash_values));
 
     heartbeat_t hb;
@@ -390,17 +376,16 @@ static int ebpf_mount_load_bpf(ebpf_module_t *em)
     if (em->load & EBPF_LOAD_LEGACY) {
         em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
         if (!em->probe_links) {
-            em->enabled = CONFIG_BOOLEAN_NO;
             ret = -1;
         }
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else {
-        bpf_obj = mount_bpf__open();
-        if (!bpf_obj)
+        mount_bpf_obj = mount_bpf__open();
+        if (!mount_bpf_obj)
             ret = -1;
         else
-            ret = ebpf_mount_load_and_attach(bpf_obj, em);
+            ret = ebpf_mount_load_and_attach(mount_bpf_obj, em);
     }
 #endif
 
@@ -430,7 +415,6 @@ void *ebpf_mount_thread(void *ptr)
     ebpf_adjust_thread_load(em, default_btf);
 #endif
     if (ebpf_mount_load_bpf(em)) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endmount;
     }
 

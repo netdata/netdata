@@ -46,7 +46,7 @@ static void ebpf_mdflush_free(ebpf_module_t *em)
 {
     freez(mdflush_ebpf_vals);
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -247,24 +247,19 @@ void *ebpf_mdflush_thread(void *ptr)
 
     char *md_flush_request = ebpf_find_symbol("md_flush_request");
     if (!md_flush_request) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         error("Cannot monitor MD devices, because md is not loaded.");
-    }
-    freez(md_flush_request);
-
-    if (em->thread->enabled == NETDATA_THREAD_EBPF_STOPPED) {
         goto endmdflush;
     }
 
     em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
     if (!em->probe_links) {
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endmdflush;
     }
 
     mdflush_collector(em);
 
 endmdflush:
+    freez(md_flush_request);
     ebpf_update_disabled_plugin_stats(em);
 
     netdata_thread_cleanup_pop(1);

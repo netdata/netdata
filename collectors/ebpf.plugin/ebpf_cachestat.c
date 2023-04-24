@@ -3,12 +3,6 @@
 #include "ebpf.h"
 #include "ebpf_cachestat.h"
 
-// ----------------------------------------------------------------------------
-// ARAL vectors used to speed up processing
-ARAL *ebpf_aral_cachestat_pid = NULL;
-
-netdata_publish_cachestat_t **cachestat_pid;
-
 static char *cachestat_counter_dimension_name[NETDATA_CACHESTAT_END] = { "ratio", "dirty", "hit",
                                                                          "miss" };
 static netdata_syscall_stat_t cachestat_counter_aggregated_data[NETDATA_CACHESTAT_END];
@@ -50,10 +44,6 @@ static char *account_page[NETDATA_CACHESTAT_ACCOUNT_DIRTY_END] ={ "account_page_
                                                                   "__set_page_dirty", "__folio_mark_dirty"  };
 
 #ifdef LIBBPF_MAJOR_VERSION
-#include "includes/cachestat.skel.h" // BTF code
-
-static struct cachestat_bpf *bpf_obj = NULL;
-
 /**
  * Disable probe
  *
@@ -337,20 +327,14 @@ static inline int ebpf_cachestat_load_and_attach(struct cachestat_bpf *obj, ebpf
 static void ebpf_cachestat_free(ebpf_module_t *em)
 {
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPING;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
-
-    ebpf_cleanup_publish_syscall(cachestat_counter_publish_aggregated);
 
     freez(cachestat_vector);
     freez(cachestat_values);
 
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        cachestat_bpf__destroy(bpf_obj);
-#endif
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -366,46 +350,6 @@ static void ebpf_cachestat_exit(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     ebpf_cachestat_free(em);
-}
-
-/*****************************************************************
- *
- *  ARAL FUNCTIONS
- *
- *****************************************************************/
-
-/**
- * eBPF Cachestat Aral init
- *
- * Initiallize array allocator that will be used when integration with apps is enabled.
- */
-static inline void ebpf_cachestat_aral_init()
-{
-    ebpf_aral_cachestat_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_CACHESTAT_ARAL_NAME, sizeof(netdata_publish_cachestat_t));
-}
-
-/**
- * eBPF publish cachestat get
- *
- * Get a netdata_publish_cachestat_t entry to be used with a specific PID.
- *
- * @return it returns the address on success.
- */
-netdata_publish_cachestat_t *ebpf_publish_cachestat_get(void)
-{
-    netdata_publish_cachestat_t *target = aral_mallocz(ebpf_aral_cachestat_pid);
-    memset(target, 0, sizeof(netdata_publish_cachestat_t));
-    return target;
-}
-
-/**
- * eBPF cachestat release
- *
- * @param stat Release a target after usage.
- */
-void ebpf_cachestat_release(netdata_publish_cachestat_t *stat)
-{
-    aral_freez(ebpf_aral_cachestat_pid, stat);
 }
 
 /*****************************************************************
@@ -1282,11 +1226,11 @@ static int ebpf_cachestat_load_bpf(ebpf_module_t *em)
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else {
-        bpf_obj = cachestat_bpf__open();
-        if (!bpf_obj)
+        cachestat_bpf_obj = cachestat_bpf__open();
+        if (!cachestat_bpf_obj)
             ret = -1;
         else
-            ret = ebpf_cachestat_load_and_attach(bpf_obj, em);
+            ret = ebpf_cachestat_load_and_attach(cachestat_bpf_obj, em);
     }
 #endif
 
@@ -1315,7 +1259,6 @@ void *ebpf_cachestat_thread(void *ptr)
     ebpf_update_pid_table(&cachestat_maps[NETDATA_CACHESTAT_PID_STATS], em);
 
     if (ebpf_cachestat_set_internal_value()) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endcachestat;
     }
 
@@ -1323,7 +1266,6 @@ void *ebpf_cachestat_thread(void *ptr)
     ebpf_adjust_thread_load(em, default_btf);
 #endif
     if (ebpf_cachestat_load_bpf(em)) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endcachestat;
     }
 

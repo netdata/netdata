@@ -187,15 +187,11 @@ void ebpf_hardirq_release(hardirq_val_t *stat)
  */
 static void ebpf_hardirq_free(ebpf_module_t *em)
 {
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-
     for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
         ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
     }
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -314,7 +310,9 @@ static int hardirq_parse_interrupts(char *irq_name, int irq)
  */
 static int hardirq_read_latency_map(int mapfd)
 {
-    hardirq_ebpf_static_val_t hardirq_ebpf_vals[ebpf_nprocs + 1];
+    static hardirq_ebpf_static_val_t *hardirq_ebpf_vals = NULL;
+    if (!hardirq_ebpf_vals)
+        hardirq_ebpf_vals = callocz(ebpf_nprocs + 1, sizeof(hardirq_ebpf_static_val_t));
 
     hardirq_ebpf_key_t key = {};
     hardirq_ebpf_key_t next_key = {};
@@ -390,7 +388,9 @@ static int hardirq_read_latency_map(int mapfd)
 
 static void hardirq_read_latency_static_map(int mapfd)
 {
-    hardirq_ebpf_static_val_t hardirq_ebpf_static_vals[ebpf_nprocs + 1];
+    static hardirq_ebpf_static_val_t *hardirq_ebpf_static_vals = NULL;
+    if (!hardirq_ebpf_static_vals)
+        hardirq_ebpf_static_vals = callocz(ebpf_nprocs + 1, sizeof(hardirq_ebpf_static_val_t));
 
     uint32_t i;
     for (i = 0; i < HARDIRQ_EBPF_STATIC_END; i++) {
@@ -489,9 +489,12 @@ static inline void hardirq_write_static_dims()
 
 /**
 * Main loop for this collector.
+ *
+ * @param em the main thread structure.
 */
 static void hardirq_collector(ebpf_module_t *em)
 {
+    memset(&hardirq_pub, 0, sizeof(hardirq_pub));
     avl_init_lock(&hardirq_pub, hardirq_val_cmp);
     ebpf_hardirq_aral_init();
 
@@ -549,13 +552,11 @@ void *ebpf_hardirq_thread(void *ptr)
     em->maps = hardirq_maps;
 
     if (ebpf_enable_tracepoints(hardirq_tracepoints) == 0) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endhardirq;
     }
 
     em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
     if (!em->probe_links) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endhardirq;
     }
 

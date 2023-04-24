@@ -3,10 +3,6 @@
 #include "ebpf.h"
 #include "ebpf_shm.h"
 
-// ----------------------------------------------------------------------------
-// ARAL vectors used to speed up processing
-ARAL *ebpf_aral_shm_pid = NULL;
-
 static char *shm_dimension_name[NETDATA_SHM_END] = { "get", "at", "dt", "ctl" };
 static netdata_syscall_stat_t shm_aggregated_data[NETDATA_SHM_END];
 static netdata_publish_syscall_t shm_publish_aggregated[NETDATA_SHM_END];
@@ -15,8 +11,6 @@ netdata_publish_shm_t *shm_vector = NULL;
 
 static netdata_idx_t shm_hash_values[NETDATA_SHM_END];
 static netdata_idx_t *shm_values = NULL;
-
-netdata_publish_shm_t **shm_pid = NULL;
 
 struct config shm_config = { .first_section = NULL,
     .last_section = NULL,
@@ -45,10 +39,6 @@ netdata_ebpf_targets_t shm_targets[] = { {.name = "shmget", .mode = EBPF_LOAD_TR
                                          {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 #ifdef LIBBPF_MAJOR_VERSION
-#include "includes/shm.skel.h"
-
-static struct shm_bpf *bpf_obj = NULL;
-
 /*****************************************************************
  *
  *  BTF FUNCTIONS
@@ -291,22 +281,11 @@ static inline int ebpf_shm_load_and_attach(struct shm_bpf *obj, ebpf_module_t *e
  */
 static void ebpf_shm_free(ebpf_module_t *em)
 {
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-
-    ebpf_cleanup_publish_syscall(shm_publish_aggregated);
-
     freez(shm_vector);
     freez(shm_values);
 
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        shm_bpf__destroy(bpf_obj);
-#endif
-
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -321,46 +300,6 @@ static void ebpf_shm_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     ebpf_shm_free(em);
-}
-
-/*****************************************************************
- *
- *  ARAL FUNCTIONS
- *
- *****************************************************************/
-
-/**
- * eBPF shared memory Aral init
- *
- * Initiallize array allocator that will be used when integration with apps is enabled.
- */
-static inline void ebpf_shm_aral_init()
-{
-    ebpf_aral_shm_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_SHM_ARAL_NAME, sizeof(netdata_publish_shm_t));
-}
-
-/**
- * eBPF shared memory get
- *
- * Get a netdata_publish_shm_t entry to be used with a specific PID.
- *
- * @return it returns the address on success.
- */
-netdata_publish_shm_t *ebpf_shm_stat_get(void)
-{
-    netdata_publish_shm_t *target = aral_mallocz(ebpf_aral_shm_pid);
-    memset(target, 0, sizeof(netdata_publish_shm_t));
-    return target;
-}
-
-/**
- * eBPF shared memory release
- *
- * @param stat Release a target after usage.
- */
-void ebpf_shm_release(netdata_publish_shm_t *stat)
-{
-    aral_freez(ebpf_aral_shm_pid, stat);
 }
 
 /*****************************************************************
@@ -1051,17 +990,16 @@ static int ebpf_shm_load_bpf(ebpf_module_t *em)
     if (em->load & EBPF_LOAD_LEGACY) {
         em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
         if (!em->probe_links) {
-            em->enabled = CONFIG_BOOLEAN_NO;
             ret = -1;
         }
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else {
-        bpf_obj = shm_bpf__open();
-        if (!bpf_obj)
+        shm_bpf_obj = shm_bpf__open();
+        if (!shm_bpf_obj)
             ret = -1;
         else
-            ret = ebpf_shm_load_and_attach(bpf_obj, em);
+            ret = ebpf_shm_load_and_attach(shm_bpf_obj, em);
     }
 #endif
 
@@ -1091,7 +1029,6 @@ void *ebpf_shm_thread(void *ptr)
     ebpf_adjust_thread_load(em, default_btf);
 #endif
     if (ebpf_shm_load_bpf(em)) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endshm;
     }
 

@@ -3,16 +3,11 @@
 #include "ebpf.h"
 #include "ebpf_dcstat.h"
 
-// ----------------------------------------------------------------------------
-// ARAL vectors used to speed up processing
-ARAL *ebpf_aral_dcstat_pid = NULL;
-
 static char *dcstat_counter_dimension_name[NETDATA_DCSTAT_IDX_END] = { "ratio", "reference", "slow", "miss" };
 static netdata_syscall_stat_t dcstat_counter_aggregated_data[NETDATA_DCSTAT_IDX_END];
 static netdata_publish_syscall_t dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_END];
 
 netdata_dcstat_pid_t *dcstat_vector = NULL;
-netdata_publish_dcstat_t **dcstat_pid = NULL;
 
 static netdata_idx_t dcstat_hash_values[NETDATA_DCSTAT_IDX_END];
 static netdata_idx_t *dcstat_values = NULL;
@@ -49,10 +44,6 @@ netdata_ebpf_targets_t dc_targets[] = { {.name = "lookup_fast", .mode = EBPF_LOA
                                         {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 #ifdef LIBBPF_MAJOR_VERSION
-#include "includes/dc.skel.h" // BTF code
-
-static struct dc_bpf *bpf_obj = NULL;
-
 /**
  * Disable probe
  *
@@ -298,23 +289,16 @@ void ebpf_dcstat_clean_names()
 static void ebpf_dcstat_free(ebpf_module_t *em )
 {
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPING;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     freez(dcstat_vector);
     freez(dcstat_values);
 
-    ebpf_cleanup_publish_syscall(dcstat_counter_publish_aggregated);
-
     ebpf_dcstat_clean_names();
 
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        dc_bpf__destroy(bpf_obj);
-#endif
-
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -329,46 +313,6 @@ static void ebpf_dcstat_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     ebpf_dcstat_free(em);
-}
-
-/*****************************************************************
- *
- *  ARAL FUNCTIONS
- *
- *****************************************************************/
-
-/**
- * eBPF directory cache Aral init
- *
- * Initiallize array allocator that will be used when integration with apps is enabled.
- */
-static inline void ebpf_dcstat_aral_init()
-{
-    ebpf_aral_dcstat_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_DCSTAT_ARAL_NAME, sizeof(netdata_publish_dcstat_t));
-}
-
-/**
- * eBPF publish dcstat get
- *
- * Get a netdata_publish_dcstat_t entry to be used with a specific PID.
- *
- * @return it returns the address on success.
- */
-netdata_publish_dcstat_t *ebpf_publish_dcstat_get(void)
-{
-    netdata_publish_dcstat_t *target = aral_mallocz(ebpf_aral_dcstat_pid);
-    memset(target, 0, sizeof(netdata_publish_dcstat_t));
-    return target;
-}
-
-/**
- * eBPF dcstat release
- *
- * @param stat Release a target after usage.
- */
-void ebpf_dcstat_release(netdata_publish_dcstat_t *stat)
-{
-    aral_freez(ebpf_aral_dcstat_pid, stat);
 }
 
 /*****************************************************************
@@ -1150,11 +1094,11 @@ static int ebpf_dcstat_load_bpf(ebpf_module_t *em)
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else {
-        bpf_obj = dc_bpf__open();
-        if (!bpf_obj)
+        dc_bpf_obj = dc_bpf__open();
+        if (!dc_bpf_obj)
             ret = -1;
         else
-            ret = ebpf_dc_load_and_attach(bpf_obj, em);
+            ret = ebpf_dc_load_and_attach(dc_bpf_obj, em);
     }
 #endif
 
@@ -1188,7 +1132,6 @@ void *ebpf_dcstat_thread(void *ptr)
     ebpf_adjust_thread_load(em, default_btf);
 #endif
     if (ebpf_dcstat_load_bpf(em)) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto enddcstat;
     }
 

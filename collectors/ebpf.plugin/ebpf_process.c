@@ -42,8 +42,6 @@ static netdata_idx_t *process_hash_values = NULL;
 static netdata_syscall_stat_t process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_END];
 static netdata_publish_syscall_t process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_END];
 
-ebpf_process_stat_t **global_process_stats = NULL;
-
 int process_enabled = 0;
 bool publish_internal_metrics = true;
 
@@ -607,58 +605,6 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
     em->apps_charts |= NETDATA_EBPF_APPS_FLAG_CHART_CREATED;
 }
 
-/**
- * Create apps charts
- *
- * Call ebpf_create_chart to create the charts on apps submenu.
- *
- * @param root a pointer for the targets.
- */
-static void ebpf_create_apps_charts(struct ebpf_target *root)
-{
-    if (unlikely(!ebpf_all_pids))
-        return;
-
-    struct ebpf_target *w;
-    int newly_added = 0;
-
-    for (w = root; w; w = w->next) {
-        if (w->target)
-            continue;
-
-        if (unlikely(w->processes && (debug_enabled || w->debug_enabled))) {
-            struct ebpf_pid_on_target *pid_on_target;
-
-            fprintf(
-                stderr, "ebpf.plugin: target '%s' has aggregated %u process%s:", w->name, w->processes,
-                (w->processes == 1) ? "" : "es");
-
-            for (pid_on_target = w->root_pid; pid_on_target; pid_on_target = pid_on_target->next) {
-                fprintf(stderr, " %d", pid_on_target->pid);
-            }
-
-            fputc('\n', stderr);
-        }
-
-        if (!w->exposed && w->processes) {
-            newly_added++;
-            w->exposed = 1;
-            if (debug_enabled || w->debug_enabled)
-                debug_log_int("%s just added - regenerating charts.", w->name);
-        }
-    }
-
-    if (!newly_added)
-        return;
-
-    int counter;
-    for (counter = 0; ebpf_modules[counter].thread_name; counter++) {
-        ebpf_module_t *current = &ebpf_modules[counter];
-        if (current->enabled && current->apps_charts && current->apps_routine)
-            current->apps_routine(current, root);
-    }
-}
-
 /*****************************************************************
  *
  *  FUNCTIONS TO CLOSE THE THREAD
@@ -700,13 +646,13 @@ static void ebpf_process_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    ebpf_cleanup_publish_syscall(process_publish_aggregated);
     freez(process_hash_values);
 
     ebpf_process_disable_tracepoints();
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    process_pid_fd = -1;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -1033,8 +979,7 @@ void ebpf_process_update_cgroup_algorithm()
     int i;
     for (i = 0; i < NETDATA_KEY_PUBLISH_PROCESS_END; i++)  {
         netdata_publish_syscall_t *ptr = &process_publish_aggregated[i];
-        freez(ptr->algorithm);
-        ptr->algorithm = strdupz(ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
+        ptr->algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX];
     }
 }
 
@@ -1078,28 +1023,20 @@ static void process_collector(ebpf_module_t *em)
     heartbeat_init(&hb);
     int publish_global = em->global_charts;
     int cgroups = em->cgroup_charts;
+    pthread_mutex_lock(&ebpf_exit_cleanup);
     int thread_enabled = em->enabled;
+    process_pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
     if (cgroups)
         ebpf_process_update_cgroup_algorithm();
 
-    int update_apps_every = (int) EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT;
-    int pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
     int update_every = em->update_every;
     int counter = update_every - 1;
-    int update_apps_list = update_apps_every - 1;
     while (!ebpf_exit_plugin) {
         usec_t dt = heartbeat_next(&hb, USEC_PER_SEC);
         (void)dt;
         if (ebpf_exit_plugin)
             break;
-
-        pthread_mutex_lock(&collect_data_mutex);
-        if (++update_apps_list == update_apps_every) {
-            update_apps_list = 0;
-            cleanup_exited_pids();
-            collect_data_for_all_processes(pid_fd);
-        }
-        pthread_mutex_unlock(&collect_data_mutex);
 
         if (++counter == update_every) {
             counter = 0;
@@ -1109,7 +1046,6 @@ static void process_collector(ebpf_module_t *em)
             netdata_apps_integration_flags_t apps_enabled = em->apps_charts;
             pthread_mutex_lock(&collect_data_mutex);
 
-            ebpf_create_apps_charts(apps_groups_root_target);
             if (ebpf_all_pids_count > 0) {
                 if (cgroups && shm_ebpf_cgroup.header) {
                     ebpf_update_process_cgroup();
@@ -1119,7 +1055,7 @@ static void process_collector(ebpf_module_t *em)
             pthread_mutex_lock(&lock);
             ebpf_send_statistic_data();
 
-            if (thread_enabled) {
+            if (thread_enabled == NETDATA_THREAD_EBPF_RUNNING) {
                 if (publish_global) {
                     ebpf_process_send_data(em);
                 }
@@ -1244,10 +1180,12 @@ void *ebpf_process_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = process_maps;
 
+    pthread_mutex_lock(&ebpf_exit_cleanup);
     if (ebpf_process_enable_tracepoints()) {
-        em->enabled = em->global_charts = em->apps_charts = em->cgroup_charts =  CONFIG_BOOLEAN_NO;
+        em->enabled = em->global_charts = em->apps_charts = em->cgroup_charts = NETDATA_THREAD_EBPF_STOPPING;
     }
     process_enabled = em->enabled;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     pthread_mutex_lock(&lock);
     ebpf_process_allocate_global_vectors(NETDATA_KEY_PUBLISH_PROCESS_END);
@@ -1257,7 +1195,6 @@ void *ebpf_process_thread(void *ptr)
     set_local_pointers();
     em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
     if (!em->probe_links) {
-        em->enabled = CONFIG_BOOLEAN_NO;
         pthread_mutex_unlock(&lock);
         goto endprocess;
     }
@@ -1270,7 +1207,7 @@ void *ebpf_process_thread(void *ptr)
         process_aggregated_data, process_publish_aggregated, process_dimension_names, process_id_names,
         algorithms, NETDATA_KEY_PUBLISH_PROCESS_END);
 
-    if (process_enabled) {
+    if (process_enabled == NETDATA_THREAD_EBPF_RUNNING) {
         ebpf_create_global_charts(em);
     }
 
@@ -1289,8 +1226,10 @@ void *ebpf_process_thread(void *ptr)
     process_collector(em);
 
 endprocess:
-    if (!em->enabled)
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    if (em->enabled == NETDATA_THREAD_EBPF_RUNNING)
         ebpf_update_disabled_plugin_stats(em);
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     netdata_thread_cleanup_pop(1);
     return NULL;
