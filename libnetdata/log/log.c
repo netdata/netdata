@@ -634,7 +634,7 @@ int error_log_limit(int reset) {
     static time_t start = 0;
     static unsigned long counter = 0, prevented = 0;
 
-    FILE *fp = (!stderror) ? stderr : stderror;
+    FILE *fp = stderror;
 
     // fprintf(fp, "FLOOD: counter=%lu, allowed=%lu, backup=%lu, period=%llu\n", counter, error_log_errors_per_period, error_log_errors_per_period_backup, (unsigned long long)error_log_throttle_period);
 
@@ -781,7 +781,7 @@ void debug_int( const char *file, const char *function, const unsigned long line
 void info_int( int is_collector, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... )
 {
     va_list args;
-    FILE *fp = (is_collector || !stderror) ? stderr : stderror;
+    FILE *fp = (is_collector) ? stderr : stderror;
 
     log_lock();
 
@@ -841,7 +841,7 @@ static const char *strerror_result_string(const char *a, const char *b) { (void)
 #endif
 
 void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
-    FILE *fp = (!stderror) ? stderr : stderror;
+    FILE *fp = stderror;
 
     if(erl->sleep_ut)
         sleep_usec(erl->sleep_ut);
@@ -910,7 +910,7 @@ void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __ma
 void error_int(int is_collector, const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
     // save a copy of errno - just in case this function generates a new error
     int __errno = errno;
-    FILE *fp = (is_collector || !stderror) ? stderr : stderror;
+    FILE *fp = (is_collector) ? stderr : stderror;
 
     va_list args;
 
@@ -975,7 +975,7 @@ static void print_call_stack(void) {
 #endif
 
 void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
-    FILE *fp = (!stderror) ? stderr : stderror;
+    FILE *fp = stderror;
 
     // save a copy of errno - just in case this function generates a new error
     int __errno = errno;
