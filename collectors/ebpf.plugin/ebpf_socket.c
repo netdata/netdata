@@ -2175,6 +2175,7 @@ void *ebpf_socket_read_hash(void *ptr)
     heartbeat_init(&hb);
     int fd_ipv4 = socket_maps[NETDATA_SOCKET_TABLE_IPV4].map_fd;
     int fd_ipv6 = socket_maps[NETDATA_SOCKET_TABLE_IPV6].map_fd;
+    int maps_per_core = em->maps_per_core;
     // This thread is cancelled from another thread
     for (;;) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
