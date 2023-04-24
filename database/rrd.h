@@ -1260,6 +1260,10 @@ extern RRDHOST *localhost;
 extern DICTIONARY *rrdhost_root_index;
 size_t rrdhost_hosts_available(void);
 
+RRDHOST_ACQUIRED *rrdhost_find_and_acquire(const char *machine_guid);
+RRDHOST *rrdhost_acquired_to_rrdhost(RRDHOST_ACQUIRED *rha);
+void rrdhost_acquired_release(RRDHOST_ACQUIRED *rha);
+
 // ----------------------------------------------------------------------------
 
 #define rrdhost_foreach_read(var) \
