@@ -16,7 +16,7 @@ If you plan to put the dashboard on TV, check out
 [tv.html](http://netdata.firehol.org/tv.html). Here's is a screenshot of it,
 monitoring two servers on the same page:
 
-<img width="954" alt="image" src="https://user-images.githubusercontent.com/43294513/233790352-2780fd51-3293-49fe-8ad9-30ad9a362c60.png">
+<img width="954" alt="image" src="https://user-images.githubusercontent.com/43294513/233790352-2780fd51-3293-49fe-8ad9-30ad9a362c60.png"/>
 
 
 
