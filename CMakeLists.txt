@@ -1259,6 +1259,7 @@ set(ACLK_PROTO_DEFS
         aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto
         aclk/aclk-schemas/proto/context/v1/context.proto
         aclk/aclk-schemas/proto/context/v1/stream.proto
+        aclk/aclk-schemas/proto/agent/v1/cmds.proto
         )
 PROTOBUF_ACLK_GENERATE_CPP(ACLK_PROTO_BUILT_SRCS ACLK_PROTO_BUILT_HDRS ${ACLK_PROTO_DEFS})
 
