@@ -582,9 +582,7 @@ void reopen_all_log_files() {
         open_log_file(STDERR_FILENO, stderr, stdcollector_filename, &collector_log_syslog, 0, NULL);
 
     if(stderr_filename) {
-        log_lock();
         stderror = open_log_file(stdcollector_fd, stderror, stderr_filename, &error_log_syslog, 1, &stdcollector_fd);
-        log_unlock();
     }
 
 #ifdef ENABLE_ACLK
