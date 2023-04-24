@@ -606,9 +606,7 @@ void open_all_log_files() {
     open_log_file(STDOUT_FILENO, stdout, stdout_filename, &output_log_syslog, 0, NULL);
     open_log_file(STDERR_FILENO, stderr, stdcollector_filename, &collector_log_syslog, 0, NULL);
 
-    log_lock();
     stderror = open_log_file(stdcollector_fd, NULL, stderr_filename, &error_log_syslog, 1, &stdcollector_fd);
-    log_unlock();
 
 #ifdef ENABLE_ACLK
     if(aclklog_enabled)
