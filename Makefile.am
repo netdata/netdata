@@ -726,6 +726,8 @@ ACLK_FILES = \
     aclk/schema-wrappers/context_stream.h \
     aclk/schema-wrappers/context.cc \
     aclk/schema-wrappers/context.h \
+    aclk/schema-wrappers/agent_cmds.cc \
+    aclk/schema-wrappers/agent_cmds.h \
     $(NULL)
 
 noinst_LIBRARIES += libmqttwebsockets.a
