@@ -2585,6 +2585,7 @@ int main(int argc, char **argv)
     heartbeat_init(&hb);
     int update_apps_every = (int) EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT;
     int update_apps_list = update_apps_every - 1;
+    int process_maps_per_core = ebpf_modules[EBPF_MODULE_PROCESS_IDX].maps_per_core;
     //Plugin will be killed when it receives a signal
     while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
@@ -2595,7 +2596,7 @@ int main(int argc, char **argv)
             if (++update_apps_list == update_apps_every) {
                 update_apps_list = 0;
                 cleanup_exited_pids();
-                collect_data_for_all_processes(process_pid_fd);
+                collect_data_for_all_processes(process_pid_fd, process_maps_per_core);
 
                 pthread_mutex_lock(&lock);
                 ebpf_create_apps_charts(apps_groups_root_target);
@@ -2610,3 +2611,4 @@ int main(int argc, char **argv)
 
     return 0;
 }
+
