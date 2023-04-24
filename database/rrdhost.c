@@ -79,7 +79,7 @@ static inline void rrdhost_init() {
 }
 
 RRDHOST_ACQUIRED *rrdhost_find_and_acquire(const char *machine_guid) {
-    debug(D_RRD_CALLS, "rrdhost_find_and_acquire() host %s", id);
+    debug(D_RRD_CALLS, "rrdhost_find_and_acquire() host %s", machine_guid);
 
     return (RRDHOST_ACQUIRED *)dictionary_get_and_acquire_item(rrdhost_root_index, machine_guid);
 }
