@@ -446,6 +446,20 @@ int stop_streaming_contexts(const char *msg, size_t msg_len)
     return 0;
 }
 
+int cancel_pending_req(const char *msg, size_t msg_len)
+{
+    struct aclk_cancel_pending_req cmd;
+    if(parse_cancel_pending_req(msg, msg_len, &cmd)) {
+        error_report("Error parsing CancelPendingReq");
+        return 1;
+    }
+
+    // TODO: add to list of cancellations
+
+    free_cancel_pending_req(&cmd);
+    return 0;
+}
+
 typedef struct {
     const char *name;
     simple_hash_t name_hash;
@@ -466,6 +480,7 @@ new_cloud_rx_msg_t rx_msgs[] = {
     { .name = "DisconnectReq",             .name_hash = 0, .fnc = handle_disconnect_req        },
     { .name = "ContextsCheckpoint",        .name_hash = 0, .fnc = contexts_checkpoint          },
     { .name = "StopStreamingContexts",     .name_hash = 0, .fnc = stop_streaming_contexts      },
+    { .name = "CancelPendingRequest",      .name_hash = 0, .fnc = cancel_pending_req           },
     { .name = NULL,                        .name_hash = 0, .fnc = NULL                         },
 };
 
