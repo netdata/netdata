@@ -693,12 +693,13 @@ RRDHOST *rrdhost_find_or_create(
 
     RRDHOST *host = rrdhost_find_by_guid(guid);
     if (unlikely(host && host->rrd_memory_mode != mode && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) {
-        /* If a legacy memory mode instantiates all dbengine state must be discarded to avoid inconsistencies */
-        error("Archived host '%s' has memory mode '%s', but the wanted one is '%s'. Discarding archived state.",
-              rrdhost_hostname(host), rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
 
         if (likely(!archived && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)))
             return host;
+
+        /* If a legacy memory mode instantiates all dbengine state must be discarded to avoid inconsistencies */
+        error("Archived host '%s' has memory mode '%s', but the wanted one is '%s'. Discarding archived state.",
+              rrdhost_hostname(host), rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
 
         rrd_wrlock();
         rrdhost_free___while_having_rrd_wrlock(host, true);
