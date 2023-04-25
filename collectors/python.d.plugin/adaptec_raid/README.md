@@ -9,7 +9,7 @@ Executed commands:
 
 ## Metrics
 
-You can find the list of metrics this module provides at [metrics.csv](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/adaptec_raid/metrics.csv).
+See [metrics.csv](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/adaptec_raid/metrics.csv) for a list of metrics.
 
 ## Requirements
 
