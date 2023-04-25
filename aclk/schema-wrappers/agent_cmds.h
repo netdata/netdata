@@ -3,6 +3,8 @@
 #ifndef ACLK_SCHEMA_WRAPPERS_AGENT_CMDS_H
 #define ACLK_SCHEMA_WRAPPERS_AGENT_CMDS_H
 
+#include "libnetdata/libnetdata.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

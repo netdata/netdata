@@ -4,8 +4,6 @@
 
 #include "agent_cmds.h"
 
-#include "libnetdata/libnetdata.h"
-
 #include "schema_wrapper_utils.h"
 
 using namespace agent::v1;
