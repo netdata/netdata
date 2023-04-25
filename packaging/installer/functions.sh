@@ -919,7 +919,7 @@ portable_add_user() {
 
   # Check if user exists
   if command -v getent > /dev/null 2>&1; then
-    if ! getent passwd "${username}" > /dev/null 2>&1; then
+    if getent passwd "${username}" > /dev/null 2>&1; then
         echo >&2 "User '${username}' already exists."
         return 0
     fi
