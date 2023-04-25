@@ -1,62 +1,15 @@
-<!--
-title: "ISC Bind monitoring with Netdata"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/bind_rndc/README.md"
-sidebar_label: "ISC Bind"
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Integrations/Monitor/Webapps"
--->
-
 # ISC Bind collector
 
 Collects Name server summary performance statistics using `rndc` tool.
+
+## Metrics
+
+See [metrics.csv](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/bind_rndc/metrics.csv) for a list of metrics.
 
 ## Requirements
 
 -   Version of bind must be 9.6 +
 -   Netdata must have permissions to run `rndc stats`
-
-It produces:
-
-1.  **Name server statistics**
-
-    -   requests
-    -   responses
-    -   success
-    -   auth_answer
-    -   nonauth_answer
-    -   nxrrset
-    -   failure
-    -   nxdomain
-    -   recursion
-    -   duplicate
-    -   rejections
-
-2.  **Incoming queries**
-
-    -   RESERVED0
-    -   A
-    -   NS
-    -   CNAME
-    -   SOA
-    -   PTR
-    -   MX
-    -   TXT
-    -   X25
-    -   AAAA
-    -   SRV
-    -   NAPTR
-    -   A6
-    -   DS
-    -   RSIG
-    -   DNSKEY
-    -   SPF
-    -   ANY
-    -   DLV
-
-3.  **Outgoing queries**
-
--   Same as Incoming queries
 
 ## Configuration
 

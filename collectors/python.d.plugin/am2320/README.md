@@ -1,12 +1,3 @@
-<!--
-title: "AM2320 sensor monitoring with netdata"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/am2320/README.md"
-sidebar_label: "AM2320"
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Integrations/Monitor/Remotes/Devices"
--->
-
 # AM2320 sensor monitoring with netdata
 
 Displays a graph of the temperature and humidity from a AM2320 sensor.
@@ -15,16 +6,10 @@ Displays a graph of the temperature and humidity from a AM2320 sensor.
 
 See [metrics.csv](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/am2320/metrics.csv) for a list of metrics.
 
-
 ## Requirements
  - Adafruit Circuit Python AM2320 library
  - Adafruit AM2320 I2C sensor
  - Python 3 (Adafruit libraries are not Python 2.x compatible)
- 
-
-It produces the following charts:
-1. **Temperature** 
-2. **Humidity**
 
 ## Configuration
 
