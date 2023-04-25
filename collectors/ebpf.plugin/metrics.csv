@@ -1,0 +1,220 @@
+/home/thiago/Netdata/netdata/collectors/ebpf.plugin/ebpf_fd.c
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+"type.NETDATA_SYSCALL_APPS_FILE_OPEN",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Number of open files",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SWAP
+"type.NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Fails to open files",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SWAP
+"type.NETDATA_SYSCALL_APPS_FILE_CLOSED",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Files closed",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SWAP
+"type.NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Fails to close files",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SWAP
+"services.NETDATA_SYSCALL_APPS_FILE_OPEN","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Number of open files",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,em->update_every
+"services.NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Fails to open files",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,em->update_every
+"services.NETDATA_SYSCALL_APPS_FILE_CLOSED","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Files closed",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,em->update_every
+"services.NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Fails to close files",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,em->update_every
+"apps.NETDATA_SYSCALL_APPS_FILE_OPEN","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Number of open files",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_PROCESS
+"apps.NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Fails to open files",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_PROCESS
+"apps.NETDATA_SYSCALL_APPS_FILE_CLOSED","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Files closed",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_PROCESS
+"apps.NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Fails to close files",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_PROCESS
+"NETDATA_FILESYSTEM_FAMILY.NETDATA_FILE_OPEN_CLOSE_COUNT",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Open and close calls",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_FD
+"NETDATA_FILESYSTEM_FAMILY.NETDATA_FILE_OPEN_ERR_COUNT",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Open fails",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_FD
+/home/thiago/Netdata/netdata/collectors/ebpf.plugin/ebpf_process.c
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+"NETDATA_EBPF_SYSTEM_GROUP.NETDATA_PROCESS_SYSCALL",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Start process",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_PROCESS
+"NETDATA_EBPF_SYSTEM_GROUP.NETDATA_EXIT_SYSCALL",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Exit process",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_PROCESS
+"NETDATA_EBPF_SYSTEM_GROUP.NETDATA_PROCESS_ERROR_NAME",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Fails to create process",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_PROCESS
+"apps.NETDATA_SYSCALL_APPS_TASK_PROCESS","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Process started",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_PROCESS
+"apps.NETDATA_SYSCALL_APPS_TASK_THREAD","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Threads started",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_PROCESS
+"apps.NETDATA_SYSCALL_APPS_TASK_EXIT","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Tasks starts exit process.",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_PROCESS
+"apps.NETDATA_SYSCALL_APPS_TASK_CLOSE","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Tasks closed",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_PROCESS
+"apps.NETDATA_SYSCALL_APPS_TASK_ERROR","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Errors to create process or threads.",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_PROCESS
+"type.NETDATA_SYSCALL_APPS_TASK_PROCESS",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Process started",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_PROCESS
+"type.NETDATA_SYSCALL_APPS_TASK_THREAD",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Threads started",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_PROCESS
+"type.NETDATA_SYSCALL_APPS_TASK_EXIT",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Tasks starts exit process.",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_PROCESS
+"type.NETDATA_SYSCALL_APPS_TASK_CLOSE",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Tasks closed",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_PROCESS
+"type.NETDATA_SYSCALL_APPS_TASK_ERROR",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Errors to create process or threads.",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_PROCESS
+"services.NETDATA_SYSCALL_APPS_TASK_PROCESS","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Process started",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,em->update_every
+"services.NETDATA_SYSCALL_APPS_TASK_THREAD","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Threads started",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,em->update_every
+"services.NETDATA_SYSCALL_APPS_TASK_CLOSE","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Tasks starts exit process.",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,em->update_every
+"services.NETDATA_SYSCALL_APPS_TASK_EXIT","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Tasks closed",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,em->update_every
+"services.NETDATA_SYSCALL_APPS_TASK_ERROR","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Errors to create process or threads.",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,em->update_every
+/home/thiago/Netdata/netdata/collectors/ebpf.plugin/ebpf_disk.c
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+"w->histogram.name.family",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Disk latency",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_DISK
+/home/thiago/Netdata/netdata/collectors/ebpf.plugin/ebpf_hardirq.c
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+"NETDATA_EBPF_SYSTEM_GROUP.hardirq_latency",scope,dimensions,EBPF_COMMON_DIMENSION_MILLISECONDS,"Hardware IRQ latency",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_HARDIRQ
+/home/thiago/Netdata/netdata/collectors/ebpf.plugin/ebpf_cachestat.c
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+"apps.NETDATA_CACHESTAT_HIT_RATIO_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_PERCENTAGE,"Hit ratio",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_CACHESTAT
+"apps.NETDATA_CACHESTAT_DIRTY_CHART","apps","apps group inside apps_group.conf",EBPF_CACHESTAT_DIMENSION_PAGE,"Number of dirty pages",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_CACHESTAT
+"apps.NETDATA_CACHESTAT_HIT_CHART","apps","apps group inside apps_group.conf",EBPF_CACHESTAT_DIMENSION_HITS,"Number of accessed files",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_CACHESTAT
+"apps.NETDATA_CACHESTAT_MISSES_CHART","apps","apps group inside apps_group.conf",EBPF_CACHESTAT_DIMENSION_MISSES,"Files out of page cache",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_CACHESTAT
+"services.NETDATA_CACHESTAT_HIT_RATIO_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_PERCENTAGE,"Hit ratio",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,update_every
+"services.NETDATA_CACHESTAT_DIRTY_CHART","apps","apps group inside apps_group.conf",EBPF_CACHESTAT_DIMENSION_PAGE,"Number of dirty pages",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,update_every
+"services.NETDATA_CACHESTAT_HIT_CHART","apps","apps group inside apps_group.conf",EBPF_CACHESTAT_DIMENSION_HITS,"Number of accessed files",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,update_every
+"services.NETDATA_CACHESTAT_MISSES_CHART","apps","apps group inside apps_group.conf",EBPF_CACHESTAT_DIMENSION_MISSES,"Files out of page cache",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,update_every
+"type.NETDATA_CACHESTAT_HIT_RATIO_CHART",scope,dimensions,EBPF_COMMON_DIMENSION_PERCENTAGE,"Hit ratio",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_CACHESTAT
+"type.NETDATA_CACHESTAT_DIRTY_CHART",scope,dimensions,EBPF_CACHESTAT_DIMENSION_PAGE,"Number of dirty pages",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_CACHESTAT
+"type.NETDATA_CACHESTAT_HIT_CHART",scope,dimensions,EBPF_CACHESTAT_DIMENSION_HITS,"Number of accessed files",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_CACHESTAT
+"type.NETDATA_CACHESTAT_MISSES_CHART",scope,dimensions,EBPF_CACHESTAT_DIMENSION_MISSES,"Files out of page cache",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_CACHESTAT
+"NETDATA_EBPF_MEMORY_GROUP.NETDATA_CACHESTAT_HIT_RATIO_CHART",scope,dimensions,EBPF_COMMON_DIMENSION_PERCENTAGE,"Hit ratio",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_CACHESTAT
+"NETDATA_EBPF_MEMORY_GROUP.NETDATA_CACHESTAT_DIRTY_CHART",scope,dimensions,EBPF_CACHESTAT_DIMENSION_PAGE,"Number of dirty pages",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_CACHESTAT
+"NETDATA_EBPF_MEMORY_GROUP.NETDATA_CACHESTAT_HIT_CHART",scope,dimensions,EBPF_CACHESTAT_DIMENSION_HITS,"Number of accessed files",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_CACHESTAT
+"NETDATA_EBPF_MEMORY_GROUP.NETDATA_CACHESTAT_MISSES_CHART",scope,dimensions,EBPF_CACHESTAT_DIMENSION_MISSES,"Files out of page cache",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_CACHESTAT
+/home/thiago/Netdata/netdata/collectors/ebpf.plugin/ebpf_mdflush.c
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+"mdstat.mdstat_flush",scope,dimensions,"flushes","MD flushes",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_MDFLUSH
+/home/thiago/Netdata/netdata/collectors/ebpf.plugin/ebpf_swap.c
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+"type.NETDATA_MEM_SWAP_READ_CHART",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Calls to function <code>swap_readpage</code>.",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SWAP
+"type.NETDATA_MEM_SWAP_WRITE_CHART",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Calls to function <code>swap_writepage</code>.",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SWAP
+"services.NETDATA_MEM_SWAP_READ_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls to <code>swap_readpage</code>.",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,update_every
+"services.NETDATA_MEM_SWAP_WRITE_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls to function <code>swap_writepage</code>.",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,update_every
+"apps.NETDATA_MEM_SWAP_READ_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls to function <code>swap_readpage</code>.",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SWAP
+"apps.NETDATA_MEM_SWAP_WRITE_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls to function <code>swap_writepage</code>.",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SWAP
+"NETDATA_EBPF_SYSTEM_GROUP.NETDATA_MEM_SWAP_CHART",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Calls to access swap memory",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SWAP
+/home/thiago/Netdata/netdata/collectors/ebpf.plugin/ebpf_oomkill.c
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+"type.NETDATA_OOMKILL_CHART",scope,dimensions,EBPF_COMMON_DIMENSION_KILLS,"OOM kills. This chart is provided by eBPF plugin.",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_OOMKILL
+"services.NETDATA_OOMKILL_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_KILLS,"OOM kills. This chart is provided by eBPF plugin.",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,update_every
+"apps.NETDATA_OOMKILL_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_KILLS,"OOM kills",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_OOMKILL
+/home/thiago/Netdata/netdata/collectors/ebpf.plugin/ebpf_socket.c
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+"NETDATA_EBPF_IP_FAMILY.NETDATA_INBOUND_CONNECTIONS",scope,dimensions,EBPF_COMMON_DIMENSION_CONNECTIONS,"Inbound connections.",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SOCKET
+"NETDATA_EBPF_IP_FAMILY.NETDATA_TCP_OUTBOUND_CONNECTIONS",scope,dimensions,EBPF_COMMON_DIMENSION_CONNECTIONS,"TCP outbound connections.",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SOCKET
+"NETDATA_EBPF_IP_FAMILY.NETDATA_TCP_FUNCTION_COUNT",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Calls to internal functions",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SOCKET
+"NETDATA_EBPF_IP_FAMILY.NETDATA_TCP_FUNCTION_BITS",scope,dimensions,EBPF_COMMON_DIMENSION_BITS,"TCP bandwidth",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SOCKET
+"NETDATA_EBPF_IP_FAMILY.NETDATA_TCP_FUNCTION_ERROR",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"TCP errors",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SOCKET
+"NETDATA_EBPF_IP_FAMILY.NETDATA_TCP_RETRANSMIT",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Packages retransmitted",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SOCKET
+"NETDATA_EBPF_IP_FAMILY.NETDATA_UDP_FUNCTION_COUNT",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"UDP calls",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SOCKET
+"NETDATA_EBPF_IP_FAMILY.NETDATA_UDP_FUNCTION_BITS",scope,dimensions,EBPF_COMMON_DIMENSION_BITS,"UDP bandwidth",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SOCKET
+"NETDATA_EBPF_IP_FAMILY.NETDATA_UDP_FUNCTION_ERROR",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"UDP errors",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SOCKET
+An invalid number of indexes 11 was found 
+['ebpf_create_charts_on_apps(', 'NETDATA_NET_APPS_CONNECTION_TCP_V4', '"Calls to tcp_v4_connection" EBPF_COMMON_DIMENSION_CONNECTIONS', 'NETDATA_APPS_NET_GROUP', 'NETDATA_EBPF_CHART_TYPE_STACKED', 'order++', 'ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]', 'root', 'em->update_every', 'NETDATA_EBPF_MODULE_NAME_SOCKET', ');']
+An invalid number of indexes 11 was found 
+['ebpf_create_charts_on_apps(', 'NETDATA_NET_APPS_CONNECTION_TCP_V6', '"Calls to tcp_v6_connection" EBPF_COMMON_DIMENSION_CONNECTIONS', 'NETDATA_APPS_NET_GROUP', 'NETDATA_EBPF_CHART_TYPE_STACKED', 'order++', 'ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]', 'root', 'em->update_every', 'NETDATA_EBPF_MODULE_NAME_SOCKET', ');']
+An invalid number of indexes 11 was found 
+['ebpf_create_charts_on_apps(', 'NETDATA_NET_APPS_BANDWIDTH_SENT', '"Bytes sent" EBPF_COMMON_DIMENSION_BITS', 'NETDATA_APPS_NET_GROUP', 'NETDATA_EBPF_CHART_TYPE_STACKED', 'order++', 'ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]', 'root', 'em->update_every', 'NETDATA_EBPF_MODULE_NAME_SOCKET', ');']
+An invalid number of indexes 11 was found 
+['ebpf_create_charts_on_apps(', 'NETDATA_NET_APPS_BANDWIDTH_RECV', '"bytes received" EBPF_COMMON_DIMENSION_BITS', 'NETDATA_APPS_NET_GROUP', 'NETDATA_EBPF_CHART_TYPE_STACKED', 'order++', 'ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]', 'root', 'em->update_every', 'NETDATA_EBPF_MODULE_NAME_SOCKET', ');']
+"apps.NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls for tcp_sendmsg",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SOCKET
+"apps.NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls for tcp_cleanup_rbuf",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SOCKET
+"apps.NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls for tcp_retransmit",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SOCKET
+"apps.NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls for udp_sendmsg",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SOCKET
+"apps.NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls for udp_recvmsg",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SOCKET
+"type.NETDATA_NET_APPS_CONNECTION_TCP_V4",scope,dimensions,EBPF_COMMON_DIMENSION_CONNECTIONS,"Calls to tcp_v4_connection",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SOCKET
+"type.NETDATA_NET_APPS_CONNECTION_TCP_V6",scope,dimensions,EBPF_COMMON_DIMENSION_CONNECTIONS,"Calls to tcp_v6_connection",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SOCKET
+"type.NETDATA_NET_APPS_BANDWIDTH_RECV",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Bytes received",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SOCKET
+"type.NETDATA_NET_APPS_BANDWIDTH_SENT",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Bytes sent",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SOCKET
+"type.NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Calls to tcp_cleanup_rbuf.",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SOCKET
+"type.NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Calls to tcp_sendmsg.",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SOCKET
+"type.NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Calls to tcp_retransmit.",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SOCKET
+"type.NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Calls to udp_sendmsg",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SOCKET
+"type.NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Calls to udp_recvmsg",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SOCKET
+"services.NETDATA_NET_APPS_CONNECTION_TCP_V4","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CONNECTIONS,"Calls to tcp_v4_connection",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,update_every
+"services.NETDATA_NET_APPS_CONNECTION_TCP_V6","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CONNECTIONS,"Calls to tcp_v6_connection",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,update_every
+"services.NETDATA_NET_APPS_BANDWIDTH_RECV","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_BITS,"Bytes received",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,update_every
+"services.NETDATA_NET_APPS_BANDWIDTH_SENT","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_BITS,"Bytes sent",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,update_every
+"services.NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls to tcp_cleanup_rbuf.",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,update_every
+"services.NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls to tcp_sendmsg.",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,update_every
+"services.NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls to tcp_retransmit",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,update_every
+"services.NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls to udp_sendmsg",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,update_every
+"services.NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls to udp_recvmsg",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,update_every
+/home/thiago/Netdata/netdata/collectors/ebpf.plugin/ebpf_dcstat.c
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+"apps.NETDATA_DC_HIT_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_PERCENTAGE,"Percentage of files inside directory cache",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_DCSTAT
+"apps.NETDATA_DC_REFERENCE_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_FILES,"Count file access",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_DCSTAT
+"apps.NETDATA_DC_REQUEST_NOT_CACHE_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_FILES,"Files not present inside directory cache",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_DCSTAT
+"apps.NETDATA_DC_REQUEST_NOT_FOUND_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_FILES,"Files not found",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_DCSTAT
+"type.NETDATA_DC_HIT_CHART",scope,dimensions,EBPF_COMMON_DIMENSION_PERCENTAGE,"Percentage of files inside directory cache",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_DCSTAT
+"type.NETDATA_DC_REFERENCE_CHART",scope,dimensions,EBPF_COMMON_DIMENSION_FILES,"Count file access",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_DCSTAT
+"type.NETDATA_DC_REQUEST_NOT_CACHE_CHART",scope,dimensions,EBPF_COMMON_DIMENSION_FILES,"Files not present inside directory cache",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_DCSTAT
+"type.NETDATA_DC_REQUEST_NOT_FOUND_CHART",scope,dimensions,EBPF_COMMON_DIMENSION_FILES,"Files not found",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_DCSTAT
+"services.NETDATA_DC_HIT_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_PERCENTAGE,"Percentage of files inside directory cache",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,update_every
+"services.NETDATA_DC_REFERENCE_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_FILES,"Count file access",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,update_every
+"services.NETDATA_DC_REQUEST_NOT_CACHE_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_FILES,"Files not present inside directory cache",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,update_every
+"services.NETDATA_DC_REQUEST_NOT_FOUND_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_FILES,"Files not found",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,update_every
+"NETDATA_FILESYSTEM_FAMILY.NETDATA_DC_HIT_CHART",scope,dimensions,EBPF_COMMON_DIMENSION_PERCENTAGE,"Percentage of files inside directory cache",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_DCSTAT
+"NETDATA_FILESYSTEM_FAMILY.NETDATA_DC_REFERENCE_CHART",scope,dimensions,EBPF_COMMON_DIMENSION_FILES,"Variables used to calculate hit ratio.",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_DCSTAT
+/home/thiago/Netdata/netdata/collectors/ebpf.plugin/ebpf_filesystem.c
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+"NETDATA_FILESYSTEM_FAMILY.efp->hread.name",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,title,NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_FILESYSTEM
+"NETDATA_FILESYSTEM_FAMILY.efp->hwrite.name",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,title,NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_FILESYSTEM
+An invalid number of indexes 14 was found 
+['ebpf_create_chart(', 'NETDATA_FILESYSTEM_FAMILY', 'efp->hopen.name', 'title', 'EBPF_COMMON_DIMENSION_CALL', 'family', 'NULL NETDATA_EBPF_CHART_TYPE_STACKED', 'order', 'ebpf_create_global_dimension', 'filesystem_publish_aggregated', 'NETDATA_EBPF_HIST_MAX_BINS', 'update_every', 'NETDATA_EBPF_MODULE_NAME_FILESYSTEM', ');']
+An invalid number of indexes 14 was found 
+['ebpf_create_chart(', 'NETDATA_FILESYSTEM_FAMILY', 'efp->hadditional.name', 'title', 'EBPF_COMMON_DIMENSION_CALL', 'family', 'NULL NETDATA_EBPF_CHART_TYPE_STACKED', 'order', 'ebpf_create_global_dimension', 'filesystem_publish_aggregated', 'NETDATA_EBPF_HIST_MAX_BINS', 'update_every', 'NETDATA_EBPF_MODULE_NAME_FILESYSTEM', ');']
+/home/thiago/Netdata/netdata/collectors/ebpf.plugin/ebpf_shm.c
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+"type.NETDATA_SHMGET_CHART",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Calls to syscall <code>shmget(2)</code>.",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SHM
+"type.NETDATA_SHMAT_CHART",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Calls to syscall <code>shmat(2)</code>.",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SHM
+"type.NETDATA_SHMDT_CHART",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Calls to syscall <code>shmdt(2)</code>.",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SHM
+"type.NETDATA_SHMCTL_CHART",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Calls to syscall <code>shmctl(2)</code>.",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SHM
+"services.NETDATA_SHMGET_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls to syscall <code>shmget(2)</code>.",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,update_every
+"services.NETDATA_SHMAT_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls to syscall <code>shmat(2)</code>.",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,update_every
+"services.NETDATA_SHMDT_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls to syscall <code>shmdt(2)</code>.",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,update_every
+"services.NETDATA_SHMCTL_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls to syscall <code>shmctl(2)</code>.",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,update_every
+"apps.NETDATA_SHMGET_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls to syscall <code>shmget(2)</code>.",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SHM
+"apps.NETDATA_SHMAT_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls to syscall <code>shmat(2)</code>.",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SHM
+"apps.NETDATA_SHMDT_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls to syscall <code>shmdt(2)</code>.",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SHM
+"apps.NETDATA_SHMCTL_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls to syscall <code>shmctl(2)</code>.",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SHM
+"NETDATA_EBPF_SYSTEM_GROUP.NETDATA_SHM_GLOBAL_CHART",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Calls to shared memory system calls",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SHM
+/home/thiago/Netdata/netdata/collectors/ebpf.plugin/ebpf_softirq.c
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+"NETDATA_EBPF_SYSTEM_GROUP.softirq_latency",scope,dimensions,EBPF_COMMON_DIMENSION_MILLISECONDS,"Software IRQ latency",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SOFTIRQ
+/home/thiago/Netdata/netdata/collectors/ebpf.plugin/ebpf_mount.c
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+"NETDATA_EBPF_MOUNT_GLOBAL_FAMILY.NETDATA_EBPF_MOUNT_CALLS",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Calls to mount and umount syscalls",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_MOUNT
+"NETDATA_EBPF_MOUNT_GLOBAL_FAMILY.NETDATA_EBPF_MOUNT_ERRORS",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Errors to mount and umount file systems",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_MOUNT
+/home/thiago/Netdata/netdata/collectors/ebpf.plugin/ebpf_vfs.c
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+"type.NETDATA_SYSCALL_APPS_FILE_DELETED",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Files deleted",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SWAP
+"type.NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Write to disk",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SWAP
+"type.NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Fails to write",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SWAP
+"type.NETDATA_SYSCALL_APPS_VFS_READ_CALLS",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Read from disk",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SWAP
+"type.NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Fails to read",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SWAP
+"type.NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES",scope,dimensions,EBPF_COMMON_DIMENSION_BYTES,"Bytes written on disk",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SWAP
+"type.NETDATA_SYSCALL_APPS_VFS_READ_BYTES",scope,dimensions,EBPF_COMMON_DIMENSION_BYTES,"Bytes read from disk",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SWAP
+"type.NETDATA_SYSCALL_APPS_VFS_FSYNC",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Calls for <code>vfs_fsync</code>",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SWAP
+"type.NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Sync error",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SWAP
+"type.NETDATA_SYSCALL_APPS_VFS_OPEN",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Calls for <code>vfs_open</code>",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SWAP
+"type.NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Open error",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SWAP
+"type.NETDATA_SYSCALL_APPS_VFS_CREATE",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Calls for <code>vfs_create</code>",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SWAP
+"type.NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Create error",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_SWAP
+"services.NETDATA_SYSCALL_APPS_FILE_DELETED","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Files deleted",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,em->update_every
+"services.NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Write to disk",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,em->update_every
+"services.NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Fails to write",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,em->update_every
+"services.NETDATA_SYSCALL_APPS_VFS_READ_CALLS","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Read from disk",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,em->update_every
+"services.NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Fails to read",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,em->update_every
+"services.NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_BYTES,"Bytes written on disk",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,em->update_every
+"services.NETDATA_SYSCALL_APPS_VFS_READ_BYTES","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_BYTES,"Bytes read from disk",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,em->update_every
+"services.NETDATA_SYSCALL_APPS_VFS_FSYNC","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls to <code>vfs_fsync</code>",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,em->update_every
+"services.NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Sync error",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,em->update_every
+"services.NETDATA_SYSCALL_APPS_VFS_OPEN","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls to <code>vfs_open</code>",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,em->update_every
+"services.NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Open error",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,em->update_every
+"services.NETDATA_SYSCALL_APPS_VFS_CREATE","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Calls to <code>vfs_create</code>",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,em->update_every
+"services.NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Create error",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,em->update_every
+"NETDATA_FILESYSTEM_FAMILY.NETDATA_VFS_FILE_CLEAN_COUNT",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Remove files",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_VFS
+"NETDATA_FILESYSTEM_FAMILY.NETDATA_VFS_FILE_IO_COUNT",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Calls to IO",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_VFS
+"NETDATA_FILESYSTEM_FAMILY.NETDATA_VFS_FILE_ERR_COUNT",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Fails to write or read",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_VFS
+"NETDATA_FILESYSTEM_FAMILY.NETDATA_VFS_FSYNC",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Calls for <code>vfs_fsync</code>",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_VFS
+"NETDATA_FILESYSTEM_FAMILY.NETDATA_VFS_FSYNC_ERR",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Fails to synchronize",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_VFS
+"NETDATA_FILESYSTEM_FAMILY.NETDATA_VFS_OPEN",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Calls for <code>vfs_open</code>",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_VFS
+"NETDATA_FILESYSTEM_FAMILY.NETDATA_VFS_OPEN_ERR",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Fails to open a file",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_VFS
+"NETDATA_FILESYSTEM_FAMILY.NETDATA_VFS_CREATE",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Calls for <code>vfs_create</code>",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_VFS
+"NETDATA_FILESYSTEM_FAMILY.NETDATA_VFS_CREATE_ERR",scope,dimensions,EBPF_COMMON_DIMENSION_CALL,"Fails to create a file.",NETDATA_EBPF_CHART_TYPE_LINE,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_VFS
+"apps.NETDATA_SYSCALL_APPS_FILE_DELETED","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Files deleted",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_VFS
+"apps.NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Write to disk",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_VFS
+"apps.NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Fails to write",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_VFS
+"apps.NETDATA_SYSCALL_APPS_VFS_READ_CALLS","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Read from disk",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_VFS
+"apps.NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Fails to read",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_VFS
+An invalid number of indexes 11 was found 
+['ebpf_create_charts_on_apps(', 'NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES', '"Bytes written on disk" EBPF_COMMON_DIMENSION_BYTES', 'NETDATA_VFS_GROUP', 'NETDATA_EBPF_CHART_TYPE_STACKED', '20070', 'ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]', 'root', 'em->update_every', 'NETDATA_EBPF_MODULE_NAME_VFS', ');']
+An invalid number of indexes 11 was found 
+['ebpf_create_charts_on_apps(', 'NETDATA_SYSCALL_APPS_VFS_READ_BYTES', '"Bytes read from disk" EBPF_COMMON_DIMENSION_BYTES', 'NETDATA_VFS_GROUP', 'NETDATA_EBPF_CHART_TYPE_STACKED', '20071', 'ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]', 'root', 'em->update_every', 'NETDATA_EBPF_MODULE_NAME_VFS', ');']
+An invalid number of indexes 11 was found 
+['ebpf_create_charts_on_apps(', 'NETDATA_SYSCALL_APPS_VFS_FSYNC', '"Calls for <code>vfs_fsync</code>" EBPF_COMMON_DIMENSION_CALL', 'NETDATA_VFS_GROUP', 'NETDATA_EBPF_CHART_TYPE_STACKED', '20072', 'ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]', 'root', 'em->update_every', 'NETDATA_EBPF_MODULE_NAME_VFS', ');']
+"apps.NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Sync error",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_VFS
+An invalid number of indexes 11 was found 
+['ebpf_create_charts_on_apps(', 'NETDATA_SYSCALL_APPS_VFS_OPEN', '"Calls for <code>vfs_open</code>" EBPF_COMMON_DIMENSION_CALL', 'NETDATA_VFS_GROUP', 'NETDATA_EBPF_CHART_TYPE_STACKED', '20074', 'ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]', 'root', 'em->update_every', 'NETDATA_EBPF_MODULE_NAME_VFS', ');']
+"apps.NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Open error",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_VFS
+An invalid number of indexes 11 was found 
+['ebpf_create_charts_on_apps(', 'NETDATA_SYSCALL_APPS_VFS_CREATE', '"Calls for <code>vfs_create</code>" EBPF_COMMON_DIMENSION_CALL', 'NETDATA_VFS_GROUP', 'NETDATA_EBPF_CHART_TYPE_STACKED', '20076', 'ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]', 'root', 'em->update_every', 'NETDATA_EBPF_MODULE_NAME_VFS', ');']
+"apps.NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_CALL,"Create error",NETDATA_EBPF_CHART_TYPE_STACKED,labels,ebpf.plugin,NETDATA_EBPF_MODULE_NAME_VFS
