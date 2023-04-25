@@ -68,6 +68,7 @@ enum metadata_opcode {
     METADATA_MAINTENANCE,
     METADATA_SYNC_SHUTDOWN,
     METADATA_UNITTEST,
+    METADATA_ML_LOAD_MODELS,
     // leave this last
     // we need it to check for worker utilization
     METADATA_MAX_ENUMERATIONS_DEFINED
@@ -1209,6 +1210,7 @@ static void metadata_event_loop(void *arg)
     worker_register_job_name(METADATA_STORE_CLAIM_ID,       "add claim id");
     worker_register_job_name(METADATA_ADD_HOST_INFO,        "add host info");
     worker_register_job_name(METADATA_MAINTENANCE,          "maintenance");
+    worker_register_job_name(METADATA_ML_LOAD_MODELS,       "ml load models");
 
     int ret;
     uv_loop_t *loop;
@@ -1289,6 +1291,11 @@ static void metadata_event_loop(void *arg)
                 case METADATA_DATABASE_TIMER:
                     break;
 
+                case METADATA_ML_LOAD_MODELS: {
+                    RRDDIM *rd = (RRDDIM *) cmd.param[0];
+                    ml_dimension_load_models(rd);
+                    break;
+                }
                 case METADATA_DEL_DIMENSION:
                     uuid = (uuid_t *) cmd.param[0];
                     if (likely(dimension_can_be_deleted(uuid)))
@@ -1512,6 +1519,13 @@ void metaqueue_host_update_info(RRDHOST *host)
     if (unlikely(!metasync_worker.loop))
         return;
     queue_metadata_cmd(METADATA_ADD_HOST_INFO, host, NULL);
+}
+
+void metaqueue_ml_load_models(RRDDIM *rd)
+{
+    if (unlikely(!metasync_worker.loop))
+        return;
+    queue_metadata_cmd(METADATA_ML_LOAD_MODELS, rd, NULL);
 }
 
 void metadata_queue_load_host_context(RRDHOST *host)

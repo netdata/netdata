@@ -45,7 +45,7 @@ void ml_config_load(ml_config_t *cfg) {
 
     size_t num_training_threads = config_get_number(config_section_ml, "num training threads", 4);
 
-    bool enable_statistics_charts = config_get_boolean(config_section_ml, "enable statistics charts", false);
+    bool enable_statistics_charts = config_get_boolean(config_section_ml, "enable statistics charts", true);
 
     /*
      * Clamp
@@ -87,9 +87,15 @@ void ml_config_load(ml_config_t *cfg) {
 
     cfg->enable_anomaly_detection = enable_anomaly_detection;
 
+#if 0
     cfg->max_train_samples = max_train_samples;
     cfg->min_train_samples = min_train_samples;
     cfg->train_every = train_every;
+ #else
+    cfg->max_train_samples = 60;
+    cfg->min_train_samples = 30;
+    cfg->train_every = 60;
+ #endif
 
     cfg->num_models_to_use = num_models_to_use;
 

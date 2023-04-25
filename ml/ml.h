@@ -36,6 +36,8 @@ void ml_dimension_new(RRDDIM *rd);
 void ml_dimension_delete(RRDDIM *rd);
 bool ml_dimension_is_anomalous(RRDDIM *rd, time_t curr_time, double value, bool exists);
 
+int ml_dimension_load_models(RRDDIM *rd);
+
 void ml_update_global_statistics_charts(uint64_t models_consulted);
 
 #ifdef __cplusplus
