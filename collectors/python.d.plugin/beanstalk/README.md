@@ -1,10 +1,15 @@
+<!--
+title: "Beanstalk monitoring with Netdata"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/beanstalk/README.md"
+sidebar_label: "Beanstalk"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Integrations/Monitor/Message brokers"
+-->
+
 # Beanstalk collector
 
 Provides server and tube-level statistics.
-
-## Metrics
-
-See [metrics.csv](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/beanstalk/metrics.csv) for a list of metrics.
 
 ## Requirements
 
@@ -148,4 +153,3 @@ Now you can manually run the `beanstalk` module in debug mode:
 ```bash
 ./python.d.plugin beanstalk debug trace
 ```
-
