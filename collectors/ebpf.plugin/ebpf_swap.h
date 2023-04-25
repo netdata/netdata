@@ -42,8 +42,6 @@ enum swap_counters {
     NETDATA_SWAP_END
 };
 
-extern netdata_publish_swap_t **swap_pid;
-
 void *ebpf_swap_thread(void *ptr);
 void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr);
 

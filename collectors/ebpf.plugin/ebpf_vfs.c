@@ -5,10 +5,6 @@
 #include "ebpf.h"
 #include "ebpf_vfs.h"
 
-// ----------------------------------------------------------------------------
-// ARAL vectors used to speed up processing
-ARAL *ebpf_aral_vfs_pid = NULL;
-
 static char *vfs_dimension_names[NETDATA_KEY_PUBLISH_VFS_END] = { "delete",  "read",  "write",
                                                                   "fsync", "open", "create" };
 static char *vfs_id_names[NETDATA_KEY_PUBLISH_VFS_END] = { "vfs_unlink", "vfs_read", "vfs_write",
@@ -17,7 +13,6 @@ static char *vfs_id_names[NETDATA_KEY_PUBLISH_VFS_END] = { "vfs_unlink", "vfs_re
 static netdata_idx_t *vfs_hash_values = NULL;
 static netdata_syscall_stat_t vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_END];
 static netdata_publish_syscall_t vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_END];
-netdata_publish_vfs_t **vfs_pid = NULL;
 netdata_publish_vfs_t *vfs_vector = NULL;
 
 static ebpf_local_maps_t vfs_maps[] = {{.name = "tbl_vfs_pid", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
@@ -50,10 +45,6 @@ netdata_ebpf_targets_t vfs_targets[] = { {.name = "vfs_write", .mode = EBPF_LOAD
                                          {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 #ifdef LIBBPF_MAJOR_VERSION
-#include "includes/vfs.skel.h" // BTF code
-
-static struct vfs_bpf *bpf_obj = NULL;
-
 /**
  * Disable probe
  *
@@ -388,46 +379,6 @@ static inline int ebpf_vfs_load_and_attach(struct vfs_bpf *obj, ebpf_module_t *e
 
 /*****************************************************************
  *
- *  ARAL FUNCTIONS
- *
- *****************************************************************/
-
-/**
- * eBPF VFS Aral init
- *
- * Initiallize array allocator that will be used when integration with apps is enabled.
- */
-static inline void ebpf_vfs_aral_init()
-{
-    ebpf_aral_vfs_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_VFS_ARAL_NAME, sizeof(netdata_publish_vfs_t));
-}
-
-/**
- * eBPF publish VFS get
- *
- * Get a netdata_publish_vfs_t entry to be used with a specific PID.
- *
- * @return it returns the address on success.
- */
-netdata_publish_vfs_t *ebpf_vfs_get(void)
-{
-    netdata_publish_vfs_t *target = aral_mallocz(ebpf_aral_vfs_pid);
-    memset(target, 0, sizeof(netdata_publish_vfs_t));
-    return target;
-}
-
-/**
- * eBPF VFS release
- *
- * @param stat Release a target after usage.
- */
-void ebpf_vfs_release(netdata_publish_vfs_t *stat)
-{
-    aral_freez(ebpf_aral_vfs_pid, stat);
-}
-
-/*****************************************************************
- *
  *  FUNCTIONS TO CLOSE THE THREAD
  *
  *****************************************************************/
@@ -441,20 +392,11 @@ void ebpf_vfs_release(netdata_publish_vfs_t *stat)
  */
 static void ebpf_vfs_free(ebpf_module_t *em)
 {
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-
     freez(vfs_hash_values);
     freez(vfs_vector);
 
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        vfs_bpf__destroy(bpf_obj);
-#endif
-
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -1911,11 +1853,11 @@ static int ebpf_vfs_load_bpf(ebpf_module_t *em)
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else {
-        bpf_obj = vfs_bpf__open();
-        if (!bpf_obj)
+        vfs_bpf_obj = vfs_bpf__open();
+        if (!vfs_bpf_obj)
             ret = -1;
         else
-            ret = ebpf_vfs_load_and_attach(bpf_obj, em);
+            ret = ebpf_vfs_load_and_attach(vfs_bpf_obj, em);
     }
 #endif
 
@@ -1946,7 +1888,6 @@ void *ebpf_vfs_thread(void *ptr)
     ebpf_adjust_thread_load(em, default_btf);
 #endif
     if (ebpf_vfs_load_bpf(em)) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endvfs;
     }
 

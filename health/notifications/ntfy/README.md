@@ -1,4 +1,4 @@
-# Ntfy agent alert notifications
+# ntfy agent alert notifications
 
 Learn how to send alerts to an ntfy server using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
@@ -6,7 +6,7 @@ Learn how to send alerts to an ntfy server using Netdata's Agent alert notificat
 >
 > This file assumes you have read the [Introduction to Agent alert notifications](https://github.com/netdata/netdata/blob/master/health/notifications/README.md), detailing how the Netdata Agent's alert notification method works.
 
-[Ntfy](https://ntfy.sh/) (pronounce: notify) is a simple HTTP-based [pub-sub](https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern) notification service. It allows you to send notifications to your phone or desktop via scripts from any computer, entirely without signup, cost or setup. It's also [open source](https://github.com/binwiederhier/ntfy) if you want to run your own server. 
+[ntfy](https://ntfy.sh/) (pronounce: notify) is a simple HTTP-based [pub-sub](https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern) notification service. It allows you to send notifications to your phone or desktop via scripts from any computer, entirely without signup, cost or setup. It's also [open source](https://github.com/binwiederhier/ntfy) if you want to run your own server. 
 
 This is what you will get:
 
@@ -20,7 +20,7 @@ You will need:
 - A new [topic](https://ntfy.sh/#subscribe) for the notifications to be published to
 - terminal access to the Agent you wish to configure
 
-## Configure Netdata to send alert notifications to Ntfy
+## Configure Netdata to send alert notifications to ntfy
 
 > ### Info
 >

@@ -8,6 +8,23 @@
 // ARAL vectors used to speed up processing
 ARAL *ebpf_aral_apps_pid_stat = NULL;
 ARAL *ebpf_aral_process_stat = NULL;
+ARAL *ebpf_aral_socket_pid = NULL;
+ARAL *ebpf_aral_cachestat_pid = NULL;
+ARAL *ebpf_aral_dcstat_pid = NULL;
+ARAL *ebpf_aral_vfs_pid = NULL;
+ARAL *ebpf_aral_fd_pid = NULL;
+ARAL *ebpf_aral_shm_pid = NULL;
+
+// ----------------------------------------------------------------------------
+// Global vectors used with apps
+ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
+netdata_publish_cachestat_t **cachestat_pid = NULL;
+netdata_publish_dcstat_t **dcstat_pid = NULL;
+netdata_publish_swap_t **swap_pid = NULL;
+netdata_publish_vfs_t **vfs_pid = NULL;
+netdata_fd_stat_t **fd_pid = NULL;
+netdata_publish_shm_t **shm_pid = NULL;
+ebpf_process_stat_t **global_process_stats = NULL;
 
 /**
  * eBPF ARAL Init
@@ -55,6 +72,12 @@ void ebpf_pid_stat_release(struct ebpf_pid_stat *stat)
     aral_freez(ebpf_aral_apps_pid_stat, stat);
 }
 
+/*****************************************************************
+ *
+ *  PROCESS ARAL FUNCTIONS
+ *
+ *****************************************************************/
+
 /**
  * eBPF process stat get
  *
@@ -77,6 +100,246 @@ ebpf_process_stat_t *ebpf_process_stat_get(void)
 void ebpf_process_stat_release(ebpf_process_stat_t *stat)
 {
     aral_freez(ebpf_aral_process_stat, stat);
+}
+
+/*****************************************************************
+ *
+ *  SOCKET ARAL FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * eBPF socket Aral init
+ *
+ * Initiallize array allocator that will be used when integration with apps is enabled.
+ */
+void ebpf_socket_aral_init()
+{
+    ebpf_aral_socket_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_SOCKET_ARAL_NAME, sizeof(ebpf_socket_publish_apps_t));
+}
+
+/**
+ * eBPF socket get
+ *
+ * Get a ebpf_socket_publish_apps_t entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+ebpf_socket_publish_apps_t *ebpf_socket_stat_get(void)
+{
+    ebpf_socket_publish_apps_t *target = aral_mallocz(ebpf_aral_socket_pid);
+    memset(target, 0, sizeof(ebpf_socket_publish_apps_t));
+    return target;
+}
+
+/**
+ * eBPF socket release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_socket_release(ebpf_socket_publish_apps_t *stat)
+{
+    aral_freez(ebpf_aral_socket_pid, stat);
+}
+
+/*****************************************************************
+ *
+ *  CACHESTAT ARAL FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * eBPF Cachestat Aral init
+ *
+ * Initiallize array allocator that will be used when integration with apps is enabled.
+ */
+void ebpf_cachestat_aral_init()
+{
+    ebpf_aral_cachestat_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_CACHESTAT_ARAL_NAME, sizeof(netdata_publish_cachestat_t));
+}
+
+/**
+ * eBPF publish cachestat get
+ *
+ * Get a netdata_publish_cachestat_t entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+netdata_publish_cachestat_t *ebpf_publish_cachestat_get(void)
+{
+    netdata_publish_cachestat_t *target = aral_mallocz(ebpf_aral_cachestat_pid);
+    memset(target, 0, sizeof(netdata_publish_cachestat_t));
+    return target;
+}
+
+/**
+ * eBPF cachestat release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_cachestat_release(netdata_publish_cachestat_t *stat)
+{
+    aral_freez(ebpf_aral_cachestat_pid, stat);
+}
+
+/*****************************************************************
+ *
+ *  DCSTAT ARAL FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * eBPF directory cache Aral init
+ *
+ * Initiallize array allocator that will be used when integration with apps is enabled.
+ */
+void ebpf_dcstat_aral_init()
+{
+    ebpf_aral_dcstat_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_DCSTAT_ARAL_NAME, sizeof(netdata_publish_dcstat_t));
+}
+
+/**
+ * eBPF publish dcstat get
+ *
+ * Get a netdata_publish_dcstat_t entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+netdata_publish_dcstat_t *ebpf_publish_dcstat_get(void)
+{
+    netdata_publish_dcstat_t *target = aral_mallocz(ebpf_aral_dcstat_pid);
+    memset(target, 0, sizeof(netdata_publish_dcstat_t));
+    return target;
+}
+
+/**
+ * eBPF dcstat release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_dcstat_release(netdata_publish_dcstat_t *stat)
+{
+    aral_freez(ebpf_aral_dcstat_pid, stat);
+}
+
+/*****************************************************************
+ *
+ *  VFS ARAL FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * eBPF VFS Aral init
+ *
+ * Initiallize array allocator that will be used when integration with apps is enabled.
+ */
+void ebpf_vfs_aral_init()
+{
+    ebpf_aral_vfs_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_VFS_ARAL_NAME, sizeof(netdata_publish_vfs_t));
+}
+
+/**
+ * eBPF publish VFS get
+ *
+ * Get a netdata_publish_vfs_t entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+netdata_publish_vfs_t *ebpf_vfs_get(void)
+{
+    netdata_publish_vfs_t *target = aral_mallocz(ebpf_aral_vfs_pid);
+    memset(target, 0, sizeof(netdata_publish_vfs_t));
+    return target;
+}
+
+/**
+ * eBPF VFS release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_vfs_release(netdata_publish_vfs_t *stat)
+{
+    aral_freez(ebpf_aral_vfs_pid, stat);
+}
+
+/*****************************************************************
+ *
+ *  FD ARAL FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * eBPF file descriptor Aral init
+ *
+ * Initiallize array allocator that will be used when integration with apps is enabled.
+ */
+void ebpf_fd_aral_init()
+{
+    ebpf_aral_fd_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_FD_ARAL_NAME, sizeof(netdata_fd_stat_t));
+}
+
+/**
+ * eBPF publish file descriptor get
+ *
+ * Get a netdata_fd_stat_t entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+netdata_fd_stat_t *ebpf_fd_stat_get(void)
+{
+    netdata_fd_stat_t *target = aral_mallocz(ebpf_aral_fd_pid);
+    memset(target, 0, sizeof(netdata_fd_stat_t));
+    return target;
+}
+
+/**
+ * eBPF file descriptor release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_fd_release(netdata_fd_stat_t *stat)
+{
+    aral_freez(ebpf_aral_fd_pid, stat);
+}
+
+/*****************************************************************
+ *
+ *  SHM ARAL FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * eBPF shared memory Aral init
+ *
+ * Initiallize array allocator that will be used when integration with apps is enabled.
+ */
+void ebpf_shm_aral_init()
+{
+    ebpf_aral_shm_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_SHM_ARAL_NAME, sizeof(netdata_publish_shm_t));
+}
+
+/**
+ * eBPF shared memory get
+ *
+ * Get a netdata_publish_shm_t entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+netdata_publish_shm_t *ebpf_shm_stat_get(void)
+{
+    netdata_publish_shm_t *target = aral_mallocz(ebpf_aral_shm_pid);
+    memset(target, 0, sizeof(netdata_publish_shm_t));
+    return target;
+}
+
+/**
+ * eBPF shared memory release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_shm_release(netdata_publish_shm_t *stat)
+{
+    aral_freez(ebpf_aral_shm_pid, stat);
 }
 
 // ----------------------------------------------------------------------------

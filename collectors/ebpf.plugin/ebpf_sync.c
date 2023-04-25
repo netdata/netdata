@@ -204,16 +204,12 @@ void ebpf_sync_cleanup_objects()
  */
 static void ebpf_sync_free(ebpf_module_t *em)
 {
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-
 #ifdef LIBBPF_MAJOR_VERSION
     ebpf_sync_cleanup_objects();
 #endif
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -523,7 +519,6 @@ void *ebpf_sync_thread(void *ptr)
     ebpf_adjust_thread_load(em, default_btf);
 #endif
     if (ebpf_sync_initialize_syscall(em)) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endsync;
     }
 

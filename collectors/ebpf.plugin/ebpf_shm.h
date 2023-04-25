@@ -53,8 +53,6 @@ enum shm_counters {
     NETDATA_SHM_END
 };
 
-extern netdata_publish_shm_t **shm_pid;
-
 void *ebpf_shm_thread(void *ptr);
 void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr);
 void ebpf_shm_release(netdata_publish_shm_t *stat);

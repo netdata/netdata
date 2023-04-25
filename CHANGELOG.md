@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Terminate JSX element in doc file [\#14952](https://github.com/netdata/netdata/pull/14952) ([Ancairon](https://github.com/Ancairon))
 - Update dbengine README.md [\#14951](https://github.com/netdata/netdata/pull/14951) ([ktsaou](https://github.com/ktsaou))
 - Update README.md [\#14948](https://github.com/netdata/netdata/pull/14948) ([cakrit](https://github.com/cakrit))
 - Disable SQL operations in training thread [\#14947](https://github.com/netdata/netdata/pull/14947) ([vkalintiris](https://github.com/vkalintiris))
@@ -33,6 +34,7 @@
 - Update change-metrics-storage.md [\#14905](https://github.com/netdata/netdata/pull/14905) ([cakrit](https://github.com/cakrit))
 - /api/v2 part 10 [\#14904](https://github.com/netdata/netdata/pull/14904) ([ktsaou](https://github.com/ktsaou))
 - Optimize the cheat sheet to be in a printable form factor  [\#14903](https://github.com/netdata/netdata/pull/14903) ([Ancairon](https://github.com/Ancairon))
+- Address issues on `EC2` \(eBPF\). [\#14902](https://github.com/netdata/netdata/pull/14902) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update REFERENCE.md [\#14900](https://github.com/netdata/netdata/pull/14900) ([cakrit](https://github.com/cakrit))
 - Update README.md [\#14899](https://github.com/netdata/netdata/pull/14899) ([cakrit](https://github.com/cakrit))
 - Update README.md [\#14898](https://github.com/netdata/netdata/pull/14898) ([cakrit](https://github.com/cakrit))
@@ -404,9 +406,6 @@
 - DBENGINE v2 - improvements part 10 [\#14332](https://github.com/netdata/netdata/pull/14332) ([ktsaou](https://github.com/ktsaou))
 - reviewed the docs functions to fix broken links and other additions [\#14331](https://github.com/netdata/netdata/pull/14331) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Add |nowarn and |noclear notification modifiers [\#14330](https://github.com/netdata/netdata/pull/14330) ([vobruba-martin](https://github.com/vobruba-martin))
-- Revert "Misc SSL improvements" [\#14327](https://github.com/netdata/netdata/pull/14327) ([MrZammler](https://github.com/MrZammler))
-- DBENGINE v2 - improvements part 9 [\#14326](https://github.com/netdata/netdata/pull/14326) ([ktsaou](https://github.com/ktsaou))
-- Don't send alert variables to the cloud [\#14325](https://github.com/netdata/netdata/pull/14325) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
