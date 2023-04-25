@@ -697,6 +697,9 @@ RRDHOST *rrdhost_find_or_create(
         error("Archived host '%s' has memory mode '%s', but the wanted one is '%s'. Discarding archived state.",
               rrdhost_hostname(host), rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
 
+        if (likely(!archived && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)))
+            return host;
+
         rrd_wrlock();
         rrdhost_free___while_having_rrd_wrlock(host, true);
         host = NULL;
