@@ -12,6 +12,11 @@ learn_rel_path: "Integrations/Monitor/Webapps"
 Simple module executing `exim -bpc` to grab exim queue.
 This command can take a lot of time to finish its execution thus it is not recommended to run it every second.
 
+## Metrics
+
+See [metrics.csv](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/exim/metrics.csv) for a list of metrics.
+
+
 ## Requirements
 
 The module uses the `exim` binary, which can only be executed as root by default. We need to allow other users to `exim` binary. We solve that adding `queue_list_requires_admin` statement in exim configuration and set to `false`, because it is `true` by default. On many Linux distributions, the default location of `exim` configuration is in `/etc/exim.conf`.

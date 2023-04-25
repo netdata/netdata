@@ -13,13 +13,9 @@ Monitors application bandwidth, peers and DHT metrics.
 
 This module will monitor one or more `RetroShare` applications, depending on your configuration.
 
-## Charts
+## Metrics
 
-This module produces the following charts:
-
--   Bandwidth in `kilobits/s`
--   Peers in `peers`
--   DHT in `peers`
+See [metrics.csv](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/retroshare/metrics.csv) for a list of metrics.
 
 
 ## Configuration

@@ -1,0 +1,5 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+boinc.tasks,,"Total, Active",tasks,Overall Tasks,line,,python.d.plugin,boinc
+boinc.states,,"New, Downloading, Ready to Run, Compute Errors, Uploading, Uploaded, Aborted, Failed Uploads",tasks,Tasks per State,line,,python.d.plugin,boinc
+boinc.sched,,"Uninitialized, Preempted, Scheduled",tasks,Tasks per Scheduler State,line,,python.d.plugin,boinc
+boinc.process,,"Uninitialized, Executing, Suspended, Aborted, Quit, Copy Pending",tasks,Tasks per Process State,line,,python.d.plugin,boinc

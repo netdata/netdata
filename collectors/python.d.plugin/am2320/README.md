@@ -11,6 +11,11 @@ learn_rel_path: "Integrations/Monitor/Remotes/Devices"
 
 Displays a graph of the temperature and humidity from a AM2320 sensor.
 
+## Metrics
+
+See [metrics.csv](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/am2320/metrics.csv) for a list of metrics.
+
+
 ## Requirements
  - Adafruit Circuit Python AM2320 library
  - Adafruit AM2320 I2C sensor

@@ -11,6 +11,11 @@ learn_rel_path: "Integrations/Monitor/Networking"
 
 Monitors the number of listeners for active sources.
 
+## Metrics
+
+See [metrics.csv](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/icecast/metrics.csv) for a list of metrics.
+
+
 ## Requirements
 
 -   icecast version >= 2.4.0

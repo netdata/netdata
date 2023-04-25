@@ -1,17 +1,12 @@
-<!--
-title: "BOINC monitoring with Netdata"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/boinc/README.md"
-sidebar_label: "BOINC"
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Integrations/Monitor/Distributed computing"
--->
-
 # BOINC collector
 
 Monitors task counts for the Berkeley Open Infrastructure Networking Computing (BOINC) distributed computing client using the same RPC interface that the BOINC monitoring GUI does.
 
 It provides charts tracking the total number of tasks and active tasks, as well as ones tracking each of the possible states for tasks.
+
+## Metrics
+
+See [metrics.csv](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/boinc/metrics.csv) for a list of metrics.
 
 ## Configuration
 

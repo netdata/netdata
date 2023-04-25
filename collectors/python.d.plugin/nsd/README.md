@@ -11,6 +11,11 @@ learn_rel_path: "Integrations/Monitor/Networking"
 
 Uses the `nsd-control stats_noreset` command to provide `nsd` statistics.
 
+## Metrics
+
+See [metrics.csv](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/nsd/metrics.csv) for a list of metrics.
+
+
 ## Requirements
 
 -   Version of `nsd` must be 4.0+

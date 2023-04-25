@@ -1,0 +1,10 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+beanstalk.cpu_usage,,"user, system",cpu time,"Cpu Usage",area,,python.d.plugin,beanstalk
+beanstalk.jobs_rate,,"total, timeouts",jobs/s,"Jobs Rate",line,,python.d.plugin,beanstalk
+beanstalk.connections_rate,,"connections",connections/s,"Connections Rate",area,,python.d.plugin,beanstalk
+beanstalk.commands_rate,,"put, peek, peek-ready, peek-delayed, peek-buried, reserve, use, watch, ignore, delete, release, bury, kick, stats, stats-job, stats-tube, list-tubes, list-tube-used, list-tubes-watched, pause-tube",commands/s,"Commands Rate",stacked,,python.d.plugin,beanstalk
+beanstalk.current_tubes,,"tubes",tubes,"Current Tubes",area,,python.d.plugin,beanstalk
+beanstalk.current_jobs,,"urgent, ready, reserved, delayed, buried",jobs,"Current Jobs",stacked,,python.d.plugin,beanstalk
+beanstalk.current_connections,,"written, producers, workers, waiting",connections,"Current Connections",line,,python.d.plugin,beanstalk
+beanstalk.binlog,,"written, migrated",records/s,"Binlog",line,,python.d.plugin,beanstalk
+beanstalk.uptime,,",seconds,"Uptime",line,,python.d.plugin,beanstalk
