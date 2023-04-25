@@ -1,12 +1,3 @@
-<!--
-title: "Samba monitoring with Netdata"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/samba/README.md"
-sidebar_label: "Samba"
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Integrations/Monitor/Apps"
--->
-
 # Samba collector
 
 Monitors the performance metrics of Samba file sharing using `smbstatus` command-line tool.
@@ -14,6 +5,10 @@ Monitors the performance metrics of Samba file sharing using `smbstatus` command
 Executed commands:
 
 - `sudo -n smbstatus -P`
+
+## Metrics
+
+See [metrics.csv](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/samba/metrics.csv) for a list of metrics.
 
 ## Requirements
 

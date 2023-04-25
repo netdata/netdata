@@ -1,12 +1,3 @@
-<!--
-title: "1-Wire Sensors monitoring with Netdata"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/w1sensor/README.md"
-sidebar_label: "1-Wire sensors"
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Integrations/Monitor/Remotes/Devices"
--->
-
 # 1-Wire Sensors collector
 
 Monitors sensor temperature.
@@ -15,6 +6,10 @@ On Linux these are supported by the wire, w1_gpio, and w1_therm modules.
 Currently temperature sensors are supported and automatically detected.
 
 Charts are created dynamically based on the number of detected sensors.
+
+## Metrics
+
+See [metrics.csv](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/w1sensor/metrics.csv) for a list of metrics.
 
 ## Configuration
 
