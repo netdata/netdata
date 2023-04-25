@@ -13,85 +13,80 @@ pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
 #define QUERY_THREAD_LOCK pthread_mutex_lock(&query_lock_wait)
 #define QUERY_THREAD_UNLOCK pthread_mutex_unlock(&query_lock_wait)
 
-#define CANCELLATION_GC_INTERVAL_S 10
+struct pending_req_list {
+    const char *msg_id;
+    uint32_t hash;
 
-struct cancellation {
-    uint64_t hash;
-    char* id;
+    int canceled;
 
-    time_t timestamp;
-
-    struct cancellation *next;
+    struct pending_req_list *next;
 };
 
-struct cancellation *cancellations = NULL;
+static struct pending_req_list *pending_req_list_head = NULL;
+static pthread_mutex_t pending_req_list_lock = PTHREAD_MUTEX_INITIALIZER;
 
-void aclk_cancel_query(const char *id) {
-    struct cancellation *c = callocz(1, sizeof(struct cancellation));
-    c->hash = simple_hash(id);
-    c->id = strdupz(id);
-    c->timestamp = now_monotonic_sec();
+static struct pending_req_list *pending_req_list_add(const char *msg_id)
+{
+    struct pending_req_list *new = callocz(1, sizeof(struct pending_req_list));
+    new->msg_id = msg_id;
+    new->hash = simple_hash(msg_id);
 
-    c->next = cancellations;
-    cancellations = c;
+    pthread_mutex_lock(&pending_req_list_lock);
+    new->next = pending_req_list_head;
+    pending_req_list_head = new;
+    pthread_mutex_unlock(&pending_req_list_lock);
+    return new;
 }
 
-static int remove_cancellation(const char *id, uint64_t hash) {
-    struct cancellation *c = cancellations;
-    struct cancellation *p = NULL;
-    while(c) {
-        if(c->hash == hash && !strcmp(c->id, id)) {
-            if(p)
-                p->next = c->next;
+void pending_req_list_rm(const char *msg_id)
+{
+    uint32_t hash = simple_hash(msg_id);
+    struct pending_req_list *prev = NULL;
+
+    pthread_mutex_lock(&pending_req_list_lock);
+    struct pending_req_list *curr = pending_req_list_head;
+
+    while (curr) {
+        if (curr->hash == hash && strcmp(curr->msg_id, msg_id) == 0) {
+            if (prev)
+                prev->next = curr->next;
             else
-                cancellations = c->next;
-            freez(c->id);
-            freez(c);
-            return 1;
+                pending_req_list_head = curr->next;
+
+            freez(curr);
+            break;
         }
-        p = c;
-        c = c->next;
+
+        prev = curr;
+        curr = curr->next;
     }
-    return 0;
+    pthread_mutex_unlock(&pending_req_list_lock);
 }
 
-static int is_cancelled(const char *id) {
-    uint64_t hash = simple_hash(id);
-    struct cancellation *c = cancellations;
-    while(c) {
-        if(c->hash == hash && !strcmp(c->id, id)) {
-            remove_cancellation(id, hash);
-            return 1;
-        }
-        c = c->next;
-    }
-    return 0;
-}
+int mark_pending_req_cancelled(const char *msg_id)
+{
+    uint32_t hash = simple_hash(msg_id);
 
-void aclk_cancellation_gc() {
-    struct cancellation *c = cancellations;
-    struct cancellation *p = NULL;
-    time_t now = now_monotonic_sec();
-    while(c) {
-        if(now - c->timestamp > CANCELLATION_GC_INTERVAL_S) {
-            error_report("Canncelation request timed out. Dropping cancel request for %s", c->id);
-            if(p)
-                p->next = c->next;
-            else
-                cancellations = c->next;
-            freez(c->id);
-            freez(c);
-            c = p ? p->next : cancellations;
-        } else {
-            p = c;
-            c = c->next;
+    pthread_mutex_lock(&pending_req_list_lock);
+    struct pending_req_list *curr = pending_req_list_head;
+
+    while (curr) {
+        if (curr->hash == hash && strcmp(curr->msg_id, msg_id) == 0) {
+            curr->canceled = 1;
+            pthread_mutex_unlock(&pending_req_list_lock);
+            return 0;
         }
+
+        curr = curr->next;
     }
+    pthread_mutex_unlock(&pending_req_list_lock);
+    return 1;
 }
 
 static bool aclk_web_client_interrupt_cb(struct web_client *w __maybe_unused, void *data)
 {
-    return is_cancelled((char *)data);
+    struct pending_req_list *req = (struct pending_req_list *)data;
+    return req->canceled;
 }
 
 static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) {
@@ -112,7 +107,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) 
     w->timings.tv_in = query->created_tv;
 
     w->interrupt.callback = aclk_web_client_interrupt_cb;
-    w->interrupt.callback_data = query->msg_id;
+    w->interrupt.callback_data = pending_req_list_add(query->msg_id);
 
     usec_t t;
     web_client_timeout_checkpoint_set(w, query->timeout);
@@ -251,6 +246,8 @@ cleanup:
     );
 
     web_client_release_to_cache(w);
+
+    pending_req_list_rm(query->msg_id);
 
 #ifdef NETDATA_WITH_ZLIB
     buffer_free(z_buffer);

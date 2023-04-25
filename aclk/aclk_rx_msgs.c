@@ -457,7 +457,8 @@ int cancel_pending_req(const char *msg, size_t msg_len)
 
     log_access("ACLK CancelPendingRequest REQ: %s, cloud trace-id: %s", cmd.request_id, cmd.trace_id);
 
-    aclk_cancel_query(cmd.request_id);
+    if (mark_pending_req_cancelled(cmd.request_id))
+        error_report("CancelPending Request for %s failed. No such pending request.", cmd.request_id);
 
     free_cancel_pending_req(&cmd);
     return 0;
