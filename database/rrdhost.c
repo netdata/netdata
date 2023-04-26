@@ -78,6 +78,26 @@ static inline void rrdhost_init() {
     }
 }
 
+RRDHOST_ACQUIRED *rrdhost_find_and_acquire(const char *machine_guid) {
+    debug(D_RRD_CALLS, "rrdhost_find_and_acquire() host %s", machine_guid);
+
+    return (RRDHOST_ACQUIRED *)dictionary_get_and_acquire_item(rrdhost_root_index, machine_guid);
+}
+
+RRDHOST *rrdhost_acquired_to_rrdhost(RRDHOST_ACQUIRED *rha) {
+    if(unlikely(!rha))
+        return NULL;
+
+    return (RRDHOST *) dictionary_acquired_item_value((const DICTIONARY_ITEM *)rha);
+}
+
+void rrdhost_acquired_release(RRDHOST_ACQUIRED *rha) {
+    if(unlikely(!rha))
+        return;
+
+    dictionary_acquired_item_release(rrdhost_root_index, (const DICTIONARY_ITEM *)rha);
+}
+
 // ----------------------------------------------------------------------------
 // RRDHOST index by UUID
 

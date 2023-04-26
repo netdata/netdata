@@ -124,7 +124,7 @@ enum ml_training_result {
 
 typedef struct {
     // Chart/dimension we want to train
-    STRING *host_id;
+    char machine_guid[GUID_LEN + 1];
     STRING *chart_id;
     STRING *dimension_id;
 

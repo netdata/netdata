@@ -479,6 +479,27 @@ inline RRDSET *rrdset_find_byname(RRDHOST *host, const char *name) {
     return(st);
 }
 
+RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id) {
+    debug(D_RRD_CALLS, "rrdset_find_and_acquire() for host %s, chart %s", rrdhost_hostname(host), id);
+
+    return (RRDSET_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdset_root_index, id);
+}
+
+RRDSET *rrdset_acquired_to_rrdset(RRDSET_ACQUIRED *rsa) {
+    if(unlikely(!rsa))
+        return NULL;
+
+    return (RRDSET *) dictionary_acquired_item_value((const DICTIONARY_ITEM *)rsa);
+}
+
+void rrdset_acquired_release(RRDSET_ACQUIRED *rsa) {
+    if(unlikely(!rsa))
+        return;
+
+    RRDSET *rs = rrdset_acquired_to_rrdset(rsa);
+    dictionary_acquired_item_release(rs->rrdhost->rrdset_root_index, (const DICTIONARY_ITEM *)rsa);
+}
+
 // ----------------------------------------------------------------------------
 // RRDSET - rename charts
 

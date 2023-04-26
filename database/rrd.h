@@ -1260,6 +1260,10 @@ extern RRDHOST *localhost;
 extern DICTIONARY *rrdhost_root_index;
 size_t rrdhost_hosts_available(void);
 
+RRDHOST_ACQUIRED *rrdhost_find_and_acquire(const char *machine_guid);
+RRDHOST *rrdhost_acquired_to_rrdhost(RRDHOST_ACQUIRED *rha);
+void rrdhost_acquired_release(RRDHOST_ACQUIRED *rha);
+
 // ----------------------------------------------------------------------------
 
 #define rrdhost_foreach_read(var) \
@@ -1368,6 +1372,11 @@ void rrdset_update_heterogeneous_flag(RRDSET *st);
 time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s);
 
 RRDSET *rrdset_find(RRDHOST *host, const char *id);
+
+RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id);
+RRDSET *rrdset_acquired_to_rrdset(RRDSET_ACQUIRED *rsa);
+void rrdset_acquired_release(RRDSET_ACQUIRED *rsa);
+
 #define rrdset_find_localhost(id) rrdset_find(localhost, id)
 /* This will not return charts that are archived */
 static inline RRDSET *rrdset_find_active_localhost(const char *id)
