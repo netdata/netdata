@@ -96,7 +96,6 @@ metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "services.bandwidth_tcp_retransmit","apps","services running","calls/s","Calls to tcp_retransmit","stacked",,"ebpf.plugin","socket"
 "services.bandwidth_udp_send","apps","services running","calls/s","Calls to udp_sendmsg","stacked",,"ebpf.plugin","socket"
 "services.bandwidth_udp_recv","apps","services running","calls/s","Calls to udp_recvmsg","stacked",,"ebpf.plugin","socket"
-metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "apps.dc_hit_ratio","apps","apps group inside apps_group.conf","%","Percentage of files inside directory cache","line",,"ebpf.plugin","dcstat"
 "apps.dc_reference","apps","apps group inside apps_group.conf","files","Count file access","stacked",,"ebpf.plugin","dcstat"
 "apps.dc_not_cache","apps","apps group inside apps_group.conf","files","Files not present inside directory cache","stacked",,"ebpf.plugin","dcstat"
@@ -111,14 +110,11 @@ metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "services.dc_not_found","apps","services running","files","Files not found","line",,"ebpf.plugin","dcstat"
 "filesystem.dc_hit_ratio",,"ratio","%","Percentage of files inside directory cache","line",,"ebpf.plugin","dcstat"
 "filesystem.dc_reference",,"reference,slow,miss","files","Variables used to calculate hit ratio.","line",,"ebpf.plugin","dcstat"
-/home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_filesystem.c
-metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
-"filesystem.efp->hread.name",scope,dimensions,"calls/s",title,"stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_FILESYSTEM
-"filesystem.efp->hwrite.name",scope,dimensions,"calls/s",title,"stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_FILESYSTEM
-An invalid number of indexes 14 was found 
-['ebpf_create_chart(', 'NETDATA_FILESYSTEM_FAMILY', 'efp->hopen.name', 'title', '"calls/s"', 'family', 'NULL "stacked"', 'order', 'ebpf_create_global_dimension', 'filesystem_publish_aggregated', 'NETDATA_EBPF_HIST_MAX_BINS', 'update_every', 'NETDATA_EBPF_MODULE_NAME_FILESYSTEM', ');']
-An invalid number of indexes 14 was found 
-['ebpf_create_chart(', 'NETDATA_FILESYSTEM_FAMILY', 'efp->hadditional.name', 'title', '"calls/s"', 'family', 'NULL "stacked"', 'order', 'ebpf_create_global_dimension', 'filesystem_publish_aggregated', 'NETDATA_EBPF_HIST_MAX_BINS', 'update_every', 'NETDATA_EBPF_MODULE_NAME_FILESYSTEM', ');']
+"filesystem.FS_read_latency",,"latency period","calls/s","FS latency for each read request.","stacked",,"ebpf.plugin","filesystem"
+"filesystem.FS_write_latency",,"latency period","calls/s","FS latency for each write request.","stacked",,"ebpf.plugin","filesystem"
+"filesystem.FS_open_latency",,"latency period","calls/s","FS latency for each open request.","stacked",,"ebpf.plugin","filesystem"
+"filesystem.FS_attributte_latency",,"latency period","calls/s","FS latency for each attribute request.","stacked",,"ebpf.plugin","filesystem"
+"filesystem.FS_attributte_sync",,"latency period","calls/s","FS latency for each sync request.","stacked",,"ebpf.plugin","filesystem"
 /home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_shm.c
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "cgroup_name.NETDATA_SHMGET_CHART","cgroup",dimensions,"calls/s","Calls to syscall <code>shmget(2)</code>.","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SHM
