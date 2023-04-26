@@ -131,58 +131,52 @@ metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "system.softirq_latency",,"soft IRQs","miliseconds","Software IRQ latency","stacked",,"ebpf.plugin","softirq"
 "mount_points.call",,"mount,umount","calls/s","Calls to mount and umount syscalls","line",,"ebpf.plugin","mount"
 "mount_points.error",,"mount,umount","calls/s","Errors to mount and umount file systems","line",,"ebpf.plugin","mount"
-/home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_vfs.c
-metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
-"cgroup_name.NETDATA_SYSCALL_APPS_FILE_DELETED","cgroup",dimensions,"calls/s","Files deleted","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SWAP
-"cgroup_name.NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS","cgroup",dimensions,"calls/s","Write to disk","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SWAP
-"cgroup_name.NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR","cgroup",dimensions,"calls/s","Fails to write","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SWAP
-"cgroup_name.NETDATA_SYSCALL_APPS_VFS_READ_CALLS","cgroup",dimensions,"calls/s","Read from disk","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SWAP
-"cgroup_name.NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR","cgroup",dimensions,"calls/s","Fails to read","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SWAP
-"cgroup_name.NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES","cgroup",dimensions,EBPF_COMMON_DIMENSION_BYTES,"Bytes written on disk","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SWAP
-"cgroup_name.NETDATA_SYSCALL_APPS_VFS_READ_BYTES","cgroup",dimensions,EBPF_COMMON_DIMENSION_BYTES,"Bytes read from disk","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SWAP
-"cgroup_name.NETDATA_SYSCALL_APPS_VFS_FSYNC","cgroup",dimensions,"calls/s","Calls for <code>vfs_fsync</code>","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SWAP
-"cgroup_name.NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR","cgroup",dimensions,"calls/s","Sync error","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SWAP
-"cgroup_name.NETDATA_SYSCALL_APPS_VFS_OPEN","cgroup",dimensions,"calls/s","Calls for <code>vfs_open</code>","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SWAP
-"cgroup_name.NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR","cgroup",dimensions,"calls/s","Open error","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SWAP
-"cgroup_name.NETDATA_SYSCALL_APPS_VFS_CREATE","cgroup",dimensions,"calls/s","Calls for <code>vfs_create</code>","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SWAP
-"cgroup_name.NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR","cgroup",dimensions,"calls/s","Create error","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SWAP
-"services.NETDATA_SYSCALL_APPS_FILE_DELETED","apps","services running","calls/s","Files deleted","stacked",,"ebpf.plugin",em->update_every
-"services.NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS","apps","services running","calls/s","Write to disk","stacked",,"ebpf.plugin",em->update_every
-"services.NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR","apps","services running","calls/s","Fails to write","stacked",,"ebpf.plugin",em->update_every
-"services.NETDATA_SYSCALL_APPS_VFS_READ_CALLS","apps","services running","calls/s","Read from disk","stacked",,"ebpf.plugin",em->update_every
-"services.NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR","apps","services running","calls/s","Fails to read","stacked",,"ebpf.plugin",em->update_every
-"services.NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES","apps","services running",EBPF_COMMON_DIMENSION_BYTES,"Bytes written on disk","stacked",,"ebpf.plugin",em->update_every
-"services.NETDATA_SYSCALL_APPS_VFS_READ_BYTES","apps","services running",EBPF_COMMON_DIMENSION_BYTES,"Bytes read from disk","stacked",,"ebpf.plugin",em->update_every
-"services.NETDATA_SYSCALL_APPS_VFS_FSYNC","apps","services running","calls/s","Calls to <code>vfs_fsync</code>","stacked",,"ebpf.plugin",em->update_every
-"services.NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR","apps","services running","calls/s","Sync error","stacked",,"ebpf.plugin",em->update_every
-"services.NETDATA_SYSCALL_APPS_VFS_OPEN","apps","services running","calls/s","Calls to <code>vfs_open</code>","stacked",,"ebpf.plugin",em->update_every
-"services.NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR","apps","services running","calls/s","Open error","stacked",,"ebpf.plugin",em->update_every
-"services.NETDATA_SYSCALL_APPS_VFS_CREATE","apps","services running","calls/s","Calls to <code>vfs_create</code>","stacked",,"ebpf.plugin",em->update_every
-"services.NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR","apps","services running","calls/s","Create error","stacked",,"ebpf.plugin",em->update_every
-"filesystem.NETDATA_VFS_FILE_CLEAN_COUNT",scope,dimensions,"calls/s","Remove files","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_VFS
-"filesystem.NETDATA_VFS_FILE_IO_COUNT",scope,dimensions,"calls/s","Calls to IO","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_VFS
-"filesystem.NETDATA_VFS_FILE_ERR_COUNT",scope,dimensions,"calls/s","Fails to write or read","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_VFS
-"filesystem.NETDATA_VFS_FSYNC",scope,dimensions,"calls/s","Calls for <code>vfs_fsync</code>","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_VFS
-"filesystem.NETDATA_VFS_FSYNC_ERR",scope,dimensions,"calls/s","Fails to synchronize","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_VFS
-"filesystem.NETDATA_VFS_OPEN",scope,dimensions,"calls/s","Calls for <code>vfs_open</code>","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_VFS
-"filesystem.NETDATA_VFS_OPEN_ERR",scope,dimensions,"calls/s","Fails to open a file","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_VFS
-"filesystem.NETDATA_VFS_CREATE",scope,dimensions,"calls/s","Calls for <code>vfs_create</code>","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_VFS
-"filesystem.NETDATA_VFS_CREATE_ERR",scope,dimensions,"calls/s","Fails to create a file.","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_VFS
-"apps.NETDATA_SYSCALL_APPS_FILE_DELETED","apps","apps group inside apps_group.conf","calls/s","Files deleted","stacked",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_VFS
-"apps.NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS","apps","apps group inside apps_group.conf","calls/s","Write to disk","stacked",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_VFS
-"apps.NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR","apps","apps group inside apps_group.conf","calls/s","Fails to write","stacked",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_VFS
-"apps.NETDATA_SYSCALL_APPS_VFS_READ_CALLS","apps","apps group inside apps_group.conf","calls/s","Read from disk","stacked",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_VFS
-"apps.NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR","apps","apps group inside apps_group.conf","calls/s","Fails to read","stacked",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_VFS
-An invalid number of indexes 11 was found 
-['ebpf_create_charts_on_apps(', 'NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES', '"Bytes written on disk" EBPF_COMMON_DIMENSION_BYTES', 'NETDATA_VFS_GROUP', '"stacked"', '20070', 'ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]', 'root', 'em->update_every', 'NETDATA_EBPF_MODULE_NAME_VFS', ');']
-An invalid number of indexes 11 was found 
-['ebpf_create_charts_on_apps(', 'NETDATA_SYSCALL_APPS_VFS_READ_BYTES', '"Bytes read from disk" EBPF_COMMON_DIMENSION_BYTES', 'NETDATA_VFS_GROUP', '"stacked"', '20071', 'ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]', 'root', 'em->update_every', 'NETDATA_EBPF_MODULE_NAME_VFS', ');']
-An invalid number of indexes 11 was found 
-['ebpf_create_charts_on_apps(', 'NETDATA_SYSCALL_APPS_VFS_FSYNC', '"Calls for <code>vfs_fsync</code>" "calls/s"', 'NETDATA_VFS_GROUP', '"stacked"', '20072', 'ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]', 'root', 'em->update_every', 'NETDATA_EBPF_MODULE_NAME_VFS', ');']
-"apps.NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR","apps","apps group inside apps_group.conf","calls/s","Sync error","stacked",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_VFS
-An invalid number of indexes 11 was found 
-['ebpf_create_charts_on_apps(', 'NETDATA_SYSCALL_APPS_VFS_OPEN', '"Calls for <code>vfs_open</code>" "calls/s"', 'NETDATA_VFS_GROUP', '"stacked"', '20074', 'ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]', 'root', 'em->update_every', 'NETDATA_EBPF_MODULE_NAME_VFS', ');']
-"apps.NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR","apps","apps group inside apps_group.conf","calls/s","Open error","stacked",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_VFS
-An invalid number of indexes 11 was found 
-['ebpf_create_charts_on_apps(', 'NETDATA_SYSCALL_APPS_VFS_CREATE', '"Calls for <code>vfs_create</code>" "calls/s"', 'NETDATA_VFS_GROUP', '"stacked"', '20076', 'ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]', 'root', 'em->update_every', 'NETDATA_EBPF_MODULE_NAME_VFS', ');']
-"apps.NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR","apps","apps group inside apps_group.conf","calls/s","Create error","stacked",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_VFS
+"cgroup_name.file_deleted","cgroup",dimensions,"calls/s","Files deleted","line",,"ebpf.plugin","vfs"
+"cgroup_name.vfs_write_call","cgroup",dimensions,"calls/s","Write to disk","line",,"ebpf.plugin","vfs"
+"cgroup_name.vfs_write_error","cgroup",dimensions,"calls/s","Fails to write","line",,"ebpf.plugin","vfs"
+"cgroup_name.vfs_read_call","cgroup",dimensions,"calls/s","Read from disk","line",,"ebpf.plugin","vfs"
+"cgroup_name.vfs_read_error","cgroup",dimensions,"calls/s","Fails to read","line",,"ebpf.plugin","vfs"
+"cgroup_name.vfs_write_bytes","cgroup",dimensions,"bytes/s","Bytes written on disk","line",,"ebpf.plugin","vfs"
+"cgroup_name.vfs_read_bytes","cgroup",dimensions,"bytes/s","Bytes read from disk","line",,"ebpf.plugin","vfs"
+"cgroup_name.vfs_fsync","cgroup",dimensions,"calls/s","Calls for <code>vfs_fsync</code>","line",,"ebpf.plugin","vfs"
+"cgroup_name.vfs_fsync_error","cgroup",dimensions,"calls/s","Sync error","line",,"ebpf.plugin","vfs"
+"cgroup_name.vfs_open","cgroup",dimensions,"calls/s","Calls for <code>vfs_open</code>","line",,"ebpf.plugin","vfs"
+"cgroup_name.vfs_open_error","cgroup",dimensions,"calls/s","Open error","line",,"ebpf.plugin","vfs"
+"cgroup_name.vfs_create","cgroup",dimensions,"calls/s","Calls for <code>vfs_create</code>","line",,"ebpf.plugin","vfs"
+"cgroup_name.vfs_create_error","cgroup",dimensions,"calls/s","Create error","line",,"ebpf.plugin","vfs"
+"services.file_deleted","services","services running","calls/s","Files deleted","stacked",,"ebpf.plugin","vfs"
+"services.vfs_write_call","services","services running","calls/s","Write to disk","stacked",,"ebpf.plugin","vfs"
+"services.vfs_write_error","services","services running","calls/s","Fails to write","stacked",,"ebpf.plugin","vfs"
+"services.vfs_read_call","services","services running","calls/s","Read from disk","stacked",,"ebpf.plugin","vfs"
+"services.vfs_read_error","services","services running","calls/s","Fails to read","stacked",,"ebpf.plugin","vfs"
+"services.vfs_write_bytes","services","services running","bytes/s","Bytes written on disk","stacked",,"ebpf.plugin","vfs"
+"services.vfs_read_bytes","services","services running","bytes/s","Bytes read from disk","stacked",,"ebpf.plugin","vfs"
+"services.vfs_fsync","services","services running","calls/s","Calls to <code>vfs_fsync</code>","stacked",,"ebpf.plugin","vfs"
+"services.vfs_fsync_error","services","services running","calls/s","Sync error","stacked",,"ebpf.plugin","vfs"
+"services.vfs_open","services","services running","calls/s","Calls to <code>vfs_open</code>","stacked",,"ebpf.plugin","vfs"
+"services.vfs_open_error","services","services running","calls/s","Open error","stacked",,"ebpf.plugin","vfs"
+"services.vfs_create","services","services running","calls/s","Calls to <code>vfs_create</code>","stacked",,"ebpf.plugin","vfs"
+"services.vfs_create_error","services","services running","calls/s","Create error","stacked",,"ebpf.plugin","vfs"
+"filesystem.vfs_deleted_objects",,"delete","calls/s","Remove files","line",,"ebpf.plugin","vfs"
+"filesystem.vfs_io",,"read,write","calls/s","Calls to IO","line",,"ebpf.plugin","vfs"
+"filesystem.vfs_io_error",,"read,write","calls/s","Fails to write or read","line",,"ebpf.plugin","vfs"
+"filesystem.vfs_fsync",,"fsync","calls/s","Calls for <code>vfs_fsync</code>","line",,"ebpf.plugin","vfs"
+"filesystem.vfs_fsync_error",,"fsync","calls/s","Fails to synchronize","line",,"ebpf.plugin","vfs"
+"filesystem.vfs_open",,"open","calls/s","Calls for <code>vfs_open</code>","line",,"ebpf.plugin","vfs"
+"filesystem.vfs_open_error",,"open","calls/s","Fails to open a file","line",,"ebpf.plugin","vfs"
+"filesystem.vfs_create",,"create","calls/s","Calls for <code>vfs_create</code>","line",,"ebpf.plugin","vfs"
+"filesystem.vfs_create_error",,"create","calls/s","Fails to create a file.","line",,"ebpf.plugin","vfs"
+"apps.file_deleted","apps","apps group inside apps_group.conf","calls/s","Files deleted","stacked",,"ebpf.plugin","vfs"
+"apps.vfs_write_call","apps","apps group inside apps_group.conf","calls/s","Write to disk","stacked",,"ebpf.plugin","vfs"
+"apps.vfs_write_error","apps","apps group inside apps_group.conf","calls/s","Fails to write","stacked",,"ebpf.plugin","vfs"
+"apps.vfs_read_call","apps","apps group inside apps_group.conf","calls/s","Read from disk","stacked",,"ebpf.plugin","vfs"
+"apps.vfs_read_error","apps","apps group inside apps_group.conf","calls/s","Fails to read","stacked",,"ebpf.plugin","vfs"
+"apps.vfs_write_bytes","apps","apps group inside apps_group.conf","bytes/s","Bytes written on disk","stacked",,"ebpf.plugin","vfs"
+"apps.vfs_read_bytes","apps","apps group inside apps_group.conf","bytes/s","Bytes read on disk","stacked",,"ebpf.plugin","vfs"
+"apps.vfs_fsync","apps","apps group inside apps_group.conf","calls/s","Calls for <code>vfs_fsync</code>","stacked",,"ebpf.plugin","vfs"
+"apps.vfs_fsync_error","apps","apps group inside apps_group.conf","calls/s","Sync error","stacked",,"ebpf.plugin","vfs"
+"apps.vfs_open","apps","apps group inside apps_group.conf","calls/s","Calls for <code>vfs_open</code>","stacked",,"ebpf.plugin","vfs"
+"apps.vfs_open_error","apps","apps group inside apps_group.conf","calls/s","Open error","stacked",,"ebpf.plugin","vfs"
+"apps.vfs_create","apps","apps group inside apps_group.conf","calls/s","Calls for <code>vfs_create</code>","stacked",,"ebpf.plugin","vfs"
+"apps.vfs_create_error","apps","apps group inside apps_group.conf","calls/s","Create error","stacked",,"ebpf.plugin","vfs"
+
