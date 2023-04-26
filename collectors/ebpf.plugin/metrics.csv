@@ -29,8 +29,8 @@ cgroup.task_close,cgroup,process,"calls/s",Tasks closed,line,,ebpf.plugin,proces
 cgroup.task_error,cgroup,process,"calls/s",Errors to create process or threads,line,,ebpf.plugin,processes
 services.process_create,cgroup,services running,"calls/s",Process started,stacked,,ebpf.plugin,processes
 services.thread_create,cgroup,services running,"calls/s",Threads started,stacked,,ebpf.plugin,processes
-services.task_close,cgroup,services running,"calls/s","Tasks starts exit process,stacked,,ebpf.plugin,processes
-services.task_exit,cgroup,services running,"calls/s","Tasks closed,stacked,,ebpf.plugin,processes
+services.task_close,cgroup,services running,"calls/s",Tasks starts exit process,stacked,,ebpf.plugin,processes
+services.task_exit,cgroup,services running,"calls/s",Tasks closed,stacked,,ebpf.plugin,processes
 services.task_error,cgroup,services running,"calls/s",Errors to create process or threads,stacked,,ebpf.plugin,processes
 disk.latency_io,,latency,"calls/s",Disk latency,stacked,,ebpf.plugin,disk
 system.hardirq_latency,,hardirq names,milisecondds,Hardware IRQ latency,stacked,,ebpf.plugin,hardirq
@@ -151,7 +151,7 @@ cgroup.vfs_unlink,cgroup,delete,"calls/s",Files deleted,line,,ebpf.plugin,vfs
 cgroup.vfs_write,cgroup,write,"calls/s",Write to disk,line,,ebpf.plugin,vfs
 cgroup.vfs_write_error,cgroup,write,"calls/s",Fails to write,line,,ebpf.plugin,vfs
 cgroup.vfs_read,cgroup,read,"calls/s",Read from disk,line,,ebpf.plugin,vfs
-cgroup.vfs_read_error,cgroup,read,"calls/s","ails to read,line,,ebpf.plugin,vfs
+cgroup.vfs_read_error,cgroup,read,"calls/s",Fails to read,line,,ebpf.plugin,vfs
 cgroup.vfs_write_bytes,cgroup,write,"bytes/s",Bytes written on disk,line,,ebpf.plugin,vfs
 cgroup.vfs_read_bytes,cgroup,read,"bytes/s",Bytes read from disk,line,,ebpf.plugin,vfs
 cgroup.vfs_fsync,cgroup,fsync,"calls/s","Calls for <code>vfs_fsync</code>",line,,ebpf.plugin,vfs
@@ -186,7 +186,7 @@ filesystem.vfs_create_error,,create,"calls/s",Fails to create a file.,line,,ebpf
 apps.file_deleted,,a dimension per app group,"calls/s",Files deleted,stacked,,ebpf.plugin,vfs
 apps.vfs_write_call,,a dimension per app group,"calls/s",Write to disk,stacked,,ebpf.plugin,vfs
 apps.vfs_write_error,,a dimension per app group,"calls/s",Fails to write,stacked,,ebpf.plugin,vfs
-apps.vfs_read_call,,a dimension per app group,"calls/s","Read from disk,stacked,,ebpf.plugin,vfs
+apps.vfs_read_call,,a dimension per app group,"calls/s",Read from disk,stacked,,ebpf.plugin,vfs
 apps.vfs_read_error,,a dimension per app group,"calls/s",Fails to read,stacked,,ebpf.plugin,vfs
 apps.vfs_write_bytes,,a dimension per app group,"bytes/s",Bytes written on disk,stacked,,ebpf.plugin,vfs
 apps.vfs_read_bytes,,a dimension per app group,"bytes/s",Bytes read on disk,stacked,,ebpf.plugin,vfs
@@ -210,4 +210,3 @@ mem.sync,,sync,"calls/s","Monitor calls for <code>sync(2)</code> and <code>syncf
 mem.file_segment,,sync_file_range,"calls/s","Monitor calls for <code>sync_file_range(2)</code>.",line,,ebpf.plugin,sync
 netdata.ebpf_aral_stat_size,,memory,bytes,Bytes allocated for ARAL.,stacked,,ebpf.plugin,process
 netdata.ebpf_aral_stat_alloc,,aral,calls,Calls to allocate memory,stacked,,ebpf.plugin,process
-
