@@ -14,31 +14,30 @@ metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "filesystem.file_descriptor",,"open,close","calls/s","Open and close calls","line",,"ebpf.plugin","filedescriptor"
 "filesystem.file_error",,"open,close","calls/s","Open fails","line",labels,"ebpf.plugin","filedescriptor"
 /home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_process.c
-metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
-"NETDATA_EBPF_SYSTEM_GROUP.NETDATA_PROCESS_SYSCALL",scope,dimensions,"calls/s","Start process","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
-"NETDATA_EBPF_SYSTEM_GROUP.NETDATA_EXIT_SYSCALL",scope,dimensions,"calls/s","Exit process","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
-"NETDATA_EBPF_SYSTEM_GROUP.NETDATA_PROCESS_ERROR_NAME",scope,dimensions,"calls/s","Fails to create process","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
-"apps.NETDATA_SYSCALL_APPS_TASK_PROCESS","apps","apps group inside apps_group.conf","calls/s","Process started","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
-"apps.NETDATA_SYSCALL_APPS_TASK_THREAD","apps","apps group inside apps_group.conf","calls/s","Threads started","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
-"apps.NETDATA_SYSCALL_APPS_TASK_EXIT","apps","apps group inside apps_group.conf","calls/s","Tasks starts exit process.","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
-"apps.NETDATA_SYSCALL_APPS_TASK_CLOSE","apps","apps group inside apps_group.conf","calls/s","Tasks closed","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
-"apps.NETDATA_SYSCALL_APPS_TASK_ERROR","apps","apps group inside apps_group.conf","calls/s","Errors to create process or threads.","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
-"cgroup_name.NETDATA_SYSCALL_APPS_TASK_PROCESS","cgroup",dimensions,"calls/s","Process started","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
-"cgroup_name.NETDATA_SYSCALL_APPS_TASK_THREAD","cgroup",dimensions,"calls/s","Threads started","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
-"cgroup_name.NETDATA_SYSCALL_APPS_TASK_EXIT","cgroup",dimensions,"calls/s","Tasks starts exit process.","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
-"cgroup_name.NETDATA_SYSCALL_APPS_TASK_CLOSE","cgroup",dimensions,"calls/s","Tasks closed","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
-"cgroup_name.NETDATA_SYSCALL_APPS_TASK_ERROR","cgroup",dimensions,"calls/s","Errors to create process or threads.","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
-"services.NETDATA_SYSCALL_APPS_TASK_PROCESS","apps","apps group inside apps_group.conf","calls/s","Process started","stacked",labels,"ebpf.plugin",em->update_every
-"services.NETDATA_SYSCALL_APPS_TASK_THREAD","apps","apps group inside apps_group.conf","calls/s","Threads started","stacked",labels,"ebpf.plugin",em->update_every
-"services.NETDATA_SYSCALL_APPS_TASK_CLOSE","apps","apps group inside apps_group.conf","calls/s","Tasks starts exit process.","stacked",labels,"ebpf.plugin",em->update_every
-"services.NETDATA_SYSCALL_APPS_TASK_EXIT","apps","apps group inside apps_group.conf","calls/s","Tasks closed","stacked",labels,"ebpf.plugin",em->update_every
-"services.NETDATA_SYSCALL_APPS_TASK_ERROR","apps","apps group inside apps_group.conf","calls/s","Errors to create process or threads.","stacked",labels,"ebpf.plugin",em->update_every
+"system.process_thread",scope,dimensions,"calls/s","Start process","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
+"system.exit",scope,dimensions,"calls/s","Exit process","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
+"system.task_error",scope,dimensions,"calls/s","Fails to create process","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
+"apps.process_create","apps","apps group inside apps_group.conf","calls/s","Process started","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
+"apps.thread_create","apps","apps group inside apps_group.conf","calls/s","Threads started","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
+"apps.task_exit","apps","apps group inside apps_group.conf","calls/s","Tasks starts exit process.","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
+"apps.task_close","apps","apps group inside apps_group.conf","calls/s","Tasks closed","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
+"apps.task_error","apps","apps group inside apps_group.conf","calls/s","Errors to create process or threads.","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
+"cgroup_name.process_create","cgroup",dimensions,"calls/s","Process started","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
+"cgroup_name.thread_create","cgroup",dimensions,"calls/s","Threads started","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
+"cgroup_name.task_exit","cgroup",dimensions,"calls/s","Tasks starts exit process.","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
+"cgroup_name.task_close","cgroup",dimensions,"calls/s","Tasks closed","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
+"cgroup_name.task_error","cgroup",dimensions,"calls/s","Errors to create process or threads.","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
+"services.process_create","apps","apps group inside apps_group.conf","calls/s","Process started","stacked",labels,"ebpf.plugin",em->update_every
+"services.thread_create","apps","apps group inside apps_group.conf","calls/s","Threads started","stacked",labels,"ebpf.plugin",em->update_every
+"services.task_close","apps","apps group inside apps_group.conf","calls/s","Tasks starts exit process.","stacked",labels,"ebpf.plugin",em->update_every
+"services.task_exit","apps","apps group inside apps_group.conf","calls/s","Tasks closed","stacked",labels,"ebpf.plugin",em->update_every
+"services.task_error","apps","apps group inside apps_group.conf","calls/s","Errors to create process or threads.","stacked",labels,"ebpf.plugin",em->update_every
 /home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_disk.c
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "w->histogram.name.family",scope,dimensions,"calls/s","Disk latency","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_DISK
 /home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_hardirq.c
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
-"NETDATA_EBPF_SYSTEM_GROUP.hardirq_latency",scope,dimensions,EBPF_COMMON_DIMENSION_MILLISECONDS,"Hardware IRQ latency","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_HARDIRQ
+"system.hardirq_latency",scope,dimensions,EBPF_COMMON_DIMENSION_MILLISECONDS,"Hardware IRQ latency","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_HARDIRQ
 /home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_cachestat.c
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "apps.NETDATA_CACHESTAT_HIT_RATIO_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_PERCENTAGE,"Hit ratio","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_CACHESTAT
@@ -68,7 +67,7 @@ metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "services.NETDATA_MEM_SWAP_WRITE_CHART","apps","apps group inside apps_group.conf","calls/s","Calls to function <code>swap_writepage</code>.","stacked",labels,"ebpf.plugin",update_every
 "apps.NETDATA_MEM_SWAP_READ_CHART","apps","apps group inside apps_group.conf","calls/s","Calls to function <code>swap_readpage</code>.","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SWAP
 "apps.NETDATA_MEM_SWAP_WRITE_CHART","apps","apps group inside apps_group.conf","calls/s","Calls to function <code>swap_writepage</code>.","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SWAP
-"NETDATA_EBPF_SYSTEM_GROUP.NETDATA_MEM_SWAP_CHART",scope,dimensions,"calls/s","Calls to access swap memory","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SWAP
+"system.NETDATA_MEM_SWAP_CHART",scope,dimensions,"calls/s","Calls to access swap memory","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SWAP
 /home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_oomkill.c
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "cgroup_name.NETDATA_OOMKILL_CHART","cgroup",dimensions,EBPF_COMMON_DIMENSION_KILLS,"OOM kills. This chart is provided by eBPF plugin.","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_OOMKILL
@@ -154,10 +153,10 @@ metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "apps.NETDATA_SHMAT_CHART","apps","apps group inside apps_group.conf","calls/s","Calls to syscall <code>shmat(2)</code>.","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SHM
 "apps.NETDATA_SHMDT_CHART","apps","apps group inside apps_group.conf","calls/s","Calls to syscall <code>shmdt(2)</code>.","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SHM
 "apps.NETDATA_SHMCTL_CHART","apps","apps group inside apps_group.conf","calls/s","Calls to syscall <code>shmctl(2)</code>.","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SHM
-"NETDATA_EBPF_SYSTEM_GROUP.NETDATA_SHM_GLOBAL_CHART",scope,dimensions,"calls/s","Calls to shared memory system calls","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SHM
+"system.NETDATA_SHM_GLOBAL_CHART",scope,dimensions,"calls/s","Calls to shared memory system calls","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SHM
 /home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_softirq.c
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
-"NETDATA_EBPF_SYSTEM_GROUP.softirq_latency",scope,dimensions,EBPF_COMMON_DIMENSION_MILLISECONDS,"Software IRQ latency","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOFTIRQ
+"system.softirq_latency",scope,dimensions,EBPF_COMMON_DIMENSION_MILLISECONDS,"Software IRQ latency","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOFTIRQ
 /home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_mount.c
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "NETDATA_EBPF_MOUNT_GLOBAL_FAMILY.NETDATA_EBPF_MOUNT_CALLS",scope,dimensions,"calls/s","Calls to mount and umount syscalls","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_MOUNT
