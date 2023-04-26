@@ -41,7 +41,7 @@ metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "services.cachestat_dirties","services","services running","page/s","Number of dirty pages","line",,"ebpf.plugin","cachestat"
 "services.cachestat_hits","services","services running","hits/s","Number of accessed files","line",,"ebpf.plugin","cachestat"
 "services.cachestat_misses","services","services running","misses/s","Files out of page cache","line",,"ebpf.plugin","cachestat"
-"cgroup_name.cachestat_ratio","cgroup","ratio","%","Hit ratio","line",labels,"ebpf.plugin","cachestat"
+"cgroup_name.cachestat_ratio","cgroup","ratio","%","Hit ratio","line",,"ebpf.plugin","cachestat"
 "cgroup_name.cachestat_dirties","cgroup","dirty","page/s","Number of dirty pages","line",,"ebpf.plugin","cachestat"
 "cgroup_name.cachestat_hits","cgroup","hit","hits/s","Number of accessed files","line",,"ebpf.plugin","cachestat"
 "cgroup_name.cachestat_misses","cgroup","miss","misses/s","Files out of page cache","line",,"ebpf.plugin","cachestat"
@@ -96,22 +96,21 @@ metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "services.bandwidth_tcp_retransmit","apps","services running","calls/s","Calls to tcp_retransmit","stacked",,"ebpf.plugin","socket"
 "services.bandwidth_udp_send","apps","services running","calls/s","Calls to udp_sendmsg","stacked",,"ebpf.plugin","socket"
 "services.bandwidth_udp_recv","apps","services running","calls/s","Calls to udp_recvmsg","stacked",,"ebpf.plugin","socket"
-/home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_dcstat.c
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
-"apps.NETDATA_DC_HIT_CHART","apps","apps group inside apps_group.conf",%,"Percentage of files inside directory cache","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_DCSTAT
-"apps.NETDATA_DC_REFERENCE_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_FILES,"Count file access","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_DCSTAT
-"apps.NETDATA_DC_REQUEST_NOT_CACHE_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_FILES,"Files not present inside directory cache","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_DCSTAT
-"apps.NETDATA_DC_REQUEST_NOT_FOUND_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_FILES,"Files not found","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_DCSTAT
-"cgroup_name.NETDATA_DC_HIT_CHART","cgroup",dimensions,%,"Percentage of files inside directory cache","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_DCSTAT
-"cgroup_name.NETDATA_DC_REFERENCE_CHART","cgroup",dimensions,EBPF_COMMON_DIMENSION_FILES,"Count file access","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_DCSTAT
-"cgroup_name.NETDATA_DC_REQUEST_NOT_CACHE_CHART","cgroup",dimensions,EBPF_COMMON_DIMENSION_FILES,"Files not present inside directory cache","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_DCSTAT
-"cgroup_name.NETDATA_DC_REQUEST_NOT_FOUND_CHART","cgroup",dimensions,EBPF_COMMON_DIMENSION_FILES,"Files not found","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_DCSTAT
-"services.NETDATA_DC_HIT_CHART","apps","services running",%,"Percentage of files inside directory cache","line",labels,"ebpf.plugin",update_every
-"services.NETDATA_DC_REFERENCE_CHART","apps","services running",EBPF_COMMON_DIMENSION_FILES,"Count file access","line",labels,"ebpf.plugin",update_every
-"services.NETDATA_DC_REQUEST_NOT_CACHE_CHART","apps","services running",EBPF_COMMON_DIMENSION_FILES,"Files not present inside directory cache","line",labels,"ebpf.plugin",update_every
-"services.NETDATA_DC_REQUEST_NOT_FOUND_CHART","apps","services running",EBPF_COMMON_DIMENSION_FILES,"Files not found","line",labels,"ebpf.plugin",update_every
-"filesystem.NETDATA_DC_HIT_CHART",scope,dimensions,%,"Percentage of files inside directory cache","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_DCSTAT
-"filesystem.NETDATA_DC_REFERENCE_CHART",scope,dimensions,EBPF_COMMON_DIMENSION_FILES,"Variables used to calculate hit ratio.","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_DCSTAT
+"apps.dc_hit_ratio","apps","apps group inside apps_group.conf","%","Percentage of files inside directory cache","line",,"ebpf.plugin","dcstat"
+"apps.dc_reference","apps","apps group inside apps_group.conf","files","Count file access","stacked",,"ebpf.plugin","dcstat"
+"apps.dc_not_cache","apps","apps group inside apps_group.conf","files","Files not present inside directory cache","stacked",,"ebpf.plugin","dcstat"
+"apps.dc_not_found","apps","apps group inside apps_group.conf","files","Files not found","stacked",,"ebpf.plugin","dcstat"
+"cgroup_name.dc_hit_ratio","cgroup","ratio","%","Percentage of files inside directory cache","line",,"ebpf.plugin","dcstat"
+"cgroup_name.dc_reference","cgroup","reference","files","Count file access","line",,"ebpf.plugin","dcstat"
+"cgroup_name.dc_not_cache","cgroup","slow","files","Files not present inside directory cache","line",,"ebpf.plugin","dcstat"
+"cgroup_name.dc_not_found","cgroup","miss","files","Files not found","line",,"ebpf.plugin","dcstat"
+"services.dc_hit_ratio","apps","services running",%,"Percentage of files inside directory cache","line",,"ebpf.plugin","dcstat"
+"services.dc_reference","apps","services running","files","Count file access","line",,"ebpf.plugin","dcstat"
+"services.dc_not_cache","apps","services running","files","Files not present inside directory cache","line",,"ebpf.plugin","dcstat"
+"services.dc_not_found","apps","services running","files","Files not found","line",,"ebpf.plugin","dcstat"
+"filesystem.dc_hit_ratio",,"ratio","%","Percentage of files inside directory cache","line",,"ebpf.plugin","dcstat"
+"filesystem.dc_reference",,"reference,slow,miss","files","Variables used to calculate hit ratio.","line",,"ebpf.plugin","dcstat"
 /home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_filesystem.c
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "filesystem.efp->hread.name",scope,dimensions,"calls/s",title,"stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_FILESYSTEM
