@@ -6,8 +6,15 @@
 
 **Merged pull requests:**
 
+- Update ML README.md [\#14964](https://github.com/netdata/netdata/pull/14964) ([ktsaou](https://github.com/ktsaou))
+- Document netdatacli dumpconfig option [\#14963](https://github.com/netdata/netdata/pull/14963) ([cakrit](https://github.com/cakrit))
+- Update README.md [\#14962](https://github.com/netdata/netdata/pull/14962) ([cakrit](https://github.com/cakrit))
+- Fix handling of users and groups on install. [\#14961](https://github.com/netdata/netdata/pull/14961) ([Ferroin](https://github.com/Ferroin))
+- Reject child when context is loading [\#14960](https://github.com/netdata/netdata/pull/14960) ([stelfrag](https://github.com/stelfrag))
+- Add adaptec\_raid metrics.csv [\#14955](https://github.com/netdata/netdata/pull/14955) ([Ancairon](https://github.com/Ancairon))
 - Terminate JSX element in doc file [\#14952](https://github.com/netdata/netdata/pull/14952) ([Ancairon](https://github.com/Ancairon))
 - Update dbengine README.md [\#14951](https://github.com/netdata/netdata/pull/14951) ([ktsaou](https://github.com/ktsaou))
+- Prevent pager from preventing non-interactive install [\#14950](https://github.com/netdata/netdata/pull/14950) ([bompus](https://github.com/bompus))
 - Update README.md [\#14948](https://github.com/netdata/netdata/pull/14948) ([cakrit](https://github.com/cakrit))
 - Disable SQL operations in training thread [\#14947](https://github.com/netdata/netdata/pull/14947) ([vkalintiris](https://github.com/vkalintiris))
 - fix 32bit segv [\#14940](https://github.com/netdata/netdata/pull/14940) ([ktsaou](https://github.com/ktsaou))
@@ -337,7 +344,6 @@
 - Update the "Deploy Kubernetes monitoring with Netdata" doc [\#14345](https://github.com/netdata/netdata/pull/14345) ([Ancairon](https://github.com/Ancairon))
 - Events docs [\#14341](https://github.com/netdata/netdata/pull/14341) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Update the "Install Netdata with kickstart.sh" doc [\#14338](https://github.com/netdata/netdata/pull/14338) ([Ancairon](https://github.com/Ancairon))
-- Misc SSL improvements 2 [\#14334](https://github.com/netdata/netdata/pull/14334) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
@@ -400,12 +406,6 @@
 - Patch convert rel links [\#14344](https://github.com/netdata/netdata/pull/14344) ([tkatsoulas](https://github.com/tkatsoulas))
 - Update dashboard [\#14342](https://github.com/netdata/netdata/pull/14342) ([thiagoftsm](https://github.com/thiagoftsm))
 - minor fix on notification doc \(Discord\) [\#14339](https://github.com/netdata/netdata/pull/14339) ([tkatsoulas](https://github.com/tkatsoulas))
-- DBENGINE v2 - improvements part 11 [\#14337](https://github.com/netdata/netdata/pull/14337) ([ktsaou](https://github.com/ktsaou))
-- Update the Get started doc [\#14336](https://github.com/netdata/netdata/pull/14336) ([Ancairon](https://github.com/Ancairon))
-- Notifications integration docs [\#14335](https://github.com/netdata/netdata/pull/14335) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- DBENGINE v2 - improvements part 10 [\#14332](https://github.com/netdata/netdata/pull/14332) ([ktsaou](https://github.com/ktsaou))
-- reviewed the docs functions to fix broken links and other additions [\#14331](https://github.com/netdata/netdata/pull/14331) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- Add |nowarn and |noclear notification modifiers [\#14330](https://github.com/netdata/netdata/pull/14330) ([vobruba-martin](https://github.com/vobruba-martin))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
