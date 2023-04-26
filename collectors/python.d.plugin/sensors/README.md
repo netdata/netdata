@@ -1,12 +1,17 @@
+<!--
+title: "Linux machine sensors monitoring with Netdata"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/sensors/README.md"
+sidebar_label: "sensors-python.d.plugin"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Integrations/Monitor/Devices"
+-->
+
 # Linux machine sensors collector
 
 Reads system sensors information (temperature, voltage, electric current, power, etc.).
 
 Charts are created dynamically.
-
-## Metrics
-
-See [metrics.csv](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/sensors/metrics.csv) for a list of metrics.
 
 ## Configuration
 
