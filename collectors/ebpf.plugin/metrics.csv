@@ -50,15 +50,13 @@ metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "mem.cachestat_hits",,"hit","hits/s","Number of accessed files","line",,"ebpf.plugin","cachestat"
 "mem.cachestat_misses",,"miss","misses/s","Files out of page cache","line",,"ebpf.plugin","cachestat"
 "mdstat.mdstat_flush",,"disk","flushes","MD flushes","stacked",,"ebpf.plugin","mdflush"
-/home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_swap.c
-metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
-"cgroup_name.NETDATA_MEM_SWAP_READ_CHART","cgroup",dimensions,"calls/s","Calls to function <code>swap_readpage</code>.","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SWAP
-"cgroup_name.NETDATA_MEM_SWAP_WRITE_CHART","cgroup",dimensions,"calls/s","Calls to function <code>swap_writepage</code>.","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SWAP
-"services.NETDATA_MEM_SWAP_READ_CHART","apps","services running","calls/s","Calls to <code>swap_readpage</code>.","stacked",labels,"ebpf.plugin",update_every
-"services.NETDATA_MEM_SWAP_WRITE_CHART","apps","services running","calls/s","Calls to function <code>swap_writepage</code>.","stacked",labels,"ebpf.plugin",update_every
-"apps.NETDATA_MEM_SWAP_READ_CHART","apps","apps group inside apps_group.conf","calls/s","Calls to function <code>swap_readpage</code>.","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SWAP
-"apps.NETDATA_MEM_SWAP_WRITE_CHART","apps","apps group inside apps_group.conf","calls/s","Calls to function <code>swap_writepage</code>.","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SWAP
-"system.NETDATA_MEM_SWAP_CHART",scope,dimensions,"calls/s","Calls to access swap memory","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SWAP
+"cgroup_name.swap_read_call","cgroup","read","calls/s","Calls to function <code>swap_readpage</code>.","line",,"ebpf.plugin","swap"
+"cgroup_name.swap_write_call","cgroup","write","calls/s","Calls to function <code>swap_writepage</code>.","line",,"ebpf.plugin","swap"
+"services.swap_read_call","services","services running","calls/s","Calls to <code>swap_readpage</code>.","stacked",,"ebpf.plugin","swap"
+"services.swap_write_call","services","services running","calls/s","Calls to function <code>swap_writepage</code>.","stacked",,"ebpf.plugin","swap"
+"apps.swap_read_call","apps","apps group inside apps_group.conf","calls/s","Calls to function <code>swap_readpage</code>.","stacked",,"ebpf.plugin","swap"
+"apps.swap_write_call","apps","apps group inside apps_group.conf","calls/s","Calls to function <code>swap_writepage</code>.","stacked",,"ebpf.plugin","swap"
+"system.swapcalls",scope,dimensions,"calls/s","Calls to access swap memory","line",,"ebpf.plugin","swap"
 /home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_oomkill.c
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "cgroup_name.NETDATA_OOMKILL_CHART","cgroup",dimensions,EBPF_COMMON_DIMENSION_KILLS,"OOM kills. This chart is provided by eBPF plugin.","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_OOMKILL
