@@ -1,0 +1,12 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+nut.charge,ups,charge,percentage,"UPS Charge",area,,charts.d.plugin,nut
+nut.runtime,ups,runtime,seconds,"UPS Runtime",line,,charts.d.plugin,nut
+nut.battery.voltage,ups,"voltage, high, low, nominal",Volts,"UPS Battery Voltage",line,,charts.d.plugin,nut
+nut.input.voltage,ups,"voltage, fault, nominal",Volts,"UPS Input Voltage",line,,charts.d.plugin,nut
+nut.input.current,ups,nominal,Ampere,"UPS Input Current",line,,charts.d.plugin,nut
+nut.input.frequency,ups,"frequency, nominal",Hz,"UPS Input Frequency",line,,charts.d.plugin,nut
+nut.output.voltage,ups,voltage,Volts,"UPS Output Voltage",line,,charts.d.plugin,nut
+nut.load,ups,load,percentage,"UPS Load",area,,charts.d.plugin,nut
+nut.load_usage,ups,load_usage,Watts,"UPS Load Usage",area,,charts.d.plugin,nut
+nut.temperature,ups,temp,temperature,"UPS Temperature",line,,charts.d.plugin,nut
+nut.clients,ups,clients,clients,"UPS Connected Clients",area,,charts.d.plugin,nut
