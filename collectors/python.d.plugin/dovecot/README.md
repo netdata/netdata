@@ -1,3 +1,12 @@
+<!--
+title: "Dovecot monitoring with Netdata"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/dovecot/README.md"
+sidebar_label: "Dovecot"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Integrations/Monitor/Webapps"
+-->
+
 # Dovecot collector
 
 Provides statistics information from Dovecot server.
@@ -7,11 +16,6 @@ More information about dovecot stats can be found on [project wiki page.](http:/
 
 Module isn't compatible with new statistic api (v2.3), but you are still able to use the module with Dovecot v2.3
 by following [upgrading steps.](https://wiki2.dovecot.org/Upgrading/2.3).
-
-## Metrics
-
-See [metrics.csv](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/dovecot/metrics.csv) for a list of metrics.
-
 
 **Requirement:**
 Dovecot UNIX socket with R/W permissions for user `netdata` or Dovecot with configured TCP/IP socket.
@@ -121,4 +125,3 @@ Now you can manually run the `dovecot` module in debug mode:
 ```bash
 ./python.d.plugin dovecot debug trace
 ```
-
