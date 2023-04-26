@@ -1,0 +1,4 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+system.clock_sync_state,,state,state,"System Clock Synchronization State",line,,timex.plugin,
+system.clock_status,,"unsync, clockerr",status,"System Clock Status",line,,timex.plugin,
+system.clock_sync_offset,,offset,milliseconds,"Computed Time Offset Between Local System and Reference Clock",line,,timex.plugin,
