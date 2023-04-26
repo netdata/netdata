@@ -1,0 +1,11 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+apcupsd.charge,ups,charge,percentage,"UPS Charge",area,,charts.d.plugin,apcupsd
+apcupsd.battery.voltage,ups,"voltage, nominal",Volts,"UPS Battery Voltage",line,,charts.d.plugin,apcupsd
+apcupsd.input.voltage,ups,"voltage, min, max",Volts,"UPS Input Voltage",line,,charts.d.plugin,apcupsd
+apcupsd.output.voltage,ups,"absolute, nominal",Volts,"UPS Output Voltage",line,,charts.d.plugin,apcupsd
+apcupsd.input.frequency,ups,frequency,Hz,"UPS Input Voltage",line,,charts.d.plugin,apcupsd
+apcupsd.load,ups,load,percentage,"UPS Load",area,,charts.d.plugin,apcupsd
+apcupsd.load_usage,ups,load,Watts,"UPS Load Usage",area,,charts.d.plugin,apcupsd
+apcupsd.temperature,ups,temp,Celsius,"UPS Temperature",line,,charts.d.plugin,apcupsd
+apcupsd.time,ups,time,Minutes,"UPS Time Remaining",area,,charts.d.plugin,apcupsd
+apcupsd.online,ups,online,boolean,"UPS ONLINE flag",line,,charts.d.plugin,apcupsd
