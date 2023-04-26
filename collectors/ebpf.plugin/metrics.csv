@@ -37,7 +37,7 @@ apps.cachestat_ratio,,a dimension per app group,%,Hit ratio,line,,ebpf.plugin,ca
 apps.cachestat_dirties,,a dimension per app group,"page/s",Number of dirty pages,stacked,,ebpf.plugin,cachestat
 apps.cachestat_hits,,a dimension per app group,"hits/s",Number of accessed files,stacked,,ebpf.plugin,cachestat
 apps.cachestat_misses,,a dimension per app group,"misses/s",Files out of page cache,stacked,,ebpf.plugin,cachestat
-services.cachestat_ratio,services,services running,"%",Hit ratio,line,,ebpf.plugin,cachestat
+services.cachestat_ratio,services,services running,%,Hit ratio,line,,ebpf.plugin,cachestat
 services.cachestat_dirties,services,services running,"page/s",Number of dirty pages,line,,ebpf.plugin,cachestat
 services.cachestat_hits,services,services running,"hits/s",Number of accessed files,line,,ebpf.plugin,cachestat
 services.cachestat_misses,services,services running,"misses/s",Files out of page cache,line,,ebpf.plugin,cachestat
@@ -51,7 +51,7 @@ mem.cachestat_hits,,hit,"hits/s",Number of accessed files,line,,ebpf.plugin,cach
 mem.cachestat_misses,,miss,"misses/s",Files out of page cache,line,,ebpf.plugin,cachestat
 mdstat.mdstat_flush,,disk,flushes,MD flushes,stacked,,ebpf.plugin,mdflush
 cgroup_name.swap_read_call,cgroup,read,"calls/s","Calls to function <code>swap_readpage</code>.",line,,ebpf.plugin,swap
-cgroup_name.swap_write_call,cgroup,"write","calls/s","Calls to function <code>swap_writepage</code>.",line,,ebpf.plugin,swap
+cgroup_name.swap_write_call,cgroup,write,"calls/s","Calls to function <code>swap_writepage</code>.",line,,ebpf.plugin,swap
 services.swap_read_call,services,services running,"calls/s","Calls to <code>swap_readpage</code>.",stacked,,ebpf.plugin,swap
 services.swap_write_call,services,services running,"calls/s","Calls to function <code>swap_writepage</code>.",stacked,,ebpf.plugin,swap
 apps.swap_read_call,,a dimension per app group,"calls/s","Calls to function <code>swap_readpage</code>.",stacked,,ebpf.plugin,swap
