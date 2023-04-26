@@ -57,51 +57,45 @@ metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "apps.swap_read_call","apps","apps group inside apps_group.conf","calls/s","Calls to function <code>swap_readpage</code>.","stacked",,"ebpf.plugin","swap"
 "apps.swap_write_call","apps","apps group inside apps_group.conf","calls/s","Calls to function <code>swap_writepage</code>.","stacked",,"ebpf.plugin","swap"
 "system.swapcalls",,"write,read","calls/s","Calls to access swap memory","line",,"ebpf.plugin","swap"
-"cgroup_name.oomkills","cgroup",dimensions,kills,"OOM kills. This chart is provided by eBPF plugin.","line",,"ebpf.plugin","oomkill"
+"cgroup_name.oomkills","cgroup","cgroup name","kills","OOM kills. This chart is provided by eBPF plugin.","line",,"ebpf.plugin","oomkill"
 "services.oomkills","services","services running",kills,"OOM kills. This chart is provided by eBPF plugin.","line",,"ebpf.plugin","oomkill"
 "apps.oomkills","apps","apps group inside apps_group.conf",kills,"OOM kills","stacked",,"ebpf.plugin","oomkill"
-/home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_socket.c
-metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
-"NETDATA_EBPF_IP_FAMILY.NETDATA_INBOUND_CONNECTIONS",scope,dimensions,EBPF_COMMON_DIMENSION_CONNECTIONS,"Inbound connections.","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOCKET
-"NETDATA_EBPF_IP_FAMILY.NETDATA_TCP_OUTBOUND_CONNECTIONS",scope,dimensions,EBPF_COMMON_DIMENSION_CONNECTIONS,"TCP outbound connections.","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOCKET
-"NETDATA_EBPF_IP_FAMILY.NETDATA_TCP_FUNCTION_COUNT",scope,dimensions,"calls/s","Calls to internal functions","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOCKET
-"NETDATA_EBPF_IP_FAMILY.NETDATA_TCP_FUNCTION_BITS",scope,dimensions,EBPF_COMMON_DIMENSION_BITS,"TCP bandwidth","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOCKET
-"NETDATA_EBPF_IP_FAMILY.NETDATA_TCP_FUNCTION_ERROR",scope,dimensions,"calls/s","TCP errors","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOCKET
-"NETDATA_EBPF_IP_FAMILY.NETDATA_TCP_RETRANSMIT",scope,dimensions,"calls/s","Packages retransmitted","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOCKET
-"NETDATA_EBPF_IP_FAMILY.NETDATA_UDP_FUNCTION_COUNT",scope,dimensions,"calls/s","UDP calls","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOCKET
-"NETDATA_EBPF_IP_FAMILY.NETDATA_UDP_FUNCTION_BITS",scope,dimensions,EBPF_COMMON_DIMENSION_BITS,"UDP bandwidth","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOCKET
-"NETDATA_EBPF_IP_FAMILY.NETDATA_UDP_FUNCTION_ERROR",scope,dimensions,"calls/s","UDP errors","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOCKET
-An invalid number of indexes 11 was found 
-['ebpf_create_charts_on_apps(', 'NETDATA_NET_APPS_CONNECTION_TCP_V4', '"Calls to tcp_v4_connection" EBPF_COMMON_DIMENSION_CONNECTIONS', 'NETDATA_APPS_NET_GROUP', '"stacked"', 'order++', 'ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]', 'root', 'em->update_every', 'NETDATA_EBPF_MODULE_NAME_SOCKET', ');']
-An invalid number of indexes 11 was found 
-['ebpf_create_charts_on_apps(', 'NETDATA_NET_APPS_CONNECTION_TCP_V6', '"Calls to tcp_v6_connection" EBPF_COMMON_DIMENSION_CONNECTIONS', 'NETDATA_APPS_NET_GROUP', '"stacked"', 'order++', 'ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]', 'root', 'em->update_every', 'NETDATA_EBPF_MODULE_NAME_SOCKET', ');']
-An invalid number of indexes 11 was found 
-['ebpf_create_charts_on_apps(', 'NETDATA_NET_APPS_BANDWIDTH_SENT', '"Bytes sent" EBPF_COMMON_DIMENSION_BITS', 'NETDATA_APPS_NET_GROUP', '"stacked"', 'order++', 'ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]', 'root', 'em->update_every', 'NETDATA_EBPF_MODULE_NAME_SOCKET', ');']
-An invalid number of indexes 11 was found 
-['ebpf_create_charts_on_apps(', 'NETDATA_NET_APPS_BANDWIDTH_RECV', '"bytes received" EBPF_COMMON_DIMENSION_BITS', 'NETDATA_APPS_NET_GROUP', '"stacked"', 'order++', 'ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]', 'root', 'em->update_every', 'NETDATA_EBPF_MODULE_NAME_SOCKET', ');']
-"apps.NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS","apps","apps group inside apps_group.conf","calls/s","Calls for tcp_sendmsg","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOCKET
-"apps.NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS","apps","apps group inside apps_group.conf","calls/s","Calls for tcp_cleanup_rbuf","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOCKET
-"apps.NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT","apps","apps group inside apps_group.conf","calls/s","Calls for tcp_retransmit","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOCKET
-"apps.NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS","apps","apps group inside apps_group.conf","calls/s","Calls for udp_sendmsg","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOCKET
-"apps.NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS","apps","apps group inside apps_group.conf","calls/s","Calls for udp_recvmsg","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOCKET
-"cgroup_name.NETDATA_NET_APPS_CONNECTION_TCP_V4","cgroup",dimensions,EBPF_COMMON_DIMENSION_CONNECTIONS,"Calls to tcp_v4_connection","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOCKET
-"cgroup_name.NETDATA_NET_APPS_CONNECTION_TCP_V6","cgroup",dimensions,EBPF_COMMON_DIMENSION_CONNECTIONS,"Calls to tcp_v6_connection","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOCKET
-"cgroup_name.NETDATA_NET_APPS_BANDWIDTH_RECV","cgroup",dimensions,"calls/s","Bytes received","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOCKET
-"cgroup_name.NETDATA_NET_APPS_BANDWIDTH_SENT","cgroup",dimensions,"calls/s","Bytes sent","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOCKET
-"cgroup_name.NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS","cgroup",dimensions,"calls/s","Calls to tcp_cleanup_rbuf.","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOCKET
-"cgroup_name.NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS","cgroup",dimensions,"calls/s","Calls to tcp_sendmsg.","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOCKET
-"cgroup_name.NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT","cgroup",dimensions,"calls/s","Calls to tcp_retransmit.","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOCKET
-"cgroup_name.NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS","cgroup",dimensions,"calls/s","Calls to udp_sendmsg","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOCKET
-"cgroup_name.NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS","cgroup",dimensions,"calls/s","Calls to udp_recvmsg","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOCKET
-"services.NETDATA_NET_APPS_CONNECTION_TCP_V4","apps","services running",EBPF_COMMON_DIMENSION_CONNECTIONS,"Calls to tcp_v4_connection","stacked",labels,"ebpf.plugin",update_every
-"services.NETDATA_NET_APPS_CONNECTION_TCP_V6","apps","services running",EBPF_COMMON_DIMENSION_CONNECTIONS,"Calls to tcp_v6_connection","stacked",labels,"ebpf.plugin",update_every
-"services.NETDATA_NET_APPS_BANDWIDTH_RECV","apps","services running",EBPF_COMMON_DIMENSION_BITS,"Bytes received","stacked",labels,"ebpf.plugin",update_every
-"services.NETDATA_NET_APPS_BANDWIDTH_SENT","apps","services running",EBPF_COMMON_DIMENSION_BITS,"Bytes sent","stacked",labels,"ebpf.plugin",update_every
-"services.NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS","apps","services running","calls/s","Calls to tcp_cleanup_rbuf.","stacked",labels,"ebpf.plugin",update_every
-"services.NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS","apps","services running","calls/s","Calls to tcp_sendmsg.","stacked",labels,"ebpf.plugin",update_every
-"services.NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT","apps","services running","calls/s","Calls to tcp_retransmit","stacked",labels,"ebpf.plugin",update_every
-"services.NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS","apps","services running","calls/s","Calls to udp_sendmsg","stacked",labels,"ebpf.plugin",update_every
-"services.NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS","apps","services running","calls/s","Calls to udp_recvmsg","stacked",labels,"ebpf.plugin",update_every
+"ip.inbound_conn",,"connection_tcp","connections/s","Inbound connections.","line",,"ebpf.plugin","socket"
+"ip.tcp_outbound_conn",,"received","connections/s","TCP outbound connections.","line",,"ebpf.plugin","socket"
+"ip.tcp_functions",,"received,send,closed","calls/s","Calls to internal functions","line",,"ebpf.plugin","socket"
+"ip.total_tcp_bandwidth",,"received,send","kilobits/s","TCP bandwidth","line",,"ebpf.plugin","socket"
+"ip.tcp_error",,"received,send","calls/s","TCP errors","line",,"ebpf.plugin","socket"
+"ip.tcp_retransmit",,"retransmited","calls/s","Packages retransmitted","line",,"ebpf.plugin","socket"
+"ip.udp_functions",,"received,send","calls/s","UDP calls","line",,"ebpf.plugin","socket"
+"ip.total_udp_bandwidth",,"received,send","kilobits/s","UDP bandwidth","line",,"ebpf.plugin","socket"
+"ip.udp_error",,"received,send","calls/s","UDP errors","line",,"ebpf.plugin","socket"
+"apps.outbound_conn_v4","apps","apps group inside apps_group.conf","connections/s","Calls to tcp_v4_connection","stacked",,"ebpf.plugin","socket"
+"apps.outbound_conn_v6","apps","apps group inside apps_group.conf","connections/s","Calls to tcp_v6_connection","stacked",,"ebpf.plugin","socket"
+"apps.total_bandwidth_sent","apps","apps group inside apps_group.conf","kilobits/s","Bytes sent","stacked",,"ebpf.plugin","socket"
+"apps.total_bandwidth_recv","apps","apps group inside apps_group.conf","kilobits/s","bytes received","stacked",,"ebpf.plugin","socket"
+"apps.bandwidth_tcp_send","apps","apps group inside apps_group.conf","calls/s","Calls for tcp_sendmsg","stacked",,"ebpf.plugin","socket"
+"apps.bandwidth_tcp_recv","apps","apps group inside apps_group.conf","calls/s","Calls for tcp_cleanup_rbuf","stacked",,"ebpf.plugin","socket"
+"apps.bandwidth_tcp_retransmit","apps","apps group inside apps_group.conf","calls/s","Calls for tcp_retransmit","stacked",,"ebpf.plugin","socket"
+"apps.bandwidth_udp_send","apps","apps group inside apps_group.conf","calls/s","Calls for udp_sendmsg","stacked",,"ebpf.plugin","socket"
+"apps.bandwidth_udp_recv","apps","apps group inside apps_group.conf","calls/s","Calls for udp_recvmsg","stacked",,"ebpf.plugin","socket"
+"cgroup_name.outbound_conn_v4","cgroup",dimensions,"connections/s","Calls to tcp_v4_connection","line",,"ebpf.plugin","socket"
+"cgroup_name.outbound_conn_v6","cgroup",dimensions,"connections/s","Calls to tcp_v6_connection","line",,"ebpf.plugin","socket"
+"cgroup_name.total_bandwidth_recv","cgroup",dimensions,"calls/s","Bytes received","line",,"ebpf.plugin","socket"
+"cgroup_name.total_bandwidth_sent","cgroup",dimensions,"calls/s","Bytes sent","line",,"ebpf.plugin","socket"
+"cgroup_name.bandwidth_tcp_recv","cgroup",dimensions,"calls/s","Calls to tcp_cleanup_rbuf.","line",,"ebpf.plugin","socket"
+"cgroup_name.bandwidth_tcp_send","cgroup",dimensions,"calls/s","Calls to tcp_sendmsg.","line",,"ebpf.plugin","socket"
+"cgroup_name.bandwidth_tcp_retransmit","cgroup",dimensions,"calls/s","Calls to tcp_retransmit.","line",,"ebpf.plugin","socket"
+"cgroup_name.bandwidth_udp_send","cgroup",dimensions,"calls/s","Calls to udp_sendmsg","line",,"ebpf.plugin","socket"
+"cgroup_name.bandwidth_udp_recv","cgroup",dimensions,"calls/s","Calls to udp_recvmsg","line",,"ebpf.plugin","socket"
+"services.outbound_conn_v4","apps","services running","connections/s","Calls to tcp_v4_connection","stacked",,"ebpf.plugin","socket"
+"services.outbound_conn_v6","apps","services running","connections/s","Calls to tcp_v6_connection","stacked",,"ebpf.plugin","socket"
+"services.total_bandwidth_recv","apps","services running","kilobits/s","Bytes received","stacked",,"ebpf.plugin","socket"
+"services.total_bandwidth_sent","apps","services running","kilobits/s","Bytes sent","stacked",,"ebpf.plugin","socket"
+"services.bandwidth_tcp_recv","apps","services running","calls/s","Calls to tcp_cleanup_rbuf.","stacked",,"ebpf.plugin","socket"
+"services.bandwidth_tcp_send","apps","services running","calls/s","Calls to tcp_sendmsg.","stacked",,"ebpf.plugin","socket"
+"services.bandwidth_tcp_retransmit","apps","services running","calls/s","Calls to tcp_retransmit","stacked",,"ebpf.plugin","socket"
+"services.bandwidth_udp_send","apps","services running","calls/s","Calls to udp_sendmsg","stacked",,"ebpf.plugin","socket"
+"services.bandwidth_udp_recv","apps","services running","calls/s","Calls to udp_recvmsg","stacked",,"ebpf.plugin","socket"
 /home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_dcstat.c
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "apps.NETDATA_DC_HIT_CHART","apps","apps group inside apps_group.conf",%,"Percentage of files inside directory cache","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_DCSTAT
