@@ -1,13 +1,17 @@
+<!--
+title: "Postfix monitoring with Netdata"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/postfix/README.md"
+sidebar_label: "Postfix"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Integrations/Monitor/Webapps"
+-->
+
 # Postfix collector
 
 Monitors MTA email queue statistics using [postqueue](http://www.postfix.org/postqueue.1.html) tool.
 
 The collector executes  `postqueue -p` to get Postfix queue statistics.
-
-## Metrics
-
-See [metrics.csv](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/postfix/metrics.csv) for a list of metrics.
-
 
 ## Requirements
 
@@ -17,6 +21,18 @@ view the mail queue. In order to do it, add `netdata` to `authorized_mailq_users
 
 See the `authorized_mailq_users` setting in
 the [Postfix documentation](https://www.postfix.org/postconf.5.html) for more details.
+
+## Charts
+
+It produces only two charts:
+
+1. **Postfix Queue Emails**
+
+    - emails
+
+2. **Postfix Queue Emails Size** in KB
+
+    - size
 
 ## Configuration
 
