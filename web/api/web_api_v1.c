@@ -713,6 +713,8 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
             .labels = chart_labels_filter,
             .query_source = QUERY_SOURCE_API_DATA,
             .priority = STORAGE_PRIORITY_NORMAL,
+            .interrupt_callback = web_client_interrupt_callback,
+            .interrupt_callback_data = w,
     };
     qt = query_target_create(&qtr);
 

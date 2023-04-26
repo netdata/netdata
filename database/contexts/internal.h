@@ -218,7 +218,7 @@ typedef struct rrdinstance {
     STRING *title;
     STRING *units;
     STRING *family;
-    uint32_t priority;
+    uint32_t priority:24;
     RRDSET_TYPE chart_type;
 
     RRD_FLAGS flags;                    // flags related to this instance
