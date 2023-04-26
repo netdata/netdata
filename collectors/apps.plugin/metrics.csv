@@ -69,3 +69,7 @@ users.uptime_max,,a dimension per user,seconds,"Users Maximum Uptime",line,,apps
 users.files,,a dimension per user,"open files","Users Open Files",stacked,,apps.plugin,
 users.sockets,,a dimension per user,"open sockets","Users Open Sockets",stacked,,apps.plugin,
 users.pipes,,a dimension per user,"open pipes","Users Open Pipes",stacked,,apps.plugin,
+netdata.apps_cpu,,"user, system",milliseconds/s,"Apps Plugin CPU",stacked,,apps.plugin,
+netdata.apps_sizes,,"calls, files, filenames, inode_changes, link_changes, pids, fds, targets, new_pids",files/s,"Apps Plugin Files",line,,apps.plugin,
+netdata.apps_fix,,"utime, stime, gtime, minflt, majflt",percentage,"Apps Plugin Normalization Ratios",line,,apps.plugin,
+netdata.apps_children_fix,,"utime, stime, gtime, minflt, majflt",percentage,"Apps Plugin Exited Children Normalization Ratios",line,,apps.plugin,
