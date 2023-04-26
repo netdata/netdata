@@ -49,9 +49,7 @@ metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "mem.cachestat_dirties",,"dirty","page/s","Number of dirty pages","line",,"ebpf.plugin","cachestat"
 "mem.cachestat_hits",,"hit","hits/s","Number of accessed files","line",,"ebpf.plugin","cachestat"
 "mem.cachestat_misses",,"miss","misses/s","Files out of page cache","line",,"ebpf.plugin","cachestat"
-/home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_mdflush.c
-metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
-"mdstat.mdstat_flush",scope,dimensions,"flushes","MD flushes","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_MDFLUSH
+"mdstat.mdstat_flush",,"disk","flushes","MD flushes","stacked",,"ebpf.plugin","mdflush"
 /home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_swap.c
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "cgroup_name.NETDATA_MEM_SWAP_READ_CHART","cgroup",dimensions,"calls/s","Calls to function <code>swap_readpage</code>.","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SWAP
