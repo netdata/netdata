@@ -1,10 +1,39 @@
+<!--
+title: "Squid monitoring with Netdata"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/squid/README.md"
+sidebar_label: "Squid"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Integrations/Monitor/Webapps"
+-->
+
 # Squid collector
 
 Monitors one or more squid instances depending on configuration.
 
-## Metrics
+It produces following charts:
 
-See [metrics.csv](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/squid/metrics.csv) for a list of metrics.
+1.  **Client Bandwidth** in kilobits/s
+
+    -   in
+    -   out
+    -   hits
+
+2.  **Client Requests** in requests/s
+
+    -   requests
+    -   hits
+    -   errors
+
+3.  **Server Bandwidth** in kilobits/s
+
+    -   in
+    -   out
+
+4.  **Server Requests** in requests/s
+
+    -   requests
+    -   errors
 
 ## Configuration
 
