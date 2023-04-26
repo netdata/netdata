@@ -1,15 +1,27 @@
+<!--
+title: "Tor monitoring with Netdata"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/tor/README.md"
+sidebar_label: "Tor"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Integrations/Monitor/Apps"
+-->
+
 # Tor collector
 
 Connects to the Tor control port to collect traffic statistics.
-
-## Metrics
-
-See [metrics.csv](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/tor/metrics.csv) for a list of metrics.
 
 ## Requirements
 
 -   `tor` program
 -   `stem` python package
+
+It produces only one chart:
+
+1.  **Traffic**
+
+    -   read
+    -   write
 
 ## Configuration
 
