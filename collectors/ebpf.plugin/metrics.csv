@@ -31,9 +31,7 @@ metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "services.task_close","cgroup","services running","calls/s","Tasks starts exit process.","stacked",,"ebpf.plugin","processes"
 "services.task_exit","cgroup","services running","calls/s","Tasks closed","stacked",,"ebpf.plugin","processes"
 "services.task_error","cgroup","services running","calls/s","Errors to create process or threads.","stacked",,"ebpf.plugin","processes"
-/home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_disk.c
-metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
-"w->histogram.name.family",scope,dimensions,"calls/s","Disk latency","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_DISK
+"disk_latency_io.hd",,"latency","calls/s","Disk latency","stacked",,"ebpf.plugin","disk"
 /home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_hardirq.c
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "system.hardirq_latency",scope,dimensions,EBPF_COMMON_DIMENSION_MILLISECONDS,"Hardware IRQ latency","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_HARDIRQ
