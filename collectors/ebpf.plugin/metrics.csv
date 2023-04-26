@@ -53,8 +53,8 @@ mem.cachestat_misses,,miss,"misses/s",Files out of page cache,line,,ebpf.plugin,
 mdstat.mdstat_flush,,disk,flushes,MD flushes,stacked,,ebpf.plugin,mdflush
 cgroup.swap_read,cgroup,read,"calls/s","Calls to function <code>swap_readpage</code>.",line,,ebpf.plugin,swap
 cgroup.swap_write,cgroup,write,"calls/s","Calls to function <code>swap_writepage</code>.",line,,ebpf.plugin,swap
-services.swap_read_call,,services running,"calls/s","Calls to <code>swap_readpage</code>.",stacked,,ebpf.plugin,swap
-services.swap_write_call,,services running,"calls/s","Calls to function <code>swap_writepage</code>.",stacked,,ebpf.plugin,swap
+services.swap_read,,services running,"calls/s","Calls to <code>swap_readpage</code>.",stacked,,ebpf.plugin,swap
+services.swap_write,,services running,"calls/s","Calls to function <code>swap_writepage</code>.",stacked,,ebpf.plugin,swap
 apps.swap_read_call,,a dimension per app group,"calls/s","Calls to function <code>swap_readpage</code>.",stacked,,ebpf.plugin,swap
 apps.swap_write_call,,a dimension per app group,"calls/s","Calls to function <code>swap_writepage</code>.",stacked,,ebpf.plugin,swap
 system.swapcalls,,"write, read","calls/s",Calls to access swap memory,line,,ebpf.plugin,swap
@@ -88,24 +88,24 @@ cgroup.net_tcp_send,cgroup,sent,"calls/s",Calls to tcp_sendmsg.,line,,ebpf.plugi
 cgroup.net_retransmit,cgroup,retransmitted,"calls/s",Calls to tcp_retransmit.,line,,ebpf.plugin,socket
 cgroup.net_udp_send,cgroup,sent,"calls/s",Calls to udp_sendmsg,line,,ebpf.plugin,socket
 cgroup.net_udp_recv,cgroup,received,"calls/s",Calls to udp_recvmsg,line,,ebpf.plugin,socket
-services.outbound_conn_v4,,services running,"connections/s",Calls to tcp_v4_connection,stacked,,ebpf.plugin,socket
-services.outbound_conn_v6,,services running,"connections/s",Calls to tcp_v6_connection,stacked,,ebpf.plugin,socket
-services.total_bandwidth_recv,,services running,"kilobits/s",Bytes received,stacked,,ebpf.plugin,socket
-services.total_bandwidth_sent,,services running,"kilobits/s",Bytes sent,stacked,,ebpf.plugin,socket
-services.bandwidth_tcp_recv,,services running,"calls/s",Calls to tcp_cleanup_rbuf.,stacked,,ebpf.plugin,socket
-services.bandwidth_tcp_send,,services running,"calls/s",Calls to tcp_sendmsg.,stacked,,ebpf.plugin,socket
-services.bandwidth_tcp_retransmit,,services running,"calls/s",Calls to tcp_retransmit,stacked,,ebpf.plugin,socket
-services.bandwidth_udp_send,,services running,"calls/s",Calls to udp_sendmsg,stacked,,ebpf.plugin,socket
-services.bandwidth_udp_recv,,services running,"calls/s",Calls to udp_recvmsg,stacked,,ebpf.plugin,socket
-apps.dc_hit_ratio,,a dimension per app group,%,Percentage of files inside directory cache,line,,ebpf.plugin,dcstat
+services.net_conn_ipv4,,services running,"connections/s",Calls to tcp_v4_connection,stacked,,ebpf.plugin,socket
+services.net_conn_ipv6,,services running,"connections/s",Calls to tcp_v6_connection,stacked,,ebpf.plugin,socket
+services.net_bytes_recv,,services running,"kilobits/s",Bytes received,stacked,,ebpf.plugin,socket
+services.net_bytes_sent,,services running,"kilobits/s",Bytes sent,stacked,,ebpf.plugin,socket
+services.net_tcp_recv,,services running,"calls/s",Calls to tcp_cleanup_rbuf.,stacked,,ebpf.plugin,socket
+services.net_tcp_send,,services running,"calls/s",Calls to tcp_sendmsg.,stacked,,ebpf.plugin,socket
+services.net_tcp_retransmit,,services running,"calls/s",Calls to tcp_retransmit,stacked,,ebpf.plugin,socket
+services.net_udp_send,,services running,"calls/s",Calls to udp_sendmsg,stacked,,ebpf.plugin,socket
+services.net_udp_recv,,services running,"calls/s",Calls to udp_recvmsg,stacked,,ebpf.plugin,socket
+apps.dc_ratio,,a dimension per app group,%,Percentage of files inside directory cache,line,,ebpf.plugin,dcstat
 apps.dc_reference,,a dimension per app group,"files",Count file access,stacked,,ebpf.plugin,dcstat
 apps.dc_not_cache,,a dimension per app group,"files",Files not present inside directory cache,stacked,,ebpf.plugin,dcstat
 apps.dc_not_found,,a dimension per app group,"files",Files not found,stacked,,ebpf.plugin,dcstat
-cgroup.dc_hi_ratio,cgroup,ratio,%,Percentage of files inside directory cache,line,,ebpf.plugin,dcstat
+cgroup.dc_ratio,cgroup,ratio,%,Percentage of files inside directory cache,line,,ebpf.plugin,dcstat
 cgroup.dc_reference,cgroup,reference,files,Count file access,line,,ebpf.plugin,dcstat
 cgroup.dc_not_cache,cgroup,slow,files,Files not present inside directory cache,line,,ebpf.plugin,dcstat
 cgroup.dc_not_found,cgroup,miss,files,Files not found,line,,ebpf.plugin,dcstat
-services.dc_hit_ratio,,services running,%,Percentage of files inside directory cache,line,,ebpf.plugin,dcstat
+services.dc_ratio,,services running,%,Percentage of files inside directory cache,line,,ebpf.plugin,dcstat
 services.dc_reference,,services running,files,Count file access,line,,ebpf.plugin,dcstat
 services.dc_not_cache,,services running,files,Files not present inside directory cache,line,,ebpf.plugin,dcstat
 services.dc_not_found,,services running,files,Files not found,line,,ebpf.plugin,dcstat
@@ -135,10 +135,10 @@ cgroup.shmget,cgroup,get,"calls/s",Calls to syscall <code>shmget(2)</code>.,line
 cgroup.shmat,cgroup,at,"calls/s",Calls to syscall <code>shmat(2)</code>.,line,,ebpf.plugin,shm
 cgroup.shmdt,cgroup,dt,"calls/s",Calls to syscall <code>shmdt(2)</code>.,line,,ebpf.plugin,shm
 cgroup.shmctl,cgroup,ctl,"calls/s",Calls to syscall <code>shmctl(2)</code>.,line,,ebpf.plugin,shm
-services.shmget_call,,services running,"calls/s","Calls to syscall <code>shmget(2)</code>.",stacked,,ebpf.plugin,shm
-services.shmat_call,,services running,"calls/s","Calls to syscall <code>shmat(2)</code>.",stacked,,ebpf.plugin,shm
-services.shmdt_call,,services running,"calls/s","Calls to syscall <code>shmdt(2)</code>.",stacked,,ebpf.plugin,shm
-services.shmctl_call,,services running,"calls/s","Calls to syscall <code>shmctl(2)</code>.",stacked,,ebpf.plugin,shm
+services.shmget,,services running,"calls/s","Calls to syscall <code>shmget(2)</code>.",stacked,,ebpf.plugin,shm
+services.shmat,,services running,"calls/s","Calls to syscall <code>shmat(2)</code>.",stacked,,ebpf.plugin,shm
+services.shmdt,,services running,"calls/s","Calls to syscall <code>shmdt(2)</code>.",stacked,,ebpf.plugin,shm
+services.shmctl,,services running,"calls/s","Calls to syscall <code>shmctl(2)</code>.",stacked,,ebpf.plugin,shm
 apps.shmget_call,,a dimension per app group,"calls/s","Calls to syscall <code>shmget(2)</code>.",stacked,,ebpf.plugin,shm
 apps.shmat_call,,a dimension per app group,"calls/s","Calls to syscall <code>shmat(2)</code>.",stacked,,ebpf.plugin,shm
 apps.shmdt_call,,a dimension per app group,"calls/s","Calls to syscall <code>shmdt(2)</code>.",stacked,,ebpf.plugin,shm
@@ -160,10 +160,10 @@ cgroup.vfs_open,cgroup,open,"calls/s","Calls for <code>vfs_open</code>",line,,eb
 cgroup.vfs_open_error,cgroup,open,"calls/s",Open error,line,,ebpf.plugin,vfs
 cgroup.vfs_create,cgroup,create,"calls/s","Calls for <code>vfs_create</code>",line,,ebpf.plugin,vfs
 cgroup.vfs_create_error,cgroup,create,"calls/s",Create error,line,,ebpf.plugin,vfs
-services.file_deleted,,services running,"calls/s",Files deleted,stacked,,ebpf.plugin,vfs
-services.vfs_write_call,,services running,"calls/s",Write to disk,stacked,,ebpf.plugin,vfs
+services.vfs_unlink,,services running,"calls/s",Files deleted,stacked,,ebpf.plugin,vfs
+services.vfs_write,,services running,"calls/s",Write to disk,stacked,,ebpf.plugin,vfs
 services.vfs_write_error,,services running,"calls/s",Fails to write,stacked,,ebpf.plugin,vfs
-services.vfs_read_call,,services running,"calls/s",Read from disk,stacked,,ebpf.plugin,vfs
+services.vfs_read,,services running,"calls/s",Read from disk,stacked,,ebpf.plugin,vfs
 services.vfs_read_error,,services running,"calls/s",Fails to read,stacked,,ebpf.plugin,vfs
 services.vfs_write_bytes,,services running,"bytes/s",Bytes written on disk,stacked,,ebpf.plugin,vfs
 services.vfs_read_bytes,,services running,"bytes/s",Bytes read from disk,stacked,,ebpf.plugin,vfs
