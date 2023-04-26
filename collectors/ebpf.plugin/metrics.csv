@@ -115,21 +115,19 @@ metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "filesystem.FS_open_latency",,"latency period","calls/s","FS latency for each open request.","stacked",,"ebpf.plugin","filesystem"
 "filesystem.FS_attributte_latency",,"latency period","calls/s","FS latency for each attribute request.","stacked",,"ebpf.plugin","filesystem"
 "filesystem.FS_attributte_sync",,"latency period","calls/s","FS latency for each sync request.","stacked",,"ebpf.plugin","filesystem"
-/home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_shm.c
-metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
-"cgroup_name.NETDATA_SHMGET_CHART","cgroup",dimensions,"calls/s","Calls to syscall <code>shmget(2)</code>.","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SHM
-"cgroup_name.NETDATA_SHMAT_CHART","cgroup",dimensions,"calls/s","Calls to syscall <code>shmat(2)</code>.","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SHM
-"cgroup_name.NETDATA_SHMDT_CHART","cgroup",dimensions,"calls/s","Calls to syscall <code>shmdt(2)</code>.","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SHM
-"cgroup_name.NETDATA_SHMCTL_CHART","cgroup",dimensions,"calls/s","Calls to syscall <code>shmctl(2)</code>.","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SHM
-"services.NETDATA_SHMGET_CHART","apps","services running","calls/s","Calls to syscall <code>shmget(2)</code>.","stacked",,"ebpf.plugin",update_every
-"services.NETDATA_SHMAT_CHART","apps","services running","calls/s","Calls to syscall <code>shmat(2)</code>.","stacked",,"ebpf.plugin",update_every
-"services.NETDATA_SHMDT_CHART","apps","services running","calls/s","Calls to syscall <code>shmdt(2)</code>.","stacked",,"ebpf.plugin",update_every
-"services.NETDATA_SHMCTL_CHART","apps","services running","calls/s","Calls to syscall <code>shmctl(2)</code>.","stacked",,"ebpf.plugin",update_every
-"apps.NETDATA_SHMGET_CHART","apps","apps group inside apps_group.conf","calls/s","Calls to syscall <code>shmget(2)</code>.","stacked",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SHM
-"apps.NETDATA_SHMAT_CHART","apps","apps group inside apps_group.conf","calls/s","Calls to syscall <code>shmat(2)</code>.","stacked",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SHM
-"apps.NETDATA_SHMDT_CHART","apps","apps group inside apps_group.conf","calls/s","Calls to syscall <code>shmdt(2)</code>.","stacked",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SHM
-"apps.NETDATA_SHMCTL_CHART","apps","apps group inside apps_group.conf","calls/s","Calls to syscall <code>shmctl(2)</code>.","stacked",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SHM
-"system.NETDATA_SHM_GLOBAL_CHART",scope,dimensions,"calls/s","Calls to shared memory system calls","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SHM
+"cgroup_name.shmget_call","cgroup","get","calls/s","Calls to syscall <code>shmget(2)</code>.","line",,"ebpf.plugin","shm"
+"cgroup_name.shmat_call","cgroup","at","calls/s","Calls to syscall <code>shmat(2)</code>.","line",,"ebpf.plugin","shm"
+"cgroup_name.shmdt_call","cgroup","dt","calls/s","Calls to syscall <code>shmdt(2)</code>.","line",,"ebpf.plugin","shm"
+"cgroup_name.shmctl_call","cgroup","ctl","calls/s","Calls to syscall <code>shmctl(2)</code>.","line",,"ebpf.plugin","shm"
+"services.shmget_call","services","services running","calls/s","Calls to syscall <code>shmget(2)</code>.","stacked",,"ebpf.plugin","shm"
+"services.shmat_call","services","services running","calls/s","Calls to syscall <code>shmat(2)</code>.","stacked",,"ebpf.plugin","shm"
+"services.shmdt_call","services","services running","calls/s","Calls to syscall <code>shmdt(2)</code>.","stacked",,"ebpf.plugin","shm"
+"services.shmctl_call","services","services running","calls/s","Calls to syscall <code>shmctl(2)</code>.","stacked",,"ebpf.plugin","shm"
+"apps.shmget_call","apps","apps group inside apps_group.conf","calls/s","Calls to syscall <code>shmget(2)</code>.","stacked",,"ebpf.plugin","shm"
+"apps.shmat_call","apps","apps group inside apps_group.conf","calls/s","Calls to syscall <code>shmat(2)</code>.","stacked",,"ebpf.plugin","shm"
+"apps.shmdt_call","apps","apps group inside apps_group.conf","calls/s","Calls to syscall <code>shmdt(2)</code>.","stacked",,"ebpf.plugin","shm"
+"apps.shmctl_call","apps","apps group inside apps_group.conf","calls/s","Calls to syscall <code>shmctl(2)</code>.","stacked",,"ebpf.plugin","shm"
+"system.shared_memory_calls",,"get,at,dt,ctl","calls/s","Calls to shared memory system calls","line",,"ebpf.plugin","shm"
 /home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_softirq.c
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "system.softirq_latency",scope,dimensions,EBPF_COMMON_DIMENSION_MILLISECONDS,"Software IRQ latency","stacked",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOFTIRQ
