@@ -1,0 +1,2 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+ioping.latency,disk,latency,microseconds,"Read Latency",line,,ioping.plugin,

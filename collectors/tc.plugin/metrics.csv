@@ -1,0 +1,6 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+tc.qos,"network device, direction",a dimension per class,kilobits/s,"Class Usage",stacked,"device, name, family",tc.plugin,
+tc.qos_packets,"network device, direction",a dimension per class,packets/s,"Class Packets",stacked,"device, name, family",tc.plugin,
+tc.qos_dropped,"network device, direction",a dimension per class,packets/s,"Class Dropped Packets",stacked,"device, name, family",tc.plugin,
+tc.qos_tokens,"network device, direction",a dimension per class,tokens,"Class Tokens",line,"device, name, family",tc.plugin,
+tc.qos_ctokens,"network device, direction",a dimension per class,ctokens,"Class cTokens",line,"device, name, family",tc.plugin,
