@@ -319,7 +319,7 @@ typedef struct storage_collect_handle {
 struct rrddim_tier {
     STORAGE_POINT virtual_point;
     STORAGE_ENGINE_BACKEND backend;
-    size_t tier_grouping;
+    uint32_t tier_grouping;
     time_t next_point_end_time_s;
     STORAGE_METRIC_HANDLE *db_metric_handle;        // the metric handle inside the database
     STORAGE_COLLECT_HANDLE *db_collection_handle;   // the data collection handle
@@ -1135,7 +1135,7 @@ struct rrdhost {
         RRD_MEMORY_MODE mode;                       // the db mode for this tier
         STORAGE_ENGINE *eng;                        // the storage engine API for this tier
         STORAGE_INSTANCE *instance;                 // the db instance for this tier
-        size_t tier_grouping;                       // tier 0 iterations aggregated on this tier
+        uint32_t tier_grouping;                     // tier 0 iterations aggregated on this tier
     } db[RRD_STORAGE_TIERS];
 
     struct rrdhost_system_info *system_info;        // information collected from the host environment
