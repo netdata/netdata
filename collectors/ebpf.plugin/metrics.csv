@@ -57,11 +57,9 @@ metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "apps.swap_read_call","apps","apps group inside apps_group.conf","calls/s","Calls to function <code>swap_readpage</code>.","stacked",,"ebpf.plugin","swap"
 "apps.swap_write_call","apps","apps group inside apps_group.conf","calls/s","Calls to function <code>swap_writepage</code>.","stacked",,"ebpf.plugin","swap"
 "system.swapcalls",,"write,read","calls/s","Calls to access swap memory","line",,"ebpf.plugin","swap"
-/home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_oomkill.c
-metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
-"cgroup_name.NETDATA_OOMKILL_CHART","cgroup",dimensions,EBPF_COMMON_DIMENSION_KILLS,"OOM kills. This chart is provided by eBPF plugin.","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_OOMKILL
-"services.NETDATA_OOMKILL_CHART","apps","services running",EBPF_COMMON_DIMENSION_KILLS,"OOM kills. This chart is provided by eBPF plugin.","line",labels,"ebpf.plugin",update_every
-"apps.NETDATA_OOMKILL_CHART","apps","apps group inside apps_group.conf",EBPF_COMMON_DIMENSION_KILLS,"OOM kills","stacked",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_OOMKILL
+"cgroup_name.oomkills","cgroup",dimensions,kills,"OOM kills. This chart is provided by eBPF plugin.","line",,"ebpf.plugin","oomkill"
+"services.oomkills","services","services running",kills,"OOM kills. This chart is provided by eBPF plugin.","line",,"ebpf.plugin","oomkill"
+"apps.oomkills","apps","apps group inside apps_group.conf",kills,"OOM kills","stacked",,"ebpf.plugin","oomkill"
 /home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_socket.c
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "NETDATA_EBPF_IP_FAMILY.NETDATA_INBOUND_CONNECTIONS",scope,dimensions,EBPF_COMMON_DIMENSION_CONNECTIONS,"Inbound connections.","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOCKET
