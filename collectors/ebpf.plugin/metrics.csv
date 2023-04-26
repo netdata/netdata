@@ -1,8 +1,8 @@
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
-"cgroup_name.file_open","cgroup",dimensions,"calls/s","Number of open files","line",labels,"ebpf.plugin","filedescriptor"
-"cgroup_name.file_open_error","cgroup",dimensions,"calls/s","Fails to open files","line",labels,"ebpf.plugin","filedescriptor"
-"cgroup_name.file_closed","cgroup",dimensions,"calls/s","Files closed","line",labels,"ebpf.plugin","filedescriptor"
-"cgroup_name.file_close_error","cgroup",dimensions,"calls/s","Fails to close files","line",labels,"ebpf.plugin","filedescriptor"
+"cgroup_name.file_open","cgroup","open","calls/s","Number of open files","line",labels,"ebpf.plugin","filedescriptor"
+"cgroup_name.file_open_error","cgroup","open","calls/s","Fails to open files","line",labels,"ebpf.plugin","filedescriptor"
+"cgroup_name.file_closed","cgroup","close","calls/s","Files closed","line",labels,"ebpf.plugin","filedescriptor"
+"cgroup_name.file_close_error","cgroup","close","calls/s","Fails to close files","line",labels,"ebpf.plugin","filedescriptor"
 "services.file_open","apps","apps group inside apps_group.conf","calls/s","Number of open files","stacked",labels,"ebpf.plugin","filedescriptor"
 "services.file_open_error","apps","apps group inside apps_group.conf","calls/s","Fails to open files","stacked",labels,"ebpf.plugin","filedescriptor"
 "services.file_closed","apps","apps group inside apps_group.conf","calls/s","Files closed","stacked",labels,"ebpf.plugin","filedescriptor"
@@ -11,8 +11,8 @@ metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "apps.file_open_error","apps","apps group inside apps_group.conf","calls/s","Fails to open files","stacked",labels,"ebpf.plugin","filedescriptor"
 "apps.file_closed","apps","apps group inside apps_group.conf","calls/s","Files closed","stacked",labels,"ebpf.plugin","filedescriptor"
 "apps.file_close_error","apps","apps group inside apps_group.conf","calls/s","Fails to close files","stacked",labels,"ebpf.plugin","filedescriptor"
-"filesystem.file_descriptor",scope,dimensions,"calls/s","Open and close calls","line",labels,"ebpf.plugin","filedescriptor"
-"filesystem.file_error",scope,dimensions,"calls/s","Open fails","line",labels,"ebpf.plugin","filedescriptor"
+"filesystem.file_descriptor",scope,"open,close","calls/s","Open and close calls","line",labels,"ebpf.plugin","filedescriptor"
+"filesystem.file_error",scope,"open,close","calls/s","Open fails","line",labels,"ebpf.plugin","filedescriptor"
 /home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_process.c
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "NETDATA_EBPF_SYSTEM_GROUP.NETDATA_PROCESS_SYSCALL",scope,dimensions,"calls/s","Start process","line",labels,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_PROCESS
