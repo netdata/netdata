@@ -11,9 +11,36 @@ learn_rel_path: "Integrations/Monitor/Application Performance Monitoring"
 
 Monitors Go application that exposes its metrics with the use of `expvar` package from the Go standard library.  The package produces charts for Go runtime memory statistics and optionally any number of custom charts.
 
-## Metrics
+The `go_expvar` module produces the following charts:
 
-See [metrics.csv](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/go_expvar/metrics.csv) for a list of metrics.
+1.  **Heap allocations** in kB
+
+    -   alloc: size of objects allocated on the heap
+    -   inuse: size of allocated heap spans
+
+2.  **Stack allocations** in kB
+
+    -   inuse: size of allocated stack spans
+
+3.  **MSpan allocations** in kB
+
+    -   inuse: size of allocated mspan structures
+
+4.  **MCache allocations** in kB
+
+    -   inuse: size of allocated mcache structures
+
+5.  **Virtual memory** in kB
+
+    -   sys: size of reserved virtual address space
+
+6.  **Live objects**
+
+    -   live: number of live objects in memory
+
+7.  **GC pauses average** in ns
+
+    -   avg: average duration of all GC stop-the-world pauses
 
 ## Monitoring Go applications
 
