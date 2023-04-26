@@ -1,0 +1,8 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+openldap.total_connections,,connections,connections/s,Total Connections,line,,python.d.plugin,openldap
+openldap.traffic_stats,,sent,KiB/s,Traffic,line,,python.d.plugin,openldap
+openldap.operations_status,,"completed, initiated",ops/s,Operations Status,line,,python.d.plugin,openldap
+openldap.referrals,,sent,referrals/s,Referrals,line,,python.d.plugin,openldap
+openldap.entries,,sent,entries/s,Entries,line,,python.d.plugin,openldap
+openldap.ldap_operations,,"bind, search, unbind, add, delete, modify, compare",ops/s,Operations,line,,python.d.plugin,openldap
+openldap.waiters,,"write, read",waiters/s,Waiters,line,,python.d.plugin,openldap
