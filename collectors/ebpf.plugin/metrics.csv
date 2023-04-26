@@ -129,10 +129,8 @@ metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "apps.shmctl_call","apps","apps group inside apps_group.conf","calls/s","Calls to syscall <code>shmctl(2)</code>.","stacked",,"ebpf.plugin","shm"
 "system.shared_memory_calls",,"get,at,dt,ctl","calls/s","Calls to shared memory system calls","line",,"ebpf.plugin","shm"
 "system.softirq_latency",,"soft IRQs","miliseconds","Software IRQ latency","stacked",,"ebpf.plugin","softirq"
-/home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_mount.c
-metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
-"NETDATA_EBPF_MOUNT_GLOBAL_FAMILY.NETDATA_EBPF_MOUNT_CALLS",scope,dimensions,"calls/s","Calls to mount and umount syscalls","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_MOUNT
-"NETDATA_EBPF_MOUNT_GLOBAL_FAMILY.NETDATA_EBPF_MOUNT_ERRORS",scope,dimensions,"calls/s","Errors to mount and umount file systems","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_MOUNT
+"mount_points.call",,"mount,umount","calls/s","Calls to mount and umount syscalls","line",,"ebpf.plugin","mount"
+"mount_points.error",,"mount,umount","calls/s","Errors to mount and umount file systems","line",,"ebpf.plugin","mount"
 /home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_vfs.c
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "cgroup_name.NETDATA_SYSCALL_APPS_FILE_DELETED","cgroup",dimensions,"calls/s","Files deleted","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SWAP
