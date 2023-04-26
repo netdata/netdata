@@ -3846,6 +3846,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     APPS_PLUGIN_FUNCTIONS();
 
 #ifdef __FreeBSD__
+    // FIXME: same metric name as in Linux but different units.
     fprintf(stdout, "CHART %s.preads '' '%s Disk Reads' 'blocks/s' disk %s.preads stacked 20002 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
