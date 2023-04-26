@@ -540,10 +540,13 @@ static inline bool query_target_needs_all_dimensions(QUERY_TARGET *qt) {
 }
 
 static inline bool query_target_has_percentage_units(QUERY_TARGET *qt) {
-    if(qt->window.time_group_method == RRDR_GROUPING_CV || query_target_needs_all_dimensions(qt))
+    if(qt->window.time_group_method == RRDR_GROUPING_CV)
         return true;
 
-    return false;
+    if((qt->request.options & RRDR_OPTION_PERCENTAGE) && !(qt->window.options & RRDR_OPTION_RETURN_RAW))
+        return true;
+
+    return query_target_has_percentage_of_instance(qt);
 }
 
 #endif // NETDATA_RRDCONTEXT_H

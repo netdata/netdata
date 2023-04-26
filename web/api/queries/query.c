@@ -3416,7 +3416,7 @@ static RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
         qt->window.options &= ~RRDR_OPTION_NONZERO;
     }
 
-    if(options & RRDR_OPTION_PERCENTAGE)
+    if(options & RRDR_OPTION_PERCENTAGE && !(options & RRDR_OPTION_RETURN_RAW))
         rrd2rrdr_convert_to_percentage(r);
 
     // update query instance counts in query host and query context
