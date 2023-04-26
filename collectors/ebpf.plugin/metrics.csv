@@ -128,9 +128,7 @@ metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "apps.shmdt_call","apps","apps group inside apps_group.conf","calls/s","Calls to syscall <code>shmdt(2)</code>.","stacked",,"ebpf.plugin","shm"
 "apps.shmctl_call","apps","apps group inside apps_group.conf","calls/s","Calls to syscall <code>shmctl(2)</code>.","stacked",,"ebpf.plugin","shm"
 "system.shared_memory_calls",,"get,at,dt,ctl","calls/s","Calls to shared memory system calls","line",,"ebpf.plugin","shm"
-/home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_softirq.c
-metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
-"system.softirq_latency",scope,dimensions,EBPF_COMMON_DIMENSION_MILLISECONDS,"Software IRQ latency","stacked",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_SOFTIRQ
+"system.softirq_latency",,"soft IRQs","miliseconds","Software IRQ latency","stacked",,"ebpf.plugin","softirq"
 /home/thiago/Netdata/netdata/collectors/"ebpf.plugin"/ebpf_mount.c
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 "NETDATA_EBPF_MOUNT_GLOBAL_FAMILY.NETDATA_EBPF_MOUNT_CALLS",scope,dimensions,"calls/s","Calls to mount and umount syscalls","line",,"ebpf.plugin",NETDATA_EBPF_MODULE_NAME_MOUNT
