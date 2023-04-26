@@ -1,0 +1,3 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+disk.space,mount point,"avail, used, reserved_for_root",GiB,"Disk Space Usage",stacked,"mount_point, filesystem, mount_root",diskspace.plugin,
+disk.inodes,mount point,"avail, used, reserved_for_root",inodes,"Disk Files (inodes) Usage",stacked,"mount_point, filesystem, mount_root",diskspace.plugin,
