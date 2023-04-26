@@ -1,0 +1,8 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+netfilter.netlink_new,,"new, ignore, invalid",connections/s,"Connection Tracker New Connections",line,,nfacct.plugin,
+netfilter.netlink_changes,,"insert, delete, delete_list",changes/s,"Connection Tracker Changes",line,,nfacct.plugin,
+netfilter.netlink_search,,"searched, search_restart, found",searches/s,"Connection Tracker Searches",line,,nfacct.plugin,
+netfilter.netlink_errors,,"icmp_error, insert_failed, drop, early_drop",events/s,"Connection Tracker Errors",line,,nfacct.plugin,
+netfilter.netlink_expect,,"created, deleted, new",expectations/s,"Connection Tracker Expectations",line,,nfacct.plugin,
+netfilter.nfacct_packets,,a dimension per nfacct object,packets/s,"Netfilter Accounting Packets",line,,nfacct.plugin,
+netfilter.nfacct_bytes,,a dimension per nfacct object,kilobytes/s,"Netfilter Accounting Bandwidth",line,,nfacct.plugin,
