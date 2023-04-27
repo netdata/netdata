@@ -1137,10 +1137,9 @@ ml_detect_main(void *arg)
                     training_stats.consumed_ut /= training_stats.num_popped_items;
                     training_stats.remaining_ut /= training_stats.num_popped_items;
                 } else {
-                    training_stats.queue_size = 0;
-                    training_stats.allotted_ut = 0;
+                    training_stats.queue_size = ml_queue_size(training_thread->training_queue);
                     training_stats.consumed_ut = 0;
-                    training_stats.remaining_ut = 0;
+                    training_stats.remaining_ut = training_stats.allotted_ut;
 
                     training_stats.training_result_ok = 0;
                     training_stats.training_result_invalid_query_time_range = 0;
