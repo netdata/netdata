@@ -146,3 +146,9 @@ nfsd.proc2,,a dimension per proc2 call,calls/s,NFS v2 Server Remote Procedure Ca
 nfsd.proc3,,a dimension per proc3 call,calls/s,NFS v3 Server Remote Procedure Calls,stacked,,proc.plugin,/proc/net/rpc/nfsd
 nfsd.proc4,,a dimension per proc4 call,calls/s,NFS v4 Server Remote Procedure Calls,stacked,,proc.plugin,/proc/net/rpc/nfsd
 nfsd.proc4ops,,a dimension per proc4 operation,operations/s,NFS v4 Server Operations,stacked,,proc.plugin,/proc/net/rpc/nfsd
+
+sctp.established,,established,associations,SCTP current total number of established associations,line,,proc.plugin,/proc/net/sctp/snmp
+sctp.transitions,,"active, passive, aborted, shutdown",transitions/s,SCTP Association Transitions,line,,proc.plugin,/proc/net/sctp/snmp
+sctp.packets,,"received, sent",packets/s,SCTP Packets,line,,proc.plugin,/proc/net/sctp/snmp
+sctp.packet_errors,,"invalid, checksum",packets/s,SCTP Packet Errors,line,,proc.plugin,/proc/net/sctp/snmp
+sctp.fragmentation,,"reassembled, fragmented",packets/s,SCTP Fragmentation,line,,proc.plugin,/proc/net/sctp/snmp
