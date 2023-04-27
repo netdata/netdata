@@ -6,6 +6,15 @@
 
 **Merged pull requests:**
 
+- fix adding chart labels in tc.plugin [\#14976](https://github.com/netdata/netdata/pull/14976) ([ilyam8](https://github.com/ilyam8))
+- add metrics.csv to some c collectors [\#14974](https://github.com/netdata/netdata/pull/14974) ([ilyam8](https://github.com/ilyam8))
+- add metrics.csv to perf.plugin [\#14973](https://github.com/netdata/netdata/pull/14973) ([ilyam8](https://github.com/ilyam8))
+- add metrics.csv to xenstat.plugin [\#14972](https://github.com/netdata/netdata/pull/14972) ([ilyam8](https://github.com/ilyam8))
+- add metrics.csv to slabinfo.plugin [\#14971](https://github.com/netdata/netdata/pull/14971) ([ilyam8](https://github.com/ilyam8))
+- add metrics.csv to timex.plugin [\#14970](https://github.com/netdata/netdata/pull/14970) ([ilyam8](https://github.com/ilyam8))
+- do not convert to percentage, when the raw option is given [\#14969](https://github.com/netdata/netdata/pull/14969) ([ktsaou](https://github.com/ktsaou))
+- add metrics.csv to apps.plugin [\#14968](https://github.com/netdata/netdata/pull/14968) ([ilyam8](https://github.com/ilyam8))
+- add metrics.csv to charts.d [\#14966](https://github.com/netdata/netdata/pull/14966) ([ilyam8](https://github.com/ilyam8))
 - Update ML README.md [\#14964](https://github.com/netdata/netdata/pull/14964) ([ktsaou](https://github.com/ktsaou))
 - Document netdatacli dumpconfig option [\#14963](https://github.com/netdata/netdata/pull/14963) ([cakrit](https://github.com/cakrit))
 - Update README.md [\#14962](https://github.com/netdata/netdata/pull/14962) ([cakrit](https://github.com/cakrit))
@@ -17,6 +26,7 @@
 - Prevent pager from preventing non-interactive install [\#14950](https://github.com/netdata/netdata/pull/14950) ([bompus](https://github.com/bompus))
 - Update README.md [\#14948](https://github.com/netdata/netdata/pull/14948) ([cakrit](https://github.com/cakrit))
 - Disable SQL operations in training thread [\#14947](https://github.com/netdata/netdata/pull/14947) ([vkalintiris](https://github.com/vkalintiris))
+- Add support for acquire/release operations on RRDSETs [\#14945](https://github.com/netdata/netdata/pull/14945) ([vkalintiris](https://github.com/vkalintiris))
 - fix 32bit segv [\#14940](https://github.com/netdata/netdata/pull/14940) ([ktsaou](https://github.com/ktsaou))
 - Update using-host-labels.md [\#14939](https://github.com/netdata/netdata/pull/14939) ([cakrit](https://github.com/cakrit))
 - Fix broken image, in database/README.md [\#14936](https://github.com/netdata/netdata/pull/14936) ([Ancairon](https://github.com/Ancairon))
@@ -339,11 +349,6 @@
 - update the "Install Netdata with Docker" doc [\#14385](https://github.com/netdata/netdata/pull/14385) ([Ancairon](https://github.com/Ancairon))
 - generates dual ksy for njfv2 + fix for padding after page blocks [\#14383](https://github.com/netdata/netdata/pull/14383) ([underhood](https://github.com/underhood))
 - Delete docs/cloud/get-started.mdx [\#14382](https://github.com/netdata/netdata/pull/14382) ([Ancairon](https://github.com/Ancairon))
-- fix judyltablesgen crosscompile [\#14349](https://github.com/netdata/netdata/pull/14349) ([underhood](https://github.com/underhood))
-- Update the "Kubernetes visualizations" doc [\#14347](https://github.com/netdata/netdata/pull/14347) ([Ancairon](https://github.com/Ancairon))
-- Update the "Deploy Kubernetes monitoring with Netdata" doc [\#14345](https://github.com/netdata/netdata/pull/14345) ([Ancairon](https://github.com/Ancairon))
-- Events docs [\#14341](https://github.com/netdata/netdata/pull/14341) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- Update the "Install Netdata with kickstart.sh" doc [\#14338](https://github.com/netdata/netdata/pull/14338) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
@@ -401,11 +406,6 @@
 - Delete BREAKING\_CHANGES.md [\#14353](https://github.com/netdata/netdata/pull/14353) ([cakrit](https://github.com/cakrit))
 - Add redistributed to learn [\#14352](https://github.com/netdata/netdata/pull/14352) ([cakrit](https://github.com/cakrit))
 - Add missing entries in README.md [\#14351](https://github.com/netdata/netdata/pull/14351) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add ansible.md to learn [\#14350](https://github.com/netdata/netdata/pull/14350) ([cakrit](https://github.com/cakrit))
-- Delete BUILD.md [\#14348](https://github.com/netdata/netdata/pull/14348) ([cakrit](https://github.com/cakrit))
-- Patch convert rel links [\#14344](https://github.com/netdata/netdata/pull/14344) ([tkatsoulas](https://github.com/tkatsoulas))
-- Update dashboard [\#14342](https://github.com/netdata/netdata/pull/14342) ([thiagoftsm](https://github.com/thiagoftsm))
-- minor fix on notification doc \(Discord\) [\#14339](https://github.com/netdata/netdata/pull/14339) ([tkatsoulas](https://github.com/tkatsoulas))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
