@@ -557,4 +557,4 @@ Caddyfile.
 ## Publish a test image to your own repository
 
 At Netdata, we provide multiple ways of testing your Docker images using your own repositories.
-You may either use the command line tools available or take advantage of our GitHub Acions infrastructure.
+You may either use the command line tools available or take advantage of our GitHub Actions infrastructure.
