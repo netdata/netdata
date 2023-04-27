@@ -255,7 +255,7 @@ static void sql_delete_aclk_table_list(char *host_guid)
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement to clean up aclk tables, rc = %d", rc);
 
-    rc = db_execute(buffer_tostring(sql));
+    rc = db_execute(db_meta, buffer_tostring(sql));
     if (unlikely(rc))
         error("Failed to drop unused ACLK tables");
 
@@ -294,7 +294,7 @@ static int sql_maint_aclk_sync_database(void *data __maybe_unused, int argc __ma
 {
     char sql[512];
     snprintfz(sql,511, SQL_ALERT_CLEANUP, (char *) argv[0], ACLK_DELETE_ACK_ALERTS_INTERNAL);
-    if (unlikely(db_execute(sql)))
+    if (unlikely(db_execute(db_meta, sql)))
         error_report("Failed to clean stale ACLK alert entries");
     return 0;
 }
@@ -491,12 +491,12 @@ void sql_create_aclk_table(RRDHOST *host __maybe_unused, uuid_t *host_uuid __may
     char sql[ACLK_SYNC_QUERY_SIZE];
 
     snprintfz(sql, ACLK_SYNC_QUERY_SIZE-1, TABLE_ACLK_ALERT, uuid_str);
-    rc = db_execute(sql);
+    rc = db_execute(db_meta, sql);
     if (unlikely(rc))
         error_report("Failed to create ACLK alert table for host %s", host ? rrdhost_hostname(host) : host_guid);
     else {
         snprintfz(sql, ACLK_SYNC_QUERY_SIZE -1, INDEX_ACLK_ALERT, uuid_str, uuid_str);
-        rc = db_execute(sql);
+        rc = db_execute(db_meta, sql);
         if (unlikely(rc))
             error_report("Failed to create ACLK alert table index for host %s", host ? string2str(host->hostname) : host_guid);
     }
