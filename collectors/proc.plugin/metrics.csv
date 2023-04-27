@@ -274,3 +274,8 @@ zfs.prefetch_data_hits,,"hits, misses",percentage,"ZFS Data Prefetch Efficiency"
 zfs.prefetch_data_hits_rate,,"hits, misses",events/s,"ZFS Data Prefetch Efficiency Rate",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
 zfs.hash_elements,,"current, max",elements,"ZFS ARC Hash Elements",line,,proc.plugin,/proc/spl/kstat/zfs/arcstats
 zfs.hash_chains,,"current, max",chains,"ZFS ARC Hash Chains",line,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+
+powersupply.capacity,power device,capacity,percentage,Battery capacity,line,device,proc.plugin,/sys/class/power_supply
+powersupply.charge,power device,"empty_design, empty, now, full, full_design",Ah,Battery charge,line,device,proc.plugin,/sys/class/power_supply
+powersupply.energy,power device,"empty_design, empty, now, full, full_design",Wh,Battery energy,line,device,proc.plugin,/sys/class/power_supply
+powersupply.voltage,power device,"min_design, min, now, max, max_design",V,Power supply voltage,line,device,proc.plugin,/sys/class/power_supply
