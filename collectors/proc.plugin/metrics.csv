@@ -73,6 +73,13 @@ net.fifo,network card,"receive, transmit",errors,Interface FIFO Buffer Errors,li
 net.compressed,network card,"received, sent",packets/s,Compressed Packets,line,"interface_type, device",proc.plugin,/proc/net/dev
 net.events,network card,"frames, collisions, carrier",events/s,Network Interface Events,line,"interface_type, device",proc.plugin,/proc/net/dev
 
+wireless.status,wireless device,status,status,Internal status reported by interface.,line,,proc.plugin,/proc/net/wireless
+wireless.link_quality,wireless device,link_quality,value,"Overall quality of the link. This is an aggregate value, and depends on the driver and hardware.",line,,proc.plugin,/proc/net/wireless
+wireless.signal_level,wireless device,signal_level,dBm,"The signal level is the wireless signal power level received by the wireless client. The closer the value is to 0, the stronger the signal.",line,,proc.plugin,/proc/net/wireless
+wireless.noise_level,wireless device,noise_level,dBm,"The noise level indicates the amount of background noise in your environment. The closer the value to 0, the greater the noise level.",line,,proc.plugin,/proc/net/wireless
+wireless.discarded_packets,wireless device,"nwid, crypt, frag, retry, misc",packets/s,"Packet discarded in the wireless adapter due to wireless specific problems.",line,,proc.plugin,/proc/net/wireless
+wireless.missed_beacons,wireless device,missed_beacons,frames/s,Number of missed beacons.,line,,proc.plugin,/proc/net/wireless
+
 system.ip,,"received, sent",kilobits/s,IP Bandwidth,area,,proc.plugin,/proc/net/netstat
 ip.inerrors,,"noroutes, truncated, checksum",packets/s,IP Input Errors,line,,proc.plugin,/proc/net/netstat
 ip.mcast,,"received, sent",kilobits/s,IP Multicast Bandwidth,area,,proc.plugin,/proc/net/netstat
