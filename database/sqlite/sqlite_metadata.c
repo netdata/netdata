@@ -184,7 +184,7 @@ static int check_and_update_chart_labels(RRDSET *st, BUFFER *work_buffer, size_t
     struct query_build tmp = {.sql = work_buffer, .count = 0};
     uuid_unparse_lower(st->chart_uuid, tmp.uuid_str);
     rrdlabels_walkthrough_read(st->rrdlabels, chart_label_store_to_sql_callback, &tmp);
-    int rc = db_execute(buffer_tostring(work_buffer));
+    int rc = db_execute(db_meta, buffer_tostring(work_buffer));
     if (likely(!rc)) {
         st->rrdlabels_last_saved_version = new_version;
         (*query_counter)++;
@@ -203,7 +203,7 @@ void migrate_localhost(uuid_t *host_uuid)
     if (!rc)
         rc = exec_statement_with_uuid(DELETE_NON_EXISTING_LOCALHOST, host_uuid);
     if (!rc) {
-        if (unlikely(db_execute(DELETE_MISSING_NODE_INSTANCES)))
+        if (unlikely(db_execute(db_meta, DELETE_MISSING_NODE_INSTANCES)))
             error_report("Failed to remove deleted hosts from node instances");
     }
 }
@@ -1012,7 +1012,7 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count, bool use_trans
     uint32_t scan_count = 1;
 
     if (use_transaction)
-        (void)db_execute("BEGIN TRANSACTION;");
+        (void)db_execute(db_meta, "BEGIN TRANSACTION;");
 
     rrdset_foreach_reentrant(st, host) {
         if (scan_count == max_count) {
@@ -1061,7 +1061,7 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count, bool use_trans
     rrdset_foreach_done(st);
 
     if (use_transaction)
-        (void)db_execute("COMMIT TRANSACTION;");
+        (void)db_execute(db_meta, "COMMIT TRANSACTION;");
 
     return more_to_do;
 }
@@ -1074,7 +1074,7 @@ static void store_host_and_system_info(RRDHOST *host, BUFFER *work_buffer, size_
         work_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
 
     if (build_host_system_info_statements(host, work_buffer)) {
-        int rc = db_execute(buffer_tostring(work_buffer));
+        int rc = db_execute(db_meta, buffer_tostring(work_buffer));
         if (unlikely(rc)) {
             error_report("METADATA: 'host:%s': Failed to store host updated information in the database", rrdhost_hostname(host));
             rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
@@ -1118,7 +1118,7 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
     worker_is_busy(UV_EVENT_METADATA_STORE);
 
     if (!data->max_count)
-        transaction_started = !db_execute("BEGIN TRANSACTION;");
+        transaction_started = !db_execute(db_meta, "BEGIN TRANSACTION;");
 
     dfe_start_reentrant(rrdhost_root_index, host) {
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) || !rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_UPDATE))
@@ -1139,7 +1139,7 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
                 struct query_build tmp = {.sql = work_buffer, .count = 0};
                 uuid_unparse_lower(host->host_uuid, tmp.uuid_str);
                 rrdlabels_walkthrough_read(host->rrdlabels, host_label_store_to_sql_callback, &tmp);
-                rc = db_execute(buffer_tostring(work_buffer));
+                rc = db_execute(db_meta, buffer_tostring(work_buffer));
 
                 if (unlikely(rc)) {
                     error_report("METADATA: 'host:%s': failed to update metadata host labels", rrdhost_hostname(host));
@@ -1187,7 +1187,7 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
     dfe_done(host);
 
     if (!data->max_count && transaction_started)
-        transaction_started = db_execute("COMMIT TRANSACTION;");
+        transaction_started = db_execute(db_meta, "COMMIT TRANSACTION;");
 
     usec_t all_ended_ut = now_monotonic_usec(); (void)all_ended_ut;
     internal_error(true, "METADATA: checking all hosts completed in %0.2f ms",

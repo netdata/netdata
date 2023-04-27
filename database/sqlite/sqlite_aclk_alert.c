@@ -299,13 +299,13 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
 
         BUFFER *sql_fix = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
         buffer_sprintf(sql_fix, TABLE_ACLK_ALERT, wc->uuid_str);
-        rc = db_execute(buffer_tostring(sql_fix));
+        rc = db_execute(db_meta, buffer_tostring(sql_fix));
         if (unlikely(rc))
             error_report("Failed to create ACLK alert table for host %s", rrdhost_hostname(wc->host));
         else {
             buffer_flush(sql_fix);
             buffer_sprintf(sql_fix, INDEX_ACLK_ALERT, wc->uuid_str, wc->uuid_str);
-            if (unlikely(db_execute(buffer_tostring(sql_fix))))
+            if (unlikely(db_execute(db_meta, buffer_tostring(sql_fix))))
                 error_report("Failed to create ACLK alert table for host %s", rrdhost_hostname(wc->host));
         }
         buffer_free(sql_fix);
@@ -416,7 +416,7 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
                             "WHERE date_submitted IS NULL AND sequence_id BETWEEN %" PRIu64 " AND %" PRIu64 ";",
                        wc->uuid_str, first_sequence_id, last_sequence_id);
 
-        if (unlikely(db_execute(buffer_tostring(sql))))
+        if (unlikely(db_execute(db_meta, buffer_tostring(sql))))
             error_report("Failed to mark ACLK alert entries as submitted for host %s", rrdhost_hostname(wc->host));
 
         // Mark to do one more check
@@ -475,7 +475,7 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
 
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
-    if (unlikely(db_execute(buffer_tostring(sql))))
+    if (unlikely(db_execute(db_meta, buffer_tostring(sql))))
         error_report("Failed to queue existing ACLK alert events for host %s", rrdhost_hostname(host));
 
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
@@ -685,7 +685,7 @@ void sql_process_queue_removed_alerts_to_aclk(char *node_id)
 
     snprintfz(sql,ACLK_SYNC_QUERY_SIZE * 2 - 1, SQL_QUEUE_REMOVE_ALERTS, wc->uuid_str, wc->uuid_str, wc->uuid_str);
 
-    if (unlikely(db_execute(sql))) {
+    if (unlikely(db_execute(db_meta, sql))) {
         log_access("ACLK STA [%s (%s)]: QUEUED REMOVED ALERTS FAILED", wc->node_id, rrdhost_hostname(wc->host));
         error_report("Failed to queue ACLK alert removed entries for host %s", rrdhost_hostname(wc->host));
     }
