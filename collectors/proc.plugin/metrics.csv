@@ -59,7 +59,7 @@ mem.slab,,"reclaimable, unreclaimable",MiB,Reclaimable Kernel Memory,stacked,,pr
 mem.hugepage,,"free, used, surplus, reserved",MiB,Dedicated HugePages Memory,stacked,,proc.plugin,/proc/meminfo
 mem.transparent_hugepages,,"anonymous, shmem",MiB,Transparent HugePages Memory,stacked,,proc.plugin,/proc/meminfo
 
-system.net,,"received, sent",kilobits/s,Physical Network Interfaces Aggregated Bandwidth,area,labels,proc.plugin,/proc/net/dev
+system.net,,"received, sent",kilobits/s,Physical Network Interfaces Aggregated Bandwidth,area,,proc.plugin,/proc/net/dev
 net.net,network card,"received, sent",kilobits/s,Bandwidth,area,"interface_type, device",proc.plugin,/proc/net/dev
 net.speed,network card,speed,kilobits/s,Interface Speed,line,"interface_type, device",proc.plugin,/proc/net/dev
 net.duplex,network card,"full, half, unknown",state,Interface Duplex State,line,"interface_type, device",proc.plugin,/proc/net/dev
@@ -72,6 +72,60 @@ net.drops,network card,"inbound, outbound",drops/s,Interface Drops,line,"interfa
 net.fifo,network card,"receive, transmit",errors,Interface FIFO Buffer Errors,line,"interface_type, device",proc.plugin,/proc/net/dev
 net.compressed,network card,"received, sent",packets/s,Compressed Packets,line,"interface_type, device",proc.plugin,/proc/net/dev
 net.events,network card,"frames, collisions, carrier",events/s,Network Interface Events,line,"interface_type, device",proc.plugin,/proc/net/dev
+
+system.ip,,"received, sent",kilobits/s,IP Bandwidth,area,,proc.plugin,/proc/net/netstat
+ip.inerrors,,"noroutes, truncated, checksum",packets/s,IP Input Errors,line,,proc.plugin,/proc/net/netstat
+ip.mcast,,"received, sent",kilobits/s,IP Multicast Bandwidth,area,,proc.plugin,/proc/net/netstat
+ip.bcast,,"received, sent",kilobits/s,IP Broadcast Bandwidth,area,,proc.plugin,/proc/net/netstat
+ip.mcastpkts,,"received, sent",packets/s,IP Multicast Packets,line,,proc.plugin,/proc/net/netstat
+ip.bcastpkts,,"received, sent",packets/s,IP Broadcast Packets,line,,proc.plugin,/proc/net/netstat
+ip.ecnpkts,,"CEP, NoECTP, ECTP0, ECTP1",packets/s,IP ECN Statistics,line,,proc.plugin,/proc/net/netstat
+ip.tcpmemorypressures,,pressures,events/s,TCP Memory Pressures,line,,proc.plugin,/proc/net/netstat
+ip.tcpconnaborts,,"baddata, userclosed, nomemory, timeout, linger, failed",connections/s,TCP Connection Aborts,line,,proc.plugin,/proc/net/netstat
+ip.tcpreorders,,"timestamp, sack, fack, reno",packets/s,TCP Reordered Packets by Detection Method,line,,proc.plugin,/proc/net/netstat
+ip.tcpofo,,"inqueue, dropped, merged, pruned",packets/s,TCP Out-Of-Order Queue,line,,proc.plugin,/proc/net/netstat
+ip.tcpsyncookies,,"received, sent, failed",packets/s,TCP SYN Cookies,line,,proc.plugin,/proc/net/netstat
+ip.tcp_syn_queue,,"drops, cookies",packets/s,TCP SYN Queue Issues,line,,proc.plugin,/proc/net/netstat
+ip.tcp_accept_queue,,"overflows, drops",packets/s,TCP Accept Queue Issues,line,,proc.plugin,/proc/net/netstat
+ipv4.packets,,"received, sent, forwarded, delivered",packets/s,IPv4 Packets,line,,proc.plugin,/proc/net/netstat
+ipv4.fragsout,,"ok, failed, created",packets/s,IPv4 Fragments Sent,line,,proc.plugin,/proc/net/netstat
+ipv4.fragsin,,"ok, failed, all",packets/s,IPv4 Fragments Reassembly,line,,proc.plugin,/proc/net/netstat
+ipv4.errors,,"InDiscards, OutDiscards, InHdrErrors, OutNoRoutes, InAddrErrors, InUnknownProtos",packets/s,IPv4 Errors,line,,proc.plugin,/proc/net/netstat
+ipv4.icmp,,"received, sent",packets/s,IPv4 ICMP Packets,line,,proc.plugin,/proc/net/netstat
+ipv4.icmp_errors,,"InErrors, OutErrors, InCsumErrors",packets/s,IPv4 ICMP Errors,line,,proc.plugin,/proc/net/netstat
+ipv4.icmpmsg,,"InEchoReps, OutEchoReps, InDestUnreachs, OutDestUnreachs, InRedirects, OutRedirects, InEchos, OutEchos, InRouterAdvert, OutRouterAdvert, InRouterSelect, OutRouterSelect, InTimeExcds, OutTimeExcds, InParmProbs, OutParmProbs, InTimestamps, OutTimestamps, InTimestampReps, OutTimestampReps",packets/s,IPv4 ICMP Messages,line,,proc.plugin,/proc/net/netstat
+ipv4.tcpsock,,connections,active connections,IPv4 TCP Connections,line,,proc.plugin,/proc/net/netstat
+ipv4.tcppackets,,"received, sent",packets/s,IPv4 TCP Packets,line,,proc.plugin,/proc/net/netstat
+ipv4.tcperrors,,"InErrs, InCsumErrors, RetransSegs",packets/s,IPv4 TCP Errors,line,,proc.plugin,/proc/net/netstat
+ipv4.tcpopens,,"active, passive",connections/s,IPv4 TCP Opens,line,,proc.plugin,/proc/net/netstat
+ipv4.tcphandshake,,"EstabResets, OutRsts, AttemptFails, SynRetrans",events/s,IPv4 TCP Handshake Issues,line,,proc.plugin,/proc/net/netstat
+ipv4.udppackets,,"received, sent",packets/s,IPv4 UDP Packets,line,,proc.plugin,/proc/net/netstat
+ipv4.udperrors,,"RcvbufErrors, SndbufErrors, InErrors, NoPorts, InCsumErrors, IgnoredMulti",events/s,IPv4 UDP Errors,line,,proc.plugin,/proc/net/netstat
+ipv4.udplite,,"received, sent",packets/s,IPv4 UDPLite Packets,line,,proc.plugin,/proc/net/netstat
+ipv4.udplite_errors,,"RcvbufErrors, SndbufErrors, InErrors, NoPorts, InCsumErrors, IgnoredMulti",packets/s,IPv4 UDPLite Errors,line,,proc.plugin,/proc/net/netstat
+system.ipv6,,"received, sent",kilobits/s,IPv6 Bandwidth,area,,proc.plugin,/proc/net/netstat
+system.ipv6,,"received, sent, forwarded, delivers",packets/s,IPv6 Packets,line,,proc.plugin,/proc/net/netstat
+ipv6.fragsout,,"ok, failed, all",packets/s,IPv6 Fragments Sent,line,,proc.plugin,/proc/net/netstat
+ipv6.fragsin,,"ok, failed, timeout, all",packets/s,IPv6 Fragments Reassembly,line,,proc.plugin,/proc/net/netstat
+ipv6.errors,,"InDiscards, OutDiscards, InHdrErrors, InAddrErrors, InUnknownProtos, InTooBigErrors, InTruncatedPkts, InNoRoutes, OutNoRoutes",packets/s,IPv6 Errors,line,,proc.plugin,/proc/net/netstat
+ipv6.udppackets,,"received, sent",packets/s,IPv6 UDP Packets,line,,proc.plugin,/proc/net/netstat
+ipv6.udperrors,,"RcvbufErrors, SndbufErrors, InErrors, NoPorts, InCsumErrors, IgnoredMulti",events/s,IPv6 UDP Errors,line,,proc.plugin,/proc/net/netstat
+ipv6.udplitepackets,,"received, sent",packets/s,IPv6 UDPlite Packets,line,,proc.plugin,/proc/net/netstat
+ipv6.udpliteerrors,,"RcvbufErrors, SndbufErrors, InErrors, NoPorts, InCsumErrors",events/s,IPv6 UDP Lite Errors,line,,proc.plugin,/proc/net/netstat
+ipv6.mcast,,"received, sent",kilobits/s,IPv6 Multicast Bandwidth,area,,proc.plugin,/proc/net/netstat
+ipv6.bcast,,"received, sent",kilobits/s,IPv6 Broadcast Bandwidth,area,,proc.plugin,/proc/net/netstat
+ipv6.mcastpkts,,"received, sent",packets/s,IPv6 Multicast Packets,line,,proc.plugin,/proc/net/netstat
+ipv6.icmp,,"received, sent",messages/s,IPv6 ICMP Messages,line,,proc.plugin,/proc/net/netstat
+ipv6.icmpredir,,"received, sent",redirects/s,IPv6 ICMP Redirects,line,,proc.plugin,/proc/net/netstat
+ipv6.icmperrors,,"InErrors, OutErrors, InCsumErrors, InDestUnreachs, InPktTooBigs, InTimeExcds, InParmProblems, OutDestUnreachs, OutPktTooBigs, OutTimeExcds, OutParmProblems",errors/s,IPv6 ICMP Errors,line,,proc.plugin,/proc/net/netstat
+ipv6.icmpechos,,"InEchos, OutEchos, InEchoReplies, OutEchoReplies",messages/s,IPv6 ICMP Echo,line,,proc.plugin,/proc/net/netstat
+ipv6.groupmemb,,"InQueries, OutQueries, InResponses, OutResponses, InReductions, OutReductions",messages/s,IPv6 ICMP Group Membership,line,,proc.plugin,/proc/net/netstat
+ipv6.icmprouter,,"InSolicits, OutSolicits, InAdvertisements, OutAdvertisements",messages/s,IPv6 Router Messages,line,,proc.plugin,/proc/net/netstat
+ipv6.icmpneighbor,,"InSolicits, OutSolicits, InAdvertisements, OutAdvertisements",messages/s,IPv6 Neighbor Messages,line,,proc.plugin,/proc/net/netstat
+ipv6.icmpmldv2,,"received, sent",reports/s,IPv6 ICMP MLDv2 Reports,line,,proc.plugin,/proc/net/netstat
+ipv6.icmptypes,,"InType1, InType128, InType129, InType136, OutType1, OutType128, OutType129, OutType133, OutType135, OutType143",messages/s,IPv6 ICMP Types,line,,proc.plugin,/proc/net/netstat
+ipv6.ect,,"InNoECTPkts, InECT1Pkts, InECT0Pkts, InCEPkts",packets/s,IPv6 ECT Packets,line,,proc.plugin,/proc/net/netstat
+ipv6.ect,,"InNoECTPkts, InECT1Pkts, InECT0Pkts, InCEPkts",packets/s,IPv6 ECT Packets,line,,proc.plugin,/proc/net/netstat
 
 ipvs.sockets,,connections,connections/s,IPVS New Connections,line,,proc.plugin,/proc/net/ip_vs_stats
 ipvs.packets,,"received, sent",packets/s,IPVS Packets,line,,proc.plugin,/proc/net/ip_vs_stats
