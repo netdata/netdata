@@ -59,6 +59,9 @@ mem.slab,,"reclaimable, unreclaimable",MiB,Reclaimable Kernel Memory,stacked,,pr
 mem.hugepage,,"free, used, surplus, reserved",MiB,Dedicated HugePages Memory,stacked,,proc.plugin,/proc/meminfo
 mem.transparent_hugepages,,"anonymous, shmem",MiB,Transparent HugePages Memory,stacked,,proc.plugin,/proc/meminfo
 
+mem.pagetype_global,,a dimension per pagesize,B,System orders available,stacked,,proc.plugin,/proc/pagetypeinfo
+mem.pagetype,"node, zone, type",a dimension per pagesize,B,"pagetype_Node{node}_{zone}_{type}",stacked,"node_id, node_zone, node_type",proc.plugin,/proc/pagetypeinfo
+
 system.net,,"received, sent",kilobits/s,Physical Network Interfaces Aggregated Bandwidth,area,,proc.plugin,/proc/net/dev
 net.net,network card,"received, sent",kilobits/s,Bandwidth,area,"interface_type, device",proc.plugin,/proc/net/dev
 net.speed,network card,speed,kilobits/s,Interface Speed,line,"interface_type, device",proc.plugin,/proc/net/dev
