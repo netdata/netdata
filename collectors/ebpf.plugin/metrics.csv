@@ -1,0 +1,197 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+cgroup.fd_open,cgroup,open,calls/s,Number of open files,line,,ebpf.plugin,filedescriptor
+cgroup.fd_open_error,cgroup,open,calls/s,Fails to open files,line,,ebpf.plugin,filedescriptor
+cgroup.fd_closed,cgroup,close,calls/s,Files closed,line,,ebpf.plugin,filedescriptor
+cgroup.fd_close_error,cgroup,close,calls/s,Fails to close files,line,,ebpf.plugin,filedescriptor
+services.file_open,,a dimension per systemd service,calls/s,Number of open files,stacked,,ebpf.plugin,filedescriptor
+services.file_open_error,,a dimension per systemd service,calls/s,Fails to open files,stacked,,ebpf.plugin,filedescriptor
+services.file_closed,,a dimension per systemd service,calls/s,Files closed,stacked,,ebpf.plugin,filedescriptor
+services.file_close_error,,a dimension per systemd service,calls/s,Fails to close files,stacked,,ebpf.plugin,filedescriptor
+apps.file_open,,a dimension per app group,calls/s,Number of open files,stacked,,ebpf.plugin,filedescriptor
+apps.file_open_error,,a dimension per app group,calls/s,Fails to open files,stacked,,ebpf.plugin,filedescriptor
+apps.file_closed,,a dimension per app group,calls/s,Files closed,stacked,,ebpf.plugin,filedescriptor
+apps.file_close_error,,a dimension per app group,calls/s,Fails to close files,stacked,,ebpf.plugin,filedescriptor
+filesystem.file_descriptor,,"open, close",calls/s,Open and close calls,line,,ebpf.plugin,filedescriptor
+filesystem.file_error,,"open, close",calls/s,Open fails,line,,ebpf.plugin,filedescriptor
+system.process_thread,,process,calls/s,Start process,line,,ebpf.plugin,processes
+system.process_status,,"process, zombie",difference,Process not closed,line,,ebpf.plugin,processes
+system.exit,,process,calls/s,Exit process,line,,ebpf.plugin,processes
+system.task_error,,task,calls/s,Fails to create process,line,,ebpf.plugin,processes
+apps.process_create,,a dimension per app group,calls/s,Process started,stacked,,ebpf.plugin,processes
+apps.thread_create,,a dimension per app group,calls/s,Threads started,stacked,,ebpf.plugin,processes
+apps.task_exit,,a dimension per app group,calls/s,Tasks starts exit process,stacked,,ebpf.plugin,processes
+apps.task_close,,a dimension per app group,calls/s,Tasks closed,stacked,,ebpf.plugin,processes
+apps.task_error,,a dimension per app group,calls/s,Errors to create process or threads,stacked,,ebpf.plugin,processes
+cgroup.process_create,cgroup,process,calls/s,Process started,line,,ebpf.plugin,processes
+cgroup.thread_create,cgroup,thread,calls/s,Threads started,line,,ebpf.plugin,processes
+cgroup.task_exit,cgroup,exit,calls/s,Tasks starts exit process,line,,ebpf.plugin,processes
+cgroup.task_close,cgroup,process,calls/s,Tasks closed,line,,ebpf.plugin,processes
+cgroup.task_error,cgroup,process,calls/s,Errors to create process or threads,line,,ebpf.plugin,processes
+services.process_create,cgroup,a dimension per systemd service,calls/s,Process started,stacked,,ebpf.plugin,processes
+services.thread_create,cgroup,a dimension per systemd service,calls/s,Threads started,stacked,,ebpf.plugin,processes
+services.task_close,cgroup,a dimension per systemd service,calls/s,Tasks starts exit process,stacked,,ebpf.plugin,processes
+services.task_exit,cgroup,a dimension per systemd service,calls/s,Tasks closed,stacked,,ebpf.plugin,processes
+services.task_error,cgroup,a dimension per systemd service,calls/s,Errors to create process or threads,stacked,,ebpf.plugin,processes
+disk.latency_io,disk,latency,calls/s,Disk latency,stacked,,ebpf.plugin,disk
+system.hardirq_latency,,hardirq names,milisecondds,Hardware IRQ latency,stacked,,ebpf.plugin,hardirq
+apps.cachestat_ratio,,a dimension per app group,%,Hit ratio,line,,ebpf.plugin,cachestat
+apps.cachestat_dirties,,a dimension per app group,page/s,Number of dirty pages,stacked,,ebpf.plugin,cachestat
+apps.cachestat_hits,,a dimension per app group,hits/s,Number of accessed files,stacked,,ebpf.plugin,cachestat
+apps.cachestat_misses,,a dimension per app group,misses/s,Files out of page cache,stacked,,ebpf.plugin,cachestat
+services.cachestat_ratio,,a dimension per systemd service,%,Hit ratio,line,,ebpf.plugin,cachestat
+services.cachestat_dirties,,a dimension per systemd service,page/s,Number of dirty pages,line,,ebpf.plugin,cachestat
+services.cachestat_hits,,a dimension per systemd service,hits/s,Number of accessed files,line,,ebpf.plugin,cachestat
+services.cachestat_misses,,a dimension per systemd service,misses/s,Files out of page cache,line,,ebpf.plugin,cachestat
+cgroup.cachestat_ratio,cgroup,ratio,%,Hit ratio,line,,ebpf.plugin,cachestat
+cgroup.cachestat_dirties,cgroup,dirty,page/s,Number of dirty pages,line,,ebpf.plugin,cachestat
+cgroup.cachestat_hits,cgroup,hit,hits/s,Number of accessed files,line,,ebpf.plugin,cachestat
+cgroup.cachestat_misses,cgroup,miss,misses/s,Files out of page cache,line,,ebpf.plugin,cachestat
+mem.file_sync,,"fsync, fdatasync",calls/s,Monitor calls for <code>fsync(2)</code> and <code>fdatasync(2)</code>.,stacked,,ebpf.plugin,sync
+mem.meory_map,,msync,calls/s,Monitor calls for <code>msync(2)</code>.,line,,ebpf.plugin,sync
+mem.sync,,"sync, syncfs",calls/s,Monitor calls for <code>sync(2)</code> and <code>syncfs(2)</code>.,line,,ebpf.plugin,sync
+mem.file_segment,,sync_file_range,calls/s,Monitor calls for <code>sync_file_range(2)</code>.,line,,ebpf.plugin,sync
+mem.cachestat_ratio,,ratio,%,Hit ratio,line,,ebpf.plugin,cachestat
+mem.cachestat_dirties,,dirty,page/s,Number of dirty pages,line,,ebpf.plugin,cachestat
+mem.cachestat_hits,,hit,hits/s,Number of accessed files,line,,ebpf.plugin,cachestat
+mem.cachestat_misses,,miss,misses/s,Files out of page cache,line,,ebpf.plugin,cachestat
+mdstat.mdstat_flush,,disk,flushes,MD flushes,stacked,,ebpf.plugin,mdflush
+cgroup.swap_read,cgroup,read,calls/s,Calls to function <code>swap_readpage</code>.,line,,ebpf.plugin,swap
+cgroup.swap_write,cgroup,write,calls/s,Calls to function <code>swap_writepage</code>.,line,,ebpf.plugin,swap
+services.swap_read,,a dimension per systemd service,calls/s,Calls to <code>swap_readpage</code>.,stacked,,ebpf.plugin,swap
+services.swap_write,,a dimension per systemd service,calls/s,Calls to function <code>swap_writepage</code>.,stacked,,ebpf.plugin,swap
+apps.swap_read_call,,a dimension per app group,calls/s,Calls to function <code>swap_readpage</code>.,stacked,,ebpf.plugin,swap
+apps.swap_write_call,,a dimension per app group,calls/s,Calls to function <code>swap_writepage</code>.,stacked,,ebpf.plugin,swap
+system.swapcalls,,"write, read",calls/s,Calls to access swap memory,line,,ebpf.plugin,swap
+cgroup.oomkills,cgroup,cgroup name,kills,OOM kills. This chart is provided by eBPF plugin.,line,,ebpf.plugin,oomkill
+services.oomkills,,a dimension per systemd service,kills,OOM kills. This chart is provided by eBPF plugin.,line,,ebpf.plugin,oomkill
+apps.oomkills,,a dimension per app group,kills,OOM kills,stacked,,ebpf.plugin,oomkill
+ip.inbound_conn,,connection_tcp,connections/s,Inbound connections.,line,,ebpf.plugin,socket
+ip.tcp_outbound_conn,,received,connections/s,TCP outbound connections.,line,,ebpf.plugin,socket
+ip.tcp_functions,,"received, send, closed",calls/s,Calls to internal functions,line,,ebpf.plugin,socket
+ip.total_tcp_bandwidth,,"received, send",kilobits/s,TCP bandwidth,line,,ebpf.plugin,socket
+ip.tcp_error,,"received, send",calls/s,TCP errors,line,,ebpf.plugin,socket
+ip.tcp_retransmit,,retransmited,calls/s,Packages retransmitted,line,,ebpf.plugin,socket
+ip.udp_functions,,"received, send",calls/s,UDP calls,line,,ebpf.plugin,socket
+ip.total_udp_bandwidth,,"received, send",kilobits/s,UDP bandwidth,line,,ebpf.plugin,socket
+ip.udp_error,,"received, send",calls/s,UDP errors,line,,ebpf.plugin,socket
+apps.outbound_conn_v4,,a dimension per app group,connections/s,Calls to tcp_v4_connection,stacked,,ebpf.plugin,socket
+apps.outbound_conn_v6,,a dimension per app group,connections/s,Calls to tcp_v6_connection,stacked,,ebpf.plugin,socket
+apps.total_bandwidth_sent,,a dimension per app group,kilobits/s,Bytes sent,stacked,,ebpf.plugin,socket
+apps.total_bandwidth_recv,,a dimension per app group,kilobits/s,bytes received,stacked,,ebpf.plugin,socket
+apps.bandwidth_tcp_send,,a dimension per app group,calls/s,Calls for tcp_sendmsg,stacked,,ebpf.plugin,socket
+apps.bandwidth_tcp_recv,,a dimension per app group,calls/s,Calls for tcp_cleanup_rbuf,stacked,,ebpf.plugin,socket
+apps.bandwidth_tcp_retransmit,,a dimension per app group,calls/s,Calls for tcp_retransmit,stacked,,ebpf.plugin,socket
+apps.bandwidth_udp_send,,a dimension per app group,calls/s,Calls for udp_sendmsg,stacked,,ebpf.plugin,socket
+apps.bandwidth_udp_recv,,a dimension per app group,calls/s,Calls for udp_recvmsg,stacked,,ebpf.plugin,socket
+cgroup.net_conn_ipv4,cgroup,connected_v4,connections/s,Calls to tcp_v4_connection,line,,ebpf.plugin,socket
+cgroup.net_conn_ipv6,cgroup,connected_v6,connections/s,Calls to tcp_v6_connection,line,,ebpf.plugin,socket
+cgroup.net_bytes_recv,cgroup,received,calls/s,Bytes received,line,,ebpf.plugin,socket
+cgroup.net_bytes_sent,cgroup,sent,calls/s,Bytes sent,line,,ebpf.plugin,socket
+cgroup.net_tcp_recv,cgroup,received,calls/s,Calls to tcp_cleanup_rbuf.,line,,ebpf.plugin,socket
+cgroup.net_tcp_send,cgroup,sent,calls/s,Calls to tcp_sendmsg.,line,,ebpf.plugin,socket
+cgroup.net_retransmit,cgroup,retransmitted,calls/s,Calls to tcp_retransmit.,line,,ebpf.plugin,socket
+cgroup.net_udp_send,cgroup,sent,calls/s,Calls to udp_sendmsg,line,,ebpf.plugin,socket
+cgroup.net_udp_recv,cgroup,received,calls/s,Calls to udp_recvmsg,line,,ebpf.plugin,socket
+services.net_conn_ipv4,,a dimension per systemd service,connections/s,Calls to tcp_v4_connection,stacked,,ebpf.plugin,socket
+services.net_conn_ipv6,,a dimension per systemd service,connections/s,Calls to tcp_v6_connection,stacked,,ebpf.plugin,socket
+services.net_bytes_recv,,a dimension per systemd service,kilobits/s,Bytes received,stacked,,ebpf.plugin,socket
+services.net_bytes_sent,,a dimension per systemd service,kilobits/s,Bytes sent,stacked,,ebpf.plugin,socket
+services.net_tcp_recv,,a dimension per systemd service,calls/s,Calls to tcp_cleanup_rbuf.,stacked,,ebpf.plugin,socket
+services.net_tcp_send,,a dimension per systemd service,calls/s,Calls to tcp_sendmsg.,stacked,,ebpf.plugin,socket
+services.net_tcp_retransmit,,a dimension per systemd service,calls/s,Calls to tcp_retransmit,stacked,,ebpf.plugin,socket
+services.net_udp_send,,a dimension per systemd service,calls/s,Calls to udp_sendmsg,stacked,,ebpf.plugin,socket
+services.net_udp_recv,,a dimension per systemd service,calls/s,Calls to udp_recvmsg,stacked,,ebpf.plugin,socket
+apps.dc_ratio,,a dimension per app group,%,Percentage of files inside directory cache,line,,ebpf.plugin,dcstat
+apps.dc_reference,,a dimension per app group,files,Count file access,stacked,,ebpf.plugin,dcstat
+apps.dc_not_cache,,a dimension per app group,files,Files not present inside directory cache,stacked,,ebpf.plugin,dcstat
+apps.dc_not_found,,a dimension per app group,files,Files not found,stacked,,ebpf.plugin,dcstat
+cgroup.dc_ratio,cgroup,ratio,%,Percentage of files inside directory cache,line,,ebpf.plugin,dcstat
+cgroup.dc_reference,cgroup,reference,files,Count file access,line,,ebpf.plugin,dcstat
+cgroup.dc_not_cache,cgroup,slow,files,Files not present inside directory cache,line,,ebpf.plugin,dcstat
+cgroup.dc_not_found,cgroup,miss,files,Files not found,line,,ebpf.plugin,dcstat
+services.dc_ratio,,a dimension per systemd service,%,Percentage of files inside directory cache,line,,ebpf.plugin,dcstat
+services.dc_reference,,a dimension per systemd service,files,Count file access,line,,ebpf.plugin,dcstat
+services.dc_not_cache,,a dimension per systemd service,files,Files not present inside directory cache,line,,ebpf.plugin,dcstat
+services.dc_not_found,,a dimension per systemd service,files,Files not found,line,,ebpf.plugin,dcstat
+filesystem.dc_hit_ratio,,ratio,%,Percentage of files inside directory cache,line,,ebpf.plugin,dcstat
+filesystem.dc_reference,filesystem,"reference, slow, miss",files,Variables used to calculate hit ratio.,line,,ebpf.plugin,dcstat
+filesystem.read_latency,filesystem,latency period,calls/s,ext4 latency for each read request.,stacked,,ebpf.plugin,filesystem
+filesystem.write_latency,iilesystem,latency period,calls/s,ext4 latency for each write request.,stacked,,ebpf.plugin,filesystem
+filesystem.open_latency,filesystem,latency period,calls/s,ext4 latency for each open request.,stacked,,ebpf.plugin,filesystem
+filesystem.sync_latency,filesystem,latency period,calls/s,ext4 latency for each sync request.,stacked,,ebpf.plugin,filesystem
+filesystem.attributte_latency,,latency period,calls/s,nfs latency for each attribute request.,stacked,,ebpf.plugin,filesystem
+cgroup.shmget,cgroup,get,calls/s,Calls to syscall <code>shmget(2)</code>.,line,,ebpf.plugin,shm
+cgroup.shmat,cgroup,at,calls/s,Calls to syscall <code>shmat(2)</code>.,line,,ebpf.plugin,shm
+cgroup.shmdt,cgroup,dt,calls/s,Calls to syscall <code>shmdt(2)</code>.,line,,ebpf.plugin,shm
+cgroup.shmctl,cgroup,ctl,calls/s,Calls to syscall <code>shmctl(2)</code>.,line,,ebpf.plugin,shm
+services.shmget,,a dimension per systemd service,calls/s,Calls to syscall <code>shmget(2)</code>.,stacked,,ebpf.plugin,shm
+services.shmat,,a dimension per systemd service,calls/s,Calls to syscall <code>shmat(2)</code>.,stacked,,ebpf.plugin,shm
+services.shmdt,,a dimension per systemd service,calls/s,Calls to syscall <code>shmdt(2)</code>.,stacked,,ebpf.plugin,shm
+services.shmctl,,a dimension per systemd service,calls/s,Calls to syscall <code>shmctl(2)</code>.,stacked,,ebpf.plugin,shm
+apps.shmget_call,,a dimension per app group,calls/s,Calls to syscall <code>shmget(2)</code>.,stacked,,ebpf.plugin,shm
+apps.shmat_call,,a dimension per app group,calls/s,Calls to syscall <code>shmat(2)</code>.,stacked,,ebpf.plugin,shm
+apps.shmdt_call,,a dimension per app group,calls/s,Calls to syscall <code>shmdt(2)</code>.,stacked,,ebpf.plugin,shm
+apps.shmctl_call,,a dimension per app group,calls/s,Calls to syscall <code>shmctl(2)</code>.,stacked,,ebpf.plugin,shm
+system.shared_memory_calls,,"get, at, dt, ctl",calls/s,Calls to shared memory system calls,line,,ebpf.plugin,shm
+system.softirq_latency,,soft IRQs,miliseconds,Software IRQ latency,stacked,,ebpf.plugin,softirq
+mount_points.call,,"mount, umount",calls/s,Calls to mount and umount syscalls,line,,ebpf.plugin,mount
+mount_points.error,,"mount, umount",calls/s,Errors to mount and umount file systems,line,,ebpf.plugin,mount
+cgroup.vfs_unlink,cgroup,delete,calls/s,Files deleted,line,,ebpf.plugin,vfs
+cgroup.vfs_write,cgroup,write,calls/s,Write to disk,line,,ebpf.plugin,vfs
+cgroup.vfs_write_error,cgroup,write,calls/s,Fails to write,line,,ebpf.plugin,vfs
+cgroup.vfs_read,cgroup,read,calls/s,Read from disk,line,,ebpf.plugin,vfs
+cgroup.vfs_read_error,cgroup,read,calls/s,Fails to read,line,,ebpf.plugin,vfs
+cgroup.vfs_write_bytes,cgroup,write,bytes/s,Bytes written on disk,line,,ebpf.plugin,vfs
+cgroup.vfs_read_bytes,cgroup,read,bytes/s,Bytes read from disk,line,,ebpf.plugin,vfs
+cgroup.vfs_fsync,cgroup,fsync,calls/s,Calls for <code>vfs_fsync</code>,line,,ebpf.plugin,vfs
+cgroup.vfs_fsync_error,cgroup,fsync,calls/s,Sync error,line,,ebpf.plugin,vfs
+cgroup.vfs_open,cgroup,open,calls/s,Calls for <code>vfs_open</code>,line,,ebpf.plugin,vfs
+cgroup.vfs_open_error,cgroup,open,calls/s,Open error,line,,ebpf.plugin,vfs
+cgroup.vfs_create,cgroup,create,calls/s,Calls for <code>vfs_create</code>,line,,ebpf.plugin,vfs
+cgroup.vfs_create_error,cgroup,create,calls/s,Create error,line,,ebpf.plugin,vfs
+services.vfs_unlink,,a dimension per systemd service,calls/s,Files deleted,stacked,,ebpf.plugin,vfs
+services.vfs_write,,a dimension per systemd service,calls/s,Write to disk,stacked,,ebpf.plugin,vfs
+services.vfs_write_error,,a dimension per systemd service,calls/s,Fails to write,stacked,,ebpf.plugin,vfs
+services.vfs_read,,a dimension per systemd service,calls/s,Read from disk,stacked,,ebpf.plugin,vfs
+services.vfs_read_error,,a dimension per systemd service,calls/s,Fails to read,stacked,,ebpf.plugin,vfs
+services.vfs_write_bytes,,a dimension per systemd service,bytes/s,Bytes written on disk,stacked,,ebpf.plugin,vfs
+services.vfs_read_bytes,,a dimension per systemd service,bytes/s,Bytes read from disk,stacked,,ebpf.plugin,vfs
+services.vfs_fsync,,a dimension per systemd service,calls/s,Calls to <code>vfs_fsync</code>,stacked,,ebpf.plugin,vfs
+services.vfs_fsync_error,,a dimension per systemd service,calls/s,Sync error,stacked,,ebpf.plugin,vfs
+services.vfs_open,,a dimension per systemd service,calls/s,Calls to <code>vfs_open</code>,stacked,,ebpf.plugin,vfs
+services.vfs_open_error,,a dimension per systemd service,calls/s,Open error,stacked,,ebpf.plugin,vfs
+services.vfs_create,,a dimension per systemd service,calls/s,Calls to <code>vfs_create</code>,stacked,,ebpf.plugin,vfs
+services.vfs_create_error,,a dimension per systemd service,calls/s,Create error,stacked,,ebpf.plugin,vfs
+filesystem.vfs_deleted_objects,,delete,calls/s,Remove files,line,,ebpf.plugin,vfs
+filesystem.vfs_io,,"read, write",calls/s,Calls to IO,line,,ebpf.plugin,vfs
+filesystem.vfs_io_bytes,,"read, write",bytes/s,Bytes written and read,line,,ebpf.plugin,vfs
+filesystem.vfs_io_error,,"read, write",calls/s,Fails to write or read,line,,ebpf.plugin,vfs
+filesystem.vfs_fsync,,fsync,calls/s,Calls for <code>vfs_fsync</code>,line,,ebpf.plugin,vfs
+filesystem.vfs_fsync_error,,fsync,calls/s,Fails to synchronize,line,,ebpf.plugin,vfs
+filesystem.vfs_open,,open,calls/s,Calls for <code>vfs_open</code>,line,,ebpf.plugin,vfs
+filesystem.vfs_open_error,,open,calls/s,Fails to open a file,line,,ebpf.plugin,vfs
+filesystem.vfs_create,,create,calls/s,Calls for <code>vfs_create</code>,line,,ebpf.plugin,vfs
+filesystem.vfs_create_error,,create,calls/s,Fails to create a file.,line,,ebpf.plugin,vfs
+apps.file_deleted,,a dimension per app group,calls/s,Files deleted,stacked,,ebpf.plugin,vfs
+apps.vfs_write_call,,a dimension per app group,calls/s,Write to disk,stacked,,ebpf.plugin,vfs
+apps.vfs_write_error,,a dimension per app group,calls/s,Fails to write,stacked,,ebpf.plugin,vfs
+apps.vfs_read_call,,a dimension per app group,calls/s,Read from disk,stacked,,ebpf.plugin,vfs
+apps.vfs_read_error,,a dimension per app group,calls/s,Fails to read,stacked,,ebpf.plugin,vfs
+apps.vfs_write_bytes,,a dimension per app group,bytes/s,Bytes written on disk,stacked,,ebpf.plugin,vfs
+apps.vfs_read_bytes,,a dimension per app group,bytes/s,Bytes read on disk,stacked,,ebpf.plugin,vfs
+apps.vfs_fsync,,a dimension per app group,calls/s,Calls for <code>vfs_fsync</code>,stacked,,ebpf.plugin,vfs
+apps.vfs_fsync_error,,a dimension per app group,calls/s,Sync error,stacked,,ebpf.plugin,vfs
+apps.vfs_open,,a dimension per app group,calls/s,Calls for <code>vfs_open</code>,stacked,,ebpf.plugin,vfs
+apps.vfs_open_error,,a dimension per app group,calls/s,Open error,stacked,,ebpf.plugin,vfs
+apps.vfs_create,,a dimension per app group,calls/s,Calls for <code>vfs_create</code>,stacked,,ebpf.plugin,vfs
+apps.vfs_create_error,,a dimension per app group,calls/s,Create error,stacked,,ebpf.plugin,vfs
+netdata.ebpf_aral_stat_size,,memory,bytes,Bytes allocated for ARAL.,stacked,,ebpf.plugin,process
+netdata.ebpf_aral_stat_alloc,,aral,calls,Calls to allocate memory.,stacked,,ebpf.plugin,process
+netdata.ebpf_threads,,"total, running",threads,Threads info,line,,ebpf.plugin,process
+netdata.ebpf_load_methods,,"legacy, co-re",methods,Load info,line,,ebpf.plugin,process
+netdata.ebpf_kernel_memory,,memory_locked,bytes,Memory allocated for hash tables.,line,,ebpf.plugin,process
+netdata.ebpf_hash_tables_count,,hash_table,hash tables,Number of hash tables loaded,line,,ebpf.plugin,process
+netdata.ebpf_aral_stat_size,,memory,bytes,Bytes allocated for ARAL,stacked,,ebpf.plugin,process
+netdata.ebpf_aral_stat_alloc,,aral,calls,Calls to allocate memory,stacked,,ebpf.plugin,process
+netdata.ebpf_aral_stat_size,,memory,bytes,Bytes allocated for ARAL.,stacked,,ebpf.plugin,process
+netdata.ebpf_aral_stat_alloc,,aral,calls,Calls to allocate memory,stacked,,ebpf.plugin,process
