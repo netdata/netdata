@@ -153,3 +153,4 @@ Now you can manually run the `beanstalk` module in debug mode:
 ```bash
 ./python.d.plugin beanstalk debug trace
 ```
+

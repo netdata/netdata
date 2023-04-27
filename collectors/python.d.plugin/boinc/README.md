@@ -61,3 +61,4 @@ Now you can manually run the `boinc` module in debug mode:
 ```bash
 ./python.d.plugin boinc debug trace
 ```
+

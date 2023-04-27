@@ -245,3 +245,4 @@ If you would like to go deeper on what exactly the anomalies collector is doing 
 - [Mendeley public group](https://www.mendeley.com/community/interesting-anomaly-detection-papers/) with some interesting anomaly detection papers we have been reading.
 - Good [blog post](https://www.anodot.com/blog/what-is-anomaly-detection/) from Anodot on time series anomaly detection. Anodot also have some great whitepapers in this space too that some may find useful.
 - Novelty and outlier detection in the [scikit-learn documentation](https://scikit-learn.org/stable/modules/outlier_detection.html).
+

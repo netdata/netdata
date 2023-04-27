@@ -73,3 +73,4 @@ Now you can manually run the `am2320` module in debug mode:
 ```bash
 ./python.d.plugin am2320 debug trace
 ```
+

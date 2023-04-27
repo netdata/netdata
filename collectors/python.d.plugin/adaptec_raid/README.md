@@ -100,3 +100,4 @@ Now you can manually run the `adaptec_raid` module in debug mode:
 ```bash
 ./python.d.plugin adaptec_raid debug trace
 ```
+
