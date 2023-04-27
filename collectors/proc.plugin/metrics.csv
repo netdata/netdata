@@ -1,29 +1,29 @@
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
-disk.bcache_cache_alloc,,"ununsed, dirty, clean, metadata, undefined",percentage,BCache Cache Allocations,stacked,,prog.plugin,/proc/diskstats
-disk.io,,"reads, writes",KiB/s,Disk I/O Bandwidth,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk_ext.io,,discards,KiB/s,Amount of Discarded Data,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.ops,,"reads, writes",operations/s,Disk Completed I/O Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk_ext.ops,,"discards, flushes",operations/s,Disk Completed Extended I/O Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.qops,,operations,operations,Disk Current I/O Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.backlog,,backlog,milliseconds,Disk Backlog,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.busy,,busy,milliseconds,Disk Busy Time,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.util,,utilization,% of time working,Disk Utilization Time,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.mops,,"reads, writes",merged operations/s,Disk Merged Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk_ext.mops,,discards,merged operations/s,Disk Merged Discard Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.iotime,,"reads, writes",milliseconds/s,Disk Total I/O Time,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk_ext.iotime,,"discards, flushes",milliseconds/s,Disk Total I/O Time for Extended Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.await,,"reads, writes",milliseconds/operation,Average Completed I/O Operation Time,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk_ext.await,,"discards, flushes",milliseconds/operation,Average Completed Extended I/O Operation Time,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.avgsz,,"reads, writes",KiB/operation,Average Completed I/O Operation Bandwidth,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk_ext.avgsz,,discards,KiB/operation,Average Amount of Discarded Data,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.svctm,,svctm,milliseconds/operation,Average Service Time,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.bcache_hit_ratio,,"5min, 1hour, 1day, ever",percentage,BCache Cache Hit Ratio,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.bcache_rates,,"congested, writeback",KiB/s,BCache Rates,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.bcache_size,,dirty,MiB,BCache Cache Sizes,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.bcache_usage,,avail,percentage,BCache Cache Usage,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.bcache_cache_read_races,,"races, errors",operations/s,BCache Cache Read Races,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.bcache,,"hits, misses, collisions, readaheads",operations/s,BCache Cache I/O Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.bcache_bypass,,"hits, misses",operations/s,BCache Cache Bypass I/O Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk.bcache_cache_alloc,disk,"ununsed, dirty, clean, metadata, undefined",percentage,BCache Cache Allocations,stacked,,prog.plugin,/proc/diskstats
+disk.io,disk,"reads, writes",KiB/s,Disk I/O Bandwidth,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk_ext.io,disk,discards,KiB/s,Amount of Discarded Data,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk.ops,disk,"reads, writes",operations/s,Disk Completed I/O Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk_ext.ops,disk,"discards, flushes",operations/s,Disk Completed Extended I/O Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk.qops,disk,operations,operations,Disk Current I/O Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk.backlog,disk,backlog,milliseconds,Disk Backlog,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk.busy,disk,busy,milliseconds,Disk Busy Time,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk.util,disk,utilization,% of time working,Disk Utilization Time,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk.mops,disk,"reads, writes",merged operations/s,Disk Merged Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk_ext.mops,disk,discards,merged operations/s,Disk Merged Discard Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk.iotime,disk,"reads, writes",milliseconds/s,Disk Total I/O Time,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk_ext.iotime,disk,"discards, flushes",milliseconds/s,Disk Total I/O Time for Extended Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk.await,disk,"reads, writes",milliseconds/operation,Average Completed I/O Operation Time,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk_ext.await,disk,"discards, flushes",milliseconds/operation,Average Completed Extended I/O Operation Time,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk.avgsz,disk,"reads, writes",KiB/operation,Average Completed I/O Operation Bandwidth,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk_ext.avgsz,disk,discards,KiB/operation,Average Amount of Discarded Data,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk.svctm,disk,svctm,milliseconds/operation,Average Service Time,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk.bcache_hit_ratio,disk,"5min, 1hour, 1day, ever",percentage,BCache Cache Hit Ratio,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk.bcache_rates,disk,"congested, writeback",KiB/s,BCache Rates,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk.bcache_size,disk,dirty,MiB,BCache Cache Sizes,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk.bcache_usage,disk,avail,percentage,BCache Cache Usage,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk.bcache_cache_read_races,disk,"races, errors",operations/s,BCache Cache Read Races,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk.bcache,disk,"hits, misses, collisions, readaheads",operations/s,BCache Cache I/O Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk.bcache_bypass,disk,"hits, misses",operations/s,BCache Cache Bypass I/O Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
 system.io,,"in, out",KiB/s,Disk I/O,area,,prog.plugin,/proc/diskstats
 system.interrupts,,interrupts,interrupts/s,System interrupts,stacked,,proc.plugin,/proc/interrupts
 cpu.interrupts,cpu,cpus,interrupts/s,CPU interrupts,stacked,cpu,proc.plugin,/proc/interrupts
