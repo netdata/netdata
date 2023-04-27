@@ -19,6 +19,7 @@
 #define WORKER_TRAIN_FLUSH_MODELS      7
 
 static sqlite3 *db = NULL;
+static netdata_mutex_t db_mutex = NETDATA_MUTEX_INITIALIZER;
 
 /*
  * Functions to convert enums to strings
@@ -1476,7 +1477,9 @@ static void *ml_train_main(void *arg) {
 
         if (training_thread->pending_model_info.size() >= Cfg.flush_models_batch_size) {
             worker_is_busy(WORKER_TRAIN_FLUSH_MODELS);
+            netdata_mutex_lock(&db_mutex);
             ml_flush_pending_models(training_thread);
+            netdata_mutex_unlock(&db_mutex);
             continue;
         }
 
