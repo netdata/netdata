@@ -14,6 +14,12 @@ cpuidle.cpu_cstate_residency_time,cpu core,a dimension per c-state,percentage,C-
 system.entropy,,entropy,entropy,Available Entropy,line,,prog.plugin,/proc/sys/kernel/random/entropy_avail
 system.uptime,,uptime,seconds,System Uptime,line,,prog.plugin,/proc/uptime
 
+system.swapio,,"in, out",KiB/s,Swap I/O,area,,prog.plugin,/proc/vmstat
+system.pgpgio,,"in, out",KiB/s,Memory Paged from/to disk,area,,prog.plugin,/proc/vmstat
+system.pgfaults,,"minor, major",faults/s,Memory Page Faults,line,,prog.plugin,/proc/vmstat
+mem.oom_kill,,kills,kills/s,Out of Memory Kills,line,,prog.plugin,/proc/vmstat
+mem.numa,,"local, foreign, interleave, other, pte_updates, huge_pte_updates, hint_faults, hint_faults_local, pages_migrated",events/s,NUMA events,line,,prog.plugin,/proc/vmstat
+
 system.ipc_semaphores,,semaphores,semaphores,IPC Semaphores,area,,prog.plugin,ipc
 system.ipc_semaphore_arrays,,arrays,arrays,IPC Semaphore Arrays,area,,prog.plugin,ipc
 system.message_queue_message,,a dimension per queue,messages,IPC Message Queue Number of Messages,stacked,,prog.plugin,ipc
