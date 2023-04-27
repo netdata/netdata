@@ -27,3 +27,5 @@ disk.bcache_bypass,disk,"hits, misses",operations/s,BCache Cache Bypass I/O Oper
 system.io,,"in, out",KiB/s,Disk I/O,area,,prog.plugin,/proc/diskstats
 system.interrupts,,interrupts,interrupts/s,System interrupts,stacked,,proc.plugin,/proc/interrupts
 cpu.interrupts,cpu,cpus,interrupts/s,CPU interrupts,stacked,cpu,proc.plugin,/proc/interrupts
+system.load,,"load1, load5, load15",load,System Load Average,line,labels,proc.plugin,/proc/loadavg
+system.active_processes,,active,processes,System Active Processes,line,labels,proc.plugin,/proc/loadavg
