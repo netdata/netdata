@@ -130,3 +130,19 @@ ipv6.ect,,"InNoECTPkts, InECT1Pkts, InECT0Pkts, InCEPkts",packets/s,IPv6 ECT Pac
 ipvs.sockets,,connections,connections/s,IPVS New Connections,line,,proc.plugin,/proc/net/ip_vs_stats
 ipvs.packets,,"received, sent",packets/s,IPVS Packets,line,,proc.plugin,/proc/net/ip_vs_stats
 ipvs.net,,"received, sent",kilobits/s,IPVS Bandwidth,area,,proc.plugin,/proc/net/ip_vs_stats
+
+nfs.net,,"udp, tcp",operations/s,NFS Client Network,stacked,,proc.plugin,/proc/net/rpc/nfs
+nfs.rpc,,"calls, retransmits, auth_refresh",calls/s,NFS Client Remote Procedure Calls Statistics,line,,proc.plugin,/proc/net/rpc/nfs
+nfs.proc2,,a dimension per proc2 call,calls/s,NFS v2 Client Remote Procedure Calls,stacked,,proc.plugin,/proc/net/rpc/nfs
+nfs.proc3,,a dimension per proc3 call,calls/s,NFS v3 Client Remote Procedure Calls,stacked,,proc.plugin,/proc/net/rpc/nfs
+nfs.proc4,,a dimension per proc4 call,calls/s,NFS v4 Client Remote Procedure Calls,stacked,,proc.plugin,/proc/net/rpc/nfs
+nfsd.readcache,,"hits, misses, nocache",reads/s,NFS Server Read Cache,stacked,,proc.plugin,/proc/net/rpc/nfsd
+nfsd.filehandles,,stale,handles/s,NFS Server File Handles,line,,proc.plugin,/proc/net/rpc/nfsd
+nfsd.io,,"read, write",kilobytes/s,NFS Server I/O,area,,proc.plugin,/proc/net/rpc/nfsd
+nfsd.threads,,threads,threads,NFS Server Threads,line,,proc.plugin,/proc/net/rpc/nfsd
+nfsd.net,,"udp, tcp",packets/s,NFS Server Network Statistics,line,,proc.plugin,/proc/net/rpc/nfsd
+nfsd.rpc,,"calls, bad_format, bad_auth",calls/s,NFS Server Remote Procedure Calls Statistics,line,,proc.plugin,/proc/net/rpc/nfsd
+nfsd.proc2,,a dimension per proc2 call,calls/s,NFS v2 Server Remote Procedure Calls,stacked,,proc.plugin,/proc/net/rpc/nfsd
+nfsd.proc3,,a dimension per proc3 call,calls/s,NFS v3 Server Remote Procedure Calls,stacked,,proc.plugin,/proc/net/rpc/nfsd
+nfsd.proc4,,a dimension per proc4 call,calls/s,NFS v4 Server Remote Procedure Calls,stacked,,proc.plugin,/proc/net/rpc/nfsd
+nfsd.proc4ops,,a dimension per proc4 operation,operations/s,NFS v4 Server Operations,stacked,,proc.plugin,/proc/net/rpc/nfsd
