@@ -674,7 +674,7 @@ static void ebpf_create_specific_fd_charts(char *type, ebpf_module_t *em)
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5400,
                       ebpf_create_global_dimension,
                       &fd_publish_aggregated[NETDATA_FD_SYSCALL_OPEN],
-                      1, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      1, em->update_every, NETDATA_EBPF_MODULE_NAME_FD);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(type, NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR, "Fails to open files",
@@ -684,7 +684,7 @@ static void ebpf_create_specific_fd_charts(char *type, ebpf_module_t *em)
                           ebpf_create_global_dimension,
                           &fd_publish_aggregated[NETDATA_FD_SYSCALL_OPEN],
                           1, em->update_every,
-                          NETDATA_EBPF_MODULE_NAME_SWAP);
+                          NETDATA_EBPF_MODULE_NAME_FD);
     }
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_FILE_CLOSED, "Files closed",
@@ -693,7 +693,7 @@ static void ebpf_create_specific_fd_charts(char *type, ebpf_module_t *em)
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5402,
                       ebpf_create_global_dimension,
                       &fd_publish_aggregated[NETDATA_FD_SYSCALL_CLOSE],
-                      1, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      1, em->update_every, NETDATA_EBPF_MODULE_NAME_FD);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(type, NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR, "Fails to close files",
@@ -703,7 +703,7 @@ static void ebpf_create_specific_fd_charts(char *type, ebpf_module_t *em)
                           ebpf_create_global_dimension,
                           &fd_publish_aggregated[NETDATA_FD_SYSCALL_CLOSE],
                           1, em->update_every,
-                          NETDATA_EBPF_MODULE_NAME_SWAP);
+                          NETDATA_EBPF_MODULE_NAME_FD);
     }
 }
 
@@ -786,28 +786,28 @@ static void ebpf_create_systemd_fd_charts(ebpf_module_t *em)
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_FILE_CGROUP_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20061,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_FD_OPEN_CONTEXT,
-                                  NETDATA_EBPF_MODULE_NAME_PROCESS, em->update_every);
+                                  NETDATA_EBPF_MODULE_NAME_FD, em->update_every);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR, "Fails to open files",
                                       EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_FILE_CGROUP_GROUP,
                                       NETDATA_EBPF_CHART_TYPE_STACKED, 20062,
                                       ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_FD_OPEN_ERR_CONTEXT,
-                                      NETDATA_EBPF_MODULE_NAME_PROCESS, em->update_every);
+                                      NETDATA_EBPF_MODULE_NAME_FD, em->update_every);
     }
 
     ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_FILE_CLOSED, "Files closed",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_FILE_CGROUP_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20063,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_FD_CLOSE_CONTEXT,
-                                  NETDATA_EBPF_MODULE_NAME_PROCESS, em->update_every);
+                                  NETDATA_EBPF_MODULE_NAME_FD, em->update_every);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR, "Fails to close files",
                                       EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_FILE_CGROUP_GROUP,
                                       NETDATA_EBPF_CHART_TYPE_STACKED, 20064,
                                       ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_FD_CLOSE_ERR_CONTEXT,
-                                      NETDATA_EBPF_MODULE_NAME_PROCESS, em->update_every);
+                                      NETDATA_EBPF_MODULE_NAME_FD, em->update_every);
     }
 }
 
@@ -974,7 +974,7 @@ void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20061,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root, em->update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
+                               root, em->update_every, NETDATA_EBPF_MODULE_NAME_FD);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR,
@@ -984,7 +984,7 @@ void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    NETDATA_EBPF_CHART_TYPE_STACKED,
                                    20062,
                                    ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                   root, em->update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
+                                   root, em->update_every, NETDATA_EBPF_MODULE_NAME_FD);
     }
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_CLOSED,
@@ -994,7 +994,7 @@ void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20063,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root, em->update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
+                               root, em->update_every, NETDATA_EBPF_MODULE_NAME_FD);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR,
@@ -1004,7 +1004,7 @@ void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    NETDATA_EBPF_CHART_TYPE_STACKED,
                                    20064,
                                    ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                   root, em->update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
+                                   root, em->update_every, NETDATA_EBPF_MODULE_NAME_FD);
     }
 
     em->apps_charts |= NETDATA_EBPF_APPS_FLAG_CHART_CREATED;
