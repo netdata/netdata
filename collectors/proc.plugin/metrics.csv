@@ -275,6 +275,15 @@ zfs.prefetch_data_hits_rate,,"hits, misses",events/s,"ZFS Data Prefetch Efficien
 zfs.hash_elements,,"current, max",elements,"ZFS ARC Hash Elements",line,,proc.plugin,/proc/spl/kstat/zfs/arcstats
 zfs.hash_chains,,"current, max",chains,"ZFS ARC Hash Chains",line,,proc.plugin,/proc/spl/kstat/zfs/arcstats
 
+btrfs.disk,btrfs filesystem,"unallocated, data_free, data_used, meta_free, meta_used, sys_free, sys_used",MiB,"BTRFS Physical Disk Allocation",stacked,"filesystem_uuid, filesystem_label",proc.plugin,/sys/fs/btrfs
+btrfs.data,btrfs filesystem,"free, used",MiB,"BTRFS Data Allocation",stacked,"filesystem_uuid, filesystem_label",proc.plugin,/sys/fs/btrfs
+btrfs.metadata,btrfs filesystem,"free, used, reserved",MiB,"BTRFS Metadata Allocation",stacked,"filesystem_uuid, filesystem_label",proc.plugin,/sys/fs/btrfs
+btrfs.system,btrfs filesystem,"free, used",MiB,"BTRFS System Allocation",stacked,"filesystem_uuid, filesystem_label",proc.plugin,/sys/fs/btrfs
+btrfs.commits,btrfs filesystem,commits,commits,"BTRFS Commits",line,"filesystem_uuid, filesystem_label",proc.plugin,/sys/fs/btrfs
+btrfs.commits_perc_time,btrfs filesystem,commits,percentage,"BTRFS Commits Time Share",line,"filesystem_uuid, filesystem_label",proc.plugin,/sys/fs/btrfs
+btrfs.commit_timings,btrfs filesystem,"last, max",ms,"BTRFS Commit Timings",line,"filesystem_uuid, filesystem_label",proc.plugin,/sys/fs/btrfs
+btrfs.device_errors,btrfs device,"write_errs, read_errs, flush_errs, corruption_errs, generation_errs",errors,"BTRFS Device Errors",line,"device_id, filesystem_uuid, filesystem_label",proc.plugin,/sys/fs/btrfs
+
 powersupply.capacity,power device,capacity,percentage,Battery capacity,line,device,proc.plugin,/sys/class/power_supply
 powersupply.charge,power device,"empty_design, empty, now, full, full_design",Ah,Battery charge,line,device,proc.plugin,/sys/class/power_supply
 powersupply.energy,power device,"empty_design, empty, now, full, full_design",Wh,Battery energy,line,device,proc.plugin,/sys/class/power_supply
