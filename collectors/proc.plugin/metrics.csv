@@ -124,6 +124,12 @@ wireless.noise_level,wireless device,noise_level,dBm,"The noise level indicates 
 wireless.discarded_packets,wireless device,"nwid, crypt, frag, retry, misc",packets/s,"Packet discarded in the wireless adapter due to wireless specific problems.",line,,proc.plugin,/proc/net/wireless
 wireless.missed_beacons,wireless device,missed_beacons,frames/s,Number of missed beacons.,line,,proc.plugin,/proc/net/wireless
 
+ib.bytes,infiniband port,"Received, Sent",kilobits/s,Bandwidth usage,area,,proc.plugin,/sys/class/infiniband
+ib.packets,infiniband port,"Received, Sent, Mcast_rcvd, Mcast_sent, Ucast_rcvd, Ucast_sent",packets/s,Packets Statistics,area,,proc.plugin,/sys/class/infiniband
+ib.errors,infiniband port,"Pkts_malformated, Pkts_rcvd_discarded, Pkts_sent_discarded, Tick_Wait_to_send, Pkts_missed_resource, Buffer_overrun, Link_Downed, Link_recovered, Link_integrity_err, Link_minor_errors, Pkts_rcvd_with_EBP, Pkts_rcvd_discarded_by_switch, Pkts_sent_discarded_by_switch",errors/s,Error Counters,line,,proc.plugin,/sys/class/infiniband
+ib.hwerrors,infiniband port,"Duplicated_packets, Pkt_Seq_Num_gap, Ack_timer_expired, Drop_missing_buffer, Drop_out_of_sequence, NAK_sequence_rcvd, CQE_err_Req, CQE_err_Resp, CQE_Flushed_err_Req, CQE_Flushed_err_Resp, Remote_access_err_Req, Remote_access_err_Resp, Remote_invalid_req, Local_length_err_Resp, RNR_NAK_Packets, CNP_Pkts_ignored, RoCE_ICRC_Errors",errors/s,Hardware Errors,line,,proc.plugin,/sys/class/infiniband
+ib.hwpackets,infiniband port,"RoCEv2_Congestion_sent, RoCEv2_Congestion_rcvd, IB_Congestion_handled, ATOMIC_req_rcvd, Connection_req_rcvd, Read_req_rcvd, Write_req_rcvd, RoCE_retrans_adaptive, RoCE_retrans_timeout, RoCE_slow_restart, RoCE_slow_restart_congestion, RoCE_slow_restart_count",packets/s,Hardware Packets Statistics,line,,proc.plugin,/sys/class/infiniband
+
 system.ip,,"received, sent",kilobits/s,IP Bandwidth,area,,proc.plugin,/proc/net/netstat
 ip.inerrors,,"noroutes, truncated, checksum",packets/s,IP Input Errors,line,,proc.plugin,/proc/net/netstat
 ip.mcast,,"received, sent",kilobits/s,IP Multicast Bandwidth,area,,proc.plugin,/proc/net/netstat
