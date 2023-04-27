@@ -41,12 +41,12 @@ system.load,,"load1, load5, load15",load,System Load Average,line,,proc.plugin,/
 system.active_processes,,active,processes,System Active Processes,line,,proc.plugin,/proc/loadavg
 
 md.health,,a dimension per md array,failed disks,Faulty Devices In MD,line,,proc.plugin,/proc/mdstat
-md.disks,md array,"inuse, down",disks,Disks Stats,stacked,,proc.plugin,/proc/mdstat
-md.mismatch_cnt,md array,count,unsynchronized blocks,Mismatch Count,line,,proc.plugin,/proc/mdstat
-md.status,md array,"check, resync, recovery, reshape",percent,Current Status,line,,proc.plugin,/proc/mdstat
-md.expected_time_until_operation_finish,md array,finish_in,seconds,Approximate Time Until Finish,line,,proc.plugin,/proc/mdstat
-md.operation_speed,md array,speed,KiB/s,Operation Speed,line,,proc.plugin,/proc/mdstat
-md.nonredundant,md array,available,boolean,Nonredundant Array Availability,line,,proc.plugin,/proc/mdstat
+md.disks,md array,"inuse, down",disks,Disks Stats,stacked,"device, raid_level",proc.plugin,/proc/mdstat
+md.mismatch_cnt,md array,count,unsynchronized blocks,Mismatch Count,line,"device, raid_level",proc.plugin,/proc/mdstat
+md.status,md array,"check, resync, recovery, reshape",percent,Current Status,line,"device, raid_level",proc.plugin,/proc/mdstat
+md.expected_time_until_operation_finish,md array,finish_in,seconds,Approximate Time Until Finish,line,"device, raid_level",proc.plugin,/proc/mdstat
+md.operation_speed,md array,speed,KiB/s,Operation Speed,line,"device, raid_level",proc.plugin,/proc/mdstat
+md.nonredundant,md array,available,boolean,Nonredundant Array Availability,line,"device, raid_level",proc.plugin,/proc/mdstat
 
 system.ram,,"free, used, cached, buffers",MiB,System RAM,stacked,,proc.plugin,/proc/meminfo
 mem.available,,avail,MiB,Available RAM for applications,area,,proc.plugin,/proc/meminfo
@@ -72,3 +72,7 @@ net.drops,network card,"inbound, outbound",drops/s,Interface Drops,line,"interfa
 net.fifo,network card,"receive, transmit",errors,Interface FIFO Buffer Errors,line,"interface_type, device",proc.plugin,/proc/net/dev
 net.compressed,network card,"received, sent",packets/s,Compressed Packets,line,"interface_type, device",proc.plugin,/proc/net/dev
 net.events,network card,"frames, collisions, carrier",events/s,Network Interface Events,line,"interface_type, device",proc.plugin,/proc/net/dev
+
+ipvs.sockets,,connections,connections/s,IPVS New Connections,line,,proc.plugin,/proc/net/ip_vs_stats
+ipvs.packets,,"received, sent",packets/s,IPVS Packets,line,,proc.plugin,/proc/net/ip_vs_stats
+ipvs.net,,"received, sent",kilobits/s,IPVS Bandwidth,area,,proc.plugin,/proc/net/ip_vs_stats
