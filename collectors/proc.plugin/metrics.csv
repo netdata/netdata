@@ -62,6 +62,19 @@ mem.transparent_hugepages,,"anonymous, shmem",MiB,Transparent HugePages Memory,s
 mem.pagetype_global,,a dimension per pagesize,B,System orders available,stacked,,proc.plugin,/proc/pagetypeinfo
 mem.pagetype,"node, zone, type",a dimension per pagesize,B,"pagetype_Node{node}_{zone}_{type}",stacked,"node_id, node_zone, node_type",proc.plugin,/proc/pagetypeinfo
 
+system.cpu_some_pressure,,"some10, some60, some300",percentage,"CPU some pressure",line,,proc.plugin,/proc/pressure
+system.cpu_some_pressure_stall_time,,time,ms,"CPU some pressure stall time",line,,proc.plugin,/proc/pressure
+system.cpu_full_pressure,,"some10, some60, some300",percentage,"CPU full pressure",line,,proc.plugin,/proc/pressure
+system.cpu_full_pressure_stall_time,,time,ms,"CPU full pressure stall time",line,,proc.plugin,/proc/pressure
+system.memory_some_pressure,,"some10, some60, some300",percentage,"Memory some pressure",line,,proc.plugin,/proc/pressure
+system.memory_some_pressure_stall_time,,time,ms,"Memory some pressure stall time",line,,proc.plugin,/proc/pressure
+system.memory_full_pressure,,"some10, some60, some300",percentage,"Memory full pressure",line,,proc.plugin,/proc/pressure
+system.memory_full_pressure_stall_time,,time,ms,"Memory full pressure stall time",line,,proc.plugin,/proc/pressure
+system.io_some_pressure,,"some10, some60, some300",percentage,"I/O some pressure",line,,proc.plugin,/proc/pressure
+system.io_some_pressure_stall_time,,time,ms,"I/O some pressure stall time",line,,proc.plugin,/proc/pressure
+system.io_full_pressure,,"some10, some60, some300",percentage,"I/O some pressure",line,,proc.plugin,/proc/pressure
+system.io_full_pressure_stall_time,,time,ms,"I/O some pressure stall time",line,,proc.plugin,/proc/pressure
+
 system.net,,"received, sent",kilobits/s,Physical Network Interfaces Aggregated Bandwidth,area,,proc.plugin,/proc/net/dev
 net.net,network card,"received, sent",kilobits/s,Bandwidth,area,"interface_type, device",proc.plugin,/proc/net/dev
 net.speed,network card,speed,kilobits/s,Interface Speed,line,"interface_type, device",proc.plugin,/proc/net/dev
