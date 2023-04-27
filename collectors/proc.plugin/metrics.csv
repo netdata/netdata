@@ -127,6 +127,21 @@ ipv6.icmptypes,,"InType1, InType128, InType129, InType136, OutType1, OutType128,
 ipv6.ect,,"InNoECTPkts, InECT1Pkts, InECT0Pkts, InCEPkts",packets/s,IPv6 ECT Packets,line,,proc.plugin,/proc/net/netstat
 ipv6.ect,,"InNoECTPkts, InECT1Pkts, InECT0Pkts, InCEPkts",packets/s,IPv6 ECT Packets,line,,proc.plugin,/proc/net/netstat
 
+ipv4.sockstat_sockets,,used,sockets,IPv4 Sockets Used,line,,proc.plugin,/proc/net/sockstat
+ipv4.sockstat_tcp_sockets,,"alloc, orphan, inuse, timewait",sockets,IPv4 TCP Sockets,line,,proc.plugin,/proc/net/sockstat
+ipv4.sockstat_tcp_mem,,mem,KiB,IPv4 TCP Sockets Memory,area,,proc.plugin,/proc/net/sockstat
+ipv4.sockstat_udp_sockets,,inuse,sockets,IPv4 UDP Sockets,line,,proc.plugin,/proc/net/sockstat
+ipv4.sockstat_udp_mem,,mem,sockets,IPv4 UDP Sockets Memory,line,,proc.plugin,/proc/net/sockstat
+ipv4.sockstat_udplite_sockets,,inuse,sockets,IPv4 UDPLITE Sockets,line,,proc.plugin,/proc/net/sockstat
+ipv4.sockstat_raw_sockets,,inuse,sockets,IPv4 RAW Sockets,line,,proc.plugin,/proc/net/sockstat
+ipv4.sockstat_frag_sockets,,inuse,fragments,IPv4 FRAG Sockets,line,,proc.plugin,/proc/net/sockstat
+ipv4.sockstat_frag_mem,,mem,KiB,IPv4 FRAG Sockets Memory,area,,proc.plugin,/proc/net/sockstat
+ipv6.sockstat6_tcp_sockets,,inuse,sockets,IPv6 TCP Sockets,line,,proc.plugin,/proc/net/sockstat6
+ipv6.sockstat6_udp_sockets,,inuse,sockets,IPv6 UDP Sockets,line,,proc.plugin,/proc/net/sockstat6
+ipv6.sockstat6_udplite_sockets,,inuse,sockets,IPv6 UDPLITE Sockets,line,,proc.plugin,/proc/net/sockstat6
+ipv6.sockstat6_raw_sockets,,inuse,sockets,IPv6 RAW Sockets,line,,proc.plugin,/proc/net/sockstat6
+ipv6.sockstat6_frag_sockets,,inuse,fragments,IPv6 FRAG Sockets,line,,proc.plugin,/proc/net/sockstat6
+
 ipvs.sockets,,connections,connections/s,IPVS New Connections,line,,proc.plugin,/proc/net/ip_vs_stats
 ipvs.packets,,"received, sent",packets/s,IPVS Packets,line,,proc.plugin,/proc/net/ip_vs_stats
 ipvs.net,,"received, sent",kilobits/s,IPVS Bandwidth,area,,proc.plugin,/proc/net/ip_vs_stats
