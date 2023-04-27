@@ -35,7 +35,7 @@ disk.bcache,disk,"hits, misses, collisions, readaheads",operations/s,BCache Cach
 disk.bcache_bypass,disk,"hits, misses",operations/s,BCache Cache Bypass I/O Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
 
 system.interrupts,,a dimension per device,interrupts/s,System interrupts,stacked,,proc.plugin,/proc/interrupts
-cpu.interrupts,cpu,a dimension per device,interrupts/s,CPU interrupts,stacked,cpu,proc.plugin,/proc/interrupts
+cpu.interrupts,cpu core,a dimension per device,interrupts/s,CPU interrupts,stacked,cpu,proc.plugin,/proc/interrupts
 
 system.load,,"load1, load5, load15",load,System Load Average,line,,proc.plugin,/proc/loadavg
 system.active_processes,,active,processes,System Active Processes,line,,proc.plugin,/proc/loadavg
@@ -167,3 +167,6 @@ sctp.transitions,,"active, passive, aborted, shutdown",transitions/s,SCTP Associ
 sctp.packets,,"received, sent",packets/s,SCTP Packets,line,,proc.plugin,/proc/net/sctp/snmp
 sctp.packet_errors,,"invalid, checksum",packets/s,SCTP Packet Errors,line,,proc.plugin,/proc/net/sctp/snmp
 sctp.fragmentation,,"reassembled, fragmented",packets/s,SCTP Fragmentation,line,,proc.plugin,/proc/net/sctp/snmp
+
+system.softnet_stat,,"processed, dropped, squeezed, received_rps, flow_limit_count",events/s,System softnet_stat,line,,proc.plugin,/proc/net/softnet_stat
+cpu.softnet_stat,cpu core,"processed, dropped, squeezed, received_rps, flow_limit_count",events/s,CPU softnet_stat,line,,proc.plugin,/proc/net/softnet_stat
