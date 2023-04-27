@@ -25,6 +25,10 @@ mem.ecc_ue,,a dimension per mem controller,errors,ECC Memory Uncorrectable Error
 
 mem.numa_nodes,numa node,"hit, miss, local, foreign, interleave, other",events/s,NUMA events,line,numa_node,prog.plugin,/sys/devices/system/node
 
+mem.ksm,,"shared, unshared, sharing, volatile",MiB,Kernel Same Page Merging,stacked,,prog.plugin,/sys/kernel/mm/ksm
+mem.ksm_savings,,"savings, offered",MiB,Kernel Same Page Merging Savings,area,,prog.plugin,/sys/kernel/mm/ksm
+mem.ksm_ratios,,savings,percentage,Kernel Same Page Merging Effectiveness,line,,prog.plugin,/sys/kernel/mm/ksm
+
 mem.zram_usage,zram device,"compressed, metadata",MiB,ZRAM Memory Usage,area,device,prog.plugin,/sys/block/zram
 mem.zram_savings,zram device,"savings, original",MiB,ZRAM Memory Savings,area,device,prog.plugin,/sys/block/zram
 mem.zram_ratio,zram device,ratio,ratio,ZRAM Compression Ratio (original to compressed),line,device,prog.plugin,/sys/block/zram
