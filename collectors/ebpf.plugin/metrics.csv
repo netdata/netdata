@@ -32,7 +32,7 @@ services.thread_create,cgroup,a dimension per systemd service,calls/s,Threads st
 services.task_close,cgroup,a dimension per systemd service,calls/s,Tasks starts exit process,stacked,,ebpf.plugin,processes
 services.task_exit,cgroup,a dimension per systemd service,calls/s,Tasks closed,stacked,,ebpf.plugin,processes
 services.task_error,cgroup,a dimension per systemd service,calls/s,Errors to create process or threads,stacked,,ebpf.plugin,processes
-disk.latency_io,,latency,calls/s,Disk latency,stacked,,ebpf.plugin,disk
+disk.latency_io,disk,latency,calls/s,Disk latency,stacked,,ebpf.plugin,disk
 system.hardirq_latency,,hardirq names,milisecondds,Hardware IRQ latency,stacked,,ebpf.plugin,hardirq
 apps.cachestat_ratio,,a dimension per app group,%,Hit ratio,line,,ebpf.plugin,cachestat
 apps.cachestat_dirties,,a dimension per app group,page/s,Number of dirty pages,stacked,,ebpf.plugin,cachestat
@@ -110,27 +110,12 @@ services.dc_reference,,a dimension per systemd service,files,Count file access,l
 services.dc_not_cache,,a dimension per systemd service,files,Files not present inside directory cache,line,,ebpf.plugin,dcstat
 services.dc_not_found,,a dimension per systemd service,files,Files not found,line,,ebpf.plugin,dcstat
 filesystem.dc_hit_ratio,,ratio,%,Percentage of files inside directory cache,line,,ebpf.plugin,dcstat
-filesystem.dc_reference,,"reference, slow, miss",files,Variables used to calculate hit ratio.,line,,ebpf.plugin,dcstat
-filesystem.ext4_read_latency,,latency period,calls/s,ext4 latency for each read request.,stacked,,ebpf.plugin,filesystem
-filesystem.ext4_write_latency,,latency period,calls/s,ext4 latency for each write request.,stacked,,ebpf.plugin,filesystem
-filesystem.ext4_open_latency,,latency period,calls/s,ext4 latency for each open request.,stacked,,ebpf.plugin,filesystem
-filesystem.ext4_sync_latency,,latency period,calls/s,ext4 latency for each sync request.,stacked,,ebpf.plugin,filesystem
-filesystem.nfs_read_latency,,latency period,calls/s,nfs latency for each read request.,stacked,,ebpf.plugin,filesystem
-filesystem.nfs_write_latency,,latency period,calls/s,nfs latency for each write request.,stacked,,ebpf.plugin,filesystem
-filesystem.nfs_open_latency,,latency period,calls/s,nfs latency for each open request.,stacked,,ebpf.plugin,filesystem
-filesystem.nfs_attributte_latency,,latency period,calls/s,nfs latency for each attribute request.,stacked,,ebpf.plugin,filesystem
-filesystem.zfs_read_latency,,latency period,calls/s,zfs latency for each read request.,stacked,,ebpf.plugin,filesystem
-filesystem.zfs_write_latency,,latency period,calls/s,zfs latency for each write request.,stacked,,ebpf.plugin,filesystem
-filesystem.zfs_open_latency,,latency period,calls/s,zfs latency for each open request.,stacked,,ebpf.plugin,filesystem
-filesystem.zfs_sync_latency,,latency period,calls/s,zfs latency for each sync request.,stacked,,ebpf.plugin,filesystem
-filesystem.btrfs_read_latency,,latency period,calls/s,btrfs latency for each read request.,stacked,,ebpf.plugin,filesystem
-filesystem.btrfs_write_latency,,latency period,calls/s,btrfs latency for each write request.,stacked,,ebpf.plugin,filesystem
-filesystem.btrfs_open_latency,,latency period,calls/s,btrfs latency for each open request.,stacked,,ebpf.plugin,filesystem
-filesystem.btrfs_sync_latency,,latency period,calls/s,btrfs latency for each sync request.,stacked,,ebpf.plugin,filesystem
-filesystem.xfs_read_latency,,latency period,calls/s,xfs latency for each read request.,stacked,,ebpf.plugin,filesystem
-filesystem.xfs_write_latency,,latency period,calls/s,xfs latency for each write request.,stacked,,ebpf.plugin,filesystem
-filesystem.xfs_open_latency,,latency period,calls/s,xfs latency for each open request.,stacked,,ebpf.plugin,filesystem
-filesystem.xfs_sync_latency,,latency period,calls/s,xfs latency for each sync request.,stacked,,ebpf.plugin,filesystem
+filesystem.dc_reference,filesystem,"reference, slow, miss",files,Variables used to calculate hit ratio.,line,,ebpf.plugin,dcstat
+filesystem.read_latency,filesystem,latency period,calls/s,ext4 latency for each read request.,stacked,,ebpf.plugin,filesystem
+filesystem.write_latency,iilesystem,latency period,calls/s,ext4 latency for each write request.,stacked,,ebpf.plugin,filesystem
+filesystem.open_latency,filesystem,latency period,calls/s,ext4 latency for each open request.,stacked,,ebpf.plugin,filesystem
+filesystem.sync_latency,filesystem,latency period,calls/s,ext4 latency for each sync request.,stacked,,ebpf.plugin,filesystem
+filesystem.attributte_latency,,latency period,calls/s,nfs latency for each attribute request.,stacked,,ebpf.plugin,filesystem
 cgroup.shmget,cgroup,get,calls/s,Calls to syscall <code>shmget(2)</code>.,line,,ebpf.plugin,shm
 cgroup.shmat,cgroup,at,calls/s,Calls to syscall <code>shmat(2)</code>.,line,,ebpf.plugin,shm
 cgroup.shmdt,cgroup,dt,calls/s,Calls to syscall <code>shmdt(2)</code>.,line,,ebpf.plugin,shm

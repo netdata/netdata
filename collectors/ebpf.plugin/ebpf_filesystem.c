@@ -92,7 +92,7 @@ static void ebpf_obsolete_fs_charts(int update_every)
 static void ebpf_create_fs_charts(int update_every)
 {
     static int order = NETDATA_CHART_PRIO_EBPF_FILESYSTEM_CHARTS;
-    char chart_name[64], title[256], family[64];
+    char chart_name[64], title[256], family[64], ctx[64];
     int i;
     uint32_t test = NETDATA_FILESYSTEM_FLAG_CHART_CREATED|NETDATA_FILESYSTEM_REMOVE_CHARTS;
     for (i = 0; localfs[i].filesystem; i++) {
@@ -110,7 +110,7 @@ static void ebpf_create_fs_charts(int update_every)
             ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, efp->hread.name,
                               title,
                               EBPF_COMMON_DIMENSION_CALL, family,
-                              NULL, NETDATA_EBPF_CHART_TYPE_STACKED, order, ebpf_create_global_dimension,
+                              "filesystem.read_latency", NETDATA_EBPF_CHART_TYPE_STACKED, order, ebpf_create_global_dimension,
                               filesystem_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
                               update_every, NETDATA_EBPF_MODULE_NAME_FILESYSTEM);
             order++;
@@ -123,7 +123,7 @@ static void ebpf_create_fs_charts(int update_every)
             ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, efp->hwrite.name,
                               title,
                               EBPF_COMMON_DIMENSION_CALL, family,
-                              NULL, NETDATA_EBPF_CHART_TYPE_STACKED, order, ebpf_create_global_dimension,
+                              "filesystem.write_latency", NETDATA_EBPF_CHART_TYPE_STACKED, order, ebpf_create_global_dimension,
                               filesystem_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
                               update_every, NETDATA_EBPF_MODULE_NAME_FILESYSTEM);
             order++;
@@ -136,7 +136,7 @@ static void ebpf_create_fs_charts(int update_every)
             ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, efp->hopen.name,
                               title,
                               EBPF_COMMON_DIMENSION_CALL, family,
-                              NULL, NETDATA_EBPF_CHART_TYPE_STACKED, order, ebpf_create_global_dimension,
+                              "filesystem.open_latency", NETDATA_EBPF_CHART_TYPE_STACKED, order, ebpf_create_global_dimension,
                               filesystem_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
                               update_every, NETDATA_EBPF_MODULE_NAME_FILESYSTEM);
             order++;
@@ -144,12 +144,13 @@ static void ebpf_create_fs_charts(int update_every)
             char *type = (efp->flags & NETDATA_FILESYSTEM_ATTR_CHARTS) ? "attribute" : "sync";
             snprintfz(title, 255, "%s latency for each %s request.", efp->filesystem, type);
             snprintfz(chart_name, 63, "%s_%s_latency", efp->filesystem, type);
+            snprintfz(ctx, 63, "filesystem.%s_latency", type);
             efp->hadditional.name = strdupz(chart_name);
             efp->hadditional.title = strdupz(title);
             efp->hadditional.order = order;
             ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, efp->hadditional.name, title,
                               EBPF_COMMON_DIMENSION_CALL, family,
-                              NULL, NETDATA_EBPF_CHART_TYPE_STACKED, order, ebpf_create_global_dimension,
+                              ctx, NETDATA_EBPF_CHART_TYPE_STACKED, order, ebpf_create_global_dimension,
                               filesystem_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
                               update_every, NETDATA_EBPF_MODULE_NAME_FILESYSTEM);
             order++;
