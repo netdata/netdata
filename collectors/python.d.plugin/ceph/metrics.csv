@@ -12,5 +12,5 @@ ceph.pool_read_operations,,a dimension per Ceph Pool,operations,Ceph Read Pool O
 ceph.pool_write_operations,,a dimension per Ceph Pool,operations,Ceph Write Pool Operations/s,area,,python.d.plugin,ceph
 ceph.osd_usage,,a dimension per Ceph OSD,KiB,Ceph OSDs,line,,python.d.plugin,ceph
 ceph.osd_size,,a dimension per Ceph OSD,KiB,Ceph OSDs size,line,,python.d.plugin,ceph
-ceph.apply_latency,,"a dimension per Ceph OSD",milliseconds,Ceph OSDs apply latency,line,,python.d.plugin,ceph
-ceph.commit_latency,,"a dimension per Ceph OSD",milliseconds,Ceph OSDs commit latency,line,,python.d.plugin,ceph
+ceph.apply_latency,,a dimension per Ceph OSD,milliseconds,Ceph OSDs apply latency,line,,python.d.plugin,ceph
+ceph.commit_latency,,a dimension per Ceph OSD,milliseconds,Ceph OSDs commit latency,line,,python.d.plugin,ceph
