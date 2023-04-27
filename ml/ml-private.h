@@ -320,6 +320,7 @@ typedef struct {
     std::atomic<bool> detection_stop;
 
     size_t num_training_threads;
+    size_t flush_models_batch_size;
 
     std::vector<ml_training_thread_t> training_threads;
     std::atomic<bool> training_stop;

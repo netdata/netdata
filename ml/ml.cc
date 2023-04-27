@@ -1389,7 +1389,7 @@ static int ml_flush_pending_models(ml_training_thread_t *training_thread) {
     (void) db_execute(db, "BEGIN TRANSACTION;");
     
     for (const auto &pending_model: training_thread->pending_model_info) {
-        int rc = ml_dimension_add_model(&pending_model.metric_uuid, pending_model.id.c_str(), &pending_model.kmeans);
+        int rc = ml_dimension_add_model(&pending_model.metric_uuid, &pending_model.kmeans);
         if (rc)
             return rc;
 
@@ -1494,7 +1494,7 @@ static void *ml_train_main(void *arg) {
             netdata_mutex_unlock(&training_thread->nd_mutex);
         }
 
-        if (training_thread->pending_model_info.size() >= 128) {
+        if (training_thread->pending_model_info.size() >= Cfg.flush_models_batch_size) {
             worker_is_busy(WORKER_TRAIN_FLUSH_MODELS);
             ml_flush_pending_models(training_thread);
             continue;
@@ -1535,6 +1535,7 @@ void ml_init()
 
         training_thread->id = idx;
         training_thread->training_queue = ml_queue_init();
+        training_thread->pending_model_info.reserve(Cfg.flush_models_batch_size);
         netdata_mutex_init(&training_thread->nd_mutex);
     }
 
