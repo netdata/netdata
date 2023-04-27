@@ -1,0 +1,5 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+puppet.jvm,,"committed, used",1,"JVM Heap",area,,python.d.plugin,puppet
+puppet.jvm,,"committed, used",1,"JVM Non-Heap",area,,python.d.plugin,puppet
+puppet.cpu,,"execution, GC",percentage,"CPU usage",stacked,,python.d.plugin,puppet
+puppet.fdopen,,"used",descriptors,"File Descriptors",line,,python.d.plugin,puppet
