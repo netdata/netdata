@@ -1,0 +1,3 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+zscores.z,,"a dimension per chart returned from {api/v1/allmetrics} call, can also be configured to be per dimension per chart",z,Z Score,line,,python.d.plugin,zscores
+zscores.3stddev,,"a dimension per chart returned from {api/v1/allmetrics} call, can also be configured to be per dimension per chart",count,Z Score >3,stacked,,python.d.plugin,zscores
