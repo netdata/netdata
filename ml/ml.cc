@@ -643,26 +643,6 @@ bind_fail:
     return 1;
 }
 
-int ml_dimension_update_models(RRDDIM *rd) {
-    ml_dimension_t *dim = (ml_dimension_t *) rd->ml_dimension;
-    if (!dim)
-        return 0;
-
-    netdata_mutex_lock(&dim->mutex);
-    std::vector<ml_kmeans_t> V = dim->km_contexts;
-    time_t before = dim->kmeans.before - (Cfg.num_models_to_use * Cfg.train_every);
-    netdata_mutex_unlock(&dim->mutex);
-
-    for (const ml_kmeans_t &km: V) {
-        int rc = ml_dimension_add_model(&rd->metric_uuid, &km);
-        if (rc)
-            return rc;
-    }
-
-    ml_dimension_delete_models(&dim->rd->metric_uuid, before);
-    return 0;
-}
-
 static enum ml_training_result
 ml_dimension_train_model(ml_training_thread_t *training_thread, ml_dimension_t *dim, const ml_training_request_t &training_request)
 {
