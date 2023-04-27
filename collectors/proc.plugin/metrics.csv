@@ -206,3 +206,31 @@ netfilter.conntrack_errors,,"icmp_error, error_failed, drop, early_drop",events/
 netfilter.synproxy_syn_received,,received,packets/s,SYNPROXY SYN Packets received,line,,proc.plugin,/proc/net/stat/synproxy
 netfilter.synproxy_conn_reopened,,reopened,connections/s,SYNPROXY Connections Reopened,line,,proc.plugin,/proc/net/stat/synproxy
 netfilter.synproxy_cookies,,"valid, invalid, retransmits",cookies/s,SYNPROXY TCP Cookies,line,,proc.plugin,/proc/net/stat/synproxy
+
+zfspool.state,zfs pool,"online, degraded, faulted, offline, removed, unavail, suspended",boolean,"ZFS pool state",line,pool,proc.plugin,/proc/spl/kstat/zfs
+zfs.arc_size,,"arcsz, target, min, max",MiB,"ZFS ARC Size",area,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.l2_size,,"actual, size",MiB,"ZFS L2 ARC Size",area,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.reads,,"arc, demand, prefetch, metadata, l2",reads/s,"ZFS Reads",area,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.bytes,,"read, write",KiB/s,"ZFS ARC L2 Read/Write Rate",area,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.hits,,"hits, misses",percentage,"ZFS ARC Hits",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.hits_rate,,"hits, misses",events/s,"ZFS ARC Hits Rate",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.dhits,,"hits, misses",percentage,"ZFS Demand Hits",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.dhits_rate,,"hits, misses",events/s,"ZFS Demand Hits Rate",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.phits,,"hits, misses",percentage,"ZFS Prefetch Hits",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.phits_rate,,"hits, misses",events/s,"ZFS Prefetch Hits Rate",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.mhits,,"hits, misses",percentage,"ZFS Metadata Hits",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.mhits_rate,,"hits, misses",events/s,"ZFS Metadata Hits Rate",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.l2hits,,"hits, misses",percentage,"ZFS L2 Hits",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.l2hits_rate,,"hits, misses",events/s,"ZFS L2 Hits Rate",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.list_hits,,"mfu, mfu_ghost, mru, mru_ghost",hits/s,"ZFS List Hits",area,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.arc_size_breakdown,,"recent, frequent",percentage,"ZFS ARC Size Breakdown",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.memory_ops,,"direct, throttled, indirect",operations/s,"ZFS Memory Operations",line,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.important_ops,,"evict_skip, deleted, mutex_miss, hash_collisions",operations/s,"ZFS Important Operations",line,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.actual_hits,,"hits, misses",percentage,"ZFS Actual Cache Hits",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.actual_hits_rate,,"hits, misses",events/s,"ZFS Actual Cache Hits Rate",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.demand_data_hits,,"hits, misses",percentage,"ZFS Data Demand Efficiency",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.demand_data_hits_rate,,"hits, misses",events/s,"ZFS Data Demand Efficiency Rate",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.prefetch_data_hits,,"hits, misses",percentage,"ZFS Data Prefetch Efficiency",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.prefetch_data_hits_rate,,"hits, misses",events/s,"ZFS Data Prefetch Efficiency Rate",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.hash_elements,,"current, max",elements,"ZFS ARC Hash Elements",line,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.hash_chains,,"current, max",chains,"ZFS ARC Hash Chains",line,,proc.plugin,/proc/spl/kstat/zfs/arcstats
