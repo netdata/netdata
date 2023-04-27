@@ -53,40 +53,40 @@ CHARTS = {
         ]
     },
     'evicted_reclaimed': {
-        'options': [None, 'Items', 'items', 'items', 'memcached.evicted_reclaimed', 'line'],
+        'options': [None, 'Evicted and Reclaimed Items', 'items', 'items', 'memcached.evicted_reclaimed', 'line'],
         'lines': [
             ['reclaimed', 'reclaimed', 'absolute'],
             ['evictions', 'evicted', 'absolute']
         ]
     },
     'get': {
-        'options': [None, 'Requests', 'requests', 'get ops', 'memcached.get', 'stacked'],
+        'options': [None, 'Get Requests', 'requests', 'get ops', 'memcached.get', 'stacked'],
         'lines': [
             ['get_hits', 'hits', 'percent-of-absolute-row'],
             ['get_misses', 'misses', 'percent-of-absolute-row']
         ]
     },
     'get_rate': {
-        'options': [None, 'Rate', 'requests/s', 'get ops', 'memcached.get_rate', 'line'],
+        'options': [None, 'Get Request Rate', 'requests/s', 'get ops', 'memcached.get_rate', 'line'],
         'lines': [
             ['cmd_get', 'rate', 'incremental']
         ]
     },
     'set_rate': {
-        'options': [None, 'Rate', 'requests/s', 'set ops', 'memcached.set_rate', 'line'],
+        'options': [None, 'Set Request Rate', 'requests/s', 'set ops', 'memcached.set_rate', 'line'],
         'lines': [
             ['cmd_set', 'rate', 'incremental']
         ]
     },
     'delete': {
-        'options': [None, 'Requests', 'requests', 'delete ops', 'memcached.delete', 'stacked'],
+        'options': [None, 'Delete Requests', 'requests', 'delete ops', 'memcached.delete', 'stacked'],
         'lines': [
             ['delete_hits', 'hits', 'percent-of-absolute-row'],
             ['delete_misses', 'misses', 'percent-of-absolute-row'],
         ]
     },
     'cas': {
-        'options': [None, 'Requests', 'requests', 'check and set ops', 'memcached.cas', 'stacked'],
+        'options': [None, 'Check and Set Requests', 'requests', 'check and set ops', 'memcached.cas', 'stacked'],
         'lines': [
             ['cas_hits', 'hits', 'percent-of-absolute-row'],
             ['cas_misses', 'misses', 'percent-of-absolute-row'],
@@ -94,28 +94,28 @@ CHARTS = {
         ]
     },
     'increment': {
-        'options': [None, 'Requests', 'requests', 'increment ops', 'memcached.increment', 'stacked'],
+        'options': [None, 'Increment Requests', 'requests', 'increment ops', 'memcached.increment', 'stacked'],
         'lines': [
             ['incr_hits', 'hits', 'percent-of-absolute-row'],
             ['incr_misses', 'misses', 'percent-of-absolute-row']
         ]
     },
     'decrement': {
-        'options': [None, 'Requests', 'requests', 'decrement ops', 'memcached.decrement', 'stacked'],
+        'options': [None, 'Decrement Requests', 'requests', 'decrement ops', 'memcached.decrement', 'stacked'],
         'lines': [
             ['decr_hits', 'hits', 'percent-of-absolute-row'],
             ['decr_misses', 'misses', 'percent-of-absolute-row']
         ]
     },
     'touch': {
-        'options': [None, 'Requests', 'requests', 'touch ops', 'memcached.touch', 'stacked'],
+        'options': [None, 'Touch Requests', 'requests', 'touch ops', 'memcached.touch', 'stacked'],
         'lines': [
             ['touch_hits', 'hits', 'percent-of-absolute-row'],
             ['touch_misses', 'misses', 'percent-of-absolute-row']
         ]
     },
     'touch_rate': {
-        'options': [None, 'Rate', 'requests/s', 'touch ops', 'memcached.touch_rate', 'line'],
+        'options': [None, 'Touch Request Rate', 'requests/s', 'touch ops', 'memcached.touch_rate', 'line'],
         'lines': [
             ['cmd_touch', 'rate', 'incremental']
         ]

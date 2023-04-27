@@ -1,3 +1,12 @@
+<!--
+title: "Adaptec RAID controller monitoring with Netdata"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/adaptec_raid/README.md"
+sidebar_label: "Adaptec RAID"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Integrations/Monitor/Hardware"
+-->
+
 # Adaptec RAID controller collector
 
 Collects logical and physical devices metrics using `arcconf` command-line utility.
@@ -6,10 +15,6 @@ Executed commands:
 
 - `sudo -n arcconf GETCONFIG 1 LD`
 - `sudo -n arcconf GETCONFIG 1 PD`
-
-## Metrics
-
-See [metrics.csv](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/adaptec_raid/metrics.csv) for a list of metrics.
 
 ## Requirements
 
@@ -39,6 +44,13 @@ echo -e '[Service]\nCapabilityBoundingSet=~' | tee /etc/systemd/system/netdata.s
 systemctl daemon-reload
 systemctl restart netdata.service
 ```
+
+## Charts
+
+- Logical Device Status
+- Physical Device State
+- Physical Device S.M.A.R.T warnings
+- Physical Device Temperature
 
 ## Enable the collector
 

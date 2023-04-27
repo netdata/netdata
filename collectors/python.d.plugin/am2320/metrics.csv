@@ -1,0 +1,3 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+am2320.temperature,,temperature,celsius,Temperature,line,,python.d.plugin,am2320
+am2320.humidity,,humidity,percentage,Relative Humidity,line,,python.d.plugin,am2320

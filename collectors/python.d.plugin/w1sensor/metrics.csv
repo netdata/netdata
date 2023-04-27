@@ -1,0 +1,2 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+w1sensor.temp,,a dimension per sensor,Celsius,1-Wire Temperature Sensor,line,,python.d.plugin,w1sensor

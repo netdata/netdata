@@ -1,0 +1,16 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+nvidia_smi.pci_bandwidth,GPU,"rx, tx",KiB/s,PCI Express Bandwidth Utilization,area,,python.d.plugin,nvidia_smi
+nvidia_smi.pci_bandwidth_percent,GPU,"rx_percent, tx_percent",percentage,PCI Express Bandwidth Percent,area,,python.d.plugin,nvidia_smi
+nvidia_smi.fan_speed,GPU,speed,percentage,Fan Speed,line,,python.d.plugin,nvidia_smi
+nvidia_smi.gpu_utilization,GPU,utilization,percentage,GPU Utilization,line,,python.d.plugin,nvidia_smi
+nvidia_smi.mem_utilization,GPU,utilization,percentage,Memory Bandwidth Utilization,line,,python.d.plugin,nvidia_smi
+nvidia_smi.encoder_utilization,GPU,"encoder, decoder",percentage,Encoder/Decoder Utilization,line,,python.d.plugin,nvidia_smi
+nvidia_smi.memory_allocated,GPU,"free, used",MiB,Memory Usage,stacked,,python.d.plugin,nvidia_smi
+nvidia_smi.bar1_memory_usage,GPU,"free, used",MiB,Bar1 Memory Usage,stacked,,python.d.plugin,nvidia_smi
+nvidia_smi.temperature,GPU,temp,celsius,Temperature,line,,python.d.plugin,nvidia_smi
+nvidia_smi.clocks,GPU,"graphics, video, sm, mem",MHz,Clock Frequencies,line,,python.d.plugin,nvidia_smi
+nvidia_smi.power,GPU,power,Watts,Power Utilization,line,,python.d.plugin,nvidia_smi
+nvidia_smi.power_state,GPU,a dimension per {power_state},state,Power State,line,,python.d.plugin,nvidia_smi
+nvidia_smi.processes_mem,GPU,a dimension per process,MiB,Memory Used by Each Process,stacked,,python.d.plugin,nvidia_smi
+nvidia_smi.user_mem,GPU,a dimension per user,MiB,Memory Used by Each User,stacked,,python.d.plugin,nvidia_smi
+nvidia_smi.user_num,GPU,users,num,Number of User on GPU,line,,python.d.plugin,nvidia_smi

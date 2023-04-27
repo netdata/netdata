@@ -1,0 +1,26 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+riak.kv.throughput,,"gets, puts",operations/s,Reads & writes coordinated by this node,line,,python.d.plugin,riakkv
+riak.dt.vnode_updates,,"counters, sets, maps",operations/s,Update operations coordinated by local vnodes by data type,line,,python.d.plugin,riakkv
+riak.search,,queries,queries/s,Search queries on the node,line,,python.d.plugin,riakkv
+riak.search.documents,,indexed,documents/s,Documents indexed by search,line,,python.d.plugin,riakkv
+riak.consistent.operations,,"gets, puts",operations/s,Consistent node operations,line,,python.d.plugin,riakkv
+riak.kv.latency.get,,"mean, median, 95, 99, 100",ms,Time between reception of a client GET request and subsequent response to client,line,,python.d.plugin,riakkv
+riak.kv.latency.put,,"mean, median, 95, 99, 100",ms,Time between reception of a client PUT request and subsequent response to client,line,,python.d.plugin,riakkv
+riak.dt.latency.counter_merge,,"mean, median, 95, 99, 100",ms,Time it takes to perform an Update Counter operation,line,,python.d.plugin,riakkv
+riak.dt.latency.set_merge,,"mean, median, 95, 99, 100",ms,Time it takes to perform an Update Set operation,line,,python.d.plugin,riakkv
+riak.dt.latency.map_merge,,"mean, median, 95, 99, 100",ms,Time it takes to perform an Update Map operation,line,,python.d.plugin,riakkv
+riak.search.latency.query,,"median, min, 95, 99, 999, max",ms,Search query latency,line,,python.d.plugin,riakkv
+riak.search.latency.index,,"median, min, 95, 99, 999, max",ms,Time it takes Search to index a new document,line,,python.d.plugin,riakkv
+riak.consistent.latency.get,,"mean, median, 95, 99, 100",ms,Strongly consistent read latency,line,,python.d.plugin,riakkv
+riak.consistent.latency.put,,"mean, median, 95, 99, 100",ms,Strongly consistent write latency,line,,python.d.plugin,riakkv
+riak.vm,,processes,total,Total processes running in the Erlang VM,line,,python.d.plugin,riakkv
+riak.vm.memory.processes,,"allocated, used",MB,Memory allocated & used by Erlang processes,line,,python.d.plugin,riakkv
+riak.kv.siblings_encountered.get,,"mean, median, 95, 99, 100",siblings,Number of siblings encountered during GET operations by this node during the past minute,line,,python.d.plugin,riakkv
+riak.kv.objsize.get,,"mean, median, 95, 99, 100",KB,Object size encountered by this node during the past minute,line,,python.d.plugin,riakkv
+riak.search.vnodeq_size,,"mean, median, 95, 99, 100",messages,Number of unprocessed messages in the vnode message queues of Search on this node in the past minute,line,,python.d.plugin,riakkv
+riak.search.index,,errors,errors,Number of document index errors encountered by Search,line,,python.d.plugin,riakkv
+riak.core.protobuf_connections,,active,connections,Protocol buffer connections by status,line,,python.d.plugin,riakkv
+riak.core.repairs,,read,repairs,Number of repair operations this node has coordinated,line,,python.d.plugin,riakkv
+riak.core.fsm_active,,"get, put, secondary index, list keys",fsms,Active finite state machines by kind,line,,python.d.plugin,riakkv
+riak.core.fsm_rejected,,"get, put",fsms,Finite state machines being rejected by Sidejobs overload protection,line,,python.d.plugin,riakkv
+riak.search.index,,"bad_entry, extract_fail",writes,Number of writes to Search failed due to bad data format by reason,line,,python.d.plugin,riakkv

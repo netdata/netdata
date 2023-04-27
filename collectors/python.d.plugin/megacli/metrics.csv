@@ -1,0 +1,6 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+megacli.adapter_degraded,,a dimension per adapter,is degraded,Adapter State,line,,python.d.plugin,megacli
+megacli.pd_media_error,,a dimension per physical drive,errors/s,Physical Drives Media Errors,line,,python.d.plugin,megacli
+megacli.pd_predictive_failure,,a dimension per physical drive,failures/s,Physical Drives Predictive Failures,line,,python.d.plugin,megacli
+megacli.bbu_relative_charge,battery,adapter {battery id},percentage,Relative State of Charge,line,,python.d.plugin,megacli
+megacli.bbu_cycle_count,battery,adapter {battery id},cycle count,Cycle Count,line,,python.d.plugin,megacli

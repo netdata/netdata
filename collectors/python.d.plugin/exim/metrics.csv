@@ -1,0 +1,2 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+exim.qemails,,emails,emails,Exim Queue Emails,line,,python.d.plugin,exim

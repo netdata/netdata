@@ -1,0 +1,7 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+nsd.queries,,queries,queries/s,queries,line,,python.d.plugin,nsd
+nsd.zones,,"master, slave",zones,zones,stacked,,python.d.plugin,nsd
+nsd.protocols,,"udp, udp6, tcp, tcp6",queries/s,protocol,stacked,,python.d.plugin,nsd
+nsd.type,,"A, NS, CNAME, SOA, PTR, HINFO, MX, NAPTR, TXT, AAAA, SRV, ANY",queries/s,query type,stacked,,python.d.plugin,nsd
+nsd.transfer,,"NOTIFY, AXFR",queries/s,transfer,stacked,,python.d.plugin,nsd
+nsd.rcode,,"NOERROR, FORMERR, SERVFAIL, NXDOMAIN, NOTIMP, REFUSED, YXDOMAIN",queries/s,return code,stacked,,python.d.plugin,nsd

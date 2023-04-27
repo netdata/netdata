@@ -1,0 +1,9 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+rethinkdb.cluster_connected_servers,,"connected, missing",servers,Connected Servers,stacked,,python.d.plugin,rethinkdbs
+rethinkdb.cluster_clients_active,,active,clients,Active Clients,line,,python.d.plugin,rethinkdbs
+rethinkdb.cluster_queries,,queries,queries/s,Queries,line,,python.d.plugin,rethinkdbs
+rethinkdb.cluster_documents,,"reads, writes",documents/s,Documents,line,,python.d.plugin,rethinkdbs
+rethinkdb.client_connections,database server,connections,connections,Client Connections,line,,python.d.plugin,rethinkdbs
+rethinkdb.clients_active,database server,active,clients,Active Clients,line,,python.d.plugin,rethinkdbs
+rethinkdb.queries,database server,queries,queries/s,Queries,line,,python.d.plugin,rethinkdbs
+rethinkdb.documents,database server,"reads, writes",documents/s,Documents,line,,python.d.plugin,rethinkdbs

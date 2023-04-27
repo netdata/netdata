@@ -1,0 +1,3 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+alarms.status,,a dimension per alarm,status,Alarms ({status mapping}),line,,python.d.plugin,alarms
+alarms.status,,a dimension per alarm,value,Alarm Values,line,,python.d.plugin,alarms

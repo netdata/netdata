@@ -1,0 +1,2 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+hddtemp.temperatures,,a dimension per disk,Celsius,Disk Temperatures,line,,python.d.plugin,hddtemp

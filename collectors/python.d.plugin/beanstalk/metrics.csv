@@ -1,0 +1,15 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+beanstalk.cpu_usage,,"user, system",cpu time,Cpu Usage,area,,python.d.plugin,beanstalk
+beanstalk.jobs_rate,,"total, timeouts",jobs/s,Jobs Rate,line,,python.d.plugin,beanstalk
+beanstalk.connections_rate,,connections,connections/s,Connections Rate,area,,python.d.plugin,beanstalk
+beanstalk.commands_rate,,"put, peek, peek-ready, peek-delayed, peek-buried, reserve, use, watch, ignore, delete, bury, kick, stats, stats-job, stats-tube, list-tubes, list-tube-used, list-tubes-watched, pause-tube",commands/s,Commands Rate,stacked,,python.d.plugin,beanstalk
+beanstalk.connections_rate,,tubes,tubes,Current Tubes,area,,python.d.plugin,beanstalk
+beanstalk.current_jobs,,"urgent, ready, reserved, delayed, buried",jobs,Current Jobs,stacked,,python.d.plugin,beanstalk
+beanstalk.current_connections,,"written, producers, workers, waiting",connections,Current Connections,line,,python.d.plugin,beanstalk
+beanstalk.binlog,,"written, migrated",records/s,Binlog,line,,python.d.plugin,beanstalk
+beanstalk.uptime,,uptime,seconds,seconds,line,,python.d.plugin,beanstalk
+beanstalk.jobs_rate,tube,jobs,jobs/s,Jobs Rate,area,,python.d.plugin,beanstalk
+beanstalk.jobs,tube,"urgent, ready, reserved, delayed, buried",jobs,Jobs,stacked,,python.d.plugin,beanstalk
+beanstalk.connections,tube,"using, waiting, watching",connections,Connections,stacked,,python.d.plugin,beanstalk
+beanstalk.commands,tube,"deletes, pauses",commands/s,Commands,stacked,,python.d.plugin,beanstalk
+beanstalk.pause,tube,"since, left",seconds,Pause,stacked,,python.d.plugin,beanstalk

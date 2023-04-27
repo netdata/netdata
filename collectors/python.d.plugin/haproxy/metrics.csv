@@ -1,0 +1,31 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+haproxy_f.bin,,a dimension per frontend server,KiB/s,Kilobytes In,line,,python.d.plugin,haproxy
+haproxy_f.bout,,a dimension per frontend server,KiB/s,Kilobytes Out,line,,python.d.plugin,haproxy
+haproxy_f.scur,,a dimension per frontend server,sessions,Sessions Active,line,,python.d.plugin,haproxy
+haproxy_f.qcur,,a dimension per frontend server,sessions,Session In Queue,line,,python.d.plugin,haproxy
+haproxy_f.hrsp_1xx,,a dimension per frontend server,responses/s,HTTP responses with 1xx code,line,,python.d.plugin,haproxy
+haproxy_f.hrsp_2xx,,a dimension per frontend server,responses/s,HTTP responses with 2xx code,line,,python.d.plugin,haproxy
+haproxy_f.hrsp_3xx,,a dimension per frontend server,responses/s,HTTP responses with 3xx code,line,,python.d.plugin,haproxy
+haproxy_f.hrsp_4xx,,a dimension per frontend server,responses/s,HTTP responses with 4xx code,line,,python.d.plugin,haproxy
+haproxy_f.hrsp_5xx,,a dimension per frontend server,responses/s,HTTP responses with 5xx code,line,,python.d.plugin,haproxy
+haproxy_f.hrsp_other,,a dimension per frontend server,responses/s,HTTP responses with other codes (protocol error),line,,python.d.plugin,haproxy
+haproxy_f.hrsp_total,,a dimension per frontend server,responses,HTTP responses,line,,python.d.plugin,haproxy
+haproxy_b.bin,,a dimension per backend server,KiB/s,Kilobytes In,line,,python.d.plugin,haproxy
+haproxy_b.bout,,a dimension per backend server,KiB/s,Kilobytes Out,line,,python.d.plugin,haproxy
+haproxy_b.scur,,a dimension per backend server,sessions,Sessions Active,line,,python.d.plugin,haproxy
+haproxy_b.qcur,,a dimension per backend server,sessions,Sessions In Queue,line,,python.d.plugin,haproxy
+haproxy_b.hrsp_1xx,,a dimension per backend server,responses/s,HTTP responses with 1xx code,line,,python.d.plugin,haproxy
+haproxy_b.hrsp_2xx,,a dimension per backend server,responses/s,HTTP responses with 2xx code,line,,python.d.plugin,haproxy
+haproxy_b.hrsp_3xx,,a dimension per backend server,responses/s,HTTP responses with 3xx code,line,,python.d.plugin,haproxy
+haproxy_b.hrsp_4xx,,a dimension per backend server,responses/s,HTTP responses with 4xx code,line,,python.d.plugin,haproxy
+haproxy_b.hrsp_5xx,,a dimension per backend server,responses/s,HTTP responses with 5xx code,line,,python.d.plugin,haproxy
+haproxy_b.hrsp_other,,a dimension per backend server,responses/s,HTTP responses with other codes (protocol error),line,,python.d.plugin,haproxy
+haproxy_b.hrsp_total,,a dimension per backend server,responses/s,HTTP responses (total),line,,python.d.plugin,haproxy
+haproxy_b.qtime,,a dimension per backend server,milliseconds,The average queue time over the 1024 last requests,line,,python.d.plugin,haproxy
+haproxy_b.ctime,,a dimension per backend server,milliseconds,The average connect time over the 1024 last requests,line,,python.d.plugin,haproxy
+haproxy_b.rtime,,a dimension per backend server,milliseconds,The average response time over the 1024 last requests,line,,python.d.plugin,haproxy
+haproxy_b.ttime,,a dimension per backend server,milliseconds,The average total session time over the 1024 last requests,line,,python.d.plugin,haproxy
+haproxy_hs.down,,a dimension per backend server,failed servers,Backend Servers In DOWN State,line,,python.d.plugin,haproxy
+haproxy_hs.up,,a dimension per backend server,health servers,Backend Servers In UP State,line,,python.d.plugin,haproxy
+haproxy_hb.down,,a dimension per backend server,boolean,Is Backend Failed?,line,,python.d.plugin,haproxy
+haproxy.idle,,idle,percentage,The Ratio Of Polling Time Vs Total Time,line,,python.d.plugin,haproxy

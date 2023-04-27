@@ -1,0 +1,16 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+ceph.general_usage,,"avail, used",KiB,Ceph General Space,stacked,,python.d.plugin,ceph
+ceph.general_objects,,cluster,objects,Ceph General Objects,area,,python.d.plugin,ceph
+ceph.general_bytes,,"read, write",KiB/s,Ceph General Read/Write Data/s,area,,python.d.plugin,ceph
+ceph.general_operations,,"read, write",operations,Ceph General Read/Write Operations/s,area,,python.d.plugin,ceph
+ceph.general_latency,,"apply, commit",milliseconds,Ceph General Apply/Commit latency,area,,python.d.plugin,ceph
+ceph.pool_usage,,a dimension per Ceph Pool,KiB,Ceph Pools,line,,python.d.plugin,ceph
+ceph.pool_objects,,a dimension per Ceph Pool,objects,Ceph Pools,line,,python.d.plugin,ceph
+ceph.pool_read_bytes,,a dimension per Ceph Pool,KiB/s,Ceph Read Pool Data/s,area,,python.d.plugin,ceph
+ceph.pool_write_bytes,,a dimension per Ceph Pool,KiB/s,Ceph Write Pool Data/s,area,,python.d.plugin,ceph
+ceph.pool_read_operations,,a dimension per Ceph Pool,operations,Ceph Read Pool Operations/s,area,,python.d.plugin,ceph
+ceph.pool_write_operations,,a dimension per Ceph Pool,operations,Ceph Write Pool Operations/s,area,,python.d.plugin,ceph
+ceph.osd_usage,,a dimension per Ceph OSD,KiB,Ceph OSDs,line,,python.d.plugin,ceph
+ceph.osd_size,,a dimension per Ceph OSD,KiB,Ceph OSDs size,line,,python.d.plugin,ceph
+ceph.apply_latency,,a dimension per Ceph OSD,milliseconds,Ceph OSDs apply latency,line,,python.d.plugin,ceph
+ceph.commit_latency,,a dimension per Ceph OSD,milliseconds,Ceph OSDs commit latency,line,,python.d.plugin,ceph
