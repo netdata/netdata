@@ -1,5 +1,16 @@
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 
+system.cpu,,"guest_nice, guest, steal, softirq, irq, user, system, nice, iowait, idle",percentage,Total CPU utilization,stacked,,prog.plugin,/proc/stat
+cpu.cpu,cpu core,"guest_nice, guest, steal, softirq, irq, user, system, nice, iowait, idle",percentage,Core utilization,stacked,cpu,prog.plugin,/proc/stat
+system.intr,,interrupts,interrupts/s,CPU Interrupts,line,,prog.plugin,/proc/stat
+system.ctxt,,switches,context switches/s,CPU Context Switches,line,,prog.plugin,/proc/stat
+system.forks,,started,processes/s,Started Processes,line,,prog.plugin,/proc/stat
+system.processes,,"running, blocked",processes,System Processes,line,,prog.plugin,/proc/stat
+cpu.core_throttling,,a dimension per cpu core,events/s,Core Thermal Throttling Events,line,,prog.plugin,/proc/stat
+cpu.package_throttling,,a dimension per package,events/s,Package Thermal Throttling Events,line,,prog.plugin,/proc/stat
+cpu.cpufreq,,a dimension per cpu core,MHz,Current CPU Frequency,line,,prog.plugin,/proc/stat
+cpuidle.cpu_cstate_residency_time,cpu core,a dimension per c-state,percentage,C-state residency time,stacked,cpu,prog.plugin,/proc/stat
+
 system.ipc_semaphores,,semaphores,semaphores,IPC Semaphores,area,,prog.plugin,ipc
 system.ipc_semaphore_arrays,,arrays,arrays,IPC Semaphore Arrays,area,,prog.plugin,ipc
 system.message_queue_message,,a dimension per queue,messages,IPC Message Queue Number of Messages,stacked,,prog.plugin,ipc
