@@ -1,0 +1,36 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+smartd_log.read_error_rate,,"A dimension per ATA device: {disk_name}_1",value,"Read Error Rate",line,,python.d.plugin,smartd_log
+smartd_log.seek_error_rate,,"A dimension per ATA device: {disk_name}_7",value,"Seek Error Rate",line,,python.d.plugin,smartd_log
+smartd_log.soft_read_error_rate,,"A dimension per ATA device: {disk_name}_13",errors,"Soft Read Error Rate",line,,python.d.plugin,smartd_log
+smartd_log.write_error_rate,,"A dimension per ATA device: {disk_name}_206",value,"Write Error Rate",line,,python.d.plugin,smartd_log
+smartd_log.read_total_err_corrected,,"A dimension per SCSI device: {disk_name}_read-total-err-corrected",errors,"Read Error Corrected",line,,python.d.plugin,smartd_log
+smartd_log.read_total_unc_errors,,"A dimension per SCSI device: {disk_name}_read-total-unc-errors",errors,"Read Error Uncorrected",line,,python.d.plugin,smartd_log
+smartd_log.write_total_err_corrected,,"A dimension per SCSI device: {disk_name}_write-total-err-corrected",errors,"Write Error Corrected",line,,python.d.plugin,smartd_log
+smartd_log.write_total_unc_errors,,"A dimension per SCSI device: {disk_name}_write-total-unc-errors",errors,"Write Error Uncorrected",line,,python.d.plugin,smartd_log
+smartd_log.verify_total_err_corrected,,"A dimension per SCSI device: {disk_name}_verify-total-err-corrected",errors,"Verify Error Corrected",line,,python.d.plugin,smartd_log
+smartd_log.verify_total_unc_errors,,"A dimension per SCSI device: {disk_name}_verify-total-unc-errors",errors,"Verify Error Uncorrected",line,,python.d.plugin,smartd_log
+smartd_log.sata_interface_downshift,,"A dimension per ATA device: {disk_name}_183",events,"SATA Interface Downshift",line,,python.d.plugin,smartd_log
+smartd_log.udma_crc_error_count,,"A dimension per ATA device: {disk_name}_199",errors,"UDMA CRC Error Count",line,,python.d.plugin,smartd_log
+smartd_log.throughput_performance,,"A dimension per ATA device: {disk_name}_2",value,"Throughput Performance",line,,python.d.plugin,smartd_log
+smartd_log.seek_time_performance,,"A dimension per ATA device: {disk_name}_8",value,"Seek Time Performance",line,,python.d.plugin,smartd_log
+smartd_log.start_stop_count,,"A dimension per ATA device: {disk_name}_4",events,"Start/Stop Count",line,,python.d.plugin,smartd_log
+smartd_log.power_on_hours_count,,"A dimension per ATA device: {disk_name}_9",hours,"Power-On Hours Count",line,,python.d.plugin,smartd_log
+smartd_log.power_cycle_count,,"A dimension per ATA device: {disk_name}_12",events,"Power Cycle Count",line,,python.d.plugin,smartd_log
+smartd_log.unexpected_power_loss,,"A dimension per ATA device: {disk_name}_174",events,"Unexpected Power Loss",line,,python.d.plugin,smartd_log
+smartd_log.spin_up_time,,"A dimension per ATA device: {disk_name}_3",ms,"Spin-Up Time",line,,python.d.plugin,smartd_log
+smartd_log.spin_up_retries,,"A dimension per ATA device: {disk_name}_10",retries,"Spin-up Retries",line,,python.d.plugin,smartd_log
+smartd_log.calibration_retries,,"A dimension per ATA device: {disk_name}_11",retries,"Calibration Retries",line,,python.d.plugin,smartd_log
+smartd_log.airflow_temperature_celsius,,"A dimension per ATA device: {disk_name}_190",celsius,"Airflow Temperature Celsius",line,,python.d.plugin,smartd_log
+smartd_log.temperature_celsius,,"A dimension per device: SCSI devices: {disk_name}_temperature, ATA devices: {disk_name}_194",celsius,"Temperature",line,,python.d.plugin,smartd_log
+smartd_log.reallocated_sectors_count,,"A dimension per ATA device: {disk_name}_5",sectors,"Reallocated Sectors Count",line,,python.d.plugin,smartd_log
+smartd_log.reserved_block_count,,"A dimension per ATA device: {disk_name}_170",percentage,"Reserved Block Count",line,,python.d.plugin,smartd_log
+smartd_log.program_fail_count,,"A dimension per ATA device: {disk_name}_171",errors,"Program Fail Count",line,,python.d.plugin,smartd_log
+smartd_log.erase_fail_count,,"A dimension per ATA device: {disk_name}_172",failures,"Erase Fail Count",line,,python.d.plugin,smartd_log
+smartd_log.wear_leveller_worst_case_erase_count,,"A dimension per ATA device: {disk_name}_173",erases,"Wear Leveller Worst Case Erase Count",line,,python.d.plugin,smartd_log
+smartd_log.unused_reserved_nand_blocks,,"A dimension per ATA device: {disk_name}_180",blocks,"Unused Reserved NAND Blocks",line,,python.d.plugin,smartd_log
+smartd_log.reallocation_event_count,,"A dimension per ATA device: {disk_name}_196",events,"Reallocation Event Count",line,,python.d.plugin,smartd_log
+smartd_log.current_pending_sector_count,,"A dimension per ATA device: {disk_name}_197",sectors,"Current Pending Sector Count",line,,python.d.plugin,smartd_log
+smartd_log.offline_uncorrectable_sector_count,,"A dimension per ATA device: {disk_name}_198",sectors,"Offline Uncorrectable Sector Count",line,,python.d.plugin,smartd_log
+smartd_log.percent_lifetime_used,,"A dimension per ATA device: {disk_name}_202",percentage,"Percent Lifetime Used",line,,python.d.plugin,smartd_log
+smartd_log.media_wearout_indicator,,"A dimension per ATA device: {disk_name}_233",percentage,"Media Wearout Indicator",line,,python.d.plugin,smartd_log
+smartd_log.nand_writes_1gib,,"A dimension per ATA device: {disk_name}_249",GiB,"NAND Writes",line,,python.d.plugin,smartd_log
