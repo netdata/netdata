@@ -177,3 +177,6 @@ netfilter.conntrack_changes,,"inserted, deleted, delete_list",changes/s,Connecti
 netfilter.conntrack_expect,,"created, deleted, new",expectations/s,Connection Tracker Expectations,line,,proc.plugin,/proc/net/stat/nf_conntrack
 netfilter.conntrack_search,,"searched, restarted, found",searches/s,Connection Tracker Searches,line,,proc.plugin,/proc/net/stat/nf_conntrack
 netfilter.conntrack_errors,,"icmp_error, error_failed, drop, early_drop",events/s,Connection Tracker Errors,line,,proc.plugin,/proc/net/stat/nf_conntrack
+netfilter.synproxy_syn_received,,received,packets/s,SYNPROXY SYN Packets received,line,,proc.plugin,/proc/net/stat/synproxy
+netfilter.synproxy_conn_reopened,,reopened,connections/s,SYNPROXY Connections Reopened,line,,proc.plugin,/proc/net/stat/synproxy
+netfilter.synproxy_cookies,,"valid, invalid, retransmits",cookies/s,SYNPROXY TCP Cookies,line,,proc.plugin,/proc/net/stat/synproxy
