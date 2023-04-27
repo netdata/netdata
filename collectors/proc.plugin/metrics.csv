@@ -27,5 +27,15 @@ disk.bcache_bypass,disk,"hits, misses",operations/s,BCache Cache Bypass I/O Oper
 system.io,,"in, out",KiB/s,Disk I/O,area,,prog.plugin,/proc/diskstats
 system.interrupts,,interrupts,interrupts/s,System interrupts,stacked,,proc.plugin,/proc/interrupts
 cpu.interrupts,cpu,cpus,interrupts/s,CPU interrupts,stacked,cpu,proc.plugin,/proc/interrupts
-system.load,,"load1, load5, load15",load,System Load Average,line,labels,proc.plugin,/proc/loadavg
-system.active_processes,,active,processes,System Active Processes,line,labels,proc.plugin,/proc/loadavg
+system.load,,"load1, load5, load15",load,System Load Average,line,,proc.plugin,/proc/loadavg
+system.active_processes,,active,processes,System Active Processes,line,,proc.plugin,/proc/loadavg
+system.ram,,"free, used, cached, buffers",MiB,System RAM,stacked,,proc.plugin,/proc/meminfo
+mem.available,,avail,MiB,Available RAM for applications,area,,proc.plugin,/proc/meminfo
+system.swap,,"free, used",MiB,System Swap,stacked,,proc.plugin,/proc/meminfo
+mem.hwcorrupt,,HardwareCorrupted,MiB,Corrupted Memory detected by ECC,line,,proc.plugin,/proc/meminfo
+mem.commited,,Commited_AS,MiB,Committed (Allocated) Memory,area,,proc.plugin,/proc/meminfo
+mem.writeback,,"Dirty, Writeback, FuseWriteback, NfsWriteback, Bounce",MiB,Writeback Memory,line,,proc.plugin,/proc/meminfo
+mem.kernel,,"Slab, KernelStack, PageTables, VmallocUsed, Percpu",MiB,Memory Used by Kernel,stacked,,proc.plugin,/proc/meminfo
+mem.slab,,"reclaimable, unreclaimable",MiB,Reclaimable Kernel Memory,stacked,,proc.plugin,/proc/meminfo
+mem.hugepage,,"free, used, surplus, reserved",MiB,Dedicated HugePages Memory,stacked,,proc.plugin,/proc/meminfo
+mem.transparent_hugepages,,"anonymous, shmem",MiB,Transparent HugePages Memory,stacked,,proc.plugin,/proc/meminfo
