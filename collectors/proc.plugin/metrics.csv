@@ -20,6 +20,9 @@ system.pgfaults,,"minor, major",faults/s,Memory Page Faults,line,,prog.plugin,/p
 mem.oom_kill,,kills,kills/s,Out of Memory Kills,line,,prog.plugin,/proc/vmstat
 mem.numa,,"local, foreign, interleave, other, pte_updates, huge_pte_updates, hint_faults, hint_faults_local, pages_migrated",events/s,NUMA events,line,,prog.plugin,/proc/vmstat
 
+mem.ecc_ce,,a dimension per mem controller,errors,ECC Memory Correctable Errors,line,,prog.plugin,/sys/devices/system/edac/mc
+mem.ecc_ce,,a dimension per mem controller,errors,ECC Memory Uncorrectable Errors,line,,prog.plugin,/sys/devices/system/edac/mc
+
 mem.zram_usage,zram device,"compressed, metadata",MiB,ZRAM Memory Usage,area,device,prog.plugin,/sys/block/zram
 mem.zram_savings,zram device,"savings, original",MiB,ZRAM Memory Savings,area,device,prog.plugin,/sys/block/zram
 mem.zram_ratio,zram device,ratio,ratio,ZRAM Compression Ratio (original to compressed),line,device,prog.plugin,/sys/block/zram
