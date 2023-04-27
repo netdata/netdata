@@ -1367,7 +1367,7 @@ bool ml_dimension_is_anomalous(RRDDIM *rd, time_t curr_time, double value, bool 
 
 static int ml_flush_pending_models(ml_training_thread_t *training_thread) {
     (void) db_execute(db, "BEGIN TRANSACTION;");
-    
+
     for (const auto &pending_model: training_thread->pending_model_info) {
         int rc = ml_dimension_add_model(&pending_model.metric_uuid, &pending_model.kmeans);
         if (rc)
