@@ -39,3 +39,16 @@ mem.kernel,,"Slab, KernelStack, PageTables, VmallocUsed, Percpu",MiB,Memory Used
 mem.slab,,"reclaimable, unreclaimable",MiB,Reclaimable Kernel Memory,stacked,,proc.plugin,/proc/meminfo
 mem.hugepage,,"free, used, surplus, reserved",MiB,Dedicated HugePages Memory,stacked,,proc.plugin,/proc/meminfo
 mem.transparent_hugepages,,"anonymous, shmem",MiB,Transparent HugePages Memory,stacked,,proc.plugin,/proc/meminfo
+net.net,network card,"received, sent",kilobits/s,Bandwidth,area,"interface_type, device",proc.plugin,/proc/net/dev
+net.speed,network card,speed,kilobits/s,Interface Speed,line,"interface_type, device",proc.plugin,/proc/net/dev
+net.duplex,network card,"full, half, unknown",state,Interface Duplex State,line,"interface_type, device",proc.plugin,/proc/net/dev
+net.operstate,network card,"up, down, notpresent, lowerlayerdown, testing, dormant, unknown",state,Interface Operational State,line,"interface_type, device",proc.plugin,/proc/net/dev
+net.carrier,network card,"up, down",state,Interface Physical Link State,line,"interface_type, device",proc.plugin,/proc/net/dev
+net.mtu,network card,mtu,octets,Interface MTU,line,"interface_type, device",proc.plugin,/proc/net/dev
+net.packets,network card,"received, sent, multicast",packets/s,Packets,line,"interface_type, device",proc.plugin,/proc/net/dev
+net.errors,network card,"inbound, outbound",errors/s,Interface Errors,line,"interface_type, device",proc.plugin,/proc/net/dev
+net.drops,network card,"inbound, outbound",drops/s,Interface Drops,line,"interface_type, device",proc.plugin,/proc/net/dev
+net.fifo,network card,"receive, transmit",errors,Interface FIFO Buffer Errors,line,"interface_type, device",proc.plugin,/proc/net/dev
+net.compressed,network card,"received, sent",packets/s,Compressed Packets,line,"interface_type, device",proc.plugin,/proc/net/dev
+net.events,network card,"frames, collisions, carrier",events/s,Network Interface Events,line,"interface_type, device",proc.plugin,/proc/net/dev
+system.net,,"received, sent",kilobits/s,Physical Network Interfaces Aggregated Bandwidth,area,labels,proc.plugin,/proc/net/dev
