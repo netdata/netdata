@@ -28,4 +28,4 @@ haproxy_b.ttime,,a dimension per backend server,milliseconds,The average total s
 haproxy_hs.down,,a dimension per backend server,failed servers,Backend Servers In DOWN State,line,,python.d.plugin,haproxy
 haproxy_hs.up,,a dimension per backend server,health servers,Backend Servers In UP State,line,,python.d.plugin,haproxy
 haproxy_hb.down,,a dimension per backend server,boolean,Is Backend Failed?,line,,python.d.plugin,haproxy
-haproxy.idle,,None,percentage,The Ratio Of Polling Time Vs Total Time,line,,python.d.plugin,haproxy
+haproxy.idle,,idle,percentage,The Ratio Of Polling Time Vs Total Time,line,,python.d.plugin,haproxy
