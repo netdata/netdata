@@ -1,5 +1,13 @@
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
-disk.bcache_cache_alloc,disk,"ununsed, dirty, clean, metadata, undefined",percentage,BCache Cache Allocations,stacked,,prog.plugin,/proc/diskstats
+
+system.ipc_semaphores,,semaphores,semaphores,IPC Semaphores,area,,prog.plugin,ipc
+system.ipc_semaphore_arrays,,arrays,arrays,IPC Semaphore Arrays,area,,prog.plugin,ipc
+system.message_queue_message,,a dimension per queue,messages,IPC Message Queue Number of Messages,stacked,,prog.plugin,ipc
+system.message_queue_bytes,,a dimension per queue,bytes,IPC Message Queue Used Bytes,stacked,,prog.plugin,ipc
+system.shared_memory_segments,,segments,segments,IPC Shared Memory Number of Segments,stacked,,prog.plugin,ipc
+system.shared_memory_bytes,,bytes,bytes,IPC Shared Memory Used Bytes,stacked,,prog.plugin,ipc
+
+system.io,,"in, out",KiB/s,Disk I/O,area,,prog.plugin,/proc/diskstats
 disk.io,disk,"reads, writes",KiB/s,Disk I/O Bandwidth,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
 disk_ext.io,disk,discards,KiB/s,Amount of Discarded Data,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
 disk.ops,disk,"reads, writes",operations/s,Disk Completed I/O Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
@@ -17,6 +25,7 @@ disk_ext.await,disk,"discards, flushes",milliseconds/operation,Average Completed
 disk.avgsz,disk,"reads, writes",KiB/operation,Average Completed I/O Operation Bandwidth,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
 disk_ext.avgsz,disk,discards,KiB/operation,Average Amount of Discarded Data,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
 disk.svctm,disk,svctm,milliseconds/operation,Average Service Time,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+disk.bcache_cache_alloc,disk,"ununsed, dirty, clean, metadata, undefined",percentage,BCache Cache Allocations,stacked,,prog.plugin,/proc/diskstats
 disk.bcache_hit_ratio,disk,"5min, 1hour, 1day, ever",percentage,BCache Cache Hit Ratio,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
 disk.bcache_rates,disk,"congested, writeback",KiB/s,BCache Rates,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
 disk.bcache_size,disk,dirty,MiB,BCache Cache Sizes,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
@@ -24,11 +33,21 @@ disk.bcache_usage,disk,avail,percentage,BCache Cache Usage,area,"device, mount_p
 disk.bcache_cache_read_races,disk,"races, errors",operations/s,BCache Cache Read Races,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
 disk.bcache,disk,"hits, misses, collisions, readaheads",operations/s,BCache Cache I/O Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
 disk.bcache_bypass,disk,"hits, misses",operations/s,BCache Cache Bypass I/O Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-system.io,,"in, out",KiB/s,Disk I/O,area,,prog.plugin,/proc/diskstats
-system.interrupts,,interrupts,interrupts/s,System interrupts,stacked,,proc.plugin,/proc/interrupts
-cpu.interrupts,cpu,cpus,interrupts/s,CPU interrupts,stacked,cpu,proc.plugin,/proc/interrupts
+
+system.interrupts,,a dimension per device,interrupts/s,System interrupts,stacked,,proc.plugin,/proc/interrupts
+cpu.interrupts,cpu,a dimension per device,interrupts/s,CPU interrupts,stacked,cpu,proc.plugin,/proc/interrupts
+
 system.load,,"load1, load5, load15",load,System Load Average,line,,proc.plugin,/proc/loadavg
 system.active_processes,,active,processes,System Active Processes,line,,proc.plugin,/proc/loadavg
+
+md.health,,a dimension per md array,failed disks,Faulty Devices In MD,line,,proc.plugin,/proc/mdstat
+md.disks,md array,"inuse, down",disks,Disks Stats,stacked,,proc.plugin,/proc/mdstat
+md.mismatch_cnt,md array,count,unsynchronized blocks,Mismatch Count,line,,proc.plugin,/proc/mdstat
+md.status,md array,"check, resync, recovery, reshape",percent,Current Status,line,,proc.plugin,/proc/mdstat
+md.expected_time_until_operation_finish,md array,finish_in,seconds,Approximate Time Until Finish,line,,proc.plugin,/proc/mdstat
+md.operation_speed,md array,speed,KiB/s,Operation Speed,line,,proc.plugin,/proc/mdstat
+md.nonredundant,md array,available,boolean,Nonredundant Array Availability,line,,proc.plugin,/proc/mdstat
+
 system.ram,,"free, used, cached, buffers",MiB,System RAM,stacked,,proc.plugin,/proc/meminfo
 mem.available,,avail,MiB,Available RAM for applications,area,,proc.plugin,/proc/meminfo
 system.swap,,"free, used",MiB,System Swap,stacked,,proc.plugin,/proc/meminfo
@@ -39,6 +58,8 @@ mem.kernel,,"Slab, KernelStack, PageTables, VmallocUsed, Percpu",MiB,Memory Used
 mem.slab,,"reclaimable, unreclaimable",MiB,Reclaimable Kernel Memory,stacked,,proc.plugin,/proc/meminfo
 mem.hugepage,,"free, used, surplus, reserved",MiB,Dedicated HugePages Memory,stacked,,proc.plugin,/proc/meminfo
 mem.transparent_hugepages,,"anonymous, shmem",MiB,Transparent HugePages Memory,stacked,,proc.plugin,/proc/meminfo
+
+system.net,,"received, sent",kilobits/s,Physical Network Interfaces Aggregated Bandwidth,area,labels,proc.plugin,/proc/net/dev
 net.net,network card,"received, sent",kilobits/s,Bandwidth,area,"interface_type, device",proc.plugin,/proc/net/dev
 net.speed,network card,speed,kilobits/s,Interface Speed,line,"interface_type, device",proc.plugin,/proc/net/dev
 net.duplex,network card,"full, half, unknown",state,Interface Duplex State,line,"interface_type, device",proc.plugin,/proc/net/dev
@@ -51,4 +72,3 @@ net.drops,network card,"inbound, outbound",drops/s,Interface Drops,line,"interfa
 net.fifo,network card,"receive, transmit",errors,Interface FIFO Buffer Errors,line,"interface_type, device",proc.plugin,/proc/net/dev
 net.compressed,network card,"received, sent",packets/s,Compressed Packets,line,"interface_type, device",proc.plugin,/proc/net/dev
 net.events,network card,"frames, collisions, carrier",events/s,Network Interface Events,line,"interface_type, device",proc.plugin,/proc/net/dev
-system.net,,"received, sent",kilobits/s,Physical Network Interfaces Aggregated Bandwidth,area,labels,proc.plugin,/proc/net/dev
