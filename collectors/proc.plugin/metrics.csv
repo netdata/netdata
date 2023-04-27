@@ -170,3 +170,10 @@ sctp.fragmentation,,"reassembled, fragmented",packets/s,SCTP Fragmentation,line,
 
 system.softnet_stat,,"processed, dropped, squeezed, received_rps, flow_limit_count",events/s,System softnet_stat,line,,proc.plugin,/proc/net/softnet_stat
 cpu.softnet_stat,cpu core,"processed, dropped, squeezed, received_rps, flow_limit_count",events/s,CPU softnet_stat,line,,proc.plugin,/proc/net/softnet_stat
+
+netfilter.conntrack_sockets,,connections,active connections,Connection Tracker Connections,line,,proc.plugin,/proc/net/stat/nf_conntrack
+netfilter.conntrack_new,,"new, ignore, invalid",connections/s,Connection Tracker New Connections,line,,proc.plugin,/proc/net/stat/nf_conntrack
+netfilter.conntrack_changes,,"inserted, deleted, delete_list",changes/s,Connection Tracker Changes,line,,proc.plugin,/proc/net/stat/nf_conntrack
+netfilter.conntrack_expect,,"created, deleted, new",expectations/s,Connection Tracker Expectations,line,,proc.plugin,/proc/net/stat/nf_conntrack
+netfilter.conntrack_search,,"searched, restarted, found",searches/s,Connection Tracker Searches,line,,proc.plugin,/proc/net/stat/nf_conntrack
+netfilter.conntrack_errors,,"icmp_error, error_failed, drop, early_drop",events/s,Connection Tracker Errors,line,,proc.plugin,/proc/net/stat/nf_conntrack
