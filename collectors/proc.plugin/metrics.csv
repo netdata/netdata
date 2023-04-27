@@ -11,6 +11,8 @@ cpu.package_throttling,,a dimension per package,events/s,Package Thermal Throttl
 cpu.cpufreq,,a dimension per cpu core,MHz,Current CPU Frequency,line,,prog.plugin,/proc/stat
 cpuidle.cpu_cstate_residency_time,cpu core,a dimension per c-state,percentage,C-state residency time,stacked,cpu,prog.plugin,/proc/stat
 
+system.entropy,,entropy,entropy,Available Entropy,line,,prog.plugin,/proc/sys/kernel/random/entropy_avail
+
 system.ipc_semaphores,,semaphores,semaphores,IPC Semaphores,area,,prog.plugin,ipc
 system.ipc_semaphore_arrays,,arrays,arrays,IPC Semaphore Arrays,area,,prog.plugin,ipc
 system.message_queue_message,,a dimension per queue,messages,IPC Message Queue Number of Messages,stacked,,prog.plugin,ipc
