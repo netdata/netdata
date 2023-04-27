@@ -25,3 +25,5 @@ disk.bcache_cache_read_races,,"races, errors",operations/s,BCache Cache Read Rac
 disk.bcache,,"hits, misses, collisions, readaheads",operations/s,BCache Cache I/O Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
 disk.bcache_bypass,,"hits, misses",operations/s,BCache Cache Bypass I/O Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
 system.io,,"in, out",KiB/s,Disk I/O,area,,prog.plugin,/proc/diskstats
+system.interrupts,,interrupts,interrupts/s,System interrupts,stacked,,proc.plugin,/proc/interrupts
+cpu.interrupts,cpu,cpus,interrupts/s,CPU interrupts,stacked,cpu,proc.plugin,/proc/interrupts
