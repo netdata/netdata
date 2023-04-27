@@ -46,6 +46,10 @@ cgroup.cachestat_ratio,cgroup,ratio,%,Hit ratio,line,,ebpf.plugin,cachestat
 cgroup.cachestat_dirties,cgroup,dirty,page/s,Number of dirty pages,line,,ebpf.plugin,cachestat
 cgroup.cachestat_hits,cgroup,hit,hits/s,Number of accessed files,line,,ebpf.plugin,cachestat
 cgroup.cachestat_misses,cgroup,miss,misses/s,Files out of page cache,line,,ebpf.plugin,cachestat
+mem.file_sync,,"fsync, fdatasync",calls/s,Monitor calls for <code>fsync(2)</code> and <code>fdatasync(2)</code>.,stacked,,ebpf.plugin,sync
+mem.meory_map,,msync,calls/s,Monitor calls for <code>msync(2)</code>.,line,,ebpf.plugin,sync
+mem.sync,,"sync, syncfs",calls/s,Monitor calls for <code>sync(2)</code> and <code>syncfs(2)</code>.,line,,ebpf.plugin,sync
+mem.file_segment,,sync_file_range,calls/s,Monitor calls for <code>sync_file_range(2)</code>.,line,,ebpf.plugin,sync
 mem.cachestat_ratio,,ratio,%,Hit ratio,line,,ebpf.plugin,cachestat
 mem.cachestat_dirties,,dirty,page/s,Number of dirty pages,line,,ebpf.plugin,cachestat
 mem.cachestat_hits,,hit,hits/s,Number of accessed files,line,,ebpf.plugin,cachestat
@@ -182,16 +186,12 @@ apps.vfs_open_error,,a dimension per app group,calls/s,Open error,stacked,,ebpf.
 apps.vfs_create,,a dimension per app group,calls/s,Calls for <code>vfs_create</code>,stacked,,ebpf.plugin,vfs
 apps.vfs_create_error,,a dimension per app group,calls/s,Create error,stacked,,ebpf.plugin,vfs
 netdata.ebpf_aral_stat_size,,memory,bytes,Bytes allocated for ARAL.,stacked,,ebpf.plugin,process
-netdata.ebpf_aral_stat_alloc,,aral,calls,Calls to allocate memory..stacked,,ebpf.plugin,process
+netdata.ebpf_aral_stat_alloc,,aral,calls,Calls to allocate memory.,stacked,,ebpf.plugin,process
 netdata.ebpf_threads,,"total, running",threads,Threads info,line,,ebpf.plugin,process
 netdata.ebpf_load_methods,,"legacy, co-re",methods,Load info,line,,ebpf.plugin,process
-netdata.ebpf_kernel_memory,,memory_locked,bytes,Memory allocated for hash tables.,,ebpf.process,process
-netdata.ebpf_hash_tables_count,,hash tables,Number of hash tables loaded,line,,ebpf.process,process
-netdata.ebpf_aral_stat_size,,memory,stacked,,ebpf.plugin,process
-netdata.ebpf_aral_stat_alloc,,aral,calls,Calls to allocate memory,stacked,ebpf.plugin,process
-mem.file_sync,,"fsync, fdatasync",calls/s,Monitor calls for <code>fsync(2)</code> and <code>fdatasync(2)</code>.,stacked,,ebpf.plugin,sync
-mem.meory_map,,msync,calls/s,Monitor calls for <code>msync(2)</code>.,line,,ebpf.plugin,sync
-mem.sync,,"sync, syncfs",calls/s,Monitor calls for <code>sync(2)</code> and <code>syncfs(2)</code>.,line,,ebpf.plugin,sync
-mem.file_segment,,sync_file_range,calls/s,Monitor calls for <code>sync_file_range(2)</code>.,line,,ebpf.plugin,sync
+netdata.ebpf_kernel_memory,,memory_locked,bytes,Memory allocated for hash tables.,line,,ebpf.plugin,process
+netdata.ebpf_hash_tables_count,,hash_table,hash tables,Number of hash tables loaded,line,,ebpf.plugin,process
+netdata.ebpf_aral_stat_size,,memory,bytes,Bytes allocated for ARAL,stacked,,ebpf.plugin,process
+netdata.ebpf_aral_stat_alloc,,aral,calls,Calls to allocate memory,stacked,,ebpf.plugin,process
 netdata.ebpf_aral_stat_size,,memory,bytes,Bytes allocated for ARAL.,stacked,,ebpf.plugin,process
 netdata.ebpf_aral_stat_alloc,,aral,calls,Calls to allocate memory,stacked,,ebpf.plugin,process
