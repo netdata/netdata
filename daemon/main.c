@@ -316,7 +316,7 @@ static void init_sentry(void) {
     sentry_options_t *options = sentry_options_new();
 
     // we should get this from CI (SENTRY_DSN)
-    sentry_options_set_dsn(options, "https://1a20870e1a544b44a1cf4da4ec2a4d28@o4505001020817408.ingest.sentry.io/4505001024290816");
+    sentry_options_set_dsn(options, "https://4c37747b97164e9bbfc9fa426e9200b4@o382276.ingest.sentry.io/4505069981401088");
 
     // where to save sentry files
     char path[FILENAME_MAX];
