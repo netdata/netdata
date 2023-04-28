@@ -242,6 +242,7 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | [`repeat`](#alarm-line-repeat)                      | no              | The interval for sending notifications when an alarm is in WARNING or CRITICAL mode.  |
 | [`options`](#alarm-line-options)                    | no              | Add an option to not clear alarms.                                                    |
 | [`host labels`](#alarm-line-host-labels)            | no              | List of labels present on a host.                                                     |
+| [`chart labels`](#alarm-line-chart-labels)          | no              | List of labels present on a chart.                                                    |
 | [`info`](#alarm-line-info)                          | no              | A brief description of the alarm.                                                           |
 
 The `alarm` or `template` line must be the first line of any entity.
@@ -693,6 +694,27 @@ that will be applied to all hosts installed in the last decade with the followin
 ```yaml
 host labels: installed = 201*
 ```
+
+See our [simple patterns docs](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) for more examples.
+
+#### Alarm line `chart labels`
+
+Similar to host labels, the `chart labels` key can be used to filter if an alarm will load or not for a specific chart, based on
+whether these chart labels match or not.
+
+The list of chart labels present on each chart can be obtained from http://localhost:19999/api/v1/charts?all
+
+For example, each `disk_space` chart defines a chart label called `mount_point` with each instance of this chart having
+a value there of which mount point it monitors.
+
+If you have an e.g. external disk mounted on `/mnt/disk1` and you don't wish any related disk space alerts running for
+it (but you do for all other mount points), you can add the following to the alert's configuration:
+
+```yaml
+chart labels: !mount_point=/mnt/disk1 mount_point=*`
+```
+
+The `chart labels` is a space-separated list that accepts simple patterns.
 
 See our [simple patterns docs](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) for more examples.
 
