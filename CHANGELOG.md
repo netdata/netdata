@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Fix TYPO in README.md [\#14980](https://github.com/netdata/netdata/pull/14980) ([DevinNorgarb](https://github.com/DevinNorgarb))
+- add metrics.csv to proc.plugin [\#14979](https://github.com/netdata/netdata/pull/14979) ([thiagoftsm](https://github.com/thiagoftsm))
+- interrupt callback on api/v1/data [\#14978](https://github.com/netdata/netdata/pull/14978) ([ktsaou](https://github.com/ktsaou))
+- add metrics.csv to macos, freebsd and cgroups plugins [\#14977](https://github.com/netdata/netdata/pull/14977) ([ilyam8](https://github.com/ilyam8))
 - fix adding chart labels in tc.plugin [\#14976](https://github.com/netdata/netdata/pull/14976) ([ilyam8](https://github.com/ilyam8))
 - add metrics.csv to some c collectors [\#14974](https://github.com/netdata/netdata/pull/14974) ([ilyam8](https://github.com/ilyam8))
 - add metrics.csv to perf.plugin [\#14973](https://github.com/netdata/netdata/pull/14973) ([ilyam8](https://github.com/ilyam8))
@@ -15,11 +19,13 @@
 - do not convert to percentage, when the raw option is given [\#14969](https://github.com/netdata/netdata/pull/14969) ([ktsaou](https://github.com/ktsaou))
 - add metrics.csv to apps.plugin [\#14968](https://github.com/netdata/netdata/pull/14968) ([ilyam8](https://github.com/ilyam8))
 - add metrics.csv to charts.d [\#14966](https://github.com/netdata/netdata/pull/14966) ([ilyam8](https://github.com/ilyam8))
+- Add metrics.csv for ebpf [\#14965](https://github.com/netdata/netdata/pull/14965) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update ML README.md [\#14964](https://github.com/netdata/netdata/pull/14964) ([ktsaou](https://github.com/ktsaou))
 - Document netdatacli dumpconfig option [\#14963](https://github.com/netdata/netdata/pull/14963) ([cakrit](https://github.com/cakrit))
 - Update README.md [\#14962](https://github.com/netdata/netdata/pull/14962) ([cakrit](https://github.com/cakrit))
 - Fix handling of users and groups on install. [\#14961](https://github.com/netdata/netdata/pull/14961) ([Ferroin](https://github.com/Ferroin))
 - Reject child when context is loading [\#14960](https://github.com/netdata/netdata/pull/14960) ([stelfrag](https://github.com/stelfrag))
+- Add metadata.csv to python.d.plugin [\#14959](https://github.com/netdata/netdata/pull/14959) ([Ancairon](https://github.com/Ancairon))
 - Add adaptec\_raid metrics.csv [\#14955](https://github.com/netdata/netdata/pull/14955) ([Ancairon](https://github.com/Ancairon))
 - Terminate JSX element in doc file [\#14952](https://github.com/netdata/netdata/pull/14952) ([Ancairon](https://github.com/Ancairon))
 - Update dbengine README.md [\#14951](https://github.com/netdata/netdata/pull/14951) ([ktsaou](https://github.com/ktsaou))
@@ -400,12 +406,6 @@
 - Add dictionary readme to learn [\#14361](https://github.com/netdata/netdata/pull/14361) ([cakrit](https://github.com/cakrit))
 - Add explanation of config files to learn [\#14360](https://github.com/netdata/netdata/pull/14360) ([cakrit](https://github.com/cakrit))
 - Delete libnetdata readme [\#14357](https://github.com/netdata/netdata/pull/14357) ([cakrit](https://github.com/cakrit))
-- Add main health readme to learn [\#14356](https://github.com/netdata/netdata/pull/14356) ([cakrit](https://github.com/cakrit))
-- Delete QUICKSTART.md [\#14355](https://github.com/netdata/netdata/pull/14355) ([cakrit](https://github.com/cakrit))
-- Delete data structures readme [\#14354](https://github.com/netdata/netdata/pull/14354) ([cakrit](https://github.com/cakrit))
-- Delete BREAKING\_CHANGES.md [\#14353](https://github.com/netdata/netdata/pull/14353) ([cakrit](https://github.com/cakrit))
-- Add redistributed to learn [\#14352](https://github.com/netdata/netdata/pull/14352) ([cakrit](https://github.com/cakrit))
-- Add missing entries in README.md [\#14351](https://github.com/netdata/netdata/pull/14351) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
