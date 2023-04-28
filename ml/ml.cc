@@ -625,6 +625,10 @@ int ml_dimension_load_models(RRDDIM *rd) {
         dim->km_contexts.push_back(km);
     }
 
+    if (!dim->km_contexts.empty()) {
+        dim->ts = TRAINING_STATUS_TRAINED;
+    }
+
     netdata_mutex_unlock(&dim->mutex);
 
     if (unlikely(rc != SQLITE_DONE))
