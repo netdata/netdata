@@ -1070,6 +1070,7 @@ int alert_hash_and_store_config(
     DIGEST_ALERT_CONFIG_VAL(cfg->options);
     DIGEST_ALERT_CONFIG_VAL(cfg->repeat);
     DIGEST_ALERT_CONFIG_VAL(cfg->host_labels);
+    DIGEST_ALERT_CONFIG_VAL(cfg->chart_labels);
 
     EVP_DigestFinal_ex(evpctx, hash_value, &hash_len);
     EVP_MD_CTX_destroy(evpctx);
