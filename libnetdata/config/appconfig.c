@@ -831,7 +831,7 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
                   "#\n"
                   "\n# global netdata configuration\n");
 
-    for(i = 0; i <= 16 ;i++) {
+    for(i = 0; i <= 17 ;i++) {
         appconfig_wrlock(root);
         for(co = root->first_section; co ; co = co->next) {
             if(!strcmp(co->name, CONFIG_SECTION_GLOBAL))                 pri = 0;
