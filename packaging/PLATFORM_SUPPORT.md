@@ -94,7 +94,6 @@ with minimal user effort.
 |---------------|---------|--------------------------|------------------------------------------------------------------------------------------------------|
 | Alpine Linux  | 3.16    | No                       |                                                                                                      |
 | Alpine Linux  | 3.15    | No                       |                                                                                                      |
-| Alpine Linux  | 3.14    | No                       |                                                                                                      |
 | Amazon Linux  | 2023    | x86\_64, AArch64         | Scheduled for promotion to Core tier at some point after the release of v1.39.0 of the Netdata Agent |
 | Amazon Linux  | 2       | x86\_64, AArch64         | Scheduled for promotion to Core tier at some point after the release of v1.39.0 of the Netdata Agent |
 | Arch Linux    | Latest  | No                       | We officially recommend the community packages available for Arch Linux                              |
@@ -157,6 +156,7 @@ This is a list of platforms that we have supported in the recent past but no lon
 
 | Platform     | Version   | Notes                |
 |--------------|-----------|----------------------|
+| Alpine Linux | 3.14      | EOL as of 2023-05-01 |
 | Alpine Linux | 3.13      | EOL as of 2022-11-01 |
 | Alpine Linux | 3.12      | EOL as of 2022-05-01 |
 | Debian       | 9.x       | EOL as of 2022-06-30 |

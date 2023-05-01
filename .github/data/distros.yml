@@ -36,9 +36,6 @@ include:
   - <<: *alpine
     version: "3.15"
     eol_check: true
-  - <<: *alpine
-    version: "3.14"
-    eol_check: true
 
   - distro: archlinux
     version: latest
