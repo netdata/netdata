@@ -10,7 +10,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
     (void)dt;
 
     static procfile *ff = NULL;
-    static int do_swapio = -1, do_io = -1, do_pgfaults = -1, do_oom_kill = -1, do_numa = -1;
+    static int do_swapio = -1, do_io = -1, do_pgfaults = -1, do_oom_kill = -1, do_numa = -1, do_thp = -1, do_zswapio = -1, do_balloon = -1, do_ksm = -1;
     static int has_numa = -1;
 
     static ARL_BASE *arl_base = NULL;
@@ -31,6 +31,103 @@ int do_proc_vmstat(int update_every, usec_t dt) {
     static unsigned long long pswpout = 0ULL;
     static unsigned long long oom_kill = 0ULL;
 
+    // THP page migration
+//    static unsigned long long pgmigrate_success = 0ULL;
+//    static unsigned long long pgmigrate_fail = 0ULL;
+//    static unsigned long long thp_migration_success = 0ULL;
+//    static unsigned long long thp_migration_fail = 0ULL;
+//    static unsigned long long thp_migration_split = 0ULL;
+
+    // Compaction cost model
+    // https://lore.kernel.org/lkml/20121022080525.GB2198@suse.de/
+//    static unsigned long long compact_migrate_scanned = 0ULL;
+//    static unsigned long long compact_free_scanned = 0ULL;
+//    static unsigned long long compact_isolated = 0ULL;
+
+    // THP defragmentation
+    static unsigned long long compact_stall = 0ULL; // incremented when an application stalls allocating THP
+    static unsigned long long compact_fail = 0ULL; // defragmentation events that failed
+    static unsigned long long compact_success = 0ULL; // defragmentation events that succeeded
+
+    // ?
+//    static unsigned long long compact_daemon_wake = 0ULL;
+//    static unsigned long long compact_daemon_migrate_scanned = 0ULL;
+//    static unsigned long long compact_daemon_free_scanned = 0ULL;
+
+    // ?
+//    static unsigned long long htlb_buddy_alloc_success = 0ULL;
+//    static unsigned long long htlb_buddy_alloc_fail = 0ULL;
+
+    // ?
+//    static unsigned long long cma_alloc_success = 0ULL;
+//    static unsigned long long cma_alloc_fail = 0ULL;
+
+    // ?
+//    static unsigned long long unevictable_pgs_culled = 0ULL;
+//    static unsigned long long unevictable_pgs_scanned = 0ULL;
+//    static unsigned long long unevictable_pgs_rescued = 0ULL;
+//    static unsigned long long unevictable_pgs_mlocked = 0ULL;
+//    static unsigned long long unevictable_pgs_munlocked = 0ULL;
+//    static unsigned long long unevictable_pgs_cleared = 0ULL;
+//    static unsigned long long unevictable_pgs_stranded = 0ULL;
+
+    // THP handling of page faults
+    static unsigned long long thp_fault_alloc = 0ULL; // is incremented every time a huge page is successfully allocated to handle a page fault. This applies to both the first time a page is faulted and for COW faults.
+    static unsigned long long thp_fault_fallback = 0ULL; // is incremented if a page fault fails to allocate a huge page and instead falls back to using small pages.
+    static unsigned long long thp_fault_fallback_charge = 0ULL; // is incremented if a page fault fails to charge a huge page and instead falls back to using small pages even though the allocation was successful.
+
+    // khugepaged collapsing of small pages into huge pages
+    static unsigned long long thp_collapse_alloc = 0ULL; // is incremented by khugepaged when it has found a range of pages to collapse into one huge page and has successfully allocated a new huge page to store the data.
+    static unsigned long long thp_collapse_alloc_failed = 0ULL; // is incremented if khugepaged found a range of pages that should be collapsed into one huge page but failed the allocation.
+
+    // THP handling of file allocations
+    static unsigned long long thp_file_alloc = 0ULL; // is incremented every time a file huge page is successfully allocated
+    static unsigned long long thp_file_fallback = 0ULL; // is incremented if a file huge page is attempted to be allocated but fails and instead falls back to using small pages
+    static unsigned long long thp_file_fallback_charge = 0ULL; // is incremented if a file huge page cannot be charged and instead falls back to using small pages even though the allocation was successful
+    static unsigned long long thp_file_mapped = 0ULL; // is incremented every time a file huge page is mapped into user address space
+
+    // THP splitting of huge pages into small pages
+    static unsigned long long thp_split_page = 0ULL;
+    static unsigned long long thp_split_page_failed = 0ULL;
+    static unsigned long long thp_deferred_split_page = 0ULL; // is incremented when a huge page is put onto split queue. This happens when a huge page is partially unmapped and splitting it would free up some memory. Pages on split queue are going to be split under memory pressure
+    static unsigned long long thp_split_pmd = 0ULL; // is incremented every time a PMD split into table of PTEs. This can happen, for instance, when application calls mprotect() or munmap() on part of huge page. It doesn’t split huge page, only page table entry
+
+    // ?
+//    static unsigned long long thp_scan_exceed_none_pte = 0ULL;
+//    static unsigned long long thp_scan_exceed_swap_pte = 0ULL;
+//    static unsigned long long thp_scan_exceed_share_pte = 0ULL;
+//    static unsigned long long thp_split_pud = 0ULL;
+
+    // THP Zero Huge Page
+    static unsigned long long thp_zero_page_alloc = 0ULL; // is incremented every time a huge zero page used for thp is successfully allocated. Note, it doesn’t count every map of the huge zero page, only its allocation
+    static unsigned long long thp_zero_page_alloc_failed = 0ULL; // is incremented if kernel fails to allocate huge zero page and falls back to using small pages
+
+    // THP Swap Out
+    static unsigned long long thp_swpout = 0ULL; // is incremented every time a huge page is swapout in one piece without splitting
+    static unsigned long long thp_swpout_fallback = 0ULL; // is incremented if a huge page has to be split before swapout. Usually because failed to allocate some continuous swap space for the huge page
+
+    // memory ballooning
+    // Current size of balloon is (balloon_inflate - balloon_deflate) pages
+    static unsigned long long balloon_inflate = 0ULL;
+    static unsigned long long balloon_deflate = 0ULL;
+    static unsigned long long balloon_migrate = 0ULL;
+
+    // ?
+//    static unsigned long long swap_ra = 0ULL;
+//    static unsigned long long swap_ra_hit = 0ULL;
+
+    static unsigned long long ksm_swpin_copy = 0ULL; // is incremented every time a KSM page is copied when swapping in
+    static unsigned long long cow_ksm = 0ULL; // is incremented every time a KSM page triggers copy on write (COW) when users try to write to a KSM page, we have to make a copy
+
+    // zswap
+    static unsigned long long zswpin = 0ULL;
+    static unsigned long long zswpout = 0ULL;
+
+    // ?
+//    static unsigned long long direct_map_level2_splits = 0ULL;
+//    static unsigned long long direct_map_level3_splits = 0ULL;
+//    static unsigned long long nr_unstable = 0ULL;
+
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/vmstat");
@@ -49,7 +146,10 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         do_pgfaults = config_get_boolean("plugin:proc:/proc/vmstat", "memory page faults", CONFIG_BOOLEAN_YES);
         do_oom_kill = config_get_boolean("plugin:proc:/proc/vmstat", "out of memory kills", CONFIG_BOOLEAN_AUTO);
         do_numa = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "system-wide numa metric summary", CONFIG_BOOLEAN_AUTO);
-
+        do_thp = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "transparent huge pages", CONFIG_BOOLEAN_AUTO);
+        do_zswapio = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "zswap i/o", CONFIG_BOOLEAN_AUTO);
+        do_balloon = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "memory ballooning", CONFIG_BOOLEAN_AUTO);
+        do_ksm = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "kernel same memory", CONFIG_BOOLEAN_AUTO);
 
         arl_base = arl_create("vmstat", NULL, 60);
         arl_expect(arl_base, "pgfault", &pgfault);
@@ -93,6 +193,56 @@ int do_proc_vmstat(int update_every, usec_t dt) {
             // Also ARL will not parse their values.
             has_numa = 0;
             do_numa = CONFIG_BOOLEAN_NO;
+        }
+
+        if(do_thp == CONFIG_BOOLEAN_YES || do_thp == CONFIG_BOOLEAN_AUTO) {
+//            arl_expect(arl_base, "pgmigrate_success", &pgmigrate_success);
+//            arl_expect(arl_base, "pgmigrate_fail", &pgmigrate_fail);
+//            arl_expect(arl_base, "thp_migration_success", &thp_migration_success);
+//            arl_expect(arl_base, "thp_migration_fail", &thp_migration_fail);
+//            arl_expect(arl_base, "thp_migration_split", &thp_migration_split);
+//            arl_expect(arl_base, "compact_migrate_scanned", &compact_migrate_scanned);
+//            arl_expect(arl_base, "compact_free_scanned", &compact_free_scanned);
+//            arl_expect(arl_base, "compact_isolated", &compact_isolated);
+            arl_expect(arl_base, "compact_stall", &compact_stall);
+            arl_expect(arl_base, "compact_fail", &compact_fail);
+            arl_expect(arl_base, "compact_success", &compact_success);
+//            arl_expect(arl_base, "compact_daemon_wake", &compact_daemon_wake);
+//            arl_expect(arl_base, "compact_daemon_migrate_scanned", &compact_daemon_migrate_scanned);
+//            arl_expect(arl_base, "compact_daemon_free_scanned", &compact_daemon_free_scanned);
+            arl_expect(arl_base, "thp_fault_alloc", &thp_fault_alloc);
+            arl_expect(arl_base, "thp_fault_fallback", &thp_fault_fallback);
+            arl_expect(arl_base, "thp_fault_fallback_charge", &thp_fault_fallback_charge);
+            arl_expect(arl_base, "thp_collapse_alloc", &thp_collapse_alloc);
+            arl_expect(arl_base, "thp_collapse_alloc_failed", &thp_collapse_alloc_failed);
+            arl_expect(arl_base, "thp_file_alloc", &thp_file_alloc);
+            arl_expect(arl_base, "thp_file_fallback", &thp_file_fallback);
+            arl_expect(arl_base, "thp_file_fallback_charge", &thp_file_fallback_charge);
+            arl_expect(arl_base, "thp_file_mapped", &thp_file_mapped);
+            arl_expect(arl_base, "thp_split_page", &thp_split_page);
+            arl_expect(arl_base, "thp_split_page_failed", &thp_split_page_failed);
+            arl_expect(arl_base, "thp_deferred_split_page", &thp_deferred_split_page);
+            arl_expect(arl_base, "thp_split_pmd", &thp_split_pmd);
+            arl_expect(arl_base, "thp_zero_page_alloc", &thp_zero_page_alloc);
+            arl_expect(arl_base, "thp_zero_page_alloc_failed", &thp_zero_page_alloc_failed);
+            arl_expect(arl_base, "thp_swpout", &thp_swpout);
+            arl_expect(arl_base, "thp_swpout_fallback", &thp_swpout_fallback);
+        }
+
+        if(do_balloon == CONFIG_BOOLEAN_YES || do_balloon == CONFIG_BOOLEAN_AUTO) {
+            arl_expect(arl_base, "balloon_inflate", &balloon_inflate);
+            arl_expect(arl_base, "balloon_deflate", &balloon_deflate);
+            arl_expect(arl_base, "balloon_migrate", &balloon_migrate);
+        }
+
+        if(do_ksm == CONFIG_BOOLEAN_YES || do_ksm == CONFIG_BOOLEAN_AUTO) {
+            arl_expect(arl_base, "ksm_swpin_copy", &ksm_swpin_copy);
+            arl_expect(arl_base, "cow_ksm", &cow_ksm);
+        }
+
+        if(do_zswapio == CONFIG_BOOLEAN_YES || do_zswapio == CONFIG_BOOLEAN_AUTO) {
+            arl_expect(arl_base, "zswpin", &zswpin);
+            arl_expect(arl_base, "zswpout", &zswpout);
         }
     }
 
@@ -304,6 +454,355 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         rrddim_set_by_pointer(st_numa, rd_pages_migrated,    numa_pages_migrated);
 
         rrdset_done(st_numa);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_balloon == CONFIG_BOOLEAN_YES || (do_balloon == CONFIG_BOOLEAN_AUTO && (balloon_inflate || balloon_deflate ||
+            balloon_migrate || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_balloon = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st_balloon = NULL;
+        static RRDDIM *rd_inflate = NULL, *rd_deflate = NULL, *rd_migrate = NULL;
+
+        if(unlikely(!st_balloon)) {
+            st_balloon = rrdset_create_localhost(
+                    "mem"
+                    , "balloon"
+                    , NULL
+                    , "balloon"
+                    , NULL
+                    , "Memory Ballooning Operations"
+                    , "KiB/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_VMSTAT_NAME
+                    , NETDATA_CHART_PRIO_MEM_BALLOON
+                    , update_every
+                    , RRDSET_TYPE_LINE
+                    );
+
+            rd_inflate  = rrddim_add(st_balloon, "inflate", NULL, sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_INCREMENTAL);
+            rd_deflate = rrddim_add(st_balloon, "deflate", NULL, -sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_INCREMENTAL);
+            rd_migrate = rrddim_add(st_balloon, "migrate", NULL, sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_INCREMENTAL);
+        }
+
+        rrddim_set_by_pointer(st_balloon, rd_inflate, balloon_inflate);
+        rrddim_set_by_pointer(st_balloon, rd_deflate, balloon_deflate);
+        rrddim_set_by_pointer(st_balloon, rd_migrate, balloon_migrate);
+
+        rrdset_done(st_balloon);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_zswapio == CONFIG_BOOLEAN_YES || (do_zswapio == CONFIG_BOOLEAN_AUTO &&
+                                           (zswpin || zswpout ||
+                                            netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_zswapio = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st_zswapio = NULL;
+        static RRDDIM *rd_in = NULL, *rd_out = NULL;
+
+        if(unlikely(!st_zswapio)) {
+            st_zswapio = rrdset_create_localhost(
+                    "system"
+                    , "zswapio"
+                    , NULL
+                    , "zswap"
+                    , NULL
+                    , "ZSwap I/O"
+                    , "KiB/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_VMSTAT_NAME
+                    , NETDATA_CHART_PRIO_SYSTEM_ZSWAPIO
+                    , update_every
+                    , RRDSET_TYPE_AREA
+            );
+
+            rd_in  = rrddim_add(st_zswapio, "in", NULL, sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_INCREMENTAL);
+            rd_out = rrddim_add(st_zswapio, "out", NULL, -sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_INCREMENTAL);
+        }
+
+        rrddim_set_by_pointer(st_zswapio, rd_in, zswpin);
+        rrddim_set_by_pointer(st_zswapio, rd_out, zswpout);
+        rrdset_done(st_zswapio);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_ksm == CONFIG_BOOLEAN_YES || (do_ksm == CONFIG_BOOLEAN_AUTO &&
+                                            (cow_ksm || ksm_swpin_copy ||
+                                             netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_ksm = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st_ksm_cow = NULL;
+        static RRDDIM *rd_swapin = NULL, *rd_write = NULL;
+
+        if(unlikely(!st_ksm_cow)) {
+            st_ksm_cow = rrdset_create_localhost(
+                    "mem"
+            , "ksm_cow"
+            , NULL
+            , "ksm"
+            , NULL
+            , "KSM Copy On Write Operations"
+            , "KiB/s"
+            , PLUGIN_PROC_NAME
+            , PLUGIN_PROC_MODULE_VMSTAT_NAME
+            , NETDATA_CHART_PRIO_MEM_KSM_COW
+            , update_every
+            , RRDSET_TYPE_LINE
+            );
+
+            rd_swapin  = rrddim_add(st_ksm_cow, "swapin", NULL, sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_INCREMENTAL);
+            rd_write = rrddim_add(st_ksm_cow, "write", NULL, sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_INCREMENTAL);
+        }
+
+        rrddim_set_by_pointer(st_ksm_cow, rd_swapin, ksm_swpin_copy);
+        rrddim_set_by_pointer(st_ksm_cow, rd_write, cow_ksm);
+
+        rrdset_done(st_ksm_cow);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_thp == CONFIG_BOOLEAN_YES || do_thp == CONFIG_BOOLEAN_AUTO) {
+
+        if(do_thp == CONFIG_BOOLEAN_YES || (do_thp == CONFIG_BOOLEAN_AUTO &&
+                                            (netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES || thp_fault_alloc || thp_fault_fallback || thp_fault_fallback_charge))) {
+
+            static RRDSET *st_thp_fault = NULL;
+            static RRDDIM *rd_alloc = NULL, *rd_fallback = NULL, *rd_fallback_charge = NULL;
+
+            if(unlikely(!st_thp_fault)) {
+                st_thp_fault = rrdset_create_localhost(
+                        "mem"
+                        , "thp_faults"
+                        , NULL
+                        , "hugepages"
+                        , NULL
+                        , "Transparent Huge Page Fault Allocations"
+                        , "events/s"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_VMSTAT_NAME
+                        , NETDATA_CHART_PRIO_MEM_HUGEPAGES_FAULTS
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                        );
+
+                rd_alloc  = rrddim_add(st_thp_fault, "alloc", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_fallback = rrddim_add(st_thp_fault, "fallback", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_fallback_charge = rrddim_add(st_thp_fault, "fallback_charge", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+
+            rrddim_set_by_pointer(st_thp_fault, rd_alloc, thp_fault_alloc);
+            rrddim_set_by_pointer(st_thp_fault, rd_fallback, thp_fault_fallback);
+            rrddim_set_by_pointer(st_thp_fault, rd_fallback_charge, thp_fault_fallback_charge);
+
+            rrdset_done(st_thp_fault);
+        }
+
+        if(do_thp == CONFIG_BOOLEAN_YES || (do_thp == CONFIG_BOOLEAN_AUTO &&
+                                            (netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES || thp_fault_alloc || thp_fault_fallback || thp_fault_fallback_charge || thp_file_mapped))) {
+
+            static RRDSET *st_thp_file = NULL;
+            static RRDDIM *rd_alloc = NULL, *rd_fallback = NULL, *rd_fallback_charge = NULL, *rd_mapped = NULL;
+
+            if(unlikely(!st_thp_file)) {
+                st_thp_file = rrdset_create_localhost(
+                        "mem"
+                        , "thp_file"
+                        , NULL
+                        , "hugepages"
+                        , NULL
+                        , "Transparent Huge Page File Allocations"
+                        , "events/s"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_VMSTAT_NAME
+                        , NETDATA_CHART_PRIO_MEM_HUGEPAGES_FILE
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                        );
+
+                rd_alloc  = rrddim_add(st_thp_file, "alloc", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_fallback = rrddim_add(st_thp_file, "fallback", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_mapped = rrddim_add(st_thp_file, "mapped", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_fallback_charge = rrddim_add(st_thp_file, "fallback_charge", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+
+            rrddim_set_by_pointer(st_thp_file, rd_alloc, thp_file_alloc);
+            rrddim_set_by_pointer(st_thp_file, rd_fallback, thp_file_fallback);
+            rrddim_set_by_pointer(st_thp_file, rd_mapped, thp_file_fallback_charge);
+            rrddim_set_by_pointer(st_thp_file, rd_fallback_charge, thp_file_fallback_charge);
+
+            rrdset_done(st_thp_file);
+        }
+
+        if(do_thp == CONFIG_BOOLEAN_YES || (do_thp == CONFIG_BOOLEAN_AUTO &&
+                                            (netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES || thp_zero_page_alloc || thp_zero_page_alloc_failed))) {
+
+            static RRDSET *st_thp_zero = NULL;
+            static RRDDIM *rd_alloc = NULL, *rd_failed = NULL;
+
+            if(unlikely(!st_thp_zero)) {
+                st_thp_zero = rrdset_create_localhost(
+                        "mem"
+                        , "thp_zero"
+                        , NULL
+                        , "hugepages"
+                        , NULL
+                        , "Transparent Huge Zero Page Allocations"
+                        , "events/s"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_VMSTAT_NAME
+                        , NETDATA_CHART_PRIO_MEM_HUGEPAGES_ZERO
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                        );
+
+                rd_alloc  = rrddim_add(st_thp_zero, "alloc", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_failed = rrddim_add(st_thp_zero, "failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+
+            rrddim_set_by_pointer(st_thp_zero, rd_alloc, thp_zero_page_alloc);
+            rrddim_set_by_pointer(st_thp_zero, rd_failed, thp_zero_page_alloc_failed);
+
+            rrdset_done(st_thp_zero);
+        }
+
+        if(do_thp == CONFIG_BOOLEAN_YES || (do_thp == CONFIG_BOOLEAN_AUTO &&
+                                            (netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES || thp_collapse_alloc || thp_collapse_alloc_failed))) {
+
+            static RRDSET *st_khugepaged = NULL;
+            static RRDDIM *rd_alloc = NULL, *rd_failed = NULL;
+
+            if(unlikely(!st_khugepaged)) {
+                st_khugepaged = rrdset_create_localhost(
+                        "mem"
+                        , "thp_collapse"
+                        , NULL
+                        , "hugepages"
+                        , NULL
+                        , "Transparent Huge Pages Collapsed by khugepaged"
+                        , "events/s"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_VMSTAT_NAME
+                        , NETDATA_CHART_PRIO_MEM_HUGEPAGES_KHUGEPAGED
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                        );
+
+                rd_alloc  = rrddim_add(st_khugepaged, "alloc", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_failed = rrddim_add(st_khugepaged, "failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+
+            rrddim_set_by_pointer(st_khugepaged, rd_alloc, thp_collapse_alloc);
+            rrddim_set_by_pointer(st_khugepaged, rd_failed, thp_collapse_alloc_failed);
+
+            rrdset_done(st_khugepaged);
+        }
+
+        if(do_thp == CONFIG_BOOLEAN_YES || (do_thp == CONFIG_BOOLEAN_AUTO &&
+                                            (netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES || thp_split_page || thp_split_page_failed || thp_deferred_split_page || thp_split_pmd))) {
+
+            static RRDSET *st_thp_split = NULL;
+            static RRDDIM *rd_split = NULL, *rd_failed = NULL, *rd_deferred_split = NULL, *rd_split_pmd = NULL;
+
+            if(unlikely(!st_thp_split)) {
+                st_thp_split = rrdset_create_localhost(
+                        "mem"
+                        , "thp_split"
+                        , NULL
+                        , "hugepages"
+                        , NULL
+                        , "Transparent Huge Page Splits"
+                        , "events/s"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_VMSTAT_NAME
+                        , NETDATA_CHART_PRIO_MEM_HUGEPAGES_SPLITS
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                        );
+
+                rd_split  = rrddim_add(st_thp_split, "split", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_failed = rrddim_add(st_thp_split, "failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_split_pmd = rrddim_add(st_thp_split, "split_pmd", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_deferred_split = rrddim_add(st_thp_split, "split_deferred", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+
+            rrddim_set_by_pointer(st_thp_split, rd_split, thp_split_page);
+            rrddim_set_by_pointer(st_thp_split, rd_failed, thp_split_page_failed);
+            rrddim_set_by_pointer(st_thp_split, rd_split_pmd, thp_split_pmd);
+            rrddim_set_by_pointer(st_thp_split, rd_deferred_split, thp_deferred_split_page);
+
+            rrdset_done(st_thp_split);
+        }
+
+        if(do_thp == CONFIG_BOOLEAN_YES || (do_thp == CONFIG_BOOLEAN_AUTO &&
+                                            (netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES || thp_swpout || thp_swpout_fallback))) {
+
+            static RRDSET *st_tmp_swapout = NULL;
+            static RRDDIM *rd_swapout = NULL, *rd_fallback = NULL;
+
+            if(unlikely(!st_tmp_swapout)) {
+                st_tmp_swapout = rrdset_create_localhost(
+                        "mem"
+                        , "thp_swapout"
+                        , NULL
+                        , "hugepages"
+                        , NULL
+                        , "Transparent Huge Pages Swap Out"
+                        , "events/s"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_VMSTAT_NAME
+                        , NETDATA_CHART_PRIO_MEM_HUGEPAGES_SWAPOUT
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                        );
+
+                rd_swapout  = rrddim_add(st_tmp_swapout, "swapout", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_fallback = rrddim_add(st_tmp_swapout, "fallback", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+
+            rrddim_set_by_pointer(st_tmp_swapout, rd_swapout, thp_swpout);
+            rrddim_set_by_pointer(st_tmp_swapout, rd_fallback, thp_swpout_fallback);
+
+            rrdset_done(st_tmp_swapout);
+        }
+
+        if(do_thp == CONFIG_BOOLEAN_YES || (do_thp == CONFIG_BOOLEAN_AUTO &&
+                                            (netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES || compact_stall || compact_fail || compact_success))) {
+
+            static RRDSET *st_thp_compact = NULL;
+            static RRDDIM *rd_success = NULL, *rd_fail = NULL, *rd_stall = NULL;
+
+            if(unlikely(!st_thp_compact)) {
+                st_thp_compact = rrdset_create_localhost(
+                        "mem"
+                        , "thp_compact"
+                        , NULL
+                        , "hugepages"
+                        , NULL
+                        , "Transparent Huge Pages Compaction"
+                        , "events/s"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_VMSTAT_NAME
+                        , NETDATA_CHART_PRIO_MEM_HUGEPAGES_COMPACT
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                        );
+
+                rd_success  = rrddim_add(st_thp_compact, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_fail = rrddim_add(st_thp_compact, "fail", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_stall = rrddim_add(st_thp_compact, "stall", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+
+            rrddim_set_by_pointer(st_thp_compact, rd_success, compact_success);
+            rrddim_set_by_pointer(st_thp_compact, rd_fail, compact_fail);
+            rrddim_set_by_pointer(st_thp_compact, rd_stall, compact_stall);
+
+            rrdset_done(st_thp_compact);
+        }
     }
 
     return 0;
