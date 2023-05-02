@@ -22,14 +22,14 @@ ORDER = [
 CHARTS = {
     # count of emails in the active queue
     'qactiveemails': {
-        'options': [None, 'Postfix Active Queue Emails', 'emails', 'queue', 'postfix.qactiveemails', 'line'],
+        'options': [None, 'Active Queue Emails', 'emails', 'queue', 'postfix.qactiveemails', 'line'],
         'lines': [
             ['active_emails', None, 'absolute']
         ]
     },
     # count of emails in the deferred queue with delay_reson = 'temporary failure'
     'qtemporaryfails': {
-        'options': [None, 'Postfix Deferred Queue Failures', 'emails', 'queue', 'postfix.qtemporaryfails', 'line'],
+        'options': [None, 'Deferred Queue Failures', 'emails', 'queue', 'postfix.qtemporaryfails', 'line'],
         'lines': [
             ['temporary_failures', None, 'absolute']
         ]
@@ -38,7 +38,7 @@ CHARTS = {
     # only those datapoints within 2*SD from the mean are considered to avoid skewing the distribution 
     #   by outliers ( all messages that have been in the queue for a considerable amount of time )
     'qdelay': {
-        'options': [None, 'Postfix Queue Mean Delay', 'seconds', 'queue', 'postfix.qdelay', 'line'],
+        'options': [None, 'Queue Mean Delay', 'seconds', 'queue', 'postfix.qdelay', 'line'],
         'lines': [
             ['delay', None, 'absolute']
         ]
@@ -47,7 +47,7 @@ CHARTS = {
     # only those messages which have a delay within a specified time window, messages failed a long time ago are not considered
     #   window can be specified in the config file, default 40min
     'qwdelay': {
-        'options': [None, 'Postfix Queue Mean Delay', 'seconds', 'queue', 'postfix.qwdelay', 'line'],
+        'options': [None, 'Queue Mean Delay in Window', 'seconds', 'queue', 'postfix.qwdelay', 'line'],
         'lines': [
             ['wdelay', None, 'absolute']
         ]
