@@ -936,8 +936,8 @@ set(ACLK_FILES
         aclk/schema-wrappers/schema_wrappers.h
         aclk/schema-wrappers/schema_wrapper_utils.cc
         aclk/schema-wrappers/schema_wrapper_utils.h
-        aclk/schema-wrappers/agent_cmds.cc \
-        aclk/schema-wrappers/agent_cmds.h \
+        aclk/schema-wrappers/agent_cmds.cc
+        aclk/schema-wrappers/agent_cmds.h
         aclk/helpers/mqtt_wss_pal.h
         aclk/helpers/ringbuffer_pal.h
         )
