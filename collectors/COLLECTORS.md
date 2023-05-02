@@ -342,8 +342,6 @@ configure any of these collectors according to your setup and infrastructure.
   any HTTP endpoint's availability and response time.
 - [Lighttpd](https://github.com/netdata/go.d.plugin/blob/master/modules/lighttpd/README.md): Collect web server
   performance metrics using the `server-status?auto` endpoint.
-- [Lighttpd2](https://github.com/netdata/go.d.plugin/blob/master/modules/lighttpd2/README.md): Collect web server
-  performance metrics using the `server-status?format=plain` endpoint.
 - [Litespeed](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/litespeed/README.md): Collect
   web server data (network, connection,
   requests, cache) by reading `.rtreport*` files.
