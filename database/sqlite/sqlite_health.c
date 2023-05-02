@@ -25,12 +25,12 @@ int sql_create_health_log_table(RRDHOST *host) {
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CREATE_HEALTH_LOG_TABLE(uuid_str));
 
-    rc = db_execute(command);
+    rc = db_execute(db_meta, command);
     if (unlikely(rc))
         error_report("HEALTH [%s]: SQLite error during creation of health log table", rrdhost_hostname(host));
     else {
         snprintfz(command, MAX_HEALTH_SQL_SIZE, "CREATE INDEX IF NOT EXISTS health_log_index_%s ON health_log_%s (unique_id); ", uuid_str, uuid_str);
-        rc = db_execute(command);
+        rc = db_execute(db_meta, command);
         if (unlikely(unlikely(rc)))
             error_report("HEALTH [%s]: SQLite error during creation of health log table index", rrdhost_hostname(host));
     }

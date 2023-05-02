@@ -92,6 +92,11 @@ bool ml_dimension_is_anomalous(RRDDIM *rd, time_t curr_time, double value, bool 
     return false;
 }
 
+int ml_dimension_load_models(RRDDIM *rd) {
+    UNUSED(rd);
+    return 0;
+}
+
 void ml_update_global_statistics_charts(uint64_t models_consulted) {
     UNUSED(models_consulted);
 }

@@ -247,6 +247,11 @@ typedef struct {
 } ml_host_t;
 
 typedef struct {
+    uuid_t metric_uuid;
+    ml_kmeans_t kmeans;
+} ml_model_info_t;
+
+typedef struct {
     size_t id;
     netdata_thread_t nd_thread;
     netdata_mutex_t nd_mutex;
@@ -257,6 +262,8 @@ typedef struct {
     calculated_number_t *training_cns;
     calculated_number_t *scratch_training_cns;
     std::vector<DSample> training_samples;
+
+    std::vector<ml_model_info_t> pending_model_info;
 
     RRDSET *queue_stats_rs;
     RRDDIM *queue_stats_queue_size_rd;
@@ -313,6 +320,7 @@ typedef struct {
     std::atomic<bool> detection_stop;
 
     size_t num_training_threads;
+    size_t flush_models_batch_size;
 
     std::vector<ml_training_thread_t> training_threads;
     std::atomic<bool> training_stop;

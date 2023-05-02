@@ -510,13 +510,13 @@ skip:
 }
 // Return 0 OK
 // Return 1 Failed
-int db_execute(const char *cmd)
+int db_execute(sqlite3 *db, const char *cmd)
 {
     int rc;
     int cnt = 0;
     while (cnt < SQL_MAX_RETRY) {
         char *err_msg;
-        rc = sqlite3_exec_monitored(db_meta, cmd, 0, 0, &err_msg);
+        rc = sqlite3_exec_monitored(db, cmd, 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
             error_report("Failed to execute '%s', rc = %d (%s) -- attempt %d", cmd, rc, err_msg, cnt);
             sqlite3_free(err_msg);
