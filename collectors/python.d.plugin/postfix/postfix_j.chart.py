@@ -35,7 +35,7 @@ CHARTS = {
         ]
     },
     # average delay of all messages either in the active queue or in the deferred queue with status 'temporary failure'
-    # only those datapoints within 2*SD from the mean are considered to avoid skewing the distribution 
+    # only those datapoints within 2*SD from the mean are considered to avoid skewing the distribution
     #   by outliers ( all messages that have been in the queue for a considerable amount of time )
     'qdelay': {
         'options': [None, 'Queue Mean Delay', 'seconds', 'queue', 'postfix.qdelay', 'line'],
@@ -62,7 +62,7 @@ class Service(ExecutableService):
         self.definitions = CHARTS
         self.command = POSTQUEUE_COMMAND
         self.delay_window = float(self.configuration.get('delay_window_span', 2400))
-        self.data = { 
+        self.data = {
                         'active_emails' : 0,
                         'temp_fail' : 0,
                         'delay' : 0.0,
@@ -88,7 +88,7 @@ class Service(ExecutableService):
 
             raw = self._get_raw_data()
 
-	
+
             if not raw:
                 return None
 	
@@ -103,7 +103,7 @@ class Service(ExecutableService):
                 if jdata['queue_name'] != 'active' \
                     and not ( jdata['queue_name'] == 'deferred' \
                             and jdata['recipients'][0]['delay_reason'] == 'temporary failure' ) :
-	            # for now only collecting stats for active messages 
+	            # for now only collecting stats for active messages
 	            #   and temporary failures
                     continue
 
@@ -139,7 +139,7 @@ class Service(ExecutableService):
         # only data 2*SD from mean
         final_fail = [ x for x in delays if x >= lower and x <= upper ]
             
-        return dict({ 
+        return dict({
             'active_emails' : self.data['active_emails'],
             'temporary_failures' : self.data['temp_fail'],
             'delay' : stat.mean(final_fail),
