@@ -726,6 +726,8 @@ ACLK_FILES = \
     aclk/schema-wrappers/context_stream.h \
     aclk/schema-wrappers/context.cc \
     aclk/schema-wrappers/context.h \
+    aclk/schema-wrappers/agent_cmds.cc \
+    aclk/schema-wrappers/agent_cmds.h \
     $(NULL)
 
 noinst_LIBRARIES += libmqttwebsockets.a
@@ -768,6 +770,7 @@ ACLK_PROTO_DEFINITIONS = \
     aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto \
     aclk/aclk-schemas/proto/context/v1/context.proto \
     aclk/aclk-schemas/proto/context/v1/stream.proto \
+    aclk/aclk-schemas/proto/agent/v1/cmds.proto \
     $(NULL)
 
 dist_noinst_DATA += $(ACLK_PROTO_DEFINITIONS)
@@ -792,6 +795,8 @@ ACLK_PROTO_BUILT_FILES = aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
     aclk/aclk-schemas/proto/context/v1/context.pb.h \
     aclk/aclk-schemas/proto/context/v1/stream.pb.cc \
     aclk/aclk-schemas/proto/context/v1/stream.pb.h \
+    aclk/aclk-schemas/proto/agent/v1/cmds.pb.cc \
+    aclk/aclk-schemas/proto/agent/v1/cmds.pb.h \
     $(NULL)
 
 BUILT_SOURCES += $(ACLK_PROTO_BUILT_FILES)
@@ -836,6 +841,10 @@ aclk/aclk-schemas/proto/context/v1/context.pb.h: aclk/aclk-schemas/proto/context
 
 aclk/aclk-schemas/proto/context/v1/stream.pb.cc \
 aclk/aclk-schemas/proto/context/v1/stream.pb.h: aclk/aclk-schemas/proto/context/v1/stream.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
+aclk/aclk-schemas/proto/agent/v1/cmds.pb.cc \
+aclk/aclk-schemas/proto/agent/v1/cmds.pb.h: aclk/aclk-schemas/proto/agent/v1/cmds.proto
 	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
 
 endif #ENABLE_ACLK

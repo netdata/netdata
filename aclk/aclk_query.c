@@ -13,6 +13,82 @@ pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
 #define QUERY_THREAD_LOCK pthread_mutex_lock(&query_lock_wait)
 #define QUERY_THREAD_UNLOCK pthread_mutex_unlock(&query_lock_wait)
 
+struct pending_req_list {
+    const char *msg_id;
+    uint32_t hash;
+
+    int canceled;
+
+    struct pending_req_list *next;
+};
+
+static struct pending_req_list *pending_req_list_head = NULL;
+static pthread_mutex_t pending_req_list_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static struct pending_req_list *pending_req_list_add(const char *msg_id)
+{
+    struct pending_req_list *new = callocz(1, sizeof(struct pending_req_list));
+    new->msg_id = msg_id;
+    new->hash = simple_hash(msg_id);
+
+    pthread_mutex_lock(&pending_req_list_lock);
+    new->next = pending_req_list_head;
+    pending_req_list_head = new;
+    pthread_mutex_unlock(&pending_req_list_lock);
+    return new;
+}
+
+void pending_req_list_rm(const char *msg_id)
+{
+    uint32_t hash = simple_hash(msg_id);
+    struct pending_req_list *prev = NULL;
+
+    pthread_mutex_lock(&pending_req_list_lock);
+    struct pending_req_list *curr = pending_req_list_head;
+
+    while (curr) {
+        if (curr->hash == hash && strcmp(curr->msg_id, msg_id) == 0) {
+            if (prev)
+                prev->next = curr->next;
+            else
+                pending_req_list_head = curr->next;
+
+            freez(curr);
+            break;
+        }
+
+        prev = curr;
+        curr = curr->next;
+    }
+    pthread_mutex_unlock(&pending_req_list_lock);
+}
+
+int mark_pending_req_cancelled(const char *msg_id)
+{
+    uint32_t hash = simple_hash(msg_id);
+
+    pthread_mutex_lock(&pending_req_list_lock);
+    struct pending_req_list *curr = pending_req_list_head;
+
+    while (curr) {
+        if (curr->hash == hash && strcmp(curr->msg_id, msg_id) == 0) {
+            curr->canceled = 1;
+            pthread_mutex_unlock(&pending_req_list_lock);
+            return 0;
+        }
+
+        curr = curr->next;
+    }
+    pthread_mutex_unlock(&pending_req_list_lock);
+    return 1;
+}
+
+static bool aclk_web_client_interrupt_cb(struct web_client *w __maybe_unused, void *data)
+{
+    struct pending_req_list *req = (struct pending_req_list *)data;
+    return req->canceled;
+}
+
 static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) {
     int retval = 0;
     BUFFER *local_buffer = NULL;
@@ -29,6 +105,9 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) 
     w->acl = WEB_CLIENT_ACL_ACLK;
     w->mode = WEB_CLIENT_MODE_GET;
     w->timings.tv_in = query->created_tv;
+
+    w->interrupt.callback = aclk_web_client_interrupt_cb;
+    w->interrupt.callback_data = pending_req_list_add(query->msg_id);
 
     usec_t t;
     web_client_timeout_checkpoint_set(w, query->timeout);
@@ -167,6 +246,8 @@ cleanup:
     );
 
     web_client_release_to_cache(w);
+
+    pending_req_list_rm(query->msg_id);
 
 #ifdef NETDATA_WITH_ZLIB
     buffer_free(z_buffer);

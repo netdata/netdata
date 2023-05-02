@@ -936,6 +936,8 @@ set(ACLK_FILES
         aclk/schema-wrappers/schema_wrappers.h
         aclk/schema-wrappers/schema_wrapper_utils.cc
         aclk/schema-wrappers/schema_wrapper_utils.h
+        aclk/schema-wrappers/agent_cmds.cc \
+        aclk/schema-wrappers/agent_cmds.h \
         aclk/helpers/mqtt_wss_pal.h
         aclk/helpers/ringbuffer_pal.h
         )
@@ -1259,6 +1261,7 @@ set(ACLK_PROTO_DEFS
         aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto
         aclk/aclk-schemas/proto/context/v1/context.proto
         aclk/aclk-schemas/proto/context/v1/stream.proto
+        aclk/aclk-schemas/proto/agent/v1/cmds.proto
         )
 PROTOBUF_ACLK_GENERATE_CPP(ACLK_PROTO_BUILT_SRCS ACLK_PROTO_BUILT_HDRS ${ACLK_PROTO_DEFS})
 
