@@ -2321,13 +2321,21 @@ EOF
 # Opsgenie sender
 
 send_opsgenie() {
-  local payload httpcode oldv currv
+  local payload httpcode oldv currv priority
   [ "${SEND_OPSGENIE}" != "YES" ] && return 1
 
   if [ -z "${OPSGENIE_API_KEY}" ] ; then
     info "Can't send Opsgenie notification, because OPSGENIE_API_KEY is not defined"
     return 1
   fi
+
+  # Priority for OpsGenie alert (https://support.atlassian.com/opsgenie/docs/update-alert-priority-level/)
+  case "${status}" in
+  CRITICAL) priority="P1" ;; # Critical is P1
+  WARNING) priority="P3" ;; # Warning is P3
+  CLEAR) priority="P5" ;; # Clear is P5
+  *) priority="P3" ;; # OpsGenie's default alert level is P3
+  esac
 
   # We are sending null when values are nan to avoid errors while JSON message is parsed
   [ "${old_value}" != "nan" ] && oldv="${old_value}" ||  oldv="null"
@@ -2343,6 +2351,7 @@ send_opsgenie() {
     "when": ${when},
     "name" : "${name}",
     "family" : "${family}",
+    "priority" : "${priority}",
     "status" : "${status}",
     "old_status" : "${old_status}",
     "value" : ${currv},
