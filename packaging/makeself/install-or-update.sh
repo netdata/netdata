@@ -102,7 +102,7 @@ if [ ! -f "etc/netdata/.installer-cleanup-of-stock-configs-done" ]; then
 fi
 
 # -----------------------------------------------------------------------------
-progress "Attempt to create user/group netdata/netadata"
+progress "Attempt to create user/group netdata/netdata"
 
 NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C"
 NETDATA_ADDED_TO_GROUPS=""
