@@ -2329,7 +2329,7 @@ send_opsgenie() {
     return 1
   fi
 
-  # Priority for OpsGenie alert
+  # Priority for OpsGenie alert (https://support.atlassian.com/opsgenie/docs/update-alert-priority-level/)
   case "${status}" in
   CRITICAL) priority="P1" ;; # Critical is P1
   WARNING) priority="P3" ;; # Warning is P3
