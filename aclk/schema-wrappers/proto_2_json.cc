@@ -11,6 +11,7 @@
 #include "proto/nodeinstance/info/v1/info.pb.h"
 #include "proto/context/v1/stream.pb.h"
 #include "proto/context/v1/context.pb.h"
+#include "proto/agent/v1/cmds.pb.h"
 
 #include "libnetdata/libnetdata.h"
 
@@ -63,6 +64,8 @@ static google::protobuf::Message *msg_name_to_protomsg(const char *msgname)
         return new context::v1::ContextsCheckpoint;
     if (!strcmp(msgname, "StopStreamingContexts"))
         return new context::v1::StopStreamingContexts;
+    if (!strcmp(msgname, "CancelPendingRequest"))
+        return new agent::v1::CancelPendingRequest;
 
     return NULL;
 }
