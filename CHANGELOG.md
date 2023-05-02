@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- fix config generation for plugins [\#14990](https://github.com/netdata/netdata/pull/14990) ([ilyam8](https://github.com/ilyam8))
 - Fix TYPO in README.md [\#14980](https://github.com/netdata/netdata/pull/14980) ([DevinNorgarb](https://github.com/DevinNorgarb))
 - add metrics.csv to proc.plugin [\#14979](https://github.com/netdata/netdata/pull/14979) ([thiagoftsm](https://github.com/thiagoftsm))
 - interrupt callback on api/v1/data [\#14978](https://github.com/netdata/netdata/pull/14978) ([ktsaou](https://github.com/ktsaou))
@@ -71,6 +72,7 @@
 - Fix/introduce links inside charts.d.plugin documentation  [\#14884](https://github.com/netdata/netdata/pull/14884) ([Ancairon](https://github.com/Ancairon))
 - Add support for alert notifications to ntfy.sh [\#14875](https://github.com/netdata/netdata/pull/14875) ([Dim-P](https://github.com/Dim-P))
 - WEBRTC for communication between agents and browsers [\#14874](https://github.com/netdata/netdata/pull/14874) ([ktsaou](https://github.com/ktsaou))
+- Remove alpine 3.14 from the ci [\#14873](https://github.com/netdata/netdata/pull/14873) ([tkatsoulas](https://github.com/tkatsoulas))
 - cgroups.plugin: add image label [\#14872](https://github.com/netdata/netdata/pull/14872) ([ilyam8](https://github.com/ilyam8))
 - Fix regex syntax for clang-format checks. [\#14871](https://github.com/netdata/netdata/pull/14871) ([Ferroin](https://github.com/Ferroin))
 - bump go.d.plugin v0.52.0 [\#14870](https://github.com/netdata/netdata/pull/14870) ([ilyam8](https://github.com/ilyam8))
@@ -404,8 +406,6 @@
 - Add ARL readme to learn [\#14363](https://github.com/netdata/netdata/pull/14363) ([cakrit](https://github.com/cakrit))
 - Add BUFFER lib doc to learn [\#14362](https://github.com/netdata/netdata/pull/14362) ([cakrit](https://github.com/cakrit))
 - Add dictionary readme to learn [\#14361](https://github.com/netdata/netdata/pull/14361) ([cakrit](https://github.com/cakrit))
-- Add explanation of config files to learn [\#14360](https://github.com/netdata/netdata/pull/14360) ([cakrit](https://github.com/cakrit))
-- Delete libnetdata readme [\#14357](https://github.com/netdata/netdata/pull/14357) ([cakrit](https://github.com/cakrit))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
