@@ -83,7 +83,10 @@ static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_objec
         memcpy(&full_msg[len], payload, payload_len);
     }
 
-    mqtt_wss_publish5(client, (char*)topic, NULL, full_msg, &freez_aclk_publish5b, full_msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
+    int rc = mqtt_wss_publish5(client, (char*)topic, NULL, full_msg, &freez_aclk_publish5b, full_msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
+
+    if (rc == MQTT_WSS_ERR_TOO_BIG_FOR_SERVER)
+        return HTTP_RESP_FORBIDDEN;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_published(packet_id);
