@@ -132,10 +132,10 @@ class Service(ExecutableService):
 
         mean = stat.mean(delays)
         sd = stat.pstdev(delays)
-        
+
         lower = mean - 2*sd
         upper = mean + 2*sd
-            
+
         # only data 2*SD from mean
         final_fail = [ x for x in delays if x >= lower and x <= upper ]
 
