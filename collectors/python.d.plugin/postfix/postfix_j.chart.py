@@ -93,21 +93,21 @@ class Service(ExecutableService):
                 return None
 
             epoch_now = calendar.timegm(time.gmtime())
-	
+
             for line in raw:
                 jdata = json.loads(line)
 
                 if not jdata:
                     continue
-	
+
                 if jdata['queue_name'] != 'active' \
                     and not ( jdata['queue_name'] == 'deferred' \
                             and jdata['recipients'][0]['delay_reason'] == 'temporary failure' ) :
-	            # for now only collecting stats for active messages
-	            #   and temporary failures
+                # for now only collecting stats for active messages
+                #   and temporary failures
                     continue
 
-	            
+
                 delay = epoch_now - jdata['arrival_time']
                 delays.append(delay)
                 if delay <= self.delay_window:
@@ -116,14 +116,14 @@ class Service(ExecutableService):
                 if jdata['queue_name'] == 'active':
                     self.data['active_emails'] += 1
                     continue
-	
+
                 if 'delay_reason' in jdata['recipients'][0] and jdata['recipients'][0]['delay_reason'] == 'temporary failure':
                     self.data['temp_fail'] += 1
-	
+
 
         except (ValueError, AttributeError):
             return None
-	
+
         # ensure atleast one datapoint
         if len(delays) <=0:
             delays.append(0)
@@ -138,7 +138,7 @@ class Service(ExecutableService):
             
         # only data 2*SD from mean
         final_fail = [ x for x in delays if x >= lower and x <= upper ]
-            
+
         return dict({
             'active_emails' : self.data['active_emails'],
             'temporary_failures' : self.data['temp_fail'],
