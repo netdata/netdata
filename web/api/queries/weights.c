@@ -91,7 +91,7 @@ static void register_result(DICTIONARY *results, RRDHOST *host, RRDCONTEXT_ACQUI
         return;
 
     // keep track of the max of the baseline / highlight ratio
-    if(flags & RESULT_IS_BASE_HIGH_RATIO && v > stats->max_base_high_ratio)
+    if((flags & RESULT_IS_BASE_HIGH_RATIO) && v > stats->max_base_high_ratio)
         stats->max_base_high_ratio = v;
 
     struct register_result t = {
@@ -730,14 +730,6 @@ static inline struct dict_unique_id_name *dict_unique_id_name_add(DICTIONARY *di
     return dun;
 }
 
-static inline bool storage_point_should_be_exposed(struct aggregated_weight *aw, RRDR_OPTIONS options, bool baseline) {
-    if((options & RRDR_OPTION_NONZERO) && netdata_double_is_zero(aw->min) && netdata_double_is_zero(aw->max) && netdata_double_is_zero(aw->sum) &&
-       storage_point_is_zero(aw->hsp) && (!baseline || storage_point_is_zero(aw->bsp)))
-        return false;
-
-    return true;
-}
-
 static size_t registered_results_to_json_multinode_no_group_by(
         DICTIONARY *results, BUFFER *wb,
         time_t after, time_t before,
@@ -782,31 +774,24 @@ static size_t registered_results_to_json_multinode_no_group_by(
 
         // close instance
         if(t->ria != last_ria && last_ria) {
-            if(storage_point_should_be_exposed(&instance_aw, options, baseline)) {
-                storage_point_to_json(wb, WPT_INSTANCE, di, ii, ci, ni, &instance_aw, options, baseline);
-                instance_dun->exposed = true;
-            }
-
+            storage_point_to_json(wb, WPT_INSTANCE, di, ii, ci, ni, &instance_aw, options, baseline);
+            instance_dun->exposed = true;
             last_ria = NULL;
             instance_aw = AGGREGATED_WEIGHT_EMPTY;
         }
 
         // close context
         if(t->rca != last_rca && last_rca) {
-            if(storage_point_should_be_exposed(&context_aw, options, baseline)) {
-                storage_point_to_json(wb, WPT_CONTEXT, di, ii, ci, ni, &context_aw, options, baseline);
-                context_dun->exposed = true;
-            }
+            storage_point_to_json(wb, WPT_CONTEXT, di, ii, ci, ni, &context_aw, options, baseline);
+            context_dun->exposed = true;
             last_rca = NULL;
             context_aw = AGGREGATED_WEIGHT_EMPTY;
         }
 
         // close node
         if(t->host != last_host && last_host) {
-            if(storage_point_should_be_exposed(&node_aw, options, baseline)) {
-                storage_point_to_json(wb, WPT_NODE, di, ii, ci, ni, &node_aw, options, baseline);
-                node_dun->exposed = true;
-            }
+            storage_point_to_json(wb, WPT_NODE, di, ii, ci, ni, &node_aw, options, baseline);
+            node_dun->exposed = true;
             last_host = NULL;
             node_aw = AGGREGATED_WEIGHT_EMPTY;
         }
@@ -845,13 +830,11 @@ static size_t registered_results_to_json_multinode_no_group_by(
                 .bsp = t->baseline,
         };
 
-        if(storage_point_should_be_exposed(&aw, options, baseline)) {
-            storage_point_to_json(wb, WPT_DIMENSION, di, ii, ci, ni, &aw, options, baseline);
-            node_dun->exposed = true;
-            context_dun->exposed = true;
-            instance_dun->exposed = true;
-            dimension_dun->exposed = true;
-        }
+        storage_point_to_json(wb, WPT_DIMENSION, di, ii, ci, ni, &aw, options, baseline);
+        node_dun->exposed = true;
+        context_dun->exposed = true;
+        instance_dun->exposed = true;
+        dimension_dun->exposed = true;
 
         merge_into_aw(instance_aw, t);
         merge_into_aw(context_aw, t);
@@ -863,19 +846,19 @@ static size_t registered_results_to_json_multinode_no_group_by(
     dfe_done(t);
 
     // close instance
-    if(last_ria && storage_point_should_be_exposed(&instance_aw, options, baseline)) {
+    if(last_ria) {
         storage_point_to_json(wb, WPT_INSTANCE, di, ii, ci, ni, &instance_aw, options, baseline);
         instance_dun->exposed = true;
     }
 
     // close context
-    if(last_rca && storage_point_should_be_exposed(&context_aw, options, baseline)) {
+    if(last_rca) {
         storage_point_to_json(wb, WPT_CONTEXT, di, ii, ci, ni, &context_aw, options, baseline);
         context_dun->exposed = true;
     }
 
     // close node
-    if(last_host && storage_point_should_be_exposed(&node_aw, options, baseline)) {
+    if(last_host) {
         storage_point_to_json(wb, WPT_NODE, di, ii, ci, ni, &node_aw, options, baseline);
         node_dun->exposed = true;
     }
@@ -1069,9 +1052,6 @@ static size_t registered_results_to_json_multinode_group_by(
     dfe_start_read(group_by, aw) {
         const char *k = aw_dfe.name;
         const char *n = aw->name;
-
-        if(!storage_point_should_be_exposed(aw, options, baseline))
-            continue;
 
         buffer_json_add_array_item_object(wb);
         buffer_json_member_add_string(wb, "id", k);
@@ -1454,6 +1434,11 @@ static void rrdset_metric_correlations_volume(
         return;
     }
 
+    if((options & RRDR_OPTION_ANOMALY_BIT) && highlight_average.value < baseline_average.value) {
+        // when working on anomaly bits, we are looking for an increase in the anomaly rate
+        return;
+    }
+
     char highlight_countif_options[50 + 1];
     snprintfz(highlight_countif_options, 50, "%s" NETDATA_DOUBLE_FORMAT, highlight_average.value < baseline_average.value ? "<" : ">", baseline_average.value);
     QUERY_VALUE highlight_countif = rrdmetric2value(host, rca, ria, rma, after, before,
@@ -1627,7 +1612,7 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
     NETDATA_DOUBLE slots[dimensions];
     dimensions = 0;
     dfe_start_read(results, t) {
-        if(t->flags & (RESULT_IS_PERCENTAGE_OF_TIME))
+        if(t->flags & RESULT_IS_PERCENTAGE_OF_TIME)
             t->value = t->value * stats->max_base_high_ratio;
 
         slots[dimensions++] = t->value;
