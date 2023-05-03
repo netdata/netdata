@@ -6,7 +6,13 @@
 
 **Merged pull requests:**
 
+- Fix cmake errors [\#14998](https://github.com/netdata/netdata/pull/14998) ([stelfrag](https://github.com/stelfrag))
+- Remove lighttpd2 from docs [\#14997](https://github.com/netdata/netdata/pull/14997) ([Ancairon](https://github.com/Ancairon))
+- Update netdata-security.md [\#14995](https://github.com/netdata/netdata/pull/14995) ([cakrit](https://github.com/cakrit))
+- feat: add OpsGenie alert levels to payload [\#14992](https://github.com/netdata/netdata/pull/14992) ([OliverNChalk](https://github.com/OliverNChalk))
+- disable CPU full pressure at the system level [\#14991](https://github.com/netdata/netdata/pull/14991) ([ilyam8](https://github.com/ilyam8))
 - fix config generation for plugins [\#14990](https://github.com/netdata/netdata/pull/14990) ([ilyam8](https://github.com/ilyam8))
+- Load/Store ML models [\#14981](https://github.com/netdata/netdata/pull/14981) ([vkalintiris](https://github.com/vkalintiris))
 - Fix TYPO in README.md [\#14980](https://github.com/netdata/netdata/pull/14980) ([DevinNorgarb](https://github.com/DevinNorgarb))
 - add metrics.csv to proc.plugin [\#14979](https://github.com/netdata/netdata/pull/14979) ([thiagoftsm](https://github.com/thiagoftsm))
 - interrupt callback on api/v1/data [\#14978](https://github.com/netdata/netdata/pull/14978) ([ktsaou](https://github.com/ktsaou))
@@ -27,7 +33,10 @@
 - Fix handling of users and groups on install. [\#14961](https://github.com/netdata/netdata/pull/14961) ([Ferroin](https://github.com/Ferroin))
 - Reject child when context is loading [\#14960](https://github.com/netdata/netdata/pull/14960) ([stelfrag](https://github.com/stelfrag))
 - Add metadata.csv to python.d.plugin [\#14959](https://github.com/netdata/netdata/pull/14959) ([Ancairon](https://github.com/Ancairon))
+- Address log issue [\#14958](https://github.com/netdata/netdata/pull/14958) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add adaptec\_raid metrics.csv [\#14955](https://github.com/netdata/netdata/pull/14955) ([Ancairon](https://github.com/Ancairon))
+- Set api v2 version 2 [\#14954](https://github.com/netdata/netdata/pull/14954) ([stelfrag](https://github.com/stelfrag))
+- Cancel Pending Request [\#14953](https://github.com/netdata/netdata/pull/14953) ([underhood](https://github.com/underhood))
 - Terminate JSX element in doc file [\#14952](https://github.com/netdata/netdata/pull/14952) ([Ancairon](https://github.com/Ancairon))
 - Update dbengine README.md [\#14951](https://github.com/netdata/netdata/pull/14951) ([ktsaou](https://github.com/ktsaou))
 - Prevent pager from preventing non-interactive install [\#14950](https://github.com/netdata/netdata/pull/14950) ([bompus](https://github.com/bompus))
@@ -397,15 +406,6 @@
 - Revert "Delete libnetdata readme" [\#14374](https://github.com/netdata/netdata/pull/14374) ([cakrit](https://github.com/cakrit))
 - Revert "Add libnetdata readmes to learn, delete empty" [\#14373](https://github.com/netdata/netdata/pull/14373) ([cakrit](https://github.com/cakrit))
 - Publish Docker images to GHCR.io and Quay.io [\#14372](https://github.com/netdata/netdata/pull/14372) ([Ferroin](https://github.com/Ferroin))
-- Add libnetdata readmes to learn, delete empty [\#14371](https://github.com/netdata/netdata/pull/14371) ([cakrit](https://github.com/cakrit))
-- Add collectors main readme to learn [\#14370](https://github.com/netdata/netdata/pull/14370) ([cakrit](https://github.com/cakrit))
-- Add collectors list to learn temporarily [\#14369](https://github.com/netdata/netdata/pull/14369) ([cakrit](https://github.com/cakrit))
-- Add simple patterns readme to learn [\#14366](https://github.com/netdata/netdata/pull/14366) ([cakrit](https://github.com/cakrit))
-- Add one way allocator readme to learn [\#14365](https://github.com/netdata/netdata/pull/14365) ([cakrit](https://github.com/cakrit))
-- Add July README to learn [\#14364](https://github.com/netdata/netdata/pull/14364) ([cakrit](https://github.com/cakrit))
-- Add ARL readme to learn [\#14363](https://github.com/netdata/netdata/pull/14363) ([cakrit](https://github.com/cakrit))
-- Add BUFFER lib doc to learn [\#14362](https://github.com/netdata/netdata/pull/14362) ([cakrit](https://github.com/cakrit))
-- Add dictionary readme to learn [\#14361](https://github.com/netdata/netdata/pull/14361) ([cakrit](https://github.com/cakrit))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
