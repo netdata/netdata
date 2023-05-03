@@ -91,7 +91,7 @@ class Service(ExecutableService):
 
             if not raw:
                 return None
-	
+
             epoch_now = calendar.timegm(time.gmtime())
 	
             for line in raw:
