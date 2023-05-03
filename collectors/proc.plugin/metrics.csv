@@ -1,19 +1,19 @@
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
-system.cpu,,"guest_nice, guest, steal, softirq, irq, user, system, nice, iowait, idle",percentage,Total CPU utilization,stacked,,prog.plugin,/proc/stat
-cpu.cpu,cpu core,"guest_nice, guest, steal, softirq, irq, user, system, nice, iowait, idle",percentage,Core utilization,stacked,cpu,prog.plugin,/proc/stat
-system.intr,,interrupts,interrupts/s,CPU Interrupts,line,,prog.plugin,/proc/stat
-system.ctxt,,switches,context switches/s,CPU Context Switches,line,,prog.plugin,/proc/stat
-system.forks,,started,processes/s,Started Processes,line,,prog.plugin,/proc/stat
-system.processes,,"running, blocked",processes,System Processes,line,,prog.plugin,/proc/stat
-cpu.core_throttling,,a dimension per cpu core,events/s,Core Thermal Throttling Events,line,,prog.plugin,/proc/stat
-cpu.package_throttling,,a dimension per package,events/s,Package Thermal Throttling Events,line,,prog.plugin,/proc/stat
-cpu.cpufreq,,a dimension per cpu core,MHz,Current CPU Frequency,line,,prog.plugin,/proc/stat
-cpuidle.cpu_cstate_residency_time,cpu core,a dimension per c-state,percentage,C-state residency time,stacked,cpu,prog.plugin,/proc/stat
-system.entropy,,entropy,entropy,Available Entropy,line,,prog.plugin,/proc/sys/kernel/random/entropy_avail
-system.uptime,,uptime,seconds,System Uptime,line,,prog.plugin,/proc/uptime
-system.swapio,,"in, out",KiB/s,Swap I/O,area,,prog.plugin,/proc/vmstat
-system.pgpgio,,"in, out",KiB/s,Memory Paged from/to disk,area,,prog.plugin,/proc/vmstat
-system.pgfaults,,"minor, major",faults/s,Memory Page Faults,line,,prog.plugin,/proc/vmstat
+system.cpu,,"guest_nice, guest, steal, softirq, irq, user, system, nice, iowait, idle",percentage,Total CPU utilization,stacked,,proc.plugin,/proc/stat
+cpu.cpu,cpu core,"guest_nice, guest, steal, softirq, irq, user, system, nice, iowait, idle",percentage,Core utilization,stacked,cpu,proc.plugin,/proc/stat
+system.intr,,interrupts,interrupts/s,CPU Interrupts,line,,proc.plugin,/proc/stat
+system.ctxt,,switches,context switches/s,CPU Context Switches,line,,proc.plugin,/proc/stat
+system.forks,,started,processes/s,Started Processes,line,,proc.plugin,/proc/stat
+system.processes,,"running, blocked",processes,System Processes,line,,proc.plugin,/proc/stat
+cpu.core_throttling,,a dimension per cpu core,events/s,Core Thermal Throttling Events,line,,proc.plugin,/proc/stat
+cpu.package_throttling,,a dimension per package,events/s,Package Thermal Throttling Events,line,,proc.plugin,/proc/stat
+cpu.cpufreq,,a dimension per cpu core,MHz,Current CPU Frequency,line,,proc.plugin,/proc/stat
+cpuidle.cpu_cstate_residency_time,cpu core,a dimension per c-state,percentage,C-state residency time,stacked,cpu,proc.plugin,/proc/stat
+system.entropy,,entropy,entropy,Available Entropy,line,,proc.plugin,/proc/sys/kernel/random/entropy_avail
+system.uptime,,uptime,seconds,System Uptime,line,,proc.plugin,/proc/uptime
+system.swapio,,"in, out",KiB/s,Swap I/O,area,,proc.plugin,/proc/vmstat
+system.pgpgio,,"in, out",KiB/s,Memory Paged from/to disk,area,,proc.plugin,/proc/vmstat
+system.pgfaults,,"minor, major",faults/s,Memory Page Faults,line,,proc.plugin,/proc/vmstat
 system.interrupts,,a dimension per device,interrupts/s,System interrupts,stacked,,proc.plugin,/proc/interrupts
 cpu.interrupts,cpu core,a dimension per device,interrupts/s,CPU interrupts,stacked,cpu,proc.plugin,/proc/interrupts
 system.load,,"load1, load5, load15",load,System Load Average,line,,proc.plugin,/proc/loadavg
@@ -44,52 +44,62 @@ mem.kernel,,"Slab, KernelStack, PageTables, VmallocUsed, Percpu",MiB,Memory Used
 mem.slab,,"reclaimable, unreclaimable",MiB,Reclaimable Kernel Memory,stacked,,proc.plugin,/proc/meminfo
 mem.hugepage,,"free, used, surplus, reserved",MiB,Dedicated HugePages Memory,stacked,,proc.plugin,/proc/meminfo
 mem.transparent_hugepages,,"anonymous, shmem",MiB,Transparent HugePages Memory,stacked,,proc.plugin,/proc/meminfo
+mem.balloon,,"inflate, deflate, migrate",KiB/s,Memory Ballooning Operations,line,,proc.plugin,/proc/vmstat
+mem.zswapio,,"in, out",KiB/s,ZSwap I/O,area,,proc.plugin,/proc/vmstat
+mem.ksm_cow,,"swapin, write",KiB/s,KSM Copy On Write Operations,line,,proc.plugin,/proc/vmstat
+mem.thp_faults,,"alloc, fallback, fallback_charge",events/s,Transparent Huge Page Fault Allocations,line,,proc.plugin,/proc/vmstat
+mem.thp_file,,"alloc, fallback, mapped, fallback_charge",events/s,Transparent Huge Page File Allocations,line,,proc.plugin,/proc/vmstat
+mem.thp_zero,,"alloc, failed",events/s,Transparent Huge Zero Page Allocations,line,,proc.plugin,/proc/vmstat
+mem.thp_collapse,,"alloc, failed",events/s,Transparent Huge Pages Collapsed by khugepaged,line,,proc.plugin,/proc/vmstat
+mem.thp_split,,"split, failed, split_pmd, split_deferred",events/s,Transparent Huge Page Splits,line,,proc.plugin,/proc/vmstat
+mem.thp_swapout,,"swapout, fallback",events/s,Transparent Huge Pages Swap Out,line,,proc.plugin,/proc/vmstat
+mem.thp_compact,,"success, fail, stall",events/s,Transparent Huge Pages Compaction,line,,proc.plugin,/proc/vmstat
 mem.pagetype_global,,a dimension per pagesize,B,System orders available,stacked,,proc.plugin,/proc/pagetypeinfo
 mem.pagetype,"node, zone, type",a dimension per pagesize,B,"pagetype_Node{node}_{zone}_{type}",stacked,"node_id, node_zone, node_type",proc.plugin,/proc/pagetypeinfo
-mem.oom_kill,,kills,kills/s,Out of Memory Kills,line,,prog.plugin,/proc/vmstat
-mem.numa,,"local, foreign, interleave, other, pte_updates, huge_pte_updates, hint_faults, hint_faults_local, pages_migrated",events/s,NUMA events,line,,prog.plugin,/proc/vmstat
-mem.ecc_ce,,a dimension per mem controller,errors,ECC Memory Correctable Errors,line,,prog.plugin,/sys/devices/system/edac/mc
-mem.ecc_ue,,a dimension per mem controller,errors,ECC Memory Uncorrectable Errors,line,,prog.plugin,/sys/devices/system/edac/mc
-mem.numa_nodes,numa node,"hit, miss, local, foreign, interleave, other",events/s,NUMA events,line,numa_node,prog.plugin,/sys/devices/system/node
-mem.ksm,,"shared, unshared, sharing, volatile",MiB,Kernel Same Page Merging,stacked,,prog.plugin,/sys/kernel/mm/ksm
-mem.ksm_savings,,"savings, offered",MiB,Kernel Same Page Merging Savings,area,,prog.plugin,/sys/kernel/mm/ksm
-mem.ksm_ratios,,savings,percentage,Kernel Same Page Merging Effectiveness,line,,prog.plugin,/sys/kernel/mm/ksm
-mem.zram_usage,zram device,"compressed, metadata",MiB,ZRAM Memory Usage,area,device,prog.plugin,/sys/block/zram
-mem.zram_savings,zram device,"savings, original",MiB,ZRAM Memory Savings,area,device,prog.plugin,/sys/block/zram
-mem.zram_ratio,zram device,ratio,ratio,ZRAM Compression Ratio (original to compressed),line,device,prog.plugin,/sys/block/zram
-mem.zram_efficiency,zram device,percent,percentage,ZRAM Efficiency,line,device,prog.plugin,/sys/block/zram
-system.ipc_semaphores,,semaphores,semaphores,IPC Semaphores,area,,prog.plugin,ipc
-system.ipc_semaphore_arrays,,arrays,arrays,IPC Semaphore Arrays,area,,prog.plugin,ipc
-system.message_queue_message,,a dimension per queue,messages,IPC Message Queue Number of Messages,stacked,,prog.plugin,ipc
-system.message_queue_bytes,,a dimension per queue,bytes,IPC Message Queue Used Bytes,stacked,,prog.plugin,ipc
-system.shared_memory_segments,,segments,segments,IPC Shared Memory Number of Segments,stacked,,prog.plugin,ipc
-system.shared_memory_bytes,,bytes,bytes,IPC Shared Memory Used Bytes,stacked,,prog.plugin,ipc
-system.io,,"in, out",KiB/s,Disk I/O,area,,prog.plugin,/proc/diskstats
-disk.io,disk,"reads, writes",KiB/s,Disk I/O Bandwidth,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk_ext.io,disk,discards,KiB/s,Amount of Discarded Data,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.ops,disk,"reads, writes",operations/s,Disk Completed I/O Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk_ext.ops,disk,"discards, flushes",operations/s,Disk Completed Extended I/O Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.qops,disk,operations,operations,Disk Current I/O Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.backlog,disk,backlog,milliseconds,Disk Backlog,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.busy,disk,busy,milliseconds,Disk Busy Time,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.util,disk,utilization,% of time working,Disk Utilization Time,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.mops,disk,"reads, writes",merged operations/s,Disk Merged Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk_ext.mops,disk,discards,merged operations/s,Disk Merged Discard Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.iotime,disk,"reads, writes",milliseconds/s,Disk Total I/O Time,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk_ext.iotime,disk,"discards, flushes",milliseconds/s,Disk Total I/O Time for Extended Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.await,disk,"reads, writes",milliseconds/operation,Average Completed I/O Operation Time,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk_ext.await,disk,"discards, flushes",milliseconds/operation,Average Completed Extended I/O Operation Time,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.avgsz,disk,"reads, writes",KiB/operation,Average Completed I/O Operation Bandwidth,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk_ext.avgsz,disk,discards,KiB/operation,Average Amount of Discarded Data,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.svctm,disk,svctm,milliseconds/operation,Average Service Time,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.bcache_cache_alloc,disk,"ununsed, dirty, clean, metadata, undefined",percentage,BCache Cache Allocations,stacked,,prog.plugin,/proc/diskstats
-disk.bcache_hit_ratio,disk,"5min, 1hour, 1day, ever",percentage,BCache Cache Hit Ratio,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.bcache_rates,disk,"congested, writeback",KiB/s,BCache Rates,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.bcache_size,disk,dirty,MiB,BCache Cache Sizes,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.bcache_usage,disk,avail,percentage,BCache Cache Usage,area,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.bcache_cache_read_races,disk,"races, errors",operations/s,BCache Cache Read Races,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.bcache,disk,"hits, misses, collisions, readaheads",operations/s,BCache Cache I/O Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
-disk.bcache_bypass,disk,"hits, misses",operations/s,BCache Cache Bypass I/O Operations,line,"device, mount_point, device_type",prog.plugin,/proc/diskstats
+mem.oom_kill,,kills,kills/s,Out of Memory Kills,line,,proc.plugin,/proc/vmstat
+mem.numa,,"local, foreign, interleave, other, pte_updates, huge_pte_updates, hint_faults, hint_faults_local, pages_migrated",events/s,NUMA events,line,,proc.plugin,/proc/vmstat
+mem.ecc_ce,,a dimension per mem controller,errors,ECC Memory Correctable Errors,line,,proc.plugin,/sys/devices/system/edac/mc
+mem.ecc_ue,,a dimension per mem controller,errors,ECC Memory Uncorrectable Errors,line,,proc.plugin,/sys/devices/system/edac/mc
+mem.numa_nodes,numa node,"hit, miss, local, foreign, interleave, other",events/s,NUMA events,line,numa_node,proc.plugin,/sys/devices/system/node
+mem.ksm,,"shared, unshared, sharing, volatile",MiB,Kernel Same Page Merging,stacked,,proc.plugin,/sys/kernel/mm/ksm
+mem.ksm_savings,,"savings, offered",MiB,Kernel Same Page Merging Savings,area,,proc.plugin,/sys/kernel/mm/ksm
+mem.ksm_ratios,,savings,percentage,Kernel Same Page Merging Effectiveness,line,,proc.plugin,/sys/kernel/mm/ksm
+mem.zram_usage,zram device,"compressed, metadata",MiB,ZRAM Memory Usage,area,device,proc.plugin,/sys/block/zram
+mem.zram_savings,zram device,"savings, original",MiB,ZRAM Memory Savings,area,device,proc.plugin,/sys/block/zram
+mem.zram_ratio,zram device,ratio,ratio,ZRAM Compression Ratio (original to compressed),line,device,proc.plugin,/sys/block/zram
+mem.zram_efficiency,zram device,percent,percentage,ZRAM Efficiency,line,device,proc.plugin,/sys/block/zram
+system.ipc_semaphores,,semaphores,semaphores,IPC Semaphores,area,,proc.plugin,ipc
+system.ipc_semaphore_arrays,,arrays,arrays,IPC Semaphore Arrays,area,,proc.plugin,ipc
+system.message_queue_message,,a dimension per queue,messages,IPC Message Queue Number of Messages,stacked,,proc.plugin,ipc
+system.message_queue_bytes,,a dimension per queue,bytes,IPC Message Queue Used Bytes,stacked,,proc.plugin,ipc
+system.shared_memory_segments,,segments,segments,IPC Shared Memory Number of Segments,stacked,,proc.plugin,ipc
+system.shared_memory_bytes,,bytes,bytes,IPC Shared Memory Used Bytes,stacked,,proc.plugin,ipc
+system.io,,"in, out",KiB/s,Disk I/O,area,,proc.plugin,/proc/diskstats
+disk.io,disk,"reads, writes",KiB/s,Disk I/O Bandwidth,area,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk_ext.io,disk,discards,KiB/s,Amount of Discarded Data,area,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.ops,disk,"reads, writes",operations/s,Disk Completed I/O Operations,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk_ext.ops,disk,"discards, flushes",operations/s,Disk Completed Extended I/O Operations,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.qops,disk,operations,operations,Disk Current I/O Operations,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.backlog,disk,backlog,milliseconds,Disk Backlog,area,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.busy,disk,busy,milliseconds,Disk Busy Time,area,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.util,disk,utilization,% of time working,Disk Utilization Time,area,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.mops,disk,"reads, writes",merged operations/s,Disk Merged Operations,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk_ext.mops,disk,discards,merged operations/s,Disk Merged Discard Operations,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.iotime,disk,"reads, writes",milliseconds/s,Disk Total I/O Time,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk_ext.iotime,disk,"discards, flushes",milliseconds/s,Disk Total I/O Time for Extended Operations,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.await,disk,"reads, writes",milliseconds/operation,Average Completed I/O Operation Time,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk_ext.await,disk,"discards, flushes",milliseconds/operation,Average Completed Extended I/O Operation Time,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.avgsz,disk,"reads, writes",KiB/operation,Average Completed I/O Operation Bandwidth,area,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk_ext.avgsz,disk,discards,KiB/operation,Average Amount of Discarded Data,area,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.svctm,disk,svctm,milliseconds/operation,Average Service Time,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.bcache_cache_alloc,disk,"ununsed, dirty, clean, metadata, undefined",percentage,BCache Cache Allocations,stacked,,proc.plugin,/proc/diskstats
+disk.bcache_hit_ratio,disk,"5min, 1hour, 1day, ever",percentage,BCache Cache Hit Ratio,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.bcache_rates,disk,"congested, writeback",KiB/s,BCache Rates,area,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.bcache_size,disk,dirty,MiB,BCache Cache Sizes,area,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.bcache_usage,disk,avail,percentage,BCache Cache Usage,area,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.bcache_cache_read_races,disk,"races, errors",operations/s,BCache Cache Read Races,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.bcache,disk,"hits, misses, collisions, readaheads",operations/s,BCache Cache I/O Operations,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.bcache_bypass,disk,"hits, misses",operations/s,BCache Cache Bypass I/O Operations,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
 md.health,,a dimension per md array,failed disks,Faulty Devices In MD,line,,proc.plugin,/proc/mdstat
 md.disks,md array,"inuse, down",disks,Disks Stats,stacked,"device, raid_level",proc.plugin,/proc/mdstat
 md.mismatch_cnt,md array,count,unsynchronized blocks,Mismatch Count,line,"device, raid_level",proc.plugin,/proc/mdstat
