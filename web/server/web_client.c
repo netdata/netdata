@@ -2027,7 +2027,6 @@ int web_client_socket_is_now_used_for_streaming(struct web_client *w) {
 
 void web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string) {
     char buffer[NETDATA_WEB_REQUEST_URL_SIZE + 2];
-    buffer[0] = '?';
     buffer[0] = '\0';
 
     buffer_flush(w->url_path_decoded);
