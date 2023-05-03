@@ -3575,6 +3575,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
         send_END();
     }
 
+#ifndef __FreeBSD__
     send_BEGIN(type, "voluntary_ctxt_switches", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed && w->processes))
@@ -3588,6 +3589,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
             send_SET(w->name, w->status_nonvoluntary_ctxt_switches);
     }
     send_END();
+#endif
 
     send_BEGIN(type, "threads", dt);
     for (w = root; w ; w = w->next) {
@@ -3871,6 +3873,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         APPS_PLUGIN_FUNCTIONS();
     }
 
+#ifndef __FreeBSD__
     fprintf(stdout, "CHART %s.voluntary_ctxt_switches '' '%s Voluntary Context Switches' 'switches/s' cpu %s.voluntary_ctxt_switches stacked 20023 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
@@ -3884,6 +3887,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
     }
     APPS_PLUGIN_FUNCTIONS();
+#endif
 
 #ifndef __FreeBSD__
     fprintf(stdout, "CHART %s.swap '' '%s Swap Memory' 'MiB' swap %s.swap stacked 20011 %d\n", type, title, type, update_every);
