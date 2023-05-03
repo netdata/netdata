@@ -3583,7 +3583,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     }
     send_END();
 
-    send_BEGIN(type, "nonvoluntary_ctxt_switches", dt);
+    send_BEGIN(type, "involuntary_ctxt_switches", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed && w->processes))
             send_SET(w->name, w->status_nonvoluntary_ctxt_switches);
@@ -3881,7 +3881,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     }
     APPS_PLUGIN_FUNCTIONS();
 
-    fprintf(stdout, "CHART %s.nonvoluntary_ctxt_switches '' '%s Non-voluntary Context Switches' 'switches/s' cpu %s.nonvoluntary_ctxt_switches stacked 20024 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.involuntary_ctxt_switches '' '%s Involuntary Context Switches' 'switches/s' cpu %s.involuntary_ctxt_switches stacked 20024 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
@@ -4684,7 +4684,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
 
         // CPU context switches
         add_table_field(wb, "vCtxSwitch", "Voluntary Context Switches", false, "bar-with-integer", "bar", "number", 2, "switches/s", VoluntaryCtxtSwitches_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "nCtxSwitch", "Non-Voluntary Context Switches", false, "bar-with-integer", "bar", "number", 2, "switches/s", NonVoluntaryCtxtSwitches_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "iCtxSwitch", "Involuntary Context Switches", false, "bar-with-integer", "bar", "number", 2, "switches/s", NonVoluntaryCtxtSwitches_max, "descending", true, false, false, NULL, "sum", true);
 
         // memory
         if(MemTotal)
@@ -4767,7 +4767,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
             buffer_json_member_add_array(wb, "columns");
             {
                 buffer_json_add_array_item_string(wb, "vCtxSwitch");
-                buffer_json_add_array_item_string(wb, "nCtxSwitch");
+                buffer_json_add_array_item_string(wb, "iCtxSwitch");
             }
             buffer_json_array_close(wb);
         }
