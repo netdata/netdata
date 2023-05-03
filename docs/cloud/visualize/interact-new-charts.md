@@ -81,12 +81,12 @@ You can rapidly access condensed information for collected metrics, grouped by n
 
 At the Definition bar of each chart, there are a few drop-down menus. These drop-down menus have 2 functions:
 
-1. Provide additional information about the visualized chart, to help us understand the data we see.
-2. Provide filtering and grouping capabilities, altering the query on the fly, to help us get different views of the dataset.
+1. Provide additional information about the visualized chart, to help with understanding the data that is presented.
+2. Provide filtering and grouping capabilities, altering the query on the fly, to help get different views of the dataset.
 
-The NIDL framework attaches metadata to every metric we collect to provide for each of them the following consolidated data for the visible time frame:
+The NIDL framework attaches metadata to every metric that is collected to provide for each of them the following consolidated data for the visible time frame:
 
-1. The volume contribution of each metric into the final query. So even if a query comes from 1000 nodes, we can instantly see the contribution of each node in the result. The same goes for instances, dimensions and labels. Especially for labels, Netdata also provides the volume contribution of each label `key:value` pair to the final query, so that we can immediately see for all label values involved in the query how much they affected the chart.
+1. The volume contribution of each metric into the final query. So even if a query comes from 1000 nodes, the contribution of each node in the result can instantly be visualized. The same goes for instances, dimensions and labels. Especially for labels, Netdata also provides the volume contribution of each label `key:value` pair to the final query, so that you can immediately see how much every label value involved in the query affected the chart.
 2. The anomaly rate of each of them for the time-frame of the query. This is used to quickly spot which of the nodes, instances, dimensions or labels have anomalies in the requested time-frame.
 3. The minimum, average and maximum values of all the points used for the query. This is used to quickly spot which of the nodes, instances, dimensions or labels are responsible for a spike or a dive in the chart.
 
@@ -232,7 +232,7 @@ When hovering the anomaly ribbon, the overlay sorts all dimensions by anomaly ra
 Additionally, when hovering over the chart, the overlay may display an indication in the "Annotations" column.
 
 Currently, annotations are used to inform users of any data collection issues that might affect the chart.
-Below each chart, we added an information ribbon. This ribbon currently shows 3 states related to the points presented in the chart:
+Below each chart, there is an information ribbon. This ribbon currently shows 3 states related to the points presented in the chart:
 
 1. **[P]: Partial Data**
    At least one of the dimensions in the chart has partial data, meaning that not all instances available contributed data to this point. This can happen when a container is stopped, or when a node is restarted. This indicator helps to gain confidence of the dataset, in situations when unusual spikes or dives appear due to infrastructure maintenance, or due to failures to part of the infrastructure.
@@ -326,7 +326,7 @@ Selecting timeframes is useful when you see an interesting spike or change in a 
 
 ### Select and zoom
 
-The actions above are _normal_ vertical zoom actions. We also provide an horizontal zoom action that helps you focus on
+The actions above are _normal_ vertical zoom actions. There is also a horizontal zoom action that helps you focus on
 a specific Y-axis area to further investigate a spike or dive on your charts.
 
 | Interaction                                | Keyboard/mouse                       | Touchpad/touchscreen                                 |
@@ -351,7 +351,7 @@ memory usage.
 
 ### Order dimensions legend
 
-The bottom legend of the chart where you can see the dimensions of the chart can now be ordered by:
+The bottom legend of the chart where you can see the dimensions of the chart can be ordered by:
 
 - Dimension name (Ascending or Descending)
 - Dimension value (Ascending or Descending)
