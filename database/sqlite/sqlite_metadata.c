@@ -38,6 +38,7 @@ const char *database_cleanup[] = {
     "DELETE FROM host_info WHERE host_id NOT IN (SELECT host_id FROM host);",
     "DROP TABLE IF EXISTS alert_hash;",
     "DROP TRIGGER IF EXISTS tr_dim_del;",
+    "DROP TRIGGER IF EXISTS ins_host;",
     "DROP INDEX IF EXISTS ind_d1;",
     "DROP INDEX IF EXISTS ind_c1;",
     "DROP INDEX IF EXISTS ind_c2;",
