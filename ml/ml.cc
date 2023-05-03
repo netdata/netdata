@@ -1542,6 +1542,7 @@ void ml_init()
         if (rc != SQLITE_OK) {
             error_report("Failed to create models table (%s, %s)", sqlite3_errstr(rc), err ? err : "");
             sqlite3_close(db);
+            sqlite3_free(err);
             db = NULL;
         }
     }

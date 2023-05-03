@@ -95,7 +95,7 @@ static int registry_json_person_url_callback(void *entry, void *data) {
     buffer_json_add_array_item_array(w->response.data);
     buffer_json_add_array_item_string(w->response.data, pu->machine->guid);
     buffer_json_add_array_item_string(w->response.data, pu->url->url);
-    buffer_json_add_array_item_uint64(w->response.data, pu->last_t * 1000);
+    buffer_json_add_array_item_uint64(w->response.data, pu->last_t * (uint64_t) 1000);
     buffer_json_add_array_item_uint64(w->response.data, pu->usages);
     buffer_json_add_array_item_string(w->response.data, pu->machine_name);
     buffer_json_array_close(w->response.data);
@@ -115,7 +115,7 @@ static int registry_json_machine_url_callback(const DICTIONARY_ITEM *item __mayb
     buffer_json_add_array_item_array(w->response.data);
     buffer_json_add_array_item_string(w->response.data, m->guid);
     buffer_json_add_array_item_string(w->response.data, mu->url->url);
-    buffer_json_add_array_item_uint64(w->response.data, mu->last_t * 1000);
+    buffer_json_add_array_item_uint64(w->response.data, mu->last_t * (uint64_t) 1000);
     buffer_json_add_array_item_uint64(w->response.data, mu->usages);
     buffer_json_array_close(w->response.data);
 
