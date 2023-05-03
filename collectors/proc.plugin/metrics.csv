@@ -56,6 +56,16 @@ mem.kernel,,"Slab, KernelStack, PageTables, VmallocUsed, Percpu",MiB,Memory Used
 mem.slab,,"reclaimable, unreclaimable",MiB,Reclaimable Kernel Memory,stacked,,proc.plugin,/proc/meminfo
 mem.hugepage,,"free, used, surplus, reserved",MiB,Dedicated HugePages Memory,stacked,,proc.plugin,/proc/meminfo
 mem.transparent_hugepages,,"anonymous, shmem",MiB,Transparent HugePages Memory,stacked,,proc.plugin,/proc/meminfo
+mem.balloon,,"inflate, deflate, migrate",KiB/s,Memory Ballooning Operations,line,,proc.plugin,/proc/vmstat
+mem.zswapio,,"in, out",KiB/s,ZSwap I/O,area,,proc.plugin,/proc/vmstat
+mem.ksm_cow,,"swapin, write",KiB/s,KSM Copy On Write Operations,line,,proc.plugin,/proc/vmstat
+mem.thp_faults,,"alloc, fallback, fallback_charge",events/s,Transparent Huge Page Fault Allocations,line,,proc.plugin,/proc/vmstat
+mem.thp_file,,"alloc, fallback, mapped, fallback_charge",events/s,Transparent Huge Page File Allocations,line,,proc.plugin,/proc/vmstat
+mem.thp_zero,,"alloc, failed",events/s,Transparent Huge Zero Page Allocations,line,,proc.plugin,/proc/vmstat
+mem.thp_collapse,,"alloc, failed",events/s,Transparent Huge Pages Collapsed by khugepaged,line,,proc.plugin,/proc/vmstat
+mem.thp_split,,"split, failed, split_pmd, split_deferred",events/s,Transparent Huge Page Splits,line,,proc.plugin,/proc/vmstat
+mem.thp_swapout,,"swapout, fallback",events/s,Transparent Huge Pages Swap Out,line,,proc.plugin,/proc/vmstat
+mem.thp_compact,,"success, fail, stall",events/s,Transparent Huge Pages Compaction,line,,proc.plugin,/proc/vmstat
 mem.pagetype_global,,a dimension per pagesize,B,System orders available,stacked,,proc.plugin,/proc/pagetypeinfo
 mem.pagetype,"node, zone, type",a dimension per pagesize,B,"pagetype_Node{node}_{zone}_{type}",stacked,"node_id, node_zone, node_type",proc.plugin,/proc/pagetypeinfo
 mem.ecc_ce,,a dimension per mem controller,errors,ECC Memory Correctable Errors,line,,proc.plugin,/sys/devices/system/edac/mc
