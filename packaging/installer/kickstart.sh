@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F0512
+# Next unused error code: F0515
 
 # ======================================================================
 # Constants
@@ -1137,8 +1137,14 @@ claim() {
     NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/netdata/usr/sbin/netdata-claim.sh"
   fi
 
-  if [ ! -x "${NETDATA_CLAIM_PATH}" ]; then
+  if [ -z "${NETDATA_CLAIM_PATH}" ]; then
     fatal "Unable to find usable claiming script. Reinstalling Netdata may resolve this." F050B
+  elif [ ! -e "${NETDATA_CLAIM_PATH}" ]; then
+    fatal "${NETDATA_CLAIM_PATH} does not exist." F0512
+  elif [ ! -f "${NETDATA_CLAIM_PATH}" ]; then
+    fatal "${NETDATA_CLAIM_PATH} is not a file." F0513
+  elif [ ! -x "${NETDATA_CLAIM_PATH}" ]; then
+    fatal "Claiming script at ${NETDATA_CLAIM_PATH} is not executable. Reinstalling Netdata may resolve this." F0514
   fi
 
   if ! is_netdata_running; then
