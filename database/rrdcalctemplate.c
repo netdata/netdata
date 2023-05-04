@@ -53,6 +53,13 @@ bool rrdcalctemplate_check_rrdset_conditions(RRDCALCTEMPLATE *rt, RRDSET *st, RR
                                                                                             '=', NULL))
         return false;
 
+    if (rt->options & RRDR_OPTION_LOCALHOST_ANOMALY_RATE && !strncmp(string2str(rt->context), "anomaly_detection.anomaly_rate", 30)) {
+        char name_buf[1024 + 1];
+        snprintfz(name_buf, 1024, "anomaly_detection.anomaly_rate_on_%s", rrdhost_hostname(localhost));
+        if (strncmp(string2str(st->name), name_buf, 1024))
+            return false;
+    }
+
     return true;
 }
 

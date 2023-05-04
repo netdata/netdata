@@ -34,9 +34,10 @@ typedef enum {
     // This list uses several other options from RRDR_OPTIONS for db lookups.
     // To add an item here, you need to reserve a bit in RRDR_OPTIONS.
     RRDCALC_OPTION_NO_CLEAR_NOTIFICATION    = RRDR_OPTION_HEALTH_RSRVD1,
+    RRDCALC_OPTION_SET_GLOBAL               = RRDR_OPTION_HEALTH_RSRVD2,
 } RRDCALC_OPTIONS;
 
-#define RRDCALC_ALL_OPTIONS_EXCLUDING_THE_RRDR_ONES (RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)
+#define RRDCALC_ALL_OPTIONS_EXCLUDING_THE_RRDR_ONES (RRDCALC_OPTION_NO_CLEAR_NOTIFICATION & RRDCALC_OPTION_SET_GLOBAL)
 
 struct rrdcalc {
     STRING *key;                    // the unique key in the host's rrdcalc_root_index

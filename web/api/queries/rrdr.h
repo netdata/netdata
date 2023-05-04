@@ -47,8 +47,10 @@ typedef enum rrdr_options {
     RRDR_OPTION_GROUP_BY_LABELS = (1 << 26), // v2 returns flattened labels per dimension of the chart
 
     // internal ones - not to be exposed to the API
-    RRDR_OPTION_HEALTH_RSRVD1        = (1 << 30), // reserved for RRDCALC_OPTION_NO_CLEAR_NOTIFICATION
-    RRDR_OPTION_INTERNAL_AR          = (1 << 31), // internal use only, to let the formatters know we want to render the anomaly rate
+    RRDR_OPTION_LOCALHOST_ANOMALY_RATE = (1 << 28), // anomaly rate produced by localhost
+    RRDR_OPTION_HEALTH_RSRVD2          = (1 << 29), // reserved for RRDCALC_OPTION_SET_GLOBAL
+    RRDR_OPTION_HEALTH_RSRVD1          = (1 << 30), // reserved for RRDCALC_OPTION_NO_CLEAR_NOTIFICATION
+    RRDR_OPTION_INTERNAL_AR            = (1 << 31), // internal use only, to let the formatters know we want to render the anomaly rate
 } RRDR_OPTIONS;
 
 typedef enum context_v2_options {
