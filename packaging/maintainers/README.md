@@ -49,7 +49,7 @@ This page tracks the package maintainers for Netdata, for various operating syst
 | Embedded Linux | Netdata Version | Maintainer | Related URL |
 | :-: | :-: | :-: | :-- |
 | ASUSTOR NAS | ? | William Lin | https://www.asustor.com/apps/app_detail?id=532 |
-| OpenWRT | Release | @nitroshift | [openwrt package](https://github.com/openwrt/packages/tree/master/admin/netdata) |
+| OpenWrt | Release | @nitroshift | [openwrt package](https://github.com/openwrt/packages/tree/master/admin/netdata) |
 | ReadyNAS | Release | @NAStools | https://github.com/nastools/netdata |
 | QNAP | Release | QNAP_Stephane | https://forum.qnap.com/viewtopic.php?t=121518 |
 | DietPi | Release | @Fourdee | https://github.com/Fourdee/DietPi |

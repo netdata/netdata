@@ -120,7 +120,7 @@ platforms, but may require some extra effort from users.
 | macOS        | 11         | No                       | Currently only works for Intel-based hardware. Requires Homebrew for dependencies.                        |
 | macOS        | 10.15      | No                       | Requires Homebrew for dependencies.                                                                       |
 | openSUSE     | Tumbleweed | No                       |                                                                                                           |
-| OpenWRT      | Latest     | No                       | See our [OpenWRT installation instructions.](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/openwrt.md) |
+| OpenWrt      | Latest     | No                       | See our [OpenWrt installation instructions.](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/openwrt.md) |
 
 ## Third-party supported platforms
 
