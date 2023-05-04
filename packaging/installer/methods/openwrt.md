@@ -17,11 +17,11 @@ learn_rel_path: "Installation/Install on specific environments"
 > PR](https://github.com/netdata/netdata/edit/master/packaging/installer/methods/openwrt.md) with your recommended
 > improvements or changes. Thank you!
 
-Since PRs [#14822](https://github.com/netdata/netdata/pull/14822) and [#14994](https://github.com/netdata/netdata/pull/14994), it is possible to install Netdata static builds on OpenWrt using [kickstart.sh](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md). However, some extra steps are required to ensure a successful Netdata install, with features such as log rotation and automatic updates working correctly.
+Since PRs [#14822](https://github.com/netdata/netdata/pull/14822) and [#14994](https://github.com/netdata/netdata/pull/14994), it is possible to install Netdata static builds on OpenWrt using our [one line kickstart.sh installer](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md). However, some extra steps are required to ensure a successful Netdata install, with features such as log rotation and automatic updates working correctly.
 
 A new installation of OpenWrt [may not offer enough space](https://forum.openwrt.org/t/howto-resizing-root-partition-on-x86/140631#the-root-cause-1) for the Netdata static builds to be decompressed and for the installation to be completed successfully. In that case, the root partition and the root filesystem may need to be expanded. A comprehensive guide on how to accomplish that on x86 can be found [here](https://forum.openwrt.org/t/howto-resizing-root-partition-on-x86/140631#the-root-cause-1).
 
-As of Netdata version `v1.39.0`, at least 300MB of space are required for the root filesystem, if `dbengine` is disabled. If `dbengine` is used to store metrics locally, a larger root partition is required.
+As of Netdata version `v1.39.0`, at least 250MB of free space[^1] is required for static builds to be installed successfully, if Netdata is to be used with [dbengine disabled](https://learn.netdata.cloud/docs/deployment-in-production/streaming-and-replication/database-modes-for-parent-child-setups#which-database-mode-to-use). If `dbengine` is used to store metrics locally, a larger root partition is required.
 
 Once there is enough space for the installation, proceed with installing `bash`: 
 ```sh
@@ -58,3 +58,6 @@ crontab -e
 
 # Restart the cron service
 /etc/init.d/cron restart
+```
+
+[^1]: For space-constrained devices, [a stripped-down version of Netdata](https://openwrt.org/packages/pkgdata/netdata) is offered and maintained by the OpenWrt community.
