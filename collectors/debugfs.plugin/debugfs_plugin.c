@@ -4,6 +4,9 @@
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
+static char *user_config_dir = CONFIG_DIR;
+static char *stock_config_dir = LIBCONFIG_DIR;
+
 int main(int argc, char **argv)
 {
     // debug_flags = D_PROCFILE;
