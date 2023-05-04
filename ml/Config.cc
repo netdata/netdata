@@ -47,7 +47,7 @@ void ml_config_load(ml_config_t *cfg) {
     size_t flush_models_batch_size = config_get_number(config_section_ml, "flush models batch size", 128);
 
     size_t suppression_window = config_get_number(config_section_ml, "dimension anomaly rate suppression window", 1800);
-    size_t suppression_threshold = config_get_number(config_section_ml, "dimension anomaly rate suppression threshold", 1800 / 2);
+    size_t suppression_threshold = config_get_number(config_section_ml, "dimension anomaly rate suppression threshold", suppression_window / 2);
 
     bool enable_statistics_charts = config_get_boolean(config_section_ml, "enable statistics charts", true);
 
