@@ -325,6 +325,9 @@ typedef struct {
     std::vector<ml_training_thread_t> training_threads;
     std::atomic<bool> training_stop;
 
+    size_t suppression_window;
+    size_t suppression_threshold;
+
     bool enable_statistics_charts;
 } ml_config_t;
 
