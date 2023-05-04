@@ -42,7 +42,7 @@ With a quick glance you have immediate information available at your disposal:
 
 When you start interacting with a chart, you'll notice valuable information on the top bar:
 
-<img src="https://user-images.githubusercontent.com/70198089/236133832-fad45e65-5bd6-4fd1-8d68-33acf69fff5c.png" width="900">
+<img src="https://user-images.githubusercontent.com/70198089/236133832-fad45e65-5bd6-4fd1-8d68-33acf69fff5c.png" width="900"/>
 
 The elements that you can find on this top bar are:
 
@@ -63,7 +63,7 @@ Along with viewing chart type, context and units, on this bar you have access to
 
 Each composite chart has a definition bar to provide information and options about the following:
 
-<img src="https://user-images.githubusercontent.com/70198089/236134615-e53a1d68-8a0f-466b-b2ef-1974085f0e8d.png" width="900">
+<img src="https://user-images.githubusercontent.com/70198089/236134615-e53a1d68-8a0f-466b-b2ef-1974085f0e8d.png" width="900"/>
 
 - Group by option
 - Aggregate function to be applied in case multiple data sources exist
@@ -91,7 +91,7 @@ You can rapidly access condensed information for collected metrics, grouped by n
 
 At the Definition bar of each chart, there are a few dropdown menus:
 
-<img src="https://user-images.githubusercontent.com/43294513/235470150-62a3b9ac-51ca-4c0d-81de-8804e3d733eb.png" width="900">
+<img src="https://user-images.githubusercontent.com/43294513/235470150-62a3b9ac-51ca-4c0d-81de-8804e3d733eb.png" width="900"/>
 
 These dropdown menus have 2 functions:
 
@@ -179,14 +179,14 @@ This menu also presents the contribution of each original dimensions on the char
 In this dropdown, you can view or filter the contributing time-series labels of the chart.  
 This menu also presents the contribution of each label on the chart,and a break down of the anomaly rate of the data per label.
 
-<img src="https://user-images.githubusercontent.com/70198089/236139027-8a51a958-2074-4675-a41b-efff30d8f51a.png" width="900">
+<img src="https://user-images.githubusercontent.com/70198089/236139027-8a51a958-2074-4675-a41b-efff30d8f51a.png" width="900"/>
 
 ### Aggregate functions over time
 
 When the granularity of the data collected is higher than the plotted points on the chart an aggregation function over
 time is applied.
 
-<img src="https://user-images.githubusercontent.com/70198089/236139263-da5579df-8e4d-4ab8-8b36-298ee779ee83.png" width="400">
+<img src="https://user-images.githubusercontent.com/70198089/236139263-da5579df-8e4d-4ab8-8b36-298ee779ee83.png" width="400"/>
 
 By default the aggregation applied is _average_ but the user can choose different options from the following:
 
@@ -222,7 +222,7 @@ It then uses these unique models during data collection to predict the value tha
 
 If the value collected is an outlier, it is marked as anomalous.
 
-<img src="https://user-images.githubusercontent.com/70198089/236139886-79d63cf6-61ed-4aa7-842c-b5a1728c870d.png" width=900/>
+<img src="https://user-images.githubusercontent.com/70198089/236139886-79d63cf6-61ed-4aa7-842c-b5a1728c870d.png" width="900"/>
 
 This unmatched capability of real-time predictions as data is collected allows you to **detect anomalies for potentially millions of metrics across your entire infrastructure within a second of occurrence**.
 
