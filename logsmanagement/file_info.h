@@ -151,7 +151,6 @@ extern int g_logs_manag_update_every;               /**< Variable defining globa
 
 typedef struct {
     int update_every;
-    int circ_buff_spare_items;
     int circ_buff_max_size_in_mib;
     int circ_buff_drop_logs;
     int compression_acceleration;

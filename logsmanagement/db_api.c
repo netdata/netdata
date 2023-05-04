@@ -16,7 +16,7 @@
 
 #define MAIN_DB "main.db" /**< Primary DB with metadata for all the logs managemt collections **/
 #define MAIN_COLLECTIONS_TABLE "LogCollections" /*< Table name where logs collections metadata is stored in MAIN_DB **/
-#define BLOB_STORE_FILENAME "logs.bin" /*< Filename of BLOBs where logs are stored in **/
+#define BLOB_STORE_FILENAME "logs.bin." /*< Filename of BLOBs where logs are stored in **/
 #define METADATA_DB_FILENAME "metadata.db" /**< Metadata DB for each log collection **/
 #define LOGS_TABLE "Logs" /*< Table name where logs metadata is stored in METADATA_DB_FILENAME **/
 #define BLOBS_TABLE "Blobs" /*< Table name where BLOBs metadata is stored in METADATA_DB_FILENAME **/
@@ -137,7 +137,10 @@ static void db_writer_db_mode_none(void *arg){
     Circ_buff_item_t *item;
     
     while(1){
+        uv_rwlock_rdlock(&p_file_info->circ_buff->buff_realloc_rwlock);
         do{ item = circ_buff_read_item(p_file_info->circ_buff);} while(item);
+        circ_buff_read_done(p_file_info->circ_buff);
+        uv_rwlock_rdunlock(&p_file_info->circ_buff->buff_realloc_rwlock);
         sleep_usec(p_file_info->buff_flush_to_db_interval * USEC_PER_SEC);
     }
 }
@@ -176,14 +179,6 @@ static void db_writer_db_mode_full(void *arg){
                             -1, &stmt_blobs_update, NULL);
     if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
     
-    /* Prepare BLOBS_TABLE Filename rotate statement */
-    sqlite3_stmt *stmt_rotate_blobs;
-    rc = sqlite3_prepare_v2(p_file_info->db,
-                            "UPDATE " BLOBS_TABLE
-                            " SET Filename = REPLACE(Filename, ?, ?);",
-                            -1, &stmt_rotate_blobs, NULL);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
-    
     /* Prepare BLOBS_TABLE UPDATE SET zero filesize statement */
     sqlite3_stmt *stmt_blobs_set_zero_filesize;
     rc = sqlite3_prepare_v2(p_file_info->db,
@@ -217,6 +212,7 @@ static void db_writer_db_mode_full(void *arg){
     if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
         
     while(1){
+        uv_rwlock_rdlock(&p_file_info->circ_buff->buff_realloc_rwlock);
         uv_mutex_lock(p_file_info->db_mut);
         rc = sqlite3_exec(p_file_info->db, "BEGIN TRANSACTION;", NULL, NULL, NULL);
         if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
@@ -277,54 +273,43 @@ static void db_writer_db_mode_full(void *arg){
         // TODO: Should we log it if there is a fatal error in the above line, as there will be a mismatch between BLOBs and SQLite metadata?
         //sqlite3_wal_checkpoint_v2(p_file_info->db,NULL,SQLITE_CHECKPOINT_PASSIVE,0,0);
         
+        circ_buff_read_done(p_file_info->circ_buff);
+
         /* If the filesize of the current write-to BLOB is > p_file_info->blob_max_size, rotate BLOBs */
         if(blob_filesize > p_file_info->blob_max_size){
             uv_fs_t rename_req;
             char old_path[FILENAME_MAX + 1], new_path[FILENAME_MAX + 1];
 
-            /* 1. Rotate BLOBS_TABLE Filenames and path of actual BLOBs. 
-             * Performed in 2 steps: 
-             * (a) First increase all of their endings numbers by 1 and 
-             * (b) then replace the maximum number with 0. */
-            rc = sqlite3_exec(p_file_info->db, "BEGIN TRANSACTION;", NULL, NULL, NULL);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
-            for(int i = BLOB_MAX_FILES - 1; i >= 0; i--){
+            /* 1. Rotate path of actual BLOBs and BLOBS_TABLE Filenames. */
+
+            /* Rotate path of BLOBs */
+            for(int i = BLOB_MAX_FILES - 1; i >= 0; i--){                
                 
-                /* Rotate BLOBS_TABLE Filenames */
-                rc = sqlite3_bind_int(stmt_rotate_blobs, 1, i);
-                if (rc != SQLITE_OK) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
-                rc = sqlite3_bind_int(stmt_rotate_blobs, 2, i + 1);
-                if (rc != SQLITE_OK) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
-                rc = sqlite3_step(stmt_rotate_blobs);
-                if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
-                rc = sqlite3_reset(stmt_rotate_blobs);
-                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
-                
-                /* Rotate path of BLOBs */
-                snprintfz(old_path, FILENAME_MAX, "%s" BLOB_STORE_FILENAME ".%d", p_file_info->db_dir, i);
-                snprintfz(new_path, FILENAME_MAX, "%s" BLOB_STORE_FILENAME ".%d", p_file_info->db_dir, i + 1);
+                snprintfz(old_path, FILENAME_MAX, "%s" BLOB_STORE_FILENAME "%d", p_file_info->db_dir, i);
+                snprintfz(new_path, FILENAME_MAX, "%s" BLOB_STORE_FILENAME "%d", p_file_info->db_dir, i + 1);
                 rc = uv_fs_rename(NULL, &rename_req, old_path, new_path, NULL);
                 if (unlikely(rc)) fatal_libuv_err(rc, __LINE__);
                 uv_fs_req_cleanup(&rename_req);
             }
-            /* Replace the maximum number with 0 in SQLite DB. */
-            rc = sqlite3_bind_int(stmt_rotate_blobs, 1, BLOB_MAX_FILES);
-            if (rc != SQLITE_OK) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
-            rc = sqlite3_bind_int(stmt_rotate_blobs, 2, 0);
-            if (rc != SQLITE_OK) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
-            rc = sqlite3_step(stmt_rotate_blobs);
-            if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
-            rc = sqlite3_reset(stmt_rotate_blobs);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
-            rc = sqlite3_exec(p_file_info->db, "END TRANSACTION;", NULL, NULL, NULL);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             
             /* Replace the maximum number with 0 in BLOB files. */
-            snprintfz(old_path, FILENAME_MAX, "%s" BLOB_STORE_FILENAME ".%d", p_file_info->db_dir, BLOB_MAX_FILES);
-            snprintfz(new_path, FILENAME_MAX, "%s" BLOB_STORE_FILENAME ".%d", p_file_info->db_dir, 0);
+            snprintfz(old_path, FILENAME_MAX, "%s" BLOB_STORE_FILENAME "%d", p_file_info->db_dir, BLOB_MAX_FILES);
+            snprintfz(new_path, FILENAME_MAX, "%s" BLOB_STORE_FILENAME "%d", p_file_info->db_dir, 0);
             rc = uv_fs_rename(NULL, &rename_req, old_path, new_path, NULL);
             if (unlikely(rc)) fatal_libuv_err(rc, __LINE__);
             uv_fs_req_cleanup(&rename_req);
+
+            /* Rotate BLOBS_TABLE Filenames */
+            rc = sqlite3_exec(p_file_info->db,
+                        "UPDATE " BLOBS_TABLE
+                        " SET Filename = REPLACE( "
+                        "   Filename, " 
+                        "   substr(Filename, -1), "
+                        "   case when " 
+                        "     (cast(substr(Filename, -1) AS INTEGER) < (" LOGS_MANAG_STR(BLOB_MAX_FILES) " - 1)) then " 
+                        "     substr(Filename, -1) + 1 else 0 end);",
+                        NULL, NULL, NULL);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             
             /* (a) Update blob_write_handle_offset, (b) truncate new write-to BLOB, 
              * (c) update filesize of truncated BLOB in SQLite DB, (d) delete
@@ -366,6 +351,7 @@ static void db_writer_db_mode_full(void *arg){
 
         // TODO: Can uv_mutex_unlock(p_file_info->db_mut) be moved before if(blob_filesize > p_file_info-> blob_max_size) ?
         uv_mutex_unlock(p_file_info->db_mut);
+        uv_rwlock_rdunlock(&p_file_info->circ_buff->buff_realloc_rwlock);
         sleep_usec(p_file_info->buff_flush_to_db_interval * USEC_PER_SEC);
     }
 }
@@ -624,8 +610,8 @@ int db_init() {
                                 -1, &stmt_init_BLOBS_table, NULL);
                 if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
                 for( int i = 0; i < BLOB_MAX_FILES; i++){
-                    char *filename = mallocz(snprintf(NULL, 0, BLOB_STORE_FILENAME ".%d", i) + 1);
-                    sprintf(filename, BLOB_STORE_FILENAME ".%d", i);
+                    char *filename = mallocz(snprintf(NULL, 0, BLOB_STORE_FILENAME "%d", i) + 1);
+                    sprintf(filename, BLOB_STORE_FILENAME "%d", i);
                     rc = sqlite3_bind_text(stmt_init_BLOBS_table, 1, filename, -1, NULL);
                     if (rc != SQLITE_OK) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
                     rc = sqlite3_bind_int64(stmt_init_BLOBS_table, 2, (sqlite3_int64) 0);
@@ -727,7 +713,7 @@ int db_init() {
 
                         // Delete BLOB file from filesystem
                         char blob_delete_path[FILENAME_MAX + 1];
-                        snprintfz(blob_delete_path, FILENAME_MAX, "%s" BLOB_STORE_FILENAME ".%d", p_file_info->db_dir, last_digits);
+                        snprintfz(blob_delete_path, FILENAME_MAX, "%s" BLOB_STORE_FILENAME "%d", p_file_info->db_dir, last_digits);
                         uv_fs_t unlink_req;
                         rc = uv_fs_unlink(NULL, &unlink_req, blob_delete_path, NULL);
                         if (unlikely(rc)) fatal("Delete %s error: %s\n", blob_delete_path, uv_strerror(rc));

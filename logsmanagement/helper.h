@@ -13,6 +13,9 @@
 #include <string.h>
 #include <sys/time.h>
 
+#define LOGS_MANAG_STR_HELPER(x) #x
+#define LOGS_MANAG_STR(x) LOGS_MANAG_STR_HELPER(x)
+
 #define MAX_LOGS_MANAG_LOG_MSG_LEN 256
 
 typedef enum { LOGS_MANAG_ERROR,

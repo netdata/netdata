@@ -3,21 +3,21 @@
 #include "plugin_logsmanagement.h"
 #include "../../database/rrdfunctions.h"
 #include "../../logsmanagement/query.h"
+#include "../../logsmanagement/helper.h"
 
 /* NETDATA_CHART_PRIO for Stats_chart_data */
 #define NETDATA_CHART_PRIO_CIRC_BUFF_MEM_TOT    NETDATA_CHART_PRIO_LOGS_STATS_BASE + 1
-#define NETDATA_CHART_PRIO_CIRC_BUFF_MEM_UNC    NETDATA_CHART_PRIO_LOGS_STATS_BASE + 2
-#define NETDATA_CHART_PRIO_CIRC_BUFF_MEM_COM    NETDATA_CHART_PRIO_LOGS_STATS_BASE + 3
-#define NETDATA_CHART_PRIO_COMPR_RATIO          NETDATA_CHART_PRIO_LOGS_STATS_BASE + 4
-#define NETDATA_CHART_PRIO_DISK_USAGE           NETDATA_CHART_PRIO_LOGS_STATS_BASE + 5
+#define NETDATA_CHART_PRIO_CIRC_BUFF_NUM_ITEMS  NETDATA_CHART_PRIO_LOGS_STATS_BASE + 2
+#define NETDATA_CHART_PRIO_CIRC_BUFF_MEM_UNC    NETDATA_CHART_PRIO_LOGS_STATS_BASE + 3
+#define NETDATA_CHART_PRIO_CIRC_BUFF_MEM_COM    NETDATA_CHART_PRIO_LOGS_STATS_BASE + 4
+#define NETDATA_CHART_PRIO_COMPR_RATIO          NETDATA_CHART_PRIO_LOGS_STATS_BASE + 5
+#define NETDATA_CHART_PRIO_DISK_USAGE           NETDATA_CHART_PRIO_LOGS_STATS_BASE + 6
 
 #define NETDATA_CHART_PRIO_LOGS_INCR            100  /**< PRIO increment step from one log source to another **/
 
 #define WORKER_JOB_COLLECT                      0
 #define WORKER_JOB_UPDATE                       1
 
-#define LOGS_MANAG_STR_HELPER(x) #x
-#define LOGS_MANAG_STR(x) LOGS_MANAG_STR_HELPER(x)
 #define FUNCTION_LOGSMANAGEMENT_HELP_SHORT      "Query of logs management engine running on this node"
 #define FUNCTION_LOGSMANAGEMENT_HELP_LONG       \
     "logsmanagement\n\n" \
@@ -74,6 +74,10 @@ struct Stats_chart_data{
     RRDSET *st_circ_buff_mem_total;
     RRDDIM **dim_circ_buff_mem_total_arr;
     collected_number *num_circ_buff_mem_total_arr;
+
+    RRDSET *st_circ_buff_num_of_items;
+    RRDDIM **dim_circ_buff_num_of_items_arr;
+    collected_number *num_circ_buff_num_of_items_arr;
 
     RRDSET *st_circ_buff_mem_uncompressed;
     RRDDIM **dim_circ_buff_mem_uncompressed_arr;
@@ -480,6 +484,24 @@ void *logsmanagement_plugin_main(void *ptr){
     stats_chart_data->dim_circ_buff_mem_total_arr = callocz(p_file_infos_arr->count, sizeof(RRDDIM));
     stats_chart_data->num_circ_buff_mem_total_arr = callocz(p_file_infos_arr->count, sizeof(collected_number));
 
+     /* Circular buffer number of items - initialise */
+    stats_chart_data->st_circ_buff_num_of_items = rrdset_create_localhost(
+            stats_chart_data->rrd_type
+            , "circular_buffers_num_of_items"
+            , NULL
+            , "logsmanagement.plugin"
+            , NULL
+            , "Circular buffers number of items"
+            , "items"
+            , "logsmanagement.plugin"
+            , NULL
+            , NETDATA_CHART_PRIO_CIRC_BUFF_NUM_ITEMS
+            , g_logs_manag_config.update_every
+            , RRDSET_TYPE_LINE
+    );
+    stats_chart_data->dim_circ_buff_num_of_items_arr = callocz(p_file_infos_arr->count, sizeof(RRDDIM));
+    stats_chart_data->num_circ_buff_num_of_items_arr = callocz(p_file_infos_arr->count, sizeof(collected_number));
+
     /* Circular buffer uncompressed buffered items memory stats - initialise */
     stats_chart_data->st_circ_buff_mem_uncompressed = rrdset_create_localhost(
             stats_chart_data->rrd_type
@@ -574,6 +596,11 @@ void *logsmanagement_plugin_main(void *ptr){
             rrddim_add( stats_chart_data->st_circ_buff_mem_compressed, 
                         p_file_info->chart_name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
+        /* Circular buffer number of items - add dimensions */
+        stats_chart_data->dim_circ_buff_num_of_items_arr[i] = 
+            rrddim_add( stats_chart_data->st_circ_buff_num_of_items, 
+                        p_file_info->chart_name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
         /* Compression stats - add dimensions */
         stats_chart_data->dim_compression_ratio[i] = 
             rrddim_add( stats_chart_data->st_compression_ratio, 
@@ -650,6 +677,9 @@ void *logsmanagement_plugin_main(void *ptr){
             /* Circular buffer total memory stats - collect (no need to be within p_file_info->parser_metrics_mut lock) */
             stats_chart_data->num_circ_buff_mem_total_arr[i] = __atomic_load_n(&p_file_info->circ_buff->total_cached_mem, __ATOMIC_RELAXED);
 
+            /* Circular buffer number of items - collect */
+            stats_chart_data->num_circ_buff_num_of_items_arr[i] = p_file_info->circ_buff->num_of_items;
+
             /* Circular buffer buffered uncompressed & compressed memory stats - collect */
             stats_chart_data->num_circ_buff_mem_uncompressed_arr[i] = __atomic_load_n(&p_file_info->circ_buff->text_size_total, __ATOMIC_RELAXED);
             stats_chart_data->num_circ_buff_mem_compressed_arr[i] = __atomic_load_n(&p_file_info->circ_buff->text_compressed_size_total, __ATOMIC_RELAXED);
@@ -683,6 +713,11 @@ void *logsmanagement_plugin_main(void *ptr){
             rrddim_set_by_pointer(stats_chart_data->st_circ_buff_mem_total, 
                                   stats_chart_data->dim_circ_buff_mem_total_arr[i], 
                                   stats_chart_data->num_circ_buff_mem_total_arr[i]);
+            
+            /* Circular buffer number of items - update chart */
+            rrddim_set_by_pointer(stats_chart_data->st_circ_buff_num_of_items, 
+                                  stats_chart_data->dim_circ_buff_num_of_items_arr[i], 
+                                  stats_chart_data->num_circ_buff_num_of_items_arr[i]);
             
             /* Circular buffer buffered compressed & uncompressed memory stats - update chart */
             rrddim_set_by_pointer(stats_chart_data->st_circ_buff_mem_uncompressed, 
@@ -720,6 +755,7 @@ void *logsmanagement_plugin_main(void *ptr){
 
         // outside for loop as dimensions updated across different loop iterations, unlike chart_data_arr metrics.
         rrdset_done(stats_chart_data->st_circ_buff_mem_total); 
+        rrdset_done(stats_chart_data->st_circ_buff_num_of_items); 
         rrdset_done(stats_chart_data->st_circ_buff_mem_uncompressed);
         rrdset_done(stats_chart_data->st_circ_buff_mem_compressed);
         rrdset_done(stats_chart_data->st_compression_ratio);

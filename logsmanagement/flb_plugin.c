@@ -306,6 +306,7 @@ void flb_tmp_buff_cpy_timer_cb(uv_timer_t *handle) {
      * and any custom charts */
     uv_mutex_lock(&p_file_info->notify_parser_thread_mut);
     p_file_info->log_batches_to_be_parsed++;
+    collector_error("log_batches_to_be_parsed: %d", p_file_info->log_batches_to_be_parsed);
     uv_cond_signal(&p_file_info->notify_parser_thread_cond);
     uv_mutex_unlock(&p_file_info->notify_parser_thread_mut);
 }

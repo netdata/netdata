@@ -151,8 +151,12 @@ LOGS_QUERY_RESULT_TYPE execute_logs_manag_query(logs_query_params_t *p_query_par
         int pfi_off = -1;
         while(p_file_infos[++pfi_off]){
             circ_buffs[pfi_off] = p_file_infos[pfi_off]->circ_buff;
+            uv_rwlock_rdlock(&circ_buffs[pfi_off]->buff_realloc_rwlock);
         }
         circ_buff_search(circ_buffs, p_query_params);
+        for(pfi_off = 0; p_file_infos[pfi_off]; pfi_off++){
+            uv_rwlock_rdunlock(&circ_buffs[pfi_off]->buff_realloc_rwlock);
+        }
     }
 
     for(int pfi_off = 0; p_file_infos[pfi_off]; pfi_off++){

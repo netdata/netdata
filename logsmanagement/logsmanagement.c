@@ -58,7 +58,6 @@ volatile sig_atomic_t p_file_infos_arr_ready = 0;
 
 g_logs_manag_config_t g_logs_manag_config = {
     .update_every = 1,
-    .circ_buff_spare_items = CIRCULAR_BUFF_SPARE_ITEMS_DEFAULT,
     .circ_buff_max_size_in_mib = CIRCULAR_BUFF_DEFAULT_MAX_SIZE / (1 MiB),
     .circ_buff_drop_logs = CIRCULAR_BUFF_DEFAULT_DROP_LOGS,
     .compression_acceleration = COMPRESSION_ACCELERATION_DEFAULT,
@@ -180,13 +179,6 @@ static int logs_manag_config_load(Flb_socket_config_t **forward_in_config_p){
     if(g_logs_manag_config.update_every < localhost->rrd_update_every) 
         g_logs_manag_config.update_every = localhost->rrd_update_every;
     collector_info("CONFIG: global logs management update_every: %d", g_logs_manag_config.update_every);
-
-
-    g_logs_manag_config.circ_buff_spare_items = (int)config_get_number( CONFIG_SECTION_LOGS_MANAGEMENT, 
-                                                                        "circular buffer spare items", 
-                                                                        g_logs_manag_config.circ_buff_spare_items);
-    collector_info("CONFIG: global logs management circ_buff_spare_items: %d", g_logs_manag_config.circ_buff_spare_items);
-
 
     g_logs_manag_config.circ_buff_max_size_in_mib = config_get_number(  CONFIG_SECTION_LOGS_MANAGEMENT, 
                                                                         "circular buffer max size MiB", 
@@ -965,8 +957,7 @@ static void logs_management_init(struct section *config_section){
     collector_info("[%s]: circular buffer drop logs if full = %s", p_file_info->chart_name, 
         circular_buffer_allow_dropped_logs ? "yes" : "no");
 
-    p_file_info->circ_buff = circ_buff_init(p_file_info->buff_flush_to_db_interval + 
-                                                g_logs_manag_config.circ_buff_spare_items,
+    p_file_info->circ_buff = circ_buff_init(p_file_info->buff_flush_to_db_interval,
                                             circular_buffer_max_size,
                                             circular_buffer_allow_dropped_logs);
 

@@ -34,14 +34,16 @@ typedef struct Circ_buff_item {
 } Circ_buff_item_t;
 
 typedef struct Circ_buff {
-    int num_of_items;
-    Circ_buff_item_t *items;
-    Circ_buff_item_t *in;
+    int num_of_items;                           /**< Number of preallocated items in the buffer **/
+    Circ_buff_item_t *items;                    /**< Array of all circular buffer items **/
+    Circ_buff_item_t *in;                       /**< Circular buffer item to write new data into **/
     int head;							        /**< Position of next item insertion **/
     int read;							        /**< Index between tail and head, used to read items out of Circ_buff **/
     int tail;							        /**< Last valid item in Circ_buff **/
     int parse;									/**< Points to next item in buffer to be parsed **/
     int full;							        /**< When head == tail, this indicates if buffer is full or empty **/
+    uv_rwlock_t buff_realloc_rwlock;            /**< RW lock to lock buffer operations when reallocating or expanding buffer **/
+    unsigned int buff_realloc_cnt;              /**< Counter of how any buffer reallocations have occurred **/
     size_t total_cached_mem;				    /**< Total memory allocated for Circ_buff (excluding *in) **/
     size_t total_cached_mem_max;				/**< Maximum allowable size for total_cached_mem **/
     int allow_dropped_logs;                     /**< Boolean to indicate whether logs are allowed to be dropped if buffer is full */
@@ -55,6 +57,7 @@ void circ_buff_search(Circ_buff_t *const buffs[], logs_query_params_t *const p_q
 size_t circ_buff_prepare_write(Circ_buff_t *const buff, size_t const requested_text_space);
 int circ_buff_insert(Circ_buff_t *const buff);
 Circ_buff_item_t *circ_buff_read_item(Circ_buff_t *const buff);
+void circ_buff_read_done(Circ_buff_t *const buff);
 Circ_buff_t *circ_buff_init(const int num_of_items, const size_t max_size, const int allow_dropped_logs);
 void circ_buff_destroy(Circ_buff_t *buff);
 
