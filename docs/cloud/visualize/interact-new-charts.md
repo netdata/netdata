@@ -11,8 +11,8 @@ These charts provide a lot of useful information, so that you can:
 - Explore visualization with more options such as _line_, _stacked_, _area_, _pie_, _gauges_ types and more
 - Examine all the metrics by hovering over them with your cursor
 - Filter the metrics in any way you want using the [Definition bar](#definition-bar)
-- Use intuitive tooling and shortcuts to pan, zoom or highlight your charts
-- On highlight, ease access
+- Use intuitive tooling and shortcuts to pan, zoom or highlight areas of interest in your charts
+- On highlight, get easy access
   to [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md) to
   see other metrics with similar patterns
 - Have the dimensions sorted based on name or value
@@ -127,6 +127,10 @@ Using this menu, you can slice and dice the data in any possible way, to quickly
 > You have the means to change the default group by or apply filtering to get a better view into what data your are trying to analyze.
 > For example, if you change the group by to _instance_ you get a view with the data of all the instances (cgroups) that contribute to that chart.
 > Then you can use further filtering tools to focus the data that is important to you and even save the result to your own dashboards.
+
+> ### Tip
+>
+> Group by instance, dimension to see the time series of every individual collected metric participating in the chart.
 
 ### Aggregate functions over data sources dropdown
 
