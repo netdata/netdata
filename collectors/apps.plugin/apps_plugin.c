@@ -251,6 +251,8 @@ struct target {
     kernel_uint_t status_rssfile;
     kernel_uint_t status_rssshmem;
     kernel_uint_t status_vmswap;
+    kernel_uint_t status_voluntary_ctxt_switches;
+    kernel_uint_t status_nonvoluntary_ctxt_switches;
 
     kernel_uint_t io_logical_bytes_read;
     kernel_uint_t io_logical_bytes_written;
@@ -381,12 +383,17 @@ struct pid_stat {
     uid_t uid;
     gid_t gid;
 
+    kernel_uint_t status_voluntary_ctxt_switches_raw;
+    kernel_uint_t status_nonvoluntary_ctxt_switches_raw;
+
     kernel_uint_t status_vmsize;
     kernel_uint_t status_vmrss;
     kernel_uint_t status_vmshared;
     kernel_uint_t status_rssfile;
     kernel_uint_t status_rssshmem;
     kernel_uint_t status_vmswap;
+    kernel_uint_t status_voluntary_ctxt_switches;
+    kernel_uint_t status_nonvoluntary_ctxt_switches;
 #ifndef __FreeBSD__
     ARL_BASE *status_arl;
 #endif
@@ -1263,6 +1270,26 @@ void arl_callback_status_rssshmem(const char *name, uint32_t hash, const char *v
     aptr->p->status_rssshmem = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
 }
 
+void arl_callback_status_voluntary_ctxt_switches(const char *name, uint32_t hash, const char *value, void *dst) {
+    (void)name; (void)hash; (void)value;
+    struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
+    if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 2)) return;
+
+    struct pid_stat *p = aptr->p;
+    pid_incremental_rate(
+        stat, p->status_voluntary_ctxt_switches, str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)));
+}
+
+void arl_callback_status_nonvoluntary_ctxt_switches(const char *name, uint32_t hash, const char *value, void *dst) {
+    (void)name; (void)hash; (void)value;
+    struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
+    if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 2)) return;
+
+    struct pid_stat *p = aptr->p;
+    pid_incremental_rate(
+        stat, p->status_nonvoluntary_ctxt_switches, str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)));
+}
+
 static void update_proc_state_count(char proc_state) {
     switch (proc_state) {
         case 'S':
@@ -1293,6 +1320,8 @@ static inline int read_proc_pid_status(struct pid_stat *p, void *ptr) {
     p->status_rssfile          = 0;
     p->status_rssshmem         = 0;
     p->status_vmswap           = 0;
+    p->status_voluntary_ctxt_switches = 0;
+    p->status_nonvoluntary_ctxt_switches = 0;
 
 #ifdef __FreeBSD__
     struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
@@ -1318,6 +1347,8 @@ static inline int read_proc_pid_status(struct pid_stat *p, void *ptr) {
         arl_expect_custom(p->status_arl, "RssFile", arl_callback_status_rssfile, &arl_ptr);
         arl_expect_custom(p->status_arl, "RssShmem", arl_callback_status_rssshmem, &arl_ptr);
         arl_expect_custom(p->status_arl, "VmSwap", arl_callback_status_vmswap, &arl_ptr);
+        arl_expect_custom(p->status_arl, "voluntary_ctxt_switches", arl_callback_status_voluntary_ctxt_switches, &arl_ptr);
+        arl_expect_custom(p->status_arl, "nonvoluntary_ctxt_switches", arl_callback_status_nonvoluntary_ctxt_switches, &arl_ptr);
     }
 
 
@@ -2905,6 +2936,8 @@ static size_t zero_all_targets(struct target *root) {
         w->status_rssfile = 0;
         w->status_rssshmem = 0;
         w->status_vmswap = 0;
+        w->status_voluntary_ctxt_switches = 0;
+        w->status_nonvoluntary_ctxt_switches = 0;
 
         w->io_logical_bytes_read = 0;
         w->io_logical_bytes_written = 0;
@@ -3095,6 +3128,8 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
     w->status_rssfile  += p->status_rssfile;
     w->status_rssshmem += p->status_rssshmem;
     w->status_vmswap   += p->status_vmswap;
+    w->status_voluntary_ctxt_switches += p->status_voluntary_ctxt_switches;
+    w->status_nonvoluntary_ctxt_switches += p->status_nonvoluntary_ctxt_switches;
 
     w->io_logical_bytes_read    += p->io_logical_bytes_read;
     w->io_logical_bytes_written += p->io_logical_bytes_written;
@@ -3540,6 +3575,22 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
         send_END();
     }
 
+#ifndef __FreeBSD__
+    send_BEGIN(type, "voluntary_ctxt_switches", dt);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed && w->processes))
+            send_SET(w->name, w->status_voluntary_ctxt_switches);
+    }
+    send_END();
+
+    send_BEGIN(type, "involuntary_ctxt_switches", dt);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed && w->processes))
+            send_SET(w->name, w->status_nonvoluntary_ctxt_switches);
+    }
+    send_END();
+#endif
+
     send_BEGIN(type, "threads", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
@@ -3821,6 +3872,22 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         }
         APPS_PLUGIN_FUNCTIONS();
     }
+
+#ifndef __FreeBSD__
+    fprintf(stdout, "CHART %s.voluntary_ctxt_switches '' '%s Voluntary Context Switches' 'switches/s' cpu %s.voluntary_ctxt_switches stacked 20023 %d\n", type, title, type, update_every);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed))
+            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
+    }
+    APPS_PLUGIN_FUNCTIONS();
+
+    fprintf(stdout, "CHART %s.involuntary_ctxt_switches '' '%s Involuntary Context Switches' 'switches/s' cpu %s.involuntary_ctxt_switches stacked 20024 %d\n", type, title, type, update_every);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed))
+            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
+    }
+    APPS_PLUGIN_FUNCTIONS();
+#endif
 
 #ifndef __FreeBSD__
     fprintf(stdout, "CHART %s.swap '' '%s Swap Memory' 'MiB' swap %s.swap stacked 20011 %d\n", type, title, type, update_every);
@@ -4426,6 +4493,8 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
     unsigned long long
               Processes_max = 0
             , Threads_max = 0
+            , VoluntaryCtxtSwitches_max = 0
+            , NonVoluntaryCtxtSwitches_max = 0
             , Uptime_max = 0
             , MinFlt_max = 0
             , CMinFlt_max = 0
@@ -4527,6 +4596,9 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         add_value_field_ndd_with_max(wb, CSysCPU, (NETDATA_DOUBLE)(p->cstime) / cpu_divisor);
         add_value_field_ndd_with_max(wb, CGuestCPU, (NETDATA_DOUBLE)(p->cgtime) / cpu_divisor);
 
+        add_value_field_llu_with_max(wb, VoluntaryCtxtSwitches, p->status_voluntary_ctxt_switches / RATES_DETAIL);
+        add_value_field_llu_with_max(wb, NonVoluntaryCtxtSwitches, p->status_nonvoluntary_ctxt_switches / RATES_DETAIL);
+
         // memory MiB
         if(MemTotal)
             add_value_field_ndd_with_max(wb, Memory, (NETDATA_DOUBLE)p->status_vmrss * 100.0 / (NETDATA_DOUBLE)MemTotal);
@@ -4610,6 +4682,10 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         add_table_field(wb, "CSysCPU", "Children System CPU Time (100% = 1 core)", false, "bar-with-integer", "bar", "number", 2, "%", CSysCPU_max, "descending", true, false, false, NULL, "sum", true);
         add_table_field(wb, "CGuestCPU", "Children Guest CPU Time (100% = 1 core)", false, "bar-with-integer", "bar", "number", 2, "%", CGuestCPU_max, "descending", true, false, false, NULL, "sum", true);
 
+        // CPU context switches
+        add_table_field(wb, "vCtxSwitch", "Voluntary Context Switches", false, "bar-with-integer", "bar", "number", 2, "switches/s", VoluntaryCtxtSwitches_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "iCtxSwitch", "Involuntary Context Switches", false, "bar-with-integer", "bar", "number", 2, "switches/s", NonVoluntaryCtxtSwitches_max, "descending", true, false, false, NULL, "sum", true);
+
         // memory
         if(MemTotal)
             add_table_field(wb, "Memory", "Memory Percentage", true, "bar-with-integer", "bar", "number", 2, "%", 100.0, "descending", true, false, false, NULL, "sum", true);
@@ -4679,6 +4755,19 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
                 buffer_json_add_array_item_string(wb, "CUserCPU");
                 buffer_json_add_array_item_string(wb, "CSysCPU");
                 buffer_json_add_array_item_string(wb, "CGuestCPU");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "CPUCtxSwitches");
+        {
+            buffer_json_member_add_string(wb, "name", "CPU Context Switches");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "vCtxSwitch");
+                buffer_json_add_array_item_string(wb, "iCtxSwitch");
             }
             buffer_json_array_close(wb);
         }
