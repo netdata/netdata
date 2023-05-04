@@ -27,7 +27,7 @@ on your [Custom Dashboards](https://github.com/netdata/netdata/blob/master/docs/
 
 A Netdata chart looks like this:  
 
-<img src=https://user-images.githubusercontent.com/70198089/236133212-353c102f-a6ed-45b7-9251-34e004c7a10a.png  width="900"/>
+<img src="https://user-images.githubusercontent.com/70198089/236133212-353c102f-a6ed-45b7-9251-34e004c7a10a.png"  width="900"/>
 
 With a quick glance you have immediate information available at your disposal:
 
