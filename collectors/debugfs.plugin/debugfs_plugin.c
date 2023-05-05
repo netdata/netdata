@@ -7,6 +7,8 @@
 static char *user_config_dir = CONFIG_DIR;
 static char *stock_config_dir = LIBCONFIG_DIR;
 
+static int update_every = 1;
+
 #ifdef HAVE_CAPABILITY
 static int debugfs_check_capabilities()
 {
@@ -48,6 +50,22 @@ static int debugfs_am_i_running_as_root()
     }
 
     return 0;
+}
+
+static void debugfs_parse_args(int argc, char **argv)
+{
+    int i, freq = 0;
+    for(i = 1; i < argc; i++) {
+        if(!freq) {
+            int n = (int)str2l(argv[i]);
+            if(n > 0) {
+                freq = n;
+                continue;
+            }
+        }
+    }
+
+    if(freq > 0) update_every = freq;
 }
 
 int main(int argc, char **argv)
@@ -101,6 +119,8 @@ int main(int argc, char **argv)
             argv[0]);
 #endif
     }
+
+    debugfs_parse_args(argc, argv);
 
     return 0;
 }
