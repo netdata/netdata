@@ -8,16 +8,15 @@ To make sense of all the metrics, Netdata offers an enhanced version of charts t
 These charts provide a lot of useful information, so that you can:
 
 - Enjoy the high-resolution, granular metrics collected by Netdata
-- Explore visualization with more options such as _line_, _stacked_, _area_, _pie_, _gauges_ types and more
 - Examine all the metrics by hovering over them with your cursor
 - Filter the metrics in any way you want using the [Definition bar](#definition-bar)
+- View the combined anomaly rate of all underlying data with the [Anomaly Rate ribbon](#anomaly-rate-ribbon)
+- Explore even more details about a chart's metrics through [hovering over certain elements of it](#hover-over-the-chart)
 - Use intuitive tooling and shortcuts to pan, zoom or highlight areas of interest in your charts
-- On highlight, get easy access
-  to [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md) to
-  see other metrics with similar patterns
+- On highlight, get easy access to [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md) to see other metrics with similar patterns
 - Have the dimensions sorted based on name or value
 - View information about the chart, its plugin, context, and type
-- Get the chart status and possible errors. On top, reload functionality
+- View individual metric collection status about a chart
 
 These charts are available on Netdata Cloud's
 [Overview tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md), Single Node tab and
@@ -55,7 +54,7 @@ Along with viewing chart type, context and units, on this bar you have access to
 <img src="https://user-images.githubusercontent.com/70198089/236134195-ecb08f79-1355-4bce-8449-e829f4a6b1c0.png" width="200" />
 
 - **Chart info**: get more information relevant to the chart you are interacting with.
-- **Chart type**: change the chart type from _line_, _stacked_ or _area_.
+- **Chart type**: change the chart type from **line**, **stacked**, **area**, **stacked bar** and **multi bar**.
 - **Enter fullscreen mode**: expand the current chart to the full size of your screen.
 - **Add chart to dashboard**: add the chart to an existing custom dashboard or directly create a new one that includes the chart.
 
@@ -190,28 +189,22 @@ This menu also presents the contribution of each label on the chart,and a break 
 When the granularity of the data collected is higher than the plotted points on the chart an aggregation function over
 time is applied.
 
-<img src="https://user-images.githubusercontent.com/70198089/236139263-da5579df-8e4d-4ab8-8b36-298ee779ee83.png" width="400"/>
+<img src="https://user-images.githubusercontent.com/70198089/236411297-e123db06-0117-4e24-a5ac-955b980a8f55.png" width="400"/>
 
 By default the aggregation applied is _average_ but the user can choose different options from the following:
 
-- Min
-- Max
-- Mean or Average
-- Sum
-- Percentile `**`
-- Trimmed Mean or Trimmed Average `*`
+- Min, Max, Average or Sum
+- Percentile
+  - you can specify the percentile you want to focus on: 25th, 50th, 75th, 80th, 90th, 95th, 97th, 98th and 99th.  
+    <img src="https://user-images.githubusercontent.com/70198089/236410299-de5f3367-f3b0-4beb-a73f-a49007c543d4.png" width="250"/>
+- Trimmed Mean or Trimmed Median
+  - you can choose the percentage of data tha you want to focus on: 1%, 2%, 3%, 5%, 10%, 15%, 20% and 25%.  
+    <img src="https://user-images.githubusercontent.com/70198089/236410858-74b46af9-280a-4ab2-ad26-5a6aa9403aa8.png" width="250"/>
 - Median
-- Trimmed Median `*`
 - Standard deviation
-- Coefficient of variation or Relative standard deviation
-- Incremental sum or Delta
-- Single exponential smoothing
-- Double exponential smoothing
-
-> ### Info
->
-> - `*` For **Trimmed Median and Mean** you can choose the percentage of data tha you want to focus on: 1%, 2%, 3%, 5%, 10%, 15%, 20% and 25%.
-> - `**` For **Percentile** you can specify the percentile you want to focus on: 25th, 50th, 75th, 80th, 90th, 95th, 97th, 98th and 99th.
+- Coefficient of variation
+- Delta
+- Single or Double exponential smoothing
 
 For more details on each, you can refer to our Agent's HTTP API details on [Data Queries - Data Grouping](https://github.com/netdata/netdata/blob/master/web/api/queries/README.md#data-grouping).
 
