@@ -208,9 +208,28 @@ run chown -R ${NETDATA_USER}:${NETDATA_GROUP} /opt/netdata
 
 # -----------------------------------------------------------------------------
 
-progress "changing plugins ownership and setting setuid"
+progress "changing plugins ownership and permissions"
 
-for x in apps.plugin freeipmi.plugin ioping cgroup-network ebpf.plugin perf.plugin slabinfo.plugin nfacct.plugin xenstat.plugin; do
+if command -v setcap >/dev/null 2>&1; then
+    run setcap "cap_dac_read_search,cap_sys_ptrace=ep" "usr/libexec/netdata/plugins.d/apps.plugin"
+    run setcap "cap_dac_read_search=ep" "usr/libexec/netdata/plugins.d/slabinfo.plugin"
+
+    if command -v capsh >/dev/null 2>&1 && capsh --supports=cap_perfmon 2>/dev/null ; then
+        run setcap "cap_perfmon=ep" "usr/libexec/netdata/perf.plugin"
+    else
+        run setcap "cap_sys_admin=ep" "usr/libexec/netdata/perf.plugin"
+    fi
+
+    run setcap "cap_net_admin,cap_net_raw=eip" "usr/libexec/netdata/plugins.d/go.d.plugin"
+else
+  for x in apps.plugin perf.plugin slabinfo.plugin; do
+    f="usr/libexec/netdata/plugins.d/${x}"
+    run chown root:${NETDATA_GROUP} "${f}"
+    run chmod 4750 "${f}"
+  done
+fi
+
+for x in freeipmi.plugin ioping cgroup-network ebpf.plugin nfacct.plugin xenstat.plugin; do
   f="usr/libexec/netdata/plugins.d/${x}"
 
   if [ -f "${f}" ]; then
@@ -218,10 +237,6 @@ for x in apps.plugin freeipmi.plugin ioping cgroup-network ebpf.plugin perf.plug
     run chmod 4750 "${f}"
   fi
 done
-
-if [ -f "usr/libexec/netdata/plugins.d/go.d.plugin" ] && command -v setcap 1>/dev/null 2>&1; then
-  run setcap "cap_net_admin+epi cap_net_raw=eip" "usr/libexec/netdata/plugins.d/go.d.plugin"
-fi
 
 # -----------------------------------------------------------------------------
 
