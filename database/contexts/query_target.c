@@ -207,7 +207,7 @@ typedef struct query_target_locals {
 
     size_t metrics_skipped_due_to_not_matching_timeframe;
 
-    char host_uuid_buffer[UUID_STR_LEN];
+    char host_node_id_str[UUID_STR_LEN];
     QUERY_NODE *qn; // temp to pass on callbacks, ignore otherwise - no need to free
 } QUERY_TARGET_LOCALS;
 
@@ -699,7 +699,8 @@ static inline SIMPLE_PATTERN_RESULT query_instance_matches(QUERY_INSTANCE *qi,
                                              SIMPLE_PATTERN *instances_sp,
                                              bool match_ids,
                                              bool match_names,
-                                             size_t version) {
+                                             size_t version,
+                                             char *host_node_id_str) {
     SIMPLE_PATTERN_RESULT ret = SP_MATCHED_POSITIVE;
 
     if(instances_sp) {
@@ -713,6 +714,12 @@ static inline SIMPLE_PATTERN_RESULT query_instance_matches(QUERY_INSTANCE *qi,
             ret = simple_pattern_matches_string_extract(instances_sp, query_instance_id_fqdn(qi, version), NULL, 0);
         if (ret == SP_NOT_MATCHED && match_names)
             ret = simple_pattern_matches_string_extract(instances_sp, query_instance_name_fqdn(qi, version), NULL, 0);
+
+        if (ret == SP_NOT_MATCHED && match_ids && host_node_id_str[0]) {
+            char buffer[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s", rrdinstance_acquired_id(qi->ria), host_node_id_str);
+            ret = simple_pattern_matches_extract(instances_sp, buffer, NULL, 0);
+        }
     }
 
     return ret;
@@ -742,7 +749,7 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
 
     if(queryable_instance && filter_instances)
         queryable_instance = (SP_MATCHED_POSITIVE == query_instance_matches(
-                qi, ri, qt->instances.pattern, qtl->match_ids, qtl->match_names, qt->request.version));
+                qi, ri, qt->instances.pattern, qtl->match_ids, qtl->match_names, qt->request.version, qtl->host_node_id_str));
 
     if(queryable_instance)
         queryable_instance = query_instance_matches_labels(ri, qt->instances.chart_label_key_pattern, qt->instances.labels_pattern);
@@ -878,10 +885,10 @@ static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
     QUERY_NODE *qn = query_node_allocate(qt, host);
 
     if(host->node_id) {
-        if(!qtl->host_uuid_buffer[0])
+        if(!qtl->host_node_id_str[0])
             uuid_unparse_lower(*host->node_id, qn->node_id);
         else
-            memcpy(qn->node_id, qtl->host_uuid_buffer, sizeof(qn->node_id));
+            memcpy(qn->node_id, qtl->host_node_id_str, sizeof(qn->node_id));
     }
     else
         qn->node_id[0] = '\0';
@@ -1098,6 +1105,11 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     }
 
     if(host) {
+        if(host->node_id)
+            uuid_unparse_lower(*host->node_id, qtl.host_node_id_str);
+        else
+            qtl.host_node_id_str[0] = '\0';
+
         // single host query
         qt->versions.contexts_hard_hash = dictionary_version(host->rrdctx.contexts);
         qt->versions.contexts_soft_hash = dictionary_version(host->rrdctx.hub_queue);
@@ -1110,7 +1122,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
         query_scope_foreach_host(qt->nodes.scope_pattern, qt->nodes.pattern,
                                  query_node_add, &qtl,
                                  &qt->versions,
-                                 qtl.host_uuid_buffer);
+                                 qtl.host_node_id_str);
 
     // we need the available db retention for this call
     // so it has to be done last
@@ -1136,6 +1148,8 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
     if(!rc || rrd_flag_is_deleted(rc))
         return 0;
 
+    char host_node_id_str[UUID_STR_LEN] = "";
+
     bool proceed = true;
 
     ssize_t count = 0;
@@ -1148,7 +1162,7 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
 
                 if(instances_sp) {
                     QUERY_INSTANCE qi = { .ria = ria, };
-                    SIMPLE_PATTERN_RESULT ret = query_instance_matches(&qi, ri, instances_sp, match_ids, match_names, version);
+                    SIMPLE_PATTERN_RESULT ret = query_instance_matches(&qi, ri, instances_sp, match_ids, match_names, version, host_node_id_str);
                     qi.ria = NULL;
                     query_instance_release(&qi);
 
