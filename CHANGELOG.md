@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- Differentiate error codes better when claiming from kickstart script. [\#15015](https://github.com/netdata/netdata/pull/15015) ([Ferroin](https://github.com/Ferroin))
+- Fix coverity issues  [\#15005](https://github.com/netdata/netdata/pull/15005) ([stelfrag](https://github.com/stelfrag))
+- weights endpoint: volume diff of anomaly rates [\#15004](https://github.com/netdata/netdata/pull/15004) ([ktsaou](https://github.com/ktsaou))
+- Bump Coverity scan tool version. [\#15003](https://github.com/netdata/netdata/pull/15003) ([Ferroin](https://github.com/Ferroin))
+- feat\(apps.plugin\): collect context switches  [\#15002](https://github.com/netdata/netdata/pull/15002) ([ilyam8](https://github.com/ilyam8))
+- add support for monitoring thp, ballooning, zswap, ksm cow [\#15000](https://github.com/netdata/netdata/pull/15000) ([ktsaou](https://github.com/ktsaou))
 - Fix cmake errors [\#14998](https://github.com/netdata/netdata/pull/14998) ([stelfrag](https://github.com/stelfrag))
 - Remove lighttpd2 from docs [\#14997](https://github.com/netdata/netdata/pull/14997) ([Ancairon](https://github.com/Ancairon))
 - Update netdata-security.md [\#14995](https://github.com/netdata/netdata/pull/14995) ([cakrit](https://github.com/cakrit))
@@ -400,12 +406,6 @@
 - Fix kickstart and updater not working with BusyBox wget [\#14392](https://github.com/netdata/netdata/pull/14392) ([Dim-P](https://github.com/Dim-P))
 - Fix publishing Docker Images to secondary registries. [\#14389](https://github.com/netdata/netdata/pull/14389) ([Ferroin](https://github.com/Ferroin))
 - Reduce service exit [\#14381](https://github.com/netdata/netdata/pull/14381) ([thiagoftsm](https://github.com/thiagoftsm))
-- DBENGINE v2 - improvements part 12 [\#14379](https://github.com/netdata/netdata/pull/14379) ([ktsaou](https://github.com/ktsaou))
-- bump go.d.plugin v0.50.0 [\#14378](https://github.com/netdata/netdata/pull/14378) ([ilyam8](https://github.com/ilyam8))
-- Patch master [\#14377](https://github.com/netdata/netdata/pull/14377) ([tkatsoulas](https://github.com/tkatsoulas))
-- Revert "Delete libnetdata readme" [\#14374](https://github.com/netdata/netdata/pull/14374) ([cakrit](https://github.com/cakrit))
-- Revert "Add libnetdata readmes to learn, delete empty" [\#14373](https://github.com/netdata/netdata/pull/14373) ([cakrit](https://github.com/cakrit))
-- Publish Docker images to GHCR.io and Quay.io [\#14372](https://github.com/netdata/netdata/pull/14372) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
