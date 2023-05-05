@@ -39,10 +39,11 @@ static int debugfs_check_capabilities()
 #endif
 
 // TODO: This is a function used by 3 different collector, we should do it global (next PR)
-static int debugfs_am_i_running_as_root() {
+static int debugfs_am_i_running_as_root()
+{
     uid_t uid = getuid(), euid = geteuid();
 
-    if(uid == 0 || euid == 0) {
+    if (uid == 0 || euid == 0) {
         return 1;
     }
 
@@ -75,22 +76,29 @@ int main(int argc, char **argv)
         stock_config_dir = LIBCONFIG_DIR;
     }
 
-    if(!debugfs_check_capabilities() && !debugfs_am_i_running_as_root()) {
+    if (!debugfs_check_capabilities() && !debugfs_am_i_running_as_root()) {
         uid_t uid = getuid(), euid = geteuid();
 #ifdef HAVE_CAPABILITY
-        error("debugfs.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
-              "Without these, debugfs.plugin cannot access /sys/kernel/debug. "
-              "To enable capabilities run: sudo setcap cap_dac_read_search,cap_sys_ptrace+ep %s; "
-              "To enable setuid to root run: sudo chown root:netdata %s; sudo chmod 4750 %s; "
-              , uid, euid, argv[0], argv[0], argv[0]
-              );
+        error(
+            "debugfs.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
+            "Without these, debugfs.plugin cannot access /sys/kernel/debug. "
+            "To enable capabilities run: sudo setcap cap_dac_read_search,cap_sys_ptrace+ep %s; "
+            "To enable setuid to root run: sudo chown root:netdata %s; sudo chmod 4750 %s; ",
+            uid,
+            euid,
+            argv[0],
+            argv[0],
+            argv[0]);
 #else
-        error("debugfs.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
-              "Without these, debugfs.plugin cannot access /sys/kernel/debug."
-              "Your system does not support capabilities. "
-              "To enable setuid to root run: sudo chown root:netdata %s; sudo chmod 4750 %s; "
-              , uid, euid, argv[0], argv[0]
-              );
+        error(
+            "debugfs.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
+            "Without these, debugfs.plugin cannot access /sys/kernel/debug."
+            "Your system does not support capabilities. "
+            "To enable setuid to root run: sudo chown root:netdata %s; sudo chmod 4750 %s; ",
+            uid,
+            euid,
+            argv[0],
+            argv[0]);
 #endif
     }
 
