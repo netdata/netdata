@@ -1158,7 +1158,8 @@ void *health_main(void *ptr) {
                                                                     rc->summary,
                                                                     rc->info,
                                                                     0,
-                                                                    rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0);
+                                                                    rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0,
+                                                                    rc);
 
                         if (ae) {
                             health_alarm_log_add_entry(host, ae);
@@ -1429,8 +1430,8 @@ void *health_main(void *ptr) {
                                                                      ((rc->options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
                                                                      ((rc->run_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0) |
                                                                      (rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0)
-                                                                     )
-                                                                    );
+                                                                     ),
+                                                                    rc);
 
                         health_alarm_log_add_entry(host, ae);
 
@@ -1516,8 +1517,8 @@ void *health_main(void *ptr) {
                                                                      ((rc->options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
                                                                      ((rc->run_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0) |
                                                                      (rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0)
-                                                                     )
-                                                                    );
+                                                                     ),
+                                                                    rc);
 
                         ae->last_repeat = rc->last_repeat;
                         if (!(rc->run_flags & RRDCALC_FLAG_RUN_ONCE) && rc->status == RRDCALC_STATUS_CLEAR) {

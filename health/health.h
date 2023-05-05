@@ -86,7 +86,8 @@ ALARM_ENTRY* health_create_alarm_entry(
     STRING *summary,
     STRING *info,
     int delay,
-    HEALTH_ENTRY_FLAGS flags);
+    HEALTH_ENTRY_FLAGS flags,
+    RRDCALC *rc);
 
 void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae);
 
@@ -104,5 +105,9 @@ void sql_refresh_hashes(void);
 
 void health_add_host_labels(void);
 void health_string2json(BUFFER *wb, const char *prefix, const char *label, const char *value, const char *suffix);
+
+#define ALARM_ENTRY_VAR_MAX 100
+#define ALARM_ENTRY_VAR_VALUE "${value:"
+#define ALARM_ENTRY_VAR_VALUE_LEN (sizeof(ALARM_ENTRY_VAR_VALUE)-1)
 
 #endif //NETDATA_HEALTH_H

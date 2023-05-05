@@ -8,6 +8,58 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
     sql_health_alarm_log_save(host, ae);
 }
 
+static inline STRING *alarm_entry_replace_variables(const char *line, RRDCALC *rc) {
+    if (!line || !*line)
+        return NULL;
+
+    size_t pos = 0;
+    char *temp = strdupz(line);
+    char var[ALARM_ENTRY_VAR_MAX];
+    char *m;
+
+    while ((m = strchr(temp + pos, '$')) && *(m+1) == '{') {
+        int i = 0;
+        char *e = m;
+        while (*e) {
+            var[i++] = *e;
+
+            if (*e == '}' || i == ALARM_ENTRY_VAR_MAX - 1)
+                break;
+
+            e++;
+        }
+
+        var[i] = '\0';
+        pos = m - temp + 1;
+
+        if (!strncmp(var, ALARM_ENTRY_VAR_VALUE, ALARM_ENTRY_VAR_VALUE_LEN)) {
+            char value_val[ALARM_ENTRY_VAR_MAX + ALARM_ENTRY_VAR_VALUE_LEN + 1] = { 0 };
+            strcpy(value_val, var+ALARM_ENTRY_VAR_VALUE_LEN);
+            value_val[i - ALARM_ENTRY_VAR_VALUE_LEN - 1] = '\0';
+
+            NETDATA_DOUBLE n;
+            if (health_variable_lookup(string_strdupz(value_val), rc, &n)) {
+                if(isnan(n) || isinf(n)) {
+                    char *buf = find_and_replace(temp, var, "null", m);
+                    freez(temp);
+                    temp = buf;
+                } else {
+                    char val_string[100];
+                    snprintfz(val_string, 99, "" NETDATA_DOUBLE_FORMAT "", n);
+                    char *buf = find_and_replace(temp, var, val_string, m);
+                    freez(temp);
+                    temp = buf;
+                }
+            }
+        }
+    }
+
+    STRING *ret = string_strdupz(temp);
+    freez(temp);
+
+    return ret;
+}
+
 // ----------------------------------------------------------------------------
 // health alarm log management
 
@@ -36,7 +88,8 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     STRING *summary,
     STRING *info,
     int delay,
-    HEALTH_ENTRY_FLAGS flags
+    HEALTH_ENTRY_FLAGS flags,
+    RRDCALC *rc
 ) {
     netdata_log_debug(D_HEALTH, "Health adding alarm log entry with id: %u", host->health_log.next_log_id);
 
@@ -72,6 +125,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
 
     ae->summary = string_dup(summary);
     ae->info = string_dup(info);
+
     ae->old_status = old_status;
     ae->new_status = new_status;
     ae->duration = duration;
@@ -84,6 +138,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     if(ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL)
         ae->non_clear_duration += ae->duration;
 
+    ae->info = alarm_entry_replace_variables(string2str(info), rc);
     return ae;
 }
 
