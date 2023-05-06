@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- On data and weight queries now instances filter matches also instance\_id@node\_id [\#15021](https://github.com/netdata/netdata/pull/15021) ([ktsaou](https://github.com/ktsaou))
+- add `grafana` to `apps_groups.conf` [\#15020](https://github.com/netdata/netdata/pull/15020) ([andrewm4894](https://github.com/andrewm4894))
+- Set file capabilities correctly on static installs. [\#15018](https://github.com/netdata/netdata/pull/15018) ([Ferroin](https://github.com/Ferroin))
 - Differentiate error codes better when claiming from kickstart script. [\#15015](https://github.com/netdata/netdata/pull/15015) ([Ferroin](https://github.com/Ferroin))
 - Fix coverity issues  [\#15005](https://github.com/netdata/netdata/pull/15005) ([stelfrag](https://github.com/stelfrag))
 - weights endpoint: volume diff of anomaly rates [\#15004](https://github.com/netdata/netdata/pull/15004) ([ktsaou](https://github.com/ktsaou))
@@ -370,8 +373,6 @@
 - Roles permissions docs [\#14391](https://github.com/netdata/netdata/pull/14391) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - add note about not needing to have room id [\#14390](https://github.com/netdata/netdata/pull/14390) ([andrewm4894](https://github.com/andrewm4894))
 - update the "Install Netdata with Docker" doc [\#14385](https://github.com/netdata/netdata/pull/14385) ([Ancairon](https://github.com/Ancairon))
-- generates dual ksy for njfv2 + fix for padding after page blocks [\#14383](https://github.com/netdata/netdata/pull/14383) ([underhood](https://github.com/underhood))
-- Delete docs/cloud/get-started.mdx [\#14382](https://github.com/netdata/netdata/pull/14382) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
@@ -405,7 +406,6 @@
 - Fix typo on the page [\#14397](https://github.com/netdata/netdata/pull/14397) ([iorvd](https://github.com/iorvd))
 - Fix kickstart and updater not working with BusyBox wget [\#14392](https://github.com/netdata/netdata/pull/14392) ([Dim-P](https://github.com/Dim-P))
 - Fix publishing Docker Images to secondary registries. [\#14389](https://github.com/netdata/netdata/pull/14389) ([Ferroin](https://github.com/Ferroin))
-- Reduce service exit [\#14381](https://github.com/netdata/netdata/pull/14381) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
