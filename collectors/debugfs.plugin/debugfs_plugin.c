@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "collectors/all.h"
+#include "debugfs_plugin.h"
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
@@ -8,6 +8,21 @@ static char *user_config_dir = CONFIG_DIR;
 static char *stock_config_dir = LIBCONFIG_DIR;
 
 static int update_every = 1;
+
+static struct debugfs_module {
+    const char *name;
+
+    int enabled;
+
+    int (*func)(int update_every);
+}  debugfs_modules[] = {
+    // Memory Fragmentation
+    { .name = "/sys/kernel/debug/extfrag/extfrag_index", .enabled = CONFIG_BOOLEAN_YES,
+      .func = debugfs_parse_extfrag_index},
+
+    // The terminator
+    { .name = NULL, .enabled = CONFIG_BOOLEAN_NO, .func = NULL}
+};
 
 #ifdef HAVE_CAPABILITY
 static int debugfs_check_capabilities()
