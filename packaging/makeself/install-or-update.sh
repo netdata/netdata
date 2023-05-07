@@ -215,9 +215,9 @@ if command -v setcap >/dev/null 2>&1; then
     run setcap "cap_dac_read_search=ep" "usr/libexec/netdata/plugins.d/slabinfo.plugin"
 
     if command -v capsh >/dev/null 2>&1 && capsh --supports=cap_perfmon 2>/dev/null ; then
-        run setcap "cap_perfmon=ep" "usr/libexec/netdata/perf.plugin"
+        run setcap "cap_perfmon=ep" "usr/libexec/netdata/plugins.d/perf.plugin"
     else
-        run setcap "cap_sys_admin=ep" "usr/libexec/netdata/perf.plugin"
+        run setcap "cap_sys_admin=ep" "usr/libexec/netdata/plugins.d/perf.plugin"
     fi
 
     run setcap "cap_net_admin,cap_net_raw=eip" "usr/libexec/netdata/plugins.d/go.d.plugin"
