@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "debugfs_plugin.h"
-#include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
 static char *user_config_dir = CONFIG_DIR;
@@ -14,7 +13,7 @@ static struct debugfs_module {
 
     int enabled;
 
-    int (*func)(int update_every);
+    int (*func)(int update_every, const char *name);
 }  debugfs_modules[] = {
     // Memory Fragmentation
     { .name = "/sys/kernel/debug/extfrag/extfrag_index", .enabled = CONFIG_BOOLEAN_YES,
@@ -66,6 +65,15 @@ static int debugfs_am_i_running_as_root()
 
     return 0;
 }
+
+void debugfs2lower(char *name)
+{
+    while (*name) {
+        *name = tolower(*name);
+        name++;
+    }
+}
+
 
 static void debugfs_parse_args(int argc, char **argv)
 {
@@ -136,6 +144,15 @@ int main(int argc, char **argv)
     }
 
     debugfs_parse_args(argc, argv);
+
+    int i;
+    for (i = 0; debugfs_modules[i].name; i++) {
+        struct debugfs_module *pm = &debugfs_modules[i];
+        if (unlikely(!pm->enabled))
+            continue;
+
+        pm->enabled = !pm->func(update_every, pm->name);
+    }
 
     return 0;
 }
