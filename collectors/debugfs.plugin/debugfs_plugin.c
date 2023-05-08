@@ -74,6 +74,21 @@ void debugfs2lower(char *name)
     }
 }
 
+int debugfs_check_sys_permission() {
+    int ret = 0;
+
+    procfile *ff = procfile_open(debugfs_modules[0].name, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
+    if(!ff) goto dcsp_cleanup;
+
+    ff = procfile_readall(ff);
+    if(!ff) goto dcsp_cleanup;
+
+    ret = 1;
+
+dcsp_cleanup:
+    procfile_close(ff);
+    return ret;
+}
 
 static void debugfs_parse_args(int argc, char **argv)
 {
@@ -85,6 +100,15 @@ static void debugfs_parse_args(int argc, char **argv)
                 freq = n;
                 continue;
             }
+        }
+
+        if(strcmp("test-permissions", argv[i]) == 0 || strcmp("-t", argv[i]) == 0) {
+            if(!debugfs_check_sys_permission()) {
+                perror("Cannot open /sys/kernel/debug/extfrag/extfrag_index file");
+                exit(1);
+            }
+            printf("OK\n");
+            exit(0);
         }
     }
 
