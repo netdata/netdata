@@ -225,6 +225,7 @@ int main(int argc, char **argv)
         to_copy = MIN(strlen(argv[i]), MAX_COMMAND_LENGTH - 1 - command_string_size);
         strncpy(command_string + command_string_size, argv[i], to_copy);
         command_string_size += to_copy;
+        command_string[command_string_size] = '\0';
 
         if (command_string_size < MAX_COMMAND_LENGTH - 1) {
             command_string[command_string_size++] = ' ';
