@@ -883,6 +883,14 @@ netdataDashboard.submenu = {
         'When the kernel or an application requests some memory, the buddy allocator provides a page that matches closest the request.'
     },
 
+    'mem.fragmentation': {
+        title: 'Memory fragmentation',
+        info: 'These charts show whether the kernel will compact memory or direct reclaim to satisfy a high-order allocation. '+
+            'The extfrag/extfrag_index file in debugfs shows what the fragmentation index for each order is in each zone in the system.' +
+            'Values tending towards 0 imply allocations would fail due to lack of memory, values towards 1000 imply failures are due to ' +
+            'fragmentation and -1 implies that the allocation will succeed as long as watermarks are met.'
+    },
+
     'ip.ecn': {
         info: '<a href="https://en.wikipedia.org/wiki/Explicit_Congestion_Notification" target="_blank">Explicit Congestion Notification (ECN)</a> '+
         'is an extension to the IP and to the TCP that allows end-to-end notification of network congestion without dropping packets. '+
