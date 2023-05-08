@@ -55,15 +55,12 @@ If, for a given month, your usage is over these committed nodes we will charge t
 
 It is ok to change your mind. We allow to change your plan, billing frequency or adjust the committed nodes, on yearly plans, at any time.
 
-To achieve this you will need to:
+To achieve this you can check the [Update plan](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/view-plan-billing.md#update-plan) section.
 
-* Move to the Community plan, where we will cancel the current subscription and:
-  * Issue a credit to you for the unused period, in case you are on a **yearly plan**
-  * Charge you only for the current used period and issue a credit for the unused period related to the flat fee, in case you are on a **monthly plan**
-* Select the new subscription with the change that you want
-
-> ⚠️ On a move to Community (cancellation of an active subscription), please note that you will have all your notification methods configurations active **for a period of 24 hours**.
+> ⚠️ On a downgrade (going to a new plan with less benefits) or cancellation of an active subscription, please note that you will have all your notification methods configurations active **for a period of 24 hours**.
 > After that, any notification methods unavailable in your new plan at that time will be automatically disabled. You can always re-enable them once you move to a paid plan that includes them.
+
+> ⚠️ Downgrade or cancellation may affect users in your Space. Please check what roles are available on the [each plans](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md#areas-impacted-by-plans). Users with unavailable roles on the new plan will immediately have restricted access to the Space.
 
 > ⚠️ Any credit given to you will be available to use on future paid subscriptions with us. It will be available until the the **end of the following year**.
 
