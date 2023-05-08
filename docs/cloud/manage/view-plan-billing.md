@@ -127,13 +127,13 @@ You can find some further details on the [Netdata Plans page](https://github.com
 
 ### 8. How is the **Total Before Tax** value calculated on plan changes?
 
-When you are performing a plan change we will be calculating what value you may still have from the current plan and identify the **Unused time on _current plan_**.
+When you change your plan we will be calculating the residual before tax value you have from the _Unused time on your current plan_ in order to credit you with this value.  
 
 After that, we will be performing the following calculations:
+
 1. Get the **Subscription total** (total amount to be paid for Nodes and Space)
 2. Deduct any Discount applicable from promotion codes
-3. If an amount remains, deduct the maximum amount from the **Unused time on _current plan_**
-4. If an amount remains, deduct the maximum Credit amount from the existing balance
-5. On the **Total Before Tax**, if applicable, apply the VAT rates
+3. If an amount remains, then we deduct the sum of the _Unused time on current plan_ then and the Credit amount from any existing credit balance. 
+4. The result, if positive, is the Total Before Tax, if applicable, any sales tax (VAT or other) will apply. 
 
-If after step 3. there is a remaining amount from the **Unused time on _current plan_** this amount will be given to your credit balance.
+If  the calculation of step 3 returns a negative amount then this amount will be your new customer credit balance.
