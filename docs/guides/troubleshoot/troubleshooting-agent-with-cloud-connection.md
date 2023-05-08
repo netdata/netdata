@@ -1,27 +1,45 @@
 # Troubleshoot Agent-Cloud connectivity issues
 
-Learn how to troubleshoot the Netdata Agent showing as offline after claiming, so you can connect the Agent to Netdata Cloud.
+Learn how to troubleshoot connectivity issues leading to agents not appearing at all in Netdata Cloud, or 
+appearing with a status other than `live`.
 
-When you are claiming a node, you might not be able to immediately see it online in Netdata Cloud.  
-This could be due to an error in the claiming process or a temporary outage of some services.
+After installing an agent with the claiming token provided by Netdata Cloud, you should see charts from that node on 
+Netdata Cloud within seconds. If you don't see charts, check if the node appears in the list of nodes 
+(Nodes tab, top right Node filter, or Manage Nodes screen). If your node does not appear in the list, or it does appear with a status other than `live`, this guide will help you troubleshoot what's happening.
 
-We identified some scenarios that might cause this delay and possible actions you could take to overcome each situation.
+ The most common explanation for connectivity issues usually falls into one of the following three categories:
 
-The most common explanation for the delay usually falls into one of the following three categories:
-
-- [Troubleshoot Agent-Cloud connectivity issues](#troubleshoot-agent-cloud-connectivity-issues)
-  - [The claiming process of the kickstart script was unsuccessful](#the-claiming-process-of-the-kickstart-script-was-unsuccessful)
-    - [The kickstart script auto-claimed the Agent but there was no error message displayed](#the-kickstart-script-auto-claimed-the-agent-but-there-was-no-error-message-displayed)
+- If the node does not appear at all in Netdata Cloud, [the claiming process was unsuccessful](#the-claiming-process-was-unsuccessful). 
+- [The kickstart script auto-claimed the Agent but there was no error message displayed](#the-kickstart-script-auto-claimed-the-agent-but-there-was-no-error-message-displayed)
   - [Claiming on an older, deprecated version of the Agent](#claiming-on-an-older-deprecated-version-of-the-agent)
   - [Network issues while connecting to the Cloud](#network-issues-while-connecting-to-the-cloud)
     - [Verify that your IP is whitelisted from Netdata Cloud](#verify-that-your-ip-is-whitelisted-from-netdata-cloud)
     - [Make sure that your node has internet connectivity and can resolve network domains](#make-sure-that-your-node-has-internet-connectivity-and-can-resolve-network-domains)
 
-## The claiming process of the kickstart script was unsuccessful
+## The claiming process was unsuccessful
 
-Here, we will try to define some edge cases you might encounter when claiming a node.
+If the claiming process fails, a **node does not appear at all in Netdata Cloud**. 
+The possible causes differ between kickstart installations and Docker installations. 
+However, first ensure that you **use the newest possible stable or nightly version of the agent**.
 
-### The kickstart script auto-claimed the Agent but there was no error message displayed
+### Using kickstart.sh
+
+Claiming is done by executing `netdata-claim.sh`, a script that is usually located under `${INSTALL_PREFIX}/netdata/usr/sbin/netdata-claim.sh`. Possible error conditions we have identified are:
+- No script found at all in any of our search paths.
+- The path where the claiming script should be does not exist.
+- The path exists, but is not a file.
+- The path is a file, but is not executable.
+Check the output of the kickstart script for any reported errors claiming and verify that the claiming script exists 
+and can be executed. 
+
+### Using Docker
+
+First verify that the NETDATA_CLAIM_TOKEN parameter is correctly configured and then check for any errors during
+initialization of the container. 
+
+The most common issue we have seen claiming nodes in Docker is [running on older hosts with seccomp enabled](https://github.com/netdata/netdata/blob/master/claim/README.md#known-issues-on-older-hosts-with-seccomp-enabled).
+
+## The kickstart script auto-claimed the Agent but there was no error message displayed
 
 The kickstart script will install/update your Agent and then try to claim the node to the Cloud (if tokens are provided). To
 complete the second part, the Agent must be running. In some platforms, the Netdata service cannot be enabled by default
@@ -53,11 +71,6 @@ and you must do it manually, using the following steps:
 > In some cases a simple restart of the Agent can fix the issue.  
 > Read more about [Starting, Stopping and Restarting the Agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md).
 
-## Claiming on an older, deprecated version of the Agent
-
-Make sure that you are using the latest version of Netdata if you are using the [Claiming script](https://github.com/netdata/netdata/blob/master/claim/README.md#claiming-script).
-
-With the introduction of our new architecture, Agents running versions lower than `v1.32.0` can face claiming problems, so we recommend you [update the Netdata Agent](https://github.com/netdata/netdata/blob/master/packaging/installer/UPDATE.md) to the latest stable version.
 
 ## Network issues while connecting to the Cloud
 
