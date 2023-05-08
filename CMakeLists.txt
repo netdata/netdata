@@ -529,7 +529,11 @@ set(APPS_PLUGIN_FILES
         collectors/apps.plugin/apps_plugin.c)
 
 set(DEBUGFS_PLUGIN_FILES
-        collectors/debugfs.plugin/debugfs_plugin.c)
+        collectors/debugfs.plugin/debugfs_plugin.c
+        collectors/debugfs.plugin/debugfs_plugin.h
+        collectors/debugfs.plugin/debugfs_extfrag_index.c
+        collectors/debugfs.plugin/debugfs_zswap.c
+        )
 
 set(FREEBSD_PLUGIN_FILES
         collectors/freebsd.plugin/plugin_freebsd.c

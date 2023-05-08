@@ -213,7 +213,9 @@ APPS_PLUGIN_FILES = \
 
 DEBUGFS_PLUGIN_FILES = \
     collectors/debugfs.plugin/debugfs_plugin.c \
+    collectors/debugfs.plugin/debugfs_plugin.h \
     collectors/debugfs.plugin/debugfs_extfrag_index.c \
+    collectors/debugfs.plugin/debugfs_zswap.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
