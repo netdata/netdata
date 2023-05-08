@@ -18,8 +18,8 @@ Netdata Cloud within seconds. If you don't see charts, check if the node appears
 If the claiming process fails, the node will not appear at all in Netdata Cloud. 
 
 First ensure that you:
- - Use the newest possible stable or nightly version of the agent (at least v1.32).
- - Your node can successfully issue an HTTPS request to https://api.netdata.cloud 
+- Use the newest possible stable or nightly version of the agent (at least v1.32).
+- Your node can successfully issue an HTTPS request to https://api.netdata.cloud 
 
 Other possible causes differ between kickstart installations and Docker installations. 
 
@@ -109,21 +109,21 @@ websockets. Some firewalls completely prevent the use of websockets, even for ou
 The states "Offline" and "Stale" suggest that the agent was able to connect at some point in the past, but
 that it is currently not connected.
 
-### Is network connectivity still possible?
+### Verify that network connectivity is still possible
 
 Verify that you can still issue HTTPS requests to api.netdata.cloud and that no firewall or proxy changes were made. 
 
-### Is the claiming info persisted?
+### Verify that the claiming info is persisted
 
 If you use Docker, verify that the contents of `/var/lib/netdata` are preserved across container restarts, using a persistent volume. 
 
-### Is the claiming info cloned?
+### Verify that the claiming info is not cloned
 
 A relatively common case we have seen especially with VMs is two or more nodes sharing the same credentials. 
 This happens if you claim a node in a VM and then create an image based on that node. Netdata can't properly
 work this way, as we have unique node identification information under `/var/lib/netdata`.
 
-### Is your IP blocked by Netdata Cloud?
+### Verify that your IP is not blocked by Netdata Cloud
 
 Most of the nodes change IPs dynamically. It is possible that your current IP has been restricted from accessing `api.netdata.cloud` due to security concerns, usually because it was spamming Netdata Coud with too many
 failed requests (old versions of the agent).
