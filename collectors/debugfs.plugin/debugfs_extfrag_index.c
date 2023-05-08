@@ -56,6 +56,7 @@ static void extfrag_send_chart(char *chart_id, collected_number *values)
         fprintf(stdout, "SET %s = %lld\n", orders[i], values[i]);
     }
     fprintf(stdout, "END\n");
+    fflush(stdout);
 }
 
 int debugfs_parse_extfrag_index(int update_every, const char *name) {

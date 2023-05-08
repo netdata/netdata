@@ -169,7 +169,7 @@ int main(int argc, char **argv)
 
     debugfs_parse_args(argc, argv);
 
-    size_t iteration = 0;
+    size_t iteration;
     usec_t step = update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
