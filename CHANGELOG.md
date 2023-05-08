@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Fix typo in file capabilities settings in static installer. [\#15023](https://github.com/netdata/netdata/pull/15023) ([Ferroin](https://github.com/Ferroin))
 - On data and weight queries now instances filter matches also instance\_id@node\_id [\#15021](https://github.com/netdata/netdata/pull/15021) ([ktsaou](https://github.com/ktsaou))
 - add `grafana` to `apps_groups.conf` [\#15020](https://github.com/netdata/netdata/pull/15020) ([andrewm4894](https://github.com/andrewm4894))
 - Set file capabilities correctly on static installs. [\#15018](https://github.com/netdata/netdata/pull/15018) ([Ferroin](https://github.com/Ferroin))
