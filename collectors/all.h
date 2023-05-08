@@ -24,6 +24,7 @@
 #define NETDATA_CHART_PRIO_SYSTEM_PGPGIO                151
 #define NETDATA_CHART_PRIO_SYSTEM_RAM                   200
 #define NETDATA_CHART_PRIO_SYSTEM_SWAP                  201
+#define NETDATA_CHART_PRIO_SYSTEM_SWAP_CALLS            202
 #define NETDATA_CHART_PRIO_SYSTEM_SWAPIO                250
 #define NETDATA_CHART_PRIO_SYSTEM_ZSWAPIO               300
 #define NETDATA_CHART_PRIO_SYSTEM_NET                   500
