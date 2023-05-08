@@ -615,8 +615,8 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
     // read device uuid if it is an LVM volume
     if (!strncmp(d->device, "dm-", 3)) {
         char uuid_filename[FILENAME_MAX + 1];
-        snprintfz(uuid_filename, FILENAME_MAX, path_to_sys_devices_virtual_block_device, disk);
-        strncat(uuid_filename, "/dm/uuid", FILENAME_MAX);
+        int size = snprintfz(uuid_filename, FILENAME_MAX, path_to_sys_devices_virtual_block_device, disk);
+        strncat(uuid_filename, "/dm/uuid", FILENAME_MAX - size);
 
         char device_uuid[RRD_ID_LENGTH_MAX + 1];
         if (!read_file(uuid_filename, device_uuid, RRD_ID_LENGTH_MAX) && !strncmp(device_uuid, "LVM-", 4)) {
