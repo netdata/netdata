@@ -169,13 +169,21 @@ int main(int argc, char **argv)
 
     debugfs_parse_args(argc, argv);
 
-    int i;
-    for (i = 0; debugfs_modules[i].name; i++) {
-        struct debugfs_module *pm = &debugfs_modules[i];
-        if (unlikely(!pm->enabled))
-            continue;
+    size_t iteration = 0;
+    usec_t step = update_every * USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    for (iteration = 0; iteration < 86400; iteration++) {
+        heartbeat_next(&hb, step);
 
-        pm->enabled = !pm->func(update_every, pm->name);
+        int i;
+        for (i = 0; debugfs_modules[i].name; i++) {
+            struct debugfs_module *pm = &debugfs_modules[i];
+            if (unlikely(!pm->enabled))
+                continue;
+
+            pm->enabled = !pm->func(update_every, pm->name);
+        }
     }
 
     return 0;
