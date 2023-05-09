@@ -2,3 +2,13 @@ metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 mem.fragmentation_dma,node,"scope0, scope1, scope2, scope3, scope4, scope5, scope6, scope7, scope8, scope9, scope10",degree,fragmentation degree,,debugfs.plugin,/sys/kernel/debug/extfrag/extfrag_index
 mem.fragmentation_dma32,node,"scope0, scope1, scope2, scope3, scope4, scope5, scope6, scope7, scope8, scope9, scope10",degree,fragmentation degree,,debugfs.plugin,/sys/kernel/debug/extfrag/extfrag_index
 mem.fragmentation_normal,node,"scope0, scope1, scope2, scope3, scope4, scope5, scope6, scope7, scope8, scope9, scope10",degree,fragmentation degree,,debugfs.plugin,/sys/kernel/debug/extfrag/extfrag_index
+system.same_filled_page,,pages,pages,Total same-value filled pages currently stored,line,,debugfs.plugin,/sys/kernel/debug/zswap/same_filled_pages
+system.stored_pages,,pages,pages,Compressed pages stored in zswap.,line,,debugfs.plugin,/sys/kernel/debug/zswap/stored_pages
+system.pool_total_size,,pool,bytes,Total bytes used by the compressed storage,line,,debugfs.plugin,/sys/kernel/debug/zswap/pool_total_size
+system.duplicate_entry,,duplicate,pages,Duplicate store was found.,line,,debugfs.plugin,/sys/kernel/debug/zswap/duplicate_entry
+system.written_back_pages,,pages,pages,Pages written back when pool limit was reached.,line,,debugfs.plugin,/sys/kernel/debug/zswap/written_back_pages
+system.reject_compress_poor,,pages,pages,Compressed page was too big for the allocator to store.,line,,debugfs.plugin,/sys/kernel/debug/zswap/reject_compress_poor
+system.reject_kmemcache_fail,,pages,pages,Number of entry metadata that could not be allocated,line,,debugfs.plugin,/sys/kernel/debug/zswap/reject_kmemcache_fail
+system.reject_alloc_fail,,pages,pages,Allocator could not get memory,line,,debugfs.plugin,/sys/kernel/debug/zswap/reject_alloc_fail
+system.reject_reclaim_fail,,pages,pages,Memory cannot be reclaimed (pool limit was reached),line,,debugfs.plugin,/sys/kernel/debug/zswap/reject_reclaim_fail
+system.pool_limit_hit,,limit,boolean,Was the pool limit reached?,line,,debugfs.plugin,/sys/kernel/debug/zswap/pool_limit_hit
