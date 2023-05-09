@@ -891,6 +891,12 @@ netdataDashboard.submenu = {
             'fragmentation and -1 implies that the allocation will succeed as long as watermarks are met.'
     },
 
+    'system.zswap': {
+        info : 'Zswap is a backend for frontswap that takes pages that are in the process of being swapped out and attempts to compress and store them in a ' +
+            'RAM-based memory pool.  This can result in a significant I/O reduction on the swap device and, in the case where decompressing from RAM is faster ' +
+            'than reading from the swap device, can also improve workload performance.'
+    },
+
     'ip.ecn': {
         info: '<a href="https://en.wikipedia.org/wiki/Explicit_Congestion_Notification" target="_blank">Explicit Congestion Notification (ECN)</a> '+
         'is an extension to the IP and to the TCP that allows end-to-end notification of network congestion without dropping packets. '+
