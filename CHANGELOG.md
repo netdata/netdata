@@ -1,5 +1,14 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.39.0...HEAD)
+
+**Merged pull requests:**
+
+- review the billing docs for the flow [\#15014](https://github.com/netdata/netdata/pull/15014) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- Update chart documentation [\#15010](https://github.com/netdata/netdata/pull/15010) ([Ancairon](https://github.com/Ancairon))
+
 ## [v1.39.0](https://github.com/netdata/netdata/tree/v1.39.0) (2023-05-08)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.38.1...v1.39.0)
@@ -373,7 +382,6 @@
 - add @andrewm4894 as docs/ codeowner [\#14398](https://github.com/netdata/netdata/pull/14398) ([andrewm4894](https://github.com/andrewm4894))
 - Roles permissions docs [\#14391](https://github.com/netdata/netdata/pull/14391) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - add note about not needing to have room id [\#14390](https://github.com/netdata/netdata/pull/14390) ([andrewm4894](https://github.com/andrewm4894))
-- update the "Install Netdata with Docker" doc [\#14385](https://github.com/netdata/netdata/pull/14385) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
