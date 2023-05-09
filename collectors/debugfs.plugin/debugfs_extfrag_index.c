@@ -61,7 +61,7 @@ static void extfrag_send_chart(char *chart_id, collected_number *values)
 
 int debugfs_parse_extfrag_index(int update_every, const char *name) {
     static procfile *ff = NULL;
-    static int chart_order = NETDATA_CHART_PRIO_MEM_FRAGMENATION;
+    static int chart_order = NETDATA_CHART_PRIO_MEM_FRAGMENTATION;
 
     if (unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
