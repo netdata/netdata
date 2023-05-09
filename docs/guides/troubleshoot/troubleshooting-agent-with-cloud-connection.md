@@ -31,8 +31,7 @@ and firewall settings for outbound connections.
 
 If your firewall is configured to completely prevent outbound connections, you need to whitelist `api.netdata.cloud` and `mqtt.netdata.cloud`.  If you can't whitelist domains in your firewall, you can whitelist the IPs that the hostnames resolve to, but keep in mind that they can change without any notice.
 
-If you use an outbout proxy, you need to 
-[take some extra steps]( https://github.com/netdata/netdata/blob/master/claim/README.md#connect-through-a-proxy).
+If you use an outbound proxy, you need to [take some extra steps]( https://github.com/netdata/netdata/blob/master/claim/README.md#connect-through-a-proxy).
 
 ### Troubleshoot claiming with kickstart.sh
 
