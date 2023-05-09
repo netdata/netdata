@@ -1292,7 +1292,7 @@ char *aclk_state_json(void)
 }
 
 void add_aclk_host_labels(void) {
-    DICTIONARY *labels = localhost->rrdlabels;
+    RRDLABELS *labels = localhost->rrdlabels;
 
 #ifdef ENABLE_ACLK
     rrdlabels_add(labels, "_aclk_available", "true", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);

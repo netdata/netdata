@@ -20,13 +20,12 @@ struct k8s_test_data {
     int i;
 };
 
-static int read_label_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data)
+static int read_label_callback(const char *name, const char *value, void *data)
 {
   struct k8s_test_data *test_data = (struct k8s_test_data *)data;
 
   test_data->result_key[test_data->i] = name;
   test_data->result_value[test_data->i] = value;
-  test_data->result_ls[test_data->i] = ls;
 
   test_data->i++;
 
@@ -37,7 +36,7 @@ static void test_cgroup_parse_resolved_name(void **state)
 {
     UNUSED(state);
 
-    DICTIONARY *labels = rrdlabels_create();
+    RRDLABELS *labels = rrdlabels_create();
 
     struct k8s_test_data test_data[] = {
         // One label

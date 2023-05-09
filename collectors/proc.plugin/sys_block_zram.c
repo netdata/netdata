@@ -73,7 +73,7 @@ static inline void init_rrd(const char *name, ZRAM_DEVICE *d, int update_every) 
         , RRDSET_TYPE_AREA);
     d->rd_compr_data_size = rrddim_add(d->st_usage, "compressed", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
     d->rd_metadata_size = rrddim_add(d->st_usage, "metadata", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
-    rrdlabels_add(d->st_usage->rrdlabels, "device", name, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(d->st_usage->rrdlabels, "device", name,RRDLABEL_SRC_AUTO);
 
     snprintfz(chart_name, RRD_ID_LENGTH_MAX, "zram_savings.%s", name);
     d->st_savings = rrdset_create_localhost(
@@ -108,7 +108,7 @@ static inline void init_rrd(const char *name, ZRAM_DEVICE *d, int update_every) 
         , update_every
         , RRDSET_TYPE_LINE);
     d->rd_comp_ratio = rrddim_add(d->st_comp_ratio, "ratio", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
-    rrdlabels_add(d->st_comp_ratio->rrdlabels, "device", name, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(d->st_comp_ratio->rrdlabels, "device", name,RRDLABEL_SRC_AUTO);
 
     snprintfz(chart_name, RRD_ID_LENGTH_MAX, "zram_efficiency.%s", name);
     d->st_alloc_efficiency = rrdset_create_localhost(

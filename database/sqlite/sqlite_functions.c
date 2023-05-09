@@ -930,11 +930,11 @@ skip:
 #define SELECT_HOST_LABELS "SELECT label_key, label_value, source_type FROM host_label WHERE host_id = @host_id " \
     "AND label_key IS NOT NULL AND label_value IS NOT NULL;"
 
-DICTIONARY *sql_load_host_labels(uuid_t *host_id)
+RRDLABELS *sql_load_host_labels(uuid_t *host_id)
 {
     int rc;
 
-    DICTIONARY *labels = NULL;
+    RRDLABELS *labels = NULL;
     sqlite3_stmt *res = NULL;
 
     rc = sqlite3_prepare_v2(db_meta, SELECT_HOST_LABELS, -1, &res, 0);
@@ -952,11 +952,7 @@ DICTIONARY *sql_load_host_labels(uuid_t *host_id)
     labels = rrdlabels_create();
 
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-        rrdlabels_add(
-            labels,
-            (const char *)sqlite3_column_text(res, 0),
-            (const char *)sqlite3_column_text(res, 1),
-            sqlite3_column_int(res, 2));
+        rrdlabels_add(labels, (const char *)sqlite3_column_text(res, 0), (const char *)sqlite3_column_text(res, 1), sqlite3_column_int(res, 2));
     }
 
 skip:

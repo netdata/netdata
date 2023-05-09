@@ -40,7 +40,7 @@ const char *rrdinstance_acquired_name(RRDINSTANCE_ACQUIRED *ria);
 bool rrdinstance_acquired_has_name(RRDINSTANCE_ACQUIRED *ria);
 const char *rrdinstance_acquired_units(RRDINSTANCE_ACQUIRED *ria);
 STRING *rrdinstance_acquired_units_dup(RRDINSTANCE_ACQUIRED *ria);
-DICTIONARY *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria);
+RRDLABELS *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria);
 DICTIONARY *rrdinstance_acquired_functions(RRDINSTANCE_ACQUIRED *ria);
 RRDHOST *rrdinstance_acquired_rrdhost(RRDINSTANCE_ACQUIRED *ria);
 RRDSET *rrdinstance_acquired_rrdset(RRDINSTANCE_ACQUIRED *ria);

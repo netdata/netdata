@@ -35,7 +35,7 @@ inline STRING *rrdinstance_acquired_units_dup(RRDINSTANCE_ACQUIRED *ria) {
     return string_dup(ri->units);
 }
 
-inline DICTIONARY *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria) {
+inline RRDLABELS *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria) {
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
     return ri->rrdlabels;
 }
@@ -68,7 +68,7 @@ inline time_t rrdinstance_acquired_update_every(RRDINSTANCE_ACQUIRED *ria) {
 static void rrdinstance_free(RRDINSTANCE *ri) {
 
     if(rrd_flag_check(ri, RRD_FLAG_OWN_LABELS))
-        dictionary_destroy(ri->rrdlabels);
+        rrdlabels_destroy(ri->rrdlabels);
 
     rrdmetrics_destroy_from_rrdinstance(ri);
     string_freez(ri->id);
@@ -211,7 +211,7 @@ static bool rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
         ri->rrdset = ri_new->rrdset;
 
         if(ri->rrdset && rrd_flag_check(ri, RRD_FLAG_OWN_LABELS)) {
-            DICTIONARY *old = ri->rrdlabels;
+            RRDLABELS *old = ri->rrdlabels;
             ri->rrdlabels = ri->rrdset->rrdlabels;
             rrd_flag_clear(ri, RRD_FLAG_OWN_LABELS);
             rrdlabels_destroy(old);

@@ -806,7 +806,7 @@ struct cgroup {
 
     char *chart_title;
 
-    DICTIONARY *chart_labels;
+    RRDLABELS *chart_labels;
 
     int container_orchestrator;
 
@@ -1781,7 +1781,7 @@ static inline void substitute_dots_in_id(char *s) {
 // ----------------------------------------------------------------------------
 // parse k8s labels
 
-char *cgroup_parse_resolved_name_and_labels(DICTIONARY *labels, char *data) {
+char *cgroup_parse_resolved_name_and_labels(RRDLABELS *labels, char *data) {
     // the first word, up to the first space is the name
     char *name = strsep_skip_consecutive_separators(&data, " ");
 
@@ -2745,9 +2745,9 @@ static inline void discovery_process_cgroup(struct cgroup *cg) {
 
     if (!k8s_is_kubepod(cg)) {
         rrdlabels_add(cg->chart_labels, "cgroup_name", cg->chart_id, RRDLABEL_SRC_AUTO);
-        if (!dictionary_get(cg->chart_labels, "image")) {
-            rrdlabels_add(cg->chart_labels, "image", "", RRDLABEL_SRC_AUTO);
-        }
+        //if (!dictionary_get(cg->chart_labels, "image")) {
+        //    rrdlabels_add(cg->chart_labels, "image", "", RRDLABEL_SRC_AUTO);
+        //}
     }
 
     worker_is_busy(WORKER_DISCOVERY_PROCESS_NETWORK);

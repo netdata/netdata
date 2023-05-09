@@ -23,6 +23,8 @@ typedef struct rrdcalc RRDCALC;
 typedef struct rrdcalctemplate RRDCALCTEMPLATE;
 typedef struct alarm_entry ALARM_ENTRY;
 
+typedef struct rrdlabels RRDLABELS;
+
 typedef struct rrdfamily_acquired RRDFAMILY_ACQUIRED;
 typedef struct rrdvar_acquired RRDVAR_ACQUIRED;
 typedef struct rrdsetvar_acquired RRDSETVAR_ACQUIRED;
@@ -215,6 +217,68 @@ typedef enum __attribute__ ((__packed__)) rrd_algorithm {
 
 RRD_ALGORITHM rrd_algorithm_id(const char *name);
 const char *rrd_algorithm_name(RRD_ALGORITHM algorithm);
+
+
+// RRDLABELS
+// Key OF HS ARRRAY
+typedef struct label_registry_idx {
+    STRING *key;
+    STRING *value;
+} LABEL_REGISTRY_IDX;
+
+typedef struct labels_registry_entry {
+    LABEL_REGISTRY_IDX index;
+} RRDLABEL;
+
+// Value of HS array
+typedef struct labels_registry_idx_entry {
+    RRDLABEL label;
+    size_t refcount;
+} RRDLABEL_IDX;
+
+typedef struct rrdlabels {
+    SPINLOCK spinlock;
+//    uint16_t entries;
+    size_t version;
+    //RRDLABEL **array;
+    Pvoid_t JudyL;
+} RRDLABELS;
+
+//#define lfe_start_read(label_list, label) lfe_start_rw(label_list, label, DICTIONARY_LOCK_READ)
+#define lfe_start_write(dict, value) lfe_start_rw(dict, value, DICTIONARY_LOCK_WRITE)
+#define lfe_start_reentrant(dict, value) lfe_start_rw(dict, value, DICTIONARY_LOCK_REENTRANT)
+
+#define lfe_start_nolock(label_list, label, ls)                                                                        \
+    do {                                                                                                               \
+        (void)(label); /* needed to avoid warning when looping without using this */                                   \
+        bool _first_then_next = true;                                                                                  \
+        Pvoid_t *_PValue;                                                                                              \
+        Word_t _Index = 0;                                                                                             \
+        while ((_PValue = JudyLFirstThenNext((label_list)->JudyL, &_Index, &_first_then_next))) {                      \
+            (ls) = *(RRDLABEL_SRC *)_PValue;                                                                           \
+            (label) = (void *)_Index;
+
+#define lfe_done_nolock()                                                                                              \
+        }                                                                                                              \
+    }                                                                                                                  \
+    while (0)
+
+#define lfe_start_read(label_list, label, ls)                                                                          \
+    do {                                                                                                               \
+        spinlock_lock(&(label_list)->spinlock);                                                                        \
+        (void)(label); /* needed to avoid warning when looping without using this */                                   \
+        bool _first_then_next = true;                                                                                  \
+        Pvoid_t *_PValue;                                                                                              \
+        Word_t _Index = 0;                                                                                             \
+        while ((_PValue = JudyLFirstThenNext((label_list)->JudyL, &_Index, &_first_then_next))) {                      \
+            (ls) = *(RRDLABEL_SRC *)_PValue;                                                                           \
+            (label) = (void *)_Index;
+
+#define lfe_done(label_list)                                                                                           \
+        }                                                                                                              \
+        spinlock_unlock(&(label_list)->spinlock);                                                                      \
+    }                                                                                                                  \
+    while (0)
 
 // ----------------------------------------------------------------------------
 // RRD FAMILY
@@ -795,7 +859,7 @@ struct rrdset {
     int32_t priority;                               // the sorting priority of this chart
     int32_t update_every;                           // data collection frequency
 
-    DICTIONARY *rrdlabels;                          // chart labels
+    RRDLABELS *rrdlabels;                           // chart labels
     DICTIONARY *rrdsetvar_root_index;               // chart variables
     DICTIONARY *rrddimvar_root_index;               // dimension variables
                                                     // we use this dictionary to manage their allocation
@@ -1263,7 +1327,7 @@ struct rrdhost {
 
     // ------------------------------------------------------------------------
     // Support for host-level labels
-    DICTIONARY *rrdlabels;
+    RRDLABELS *rrdlabels;
 
     // ------------------------------------------------------------------------
     // Support for functions
@@ -1508,6 +1572,8 @@ time_t rrdset_last_entry_s(RRDSET *st);
 time_t rrdset_last_entry_s_of_tier(RRDSET *st, size_t tier);
 
 void rrdset_get_retention_of_tier_for_collected_chart(RRDSET *st, time_t *first_time_s, time_t *last_time_s, time_t now_s, size_t tier);
+
+void rrdset_update_rrdlabels(RRDSET *st, RRDLABELS *new_rrdlabels);
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION functions

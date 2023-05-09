@@ -42,7 +42,7 @@ struct mount_point_metadata {
     int updated;
     int slow;
 
-    DICTIONARY *chart_labels;
+    RRDLABELS *chart_labels;
 
     size_t collected; // the number of times this has been collected
 

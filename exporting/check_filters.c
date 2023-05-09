@@ -3,11 +3,11 @@
 #include "exporting_engine.h"
 
 
-bool exporting_labels_filter_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
+bool exporting_labels_filter_callback(const char *name, const char *value, RRDLABEL_SRC ls __maybe_unused, void *data) {
     (void)name;
     (void)value;
     struct instance *instance = (struct instance *)data;
-    return should_send_label(instance, ls);
+    return should_send_label(instance);
 }
 
 /**

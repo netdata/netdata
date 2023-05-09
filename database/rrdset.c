@@ -2225,3 +2225,14 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
     __atomic_add_fetch(&rrddim_db_memory_size, st_on_file->memsize, __ATOMIC_RELAXED);
     return true;
 }
+
+void rrdset_update_rrdlabels(RRDSET *st, RRDLABELS *new_rrdlabels) {
+    if(!st->rrdlabels)
+        st->rrdlabels = rrdlabels_create();
+
+    if (new_rrdlabels)
+        rrdlabels_migrate_to_these(st->rrdlabels, new_rrdlabels);
+
+    rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
+    rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
+}

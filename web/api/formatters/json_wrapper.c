@@ -1209,7 +1209,7 @@ static void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS
                         buffer_json_member_add_object(wb, rrdinstance_acquired_id(ria));
                         buffer_json_member_add_string(wb, "nm", rrdinstance_acquired_name(ria));
                         buffer_json_member_add_time_t(wb, "ue", rrdinstance_acquired_update_every(ria));
-                        DICTIONARY *labels = rrdinstance_acquired_labels(ria);
+                        RRDLABELS *labels = rrdinstance_acquired_labels(ria);
                         if(labels) {
                             buffer_json_member_add_object(wb, "labels");
                             rrdlabels_to_buffer_json_members(labels, wb);
