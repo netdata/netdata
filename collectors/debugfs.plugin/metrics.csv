@@ -1,2 +1,4 @@
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
-mem.fragmentation,node,"scope0, scope1, scope2, scope3, scope4, scope5, scope6, scope7, scope8, scope9, scope10",degree,fragmentation degree,,debugfs.plugin,/sys/kernel/debug/extfrag/extfrag_index
+mem.fragmentation_dma,node,"scope0, scope1, scope2, scope3, scope4, scope5, scope6, scope7, scope8, scope9, scope10",degree,fragmentation degree,,debugfs.plugin,/sys/kernel/debug/extfrag/extfrag_index
+mem.fragmentation_dma32,node,"scope0, scope1, scope2, scope3, scope4, scope5, scope6, scope7, scope8, scope9, scope10",degree,fragmentation degree,,debugfs.plugin,/sys/kernel/debug/extfrag/extfrag_index
+mem.fragmentation_normal,node,"scope0, scope1, scope2, scope3, scope4, scope5, scope6, scope7, scope8, scope9, scope10",degree,fragmentation degree,,debugfs.plugin,/sys/kernel/debug/extfrag/extfrag_index

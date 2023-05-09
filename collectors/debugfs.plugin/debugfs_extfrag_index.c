@@ -98,8 +98,8 @@ int debugfs_parse_extfrag_index(int update_every, const char *name) {
         if (unlikely(!extrafrag->id)) {
             extrafrag->id = extrafrag->node_zone;
             fprintf(stdout,
-                    "CHART mem.%s '' 'fragmentation degree' 'degree' 'fragmentation' 'mem.fragmentation' 'line' %d %d '' 'debugfs.plugin' '%s'\n",
-                    extrafrag->node_zone, chart_order++, update_every, name);
+                    "CHART mem.%s '' 'fragmentation degree' 'degree' 'fragmentation' 'mem.fragmentation_%s' 'line' %d %d '' 'debugfs.plugin' '%s'\n",
+                    extrafrag->node_zone, zone, chart_order++, update_every, name);
             for (i = 0; i < NETDATA_ORDER_FRAGMENTATION; i++) {
                 fprintf(stdout, "DIMENSION '%s' '%s' absolute 1 1000 ''\n", orders[i], orders[i]);
             }
