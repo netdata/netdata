@@ -42,7 +42,7 @@ opkg install shadow
 opkg install logrotate
 ```
 
-Finally, proceed with the Netdata installation using the [kickstart.sh one line installer](https://learn.netdata.cloud/docs/installation/installation-methods/one-line-installer-kickstart.sh) method. The installer should complete successfully and it should start Netdata.
+Finally, proceed with the Netdata installation using the [kickstart.sh one line installer](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md) method. The installer should complete successfully and it should start Netdata.
 
 OpenWrt keeps cron jobs configuration in `/etc/crontabs/root`, so the Netdata installer cannot enable automatic updates during the installation process. To enable them manually, run the following commands:
 ```sh
