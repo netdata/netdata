@@ -51,10 +51,11 @@ static struct netdata_zswap_metric {
     {.filename = "/sys/kernel/debug/zswap/reject_reclaim_fail", .chart_id = "reject_reclaim_fail",
      .enabled = CONFIG_BOOLEAN_YES, .chart_created = CONFIG_BOOLEAN_NO,
      .dimension = "pages", .units = "pages", .title = "Memory cannot be reclaimed (pool limit was reached).",
-     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_POOL_LIM_HIT},
+     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_RRECLAIM_FAIL},
     {.filename = "/sys/kernel/debug/zswap/pool_limit_hit", .chart_id = "pool_limit_hit",
      .enabled = CONFIG_BOOLEAN_YES, .chart_created = CONFIG_BOOLEAN_NO,
-     .dimension = "limit", .units = "boolean", .title = "Was the pool limit reached?"},
+     .dimension = "limit", .units = "boolean", .title = "Was the pool limit reached?",
+     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_POOL_LIM_HIT},
 
     // The terminator
     {.filename = NULL, .chart_id = NULL, .enabled = CONFIG_BOOLEAN_NO}
