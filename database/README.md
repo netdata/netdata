@@ -39,8 +39,7 @@ So,
 
 - On a single node setup, use `[db].mode = dbengine`.
 - On a [Parent - Child](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md) setup, use `[db].mode = dbengine` on the
-  parent to increase retention, a more resource efficient mode like, `dbengine` with light retention settings, and
-  `save`, `ram` or `none` modes for the children to minimize resource utilization.
+  parent to increase retention, and a more resource-efficient mode like, `dbengine` with light retention settings, `save`, `ram`, or `none` for the children to minimize resource utilization.
 
 ## Choose your database mode
 
