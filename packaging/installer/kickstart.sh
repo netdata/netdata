@@ -972,7 +972,7 @@ handle_existing_install() {
         claim
         ret=$?
       elif [ "${ACTION}" = "claim" ]; then
-        fatal "User asked to claim, but did not proide a claiming token." F0202
+        fatal "User asked to claim, but did not provide a claiming token." F0202
       else
         progress "Not attempting to claim existing install at ${ndprefix} (no claiming token provided)."
       fi
@@ -1010,7 +1010,7 @@ handle_existing_install() {
           trap - EXIT
           exit $ret
         elif [ "${ACTION}" = "claim" ]; then
-          fatal "User asked to claim, but did not proide a claiming token." F0202
+          fatal "User asked to claim, but did not provide a claiming token." F0202
         else
           fatal "Found an existing netdata install at ${ndprefix}, but the install type is '${INSTALL_TYPE}', which is not supported by this script, refusing to proceed." F0103
         fi
