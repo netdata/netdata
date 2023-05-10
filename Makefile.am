@@ -1017,8 +1017,8 @@ endif
 
 NETDATACLI_FILES = \
     daemon/commands.h \
-	libnetdata/buffer/buffer.c \
-	libnetdata/buffer/buffer.h \
+    libnetdata/buffer/buffer.c \
+    libnetdata/buffer/buffer.h \
     cli/cli.c \
     cli/cli.h \
     $(NULL)
