@@ -2,7 +2,7 @@
 
 #include "debugfs_plugin.h"
 
-static struct netdata_zswap_metric {
+struct netdata_zswap_metric {
     const char *filename;
 
     const char *chart_id;
@@ -16,7 +16,9 @@ static struct netdata_zswap_metric {
     int prio;
 
     collected_number value;
-} zswap_metrics[] = {
+};
+
+static struct netdata_zswap_metric zswap_independent_metrics[] = {
     // https://elixir.bootlin.com/linux/latest/source/mm/zswap.c
     {.filename = "/sys/kernel/debug/zswap/same_filled_pages",
      .chart_id = "same_filled_page",
@@ -63,6 +65,21 @@ static struct netdata_zswap_metric {
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_STORED_PAGE,
      .value = -1},
+    {.filename = "/sys/kernel/debug/zswap/pool_limit_hit",
+     .chart_id = "pool_limit_hit",
+     .enabled = CONFIG_BOOLEAN_YES,
+     .chart_created = CONFIG_BOOLEAN_NO,
+     .dimension = "limit",
+     .units = "boolean",
+     .title = "Was the pool limit reached?",
+     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_POOL_LIM_HIT,
+     .value = -1},
+
+    // The terminator
+    {.filename = NULL, .chart_id = NULL, .enabled = CONFIG_BOOLEAN_NO}
+};
+
+static struct netdata_zswap_metric zswap_associated_metrics[] = {
     {.filename = "/sys/kernel/debug/zswap/reject_compress_poor",
      .chart_id = "reject_compress_poor",
      .dimension = "pages",
@@ -97,15 +114,6 @@ static struct netdata_zswap_metric {
      .units = "pages",
      .title = "Memory cannot be reclaimed (pool limit was reached).",
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_RRECLAIM_FAIL,
-     .value = -1},
-    {.filename = "/sys/kernel/debug/zswap/pool_limit_hit",
-     .chart_id = "pool_limit_hit",
-     .enabled = CONFIG_BOOLEAN_YES,
-     .chart_created = CONFIG_BOOLEAN_NO,
-     .dimension = "limit",
-     .units = "boolean",
-     .title = "Was the pool limit reached?",
-     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_POOL_LIM_HIT,
      .value = -1},
 
     // The terminator
@@ -159,8 +167,13 @@ int debugfs_zswap(int update_every, const char *name) {
     (void)name;
 
     int i;
-    for (i = 0; zswap_metrics[i].filename; i++) {
-        struct netdata_zswap_metric *ptr = &zswap_metrics[i];
+    for (i = 0; zswap_independent_metrics[i].filename; i++) {
+        struct netdata_zswap_metric *ptr = &zswap_independent_metrics[i];
+        ptr->enabled = !zswap_charts(ptr, update_every);
+    }
+
+    for (i = 0; zswap_associated_metrics[i].filename; i++) {
+        struct netdata_zswap_metric *ptr = &zswap_associated_metrics[i];
         ptr->enabled = !zswap_charts(ptr, update_every);
     }
 
