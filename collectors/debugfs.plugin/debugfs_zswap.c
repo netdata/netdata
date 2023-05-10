@@ -79,7 +79,7 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
     {.filename = NULL, .chart_id = NULL, .enabled = CONFIG_BOOLEAN_NO}
 };
 
-static struct netdata_zswap_metric zswap_associated_metrics[] = {
+static struct netdata_zswap_metric zswap_rejected_metrics[] = {
     {.filename = "/sys/kernel/debug/zswap/reject_compress_poor",
      .chart_id = "reject_compress_poor",
      .dimension = "pages",
@@ -178,8 +178,8 @@ int debugfs_zswap(int update_every, const char *name) {
             zswap_independent_chart(metric, update_every);
     }
 
-    for (i = 0; zswap_associated_metrics[i].filename; i++) {
-        metric = &zswap_associated_metrics[i];
+    for (i = 0; zswap_rejected_metrics[i].filename; i++) {
+        metric = &zswap_rejected_metrics[i];
         metric->enabled = !zswap_collect_data(metric);
     }
 
