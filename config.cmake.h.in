@@ -35,7 +35,6 @@
 #cmakedefine ENABLE_PROMETHEUS_REMOTE_WRITE
 
 /* they are defined as REQUIRED in CMakeLists.txt */
-#define NETDATA_WITH_ZLIB 1
 #define ENABLE_JSONC 1
 
 #cmakedefine ENABLE_ML

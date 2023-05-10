@@ -176,9 +176,7 @@ extern "C" {
 #include <stdint.h>
 #endif
 
-#ifdef NETDATA_WITH_ZLIB
 #include <zlib.h>
-#endif
 
 #ifdef HAVE_CAPABILITY
 #include <sys/capability.h>

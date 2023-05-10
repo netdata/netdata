@@ -8,9 +8,7 @@
 int respect_web_browser_do_not_track_policy = 0;
 char *web_x_frame_options = NULL;
 
-#ifdef NETDATA_WITH_ZLIB
 int web_enable_gzip = 1, web_gzip_level = 3, web_gzip_strategy = Z_DEFAULT_STRATEGY;
-#endif /* NETDATA_WITH_ZLIB */
 
 inline int web_client_permission_denied(struct web_client *w) {
     w->response.data->content_type = CT_TEXT_PLAIN;
@@ -142,7 +140,6 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
     w->auth_bearer_token = NULL;
 
     // if we had enabled compression, release it
-#ifdef NETDATA_WITH_ZLIB
     if(w->response.zinitialized) {
         deflateEnd(&w->response.zstream);
         w->response.zsent = 0;
@@ -154,7 +151,6 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
         w->response.zinitialized = false;
         w->flags &= ~WEB_CLIENT_CHUNKED_TRANSFER;
     }
-#endif // NETDATA_WITH_ZLIB
 }
 
 void web_client_request_done(struct web_client *w) {
@@ -168,9 +164,7 @@ void web_client_request_done(struct web_client *w) {
 
         size_t size = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->response.rlen:w->response.data->len;
         size_t sent = size;
-#ifdef NETDATA_WITH_ZLIB
         if(likely(w->response.zoutput)) sent = (size_t)w->response.zstream.total_out;
-#endif
 
         // --------------------------------------------------------------------
         // global statistics
@@ -444,9 +438,6 @@ int mysendfile(struct web_client *w, char *filename) {
 }
 #endif
 
-
-
-#ifdef NETDATA_WITH_ZLIB
 void web_client_enable_deflate(struct web_client *w, int gzip) {
     if(unlikely(w->response.zinitialized)) {
         debug(D_DEFLATE, "%llu: Compression has already be initialized for this client.", w->id);
@@ -492,7 +483,6 @@ void web_client_enable_deflate(struct web_client *w, int gzip) {
 
     debug(D_DEFLATE, "%llu: Initialized compression.", w->id);
 }
-#endif // NETDATA_WITH_ZLIB
 
 void buffer_data_options2string(BUFFER *wb, uint32_t options) {
     int count = 0;
@@ -730,16 +720,12 @@ const char *web_response_code_to_string(int code) {
 static inline char *http_header_parse(struct web_client *w, char *s, int parse_useragent) {
     static uint32_t hash_origin = 0, hash_connection = 0, hash_donottrack = 0, hash_useragent = 0,
                     hash_authorization = 0, hash_host = 0, hash_forwarded_proto = 0, hash_forwarded_host = 0;
-#ifdef NETDATA_WITH_ZLIB
     static uint32_t hash_accept_encoding = 0;
-#endif
 
     if(unlikely(!hash_origin)) {
         hash_origin = simple_uhash("Origin");
         hash_connection = simple_uhash("Connection");
-#ifdef NETDATA_WITH_ZLIB
         hash_accept_encoding = simple_uhash("Accept-Encoding");
-#endif
         hash_donottrack = simple_uhash("DNT");
         hash_useragent = simple_uhash("User-Agent");
         hash_authorization = simple_uhash("X-Auth-Token");
@@ -798,7 +784,6 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
         strncpyz(buffer, v, ((size_t)(ve - v) < sizeof(buffer) - 1 ? (size_t)(ve - v) : sizeof(buffer) - 1));
         w->server_host = strdupz(buffer);
     }
-#ifdef NETDATA_WITH_ZLIB
     else if(hash == hash_accept_encoding && !strcasecmp(s, "Accept-Encoding")) {
         if(web_enable_gzip) {
             if(strcasestr(v, "gzip"))
@@ -809,7 +794,6 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
             //  web_client_enable_deflate(w, 0);
         }
     }
-#endif /* NETDATA_WITH_ZLIB */
 #ifdef ENABLE_HTTPS
     else if(hash == hash_forwarded_proto && !strcasecmp(s, "X-Forwarded-Proto")) {
         if(strcasestr(v, "https"))
@@ -1736,7 +1720,6 @@ ssize_t web_client_send_chunk_finalize(struct web_client *w)
     return bytes;
 }
 
-#ifdef NETDATA_WITH_ZLIB
 ssize_t web_client_send_deflate(struct web_client *w)
 {
     ssize_t len = 0, t = 0;
@@ -1851,12 +1834,9 @@ ssize_t web_client_send_deflate(struct web_client *w)
 
     return(len);
 }
-#endif // NETDATA_WITH_ZLIB
 
 ssize_t web_client_send(struct web_client *w) {
-#ifdef NETDATA_WITH_ZLIB
     if(likely(w->response.zoutput)) return web_client_send_deflate(w);
-#endif // NETDATA_WITH_ZLIB
 
     ssize_t bytes;
 

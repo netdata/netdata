@@ -130,12 +130,6 @@ AC_ARG_WITH(
     [with_libcap="detect"]
 )
 AC_ARG_WITH(
-    [zlib],
-    [AS_HELP_STRING([--without-zlib], [build without zlib @<:@default enabled@:>@])],
-    ,
-    [with_zlib="yes"]
-)
-AC_ARG_WITH(
     [math],
     [AS_HELP_STRING([--without-math], [build without math @<:@default enabled@:>@])],
     ,
@@ -481,19 +475,7 @@ PKG_CHECK_MODULES(
     [have_zlib=yes],
     [have_zlib=no]
 )
-test "${with_zlib}" = "yes" -a "${have_zlib}" != "yes" && AC_MSG_ERROR([zlib required but not found. Try installing 'zlib1g-dev' or 'zlib-devel'.])
-
-AC_MSG_CHECKING([if zlib should be used])
-if test "${with_zlib}" != "no" -a "${have_zlib}" = "yes"; then
-    with_zlib="yes"
-    AC_DEFINE([NETDATA_WITH_ZLIB], [1], [zlib usability])
-    OPTIONAL_ZLIB_CFLAGS="${ZLIB_CFLAGS}"
-    OPTIONAL_ZLIB_LIBS="${ZLIB_LIBS}"
-else
-    with_zlib="no"
-fi
-AC_MSG_RESULT([${with_zlib}])
-
+test "${have_zlib}" != "yes" && AC_MSG_ERROR([zlib required but not found. Try installing 'zlib1g-dev' or 'zlib-devel'.])
 
 # -----------------------------------------------------------------------------
 # libuuid
@@ -1723,7 +1705,7 @@ AC_SUBST([netdata_user])
 AC_SUBST([libsysdir])
 
 CFLAGS="${originalCFLAGS} ${OPTIONAL_LTO_CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} \
-    ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
+    ${ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
     ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PUBSUB_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} \
     ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_YAML_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${JUDY_CFLAGS} \
@@ -1752,8 +1734,8 @@ AC_SUBST([OPTIONAL_JSONC_LIBS])
 AC_SUBST([OPTIONAL_YAML_LIBS])
 AC_SUBST([OPTIONAL_NFACCT_CFLAGS])
 AC_SUBST([OPTIONAL_NFACCT_LIBS])
-AC_SUBST([OPTIONAL_ZLIB_CFLAGS])
-AC_SUBST([OPTIONAL_ZLIB_LIBS])
+AC_SUBST([ZLIB_CFLAGS])
+AC_SUBST([ZLIB_LIBS])
 AC_SUBST([OPTIONAL_UUID_CFLAGS])
 AC_SUBST([OPTIONAL_UUID_LIBS])
 AC_SUBST([OPTIONAL_BPF_CFLAGS])
@@ -1934,4 +1916,3 @@ AC_CONFIG_FILES([
 AC_OUTPUT
 
 test "${with_math}" != "yes" && AC_MSG_WARN([You are building without math. math allows accurate calculations. It should be enabled.]) || :
-test "${with_zlib}" != "yes" && AC_MSG_WARN([You are building without zlib. zlib allows netdata to transfer a lot less data with web clients. It should be enabled.]) || :

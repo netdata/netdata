@@ -576,8 +576,6 @@ void web_server_config_options(void)
     web_allow_mgmt_dns         =
         make_dns_decision(CONFIG_SECTION_WEB, "allow management by dns","heuristic",web_allow_mgmt_from);
 
-
-#ifdef NETDATA_WITH_ZLIB
     web_enable_gzip = config_get_boolean(CONFIG_SECTION_WEB, "enable gzip compression", web_enable_gzip);
 
     char *s = config_get(CONFIG_SECTION_WEB, "gzip compression strategy", "default");
@@ -605,7 +603,6 @@ void web_server_config_options(void)
         error("Invalid compression level %d. Valid levels are 1 (fastest) to 9 (best ratio). Proceeding with level 9 (best compression).", web_gzip_level);
         web_gzip_level = 9;
     }
-#endif /* NETDATA_WITH_ZLIB */
 }
 
 

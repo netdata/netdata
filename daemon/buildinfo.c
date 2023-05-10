@@ -95,12 +95,6 @@
 #define FEAT_LIBCAP 0
 #endif
 
-#ifdef NETDATA_WITH_ZLIB
-#define FEAT_ZLIB 1
-#else
-#define FEAT_ZLIB 0
-#endif
-
 #ifdef STORAGE_WITH_MATH
 #define FEAT_LIBM 1
 #else
@@ -291,7 +285,7 @@ void print_build_info(void) {
     printf("    libcrypto:               %s\n", FEAT_YES_NO(FEAT_CRYPTO));
     printf("    libm:                    %s\n", FEAT_YES_NO(FEAT_LIBM));
     printf("    tcalloc:                 %s\n", FEAT_YES_NO(FEAT_TCMALLOC));
-    printf("    zlib:                    %s\n", FEAT_YES_NO(FEAT_ZLIB));
+    printf("    zlib:                    %s\n", FEAT_YES_NO(1));
 
     printf("Plugins:\n");
     printf("    apps:                    %s\n", FEAT_YES_NO(FEAT_APPS_PLUGIN));
@@ -348,7 +342,7 @@ void print_build_info_json(void) {
     printf("    \"libcrypto\": %s,\n",        FEAT_JSON_BOOL(FEAT_CRYPTO));
     printf("    \"libm\": %s,\n",             FEAT_JSON_BOOL(FEAT_LIBM));
     printf("    \"tcmalloc\": %s,\n",         FEAT_JSON_BOOL(FEAT_TCMALLOC));
-    printf("    \"zlib\": %s\n",              FEAT_JSON_BOOL(FEAT_ZLIB));
+    printf("    \"zlib\": %s\n",              FEAT_JSON_BOOL(1));
     printf("  },\n");
 
     printf("  \"plugins\": {\n");
@@ -425,9 +419,7 @@ void analytics_build_info(BUFFER *b) {
 #ifdef ENABLE_TCMALLOC
     add_to_bi(b, "tcalloc");
 #endif
-#ifdef NETDATA_WITH_ZLIB
     add_to_bi(b, "zlib");
-#endif
 
 #ifdef ENABLE_APPS_PLUGIN
     add_to_bi(b, "apps");
