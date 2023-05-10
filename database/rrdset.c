@@ -2207,7 +2207,7 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
     memset(st_on_file, 0, size);
 
     // set the values we need
-    strncpyz(st_on_file->id, rrdset_id(st), RRD_ID_LENGTH_MAX_V019 + 1);
+    strncpyz(st_on_file->id, rrdset_id(st), RRD_ID_LENGTH_MAX_V019);
     strcpy(st_on_file->cache_filename, fullfilename);
     strcpy(st_on_file->magic, RRDSET_MAGIC_V019);
     st_on_file->memsize = size;
