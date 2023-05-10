@@ -83,6 +83,7 @@ dist_noinst_DATA = \
     packaging/protobuf.version \
     packaging/version \
     database/engine/journalfile_v2.ksy.in \
+    httpd/h2o \
     $(NULL)
 
 # until integrated within build
@@ -197,6 +198,7 @@ LIBNETDATA_FILES = \
     libnetdata/string/utf8.h \
     libnetdata/worker_utilization/worker_utilization.c \
     libnetdata/worker_utilization/worker_utilization.h \
+    libnetdata/http/http_defs.h \
     $(NULL)
 
 if ENABLE_PLUGIN_EBPF
@@ -749,7 +751,8 @@ libmqttwebsockets_a_SOURCES = \
     mqtt_websockets/c-rbuf/src/ringbuffer_internal.h \
     mqtt_websockets/c_rhash/src/c_rhash.c \
     mqtt_websockets/c_rhash/include/c_rhash.h \
-    mqtt_websockets/c_rhash/src/c_rhash_internal.h
+    mqtt_websockets/c_rhash/src/c_rhash_internal.h \
+    $(NULL)
 
 libmqttwebsockets_a_CFLAGS = $(CFLAGS) -DMQTT_WSS_CUSTOM_ALLOC -DRBUF_CUSTOM_MALLOC -DMQTT_WSS_CPUSTATS -I$(srcdir)/aclk/helpers -I$(srcdir)/mqtt_websockets/c_rhash/include
 
@@ -939,6 +942,123 @@ DAEMON_FILES = \
     daemon/unit_test.h \
     $(NULL)
 
+HTTPD_FILES = \
+    httpd/http_server.c \
+    httpd/http_server.h \
+    httpd/h2o_utils.c \
+    httpd/h2o_utils.h \
+    $(NULL)
+
+libh2o_dir = httpd/h2o
+
+libh2o_a_SOURCES = \
+    $(libh2o_dir)/deps/cloexec/cloexec.c \
+    $(libh2o_dir)/deps/libgkc/gkc.c \
+    $(libh2o_dir)/deps/libyrmcds/close.c \
+    $(libh2o_dir)/deps/libyrmcds/connect.c \
+    $(libh2o_dir)/deps/libyrmcds/recv.c \
+    $(libh2o_dir)/deps/libyrmcds/send.c \
+    $(libh2o_dir)/deps/libyrmcds/send_text.c \
+    $(libh2o_dir)/deps/libyrmcds/socket.c \
+    $(libh2o_dir)/deps/libyrmcds/strerror.c \
+    $(libh2o_dir)/deps/libyrmcds/text_mode.c \
+    $(libh2o_dir)/deps/picohttpparser/picohttpparser.c \
+    $(libh2o_dir)/lib/common/cache.c \
+    $(libh2o_dir)/lib/common/file.c \
+    $(libh2o_dir)/lib/common/filecache.c \
+    $(libh2o_dir)/lib/common/hostinfo.c \
+    $(libh2o_dir)/lib/common/http1client.c \
+    $(libh2o_dir)/lib/common/memcached.c \
+    $(libh2o_dir)/lib/common/memory.c \
+    $(libh2o_dir)/lib/common/multithread.c \
+    $(libh2o_dir)/lib/common/serverutil.c \
+    $(libh2o_dir)/lib/common/socket.c \
+    $(libh2o_dir)/lib/common/socketpool.c \
+    $(libh2o_dir)/lib/common/string.c \
+    $(libh2o_dir)/lib/common/time.c \
+    $(libh2o_dir)/lib/common/timeout.c \
+    $(libh2o_dir)/lib/common/url.c \
+    $(libh2o_dir)/lib/core/config.c \
+    $(libh2o_dir)/lib/core/configurator.c \
+    $(libh2o_dir)/lib/core/context.c \
+    $(libh2o_dir)/lib/core/headers.c \
+    $(libh2o_dir)/lib/core/logconf.c \
+    $(libh2o_dir)/lib/core/proxy.c \
+    $(libh2o_dir)/lib/core/request.c \
+    $(libh2o_dir)/lib/core/token.c \
+    $(libh2o_dir)/lib/core/util.c \
+    $(libh2o_dir)/lib/handler/access_log.c \
+    $(libh2o_dir)/lib/handler/chunked.c \
+    $(libh2o_dir)/lib/handler/compress.c \
+    $(libh2o_dir)/lib/handler/compress/gzip.c \
+    $(libh2o_dir)/lib/handler/errordoc.c \
+    $(libh2o_dir)/lib/handler/expires.c \
+    $(libh2o_dir)/lib/handler/fastcgi.c \
+    $(libh2o_dir)/lib/handler/file.c \
+    $(libh2o_dir)/lib/handler/headers.c \
+    $(libh2o_dir)/lib/handler/mimemap.c \
+    $(libh2o_dir)/lib/handler/proxy.c \
+    $(libh2o_dir)/lib/handler/redirect.c \
+    $(libh2o_dir)/lib/handler/reproxy.c \
+    $(libh2o_dir)/lib/handler/throttle_resp.c \
+    $(libh2o_dir)/lib/handler/status.c \
+    $(libh2o_dir)/lib/handler/headers_util.c \
+    $(libh2o_dir)/lib/handler/status/events.c \
+    $(libh2o_dir)/lib/handler/status/requests.c \
+    $(libh2o_dir)/lib/handler/http2_debug_state.c \
+    $(libh2o_dir)/lib/handler/status/durations.c \
+    $(libh2o_dir)/lib/handler/configurator/access_log.c \
+    $(libh2o_dir)/lib/handler/configurator/compress.c \
+    $(libh2o_dir)/lib/handler/configurator/errordoc.c \
+    $(libh2o_dir)/lib/handler/configurator/expires.c \
+    $(libh2o_dir)/lib/handler/configurator/fastcgi.c \
+    $(libh2o_dir)/lib/handler/configurator/file.c \
+    $(libh2o_dir)/lib/handler/configurator/headers.c \
+    $(libh2o_dir)/lib/handler/configurator/proxy.c \
+    $(libh2o_dir)/lib/handler/configurator/redirect.c \
+    $(libh2o_dir)/lib/handler/configurator/reproxy.c \
+    $(libh2o_dir)/lib/handler/configurator/throttle_resp.c \
+    $(libh2o_dir)/lib/handler/configurator/status.c \
+    $(libh2o_dir)/lib/handler/configurator/http2_debug_state.c \
+    $(libh2o_dir)/lib/handler/configurator/headers_util.c \
+    $(libh2o_dir)/lib/http1.c \
+    $(libh2o_dir)/lib/tunnel.c \
+    $(libh2o_dir)/lib/http2/cache_digests.c \
+    $(libh2o_dir)/lib/http2/casper.c \
+    $(libh2o_dir)/lib/http2/connection.c \
+    $(libh2o_dir)/lib/http2/frame.c \
+    $(libh2o_dir)/lib/http2/hpack.c \
+    $(libh2o_dir)/lib/http2/scheduler.c \
+    $(libh2o_dir)/lib/http2/stream.c \
+    $(libh2o_dir)/lib/http2/http2_debug_state.c \
+    $(NULL)
+
+libh2o_a_INCLUDES = \
+    -I$(srcdir)/$(libh2o_dir)/include \
+    -I$(srcdir)/$(libh2o_dir)/deps/cloexec \
+    -I$(srcdir)/$(libh2o_dir)/deps/brotli/enc \
+    -I$(srcdir)/$(libh2o_dir)/deps/golombset \
+    -I$(srcdir)/$(libh2o_dir)/deps/libgkc \
+    -I$(srcdir)/$(libh2o_dir)/deps/libyrmcds \
+    -I$(srcdir)/$(libh2o_dir)/deps/klib \
+    -I$(srcdir)/$(libh2o_dir)/deps/neverbleed \
+    -I$(srcdir)/$(libh2o_dir)/deps/picohttpparser \
+    -I$(srcdir)/$(libh2o_dir)/deps/picotest \
+    -I$(srcdir)/$(libh2o_dir)/deps/yaml/include \
+    -I$(srcdir)/$(libh2o_dir)/deps/yoml \
+    $(NULL)
+
+if ENABLE_HTTPD
+noinst_LIBRARIES += libh2o.a
+
+# until h2o updates support for OpenSSL 3.0 we silence the warnings
+libh2o_a_CFLAGS = $(CFLAGS) -Wno-deprecated-declarations -Wno-unused-parameter -Wno-sign-compare -Wno-missing-field-initializers -DH2O_USE_LIBUV=0 $(libh2o_a_INCLUDES)
+
+if LINUX
+    libh2o_a_CFLAGS += -D_GNU_SOURCE
+endif
+endif #ENABLE_HTTPD
+
 NETDATA_FILES = \
     collectors/all.h \
     $(DAEMON_FILES) \
@@ -1005,6 +1125,11 @@ NETDATA_COMMON_LIBS = \
 
 if ENABLE_ACLK
     NETDATA_COMMON_LIBS += libmqttwebsockets.a
+endif
+
+if ENABLE_HTTPD
+    NETDATA_FILES += $(HTTPD_FILES)
+    NETDATA_COMMON_LIBS += libh2o.a
 endif
 
 if LINK_STATIC_JSONC

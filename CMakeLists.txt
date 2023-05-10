@@ -513,6 +513,7 @@ set(LIBNETDATA_FILES
         libnetdata/worker_utilization/worker_utilization.h
 		libnetdata/parser/parser.h
 		libnetdata/parser/parser.c
+        libnetdata/http/http_defs.h
         )
 
 IF(ENABLE_PLUGIN_EBPF)

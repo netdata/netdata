@@ -503,3 +503,11 @@ int buffer_unittest(void) {
     return errors;
 }
 
+#ifdef ENABLE_HTTPD
+h2o_iovec_t buffer_to_h2o_iovec(BUFFER *wb) {
+    h2o_iovec_t ret;
+    ret.base = wb->buffer;
+    ret.len = wb->len;
+    return ret;
+}
+#endif

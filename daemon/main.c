@@ -170,6 +170,8 @@ static void service_to_buffer(BUFFER *wb, SERVICE_TYPE service) {
         buffer_strcat(wb, "ANALYTICS ");
     if(service & SERVICE_EXPORTERS)
         buffer_strcat(wb, "EXPORTERS ");
+    if(service & SERVICE_HTTPD)
+        buffer_strcat(wb, "HTTPD ");
 }
 
 static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
@@ -365,6 +367,7 @@ void netdata_cleanup_and_exit(int ret) {
             | SERVICE_EXPORTERS
             | SERVICE_HEALTH
             | SERVICE_WEB_SERVER
+            | SERVICE_HTTPD
             , 3 * USEC_PER_SEC);
 
     delta_shutdown_time("stop collectors and streaming threads");
@@ -1979,6 +1982,14 @@ int main(int argc, char **argv) {
 
         if(web_server_mode != WEB_SERVER_MODE_NONE)
             api_listen_sockets_setup();
+
+#ifdef ENABLE_HTTPD
+        delta_startup_time("initialize httpd server");
+        for (int i = 0; static_threads[i].name; i++) {
+            if (static_threads[i].start_routine == httpd_main)
+                static_threads[i].enabled = httpd_is_enabled();
+        }
+#endif
     }
 
     delta_startup_time("set resource limits");
