@@ -1,0 +1,6 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+hpssa.ctrl_status,,"ctrl_{adapter slot}_status, cache_{adapter slot}_status, battery_{adapter slot}_status per adapter",Status,"Status 1 is OK, Status 0 is not OK",line,,python.d.plugin,hpssa
+hpssa.ctrl_temperature,,"ctrl_{adapter slot}_temperature, cache_{adapter slot}_temperature per adapter",Celsius,Temperature,line,,python.d.plugin,hpssa
+hpssa.ld_status,,a dimension per logical drive,Status,"Status 1 is OK, Status 0 is not OK",line,,python.d.plugin,hpssa
+hpssa.pd_status,,a dimension per physical drive,Status,"Status 1 is OK, Status 0 is not OK",line,,python.d.plugin,hpssa
+hpssa.pd_temperature,,a dimension per physical drive,Celsius,Temperature,line,,python.d.plugin,hpssa

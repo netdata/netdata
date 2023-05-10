@@ -1,0 +1,8 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+syscall.rw,,"sendfile, recvfile",KiB/s,R/Ws,area,,python.d.plugin,samba
+smb2.rw,,"readout, writein, readin, writeout",KiB/s,R/Ws,area,,python.d.plugin,samba
+smb2.create_close,,"create, close",operations/s,Create/Close,line,,python.d.plugin,samba
+smb2.get_set_info,,"getinfo, setinfo",operations/s,Info,line,,python.d.plugin,samba
+smb2.find,,find,operations/s,Find,line,,python.d.plugin,samba
+smb2.notify,,notify,operations/s,Notify,line,,python.d.plugin,samba
+smb2.sm_counters,,"tcon, negprot, tdis, cancel, logoff, flush, lock, keepalive, break, sessetup",count,Lesser Ops,stacked,,python.d.plugin,samba

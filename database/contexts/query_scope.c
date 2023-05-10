@@ -5,10 +5,10 @@
 ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hosts_sp,
                                   foreach_host_cb_t cb, void *data,
                                   struct query_versions *versions,
-                                  char *host_uuid_buffer) {
+                                  char *host_node_id_str) {
     char uuid[UUID_STR_LEN];
-    if(!host_uuid_buffer) host_uuid_buffer = uuid;
-    host_uuid_buffer[0] = '\0';
+    if(!host_node_id_str) host_node_id_str = uuid;
+    host_node_id_str[0] = '\0';
 
     RRDHOST *host;
     ssize_t added = 0;
@@ -19,15 +19,17 @@ ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN 
 
     dfe_start_read(rrdhost_root_index, host) {
         if(host->node_id)
-            uuid_unparse_lower(*host->node_id, host_uuid_buffer);
+            uuid_unparse_lower(*host->node_id, host_node_id_str);
+        else
+            host_node_id_str[0] = '\0';
 
         SIMPLE_PATTERN_RESULT match = SP_MATCHED_POSITIVE;
         if(scope_hosts_sp) {
             match = simple_pattern_matches_string_extract(scope_hosts_sp, host->hostname, NULL, 0);
             if(match == SP_NOT_MATCHED) {
                 match = simple_pattern_matches_extract(scope_hosts_sp, host->machine_guid, NULL, 0);
-                if(match == SP_NOT_MATCHED && *host_uuid_buffer)
-                    match = simple_pattern_matches_extract(scope_hosts_sp, host_uuid_buffer, NULL, 0);
+                if(match == SP_NOT_MATCHED && *host_node_id_str)
+                    match = simple_pattern_matches_extract(scope_hosts_sp, host_node_id_str, NULL, 0);
             }
         }
 
@@ -40,8 +42,8 @@ ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN 
             match = simple_pattern_matches_string_extract(hosts_sp, host->hostname, NULL, 0);
             if(match == SP_NOT_MATCHED) {
                 match = simple_pattern_matches_extract(hosts_sp, host->machine_guid, NULL, 0);
-                if(match == SP_NOT_MATCHED && *host_uuid_buffer)
-                    match = simple_pattern_matches_extract(hosts_sp, host_uuid_buffer, NULL, 0);
+                if(match == SP_NOT_MATCHED && *host_node_id_str)
+                    match = simple_pattern_matches_extract(hosts_sp, host_node_id_str, NULL, 0);
             }
         }
 

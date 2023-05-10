@@ -1,0 +1,5 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+squid.clients_net,squid instance,"in, out, hits",kilobits/s,Squid Client Bandwidth,area,,python.d.plugin,squid
+squid.clients_requests,squid instance,"requests, hits, errors",requests/s,Squid Client Requests,line,,python.d.plugin,squid
+squid.servers_net,squid instance,"in, out",kilobits/s,Squid Server Bandwidth,area,,python.d.plugin,squid
+squid.servers_requests,squid instance,"requests, errors",requests/s,Squid Server Requests,line,,python.d.plugin,squid

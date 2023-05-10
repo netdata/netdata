@@ -4,7 +4,7 @@
   |   '-'   '-'   '-'   '-'   real-time performance monitoring, done right!
   +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->
 
-  (C) Copyright 2017, Costa Tsaousis
+  (C) Copyright 2017-2023, Costa Tsaousis
   All rights reserved
   Released under GPL v3+
 
@@ -24,13 +24,10 @@
    - /etc/logrotate.d/netdata
 
   # SYSTEM INIT
-  This file will be installed if this system runs with systemd:
-
-   - /lib/systemd/system/netdata.service
-
-   or, for older CentOS, Debian/Ubuntu or OpenRC Gentoo:
-
-   - /etc/init.d/netdata         will be created
+  If a supported init system is detected, appropriate configuration will be
+  installed to allow Netdata to run as a system service. We currently support
+  systemd, OpenRC, LSB init scripts, and traditional init.d setups, as well as
+  having experimental support for runit.
 
 
   This package can also update a netdata installation that has been

@@ -10,9 +10,6 @@ static uv_shutdown_t shutdown_req;
 static char command_string[MAX_COMMAND_LENGTH];
 static unsigned command_string_size;
 
-static char response_string[MAX_COMMAND_LENGTH];
-static unsigned response_string_size;
-
 static int exit_status;
 
 struct command_context {
@@ -24,8 +21,10 @@ struct command_context {
     cmd_status_t status;
 };
 
-static void parse_command_reply(void)
+static void parse_command_reply(BUFFER *buf)
 {
+    char *response_string = (char *) buffer_tostring(buf);
+    unsigned response_string_size = buffer_strlen(buf);
     FILE *stream = NULL;
     char *pos;
     int syntax_error = 0;
@@ -64,28 +63,21 @@ static void parse_command_reply(void)
 
 static void pipe_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf)
 {
-    if (0 == nread) {
+    BUFFER  *response = client->data;
+
+    if (0 == nread)
         fprintf(stderr, "%s: Zero bytes read by command pipe.\n", __func__);
-    } else if (UV_EOF == nread) {
-//      fprintf(stderr, "EOF found in command pipe.\n");
-        parse_command_reply();
-    } else if (nread < 0) {
-        fprintf(stderr, "%s: %s\n", __func__, uv_strerror(nread));
+    else if (UV_EOF == nread)
+       parse_command_reply(response);
+    else if (nread < 0) {
+       fprintf(stderr, "%s: %s\n", __func__, uv_strerror(nread));
+       (void)uv_read_stop((uv_stream_t *)client);
     }
+    else
+        buffer_fast_rawcat(response, buf->base, nread);
 
-    if (nread < 0) { /* stop stream due to EOF or error */
-        (void)uv_read_stop((uv_stream_t *)client);
-    } else if (nread) {
-        size_t to_copy;
-
-        to_copy = MIN((unsigned int) nread, MAX_COMMAND_LENGTH - 1 - response_string_size);
-        memcpy(response_string + response_string_size, buf->base, to_copy);
-        response_string_size += to_copy;
-        response_string[response_string_size] = '\0';
-    }
-    if (buf && buf->len) {
+    if (buf && buf->len)
         free(buf->base);
-    }
 }
 
 static void alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
@@ -104,8 +96,7 @@ static void shutdown_cb(uv_shutdown_t* req, int status)
     (void)status;
 
     /* receive reply */
-    response_string_size = 0;
-    response_string[0] = '\0';
+    client_pipe.data = req->data;
 
     ret = uv_read_start((uv_stream_t *)&client_pipe, alloc_cb, pipe_read_cb);
     if (ret) {
@@ -113,15 +104,16 @@ static void shutdown_cb(uv_shutdown_t* req, int status)
         uv_close((uv_handle_t *)&client_pipe, NULL);
         return;
     }
-
 }
 
 static void pipe_write_cb(uv_write_t* req, int status)
 {
     int ret;
 
-    (void)req;
     (void)status;
+
+    uv_pipe_t *clientp = req->data;
+    shutdown_req.data = clientp->data;
 
     ret = uv_shutdown(&shutdown_req, (uv_stream_t *)&client_pipe, shutdown_cb);
     if (ret) {
@@ -144,10 +136,11 @@ static void connect_cb(uv_connect_t* req, int status)
         exit(-1);
     }
     if (0 == command_string_size) {
-        s = fgets(command_string, MAX_COMMAND_LENGTH, stdin);
+        s = fgets(command_string, MAX_COMMAND_LENGTH - 1, stdin);
     }
     (void)s; /* We don't need input to communicate with the server */
     command_string_size = strlen(command_string);
+    client_pipe.data = req->data;
 
     write_req.data = &client_pipe;
     write_buf.base = command_string;
@@ -191,11 +184,13 @@ int main(int argc, char **argv)
         }
     }
 
+    req.data = buffer_create(128, NULL);
     uv_pipe_connect(&req, &client_pipe, PIPENAME, connect_cb);
 
     uv_run(loop, UV_RUN_DEFAULT);
 
     uv_close((uv_handle_t *)&client_pipe, NULL);
+    buffer_free(client_pipe.data);
 
     return exit_status;
 }

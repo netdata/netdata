@@ -394,6 +394,7 @@
                 "enum": [
                   "dimension",
                   "instance",
+                  "percentage-of-instance",
                   "label",
                   "node",
                   "context",
@@ -2994,6 +2995,50 @@
                     }
                   }
                 }
+              },
+              "units": {
+                "description": "The units of the database data\n",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                ]
+              },
+              "dimensions": {
+                "type": "object",
+                "properties": {
+                  "ids": {
+                    "description": "An array with the dimension ids that uniquely identify the dimensions for this query. It is the same with `view.dimensions.ids`.\n",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "units": {
+                    "description": "An array with the units each dimension has in the database (independent of group-by aggregation that may override the units).\n",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "sts": {
+                    "description": "Statistics about the data collection points used for each dimension.\n",
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/jsonwrap2_sts"
+                      },
+                      {
+                        "$ref": "#/components/schemas/jsonwrap2_sts_raw"
+                      }
+                    ]
+                  }
+                }
               }
             }
           },
@@ -3107,13 +3152,6 @@
                       "type": "string"
                     }
                   },
-                  "units": {
-                    "description": "An array with the units each dimension has.\n",
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
                   "priorities": {
                     "description": "An array with the relative priorities of the dimensions.\nNumbers may not be sequential or unique. The application is expected to order by this and then by name.\n",
                     "type": "array",
@@ -3128,88 +3166,23 @@
                       "type": "integer"
                     }
                   },
-                  "min": {
-                    "description": "An array of the minimum value of each dimension across the entire query.\n",
+                  "units": {
+                    "description": "An array with the units each dimension has.\n",
                     "type": "array",
                     "items": {
-                      "type": "number"
-                    }
-                  },
-                  "max": {
-                    "description": "An array of the maximum value of each dimension across the entire query.\n",
-                    "type": "array",
-                    "items": {
-                      "type": "number"
-                    }
-                  },
-                  "avg": {
-                    "description": "An array of the average value of each dimension across the entire query.\n",
-                    "type": "array",
-                    "items": {
-                      "type": "number"
+                      "type": "string"
                     }
                   },
                   "sts": {
-                    "description": "Statistics about the data collection points used for each dimension.\n",
-                    "type": "object",
-                    "properties": {
-                      "min": {
-                        "description": "An array with the minimum data collection value aggregated to each dimension.\n",
-                        "type": "array",
-                        "items": {
-                          "type": "number"
-                        }
+                    "description": "Statistics about the view points for each dimension.\n",
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/jsonwrap2_sts"
                       },
-                      "max": {
-                        "description": "An array with the maximum data collection value aggregated to each dimension.\n",
-                        "type": "array",
-                        "items": {
-                          "type": "number"
-                        }
-                      },
-                      "sum": {
-                        "description": "An array with the sum of all data collection values aggregated to each dimension.\nThis member exists only when option `raw` is given.\n",
-                        "type": "array",
-                        "items": {
-                          "type": "number"
-                        }
-                      },
-                      "cnt": {
-                        "description": "An array with the count of the data collection values aggregated to each dimension.\nThis member exists only when option `raw` is given.\n",
-                        "type": "array",
-                        "items": {
-                          "type": "number"
-                        }
-                      },
-                      "ars": {
-                        "description": "An array with the anomaly rate sum of all data collection values aggregated to each dimension.\nThis member exists only when option `raw` is given.\n",
-                        "type": "array",
-                        "items": {
-                          "type": "number"
-                        }
-                      },
-                      "avg": {
-                        "description": "An array with the average of all data collection values aggregated to each dimension.\nThis member exists only when option `raw` is not given. When option `raw` is given, the average can be calculated by dividing `sum` with `cnt`.\n",
-                        "type": "array",
-                        "items": {
-                          "type": "number"
-                        }
-                      },
-                      "arp": {
-                        "description": "An array with the average anomaly rate of all data collection values aggregated to each dimension.\nThis member exists only when option `raw` is not given. When option `raw` is given, the average can be calculated by dividing `ars` with `cnt`.\n",
-                        "type": "array",
-                        "items": {
-                          "type": "number"
-                        }
-                      },
-                      "con": {
-                        "description": "An array with the contribution % of all data collection values aggregated to each dimension.\nThis member exists only when option `raw` is not given. When option `raw` is given, the contribution can be calculated by multiplying `ABS(sum)` with 100.0 and dividing it with the total of the ABS(sum) of all dimensions.\n",
-                        "type": "array",
-                        "items": {
-                          "type": "number"
-                        }
+                      {
+                        "$ref": "#/components/schemas/jsonwrap2_sts_raw"
                       }
-                    }
+                    ]
                   },
                   "labels": {
                     "description": "The labels associated with each dimension in the query.\nThis object is only available when the `group-by-labels` option is given to the query.\n",

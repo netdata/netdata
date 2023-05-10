@@ -1,0 +1,8 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+expvar.memstats.heap,,"alloc, inuse",KiB,memory: size of heap memory structures,line,,python.d.plugin,go_expvar
+expvar.memstats.stack,,inuse,KiB,memory: size of stack memory structures,line,,python.d.plugin,go_expvar
+expvar.memstats.mspan,,inuse,KiB,memory: size of mspan memory structures,line,,python.d.plugin,go_expvar
+expvar.memstats.mcache,,inuse,KiB,memory: size of mcache memory structures,line,,python.d.plugin,go_expvar
+expvar.memstats.live_objects,,live,objects,memory: number of live objects,line,,python.d.plugin,go_expvar
+expvar.memstats.sys,,sys,KiB,memory: size of reserved virtual address space,line,,python.d.plugin,go_expvar
+expvar.memstats.gc_pauses,,avg,ns,memory: average duration of GC pauses,line,,python.d.plugin,go_expvar

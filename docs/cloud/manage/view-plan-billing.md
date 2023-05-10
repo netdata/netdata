@@ -13,11 +13,13 @@ To see your plan and billing setting you need:
 
 ## Steps
 
+### View current plan and Billing options and Invoices
+
 1. Click on the **Space settings** cog (located above your profile icon)
 1. Click on the **Plan & Billing** tab
 1. On this page you will be presented with information on your current plan, billing settings, and usage information:
    1. At the top of the page you will see:
-      - **Credit** amount which refers to any amount you have available to use on future invoices or subscription changes (<https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md#plan-changes-and-credit-balance>) - this is displayed once you have had an active paid subscription with us
+      - **Credit** amount which refers to any amount you have available to use on future invoices or subscription changes ([Plan changes and credit balance](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md#plan-changes-and-credit-balance)) - this is displayed once you have had an active paid subscription with us
       - **Billing email** the email that was specified to be linked to tha plan subscription. This is where invoices, payment, and subscription-related notifications will be sent.
       - **Billing options and Invoices** is the link to our billing provider Customer Portal where you will be able to:
          - See the current subscription. There will always be 2 subscriptions active for the two pricing components mentioned on [Netdata Plans documentation page](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md#plans)
@@ -31,19 +33,51 @@ To see your plan and billing setting you need:
          - View your invoice history
    1. At the middle, you'll see details on your current plan as well as means to:
       - Upgrade or cancel your plan
-      - View full plan details page
+      - View **All Plans** details page
    1. At the bottom, you will find your Usage chart that displays:
       - Daily count - The weighted 90th percentile of the live node count during the day, taking time as the weight. If you have 30 live nodes throughout the day
       except for a two hour peak of 44 live nodes, the daily value is 31.
       - Period count: The 90th percentile of the daily counts for this period up to the date. The last value for the period is used as the number of nodes for the bill for that period. See more details in [running nodes and billing](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md#running-nodes-and-billing) (only applicable if you are on a paid plan subscription)
       - Committed nodes: The number of nodes committed to in the yearly plan. In case the period count is higher than the number of committed nodes, the difference is billed as overage.
 
-> ⚠️ At the moment, any changes to an active paid plan, upgrades, change billing frequency or committed nodes, will be a manual two-setup flow:
->
-> 1. cancel your current subscription - move you to the Community plan
-> 2. chose the plan with the intended changes
->
-> This is a temporary process that we aim to sort out soon so that it will effortless for you to do any of these actions.
+
+### Update plan
+
+1. Click on the **Space settings** cog (located above your profile icon)
+1. Click on the **Plan & Billing** tab
+1. On this page you will be presented with information on your current plan, billing settings, and usage information
+   1. Depending on your plan there could be shortcuts to immediately take you to change, for example, the billing frequency to **Yearly**
+   1. Most actions will be available under the **Change plan** link that take you to the **All plans** details page where you can
+      1. Downgrade or upgrade your plan
+      1. Change the billing frequency
+      1. Change committed nodes, in case you are on a Yearly plan
+   1. Once you chose an action to update your plan a modal will pop-up on the right with
+      1. Billing frequency displayed on the top right-corner
+      1. Committed Nodes, when applicable
+      1. Current billing information:
+         - Billing email
+         - Default payment method
+         - Business name and VAT number, when these are applicable
+         - Billing Address
+         Note: Any changes to these need to done through our billing provider Customer Portal prior to confirm the checkout. You can click on the link **Change billing info and payment method** to access it.
+      1. Promotion code, so you can review any applied promotion or enter one you may have
+      1. Detailed view on Node and Space charges 
+      1. Breakdown of: 
+         - Subscription Total
+         - Discount from promotion codes, if applicable
+         - credit value for Unused time from current plan, if applicable
+         - Credit amount used from balance, if applicable
+         - Total Before Tax
+         - VAT rate and amount, if applicable
+      1. Summary of:
+         - Total payable amount
+         - credit adjustment value for any Remaining Unused time from current plan, if applicable
+         - Final credit balance
+   
+Notes:
+* Since there is an active plan you won't be redirected to our billing provider, the checkout if performed as soon as you click on **Checkout**
+* The change to your plan will be applied as soon as the checkout process is completed successfully
+* Downgrade or cancellations may have impacts on some of notification method settings or user accesses to your space, for more details please check [Plan changes and credit balance](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md#plan-changes-and-credit-balance)
 
 ## FAQ
 
@@ -90,3 +124,16 @@ Every time you purchase or renew a Plan, two separate Invoices are generated:
 You can find some further details on the [Netdata Plans page](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md#plans).
 
 > ⚠️ We expect this to change to a single invoice in the future, but currently do not have a concrete timeline for when this change will happen.
+
+### 8. How is the **Total Before Tax** value calculated on plan changes?
+
+When you change your plan we will be calculating the residual before tax value you have from the _Unused time on your current plan_ in order to credit you with this value.  
+
+After that, we will be performing the following calculations:
+
+1. Get the **Subscription total** (total amount to be paid for Nodes and Space)
+2. Deduct any Discount applicable from promotion codes
+3. If an amount remains, then we deduct the sum of the _Unused time on current plan_ then and the Credit amount from any existing credit balance. 
+4. The result, if positive, is the Total Before Tax, if applicable, any sales tax (VAT or other) will apply. 
+
+If  the calculation of step 3 returns a negative amount then this amount will be your new customer credit balance.

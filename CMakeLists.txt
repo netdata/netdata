@@ -86,7 +86,6 @@ pkg_check_modules(ZLIB REQUIRED zlib)
 set(NETDATA_COMMON_CFLAGS ${NETDATA_COMMON_CFLAGS} ${ZLIB_CFLAGS_OTHER})
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${ZLIB_LIBRARIES})
 set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${ZLIB_INCLUDE_DIRS})
-# set(NETDATA_REQUIRED_DEFINES "${NETDATA_REQUIRED_DEFINES} -DNETDATA_WITH_ZLIB=1")
 
 # -----------------------------------------------------------------------------
 # libuv multi-platform support library with a focus on asynchronous I/O
@@ -513,6 +512,7 @@ set(LIBNETDATA_FILES
         libnetdata/worker_utilization/worker_utilization.h
 		libnetdata/parser/parser.h
 		libnetdata/parser/parser.c
+        libnetdata/http/http_defs.h
         )
 
 IF(ENABLE_PLUGIN_EBPF)
@@ -863,6 +863,8 @@ set(API_PLUGIN_FILES
         web/api/formatters/rrdset2json.c
         web/api/formatters/rrdset2json.h
         web/api/health/health_cmdapi.c
+        web/rtc/webrtc.c
+        web/rtc/webrtc.h
         )
 
 set(STREAMING_PLUGIN_FILES
@@ -886,6 +888,8 @@ set(ACLK_ALWAYS_BUILD
         aclk/aclk_proxy.h
         aclk/aclk.c
         aclk/aclk.h
+        aclk/aclk_capas.c
+        aclk/aclk_capas.h
         )
 
 set(ACLK_FILES
@@ -909,8 +913,6 @@ set(ACLK_FILES
         aclk/aclk_alarm_api.h
         aclk/aclk_contexts_api.c
         aclk/aclk_contexts_api.h
-        aclk/aclk_capas.c
-        aclk/aclk_capas.h
         aclk/schema-wrappers/connection.cc
         aclk/schema-wrappers/connection.h
         aclk/schema-wrappers/node_connection.cc
@@ -934,6 +936,8 @@ set(ACLK_FILES
         aclk/schema-wrappers/schema_wrappers.h
         aclk/schema-wrappers/schema_wrapper_utils.cc
         aclk/schema-wrappers/schema_wrapper_utils.h
+        aclk/schema-wrappers/agent_cmds.cc
+        aclk/schema-wrappers/agent_cmds.h
         aclk/helpers/mqtt_wss_pal.h
         aclk/helpers/ringbuffer_pal.h
         )
@@ -1257,6 +1261,7 @@ set(ACLK_PROTO_DEFS
         aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto
         aclk/aclk-schemas/proto/context/v1/context.proto
         aclk/aclk-schemas/proto/context/v1/stream.proto
+        aclk/aclk-schemas/proto/agent/v1/cmds.proto
         )
 PROTOBUF_ACLK_GENERATE_CPP(ACLK_PROTO_BUILT_SRCS ACLK_PROTO_BUILT_HDRS ${ACLK_PROTO_DEFS})
 

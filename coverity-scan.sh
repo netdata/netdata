@@ -40,7 +40,7 @@ set -e
 INSTALL_DIR="/opt"
 
 # the version of coverity to use
-COVERITY_BUILD_VERSION="${COVERITY_BUILD_VERSION:-cov-analysis-linux64-2022.06}"
+COVERITY_BUILD_VERSION="${COVERITY_BUILD_VERSION:-cov-analysis-linux64-2022.12.2}"
 
 # TODO: For some reasons this does not fully load on Debian 10 (Haven't checked if it happens on other distros yet), it breaks
 source packaging/installer/functions.sh || echo "Failed to fully load the functions library"
@@ -150,6 +150,7 @@ installit() {
     COVERITY_PATH=$(find "${INSTALL_DIR}" -maxdepth 1 -name 'cov*linux*')
     export PATH=${PATH}:${COVERITY_PATH}/bin/
   elif find . -name "*.tar.gz" > /dev/null 2>&1; then
+    ls ./*.tar.gz
     fatal "Downloaded coverity tool tarball does not appear to be the version we were expecting, exiting."
   else
     fatal "Failed to download coverity tool tarball!"

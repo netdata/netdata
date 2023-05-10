@@ -1,0 +1,5 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+adaptec_raid.ld_status,,a dimension per logical device,bool,Status of logical devices (1: Failed or Degraded),line,,python.d.plugin,adaptec_raid
+adaptec_raid.pd_state,,a dimension per physical device,bool,State of physical devices (1: not Online),line,,python.d.plugin,adaptec_raid
+adaptec_raid.smart_warnings,,a dimension per physical device,count,S.M.A.R.T warnings,line,,python.d.plugin,adaptec_raid
+adaptec_raid.temperature,,a dimension per physical device,celsius,Temperature,line,,python.d.plugin,adaptec_raid

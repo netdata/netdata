@@ -61,6 +61,14 @@ run rm "${NETDATA_INSTALL_PATH}/sbin" \
   "${NETDATA_INSTALL_PATH}/usr/local"
 
 # -----------------------------------------------------------------------------
+# ensure required directories actually exist
+
+for dir in var/lib/netdata var/cache/netdata var/log/netdata ; do
+    run mkdir -p "${NETDATA_INSTALL_PATH}/${dir}"
+    run touch "${NETDATA_INSTALL_PATH}/${dir}/.keep"
+done
+
+# -----------------------------------------------------------------------------
 # create the makeself archive
 
 run sed "s|NETDATA_VERSION|${VERSION}|g" < "${NETDATA_MAKESELF_PATH}/makeself.lsm" > "${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp"

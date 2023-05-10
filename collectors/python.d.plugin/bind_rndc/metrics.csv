@@ -1,0 +1,5 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+bind_rndc.name_server_statistics,,"requests, rejected_queries, success, failure, responses, duplicate, recursion, nxrrset, nxdomain, non_auth_answer, auth_answer, dropped_queries",stats,Name Server Statistics,line,,python.d.plugin,bind_rndc
+bind_rndc.incoming_queries,,a dimension per incoming query type,queries,Incoming queries,line,,python.d.plugin,bind_rndc
+bind_rndc.outgoing_queries,,a dimension per outgoing query type,queries,Outgoing queries,line,,python.d.plugin,bind_rndc
+bind_rndc.stats_size,,stats_size,MiB,Named Stats File Size,line,,python.d.plugin,bind_rndc

@@ -158,7 +158,7 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
             STORAGE_ENGINE *eng = st->rrdhost->db[tier].eng;
             if(!eng) continue;
 
-            st->storage_metrics_groups[tier] = eng->api.collect_ops.metrics_group_get(host->db[tier].instance, &st->chart_uuid);
+            st->storage_metrics_groups[tier] = storage_engine_metrics_group_get(eng->backend, host->db[tier].instance, &st->chart_uuid);
         }
     }
 
@@ -203,7 +203,7 @@ void rrdset_finalize_collection(RRDSET *st, bool dimensions_too) {
         if(!eng) continue;
 
         if(st->storage_metrics_groups[tier]) {
-            eng->api.collect_ops.metrics_group_release(host->db[tier].instance, st->storage_metrics_groups[tier]);
+            storage_engine_metrics_group_release(eng->backend, host->db[tier].instance, st->storage_metrics_groups[tier]);
             st->storage_metrics_groups[tier] = NULL;
         }
     }
@@ -479,6 +479,27 @@ inline RRDSET *rrdset_find_byname(RRDHOST *host, const char *name) {
     return(st);
 }
 
+RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id) {
+    debug(D_RRD_CALLS, "rrdset_find_and_acquire() for host %s, chart %s", rrdhost_hostname(host), id);
+
+    return (RRDSET_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdset_root_index, id);
+}
+
+RRDSET *rrdset_acquired_to_rrdset(RRDSET_ACQUIRED *rsa) {
+    if(unlikely(!rsa))
+        return NULL;
+
+    return (RRDSET *) dictionary_acquired_item_value((const DICTIONARY_ITEM *)rsa);
+}
+
+void rrdset_acquired_release(RRDSET_ACQUIRED *rsa) {
+    if(unlikely(!rsa))
+        return;
+
+    RRDSET *rs = rrdset_acquired_to_rrdset(rsa);
+    dictionary_acquired_item_release(rs->rrdhost->rrdset_root_index, (const DICTIONARY_ITEM *)rsa);
+}
+
 // ----------------------------------------------------------------------------
 // RRDSET - rename charts
 
@@ -741,10 +762,8 @@ void rrdset_reset(RRDSET *st) {
         rd->collections_counter = 0;
 
         if(!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-            for(size_t tier = 0; tier < storage_tiers ;tier++) {
-                if(rd->tiers[tier].db_collection_handle)
-                    rd->tiers[tier].collect_ops->flush(rd->tiers[tier].db_collection_handle);
-            }
+            for(size_t tier = 0; tier < storage_tiers ;tier++)
+                storage_engine_store_flush(rd->tiers[tier].db_collection_handle);
         }
     }
     rrddim_foreach_done(rd);
@@ -1120,7 +1139,7 @@ void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAG
 
         if (likely(!storage_point_is_unset(t->virtual_point))) {
 
-            t->collect_ops->store_metric(
+            storage_engine_store_metric(
                 t->db_collection_handle,
                 t->next_point_end_time_s * USEC_PER_SEC,
                 t->virtual_point.sum,
@@ -1131,7 +1150,7 @@ void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAG
                 t->virtual_point.flags);
         }
         else {
-            t->collect_ops->store_metric(
+            storage_engine_store_metric(
                 t->db_collection_handle,
                 t->next_point_end_time_s * USEC_PER_SEC,
                 NAN,
@@ -1203,7 +1222,10 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
 #endif // NETDATA_LOG_COLLECTION_ERRORS
 
     // store the metric on tier 0
-    rd->tiers[0].collect_ops->store_metric(rd->tiers[0].db_collection_handle, point_end_time_ut, n, 0, 0, 1, 0, flags);
+    storage_engine_store_metric(rd->tiers[0].db_collection_handle, point_end_time_ut,
+                                n, 0, 0,
+                                1, 0, flags);
+
     rrdset_done_statistics_points_stored_per_tier[0]++;
 
     time_t now_s = (time_t)(point_end_time_ut / USEC_PER_SEC);
@@ -1981,7 +2003,9 @@ time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
     rrddim_foreach_read(rd, st) {
         for (size_t tier = 0; tier < storage_tiers; tier++) {
             if (rd->tiers[tier].db_collection_handle)
-                rd->tiers[tier].collect_ops->change_collection_frequency(rd->tiers[tier].db_collection_handle, (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
+                storage_engine_store_change_collection_frequency(
+                        rd->tiers[tier].db_collection_handle,
+                        (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
         }
 
         assert(rd->update_every == (int) prev_update_every_s &&
@@ -2183,7 +2207,7 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
     memset(st_on_file, 0, size);
 
     // set the values we need
-    strncpyz(st_on_file->id, rrdset_id(st), RRD_ID_LENGTH_MAX_V019 + 1);
+    strncpyz(st_on_file->id, rrdset_id(st), RRD_ID_LENGTH_MAX_V019);
     strcpy(st_on_file->cache_filename, fullfilename);
     strcpy(st_on_file->magic, RRDSET_MAGIC_V019);
     st_on_file->memsize = size;

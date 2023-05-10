@@ -1,0 +1,7 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+ap.clients,wireless device,clients,clients,"Connected clients to ${ssid} on ${dev}",line,,charts.d.plugin,ap
+ap.net,wireless device,"received, sent",kilobits/s,"Bandwidth for ${ssid} on ${dev}",area,,charts.d.plugin,ap
+ap.packets,wireless device,"received, sent",packets/s,"Packets for ${ssid} on ${dev}",line,,charts.d.plugin,ap
+ap.issues,wireless device,"retries, failures",issues/s,"Transmit Issues for ${ssid} on ${dev}",line,,charts.d.plugin,ap
+ap.signal,wireless device,"average signal",dBm,"Average Signal for ${ssid} on ${dev}",line,,charts.d.plugin,ap
+ap.bitrate,wireless device,"receive, transmit, expected",Mbps,"Bitrate for ${ssid} on ${dev}",line,,charts.d.plugin,ap

@@ -142,6 +142,18 @@ const struct netdata_static_thread static_threads_common[] = {
         .start_routine = socket_listen_main_static_threaded
     },
 
+#ifdef ENABLE_HTTPD
+    {
+        .name = "httpd",
+        .config_section = NULL,
+        .config_name = NULL,
+        .enabled = 0,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = httpd_main
+    },
+#endif
+
 #ifdef ENABLE_ACLK
     {
         .name = "ACLK_MAIN",

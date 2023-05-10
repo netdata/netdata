@@ -20,6 +20,12 @@
 #endif
 #endif
 
+#ifdef ENABLE_HTTPD
+#define FEAT_HTTPD 1
+#else
+#define FEAT_HTTPD 0
+#endif
+
 #ifdef ENABLE_DBENGINE
 #define FEAT_DBENGINE 1
 #else
@@ -87,12 +93,6 @@
 #define FEAT_LIBCAP 1
 #else
 #define FEAT_LIBCAP 0
-#endif
-
-#ifdef NETDATA_WITH_ZLIB
-#define FEAT_ZLIB 1
-#else
-#define FEAT_ZLIB 0
 #endif
 
 #ifdef STORAGE_WITH_MATH
@@ -275,6 +275,7 @@ void print_build_info(void) {
     printf("    TLS Host Verification:      %s\n", FEAT_YES_NO(FEAT_TLS_HOST_VERIFY));
     printf("    Machine Learning:           %s\n", FEAT_YES_NO(FEAT_ML));
     printf("    Stream Compression:         %s\n", FEAT_YES_NO(FEAT_STREAM_COMPRESSION));
+    printf("    HTTPD (h2o):                %s\n", FEAT_YES_NO(FEAT_HTTPD));
 
     printf("Libraries:\n");
     printf("    protobuf:                %s%s\n", FEAT_YES_NO(FEAT_PROTOBUF), FEAT_PROTOBUF_BUNDLED);
@@ -284,7 +285,7 @@ void print_build_info(void) {
     printf("    libcrypto:               %s\n", FEAT_YES_NO(FEAT_CRYPTO));
     printf("    libm:                    %s\n", FEAT_YES_NO(FEAT_LIBM));
     printf("    tcalloc:                 %s\n", FEAT_YES_NO(FEAT_TCMALLOC));
-    printf("    zlib:                    %s\n", FEAT_YES_NO(FEAT_ZLIB));
+    printf("    zlib:                    %s\n", FEAT_YES_NO(1));
 
     printf("Plugins:\n");
     printf("    apps:                    %s\n", FEAT_YES_NO(FEAT_APPS_PLUGIN));
@@ -328,7 +329,8 @@ void print_build_info_json(void) {
 
     printf("    \"tls-host-verify\": %s,\n",   FEAT_JSON_BOOL(FEAT_TLS_HOST_VERIFY));
     printf("    \"machine-learning\": %s\n",   FEAT_JSON_BOOL(FEAT_ML));
-    printf("    \"stream-compression\": %s\n",   FEAT_JSON_BOOL(FEAT_STREAM_COMPRESSION));
+    printf("    \"stream-compression\": %s\n", FEAT_JSON_BOOL(FEAT_STREAM_COMPRESSION));
+    printf("    \"httpd-h2o\": %s\n",          FEAT_JSON_BOOL(FEAT_HTTPD));
     printf("  },\n");
 
     printf("  \"libs\": {\n");
@@ -340,7 +342,7 @@ void print_build_info_json(void) {
     printf("    \"libcrypto\": %s,\n",        FEAT_JSON_BOOL(FEAT_CRYPTO));
     printf("    \"libm\": %s,\n",             FEAT_JSON_BOOL(FEAT_LIBM));
     printf("    \"tcmalloc\": %s,\n",         FEAT_JSON_BOOL(FEAT_TCMALLOC));
-    printf("    \"zlib\": %s\n",              FEAT_JSON_BOOL(FEAT_ZLIB));
+    printf("    \"zlib\": %s\n",              FEAT_JSON_BOOL(1));
     printf("  },\n");
 
     printf("  \"plugins\": {\n");
@@ -417,9 +419,7 @@ void analytics_build_info(BUFFER *b) {
 #ifdef ENABLE_TCMALLOC
     add_to_bi(b, "tcalloc");
 #endif
-#ifdef NETDATA_WITH_ZLIB
     add_to_bi(b, "zlib");
-#endif
 
 #ifdef ENABLE_APPS_PLUGIN
     add_to_bi(b, "apps");

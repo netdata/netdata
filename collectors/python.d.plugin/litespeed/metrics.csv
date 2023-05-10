@@ -1,0 +1,10 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+litespeed.net_throughput,,"in, out",kilobits/s,Network Throughput HTTP,area,,python.d.plugin,litespeed
+litespeed.net_throughput,,"in, out",kilobits/s,Network Throughput HTTPS,area,,python.d.plugin,litespeed
+litespeed.connections,,"free, used",conns,Connections HTTP,stacked,,python.d.plugin,litespeed
+litespeed.connections,,"free, used",conns,Connections HTTPS,stacked,,python.d.plugin,litespeed
+litespeed.requests,,requests,requests/s,Requests,line,,python.d.plugin,litespeed
+litespeed.requests_processing,,processing,requests,Requests In Processing,line,,python.d.plugin,litespeed
+litespeed.cache,,hits,hits/s,Public Cache Hits,line,,python.d.plugin,litespeed
+litespeed.cache,,hits,hits/s,Private Cache Hits,line,,python.d.plugin,litespeed
+litespeed.static,,hits,hits/s,Static Hits,line,,python.d.plugin,litespeed

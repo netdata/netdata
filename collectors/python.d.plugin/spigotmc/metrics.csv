@@ -1,0 +1,4 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+spigotmc.tps,,"1 Minute Average, 5 Minute Average, 15 Minute Average",ticks,Spigot Ticks Per Second,line,,python.d.plugin,spigotmc
+spigotmc.users,,Users,users,Minecraft Users,area,,python.d.plugin,spigotmc
+spigotmc.mem,,"used, allocated, max",MiB,Minecraft Memory Usage,line,,python.d.plugin,spigotmc

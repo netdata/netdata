@@ -218,6 +218,10 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd);
 extern ebpf_process_stat_t **global_process_stats;
 extern netdata_publish_cachestat_t **cachestat_pid;
 extern netdata_publish_dcstat_t **dcstat_pid;
+extern netdata_publish_swap_t **swap_pid;
+extern netdata_publish_vfs_t **vfs_pid;
+extern netdata_fd_stat_t **fd_pid;
+extern netdata_publish_shm_t **shm_pid;
 
 // The default value is at least 32 times smaller than maximum number of PIDs allowed on system,
 // this is only possible because we are using ARAL (https://github.com/netdata/netdata/tree/master/libnetdata/aral).
@@ -226,10 +230,47 @@ extern netdata_publish_dcstat_t **dcstat_pid;
 #endif
 #define NETDATA_EBPF_ALLOC_MIN_ELEMENTS 256
 
+// ARAL Sectiion
 extern void ebpf_aral_init(void);
 
 extern ebpf_process_stat_t *ebpf_process_stat_get(void);
 extern void ebpf_process_stat_release(ebpf_process_stat_t *stat);
+
+extern ARAL *ebpf_aral_socket_pid;
+void ebpf_socket_aral_init();
+ebpf_socket_publish_apps_t *ebpf_socket_stat_get(void);
+void ebpf_socket_release(ebpf_socket_publish_apps_t *stat);
+
+extern ARAL *ebpf_aral_cachestat_pid;
+void ebpf_cachestat_aral_init();
+netdata_publish_cachestat_t *ebpf_publish_cachestat_get(void);
+void ebpf_cachestat_release(netdata_publish_cachestat_t *stat);
+
+extern ARAL *ebpf_aral_dcstat_pid;
+void ebpf_dcstat_aral_init();
+netdata_publish_dcstat_t *ebpf_publish_dcstat_get(void);
+void ebpf_dcstat_release(netdata_publish_dcstat_t *stat);
+
+extern ARAL *ebpf_aral_vfs_pid;
+void ebpf_vfs_aral_init();
+netdata_publish_vfs_t *ebpf_vfs_get(void);
+void ebpf_vfs_release(netdata_publish_vfs_t *stat);
+
+extern ARAL *ebpf_aral_fd_pid;
+void ebpf_fd_aral_init();
+netdata_fd_stat_t *ebpf_fd_stat_get(void);
+void ebpf_fd_release(netdata_fd_stat_t *stat);
+
+extern ARAL *ebpf_aral_shm_pid;
+void ebpf_shm_aral_init();
+netdata_publish_shm_t *ebpf_shm_stat_get(void);
+void ebpf_shm_release(netdata_publish_shm_t *stat);
+
+// ARAL Section end
+
+// Threads integrated with apps
+extern ebpf_socket_publish_apps_t **socket_bandwidth_curr;
+// Threads integrated with apps
 
 #include "libnetdata/threads/threads.h"
 

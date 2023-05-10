@@ -165,9 +165,16 @@ int do_proc_pressure(int update_every, usec_t dt) {
             do_some = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_PRESSURE, config_key, CONFIG_BOOLEAN_YES);
             resources[i].some.enabled = do_some;
 
-            snprintfz(config_key, CONFIG_MAX_NAME, "enable %s full pressure", resource_info[i].name);
-            do_full = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_PRESSURE, config_key, CONFIG_BOOLEAN_YES);
-            resources[i].full.enabled = do_full;
+            // Disable CPU full pressure.
+            // See https://github.com/torvalds/linux/commit/890d550d7dbac7a31ecaa78732aa22be282bb6b8
+            if (i == 0) {
+                do_full = CONFIG_BOOLEAN_NO;
+                resources[i].full.enabled = do_full;
+            } else {
+                snprintfz(config_key, CONFIG_MAX_NAME, "enable %s full pressure", resource_info[i].name);
+                do_full = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_PRESSURE, config_key, CONFIG_BOOLEAN_YES);
+                resources[i].full.enabled = do_full;
+            }
 
             ff = procfile_open(filename, " =", PROCFILE_FLAG_DEFAULT);
             if (unlikely(!ff)) {

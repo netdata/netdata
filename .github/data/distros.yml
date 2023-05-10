@@ -36,9 +36,6 @@ include:
   - <<: *alpine
     version: "3.15"
     eol_check: true
-  - <<: *alpine
-    version: "3.14"
-    eol_check: true
 
   - distro: archlinux
     version: latest
@@ -240,15 +237,3 @@ include:
     packages:
       <<: *ubuntu_packages
       repo_distro: ubuntu/focal
-  - <<: *ubuntu
-    version: "18.04"
-    packages:
-      <<: *ubuntu_packages
-      repo_distro: ubuntu/bionic
-      arches:
-        - i386
-        - amd64
-        - armhf
-        - arm64
-    test:
-      ebpf-core: false

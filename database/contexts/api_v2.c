@@ -2,6 +2,7 @@
 
 #include "internal.h"
 
+#include "aclk/aclk_capas.h"
 
 // ----------------------------------------------------------------------------
 // /api/v2/contexts API
@@ -107,10 +108,12 @@ struct rrdcontext_to_json_v2_data {
 
     struct {
         FTS_MATCH host_match;
-        char host_uuid_buffer[UUID_STR_LEN];
+        char host_node_id_str[UUID_STR_LEN];
         SIMPLE_PATTERN *pattern;
         FTS_INDEX fts;
     } q;
+
+    struct query_timings timings;
 };
 
 static FTS_MATCH rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_json_v2_data *ctl, RRDCONTEXT *rc, SIMPLE_PATTERN *q) {
@@ -193,7 +196,7 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
     struct rrdcontext_to_json_v2_entry t = {
             .count = 0,
             .id = rc->id,
-            .family = rc->family,
+            .family = string_dup(rc->family),
             .priority = rc->priority,
             .first_time_s = rc->first_time_s,
             .last_time_s = rc->last_time_s,
@@ -218,6 +221,10 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
 
         if(z->last_time_s < rc->last_time_s)
             z->last_time_s = rc->last_time_s;
+
+        if(z->family != rc->family) {
+            z->family = string_2way_merge(z->family, rc->family);
+        }
     }
 
     return 1;
@@ -247,7 +254,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
     struct rrdcontext_to_json_v2_data *ctl = data;
     BUFFER *wb = ctl->wb;
 
-    if(ctl->request->timeout_ms && now_monotonic_usec() > ctl->request->timings.received_ut + ctl->request->timeout_ms * USEC_PER_MS)
+    if(ctl->request->timeout_ms && now_monotonic_usec() > ctl->timings.received_ut + ctl->request->timeout_ms * USEC_PER_MS)
         // timed out
         return -2;
 
@@ -264,7 +271,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
         if(ctl->q.pattern && (
                 full_text_search_string(&ctl->q.fts, ctl->q.pattern, host->hostname) ||
                 full_text_search_char(&ctl->q.fts, ctl->q.pattern, host->machine_guid) ||
-                (ctl->q.pattern && full_text_search_char(&ctl->q.fts, ctl->q.pattern, ctl->q.host_uuid_buffer)))) {
+                (ctl->q.pattern && full_text_search_char(&ctl->q.fts, ctl->q.pattern, ctl->q.host_node_id_str)))) {
             ctl->q.host_match = FTS_MATCHED_HOST;
             do_contexts = true;
         }
@@ -306,23 +313,20 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
             buffer_json_member_add_array(wb, "services");
             buffer_json_array_close(wb);
 
-            buffer_json_member_add_array(wb, "capabilities");
-            buffer_json_add_array_item_object(wb);
-            buffer_json_member_add_string(wb, "name", "funcs");
-            buffer_json_member_add_uint64(wb, "version", 1);
-            buffer_json_member_add_boolean(wb, "enabled", true);
-            buffer_json_object_close(wb);
-            buffer_json_add_array_item_object(wb);
-            buffer_json_member_add_string(wb, "name", "mc");
-            buffer_json_member_add_uint64(wb, "version", 1);
-            buffer_json_member_add_boolean(wb, "enabled", true);
-            buffer_json_object_close(wb);
-            buffer_json_add_array_item_object(wb);
-            buffer_json_member_add_string(wb, "name", "ml");
-            buffer_json_member_add_uint64(wb, "version", 1);
-            buffer_json_member_add_boolean(wb, "enabled", true);
-            buffer_json_object_close(wb);
+            buffer_json_member_add_array(wb, "nodeInstanceCapabilities");
+
+            struct capability *capas = aclk_get_node_instance_capas(host);
+            struct capability *capa = capas;
+            while(capa->name != NULL) {
+                buffer_json_add_array_item_object(wb);
+                buffer_json_member_add_string(wb, "name", capa->name);
+                buffer_json_member_add_uint64(wb, "version", capa->version);
+                buffer_json_member_add_boolean(wb, "enabled", capa->enabled);
+                buffer_json_object_close(wb);
+                capa++;
+            }
             buffer_json_array_close(wb);
+            freez(capas);
 
             web_client_api_request_v1_info_summary_alarm_statuses(host, wb, "alarmCounters");
 
@@ -386,7 +390,22 @@ static void buffer_json_contexts_v2_options_to_array(BUFFER *wb, CONTEXTS_V2_OPT
         buffer_json_add_array_item_string(wb, "search");
 }
 
-void buffer_json_agents_array_v2(BUFFER *wb, time_t now_s) {
+void buffer_json_query_timings(BUFFER *wb, const char *key, struct query_timings *timings) {
+    timings->finished_ut = now_monotonic_usec();
+    if(!timings->executed_ut)
+        timings->executed_ut = timings->finished_ut;
+    if(!timings->preprocessed_ut)
+        timings->preprocessed_ut = timings->received_ut;
+    buffer_json_member_add_object(wb, key);
+    buffer_json_member_add_double(wb, "prep_ms", (NETDATA_DOUBLE)(timings->preprocessed_ut - timings->received_ut) / USEC_PER_MS);
+    buffer_json_member_add_double(wb, "query_ms", (NETDATA_DOUBLE)(timings->executed_ut - timings->preprocessed_ut) / USEC_PER_MS);
+    buffer_json_member_add_double(wb, "output_ms", (NETDATA_DOUBLE)(timings->finished_ut - timings->executed_ut) / USEC_PER_MS);
+    buffer_json_member_add_double(wb, "total_ms", (NETDATA_DOUBLE)(timings->finished_ut - timings->received_ut) / USEC_PER_MS);
+    buffer_json_member_add_double(wb, "cloud_ms", (NETDATA_DOUBLE)(timings->finished_ut - timings->received_ut) / USEC_PER_MS);
+    buffer_json_object_close(wb);
+}
+
+void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time_t now_s) {
     if(!now_s)
         now_s = now_realtime_sec();
 
@@ -397,14 +416,29 @@ void buffer_json_agents_array_v2(BUFFER *wb, time_t now_s) {
     buffer_json_member_add_string(wb, "nm", rrdhost_hostname(localhost));
     buffer_json_member_add_time_t(wb, "now", now_s);
     buffer_json_member_add_uint64(wb, "ai", 0);
+
+    if(timings)
+        buffer_json_query_timings(wb, "timings", timings);
+
     buffer_json_object_close(wb);
     buffer_json_array_close(wb);
 }
 
+void buffer_json_cloud_timings(BUFFER *wb, const char *key, struct query_timings *timings) {
+    buffer_json_member_add_object(wb, key);
+    buffer_json_member_add_double(wb, "routing_ms", 0.0);
+    buffer_json_member_add_double(wb, "node_max_ms", 0.0);
+    buffer_json_member_add_double(wb, "total_ms", (NETDATA_DOUBLE)(timings->finished_ut - timings->received_ut) / USEC_PER_MS);
+    buffer_json_object_close(wb);
+}
+
+void contexts_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct rrdcontext_to_json_v2_entry *z = value;
+    string_freez(z->family);
+}
+
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_OPTIONS options) {
     int resp = HTTP_RESP_OK;
-
-    req->timings.processing_ut = now_monotonic_usec();
 
     if(options & CONTEXTS_V2_SEARCH)
         options |= CONTEXTS_V2_CONTEXTS;
@@ -420,15 +454,22 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
             .contexts.pattern = string_to_simple_pattern(req->contexts),
             .contexts.scope_pattern = string_to_simple_pattern(req->scope_contexts),
             .q.pattern = string_to_simple_pattern_nocase(req->q),
+            .timings = {
+                    .received_ut = now_monotonic_usec(),
+            }
     };
 
-    if(options & CONTEXTS_V2_CONTEXTS)
-        ctl.ctx = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct rrdcontext_to_json_v2_entry));
+    if(options & CONTEXTS_V2_CONTEXTS) {
+        ctl.ctx = dictionary_create_advanced(
+                DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL,
+                sizeof(struct rrdcontext_to_json_v2_entry));
+
+        dictionary_register_delete_callback(ctl.ctx, contexts_delete_callback, NULL);
+    }
 
     time_t now_s = now_realtime_sec();
     buffer_json_initialize(wb, "\"", "\"", 0, true, false);
     buffer_json_member_add_uint64(wb, "api", 2);
-    buffer_json_agents_array_v2(wb, now_s);
 
     if(options & CONTEXTS_V2_DEBUG) {
         buffer_json_member_add_object(wb, "request");
@@ -456,7 +497,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
     ssize_t ret = query_scope_foreach_host(ctl.nodes.scope_pattern, ctl.nodes.pattern,
                              rrdcontext_to_json_v2_add_host, &ctl,
-                             &ctl.versions, ctl.q.host_uuid_buffer);
+                             &ctl.versions, ctl.q.host_node_id_str);
 
     if(unlikely(ret < 0)) {
         buffer_flush(wb);
@@ -475,7 +516,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     if(options & (CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED | CONTEXTS_V2_DEBUG))
         buffer_json_array_close(wb);
 
-    req->timings.output_ut = now_monotonic_usec();
+    ctl.timings.executed_ut = now_monotonic_usec();
     version_hashes_api_v2(wb, &ctl.versions);
 
     if(options & CONTEXTS_V2_CONTEXTS) {
@@ -508,13 +549,8 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         buffer_json_object_close(wb);
     }
 
-    req->timings.finished_ut = now_monotonic_usec();
-    buffer_json_member_add_object(wb, "timings");
-    buffer_json_member_add_double(wb, "prep_ms", (NETDATA_DOUBLE)(req->timings.processing_ut - req->timings.received_ut) / USEC_PER_MS);
-    buffer_json_member_add_double(wb, "query_ms", (NETDATA_DOUBLE)(req->timings.output_ut - req->timings.processing_ut) / USEC_PER_MS);
-    buffer_json_member_add_double(wb, "output_ms", (NETDATA_DOUBLE)(req->timings.finished_ut - req->timings.output_ut) / USEC_PER_MS);
-    buffer_json_member_add_double(wb, "total_ms", (NETDATA_DOUBLE)(req->timings.finished_ut - req->timings.received_ut) / USEC_PER_MS);
-    buffer_json_object_close(wb);
+    buffer_json_agents_array_v2(wb, &ctl.timings, now_s);
+    buffer_json_cloud_timings(wb, "timings", &ctl.timings);
     buffer_json_finalize(wb);
 
 cleanup:

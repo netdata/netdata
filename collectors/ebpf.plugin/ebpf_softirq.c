@@ -64,7 +64,7 @@ static softirq_ebpf_val_t *softirq_ebpf_vals = NULL;
 static void ebpf_softirq_free(ebpf_module_t *em)
 {
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPING;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     for (int i = 0; softirq_tracepoints[i].class != NULL; i++) {
@@ -73,7 +73,7 @@ static void ebpf_softirq_free(ebpf_module_t *em)
     freez(softirq_ebpf_vals);
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -209,13 +209,11 @@ void *ebpf_softirq_thread(void *ptr)
     em->maps = softirq_maps;
 
     if (ebpf_enable_tracepoints(softirq_tracepoints) == 0) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endsoftirq;
     }
 
     em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
     if (!em->probe_links) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endsoftirq;
     }
 

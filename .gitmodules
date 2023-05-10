@@ -9,3 +9,7 @@
 	url = https://github.com/davisking/dlib.git
 	shallow = true
 	ignore = dirty
+[submodule "httpd/h2o"]
+	path = httpd/h2o
+	url = https://github.com/h2o/h2o.git
+	ignore = untracked

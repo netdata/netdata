@@ -1,0 +1,3 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+anomalies.probability,,a dimension per probability,probability,Anomaly Probability,line,,python.d.plugin,anomalies
+anomalies.anomaly,,a dimension per anomaly,count,Anomaly,stacked,,python.d.plugin,anomalies

@@ -3,26 +3,140 @@
 #include "aclk_query.h"
 #include "aclk_stats.h"
 #include "aclk_tx_msgs.h"
+#include "../../web/server/web_client_cache.h"
 
 #define WEB_HDR_ACCEPT_ENC "Accept-Encoding:"
+#define ACLK_MAX_WEB_RESPONSE_SIZE (30 * 1024 * 1024)
 
 pthread_cond_t query_cond_wait = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
 #define QUERY_THREAD_LOCK pthread_mutex_lock(&query_lock_wait)
 #define QUERY_THREAD_UNLOCK pthread_mutex_unlock(&query_lock_wait)
 
-static usec_t aclk_web_api_request(RRDHOST *host, struct web_client *w, char *url, const size_t api_version)
+struct pending_req_list {
+    const char *msg_id;
+    uint32_t hash;
+
+    int canceled;
+
+    struct pending_req_list *next;
+};
+
+static struct pending_req_list *pending_req_list_head = NULL;
+static pthread_mutex_t pending_req_list_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static struct pending_req_list *pending_req_list_add(const char *msg_id)
 {
+    struct pending_req_list *new = callocz(1, sizeof(struct pending_req_list));
+    new->msg_id = msg_id;
+    new->hash = simple_hash(msg_id);
+
+    pthread_mutex_lock(&pending_req_list_lock);
+    new->next = pending_req_list_head;
+    pending_req_list_head = new;
+    pthread_mutex_unlock(&pending_req_list_lock);
+    return new;
+}
+
+void pending_req_list_rm(const char *msg_id)
+{
+    uint32_t hash = simple_hash(msg_id);
+    struct pending_req_list *prev = NULL;
+
+    pthread_mutex_lock(&pending_req_list_lock);
+    struct pending_req_list *curr = pending_req_list_head;
+
+    while (curr) {
+        if (curr->hash == hash && strcmp(curr->msg_id, msg_id) == 0) {
+            if (prev)
+                prev->next = curr->next;
+            else
+                pending_req_list_head = curr->next;
+
+            freez(curr);
+            break;
+        }
+
+        prev = curr;
+        curr = curr->next;
+    }
+    pthread_mutex_unlock(&pending_req_list_lock);
+}
+
+int mark_pending_req_cancelled(const char *msg_id)
+{
+    uint32_t hash = simple_hash(msg_id);
+
+    pthread_mutex_lock(&pending_req_list_lock);
+    struct pending_req_list *curr = pending_req_list_head;
+
+    while (curr) {
+        if (curr->hash == hash && strcmp(curr->msg_id, msg_id) == 0) {
+            curr->canceled = 1;
+            pthread_mutex_unlock(&pending_req_list_lock);
+            return 0;
+        }
+
+        curr = curr->next;
+    }
+    pthread_mutex_unlock(&pending_req_list_lock);
+    return 1;
+}
+
+static bool aclk_web_client_interrupt_cb(struct web_client *w __maybe_unused, void *data)
+{
+    struct pending_req_list *req = (struct pending_req_list *)data;
+    return req->canceled;
+}
+
+static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) {
+    int retval = 0;
+    BUFFER *local_buffer = NULL;
+    size_t size = 0;
+    size_t sent = 0;
+
+    int z_ret;
+    BUFFER *z_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, &netdata_buffers_statistics.buffers_aclk);
+    char *start, *end;
+
+    struct web_client *w = web_client_get_from_cache();
+    w->acl = WEB_CLIENT_ACL_ACLK;
+    w->mode = WEB_CLIENT_MODE_GET;
+    w->timings.tv_in = query->created_tv;
+
+    w->interrupt.callback = aclk_web_client_interrupt_cb;
+    w->interrupt.callback_data = pending_req_list_add(query->msg_id);
+
     usec_t t;
+    web_client_timeout_checkpoint_set(w, query->timeout);
+    if(web_client_timeout_checkpoint_and_check(w, &t)) {
+        log_access("QUERY CANCELED: QUEUE TIME EXCEEDED %llu ms (LIMIT %d ms)", t / USEC_PER_MS, query->timeout);
+        retval = 1;
+        w->response.code = HTTP_RESP_BACKEND_FETCH_FAILED;
+        aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, w->response.code, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT, NULL, 0);
+        goto cleanup;
+    }
 
-    t = now_monotonic_high_precision_usec();
+    web_client_decode_path_and_query_string(w, query->data.http_api_v2.query);
+    char *path = (char *)buffer_tostring(w->url_path_decoded);
 
-    if(api_version == 2)
-        w->response.code = web_client_api_request_v2(host, w, url);
-    else
-        w->response.code = web_client_api_request_v1(host, w, url);
+    if (aclk_stats_enabled) {
+        char *url_path_endpoint = strrchr(path, '/');
+        ACLK_STATS_LOCK;
+        int stat_idx = aclk_cloud_req_http_type_to_idx(url_path_endpoint ? url_path_endpoint + 1 : "other");
+        aclk_metrics_per_sample.cloud_req_http_by_type[stat_idx]++;
+        ACLK_STATS_UNLOCK;
+    }
 
-    t = now_monotonic_high_precision_usec() - t;
+    w->response.code = web_client_api_request_with_node_selection(localhost, w, path);
+    web_client_timeout_checkpoint_response_ready(w, &t);
+
+    if(buffer_strlen(w->response.data) > ACLK_MAX_WEB_RESPONSE_SIZE) {
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "response is too big");
+        w->response.data->content_type = CT_TEXT_PLAIN;
+        w->response.code = HTTP_RESP_CONTENT_TOO_LONG;
+    }
 
     if (aclk_stats_enabled) {
         ACLK_STATS_LOCK;
@@ -33,129 +147,9 @@ static usec_t aclk_web_api_request(RRDHOST *host, struct web_client *w, char *ur
         ACLK_STATS_UNLOCK;
     }
 
-    return t;
-}
-
-static RRDHOST *node_id_2_rrdhost(const char *node_id)
-{
-    int res;
-    uuid_t node_id_bin, host_id_bin;
-
-    RRDHOST *host = find_host_by_node_id((char *)node_id);
-    if (host)
-        return host;
-
-    char host_id[UUID_STR_LEN];
-    if (uuid_parse(node_id, node_id_bin)) {
-        error("Couldn't parse UUID %s", node_id);
-        return NULL;
-    }
-    if ((res = get_host_id(&node_id_bin, &host_id_bin))) {
-        error("node not found rc=%d", res);
-        return NULL;
-    }
-    uuid_unparse_lower(host_id_bin, host_id);
-    return rrdhost_find_by_guid(host_id);
-}
-
-#define NODE_ID_QUERY "/node/"
-// TODO this function should be quarantied and written nicely
-// lots of skeletons from initial ACLK Legacy impl.
-// quick and dirty from the start
-static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
-{
-    int retval = 0;
-    usec_t t;
-    BUFFER *local_buffer = NULL;
-    BUFFER *log_buffer = buffer_create(NETDATA_WEB_REQUEST_URL_SIZE, &netdata_buffers_statistics.buffers_aclk);
-    RRDHOST *query_host = localhost;
-
-#ifdef NETDATA_WITH_ZLIB
-    int z_ret;
-    BUFFER *z_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, &netdata_buffers_statistics.buffers_aclk);
-    char *start, *end;
-#endif
-
-    struct web_client *w = (struct web_client *)callocz(1, sizeof(struct web_client));
-    w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, &netdata_buffers_statistics.buffers_aclk);
-    w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE, &netdata_buffers_statistics.buffers_aclk);
-    w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE, &netdata_buffers_statistics.buffers_aclk);
-    strcpy(w->origin, "*"); // Simulate web_client_create_on_fd()
-    w->cookie1[0] = 0;      // Simulate web_client_create_on_fd()
-    w->cookie2[0] = 0;      // Simulate web_client_create_on_fd()
-    w->acl = WEB_CLIENT_ACL_ACLK;
-
-    buffer_strcat(log_buffer, query->data.http_api_v2.query);
-    size_t size = 0;
-    size_t sent = 0;
-    w->tv_in = query->created_tv;
-    now_realtime_timeval(&w->tv_ready);
-
-    if (query->timeout) {
-        int in_queue = (int) (dt_usec(&w->tv_in, &w->tv_ready) / 1000);
-        if (in_queue > query->timeout) {
-            log_access("QUERY CANCELED: QUEUE TIME EXCEEDED %d ms (LIMIT %d ms)", in_queue, query->timeout);
-            retval = 1;
-            w->response.code = HTTP_RESP_BACKEND_FETCH_FAILED;
-            aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, w->response.code, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT, NULL, 0);
-            goto cleanup;
-        }
-    }
-
-    if (!strncmp(query->data.http_api_v2.query, NODE_ID_QUERY, strlen(NODE_ID_QUERY))) {
-        char *node_uuid = query->data.http_api_v2.query + strlen(NODE_ID_QUERY);
-        char nodeid[UUID_STR_LEN];
-        if (strlen(node_uuid) < (UUID_STR_LEN - 1)) {
-            error_report(CLOUD_EMSG_MALFORMED_NODE_ID);
-            retval = 1;
-            w->response.code = 404;
-            aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, w->response.code, CLOUD_EC_MALFORMED_NODE_ID, CLOUD_EMSG_MALFORMED_NODE_ID, NULL, 0);
-            goto cleanup;
-        }
-        strncpyz(nodeid, node_uuid, UUID_STR_LEN - 1);
-
-        query_host = node_id_2_rrdhost(nodeid);
-        if (!query_host) {
-            error_report("Host with node_id \"%s\" not found! Returning 404 to Cloud!", nodeid);
-            retval = 1;
-            w->response.code = 404;
-            aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, w->response.code, CLOUD_EC_NODE_NOT_FOUND, CLOUD_EMSG_NODE_NOT_FOUND, NULL, 0);
-            goto cleanup;
-        }
-    }
-
-    size_t api_version = 1;
-    {
-        char *s = strstr(query->data.http_api_v2.query, "/api/v");
-        if(s && s[6]) {
-            api_version = str2u(&s[6]);
-            if(api_version != 1 && api_version != 2)
-                api_version = 1;
-        }
-    }
-
-    char *mysep = strchr(query->data.http_api_v2.query, '?');
-    if (mysep) {
-        url_decode_r(w->decoded_query_string, mysep, NETDATA_WEB_REQUEST_URL_SIZE + 1);
-        *mysep = '\0';
-    } else
-        url_decode_r(w->decoded_query_string, query->data.http_api_v2.query, NETDATA_WEB_REQUEST_URL_SIZE + 1);
-
-    mysep = strrchr(query->data.http_api_v2.query, '/');
-
-    if (aclk_stats_enabled) {
-        ACLK_STATS_LOCK;
-        int stat_idx = aclk_cloud_req_http_type_to_idx(mysep ? mysep + 1 : "other");
-        aclk_metrics_per_sample.cloud_req_http_by_type[stat_idx]++;
-        ACLK_STATS_UNLOCK;
-    }
-
-    // execute the query
-    t = aclk_web_api_request(query_host, w, mysep ? mysep + 1 : "noop", api_version);
-    size = (w->mode == WEB_CLIENT_MODE_FILECOPY) ? w->response.rlen : w->response.data->len;
+    size = w->response.data->len;
     sent = size;
 
-#ifdef NETDATA_WITH_ZLIB
     // check if gzip encoding can and should be used
     if ((start = strstr((char *)query->data.http_api_v2.payload, WEB_HDR_ACCEPT_ENC))) {
         start += strlen(WEB_HDR_ACCEPT_ENC);
@@ -167,8 +161,8 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
             w->response.zstream.zfree = Z_NULL;
             w->response.zstream.opaque = Z_NULL;
             if(deflateInit2(&w->response.zstream, web_gzip_level, Z_DEFLATED, 15 + 16, 8, web_gzip_strategy) == Z_OK) {
-                w->response.zinitialized = 1;
-                w->response.zoutput = 1;
+                w->response.zinitialized = true;
+                w->response.zoutput = true;
             } else
                 error("Failed to initialize zlib. Proceeding without compression.");
         }
@@ -202,9 +196,8 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
         w->response.data = z_buffer;
         z_buffer = NULL;
     }
-#endif
 
-    w->response.data->date = w->tv_ready.tv_sec;
+    w->response.data->date = w->timings.tv_ready.tv_sec;
     web_client_build_http_header(w);
     local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, &netdata_buffers_statistics.buffers_aclk);
     local_buffer->content_type = CT_APPLICATION_JSON;
@@ -212,18 +205,14 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
     buffer_strcat(local_buffer, w->response.header_output->buffer);
 
     if (w->response.data->len) {
-#ifdef NETDATA_WITH_ZLIB
         if (w->response.zinitialized) {
             buffer_need_bytes(local_buffer, w->response.data->len);
             memcpy(&local_buffer->buffer[local_buffer->len], w->response.data->buffer, w->response.data->len);
             local_buffer->len += w->response.data->len;
             sent = sent - size + w->response.data->len;
         } else {
-#endif
             buffer_strcat(local_buffer, w->response.data->buffer);
-#ifdef NETDATA_WITH_ZLIB
         }
-#endif
     }
 
     // send msg.
@@ -232,7 +221,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
     struct timeval tv;
 
 cleanup:
-    now_realtime_timeval(&tv);
+    now_monotonic_high_precision_timeval(&tv);
     log_access("%llu: %d '[ACLK]:%d' '%s' (sent/all = %zu/%zu bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %d '%s'",
         w->id
         , gettid()
@@ -241,24 +230,19 @@ cleanup:
         , sent
         , size
         , size > sent ? -(((size - sent) / (double)size) * 100.0) : ((size > 0) ? (((sent - size ) / (double)size) * 100.0) : 0.0)
-        , dt_usec(&w->tv_ready, &w->tv_in) / 1000.0
-        , dt_usec(&tv, &w->tv_ready) / 1000.0
-        , dt_usec(&tv, &w->tv_in) / 1000.0
+        , dt_usec(&w->timings.tv_ready, &w->timings.tv_in) / 1000.0
+        , dt_usec(&tv, &w->timings.tv_ready) / 1000.0
+        , dt_usec(&tv, &w->timings.tv_in) / 1000.0
         , w->response.code
-        , strip_control_characters((char *)buffer_tostring(log_buffer))
+        , strip_control_characters((char *)buffer_tostring(w->url_as_received))
     );
 
-#ifdef NETDATA_WITH_ZLIB
-    if(w->response.zinitialized)
-        deflateEnd(&w->response.zstream);
+    web_client_release_to_cache(w);
+
+    pending_req_list_rm(query->msg_id);
+
     buffer_free(z_buffer);
-#endif
-    buffer_free(w->response.data);
-    buffer_free(w->response.header);
-    buffer_free(w->response.header_output);
-    freez(w);
     buffer_free(local_buffer);
-    buffer_free(log_buffer);
     return retval;
 }
 
@@ -272,19 +256,19 @@ static int send_bin_msg(struct aclk_query_thread *query_thr, aclk_query_t query)
 const char *aclk_query_get_name(aclk_query_type_t qt, int unknown_ok)
 {
     switch (qt) {
-        case HTTP_API_V2:          return "http_api_request_v2";
-        case REGISTER_NODE:        return "register_node";
-        case NODE_STATE_UPDATE:    return "node_state_update";
-        case CHART_DIMS_UPDATE:    return "chart_and_dim_update";
-        case CHART_CONFIG_UPDATED: return "chart_config_updated";
-        case CHART_RESET:          return "reset_chart_messages";
-        case RETENTION_UPDATED:    return "update_retention_info";
-        case UPDATE_NODE_INFO:     return "update_node_info";
-        case ALARM_LOG_HEALTH:     return "alarm_log_health";
-        case ALARM_PROVIDE_CFG:    return "provide_alarm_config";
-        case ALARM_SNAPSHOT:       return "alarm_snapshot";
-        case UPDATE_NODE_COLLECTORS: return "update_node_collectors";
-        case PROTO_BIN_MESSAGE:    return "generic_binary_proto_message";
+        case HTTP_API_V2:               return "http_api_request_v2";
+        case REGISTER_NODE:             return "register_node";
+        case NODE_STATE_UPDATE:         return "node_state_update";
+        case CHART_DIMS_UPDATE:         return "chart_and_dim_update";
+        case CHART_CONFIG_UPDATED:      return "chart_config_updated";
+        case CHART_RESET:               return "reset_chart_messages";
+        case RETENTION_UPDATED:         return "update_retention_info";
+        case UPDATE_NODE_INFO:          return "update_node_info";
+        case ALARM_PROVIDE_CHECKPOINT:  return "alarm_checkpoint";
+        case ALARM_PROVIDE_CFG:         return "provide_alarm_config";
+        case ALARM_SNAPSHOT:            return "alarm_snapshot";
+        case UPDATE_NODE_COLLECTORS:    return "update_node_collectors";
+        case PROTO_BIN_MESSAGE:         return "generic_binary_proto_message";
         default:
             if (!unknown_ok)
                 error_report("Unknown query type used %d", (int) qt);

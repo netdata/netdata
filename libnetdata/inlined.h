@@ -514,4 +514,62 @@ static inline int uuid_memcmp(const uuid_t *uu1, const uuid_t *uu2) {
     return memcmp(uu1, uu2, sizeof(uuid_t));
 }
 
+static inline char *strsep_skip_consecutive_separators(char **ptr, char *s) {
+    char *p = (char *)"";
+    while (p && !p[0] && *ptr) p = strsep(ptr, s);
+    return (p);
+}
+
+// remove leading and trailing spaces; may return NULL
+static inline char *trim(char *s) {
+    // skip leading spaces
+    while (*s && isspace(*s)) s++;
+    if (!*s) return NULL;
+
+    // skip tailing spaces
+    // this way is way faster. Writes only one NUL char.
+    ssize_t l = (ssize_t)strlen(s);
+    if (--l >= 0) {
+        char *p = s + l;
+        while (p > s && isspace(*p)) p--;
+        *++p = '\0';
+    }
+
+    if (!*s) return NULL;
+
+    return s;
+}
+
+// like trim(), but also remove duplicate spaces inside the string; may return NULL
+static inline char *trim_all(char *buffer) {
+    char *d = buffer, *s = buffer;
+
+    // skip spaces
+    while(isspace(*s)) s++;
+
+    while(*s) {
+        // copy the non-space part
+        while(*s && !isspace(*s)) *d++ = *s++;
+
+        // add a space if we have to
+        if(*s && isspace(*s)) {
+            *d++ = ' ';
+            s++;
+        }
+
+        // skip spaces
+        while(isspace(*s)) s++;
+    }
+
+    *d = '\0';
+
+    if(d > buffer) {
+        d--;
+        if(isspace(*d)) *d = '\0';
+    }
+
+    if(!buffer[0]) return NULL;
+    return buffer;
+}
+
 #endif //NETDATA_INLINED_H

@@ -309,7 +309,7 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
 
     if (contexts) {
         p = (char*)buffer_tostring(contexts);
-        while(p && *p && (tok = mystrsep(&p, ", |"))) {
+        while(p && *p && (tok = strsep_skip_consecutive_separators(&p, ", |"))) {
             if(!*tok) continue;
 
             STRING *tok_string = string_strdupz(tok);

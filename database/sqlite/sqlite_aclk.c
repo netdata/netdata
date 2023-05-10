@@ -255,7 +255,7 @@ static void sql_delete_aclk_table_list(char *host_guid)
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement to clean up aclk tables, rc = %d", rc);
 
-    rc = db_execute(buffer_tostring(sql));
+    rc = db_execute(db_meta, buffer_tostring(sql));
     if (unlikely(rc))
         error("Failed to drop unused ACLK tables");
 
@@ -294,7 +294,7 @@ static int sql_maint_aclk_sync_database(void *data __maybe_unused, int argc __ma
 {
     char sql[512];
     snprintfz(sql,511, SQL_ALERT_CLEANUP, (char *) argv[0], ACLK_DELETE_ACK_ALERTS_INTERNAL);
-    if (unlikely(db_execute(sql)))
+    if (unlikely(db_execute(db_meta, sql)))
         error_report("Failed to clean stale ACLK alert entries");
     return 0;
 }
@@ -367,12 +367,12 @@ static void aclk_synchronization(void *arg __maybe_unused)
     service_register(SERVICE_THREAD_TYPE_EVENT_LOOP, NULL, NULL, NULL, true);
 
     worker_register_job_name(ACLK_DATABASE_NOOP,                 "noop");
-    worker_register_job_name(ACLK_DATABASE_ALARM_HEALTH_LOG,     "alert log");
     worker_register_job_name(ACLK_DATABASE_CLEANUP,              "cleanup");
     worker_register_job_name(ACLK_DATABASE_DELETE_HOST,          "node delete");
     worker_register_job_name(ACLK_DATABASE_NODE_STATE,           "node state");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT,           "alert push");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_CONFIG,    "alert conf push");
+    worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_CHECKPOINT,"alert checkpoint");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_SNAPSHOT,  "alert snapshot");
     worker_register_job_name(ACLK_DATABASE_QUEUE_REMOVED_ALERTS, "alerts check");
     worker_register_job_name(ACLK_DATABASE_TIMER,                "timer");
@@ -437,9 +437,6 @@ static void aclk_synchronization(void *arg __maybe_unused)
                 case ACLK_DATABASE_PUSH_ALERT:
                     aclk_push_alert_events_for_all_hosts();
                     break;
-                case ACLK_DATABASE_ALARM_HEALTH_LOG:
-                    aclk_push_alarm_health_log(cmd.param[0]);
-                    break;
                 case ACLK_DATABASE_PUSH_ALERT_SNAPSHOT:;
                     aclk_push_alert_snapshot_event(cmd.param[0]);
                     break;
@@ -494,12 +491,12 @@ void sql_create_aclk_table(RRDHOST *host __maybe_unused, uuid_t *host_uuid __may
     char sql[ACLK_SYNC_QUERY_SIZE];
 
     snprintfz(sql, ACLK_SYNC_QUERY_SIZE-1, TABLE_ACLK_ALERT, uuid_str);
-    rc = db_execute(sql);
+    rc = db_execute(db_meta, sql);
     if (unlikely(rc))
         error_report("Failed to create ACLK alert table for host %s", host ? rrdhost_hostname(host) : host_guid);
     else {
         snprintfz(sql, ACLK_SYNC_QUERY_SIZE -1, INDEX_ACLK_ALERT, uuid_str, uuid_str);
-        rc = db_execute(sql);
+        rc = db_execute(db_meta, sql);
         if (unlikely(rc))
             error_report("Failed to create ACLK alert table index for host %s", host ? string2str(host->hostname) : host_guid);
     }
@@ -604,14 +601,6 @@ void aclk_push_node_alert_snapshot(const char *node_id)
     queue_aclk_sync_cmd(ACLK_DATABASE_PUSH_ALERT_SNAPSHOT, strdupz(node_id), NULL);
 }
 
-
-void aclk_push_node_health_log(const char *node_id)
-{
-    if (unlikely(!aclk_sync_config.initialized))
-        return;
-
-    queue_aclk_sync_cmd(ACLK_DATABASE_ALARM_HEALTH_LOG, strdupz(node_id), NULL);
-}
 
 void aclk_push_node_removed_alerts(const char *node_id)
 {

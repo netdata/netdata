@@ -1,0 +1,112 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+system.load,,"load1, load5, load15",load,"System Load Average",line,,freebsd.plugin,vm.loadavg
+system.active_processes,,active,processes,"System Active Processes",line,,freebsd.plugin,vm.vmtotal
+system.processes,,"running, blocked",processes,"System Processes",line,,freebsd.plugin,vm.vmtotal
+mem.real,,used,MiB,"Total Real Memory In Use",area,,freebsd.plugin,vm.vmtotal
+system.cpu,,"nice, system, user, interrupt, idle",percentage,"Total CPU utilization",stacked,,freebsd.plugin,kern.cp_time
+cpu.cpu,core,"nice, system, user, interrupt, idle",percentage,"Core utilization",stacked,,freebsd.plugin,kern.cp_time
+cpu.temperature,,a dimension per core,Celsius,"Core temperature",line,,freebsd.plugin,dev.cpu.temperature
+cpu.scaling_cur_freq,,frequency,MHz,"Current CPU Scaling Frequency",line,,freebsd.plugin,dev.cpu.0.freq
+system.intr,,interrupts,interrupts/s,"Total Hardware Interrupts",line,,freebsd.plugin,hw.intrcnt
+system.interrupts,,a dimension per interrupt,interrupts/s,"System interrupts",stacked,,freebsd.plugin,hw.intrcnt
+system.dev_intr,,interrupts,interrupts/s,"Device Interrupts",line,,freebsd.plugin,vm.stats.sys.v_intr
+system.soft_intr,,interrupts,interrupts/s,"Software Interrupts",line,,freebsd.plugin,vm.stats.sys.v_soft
+system.ctxt,,switches,context switches/s,"CPU Context Switches",line,,freebsd.plugin,vm.stats.sys.v_swtch
+system.forks,,started,processes/s,"Started Processes",line,,freebsd.plugin,vm.stats.sys.v_swtch
+system.swap,,"free, used",MiB,"System Swap",stacked,,freebsd.plugin,vm.swap_info
+system.ram,,"free, active, inactive, wired, cache, laundry, buffers",MiB,"System RAM",stacked,,freebsd.plugin,system.ram
+mem.available,,avail,MiB,"Available RAM for applications",line,,freebsd.plugin,system.ram
+system.swapio,,"io, out",KiB/s,"Swap I/O",area,,freebsd.plugin,vm.stats.vm.v_swappgs
+mem.pgfaults,,"memory, io_requiring, cow, cow_optimized, in_transit",page faults/s,"Memory Page Faults",line,,freebsd.plugin,vm.stats.vm.v_pgfaults
+system.ipc_semaphores,,semaphores,semaphores,"IPC Semaphores",area,,freebsd.plugin,kern.ipc.sem
+system.ipc_semaphore_arrays,,arrays,arrays,"IPC Semaphore Arrays",area,,freebsd.plugin,kern.ipc.sem
+system.ipc_shared_mem_segs,,segments,segments,"IPC Shared Memory Segments",area,,freebsd.plugin,kern.ipc.shm
+system.ipc_shared_mem_size,,allocated,KiB,"IPC Shared Memory Segments Size",area,,freebsd.plugin,kern.ipc.shm
+system.ipc_msq_queues,,queues,queues,"Number of IPC Message Queues",area,,freebsd.plugin,kern.ipc.msq
+system.ipc_msq_messages,,messages,messages,"Number of Messages in IPC Message Queues",area,,freebsd.plugin,kern.ipc.msq
+system.ipc_msq_size,,"allocated, used",bytes,"Size of IPC Message Queues",line,,freebsd.plugin,kern.ipc.msq
+system.uptime,,uptime,seconds,"System Uptime",line,,freebsd.plugin,uptime
+system.softnet_stat,,"dispatched, hybrid_dispatched, qdrops, queued",events/s,"System softnet_stat",line,,freebsd.plugin,net.isr
+cpu.softnet_stat,core,"dispatched, hybrid_dispatched, qdrops, queued",events/s,"Per CPU netisr statistics",line,,freebsd.plugin,net.isr
+system.io,,"io, out",KiB/s,"Disk I/O",area,,freebsd.plugin,devstat
+disk.io,disk,"reads, writes, frees",KiB/s,"Disk I/O Bandwidth",area,,freebsd.plugin,devstat
+disk.ops,disk,"reads, writes, other, frees",operations/s,"Disk Completed I/O Operations",line,,freebsd.plugin,devstat
+disk.qops,disk,operations,operations,"Disk Current I/O Operations",line,,freebsd.plugin,devstat
+disk.util,disk,utilization,% of time working,"Disk Utilization Time",line,,freebsd.plugin,devstat
+disk.iotime,disk,"reads, writes, other, frees",milliseconds/s,"Disk Total I/O Time",line,,freebsd.plugin,devstat
+disk.await,disk,"reads, writes, other, frees",milliseconds/operation,"Average Completed I/O Operation Time",line,,freebsd.plugin,devstat
+disk.avgsz,disk,"reads, writes, frees",KiB/operation,"Average Completed I/O Operation Bandwidth",area,,freebsd.plugin,devstat
+disk.svctm,disk,svctm,milliseconds/operation,"Average Service Time",line,,freebsd.plugin,devstat
+ipv4.tcpsock,,connections,active connections,"IPv4 TCP Connections",line,,freebsd.plugin,net.inet.tcp.states
+ipv4.tcppackets,,"received, sent",packets/s,"IPv4 TCP Packets",line,,freebsd.plugin,net.inet.tcp.stats
+ipv4.tcperrors,,"InErrs, InCsumErrors, RetransSegs",packets/s,"IPv4 TCP Errors",line,,freebsd.plugin,net.inet.tcp.stats
+ipv4.tcphandshake,,"EstabResets, ActiveOpens, PassiveOpens, AttemptFails",events/s,"IPv4 TCP Handshake Issues",line,,freebsd.plugin,net.inet.tcp.stats
+ipv4.tcpconnaborts,,"baddata, userclosed, nomemory, timeout, linger",connections/s,"TCP Connection Aborts",line,,freebsd.plugin,net.inet.tcp.stats
+ipv4.tcpofo,,inqueue,packets/s,"TCP Out-Of-Order Queue",line,,freebsd.plugin,net.inet.tcp.stats
+ipv4.tcpsyncookies,,"received, sent, failed",packets/s,"TCP SYN Cookies",line,,freebsd.plugin,net.inet.tcp.stats
+ipv4.tcplistenissues,,overflows,packets/s,"TCP Listen Socket Issues",line,,freebsd.plugin,net.inet.tcp.stats
+ipv4.ecnpkts,,"InCEPkts, InECT0Pkts, InECT1Pkts, OutECT0Pkts, OutECT1Pkts",packets/s,"IPv4 ECN Statistics",line,,freebsd.plugin,net.inet.tcp.stats
+ipv4.udppackets,,"received, sent",packets/s,"IPv4 UDP Packets",line,,freebsd.plugin,net.inet.udp.stats
+ipv4.udperrors,,"InErrors, NoPorts, RcvbufErrors, InCsumErrors, IgnoredMulti",events/s,"IPv4 UDP Errors",line,,freebsd.plugin,net.inet.udp.stats
+ipv4.icmp,,"received, sent",packets/s,"IPv4 ICMP Packets",line,,freebsd.plugin,net.inet.icmp.stats
+ipv4.icmp_errors,,"InErrors, OutErrors, InCsumErrors",packets/s,"IPv4 ICMP Errors",line,,freebsd.plugin,net.inet.icmp.stats
+ipv4.icmpmsg,,"InEchoReps, OutEchoReps, InEchos, OutEchos",packets/s,"IPv4 ICMP Messages",line,,freebsd.plugin,net.inet.icmp.stats
+ipv4.packets,,"received, sent, forwarded, delivered",packets/s,"IPv4 Packets",line,,freebsd.plugin,net.inet.ip.stats
+ipv4.fragsout,,"ok, failed, created",packets/s,"IPv4 Fragments Sent",line,,freebsd.plugin,net.inet.ip.stats
+ipv4.fragsin,,"ok, failed, all",packets/s,"IPv4 Fragments Reassembly",line,,freebsd.plugin,net.inet.ip.stats
+ipv4.errors,,"InDiscards, OutDiscards, InHdrErrors, OutNoRoutes, InAddrErrors, InUnknownProtos",packets/s,"IPv4 Errors",line,,freebsd.plugin,net.inet.ip.stats
+ipv6.packets,,"received, sent, forwarded, delivers",packets/s,"IPv6 Packets",line,,freebsd.plugin,net.inet6.ip6.stats
+ipv6.fragsout,,"ok, failed, all",packets/s,"IPv6 Fragments Sent",line,,freebsd.plugin,net.inet6.ip6.stats
+ipv6.fragsin,,"ok, failed, timeout, all",packets/s,"IPv6 Fragments Reassembly",line,,freebsd.plugin,net.inet6.ip6.stats
+ipv6.errors,,"InDiscards, OutDiscards, InHdrErrors, InAddrErrors, InTruncatedPkts, InNoRoutes, OutNoRoutes",packets/s,"IPv6 Errors",line,,freebsd.plugin,net.inet6.ip6.stats
+ipv6.icmp,,"received, sent",messages/s,"IPv6 ICMP Messages",line,,freebsd.plugin,net.inet6.icmp6.stats
+ipv6.icmpredir,,"received, sent",redirects/s,"IPv6 ICMP Redirects",line,,freebsd.plugin,net.inet6.icmp6.stats
+ipv6.icmperrors,,"InErrors, OutErrors, InCsumErrors, InDestUnreachs, InPktTooBigs, InTimeExcds, InParmProblems, OutDestUnreachs, OutTimeExcds, OutParmProblems",errors/s,"IPv6 ICMP Errors",line,,freebsd.plugin,net.inet6.icmp6.stats
+ipv6.icmpechos,,"InEchos, OutEchos, InEchoReplies, OutEchoReplies",messages/s,"IPv6 ICMP Echo",line,,freebsd.plugin,net.inet6.icmp6.stats
+ipv6.icmprouter,,"InSolicits, OutSolicits, InAdvertisements, OutAdvertisements",messages/s,"IPv6 Router Messages",line,,freebsd.plugin,net.inet6.icmp6.stats
+ipv6.icmpneighbor,,"InSolicits, OutSolicits, InAdvertisements, OutAdvertisements",messages/s,"IPv6 Neighbor Messages",line,,freebsd.plugin,net.inet6.icmp6.stats
+ipv6.icmptypes,,"InType1, InType128, InType129, InType136, OutType1, OutType128, OutType129, OutType133, OutType135, OutType143",messages/s,"IPv6 ICMP Types",line,,freebsd.plugin,net.inet6.icmp6.stats
+ipfw.mem,,"dynamic, static",bytes,"Memory allocated by rules",stacked,,freebsd.plugin,ipfw
+ipfw.packets,,a dimension per static rule,packets/s,"Packets",stacked,,freebsd.plugin,ipfw
+ipfw.bytes,,a dimension per static rule,bytes/s,"Bytes",stacked,,freebsd.plugin,ipfw
+ipfw.active,,a dimension per dynamic rule,rules,"Active rules",stacked,,freebsd.plugin,ipfw
+ipfw.expired,,a dimension per dynamic rule,rules,"Expired rules",stacked,,freebsd.plugin,ipfw
+system.net,,"received, sent",kilobits/s,"Network Traffic",area,,freebsd.plugin,getifaddrs
+system.packets,,"received, sent, multicast_received, multicast_sent",packets/s,"Network Packets",line,,freebsd.plugin,getifaddrs
+system.ipv4,,"received, sent",kilobits/s,"IPv4 Bandwidth",area,,freebsd.plugin,getifaddrs
+system.ipv6,,"received, sent",kilobits/s,"IPv6 Bandwidth",area,,freebsd.plugin,getifaddrs
+net.net,network device,"received, sent",kilobits/s,"Bandwidth",area,,freebsd.plugin,getifaddrs
+net.packets,network device,"received, sent, multicast_received, multicast_sent",packets/s,"Packets",line,,freebsd.plugin,getifaddrs
+net.errors,network device,"inbound, outbound",errors/s,"Interface Errors",line,,freebsd.plugin,getifaddrs
+net.drops,network device,"inbound, outbound",drops/s,"Interface Drops",line,,freebsd.plugin,getifaddrs
+net.events,network device,collisions,events/s,"Network Interface Events",line,,freebsd.plugin,getifaddrs
+disk.space,mount point,"avail, used, reserved_for_root",GiB,"Disk Space Usage for {mounted dir} [{mounted filesystem}]",stacked,,freebsd.plugin,getmntinfo
+disk.inodes,mount point,"avail, used, reserved_for_root",inodes,"Disk Files (inodes) Usage for {mounted dir} [{mounted filesystem}]",stacked,,freebsd.plugin,getmntinfo
+zfs.arc_size,,"arcsz, target, min, max",MiB,"ZFS ARC Size",area,,freebsd.plugin,zfs
+zfs.l2_size,,"actual, size",MiB,"ZFS L2 ARC Size",area,,freebsd.plugin,zfs
+zfs.reads,,"arc, demand, prefetch, metadata, l2",reads/s,"ZFS Reads",area,,freebsd.plugin,zfs
+zfs.bytes,,"read, write",KiB/s,"ZFS ARC L2 Read/Write Rate",area,,freebsd.plugin,zfs
+zfs.hits,,"hits, misses",percentage,"ZFS ARC Hits",stacked,,freebsd.plugin,zfs
+zfs.hits_rate,,"hits, misses",events/s,"ZFS ARC Hits Rate",stacked,,freebsd.plugin,zfs
+zfs.dhits,,"hits, misses",percentage,"ZFS Demand Hits",stacked,,freebsd.plugin,zfs
+zfs.dhits_rate,,"hits, misses",events/s,"ZFS Demand Hits Rate",stacked,,freebsd.plugin,zfs
+zfs.phits,,"hits, misses",percentage,"ZFS Prefetch Hits",stacked,,freebsd.plugin,zfs
+zfs.phits_rate,,"hits, misses",events/s,"ZFS Prefetch Hits Rate",stacked,,freebsd.plugin,zfs
+zfs.mhits,,"hits, misses",percentage,"ZFS Metadata Hits",stacked,,freebsd.plugin,zfs
+zfs.mhits_rate,,"hits, misses",events/s,"ZFS Metadata Hits Rate",stacked,,freebsd.plugin,zfs
+zfs.l2hits,,"hits, misses",percentage,"ZFS L2 Hits",stacked,,freebsd.plugin,zfs
+zfs.l2hits_rate,,"hits, misses",events/s,"ZFS L2 Hits Rate",stacked,,freebsd.plugin,zfs
+zfs.list_hits,,"mfu, mfu_ghost, mru, mru_ghost",hits/s,"ZFS List Hits",area,,freebsd.plugin,zfs
+zfs.arc_size_breakdown,,"recent, frequent",percentage,"ZFS ARC Size Breakdown",stacked,,freebsd.plugin,zfs
+zfs.memory_ops,,throttled,operations/s,"ZFS Memory Operations",line,,freebsd.plugin,zfs
+zfs.important_ops,,"evict_skip, deleted, mutex_miss, hash_collisions",operations/s,"ZFS Important Operations",line,,freebsd.plugin,zfs
+zfs.actual_hits,,"hits, misses",percentage,"ZFS Actual Cache Hits",stacked,,freebsd.plugin,zfs
+zfs.actual_hits_rate,,"hits, misses",events/s,"ZFS Actual Cache Hits Rate",stacked,,freebsd.plugin,zfs
+zfs.demand_data_hits,,"hits, misses",percentage,"ZFS Data Demand Efficiency",stacked,,freebsd.plugin,zfs
+zfs.demand_data_hits_rate,,"hits, misses",events/s,"ZFS Data Demand Efficiency Rate",stacked,,freebsd.plugin,zfs
+zfs.prefetch_data_hits,,"hits, misses",percentage,"ZFS Data Prefetch Efficiency",stacked,,freebsd.plugin,zfs
+zfs.prefetch_data_hits_rate,,"hits, misses",events/s,"ZFS Data Prefetch Efficiency Rate",stacked,,freebsd.plugin,zfs
+zfs.hash_elements,,"current, max",elements,"ZFS ARC Hash Elements",line,,freebsd.plugin,zfs
+zfs.hash_chains,,"current, max",chains,"ZFS ARC Hash Chains",line,,freebsd.plugin,zfs
+zfs.trim_bytes,,TRIMmed,bytes,"Successfully TRIMmed bytes",line,,freebsd.plugin,zfs
+zfs.trim_requests,,"successful, failed, unsupported",requests,"TRIM requests",line,,freebsd.plugin,zfs

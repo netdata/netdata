@@ -21,57 +21,24 @@ struct start_alarm_streaming parse_start_alarm_streaming(const char *data, size_
         return ret;
 
     ret.node_id = strdupz(msg.node_id().c_str());
-    ret.batch_id = msg.batch_id();
-    ret.start_seq_id = msg.start_sequnce_id();
+    ret.resets = msg.resets();
 
     return ret;
 }
 
-char *parse_send_alarm_log_health(const char *data, size_t len)
+struct send_alarm_checkpoint parse_send_alarm_checkpoint(const char *data, size_t len)
 {
-    SendAlarmLogHealth msg;
+    struct send_alarm_checkpoint ret;
+    memset(&ret, 0, sizeof(ret));
+
+    SendAlarmCheckpoint msg;
     if (!msg.ParseFromArray(data, len))
-        return NULL;
-    return strdupz(msg.node_id().c_str());
-}
+        return ret;
 
-char *generate_alarm_log_health(size_t *len, struct alarm_log_health *data)
-{
-    AlarmLogHealth msg;
-    LogEntries *entries;
+    ret.node_id = strdupz(msg.node_id().c_str());
+    ret.claim_id = strdupz(msg.claim_id().c_str());
 
-    msg.set_claim_id(data->claim_id);
-    msg.set_node_id(data->node_id);
-    msg.set_enabled(data->enabled);
-
-    switch (data->status) {
-        case alarm_log_status_aclk::ALARM_LOG_STATUS_IDLE:
-            msg.set_status(alarms::v1::ALARM_LOG_STATUS_IDLE);
-            break;
-        case alarm_log_status_aclk::ALARM_LOG_STATUS_RUNNING:
-            msg.set_status(alarms::v1::ALARM_LOG_STATUS_RUNNING);
-            break;
-        case alarm_log_status_aclk::ALARM_LOG_STATUS_UNSPECIFIED:
-            msg.set_status(alarms::v1::ALARM_LOG_STATUS_UNSPECIFIED);
-            break;
-        default:
-            error("Unknown status of AlarmLogHealth LogEntry");
-            return NULL;
-    }
-
-    entries = msg.mutable_log_entries();
-    entries->set_first_sequence_id(data->log_entries.first_seq_id);
-    entries->set_last_sequence_id(data->log_entries.last_seq_id);
-
-    set_google_timestamp_from_timeval(data->log_entries.first_when, entries->mutable_first_when());
-    set_google_timestamp_from_timeval(data->log_entries.last_when, entries->mutable_last_when());
-
-    *len = PROTO_COMPAT_MSG_SIZE(msg);
-    char *bin = (char*)mallocz(*len);
-    if (!msg.SerializeToArray(bin, *len))
-        return NULL;
-
-    return bin;
+    return ret;
 }
 
 static alarms::v1::AlarmStatus aclk_alarm_status_to_proto(enum aclk_alarm_status status)
@@ -131,8 +98,6 @@ static void fill_alarm_log_entry(struct alarm_log_entry *data, AlarmLogEntry *pr
     if (data->family)
         proto->set_family(data->family);
 
-    proto->set_batch_id(data->batch_id);
-    proto->set_sequence_id(data->sequence_id);
     proto->set_when(data->when);
 
     proto->set_config_hash(data->config_hash);
@@ -187,6 +152,24 @@ char *generate_alarm_log_entry(size_t *len, struct alarm_log_entry *data)
     return bin;
 }
 
+char *generate_alarm_checkpoint(size_t *len, struct alarm_checkpoint *data)
+{
+    AlarmCheckpoint msg;
+
+    msg.set_claim_id(data->claim_id);
+    msg.set_node_id(data->node_id);
+    msg.set_checksum(data->checksum);
+
+    *len = PROTO_COMPAT_MSG_SIZE(msg);
+    char *bin = (char*)mallocz(*len);
+    if (!msg.SerializeToArray(bin, *len)) {
+        freez(bin);
+        return NULL;
+    }
+
+    return bin;
+}
+
 struct send_alarm_snapshot *parse_send_alarm_snapshot(const char *data, size_t len)
 {
     SendAlarmSnapshot msg;
@@ -198,8 +181,8 @@ struct send_alarm_snapshot *parse_send_alarm_snapshot(const char *data, size_t l
         ret->claim_id = strdupz(msg.claim_id().c_str());
     if (msg.node_id().c_str())
         ret->node_id = strdupz(msg.node_id().c_str());
-    ret->snapshot_id = msg.snapshot_id();
-    ret->sequence_id = msg.sequence_id();
+    if (msg.snapshot_uuid().c_str())
+        ret->snapshot_uuid = strdupz(msg.snapshot_uuid().c_str());
     
     return ret;
 }
@@ -208,6 +191,7 @@ void destroy_send_alarm_snapshot(struct send_alarm_snapshot *ptr)
 {
     freez(ptr->claim_id);
     freez(ptr->node_id);
+    freez(ptr->snapshot_uuid);
     freez(ptr);
 }
 
@@ -218,7 +202,7 @@ alarm_snapshot_proto_ptr_t generate_alarm_snapshot_proto(struct alarm_snapshot *
 
     msg->set_node_id(data->node_id);
     msg->set_claim_id(data->claim_id);
-    msg->set_snapshot_id(data->snapshot_id);
+    msg->set_snapshot_uuid(data->snapshot_uuid);
     msg->set_chunks(data->chunks);
     msg->set_chunk(data->chunk);
 

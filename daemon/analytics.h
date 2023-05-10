@@ -74,7 +74,7 @@ struct analytics_data {
     bool exporting_enabled;
 };
 
-void set_late_global_environment(void);
+void set_late_global_environment(struct rrdhost_system_info *system_info);
 void analytics_free_data(void);
 void set_global_environment(void);
 void send_statistics(const char *action, const char *action_result, const char *action_data);

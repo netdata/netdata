@@ -41,6 +41,22 @@ bool is_storage_engine_shared(STORAGE_INSTANCE *engine __maybe_unused) {
     return false;
 }
 
+RRDHOST *find_host_by_node_id(char *node_id) {
+    uuid_t node_uuid;
+    if (unlikely(!node_id || uuid_parse(node_id, node_uuid)))
+        return NULL;
+
+    RRDHOST *host, *ret = NULL;
+    dfe_start_read(rrdhost_root_index, host) {
+        if (host->node_id && !(uuid_memcmp(host->node_id, &node_uuid))) {
+            ret = host;
+            break;
+        }
+    }
+    dfe_done(host);
+
+    return ret;
+}
 
 // ----------------------------------------------------------------------------
 // RRDHOST indexes management
@@ -60,6 +76,26 @@ static inline void rrdhost_init() {
             DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE,
             &dictionary_stats_category_rrdhost, 0);
     }
+}
+
+RRDHOST_ACQUIRED *rrdhost_find_and_acquire(const char *machine_guid) {
+    debug(D_RRD_CALLS, "rrdhost_find_and_acquire() host %s", machine_guid);
+
+    return (RRDHOST_ACQUIRED *)dictionary_get_and_acquire_item(rrdhost_root_index, machine_guid);
+}
+
+RRDHOST *rrdhost_acquired_to_rrdhost(RRDHOST_ACQUIRED *rha) {
+    if(unlikely(!rha))
+        return NULL;
+
+    return (RRDHOST *) dictionary_acquired_item_value((const DICTIONARY_ITEM *)rha);
+}
+
+void rrdhost_acquired_release(RRDHOST_ACQUIRED *rha) {
+    if(unlikely(!rha))
+        return;
+
+    dictionary_acquired_item_release(rrdhost_root_index, (const DICTIONARY_ITEM *)rha);
 }
 
 // ----------------------------------------------------------------------------
@@ -524,7 +560,6 @@ int is_legacy = 1;
         rrdhost_load_rrdcontext_data(host);
 //        rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
         ml_host_new(host);
-        ml_host_start_training_thread(host);
     } else
         rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD | RRDHOST_FLAG_ARCHIVED | RRDHOST_FLAG_ORPHAN);
 
@@ -641,7 +676,6 @@ static void rrdhost_update(RRDHOST *host
         host->rrdpush_replication_step = rrdpush_replication_step;
 
         ml_host_new(host);
-        ml_host_start_training_thread(host);
         
         rrdhost_load_rrdcontext_data(host);
         info("Host %s is not in archived mode anymore", rrdhost_hostname(host));
@@ -679,6 +713,10 @@ RRDHOST *rrdhost_find_or_create(
 
     RRDHOST *host = rrdhost_find_by_guid(guid);
     if (unlikely(host && host->rrd_memory_mode != mode && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) {
+
+        if (likely(!archived && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)))
+            return host;
+
         /* If a legacy memory mode instantiates all dbengine state must be discarded to avoid inconsistencies */
         error("Archived host '%s' has memory mode '%s', but the wanted one is '%s'. Discarding archived state.",
               rrdhost_hostname(host), rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
@@ -921,8 +959,10 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
     rrdhost_init();
 
     if (unlikely(sql_init_database(DB_CHECK_NONE, system_info ? 0 : 1))) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+            set_late_global_environment(system_info);
             fatal("Failed to initialize SQLite");
+        }
         info("Skipping SQLITE metadata initialization since memory mode is not dbengine");
     }
 
@@ -1143,7 +1183,6 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     rrdcalctemplate_index_destroy(host);
 
     // cleanup ML resources
-    ml_host_stop_training_thread(host);
     ml_host_delete(host);
 
     freez(host->exporting_flags);

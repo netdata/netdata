@@ -1,0 +1,2 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+system.idlejitter,,"min, max, average","microseconds lost/s","CPU Idle Jitter",line,,idlejitter.plugin,

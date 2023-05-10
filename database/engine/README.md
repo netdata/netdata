@@ -2,6 +2,8 @@
 
 DBENGINE is the time-series database of Netdata.
 
+![image](https://user-images.githubusercontent.com/2662304/233838474-d4f8f0b9-61dc-4409-a708-97d403cd153a.png)
+
 ## Design
 
 ### Data Points

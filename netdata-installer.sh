@@ -1564,6 +1564,11 @@ remove_old_ebpf() {
     rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf"*.?.*.o
   fi
 
+  # Remove old eBPF programs that did not have "rhf" suffix
+  if [ ! -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.d/pnetdata_ebpf_process.3.10.rhf.o" ]; then
+    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.d/"*.o
+  fi
+
   # Remove old reject list from previous directory
   if [ -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_kernel_reject_list.txt" ]; then
     echo >&2 "Removing old ebpf_kernel_reject_list.txt."

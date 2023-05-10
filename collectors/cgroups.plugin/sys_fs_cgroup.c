@@ -1769,13 +1769,13 @@ static inline void substitute_dots_in_id(char *s) {
 // ----------------------------------------------------------------------------
 // parse k8s labels
 
-char *k8s_parse_resolved_name_and_labels(DICTIONARY *labels, char *data) {
+char *cgroup_parse_resolved_name_and_labels(DICTIONARY *labels, char *data) {
     // the first word, up to the first space is the name
-    char *name = mystrsep(&data, " ");
+    char *name = strsep_skip_consecutive_separators(&data, " ");
 
     // the rest are key=value pairs separated by comma
     while(data) {
-        char *pair = mystrsep(&data, ",");
+        char *pair = strsep_skip_consecutive_separators(&data, ",");
         rrdlabels_add_pair(labels, pair, RRDLABEL_SRC_AUTO| RRDLABEL_SRC_K8S);
     }
 
@@ -1898,19 +1898,21 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
             break;
     }
 
-    if(cg->pending_renames || cg->processed) return;
-    if(!new_name || !*new_name || *new_name == '\n') return;
-    if(!(new_name = trim(new_name))) return;
+    if (cg->pending_renames || cg->processed)
+        return;
+    if (!new_name || !*new_name || *new_name == '\n')
+        return;
+    if (!(new_name = trim(new_name)))
+        return;
 
     char *name = new_name;
-    if (!strncmp(new_name, "k8s_", 4)) {
-        if(!cg->chart_labels) cg->chart_labels = rrdlabels_create();
 
-        // read the new labels and remove the obsolete ones
-        rrdlabels_unmark_all(cg->chart_labels);
-        name = k8s_parse_resolved_name_and_labels(cg->chart_labels, new_name);
-        rrdlabels_remove_all_unmarked(cg->chart_labels);
-    }
+    if (!cg->chart_labels)
+        cg->chart_labels = rrdlabels_create();
+    // read the new labels and remove the obsolete ones
+    rrdlabels_unmark_all(cg->chart_labels);
+    name = cgroup_parse_resolved_name_and_labels(cg->chart_labels, new_name);
+    rrdlabels_remove_all_unmarked(cg->chart_labels);
 
     freez(cg->chart_title);
     cg->chart_title = cgroup_title_strdupz(name);
@@ -1950,7 +1952,7 @@ static void is_cgroup_procs_exist(netdata_ebpf_cgroup_shm_body_t *out, char *id)
 }
 
 static inline void convert_cgroup_to_systemd_service(struct cgroup *cg) {
-    char buffer[CGROUP_CHARTID_LINE_MAX];
+    char buffer[CGROUP_CHARTID_LINE_MAX + 1];
     cg->options |= CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE;
     strncpyz(buffer, cg->id, CGROUP_CHARTID_LINE_MAX);
     char *s = buffer;
@@ -2605,7 +2607,7 @@ static inline void discovery_process_first_time_seen_cgroup(struct cgroup *cg) {
     }
     cg->first_time_seen = 0;
 
-    char comm[TASK_COMM_LEN];
+    char comm[TASK_COMM_LEN + 1];
 
     if (cg->container_orchestrator == CGROUPS_ORCHESTRATOR_UNSET) {
         if (strstr(cg->id, "kubepods")) {
@@ -2711,6 +2713,16 @@ static inline void discovery_process_cgroup(struct cgroup *cg) {
         cg->enabled = 0;
         cg->options |= CGROUP_OPTIONS_DISABLED_DUPLICATE;
         return;
+    }
+
+    if (!cg->chart_labels)
+        cg->chart_labels = rrdlabels_create();
+
+    if (!k8s_is_kubepod(cg)) {
+        rrdlabels_add(cg->chart_labels, "cgroup_name", cg->chart_id, RRDLABEL_SRC_AUTO);
+        if (!dictionary_get(cg->chart_labels, "image")) {
+            rrdlabels_add(cg->chart_labels, "image", "", RRDLABEL_SRC_AUTO);
+        }
     }
 
     worker_is_busy(WORKER_DISCOVERY_PROCESS_NETWORK);
@@ -4778,6 +4790,7 @@ static void cgroup_main_cleanup(void *ptr) {
     }
 
     if (shm_cgroup_ebpf.header) {
+        shm_cgroup_ebpf.header->cgroup_root_count = 0;
         munmap(shm_cgroup_ebpf.header, shm_cgroup_ebpf.header->body_length);
     }
 

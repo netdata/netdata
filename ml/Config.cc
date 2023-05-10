@@ -34,7 +34,7 @@ void ml_config_load(ml_config_t *cfg) {
     unsigned smooth_n = config_get_number(config_section_ml, "num samples to smooth", 3);
     unsigned lag_n = config_get_number(config_section_ml, "num samples to lag", 5);
 
-    double random_sampling_ratio = config_get_float(config_section_ml, "random sampling ratio", 1.0 / lag_n);
+    double random_sampling_ratio = config_get_float(config_section_ml, "random sampling ratio", 1.0 / 5.0 /* default lag_n */);
     unsigned max_kmeans_iters = config_get_number(config_section_ml, "maximum number of k-means iterations", 1000);
 
     double dimension_anomaly_rate_threshold = config_get_float(config_section_ml, "dimension anomaly score threshold", 0.99);
@@ -42,6 +42,14 @@ void ml_config_load(ml_config_t *cfg) {
     double host_anomaly_rate_threshold = config_get_float(config_section_ml, "host anomaly rate threshold", 1.0);
     std::string anomaly_detection_grouping_method = config_get(config_section_ml, "anomaly detection grouping method", "average");
     time_t anomaly_detection_query_duration = config_get_number(config_section_ml, "anomaly detection grouping duration", 5 * 60);
+
+    size_t num_training_threads = config_get_number(config_section_ml, "num training threads", 4);
+    size_t flush_models_batch_size = config_get_number(config_section_ml, "flush models batch size", 128);
+
+    size_t suppression_window = config_get_number(config_section_ml, "dimension anomaly rate suppression window", 1800);
+    size_t suppression_threshold = config_get_number(config_section_ml, "dimension anomaly rate suppression threshold", suppression_window / 2);
+
+    bool enable_statistics_charts = config_get_boolean(config_section_ml, "enable statistics charts", true);
 
     /*
      * Clamp
@@ -64,7 +72,13 @@ void ml_config_load(ml_config_t *cfg) {
     host_anomaly_rate_threshold = clamp(host_anomaly_rate_threshold, 0.1, 10.0);
     anomaly_detection_query_duration = clamp<time_t>(anomaly_detection_query_duration, 60, 15 * 60);
 
-    /*
+    num_training_threads = clamp<size_t>(num_training_threads, 1, 128);
+    flush_models_batch_size = clamp<size_t>(flush_models_batch_size, 8, 512);
+
+    suppression_window = clamp<size_t>(suppression_window, 1, max_train_samples);
+    suppression_threshold = clamp<size_t>(suppression_threshold, 1, suppression_window);
+
+     /*
      * Validate
      */
 
@@ -109,4 +123,12 @@ void ml_config_load(ml_config_t *cfg) {
     cfg->sp_charts_to_skip = simple_pattern_create(cfg->charts_to_skip.c_str(), NULL, SIMPLE_PATTERN_EXACT, true);
 
     cfg->stream_anomaly_detection_charts = config_get_boolean(config_section_ml, "stream anomaly detection charts", true);
+
+    cfg->num_training_threads = num_training_threads;
+    cfg->flush_models_batch_size = flush_models_batch_size;
+
+    cfg->suppression_window = suppression_window;
+    cfg->suppression_threshold = suppression_threshold;
+
+    cfg->enable_statistics_charts = enable_statistics_charts;
 }
