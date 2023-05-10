@@ -6,6 +6,7 @@ void error_int(int is_collector __maybe_unused, const char *prefix __maybe_unuse
     FILE *fp = stderr;
 
     va_list args;
+    va_start( args, fmt );
     vfprintf(fp, fmt, args );
     va_end( args );
 }
