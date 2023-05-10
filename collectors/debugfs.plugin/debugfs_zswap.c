@@ -14,6 +14,8 @@ static struct netdata_zswap_metric {
     int chart_created;
 
     int prio;
+
+    collected_number value;
 } zswap_metrics[] = {
     // https://elixir.bootlin.com/linux/latest/source/mm/zswap.c
     {.filename = "/sys/kernel/debug/zswap/same_filled_pages",
@@ -23,7 +25,8 @@ static struct netdata_zswap_metric {
      .title = "Total same-value filled pages currently stored",
      .enabled = CONFIG_BOOLEAN_YES,
      .chart_created = CONFIG_BOOLEAN_NO,
-     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_SAME_FILL_PAGE},
+     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_SAME_FILL_PAGE,
+     .value = -1},
     {.filename = "/sys/kernel/debug/zswap/stored_pages",
      .chart_id = "stored_pages",
      .dimension = "page",
@@ -31,7 +34,8 @@ static struct netdata_zswap_metric {
      .title = "Compressed pages stored in zswap.",
      .enabled = CONFIG_BOOLEAN_YES,
      .chart_created = CONFIG_BOOLEAN_NO,
-     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_STORED_PAGE},
+     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_STORED_PAGE,
+     .value = -1},
     {.filename = "/sys/kernel/debug/zswap/pool_total_size",
      .chart_id = "pool_total_size",
      .dimension = "pool",
@@ -39,7 +43,8 @@ static struct netdata_zswap_metric {
      .title = "Total bytes used by the compressed storage",
      .enabled = CONFIG_BOOLEAN_YES,
      .chart_created = CONFIG_BOOLEAN_NO,
-     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_POOL_TOT_SIZE},
+     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_POOL_TOT_SIZE,
+     .value = -1},
     {.filename = "/sys/kernel/debug/zswap/duplicate_entry",
      .chart_id = "duplicate_entry",
      .dimension = "duplicate",
@@ -47,7 +52,8 @@ static struct netdata_zswap_metric {
      .title = "Duplicate store was found.",
      .enabled = CONFIG_BOOLEAN_YES,
      .chart_created = CONFIG_BOOLEAN_NO,
-     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_DUPP_ENTRY},
+     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_DUPP_ENTRY,
+     .value = -1},
     {.filename = "/sys/kernel/debug/zswap/written_back_pages",
      .chart_id = "written_back_pages",
      .dimension = "pages",
@@ -55,7 +61,8 @@ static struct netdata_zswap_metric {
      .title = "Pages written back when pool limit was reached.",
      .enabled = CONFIG_BOOLEAN_YES,
      .chart_created = CONFIG_BOOLEAN_NO,
-     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_STORED_PAGE},
+     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_STORED_PAGE,
+     .value = -1},
     {.filename = "/sys/kernel/debug/zswap/reject_compress_poor",
      .chart_id = "reject_compress_poor",
      .dimension = "pages",
@@ -63,7 +70,8 @@ static struct netdata_zswap_metric {
      .title = "Compressed page was too big for the allocator to store.",
      .enabled = CONFIG_BOOLEAN_YES,
      .chart_created = CONFIG_BOOLEAN_NO,
-     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_REJECT_COM_POOR},
+     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_REJECT_COM_POOR,
+     .value = -1},
     {.filename = "/sys/kernel/debug/zswap/reject_kmemcache_fail",
      .chart_id = "reject_kmemcache_fail",
      .dimension = "pages",
@@ -71,7 +79,8 @@ static struct netdata_zswap_metric {
      .title = "Number of entry metadata that could not be allocated",
      .enabled = CONFIG_BOOLEAN_YES,
      .chart_created = CONFIG_BOOLEAN_NO,
-     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_KMEM_FAIL},
+     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_KMEM_FAIL,
+     .value = -1},
     {.filename = "/sys/kernel/debug/zswap/reject_alloc_fail",
      .chart_id = "reject_alloc_fail",
      .dimension = "allocator",
@@ -87,7 +96,8 @@ static struct netdata_zswap_metric {
      .dimension = "pages",
      .units = "pages",
      .title = "Memory cannot be reclaimed (pool limit was reached).",
-     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_RRECLAIM_FAIL},
+     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_RRECLAIM_FAIL,
+     .value = -1},
     {.filename = "/sys/kernel/debug/zswap/pool_limit_hit",
      .chart_id = "pool_limit_hit",
      .enabled = CONFIG_BOOLEAN_YES,
@@ -95,7 +105,8 @@ static struct netdata_zswap_metric {
      .dimension = "limit",
      .units = "boolean",
      .title = "Was the pool limit reached?",
-     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_POOL_LIM_HIT},
+     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_POOL_LIM_HIT,
+     .value = -1},
 
     // The terminator
     {.filename = NULL, .chart_id = NULL, .enabled = CONFIG_BOOLEAN_NO}
