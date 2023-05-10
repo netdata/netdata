@@ -241,8 +241,8 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | [`delay`](#alarm-line-delay)                        | no              | Optional hysteresis settings to prevent floods of notifications.                      |
 | [`repeat`](#alarm-line-repeat)                      | no              | The interval for sending notifications when an alarm is in WARNING or CRITICAL mode.  |
 | [`options`](#alarm-line-options)                    | no              | Add an option to not clear alarms.                                                    |
-| [`host labels`](#alarm-line-host-labels)            | no              | List of labels present on a host.                                                     |
-| [`chart labels`](#alarm-line-chart-labels)          | no              | List of labels present on a chart.                                                    |
+| [`host labels`](#alarm-line-host-labels)            | no              | Restrict an alarm or template to a list of matching labels present on a host.         |
+| [`chart labels`](#alarm-line-chart-labels)          | no              | Restrict an alarm or template to a list of matching labels present on a host.         |
 | [`info`](#alarm-line-info)                          | no              | A brief description of the alarm.                                                           |
 
 The `alarm` or `template` line must be the first line of any entity.
@@ -446,6 +446,9 @@ For example, you can create a template on the `disk.io` context, but filter it t
 ```yaml
 families: sda sdb
 ```
+
+Please note that the use of the `families` filter is planned to be deprecated in upcoming Netdata releases. 
+Please use [`chart labels`](#alarm-line-chart-labels) instead.
 
 #### Alarm line `lookup`
 
@@ -711,10 +714,17 @@ If you have an e.g. external disk mounted on `/mnt/disk1` and you don't wish any
 it (but you do for all other mount points), you can add the following to the alert's configuration:
 
 ```yaml
-chart labels: !mount_point=/mnt/disk1 mount_point=*`
+chart labels: mount_point=!/mnt/disk1 *`
 ```
 
-The `chart labels` is a space-separated list that accepts simple patterns.
+The `chart labels` is a space-separated list that accepts simple patterns. If you use multiple different chart labels,
+then the result is an OR between them. i.e. the following:
+
+```yaml
+chart labels: mount_point=/mnt/disk1 device=sda`
+```
+
+Will create the alert if the `mount_point` is `/mnt/disk1` or the `device` is `sda`.
 
 See our [simple patterns docs](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) for more examples.
 
