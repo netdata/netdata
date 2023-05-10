@@ -120,7 +120,7 @@ static struct netdata_zswap_metric zswap_associated_metrics[] = {
     {.filename = NULL, .chart_id = NULL, .enabled = CONFIG_BOOLEAN_NO}
 };
 
-int zswap_charts(struct netdata_zswap_metric *metric, int update_every) {
+int zswap_collect_data(struct netdata_zswap_metric *metric) {
     int fd;
     int ret = 0;
     char buffer[512];
@@ -143,7 +143,14 @@ int zswap_charts(struct netdata_zswap_metric *metric, int update_every) {
     }
     // We discard breakline
     buffer[r - 1] = '\0';
+    metric->value = str2ll(buffer, NULL);
 
+zswap_charts_end:
+    close(fd);
+    return ret;
+}
+
+void zswap_independent_chart(struct netdata_zswap_metric *metric, int update_every) {
     if (unlikely(!metric->chart_created)) {
         metric->chart_created = CONFIG_BOOLEAN_YES;
         fprintf(stdout,
@@ -153,28 +160,27 @@ int zswap_charts(struct netdata_zswap_metric *metric, int update_every) {
     }
 
     fprintf(stdout, "BEGIN system.%s\n"
-                    "SET %s = %s\n"
+                    "SET %s = %lld\n"
                     "END\n",
-            metric->chart_id, metric->dimension, buffer);
+            metric->chart_id, metric->dimension, metric->value);
     fflush(stdout);
-
-zswap_charts_end:
-    close(fd);
-    return ret;
 }
 
 int debugfs_zswap(int update_every, const char *name) {
     (void)name;
 
     int i;
+    struct netdata_zswap_metric *metric;
     for (i = 0; zswap_independent_metrics[i].filename; i++) {
-        struct netdata_zswap_metric *ptr = &zswap_independent_metrics[i];
-        ptr->enabled = !zswap_charts(ptr, update_every);
+        metric = &zswap_independent_metrics[i];
+        metric->enabled = !zswap_collect_data(metric);
+        if (metric->enabled)
+            zswap_independent_chart(metric, update_every);
     }
 
     for (i = 0; zswap_associated_metrics[i].filename; i++) {
-        struct netdata_zswap_metric *ptr = &zswap_associated_metrics[i];
-        ptr->enabled = !zswap_charts(ptr, update_every);
+        metric = &zswap_associated_metrics[i];
+        metric->enabled = !zswap_collect_data(metric);
     }
 
     return 0;
