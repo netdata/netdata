@@ -10,6 +10,21 @@ void error_int(int is_collector __maybe_unused, const char *prefix __maybe_unuse
     va_end( args );
 }
 
+#ifdef NETDATA_INTERNAL_CHECKS
+
+uint64_t debug_flags;
+
+void debug_int( const char *file __maybe_unused , const char *function __maybe_unused , const unsigned long line __maybe_unused, const char *fmt __maybe_unused, ... )
+{
+
+}
+
+void fatal_int( const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt __maybe_unused, ... )
+{
+    abort();
+};
+#endif
+
 void freez(void *ptr) {
     free(ptr);
 }
