@@ -1952,7 +1952,7 @@ static void is_cgroup_procs_exist(netdata_ebpf_cgroup_shm_body_t *out, char *id)
 }
 
 static inline void convert_cgroup_to_systemd_service(struct cgroup *cg) {
-    char buffer[CGROUP_CHARTID_LINE_MAX];
+    char buffer[CGROUP_CHARTID_LINE_MAX + 1];
     cg->options |= CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE;
     strncpyz(buffer, cg->id, CGROUP_CHARTID_LINE_MAX);
     char *s = buffer;
@@ -2607,7 +2607,7 @@ static inline void discovery_process_first_time_seen_cgroup(struct cgroup *cg) {
     }
     cg->first_time_seen = 0;
 
-    char comm[TASK_COMM_LEN];
+    char comm[TASK_COMM_LEN + 1];
 
     if (cg->container_orchestrator == CGROUPS_ORCHESTRATOR_UNSET) {
         if (strstr(cg->id, "kubepods")) {
