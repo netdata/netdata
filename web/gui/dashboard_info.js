@@ -971,6 +971,14 @@ netdataDashboard.submenu = {
         'This keeps your machine’s time accurate by syncing with servers that are known to have accurate times.'
     },
 
+    'system.zswap_rejections': {
+        info: 'The chart shows number of rejected pages according differnt methos: ' +
+            '<br>compress_poor: Compressed page was too big for the allocator to store. </br> ' +
+            '<br>kmemcache_fail: Number of entry metadata that could not be allocated. </br> ' +
+            '<br>alloc_fail:  Allocator could not get memory. </br> ' +
+            '<br>reclaim_fail: Memory cannot be reclaimed (pool limit was reached). </br> '
+    },
+
     'cpu.softnet_stat': {
         title: 'softnet',
         info: function (os) {
