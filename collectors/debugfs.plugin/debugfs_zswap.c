@@ -70,8 +70,8 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .enabled = CONFIG_BOOLEAN_YES,
      .chart_created = CONFIG_BOOLEAN_NO,
      .dimension = "limit",
-     .units = "boolean",
-     .title = "Was the pool limit reached?",
+     .units = "claims",
+     .title = "Reclaim space when pool limit was reached.",
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_POOL_LIM_HIT,
      .value = -1},
 
