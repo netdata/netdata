@@ -63,6 +63,8 @@ ml_training_status_to_string(enum ml_training_status ts)
             return "trained";
         case TRAINING_STATUS_UNTRAINED:
             return "untrained";
+        case TRAINING_STATUS_SILENCED:
+            return "silenced";
         default:
             return "unknown";
     }
@@ -679,6 +681,8 @@ ml_dimension_train_model(ml_training_thread_t *training_thread, ml_dimension_t *
                 break;
         }
 
+        dim->suppression_anomaly_counter = 0;
+        dim->suppression_window_counter = 0;
         dim->tr = training_response;
 
         dim->last_training_time = training_response.last_entry_on_response;
@@ -735,6 +739,10 @@ ml_dimension_train_model(ml_training_thread_t *training_thread, ml_dimension_t *
 
         dim->mt = METRIC_TYPE_CONSTANT;
         dim->ts = TRAINING_STATUS_TRAINED;
+
+        dim->suppression_anomaly_counter = 0;
+        dim->suppression_window_counter = 0;
+
         dim->tr = training_response;
         dim->last_training_time = rrddim_last_entry_s(dim->rd);
 
@@ -771,6 +779,7 @@ ml_dimension_schedule_for_training(ml_dimension_t *dim, time_t curr_time)
         schedule_for_training = true;
         dim->ts = TRAINING_STATUS_PENDING_WITHOUT_MODEL;
         break;
+    case TRAINING_STATUS_SILENCED:
     case TRAINING_STATUS_TRAINED:
         if ((dim->last_training_time + (Cfg.train_every * dim->rd->update_every)) < curr_time) {
             schedule_for_training = true;
@@ -856,12 +865,15 @@ ml_dimension_predict(ml_dimension_t *dim, time_t curr_time, calculated_number_t 
     switch (dim->ts) {
         case TRAINING_STATUS_UNTRAINED:
         case TRAINING_STATUS_PENDING_WITHOUT_MODEL: {
+        case TRAINING_STATUS_SILENCED:
             netdata_mutex_unlock(&dim->mutex);
             return false;
         }
         default:
             break;
     }
+
+    dim->suppression_window_counter++;
 
     /*
      * Use the KMeans models to check if the value is anomalous
@@ -884,6 +896,13 @@ ml_dimension_predict(ml_dimension_t *dim, time_t curr_time, calculated_number_t 
         }
 
         sum += 1;
+    }
+
+    dim->suppression_anomaly_counter += sum ? 1 : 0;
+
+    if ((dim->suppression_anomaly_counter >= Cfg.suppression_threshold) &&
+        (dim->suppression_window_counter >= Cfg.suppression_window)) {
+        dim->ts = TRAINING_STATUS_SILENCED;
     }
 
     netdata_mutex_unlock(&dim->mutex);
@@ -942,6 +961,13 @@ ml_chart_update_dimension(ml_chart_t *chart, ml_dimension_t *dim, bool is_anomal
                     chart->mls.num_anomalous_dimensions += is_anomalous;
                     chart->mls.num_normal_dimensions += !is_anomalous;
                     return;
+                case TRAINING_STATUS_SILENCED:
+                    chart->mls.num_training_status_silenced++;
+                    chart->mls.num_training_status_trained++;
+
+                    chart->mls.num_anomalous_dimensions += is_anomalous;
+                    chart->mls.num_normal_dimensions += !is_anomalous;
+                    return;
             }
 
             return;
@@ -995,6 +1021,7 @@ ml_host_detect_once(ml_host_t *host)
             host->mls.num_training_status_pending_without_model += chart_mls.num_training_status_pending_without_model;
             host->mls.num_training_status_trained += chart_mls.num_training_status_trained;
             host->mls.num_training_status_pending_with_model += chart_mls.num_training_status_pending_with_model;
+            host->mls.num_training_status_silenced += chart_mls.num_training_status_silenced;
 
             host->mls.num_anomalous_dimensions += chart_mls.num_anomalous_dimensions;
             host->mls.num_normal_dimensions += chart_mls.num_normal_dimensions;
