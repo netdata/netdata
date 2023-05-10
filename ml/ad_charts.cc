@@ -124,6 +124,8 @@ void ml_update_dimensions_chart(ml_host_t *host, const ml_machine_learning_stats
                 rrddim_add(host->training_status_rs, "trained", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             host->training_status_pending_with_model_rd =
                 rrddim_add(host->training_status_rs, "pending-with-model", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            host->training_status_silenced_rd =
+                rrddim_add(host->training_status_rs, "silenced", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
         rrddim_set_by_pointer(host->training_status_rs,
@@ -134,6 +136,8 @@ void ml_update_dimensions_chart(ml_host_t *host, const ml_machine_learning_stats
                               host->training_status_trained_rd, mls.num_training_status_trained);
         rrddim_set_by_pointer(host->training_status_rs,
                               host->training_status_pending_with_model_rd, mls.num_training_status_pending_with_model);
+        rrddim_set_by_pointer(host->training_status_rs,
+                              host->training_status_silenced_rd, mls.num_training_status_silenced);
 
         rrdset_done(host->training_status_rs);
     }

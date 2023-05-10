@@ -55,6 +55,7 @@ typedef struct machine_learning_stats_t {
     size_t num_training_status_pending_without_model;
     size_t num_training_status_trained;
     size_t num_training_status_pending_with_model;
+    size_t num_training_status_silenced;
 
     size_t num_anomalous_dimensions;
     size_t num_normal_dimensions;
@@ -103,6 +104,9 @@ enum ml_training_status {
 
     // Have a valid, up-to-date model
     TRAINING_STATUS_TRAINED,
+
+    // Have a valid, up-to-date model that is silenced because its too noisy
+    TRAINING_STATUS_SILENCED,
 };
 
 enum ml_training_result {
@@ -194,6 +198,9 @@ typedef struct {
     netdata_mutex_t mutex;
     ml_kmeans_t kmeans;
     std::vector<DSample> feature;
+
+    uint32_t suppression_window_counter;
+    uint32_t suppression_anomaly_counter;
 } ml_dimension_t;
 
 typedef struct {
@@ -233,6 +240,7 @@ typedef struct {
     RRDDIM *training_status_pending_without_model_rd;
     RRDDIM *training_status_trained_rd;
     RRDDIM *training_status_pending_with_model_rd;
+    RRDDIM *training_status_silenced_rd;
 
     RRDSET *dimensions_rs;
     RRDDIM *dimensions_anomalous_rd;
@@ -324,6 +332,9 @@ typedef struct {
 
     std::vector<ml_training_thread_t> training_threads;
     std::atomic<bool> training_stop;
+
+    size_t suppression_window;
+    size_t suppression_threshold;
 
     bool enable_statistics_charts;
 } ml_config_t;
