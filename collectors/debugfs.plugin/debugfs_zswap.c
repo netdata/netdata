@@ -79,41 +79,49 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
     {.filename = NULL, .chart_id = NULL, .enabled = CONFIG_BOOLEAN_NO}
 };
 
+enum netdata_zswap_rejected {
+    NETDATA_ZSWAP_REJECTED_COMPRESS_POOR,
+    NETDATA_ZSWAP_REJECTED_KMEM_FAIL,
+    NETDATA_ZSWAP_REJECTED_RALLOC_FAIL,
+    NETDATA_ZSWAP_REJECTED_RRECLAIM_FAIL
+};
+
+
 static struct netdata_zswap_metric zswap_rejected_metrics[] = {
     {.filename = "/sys/kernel/debug/zswap/reject_compress_poor",
      .chart_id = "reject_compress_poor",
-     .dimension = "pages",
+     .dimension = "compress_poor",
      .units = "pages",
      .title = "Compressed page was too big for the allocator to store.",
      .enabled = CONFIG_BOOLEAN_YES,
      .chart_created = CONFIG_BOOLEAN_NO,
-     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_REJECT_COM_POOR,
+     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_REJECTS,
      .value = -1},
     {.filename = "/sys/kernel/debug/zswap/reject_kmemcache_fail",
      .chart_id = "reject_kmemcache_fail",
-     .dimension = "pages",
+     .dimension = "kmemcache_fail",
      .units = "pages",
      .title = "Number of entry metadata that could not be allocated",
      .enabled = CONFIG_BOOLEAN_YES,
      .chart_created = CONFIG_BOOLEAN_NO,
-     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_KMEM_FAIL,
+     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_REJECTS,
      .value = -1},
     {.filename = "/sys/kernel/debug/zswap/reject_alloc_fail",
      .chart_id = "reject_alloc_fail",
-     .dimension = "allocator",
+     .dimension = "alloc_fail",
      .units = "calls",
      .title = "Allocator could not get memory",
      .enabled = CONFIG_BOOLEAN_YES,
      .chart_created = CONFIG_BOOLEAN_NO,
-     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_RALLOC_FAIL},
+     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_REJECTS},
     {.filename = "/sys/kernel/debug/zswap/reject_reclaim_fail",
      .chart_id = "reject_reclaim_fail",
      .enabled = CONFIG_BOOLEAN_YES,
      .chart_created = CONFIG_BOOLEAN_NO,
-     .dimension = "pages",
+     .dimension = "reclaim_fail",
      .units = "pages",
      .title = "Memory cannot be reclaimed (pool limit was reached).",
-     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_RRECLAIM_FAIL,
+     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_REJECTS,
      .value = -1},
 
     // The terminator
@@ -166,6 +174,35 @@ void zswap_independent_chart(struct netdata_zswap_metric *metric, int update_eve
     fflush(stdout);
 }
 
+void zswap_reject_chart(int update_every, const char *name) {
+    int i;
+    struct netdata_zswap_metric *metric = &zswap_rejected_metrics[NETDATA_ZSWAP_REJECTED_COMPRESS_POOR];
+    if (unlikely(!metric->chart_created)) {
+        metric->chart_created = CONFIG_BOOLEAN_YES;
+        fprintf(stdout,
+                "CHART system.zswap_rejections '' 'Zswap rejections' 'failure' 'zswap' 'system.zswap_rejections' 'line' %d %d '' 'debugfs.plugin' '%s'\n",
+                metric->prio, update_every, name);
+        for (i = 0; zswap_rejected_metrics[i].filename; i++) {
+            metric = &zswap_rejected_metrics[i];
+            fprintf(stdout,
+                    "DIMENSION '%s' '%s' absolute 1 1 ''\n",
+                    metric->dimension,
+                    metric->dimension);
+        }
+    }
+
+    fprintf(stdout, "BEGIN system.zswap_rejections\n");
+    for (i = 0; zswap_rejected_metrics[i].filename; i++) {
+        metric = &zswap_rejected_metrics[i];
+        fprintf(stdout,
+                "SET %s = %lld\n",
+                metric->dimension,
+                metric->value);
+    }
+    fprintf(stdout, "END\n");
+    fflush(stdout);
+}
+
 int debugfs_zswap(int update_every, const char *name) {
     (void)name;
 
@@ -182,6 +219,8 @@ int debugfs_zswap(int update_every, const char *name) {
         metric = &zswap_rejected_metrics[i];
         metric->enabled = !zswap_collect_data(metric);
     }
+
+    zswap_reject_chart(update_every, name);
 
     return 0;
 }
