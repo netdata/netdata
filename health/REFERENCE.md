@@ -724,7 +724,8 @@ then the result is an OR between them. i.e. the following:
 chart labels: mount_point=/mnt/disk1 device=sda`
 ```
 
-Will create the alert if the `mount_point` is `/mnt/disk1` or the `device` is `sda`.
+Will create the alert if the `mount_point` is `/mnt/disk1` or the `device` is `sda`. Furthermore, if a chart label name
+is specified that does not exist in the chart, the chart won't be matched.
 
 See our [simple patterns docs](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) for more examples.
 
