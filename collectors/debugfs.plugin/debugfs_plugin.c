@@ -16,7 +16,7 @@ static struct debugfs_module {
     int (*func)(int update_every, const char *name);
 }  debugfs_modules[] = {
     // Memory Fragmentation
-    { .name = "/sys/kernel/debug/extfrag/extfrag_index", .enabled = CONFIG_BOOLEAN_YES,
+    { .name = "/sys/kernel/debug/extfrag", .enabled = CONFIG_BOOLEAN_YES,
       .func = debugfs_parse_extfrag_index},
     { .name = "/sys/kernel/debug/zswap/", .enabled = CONFIG_BOOLEAN_YES,
       .func = debugfs_zswap},
