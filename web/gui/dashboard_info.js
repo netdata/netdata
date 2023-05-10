@@ -971,14 +971,6 @@ netdataDashboard.submenu = {
         'This keeps your machine’s time accurate by syncing with servers that are known to have accurate times.'
     },
 
-    'system.zswap_rejections': {
-        info: 'The chart shows number of rejected pages according differnt methos: ' +
-            '<br>compress_poor: Compressed page was too big for the allocator to store. </br> ' +
-            '<br>kmemcache_fail: Number of entry metadata that could not be allocated. </br> ' +
-            '<br>alloc_fail:  Allocator could not get memory. </br> ' +
-            '<br>reclaim_fail: Memory cannot be reclaimed (pool limit was reached). </br> '
-    },
-
     'cpu.softnet_stat': {
         title: 'softnet',
         info: function (os) {
@@ -1542,6 +1534,14 @@ netdataDashboard.context = {
     'system.entropy': {
         colors: '#CC22AA',
         info: '<a href="https://en.wikipedia.org/wiki/Entropy_(computing)" target="_blank">Entropy</a>, is a pool of random numbers (<a href="https://en.wikipedia.org/wiki//dev/random" target="_blank">/dev/random</a>) that is mainly used in cryptography. If the pool of entropy gets empty, processes requiring random numbers may run a lot slower (it depends on the interface each program uses), waiting for the pool to be replenished. Ideally a system with high entropy demands should have a hardware device for that purpose (TPM is one such device). There are also several software-only options you may install, like <code>haveged</code>, although these are generally useful only in servers.'
+    },
+
+    'system.zswap_rejections': {
+        info: 'The chart shows number of rejected pages per access: </br>' +
+            'compress_poor: Compressed page was too big for the allocator to store. </br> ' +
+            'kmemcache_fail: Number of entry metadata that could not be allocated. </br> ' +
+            'alloc_fail:  Allocator could not get memory. </br> ' +
+            'reclaim_fail: Memory cannot be reclaimed (pool limit was reached). </br> '
     },
 
     'system.clock_sync_state': {
