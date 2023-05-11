@@ -91,6 +91,23 @@ const char *debugfs_rrdset_type_name(RRDSET_TYPE chart_type) {
     }
 }
 
+const char *debugfs_rrd_algorithm_name(RRD_ALGORITHM algorithm) {
+    switch(algorithm) {
+        case RRD_ALGORITHM_ABSOLUTE:
+        default:
+            return RRD_ALGORITHM_ABSOLUTE_NAME;
+
+        case RRD_ALGORITHM_INCREMENTAL:
+            return RRD_ALGORITHM_INCREMENTAL_NAME;
+
+        case RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL:
+            return RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL_NAME;
+
+        case RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL:
+            return RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL_NAME;
+    }
+}
+
 int debugfs_check_sys_permission() {
     int ret = 0;
 

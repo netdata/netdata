@@ -9,8 +9,8 @@ struct netdata_zswap_metric {
     const char *dimension;
     const char *units;
     const char *title;
-    const char *algorithm; // TODO: use enum RRD_ALGORITHM
-    int charttype;
+    RRD_ALGORITHM algorithm;
+    RRDSET_TYPE charttype;
 
     int enabled;
     int obsolete;
@@ -28,7 +28,7 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .dimension = "same_filled",
      .units = "pages",
      .title = "Zswap same-value filled pages currently stored",
-     .algorithm = "absolute",
+     .algorithm = RRD_ALGORITHM_ABSOLUTE,
      .charttype = RRDSET_TYPE_LINE,
      .enabled = CONFIG_BOOLEAN_YES,
      .obsolete = CONFIG_BOOLEAN_NO,
@@ -40,7 +40,7 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .dimension = "compressed",
      .units = "pages",
      .title = "Zswap compressed pages currently stored",
-     .algorithm = "absolute",
+     .algorithm = RRD_ALGORITHM_ABSOLUTE,
      .charttype = RRDSET_TYPE_LINE,
      .enabled = CONFIG_BOOLEAN_YES,
      .obsolete = CONFIG_BOOLEAN_NO,
@@ -52,7 +52,7 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .dimension = "pool",
      .units = "bytes",
      .title = "Zswap bytes used by the compressed storage",
-     .algorithm = "absolute",
+     .algorithm = RRD_ALGORITHM_ABSOLUTE,
      .charttype = RRDSET_TYPE_LINE,
      .enabled = CONFIG_BOOLEAN_YES,
      .obsolete = CONFIG_BOOLEAN_NO,
@@ -64,7 +64,7 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .dimension = "duplicate",
      .units = "entries/s",
      .title = "Zswap duplicate store was encountered",
-     .algorithm = "incremental",
+     .algorithm = RRD_ALGORITHM_INCREMENTAL,
      .charttype = RRDSET_TYPE_LINE,
      .enabled = CONFIG_BOOLEAN_YES,
      .obsolete = CONFIG_BOOLEAN_NO,
@@ -76,7 +76,7 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .dimension = "written_back",
      .units = "pages/s",
      .title = "Zswap pages written back when pool limit was reached",
-     .algorithm = "incremental",
+     .algorithm = RRD_ALGORITHM_INCREMENTAL,
      .charttype = RRDSET_TYPE_LINE,
      .enabled = CONFIG_BOOLEAN_YES,
      .obsolete = CONFIG_BOOLEAN_NO,
@@ -88,7 +88,7 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .dimension = "limit",
      .units = "events/s",
      .title = "Zswap pool limit was reached",
-     .algorithm = "incremental",
+     .algorithm = RRD_ALGORITHM_INCREMENTAL,
      .charttype = RRDSET_TYPE_LINE,
      .enabled = CONFIG_BOOLEAN_YES,
      .obsolete = CONFIG_BOOLEAN_NO,
@@ -102,7 +102,7 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .dimension = NULL,
      .units = NULL,
      .title = NULL,
-     .algorithm = NULL,
+     .algorithm = RRD_ALGORITHM_ABSOLUTE,
      .charttype = RRDSET_TYPE_LINE,
      .enabled = CONFIG_BOOLEAN_NO,
      .obsolete = CONFIG_BOOLEAN_NO,
@@ -126,7 +126,7 @@ static struct netdata_zswap_metric zswap_rejected_metrics[] = {
      .dimension = NULL,
      .units = "rejections/s",
      .title = "Zswap rejections",
-     .algorithm = NULL,
+     .algorithm = RRD_ALGORITHM_ABSOLUTE,
      .charttype = RRDSET_TYPE_LINE,
      .enabled = CONFIG_BOOLEAN_YES,
      .obsolete = CONFIG_BOOLEAN_NO,
@@ -138,7 +138,7 @@ static struct netdata_zswap_metric zswap_rejected_metrics[] = {
      .dimension = "compress_poor",
      .units = NULL,
      .title = NULL,
-     .algorithm = "absolute",
+     .algorithm = RRD_ALGORITHM_ABSOLUTE,
      .charttype = RRDSET_TYPE_STACKED,
      .enabled = CONFIG_BOOLEAN_YES,
      .obsolete = CONFIG_BOOLEAN_NO,
@@ -150,7 +150,7 @@ static struct netdata_zswap_metric zswap_rejected_metrics[] = {
      .dimension = "kmemcache_fail",
      .units = NULL,
      .title = NULL,
-     .algorithm = "absolute",
+     .algorithm = RRD_ALGORITHM_ABSOLUTE,
      .charttype = RRDSET_TYPE_STACKED,
      .enabled = CONFIG_BOOLEAN_YES,
      .obsolete = CONFIG_BOOLEAN_NO,
@@ -162,7 +162,7 @@ static struct netdata_zswap_metric zswap_rejected_metrics[] = {
      .dimension = "alloc_fail",
      .units = NULL,
      .title = NULL,
-     .algorithm = "absolute",
+     .algorithm = RRD_ALGORITHM_ABSOLUTE,
      .charttype = RRDSET_TYPE_STACKED,
      .enabled = CONFIG_BOOLEAN_YES,
      .obsolete = CONFIG_BOOLEAN_NO,
@@ -173,7 +173,7 @@ static struct netdata_zswap_metric zswap_rejected_metrics[] = {
      .dimension = "reclaim_fail",
      .units = NULL,
      .title = NULL,
-     .algorithm = "absolute",
+     .algorithm = RRD_ALGORITHM_ABSOLUTE,
      .charttype = RRDSET_TYPE_STACKED,
      .enabled = CONFIG_BOOLEAN_YES,
      .obsolete = CONFIG_BOOLEAN_NO,
@@ -187,7 +187,7 @@ static struct netdata_zswap_metric zswap_rejected_metrics[] = {
      .dimension = NULL,
      .units = NULL,
      .title = NULL,
-     .algorithm = "absolute",
+     .algorithm = RRD_ALGORITHM_ABSOLUTE,
      .charttype = RRDSET_TYPE_STACKED,
      .enabled = CONFIG_BOOLEAN_NO,
      .obsolete = CONFIG_BOOLEAN_NO,
@@ -257,7 +257,7 @@ static void zswap_independent_chart(struct netdata_zswap_metric *metric, int upd
             "DIMENSION '%s' '%s' %s 1 1 ''\n",
             metric->dimension,
             metric->dimension,
-            metric->algorithm);
+            debugfs_rrd_algorithm_name(metric->algorithm));
     }
 
     fprintf(stdout, "BEGIN system.zswap_%s\n"
@@ -276,9 +276,10 @@ void zswap_reject_chart(int update_every, const char *name) {
         for (i = NETDATA_ZSWAP_REJECTED_COMPRESS_POOR; zswap_rejected_metrics[i].filename; i++) {
             metric = &zswap_rejected_metrics[i];
             fprintf(stdout,
-                    "DIMENSION '%s' '%s' incremental 1 1 ''\n",
+                    "DIMENSION '%s' '%s' %s 1 1 ''\n",
                     metric->dimension,
-                    metric->dimension);
+                    metric->dimension,
+                    debugfs_rrd_algorithm_name(metric->algorithm));
         }
     }
 
