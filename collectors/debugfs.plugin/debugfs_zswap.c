@@ -222,6 +222,7 @@ void zswap_reject_chart(int update_every, const char *name) {
 }
 
 int debugfs_zswap(int update_every, const char *name) {
+    // TODO: stop collector if zswap is not enabled
     (void)name;
 
     int i;
