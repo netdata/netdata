@@ -26,6 +26,42 @@ void fatal_int( const char *file __maybe_unused, const char *function __maybe_un
 };
 #endif
 
+#ifdef NETDATA_TRACE_ALLOCATIONS
+void *callocz_int(size_t nmemb, size_t size, const char *file __maybe_unused, const char *function __maybe_unused, size_t line __maybe_unused)
+{
+    void *p = calloc(nmemb, size);
+    if (unlikely(!p)) {
+        error("Cannot allocate %zu bytes of memory.", nmemb * size);
+        exit(1);
+    }
+    return p;
+}
+
+void *mallocz_int(size_t size, const char *file __maybe_unused, const char *function __maybe_unused, size_t line __maybe_unused)
+{
+    void *p = malloc(size);
+    if (unlikely(!p)) {
+        error("Cannot allocate %zu bytes of memory.", size);
+        exit(1);
+    }
+    return p;
+}
+
+void *reallocz_int(void *ptr, size_t size, const char *file __maybe_unused, const char *function __maybe_unused, size_t line __maybe_unused)
+{
+    void *p = realloc(ptr, size);
+    if (unlikely(!p)) {
+        error("Cannot allocate %zu bytes of memory.", size);
+        exit(1);
+    }
+    return p;
+}
+
+void freez_int(void *ptr, const char *file __maybe_unused, const char *function __maybe_unused, size_t line __maybe_unused)
+{
+    free(ptr);
+}
+#else
 void freez(void *ptr) {
     free(ptr);
 }
@@ -56,6 +92,7 @@ void *reallocz(void *ptr, size_t size) {
     }
     return p;
 }
+#endif
 
 int vsnprintfz(char *dst, size_t n, const char *fmt, va_list args) {
     if(unlikely(!n)) return 0;
