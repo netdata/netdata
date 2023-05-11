@@ -81,10 +81,13 @@ int debugfs_parse_extfrag_index(int update_every, const char *name) {
     size_t l, i, j, lines = procfile_lines(ff);
     for (l = 0; l < lines; l++) {
         char chart_id[64];
+        char zone_lowercase[32];
         if (unlikely(procfile_linewords(ff, l) < 15)) continue;
-        char *id = procfile_lineword(ff, l, 1);
         char *zone = procfile_lineword(ff, l, 3);
-        snprintfz(chart_id, 63, "node_%s_%s", id, zone);
+        strncpyz(zone_lowercase, zone, 31);
+
+        char *id = procfile_lineword(ff, l, 1);
+        snprintfz(chart_id, 63, "node_%s_%s", id, zone_lowercase);
         debugfs2lower(chart_id);
 
         struct netdata_extrafrag *extrafrag = find_or_create_extrafrag(chart_id);
@@ -98,12 +101,11 @@ int debugfs_parse_extfrag_index(int update_every, const char *name) {
             extrafrag->id = extrafrag->node_zone;
             // TODO: 
             // - add "node" and "zone" labels.
-            // - lowercase zone in context
             fprintf(
                 stdout,
                 "CHART mem.fragmentation_%s_index '' 'Memory fragmentation index for each order' 'index' 'fragmentation' 'mem.fragmentation_%s_index' 'line' %d %d '' 'debugfs.plugin' '%s'\n",
                 extrafrag->node_zone,
-                zone,
+                zone_lowercase,
                 chart_order++,
                 update_every,
                 name);
