@@ -75,7 +75,7 @@ static inline bool is_event_from_alert_variable_config(uint32_t unique_id, char 
     return ret;
 }
 
-#define MAX_REMOVED_PERIOD 86400
+#define MAX_REMOVED_PERIOD 604800 //a week
 //decide if some events should be sent or not
 
 #define SQL_SELECT_ALERT_BY_ID  "SELECT hl.new_status, hl.config_hash_id, hl.unique_id FROM health_log_%s hl, aclk_alert_%s aa " \
@@ -939,18 +939,14 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
 #endif
 }
 
-#define SQL_DELETE_ALERT_ENTRIES "DELETE FROM aclk_alert_%s WHERE filtered_alert_unique_id NOT IN (SELECT unique_id FROM health_log_%s);"
-
+#define SQL_DELETE_ALERT_ENTRIES "DELETE * FROM aclk_alert_%s WHERE filtered_alert_unique_id + 604800 < UNIXEPOCH();"
 void sql_aclk_alert_clean_dead_entries(RRDHOST *host)
 {
-    if (!claimed())
-        return;
-
     char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
     char sql[512];
-    snprintfz(sql,511,SQL_DELETE_ALERT_ENTRIES, uuid_str, uuid_str);
+    snprintfz(sql,511,SQL_DELETE_ALERT_ENTRIES, uuid_str);
 
     char *err_msg = NULL;
     int rc = sqlite3_exec_monitored(db_meta, sql, NULL, NULL, &err_msg);

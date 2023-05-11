@@ -2,6 +2,7 @@
 
 #include "sqlite_health.h"
 #include "sqlite_functions.h"
+#include "sqlite_db_migration.h"
 
 #define MAX_HEALTH_SQL_SIZE 2048
 #define sqlite3_bind_string_or_null(res,key,param) ((key) ? sqlite3_bind_text(res, param, string2str(key), -1, SQLITE_STATIC) : sqlite3_bind_null(res, param))
@@ -358,55 +359,6 @@ void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
 }
 
 /* Health related SQL queries
-   Cleans up the health_log table.
-*/
-#define SQL_CLEANUP_HEALTH_LOG(guid,guid2,limit) "DELETE from health_log_%s where unique_id in (SELECT unique_id from health_log_%s order by unique_id asc LIMIT %lu);", guid, guid2, limit
-void sql_health_alarm_log_cleanup(RRDHOST *host) {
-    sqlite3_stmt *res = NULL;
-    static size_t rotate_every = 0;
-    int rc;
-    char command[MAX_HEALTH_SQL_SIZE + 1];
-
-    if(unlikely(rotate_every == 0)) {
-        rotate_every = (size_t)config_get_number(CONFIG_SECTION_HEALTH, "rotate log every lines", 2000);
-        if(rotate_every < 100) rotate_every = 100;
-    }
-
-    if(likely(host->health.health_log_entries_written < rotate_every)) {
-        return;
-    }
-
-    if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            error_report("Database has not been initialized");
-        return;
-    }
-
-    char uuid_str[GUID_LEN + 1];
-    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
-
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG(uuid_str, uuid_str, (unsigned long int) (host->health.health_log_entries_written - rotate_every)));
-
-    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to cleanup health log table");
-        return;
-    }
-
-    rc = sqlite3_step_monitored(res);
-    if (unlikely(rc != SQLITE_DONE))
-        error_report("Failed to cleanup health log table, rc = %d", rc);
-
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement to cleanup health log table");
-
-    host->health.health_log_entries_written = rotate_every;
-
-    sql_aclk_alert_clean_dead_entries(host);
-}
-
-/* Health related SQL queries
    Get a count of rows from health log table
 */
 #define SQL_COUNT_HEALTH_LOG(guid) "SELECT count(1) FROM health_log_%s;", guid
@@ -441,6 +393,115 @@ void sql_health_alarm_log_count(RRDHOST *host) {
         error_report("Failed to finalize the prepared statement to count health log entries from db");
 
     info("HEALTH [%s]: Table health_log_%s, contains %lu entries.", rrdhost_hostname(host), uuid_str, (unsigned long int) host->health.health_log_entries_written);
+}
+
+/* Health related SQL queries
+   Cleans up the health_log table on a non-claimed host
+*/
+#define SQL_CLEANUP_HEALTH_LOG_NOT_CLAIMED(guid,guid2,limit) "DELETE from health_log_%s where unique_id in (SELECT unique_id from health_log_%s order by unique_id asc LIMIT %lu);", guid, guid2, limit
+void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host, size_t rotate_every) {
+    sqlite3_stmt *res = NULL;
+    int rc;
+    char command[MAX_HEALTH_SQL_SIZE + 1];
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            error_report("Database has not been initialized");
+        return;
+    }
+
+    char uuid_str[GUID_LEN + 1];
+    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
+
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG_NOT_CLAIMED(uuid_str, uuid_str, (unsigned long int) (host->health.health_log_entries_written - rotate_every)));
+
+    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to cleanup health log table");
+        return;
+    }
+
+    rc = sqlite3_step_monitored(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to cleanup health log table, rc = %d", rc);
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement to cleanup health log table");
+
+    host->health.health_log_entries_written = rotate_every;
+
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, "aclk_alert_%s", uuid_str);
+    if (unlikely(table_exists_in_database(command))) {
+        info("DES table aclk_alert does not exist");
+        sql_aclk_alert_clean_dead_entries(host);
+    }
+}
+
+/* Health related SQL queries
+   Cleans up the health_log table on a claimed host
+*/
+#define SQL_CLEANUP_HEALTH_LOG_CLAIMED(guid, guid2, guid3, limit) "DELETE from health_log_%s WHERE unique_id NOT IN (SELECT filtered_alert_unique_id FROM aclk_alert_%s) AND unique_id IN (SELECT unique_id FROM health_log_%s ORDER BY unique_id asc LIMIT %lu);", guid, guid2, guid3, limit
+void sql_health_alarm_log_cleanup_claimed(RRDHOST *host, size_t rotate_every) {
+    sqlite3_stmt *res = NULL;
+    int rc;
+    char command[MAX_HEALTH_SQL_SIZE + 1];
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            error_report("Database has not been initialized");
+        return;
+    }
+
+    char uuid_str[GUID_LEN + 1];
+    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, "aclk_alert_%s", uuid_str);
+
+    if (!table_exists_in_database(command)) {
+        sql_health_alarm_log_cleanup_not_claimed(host, rotate_every);
+        return;
+    }
+
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG_CLAIMED(uuid_str, uuid_str, uuid_str, (unsigned long int) (host->health.health_log_entries_written - rotate_every)));
+
+    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to cleanup health log table");
+        return;
+    }
+
+    rc = sqlite3_step_monitored(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to cleanup health log table, rc = %d", rc);
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement to cleanup health log table");
+
+    sql_health_alarm_log_count(host);
+
+    sql_aclk_alert_clean_dead_entries(host);
+}
+
+/* Health related SQL queries
+   Cleans up the health_log table.
+*/
+void sql_health_alarm_log_cleanup(RRDHOST *host) {
+    static size_t rotate_every = 0;
+
+    if(unlikely(rotate_every == 0)) {
+        rotate_every = (size_t)config_get_number(CONFIG_SECTION_HEALTH, "rotate log every lines", 2000);
+        if(rotate_every < 100) rotate_every = 100;
+    }
+
+    if(likely(host->health.health_log_entries_written < rotate_every)) {
+        return;
+    }
+
+    if (!claimed()) {
+        sql_health_alarm_log_cleanup_not_claimed(host, rotate_every);
+    } else
+        sql_health_alarm_log_cleanup_claimed(host, rotate_every);
 }
 
 #define SQL_INJECT_REMOVED(guid, guid2) "insert into health_log_%s (hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, " \
