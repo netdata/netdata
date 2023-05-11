@@ -276,7 +276,7 @@ int debugfs_zswap(int update_every, const char *name) {
             metric->enabled = !zswap_collect_data(metric);
             if (unlikely(metric->obsolete == CONFIG_BOOLEAN_NO))
                 zswap_independent_chart(metric, update_every, name);
-            else if (likely(metric->chart_id && metric->obsolete))
+            else if (likely(metric->chart_created && metric->obsolete))
                 zswap_send_independent_chart(metric, update_every, name, "obsolete");
         }
     }
