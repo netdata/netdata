@@ -9,6 +9,7 @@ struct netdata_zswap_metric {
     const char *dimension;
     const char *units;
     const char *title;
+    const char *algorithm; // TODO: use enum RRD_ALGORITHM
 
     int enabled;
     int chart_created;
@@ -22,18 +23,20 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
     // https://elixir.bootlin.com/linux/latest/source/mm/zswap.c
     {.filename = "/sys/kernel/debug/zswap/same_filled_pages",
      .chart_id = "same_filled_page",
-     .dimension = "pages",
+     .dimension = "same_filled",
      .units = "pages",
-     .title = "Total same-value filled pages currently stored",
+     .title = "Zswap same-value filled pages currently stored",
+     .algorithm = "absolulte",
      .enabled = CONFIG_BOOLEAN_YES,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_SAME_FILL_PAGE,
      .value = -1},
     {.filename = "/sys/kernel/debug/zswap/stored_pages",
      .chart_id = "stored_pages",
-     .dimension = "page",
+     .dimension = "compressed",
      .units = "pages",
-     .title = "Compressed pages stored in zswap.",
+     .title = "Zswap compressed pages currently stored",
+     .algorithm = "absolulte",
      .enabled = CONFIG_BOOLEAN_YES,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_STORED_PAGE,
@@ -42,7 +45,8 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .chart_id = "pool_total_size",
      .dimension = "pool",
      .units = "bytes",
-     .title = "Total bytes used by the compressed storage",
+     .title = "Zswap bytes used by the compressed storage",
+     .algorithm = "absolulte",
      .enabled = CONFIG_BOOLEAN_YES,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_POOL_TOT_SIZE,
@@ -50,28 +54,31 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
     {.filename = "/sys/kernel/debug/zswap/duplicate_entry",
      .chart_id = "duplicate_entry",
      .dimension = "duplicate",
-     .units = "page",
-     .title = "Duplicate store was found.",
+     .units = "entries/s",
+     .title = "Zswap duplicate store was encountered",
+     .algorithm = "incremental",
      .enabled = CONFIG_BOOLEAN_YES,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_DUPP_ENTRY,
      .value = -1},
     {.filename = "/sys/kernel/debug/zswap/written_back_pages",
      .chart_id = "written_back_pages",
-     .dimension = "pages",
-     .units = "pages",
-     .title = "Pages written back when pool limit was reached.",
+     .dimension = "written_back",
+     .units = "pages/s",
+     .title = "Zswap pages written back when pool limit was reached",
+     .algorithm = "incremental",
      .enabled = CONFIG_BOOLEAN_YES,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_STORED_PAGE,
      .value = -1},
     {.filename = "/sys/kernel/debug/zswap/pool_limit_hit",
      .chart_id = "pool_limit_hit",
+     .dimension = "limit",
+     .units = "events/s",
+     .title = "Zswap pool limit was reached",
+     .algorithm = "incremental",
      .enabled = CONFIG_BOOLEAN_YES,
      .chart_created = CONFIG_BOOLEAN_NO,
-     .dimension = "limit",
-     .units = "claims",
-     .title = "Reclaim space when pool limit was reached.",
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_POOL_LIM_HIT,
      .value = -1},
 
@@ -158,16 +165,27 @@ zswap_charts_end:
     return ret;
 }
 
-void zswap_independent_chart(struct netdata_zswap_metric *metric, int update_every) {
+void zswap_independent_chart(struct netdata_zswap_metric *metric, int update_every, const char *name) {
     if (unlikely(!metric->chart_created)) {
         metric->chart_created = CONFIG_BOOLEAN_YES;
-        fprintf(stdout,
-                "CHART system.%s '' '%s' '%s' 'zswap' '' 'line' %d %d '' 'debugfs.plugin' '%s'\n",
-                metric->chart_id, metric->title, metric->units, metric->prio, update_every, metric->filename);
-        fprintf(stdout, "DIMENSION '%s' '%s' incremental 1 1 ''\n", metric->dimension, metric->dimension);
+        fprintf(
+            stdout,
+            "CHART system.zswap_%s '' '%s' '%s' 'zswap' '' 'line' %d %d '' 'debugfs.plugin' '%s'\n",
+            metric->chart_id,
+            metric->title,
+            metric->units,
+            metric->prio,
+            update_every,
+            name);
+        fprintf(
+            stdout,
+            "DIMENSION '%s' '%s' %s 1 1 ''\n",
+            metric->dimension,
+            metric->dimension,
+            metric->algorithm);
     }
 
-    fprintf(stdout, "BEGIN system.%s\n"
+    fprintf(stdout, "BEGIN system.zswap_%s\n"
                     "SET %s = %lld\n"
                     "END\n",
             metric->chart_id, metric->dimension, metric->value);
@@ -210,9 +228,10 @@ int debugfs_zswap(int update_every, const char *name) {
     struct netdata_zswap_metric *metric;
     for (i = 0; zswap_independent_metrics[i].filename; i++) {
         metric = &zswap_independent_metrics[i];
+        // TODO: don't try to reopen a file if it doesn't exist
         metric->enabled = !zswap_collect_data(metric);
         if (metric->enabled)
-            zswap_independent_chart(metric, update_every);
+            zswap_independent_chart(metric, update_every, name);
     }
 
     for (i = 0; zswap_rejected_metrics[i].filename; i++) {
