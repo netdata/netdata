@@ -76,6 +76,21 @@ void debugfs2lower(char *name)
     }
 }
 
+// Consiidering our goal to redce binaries, I preferred to copy function, instead to force link with unecessary libs
+const char *debugfs_rrdset_type_name(RRDSET_TYPE chart_type) {
+    switch(chart_type) {
+        case RRDSET_TYPE_LINE:
+        default:
+            return RRDSET_TYPE_LINE_NAME;
+
+        case RRDSET_TYPE_AREA:
+            return RRDSET_TYPE_AREA_NAME;
+
+        case RRDSET_TYPE_STACKED:
+            return RRDSET_TYPE_STACKED_NAME;
+    }
+}
+
 int debugfs_check_sys_permission() {
     int ret = 0;
 

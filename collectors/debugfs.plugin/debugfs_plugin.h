@@ -5,9 +5,11 @@
 
 #include "libnetdata/libnetdata.h"
 #include "collectors/all.h"
+#include "database/rrd.h"
 
 int debugfs_parse_extfrag_index(int update_every, const char *name);
 int debugfs_zswap(int update_every, const char *name);
 void debugfs2lower(char *name);
+const char *debugfs_rrdset_type_name(RRDSET_TYPE chart_type);
 
 #endif // NETDATA_DEBUGFS_PLUGIN_H
