@@ -90,7 +90,17 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .value = -1},
 
     // The terminator
-    {.filename = NULL, .chart_id = NULL, .enabled = CONFIG_BOOLEAN_NO}
+    {.filename = NULL,
+     .chart_id = NULL,
+     .dimension = NULL,
+     .units = NULL,
+     .title = NULL,
+     .algorithm = NULL,
+     .enabled = CONFIG_BOOLEAN_NO,
+     .obsolete = CONFIG_BOOLEAN_NO,
+     .chart_created = CONFIG_BOOLEAN_NO,
+     .prio = -1,
+     .value = -1}
 };
 
 enum netdata_zswap_rejected {
@@ -143,7 +153,17 @@ static struct netdata_zswap_metric zswap_rejected_metrics[] = {
      .value = -1},
 
     // The terminator
-    {.filename = NULL, .chart_id = NULL, .enabled = CONFIG_BOOLEAN_NO}
+    {.filename = NULL,
+     .chart_id = NULL,
+     .dimension = NULL,
+     .units = NULL,
+     .title = NULL,
+     .algorithm = NULL,
+     .enabled = CONFIG_BOOLEAN_NO,
+     .obsolete = CONFIG_BOOLEAN_NO,
+     .chart_created = CONFIG_BOOLEAN_NO,
+     .prio = -1,
+     .value = -1}
 };
 
 int zswap_collect_data(struct netdata_zswap_metric *metric) {
