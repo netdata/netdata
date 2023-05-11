@@ -180,12 +180,12 @@ void zswap_reject_chart(int update_every, const char *name) {
     if (unlikely(!metric->chart_created)) {
         metric->chart_created = CONFIG_BOOLEAN_YES;
         fprintf(stdout,
-                "CHART system.zswap_rejections '' 'Zswap rejections' 'failure' 'zswap' 'system.zswap_rejections' 'line' %d %d '' 'debugfs.plugin' '%s'\n",
+                "CHART system.zswap_rejections '' 'Zswap rejections' 'rejections/s' 'zswap' 'system.zswap_rejections' 'stacked' %d %d '' 'debugfs.plugin' '%s'\n",
                 metric->prio, update_every, name);
         for (i = 0; zswap_rejected_metrics[i].filename; i++) {
             metric = &zswap_rejected_metrics[i];
             fprintf(stdout,
-                    "DIMENSION '%s' '%s' absolute 1 1 ''\n",
+                    "DIMENSION '%s' '%s' incremental 1 1 ''\n",
                     metric->dimension,
                     metric->dimension);
         }
