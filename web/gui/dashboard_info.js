@@ -1537,11 +1537,11 @@ netdataDashboard.context = {
     },
 
     'system.zswap_rejections': {
-        info: 'The chart shows number of rejected pages per access: </br>' +
-            'compress_poor: Compressed page was too big for the allocator to store. </br> ' +
-            'kmemcache_fail: Number of entry metadata that could not be allocated. </br> ' +
-            'alloc_fail:  Allocator could not get memory. </br> ' +
-            'reclaim_fail: Memory cannot be reclaimed (pool limit was reached). </br> '
+        info: '<p>Zswap rejected pages per access.</p>' +
+            '<p><b>CompressPoor</b> - compressed page was too big for the allocator to store. ' +
+            '<b>KmemcacheFail</b> - number of entry metadata that could not be allocated. ' +
+            '<b>AllocFail</b> - allocator could not get memory. ' +
+            '<b>ReclaimFail</b> - memory cannot be reclaimed (pool limit was reached).</p>'
     },
 
     'system.clock_sync_state': {
