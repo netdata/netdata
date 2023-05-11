@@ -12,6 +12,7 @@ struct netdata_zswap_metric {
     const char *algorithm; // TODO: use enum RRD_ALGORITHM
 
     int enabled;
+    int obsolete;
     int chart_created;
 
     int prio;
@@ -28,6 +29,7 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .title = "Zswap same-value filled pages currently stored",
      .algorithm = "absolulte",
      .enabled = CONFIG_BOOLEAN_YES,
+     .obsolete = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_SAME_FILL_PAGE,
      .value = -1},
@@ -38,6 +40,7 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .title = "Zswap compressed pages currently stored",
      .algorithm = "absolulte",
      .enabled = CONFIG_BOOLEAN_YES,
+     .obsolete = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_STORED_PAGE,
      .value = -1},
@@ -48,6 +51,7 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .title = "Zswap bytes used by the compressed storage",
      .algorithm = "absolulte",
      .enabled = CONFIG_BOOLEAN_YES,
+     .obsolete = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_POOL_TOT_SIZE,
      .value = -1},
@@ -58,6 +62,7 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .title = "Zswap duplicate store was encountered",
      .algorithm = "incremental",
      .enabled = CONFIG_BOOLEAN_YES,
+     .obsolete = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_DUPP_ENTRY,
      .value = -1},
@@ -68,6 +73,7 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .title = "Zswap pages written back when pool limit was reached",
      .algorithm = "incremental",
      .enabled = CONFIG_BOOLEAN_YES,
+     .obsolete = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_STORED_PAGE,
      .value = -1},
@@ -78,6 +84,7 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .title = "Zswap pool limit was reached",
      .algorithm = "incremental",
      .enabled = CONFIG_BOOLEAN_YES,
+     .obsolete = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_POOL_LIM_HIT,
      .value = -1},
@@ -101,6 +108,7 @@ static struct netdata_zswap_metric zswap_rejected_metrics[] = {
      .units = NULL,
      .title = NULL,
      .enabled = CONFIG_BOOLEAN_YES,
+     .obsolete = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_REJECTS,
      .value = -1},
@@ -110,6 +118,7 @@ static struct netdata_zswap_metric zswap_rejected_metrics[] = {
      .units = NULL,
      .title = NULL,
      .enabled = CONFIG_BOOLEAN_YES,
+     .obsolete = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_REJECTS,
      .value = -1},
@@ -119,6 +128,7 @@ static struct netdata_zswap_metric zswap_rejected_metrics[] = {
      .units = NULL,
      .title = NULL,
      .enabled = CONFIG_BOOLEAN_YES,
+     .obsolete = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_REJECTS},
     {.filename = "/sys/kernel/debug/zswap/reject_reclaim_fail",
@@ -127,6 +137,7 @@ static struct netdata_zswap_metric zswap_rejected_metrics[] = {
      .units = NULL,
      .title = NULL,
      .enabled = CONFIG_BOOLEAN_YES,
+     .obsolete = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_REJECTS,
      .value = -1},
@@ -148,8 +159,11 @@ int zswap_collect_data(struct netdata_zswap_metric *metric) {
               metric->filename);
     // we are not using profile_open/procfile_read, because they will generate error during runtime.
     fd = open(filename, O_RDONLY, 0444);
-    if (fd < 0 )
+    if (fd < 0 ) {
+        metric->obsolete = CONFIG_BOOLEAN_YES;
+        error("Cannot open file %s", filename);
         return -1;
+    }
 
     ssize_t r = read(fd, buffer, 511);
     if (r < 0) {
@@ -165,7 +179,21 @@ zswap_charts_end:
     return ret;
 }
 
-void zswap_independent_chart(struct netdata_zswap_metric *metric, int update_every, const char *name) {
+static void zswap_obsolete_independent_chart(struct netdata_zswap_metric *metric, int update_every, const char *name)
+{
+    fprintf(
+        stdout,
+        "CHART system.zswap_%s '' '%s' '%s' 'zswap' '' 'line' %d %d 'obsolete' 'debugfs.plugin' '%s'\n",
+        metric->chart_id,
+        metric->title,
+        metric->units,
+        metric->prio,
+        update_every,
+        name);
+}
+
+static void zswap_independent_chart(struct netdata_zswap_metric *metric, int update_every, const char *name)
+{
     if (unlikely(!metric->chart_created)) {
         metric->chart_created = CONFIG_BOOLEAN_YES;
         fprintf(
@@ -228,10 +256,13 @@ int debugfs_zswap(int update_every, const char *name) {
     struct netdata_zswap_metric *metric;
     for (i = 0; zswap_independent_metrics[i].filename; i++) {
         metric = &zswap_independent_metrics[i];
-        // TODO: don't try to reopen a file if it doesn't exist
-        metric->enabled = !zswap_collect_data(metric);
-        if (metric->enabled)
-            zswap_independent_chart(metric, update_every, name);
+        if (likely(metric->enabled)) {
+            metric->enabled = !zswap_collect_data(metric);
+            if (unlikely(metric->obsolete == CONFIG_BOOLEAN_NO))
+                zswap_independent_chart(metric, update_every, name);
+            else if (likely(metric->chart_id && metric->obsolete))
+                zswap_obsolete_independent_chart(metric, update_every, name);
+        }
     }
 
     for (i = 0; zswap_rejected_metrics[i].filename; i++) {
