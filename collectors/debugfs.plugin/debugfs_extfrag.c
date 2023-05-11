@@ -99,8 +99,6 @@ int debugfs_parse_extfrag_index(int update_every, const char *name) {
 
         if (unlikely(!extrafrag->id)) {
             extrafrag->id = extrafrag->node_zone;
-            // TODO: 
-            // - add "node" and "zone" labels.
             fprintf(
                 stdout,
                 "CHART mem.fragmentation_%s_index '' 'Memory fragmentation index for each order' 'index' 'fragmentation' 'mem.fragmentation_%s_index' 'line' %d %d '' 'debugfs.plugin' '%s'\n",
@@ -112,6 +110,12 @@ int debugfs_parse_extfrag_index(int update_every, const char *name) {
             for (i = 0; i < NETDATA_ORDER_FRAGMENTATION; i++) {
                 fprintf(stdout, "DIMENSION '%s' '%s' absolute 1 1000 ''\n", orders[i], orders[i]);
             }
+            fprintf(stdout,
+                    "CLABEL 'node' '%s' 1\n"
+                    "CLABEL 'zone' '%s' 1\n"
+                    "CLABEL_COMMIT\n",
+                    id,
+                    zone_lowercase);
         }
         extfrag_send_chart(chart_id, line_orders);
     }
