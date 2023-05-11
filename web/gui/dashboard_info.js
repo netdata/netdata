@@ -884,7 +884,6 @@ netdataDashboard.submenu = {
     },
 
     'mem.fragmentation': {
-        title: 'Memory fragmentation',
         info: 'These charts show whether the kernel will compact memory or direct reclaim to satisfy a high-order allocation. '+
             'The extfrag/extfrag_index file in debugfs shows what the fragmentation index for each order is in each zone in the system.' +
             'Values tending towards 0 imply allocations would fail due to lack of memory, values towards 1000 imply failures are due to ' +
