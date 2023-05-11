@@ -66,7 +66,7 @@ class Service(LogService):
         self.definitions = CHARTS
         self.re = DELAY_REGEX
         self.reSent = re.compile(r'status=sent')
-        self.reFailure = re.compile(r'status=temporary failure')
+        self.reFailure = re.compile(r'status=deferred \(temporary failure\)')
         self.log_path = self.configuration.get('log_path', '/var/log/mail.log')
         self.delay_window = float(self.configuration.get('delay_window_span', 2400))
         self.data = {
