@@ -15,31 +15,48 @@
 
 <img src="https://user-images.githubusercontent.com/1153921/95269366-1b814680-07ee-11eb-8ff4-c1b0b8758499.png" alt="---" style="max-width: 100%;" />
 
-Netdata is a distributed, real-time, performance and health monitoring platform for systems, hardware, containers and applications, collecting thousands of useful metrics with zero configuration needed. It runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices, and is perfectly safe to install on your systems mid-incident without any preparation.
+Netdata is a distributed, highly scalable and real-time, performance and health monitoring platform for systems, containers, packaged and custom applications, collecting, storing and visualizing virtually unlimited metrics, in high-resolution. It runs permanently on all your physical and virtual servers, cloud deployments, kubernetes clusters and edge/IoT devices, and is perfectly ok to install it on your systems mid-incident without any preparation.
 
-The Netdata [Agent](https://github.com/netdata/netdata) is an enormously powerful, **Open-Sourced**, **Single Node** health monitoring and performance troubleshooting tool.
-It gives you the ability to automatically identify processes, collect and store metrics locally and even more - visualize all metrics without any configuration (of course you can tweak it later on if you need).
+Netdata is designed to be super easy to setup and use, high performant and real-time, low-maintenance and cost efficient. It makes ML-assisted, high resolution monitoring easy and affordable, bringing to everyone the value that big enterprises pay millions for.
 
-[Netdata Cloud](https://www.netdata.cloud) is a hosted web interface that gives you **Free**, real-time visibility into your **Entire Infrastructure** with secure access to your Netdata Agents. It provides an ability to automatically route your requests to the most relevant agents to display your metrics, based on the stored metadata (Agents topology, what metrics are collected on specific Agents as well as the retention information for each metric).
+- The [Netdata Agent](https://github.com/netdata/netdata) is the heart of the Netdata ecosystem. It is powering everything Netdata can do, it is **open-source** and it can be used standalone.
 
-It gives you some extra features, like [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md), [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.md), [anomaly rates on every chart](https://blog.netdata.cloud/anomaly-rate-in-every-chart/) and much more. 
+- [Netdata Cloud](https://www.netdata.cloud) is an optional service on top of Netdata Agents, providing infinite horizontal scalability, infrastructure level dashboards, auditing events, role based access control, central dispatch of alert notifications, easy customization (custom dashboards) and team collaboration. Check the [Netdata Cloud demo space](https://app.netdata.cloud/spaces/netdata-demo/rooms/all-nodes/overview) (no sign up or login needed).
 
-Try it for yourself right now by checking out the Netdata Cloud [demo space](https://app.netdata.cloud/spaces/netdata-demo/rooms/all-nodes/overview) (No sign up or login needed).
+> **Important Note**:<br/>
+> People get addicted to Netdata. Once you use it on your systems, there's no going back!<br/>
+> _You've been warned..._
 
-Netdata's mission is to help more people troubleshoot ever more complex IT infrastructures, this is why our **free** [community plan](https://www.netdata.cloud/pricing) gives you ability to monitor unlimited number of Nodes, Containers and Metrics (custom or built-in).
+![image](https://github.com/netdata/netdata/assets/2662304/5fb726a4-65b9-4f58-85ab-b58bd01af12a)
 
-Due to the distributed nature of Netdata, and to ensure high-availability of your monitoring system, please check our [Data Replication](https://www.netdata.cloud/blog/why-is-data-replication-important) recommendations to increase the data availability.
+## Quick Start
 
-You can install Netdata on most Linux distributions (Ubuntu, Debian, CentOS, and more), container platforms (Kubernetes
-clusters, Docker), and many other operating systems (FreeBSD, macOS). No `sudo` required.
+1. [Install Netdata Agents everywhere](https://learn.netdata.cloud/docs/getting-started/install-netdata#install-on-linux-with-one-line-installer).
+   
+   Netdata runs on almost all Linux distributions (Ubuntu, Debian, CentOS, Arch, their derivatives, etc), container platforms (Kubernetes clusters, Docker, etc), FreeBSD, pfSense and macOS. To monitor Windows servers and applications use [this guide](https://learn.netdata.cloud/docs/data-collection/monitor-anything/system-metrics/windows-machines). To monitor SNMP devices check [this guide](https://learn.netdata.cloud/docs/data-collection/monitor-anything/networking/snmp). For a detailed list of all data collectors, check [this guide](https://learn.netdata.cloud/docs/data-collection/). For Kubernetes deployments [check here](https://learn.netdata.cloud/docs/installation/install-on-specific-environments/kubernetes/).
 
-Netdata is designed by system administrators, DevOps engineers, and developers to collect everything, help you visualize
-metrics, troubleshoot complex performance problems, and make data interoperable with the rest of your monitoring stack.
+2. Install a few Netdata Agents as centralization points (Parents) inside your network and configure streaming on all your agents to push their metrics to these central (parent) Netdata agents.
 
-People get addicted to Netdata. Once you use it on your systems, there's no going back! _You've been warned..._
+   Due to the distributed nature of Netdata, and to ensure high-availability of your monitoring system, please check our [Data Replication](https://www.netdata.cloud/blog/why-is-data-replication-important) recommendations to increase the data availability.
 
-![Users who are addicted to
-Netdata](https://user-images.githubusercontent.com/1153921/96495792-2e881380-11fd-11eb-85a3-53d3a84dcb29.png)
+**If you plan to use Netdata Cloud**
+
+1. Configure as many centralization points as you wish.
+   The more the better. Netdata Cloud supports virtually unlimited horizontal scalability and the more parents you add, the faster it gets.
+
+2. Visit Netdata Cloud to have your centralized views and central dispatch of alert notifications.
+   
+   Your data are still inside your network (your Netdata Agents). They only pass through Netdata Cloud to reach your browser for the dashboards you view. In the next few releases we will introduce WebRTC peer-to-peer communication between browsers and agents, so that your data will never be exposed to Netdata Cloud.
+
+**If you don't want to use Netdata Cloud**
+
+1. Configure only 1 parent cluster (2 servers in active-active setup), to centralize everything from your infra.
+   
+   Netdata scales verically very well: for >1M metrics/s you are going to need a 16 core VM with 32GB RAM, utilized at about 50% for ingestion and ML, leaving the rest for queries. Give it enough storage for retention. Netdata supports tiering, so you can have really long retention with a relatively small disk footprint.
+
+2. Currently, at the parents you will present single-node monitoring dashboards for all your nodes. At the next agent release, the agents will get the same dashboard as Netdata Cloud (ML-first approach, etc).
+
+Netdata Cloud does not prevent you from using your Netdata Agents directly, and vice versa.
 
 ## Menu
 
