@@ -164,7 +164,7 @@ void zswap_independent_chart(struct netdata_zswap_metric *metric, int update_eve
         fprintf(stdout,
                 "CHART system.%s '' '%s' '%s' 'zswap' '' 'line' %d %d '' 'debugfs.plugin' '%s'\n",
                 metric->chart_id, metric->title, metric->units, metric->prio, update_every, metric->filename);
-        fprintf(stdout, "DIMENSION '%s' '%s' absolute 1 1 ''\n", metric->dimension, metric->dimension);
+        fprintf(stdout, "DIMENSION '%s' '%s' incremental 1 1 ''\n", metric->dimension, metric->dimension);
     }
 
     fprintf(stdout, "BEGIN system.%s\n"
