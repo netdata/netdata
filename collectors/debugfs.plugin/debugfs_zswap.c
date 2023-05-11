@@ -21,6 +21,18 @@ struct netdata_zswap_metric {
     collected_number value;
 };
 
+enum netdata_zwap_independent {
+    NETDATA_ZSWAP_SAME_FILLED_PAGE,
+    NETDATA_ZSWAP_STORED_PAGE,
+    NETDATA_ZSWAP_POOL_TOTAL_SIZE,
+    NETDATA_ZSWAP_DUPLICATE_ENTRY,
+    NETDATA_ZSWAP_WRITTEN_BACK_PAGE,
+    NETDATA_ZSWAP_POOL_LIMIT_HIT,
+
+    // Terminator
+    NETDATA_ZSWAP_SITE_END
+};
+
 static struct netdata_zswap_metric zswap_independent_metrics[] = {
     // https://elixir.bootlin.com/linux/latest/source/mm/zswap.c
     {.filename = "/sys/kernel/debug/zswap/same_filled_pages",
@@ -116,7 +128,10 @@ enum netdata_zswap_rejected {
     NETDATA_ZSWAP_REJECTED_COMPRESS_POOR,
     NETDATA_ZSWAP_REJECTED_KMEM_FAIL,
     NETDATA_ZSWAP_REJECTED_RALLOC_FAIL,
-    NETDATA_ZSWAP_REJECTED_RRECLAIM_FAIL
+    NETDATA_ZSWAP_REJECTED_RRECLAIM_FAIL,
+
+    // Terminator
+    NETDATA_ZSWAP_REJECTED_END
 };
 
 
@@ -275,7 +290,8 @@ void zswap_reject_chart(int update_every, const char *name) {
         zswap_send_chart(metric, update_every, name, NULL);
         for (i = NETDATA_ZSWAP_REJECTED_COMPRESS_POOR; zswap_rejected_metrics[i].filename; i++) {
             metric = &zswap_rejected_metrics[i];
-            fprintf(stdout,
+            if (likely(metric->enabled))
+                fprintf(stdout,
                     "DIMENSION '%s' '%s' %s 1 1 ''\n",
                     metric->dimension,
                     metric->dimension,
@@ -296,27 +312,41 @@ void zswap_reject_chart(int update_every, const char *name) {
 }
 
 int debugfs_zswap(int update_every, const char *name) {
-    // TODO: stop collector if zswap is not enabled
-
     int i;
     struct netdata_zswap_metric *metric;
+    int independent_disabled = 0;
     for (i = 0; zswap_independent_metrics[i].filename; i++) {
         metric = &zswap_independent_metrics[i];
         if (likely(metric->enabled)) {
             metric->enabled = !zswap_collect_data(metric);
             if (unlikely(metric->obsolete == CONFIG_BOOLEAN_NO))
                 zswap_independent_chart(metric, update_every, name);
-            else if (likely(metric->chart_created && metric->obsolete))
+            else if (likely(metric->chart_created && metric->obsolete)) {
+                independent_disabled++;
                 zswap_send_chart(metric, update_every, name, "obsolete");
+            }
         }
     }
 
+    // We set as 1, because the first structure with dimensions is not zero.
+    int rejected_disabled = 1;
     for (i = NETDATA_ZSWAP_REJECTED_COMPRESS_POOR; zswap_rejected_metrics[i].filename; i++) {
         metric = &zswap_rejected_metrics[i];
         metric->enabled = !zswap_collect_data(metric);
+        if (unlikely(!metric->enabled)) {
+            rejected_disabled++;
+        }
     }
 
-    zswap_reject_chart(update_every, name);
+    // When more than half of metrics are present we still plot chart.
+    if (unlikely(rejected_disabled < NETDATA_ZSWAP_REJECTED_END))
+        zswap_reject_chart(update_every, name);
+    else {
+        zswap_send_chart(&zswap_rejected_metrics[NETDATA_ZSWAP_REJECTED_CHART], update_every, name, "obsolete");
+        // We do not have metrics, so we are disabling it
+        if (independent_disabled == NETDATA_ZSWAP_SITE_END)
+            return -1;
+    }
 
     return 0;
 }
