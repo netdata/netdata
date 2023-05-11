@@ -63,7 +63,7 @@ if [ ! "${DISABLE_TELEMETRY:-0}" -eq 0 ] ||
 fi
 
 # -----------------------------------------------------------------------------
-progress "Attempt to create user/group netdata/netadata"
+progress "Attempt to create user/group netdata/netdata"
 
 NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C"
 NETDATA_ADDED_TO_GROUPS=""
@@ -161,7 +161,7 @@ dir_should_be_link etc/netdata ../../usr/lib/netdata/conf.d orig
 progress "fix permissions"
 
 run chmod g+rx,o+rx /opt
-run chown -R ${NETDATA_USER}:${NETDATA_GROUP} /opt/netdata
+run find /opt/netdata -type f -o -type d -exec chown -h ${NETDATA_USER}:${NETDATA_GROUP} {} +
 
 # -----------------------------------------------------------------------------
 

@@ -584,7 +584,7 @@ check_for_remote_file() {
   elif [ -n "${CURL}" ]; then
     "${CURL}" --output /dev/null --silent --head --fail "${url}" || return 1
   elif command -v wget > /dev/null 2>&1; then
-    wget -S --spider "${url}" 2>&1 | grep -q 'HTTP/1.1 200 OK' || return 1
+    wget -q --spider "${url}" || return 1
   else
     fatal "${ERROR_F0003}" F0003
   fi
@@ -611,7 +611,7 @@ get_redirect() {
   if [ -n "${CURL}" ]; then
     run sh -c "${CURL} ${url} -s -L -I -o /dev/null -w '%{url_effective}' | grep -o '[^/]*$'" || return 1
   elif command -v wget > /dev/null 2>&1; then
-    run sh -c "wget -S -O /dev/null ${url} 2>&1 | grep -m 1 Location | grep -o '[^/]*$'" || return 1
+    run sh -c "wget -O /dev/null ${url} 2>&1 | grep -m 1 -o 'tag.[^ ]*' | grep -o [^/]*$" || return 1
   else
     fatal "${ERROR_F0003}" F0003
   fi
