@@ -6,11 +6,16 @@
 
 **Merged pull requests:**
 
+- Update tor.chart.py [\#15041](https://github.com/netdata/netdata/pull/15041) ([jmphilippe](https://github.com/jmphilippe))
 - Slight wording fix on the database readme [\#15034](https://github.com/netdata/netdata/pull/15034) ([Ancairon](https://github.com/Ancairon))
 - Update troubleshooting-agent-with-cloud-connection.md [\#15029](https://github.com/netdata/netdata/pull/15029) ([cakrit](https://github.com/cakrit))
+- Adjust buffers to prevent overflow [\#15025](https://github.com/netdata/netdata/pull/15025) ([stelfrag](https://github.com/stelfrag))
 - review the billing docs for the flow [\#15014](https://github.com/netdata/netdata/pull/15014) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Rollback ML transaction on failure. [\#15013](https://github.com/netdata/netdata/pull/15013) ([vkalintiris](https://github.com/vkalintiris))
+- Silence dimensions with noisy ML models [\#15011](https://github.com/netdata/netdata/pull/15011) ([vkalintiris](https://github.com/vkalintiris))
 - Update chart documentation [\#15010](https://github.com/netdata/netdata/pull/15010) ([Ancairon](https://github.com/Ancairon))
+- make zlib compulsory dep [\#14928](https://github.com/netdata/netdata/pull/14928) ([underhood](https://github.com/underhood))
+- initial minimal h2o webserver integration [\#14585](https://github.com/netdata/netdata/pull/14585) ([underhood](https://github.com/underhood))
 
 ## [v1.39.0](https://github.com/netdata/netdata/tree/v1.39.0) (2023-05-08)
 
@@ -382,7 +387,6 @@
 - Minor fix, convert metadata of the learn to hidden sections [\#14427](https://github.com/netdata/netdata/pull/14427) ([tkatsoulas](https://github.com/tkatsoulas))
 - kickstart.sh: Fix `--release-channel` as `--nightly-channel` options [\#14424](https://github.com/netdata/netdata/pull/14424) ([vobruba-martin](https://github.com/vobruba-martin))
 - Use curl from static builds if no system-wide copy exists. [\#14403](https://github.com/netdata/netdata/pull/14403) ([Ferroin](https://github.com/Ferroin))
-- add @andrewm4894 as docs/ codeowner [\#14398](https://github.com/netdata/netdata/pull/14398) ([andrewm4894](https://github.com/andrewm4894))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
@@ -412,9 +416,6 @@
 - feat\(charts.d\): add load usage \(Watts\) to nuts collector [\#14407](https://github.com/netdata/netdata/pull/14407) ([ilyam8](https://github.com/ilyam8))
 - fix link to ebpf collector [\#14405](https://github.com/netdata/netdata/pull/14405) ([ilyam8](https://github.com/ilyam8))
 - Remove equality when deciding how to use point [\#14402](https://github.com/netdata/netdata/pull/14402) ([MrZammler](https://github.com/MrZammler))
-- add help line to functions response [\#14399](https://github.com/netdata/netdata/pull/14399) ([ktsaou](https://github.com/ktsaou))
-- Fix typo on the page [\#14397](https://github.com/netdata/netdata/pull/14397) ([iorvd](https://github.com/iorvd))
-- Fix kickstart and updater not working with BusyBox wget [\#14392](https://github.com/netdata/netdata/pull/14392) ([Dim-P](https://github.com/Dim-P))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
