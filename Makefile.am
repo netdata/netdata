@@ -54,7 +54,6 @@ SUBDIRS = \
 dist_noinst_DATA = \
     CHANGELOG.md \
     cppcheck.sh \
-    configs.signatures \
     contrib \
     docs \
     mqtt_websockets \

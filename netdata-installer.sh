@@ -1057,64 +1057,6 @@ fi
 [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Installing Netdata."
 
 # -----------------------------------------------------------------------------
-
-# shellcheck disable=SC2230
-md5sum="$(command -v md5sum 2> /dev/null || command -v md5 2> /dev/null)"
-
-deleted_stock_configs=0
-if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-done" ]; then
-
-  progress "Backup existing netdata configuration before installing it"
-
-  config_signature_matches() {
-    md5="${1}"
-    file="${2}"
-
-    if [ -f "configs.signatures" ]; then
-      grep "\['${md5}'\]='${file}'" "configs.signatures" > /dev/null
-      return $?
-    fi
-
-    return 1
-  }
-
-  # clean up stock config files from the user configuration directory
-  (find -L "${NETDATA_PREFIX}/etc/netdata" -type f -not -path '*/\.*' -not -path "${NETDATA_PREFIX}/etc/netdata/orig/*" \( -name '*.conf.old' -o -name '*.conf' -o -name '*.conf.orig' -o -name '*.conf.installer_backup.*' \)) | while IFS= read -r  x; do
-    if [ -f "${x}" ]; then
-      # find it relative filename
-      p="$(echo "${NETDATA_PREFIX}/etc/netdata" | sed -e 's/\//\\\//')"
-      f="$(echo "${x}" | sed -e "s/${p}//")"
-
-      # find the stock filename
-      t="$(echo "${f}" | sed -e 's/\.conf\.installer_backup\..*/\.conf/')"
-      t="$(echo "${t}" | sed -e 's/\.conf\.old/\.conf/')"
-      t="$(echo "${t}" | sed -e 's/\.conf\.orig/\.conf/')"
-      t="$(echo "${t}" | sed -e 's/orig//')"
-
-      if [ -z "${md5sum}" ] || [ ! -x "${md5sum}" ]; then
-        # we don't have md5sum - keep it
-        echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED}is not known to distribution${TPUT_RESET}. Keeping it."
-      else
-        # find its checksum
-        md5="$(${md5sum} < "${x}" | cut -d ' ' -f 1)"
-
-        if config_signature_matches "${md5}" "${t}"; then
-	  # it is a stock version - remove it
-          echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' is stock version of '${t}'."
-          run rm -f "${x}"
-	  # shellcheck disable=SC2030
-          deleted_stock_configs=$((deleted_stock_configs + 1))
-        else
-          # edited by user - keep it
-          echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED} does not match stock of${TPUT_RESET} ${TPUT_CYAN}'${t}'${TPUT_RESET}. Keeping it."
-        fi
-      fi
-    fi
-  done
-fi
-touch "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-done"
-
-# -----------------------------------------------------------------------------
 progress "Install netdata"
 
 if ! run $make install; then
@@ -1212,16 +1154,8 @@ fi
 # --- stock conf dir ----
 
 [ ! -d "${NETDATA_STOCK_CONFIG_DIR}" ] && mkdir -p "${NETDATA_STOCK_CONFIG_DIR}"
-
-helplink="000.-.USE.THE.orig.LINK.TO.COPY.AND.EDIT.STOCK.CONFIG.FILES"
-# shellcheck disable=SC2031
-[ ${deleted_stock_configs} -eq 0 ] && helplink=""
-for link in "orig" "${helplink}"; do
-  if [ -n "${link}" ]; then
-    [ -L "${NETDATA_USER_CONFIG_DIR}/${link}" ] && run rm -f "${NETDATA_USER_CONFIG_DIR}/${link}"
-    run ln -s "${NETDATA_STOCK_CONFIG_DIR}" "${NETDATA_USER_CONFIG_DIR}/${link}"
-  fi
-done
+[ -L "${NETDATA_USER_CONFIG_DIR}/orig" ] && run rm -f "${NETDATA_USER_CONFIG_DIR}/orig"
+run ln -s "${NETDATA_STOCK_CONFIG_DIR}" "${NETDATA_USER_CONFIG_DIR}/orig"
 
 # --- web dir ----
 
