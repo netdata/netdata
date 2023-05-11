@@ -972,7 +972,7 @@ handle_existing_install() {
         claim
         ret=$?
       elif [ "${ACTION}" = "claim" ]; then
-        fatal "User asked to claim, but did not proide a claiming token." F0202
+        fatal "User asked to claim, but did not provide a claiming token." F0202
       else
         progress "Not attempting to claim existing install at ${ndprefix} (no claiming token provided)."
       fi
@@ -1010,7 +1010,7 @@ handle_existing_install() {
           trap - EXIT
           exit $ret
         elif [ "${ACTION}" = "claim" ]; then
-          fatal "User asked to claim, but did not proide a claiming token." F0202
+          fatal "User asked to claim, but did not provide a claiming token." F0202
         else
           fatal "Found an existing netdata install at ${ndprefix}, but the install type is '${INSTALL_TYPE}', which is not supported by this script, refusing to proceed." F0103
         fi
@@ -1120,7 +1120,6 @@ claim() {
     progress "Attempting to claim agent to ${NETDATA_CLAIM_URL}"
   fi
 
-  progress "Attempting to claim agent to ${NETDATA_CLAIM_URL}"
   if command -v netdata-claim.sh > /dev/null 2>&1; then
     NETDATA_CLAIM_PATH="$(command -v netdata-claim.sh)"
   elif [ -z "${INSTALL_PREFIX}" ] || [ "${INSTALL_PREFIX}" = "/" ]; then
@@ -1137,14 +1136,29 @@ claim() {
     NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/netdata/usr/sbin/netdata-claim.sh"
   fi
 
+  err_msg=
+  err_code=
   if [ -z "${NETDATA_CLAIM_PATH}" ]; then
-    fatal "Unable to find usable claiming script. Reinstalling Netdata may resolve this." F050B
+    err_msg="Unable to claim node: could not find usable claiming script. Reinstalling Netdata may resolve this."
+    err_code=F050B
   elif [ ! -e "${NETDATA_CLAIM_PATH}" ]; then
-    fatal "${NETDATA_CLAIM_PATH} does not exist." F0512
+    err_msg="Unable to claim node: ${NETDATA_CLAIM_PATH} does not exist."
+    err_code=F0512
   elif [ ! -f "${NETDATA_CLAIM_PATH}" ]; then
-    fatal "${NETDATA_CLAIM_PATH} is not a file." F0513
+    err_msg="Unable to claim node: ${NETDATA_CLAIM_PATH} is not a file."
+    err_code=F0513
   elif [ ! -x "${NETDATA_CLAIM_PATH}" ]; then
-    fatal "Claiming script at ${NETDATA_CLAIM_PATH} is not executable. Reinstalling Netdata may resolve this." F0514
+    err_msg="Unable to claim node: claiming script at ${NETDATA_CLAIM_PATH} is not executable. Reinstalling Netdata may resolve this."
+    err_code=F0514
+  fi
+
+  if [ -n "$err_msg" ]; then
+    if [ "${ACTION}" = "claim" ]; then
+      fatal "$err_msg" "$err_code"
+    else
+      warning "$err_msg"
+      return 1
+    fi
   fi
 
   if ! is_netdata_running; then
@@ -1178,7 +1192,7 @@ claim() {
     *) warning "Failed to claim node for an unknown reason. This usually means either networking problems or a bug. Please retry claiming later, and if you still see this message file a bug report at ${AGENT_BUG_REPORT_URL}" ;;
   esac
 
-  if [ -z "${NETDATA_NEW_INSTALL}" ]; then
+  if [ "${ACTION}" = "claim" ]; then
     deferred_warnings
     printf >&2 "%s\n" "For community support, you can connect with us on:"
     support_list
