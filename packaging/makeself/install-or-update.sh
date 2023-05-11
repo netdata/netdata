@@ -204,7 +204,8 @@ fi
 progress "fix permissions"
 
 run chmod g+rx,o+rx /opt
-run chown -R ${NETDATA_USER}:${NETDATA_GROUP} /opt/netdata
+run find /opt/netdata -type d -exec chmod go+rx '{}' \+
+run chown -R ${NETDATA_USER}:${NETDATA_GROUP} /opt/netdata/var
 
 # -----------------------------------------------------------------------------
 
