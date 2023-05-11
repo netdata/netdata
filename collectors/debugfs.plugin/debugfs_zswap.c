@@ -199,16 +199,20 @@ zswap_charts_end:
     return ret;
 }
 
-static void zswap_obsolete_independent_chart(struct netdata_zswap_metric *metric, int update_every, const char *name)
+static void zswap_send_independent_chart(struct netdata_zswap_metric *metric,
+                                         int update_every,
+                                         const char *name,
+                                         const char *option)
 {
     fprintf(
         stdout,
-        "CHART system.zswap_%s '' '%s' '%s' 'zswap' '' 'line' %d %d 'obsolete' 'debugfs.plugin' '%s'\n",
+        "CHART system.zswap_%s '' '%s' '%s' 'zswap' '' 'line' %d %d '%s' 'debugfs.plugin' '%s'\n",
         metric->chart_id,
         metric->title,
         metric->units,
         metric->prio,
         update_every,
+        (!option)? "" : option,
         name);
 }
 
@@ -216,15 +220,7 @@ static void zswap_independent_chart(struct netdata_zswap_metric *metric, int upd
 {
     if (unlikely(!metric->chart_created)) {
         metric->chart_created = CONFIG_BOOLEAN_YES;
-        fprintf(
-            stdout,
-            "CHART system.zswap_%s '' '%s' '%s' 'zswap' '' 'line' %d %d '' 'debugfs.plugin' '%s'\n",
-            metric->chart_id,
-            metric->title,
-            metric->units,
-            metric->prio,
-            update_every,
-            name);
+        zswap_send_independent_chart(metric, update_every, name, NULL);
         fprintf(
             stdout,
             "DIMENSION '%s' '%s' %s 1 1 ''\n",
@@ -281,7 +277,7 @@ int debugfs_zswap(int update_every, const char *name) {
             if (unlikely(metric->obsolete == CONFIG_BOOLEAN_NO))
                 zswap_independent_chart(metric, update_every, name);
             else if (likely(metric->chart_id && metric->obsolete))
-                zswap_obsolete_independent_chart(metric, update_every, name);
+                zswap_send_independent_chart(metric, update_every, name, "obsolete");
         }
     }
 
