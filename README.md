@@ -21,15 +21,15 @@ Netdata is a distributed, highly scalable, real-time, performance and health mon
 > People get addicted to Netdata. Once you use it on your systems, there's no going back!<br/>
 > _You have been warned..._
 
-Netdata is designed to be super easy to setup and use, high performant and real-time, low-maintenance and cost efficient. It makes ML-assisted, high resolution monitoring easy and affordable, bringing to everyone the value that big enterprises pay millions for.
+Netdata is designed to be super easy to setup and use, high performant and real-time, low-maintenance and cost efficient. It makes ML-assisted, high resolution monitoring easy and affordable, bringing to everyone the value that enterprises pay millions for.
 
 - The [Netdata Agent](https://github.com/netdata/netdata) is the heart of the Netdata ecosystem. It is powering everything Netdata can do, it is **open-source** and it can be used standalone.
 
-- [Netdata Cloud](https://www.netdata.cloud) is an optional service on top of Netdata Agents, providing infinite horizontal scalability, fully automated infrastructure level dashboards, auditing events, role based access control, central dispatch of alert notifications, easy customization (including custom dashboards) and team collaboration. All these, without copying your data. Your data are always stored inside your servers. Check the [Netdata Cloud demo space](https://app.netdata.cloud/spaces/netdata-demo/rooms/all-nodes/overview) (no sign up or login needed).
+- [Netdata Cloud](https://www.netdata.cloud) is an optional service on top of Netdata Agents, providing infinite horizontal scalability, fully automated infrastructure level dashboards, auditing events, role based access control (RBAC), central dispatch of alert notifications, easy customization (including custom dashboards, point-and-click, without the need of a query language) and team collaboration. All these, without copying your data. Your data are always stored inside your servers.<br/>
 
 :star: Netdata actively supports and is a [Silver Member of CNCF](https://www.cncf.io/about/members/), and although not a CNCF incubating or graduated project, [Netdata is the 3rd most starred project in the CNCF landscape](https://landscape.cncf.io/card-mode?grouping=no&sort=stars).
 
-:star: Netdata is an open platform. It can exchange data using all popular protocols. It can scrape OpenMetrics exporters, it is a StatsD server, it can export metrics to Prometheus, OpenTSDB, Graphite.
+:star: Netdata is an open platform. It can exchange data using all popular protocols. It can scrape OpenMetrics exporters, it is a StatsD server, it can export metrics to Prometheus, OpenTSDB, Graphite, and more.
 
 ![image](https://github.com/netdata/netdata/assets/2662304/5fb726a4-65b9-4f58-85ab-b58bd01af12a)
 
@@ -59,7 +59,7 @@ Netdata is designed to be super easy to setup and use, high performant and real-
    
         Netdata scales verically very well: for >1M metrics/s you are going to need a 16 core VM with 32GB RAM, utilized at about 50% for ingestion and ML, leaving the rest for queries. Give it enough storage for retention. Netdata supports tiering, so you can have really long retention with a relatively small disk footprint.
 
-      - Currently, at the parents you will present single-node monitoring dashboards for all your nodes. At the next agent release, the agents will get the same dashboard as Netdata Cloud (ML-first approach, etc).
+      - Currently, at the parents you will find single-node monitoring dashboards for all your nodes. At the next agent release, the agents will get the same dashboard as Netdata Cloud (ML-first approach, etc).
 
 💡 Netdata Cloud does not prevent you from using your Netdata Agents directly, and vice versa.
 
