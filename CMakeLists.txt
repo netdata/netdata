@@ -386,34 +386,13 @@ set(LIBJUDY_SOURCES
         libnetdata/libjudy/src/JudyL/JudyLNextEmpty.c
         libnetdata/libjudy/src/JudyL/JudyLPrev.c
         libnetdata/libjudy/src/JudyL/JudyLPrevEmpty.c
-        JudyLTables.c
+        libnetdata/libjudy/src/JudyL/JudyLTables.c
         libnetdata/libjudy/src/JudyHS/JudyHS.c)
 
 ADD_LIBRARY(judy STATIC
              ${LIBJUDY_SOURCES})
 
-ADD_EXECUTABLE(judyltablesgen
-    libnetdata/libjudy/src/JudyL/JudyLTablesGen.c)
-
-target_include_directories(judyltablesgen PUBLIC
-    libnetdata/libjudy/src
-    libnetdata/libjudy/src/JudyCommon)
-
-target_compile_options(judyltablesgen PUBLIC
-    -Wno-format
-    -Wno-format-security)
-
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/libnetdata/libjudy/src)
-
-target_compile_definitions(judyltablesgen PUBLIC
-    JU_64BIT
-    JUDYL)
-
-add_custom_command(
-  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/JudyLTables.c
-  COMMAND judyltablesgen
-  DEPENDS judyltablesgen
-  )
 
 target_include_directories(judy PUBLIC
     libnetdata/libjudy/src
