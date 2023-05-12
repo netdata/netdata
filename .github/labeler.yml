@@ -78,6 +78,10 @@ collectors/cups:
   - collectors/cups.plugin/*
   - collectors/cups.plugin/**/*
 
+collectors/debugfs:
+  - collectors/debugfs.plugin/*
+  - collectors/debugfs.plugin/**/*
+
 collectors/diskspace:
   - collectors/diskspace.plugin/*
   - collectors/diskspace.plugin/**/*
