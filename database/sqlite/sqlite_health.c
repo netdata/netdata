@@ -1190,37 +1190,35 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
 
     unsigned int max = host->health_log.max;
     unsigned int count = 0;
-    size_t command_len = 0;
 
     sqlite3_stmt *res = NULL;
     int rc;
 
-    char command[MAX_HEALTH_SQL_SIZE + 1];
+    BUFFER *command = buffer_create(MAX_HEALTH_SQL_SIZE, NULL);
     char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_SELECT_HEALTH_LOG(uuid_str));
+    buffer_sprintf(command, SQL_SELECT_HEALTH_LOG(uuid_str));
 
-    command_len = strlen(command);
     if (chart) {
         char chart_sql[MAX_HEALTH_SQL_SIZE + 1];
         snprintfz(chart_sql, MAX_HEALTH_SQL_SIZE, "AND chart = '%s' ", chart);
-        strncat(command, chart_sql, MAX_HEALTH_SQL_SIZE - command_len - 1);
+        buffer_strcat(command, chart_sql);
     }
-    command_len = strlen(command);
+
     if (after) {
         char after_sql[MAX_HEALTH_SQL_SIZE + 1];
         snprintfz(after_sql, MAX_HEALTH_SQL_SIZE, "AND unique_id > %u ", after);
-        strncat(command, after_sql, MAX_HEALTH_SQL_SIZE - command_len - 1);
+        buffer_strcat(command, after_sql);
     }
-    command_len = strlen(command);
+
     {
         char limit_sql[MAX_HEALTH_SQL_SIZE + 1];
         snprintfz(limit_sql, MAX_HEALTH_SQL_SIZE, "ORDER BY unique_id DESC LIMIT %u ", max);
-        strncat(command, limit_sql, MAX_HEALTH_SQL_SIZE - command_len - 1);
+        buffer_strcat(command, limit_sql);
     }
 
-    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(command), -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement SQL_SELECT_HEALTH_LOG");
         return;
@@ -1349,4 +1347,6 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement for SQL_SELECT_HEALTH_LOG");
+
+    buffer_free(command);
 }
