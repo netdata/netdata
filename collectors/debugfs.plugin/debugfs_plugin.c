@@ -18,7 +18,7 @@ static struct debugfs_module {
     // Memory Fragmentation
     { .name = "/sys/kernel/debug/extfrag", .enabled = CONFIG_BOOLEAN_YES,
       .func = debugfs_parse_extfrag_index},
-    { .name = "/sys/kernel/debug/zswap/", .enabled = CONFIG_BOOLEAN_YES,
+    { .name = "/sys/kernel/debug/zswap", .enabled = CONFIG_BOOLEAN_YES,
       .func = debugfs_zswap},
 
     // The terminator
