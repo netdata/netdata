@@ -51,7 +51,7 @@ static struct netdata_extrafrag *find_or_create_extrafrag(const char *name)
 static void extfrag_send_chart(char *chart_id, collected_number *values)
 {
     int i;
-    fprintf(stdout, "BEGIN mem.fragmentation_%s_index\n", chart_id);
+    fprintf(stdout, "BEGIN mem.fragmentation_index_%s\n", chart_id);
     for (i = 0; i < NETDATA_ORDER_FRAGMENTATION; i++) {
         fprintf(stdout, "SET %s = %lld\n", orders[i], values[i]);
     }
@@ -85,6 +85,7 @@ int debugfs_parse_extfrag_index(int update_every, const char *name) {
         if (unlikely(procfile_linewords(ff, l) < 15)) continue;
         char *zone = procfile_lineword(ff, l, 3);
         strncpyz(zone_lowercase, zone, 31);
+        debugfs2lower(zone_lowercase);
 
         char *id = procfile_lineword(ff, l, 1);
         snprintfz(chart_id, 63, "node_%s_%s", id, zone_lowercase);
@@ -101,7 +102,7 @@ int debugfs_parse_extfrag_index(int update_every, const char *name) {
             extrafrag->id = extrafrag->node_zone;
             fprintf(
                 stdout,
-                "CHART mem.fragmentation_%s_index '' 'Memory fragmentation index for each order' 'index' 'fragmentation' 'mem.fragmentation_%s_index' 'line' %d %d '' 'debugfs.plugin' '%s'\n",
+                "CHART mem.fragmentation_index_%s '' 'Memory fragmentation index for each order' 'index' 'fragmentation' 'mem.fragmentation_index_%s' 'line' %d %d '' 'debugfs.plugin' '%s'\n",
                 extrafrag->node_zone,
                 zone_lowercase,
                 chart_order++,
@@ -111,7 +112,7 @@ int debugfs_parse_extfrag_index(int update_every, const char *name) {
                 fprintf(stdout, "DIMENSION '%s' '%s' absolute 1 1000 ''\n", orders[i], orders[i]);
             }
             fprintf(stdout,
-                    "CLABEL 'node' '%s' 1\n"
+                    "CLABEL 'numa_node' 'node%s' 1\n"
                     "CLABEL 'zone' '%s' 1\n"
                     "CLABEL_COMMIT\n",
                     id,
