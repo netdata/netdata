@@ -59,7 +59,7 @@ static void extfrag_send_chart(char *chart_id, collected_number *values)
     fflush(stdout);
 }
 
-int debugfs_parse_extfrag_index(int update_every, const char *name) {
+int do_debugfs_extfrag(int update_every, const char *name) {
     static procfile *ff = NULL;
     static int chart_order = NETDATA_CHART_PRIO_MEM_FRAGMENTATION;
 
