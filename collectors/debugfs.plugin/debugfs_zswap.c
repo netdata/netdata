@@ -231,7 +231,8 @@ int zswap_collect_data(struct netdata_zswap_metric *metric) {
     }
 
     ssize_t r = read(fd, buffer, 511);
-    if (r < 0) {
+    // We expect at list 1 character
+    if (r < 2) {
         ret = -1;
         goto zswap_charts_end;
     }
