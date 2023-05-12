@@ -111,7 +111,11 @@ const char *debugfs_rrd_algorithm_name(RRD_ALGORITHM algorithm) {
 int debugfs_check_sys_permission() {
     int ret = 0;
 
-    procfile *ff = procfile_open(debugfs_modules[0].name, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
+    char filename[FILENAME_MAX + 1];
+
+    snprintfz(filename, FILENAME_MAX, "%s/extfrag_index", debugfs_modules[0].name);
+
+    procfile *ff = procfile_open(filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
     if(!ff) goto dcsp_cleanup;
 
     ff = procfile_readall(ff);
@@ -120,6 +124,8 @@ int debugfs_check_sys_permission() {
     ret = 1;
 
 dcsp_cleanup:
+    if (!ret)
+        perror("Cannot open /sys/kernel/debug/extfrag/extfrag_index file");
     procfile_close(ff);
     return ret;
 }
@@ -138,8 +144,7 @@ static void debugfs_parse_args(int argc, char **argv)
 
         if(strcmp("test-permissions", argv[i]) == 0 || strcmp("-t", argv[i]) == 0) {
             if(!debugfs_check_sys_permission()) {
-                perror("Cannot open /sys/kernel/debug/extfrag/extfrag_index file");
-                exit(1);
+                exit(2);
             }
             printf("OK\n");
             exit(0);
@@ -199,6 +204,11 @@ int main(int argc, char **argv)
             argv[0],
             argv[0]);
 #endif
+        exit(1);
+    }
+
+    if (!debugfs_check_sys_permission()) {
+        exit(2);
     }
 
     debugfs_parse_args(argc, argv);
