@@ -295,6 +295,7 @@ void zswap_reject_chart(int update_every, const char *name) {
         }
     }
 
+    metric = &zswap_rejected_metrics[NETDATA_ZSWAP_REJECTED_CHART];
     zswap_send_begin(metric);
     for (int i = NETDATA_ZSWAP_REJECTED_COMPRESS_POOR; zswap_rejected_metrics[i].filename; i++) {
         metric = &zswap_rejected_metrics[i];
