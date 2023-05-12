@@ -105,7 +105,7 @@ int do_debugfs_extfrag(int update_every, const char *name) {
                 "CHART mem.fragmentation_index_%s '' 'Memory fragmentation index for each order' 'index' 'fragmentation' 'mem.fragmentation_index_%s' 'line' %d %d '' 'debugfs.plugin' '%s'\n",
                 extrafrag->node_zone,
                 zone_lowercase,
-                chart_order++,
+                chart_order++, // FIXME: the same zones must have the same order
                 update_every,
                 name);
             for (i = 0; i < NETDATA_ORDER_FRAGMENTATION; i++) {
@@ -113,10 +113,8 @@ int do_debugfs_extfrag(int update_every, const char *name) {
             }
             fprintf(stdout,
                     "CLABEL 'numa_node' 'node%s' 1\n"
-                    "CLABEL 'zone' '%s' 1\n"
                     "CLABEL_COMMIT\n",
-                    id,
-                    zone_lowercase);
+                    id);
         }
         extfrag_send_chart(chart_id, line_orders);
     }
