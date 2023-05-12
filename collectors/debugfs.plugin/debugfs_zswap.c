@@ -377,8 +377,10 @@ int do_debugfs_zswap(int update_every, const char *name)
     struct netdata_zswap_metric *metric_raw_size = &zswap_independent_metrics[NETDATA_ZSWAP_STORED_PAGES];
     if (metric_size->enabled && metric_raw_size->enabled) {
         metric = &zswap_calculated_metrics[NETDATA_ZSWAP_COMPRESSION_RATIO_CHART];
-        metric->value =
-            (collected_number)((NETDATA_DOUBLE)metric_size->value / (NETDATA_DOUBLE)metric_raw_size->value * 100);
+        metric->value = 0;
+        if (metric_raw_size->value > 0)
+            metric->value =
+                (collected_number)((NETDATA_DOUBLE)metric_size->value / (NETDATA_DOUBLE)metric_raw_size->value * 100);
         zswap_independent_chart(metric, update_every, name);
     }
 
