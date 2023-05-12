@@ -1297,6 +1297,7 @@ if [ "$(id -u)" -eq 0 ]; then
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin" ]; then
     run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin"
+    capabilities=0
     if ! iscontainer && command -v setcap 1> /dev/null 2>&1; then
       if run setcap cap_dac_read_search+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin"; then
         # if we managed to setcap, but we fail to execute debugfs.plugin setuid to root
