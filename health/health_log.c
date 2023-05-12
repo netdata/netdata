@@ -110,7 +110,6 @@ inline void health_alarm_log_add_entry(
     for(t = host->health_log.alarms ; t ; t = t->next) {
         if(t != ae && t->alarm_id == ae->alarm_id) {
             if(!(t->flags & HEALTH_ENTRY_FLAG_UPDATED) && !t->updated_by_id) {
-                t->flags |= HEALTH_ENTRY_FLAG_UPDATED;
                 t->updated_by_id = ae->unique_id;
                 ae->updates_id = t->unique_id;
 
@@ -119,6 +118,7 @@ inline void health_alarm_log_add_entry(
                     ae->non_clear_duration += t->non_clear_duration;
 
                 health_alarm_log_save(host, t);
+                t->flags |= HEALTH_ENTRY_FLAG_UPDATED;
             }
 
             // no need to continue

@@ -115,34 +115,6 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
     freez(edit_command);
 }
 
-void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *chart) {
-
-    buffer_strcat(wb, "[");
-
-    unsigned int max = host->health_log.max;
-    unsigned int count = 0;
-
-    STRING *chart_string = string_strdupz(chart);
-
-    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
-
-    ALARM_ENTRY *ae;
-    for (ae = host->health_log.alarms; ae && count < max; ae = ae->next) {
-        if ((ae->unique_id > after) && (!chart || chart_string == ae->chart)) {
-            if (likely(count))
-                buffer_strcat(wb, ",");
-            health_alarm_entry2json_nolock(wb, ae, host);
-            count++;
-        }
-    }
-
-    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
-
-    string_freez(chart_string);
-
-    buffer_strcat(wb, "\n]\n");
-}
-
 static inline void health_rrdcalc_values2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC *rc) {
     (void)host;
     buffer_sprintf(wb,
@@ -410,6 +382,7 @@ static int have_recent_alarm(RRDHOST *host, uint32_t alarm_id, uint32_t mark)
     return 0;
 }
 
+//TODO replace with sqlite
 void health_active_log_alarms_2json(RRDHOST *host, BUFFER *wb) {
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
