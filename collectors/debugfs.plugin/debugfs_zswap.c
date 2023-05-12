@@ -2,6 +2,13 @@
 
 #include "debugfs_plugin.h"
 
+static long system_page_size = 4096;
+
+static collected_number pages_to_bytes(collected_number value)
+{
+    return value * system_page_size;
+}
+
 struct netdata_zswap_metric {
     const char *filename;
 
@@ -9,23 +16,42 @@ struct netdata_zswap_metric {
     const char *title;
     const char *units;
     RRDSET_TYPE charttype;
+    int prio;
     const char *dimension;
     RRD_ALGORITHM algorithm;
-    int prio;
 
     int enabled;
     int chart_created;
 
     collected_number value;
+    collected_number (*convertv)(collected_number v);
+};
+
+static struct netdata_zswap_metric zswap_calculated_metrics[] = {
+    {.filename = "",
+     .chart_id = "pool_compression_ratio",
+     .dimension = "compression_ratio",
+     .units = "percentage",
+     .title = "Zswap compression ratio",
+     .algorithm = RRD_ALGORITHM_ABSOLUTE,
+     .charttype = RRDSET_TYPE_LINE,
+     .enabled = CONFIG_BOOLEAN_YES,
+     .chart_created = CONFIG_BOOLEAN_NO,
+     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_COMPRESS_RATIO,
+     .value = -1},
+};
+
+enum netdata_zswap_calculated {
+    NETDATA_ZSWAP_COMPRESSION_RATIO_CHART,
 };
 
 enum netdata_zwap_independent {
-    NETDATA_ZSWAP_SAME_FILLED_PAGE,
-    NETDATA_ZSWAP_STORED_PAGE,
     NETDATA_ZSWAP_POOL_TOTAL_SIZE,
-    NETDATA_ZSWAP_DUPLICATE_ENTRY,
-    NETDATA_ZSWAP_WRITTEN_BACK_PAGE,
+    NETDATA_ZSWAP_STORED_PAGES,
     NETDATA_ZSWAP_POOL_LIMIT_HIT,
+    NETDATA_ZSWAP_WRITTEN_BACK_PAGES,
+    NETDATA_ZSWAP_SAME_FILLED_PAGES,
+    NETDATA_ZSWAP_DUPLICATE_ENTRY,
 
     // Terminator
     NETDATA_ZSWAP_SITE_END
@@ -33,60 +59,28 @@ enum netdata_zwap_independent {
 
 static struct netdata_zswap_metric zswap_independent_metrics[] = {
     // https://elixir.bootlin.com/linux/latest/source/mm/zswap.c
-    {.filename = "/sys/kernel/debug/zswap/same_filled_pages",
-     .chart_id = "same_filled_page",
-     .dimension = "same_filled",
-     .units = "pages",
-     .title = "Zswap same-value filled pages currently stored",
-     .algorithm = RRD_ALGORITHM_ABSOLUTE,
-     .charttype = RRDSET_TYPE_LINE,
-     .enabled = CONFIG_BOOLEAN_YES,
-     .chart_created = CONFIG_BOOLEAN_NO,
-     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_SAME_FILL_PAGE,
-     .value = -1},
-    {.filename = "/sys/kernel/debug/zswap/stored_pages",
-     .chart_id = "stored_pages",
-     .dimension = "compressed",
-     .units = "pages",
-     .title = "Zswap compressed pages currently stored",
-     .algorithm = RRD_ALGORITHM_ABSOLUTE,
-     .charttype = RRDSET_TYPE_LINE,
-     .enabled = CONFIG_BOOLEAN_YES,
-     .chart_created = CONFIG_BOOLEAN_NO,
-     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_STORED_PAGE,
-     .value = -1},
     {.filename = "/sys/kernel/debug/zswap/pool_total_size",
-     .chart_id = "pool_total_size",
-     .dimension = "pool",
+     .chart_id = "pool_compressed_size",
+     .dimension = "compressed_size",
      .units = "bytes",
-     .title = "Zswap bytes used by the compressed storage",
+     .title = "Zswap compressed bytes currently stored",
      .algorithm = RRD_ALGORITHM_ABSOLUTE,
-     .charttype = RRDSET_TYPE_LINE,
+     .charttype = RRDSET_TYPE_AREA,
      .enabled = CONFIG_BOOLEAN_YES,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_POOL_TOT_SIZE,
      .value = -1},
-    {.filename = "/sys/kernel/debug/zswap/duplicate_entry",
-     .chart_id = "duplicate_entry",
-     .dimension = "duplicate",
-     .units = "entries/s",
-     .title = "Zswap duplicate store was encountered",
-     .algorithm = RRD_ALGORITHM_INCREMENTAL,
-     .charttype = RRDSET_TYPE_LINE,
+    {.filename = "/sys/kernel/debug/zswap/stored_pages",
+     .chart_id = "pool_raw_size",
+     .dimension = "uncompressed_size",
+     .units = "bytes",
+     .title = "Zswap uncompressed bytes currently stored",
+     .algorithm = RRD_ALGORITHM_ABSOLUTE,
+     .charttype = RRDSET_TYPE_AREA,
      .enabled = CONFIG_BOOLEAN_YES,
      .chart_created = CONFIG_BOOLEAN_NO,
-     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_DUPP_ENTRY,
-     .value = -1},
-    {.filename = "/sys/kernel/debug/zswap/written_back_pages",
-     .chart_id = "written_back_pages",
-     .dimension = "written_back",
-     .units = "pages/s",
-     .title = "Zswap pages written back when pool limit was reached",
-     .algorithm = RRD_ALGORITHM_INCREMENTAL,
-     .charttype = RRDSET_TYPE_LINE,
-     .enabled = CONFIG_BOOLEAN_YES,
-     .chart_created = CONFIG_BOOLEAN_NO,
-     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_WRT_BACK_PAGES,
+     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_STORED_PAGE,
+     .convertv = pages_to_bytes,
      .value = -1},
     {.filename = "/sys/kernel/debug/zswap/pool_limit_hit",
      .chart_id = "pool_limit_hit",
@@ -98,6 +92,41 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .enabled = CONFIG_BOOLEAN_YES,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_POOL_LIM_HIT,
+     .value = -1},
+    {.filename = "/sys/kernel/debug/zswap/written_back_pages",
+     .chart_id = "written_back_raw_bytes",
+     .dimension = "written_back",
+     .units = "bytes/s",
+     .title = "Zswap uncomressed bytes written back when pool limit was reached",
+     .algorithm = RRD_ALGORITHM_INCREMENTAL,
+     .charttype = RRDSET_TYPE_AREA,
+     .enabled = CONFIG_BOOLEAN_YES,
+     .chart_created = CONFIG_BOOLEAN_NO,
+     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_WRT_BACK_PAGES,
+     .convertv = pages_to_bytes,
+     .value = -1},
+    {.filename = "/sys/kernel/debug/zswap/same_filled_pages",
+     .chart_id = "same_filled_raw_size",
+     .dimension = "same_filled",
+     .units = "bytes",
+     .title = "Zswap same-value filled uncompressed bytes currently stored",
+     .algorithm = RRD_ALGORITHM_ABSOLUTE,
+     .charttype = RRDSET_TYPE_AREA,
+     .enabled = CONFIG_BOOLEAN_YES,
+     .chart_created = CONFIG_BOOLEAN_NO,
+     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_SAME_FILL_PAGE,
+     .convertv = pages_to_bytes,
+     .value = -1},
+    {.filename = "/sys/kernel/debug/zswap/duplicate_entry",
+     .chart_id = "duplicate_entry",
+     .dimension = "duplicate",
+     .units = "entries/s",
+     .title = "Zswap duplicate store was encountered",
+     .algorithm = RRD_ALGORITHM_INCREMENTAL,
+     .charttype = RRDSET_TYPE_LINE,
+     .enabled = CONFIG_BOOLEAN_YES,
+     .chart_created = CONFIG_BOOLEAN_NO,
+     .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_DUPP_ENTRY,
      .value = -1},
 
     // The terminator
@@ -111,8 +140,7 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .enabled = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = -1,
-     .value = -1}
-};
+     .value = -1}};
 
 enum netdata_zswap_rejected {
     NETDATA_ZSWAP_REJECTED_CHART,
@@ -124,7 +152,6 @@ enum netdata_zswap_rejected {
     // Terminator
     NETDATA_ZSWAP_REJECTED_END
 };
-
 
 static struct netdata_zswap_metric zswap_rejected_metrics[] = {
     {.filename = "/sys/kernel/debug/zswap/",
@@ -193,10 +220,10 @@ static struct netdata_zswap_metric zswap_rejected_metrics[] = {
      .enabled = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = -1,
-     .value = -1}
-};
+     .value = -1}};
 
-int zswap_collect_data(struct netdata_zswap_metric *metric) {
+int zswap_collect_data(struct netdata_zswap_metric *metric)
+{
     int fd;
     int ret = 0;
     char buffer[512];
@@ -205,7 +232,7 @@ int zswap_collect_data(struct netdata_zswap_metric *metric) {
     snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, metric->filename);
     // we are not using profile_open/procfile_read, because they will generate error during runtime.
     fd = open(filename, O_RDONLY, 0444);
-    if (fd < 0 ) {
+    if (fd < 0) {
         error("Cannot open file %s", filename);
         return -1;
     }
@@ -215,13 +242,17 @@ int zswap_collect_data(struct netdata_zswap_metric *metric) {
     if (r < 2) {
         error("Cannot parse file %s", filename);
         ret = -1;
-        goto zswap_charts_end;
+        goto zswap_collect_end;
     }
+
     // We discard breakline
     buffer[r - 1] = '\0';
     metric->value = str2ll(buffer, NULL);
 
-zswap_charts_end:
+    if (metric->convertv)
+        metric->value = metric->convertv(metric->value);
+
+zswap_collect_end:
     close(fd);
     return ret;
 }
@@ -242,7 +273,8 @@ zswap_send_chart(struct netdata_zswap_metric *metric, int update_every, const ch
         name);
 }
 
-static void zswap_send_dimension(struct netdata_zswap_metric *metric) {
+static void zswap_send_dimension(struct netdata_zswap_metric *metric)
+{
     fprintf(
         stdout,
         "DIMENSION '%s' '%s' %s 1 1 ''\n",
@@ -281,7 +313,8 @@ static void zswap_independent_chart(struct netdata_zswap_metric *metric, int upd
     zswap_send_end_and_flush();
 }
 
-void zswap_reject_chart(int update_every, const char *name) {
+void zswap_reject_chart(int update_every, const char *name)
+{
     struct netdata_zswap_metric *metric = &zswap_rejected_metrics[NETDATA_ZSWAP_REJECTED_CHART];
 
     if (unlikely(!metric->chart_created)) {
@@ -305,7 +338,8 @@ void zswap_reject_chart(int update_every, const char *name) {
     zswap_send_end_and_flush();
 }
 
-static void zswap_obsolete_charts(int update_every, const char *name) {
+static void zswap_obsolete_charts(int update_every, const char *name)
+{
     struct netdata_zswap_metric *metric = NULL;
 
     for (int i = 0; zswap_independent_metrics[i].filename; i++) {
@@ -317,9 +351,15 @@ static void zswap_obsolete_charts(int update_every, const char *name) {
     metric = &zswap_rejected_metrics[NETDATA_ZSWAP_REJECTED_CHART];
     if (likely(metric->chart_created))
         zswap_send_chart(metric, update_every, name, "obsolete");
+
+    metric = &zswap_calculated_metrics[NETDATA_ZSWAP_COMPRESSION_RATIO_CHART];
+    if (likely(metric->chart_created))
+        zswap_send_chart(metric, update_every, name, "obsolete");
 }
 
-int do_debugfs_zswap(int update_every, const char *name) {
+int do_debugfs_zswap(int update_every, const char *name)
+{
+    system_page_size = sysconf(_SC_PAGESIZE);
     struct netdata_zswap_metric *metric = NULL;
     int enabled = 0;
 
@@ -331,6 +371,15 @@ int do_debugfs_zswap(int update_every, const char *name) {
             continue;
         zswap_independent_chart(metric, update_every, name);
         enabled++;
+    }
+
+    struct netdata_zswap_metric *metric_size = &zswap_independent_metrics[NETDATA_ZSWAP_POOL_TOTAL_SIZE];
+    struct netdata_zswap_metric *metric_raw_size = &zswap_independent_metrics[NETDATA_ZSWAP_STORED_PAGES];
+    if (metric_size->enabled && metric_raw_size->enabled) {
+        metric = &zswap_calculated_metrics[NETDATA_ZSWAP_COMPRESSION_RATIO_CHART];
+        metric->value =
+            (collected_number)((NETDATA_DOUBLE)metric_size->value / (NETDATA_DOUBLE)metric_raw_size->value * 100);
+        zswap_independent_chart(metric, update_every, name);
     }
 
     int enabled_rejected = 0;

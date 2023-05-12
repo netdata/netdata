@@ -2,10 +2,11 @@ metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 mem.fragmentation_index_dma,node,"scope0, scope1, scope2, scope3, scope4, scope5, scope6, scope7, scope8, scope9, scope10",index,Memory fragmentation index for each order,line,numa_node,debugfs.plugin,/sys/kernel/debug/extfragx
 mem.fragmentation_index_dma32,node,"scope0, scope1, scope2, scope3, scope4, scope5, scope6, scope7, scope8, scope9, scope10",index,Memory fragmentation index for each order,line,numa_node,debugfs.plugin,/sys/kernel/debug/extfragx
 mem.fragmentation_index_normal,node,"scope0, scope1, scope2, scope3, scope4, scope5, scope6, scope7, scope8, scope9, scope10",index,Memory fragmentation index for each order,line,numa_node,debugfs.plugin,/sys/kernel/debug/extfrag
-system.zswap_same_filled_page,,same_filled,pages,Zswap same-value filled pages currently stored,line,,debugfs.plugin,/sys/kernel/debug/zswap
-system.zswap_stored_pages,,compressed,pages,Zswap compressed pages currently stored,line,,debugfs.plugin,/sys/kernel/debug/zswap
-system.zswap_pool_total_size,,pool,bytes,Zswap bytes used by the compressed storage,line,,debugfs.plugin,/sys/kernel/debug/zswap
-system.zswap_duplicate_entry,,duplicate,entries/s,Zswap duplicate store was encountered,line,,debugfs.plugin,/sys/kernel/debug/zswap
-system.zswap_written_back_pages,,written_back,pages/s,Zswap pages written back when pool limit was reached,line,,debugfs.plugin,/sys/kernel/debug/zswap
-system.zswap_pool_limit_hit,,limit,events/s,Zswap pool limit was reached,line,,debugfs.plugin,/sys/kernel/debug/zswap
+system.zswap_pool_compression_ratio,,compression_ratio,percentage,Zswap compression ratio,line,,debugfs.plugin,/sys/kernel/debug/zswap
+system.zswap_pool_compressed_size,,compressed_size,bytes,Zswap compressed bytes currently stored,area,,debugfs.plugin,/sys/kernel/debug/zswap
+system.zswap_pool_raw_size,,uncompressed_size,bytes,Zswap uncompressed bytes currently stored,area,,debugfs.plugin,/sys/kernel/debug/zswap
 system.zswap_rejections,,"compress_poor, kmemcache_fail, alloc_fail, reclaim_fail",rejections/s,Zswap rejections,stacked,,debugfs.plugin,/sys/kernel/debug/zswap
+system.zswap_pool_limit_hit,,limit,events/s,Zswap pool limit was reached,line,,debugfs.plugin,/sys/kernel/debug/zswap
+system.zswap_written_back_raw_bytes,,written_back,bytes/s,Zswap uncomressed bytes written back when pool limit was reached,area,,debugfs.plugin,/sys/kernel/debug/zswap
+system.zswap_same_filled_raw_size,,same_filled,bytes,Zswap same-value filled uncompressed bytes currently stored,area,,debugfs.plugin,/sys/kernel/debug/zswap
+system.zswap_duplicate_entry,,duplicate,entries/s,Zswap duplicate store was encountered,line,,debugfs.plugin,/sys/kernel/debug/zswap
