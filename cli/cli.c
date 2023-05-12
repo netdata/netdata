@@ -1,7 +1,109 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "cli.h"
-#include "libnetdata/required_dummies.h"
+
+void error_int(int is_collector __maybe_unused, const char *prefix __maybe_unused, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
+    FILE *fp = stderr;
+
+    va_list args;
+    va_start( args, fmt );
+    vfprintf(fp, fmt, args );
+    va_end( args );
+}
+
+#ifdef NETDATA_INTERNAL_CHECKS
+
+uint64_t debug_flags;
+
+void debug_int( const char *file __maybe_unused , const char *function __maybe_unused , const unsigned long line __maybe_unused, const char *fmt __maybe_unused, ... )
+{
+
+}
+
+void fatal_int( const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt __maybe_unused, ... )
+{
+    abort();
+};
+#endif
+
+#ifdef NETDATA_TRACE_ALLOCATIONS
+void *callocz_int(size_t nmemb, size_t size, const char *file __maybe_unused, const char *function __maybe_unused, size_t line __maybe_unused)
+{
+    void *p = calloc(nmemb, size);
+    if (unlikely(!p)) {
+        error("Cannot allocate %zu bytes of memory.", nmemb * size);
+        exit(1);
+    }
+    return p;
+}
+
+void *mallocz_int(size_t size, const char *file __maybe_unused, const char *function __maybe_unused, size_t line __maybe_unused)
+{
+    void *p = malloc(size);
+    if (unlikely(!p)) {
+        error("Cannot allocate %zu bytes of memory.", size);
+        exit(1);
+    }
+    return p;
+}
+
+void *reallocz_int(void *ptr, size_t size, const char *file __maybe_unused, const char *function __maybe_unused, size_t line __maybe_unused)
+{
+    void *p = realloc(ptr, size);
+    if (unlikely(!p)) {
+        error("Cannot allocate %zu bytes of memory.", size);
+        exit(1);
+    }
+    return p;
+}
+
+void freez_int(void *ptr, const char *file __maybe_unused, const char *function __maybe_unused, size_t line __maybe_unused)
+{
+    free(ptr);
+}
+#else
+void freez(void *ptr) {
+    free(ptr);
+}
+
+void *mallocz(size_t size) {
+    void *p = malloc(size);
+    if (unlikely(!p)) {
+        error("Cannot allocate %zu bytes of memory.", size);
+        exit(1);
+    }
+    return p;
+}
+
+void *callocz(size_t nmemb, size_t size) {
+    void *p = calloc(nmemb, size);
+    if (unlikely(!p)) {
+        error("Cannot allocate %zu bytes of memory.", nmemb * size);
+        exit(1);
+    }
+    return p;
+}
+
+void *reallocz(void *ptr, size_t size) {
+    void *p = realloc(ptr, size);
+    if (unlikely(!p)) {
+        error("Cannot allocate %zu bytes of memory.", size);
+        exit(1);
+    }
+    return p;
+}
+#endif
+
+int vsnprintfz(char *dst, size_t n, const char *fmt, va_list args) {
+    if(unlikely(!n)) return 0;
+
+    int size = vsnprintf(dst, n, fmt, args);
+    dst[n - 1] = '\0';
+
+    if (unlikely((size_t) size > n)) size = (int)n;
+
+    return size;
+}
 
 static uv_pipe_t client_pipe;
 static uv_write_t write_req;
@@ -174,8 +276,9 @@ int main(int argc, char **argv)
         size_t to_copy;
 
         to_copy = MIN(strlen(argv[i]), MAX_COMMAND_LENGTH - 1 - command_string_size);
-        strncpyz(command_string + command_string_size, argv[i], to_copy);
+        strncpy(command_string + command_string_size, argv[i], to_copy);
         command_string_size += to_copy;
+        command_string[command_string_size] = '\0';
 
         if (command_string_size < MAX_COMMAND_LENGTH - 1) {
             command_string[command_string_size++] = ' ';
