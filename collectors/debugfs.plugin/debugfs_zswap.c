@@ -6,17 +6,15 @@ struct netdata_zswap_metric {
     const char *filename;
 
     const char *chart_id;
-    const char *dimension;
-    const char *units;
     const char *title;
-    RRD_ALGORITHM algorithm;
+    const char *units;
     RRDSET_TYPE charttype;
+    const char *dimension;
+    RRD_ALGORITHM algorithm;
+    int prio;
 
     int enabled;
-    int obsolete;
     int chart_created;
-
-    int prio;
 
     collected_number value;
 };
@@ -43,7 +41,6 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .algorithm = RRD_ALGORITHM_ABSOLUTE,
      .charttype = RRDSET_TYPE_LINE,
      .enabled = CONFIG_BOOLEAN_YES,
-     .obsolete = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_SAME_FILL_PAGE,
      .value = -1},
@@ -55,7 +52,6 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .algorithm = RRD_ALGORITHM_ABSOLUTE,
      .charttype = RRDSET_TYPE_LINE,
      .enabled = CONFIG_BOOLEAN_YES,
-     .obsolete = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_STORED_PAGE,
      .value = -1},
@@ -67,7 +63,6 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .algorithm = RRD_ALGORITHM_ABSOLUTE,
      .charttype = RRDSET_TYPE_LINE,
      .enabled = CONFIG_BOOLEAN_YES,
-     .obsolete = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_POOL_TOT_SIZE,
      .value = -1},
@@ -79,7 +74,6 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .algorithm = RRD_ALGORITHM_INCREMENTAL,
      .charttype = RRDSET_TYPE_LINE,
      .enabled = CONFIG_BOOLEAN_YES,
-     .obsolete = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_DUPP_ENTRY,
      .value = -1},
@@ -91,7 +85,6 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .algorithm = RRD_ALGORITHM_INCREMENTAL,
      .charttype = RRDSET_TYPE_LINE,
      .enabled = CONFIG_BOOLEAN_YES,
-     .obsolete = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_STORED_PAGE,
      .value = -1},
@@ -103,7 +96,6 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .algorithm = RRD_ALGORITHM_INCREMENTAL,
      .charttype = RRDSET_TYPE_LINE,
      .enabled = CONFIG_BOOLEAN_YES,
-     .obsolete = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_POOL_LIM_HIT,
      .value = -1},
@@ -117,7 +109,6 @@ static struct netdata_zswap_metric zswap_independent_metrics[] = {
      .algorithm = RRD_ALGORITHM_ABSOLUTE,
      .charttype = RRDSET_TYPE_LINE,
      .enabled = CONFIG_BOOLEAN_NO,
-     .obsolete = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = -1,
      .value = -1}
@@ -142,9 +133,8 @@ static struct netdata_zswap_metric zswap_rejected_metrics[] = {
      .units = "rejections/s",
      .title = "Zswap rejections",
      .algorithm = RRD_ALGORITHM_INCREMENTAL,
-     .charttype = RRDSET_TYPE_LINE,
+     .charttype = RRDSET_TYPE_STACKED,
      .enabled = CONFIG_BOOLEAN_YES,
-     .obsolete = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_REJECTS,
      .value = -1},
@@ -156,7 +146,6 @@ static struct netdata_zswap_metric zswap_rejected_metrics[] = {
      .algorithm = RRD_ALGORITHM_INCREMENTAL,
      .charttype = RRDSET_TYPE_STACKED,
      .enabled = CONFIG_BOOLEAN_YES,
-     .obsolete = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_REJECTS,
      .value = -1},
@@ -168,7 +157,6 @@ static struct netdata_zswap_metric zswap_rejected_metrics[] = {
      .algorithm = RRD_ALGORITHM_INCREMENTAL,
      .charttype = RRDSET_TYPE_STACKED,
      .enabled = CONFIG_BOOLEAN_YES,
-     .obsolete = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_REJECTS,
      .value = -1},
@@ -180,7 +168,6 @@ static struct netdata_zswap_metric zswap_rejected_metrics[] = {
      .algorithm = RRD_ALGORITHM_INCREMENTAL,
      .charttype = RRDSET_TYPE_STACKED,
      .enabled = CONFIG_BOOLEAN_YES,
-     .obsolete = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_REJECTS},
     {.filename = "/sys/kernel/debug/zswap/reject_reclaim_fail",
@@ -191,7 +178,6 @@ static struct netdata_zswap_metric zswap_rejected_metrics[] = {
      .algorithm = RRD_ALGORITHM_INCREMENTAL,
      .charttype = RRDSET_TYPE_STACKED,
      .enabled = CONFIG_BOOLEAN_YES,
-     .obsolete = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_REJECTS,
      .value = -1},
@@ -205,7 +191,6 @@ static struct netdata_zswap_metric zswap_rejected_metrics[] = {
      .algorithm = RRD_ALGORITHM_ABSOLUTE,
      .charttype = RRDSET_TYPE_STACKED,
      .enabled = CONFIG_BOOLEAN_NO,
-     .obsolete = CONFIG_BOOLEAN_NO,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = -1,
      .value = -1}
@@ -217,15 +202,10 @@ int zswap_collect_data(struct netdata_zswap_metric *metric) {
     char buffer[512];
 
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename,
-              FILENAME_MAX,
-              "%s%s",
-              netdata_configured_host_prefix,
-              metric->filename);
+    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, metric->filename);
     // we are not using profile_open/procfile_read, because they will generate error during runtime.
     fd = open(filename, O_RDONLY, 0444);
     if (fd < 0 ) {
-        metric->obsolete = CONFIG_BOOLEAN_YES;
         error("Cannot open file %s", filename);
         return -1;
     }
@@ -233,6 +213,7 @@ int zswap_collect_data(struct netdata_zswap_metric *metric) {
     ssize_t r = read(fd, buffer, 511);
     // We expect at list 1 character
     if (r < 2) {
+        error("Cannot parse file %s", filename);
         ret = -1;
         goto zswap_charts_end;
     }
@@ -245,10 +226,8 @@ zswap_charts_end:
     return ret;
 }
 
-static void zswap_send_chart(struct netdata_zswap_metric *metric,
-                                         int update_every,
-                                         const char *name,
-                                         const char *option)
+static void
+zswap_send_chart(struct netdata_zswap_metric *metric, int update_every, const char *name, const char *option)
 {
     fprintf(
         stdout,
@@ -259,94 +238,117 @@ static void zswap_send_chart(struct netdata_zswap_metric *metric,
         debugfs_rrdset_type_name(metric->charttype),
         metric->prio,
         update_every,
-        (!option)? "" : option,
+        (!option) ? "" : option,
         name);
+}
+
+static void zswap_send_dimension(struct netdata_zswap_metric *metric) {
+    fprintf(
+        stdout,
+        "DIMENSION '%s' '%s' %s 1 1 ''\n",
+        metric->dimension,
+        metric->dimension,
+        debugfs_rrd_algorithm_name(metric->algorithm));
+}
+
+static void zswap_send_begin(struct netdata_zswap_metric *metric)
+{
+    fprintf(stdout, "BEGIN system.zswap_%s\n", metric->chart_id);
+}
+
+static void zswap_send_set(struct netdata_zswap_metric *metric)
+{
+    fprintf(stdout, "SET %s = %lld\n", metric->dimension, metric->value);
+}
+
+static void zswap_send_end_and_flush()
+{
+    fprintf(stdout, "END\n");
+    fflush(stdout);
 }
 
 static void zswap_independent_chart(struct netdata_zswap_metric *metric, int update_every, const char *name)
 {
     if (unlikely(!metric->chart_created)) {
         metric->chart_created = CONFIG_BOOLEAN_YES;
+
         zswap_send_chart(metric, update_every, name, NULL);
-        fprintf(
-            stdout,
-            "DIMENSION '%s' '%s' %s 1 1 ''\n",
-            metric->dimension,
-            metric->dimension,
-            debugfs_rrd_algorithm_name(metric->algorithm));
+        zswap_send_dimension(metric);
     }
 
-    fprintf(stdout, "BEGIN system.zswap_%s\n"
-                    "SET %s = %lld\n"
-                    "END\n",
-            metric->chart_id, metric->dimension, metric->value);
-    fflush(stdout);
+    zswap_send_begin(metric);
+    zswap_send_set(metric);
+    zswap_send_end_and_flush();
 }
 
 void zswap_reject_chart(int update_every, const char *name) {
-    int i;
     struct netdata_zswap_metric *metric = &zswap_rejected_metrics[NETDATA_ZSWAP_REJECTED_CHART];
+
     if (unlikely(!metric->chart_created)) {
         metric->chart_created = CONFIG_BOOLEAN_YES;
+
         zswap_send_chart(metric, update_every, name, NULL);
-        for (i = NETDATA_ZSWAP_REJECTED_COMPRESS_POOR; zswap_rejected_metrics[i].filename; i++) {
+        for (int i = NETDATA_ZSWAP_REJECTED_COMPRESS_POOR; zswap_rejected_metrics[i].filename; i++) {
             metric = &zswap_rejected_metrics[i];
             if (likely(metric->enabled))
-                fprintf(stdout,
-                    "DIMENSION '%s' '%s' %s 1 1 ''\n",
-                    metric->dimension,
-                    metric->dimension,
-                    debugfs_rrd_algorithm_name(metric->algorithm));
+                zswap_send_dimension(metric);
         }
     }
 
-    fprintf(stdout, "BEGIN system.zswap_%s\n", zswap_rejected_metrics[NETDATA_ZSWAP_REJECTED_CHART].chart_id);
-    for (i = NETDATA_ZSWAP_REJECTED_COMPRESS_POOR; zswap_rejected_metrics[i].filename; i++) {
+    zswap_send_begin(metric);
+    for (int i = NETDATA_ZSWAP_REJECTED_COMPRESS_POOR; zswap_rejected_metrics[i].filename; i++) {
         metric = &zswap_rejected_metrics[i];
-        fprintf(stdout,
-                "SET %s = %lld\n",
-                metric->dimension,
-                metric->value);
+        if (likely(metric->enabled))
+            zswap_send_set(metric);
     }
-    fprintf(stdout, "END\n");
-    fflush(stdout);
+    zswap_send_end_and_flush();
 }
 
-int debugfs_zswap(int update_every, const char *name) {
-    int i;
-    struct netdata_zswap_metric *metric;
-    int independent_disabled = 0;
-    for (i = 0; zswap_independent_metrics[i].filename; i++) {
+static void zswap_obsolete_charts(int update_every, const char *name) {
+    struct netdata_zswap_metric *metric = NULL;
+
+    for (int i = 0; zswap_independent_metrics[i].filename; i++) {
         metric = &zswap_independent_metrics[i];
-        if (likely(metric->enabled)) {
-            metric->enabled = !zswap_collect_data(metric);
-            if (unlikely(metric->obsolete == CONFIG_BOOLEAN_NO))
-                zswap_independent_chart(metric, update_every, name);
-            else if (likely(metric->chart_created && metric->obsolete)) {
-                independent_disabled++;
-                zswap_send_chart(metric, update_every, name, "obsolete");
-            }
-        }
+        if (likely(metric->chart_created))
+            zswap_send_chart(metric, update_every, name, "obsolete");
     }
 
-    // We set as 1, because the first structure with dimensions is not zero.
-    int rejected_disabled = 1;
-    for (i = NETDATA_ZSWAP_REJECTED_COMPRESS_POOR; zswap_rejected_metrics[i].filename; i++) {
+    metric = &zswap_rejected_metrics[NETDATA_ZSWAP_REJECTED_CHART];
+    if (likely(metric->chart_created))
+        zswap_send_chart(metric, update_every, name, "obsolete");
+}
+
+int do_debugfs_zswap(int update_every, const char *name) {
+    struct netdata_zswap_metric *metric = NULL;
+    int enabled = 0;
+
+    for (int i = 0; zswap_independent_metrics[i].filename; i++) {
+        metric = &zswap_independent_metrics[i];
+        if (unlikely(!metric->enabled))
+            continue;
+        if (unlikely(!(metric->enabled = !zswap_collect_data(metric))))
+            continue;
+        zswap_independent_chart(metric, update_every, name);
+        enabled++;
+    }
+
+    int enabled_rejected = 0;
+    for (int i = NETDATA_ZSWAP_REJECTED_COMPRESS_POOR; zswap_rejected_metrics[i].filename; i++) {
         metric = &zswap_rejected_metrics[i];
-        metric->enabled = !zswap_collect_data(metric);
-        if (unlikely(!metric->enabled)) {
-            rejected_disabled++;
-        }
+        if (unlikely(!metric->enabled))
+            continue;
+        if (unlikely(!(metric->enabled = !zswap_collect_data(metric))))
+            continue;
+        enabled++;
+        enabled_rejected++;
     }
 
-    // When more than half of metrics are present we still plot chart.
-    if (unlikely(rejected_disabled < NETDATA_ZSWAP_REJECTED_END))
+    if (likely(enabled_rejected > 0))
         zswap_reject_chart(update_every, name);
-    else {
-        zswap_send_chart(&zswap_rejected_metrics[NETDATA_ZSWAP_REJECTED_CHART], update_every, name, "obsolete");
-        // We do not have metrics, so we are disabling it
-        if (independent_disabled == NETDATA_ZSWAP_SITE_END)
-            return -1;
+
+    if (!enabled) {
+        zswap_obsolete_charts(update_every, name);
+        return -1;
     }
 
     return 0;
