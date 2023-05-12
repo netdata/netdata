@@ -207,9 +207,9 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    if (!debugfs_check_sys_permission()) {
-        exit(2);
-    }
+    // if (!debugfs_check_sys_permission()) {
+    //     exit(2);
+    // }
 
     debugfs_parse_args(argc, argv);
 
@@ -217,16 +217,23 @@ int main(int argc, char **argv)
     usec_t step = update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
+
     for (iteration = 0; iteration < 86400; iteration++) {
         heartbeat_next(&hb, step);
+        int enabled = 0;
 
-        int i;
-        for (i = 0; debugfs_modules[i].name; i++) {
+        for (int i = 0; debugfs_modules[i].name; i++) {
             struct debugfs_module *pm = &debugfs_modules[i];
             if (unlikely(!pm->enabled))
                 continue;
 
             pm->enabled = !pm->func(update_every, pm->name);
+            if (likely(pm->enabled))
+                enabled++;
+        }
+        if (!enabled) {
+            info("all modules are disabled, exiting...");
+            return 1;
         }
     }
 
