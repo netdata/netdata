@@ -19,6 +19,7 @@ struct netdata_zswap_metric {
     int prio;
     const char *dimension;
     RRD_ALGORITHM algorithm;
+    int divisor;
 
     int enabled;
     int chart_created;
@@ -31,13 +32,14 @@ static struct netdata_zswap_metric zswap_calculated_metrics[] = {
     {.filename = "",
      .chart_id = "pool_compression_ratio",
      .dimension = "compression_ratio",
-     .units = "percentage",
+     .units = "ratio",
      .title = "Zswap compression ratio",
      .algorithm = RRD_ALGORITHM_ABSOLUTE,
      .charttype = RRDSET_TYPE_LINE,
      .enabled = CONFIG_BOOLEAN_YES,
      .chart_created = CONFIG_BOOLEAN_NO,
      .prio = NETDATA_CHART_PRIO_SYSTEM_ZSWAP_COMPRESS_RATIO,
+     .divisor = 100,
      .value = -1},
 };
 
@@ -275,12 +277,14 @@ zswap_send_chart(struct netdata_zswap_metric *metric, int update_every, const ch
 
 static void zswap_send_dimension(struct netdata_zswap_metric *metric)
 {
+    int div = metric->divisor > 0 ? metric->divisor : 1;
     fprintf(
         stdout,
-        "DIMENSION '%s' '%s' %s 1 1 ''\n",
+        "DIMENSION '%s' '%s' %s 1 %d ''\n",
         metric->dimension,
         metric->dimension,
-        debugfs_rrd_algorithm_name(metric->algorithm));
+        debugfs_rrd_algorithm_name(metric->algorithm),
+        div);
 }
 
 static void zswap_send_begin(struct netdata_zswap_metric *metric)
@@ -378,9 +382,9 @@ int do_debugfs_zswap(int update_every, const char *name)
     if (metric_size->enabled && metric_raw_size->enabled) {
         metric = &zswap_calculated_metrics[NETDATA_ZSWAP_COMPRESSION_RATIO_CHART];
         metric->value = 0;
-        if (metric_raw_size->value > 0)
+        if (metric_size->value > 0)
             metric->value =
-                (collected_number)((NETDATA_DOUBLE)metric_size->value / (NETDATA_DOUBLE)metric_raw_size->value * 100);
+                (collected_number)((NETDATA_DOUBLE)metric_raw_size->value / (NETDATA_DOUBLE)metric_size->value * 100);
         zswap_independent_chart(metric, update_every, name);
     }
 
