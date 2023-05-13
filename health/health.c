@@ -625,7 +625,7 @@ static inline void health_alarm_log_process(RRDHOST *host) {
     // remember this for the next iteration
     host->health_last_processed_id = first_waiting;
 
-    //delete those that are updated, wait for execution ok, and is not repeating
+    //delete those that are updated, no in progress execution, and is not repeating
     netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
 
     ALARM_ENTRY *prev = host->health_log.alarms;
@@ -633,7 +633,8 @@ static inline void health_alarm_log_process(RRDHOST *host) {
 
         if(likely(!(ae->flags & HEALTH_ENTRY_FLAG_IS_REPEATING)) &&
            (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) &&
-           (ae->flags & HEALTH_ENTRY_FLAG_SAVED)) {
+           (ae->flags & HEALTH_ENTRY_FLAG_SAVED) &&
+           !(ae->flags & HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS)) {
 
             if (ae == host->health_log.alarms) {
                 host->health_log.alarms = ae->next;
@@ -641,7 +642,6 @@ static inline void health_alarm_log_process(RRDHOST *host) {
             } else {
                 prev->next = ae->next;
             }
-            health_alarm_wait_for_execution(ae);
             health_alarm_log_free_one_nochecks_nounlink(ae);
             ae = prev;
         } else
