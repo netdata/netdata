@@ -12,8 +12,10 @@
 - Wording fix in interact with charts doc [\#15040](https://github.com/netdata/netdata/pull/15040) ([Ancairon](https://github.com/Ancairon))
 - fatal in claim\(\) only if --claim-only is used [\#15039](https://github.com/netdata/netdata/pull/15039) ([ilyam8](https://github.com/ilyam8))
 - Slight wording fix on the database readme [\#15034](https://github.com/netdata/netdata/pull/15034) ([Ancairon](https://github.com/Ancairon))
+- Update SQLITE to version 3.41.2 [\#15031](https://github.com/netdata/netdata/pull/15031) ([stelfrag](https://github.com/stelfrag))
 - Update troubleshooting-agent-with-cloud-connection.md [\#15029](https://github.com/netdata/netdata/pull/15029) ([cakrit](https://github.com/cakrit))
 - Adjust buffers to prevent overflow [\#15025](https://github.com/netdata/netdata/pull/15025) ([stelfrag](https://github.com/stelfrag))
+- Reduce netdatacli size [\#15024](https://github.com/netdata/netdata/pull/15024) ([stelfrag](https://github.com/stelfrag))
 - review the billing docs for the flow [\#15014](https://github.com/netdata/netdata/pull/15014) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Rollback ML transaction on failure. [\#15013](https://github.com/netdata/netdata/pull/15013) ([vkalintiris](https://github.com/vkalintiris))
 - Silence dimensions with noisy ML models [\#15011](https://github.com/netdata/netdata/pull/15011) ([vkalintiris](https://github.com/vkalintiris))
@@ -417,7 +419,6 @@
 - Minor fixes in markdown links [\#14415](https://github.com/netdata/netdata/pull/14415) ([tkatsoulas](https://github.com/tkatsoulas))
 - fix kubelet alarms [\#14414](https://github.com/netdata/netdata/pull/14414) ([ilyam8](https://github.com/ilyam8))
 - DBENGINE v2 - bug fixes [\#14413](https://github.com/netdata/netdata/pull/14413) ([ktsaou](https://github.com/ktsaou))
-- fix\(cgroups.plugin\): fix collecting full pressure stall time [\#14410](https://github.com/netdata/netdata/pull/14410) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
