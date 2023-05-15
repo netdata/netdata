@@ -5,7 +5,7 @@ systems. [Debugfs](https://docs.kernel.org/filesystems/debugfs.html) exists as a
 make information available to user space.
 
 This plugin
-is [external plugin](https://github.com/netdata/netdata/tree/master/collectors#collector-architecture-and-terminology),
+is [external](https://github.com/netdata/netdata/tree/master/collectors#collector-architecture-and-terminology),
 the netdata daemon spawns it as a long-running independent process.
 
 In detail, it collects metrics from:
