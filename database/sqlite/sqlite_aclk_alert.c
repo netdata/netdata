@@ -939,7 +939,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
 #endif
 }
 
-#define SQL_DELETE_ALERT_ENTRIES "DELETE * FROM aclk_alert_%s WHERE filtered_alert_unique_id + 604800 < UNIXEPOCH();" //TODO check the when from health log
+#define SQL_DELETE_ALERT_ENTRIES "DELETE FROM aclk_alert_%s WHERE filtered_alert_unique_id + 604800 < UNIXEPOCH();" //TODO check the when from health log
 void sql_aclk_alert_clean_dead_entries(RRDHOST *host)
 {
     char uuid_str[UUID_STR_LEN];

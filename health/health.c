@@ -906,7 +906,7 @@ static void sql_health_postpone_queue_removed(RRDHOST *host __maybe_unused) {
         if (wc->alert_queue_removed >= 1) {
             info("DES Postponed queue removed");
             //TODO set an upper limit
-            wc->alert_queue_removed+=3;
+            wc->alert_queue_removed+=6;
         }
     }
 #endif
