@@ -113,7 +113,7 @@ int debugfs_check_sys_permission() {
 
     char filename[FILENAME_MAX + 1];
 
-    snprintfz(filename, FILENAME_MAX, "%s/extfrag_index", debugfs_modules[0].name);
+    snprintfz(filename, FILENAME_MAX, "%s/sys/kernel/debug/extfrag/extfrag_index", netdata_configured_host_prefix);
 
     procfile *ff = procfile_open(filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
     if(!ff) goto dcsp_cleanup;
@@ -180,7 +180,10 @@ int main(int argc, char **argv)
         stock_config_dir = LIBCONFIG_DIR;
     }
 
-    if (!debugfs_check_capabilities() && !debugfs_am_i_running_as_root()) {
+    // FIXME: should first check if /sys/kernel/debug is mounted
+
+    // FIXME: remove debugfs_check_sys_permission() after https://github.com/netdata/netdata/issues/15048 is fixed
+    if (!debugfs_check_capabilities() && !debugfs_am_i_running_as_root() && !debugfs_check_sys_permission()) {
         uid_t uid = getuid(), euid = geteuid();
 #ifdef HAVE_CAPABILITY
         error(
