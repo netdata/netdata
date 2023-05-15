@@ -105,8 +105,10 @@ static int read_stream(struct receiver_state *r, char* buffer, size_t size) {
         return 0;
     }
 
+#ifdef ENABLE_HTTPD
     if (is_h2o_rrdpush(r))
         return (int)h2o_stream_read(r->h2o_ctx, buffer, size);
+#endif
 
     ssize_t bytes_read;
 
@@ -336,7 +338,9 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
     PARSER *parser = parser_init(&user, NULL, NULL, fd,
                                  PARSER_INPUT_SPLIT, ssl);
 
+#ifdef ENABLE_HTTPD
     parser->h2o_ctx = rpt->h2o_ctx;
+#endif
 
     pluginsd_keywords_init(parser, PARSER_INIT_STREAMING);
 
@@ -767,9 +771,11 @@ static void rrdpush_receive(struct receiver_state *rpt)
         }
 
         debug(D_STREAM, "Initial response to %s: %s", rpt->client_ip, initial_response);
+#ifdef ENABLE_HTTPD
         if (is_h2o_rrdpush(rpt)) {
             h2o_stream_write(rpt->h2o_ctx, initial_response, strlen(initial_response));
         } else {
+#endif
             ssize_t bytes_sent = send_timeout(
 #ifdef ENABLE_HTTPS
                     &rpt->ssl,
@@ -781,7 +787,9 @@ static void rrdpush_receive(struct receiver_state *rpt)
                 rrdpush_receive_log_status(rpt, "cannot reply back", "CANT REPLY DROPPING CONNECTION");
                 goto cleanup;
             }
+#ifdef ENABLE_HTTPD
         }
+#endif
     }
 
     {

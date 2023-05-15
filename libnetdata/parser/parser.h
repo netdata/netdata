@@ -46,7 +46,9 @@ typedef struct parser {
 #ifdef ENABLE_HTTPS
     NETDATA_SSL *ssl_output;
 #endif
+#ifdef ENABLE_HTTPD
     void *h2o_ctx;                  // if set we use h2o_stream functions to send data
+#endif
     void *user;                     // User defined structure to hold extra state between calls
     uint32_t flags;
     size_t line;

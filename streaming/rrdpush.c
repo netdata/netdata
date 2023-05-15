@@ -754,7 +754,9 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
     rpt->capabilities = STREAM_CAP_INVALID;
     rpt->hops = 1;
 
+#ifdef ENABLE_HTTPD
     rpt->h2o_ctx = h2o_ctx;
+#endif
 
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_receivers, sizeof(*rpt), __ATOMIC_RELAXED);
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
