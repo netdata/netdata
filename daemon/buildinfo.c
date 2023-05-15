@@ -115,7 +115,7 @@
 #define FEAT_APPS_PLUGIN 0
 #endif
 
-#ifdef ENABLE_PLUGIN_DEBUGFS
+#ifdef ENABLE_DEBUGFS_PLUGIN
 #define FEAT_DEBUGFS_PLUGIN 1
 #else
 #define FEAT_DEBUGFS_PLUGIN 0
@@ -432,7 +432,7 @@ void analytics_build_info(BUFFER *b) {
 #ifdef ENABLE_APPS_PLUGIN
     add_to_bi(b, "apps");
 #endif
-#ifdef ENABLE_PLUGIN_DEBUGFS
+#ifdef ENABLE_DEBUGFS_PLUGIN
     add_to_bi(b, "debugfs");
 #endif
 #ifdef HAVE_SETNS

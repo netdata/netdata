@@ -1277,6 +1277,7 @@ fi
 # debugfs.plugin
 
 if test "${build_target}" = "linux"; then
+    AC_DEFINE([ENABLE_DEBUGFS_PLUGIN], [1], [debugfs.plugin])
     enable_plugin_debugfs="yes"
 else
     enable_plugin_debugfs="no"
