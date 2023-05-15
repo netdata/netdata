@@ -1,6 +1,6 @@
 metric,scode,dimensions,unit,description,chart_type,labels,plugin,module
-mem.fragmentation_index_dma,node,"order0, order1, order2, order3, order4, order5, order6, order7, order8, order9, order10",index,Memory fragmentation index for each order,line,numa_node,debugfs.plugin,/sys/kernel/debug/extfragx
-mem.fragmentation_index_dma32,node,"order0, order1, order2, order3, order4, order5, order6, order7, order8, order9, order10",index,Memory fragmentation index for each order,line,numa_node,debugfs.plugin,/sys/kernel/debug/extfragx
+mem.fragmentation_index_dma,node,"order0, order1, order2, order3, order4, order5, order6, order7, order8, order9, order10",index,Memory fragmentation index for each order,line,numa_node,debugfs.plugin,/sys/kernel/debug/extfrag
+mem.fragmentation_index_dma32,node,"order0, order1, order2, order3, order4, order5, order6, order7, order8, order9, order10",index,Memory fragmentation index for each order,line,numa_node,debugfs.plugin,/sys/kernel/debug/extfrag
 mem.fragmentation_index_normal,node,"order0, order1, order2, order3, order4, order5, order6, order7, order8, order9, order10",index,Memory fragmentation index for each order,line,numa_node,debugfs.plugin,/sys/kernel/debug/extfrag
 system.zswap_pool_compression_ratio,,compression_ratio,ratio,Zswap compression ratio,line,,debugfs.plugin,/sys/kernel/debug/zswap
 system.zswap_pool_compressed_size,,compressed_size,bytes,Zswap compressed bytes currently stored,area,,debugfs.plugin,/sys/kernel/debug/zswap
