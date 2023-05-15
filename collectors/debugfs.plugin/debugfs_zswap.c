@@ -382,17 +382,17 @@ static void zswap_obsolete_charts(int update_every, const char *name)
         zswap_send_chart(metric, update_every, name, "obsolete");
 }
 
-// The correct way is to check /sys/module/zswap/parameters/enabled,
-// but this will require mounting an additional directory when Netdata is running inside a container.
-// We consider Zswap disabled if all its counters are 0.
+#define ZSWAP_STATE_SIZE 1 // Y or N
 static int debugfs_is_zswap_enabled()
 {
-    struct netdata_zswap_metric *metric = NULL;
-    for (int i = 0; zswap_independent_metrics[i].filename; i++) {
-        metric = &zswap_independent_metrics[i];
-        if (unlikely(!zswap_collect_data(metric) && metric->value > 0)) {
-            return 0;
-        }
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "/sys/module/zswap/parameters/enabled"); // host prefix is not needed here
+    char state[ZSWAP_STATE_SIZE + 1];
+
+    int ret = read_file(filename, state, ZSWAP_STATE_SIZE);
+
+    if (unlikely(!ret && !strcmp(state, "Y"))) {
+        return 0;
     }
     return 1;
 }
