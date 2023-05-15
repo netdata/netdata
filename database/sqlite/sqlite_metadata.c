@@ -63,12 +63,11 @@ const char *rebuild_chart_commands[] = {
 
 static void rebuild_chart()
 {
-    int rc;
     char *err_msg = NULL;
     info("Rebuilding chart table");
     for (int i = 0; rebuild_chart_commands[i]; i++) {
         info("Executing %s", rebuild_chart_commands[i]);
-        rc = sqlite3_exec_monitored(db_meta, rebuild_chart_commands[i], 0, 0, &err_msg);
+        int rc = sqlite3_exec_monitored(db_meta, rebuild_chart_commands[i], 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
             error_report("SQLite error during database setup, rc = %d (%s)", rc, err_msg);
             error_report("SQLite failed statement %s", rebuild_chart_commands[i]);
@@ -94,13 +93,12 @@ const char *rebuild_dimension_commands[] = {
 
 void rebuild_dimension()
 {
-    int rc;
     char *err_msg = NULL;
 
     info("Rebuilding dimension table");
     for (int i = 0; rebuild_dimension_commands[i]; i++) {
         info("Executing %s", rebuild_dimension_commands[i]);
-        rc = sqlite3_exec_monitored(db_meta, rebuild_dimension_commands[i], 0, 0, &err_msg);
+        int rc = sqlite3_exec_monitored(db_meta, rebuild_dimension_commands[i], 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
             error_report("SQLite error during database setup, rc = %d (%s)", rc, err_msg);
             error_report("SQLite failed statement %s", rebuild_dimension_commands[i]);
