@@ -81,10 +81,9 @@ static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_objec
         memcpy(&full_msg[len], V2_BIN_PAYLOAD_SEPARATOR, strlen(V2_BIN_PAYLOAD_SEPARATOR));
         len += strlen(V2_BIN_PAYLOAD_SEPARATOR);
         memcpy(&full_msg[len], payload, payload_len);
-        len += payload_len;
     }
 
-    mqtt_wss_publish5(client, (char*)topic, NULL, full_msg, &freez_aclk_publish5b, len, MQTT_WSS_PUB_QOS1, &packet_id);
+    mqtt_wss_publish5(client, (char*)topic, NULL, full_msg, &freez_aclk_publish5b, full_msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_published(packet_id);
