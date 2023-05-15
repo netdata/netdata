@@ -22,7 +22,7 @@ In detail, it collects metrics from:
 The debugfs root directory is accessible only to the root user by default. Netdata
 uses [Linux Capabilities](https://man7.org/linux/man-pages/man7/capabilities.7.html) to give the plugin access
 to debugfs. `CAP_DAC_READ_SEARCH` is added automatically during installation. This capability allows bypassing file read
-permission checks and directory read and execute permission checks.
+permission checks and directory read and execute permission checks. If file capabilities are not usable, then the plugin is instead installed with the SUID bit set in permissions so that it runs as root.
 
 ## Metrics
 
