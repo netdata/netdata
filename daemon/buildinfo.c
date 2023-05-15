@@ -296,7 +296,7 @@ void print_build_info(void) {
     printf("    apps:                    %s\n", FEAT_YES_NO(FEAT_APPS_PLUGIN));
     printf("    cgroup Network Tracking: %s\n", FEAT_YES_NO(FEAT_CGROUP_NET));
     printf("    CUPS:                    %s\n", FEAT_YES_NO(FEAT_CUPS));
-    printf("    DEBUGFS:                 %s\n", FEAT_YES_NO(FEAT_DEBUGFS_PLUGIN));
+    printf("    debugfs:                 %s\n", FEAT_YES_NO(FEAT_DEBUGFS_PLUGIN));
     printf("    EBPF:                    %s\n", FEAT_YES_NO(FEAT_EBPF));
     printf("    IPMI:                    %s\n", FEAT_YES_NO(FEAT_IPMI));
     printf("    NFACCT:                  %s\n", FEAT_YES_NO(FEAT_NFACCT));
