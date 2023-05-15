@@ -1,7 +1,7 @@
-metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
-mem.fragmentation_index_dma,node,"scope0, scope1, scope2, scope3, scope4, scope5, scope6, scope7, scope8, scope9, scope10",index,Memory fragmentation index for each order,line,numa_node,debugfs.plugin,/sys/kernel/debug/extfragx
-mem.fragmentation_index_dma32,node,"scope0, scope1, scope2, scope3, scope4, scope5, scope6, scope7, scope8, scope9, scope10",index,Memory fragmentation index for each order,line,numa_node,debugfs.plugin,/sys/kernel/debug/extfragx
-mem.fragmentation_index_normal,node,"scope0, scope1, scope2, scope3, scope4, scope5, scope6, scope7, scope8, scope9, scope10",index,Memory fragmentation index for each order,line,numa_node,debugfs.plugin,/sys/kernel/debug/extfrag
+metric,scode,dimensions,unit,description,chart_type,labels,plugin,module
+mem.fragmentation_index_dma,node,"order0, order1, order2, order3, order4, order5, order6, order7, order8, order9, order10",index,Memory fragmentation index for each order,line,numa_node,debugfs.plugin,/sys/kernel/debug/extfragx
+mem.fragmentation_index_dma32,node,"order0, order1, order2, order3, order4, order5, order6, order7, order8, order9, order10",index,Memory fragmentation index for each order,line,numa_node,debugfs.plugin,/sys/kernel/debug/extfragx
+mem.fragmentation_index_normal,node,"order0, order1, order2, order3, order4, order5, order6, order7, order8, order9, order10",index,Memory fragmentation index for each order,line,numa_node,debugfs.plugin,/sys/kernel/debug/extfrag
 system.zswap_pool_compression_ratio,,compression_ratio,ratio,Zswap compression ratio,line,,debugfs.plugin,/sys/kernel/debug/zswap
 system.zswap_pool_compressed_size,,compressed_size,bytes,Zswap compressed bytes currently stored,area,,debugfs.plugin,/sys/kernel/debug/zswap
 system.zswap_pool_raw_size,,uncompressed_size,bytes,Zswap uncompressed bytes currently stored,area,,debugfs.plugin,/sys/kernel/debug/zswap
