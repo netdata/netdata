@@ -329,7 +329,7 @@ static void init_sentry(void) {
     sentry_options_set_environment(options, "development");
 
     // TODO: we should get this from CI (SENTRY_RELEASE)
-    sentry_options_set_release(options, PACKAGE_VERSION);
+    sentry_options_set_release(options, "netdata-agent@v1.38.0-366-nightly");
 
     // TODO: use config_get() to (un)set this
     sentry_options_set_debug(options, 1);

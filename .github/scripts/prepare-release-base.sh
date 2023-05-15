@@ -89,6 +89,10 @@ check_newer_patch_version() {
     fi
 }
 
+update_sentry_version(){
+    new_version=$(cat packaging/version | tr -d '[:space:]')
+    sed -i 's/sentry_options_set_release(options, "netdata-agent@[^"]*");/sentry_options_set_release(options, "netdata-agent@'${new_version}'");/g' daemon/main.c
+}
 ##############################################################
 # Core logic
 
@@ -138,6 +142,7 @@ elif [ "${EVENT_TYPE}" = 'patch' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "type=release" >> "${GITHUB_OUTPUT}"
     echo "branch=${branch_name}" >> "${GITHUB_OUTPUT}"
     echo "version=$(tr -d 'v' < packaging/version)" >> "${GITHUB_OUTPUT}"
+    update_sentry_version || exit 1
 elif [ "${EVENT_TYPE}" = 'minor' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "::notice::Preparing a minor release build."
     check_version_format || exit 1
@@ -159,6 +164,7 @@ elif [ "${EVENT_TYPE}" = 'minor' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "branch=master" >> "${GITHUB_OUTPUT}"
     echo "new-branch=${branch_name}" >> "${GITHUB_OUTPUT}"
     echo "version=$(tr -d 'v' < packaging/version)" >> "${GITHUB_OUTPUT}"
+    update_sentry_version || exit 1
 elif [ "${EVENT_TYPE}" = 'major' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "::notice::Preparing a major release build."
     check_version_format || exit 1
@@ -174,6 +180,7 @@ elif [ "${EVENT_TYPE}" = 'major' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "type=release" >> "${GITHUB_OUTPUT}"
     echo "branch=master" >> "${GITHUB_OUTPUT}"
     echo "version=$(tr -d 'v' < packaging/version)" >> "${GITHUB_OUTPUT}"
+    update_sentry_version || exit 1
 else
     echo '::error::Unrecognized release type or invalid version.'
     exit 1
