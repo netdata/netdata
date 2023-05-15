@@ -13,6 +13,11 @@ static ssize_t send_to_plugin(const char *txt, void *data) {
     if(!txt || !*txt)
         return 0;
 
+#ifdef ENABLE_HTTPD
+    if(parser->h2o_ctx)
+        return h2o_stream_write(parser->h2o_ctx, txt, strlen(txt));
+#endif
+
 #ifdef ENABLE_HTTPS
     NETDATA_SSL *ssl = parser->ssl_output;
     if(ssl) {
