@@ -648,6 +648,8 @@ static inline void health_alarm_log_process(RRDHOST *host) {
             prev = ae;
     }
 
+    //TODO: We must also remove any REMOVED entries that haven't been updated in a while.
+
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 }
 
@@ -893,8 +895,24 @@ static int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
         return 0;
 }
 
+static void sql_health_postpone_queue_removed(RRDHOST *host __maybe_unused) {
+#ifdef ENABLE_ACLK
+    if (netdata_cloud_setting) {
+        struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *)host->aclk_sync_host_config;
+        if (unlikely(!wc)) {
+            return;
+        }
+
+        if (wc->alert_queue_removed >= 1) {
+            wc->alert_queue_removed+=3;
+        }
+    }
+#endif
+}
+
 static void health_execute_delayed_initializations(RRDHOST *host) {
     RRDSET *st;
+    bool must_postpone = false;
 
     if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION)) return;
     rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
@@ -930,8 +948,11 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
                 rrdvar_store_for_chart(host, st);
         }
         rrddim_foreach_done(rd);
+        must_postpone = true;
     }
     rrdset_foreach_done(st);
+    if (must_postpone)
+        sql_health_postpone_queue_removed(host);
 }
 
 /**
