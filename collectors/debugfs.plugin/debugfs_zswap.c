@@ -247,37 +247,18 @@ static struct netdata_zswap_metric zswap_rejected_metrics[] = {
 
 int zswap_collect_data(struct netdata_zswap_metric *metric)
 {
-    int fd;
-    int ret = 0;
-    char buffer[512];
-
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, metric->filename);
-    // we are not using profile_open/procfile_read, because they will generate error during runtime.
-    fd = open(filename, O_RDONLY, 0444);
-    if (fd < 0) {
-        error("Cannot open file %s", filename);
-        return -1;
-    }
 
-    ssize_t r = read(fd, buffer, 511);
-    // We expect at list 1 character
-    if (r < 2) {
-        error("Cannot parse file %s", filename);
-        ret = -1;
-        goto zswap_collect_end;
+    if (read_single_number_file(filename, &metric->value)) {
+        error("Cannot read file %s", filename);
+        return 1;
     }
-
-    // We discard breakline
-    buffer[r - 1] = '\0';
-    metric->value = str2ll(buffer, NULL);
 
     if (metric->convertv)
         metric->value = metric->convertv(metric->value);
 
-zswap_collect_end:
-    close(fd);
-    return ret;
+    return 0;
 }
 
 static void
