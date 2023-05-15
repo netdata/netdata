@@ -212,6 +212,14 @@ APPS_PLUGIN_FILES = \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
+DEBUGFS_PLUGIN_FILES = \
+    collectors/debugfs.plugin/debugfs_plugin.c \
+    collectors/debugfs.plugin/debugfs_plugin.h \
+    collectors/debugfs.plugin/debugfs_extfrag.c \
+    collectors/debugfs.plugin/debugfs_zswap.c \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+
 FREEBSD_PLUGIN_FILES = \
     collectors/freebsd.plugin/plugin_freebsd.c \
     collectors/freebsd.plugin/plugin_freebsd.h \
@@ -1163,6 +1171,15 @@ if ENABLE_PLUGIN_APPS
     plugins_PROGRAMS += apps.plugin
     apps_plugin_SOURCES = $(APPS_PLUGIN_FILES)
     apps_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(OPTIONAL_LIBCAP_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_DEBUGFS
+    plugins_PROGRAMS += debugfs.plugin
+    debugfs_plugin_SOURCES = $(DEBUGFS_PLUGIN_FILES)
+    debugfs_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_LIBCAP_LIBS) \
         $(NULL)

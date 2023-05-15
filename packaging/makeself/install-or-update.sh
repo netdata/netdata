@@ -171,6 +171,7 @@ progress "changing plugins ownership and permissions"
 if command -v setcap >/dev/null 2>&1; then
     run setcap "cap_dac_read_search,cap_sys_ptrace=ep" "usr/libexec/netdata/plugins.d/apps.plugin"
     run setcap "cap_dac_read_search=ep" "usr/libexec/netdata/plugins.d/slabinfo.plugin"
+    run setcap "cap_dac_read_search=ep" "usr/libexec/netdata/plugins.d/debugfs.plugin"
 
     if command -v capsh >/dev/null 2>&1 && capsh --supports=cap_perfmon 2>/dev/null ; then
         run setcap "cap_perfmon=ep" "usr/libexec/netdata/plugins.d/perf.plugin"
@@ -180,7 +181,7 @@ if command -v setcap >/dev/null 2>&1; then
 
     run setcap "cap_net_admin,cap_net_raw=eip" "usr/libexec/netdata/plugins.d/go.d.plugin"
 else
-  for x in apps.plugin perf.plugin slabinfo.plugin; do
+  for x in apps.plugin perf.plugin slabinfo.plugin debugfs.plugin; do
     f="usr/libexec/netdata/plugins.d/${x}"
     run chown root:${NETDATA_GROUP} "${f}"
     run chmod 4750 "${f}"

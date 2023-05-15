@@ -1294,6 +1294,21 @@ fi
 
 
 # -----------------------------------------------------------------------------
+# debugfs.plugin
+
+if test "${build_target}" = "linux"; then
+    AC_DEFINE([ENABLE_DEBUGFS_PLUGIN], [1], [debugfs.plugin])
+    enable_plugin_debugfs="yes"
+else
+    enable_plugin_debugfs="no"
+fi
+
+AC_MSG_CHECKING([if debugfs.plugin should be enabled])
+AC_MSG_RESULT([${enable_plugin_debugfs}])
+AM_CONDITIONAL([ENABLE_PLUGIN_DEBUGFS], [test "${enable_plugin_debugfs}" = "yes"])
+
+
+# -----------------------------------------------------------------------------
 # ebpf.plugin
 
 if test "${build_target}" = "linux" -a "${enable_ebpf}" != "no"; then
@@ -1808,6 +1823,7 @@ AC_CONFIG_FILES([
     collectors/apps.plugin/Makefile
     collectors/cgroups.plugin/Makefile
     collectors/charts.d.plugin/Makefile
+    collectors/debugfs.plugin/Makefile
     collectors/diskspace.plugin/Makefile
     collectors/timex.plugin/Makefile
     collectors/ioping.plugin/Makefile

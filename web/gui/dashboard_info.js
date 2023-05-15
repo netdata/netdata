@@ -883,6 +883,19 @@ netdataDashboard.submenu = {
         'When the kernel or an application requests some memory, the buddy allocator provides a page that matches closest the request.'
     },
 
+    'mem.fragmentation': {
+        info: 'These charts show whether the kernel will compact memory or direct reclaim to satisfy a high-order allocation. '+
+            'The extfrag/extfrag_index file in debugfs shows what the fragmentation index for each order is in each zone in the system.' +
+            'Values tending towards 0 imply allocations would fail due to lack of memory, values towards 1000 imply failures are due to ' +
+            'fragmentation and -1 implies that the allocation will succeed as long as watermarks are met.'
+    },
+
+    'system.zswap': {
+        info : 'Zswap is a backend for frontswap that takes pages that are in the process of being swapped out and attempts to compress and store them in a ' +
+            'RAM-based memory pool.  This can result in a significant I/O reduction on the swap device and, in the case where decompressing from RAM is faster ' +
+            'than reading from the swap device, can also improve workload performance.'
+    },
+
     'ip.ecn': {
         info: '<a href="https://en.wikipedia.org/wiki/Explicit_Congestion_Notification" target="_blank">Explicit Congestion Notification (ECN)</a> '+
         'is an extension to the IP and to the TCP that allows end-to-end notification of network congestion without dropping packets. '+
@@ -1520,6 +1533,14 @@ netdataDashboard.context = {
     'system.entropy': {
         colors: '#CC22AA',
         info: '<a href="https://en.wikipedia.org/wiki/Entropy_(computing)" target="_blank">Entropy</a>, is a pool of random numbers (<a href="https://en.wikipedia.org/wiki//dev/random" target="_blank">/dev/random</a>) that is mainly used in cryptography. If the pool of entropy gets empty, processes requiring random numbers may run a lot slower (it depends on the interface each program uses), waiting for the pool to be replenished. Ideally a system with high entropy demands should have a hardware device for that purpose (TPM is one such device). There are also several software-only options you may install, like <code>haveged</code>, although these are generally useful only in servers.'
+    },
+
+    'system.zswap_rejections': {
+        info: '<p>Zswap rejected pages per access.</p>' +
+            '<p><b>CompressPoor</b> - compressed page was too big for the allocator to store. ' +
+            '<b>KmemcacheFail</b> - number of entry metadata that could not be allocated. ' +
+            '<b>AllocFail</b> - allocator could not get memory. ' +
+            '<b>ReclaimFail</b> - memory cannot be reclaimed (pool limit was reached).</p>'
     },
 
     'system.clock_sync_state': {

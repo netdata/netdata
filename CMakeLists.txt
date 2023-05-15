@@ -507,6 +507,13 @@ target_include_directories(libnetdata BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
 set(APPS_PLUGIN_FILES
         collectors/apps.plugin/apps_plugin.c)
 
+set(DEBUGFS_PLUGIN_FILES
+        collectors/debugfs.plugin/debugfs_plugin.c
+        collectors/debugfs.plugin/debugfs_plugin.h
+        collectors/debugfs.plugin/debugfs_extfrag.c
+        collectors/debugfs.plugin/debugfs_zswap.c
+        )
+
 set(FREEBSD_PLUGIN_FILES
         collectors/freebsd.plugin/plugin_freebsd.c
         collectors/freebsd.plugin/plugin_freebsd.h
@@ -1361,6 +1368,21 @@ target_link_libraries (netdatacli libnetdata ${NETDATA_COMMON_LIBRARIES})
 target_include_directories(netdatacli PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
 target_include_directories(netdatacli BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
 target_compile_options(netdatacli PUBLIC ${NETDATA_COMMON_CFLAGS})
+
+
+# -----------------------------------------------------------------------------
+# debugfs.plugin
+
+IF(ENABLE_PLUGIN_DEBUGFS)
+    message(STATUS "debugfs.plugin: enabled")
+    add_executable(debugfs.plugin ${GENERATED_CONFIG_H} ${DEBUGFS_PLUGIN_FILES})
+    target_link_libraries (debugfs.plugin libnetdata ${NETDATA_COMMON_LIBRARIES} ${CAP_LIBRARIES})
+    target_include_directories(debugfs.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${CAP_INCLUDE_DIRS})
+    target_include_directories(debugfs.plugin BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
+    target_compile_options(debugfs.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${CAP_CFLAGS_OTHER})
+ELSE()
+    message(STATUS "debugfs.plugin: disabled")
+ENDIF()
 
 
 # -----------------------------------------------------------------------------
