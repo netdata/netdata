@@ -1,4 +1,4 @@
-# Debugfs
+# OS provided metrics (debugfs.plugin)
 
 `debugfs.plugin` gathers metrics from the `/sys/kernel/debug` folder on Linux
 systems. [Debugfs](https://docs.kernel.org/filesystems/debugfs.html) exists as an easy way for kernel developers to
