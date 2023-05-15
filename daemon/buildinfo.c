@@ -115,6 +115,12 @@
 #define FEAT_APPS_PLUGIN 0
 #endif
 
+#ifdef ENABLE_PLUGIN_DEBUGFS
+#define FEAT_DEBUGFS_PLUGIN 1
+#else
+#define FEAT_DEBUGFS_PLUGIN 0
+#endif
+
 #ifdef HAVE_FREEIPMI
 #define FEAT_IPMI 1
 #else
@@ -290,6 +296,7 @@ void print_build_info(void) {
     printf("    apps:                    %s\n", FEAT_YES_NO(FEAT_APPS_PLUGIN));
     printf("    cgroup Network Tracking: %s\n", FEAT_YES_NO(FEAT_CGROUP_NET));
     printf("    CUPS:                    %s\n", FEAT_YES_NO(FEAT_CUPS));
+    printf("    DEBUGFS:                 %s\n", FEAT_YES_NO(FEAT_DEBUGFS_PLUGIN));
     printf("    EBPF:                    %s\n", FEAT_YES_NO(FEAT_EBPF));
     printf("    IPMI:                    %s\n", FEAT_YES_NO(FEAT_IPMI));
     printf("    NFACCT:                  %s\n", FEAT_YES_NO(FEAT_NFACCT));
@@ -347,6 +354,7 @@ void print_build_info_json(void) {
     printf("    \"apps\": %s,\n",             FEAT_JSON_BOOL(FEAT_APPS_PLUGIN));
     printf("    \"cgroup-net\": %s,\n",       FEAT_JSON_BOOL(FEAT_CGROUP_NET));
     printf("    \"cups\": %s,\n",             FEAT_JSON_BOOL(FEAT_CUPS));
+    printf("    \"debugfs\": %s,\n",          FEAT_JSON_BOOL(FEAT_DEBUGFS_PLUGIN));
     printf("    \"ebpf\": %s,\n",             FEAT_JSON_BOOL(FEAT_EBPF));
     printf("    \"ipmi\": %s,\n",             FEAT_JSON_BOOL(FEAT_IPMI));
     printf("    \"nfacct\": %s,\n",           FEAT_JSON_BOOL(FEAT_NFACCT));
@@ -423,6 +431,9 @@ void analytics_build_info(BUFFER *b) {
 
 #ifdef ENABLE_APPS_PLUGIN
     add_to_bi(b, "apps");
+#endif
+#ifdef ENABLE_PLUGIN_DEBUGFS
+    add_to_bi(b, "debugfs");
 #endif
 #ifdef HAVE_SETNS
     add_to_bi(b, "cgroup Network Tracking");
