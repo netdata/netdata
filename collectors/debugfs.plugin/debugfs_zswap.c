@@ -250,7 +250,7 @@ int zswap_collect_data(struct netdata_zswap_metric *metric)
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, metric->filename);
 
-    if (read_single_number_file(filename, &metric->value)) {
+    if (read_single_number_file(filename, (unsigned long long *)&metric->value)) {
         error("Cannot read file %s", filename);
         return 1;
     }
