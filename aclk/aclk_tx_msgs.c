@@ -51,13 +51,6 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
     return packet_id;
 }
 
-// json_object_put returns int unfortunately :D
-// we need void(*fnc)(void *);
-static void json_object_put_wrapper(void *jsonobj)
-{
-    json_object_put(jsonobj);
-}
-
 #define TOPIC_MAX_LEN 512
 #define V2_BIN_PAYLOAD_SEPARATOR "\x0D\x0A\x0D\x0A"
 static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_object *msg, const char *topic, const void *payload, size_t payload_len)
@@ -76,19 +69,21 @@ static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_objec
     str = json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN);
     len = strlen(str);
 
-    if (payload_len) {
-        full_msg = mallocz(len + strlen(V2_BIN_PAYLOAD_SEPARATOR) + payload_len);
+    size_t full_msg_len = len;
+    if (payload_len)
+        full_msg_len += strlen(V2_BIN_PAYLOAD_SEPARATOR) + payload_len;
 
-        memcpy(full_msg, str, len);
-        json_object_put(msg);
-        msg = NULL;
+    full_msg = mallocz(full_msg_len);
+    memcpy(full_msg, str, len);
+    json_object_put(msg);
+
+    if (payload_len) {
         memcpy(&full_msg[len], V2_BIN_PAYLOAD_SEPARATOR, strlen(V2_BIN_PAYLOAD_SEPARATOR));
         len += strlen(V2_BIN_PAYLOAD_SEPARATOR);
         memcpy(&full_msg[len], payload, payload_len);
-        len += payload_len;
     }
 
-    mqtt_wss_publish5(client, (char*)topic, NULL, (char*)(payload_len ? full_msg : str), (payload_len ? &freez_aclk_publish5b : &json_object_put_wrapper), len, MQTT_WSS_PUB_QOS1, &packet_id);
+    mqtt_wss_publish5(client, (char*)topic, NULL, full_msg, &freez_aclk_publish5b, full_msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_published(packet_id);
