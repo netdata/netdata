@@ -247,37 +247,18 @@ static struct netdata_zswap_metric zswap_rejected_metrics[] = {
 
 int zswap_collect_data(struct netdata_zswap_metric *metric)
 {
-    int fd;
-    int ret = 0;
-    char buffer[512];
-
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, metric->filename);
-    // we are not using profile_open/procfile_read, because they will generate error during runtime.
-    fd = open(filename, O_RDONLY, 0444);
-    if (fd < 0) {
-        error("Cannot open file %s", filename);
-        return -1;
-    }
 
-    ssize_t r = read(fd, buffer, 511);
-    // We expect at list 1 character
-    if (r < 2) {
-        error("Cannot parse file %s", filename);
-        ret = -1;
-        goto zswap_collect_end;
+    if (read_single_number_file(filename, (unsigned long long *)&metric->value)) {
+        error("Cannot read file %s", filename);
+        return 1;
     }
-
-    // We discard breakline
-    buffer[r - 1] = '\0';
-    metric->value = str2ll(buffer, NULL);
 
     if (metric->convertv)
         metric->value = metric->convertv(metric->value);
 
-zswap_collect_end:
-    close(fd);
-    return ret;
+    return 0;
 }
 
 static void
@@ -382,8 +363,32 @@ static void zswap_obsolete_charts(int update_every, const char *name)
         zswap_send_chart(metric, update_every, name, "obsolete");
 }
 
+#define ZSWAP_STATE_SIZE 1 // Y or N
+static int debugfs_is_zswap_enabled()
+{
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "/sys/module/zswap/parameters/enabled"); // host prefix is not needed here
+    char state[ZSWAP_STATE_SIZE + 1];
+
+    int ret = read_file(filename, state, ZSWAP_STATE_SIZE);
+
+    if (unlikely(!ret && !strcmp(state, "Y"))) {
+        return 0;
+    }
+    return 1;
+}
+
 int do_debugfs_zswap(int update_every, const char *name)
 {
+    static int check_if_enabled = 1;
+
+    if (likely(check_if_enabled && debugfs_is_zswap_enabled())) {
+        info("Zswap is disabled");
+        return 1;
+    }
+
+    check_if_enabled = 0;
+
     system_page_size = sysconf(_SC_PAGESIZE);
     struct netdata_zswap_metric *metric = NULL;
     int enabled = 0;
@@ -423,9 +428,9 @@ int do_debugfs_zswap(int update_every, const char *name)
     if (likely(enabled_rejected > 0))
         zswap_reject_chart(update_every, name);
 
-    if (!enabled) {
+    if (unlikely(!enabled)) {
         zswap_obsolete_charts(update_every, name);
-        return -1;
+        return 1;
     }
 
     return 0;
