@@ -904,6 +904,7 @@ static void sql_health_postpone_queue_removed(RRDHOST *host __maybe_unused) {
         }
 
         if (wc->alert_queue_removed >= 1) {
+            info("DES Postponed queue removed");
             wc->alert_queue_removed+=3;
         }
     }
@@ -1502,6 +1503,7 @@ void *health_main(void *ptr) {
                 }
 
                 if (wc->alert_queue_removed == 1) {
+                    info("DES Queueing removed");
                     sql_queue_removed_alerts_to_aclk(host);
                 } else if (wc->alert_queue_removed > 1) {
                     wc->alert_queue_removed--;
