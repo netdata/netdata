@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Fix ACLK memleak [\#15055](https://github.com/netdata/netdata/pull/15055) ([underhood](https://github.com/underhood))
+- fix\(debugfs/zswap\): don't collect metrics if Zswap is disabled [\#15054](https://github.com/netdata/netdata/pull/15054) ([ilyam8](https://github.com/ilyam8))
+- Comment out default `role_recipients_*` values [\#15047](https://github.com/netdata/netdata/pull/15047) ([jamgregory](https://github.com/jamgregory))
 - Small update ml defaults [\#15046](https://github.com/netdata/netdata/pull/15046) ([andrewm4894](https://github.com/andrewm4894))
 - Fix handling of permissions in static installs. [\#15042](https://github.com/netdata/netdata/pull/15042) ([Ferroin](https://github.com/Ferroin))
 - Update tor.chart.py [\#15041](https://github.com/netdata/netdata/pull/15041) ([jmphilippe](https://github.com/jmphilippe))
@@ -16,6 +19,7 @@
 - Update troubleshooting-agent-with-cloud-connection.md [\#15029](https://github.com/netdata/netdata/pull/15029) ([cakrit](https://github.com/cakrit))
 - Adjust buffers to prevent overflow [\#15025](https://github.com/netdata/netdata/pull/15025) ([stelfrag](https://github.com/stelfrag))
 - Reduce netdatacli size [\#15024](https://github.com/netdata/netdata/pull/15024) ([stelfrag](https://github.com/stelfrag))
+- Debugfs collector [\#15017](https://github.com/netdata/netdata/pull/15017) ([thiagoftsm](https://github.com/thiagoftsm))
 - review the billing docs for the flow [\#15014](https://github.com/netdata/netdata/pull/15014) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Rollback ML transaction on failure. [\#15013](https://github.com/netdata/netdata/pull/15013) ([vkalintiris](https://github.com/vkalintiris))
 - Silence dimensions with noisy ML models [\#15011](https://github.com/netdata/netdata/pull/15011) ([vkalintiris](https://github.com/vkalintiris))
@@ -412,13 +416,6 @@
 - Update screenshot of timezone selector [\#14425](https://github.com/netdata/netdata/pull/14425) ([cakrit](https://github.com/cakrit))
 - Stop training thread from processing training requests once cancelled. [\#14423](https://github.com/netdata/netdata/pull/14423) ([vkalintiris](https://github.com/vkalintiris))
 - Check on parents the microseconds delta sent by agents [\#14422](https://github.com/netdata/netdata/pull/14422) ([ktsaou](https://github.com/ktsaou))
-- better logging of invalid pages detected on dbengine files [\#14420](https://github.com/netdata/netdata/pull/14420) ([ktsaou](https://github.com/ktsaou))
-- fix functions memory leak [\#14419](https://github.com/netdata/netdata/pull/14419) ([ktsaou](https://github.com/ktsaou))
-- Move under Developer in Learn [\#14417](https://github.com/netdata/netdata/pull/14417) ([cakrit](https://github.com/cakrit))
-- Libnetdata readmes learn [\#14416](https://github.com/netdata/netdata/pull/14416) ([cakrit](https://github.com/cakrit))
-- Minor fixes in markdown links [\#14415](https://github.com/netdata/netdata/pull/14415) ([tkatsoulas](https://github.com/tkatsoulas))
-- fix kubelet alarms [\#14414](https://github.com/netdata/netdata/pull/14414) ([ilyam8](https://github.com/ilyam8))
-- DBENGINE v2 - bug fixes [\#14413](https://github.com/netdata/netdata/pull/14413) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
