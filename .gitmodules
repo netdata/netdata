@@ -13,3 +13,6 @@
 	path = web/server/h2o/libh2o
 	url = https://github.com/h2o/h2o.git
 	ignore = untracked
+[submodule "libnetdata/sentry/sentry-native"]
+	path = libnetdata/sentry/sentry-native
+	url = https://github.com/getsentry/sentry-native.git
