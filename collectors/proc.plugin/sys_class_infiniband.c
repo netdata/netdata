@@ -469,15 +469,17 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                 // Sample output: "100 Gb/sec (4X EDR)"
                 snprintfz(buffer, FILENAME_MAX, "%s/%s/%s", ports_dirname, port_dent->d_name, "rate");
                 char buffer_rate[65];
+                p->width = 4;
                 if (read_file(buffer, buffer_rate, 64)) {
                     collector_error("Unable to read '%s'", buffer);
-                    p->width = 1;
                 } else {
                     char *buffer_width = strstr(buffer_rate, "(");
-                    buffer_width++;
-                    // str2ull will stop on first non-decimal value
-                    p->speed = str2ull(buffer_rate, NULL);
-                    p->width = str2ull(buffer_width, NULL);
+                    if (buffer_width) {
+                        buffer_width++;
+                        // str2ull will stop on first non-decimal value
+                        p->speed = str2ull(buffer_rate, NULL);
+                        p->width = str2ull(buffer_width, NULL);
+                    }
                 }
 
                 if (!p->discovered)
@@ -541,7 +543,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                 // On this chart, we want to have a KB/s so the dashboard will autoscale it
                 // The reported values are also per-lane, so we must multiply it by the width
                 // x4 lanes multiplier as per Documentation/ABI/stable/sysfs-class-infiniband
-                FOREACH_COUNTER_BYTES(GEN_RRD_DIM_ADD_CUSTOM, port, 4 * 8 * port->width, 1024, RRD_ALGORITHM_INCREMENTAL)
+                FOREACH_COUNTER_BYTES(GEN_RRD_DIM_ADD_CUSTOM, port, port->width * 8, 1000, RRD_ALGORITHM_INCREMENTAL)
 
                 port->stv_speed = rrdsetvar_custom_chart_variable_add_and_acquire(port->st_bytes, "link_speed");
             }
