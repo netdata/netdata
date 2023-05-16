@@ -60,7 +60,7 @@ static void process_http_hdr(http_parse_ctx *ctx, const char *key, const char *v
     // but in future the way this is written
     // it can be extended
     if (ctx->content_length < 0 && !strcmp("content-length", key)) {
-        ctx->content_length = atoi(val);
+        ctx->content_length = str2u(val);
         return;
     }
     char *val_cpy = strdupz(val);
