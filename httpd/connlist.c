@@ -24,6 +24,7 @@ void conn_list_insert(conn_list_t *list, h2o_stream_conn_t *conn)
     if (list->capacity != list->size) {
         h2o_stream_conn_t **null_element = conn_list_get_null_element_unsafe(list);
         if (unlikely(null_element == NULL)) {
+            pthread_mutex_unlock(&list->lock);
             error_report("conn_list_insert: capacity != size but no null element found");
             return;
         }
