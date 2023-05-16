@@ -631,10 +631,15 @@ static inline void health_alarm_log_process(RRDHOST *host) {
     ALARM_ENTRY *prev = host->health_log.alarms;
     for(ae = host->health_log.alarms; ae ; ae = ae->next) {
 
-        if(likely(!(ae->flags & HEALTH_ENTRY_FLAG_IS_REPEATING)) &&
+        if((likely(!(ae->flags & HEALTH_ENTRY_FLAG_IS_REPEATING)) &&
            (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) &&
            (ae->flags & HEALTH_ENTRY_FLAG_SAVED) &&
-           !(ae->flags & HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS)) {
+           !(ae->flags & HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS))
+            ||
+           ((ae->new_status == RRDCALC_STATUS_REMOVED) &&
+           (ae->flags & HEALTH_ENTRY_FLAG_SAVED) &&
+           (ae->when + 3600 < now_realtime_sec())))
+            {
 
             if (ae == host->health_log.alarms) {
                 host->health_log.alarms = ae->next;
@@ -647,8 +652,6 @@ static inline void health_alarm_log_process(RRDHOST *host) {
         } else
             prev = ae;
     }
-
-    //TODO: We must also remove any REMOVED entries that haven't been updated in a while.
 
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 }
