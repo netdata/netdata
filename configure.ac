@@ -1392,7 +1392,9 @@ if test "${enable_sentry}" = "yes"; then
     AC_DEFINE([ENABLE_SENTRY], [1], [sentry usability])
 
     OPTIONAL_SENTRY_CFLAGS="-I \$(abs_top_srcdir)/externaldeps/sentry-native/include"
-    OPTIONAL_SENTRY_LIBS="\$(abs_top_srcdir)/externaldeps/sentry-native/lib/libsentry.a \$(abs_top_srcdir)/externaldeps/sentry-native/lib/libbreakpad_client.a -lcurl"
+    OPTIONAL_SENTRY_LIBS="\$(abs_top_srcdir)/externaldeps/sentry-native/lib/libsentry.a \
+        \$(abs_top_srcdir)/externaldeps/sentry-native/lib/libbreakpad_client.a \
+        -lcurl"
 fi
 
 # -----------------------------------------------------------------------------

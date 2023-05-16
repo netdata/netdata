@@ -239,6 +239,7 @@ USAGE: ${PROGRAM} [options]
   --libs-are-really-here     If you see errors about missing zlib or libuuid but you know it is available, you might
                              have a broken pkg-config. Use this option to proceed without checking pkg-config.
   --disable-telemetry        Opt-out from our anonymous telemetry program. (DISABLE_TELEMETRY=1)
+  --enable-sentry             Enable crash reports of the Agent into the Netdata's Sentry space
   --skip-available-ram-check Skip checking the amount of RAM the system has and pretend it has enough to build safely.
 
 Netdata will by default be compiled with gcc optimization -O2
@@ -578,7 +579,7 @@ bundle_sentry() {
 
   [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling sentry."
 
-  tmp="$(mktemp -d -t netdata-protobuf-XXXXXX)"
+  tmp="$(mktemp -d -t netdata-sentry-XXXXXX)"
 
   if [ -d "${PWD}/externaldeps/sentry-native" ]
   then
@@ -588,6 +589,7 @@ bundle_sentry() {
 
   cmake -B "${tmp}" \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DCMAKE_INSTALL_LIBDIR="${PWD}/externaldeps/sentry-native/lib" \
     -DCMAKE_INSTALL_PREFIX="${PWD}/externaldeps/sentry-native" \
     -DBUILD_SHARED_LIBS=Off \
     -DCMAKE_C_FLAGS='-DJSMN_STATIC' \
