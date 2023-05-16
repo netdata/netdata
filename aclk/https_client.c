@@ -401,7 +401,7 @@ static int handle_http_request(https_req_ctx_t *ctx) {
         buffer_strcat(hdr, ctx->request->url);
     }
 
-    buffer_strcat(hdr, " HTTP/1.1\x0D\x0A");
+    buffer_strcat(hdr, HTTP_1_1 HTTP_ENDL);
 
     //TODO Headers!
     if (ctx->request->request_type != HTTP_REQ_CONNECT) {

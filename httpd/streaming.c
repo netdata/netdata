@@ -136,8 +136,6 @@ static void stream_on_recv(h2o_socket_t *sock, const char *err)
 #define GIMME_MORE_OF_DEM_SWEET_BYTEZ 0
 
 #define STREAM_METHOD "STREAM "
-#define HTTP_1_1 " HTTP/1.1"
-#define HTTP_HDR_END "\r\n\r\n"
 #define USER_AGENT "User-Agent: "
 
 #define NEED_MIN_BYTES(buf, bytes)       \
@@ -163,7 +161,7 @@ static int process_STREAM_X_HTTP_1_1(http_stream_parse_state_t *parser_state, rb
         case HTTP_URL:
             if (!rbuf_find_bytes(buf, " ", 1, &idx)) {
                 if (rbuf_bytes_available(buf) >= MAX_LEN_STREAM_HELLO) {
-                    error_report("The initial \"STREAM [URL] HTTP/1.1\" over max of %d", MAX_LEN_STREAM_HELLO);
+                    error_report("The initial \"STREAM [URL]" HTTP_1_1 "\" over max of %d", MAX_LEN_STREAM_HELLO);
                     return PARSE_ERROR;
                 }
             }
@@ -189,7 +187,7 @@ static int process_STREAM_X_HTTP_1_1(http_stream_parse_state_t *parser_state, rb
             // just the single header we need and skip everything else
             if (!rbuf_find_bytes(buf, USER_AGENT, strlen(USER_AGENT), &idx)) {
                 if (rbuf_bytes_available(buf) >= (size_t)(rbuf_get_capacity(buf) * 0.9)) {
-                    error_report("The initial \"STREAM [URL] HTTP/1.1\" over max of %d", MAX_LEN_STREAM_HELLO);
+                    error_report("The initial \"STREAM [URL]" HTTP_1_1 "\" over max of %d", MAX_LEN_STREAM_HELLO);
                     return PARSE_ERROR;
                 }
                 return GIMME_MORE_OF_DEM_SWEET_BYTEZ;
@@ -200,7 +198,7 @@ static int process_STREAM_X_HTTP_1_1(http_stream_parse_state_t *parser_state, rb
         case HTTP_USER_AGENT_VALUE:
             if (!rbuf_find_bytes(buf, "\r\n", 2, &idx)) {
                 if (rbuf_bytes_available(buf) >= (size_t)(rbuf_get_capacity(buf) * 0.9)) {
-                    error_report("The initial \"STREAM [URL] HTTP/1.1\" over max of %d", MAX_LEN_STREAM_HELLO);
+                    error_report("The initial \"STREAM [URL]" HTTP_1_1 "\" over max of %d", MAX_LEN_STREAM_HELLO);
                     return PARSE_ERROR;
                 }
                 return GIMME_MORE_OF_DEM_SWEET_BYTEZ;
@@ -215,7 +213,7 @@ static int process_STREAM_X_HTTP_1_1(http_stream_parse_state_t *parser_state, rb
         case HTTP_HDR:
             if (!rbuf_find_bytes(buf, HTTP_HDR_END, strlen(HTTP_HDR_END), &idx)) {
                 if (rbuf_bytes_available(buf) >= (size_t)(rbuf_get_capacity(buf) * 0.9)) {
-                    error_report("The initial \"STREAM [URL] HTTP/1.1\" over max of %d", MAX_LEN_STREAM_HELLO);
+                    error_report("The initial \"STREAM [URL]" HTTP_1_1 "\" over max of %d", MAX_LEN_STREAM_HELLO);
                     return PARSE_ERROR;
                 }
                 return GIMME_MORE_OF_DEM_SWEET_BYTEZ;

@@ -543,10 +543,10 @@ static int rrdpush_http_upgrade_prelude(RRDHOST *host, struct sender_state *s) {
 
     char http[HTTP_HEADER_SIZE + 1];
     int eol = snprintfz(http, HTTP_HEADER_SIZE,
-            "GET " NETDATA_STREAM_URL " HTTP/1.1\r\n"
-            "Upgrade: " NETDATA_STREAM_PROTO_NAME "\r\n"
-            "Connection: Upgrade\r\n"
-            "\r\n");
+            "GET " NETDATA_STREAM_URL HTTP_1_1 HTTP_ENDL
+            "Upgrade: " NETDATA_STREAM_PROTO_NAME HTTP_ENDL
+            "Connection: Upgrade"
+            HTTP_HDR_END);
 
     ssize_t bytes = send_timeout(
 #ifdef ENABLE_HTTPS
@@ -757,7 +757,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
                  "&NETDATA_SYSTEM_TOTAL_RAM=%s"
                  "&NETDATA_SYSTEM_TOTAL_DISK_SIZE=%s"
                  "&NETDATA_PROTOCOL_VERSION=%s"
-                 " HTTP/1.1\r\n"
+                 HTTP_1_1 HTTP_ENDL
                  "User-Agent: %s/%s\r\n"
                  "Accept: */*\r\n\r\n"
                  , host->rrdpush_send_api_key
