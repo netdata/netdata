@@ -295,7 +295,7 @@ static int hdl_stream(h2o_handler_t *self, h2o_req_t *req)
         return 1;
 
     /* build response */
-    req->res.status = 101;
+    req->res.status = HTTP_RESP_SWITCH_PROTO;
     req->res.reason = "Switching Protocols";
     h2o_add_header(&req->pool, &req->res.headers, H2O_TOKEN_UPGRADE, NULL, H2O_STRLIT(NETDATA_STREAM_PROTO_NAME));
 
