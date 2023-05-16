@@ -202,6 +202,12 @@ AC_ARG_ENABLE(
     [enable_ml="detect"]
 )
 AC_ARG_ENABLE(
+    [sentry],
+    [AS_HELP_STRING([--enable-sentry], [Enable sentry @<:@default disabled@:>@])],
+    ,
+    [enable_sentry="no"]
+)
+AC_ARG_ENABLE(
     [aclk_ssl_debug],
     [AS_HELP_STRING([--enable-aclk-ssl-debug], [Enables possibility for SSL key logging @<:@default no@:>@])],
     [aclk_ssl_debug="yes"],
@@ -636,6 +642,22 @@ OPTIONAL_YAML_LIBS="${YAML_LIBS}"
 # -----------------------------------------------------------------------------
 # DB engine and OpenSSL
 
+# curl library
+
+PKG_CHECK_MODULES(
+    [LIBCURL],
+    [libcurl],
+    [AC_CHECK_LIB(
+        [curl],
+        [curl_easy_init],
+        [have_libcurl=yes],
+        [have_libcurl=no]
+    )],
+    [have_libcurl=no]
+)
+
+# -----------------------------------------------------------------------------
+# DB engine and HTTPS
 test "${enable_dbengine}" = "yes" -a -z "${LZ4_LIBS}" && \
     AC_MSG_ERROR([liblz4 required but not found. Try installing 'liblz4-dev' or 'lz4-devel'.])
 
@@ -1346,6 +1368,34 @@ else
 fi
 
 # -----------------------------------------------------------------------------
+# sentry
+
+AC_MSG_CHECKING([if sentry-native files are present for sentry functionality])
+if test -d "libnetdata/sentry/sentry-native"; then
+    AC_MSG_RESULT([yes])
+    have_sentry_native="yes"
+else
+    AC_MSG_RESULT([no])
+    have_sentry_native="no"
+fi
+
+if test "${enable_sentry}" = "yes" -a "${have_sentry_native}" = "no"; then
+    AC_MSG_ERROR([You have explicitly requested --enable-sentry functionality but it cannot be built because the required files are missing.])
+fi
+
+if test "${enable_sentry}" = "yes" -a "${have_libcurl}" = "no"; then
+    AC_MSG_ERROR([You have explicitly requested --enable-sentry functionality but it cannot be built because the curl library is missing.])
+fi
+
+AM_CONDITIONAL([ENABLE_SENTRY], [test "${enable_sentry}" = "yes"])
+if test "${enable_sentry}" = "yes"; then
+    AC_DEFINE([ENABLE_SENTRY], [1], [sentry usability])
+
+    OPTIONAL_SENTRY_CFLAGS="-I \$(abs_top_srcdir)/externaldeps/sentry-native/include"
+    OPTIONAL_SENTRY_LIBS="\$(abs_top_srcdir)/externaldeps/sentry-native/lib/libsentry.a \$(abs_top_srcdir)/externaldeps/sentry-native/lib/libbreakpad_client.a -lcurl"
+fi
+
+# -----------------------------------------------------------------------------
 # ml - anomaly detection
 
 # Check if uuid is available. Fail if ML was explicitly requested.
@@ -1482,18 +1532,6 @@ PKG_CHECK_MODULES(
         [have_libssl=no]
     )],
     [have_libssl=no]
-)
-
-PKG_CHECK_MODULES(
-    [LIBCURL],
-    [libcurl],
-    [AC_CHECK_LIB(
-        [curl],
-        [curl_easy_init],
-        [have_libcurl=yes],
-        [have_libcurl=no]
-    )],
-    [have_libcurl=no]
 )
 
 PKG_CHECK_MODULES(
@@ -1818,7 +1856,7 @@ CFLAGS="${originalCFLAGS} ${OPTIONAL_LTO_CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${O
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
     ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PUBSUB_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} \
     ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_YAML_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${JUDY_CFLAGS} \
-    ${OPTIONAL_ACLK_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_OS_DEP_CFLAGS} ${H2O_CFLAGS} ${HARDENING_CFLAGS}"
+    ${OPTIONAL_ACLK_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_OS_DEP_CFLAGS} ${H2O_CFLAGS} ${HARDENING_CFLAGS} ${OPTIONAL_SENTRY_CFLAGS}"
 
 CXXFLAGS="${CFLAGS} ${OPTIONAL_KINESIS_CXXFLAGS} ${CPP_STD_FLAG}"
 
@@ -1874,6 +1912,8 @@ AC_SUBST([OPTIONAL_GTEST_CFLAGS])
 AC_SUBST([OPTIONAL_GTEST_LIBS])
 AC_SUBST([OPTIONAL_ML_CFLAGS])
 AC_SUBST([OPTIONAL_ML_LIBS])
+AC_SUBST([OPTIONAL_SENTRY_CFLAGS])
+AC_SUBST([OPTIONAL_SENTRY_LIBS])
 
 # -----------------------------------------------------------------------------
 # Check if cmocka is available - needed for unit testing

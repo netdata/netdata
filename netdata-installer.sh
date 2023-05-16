@@ -328,6 +328,10 @@ while [ -n "${1}" ]; do
       NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-ml)}" | sed 's/$/ --enable-ml/g')"
       NETDATA_ENABLE_ML=1
       ;;
+    "--enable-sentry")
+      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-sentry)}" | sed 's/$/ --enable-sentry/g')"
+      ENABLE_SENTRY=1
+      ;;
     "--disable-ml")
       NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ml)}" | sed 's/$/ --disable-ml/g')"
       NETDATA_ENABLE_ML=0
@@ -563,6 +567,41 @@ if [ ${LIBS_ARE_HERE} -eq 1 ]; then
 fi
 
 trap build_error EXIT
+
+# -----------------------------------------------------------------------------
+
+bundle_sentry() {
+  if [ -z "${ENABLE_SENTRY}" ]; then
+    echo "Skipping sentry"
+    return 0
+  fi
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling sentry."
+
+  tmp="$(mktemp -d -t netdata-protobuf-XXXXXX)"
+
+  if [ -d "${PWD}/externaldeps/sentry-native" ]
+  then
+    echo >&2 "Found compiled sentry-native, not compiling it again. Remove path '${PWD}/externaldeps/sentry-native' to recompile."
+    return 0
+  fi
+
+  cmake -B "${tmp}" \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DCMAKE_INSTALL_PREFIX="${PWD}/externaldeps/sentry-native" \
+    -DBUILD_SHARED_LIBS=Off \
+    -DCMAKE_C_FLAGS='-DJSMN_STATIC' \
+    "${PWD}/libnetdata/sentry/sentry-native"
+
+  cmake --build "${tmp}" --parallel
+  cmake --install "${tmp}"
+
+  rm -rf "${tmp}"
+
+  run_ok "sentry built and prepared."
+}
+
+bundle_sentry
 
 # -----------------------------------------------------------------------------
 build_protobuf() {

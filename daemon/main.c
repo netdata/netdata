@@ -307,6 +307,58 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
 
 void web_client_cache_destroy(void);
 
+#ifdef ENABLE_SENTRY
+#include "externaldeps/sentry-native/include/sentry.h"
+#endif
+
+static void init_sentry(void) {
+#ifdef ENABLE_SENTRY
+    sentry_options_t *options = sentry_options_new();
+
+    // we should get this from CI (SENTRY_DSN)
+    sentry_options_set_dsn(options, "https://1a20870e1a544b44a1cf4da4ec2a4d28@o4505001020817408.ingest.sentry.io/4505001024290816");
+
+    // where to save sentry files
+    char path[FILENAME_MAX];
+    snprintfz(path, FILENAME_MAX - 1, "%s/%s", netdata_configured_cache_dir, ".sentry-native");
+    sentry_options_set_database_path(options, path);
+
+    sentry_options_set_auto_session_tracking(options, false);
+
+    // TODO: we should get this from CI (SENTRY_ENVIRONMENT)
+    sentry_options_set_environment(options, "development");
+
+    // TODO: we should get this from CI (SENTRY_RELEASE)
+    sentry_options_set_release(options, PACKAGE_VERSION);
+
+    // TODO: use config_get() to (un)set this
+    sentry_options_set_debug(options, 1);
+
+    // TODO: ask @ktsaou/@stelfrag if we want to attach something, eg.
+    // sentry_options_add_attachment(options, "/path/to/file");
+
+    sentry_init(options);
+
+    time_t now;
+    time(&now);
+
+    char message[1024];
+    snprintfz(message, 1024 - 1, "GVD: generated at %s", ctime(&now));
+
+    sentry_capture_event(sentry_value_new_message_event(
+        SENTRY_LEVEL_INFO,
+        "custom",
+        message
+    ));
+#endif
+}
+
+static void fini_sentry(void) {
+#ifdef ENABLE_SENTRY
+    sentry_close();
+#endif
+}
+
 void netdata_cleanup_and_exit(int ret) {
     usec_t started_ut = now_monotonic_usec();
     usec_t last_ut = started_ut;
@@ -496,6 +548,8 @@ void netdata_cleanup_and_exit(int ret) {
     usec_t ended_ut = now_monotonic_usec();
     netdata_log_info("NETDATA SHUTDOWN: completed in %llu ms - netdata is now exiting - bye bye...", (ended_ut - started_ut) / USEC_PER_MS);
     exit(ret);
+
+    fini_sentry();
 }
 
 void web_server_threading_selection(void) {
@@ -1334,6 +1388,7 @@ int pluginsd_parser_unittest(void);
 void replication_initialize(void);
 
 int main(int argc, char **argv) {
+
     // initialize the system clocks
     clocks_init();
     netdata_start_time = now_realtime_sec();
@@ -1811,6 +1866,16 @@ int main(int argc, char **argv) {
     if(!config_loaded) {
         load_netdata_conf(NULL, 0, &user);
         load_cloud_conf(0);
+    }
+
+    // init sentry
+    {
+        init_sentry();
+    }
+
+    char *nd_disable_cloud = getenv("NETDATA_DISABLE_CLOUD");
+    if (nd_disable_cloud && !strncmp(nd_disable_cloud, "1", 1)) {
+        appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", "false");
     }
 
     // ------------------------------------------------------------------------
