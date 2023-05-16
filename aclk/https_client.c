@@ -71,7 +71,7 @@ static int process_http_hdr(http_parse_ctx *parse_ctx, const char *key, const ch
             netdata_log_error("Duplicate content-length header");
             return 1;
         }
-        parse_ctx->content_length = atoi(val);
+        parse_ctx->content_length = str2u(val);
         if (parse_ctx->content_length < 0) {
             netdata_log_error("Invalid content-length %d", parse_ctx->content_length);
             return 1;
