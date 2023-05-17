@@ -1114,6 +1114,7 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
         buffer_strcat(alarms_to_hash, "");
         len = 0;
     }
+    freez(active_alerts);
 
     char hash[SHA256_DIGEST_LENGTH + 1];
     if (hash256_string((const unsigned char *)buffer_tostring(alarms_to_hash), len, hash)) {
@@ -1126,6 +1127,7 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
         alarm_checkpoint.checksum = (char *)hash;
 
         aclk_send_provide_alarm_checkpoint(&alarm_checkpoint);
+        freez(claim_id);
         log_access("ACLK RES [%s (%s)]: ALERTS CHECKPOINT SENT", wc->node_id, rrdhost_hostname(host));
     } else {
         log_access("ACLK RES [%s (%s)]: FAILED TO CREATE ALERTS CHECKPOINT HASH", wc->node_id, rrdhost_hostname(host));
