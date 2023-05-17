@@ -176,7 +176,7 @@ void aclk_http_msg_v2_err(mqtt_wss_client client, const char *topic, const char 
     }
 }
 
-void aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg_id, usec_t t_exec, usec_t created, int http_code, const char *payload, size_t payload_len)
+int aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg_id, usec_t t_exec, usec_t created, int http_code, const char *payload, size_t payload_len)
 {
     json_object *tmp, *msg;
 
@@ -204,6 +204,7 @@ void aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg
         aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT, payload, payload_len);
         break;
     }
+    return rc ? rc : http_code;
 }
 
 uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable) {
