@@ -998,7 +998,7 @@ static int health_readfile(const char *filename, void *data) {
                 {
                     char *tmp = simple_pattern_trim_around_equal(value);
                     char *tmp_2 = health_config_add_key_to_values(tmp);
-                    rt->chart_labels = string_strdupz(tmp_2);
+                    rc->chart_labels = string_strdupz(tmp_2);
                     freez(tmp);
                     freez(tmp_2);
                 }
