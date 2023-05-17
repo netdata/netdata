@@ -1215,8 +1215,19 @@ static int ebpf_shm_load_bpf(ebpf_module_t *em)
         shm_bpf_obj = shm_bpf__open();
         if (!shm_bpf_obj)
             ret = -1;
-        else
+        else {
             ret = ebpf_shm_load_and_attach(shm_bpf_obj, em);
+            if (ret && em->targets[NETDATA_KEY_SHMGET_CALL].mode == EBPF_LOAD_TRAMPOLINE) {
+                shm_bpf__destroy(shm_bpf_obj);
+                shm_bpf_obj = shm_bpf__open();
+                if (shm_bpf_obj)
+                    ret = -1;
+                else {
+                    ebpf_update_target_value(em, EBPF_LOAD_PROBE);
+                    ret = ebpf_shm_load_and_attach(shm_bpf_obj, em);
+                }
+            }
+        }
     }
 #endif
 
