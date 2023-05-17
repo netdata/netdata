@@ -1473,8 +1473,18 @@ static int ebpf_cachestat_load_bpf(ebpf_module_t *em)
         cachestat_bpf_obj = cachestat_bpf__open();
         if (!cachestat_bpf_obj)
             ret = -1;
-        else
+        else {
             ret = ebpf_cachestat_load_and_attach(cachestat_bpf_obj, em);
+            if (ret && em->targets[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU].mode == EBPF_LOAD_TRAMPOLINE) {
+                cachestat_bpf__destroy(cachestat_bpf_obj);
+                cachestat_bpf_obj = cachestat_bpf__open();
+                if (!cachestat_bpf_obj)
+                    return -1;
+
+                ebpf_update_target_value(em, EBPF_LOAD_PROBE);
+                ret = ebpf_cachestat_load_and_attach(cachestat_bpf_obj, em);
+            }
+        }
     }
 #endif
 

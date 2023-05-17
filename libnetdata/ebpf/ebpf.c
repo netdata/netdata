@@ -1166,14 +1166,14 @@ int ebpf_is_function_inside_btf(struct btf *file, char *function)
 #endif
 
 /**
- * Update target with configuration
+ * Update target value
  *
- * Update target load mode with value.
+ * Modify target value according value given.
  *
  * @param em       the module structure
  * @param value    value used to update.
  */
-static void ebpf_update_target_with_conf(ebpf_module_t *em, netdata_ebpf_program_loaded_t value)
+void ebpf_update_target_value(ebpf_module_t *em, netdata_ebpf_program_loaded_t value)
 {
     netdata_ebpf_targets_t *targets = em->targets;
     if (!targets) {
