@@ -172,7 +172,7 @@ void aclk_http_msg_v2_err(mqtt_wss_client client, const char *topic, const char 
     json_object_object_add(msg, "error-description", tmp);
 
     if (aclk_send_message_with_bin_payload(client, msg, topic, payload, payload_len)) {
-        error("Failed to send cancelation message for http reply");
+        error("Failed to send cancellation message for http reply %zu %s", payload_len, payload);
     }
 }
 
