@@ -161,13 +161,6 @@ include:
       repo_distro: fedora/37
     test:
       ebpf-core: true
-  - <<: *fedora
-    version: "36"
-    packages:
-      <<: *fedora_packages
-      repo_distro: fedora/36
-    test:
-      ebpf-core: true
 
   - &opensuse
     distro: opensuse
