@@ -460,8 +460,19 @@ static int ebpf_mount_load_bpf(ebpf_module_t *em)
         mount_bpf_obj = mount_bpf__open();
         if (!mount_bpf_obj)
             ret = -1;
-        else
+        else {
             ret = ebpf_mount_load_and_attach(mount_bpf_obj, em);
+            if (ret && em->targets[NETDATA_MOUNT_SYSCALL].mode == EBPF_LOAD_TRAMPOLINE) {
+                mount_bpf__destroy(mount_bpf_obj);
+                mount_bpf_obj = mount_bpf__open();
+                if (mount_bpf_obj)
+                    ret = -1;
+                else {
+                    ebpf_update_target_value(em, EBPF_LOAD_PROBE);
+                    ret = ebpf_mount_load_and_attach(mount_bpf_obj, em);
+                }
+            }
+        }
     }
 #endif
 
