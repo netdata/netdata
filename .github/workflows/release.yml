@@ -78,7 +78,7 @@ jobs:
         run: |
           git config user.name "netdatabot"
           git config user.email "bot@netdata.cloud"
-          git add packaging/version CHANGELOG.md daemon/main.c
+          git add packaging/version CHANGELOG.md
           git commit -m "[ci skip] ${{ steps.target.outputs.message }}"
           if [ "${{ steps.target.outputs.type }}" != "nightly" ]; then
             git tag -a "${{ github.event.inputs.version }}" -m "${{ steps.target.outputs.message }}"
