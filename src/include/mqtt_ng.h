@@ -8,8 +8,9 @@
 #define MQTT_NG_MSGGEN_OK         0
 // MQTT_NG_MSGGEN_USER_ERROR means parameters given to this function
 // do not make sense or are out of MQTT specs
-#define MQTT_NG_MSGGEN_USER_ERROR 1
-#define MQTT_NG_MSGGEN_BUFFER_OOM 2
+#define MQTT_NG_MSGGEN_USER_ERROR  1
+#define MQTT_NG_MSGGEN_BUFFER_OOM  2
+#define MQTT_NG_MSGGEN_MSG_TOO_BIG 3
 
 struct mqtt_ng_client;
 

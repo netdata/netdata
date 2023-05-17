@@ -1082,7 +1082,11 @@ int mqtt_wss_publish5(mqtt_wss_client client,
         mqtt_flags |= MQTT_PUBLISH_RETAIN;
 
     int rc = mqtt_ng_publish(client->mqtt, topic, topic_free, msg, msg_free, msg_len, mqtt_flags, packet_id);
+    if (rc == MQTT_NG_MSGGEN_MSG_TOO_BIG)
+        return MQTT_WSS_ERR_TOO_BIG_FOR_SERVER;
+
     mqtt_wss_wakeup(client);
+
     return rc;
 }
 

@@ -36,8 +36,7 @@
 #define MQTT_WSS_ERR_TX_BUF_TOO_SMALL  -4
 #define MQTT_WSS_ERR_RX_BUF_TOO_SMALL  -5
 
-#define MQTT_WSS_ERR_CANT_SEND_NOW -6
-#define MQTT_WSS_ERR_BLOCK_TIMEOUT -7
+#define MQTT_WSS_ERR_TOO_BIG_FOR_SERVER -6
 // if client was initialized with MQTT 3 but MQTT 5 feature
 // was requested by user of library
 #define MQTT_WSS_ERR_CANT_DO       -8

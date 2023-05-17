@@ -253,6 +253,8 @@ struct mqtt_ng_client {
 
     struct topic_aliases_data tx_topic_aliases;
     c_rhash rx_aliases;
+
+    size_t max_msg_size;
 };
 
 char pingreq[] = { MQTT_CPT_PINGREQ << 4, 0x00 };
@@ -1157,6 +1159,7 @@ fail_rollback:
     return MQTT_NG_MSGGEN_BUFFER_OOM;
 }
 
+#define PUBLISH_SP_SIZE 64
 int mqtt_ng_publish(struct mqtt_ng_client *client,
                     char *topic,
                     free_fnc_t topic_free,
@@ -1180,6 +1183,11 @@ int mqtt_ng_publish(struct mqtt_ng_client *client,
             topic = NULL;
             topic_free = NULL;
         }
+    }
+
+    if (client->max_msg_size && PUBLISH_SP_SIZE + mqtt_ng_publish_size(topic, msg_len, topic_id) > client->max_msg_size) {
+        mws_error(client->log, "Message too big for server: %zu", msg_len);
+        return MQTT_NG_MSGGEN_MSG_TOO_BIG;
     }
 
     TRY_GENERATE_MESSAGE(mqtt_ng_generate_publish, client, topic, topic_free, msg, msg_free, msg_len, publish_flags, packet_id, topic_id);
@@ -2018,6 +2026,7 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
     struct mqtt_publish *pub;
     while( (rc = parse_data(client)) == MQTT_NG_CLIENT_OK_CALL_AGAIN );
     if ( rc == MQTT_NG_CLIENT_MQTT_PACKET_DONE ) {
+        struct mqtt_property *prop;
 #ifdef MQTT_DEBUG_VERBOSE
         DEBUG("MQTT Packet Parsed Successfully!");
 #endif
@@ -2038,6 +2047,10 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
                     ERROR("Received unexpected CONNACK");
                     client->client_state = ERROR;
                     return MQTT_NG_CLIENT_PROTOCOL_ERROR;
+                }
+                if ((prop = get_property_by_id(client->parser.properties_parser.head, MQTT_PROP_MAX_PKT_SIZE)) != NULL) {
+                    INFO("MQTT server limits message size to %" PRIu32, prop->data.uint32);
+                    client->max_msg_size = prop->data.uint32;
                 }
                 if (client->connack_callback)
                     client->connack_callback(client->user_ctx, client->parser.mqtt_packet.connack.reason_code);
@@ -2084,7 +2097,6 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
                     ERROR("Error generating PUBACK reply for PUBLISH");
                     return rc;
                 }
-                struct mqtt_property *prop;
                 if ( (prop = get_property_by_id(client->parser.properties_parser.head, MQTT_PROP_TOPIC_ALIAS)) != NULL ) {
                     // Topic Alias property was sent from server
                     void *topic_ptr;
