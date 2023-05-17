@@ -105,10 +105,13 @@ typedef struct {
 void http_parse_ctx_create(http_parse_ctx *ctx);
 void http_parse_ctx_destroy(http_parse_ctx *ctx);
 
-#define HTTP_PARSE_NEED_MORE_DATA  0
-#define HTTP_PARSE_SUCCESS   1
-#define HTTP_PARSE_ERROR    -1
-int parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx);
+typedef enum {
+    HTTP_PARSE_ERROR = -1,
+    HTTP_PARSE_NEED_MORE_DATA = 0,
+    HTTP_PARSE_SUCCESS = 1
+} http_parse_rc;
+
+http_parse_rc parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx);
 
 const char *get_http_header_by_name(http_parse_ctx *ctx, const char *name);
 

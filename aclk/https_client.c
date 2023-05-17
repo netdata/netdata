@@ -118,7 +118,7 @@ static int parse_http_hdr(rbuf_t buf, http_parse_ctx *parse_ctx)
     return 0;
 }
 
-int parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx)
+http_parse_rc parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx)
 {
     int idx;
     char rc[4];
