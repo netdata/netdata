@@ -95,7 +95,11 @@ void security_openssl_common_options(SSL_CTX *ctx, int side) {
 #if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
         SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
 #else
-        SSL_CTX_set_min_proto_version(ctx, TLS1_VERSION);
+        if (version < TLS1_2_VERSION) {
+            info("An old TLS version selected was selected, netdata is upgrading for TLS 1.2");
+            version = TLS1_2_VERSION;
+        }
+        SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
         SSL_CTX_set_max_proto_version(ctx, version);
 
         if(tls_ciphers  && strcmp(tls_ciphers, "none") != 0) {
