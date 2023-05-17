@@ -213,29 +213,29 @@ By collecting this data, Netdata is able to continuously improve their service a
 
 Internal Security Measures at Netdata are designed with an emphasis on data privacy and protection. The measures include:
 
-1. **Infrastructure as Code (IaC)** \
+1. **Infrastructure as Code (IaC)** :
 Netdata Cloud follows the IaC model, which means it is a microservices environment that is completely isolated. All changes are managed through Terraform, an open-source IaC software tool that provides a consistent CLI workflow for managing cloud services.
-2. **TLS Termination and IAM Service** \
+2. **TLS Termination and IAM Service** :
 At the edge of Netdata Cloud, there is a TLS termination, which provides the decryption point for incoming TLS connections. Additionally, an Identity Access Management (IAM) service validates JWT tokens included in request cookies or denies access to them.
-3. **Session Identification** \
+3. **Session Identification** :
 Once inside the microservices environment, all requests are associated with session IDs that identify the user making the request. This approach provides additional layers of security and traceability.
-4. **Data Storage** \
+4. **Data Storage** :
 Data is stored in various NoSQL and SQL databases and message brokers. The entire environment is fully isolated, providing a secure space for data management.
-5. **Authentication** \
+5. **Authentication** :
 Netdata Cloud does not store credentials. It offers three types of authentication: GitHub Single Sign-On (SSO), Google SSO, and email validation.
-6. **DDoS Protection** \
+6. **DDoS Protection** :
 Netdata Cloud has multiple protection mechanisms against Distributed Denial of Service (DDoS) attacks, including rate-limiting and automated blacklisting.
-7. **Security-Focused Development Process** \
+7. **Security-Focused Development Process** :
 To ensure a secure environment, Netdata employs a security-focused development process. This includes the use of static code analysers to identify potential security vulnerabilities in the codebase.
-8. **High Security Standards** \
+8. **High Security Standards** :
 Netdata Cloud maintains high security standards and can provide additional customization on a per contract basis.
-9. **Employee Security Practices** \
+9. **Employee Security Practices** :
 Netdata ensures its employees follow security best practices, including role-based access, periodic access review, and multi-factor authentication. This helps to minimize the risk of unauthorized access to sensitive data.
-10. **Experienced Developers** \
+10. **Experienced Developers** :
 Netdata hires senior developers with vast experience in security-related matters. It enforces two code reviews for every Pull Request (PR), ensuring that any potential issues are identified and addressed promptly.
-11. **DevOps Methodologies** \
+11. **DevOps Methodologies** :
 Netdata's DevOps methodologies use the highest standards in access control in all places, utilizing the best practices available.
-12. **Risk-Based Security Program** \
+12. **Risk-Based Security Program** :
 Netdata has a risk-based security program that continually assesses and mitigates risks associated with data security. This program helps maintain a secure environment for user data.
 
 These security measures ensure that Netdata Cloud is a secure environment for users to monitor and troubleshoot their systems. The company remains committed to continuously improving its security practices to safeguard user data effectively.
