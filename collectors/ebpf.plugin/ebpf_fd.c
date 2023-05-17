@@ -1331,8 +1331,19 @@ static int ebpf_fd_load_bpf(ebpf_module_t *em)
         fd_bpf_obj = fd_bpf__open();
         if (!fd_bpf_obj)
             ret = -1;
-        else
+        else {
             ret = ebpf_fd_load_and_attach(fd_bpf_obj, em);
+            if (ret && em->targets[NETDATA_FD_SYSCALL_OPEN].mode == EBPF_LOAD_TRAMPOLINE) {
+                fd_bpf__destroy(fd_bpf_obj);
+                fd_bpf_obj = fd_bpf__open();
+                if (fd_bpf_obj)
+                    ret = -1;
+                else {
+                    ebpf_update_target_value(em, EBPF_LOAD_PROBE);
+                    ret = ebpf_fd_load_and_attach(fd_bpf_obj, em);
+                }
+            }
+        }
     }
 #endif
 
