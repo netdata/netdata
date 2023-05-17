@@ -82,6 +82,8 @@ void conn_list_iter_all(conn_list_t *list, void (*cb)(h2o_stream_conn_t *conn))
     conn_list_iter_create_unsafe(&iter, list);
     h2o_stream_conn_t *conn;
     while (conn_list_iter_next_unsafe(&iter, &conn)) {
+        if (conn == NULL)
+            continue;
         cb(conn);
     }
     pthread_mutex_unlock(&list->lock);
