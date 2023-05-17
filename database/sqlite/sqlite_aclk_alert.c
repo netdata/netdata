@@ -1109,12 +1109,12 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
             else if (active_alerts[i].status == RRDCALC_STATUS_CRITICAL)
                 buffer_strcat(alarms_to_hash, "C");
         }
-        freez(active_alerts);
     } else {
         alarms_to_hash = buffer_create(1, NULL);
         buffer_strcat(alarms_to_hash, "");
         len = 0;
     }
+    freez(active_alerts);
 
     char hash[SHA256_DIGEST_LENGTH + 1];
     if (hash256_string((const unsigned char *)buffer_tostring(alarms_to_hash), len, hash)) {
