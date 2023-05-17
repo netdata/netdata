@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- bump go.d.plugin to v0.53.0 [\#15059](https://github.com/netdata/netdata/pull/15059) ([ilyam8](https://github.com/ilyam8))
 - Fix ACLK memleak [\#15055](https://github.com/netdata/netdata/pull/15055) ([underhood](https://github.com/underhood))
 - fix\(debugfs/zswap\): don't collect metrics if Zswap is disabled [\#15054](https://github.com/netdata/netdata/pull/15054) ([ilyam8](https://github.com/ilyam8))
 - Comment out default `role_recipients_*` values [\#15047](https://github.com/netdata/netdata/pull/15047) ([jamgregory](https://github.com/jamgregory))
@@ -27,6 +28,7 @@
 - libjudy: remove JudyLTablesGen [\#14984](https://github.com/netdata/netdata/pull/14984) ([mochaaP](https://github.com/mochaaP))
 - make zlib compulsory dep [\#14928](https://github.com/netdata/netdata/pull/14928) ([underhood](https://github.com/underhood))
 - Remove old logic for handling of legacy stock config files. [\#14829](https://github.com/netdata/netdata/pull/14829) ([Ferroin](https://github.com/Ferroin))
+- fix infiniband bytes counters multiplier and divisor [\#14748](https://github.com/netdata/netdata/pull/14748) ([ilyam8](https://github.com/ilyam8))
 - initial minimal h2o webserver integration [\#14585](https://github.com/netdata/netdata/pull/14585) ([underhood](https://github.com/underhood))
 
 ## [v1.39.0](https://github.com/netdata/netdata/tree/v1.39.0) (2023-05-08)
@@ -414,8 +416,6 @@
 - turn error\(\) to internal\_error\(\) [\#14428](https://github.com/netdata/netdata/pull/14428) ([ktsaou](https://github.com/ktsaou))
 - Fix typo on the netdata-functions.md [\#14426](https://github.com/netdata/netdata/pull/14426) ([lokerhp](https://github.com/lokerhp))
 - Update screenshot of timezone selector [\#14425](https://github.com/netdata/netdata/pull/14425) ([cakrit](https://github.com/cakrit))
-- Stop training thread from processing training requests once cancelled. [\#14423](https://github.com/netdata/netdata/pull/14423) ([vkalintiris](https://github.com/vkalintiris))
-- Check on parents the microseconds delta sent by agents [\#14422](https://github.com/netdata/netdata/pull/14422) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
