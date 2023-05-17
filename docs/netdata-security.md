@@ -5,15 +5,6 @@ the Data Processing Addendum, when applicable. It provides more information rega
 
 We have given special attention to all aspects of Netdata, ensuring that everything throughout its operation is as secure as possible. Netdata has been designed with security in mind.
 
-> When running Netdata in environments requiring Payment Card Industry Data Security Standard (**PCI DSS**), Systems and Organization Controls (**SOC 2**),
-or Health Insurance Portability and Accountability Act (**HIPAA**) compliance, please keep in mind that 
-**even when the user uses Netdata Cloud, all collected data is always stored inside their infrastructure**. 
-
-Dashboard data a user views and alert notifications do travel 
-over Netdata Cloud, as they also travel over third party networks, to reach the user's web browser or the notification integrations the user has configured, 
-but Netdata Cloud does not store metric data. It only transforms them as they pass through it, aggregating them from multiple Agents and Parents, 
-to appear as one data source on the user's browser.
-
 ## Netdata's Security Principles
 
 ### Security by Design
