@@ -238,7 +238,7 @@ static int process_chunked_content(rbuf_t buf, http_parse_ctx *parse_ctx)
     } while(1);
 }
 
-int parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx)
+http_parse_rc parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx)
 {
     int idx;
     char rc[4];
