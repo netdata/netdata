@@ -321,7 +321,7 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
         }
     }
 
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uint64_t  first_sequence_id = 0;
     uint64_t  last_sequence_id = 0;
     static __thread uint64_t log_first_sequence_id = 0;
@@ -463,7 +463,7 @@ void aclk_push_alert_events_for_all_hosts(void)
 
 void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
 {
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
     BUFFER *sql = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
 
@@ -747,7 +747,7 @@ void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id __maybe_unus
 void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_ENTRY *ae, RRDHOST *host)
 {
     char *edit_command = ae->source ? health_edit_command_from_source(ae_source(ae)) : strdupz("UNKNOWN=0=UNKNOWN");
-    char config_hash_id[GUID_LEN + 1];
+    char config_hash_id[UUID_STR_LEN];
     uuid_unparse_lower(ae->config_hash_id, config_hash_id);
 
     alarm_log->chart = strdupz(ae_chart_name(ae));
@@ -945,8 +945,8 @@ void sql_aclk_alert_clean_dead_entries(RRDHOST *host)
     char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
-    char sql[512];
-    snprintfz(sql,511,SQL_DELETE_ALERT_ENTRIES, uuid_str);
+    char sql[ACLK_SYNC_QUERY_SIZE];
+    snprintfz(sql, ACLK_SYNC_QUERY_SIZE - 1, SQL_DELETE_ALERT_ENTRIES, uuid_str);
 
     char *err_msg = NULL;
     int rc = sqlite3_exec_monitored(db_meta, sql, NULL, NULL, &err_msg);

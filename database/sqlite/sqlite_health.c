@@ -21,7 +21,7 @@ int sql_create_health_log_table(RRDHOST *host) {
         return 1;
     }
 
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CREATE_HEALTH_LOG_TABLE(uuid_str));
@@ -54,7 +54,7 @@ void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
         return;
     }
 
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_UPDATE_HEALTH_LOG(uuid_str));
@@ -129,7 +129,7 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
         return;
     }
 
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_INSERT_HEALTH_LOG(uuid_str));
@@ -373,7 +373,7 @@ void sql_health_alarm_log_count(RRDHOST *host) {
         return;
     }
 
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_COUNT_HEALTH_LOG(uuid_str));
@@ -410,7 +410,7 @@ void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host, size_t rotate_every
         return;
     }
 
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG_NOT_CLAIMED(uuid_str, uuid_str, (unsigned long int) (host->health.health_log_entries_written - rotate_every)));
@@ -453,7 +453,7 @@ void sql_health_alarm_log_cleanup_claimed(RRDHOST *host, size_t rotate_every) {
         return;
     }
 
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
     snprintfz(command, MAX_HEALTH_SQL_SIZE, "aclk_alert_%s", uuid_str);
 
@@ -684,7 +684,7 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         return;
     }
 
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
     sql_check_removed_alerts_state(uuid_str);
@@ -1136,7 +1136,7 @@ int alert_hash_and_store_config(
     EVP_MD_CTX_destroy(evpctx);
     fatal_assert(hash_len > sizeof(uuid_t));
 
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower(*((uuid_t *)&hash_value), uuid_str);
     uuid_copy(hash_id, *((uuid_t *)&hash_value));
 
@@ -1157,7 +1157,7 @@ int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_S
     int rc = 0, ret = -1;
     char command[MAX_HEALTH_SQL_SIZE + 1];
 
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
     sqlite3_stmt *res = NULL;
@@ -1195,7 +1195,7 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
     int rc;
 
     BUFFER *command = buffer_create(MAX_HEALTH_SQL_SIZE, NULL);
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
     buffer_sprintf(command, SQL_SELECT_HEALTH_LOG(uuid_str));
@@ -1229,7 +1229,7 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
         char old_value_string[100 + 1];
         char new_value_string[100 + 1];
 
-        char config_hash_id[GUID_LEN + 1];
+        char config_hash_id[UUID_STR_LEN];
         uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 4)), config_hash_id);
 
         char *edit_command = health_edit_command_from_source((char *)sqlite3_column_text(res, 18));
