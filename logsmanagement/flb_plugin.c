@@ -103,108 +103,65 @@ static int (*flb_output_set)(flb_ctx_t *ctx, int ffd, ...);
 static msgpack_unpack_return (*dl_msgpack_unpack_next)(msgpack_unpacked* result, const char* data, size_t len, size_t* off);
 static void (*dl_msgpack_zone_free)(msgpack_zone* zone);
 
-// TODO: Update "flush", "0.1" according to minimum update every?
 int flb_init(flb_srvc_config_t flb_srvc_config){
-
-    /* Load Fluent-Bit functions from the shared library */
-    void *handle;
+    int rc = 0;
+    void *handle = NULL;
     char *dl_error;
 
     char *flb_lib_path = strdupz_path_subpath(netdata_configured_stock_config_dir, "/../libfluent-bit.so");
-    handle = dlopen(flb_lib_path, RTLD_LAZY);
-    freez(flb_lib_path);
-    if (unlikely(!handle)){
-        if (likely((dl_error = dlerror()) != NULL)) collector_error("dlopen() libfluent-bit.so error: %s", dl_error);
+    if (unlikely(NULL == (handle = dlopen(flb_lib_path, RTLD_LAZY)))){
+        if ((dl_error = dlerror()) != NULL) 
+            collector_error("dlopen() libfluent-bit.so error: %s", dl_error);
         m_assert(handle, "dlopen() libfluent-bit.so error");
-        return -1;
+        rc = -1;
+        goto do_return;
     }
 
     dlerror();    /* Clear any existing error */
 
-    *(void **) (&flb_create) = dlsym(handle, "flb_create");
-    if ((dl_error = dlerror()) != NULL) {
-        collector_error("dlerror loading flb_create: %s", dl_error);
-        return -1;
+    /* Load Fluent-Bit functions from the shared library */
+    #define load_function(FUNC_NAME){\
+        *(void **) (&FUNC_NAME) = dlsym(handle, LOGS_MANAG_STR(FUNC_NAME));\
+        if ((dl_error = dlerror()) != NULL) {\
+            collector_error("dlerror loading %s: %s", LOGS_MANAG_STR(FUNC_NAME), dl_error);\
+            rc = -1;\
+            goto do_return;\
+        }\
     }
-    *(void **) (&flb_service_set) = dlsym(handle, "flb_service_set");
-    if ((dl_error = dlerror()) != NULL) {
-        collector_error("dlerror loading flb_service_set: %s", dl_error);
-        return -1;
-    }
-    *(void **) (&flb_start) = dlsym(handle, "flb_start");
-    if ((dl_error = dlerror()) != NULL) {
-        collector_error("dlerror loading flb_start: %s", dl_error);
-        return -1;
-    }
-    *(void **) (&flb_stop) = dlsym(handle, "flb_stop");
-    if ((dl_error = dlerror()) != NULL) {
-        collector_error("dlerror loading flb_stop: %s", dl_error);
-        return -1;
-    }
-    *(void **) (&flb_destroy) = dlsym(handle, "flb_destroy");
-    if ((dl_error = dlerror()) != NULL) {
-        collector_error("dlerror loading flb_destroy: %s", dl_error);
-        return -1;
-    }   
-    *(void **) (&flb_time_pop_from_msgpack) = dlsym(handle, "flb_time_pop_from_msgpack");
-    if ((dl_error = dlerror()) != NULL) {
-        collector_error("dlerror loading flb_time_pop_from_msgpack: %s", dl_error);
-        return -1;
-    } 
-    *(void **) (&flb_lib_free) = dlsym(handle, "flb_lib_free");
-    if ((dl_error = dlerror()) != NULL) {
-        collector_error("dlerror loading flb_lib_free: %s", dl_error);
-        return -1;
-    }
-    *(void **) (&flb_parser_create) = dlsym(handle, "flb_parser_create");
-    if ((dl_error = dlerror()) != NULL) {
-        collector_error("dlerror loading flb_parser_create: %s", dl_error);
-        return -1;
-    }
-    *(void **) (&flb_input) = dlsym(handle, "flb_input");
-    if ((dl_error = dlerror()) != NULL) {
-        collector_error("dlerror loading flb_input: %s", dl_error);
-        return -1;
-    }  
-    *(void **) (&flb_input_set) = dlsym(handle, "flb_input_set");
-    if ((dl_error = dlerror()) != NULL) {
-        collector_error("dlerror loading flb_input_set: %s", dl_error);
-        return -1;
-    } 
-    // *(void **) (&flb_filter) = dlsym(handle, "flb_filter");
-    // if ((dl_error = dlerror()) != NULL) {
-    //     collector_error("dlerror loading flb_filter: %s", dl_error);
-    //     return -1;
-    // }  
-    // *(void **) (&flb_filter_set) = dlsym(handle, "flb_filter_set");
-    // if ((dl_error = dlerror()) != NULL) {
-    //     collector_error("dlerror loading flb_filter_set: %s", dl_error);
-    //     return -1;
-    // } 
-    *(void **) (&flb_output) = dlsym(handle, "flb_output");
-    if ((dl_error = dlerror()) != NULL) {
-        collector_error("dlerror loading flb_output: %s", dl_error);
-        return -1;
-    } 
-    *(void **) (&flb_output_set) = dlsym(handle, "flb_output_set");
-    if ((dl_error = dlerror()) != NULL) {
-        collector_error("dlerror loading flb_output_set: %s", dl_error);
-        return -1;
-    } 
+
+    load_function(flb_create);
+    load_function(flb_service_set);
+    load_function(flb_start);
+    load_function(flb_stop);
+    load_function(flb_destroy);
+    load_function(flb_time_pop_from_msgpack);
+    load_function(flb_lib_free);
+    load_function(flb_parser_create);
+    load_function(flb_input);
+    load_function(flb_input_set);
+    // load_function(flb_filter);
+    // load_function(flb_filter_set);
+    load_function(flb_output);
+    load_function(flb_output_set);
     *(void **) (&dl_msgpack_unpack_next) = dlsym(handle, "msgpack_unpack_next");
     if ((dl_error = dlerror()) != NULL) {
         collector_error("dlerror loading msgpack_unpack_next: %s", dl_error);
-        return -1;
+        rc = -1;
+        goto do_return;
     } 
     *(void **) (&dl_msgpack_zone_free) = dlsym(handle, "msgpack_zone_free");
     if ((dl_error = dlerror()) != NULL) {
         collector_error("dlerror loading msgpack_zone_free: %s", dl_error);
-        return -1;
+        rc = -1;
+        goto do_return;
     } 
 
 
     ctx = flb_create();
-    if (unlikely(!ctx)) return -1;
+    if (unlikely(!ctx)){
+        rc = -1;
+        goto do_return;
+    }
 
     /* Global service settings */
     if(unlikely(flb_service_set(ctx,
@@ -214,9 +171,17 @@ int flb_init(flb_srvc_config_t flb_srvc_config){
         "HTTP_Server"   , flb_srvc_config.http_server,
         "Log_File"      , flb_srvc_config.log_path,
         "Log_Level"     , flb_srvc_config.log_level,
-        NULL) != 0 )) return -1; 
+        NULL) != 0 )){
+            rc = -1;
+            goto do_return;
+        }
 
-    return 0;
+do_return:
+    freez(flb_lib_path);
+    if(unlikely(rc)){
+        dlclose(handle);
+        return rc;
+    } else return 0;
 }
 
 int flb_run(void){

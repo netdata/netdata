@@ -365,7 +365,7 @@ int db_init() {
     char *err_msg = 0;
     uv_fs_t mkdir_req;
     
-    if(!main_db_dir || !*main_db_dir){
+    if(unlikely(!main_db_dir || !*main_db_dir)){
         rc = -1;
         collector_error("main_db_dir is not set");
         goto return_error;

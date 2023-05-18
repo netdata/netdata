@@ -1103,7 +1103,6 @@ void *logsmanagement_main(void *ptr) {
 
     /* Initialize array of File_Info pointers. */
     p_file_infos_arr = callocz(1, sizeof(struct File_infos_arr));
-    *p_file_infos_arr = (struct File_infos_arr){0};
 
     if(flb_init(flb_srvc_config)){
         collector_error("flb_init() failed - logs management will be disabled");
