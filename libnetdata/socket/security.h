@@ -9,7 +9,7 @@
 # define NETDATA_SSL_OPTIONAL 16             //Flag to define the HTTP request
 # define NETDATA_SSL_FORCE 32                //We only accepts HTTPS request
 # define NETDATA_SSL_INVALID_CERTIFICATE 64  //Accepts invalid certificate
-# define NETDATA_SSL_VALID_CERTIFICATE 128  //Accepts invalid certificate
+# define NETDATA_SSL_VALID_CERTIFICATE 128  //Accepts valid certificate
 # define NETDATA_SSL_PROXY_HTTPS 256        //Proxy is using HTTPS
 
 #define NETDATA_SSL_CONTEXT_SERVER 0
