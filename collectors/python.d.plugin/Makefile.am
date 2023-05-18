@@ -45,6 +45,7 @@ include am2320/Makefile.inc
 include anomalies/Makefile.inc
 include beanstalk/Makefile.inc
 include bind_rndc/Makefile.inc
+include bigquery/Makefile.inc
 include boinc/Makefile.inc
 include ceph/Makefile.inc
 include changefinder/Makefile.inc

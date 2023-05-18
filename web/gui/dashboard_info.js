@@ -774,7 +774,14 @@ netdataDashboard.menu = {
         title: 'Consul',
         icon: '<i class="fas fa-circle-notch"></i>',
         info: 'Consul performance and health metrics. For details, see <a href="https://developer.hashicorp.com/consul/docs/agent/telemetry#key-metrics" target="_blank">Key Metrics</a>.'
+    },
+
+    'bigquery': {
+        title: 'BigQuery',
+        icon: '<i class="fas fa-database"></i>',
+        info: 'Metrics pulled from Google BigQuery. Read the <a href="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/bigquery" target="_blank">bigquery collector docs</a> for more details.'
     }
+
 };
 
 
