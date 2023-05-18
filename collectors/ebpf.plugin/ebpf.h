@@ -39,6 +39,7 @@
 #ifdef LIBBPF_MAJOR_VERSION // BTF code
 #include "includes/cachestat.skel.h"
 #include "includes/dc.skel.h"
+#include "includes/disk.skel.h"
 #include "includes/fd.skel.h"
 #include "includes/mount.skel.h"
 #include "includes/shm.skel.h"
@@ -48,6 +49,7 @@
 
 extern struct cachestat_bpf *cachestat_bpf_obj;
 extern struct dc_bpf *dc_bpf_obj;
+extern struct disk_bpf *disk_bpf_obj;
 extern struct fd_bpf *fd_bpf_obj;
 extern struct mount_bpf *mount_bpf_obj;
 extern struct shm_bpf *shm_bpf_obj;
