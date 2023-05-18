@@ -7,6 +7,9 @@
 #define NETDATA_EBPF_MODULE_NAME_FILESYSTEM "filesystem"
 
 #include "ebpf.h"
+#ifdef LIBBPF_MAJOR_VERSION
+#include "includes/filesystem.skel.h"
+#endif
 
 #define NETDATA_FS_MAX_DIST_NAME 64UL
 
