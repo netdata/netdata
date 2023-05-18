@@ -18,10 +18,9 @@ maximum security. We aim to provide a secure environment from the ground up, rat
 
 ### Compliance with Open Source Security Foundation Best Practices
 
-Netdata is committed to adhering to the best practices laid out by the Open Source Security Foundation. Currently, the
-Netdata Agent aligns with these practices by 93%. The remainder primarily pertains to automated testing coverage, which
-is challenging due to the nature of our collectors. Nevertheless, we strive to improve this percentage by continuously
-seeking innovative solutions.
+Netdata is committed to adhering to the best practices laid out by the Open Source Security Foundation (OSSF).
+Currently, the Netdata Agent follows the OSSF best practices at the passing level. Feel free to audit our approach to 
+the [OSSF guidelines](https://bestpractices.coreinfrastructure.org/en/projects/2231)
 
 Netdata Cloud boasts of comprehensive end-to-end automated testing, encompassing the UI, back-end, and agents, where
 involved. In addition, the Netdata Agent uses an array of third-party services for static code analysis, static code
