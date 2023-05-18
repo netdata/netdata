@@ -83,7 +83,10 @@ static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_objec
         memcpy(&full_msg[len], payload, payload_len);
     }
 
-    mqtt_wss_publish5(client, (char*)topic, NULL, full_msg, &freez_aclk_publish5b, full_msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
+    int rc = mqtt_wss_publish5(client, (char*)topic, NULL, full_msg, &freez_aclk_publish5b, full_msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
+
+    if (rc == MQTT_WSS_ERR_TOO_BIG_FOR_SERVER)
+        return HTTP_RESP_FORBIDDEN;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_published(packet_id);
@@ -169,11 +172,11 @@ void aclk_http_msg_v2_err(mqtt_wss_client client, const char *topic, const char 
     json_object_object_add(msg, "error-description", tmp);
 
     if (aclk_send_message_with_bin_payload(client, msg, topic, payload, payload_len)) {
-        error("Failed to send cancelation message for http reply");
+        error("Failed to send cancellation message for http reply %zu %s", payload_len, payload);
     }
 }
 
-void aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg_id, usec_t t_exec, usec_t created, int http_code, const char *payload, size_t payload_len)
+int aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg_id, usec_t t_exec, usec_t created, int http_code, const char *payload, size_t payload_len)
 {
     json_object *tmp, *msg;
 
@@ -192,7 +195,7 @@ void aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg
 
     switch (rc) {
     case HTTP_RESP_FORBIDDEN:
-        aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_REQ_REPLY_TOO_BIG, CLOUD_EMSG_REQ_REPLY_TOO_BIG, payload, payload_len);
+        aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_REQ_REPLY_TOO_BIG, CLOUD_EMSG_REQ_REPLY_TOO_BIG, NULL, 0);
         break;
     case HTTP_RESP_INTERNAL_SERVER_ERROR:
         aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_FAIL_TOPIC, CLOUD_EMSG_FAIL_TOPIC, payload, payload_len);
@@ -201,6 +204,7 @@ void aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg
         aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT, payload, payload_len);
         break;
     }
+    return rc ? rc : http_code;
 }
 
 uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable) {
