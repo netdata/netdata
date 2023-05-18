@@ -76,8 +76,10 @@ static int ssl_init()
 
     SSL_CTX_set_options(accept_ctx.ssl_ctx, SSL_OP_NO_SSLv2);
 
+#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_110
     SSL_CTX_set_min_proto_version(accept_ctx.ssl_ctx, TLS1_2_VERSION);
     SSL_CTX_set_max_proto_version(accept_ctx.ssl_ctx, TLS_MAX_VERSION);
+#endif
 
     /* load certificate and private key */
     if (SSL_CTX_use_PrivateKey_file(accept_ctx.ssl_ctx, key_fn, SSL_FILETYPE_PEM) != 1) {
