@@ -54,7 +54,7 @@ To use the Oracle module do the following:
 
 1.  Install `oracledb` package ([link](https://python-oracledb.readthedocs.io/en/latest/user_guide/installation.html)).
 
-3.  Create a read-only `netdata` user with proper access to your Oracle Database Server.
+2.  Create a read-only `netdata` user with proper access to your Oracle Database Server.
 
 Connect to your Oracle database with an administrative user and execute:
 
