@@ -493,6 +493,7 @@ ebpf_plugin_stats_t plugin_statistics = {.core = 0, .legacy = 0, .running = 0, .
 struct btf *default_btf = NULL;
 struct cachestat_bpf *cachestat_bpf_obj = NULL;
 struct dc_bpf *dc_bpf_obj = NULL;
+struct disk_bpf *disk_bpf_obj = NULL;
 struct fd_bpf *fd_bpf_obj = NULL;
 struct mount_bpf *mount_bpf_obj = NULL;
 struct shm_bpf *shm_bpf_obj = NULL;
