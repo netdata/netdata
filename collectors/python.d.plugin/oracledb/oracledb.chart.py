@@ -8,7 +8,7 @@ from copy import deepcopy
 from bases.FrameworkServices.SimpleService import SimpleService
 
 try:
-    import cx_Oracle
+    import oracledb as cx_Oracle
 
     HAS_ORACLE = True
 except ImportError:
@@ -187,8 +187,6 @@ CHARTS = {
     },
 }
 
-CX_CONNECT_STRING = "{0}/{1}@//{2}/{3}"
-
 QUERY_SYSTEM = '''
 SELECT
   metric_name,
@@ -320,8 +318,7 @@ class Service(SimpleService):
         self.definitions = deepcopy(CHARTS)
         self.user = configuration.get('user')
         self.password = configuration.get('password')
-        self.server = configuration.get('server')
-        self.service = configuration.get('service')
+        self.cs = configuration.get('cs')
         self.alive = False
         self.conn = None
         self.active_tablespaces = set()
@@ -332,13 +329,7 @@ class Service(SimpleService):
             self.conn = None
 
         try:
-            self.conn = cx_Oracle.connect(
-                CX_CONNECT_STRING.format(
-                    self.user,
-                    self.password,
-                    self.server,
-                    self.service,
-                ))
+            self.conn = cx_Oracle.connect(user=self.user, password=self.password, dsn=self.cs)
         except cx_Oracle.DatabaseError as error:
             self.error(error)
             return False
@@ -351,16 +342,15 @@ class Service(SimpleService):
 
     def check(self):
         if not HAS_ORACLE:
-            self.error("'cx_Oracle' package is needed to use oracledb module")
+            self.error("'oracledb' package is needed to use oracledb module")
             return False
 
         if not all([
             self.user,
             self.password,
-            self.server,
-            self.service,
+            self.cs
         ]):
-            self.error("one of these parameters is not specified: user, password, server, service")
+            self.error("one of these parameters is not specified: user, password, cs")
             return False
 
         if not self.connect():
