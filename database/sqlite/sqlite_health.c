@@ -1152,6 +1152,7 @@ int alert_hash_and_store_config(
     return 1;
 }
 
+#define SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT "SELECT new_status FROM health_log_%s WHERE alarm_id = %u AND unique_id != %u AND flags & %d ORDER BY unique_id DESC LIMIT 1"
 int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_STATUS *last_executed_status)
 {
     int rc = 0, ret = -1;
@@ -1162,7 +1163,7 @@ int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_S
 
     sqlite3_stmt *res = NULL;
 
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, "select new_status from health_log_%s where alarm_id = %u and unique_id != %u and flags & %d order by unique_id desc LIMIT 1", uuid_str, ae->alarm_id, ae->unique_id, HEALTH_ENTRY_FLAG_EXEC_RUN);
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT, uuid_str, ae->alarm_id, ae->unique_id, HEALTH_ENTRY_FLAG_EXEC_RUN);
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (rc != SQLITE_OK) {
