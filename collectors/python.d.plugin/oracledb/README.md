@@ -58,12 +58,14 @@ To use the Oracle module do the following:
 
 Connect to your Oracle database with an administrative user and execute:
 
-```
+```SQL
 CREATE USER netdata IDENTIFIED BY <PASSWORD>;
 
 GRANT CONNECT TO netdata;
 GRANT SELECT_CATALOG_ROLE TO netdata;
 ```
+
+4.  Get or create a [data source name](https://python-oracledb.readthedocs.io/en/latest/user_guide/connection_handling.html#connection-strings) for your database.
 
 ## Configuration
 
@@ -79,13 +81,13 @@ sudo ./edit-config python.d/oracledb.conf
 local:
   user: 'netdata'
   password: 'secret'
-  cs: '(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1521)(host=adb.us-ashburn-1.oraclecloud.com))(connect_data=(service_name=sdf98789f98sfs98f_projectid_low.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))'
+  dsn: '(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1521)(host=adb.us-ashburn-1.oraclecloud.com))(connect_data=(service_name=sdf98789f98sfs98f_projectid_low.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))'
 
 
 remote:
   user: 'netdata'
   password: 'secret'
-  cs: '(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1521)(host=adb.us-ashburn-1.oraclecloud.com))(connect_data=(service_name=sdf98789f98sfs98f_projectid_low.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))'
+  dsn: '(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1521)(host=adb.us-ashburn-1.oraclecloud.com))(connect_data=(service_name=sdf98789f98sfs98f_projectid_low.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))'
 ```
 
 All parameters are required. Without them module will fail to start.

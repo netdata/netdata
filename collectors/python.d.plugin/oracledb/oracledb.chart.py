@@ -318,7 +318,7 @@ class Service(SimpleService):
         self.definitions = deepcopy(CHARTS)
         self.user = configuration.get('user')
         self.password = configuration.get('password')
-        self.cs = configuration.get('cs')
+        self.dsn = configuration.get('dsn')
         self.alive = False
         self.conn = None
         self.active_tablespaces = set()
@@ -329,7 +329,7 @@ class Service(SimpleService):
             self.conn = None
 
         try:
-            self.conn = cx_Oracle.connect(user=self.user, password=self.password, dsn=self.cs)
+            self.conn = cx_Oracle.connect(user=self.user, password=self.password, dsn=self.dsn)
         except cx_Oracle.DatabaseError as error:
             self.error(error)
             return False
@@ -348,9 +348,9 @@ class Service(SimpleService):
         if not all([
             self.user,
             self.password,
-            self.cs
+            self.dsn
         ]):
-            self.error("one of these parameters is not specified: user, password, cs")
+            self.error("one of these parameters is not specified: user, password, dsn")
             return False
 
         if not self.connect():
