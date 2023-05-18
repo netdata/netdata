@@ -30,17 +30,17 @@
 
 The Netdata logs management engine enables collection, processing, storage, streaming and querying of logs through the Netdata agent. The following pipeline depicts a high-level overview of the different stages that the logs have to pass through for this to be achieved:
 
-![Logs management pipeline](https://user-images.githubusercontent.com/5953192/191845591-fea3392c-427a-4b56-95f4-e029775378b0.jpg "Logs management pipeline")
+![Logs management pipeline](https://github.com/netdata/netdata/assets/5953192/dd73382c-af4b-4840-a3fe-1ba5069304e8 "Logs management pipeline")
 
 
-The [Fluent Bit](https://github.com/fluent/fluent-bit) project has been used at the logs collection and streaming engine, due to its stability and the variety of [collection (input) plugins](https://docs.fluentbit.io/manual/pipeline/inputs) that it offers. Each collected log record passes through the Fluent Bit engine first, before it gets compressed and copied to the circular buffers of the logs management engine. Optionally, it can be then streamed to another Netdata or Fluent Bit instance.
+The [Fluent Bit](https://github.com/fluent/fluent-bit) project has been used as the logs collection and exporting / streaming engine, due to its stability and the variety of [collection (input) plugins](https://docs.fluentbit.io/manual/pipeline/inputs) that it offers. Each collected log record passes through the Fluent Bit engine first, before it gets buffered, parsed, compressed and (optionally) stored locally by the logs management engine. It can also be streamed to another Netdata or Fluent Bit instance (using Fluent Bit's [Forward](https://docs.fluentbit.io/manual/pipeline/outputs/forward) protocol), or exported using any other [Fluent Bit output](https://docs.fluentbit.io/manual/pipeline/outputs).
 
-A bespoke circular buffering implementation is used to maximize performance and optimize memory utilization. More technical details about how it works can be found [here](https://github.com/netdata/netdata/pull/13291#buffering).
+A bespoke circular buffering implementation has been used to maximize performance and optimize memory utilization. More technical details about how it works can be found [here](https://github.com/netdata/netdata/pull/13291#buffering).
 
-To configure Netdata's logs management engine properly and to interpret results correctly, please make sure you are aware of the following points:
+To configure Netdata's logs management engine properly, please make sure you are aware of the following points:
 
-* One collection cycle occurs per `update every` interval and any log records collected in a collection cycle are grouped and compressed together. As expected, a longer interval will reduce memory and disk space requirements.
-* The timestamp of each collection cycle is the epoch datetime at the moment of the collection and __not the datetime of collected log records__ (although these two may well be the same if there are no delays during collection). The reason for this choice is that Netdata's metrics time-series database ([dbengine](https://learn.netdata.cloud/docs/improving-netdata---developers/metric-retention---database/database-engine)) is a [causal system](https://en.wikipedia.org/wiki/Causal_system), and while logs can be stored using past timestamps, metrics cannot. So, for logs and their extracted metrics to be aligned, the collection datetime must be used.
+* One collection cycle (at max) occurs per `update every` interval (in seconds) and any log records collected in a collection cycle are grouped and compressed together. As a result, a longer `update every` interval will reduce memory and disk space requirements.
+* When collected logs contain parsable timestamps, these will be used to display metrics from parsed logs at the correct time in each chart, even if collection of said logs takes place *much* later than the time they were produced. How much later? Up to a configurable value of `update timeout` seconds. This mechanism ensures correct  parsing and querying of delayed logs that contain parsable timestamps (such as streamed inputs or buffered logs sources that write logs in batches), but the respective charts may lag behind some seconds up to that timeout. If no parsable timestamp is found, the collection timestamp will be used instead.
 
 <a name="collector-types"/>
 
@@ -103,7 +103,8 @@ There are some fundamental configuration options that are common to all collecto
 |  Configuration Option | Default 		| Description  |
 |      :------------:  	| :------------:  | ------------ |
 | `enabled` | `no` 		| Whether this log source will be monitored or not.
-| `update every` 		| Equivalent value in `[logs management]` section of `netdata.conf` (or Netdata global value, if higher). | How often collected metrics will be updated.
+| `update every` 		| Equivalent value in `[logs management]` section of `netdata.conf` (or Netdata global value, if higher). | How often metrics in charts will be updated every (in seconds).
+| `update timeout` 		| Equivalent value in `[logs management]` section of `netdata.conf` (or Netdata global value, if higher). | Maximum timeout charts may be delayed by while waiting for new logs.
 | `log type` 			| `flb_generic`	| Type of this log collector, see [relevant table](#collector-types) for a complete list of supported collectors.
 | `circular buffer max size` | Equivalent value in `[logs management]` section of `netdata.conf`. | Maximum RAM that can be used to buffer collected logs until they are saved to the disk database.
 | `circular buffer drop logs if full` | Equivalent value in `[logs management]` section of `netdata.conf` (`no` by default). | If there are new logs pending to be collected and the circular buffer is full, enabling this setting will allow old buffered logs to be dropped in favor of new ones. If disabled, collection of new logs will be blocked until there is free space again in the buffer (no logs will be lost in this case, but logs will not be ingested in real-time).
@@ -136,6 +137,8 @@ Also, the `log path` configuration option must be defined per log source in `log
 </a>
 
 TODO
+
+NOTE / WARNING: `kmsg` timestamps will be wrong if system has been suspended and resumed.
 
 <a name="collector-configuration-systemd"/>
 
@@ -245,7 +248,7 @@ Example of configuration for a generic log source collection with custom regex-b
 ```
 [Auth.log]
 	enabled = yes
-	update every = 5
+	update every = 1
 	log type = generic
 	circular buffer max size = 256 # in MiB
 	compression acceleration = 1 # see https://github.com/lz4/lz4/blob/90d68e37093d815e7ea06b0ee3c168cccffc84b8/lib/lz4.h#L195
@@ -296,7 +299,7 @@ Netdata supports 2 streaming configurations:
 
 For option 1, please refer to the [syslog collector](#collector-configuration-syslog) section. This section will be focused on using option 2.
 
-A Netdata agent can be used as a logs aggregation parent to listen to `Forward` messages, using either Unix or network sockets. This option is separate to [Netdata's metrics streaming](https://learn.netdata.cloud/docs/deployment-in-production/streaming-and-replication) and can be used independently of whether that's enabled or not (and it uses a different listening socket too). 
+A Netdata agent can be used as a logs aggregation parent to listen to `Forward` messages, using either Unix or network sockets. This option is separate to [Netdata's metrics streaming](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md) and can be used independently of whether that's enabled or not (and it uses a different listening socket too). 
 
 To enable this option, `forward in enable = no` must be uncommented and set to `yes`, under `[logs management]` section in `netdata.conf`:
 ```

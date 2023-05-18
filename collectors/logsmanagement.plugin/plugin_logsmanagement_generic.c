@@ -5,6 +5,7 @@
 void generic_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_meta){
     chart_meta->chart_data_generic = callocz(1, sizeof (struct Chart_data_generic));
     chart_data_generic_t *chart_data = chart_meta->chart_data_generic;
+    chart_data->tv.tv_sec = now_realtime_sec(); // initial value shouldn't be 0
     long chart_prio = chart_meta->base_prio;
 
     /* Number of collected logs total - initialise */
@@ -47,32 +48,23 @@ void generic_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
 
 }
 
-void generic_chart_collect(struct File_info *p_file_info, struct Chart_meta *chart_meta){
-    chart_data_generic_t *chart_data = chart_meta->chart_data_generic;
-
-    /* Number of collected logs - collect */
-    chart_data->num_lines = p_file_info->parser_metrics->num_lines;
-
-}
-
 void generic_chart_update(struct File_info *p_file_info, struct Chart_meta *chart_meta){
-    UNUSED(p_file_info);
     chart_data_generic_t *chart_data = chart_meta->chart_data_generic;
 
-    /* Number of collected logs total - update chart */
-    if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_TOTAL){
-        rrddim_set_by_pointer(  chart_data->st_lines_total, 
-                                chart_data->dim_lines_total, 
-                                chart_data->num_lines);
-        rrdset_done(chart_data->st_lines_total);
-    }
+    if(chart_data->tv.tv_sec != p_file_info->parser_metrics->tv.tv_sec){
 
-    /* Number of collected logs rate - update chart */
-    if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_RATE){
-        rrddim_set_by_pointer(  chart_data->st_lines_rate, 
-                                chart_data->dim_lines_rate, 
-                                chart_data->num_lines);
-        rrdset_done(chart_data->st_lines_rate);
+        time_t lag_in_sec = p_file_info->parser_metrics->tv.tv_sec - chart_data->tv.tv_sec - 1;
+
+        chart_data->tv = p_file_info->parser_metrics->tv;
+
+        struct timeval tv = {
+            .tv_sec = chart_data->tv.tv_sec - lag_in_sec,
+            .tv_usec = chart_data->tv.tv_usec
+        };
+
+        do_num_of_logs_charts_update(p_file_info, chart_data, tv, lag_in_sec);
+
+        do_custom_charts_update(p_file_info, chart_data, tv, lag_in_sec);
     }
 
 }

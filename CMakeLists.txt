@@ -1085,8 +1085,6 @@ set(LOGSMANAGEMENT_FILES
         logsmanagement/query_test.h
         logsmanagement/flb_plugin.c
         logsmanagement/flb_plugin.h
-        logsmanagement/tail_plugin.c
-        logsmanagement/tail_plugin.h
         logsmanagement/unit_test/unit_test.c
         logsmanagement/unit_test/unit_test.h
         )

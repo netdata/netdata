@@ -21,6 +21,8 @@
 
 #define MAX_OUTPUTS_PER_SOURCE 100                  /**< Hard limit of maximum Fluent Bit outputs per log source **/
 
+#define UPDATE_TIMEOUT_DEFAULT 10                   /**< Default timeout to use to update charts if they haven't been updated in the meantime. **/
+
 #define ENABLE_COLLECTED_LOGS_TOTAL_DEFAULT 0       /**< Default value to enable (or not) metrics of total collected log records **/
 #define ENABLE_COLLECTED_LOGS_RATE_DEFAULT 1        /**< Default value to enable (or not) metrics of rate of collected log records */
 
@@ -73,15 +75,6 @@ typedef enum {
 
 #define VALIDATE_COMPRESSION 0                          /**< For testing purposes only as it slows down compression considerably. **/
 #define COMPRESSION_ACCELERATION_DEFAULT 1              /**< Global default value for compression acceleration **/
-
-/* -------------------------------------------------------------------------- */
-
-
-/* -------------------------------------------------------------------------- */
-/*                                Tail Plugin                                 */
-/* -------------------------------------------------------------------------- */
-
-#define FS_EVENTS_REENABLE_INTERVAL 1U                 /**< Interval (in sec) to wait for before attempting to re-register a certain log file, after it was not found (due to rotation or other reason). **/
 
 /* -------------------------------------------------------------------------- */
 

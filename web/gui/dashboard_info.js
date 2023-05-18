@@ -805,6 +805,12 @@ netdataDashboard.menu = {
         title: 'Netdata error.log',
         icon: '<i class="fas fa-book"></i>',
         info: 'Metrics extracted from Netdata\'s error.log.'
+    },
+
+    'Netdata fluentbit.log': {
+        title: 'Netdata fluentbit.log',
+        icon: '<i class="fas fa-book"></i>',
+        info: 'Metrics extracted from Netdata\'s embedded Fluent Bit logs.'
     }
 };
 

@@ -39,6 +39,8 @@ typedef enum { LOGS_MANAG_ERROR,
  */
 #define TEST_MS_TIMESTAMP_VALID(x) (((x) > 1649175852000 && (x) < 2532788652000)? 1:0)
 
+#define TIMESTAMP_MS_STR_SIZE sizeof(1649175852000)
+
 // Portable thread local, see https://stackoverflow.com/questions/18298280/how-to-declare-a-variable-as-thread-local-portably
 #ifndef thread_local
 #if __STDC_VERSION__ >= 201112 && !defined __STDC_NO_THREADS__

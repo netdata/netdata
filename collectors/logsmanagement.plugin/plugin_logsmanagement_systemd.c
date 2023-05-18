@@ -5,6 +5,7 @@
 void systemd_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_meta){
     chart_meta->chart_data_systemd = callocz(1, sizeof (struct Chart_data_systemd));
     chart_data_systemd_t *chart_data = chart_meta->chart_data_systemd;
+    chart_data->tv.tv_sec = now_realtime_sec(); // initial value shouldn't be 0
     long chart_prio = chart_meta->base_prio;
 
     /* Number of collected logs total - initialise */
@@ -137,91 +138,119 @@ void systemd_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
 
 }
 
-void systemd_chart_collect(struct File_info *p_file_info, struct Chart_meta *chart_meta){
-    chart_data_systemd_t *chart_data = chart_meta->chart_data_systemd;
-
-    /* Number of collected logs - collect */
-    chart_data->num_lines = p_file_info->parser_metrics->num_lines;
-
-    /* Syslog priority value - collect */
-    if(p_file_info->parser_config->chart_config & CHART_SYSLOG_PRIOR){
-        for(int j = 0; j < SYSLOG_PRIOR_ARR_SIZE; j++){
-            chart_data->num_prior[j] += p_file_info->parser_metrics->systemd->prior[j];
-            p_file_info->parser_metrics->systemd->prior[j] = 0;
-        }
-    }
-
-    /* Syslog severity level (== Systemd priority) - collect */
-    if(p_file_info->parser_config->chart_config & CHART_SYSLOG_SEVER){
-        for(int j = 0; j < SYSLOG_SEVER_ARR_SIZE; j++){
-            chart_data->num_sever[j] += p_file_info->parser_metrics->systemd->sever[j];
-            p_file_info->parser_metrics->systemd->sever[j] = 0;
-        }
-    }
-
-    /* Syslog facility level - collect */
-    if(p_file_info->parser_config->chart_config & CHART_SYSLOG_FACIL){
-        for(int j = 0; j < SYSLOG_FACIL_ARR_SIZE; j++){
-            chart_data->num_facil[j] += p_file_info->parser_metrics->systemd->facil[j];
-            p_file_info->parser_metrics->systemd->facil[j] = 0;
-        }
-    }
-}
-
 void systemd_chart_update(struct File_info *p_file_info, struct Chart_meta *chart_meta){
     chart_data_systemd_t *chart_data = chart_meta->chart_data_systemd;
 
-    /* Number of collected logs total - update chart */
-    if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_TOTAL){
-        rrddim_set_by_pointer(  chart_data->st_lines_total, 
-                                chart_data->dim_lines_total, 
-                                chart_data->num_lines);
-        rrdset_done(chart_data->st_lines_total);
-    }
+    if(chart_data->tv.tv_sec != p_file_info->parser_metrics->tv.tv_sec){
 
-    /* Number of collected logs rate - update chart */
-    if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_RATE){
-        rrddim_set_by_pointer(  chart_data->st_lines_rate, 
-                                chart_data->dim_lines_rate, 
-                                chart_data->num_lines);
-        rrdset_done(chart_data->st_lines_rate);
-    }
+        time_t lag_in_sec = p_file_info->parser_metrics->tv.tv_sec - chart_data->tv.tv_sec - 1;
 
-    /* Syslog priority value - update chart */
-    if(p_file_info->parser_config->chart_config & CHART_SYSLOG_PRIOR){
-        for(int j = 0; j < SYSLOG_PRIOR_ARR_SIZE - 1; j++){
-            if(unlikely(!chart_data->dim_prior[j] && chart_data->num_prior[j])){
-                char dim_prior_name[4];
-                snprintfz(dim_prior_name, 4, "%d", j);
-                chart_data->dim_prior[j] = rrddim_add(chart_data->st_prior, dim_prior_name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        chart_data->tv = p_file_info->parser_metrics->tv;
+
+        struct timeval tv = {
+            .tv_sec = chart_data->tv.tv_sec - lag_in_sec,
+            .tv_usec = chart_data->tv.tv_usec
+        };
+
+        do_num_of_logs_charts_update(p_file_info, chart_data, tv, lag_in_sec);
+
+        /* Syslog priority value - update */
+        if(p_file_info->parser_config->chart_config & CHART_SYSLOG_PRIOR){
+            if(likely(chart_data->st_prior->counter_done)){
+
+                tv.tv_sec = chart_data->tv.tv_sec - lag_in_sec;
+                
+                while(tv.tv_sec < chart_data->tv.tv_sec){
+                    for(int j = 0; j < SYSLOG_PRIOR_ARR_SIZE - 1; j++){
+                        if(chart_data->dim_prior[j])
+                            rrddim_set_by_pointer(  chart_data->st_prior, 
+                                                    chart_data->dim_prior[j], 
+                                                    chart_data->num_prior[j]);
+                    }
+                    rrddim_set_by_pointer(  chart_data->st_prior, 
+                                            chart_data->dim_prior[SYSLOG_PRIOR_ARR_SIZE - 1], // "Unknown"
+                                            chart_data->num_prior[SYSLOG_PRIOR_ARR_SIZE - 1]);
+                    rrdset_timed_done(  chart_data->st_prior, tv, true);
+                    tv.tv_sec++;
+                }
             }
-            if(chart_data->dim_prior[j]) rrddim_set_by_pointer( chart_data->st_prior, 
-                                                                chart_data->dim_prior[j], 
-                                                                chart_data->num_prior[j]);
-        }
-        rrddim_set_by_pointer(  chart_data->st_prior, 
-                                chart_data->dim_prior[SYSLOG_PRIOR_ARR_SIZE - 1], // "Unknown"
-                                chart_data->num_prior[SYSLOG_PRIOR_ARR_SIZE - 1]);
-        rrdset_done(chart_data->st_prior);
-    }
 
-    /* Syslog severity level (== Systemd priority) - update chart */
-    if(p_file_info->parser_config->chart_config & CHART_SYSLOG_SEVER){
-        for(int j = 0; j < SYSLOG_SEVER_ARR_SIZE; j++){
-            rrddim_set_by_pointer(  chart_data->st_sever, 
-                                    chart_data->dim_sever[j], 
-                                    chart_data->num_sever[j]);
-        }
-        rrdset_done(chart_data->st_sever);
-    }
+            for(int j = 0; j < SYSLOG_PRIOR_ARR_SIZE; j++){
+                chart_data->num_prior[j] += p_file_info->parser_metrics->systemd->prior[j];
+                p_file_info->parser_metrics->systemd->prior[j] = 0;
 
-    /* Syslog facility value - update chart */
-    if(p_file_info->parser_config->chart_config & CHART_SYSLOG_FACIL){
-        for(int j = 0; j < SYSLOG_FACIL_ARR_SIZE; j++){
-            rrddim_set_by_pointer(  chart_data->st_facil, 
-                                    chart_data->dim_facil[j], 
-                                    chart_data->num_facil[j]);
+                if(unlikely(!chart_data->dim_prior[j] && chart_data->num_prior[j])){
+                    char dim_prior_name[4];
+                    snprintfz(dim_prior_name, 4, "%d", j);
+                    chart_data->dim_prior[j] = rrddim_add(  chart_data->st_prior, 
+                                                            dim_prior_name, NULL, 1, 1, 
+                                                            RRD_ALGORITHM_INCREMENTAL);
+                }
+                if(chart_data->dim_prior[j]) rrddim_set_by_pointer( chart_data->st_prior, 
+                                                                    chart_data->dim_prior[j], 
+                                                                    chart_data->num_prior[j]);
+            }
+            rrdset_timed_done(  chart_data->st_prior, chart_data->tv, 
+                                chart_data->st_prior->counter_done != 0);
+        
         }
-        rrdset_done(chart_data->st_facil);
+
+        /* Syslog severity level (== Systemd priority) - update chart */
+        if(p_file_info->parser_config->chart_config & CHART_SYSLOG_SEVER){
+            if(likely(chart_data->st_sever->counter_done)){
+
+                tv.tv_sec = chart_data->tv.tv_sec - lag_in_sec;
+
+                while(tv.tv_sec < chart_data->tv.tv_sec){
+                    for(int j = 0; j < SYSLOG_SEVER_ARR_SIZE; j++)
+                        rrddim_set_by_pointer(  chart_data->st_sever, 
+                                                chart_data->dim_sever[j], 
+                                                chart_data->num_sever[j]);
+                    rrdset_timed_done(  chart_data->st_sever, tv, true);
+                    tv.tv_sec++;
+                }
+            }
+
+            for(int j = 0; j < SYSLOG_SEVER_ARR_SIZE; j++){
+                chart_data->num_sever[j] += p_file_info->parser_metrics->systemd->sever[j];
+                p_file_info->parser_metrics->systemd->sever[j] = 0;
+
+                rrddim_set_by_pointer(  chart_data->st_sever, 
+                                        chart_data->dim_sever[j], 
+                                        chart_data->num_sever[j]);
+            }
+            rrdset_timed_done(  chart_data->st_sever, chart_data->tv, 
+                                chart_data->st_sever->counter_done != 0);
+        }
+
+        /* Syslog facility value - update chart */
+        if(p_file_info->parser_config->chart_config & CHART_SYSLOG_FACIL){
+            if(likely(chart_data->st_facil->counter_done)){
+
+                tv.tv_sec = chart_data->tv.tv_sec - lag_in_sec;
+
+                while(tv.tv_sec < chart_data->tv.tv_sec){
+                    for(int j = 0; j < SYSLOG_FACIL_ARR_SIZE; j++)
+                        rrddim_set_by_pointer(  chart_data->st_facil, 
+                                                chart_data->dim_facil[j], 
+                                                chart_data->num_facil[j]);
+                    rrdset_timed_done(  chart_data->st_facil, tv, true);
+                    tv.tv_sec++;
+                }
+            }
+
+            for(int j = 0; j < SYSLOG_FACIL_ARR_SIZE; j++){
+                chart_data->num_facil[j] += p_file_info->parser_metrics->systemd->facil[j];
+                p_file_info->parser_metrics->systemd->facil[j] = 0;
+
+                rrddim_set_by_pointer(  chart_data->st_facil, 
+                                        chart_data->dim_facil[j], 
+                                        chart_data->num_facil[j]);
+            }
+            rrdset_timed_done(  chart_data->st_facil, chart_data->tv, 
+                                chart_data->st_facil->counter_done != 0);
+        }
+
+        do_custom_charts_update(p_file_info, chart_data, tv, lag_in_sec);
     }
 }

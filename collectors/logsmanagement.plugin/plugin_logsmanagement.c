@@ -57,15 +57,13 @@
 
 
 static struct Chart_meta chart_types[] = {
-    {.type = GENERIC,       .init = generic_chart_init,   .collect = generic_chart_collect,   .update = generic_chart_update},
-    {.type = FLB_GENERIC,   .init = generic_chart_init,   .collect = generic_chart_collect,   .update = generic_chart_update},
-    {.type = WEB_LOG,       .init = web_log_chart_init,   .collect = web_log_chart_collect,   .update = web_log_chart_update},
-    {.type = FLB_WEB_LOG,   .init = web_log_chart_init,   .collect = web_log_chart_collect,   .update = web_log_chart_update},
-    {.type = FLB_KMSG,      .init = kernel_chart_init,    .collect = kernel_chart_collect,    .update = kernel_chart_update},
-    {.type = FLB_SYSTEMD,   .init = systemd_chart_init,   .collect = systemd_chart_collect,   .update = systemd_chart_update},
-    {.type = FLB_DOCKER_EV, .init = docker_ev_chart_init, .collect = docker_ev_chart_collect, .update = docker_ev_chart_update},
-    {.type = FLB_SYSLOG,    .init = systemd_chart_init,   .collect = systemd_chart_collect,   .update = systemd_chart_update},
-    {.type = FLB_SERIAL,    .init = generic_chart_init,   .collect = generic_chart_collect,   .update = generic_chart_update}
+    {.type = FLB_GENERIC,   .init = generic_chart_init,   .update = generic_chart_update},
+    {.type = FLB_WEB_LOG,   .init = web_log_chart_init,   .update = web_log_chart_update},
+    {.type = FLB_KMSG,      .init = kernel_chart_init,    .update = kernel_chart_update},
+    {.type = FLB_SYSTEMD,   .init = systemd_chart_init,   .update = systemd_chart_update},
+    {.type = FLB_DOCKER_EV, .init = docker_ev_chart_init, .update = docker_ev_chart_update},
+    {.type = FLB_SYSLOG,    .init = systemd_chart_init,   .update = systemd_chart_update},
+    {.type = FLB_SERIAL,    .init = generic_chart_init,   .update = generic_chart_update}
 };
 
 struct Stats_chart_data{
@@ -450,8 +448,6 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
 
 void *logsmanagement_plugin_main(void *ptr){
     worker_register("LOGSMANAGPLG");
-    worker_register_job_name(WORKER_JOB_COLLECT, "collection");
-    worker_register_job_name(WORKER_JOB_UPDATE, "update");
 
     rrd_collector_started();
 
@@ -615,6 +611,7 @@ void *logsmanagement_plugin_main(void *ptr){
         memcpy(chart_data_arr[i], &chart_types[p_file_info->log_type], sizeof(struct Chart_meta));
         chart_data_arr[i]->base_prio = NETDATA_CHART_PRIO_LOGS_BASE + (i + 1) * NETDATA_CHART_PRIO_LOGS_INCR;
         chart_data_arr[i]->init(p_file_info, chart_data_arr[i]);
+        worker_register_job_name(i, p_file_info->file_basename);
 
         /* Custom charts - initialise */
         for(int cus_off = 0; p_file_info->parser_cus_config[cus_off]; cus_off++){
@@ -640,7 +637,7 @@ void *logsmanagement_plugin_main(void *ptr){
                         , p_file_info->update_every
                         , RRDSET_TYPE_AREA
                 );
-                // rrdset_done() need to be run for this
+                // rrdset_done() need to be run only once for each chart
                 chart_data_arr[i]->chart_data_cus_arr[cus_off]->need_rrdset_done = 1; 
             }  
             chart_data_arr[i]->chart_data_cus_arr[cus_off]->dim_cus_count = 
@@ -651,13 +648,16 @@ void *logsmanagement_plugin_main(void *ptr){
 
     }
 
+    worker_register_job_name(p_file_infos_arr->count, "stats_rrdset_done");
+
+    rrd_collector_add_function( localhost, NULL, "logsmanagement", 10, 
+                                FUNCTION_LOGSMANAGEMENT_HELP_SHORT, true, 
+                                logsmanagement_function_execute_cb, NULL);
 
     usec_t step = g_logs_manag_config.update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
-
-    rrd_collector_add_function( localhost, NULL, "logsmanagement", 10, FUNCTION_LOGSMANAGEMENT_HELP_SHORT, true, 
-                                logsmanagement_function_execute_cb, NULL);
+    
 
 	while(!netdata_exit){
 
@@ -668,58 +668,30 @@ void *logsmanagement_plugin_main(void *ptr){
 
         for(int i = 0; i < p_file_infos_arr->count; i++){
             struct File_info *p_file_info = p_file_infos_arr->data[i];
+
+            worker_is_busy(i);
             
             // Check if there is parser configuration to be used for chart generation
             if(!p_file_info->parser_config) continue; 
 
-            worker_is_busy(WORKER_JOB_COLLECT);
-
-            /* Circular buffer total memory stats - collect (no need to be within p_file_info->parser_metrics_mut lock) */
-            stats_chart_data->num_circ_buff_mem_total_arr[i] = __atomic_load_n(&p_file_info->circ_buff->total_cached_mem, __ATOMIC_RELAXED);
-
-            /* Circular buffer number of items - collect */
-            stats_chart_data->num_circ_buff_num_of_items_arr[i] = p_file_info->circ_buff->num_of_items;
-
-            /* Circular buffer buffered uncompressed & compressed memory stats - collect */
-            stats_chart_data->num_circ_buff_mem_uncompressed_arr[i] = __atomic_load_n(&p_file_info->circ_buff->text_size_total, __ATOMIC_RELAXED);
-            stats_chart_data->num_circ_buff_mem_compressed_arr[i] = __atomic_load_n(&p_file_info->circ_buff->text_compressed_size_total, __ATOMIC_RELAXED);
-
-            /* Compression stats - collect */
-            stats_chart_data->num_compression_ratio_arr[i] = __atomic_load_n(&p_file_info->circ_buff->compression_ratio, __ATOMIC_RELAXED);
-
-            /* DB disk usage stats - collect */
-            stats_chart_data->num_disk_usage_arr[i] = __atomic_load_n(&p_file_info->blob_total_size, __ATOMIC_RELAXED);
-
-
-            uv_mutex_lock(p_file_info->parser_metrics_mut);
-
-            chart_data_arr[i]->collect(p_file_info, chart_data_arr[i]);
-
-            /* Custom charts - collect */
-            for(int cus_off = 0; p_file_info->parser_cus_config[cus_off]; cus_off++){
-                chart_data_arr[i]->chart_data_cus_arr[cus_off]->num_cus_count += 
-                    p_file_info->parser_metrics->parser_cus[cus_off]->count;
-                p_file_info->parser_metrics->parser_cus[cus_off]->count = 0;
-            }
-
-            uv_mutex_unlock(p_file_info->parser_metrics_mut);
-
-
-            if(unlikely(netdata_exit)) break;
-
-            worker_is_busy(WORKER_JOB_UPDATE);
-
-            /* Circular buffer total memory stats - update chart */
+            /* Circular buffer total memory stats - update (no need to be within p_file_info->parser_metrics_mut lock) */
+            stats_chart_data->num_circ_buff_mem_total_arr[i] = 
+                __atomic_load_n(&p_file_info->circ_buff->total_cached_mem, __ATOMIC_RELAXED);
             rrddim_set_by_pointer(stats_chart_data->st_circ_buff_mem_total, 
                                   stats_chart_data->dim_circ_buff_mem_total_arr[i], 
                                   stats_chart_data->num_circ_buff_mem_total_arr[i]);
-            
-            /* Circular buffer number of items - update chart */
+
+            /* Circular buffer number of items - update */
+            stats_chart_data->num_circ_buff_num_of_items_arr[i] = p_file_info->circ_buff->num_of_items;
             rrddim_set_by_pointer(stats_chart_data->st_circ_buff_num_of_items, 
                                   stats_chart_data->dim_circ_buff_num_of_items_arr[i], 
                                   stats_chart_data->num_circ_buff_num_of_items_arr[i]);
-            
-            /* Circular buffer buffered compressed & uncompressed memory stats - update chart */
+
+            /* Circular buffer buffered uncompressed & compressed memory stats - collect */
+            stats_chart_data->num_circ_buff_mem_uncompressed_arr[i] = 
+                __atomic_load_n(&p_file_info->circ_buff->text_size_total, __ATOMIC_RELAXED);
+            stats_chart_data->num_circ_buff_mem_compressed_arr[i] = 
+                __atomic_load_n(&p_file_info->circ_buff->text_compressed_size_total, __ATOMIC_RELAXED);
             rrddim_set_by_pointer(stats_chart_data->st_circ_buff_mem_uncompressed, 
                                   stats_chart_data->dim_circ_buff_mem_uncompressed_arr[i], 
                                   stats_chart_data->num_circ_buff_mem_uncompressed_arr[i]);
@@ -727,31 +699,33 @@ void *logsmanagement_plugin_main(void *ptr){
                                   stats_chart_data->dim_circ_buff_mem_compressed_arr[i], 
                                   stats_chart_data->num_circ_buff_mem_compressed_arr[i]);
 
-            /* Compression stats - update chart */
+            /* Compression stats - update */
+            stats_chart_data->num_compression_ratio_arr[i] = 
+                __atomic_load_n(&p_file_info->circ_buff->compression_ratio, __ATOMIC_RELAXED);
             rrddim_set_by_pointer(stats_chart_data->st_compression_ratio, 
                                   stats_chart_data->dim_compression_ratio[i], 
                                   stats_chart_data->num_compression_ratio_arr[i]);
 
-            /* DB disk usage stats - update chart */
+            /* DB disk usage stats - update */
+            stats_chart_data->num_disk_usage_arr[i] = 
+                __atomic_load_n(&p_file_info->blob_total_size, __ATOMIC_RELAXED);
             rrddim_set_by_pointer(stats_chart_data->st_disk_usage, 
                                   stats_chart_data->dim_disk_usage[i], 
                                   stats_chart_data->num_disk_usage_arr[i]);
 
+
+            uv_mutex_lock(p_file_info->parser_metrics_mut);
+
+            /* Update all charts including number of collected logs and custom charts. */
             chart_data_arr[i]->update(p_file_info, chart_data_arr[i]);
 
-            /* Custom charts - update chart */
-            for(int cus_off = 0; p_file_info->parser_cus_config[cus_off]; cus_off++){
-                rrddim_set_by_pointer(  chart_data_arr[i]->chart_data_cus_arr[cus_off]->st_cus,
-                                        chart_data_arr[i]->chart_data_cus_arr[cus_off]->dim_cus_count,
-                                        chart_data_arr[i]->chart_data_cus_arr[cus_off]->num_cus_count);
-            }
-            for(int cus_off = 0; p_file_info->parser_cus_config[cus_off]; cus_off++){
-                if(chart_data_arr[i]->chart_data_cus_arr[cus_off]->need_rrdset_done){
-                    rrdset_done(chart_data_arr[i]->chart_data_cus_arr[cus_off]->st_cus);
-                }
-            }
+            uv_mutex_unlock(p_file_info->parser_metrics_mut);
+
+            if(unlikely(netdata_exit)) break;
 
         }
+
+        worker_is_busy(p_file_infos_arr->count);
 
         // outside for loop as dimensions updated across different loop iterations, unlike chart_data_arr metrics.
         rrdset_done(stats_chart_data->st_circ_buff_mem_total); 

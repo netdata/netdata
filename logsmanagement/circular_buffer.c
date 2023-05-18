@@ -10,78 +10,6 @@
 #include "helper.h"
 #include "parser.h"
 
-/**
- * @brief Performs parsing and metric extraction for a raw log message
- * @todo Doesn't really belong in this source file, should be moved.
- */
-void generic_parser(void *arg){
-
-    struct File_info *p_file_info = ((struct File_info *) arg);
-    Circ_buff_t *buff = p_file_info->circ_buff;
-    
-    while (1){
-        uv_mutex_lock(&p_file_info->notify_parser_thread_mut);
-        while (p_file_info->log_batches_to_be_parsed == 0) {
-            uv_cond_wait(&p_file_info->notify_parser_thread_cond,
-                         &p_file_info->notify_parser_thread_mut);
-        }
-        p_file_info->log_batches_to_be_parsed--;
-        uv_mutex_unlock(&p_file_info->notify_parser_thread_mut);
-
-        uv_rwlock_rdlock(&buff->buff_realloc_rwlock);
-
-        // debug(D_LOGS_MANAG, "parsing item %d(%d) to be parsed: %d", 
-        //     buff->parse % buff->num_of_items, buff->parse, 
-        //     p_file_info->log_batches_to_be_parsed);
-
-        Circ_buff_item_t *item = &buff->items[buff->parse % buff->num_of_items];
-
-        uv_mutex_lock(p_file_info->parser_metrics_mut);
-
-        /* Perform web log parsing */
-        switch(p_file_info->log_type){
-            case WEB_LOG:
-            case FLB_WEB_LOG: {
-                if(unlikely(0 != parse_web_log_buf( item->data, item->text_size, 
-                                                    p_file_info->parser_config, 
-                                                    p_file_info->parser_metrics))) { 
-                    debug(D_LOGS_MANAG,"Parsed buffer did not contain any text or was of 0 size.");
-                    m_assert(0, "Parsed buffer did not contain any text or was of 0 size.");
-                }
-                p_file_info->parser_metrics->num_lines += item->num_lines;
-                break;
-            }
-            case GENERIC:
-            case FLB_GENERIC: 
-            case FLB_SERIAL: {
-                for(int i = 0; item->data[i]; i++)
-                    if(unlikely(item->data[i] == '\n')) item->num_lines++;
-                /* +1 because last line is terminated by '\0' instead of '\n' */
-                p_file_info->parser_metrics->num_lines += ++item->num_lines;           
-                break;
-            }
-            default: 
-                break; // Silence -Wswitch warning
-        }
-
-        /* Perform custom log chart parsing */
-        for(int i = 0; p_file_info->parser_cus_config[i]; i++){
-            p_file_info->parser_metrics->parser_cus[i]->count += 
-                search_keyword( item->data, item->text_size, NULL, NULL, 
-                                NULL, &p_file_info->parser_cus_config[i]->regex, 0);
-        }
-        
-        uv_mutex_unlock(p_file_info->parser_metrics_mut);
-
-        if(unlikely(netdata_exit)) break;
-
-        buff->parse++;
-        __atomic_or_fetch(&item->status, CIRC_BUFF_ITEM_STATUS_PARSED | CIRC_BUFF_ITEM_STATUS_STREAMED, __ATOMIC_RELAXED);
-
-        uv_rwlock_rdunlock(&buff->buff_realloc_rwlock);
-    }
-}
-
 static int circ_buff_items_qsort_timestamp_fnc (const void * item_a, const void * item_b) {
    return ( (int64_t)(*(Circ_buff_item_t**)item_a)->timestamp - 
             (int64_t)(*(Circ_buff_item_t**)item_b)->timestamp);
@@ -92,8 +20,8 @@ static int circ_buff_items_qsort_timestamp_fnc (const void * item_a, const void 
  * @details If multiple buffers are to be searched, the results will be sorted
  * according to timestamps.
  * 
- * Note that buff->tail can only be changed through circ_buff_read_item(), and 
- * circ_buff_search() and circ_buff_read_item() are mutually exclusive due 
+ * Note that buff->tail can only be changed through circ_buff_read_done(), and 
+ * circ_buff_search() and circ_buff_read_done() are mutually exclusive due 
  * to uv_mutex_lock() and uv_mutex_unlock() in queries and when writing to DB.
  * 
  * @param buffs Buffers to be searched
@@ -285,25 +213,13 @@ int circ_buff_insert(Circ_buff_t *const buff){
     int head = __atomic_load_n(&buff->head, __ATOMIC_SEQ_CST) % buff->num_of_items;
     int tail = __atomic_load_n(&buff->tail, __ATOMIC_SEQ_CST) % buff->num_of_items;
     int full = __atomic_load_n(&buff->full, __ATOMIC_SEQ_CST);
-
-    // debug(D_LOGS_MANAG, "head: %d(%d) tail: %d(%d), read: %d(%d), parse: %d(%d), full? %d", 
-    //         head, buff->head, 
-    //         tail, buff->tail, 
-    //         buff->read % buff->num_of_items, buff->read, 
-    //         buff->parse % buff->num_of_items, buff->parse,
-    //         buff->full);
-    
+   
     /* If circular buffer does not have any free items, it will be expanded
      * by reallocating the `items` array and adding one more item. */
     if (unlikely(( head == tail ) && full )) {
         debug(D_LOGS_MANAG, "buff out of space! will be expanded.");
         uv_rwlock_wrlock(&buff->buff_realloc_rwlock);
 
-        // debug(D_LOGS_MANAG, "before exp: head: %d(%d) tail: %d(%d), read: %d(%d), parse: %d(%d)", 
-        //     head, buff->head, 
-        //     tail, buff->tail, 
-        //     buff->read % buff->num_of_items, buff->read, 
-        //     buff->parse % buff->num_of_items, buff->parse);
         
         Circ_buff_item_t *items_new = callocz(buff->num_of_items + 1, sizeof(Circ_buff_item_t));
 
@@ -320,12 +236,6 @@ int circ_buff_insert(Circ_buff_t *const buff){
         buff->full = 0; 
 
         __atomic_add_fetch(&buff->buff_realloc_cnt, 1, __ATOMIC_RELAXED);
-
-        // debug(D_LOGS_MANAG, "after exp: head: %d(%d) tail: %d(%d), read: %d(%d), parse: %d(%d)", 
-        //     head, buff->head, 
-        //     tail, buff->tail, 
-        //     buff->read % buff->num_of_items, buff->read, 
-        //     buff->parse % buff->num_of_items, buff->parse);
 
         uv_rwlock_wrunlock(&buff->buff_realloc_rwlock);
     }
@@ -368,6 +278,8 @@ int circ_buff_insert(Circ_buff_t *const buff){
         __atomic_store_n(&buff->full, 1, __ATOMIC_SEQ_CST);
     }
 
+    __atomic_or_fetch(&cur_item->status, CIRC_BUFF_ITEM_STATUS_PARSED | CIRC_BUFF_ITEM_STATUS_STREAMED, __ATOMIC_SEQ_CST);
+
     return 0;
 }
 
@@ -380,14 +292,6 @@ int circ_buff_insert(Circ_buff_t *const buff){
 Circ_buff_item_t *circ_buff_read_item(Circ_buff_t *const buff) {
 
     Circ_buff_item_t *item = &buff->items[buff->read % buff->num_of_items];
-
-    // debug(D_LOGS_MANAG, "head: %d(%d) tail: %d(%d), read: %d(%d), parse: %d(%d), full? %d parsed? %d", 
-    //         buff->head % buff->num_of_items, buff->head, 
-    //         buff->tail % buff->num_of_items, buff->tail, 
-    //         buff->read % buff->num_of_items, buff->read, 
-    //         buff->parse % buff->num_of_items, buff->parse,
-    //         buff->full,
-    //         item->status == CIRC_BUFF_ITEM_STATUS_DONE ? 1 : 0);
 
     m_assert(__atomic_load_n(&item->status, __ATOMIC_RELAXED) <= CIRC_BUFF_ITEM_STATUS_DONE, "Invalid status");
 

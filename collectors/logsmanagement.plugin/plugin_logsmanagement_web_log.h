@@ -17,6 +17,8 @@ typedef struct Chart_data_web_log chart_data_web_log_t;
 
 struct Chart_data_web_log {
 
+    struct timeval tv;
+
     /* Number of collected log records */
     RRDSET *st_lines_total, *st_lines_rate;
     RRDDIM *dim_lines_total, *dim_lines_rate;
@@ -52,21 +54,8 @@ struct Chart_data_web_log {
 
     /* Request methods */
     RRDSET *st_req_methods;
-    RRDDIM *dim_req_method_acl, *dim_req_method_baseline_control, *dim_req_method_bind, *dim_req_method_checkin, *dim_req_method_checkout,
-    *dim_req_method_connect, *dim_req_method_copy, *dim_req_method_delet, *dim_req_method_get, *dim_req_method_head, *dim_req_method_label,
-    *dim_req_method_link, *dim_req_method_lock, *dim_req_method_merge, *dim_req_method_mkactivity, *dim_req_method_mkcalendar, *dim_req_method_mkcol,
-    *dim_req_method_mkredirectref, *dim_req_method_mkworkspace, *dim_req_method_move, *dim_req_method_options, *dim_req_method_orderpatch, 
-    *dim_req_method_patch, *dim_req_method_post, *dim_req_method_pri, *dim_req_method_propfind, *dim_req_method_proppatch, *dim_req_method_put,
-    *dim_req_method_rebind, *dim_req_method_report, *dim_req_method_search, *dim_req_method_trace, *dim_req_method_unbind, *dim_req_method_uncheckout,
-    *dim_req_method_unlink, *dim_req_method_unlock, *dim_req_method_update, *dim_req_method_updateredirectref;
-
-    collected_number num_req_method_acl, num_req_method_baseline_control, num_req_method_bind, num_req_method_checkin, num_req_method_checkout,
-    num_req_method_connect, num_req_method_copy, num_req_method_delet, num_req_method_get, num_req_method_head, num_req_method_label, 
-    num_req_method_link, num_req_method_lock, num_req_method_merge, num_req_method_mkactivity, num_req_method_mkcalendar, num_req_method_mkcol,
-    num_req_method_mkredirectref, num_req_method_mkworkspace, num_req_method_move, num_req_method_options, num_req_method_orderpatch, 
-    num_req_method_patch, num_req_method_post, num_req_method_pri, num_req_method_propfind, num_req_method_proppatch, num_req_method_put,
-    num_req_method_rebind, num_req_method_report, num_req_method_search, num_req_method_trace, num_req_method_unbind, num_req_method_uncheckout,
-    num_req_method_unlink, num_req_method_unlock, num_req_method_update, num_req_method_updateredirectref;
+    RRDDIM *dim_req_method[REQ_METHOD_ARR_SIZE];
+    collected_number num_req_method[REQ_METHOD_ARR_SIZE];
 
     /* Request protocol */
     RRDSET *st_req_proto;
@@ -112,7 +101,6 @@ struct Chart_data_web_log {
 };
 
 void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_meta);
-void web_log_chart_collect(struct File_info *p_file_info, struct Chart_meta *chart_meta);
 void web_log_chart_update(struct File_info *p_file_info, struct Chart_meta *chart_meta);
 
 #endif  // PLUGIN_LOGSMANAGEMENT_WEB_LOG_H_

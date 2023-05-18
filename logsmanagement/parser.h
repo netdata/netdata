@@ -24,7 +24,7 @@ typedef enum{
     CHART_COLLECTED_LOGS_TOTAL =    1 << 0,
     CHART_COLLECTED_LOGS_RATE =     1 << 1,
 
-    /* WEB_LOG or FLB_WEB_LOG charts */
+    /* FLB_WEB_LOG charts */
     CHART_VHOST =                   1 << 2,            
     CHART_PORT =                    1 << 3,             
     CHART_IP_VERSION =              1 << 4,
@@ -91,7 +91,7 @@ typedef struct log_parser_config{
 /* Web log configuration */
 #define ENABLE_PARSE_WEB_LOG_LINE_DEBUG 0
 #define MEASURE_WEB_LOG_PARSE_EXTRACT_TIME 0
-#define SKIP_WEB_LOG_TIME_PARSING 1
+#define SKIP_WEB_LOG_TIME_PARSING 0
 
 #define LOG_PARSER_METRICS_VHOST_BUFFS_SCALE_FACTOR 1.5
 #define LOG_PARSER_METRICS_PORT_BUFFS_SCALE_FACTOR 8 // Unlike Vhosts, ports are stored as integers, so scale factor can be much bigger without significant waste of memory
@@ -125,6 +125,49 @@ typedef struct web_log_parser_config{
     char delimiter;       				/**< Delimiter that separates the fields in the log format. **/
     int verify_parsed_logs;				/**< Boolean whether to try and verify parsed log fields or not **/
 } Web_log_parser_config_t;
+
+static const char *const req_method_str[] = {
+    "ACL",
+    "BASELINE-CONTROL",
+    "BIND",
+    "CHECKIN",
+    "CHECKOUT",
+    "CONNECT",
+    "COPY",
+    "DELETE",
+    "GET",
+    "HEAD",
+    "LABEL",
+    "LINK",
+    "LOCK",
+    "MERGE",
+    "MKACTIVITY",
+    "MKCALENDAR",
+    "MKCOL",
+    "MKREDIRECTREF",
+    "MKWORKSPACE",
+    "MOVE",
+    "OPTIONS",
+    "ORDERPATCH",
+    "PATCH",
+    "POST",
+    "PRI",
+    "PROPFIND",
+    "PROPPATCH",
+    "PUT",
+    "REBIND",
+    "REPORT",
+    "SEARCH",
+    "TRACE",
+    "UNBIND",
+    "UNCHECKOUT",
+    "UNLINK",
+    "UNLOCK",
+    "UPDATE",
+    "UPDATEREDIRECTREF"
+};
+
+#define REQ_METHOD_ARR_SIZE (int)(sizeof(req_method_str) / sizeof(req_method_str[0]))
 
 typedef struct web_log_metrics{
     /* Web log metrics */
@@ -160,13 +203,7 @@ typedef struct web_log_metrics{
         int ipv6_size;						   		 
         int ipv6_size_max;
     } req_clients_current_arr, req_clients_alltime_arr; 
-    struct log_parser_metrics_req_method{
-        int acl, baseline_control, bind, checkin, checkout, connect, copy, delet, get,
-        head, label, link, lock, merge, mkactivity, mkcalendar, mkcol, mkredirectref,
-        mkworkspace, move, options, orderpatch, patch, post, pri, propfind, proppatch,
-        put, rebind, report, search, trace, unbind, uncheckout, unlink, unlock, update,
-        updateredirectref;
-    } req_method;  
+    int req_method[REQ_METHOD_ARR_SIZE]; 
     struct log_parser_metrics_req_proto{
         int http_1, http_1_1, http_2, other;
     } req_proto;
@@ -327,6 +364,7 @@ typedef struct log_parser_cus_metrics{
 
 struct log_parser_metrics{
     unsigned long long num_lines;
+    struct timeval tv;
     union {
         Web_log_metrics_t *web_log;
         Kernel_metrics_t *kernel;

@@ -51,6 +51,7 @@ RUN CFLAGS="-Og -g -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all
 RUN ln -sf /dev/stdout /var/log/netdata/access.log
 RUN ln -sf /dev/stdout /var/log/netdata/debug.log
 RUN ln -sf /dev/stderr /var/log/netdata/error.log
+RUN ln -sf /dev/stdout /var/log/netdata/fluentbit.log
 
 RUN printf >/opt/netdata/source/gdb_batch '\
 set args -D \n\

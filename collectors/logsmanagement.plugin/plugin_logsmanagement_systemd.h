@@ -17,6 +17,8 @@ typedef struct Chart_data_systemd chart_data_systemd_t;
 
 struct Chart_data_systemd {
 
+    struct timeval tv;
+
     /* Number of collected log records */
     RRDSET *st_lines_total, *st_lines_rate;
     RRDDIM *dim_lines_total, *dim_lines_rate;
@@ -39,7 +41,6 @@ struct Chart_data_systemd {
 };
 
 void systemd_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_meta);
-void systemd_chart_collect(struct File_info *p_file_info, struct Chart_meta *chart_meta);
 void systemd_chart_update(struct File_info *p_file_info, struct Chart_meta *chart_meta);
 
 #endif // PLUGIN_LOGSMANAGEMENT_SYSTEMD_H_

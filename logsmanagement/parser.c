@@ -4,13 +4,6 @@
  *  @author Dimitris Pantazis
  */
 
-
-#include "parser.h"
-#include "helper.h"
-#include <stdio.h>
-#include <sys/resource.h>
-#include <math.h>
-
 #if SKIP_WEB_LOG_TIME_PARSING == 0
 #if !defined(_XOPEN_SOURCE) && !defined(__DARWIN__) && !defined(__APPLE__)
 /* _XOPEN_SOURCE 700 required by strptime (POSIX 2004) and strndup (POSIX 2008)
@@ -23,6 +16,11 @@
 #endif
 #endif // SKIP_WEB_LOG_TIME_PARSING
 
+#include "parser.h"
+#include "helper.h"
+#include <stdio.h>
+#include <sys/resource.h>
+#include <math.h>
 #include <string.h>
 
 static regex_t vhost_regex, req_client_regex, cipher_suite_regex;
@@ -299,8 +297,8 @@ int search_keyword( char *src, size_t src_sz,
 
         size_t match_len = (size_t) (groupArray[0].rm_eo - groupArray[0].rm_so);
 
-        debug(D_LOGS_MANAG, "Match %d [%2d-%2d]:%.*s\n", matches, groupArray[0].rm_so, 
-                groupArray[0].rm_eo, (int) match_len, cursor + groupArray[0].rm_so);
+        // debug(D_LOGS_MANAG, "Match %d [%2d-%2d]:%.*s\n", matches, groupArray[0].rm_so, 
+        //         groupArray[0].rm_eo, (int) match_len, cursor + groupArray[0].rm_so);
 
         if(dest){
             memcpy( &dest[*dest_sz], cursor + groupArray[0].rm_so, match_len);
@@ -1302,7 +1300,8 @@ static inline void extract_web_log_metrics( Log_parser_config_t *parser_config,
                                             Log_parser_metrics_t *metrics){
 
     /* Extract number of parsed lines */
-    metrics->num_lines++;
+    /* NOTE: Commented out as it is done in flb_collect_logs_cb() now. */
+    // metrics->num_lines++;
 
     /* Extract vhost */
     // TODO: Reduce number of reallocs
@@ -1430,44 +1429,12 @@ static inline void extract_web_log_metrics( Log_parser_config_t *parser_config,
 
     /* Extract request method */
     if(parser_config->chart_config & CHART_REQ_METHODS){
-        if(!strcmp(line_parsed->req_method, "ACL")) metrics->web_log->req_method.acl++;
-        else if(!strcmp(line_parsed->req_method, "BASELINE-CONTROL")) metrics->web_log->req_method.baseline_control++;
-        else if(!strcmp(line_parsed->req_method, "BIND")) metrics->web_log->req_method.bind++;
-        else if(!strcmp(line_parsed->req_method, "CHECKIN")) metrics->web_log->req_method.checkin++;
-        else if(!strcmp(line_parsed->req_method, "CHECKOUT")) metrics->web_log->req_method.checkout++;
-        else if(!strcmp(line_parsed->req_method, "CONNECT")) metrics->web_log->req_method.connect++;
-        else if(!strcmp(line_parsed->req_method, "COPY")) metrics->web_log->req_method.copy++;
-        else if(!strcmp(line_parsed->req_method, "DELETE")) metrics->web_log->req_method.delet++;
-        else if(!strcmp(line_parsed->req_method, "GET")) metrics->web_log->req_method.get++;
-        else if(!strcmp(line_parsed->req_method, "HEAD")) metrics->web_log->req_method.head++;
-        else if(!strcmp(line_parsed->req_method, "LABEL")) metrics->web_log->req_method.label++;
-        else if(!strcmp(line_parsed->req_method, "LINK")) metrics->web_log->req_method.link++;
-        else if(!strcmp(line_parsed->req_method, "LOCK")) metrics->web_log->req_method.lock++;
-        else if(!strcmp(line_parsed->req_method, "MERGE")) metrics->web_log->req_method.merge++;
-        else if(!strcmp(line_parsed->req_method, "MKACTIVITY")) metrics->web_log->req_method.mkactivity++;
-        else if(!strcmp(line_parsed->req_method, "MKCALENDAR")) metrics->web_log->req_method.mkcalendar++;
-        else if(!strcmp(line_parsed->req_method, "MKCOL")) metrics->web_log->req_method.mkcol++;
-        else if(!strcmp(line_parsed->req_method, "MKREDIRECTREF")) metrics->web_log->req_method.mkredirectref++;
-        else if(!strcmp(line_parsed->req_method, "MKWORKSPACE")) metrics->web_log->req_method.mkworkspace++;
-        else if(!strcmp(line_parsed->req_method, "MOVE")) metrics->web_log->req_method.move++;
-        else if(!strcmp(line_parsed->req_method, "OPTIONS")) metrics->web_log->req_method.options++;
-        else if(!strcmp(line_parsed->req_method, "ORDERPATCH")) metrics->web_log->req_method.orderpatch++;
-        else if(!strcmp(line_parsed->req_method, "PATCH")) metrics->web_log->req_method.patch++;
-        else if(!strcmp(line_parsed->req_method, "POST")) metrics->web_log->req_method.post++;
-        else if(!strcmp(line_parsed->req_method, "PRI")) metrics->web_log->req_method.pri++;
-        else if(!strcmp(line_parsed->req_method, "PROPFIND")) metrics->web_log->req_method.propfind++;
-        else if(!strcmp(line_parsed->req_method, "PROPPATCH")) metrics->web_log->req_method.proppatch++;
-        else if(!strcmp(line_parsed->req_method, "PUT")) metrics->web_log->req_method.put++;
-        else if(!strcmp(line_parsed->req_method, "REBIND")) metrics->web_log->req_method.rebind++;
-        else if(!strcmp(line_parsed->req_method, "REPORT")) metrics->web_log->req_method.report++;
-        else if(!strcmp(line_parsed->req_method, "SEARCH")) metrics->web_log->req_method.search++;
-        else if(!strcmp(line_parsed->req_method, "TRACE")) metrics->web_log->req_method.trace++;
-        else if(!strcmp(line_parsed->req_method, "UNBIND")) metrics->web_log->req_method.unbind++;
-        else if(!strcmp(line_parsed->req_method, "UNCHECKOUT")) metrics->web_log->req_method.uncheckout++;
-        else if(!strcmp(line_parsed->req_method, "UNLINK")) metrics->web_log->req_method.unlink++;
-        else if(!strcmp(line_parsed->req_method, "UNLOCK")) metrics->web_log->req_method.unlock++;
-        else if(!strcmp(line_parsed->req_method, "UPDATE")) metrics->web_log->req_method.update++;
-        else if(!strcmp(line_parsed->req_method, "UPDATEREDIRECTREF")) metrics->web_log->req_method.updateredirectref++;
+        for(int i = 0; i < REQ_METHOD_ARR_SIZE; i++){
+            if(!strcmp(line_parsed->req_method, req_method_str[i])){
+                metrics->web_log->req_method[i]++;
+                break;
+            }
+        }
     }
 
     /* Extract request protocol */

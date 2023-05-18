@@ -16,7 +16,8 @@ typedef struct Chart_data_docker_ev chart_data_docker_ev_t;
 #include "plugin_logsmanagement.h"
 
 struct Chart_data_docker_ev {
-    char *rrd_type;
+
+    struct timeval tv;
 
     /* Number of collected log records */
     RRDSET *st_lines_total, *st_lines_rate;
@@ -30,7 +31,6 @@ struct Chart_data_docker_ev {
 };
 
 void docker_ev_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_meta);
-void docker_ev_chart_collect(struct File_info *p_file_info, struct Chart_meta *chart_meta);
 void docker_ev_chart_update(struct File_info *p_file_info, struct Chart_meta *chart_meta);
 
 #endif // PLUGIN_LOGSMANAGEMENT_DOCKER_EV_H_

@@ -106,7 +106,7 @@ static msgpack_unpack_return (*dl_msgpack_unpack_next)(msgpack_unpacked* result,
 static void (*dl_msgpack_zone_free)(msgpack_zone* zone);
 
 // TODO: Update "flush", "0.1" according to minimum update every?
-int flb_init(void){
+int flb_init(flb_srvc_config_t flb_srvc_config){
 
     /* Load Fluent-Bit functions from the shared library */
     void *handle;
@@ -210,7 +210,12 @@ int flb_init(void){
 
     /* Global service settings */
     if(unlikely(flb_service_set(ctx,
-        "flush", "0.1", 
+        "Flush"         , flb_srvc_config.flush,
+        "HTTP_Listen"   , flb_srvc_config.http_listen,
+        "HTTP_Port"     , flb_srvc_config.http_port,
+        "HTTP_Server"   , flb_srvc_config.http_server,
+        "Log_File"      , flb_srvc_config.log_path,
+        "Log_Level"     , flb_srvc_config.log_level,
         NULL) != 0 )) return -1; 
 
     return 0;
@@ -226,16 +231,9 @@ void flb_stop_and_cleanup(void){
     flb_destroy(ctx);
 }
 
-void flb_tmp_buff_cpy_timer_cb(uv_timer_t *handle) {
+static void flb_complete_buff_item(struct File_info *p_file_info){
 
-    struct File_info *p_file_info = handle->data;
     Circ_buff_t *buff = p_file_info->circ_buff;
-    
-    uv_mutex_lock(&p_file_info->flb_tmp_buff_mut);
-    if(!buff->in->data || !*buff->in->data || !buff->in->text_size){ // Nothing to do, just return
-        uv_mutex_unlock(&p_file_info->flb_tmp_buff_mut);
-        return; 
-    }
 
     m_assert(buff->in->timestamp, "buff->in->timestamp cannot be 0");
     m_assert(buff->in->data, "buff->in->text cannot be NULL");
@@ -246,37 +244,43 @@ void flb_tmp_buff_cpy_timer_cb(uv_timer_t *handle) {
     buff->in->data[buff->in->text_size - 1] = '\0'; 
 
     /* Store status (timestamp and text_size must have already been 
-     * stored during flb_write_to_buff_cb() ). */
+     * stored during flb_collect_logs_cb() ). */
     buff->in->status = CIRC_BUFF_ITEM_STATUS_UNPROCESSED;
 
     /* Load max size of compressed buffer, as calculated previously */
     size_t text_compressed_buff_max_size = buff->in->text_compressed_size;
 
-    /* Do compression */
+    /* Do compression.
+     * TODO: Validate compression option? */
     buff->in->text_compressed = buff->in->data + buff->in->text_size;
-    buff->in->text_compressed_size = LZ4_compress_fast( buff->in->data, buff->in->text_compressed, 
-                                                            buff->in->text_size, text_compressed_buff_max_size, 
-                                                            p_file_info->compression_accel);
+    buff->in->text_compressed_size = LZ4_compress_fast( buff->in->data, 
+                                                        buff->in->text_compressed, 
+                                                        buff->in->text_size, 
+                                                        text_compressed_buff_max_size, 
+                                                        p_file_info->compression_accel);
     m_assert(buff->in->text_compressed_size != 0, "Text_compressed_size should be != 0");
 
-    // TODO: Validate compression option?
+    struct timeval tv;
+    tv.tv_sec = buff->in->timestamp / 1000;
+    tv.tv_usec = (buff->in->timestamp % 1000) * 1000; // TODO: Is tv_usec used by charts?
 
-    unsigned long num_lines = buff->in->num_lines;
-    circ_buff_insert(buff);
-
-    /* Extract kernel logs, systemd, syslog and docker events metrics */
-    if(p_file_info->log_type == FLB_KMSG){
-        uv_mutex_lock(p_file_info->parser_metrics_mut);
-        p_file_info->parser_metrics->num_lines += num_lines;
+    /* Extract metrics */
+    uv_mutex_lock(p_file_info->parser_metrics_mut);
+    if(p_file_info->log_type == FLB_WEB_LOG){
+        if(unlikely(0 != parse_web_log_buf( buff->in->data, 
+                                            buff->in->text_size, 
+                                            p_file_info->parser_config, 
+                                            p_file_info->parser_metrics))) 
+            m_assert(0, "Parsed buffer did not contain any text or was of 0 size.");
+    }
+    else if(p_file_info->log_type == FLB_KMSG){
         for(int i = 0; i < SYSLOG_SEVER_ARR_SIZE; i++){
             p_file_info->parser_metrics->kernel->sever[i] = p_file_info->flb_tmp_kernel_metrics.sever[i];
             p_file_info->flb_tmp_kernel_metrics.sever[i] = 0;
         }
-        uv_mutex_unlock(p_file_info->parser_metrics_mut);
     }
-    else if(p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_SYSLOG) {
-        uv_mutex_lock(p_file_info->parser_metrics_mut);
-        p_file_info->parser_metrics->num_lines += num_lines;
+    else if(p_file_info->log_type == FLB_SYSTEMD || 
+            p_file_info->log_type == FLB_SYSLOG) {
         for(int i = 0; i < SYSLOG_SEVER_ARR_SIZE; i++){
             p_file_info->parser_metrics->systemd->sever[i] = p_file_info->flb_tmp_systemd_metrics.sever[i];
             p_file_info->flb_tmp_systemd_metrics.sever[i] = 0;
@@ -289,29 +293,50 @@ void flb_tmp_buff_cpy_timer_cb(uv_timer_t *handle) {
             p_file_info->parser_metrics->systemd->prior[i] = p_file_info->flb_tmp_systemd_metrics.prior[i];
             p_file_info->flb_tmp_systemd_metrics.prior[i] = 0;
         }
-        uv_mutex_unlock(p_file_info->parser_metrics_mut);
     } else if(p_file_info->log_type == FLB_DOCKER_EV) {
-        uv_mutex_lock(p_file_info->parser_metrics_mut);
-        p_file_info->parser_metrics->num_lines += num_lines;
         for(int i = 0; i < NUM_OF_DOCKER_EV_TYPES; i++){
             p_file_info->parser_metrics->docker_ev->ev_type[i] = p_file_info->flb_tmp_docker_ev_metrics.ev_type[i];
             p_file_info->flb_tmp_docker_ev_metrics.ev_type[i] = 0;
         }
-        uv_mutex_unlock(p_file_info->parser_metrics_mut);
     } 
 
-    uv_mutex_unlock(&p_file_info->flb_tmp_buff_mut);
+    p_file_info->parser_metrics->tv = tv;
+    p_file_info->parser_metrics->num_lines += buff->in->num_lines;
 
-    /* Instruct log parsing and metrics extraction (asynchronously) for web logs
-     * and any custom charts */
-    uv_mutex_lock(&p_file_info->notify_parser_thread_mut);
-    p_file_info->log_batches_to_be_parsed++;
-    collector_error("log_batches_to_be_parsed: %d", p_file_info->log_batches_to_be_parsed);
-    uv_cond_signal(&p_file_info->notify_parser_thread_cond);
-    uv_mutex_unlock(&p_file_info->notify_parser_thread_mut);
+    /* Perform custom log chart parsing */
+    for(int i = 0; p_file_info->parser_cus_config[i]; i++){
+        p_file_info->parser_metrics->parser_cus[i]->count += 
+            search_keyword( buff->in->data, buff->in->text_size, NULL, NULL, 
+                            NULL, &p_file_info->parser_cus_config[i]->regex, 0);
+    }
+    uv_mutex_unlock(p_file_info->parser_metrics_mut);
+
+    circ_buff_insert(buff);
+
 }
 
-static int flb_write_to_buff_cb(void *record, size_t size, void *data){
+void flb_complete_item_timer_timeout_cb(uv_timer_t *handle) {
+
+    struct File_info *p_file_info = handle->data;
+    Circ_buff_t *buff = p_file_info->circ_buff;
+    
+    uv_mutex_lock(&p_file_info->flb_tmp_buff_mut);
+    if(!buff->in->data || !*buff->in->data || !buff->in->text_size){
+        uv_mutex_lock(p_file_info->parser_metrics_mut);
+        struct timeval now;
+        now_realtime_timeval(&now);
+        p_file_info->parser_metrics->tv = now;
+        uv_mutex_unlock(p_file_info->parser_metrics_mut);
+        uv_mutex_unlock(&p_file_info->flb_tmp_buff_mut);
+        return; 
+    }
+
+    flb_complete_buff_item(p_file_info);
+
+    uv_mutex_unlock(&p_file_info->flb_tmp_buff_mut);    
+}
+
+static int flb_collect_logs_cb(void *record, size_t size, void *data){
     
     /* "data" is NULL for Forward-type sources and non-NULL for local sources */
     struct File_info *p_file_info = (struct File_info *) data;
@@ -321,6 +346,9 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
     size_t off = 0; 
     struct flb_time tmp_time;
     msgpack_object *x;
+
+    char timestamp_str[TIMESTAMP_MS_STR_SIZE] = "";
+    msec_t timestamp = 0;
 
     /* FLB_KMSG case */
     static int skip_kmsg_log_buffering = 1;
@@ -410,19 +438,9 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
             if(unlikely(p_file_info == NULL)) goto skip_collect_and_drop_logs;
             
 
-            buff = p_file_info->circ_buff;
             uv_mutex_lock(&p_file_info->flb_tmp_buff_mut);
+            buff = p_file_info->circ_buff;
 
-            if(buff->in->timestamp == 0) {
-                m_assert(buff->in->text_size == 0, "buff->in->timestamp == 0 but buff->in->text_size != 0");
-                // m_assert(buff->in->data == 0 || 
-                //         *buff->in->data == 0, "buff->in->timestamp == 0 but *buff->in->text != 0");
-
-                buff->in->timestamp = (msec_t) tmp_time.tm.tv_sec * MSEC_PER_SEC + (msec_t) tmp_time.tm.tv_nsec / (NSEC_PER_MSEC);
-                m_assert(TEST_MS_TIMESTAMP_VALID(buff->in->timestamp), "buff->in->timestamp is invalid"); // Timestamp within valid range up to 2050
-
-                // debug(D_LOGS_MANAG, "timestamp:%llu", buff->in->timestamp);
-            }
 
             p = x->via.map.ptr;
             pend = x->via.map.ptr + x->via.map.size;
@@ -448,7 +466,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
                 //     }
                 // }                    
                 
-                m_assert(buff->in->timestamp, "buff->in->timestamp is 0");
+                // m_assert(buff->in->timestamp, "buff->in->timestamp is 0");
 
                 /* FLB_GENERIC, FLB_WEB_LOG and FLB_SERIAL case */
                 if( p_file_info->log_type == FLB_GENERIC || 
@@ -461,21 +479,13 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
                          * parent. */
                         !strncasecmp(p->key.via.str.ptr, LOG_REC_KEY_SYSTEMD, (size_t) p->key.via.str.size)){
 
-                        char *text = (char *) p->val.via.str.ptr;
-                        size_t text_size = p->val.via.str.size;
+                        message = (char *) p->val.via.str.ptr;
+                        message_size = p->val.via.str.size;
 
-                        m_assert(text_size, "text_size is 0");
-                        m_assert(text, "text is NULL");
+                        new_tmp_text_size = message_size + 1; // +1 for '\n'
 
-                        // debug(D_LOGS_MANAG, "msg key:[%.*s]val:[%.*s]", (int) p->key.via.str.size, p->key.via.str.ptr, 
-                        //                                                 (int) p->val.via.str.size, p->val.via.str.ptr);
-
-                        new_tmp_text_size = buff->in->text_size + text_size + 1; // +1 for '\n'
-                        if(unlikely(!circ_buff_prepare_write(buff, new_tmp_text_size))) goto skip_collect_and_drop_logs;
-
-                        memcpy(&buff->in->data[buff->in->text_size], text, text_size);
-                        buff->in->text_size = new_tmp_text_size;
-                        buff->in->data[buff->in->text_size - 1] = '\n';
+                        m_assert(message_size, "message_size is 0");
+                        m_assert(message, "message is NULL");
                     }
                     ++p;
                     continue;
@@ -484,12 +494,26 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
 
                 /* FLB_KMSG case */
                 if(p_file_info->log_type == FLB_KMSG){
-                    if(!new_tmp_text_size){
-                        /* set new_tmp_text_size to previous size of buffer, do only once */
-                        new_tmp_text_size = buff->in->text_size; 
+                    if(unlikely(skip_kmsg_log_buffering)){
+                        static time_t netdata_start_time = 0;
+                        if (!netdata_start_time) netdata_start_time = now_boottime_sec();
+                        if(now_boottime_sec() - netdata_start_time < KERNEL_LOGS_COLLECT_INIT_WAIT) 
+                            goto skip_collect_and_drop_logs;
+                        else skip_kmsg_log_buffering = 0;
                     }
-                    if( !strncmp(p->key.via.str.ptr, LOG_REC_KEY, (size_t) p->key.via.str.size) && 
-                        !skip_kmsg_log_buffering){
+                    /* NOTE/WARNING: kmsg timestamps will be **wrong** if system 
+                     *               has gone into hibernation since boot. Need
+                     *               to add config option to use now_realtime_msec()
+                     *               if the user desires to use collection time.
+                     */
+                    if(!strncmp(p->key.via.str.ptr, "sec", (size_t) p->key.via.str.size)){
+                        timestamp += (now_realtime_sec() - now_boottime_sec() + p->val.via.i64) * MSEC_PER_SEC;
+                        // timestamp = now_realtime_msec();
+                    }
+                    else if(!strncmp(p->key.via.str.ptr, "usec", (size_t) p->key.via.str.size)){
+                        timestamp += p->val.via.i64 / USEC_PER_MS;
+                    }
+                    else if(!strncmp(p->key.via.str.ptr, LOG_REC_KEY, (size_t) p->key.via.str.size)){
                         message = (char *) p->val.via.str.ptr;
                         message_size = p->val.via.str.size;
 
@@ -505,8 +529,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
                             message_size = c - message;
                             bytes_remain -= message_size;
 
-                            /* Extract machine-readable info for charts, 
-                                * such as subsystem and device. */
+                            /* Extract machine-readable info for charts, such as subsystem and device. */
                             while(bytes_remain){
                                 size_t sz = 0;
                                 while(--bytes_remain && c[++sz] != '\n');
@@ -540,8 +563,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
 
                         new_tmp_text_size += message_size + 1; // +1 for '\n'
                     }
-                    else if(!strncmp(p->key.via.str.ptr, "priority", (size_t) p->key.via.str.size) && 
-                            !skip_kmsg_log_buffering){
+                    else if(!strncmp(p->key.via.str.ptr, "priority", (size_t) p->key.via.str.size)){
                         p_file_info->flb_tmp_kernel_metrics.sever[p->val.via.u64]++;
                     }
                     ++p;
@@ -549,12 +571,19 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
                 } /* FLB_KMSG case end */
 
                 /* FLB_SYSTEMD or FLB_SYSLOG case */
-                if(p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_SYSLOG){
-                    if(!new_tmp_text_size){
-                        /* set new_tmp_text_size to previous size of buffer, do only once */
-                        new_tmp_text_size = buff->in->text_size; 
+                if( p_file_info->log_type == FLB_SYSTEMD || 
+                    p_file_info->log_type == FLB_SYSLOG){
+                    if(!strncmp(p->key.via.str.ptr, "_SOURCE_REALTIME_TIMESTAMP", (size_t) p->key.via.str.size)){
+                        strncpy(timestamp_str, p->val.via.str.ptr, (size_t) p->val.via.str.size);
+                        timestamp_str[p->val.via.str.size] = '\0';
+
+                        /* TODO: Write dedicated function for timestamp conversion, with better error checking. */
+                        errno = 0;
+                        char *endptr = NULL;
+                        timestamp = strtoll(timestamp_str, &endptr, 10);
+                        timestamp = errno || *endptr ? 0 : timestamp;
                     }
-                    if(!strncmp(p->key.via.str.ptr, "PRIVAL", (size_t) p->key.via.str.size)){
+                    else if(!strncmp(p->key.via.str.ptr, "PRIVAL", (size_t) p->key.via.str.size)){
                         m_assert(p->val.via.str.size <= 3, "p->val.via.str.size > 3");
                         strncpy(syslog_prival, p->val.via.str.ptr, (size_t) p->val.via.str.size);
                         syslog_prival[p->val.via.str.size] = '\0';
@@ -616,8 +645,6 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
                         message = (char *) p->val.via.str.ptr;
                         message_size = p->val.via.str.size;
 
-                        // debug(D_LOGS_MANAG,"msg key:[%.*s]val:[%.*s]", (int) p->key.via.str.size, p->key.via.str.ptr, (int) p->val.via.str.size, p->val.via.str.ptr);
-
                         m_assert(message, "message is NULL");
                         m_assert(message_size, "message_size is 0");
 
@@ -629,22 +656,17 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
 
                 /* FLB_DOCKER_EV case */
                 if(p_file_info->log_type == FLB_DOCKER_EV){ 
-
-                    if(!new_tmp_text_size){
-                        /* set new_tmp_text_size to previous size of buffer, do only once */
-                        new_tmp_text_size = buff->in->text_size; 
-                    }
                     if(!strncmp(p->key.via.str.ptr, "time", (size_t) p->key.via.str.size)){
                         docker_ev_time = p->val.via.i64;
 
                         m_assert(docker_ev_time, "docker_ev_time is 0");
-
-                        // debug(D_LOGS_MANAG,"docker_ev_time: %ld", p->val.via.i64);
                     }
                     else if(!strncmp(p->key.via.str.ptr, "timeNano", (size_t) p->key.via.str.size)){
                         docker_ev_timeNano = p->val.via.i64;
 
                         m_assert(docker_ev_timeNano, "docker_ev_timeNano is 0");
+
+                        timestamp = docker_ev_timeNano / NSEC_PER_MSEC;
                     }
                     else if(!strncmp(p->key.via.str.ptr, "Type", (size_t) p->key.via.str.size)){
                         docker_ev_type = (char *) p->val.via.str.ptr;
@@ -734,40 +756,55 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
         } 
     }
 
-    // Below, we extract metrics and reconstruct the log record
+    /* If no log timestamp was found, use collection timestamp instead. */
+    if(timestamp == 0) 
+        timestamp = (msec_t) tmp_time.tm.tv_sec * MSEC_PER_SEC + (msec_t) tmp_time.tm.tv_nsec / (NSEC_PER_MSEC);
 
-    /* FLB_KMSG case */
-    if(p_file_info->log_type == FLB_KMSG){
+    m_assert(TEST_MS_TIMESTAMP_VALID(timestamp), "timestamp is invalid");
 
-        if(unlikely(skip_kmsg_log_buffering)){
-            static time_t netdata_start_time = 0;
-            if (!netdata_start_time) netdata_start_time = now_boottime_sec();
-            if(now_boottime_sec() - netdata_start_time >= KERNEL_LOGS_COLLECT_INIT_WAIT) skip_kmsg_log_buffering = 0;
-        }
-        else{
-            
-            /* Parse number of log lines */
-            buff->in->num_lines++;
+    /* If input buffer timestamp is not set, now is the time to set it,
+     * else just close the previous buffer */
+    if(unlikely(buff->in->timestamp == 0)) buff->in->timestamp = timestamp / 1000 * 1000; // rounding down
+    else if((timestamp - buff->in->timestamp) >= MSEC_PER_SEC) {
+        flb_complete_buff_item(p_file_info);
+        buff->in->timestamp = timestamp / 1000 * 1000; // rounding down
+    }
 
-            /* Metrics extracted, now prepare circular buffer for write */
-            // TODO: Fix: Metrics will still be collected if circ_buff_prepare_write() returns 0.
-            if(unlikely(!circ_buff_prepare_write(buff, new_tmp_text_size))) goto skip_collect_and_drop_logs;
+    m_assert(TEST_MS_TIMESTAMP_VALID(buff->in->timestamp), "buff->in->timestamp is invalid");
 
-            size_t tmp_item_off = buff->in->text_size;
+    new_tmp_text_size += buff->in->text_size; 
 
-            if(likely(message)){
-                memcpy(&buff->in->data[tmp_item_off], message, message_size);
-                tmp_item_off += message_size;  
-            }
+    /* ======================================================================== 
+     * Step 2: Extract metrics and reconstruct log record 
+     * ====================================================================== */
 
-            buff->in->data[tmp_item_off++] = '\n';
-            m_assert(tmp_item_off == new_tmp_text_size, "tmp_item_off should be == new_tmp_text_size");
-            buff->in->text_size = new_tmp_text_size;
-        }
-    } /* FLB_KMSG case end */
+    /* FLB_GENERIC, FLB_WEB_LOG, FLB_SERIAL and FLB_KMSG case */
+    if( p_file_info->log_type == FLB_GENERIC || 
+        p_file_info->log_type == FLB_WEB_LOG || 
+        p_file_info->log_type == FLB_SERIAL  ||
+        p_file_info->log_type == FLB_KMSG){
+
+        /* Parse number of log lines */
+        buff->in->num_lines++;
+
+        /* For FLB_WEB_LOG, metrics are extracted when flb_complete_buff_item()
+         * is called, not here. Prepare circular buffer for write: */
+        // TODO: Fix: Metrics will still be collected if circ_buff_prepare_write() returns 0.
+        if(unlikely(!circ_buff_prepare_write(buff, new_tmp_text_size))) goto skip_collect_and_drop_logs;
+
+        size_t tmp_item_off = buff->in->text_size;
+
+        memcpy(&buff->in->data[tmp_item_off], message, message_size);
+        tmp_item_off += message_size;  
+
+        buff->in->data[tmp_item_off++] = '\n';
+        m_assert(tmp_item_off == new_tmp_text_size, "tmp_item_off should be == new_tmp_text_size");
+        buff->in->text_size = new_tmp_text_size;
+    } /* FLB_GENERIC, FLB_WEB_LOG, FLB_SERIAL and FLB_KMSG case end */
     
     /* FLB_SYSTEMD or FLB_SYSLOG case */
-    if(p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_SYSLOG){
+    else if(p_file_info->log_type == FLB_SYSTEMD || 
+            p_file_info->log_type == FLB_SYSLOG){
 
         /* Parse number of log lines */
         buff->in->num_lines++;
@@ -1094,14 +1131,6 @@ int flb_add_input(struct File_info *const p_file_info){
     struct flb_lib_out_cb *callback = mallocz(sizeof(struct flb_lib_out_cb));
 
     switch(p_file_info->log_type){
-        case GENERIC: {
-            m_assert(0, "GENERIC case cannot exist in flb_add_input()");
-            return INVALID_LOG_TYPE; // log_type cannot be GENERIC here
-        }
-        case WEB_LOG: {
-            m_assert(0, "WEB_LOG case cannot exist in flb_add_input()");
-            return INVALID_LOG_TYPE; // log_type cannot be WEB_LOG here
-        }
         case FLB_GENERIC:
         case FLB_WEB_LOG: {
 
@@ -1258,7 +1287,7 @@ int flb_add_input(struct File_info *const p_file_info){
     }
 
     /* Set up "lib" output */
-    callback->cb = flb_write_to_buff_cb;
+    callback->cb = flb_collect_logs_cb;
     callback->data = p_file_info;
     p_file_info->flb_lib_output = flb_output(ctx, "lib", callback);
     if(p_file_info->flb_lib_output < 0 ) return FLB_OUTPUT_ERROR;
@@ -1317,7 +1346,7 @@ int flb_add_fwd_input(Flb_socket_config_t *forward_in_config){
     struct flb_lib_out_cb *callback = mallocz(sizeof(struct flb_lib_out_cb));
 
     /* Set up output */
-    callback->cb = flb_write_to_buff_cb;
+    callback->cb = flb_collect_logs_cb;
     callback->data = NULL;
     int output = flb_output(ctx, "lib", callback);
     if(output < 0 ) return -1;

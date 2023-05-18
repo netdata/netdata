@@ -117,7 +117,7 @@ function submit_query() {
             "<b>System time:</b> " + logs_management_meta.system_time + "<br>" +
             "<b>Error code:</b> " + logs_management_meta.error_code + "<br>" +
             "<b>Error message:</b> " + logs_management_meta.error + "<br>";
-    text += "<br><table border='1'><thead><tr><th>Collection time</th><th>Log Record</th></thead>";
+    text += "<br><table border='1'><thead><tr><th>Timestamp</th><th>Log Record</th></thead>";
     
       results_obj.data.forEach(function(data_entry) {
       datetime = new Date(data_entry[0]); // The 0 there is the key, which sets the date to the epoch

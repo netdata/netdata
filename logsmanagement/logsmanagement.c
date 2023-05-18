@@ -26,7 +26,6 @@
 #include "query.h"
 #include "parser.h"
 #include "flb_plugin.h"
-#include "tail_plugin.h"
 
 /* Extra options and includes when building with stress test support */
 #if defined(LOGS_MANAGEMENT_STRESS_TEST) 
@@ -58,6 +57,7 @@ volatile sig_atomic_t p_file_infos_arr_ready = 0;
 
 g_logs_manag_config_t g_logs_manag_config = {
     .update_every = 1,
+    .update_timeout = UPDATE_TIMEOUT_DEFAULT,
     .circ_buff_max_size_in_mib = CIRCULAR_BUFF_DEFAULT_MAX_SIZE / (1 MiB),
     .circ_buff_drop_logs = CIRCULAR_BUFF_DEFAULT_DROP_LOGS,
     .compression_acceleration = COMPRESSION_ACCELERATION_DEFAULT,
@@ -66,6 +66,15 @@ g_logs_manag_config_t g_logs_manag_config = {
     .buff_flush_to_db_interval = SAVE_BLOB_TO_DB_DEFAULT,
     .enable_collected_logs_total = ENABLE_COLLECTED_LOGS_TOTAL_DEFAULT,
     .enable_collected_logs_rate = ENABLE_COLLECTED_LOGS_RATE_DEFAULT
+};
+
+static flb_srvc_config_t flb_srvc_config = {
+    .flush          = "0.1",
+    .http_listen    = "0.0.0.0",
+    .http_port      = "2020",
+    .http_server    = "false",
+    .log_path       = "NULL",
+    .log_level      = "info"
 };
 
 static logs_manag_db_mode_t db_mode_str_to_db_mode(const char *const db_mode_str){
@@ -93,7 +102,6 @@ static void p_file_info_destroy(struct File_info *p_file_info){
     
     if(p_file_info->parser_metrics){
         switch(p_file_info->log_type){
-            case WEB_LOG: 
             case FLB_WEB_LOG: {
                 freez(p_file_info->parser_metrics->web_log);
                 break;
@@ -166,6 +174,7 @@ static void p_file_info_destroy(struct File_info *p_file_info){
  * -2 if config file not found
  */
 static int logs_manag_config_load(Flb_socket_config_t **forward_in_config_p){
+    char temp_path[FILENAME_MAX + 1];
     int rc = 0;
 
     if(!config_get_boolean(CONFIG_SECTION_LOGS_MANAGEMENT, "enabled", NETDATA_CONF_ENABLE_LOGS_MANAGEMENT_DEFAULT)){
@@ -179,6 +188,13 @@ static int logs_manag_config_load(Flb_socket_config_t **forward_in_config_p){
     if(g_logs_manag_config.update_every < localhost->rrd_update_every) 
         g_logs_manag_config.update_every = localhost->rrd_update_every;
     collector_info("CONFIG: global logs management update_every: %d", g_logs_manag_config.update_every);
+
+    g_logs_manag_config.update_timeout = (int)config_get_number(CONFIG_SECTION_LOGS_MANAGEMENT, 
+                                                                "update timeout", 
+                                                                UPDATE_TIMEOUT_DEFAULT);
+    if(g_logs_manag_config.update_timeout < g_logs_manag_config.update_every) 
+        g_logs_manag_config.update_timeout = g_logs_manag_config.update_every;
+    collector_info("CONFIG: global logs management update_timeout: %d", g_logs_manag_config.update_timeout);
 
     g_logs_manag_config.circ_buff_max_size_in_mib = config_get_number(  CONFIG_SECTION_LOGS_MANAGEMENT, 
                                                                         "circular buffer max size MiB", 
@@ -195,12 +211,13 @@ static int logs_manag_config_load(Flb_socket_config_t **forward_in_config_p){
                                                                         g_logs_manag_config.compression_acceleration);
     collector_info("CONFIG: global logs management compression_acceleration: %d", g_logs_manag_config.compression_acceleration);
 
-    char db_default_dir[FILENAME_MAX + 1];
-    snprintfz(db_default_dir, FILENAME_MAX, "%s" LOGS_MANAG_DB_SUBPATH, netdata_configured_cache_dir);
-    db_set_main_dir(config_get(CONFIG_SECTION_LOGS_MANAGEMENT, "db dir", db_default_dir));
+    snprintfz(temp_path, FILENAME_MAX, "%s" LOGS_MANAG_DB_SUBPATH, netdata_configured_cache_dir);
+    db_set_main_dir(config_get(CONFIG_SECTION_LOGS_MANAGEMENT, "db dir", temp_path));
 
 
-    const char *const db_mode_str = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, "db mode", GLOBAL_DB_MODE_DEFAULT_STR);
+    const char *const db_mode_str = config_get( CONFIG_SECTION_LOGS_MANAGEMENT, 
+                                                "db mode", 
+                                                GLOBAL_DB_MODE_DEFAULT_STR);
     g_logs_manag_config.db_mode = db_mode_str_to_db_mode(db_mode_str);
 
 
@@ -221,23 +238,27 @@ static int logs_manag_config_load(Flb_socket_config_t **forward_in_config_p){
     g_logs_manag_config.buff_flush_to_db_interval = config_get_number(  CONFIG_SECTION_LOGS_MANAGEMENT, 
                                                                         "circular buffer flush to db", 
                                                                         g_logs_manag_config.buff_flush_to_db_interval);
-    collector_info("CONFIG: global logs management buff_flush_to_db_interval: %d", g_logs_manag_config.buff_flush_to_db_interval);
+    collector_info( "CONFIG: global logs management buff_flush_to_db_interval: %d", 
+                    g_logs_manag_config.buff_flush_to_db_interval);
 
 
     g_logs_manag_config.disk_space_limit_in_mib = config_get_number(CONFIG_SECTION_LOGS_MANAGEMENT, 
                                                                     "disk space limit MiB", 
                                                                     g_logs_manag_config.disk_space_limit_in_mib);
-    collector_info("CONFIG: global logs management disk_space_limit_in_mib: %d", g_logs_manag_config.disk_space_limit_in_mib);
+    collector_info( "CONFIG: global logs management disk_space_limit_in_mib: %d", 
+                    g_logs_manag_config.disk_space_limit_in_mib);
 
     g_logs_manag_config.enable_collected_logs_total = config_get_boolean(CONFIG_SECTION_LOGS_MANAGEMENT, 
                                                                         "collected logs total chart enable", 
                                                                         g_logs_manag_config.enable_collected_logs_total);
-    collector_info("CONFIG: global logs management collected logs total chart enable: %d", g_logs_manag_config.enable_collected_logs_total);
+    collector_info( "CONFIG: global logs management collected logs total chart enable: %d", 
+                    g_logs_manag_config.enable_collected_logs_total);
 
     g_logs_manag_config.enable_collected_logs_rate = config_get_boolean(CONFIG_SECTION_LOGS_MANAGEMENT, 
                                                                         "collected logs rate chart enable", 
                                                                         g_logs_manag_config.enable_collected_logs_rate);
-    collector_info("CONFIG: global logs management collected logs rate chart enable: %d", g_logs_manag_config.enable_collected_logs_rate);
+    collector_info( "CONFIG: global logs management collected logs rate chart enable: %d", 
+                    g_logs_manag_config.enable_collected_logs_rate);
 
     /* TODO: save defaults as macros in logsmanagement_conf.h . */
     *forward_in_config_p = (Flb_socket_config_t *) callocz(1, sizeof(Flb_socket_config_t));
@@ -252,6 +273,22 @@ static int logs_manag_config_load(Flb_socket_config_t **forward_in_config_p){
     collector_info("forward in listen = %s", (*forward_in_config_p)->listen);
     (*forward_in_config_p)->port = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, "forward in port", "24224");
     collector_info("forward in port = %s", (*forward_in_config_p)->port);
+
+    snprintfz(temp_path, FILENAME_MAX, "%s/fluentbit.log", netdata_configured_log_dir);
+    
+    flb_srvc_config.flush = config_get(         CONFIG_SECTION_LOGS_MANAGEMENT, 
+                                                "fluent bit flush", flb_srvc_config.flush);
+    flb_srvc_config.http_listen = config_get(   CONFIG_SECTION_LOGS_MANAGEMENT, 
+                                                "fluent bit http listen", flb_srvc_config.http_listen);
+    flb_srvc_config.http_port = config_get(     CONFIG_SECTION_LOGS_MANAGEMENT, 
+                                                "fluent bit http port", flb_srvc_config.http_port);
+    flb_srvc_config.http_server = config_get(   CONFIG_SECTION_LOGS_MANAGEMENT, 
+                                                "fluent bit http server", flb_srvc_config.http_server);
+    flb_srvc_config.log_path = config_get(      CONFIG_SECTION_LOGS_MANAGEMENT, 
+                                                "fluent bit log file", temp_path);
+    flb_srvc_config.log_level = config_get(     CONFIG_SECTION_LOGS_MANAGEMENT, 
+                                                "fluent bit log level", flb_srvc_config.log_level);
+
 
     if(!fwd_enable){
         // TODO: Expected minor memory leak by not freeing the following?
@@ -338,7 +375,6 @@ static void logs_management_init(struct section *config_section){
     if(!type || !*type) p_file_info->log_type = FLB_GENERIC; // Default
     else{
         if(!strcasecmp(type, "flb_generic")) p_file_info->log_type = FLB_GENERIC;
-        else if (!strcasecmp(type, "web_log")) p_file_info->log_type = WEB_LOG;
         else if (!strcasecmp(type, "flb_web_log")) p_file_info->log_type = FLB_WEB_LOG;
         else if (!strcasecmp(type, "flb_kmsg")) p_file_info->log_type = FLB_KMSG;
         else if (!strcasecmp(type, "flb_systemd")) p_file_info->log_type = FLB_SYSTEMD;
@@ -393,9 +429,9 @@ static void logs_management_init(struct section *config_section){
         p_file_info->filename = NULL;
             
         switch(p_file_info->log_type){
-            case GENERIC:
             case FLB_GENERIC:
                 if(!strcmp(p_file_info->chart_name, "Netdata error.log")){
+                    // TODO: Use netdata_configured_log_dir instead of hard-coded paths.
                     const char * const netdata_error_path_default[] = {
                         "/var/log/netdata/error.log",
                         "/opt/netdata/var/log/netdata/error.log", /* error.log of static builds */
@@ -407,6 +443,11 @@ static void logs_management_init(struct section *config_section){
                         collector_error("[%s]: Netdata error.log path invalid, unknown or needs permissions", p_file_info->chart_name);
                         return p_file_info_destroy(p_file_info);
                     } else p_file_info->filename = strdupz(netdata_error_path_default[i]);
+                } else if(!strcasecmp(p_file_info->chart_name, "Netdata fluentbit.log")){
+                    if(access(flb_srvc_config.log_path, R_OK)){
+                        collector_error("[%s]: Netdata fluentbit.log path invalid, unknown or needs permissions", p_file_info->chart_name);
+                        return p_file_info_destroy(p_file_info);
+                    } else p_file_info->filename = strdupz(flb_srvc_config.log_path);
                 } else if(!strcasecmp(p_file_info->chart_name, "Auth.log tail")){
                     const char * const auth_path_default[] = {
                         "/var/log/auth.log",
@@ -432,7 +473,6 @@ static void logs_management_init(struct section *config_section){
                     } else p_file_info->filename = strdupz(syslog_path_default[i]);
                 }
                 break;
-            case WEB_LOG:
             case FLB_WEB_LOG:
                 if(!strcasecmp(p_file_info->chart_name, "Apache access.log")){
                     const char * const apache_access_path_default[] = {
@@ -487,12 +527,16 @@ static void logs_management_init(struct section *config_section){
 
 
     /* -------------------------------------------------------------------------
-     * Read "update every" configuration.
+     * Read "update every" and "update timeout" configuration.
      * ------------------------------------------------------------------------- */
     p_file_info->update_every = appconfig_get_number(   &log_management_config, config_section->name, 
                                                         "update every", g_logs_manag_config.update_every);
-    if(p_file_info->update_every < g_logs_manag_config.update_every) p_file_info->update_every = g_logs_manag_config.update_every;
     collector_info("[%s]: update every = %d", p_file_info->chart_name, p_file_info->update_every);
+
+    p_file_info->update_timeout = appconfig_get_number( &log_management_config, config_section->name, 
+                                                        "update timeout", g_logs_manag_config.update_timeout);
+    if(p_file_info->update_timeout < p_file_info->update_every) p_file_info->update_timeout = p_file_info->update_every;
+    collector_info("[%s]: update timeout = %d", p_file_info->chart_name, p_file_info->update_timeout);
 
 
     /* -------------------------------------------------------------------------
@@ -567,10 +611,8 @@ static void logs_management_init(struct section *config_section){
      * Deal with log-type-specific configuration options.
      * ------------------------------------------------------------------------- */
     
-    if(p_file_info->log_type == GENERIC || p_file_info->log_type == FLB_GENERIC){
-        // Do nothing
-    }
-    else if(p_file_info->log_type == WEB_LOG || p_file_info->log_type == FLB_WEB_LOG){
+    if(p_file_info->log_type == FLB_GENERIC){/* Do nothing */}
+    else if(p_file_info->log_type == FLB_WEB_LOG){
         /* Check if a valid web log format configuration is detected */
         char *log_format = appconfig_get(&log_management_config, config_section->name, "log format", "auto");
         const char delimiter = ' '; // TODO!!: TO READ FROM CONFIG
@@ -773,7 +815,6 @@ static void logs_management_init(struct section *config_section){
      * ------------------------------------------------------------------------- */
     p_file_info->parser_metrics = callocz(1, sizeof(Log_parser_metrics_t));
     switch(p_file_info->log_type){
-        case WEB_LOG: 
         case FLB_WEB_LOG:{
             p_file_info->parser_metrics->web_log = callocz(1, sizeof(Web_log_metrics_t));
             break;
@@ -967,17 +1008,6 @@ static void logs_management_init(struct section *config_section){
      * ------------------------------------------------------------------------- */
     switch(p_file_info->log_type){
         int rc;
-        case GENERIC:
-        case WEB_LOG: {
-            if(p_file_info->log_source == LOG_SOURCE_LOCAL){
-                rc = tail_plugin_add_input(p_file_info);
-                if(unlikely(rc)){
-                    collector_error("[%s]: tail_plugin_add_input() error: %d", p_file_info->chart_name, rc);
-                    return p_file_info_destroy(p_file_info);
-                }
-            }
-            break;
-        }
         case FLB_GENERIC:
         case FLB_WEB_LOG:
         case FLB_KMSG:
@@ -993,7 +1023,7 @@ static void logs_management_init(struct section *config_section){
                 }
             }
 
-            /* flb_tmp_buff_cpy_timer_cb() is needed for 
+            /* flb_complete_item_timer_timeout_cb() is needed for 
              * both local and non-local sources. */
             p_file_info->flb_tmp_buff_cpy_timer.data = p_file_info;
             if(unlikely(0 != uv_mutex_init(&p_file_info->flb_tmp_buff_mut))){
@@ -1001,8 +1031,8 @@ static void logs_management_init(struct section *config_section){
             }
             uv_timer_init(main_loop, &p_file_info->flb_tmp_buff_cpy_timer);
             uv_timer_start( &p_file_info->flb_tmp_buff_cpy_timer, 
-                            (uv_timer_cb)flb_tmp_buff_cpy_timer_cb, 
-                            0, p_file_info->update_every * MSEC_PER_SEC);            
+                            (uv_timer_cb)flb_complete_item_timer_timeout_cb, 
+                            0, p_file_info->update_timeout * MSEC_PER_SEC);            
             break;
         }
         default: 
@@ -1016,18 +1046,6 @@ static void logs_management_init(struct section *config_section){
     p_file_info->parser_metrics_mut = callocz(1, sizeof(uv_mutex_t));
     if(unlikely(uv_mutex_init(p_file_info->parser_metrics_mut)))
         fatal("Failed to initialise parser_metrics_mut for %s", p_file_info->chart_name);
-
-
-    /* -------------------------------------------------------------------------
-     * Initialise and create parser thread notifier condition variable and mutex.
-     * ------------------------------------------------------------------------- */
-    if(unlikely(uv_mutex_init(&p_file_info->notify_parser_thread_mut))) 
-        fatal("Failed to initialise notify_parser_thread_mut for %s", p_file_info->chart_name);
-    if(unlikely(uv_cond_init(&p_file_info->notify_parser_thread_cond))) 
-        fatal("Failed to initialise notify_parser_thread_cond for %s", p_file_info->chart_name);
-    p_file_info->log_parser_thread = mallocz(sizeof(uv_thread_t));
-    if(unlikely(uv_thread_create(p_file_info->log_parser_thread, generic_parser, p_file_info))) 
-        fatal("libuv uv_thread_create() for %s", p_file_info->chart_name);
 
 
     /* -------------------------------------------------------------------------
@@ -1087,11 +1105,7 @@ void *logsmanagement_main(void *ptr) {
     p_file_infos_arr = callocz(1, sizeof(struct File_infos_arr));
     *p_file_infos_arr = (struct File_infos_arr){0};
 
-#if 0
-    tail_plugin_init(p_file_infos_arr);
-#endif
-
-    if(flb_init()){
+    if(flb_init(flb_srvc_config)){
         collector_error("flb_init() failed - logs management will be disabled");
         goto cleanup;
     }
