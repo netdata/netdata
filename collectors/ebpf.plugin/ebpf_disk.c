@@ -749,6 +749,24 @@ static int ebpf_disk_enable_tracepoints()
     return 0;
 }
 
+/*
+ * Load BPF
+ *
+ * Load BPF files.
+ *
+ * @param em the structure with configuration
+ */
+static int ebpf_disk_load_bpf(ebpf_module_t *em)
+{
+    int ret = 0;
+    em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+    if (!em->probe_links) {
+        ret = -1;
+    }
+
+    return ret;
+}
+
 /**
  * Disk thread
  *
@@ -781,9 +799,9 @@ void *ebpf_disk_thread(void *ptr)
 
 #ifdef LIBBPF_MAJOR_VERSION
     ebpf_define_map_type(disk_maps, em->maps_per_core, running_on_kernel);
+    ebpf_adjust_thread_load(em, default_btf);
 #endif
-    em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
-    if (!em->probe_links) {
+    if (ebpf_disk_load_bpf(em)) {
         goto enddisk;
     }
 
