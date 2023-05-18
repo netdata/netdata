@@ -1,7 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /** @file compression.h
  *  @brief Header of compression.c 
- *
- *  @author Dimitris Pantazis
  */
 
 #ifndef COMPRESSION_H_

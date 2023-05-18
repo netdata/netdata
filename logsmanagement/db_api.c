@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+
 /** @file db_api.c
- *  @brief This is the file containing the database API
- *
- *  @author Dimitris Pantazis
+ *  @brief This is the file implementing the API to the 
+ *         logs management database.
  */
 
 #include "daemon/common.h"

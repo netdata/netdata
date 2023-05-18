@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /** @file query.c
- *  @brief This is the file containing the implementation of the querying API.
- *
- *  @author Dimitris Pantazis
+ *  
+ *  @brief This is the file containing the implementation of the 
+ *  logs management querying API.
  */
 
 #include "query.h"

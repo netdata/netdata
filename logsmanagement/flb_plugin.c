@@ -1,7 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /** @file flb_plugin.c
- *  @brief This file includes functions to use the Fluent Bit library
- *
- *  @author Dimitris Pantazis
+ *  @brief This file includes all functions that act as an API to 
+ *         the Fluent Bit library.
  */
 
 #include "flb_plugin.h"

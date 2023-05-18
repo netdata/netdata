@@ -1,7 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /** @file plugins_logsmanagement_generic.h
- *  @brief Incudes the structure and function definitions to use generic log charts.
- *
- *  @author Dimitris Pantazis
+ *  @brief Incudes the structure and function definitions for
+ *         generic log charts.
  */
 
 #ifndef PLUGIN_LOGSMANAGEMENT_GENERIC_H_

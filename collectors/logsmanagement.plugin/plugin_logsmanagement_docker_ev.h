@@ -1,7 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /** @file plugins_logsmanagement_docker_ev.h
- *  @brief Incudes the structure and function definitions to use docker event log charts.
- *
- *  @author Dimitris Pantazis
+ *  @brief Incudes the structure and function definitions 
+ *         for the docker event log charts.
  */
 
 #ifndef PLUGIN_LOGSMANAGEMENT_DOCKER_EV_H_

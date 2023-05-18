@@ -1,7 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /** @file file_info.h
- *  @brief Includes the File_info structure definition
- *
- *  @author Dimitris Pantazis
+ *  @brief Includes the File_info structure that is the primary
+ *         structure for configuring each log source.
  */
 
 #ifndef FILE_INFO_H_

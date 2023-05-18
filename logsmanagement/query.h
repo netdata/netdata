@@ -1,7 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /** @file query.h
  *  @brief Header of query.c 
- *
- *  @author Dimitris Pantazis
  */
 
 #ifndef QUERY_H_

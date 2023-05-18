@@ -1,7 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /** @file unit_test.h
- *  @brief Includes unit tests for the logs management project
- *
- *  @author Dimitris Pantazis
+ *  @brief Includes unit tests for the Logs Management project
  */
 
 #include "unit_test.h"

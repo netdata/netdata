@@ -1,7 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /** @file stress_test.c
- *  @brief Black-box stress testing of Netdata Logs management
- *
- *  @author Dimitrios Pantazis
+ *  @brief Black-box stress testing of Netdata Logs Management
  */
 
 #include <assert.h>

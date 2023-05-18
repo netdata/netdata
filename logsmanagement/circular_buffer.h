@@ -1,7 +1,7 @@
-/** @file page_buffer.h
- *  @brief Header of page_buffer.c 
- *
- *  @author Dimitris Pantazis
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+/** @file circular_buffer.h
+ *  @brief Header of circular_buffer.c 
  */
 
 #ifndef CIRCULAR_BUFFER_H_

@@ -1,12 +1,11 @@
-/** @file main.c
- *  @brief This is the main file of the netdata-logs project
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+/** @file logsmanagement.c
+ *  @brief This is the main file of the Netdata logs management project
  *
- *  The aim of the project is to add the capability to collect
- *  logs in the netdata agent and store them in a database for
- *  querying. main.c uses libuv and its callbacks mechanism to
- *  setup a listener for each log source. 
- *
- *  @author Dimitris Pantazis
+ *  The aim of the project is to add the capability to collect, parse and
+ *  query logs in the Netdata agent. For more information please refer 
+ *  to the project's [README](README.md) file.
  */
 
 #include "daemon/common.h"

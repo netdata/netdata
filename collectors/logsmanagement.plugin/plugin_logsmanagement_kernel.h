@@ -1,7 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /** @file plugins_logsmanagement_kernel.h
- *  @brief Incudes the structure and function definitions to use kernel log charts.
- *
- *  @author Dimitris Pantazis
+ *  @brief Incudes the structure and function definitions 
+ *         for the kernel log charts.
  */
 
 #ifndef PLUGIN_LOGSMANAGEMENT_KERNEL_H_

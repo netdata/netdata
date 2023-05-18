@@ -1,7 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /** @file logsmanagement_conf.h
- *  @brief Configuration settings for the logs management engine
- *
- *  @author Dimitris Pantazis
+ *  @brief Hard-coded configuration settings for the Logs Management engine
  */
 
 #ifndef LOGSMANAGEMENT_CONF_H_

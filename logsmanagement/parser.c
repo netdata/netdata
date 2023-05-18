@@ -1,7 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /** @file parser.c
  *  @brief API to parse and search logs
- *
- *  @author Dimitris Pantazis
  */
 
 #if SKIP_WEB_LOG_TIME_PARSING == 0

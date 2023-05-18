@@ -1,7 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /** @file compression.c
- *  @brief This is the file containing the implementation of the compression and decompression logic.
- *
- *  @author Dimitris Pantazis
+ *  @brief This is the file containing the implementation of 
+ *         the LZ4 decompression API.
  */
 
 #include "compression.h"

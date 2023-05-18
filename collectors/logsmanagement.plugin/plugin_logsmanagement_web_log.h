@@ -1,7 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /** @file plugins_logsmanagement_web_log.h
- *  @brief Incudes the structure and function definitions to use web log charts.
- *
- *  @author Dimitris Pantazis
+ *  @brief Incudes the structure and function definitions for
+ *         the web log charts.
  */
 
 #ifndef PLUGIN_LOGSMANAGEMENT_WEB_LOG_H_

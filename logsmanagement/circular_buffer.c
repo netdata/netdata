@@ -1,8 +1,9 @@
-/** @file page_buffer.c
- *  @brief This is an implementation of a page buffer to be user for temporarily 
- *         storing the logs before they are inserted into the database.
- *
- *  @author Dimitris Pantazis
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+/** @file circular_buffer.c
+ *  @brief This is the implementation of a circular buffer to be used 
+ *         for saving collected logs in memory, until they are stored 
+ *         into the database.
  */
 
 #include "circular_buffer.h"

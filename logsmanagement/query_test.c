@@ -1,7 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /** @file query_test.c
  *  @brief This is the file containing tests for the query API.
- *
- *  @author Dimitris Pantazis
  */
 
 #include "query.h"

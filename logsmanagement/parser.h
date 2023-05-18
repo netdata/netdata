@@ -1,7 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /** @file parser.h
  *  @brief Header of parser.c 
- *
- *  @author Dimitris Pantazis
  */
 
 #ifndef PARSER_H_

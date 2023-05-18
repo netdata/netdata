@@ -1,7 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /** @file db_api.h
  *  @brief Header of db_api.c
- *
- *  @author Dimitris Pantazis
  */
 
 #ifndef DB_API_H_

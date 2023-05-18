@@ -1,7 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /** @file helper.h
- *  @brief Includes helper functions for the Logs Project
- *
- *  @author Dimitris Pantazis
+ *  @brief Includes helper functions for the Logs Management project.
  */
 
 #ifndef HELPER_H_

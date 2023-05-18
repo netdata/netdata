@@ -1,6 +1,4 @@
 /** @file plugin_logsmanagement.h
- *
- *  @author Dimitris Pantazis
  */
 
 #ifndef PLUGIN_LOGSMANAGEMENT_H_

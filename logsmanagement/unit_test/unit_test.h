@@ -1,7 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /** @file unit_test.h
  *  @brief This is the header for unit_test.c
- *
- *  @author Dimitris Pantazis
  */
 
 #ifndef LOGS_MANAGEMENT_UNIT_TEST_H_

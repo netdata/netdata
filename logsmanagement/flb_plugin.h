@@ -1,7 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /** @file flb_plugin.h
  *  @brief Header of flb_plugin.c
- *
- *  @author Dimitris Pantazis
  */
 
 #ifndef FLB_PLUGIN_H_
