@@ -13,8 +13,7 @@ Monitors the performance and health metrics of the Oracle database.
 
 ## Requirements
 
--   `cx_Oracle` package.
--   Oracle Client (using `cx_Oracle` requires Oracle Client libraries to be installed).
+-   `oracledb` package.
 
 It produces following charts:
 
@@ -53,18 +52,13 @@ It produces following charts:
 
 To use the Oracle module do the following:
 
-1.  Install `cx_Oracle` package ([link](https://cx-oracle.readthedocs.io/en/latest/user_guide/installation.html)).
-
-2.  Install Oracle Client libraries
-    ([link](https://cx-oracle.readthedocs.io/en/latest/user_guide/installation.html#install-oracle-client)).
+1.  Install `oracledb` package ([link](https://python-oracledb.readthedocs.io/en/latest/user_guide/installation.html)).
 
 3.  Create a read-only `netdata` user with proper access to your Oracle Database Server.
 
 Connect to your Oracle database with an administrative user and execute:
 
 ```
-ALTER SESSION SET "_ORACLE_SCRIPT"=true;
-
 CREATE USER netdata IDENTIFIED BY <PASSWORD>;
 
 GRANT CONNECT TO netdata;
@@ -85,14 +79,13 @@ sudo ./edit-config python.d/oracledb.conf
 local:
   user: 'netdata'
   password: 'secret'
-  server: 'localhost:1521'
-  service: 'XE'
+  cs: '(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1521)(host=adb.us-ashburn-1.oraclecloud.com))(connect_data=(service_name=sdf98789f98sfs98f_projectid_low.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))'
+
 
 remote:
   user: 'netdata'
   password: 'secret'
-  server: '10.0.0.1:1521'
-  service: 'XE'
+  cs: '(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1521)(host=adb.us-ashburn-1.oraclecloud.com))(connect_data=(service_name=sdf98789f98sfs98f_projectid_low.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))'
 ```
 
 All parameters are required. Without them module will fail to start.
