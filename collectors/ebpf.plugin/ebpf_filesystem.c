@@ -683,6 +683,9 @@ void *ebpf_filesystem_thread(void *ptr)
     // Initialize optional as zero, to identify when there are not partitions to monitor
     em->optional = 0;
 
+#ifdef LIBBPF_MAJOR_VERSION
+    ebpf_adjust_thread_load(em, default_btf);
+#endif
     if (ebpf_update_partitions(em)) {
         if (em->optional)
             info("Netdata cannot monitor the filesystems used on this host.");
