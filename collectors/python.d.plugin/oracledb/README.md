@@ -65,7 +65,7 @@ GRANT CONNECT TO netdata;
 GRANT SELECT_CATALOG_ROLE TO netdata;
 ```
 
-4.  Get or create a [data source name](https://python-oracledb.readthedocs.io/en/latest/user_guide/connection_handling.html#connection-strings) for your database.
+3.  Get or create a [data source name](https://python-oracledb.readthedocs.io/en/latest/user_guide/connection_handling.html#connection-strings) for your database.
 
 ## Configuration
 
