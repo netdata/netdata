@@ -939,14 +939,14 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
 #endif
 }
 
-#define SQL_DELETE_ALERT_ENTRIES "DELETE FROM aclk_alert_%s WHERE filtered_alert_unique_id + 604800 < UNIXEPOCH();" //TODO check the when from health log
+#define SQL_DELETE_ALERT_ENTRIES "DELETE FROM aclk_alert_%s WHERE filtered_alert_unique_id + %d < UNIXEPOCH();"
 void sql_aclk_alert_clean_dead_entries(RRDHOST *host)
 {
     char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
     char sql[ACLK_SYNC_QUERY_SIZE];
-    snprintfz(sql, ACLK_SYNC_QUERY_SIZE - 1, SQL_DELETE_ALERT_ENTRIES, uuid_str);
+    snprintfz(sql, ACLK_SYNC_QUERY_SIZE - 1, SQL_DELETE_ALERT_ENTRIES, uuid_str, MAX_REMOVED_PERIOD);
 
     char *err_msg = NULL;
     int rc = sqlite3_exec_monitored(db_meta, sql, NULL, NULL, &err_msg);
