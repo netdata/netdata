@@ -52,6 +52,39 @@ static netdata_idx_t *disk_hash_values = NULL;
 ebpf_publish_disk_t *plot_disks = NULL;
 pthread_mutex_t plot_mutex;
 
+#ifdef LIBBPF_MAJOR_VERSION
+/**
+ * Set hash table
+ *
+ * Set the values for maps according the value given by kernel.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static inline void ebpf_cachestat_set_hash_table(struct disk_bpf *obj)
+ {
+    disk_maps[NETDATA_DISK_IO].map_fd = bpf_map__fd(obj->maps.tbl_disk_iocall);
+ }
+
+/**
+ * Load and attach
+ *
+ * Load and attach the eBPF code in kernel.
+ *
+ * @param obj is the main structure for bpf objects.
+ *
+ * @return it returns 0 on success and -1 otherwise
+ */
+static inline int ebpf_disk_load_and_attach(struct disk_bpf *obj)
+{
+    int ret = disk_bpf__load(obj);
+    if (ret) {
+        return ret;
+    }
+
+    return disk_bpf__attach(obj);
+}
+#endif
+
 /*****************************************************************
  *
  *  FUNCTIONS TO MANIPULATE HARD DISKS
@@ -702,7 +735,7 @@ static void disk_collector(ebpf_module_t *em)
             continue;
 
         counter = 0;
-        read_hard_disk_tables(disk_maps[NETDATA_DISK_READ].map_fd, maps_per_core);
+        read_hard_disk_tables(disk_maps[NETDATA_DISK_IO].map_fd, maps_per_core);
         pthread_mutex_lock(&lock);
         ebpf_remove_pointer_from_plot_disk(em);
         ebpf_latency_send_hd_data(update_every);
@@ -770,6 +803,11 @@ static int ebpf_disk_load_bpf(ebpf_module_t *em)
         disk_bpf_obj = disk_bpf__open();
         if (!disk_bpf_obj)
             ret = -1;
+        else {
+            ret = ebpf_disk_load_and_attach(disk_bpf_obj);
+            if (!ret)
+                ebpf_cachestat_set_hash_table(disk_bpf_obj);
+        }
     }
 #endif
 
