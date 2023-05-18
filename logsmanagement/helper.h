@@ -18,19 +18,12 @@
 
 #define MAX_LOGS_MANAG_LOG_MSG_LEN 256
 
-typedef enum { LOGS_MANAG_ERROR,
-               LOGS_MANAG_WARNING,
-               LOGS_MANAG_INFO,
-               LOGS_MANAG_DEBUG } Log_level;
-
 #ifndef m_assert
-#if LOGS_MANAG_DEBUG_LEV                                             // Disable m_assert if production release
-#define m_assert(expr, msg) assert(((void)(msg), (expr))) /**< Custom assert function that prints out failure message */
+#if defined(LOGS_MANAGEMENT_STRESS_TEST) 
+#define m_assert(expr, msg) assert(((void)(msg), (expr)))
 #else
-#define m_assert(expr, msg) \
-    do {                    \
-    } while (0)
-#endif  // LOGS_MANAG_DEBUG_LEV
+#define m_assert(expr, msg) do{} while(0)
+#endif  // LOGS_MANAGEMENT_STRESS_TEST
 #endif  // m_assert
 
 /* Test if a timestamp is within a valid range 
@@ -75,18 +68,6 @@ typedef enum { LOGS_MANAG_ERROR,
 #define COMPILE_TIME_ASSERT(X)    COMPILE_TIME_ASSERT2(X,__LINE__)
 #endif  // COMPILE_TIME_ASSERT
 
-#define BIT_SET(a, b) ((a) |= (1ULL << (b)))
-#define BIT_CLEAR(a, b) ((a) &= ~(1ULL << (b)))
-#define BIT_CHECK(a, b) (!!((a) & (1ULL << (b))))  // '!!' to make sure this returns 0 or 1
-
-// Include for sleep_ms()
-#ifdef _WIN32
-#include <Windows.h>
-#else
-#include <unistd.h>
-#endif  // _WIN32
-
-extern uv_loop_t *main_loop; 
 
 /**
  * @brief Extract file_basename from full file path

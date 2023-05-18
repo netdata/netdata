@@ -72,7 +72,7 @@ then
 	then
 		c_flags="-O1 -ggdb -Wall -Wextra -fsanitize=address -static-libasan "
 		c_flags+="-fno-omit-frame-pointer -Wformat-signedness -fstack-protector-all -D_FORTIFY_SOURCE=2 "
-		c_flags+="-DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_DEV_MODE=1 -DLOGS_MANAG_DEBUG_LEV=1 -DLOGS_MANAGEMENT_STRESS_TEST=$enable_stress_tests "
+		c_flags+="-DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_DEV_MODE=1 -DLOGS_MANAGEMENT_STRESS_TEST=$enable_stress_tests "
 		# c_flags+="-Wl,--no-as-needed -ldl "
 		sudo CFLAGS="$c_flags" ./netdata-installer.sh \
 					--dont-start-it \
@@ -131,7 +131,7 @@ then
 		sudo -u netdata -g netdata ASAN_OPTIONS=log_path=stdout $INSTALL_PATH/netdata/usr/sbin/netdata -D
 	fi
 else
-	if [[ $($INSTALL_PATH/netdata/usr/sbin/netdata -W buildinfo | grep -Fc DLOGS_MANAG_DEBUG_LEV) -eq 1 ]]
+	if [[ $($INSTALL_PATH/netdata/usr/sbin/netdata -W buildinfo | grep -Fc DLOGS_MANAGEMENT_STRESS_TEST) -eq 1 ]]
 	then
 		sudo -u netdata -g netdata ASAN_OPTIONS=log_path=/dev/null $INSTALL_PATH/netdata/usr/sbin/netdata -W logsmantest
 	else

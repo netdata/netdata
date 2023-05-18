@@ -21,8 +21,6 @@
 #define UNKNOWN "unknown"
 
 
-extern uv_loop_t *main_loop; 
-
 /* Including "../fluent-bit/include/fluent-bit/flb_macros.h" causes issues 
  * with CI, as it requires mk_core/mk_core_info.h which is generated only 
  * after Fluent Bit has been built. We can instead just redefined a couple 

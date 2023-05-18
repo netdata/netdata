@@ -51,7 +51,6 @@ static struct config log_management_config = {
 };
 
 struct File_infos_arr *p_file_infos_arr = NULL;
-uv_loop_t *main_loop = NULL; 
 
 volatile sig_atomic_t p_file_infos_arr_ready = 0;
 
@@ -341,7 +340,7 @@ static int flb_output_param_get_cb(void *entry, void *data){
  * @param config_section Section to read configuration from.
  * @todo How to handle duplicate entries?
  */
-static void logs_management_init(struct section *config_section){
+static void logs_management_init(uv_loop_t *main_loop, struct section *config_section){
 
     struct File_info *p_file_info = callocz(1, sizeof(struct File_info));
 
@@ -1089,14 +1088,15 @@ void *logsmanagement_main(void *ptr) {
     Flb_socket_config_t *forward_in_config = NULL;
     if(logs_manag_config_load(&forward_in_config)) goto cleanup;
 
-    main_loop = mallocz(sizeof(uv_loop_t));
+    uv_loop_t *main_loop = mallocz(sizeof(uv_loop_t));
     fatal_assert(uv_loop_init(main_loop) == 0);
 
     /* Static asserts */
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wunused-local-typedefs" 
     /* Ensure VALIDATE_COMPRESSION is disabled in release versions. */
-    COMPILE_TIME_ASSERT(LOGS_MANAG_DEBUG ? 1 : !VALIDATE_COMPRESSION);
+    // COMPILE_TIME_ASSERT(LOGS_MANAG_DEBUG ? 1 : !VALIDATE_COMPRESSION);
+    COMPILE_TIME_ASSERT(SAVE_BLOB_TO_DB_MIN <= SAVE_BLOB_TO_DB_MAX);
     COMPILE_TIME_ASSERT(CIRCULAR_BUFF_DEFAULT_MAX_SIZE >= CIRCULAR_BUFF_MAX_SIZE_RANGE_MIN); 
     COMPILE_TIME_ASSERT(CIRCULAR_BUFF_DEFAULT_MAX_SIZE <= CIRCULAR_BUFF_MAX_SIZE_RANGE_MAX);
     #pragma GCC diagnostic pop
@@ -1113,7 +1113,7 @@ void *logsmanagement_main(void *ptr) {
     /* Initialize logs management for each configuration section  */
     struct section *config_section = log_management_config.first_section;
     do {
-        logs_management_init(config_section);
+        logs_management_init(main_loop, config_section);
         config_section = config_section->next;
     } while(config_section);
     if(p_file_infos_arr->count == 0) goto cleanup; // No log sources - nothing to do
@@ -1146,9 +1146,11 @@ void *logsmanagement_main(void *ptr) {
 #endif // defined(__STDC_VERSION__)
     debug(D_LOGS_MANAG, "libuv version: %s", uv_version_string());
     debug(D_LOGS_MANAG, "LZ4 version: %s\n", LZ4_versionString());
+#if defined(D_LOGS_MANAG)
     char *sqlite_version = db_get_sqlite_version();
     debug(D_LOGS_MANAG, "SQLITE version: %s\n", sqlite_version);
     freez(sqlite_version);
+#endif // defined(D_LOGS_MANAG)
 
 #if defined(LOGS_MANAGEMENT_STRESS_TEST) && LOGS_MANAGEMENT_STRESS_TEST == 1
     debug(D_LOGS_MANAG, "Running Netdata with logs_management stress test enabled!");
