@@ -378,7 +378,7 @@ ebpf_filesystem_partitions_t localfs[] =
       .enabled = CONFIG_BOOLEAN_YES,
       .addresses = {.function = NULL, .addr = 0},
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4,
-      .fs_maps = NULL},
+      .fs_maps = NULL, .fs_obj = NULL},
      {.filesystem = "xfs",
       .optional_filesystem = NULL,
       .family = "xfs",
@@ -388,7 +388,7 @@ ebpf_filesystem_partitions_t localfs[] =
       .enabled = CONFIG_BOOLEAN_YES,
       .addresses = {.function = NULL, .addr = 0},
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4,
-      .fs_maps = NULL},
+      .fs_maps = NULL, .fs_obj = NULL},
      {.filesystem = "nfs",
       .optional_filesystem = "nfs4",
       .family = "nfs",
@@ -398,7 +398,7 @@ ebpf_filesystem_partitions_t localfs[] =
       .enabled = CONFIG_BOOLEAN_YES,
       .addresses = {.function = NULL, .addr = 0},
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4,
-      .fs_maps = NULL},
+      .fs_maps = NULL, .fs_obj = NULL},
      {.filesystem = "zfs",
       .optional_filesystem = NULL,
       .family = "zfs",
@@ -408,7 +408,7 @@ ebpf_filesystem_partitions_t localfs[] =
       .enabled = CONFIG_BOOLEAN_YES,
       .addresses = {.function = NULL, .addr = 0},
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4,
-      .fs_maps = NULL},
+      .fs_maps = NULL, .fs_obj = NULL},
      {.filesystem = "btrfs",
       .optional_filesystem = NULL,
       .family = "btrfs",
@@ -418,7 +418,7 @@ ebpf_filesystem_partitions_t localfs[] =
       .enabled = CONFIG_BOOLEAN_YES,
       .addresses = {.function = "btrfs_file_operations", .addr = 0},
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_10,
-      .fs_maps = NULL},
+      .fs_maps = NULL, .fs_obj = NULL},
      {.filesystem = NULL,
       .optional_filesystem = NULL,
       .family = NULL,
@@ -427,7 +427,7 @@ ebpf_filesystem_partitions_t localfs[] =
       .flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION,
       .enabled = CONFIG_BOOLEAN_YES,
       .addresses = {.function = NULL, .addr = 0},
-      .kernels = 0, .fs_maps = NULL}};
+      .kernels = 0, .fs_maps = NULL, .fs_obj = NULL}};
 
 ebpf_sync_syscalls_t local_syscalls[] = {
     {.syscall = NETDATA_SYSCALLS_SYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
