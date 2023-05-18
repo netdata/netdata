@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- Update netdata-security.md [\#15068](https://github.com/netdata/netdata/pull/15068) ([cakrit](https://github.com/cakrit))
+- Update netdata-security.md [\#15067](https://github.com/netdata/netdata/pull/15067) ([cakrit](https://github.com/cakrit))
+- Update CODEOWNERS [\#15064](https://github.com/netdata/netdata/pull/15064) ([cakrit](https://github.com/cakrit))
+- Update netdata-security.md [\#15063](https://github.com/netdata/netdata/pull/15063) ([sashwathn](https://github.com/sashwathn))
+- Fix memory leak when sending alerts checkoint [\#15060](https://github.com/netdata/netdata/pull/15060) ([stelfrag](https://github.com/stelfrag))
 - bump go.d.plugin to v0.53.0 [\#15059](https://github.com/netdata/netdata/pull/15059) ([ilyam8](https://github.com/ilyam8))
 - Fix ACLK memleak [\#15055](https://github.com/netdata/netdata/pull/15055) ([underhood](https://github.com/underhood))
 - fix\(debugfs/zswap\): don't collect metrics if Zswap is disabled [\#15054](https://github.com/netdata/netdata/pull/15054) ([ilyam8](https://github.com/ilyam8))
@@ -26,6 +31,7 @@
 - Silence dimensions with noisy ML models [\#15011](https://github.com/netdata/netdata/pull/15011) ([vkalintiris](https://github.com/vkalintiris))
 - Update chart documentation [\#15010](https://github.com/netdata/netdata/pull/15010) ([Ancairon](https://github.com/Ancairon))
 - libjudy: remove JudyLTablesGen [\#14984](https://github.com/netdata/netdata/pull/14984) ([mochaaP](https://github.com/mochaaP))
+- Remove Fedora 36 from CI and platform support. [\#14938](https://github.com/netdata/netdata/pull/14938) ([Ferroin](https://github.com/Ferroin))
 - make zlib compulsory dep [\#14928](https://github.com/netdata/netdata/pull/14928) ([underhood](https://github.com/underhood))
 - Remove old logic for handling of legacy stock config files. [\#14829](https://github.com/netdata/netdata/pull/14829) ([Ferroin](https://github.com/Ferroin))
 - fix infiniband bytes counters multiplier and divisor [\#14748](https://github.com/netdata/netdata/pull/14748) ([ilyam8](https://github.com/ilyam8))
@@ -397,9 +403,6 @@
 - Typos in in notification docs [\#14440](https://github.com/netdata/netdata/pull/14440) ([iorvd](https://github.com/iorvd))
 - Streaming interpolated values [\#14431](https://github.com/netdata/netdata/pull/14431) ([ktsaou](https://github.com/ktsaou))
 - Fix compiler error when CLOSE\_RANGE\_CLOEXEC is missing [\#14430](https://github.com/netdata/netdata/pull/14430) ([Dim-P](https://github.com/Dim-P))
-- Add .NET info [\#14429](https://github.com/netdata/netdata/pull/14429) ([thiagoftsm](https://github.com/thiagoftsm))
-- Minor fix, convert metadata of the learn to hidden sections [\#14427](https://github.com/netdata/netdata/pull/14427) ([tkatsoulas](https://github.com/tkatsoulas))
-- kickstart.sh: Fix `--release-channel` as `--nightly-channel` options [\#14424](https://github.com/netdata/netdata/pull/14424) ([vobruba-martin](https://github.com/vobruba-martin))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
@@ -413,9 +416,6 @@
 
 - Updated w1sensor.chart.py [\#14435](https://github.com/netdata/netdata/pull/14435) ([martindue](https://github.com/martindue))
 - replication to streaming transition when there are gaps [\#14434](https://github.com/netdata/netdata/pull/14434) ([ktsaou](https://github.com/ktsaou))
-- turn error\(\) to internal\_error\(\) [\#14428](https://github.com/netdata/netdata/pull/14428) ([ktsaou](https://github.com/ktsaou))
-- Fix typo on the netdata-functions.md [\#14426](https://github.com/netdata/netdata/pull/14426) ([lokerhp](https://github.com/lokerhp))
-- Update screenshot of timezone selector [\#14425](https://github.com/netdata/netdata/pull/14425) ([cakrit](https://github.com/cakrit))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
