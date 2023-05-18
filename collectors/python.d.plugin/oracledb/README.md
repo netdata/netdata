@@ -65,8 +65,6 @@ GRANT CONNECT TO netdata;
 GRANT SELECT_CATALOG_ROLE TO netdata;
 ```
 
-3.  Get or create a [data source name](https://python-oracledb.readthedocs.io/en/latest/user_guide/connection_handling.html#connection-strings) for your database.
-
 ## Configuration
 
 Edit the `python.d/oracledb.conf` configuration file using `edit-config` from the Netdata [config
@@ -81,13 +79,15 @@ sudo ./edit-config python.d/oracledb.conf
 local:
   user: 'netdata'
   password: 'secret'
-  dsn: '(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1521)(host=adb.us-ashburn-1.oraclecloud.com))(connect_data=(service_name=sdf98789f98sfs98f_projectid_low.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))'
+  server: 'localhost:1521'
+  service: 'XE'
 
 
 remote:
   user: 'netdata'
   password: 'secret'
-  dsn: '(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1521)(host=adb.us-ashburn-1.oraclecloud.com))(connect_data=(service_name=sdf98789f98sfs98f_projectid_low.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))'
+  server: '10.0.0.1:1521'
+  service: 'XE'
 ```
 
 All parameters are required. Without them module will fail to start.
