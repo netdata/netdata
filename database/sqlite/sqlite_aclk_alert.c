@@ -1010,8 +1010,6 @@ void aclk_send_alarm_checkpoint(char *node_id __maybe_unused, char *claim_id __m
 #endif
 }
 
-#ifdef ENABLE_ACLK
-
 typedef struct active_alerts {
     char *name;
     char *chart;
