@@ -275,13 +275,24 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
 #ifdef LIBBPF_MAJOR_VERSION
             ebpf_define_map_type(em->maps, em->maps_per_core, running_on_kernel);
 #endif
-            efp->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &efp->objects);
-            if (!efp->probe_links) {
-                em->thread_name = saved_name;
-                em->kernels = kernels;
-                em->maps = NULL;
-                return -1;
+            if (em->load & EBPF_LOAD_LEGACY) {
+                efp->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &efp->objects);
+                if (!efp->probe_links) {
+                    em->thread_name = saved_name;
+                    em->kernels = kernels;
+                    return -1;
+                }
             }
+#ifdef LIBBPF_MAJOR_VERSION
+            else {
+                efp->fs_obj = filesystem_bpf__open();
+                if (!efp->fs_obj) {
+                    em->thread_name = saved_name;
+                    em->kernels = kernels;
+                    return -1;
+                }
+            }
+#endif
             efp->flags |= NETDATA_FILESYSTEM_FLAG_HAS_PARTITION;
             pthread_mutex_lock(&lock);
             ebpf_update_kernel_memory(&plugin_statistics, efp->fs_maps, EBPF_ACTION_STAT_ADD);
