@@ -256,6 +256,7 @@ void *ebpf_mdflush_thread(void *ptr)
 
 #ifdef LIBBPF_MAJOR_VERSION
     ebpf_define_map_type(em->maps, em->maps_per_core, running_on_kernel);
+    ebpf_adjust_thread_load(em, default_btf);
 #endif
     em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
     if (!em->probe_links) {
