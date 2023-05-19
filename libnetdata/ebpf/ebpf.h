@@ -340,6 +340,16 @@ typedef struct netdata_ebpf_histogram {
     uint64_t histogram[NETDATA_EBPF_HIST_MAX_BINS];
 } netdata_ebpf_histogram_t;
 
+enum fs_btf_counters {
+    NETDATA_KEY_BTF_READ,
+    NETDATA_KEY_BTF_WRITE,
+    NETDATA_KEY_BTF_OPEN,
+    NETDATA_KEY_BTF_SYNC_ATTR,
+    NETDATA_KEY_BTF_OPEN2,
+
+    NETDATA_FS_BTF_END
+};
+
 typedef struct ebpf_filesystem_partitions {
     char *filesystem;
     char *optional_filesystem;
@@ -366,6 +376,7 @@ typedef struct ebpf_filesystem_partitions {
 #else
     void *fs_obj;
 #endif
+    const char *functions[NETDATA_FS_BTF_END];
 } ebpf_filesystem_partitions_t;
 
 typedef struct ebpf_sync_syscalls {
