@@ -222,6 +222,72 @@ static void ebpf_fs_disable_kprobe(struct filesystem_bpf *obj)
      }
 }
 
+/**
+ * Attach Kprobe
+ *
+ * Attach kprobe on targets
+ *
+  *  @param obj        FS object loaded.
+  *  @param functions  array with function names.
+ */
+static int ebpf_fs_attach_kprobe(struct filesystem_bpf *obj, const char **functions)
+{
+     // kprobe
+     obj->links.netdata_fs_file_read_probe = bpf_program__attach_kprobe(obj->progs.netdata_fs_file_read_probe,
+                                                                        false, functions[NETDATA_KEY_BTF_READ]);
+     if (libbpf_get_error(obj->links.netdata_fs_file_read_probe))
+         return -1;
+
+     obj->links.netdata_fs_file_write_probe = bpf_program__attach_kprobe(obj->progs.netdata_fs_file_write_probe,
+                                                                         false, functions[NETDATA_KEY_BTF_WRITE]);
+     if (libbpf_get_error(obj->links.netdata_fs_file_write_probe))
+         return -1;
+
+     obj->links.netdata_fs_file_open_probe = bpf_program__attach_kprobe(obj->progs.netdata_fs_file_open_probe,
+                                                                        false, functions[NETDATA_KEY_BTF_OPEN]);
+     if (libbpf_get_error(obj->links.netdata_fs_file_open_probe))
+         return -1;
+
+     obj->links.netdata_fs_getattr_probe = bpf_program__attach_kprobe(obj->progs.netdata_fs_getattr_probe,
+                                                                      false, functions[NETDATA_KEY_BTF_SYNC_ATTR]);
+     if (libbpf_get_error(obj->links.netdata_fs_getattr_probe))
+         return -1;
+
+     // kretprobe
+     obj->links.netdata_fs_file_read_retprobe = bpf_program__attach_kprobe(obj->progs.netdata_fs_file_read_retprobe,
+                                                                           false, functions[NETDATA_KEY_BTF_READ]);
+     if (libbpf_get_error(obj->links.netdata_fs_file_read_retprobe))
+         return -1;
+
+     obj->links.netdata_fs_file_write_retprobe = bpf_program__attach_kprobe(obj->progs.netdata_fs_file_write_retprobe,
+                                                                            false, functions[NETDATA_KEY_BTF_WRITE]);
+     if (libbpf_get_error(obj->links.netdata_fs_file_write_retprobe))
+         return -1;
+
+     obj->links.netdata_fs_file_open_retprobe = bpf_program__attach_kprobe(obj->progs.netdata_fs_file_open_retprobe,
+                                                                           false, functions[NETDATA_KEY_BTF_OPEN]);
+     if (libbpf_get_error(obj->links.netdata_fs_file_open_retprobe))
+         return -1;
+
+     obj->links.netdata_fs_getattr_retprobe = bpf_program__attach_kprobe(obj->progs.netdata_fs_getattr_retprobe,
+                                                                         false, functions[NETDATA_KEY_BTF_SYNC_ATTR]);
+     if (libbpf_get_error(obj->links.netdata_fs_getattr_retprobe))
+         return -1;
+
+     if (functions[NETDATA_KEY_BTF_OPEN2]) {
+         obj->links.netdata_fs_2nd_file_open_probe = bpf_program__attach_kprobe(obj->progs.netdata_fs_2nd_file_open_probe,
+                                                                                false, functions[NETDATA_KEY_BTF_OPEN2]);
+         if (libbpf_get_error(obj->links.netdata_fs_2nd_file_open_probe))
+             return -1;
+
+         obj->links.netdata_fs_2nd_file_open_retprobe = bpf_program__attach_kprobe(obj->progs.netdata_fs_2nd_file_open_retprobe,
+                                                                                   false, functions[NETDATA_KEY_BTF_OPEN2]);
+         if (libbpf_get_error(obj->links.netdata_fs_2nd_file_open_retprobe))
+             return -1;
+     }
+
+     return 0;
+}
 #endif
 
 /*****************************************************************
