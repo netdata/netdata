@@ -288,6 +288,43 @@ static int ebpf_fs_attach_kprobe(struct filesystem_bpf *obj, const char **functi
 
      return 0;
 }
+
+/**
+ * Load and Attach
+ *
+ * Load binary and attach to targets.
+ *
+ *  @param map        Structure with information about maps.
+ *  @param obj        FS object loaded.
+ *  @param functions  array with function names.
+ *  @param bf         sttruct with btf file loaded.
+ */
+static inline int ebpf_load_and_attach(ebpf_local_maps_t *map, struct filesystem_bpf *obj,
+                                       const char **functions, struct btf *bf)
+{
+    if (bf) {
+        ebpf_fs_disable_kprobe(obj);
+        ebpf_fs_set_target(obj, functions);
+    } else {
+        ebpf_fs_disable_trampoline(obj);
+    }
+
+    int ret = filesystem_bpf__load(obj);
+    if (ret) {
+        fprintf(stderr, "failed to load BPF object: %d\n", ret);
+        return -1;
+    }
+
+    if (bf)
+        ret = filesystem_bpf__attach(obj);
+    else
+        ret = ebpf_fs_attach_kprobe(obj, functions);
+
+    if (!ret)
+        map->map_fd = bpf_map__fd(obj->maps.tbl_fs);;
+
+    return ret;
+}
 #endif
 
 /*****************************************************************
