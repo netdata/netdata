@@ -526,6 +526,7 @@ struct dc_bpf *dc_bpf_obj = NULL;
 struct disk_bpf *disk_bpf_obj = NULL;
 struct fd_bpf *fd_bpf_obj = NULL;
 struct hardirq_bpf *hardirq_bpf_obj = NULL;
+struct mdflush_bpf *mdflush_bpf_obj = NULL;
 struct mount_bpf *mount_bpf_obj = NULL;
 struct shm_bpf *shm_bpf_obj = NULL;
 struct socket_bpf *socket_bpf_obj = NULL;
