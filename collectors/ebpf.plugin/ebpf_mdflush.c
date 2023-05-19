@@ -67,6 +67,33 @@ static inline void ebpf_disable_trampoline(struct mdflush_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_md_flush_request_fentry, false);
 }
 
+/**
+ * Set Trampoline
+ *
+ * Define target to attach trampoline
+ *
+ * @param obj the loaded object structure.
+ */
+static void ebpf_set_trampoline_target(struct mdflush_bpf *obj)
+{
+    bpf_program__set_attach_target(obj->progs.netdata_md_flush_request_fentry, 0,
+                                   mdflush_targets[NETDATA_MD_FLUSH_REQUEST].name);
+}
+
+/**
+ * Load probe
+ *
+ * Load probe to monitor internal function.
+ *
+ * @param obj the loaded object structure.
+ */
+static inline int ebpf_load_probes(struct mdflush_bpf *obj)
+{
+    obj->links.netdata_md_flush_request_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_md_flush_request_kprobe,
+                                                                            false,
+                                                                            mdflush_targets[NETDATA_MD_FLUSH_REQUEST].name);
+    return libbpf_get_error(obj->links.netdata_md_flush_request_kprobe);
+}
 #endif
 
 /**
