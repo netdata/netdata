@@ -42,6 +42,7 @@
 #include "includes/disk.skel.h"
 #include "includes/fd.skel.h"
 #include "includes/hardirq.skel.h"
+#include "includes/mdflush.skel.h"
 #include "includes/mount.skel.h"
 #include "includes/shm.skel.h"
 #include "includes/socket.skel.h"
@@ -54,6 +55,7 @@ extern struct disk_bpf *disk_bpf_obj;
 extern struct fd_bpf *fd_bpf_obj;
 extern struct hardirq_bpf *hardirq_bpf_obj;
 extern struct mount_bpf *mount_bpf_obj;
+extern struct mdflush_bpf *mdflush_bpf_obj;
 extern struct shm_bpf *shm_bpf_obj;
 extern struct socket_bpf *socket_bpf_obj;
 extern struct swap_bpf *bpf_obj;
