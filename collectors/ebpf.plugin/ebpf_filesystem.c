@@ -139,7 +139,7 @@ static netdata_idx_t *filesystem_hash_values = NULL;
  *  We are not calling this function for while, because we are prioritizing kprobes. We opted by this road, because
  *  distribution are still not deliverying necessary btf files per FS.
  *
- *  @obj FS object loaded.
+ *  @param obj FS object loaded.
  */
 static void ebpf_fs_disable_kprobe(struct filesystem_bpf *obj)
  {
@@ -162,7 +162,7 @@ static void ebpf_fs_disable_kprobe(struct filesystem_bpf *obj)
   *
   * Disable trampolines to use kprobes.
   *
-  *  @obj FS object loaded.
+  *  @param obj FS object loaded.
   */
  static void ebpf_fs_disable_trampoline(struct filesystem_bpf *obj)
  {
