@@ -444,11 +444,15 @@ static int private_decrypt(RSA *p_key, unsigned char * enc_data, int data_len, u
     if (!ctx)
         return 1;
 
-    if (EVP_PKEY_decrypt_init(ctx) <= 0)
+    if (EVP_PKEY_decrypt_init(ctx) <= 0) {
+        EVP_PKEY_CTX_free(ctx);
         return 1;
+    }
 
-    if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) <= 0)
+    if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) <= 0) {
+        EVP_PKEY_CTX_free(ctx);
         return 1;
+    }
 
     *decrypted = mallocz(outlen);
 
@@ -456,6 +460,8 @@ static int private_decrypt(RSA *p_key, unsigned char * enc_data, int data_len, u
         result = (int) outlen;
     else
         result = -1;
+
+    EVP_PKEY_CTX_free(ctx);
 #else
     *decrypted = mallocz(RSA_size(p_key));
     result = RSA_private_decrypt(data_len, enc_data, *decrypted, p_key, RSA_PKCS1_OAEP_PADDING);
