@@ -91,7 +91,7 @@ class Service(LogService):
         self.reFilterRelay = re.compile(f'relay={filter_relay}')
 
 
-        if type(delay_windows) != list:
+        if isinstance(delay_windows, list) is False:
             delay_windows = [delay_windows]
 
         self.delay_windows = list()
