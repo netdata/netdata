@@ -556,6 +556,13 @@ static int ebpf_hardirq_load_bpf(ebpf_module_t *em)
             ret = -1;
         }
     }
+#ifdef LIBBPF_MAJOR_VERSION
+    else {
+        hardirq_bpf_obj = hardirq_bpf__open();
+        if (!hardirq_bpf_obj)
+            ret = -1;
+    }
+#endif
 
     return ret;
 }
@@ -581,7 +588,7 @@ void *ebpf_hardirq_thread(void *ptr)
     ebpf_define_map_type(em->maps, em->maps_per_core, running_on_kernel);
     ebpf_adjust_thread_load(em, default_btf);
 #endif
-    if (ebpf_hardirq_load_bpf(ebpf_module_t *em) {
+    if (ebpf_hardirq_load_bpf(em)) {
         goto endhardirq;
     }
 
