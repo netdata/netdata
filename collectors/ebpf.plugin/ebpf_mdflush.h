@@ -33,6 +33,12 @@ typedef struct netdata_mdflush {
     uint64_t cnt;
 } netdata_mdflush_t;
 
+enum netdata_mdflush_targets {
+    NETDATA_MD_FLUSH_REQUEST,
+
+    NETDATA_MD_FLUSH_END
+};
+
 void *ebpf_mdflush_thread(void *ptr);
 
 extern struct config mdflush_config;

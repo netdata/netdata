@@ -42,6 +42,33 @@ static avl_tree_lock mdflush_pub;
 // tmp store for mdflush values we get from a per-CPU eBPF map.
 static mdflush_ebpf_val_t *mdflush_ebpf_vals = NULL;
 
+#ifdef LIBBPF_MAJOR_VERSION
+/**
+ * Disable probes
+ *
+ * Disable probes to use trampolines.
+ *
+ * @param obj the loaded object structure.
+ */
+static inline void ebpf_disable_probes(struct mdflush_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_md_flush_request_kprobe, false);
+}
+
+/**
+ * Disable trampolines
+ *
+ * Disable trampoliness to use probes.
+ *
+ * @param obj the loaded object structure.
+ */
+static inline void ebpf_disable_trampoline(struct mdflush_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_md_flush_request_fentry, false);
+}
+
+#endif
+
 /**
  * MDflush exit
  *
