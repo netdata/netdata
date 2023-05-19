@@ -157,6 +157,31 @@ static void ebpf_fs_disable_kprobe(struct filesystem_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_fs_getattr_retprobe, false);
  }
 
+ /**
+  * Disable trampoline
+  *
+  * Disable trampolines to use kprobes.
+  *
+  *  @obj FS object loaded.
+  */
+ static void ebpf_fs_disable_trampoline(struct filesystem_bpf *obj)
+ {
+    // entry
+    bpf_program__set_autoload(obj->progs.netdata_fs_file_read_entry, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_file_write_entry, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_file_open_entry, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_getattr_entry, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_2nd_file_open_entry, false);
+
+    // exit
+    bpf_program__set_autoload(obj->progs.netdata_fs_file_read_exit, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_file_write_exit, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_file_open_exit, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_getattr_exit, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_2nd_file_open_exit, false);
+ }
+
+
 #endif
 
 /*****************************************************************
