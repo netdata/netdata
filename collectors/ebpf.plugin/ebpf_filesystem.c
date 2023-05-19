@@ -181,6 +181,46 @@ static void ebpf_fs_disable_kprobe(struct filesystem_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_fs_2nd_file_open_exit, false);
  }
 
+ /**
+  * Set targets
+  *
+  * Set targets for each objects.
+  *
+  *  @param obj        FS object loaded.
+  *  @param functions  array with function names.
+  */
+ static void ebpf_fs_set_target(struct filesystem_bpf *obj, const char **functions)
+{
+     // entry
+     bpf_program__set_attach_target(obj->progs.netdata_fs_file_read_entry, 0,
+                                    functions[NETDATA_KEY_BTF_READ]);
+     bpf_program__set_attach_target(obj->progs.netdata_fs_file_write_entry, 0,
+                                    functions[NETDATA_KEY_BTF_WRITE]);
+     bpf_program__set_attach_target(obj->progs.netdata_fs_file_open_entry, 0,
+                                    functions[NETDATA_KEY_BTF_OPEN]);
+     bpf_program__set_attach_target(obj->progs.netdata_fs_getattr_entry, 0,
+                                    functions[NETDATA_KEY_BTF_SYNC_ATTR]);
+
+     // exit
+     bpf_program__set_attach_target(obj->progs.netdata_fs_file_read_exit, 0,
+                                    functions[NETDATA_KEY_BTF_READ]);
+     bpf_program__set_attach_target(obj->progs.netdata_fs_file_write_exit, 0,
+                                    functions[NETDATA_KEY_BTF_WRITE]);
+     bpf_program__set_attach_target(obj->progs.netdata_fs_file_open_exit, 0,
+                                    functions[NETDATA_KEY_BTF_OPEN]);
+     bpf_program__set_attach_target(obj->progs.netdata_fs_getattr_exit, 0,
+                                    functions[NETDATA_KEY_BTF_SYNC_ATTR]);
+
+     if (functions[NETDATA_KEY_BTF_OPEN2]) {
+         bpf_program__set_attach_target(obj->progs.netdata_fs_2nd_file_open_entry, 0,
+                                        functions[NETDATA_KEY_BTF_OPEN2]);
+         bpf_program__set_attach_target(obj->progs.netdata_fs_2nd_file_open_exit, 0,
+                                        functions[NETDATA_KEY_BTF_OPEN2]);
+     } else {
+         bpf_program__set_autoload(obj->progs.netdata_fs_2nd_file_open_entry, false);
+         bpf_program__set_autoload(obj->progs.netdata_fs_2nd_file_open_exit, false);
+     }
+}
 
 #endif
 
