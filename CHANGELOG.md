@@ -2,14 +2,16 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.39.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.39.1...HEAD)
 
 **Merged pull requests:**
 
+- Update Security doc [\#15072](https://github.com/netdata/netdata/pull/15072) ([tkatsoulas](https://github.com/tkatsoulas))
 - Update netdata-security.md [\#15068](https://github.com/netdata/netdata/pull/15068) ([cakrit](https://github.com/cakrit))
 - Update netdata-security.md [\#15067](https://github.com/netdata/netdata/pull/15067) ([cakrit](https://github.com/cakrit))
 - Update CODEOWNERS [\#15064](https://github.com/netdata/netdata/pull/15064) ([cakrit](https://github.com/cakrit))
 - Update netdata-security.md [\#15063](https://github.com/netdata/netdata/pull/15063) ([sashwathn](https://github.com/sashwathn))
+- Fix CodeQL warning  [\#15062](https://github.com/netdata/netdata/pull/15062) ([stelfrag](https://github.com/stelfrag))
 - Fix memory leak when sending alerts checkoint [\#15060](https://github.com/netdata/netdata/pull/15060) ([stelfrag](https://github.com/stelfrag))
 - bump go.d.plugin to v0.53.0 [\#15059](https://github.com/netdata/netdata/pull/15059) ([ilyam8](https://github.com/ilyam8))
 - Fix ACLK memleak [\#15055](https://github.com/netdata/netdata/pull/15055) ([underhood](https://github.com/underhood))
@@ -30,12 +32,17 @@
 - Rollback ML transaction on failure. [\#15013](https://github.com/netdata/netdata/pull/15013) ([vkalintiris](https://github.com/vkalintiris))
 - Silence dimensions with noisy ML models [\#15011](https://github.com/netdata/netdata/pull/15011) ([vkalintiris](https://github.com/vkalintiris))
 - Update chart documentation [\#15010](https://github.com/netdata/netdata/pull/15010) ([Ancairon](https://github.com/Ancairon))
+- Honor maximum message size limit of MQTT server [\#15009](https://github.com/netdata/netdata/pull/15009) ([underhood](https://github.com/underhood))
 - libjudy: remove JudyLTablesGen [\#14984](https://github.com/netdata/netdata/pull/14984) ([mochaaP](https://github.com/mochaaP))
 - Remove Fedora 36 from CI and platform support. [\#14938](https://github.com/netdata/netdata/pull/14938) ([Ferroin](https://github.com/Ferroin))
 - make zlib compulsory dep [\#14928](https://github.com/netdata/netdata/pull/14928) ([underhood](https://github.com/underhood))
 - Remove old logic for handling of legacy stock config files. [\#14829](https://github.com/netdata/netdata/pull/14829) ([Ferroin](https://github.com/Ferroin))
 - fix infiniband bytes counters multiplier and divisor [\#14748](https://github.com/netdata/netdata/pull/14748) ([ilyam8](https://github.com/ilyam8))
 - initial minimal h2o webserver integration [\#14585](https://github.com/netdata/netdata/pull/14585) ([underhood](https://github.com/underhood))
+
+## [v1.39.1](https://github.com/netdata/netdata/tree/v1.39.1) (2023-05-18)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.39.0...v1.39.1)
 
 ## [v1.39.0](https://github.com/netdata/netdata/tree/v1.39.0) (2023-05-08)
 
@@ -401,8 +408,6 @@
 - Roles permissions docs [\#14444](https://github.com/netdata/netdata/pull/14444) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Only load required charts for rrdvars [\#14443](https://github.com/netdata/netdata/pull/14443) ([MrZammler](https://github.com/MrZammler))
 - Typos in in notification docs [\#14440](https://github.com/netdata/netdata/pull/14440) ([iorvd](https://github.com/iorvd))
-- Streaming interpolated values [\#14431](https://github.com/netdata/netdata/pull/14431) ([ktsaou](https://github.com/ktsaou))
-- Fix compiler error when CLOSE\_RANGE\_CLOEXEC is missing [\#14430](https://github.com/netdata/netdata/pull/14430) ([Dim-P](https://github.com/Dim-P))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
