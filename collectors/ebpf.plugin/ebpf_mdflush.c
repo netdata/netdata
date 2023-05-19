@@ -235,6 +235,27 @@ static void mdflush_collector(ebpf_module_t *em)
     }
 }
 
+/*
+ * Load BPF
+ *
+ * Load BPF files.
+ *
+ * @param em the structure with configuration
+ */
+static int ebpf_mdflush_load_bpf(ebpf_module_t *em)
+{
+    int ret = 0;
+    if (em->load & EBPF_LOAD_LEGACY) {
+        em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+        if (!em->probe_links) {
+            ret = -1;
+        }
+    }
+
+    return ret;
+}
+
+
 /**
  * mdflush thread.
  *
@@ -258,8 +279,8 @@ void *ebpf_mdflush_thread(void *ptr)
     ebpf_define_map_type(em->maps, em->maps_per_core, running_on_kernel);
     ebpf_adjust_thread_load(em, default_btf);
 #endif
-    em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
-    if (!em->probe_links) {
+    if (ebpf_mdflush_load_bpf(em)) {
+        error("Cannot load eBPF software.");
         goto endmdflush;
     }
 
