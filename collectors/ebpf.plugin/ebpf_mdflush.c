@@ -94,6 +94,40 @@ static inline int ebpf_load_probes(struct mdflush_bpf *obj)
                                                                             mdflush_targets[NETDATA_MD_FLUSH_REQUEST].name);
     return libbpf_get_error(obj->links.netdata_md_flush_request_kprobe);
 }
+
+/**
+ * Load and Attach
+ *
+ * Load and attach bpf codes according user selection.
+ *
+ * @param obj the loaded object structure.
+ * @param em the structure with configuration
+ */
+static inline int ebpf_load_and_attach(struct mdflush_bpf *obj, ebpf_module_t *em)
+{
+    netdata_ebpf_targets_t *mt = em->targets;
+    int mode = em->targets[NETDATA_MD_FLUSH_REQUEST].mode;
+    if (mode == EBPF_LOAD_TRAMPOLINE) { // trampoline
+        ebpf_disable_probes(obj);
+
+        ebpf_set_trampoline_target(obj);
+    } else // kprobe
+        ebpf_disable_trampoline(obj);
+
+    int ret = mdflush_bpf__load(obj);
+    if (ret) {
+        fprintf(stderr, "failed to load BPF object: %d\n", ret);
+        return -1;
+    }
+
+    if (mode == EBPF_LOAD_TRAMPOLINE)
+        ret = mdflush_bpf__attach(obj);
+    else
+        ret = ebpf_load_probes(obj);
+
+    return ret;
+}
+
 #endif
 
 /**
