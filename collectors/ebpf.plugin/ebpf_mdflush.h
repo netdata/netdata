@@ -36,5 +36,6 @@ typedef struct netdata_mdflush {
 void *ebpf_mdflush_thread(void *ptr);
 
 extern struct config mdflush_config;
+extern netdata_ebpf_targets_t mdflush_targets[];
 
 #endif

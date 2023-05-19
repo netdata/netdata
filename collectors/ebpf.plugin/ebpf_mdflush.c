@@ -31,6 +31,10 @@ static ebpf_local_maps_t mdflush_maps[] = {
     }
 };
 
+netdata_ebpf_targets_t mdflush_targets[] = { {.name = "md_flush_request", .mode = EBPF_LOAD_TRAMPOLINE},
+                                           {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
+
+
 // store for "published" data from the reader thread, which the collector
 // thread will write to netdata agent.
 static avl_tree_lock mdflush_pub;
