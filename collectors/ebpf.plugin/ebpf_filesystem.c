@@ -131,6 +131,34 @@ static netdata_publish_syscall_t filesystem_publish_aggregated[NETDATA_EBPF_HIST
 char **dimensions = NULL;
 static netdata_idx_t *filesystem_hash_values = NULL;
 
+#ifdef LIBBPF_MAJOR_VERSION
+/**
+ *  FS disable kprobe
+ *
+ *  Disable kprobes, because system will use trampolines.
+ *  We are not calling this function for while, because we are prioritizing kprobes. We opted by this road, because
+ *  distribution are still not deliverying necessary btf files per FS.
+ *
+ *  @obj FS object loaded.
+ */
+static void ebpf_fs_disable_kprobe(struct filesystem_bpf *obj)
+ {
+    // kprobe
+    bpf_program__set_autoload(obj->progs.netdata_fs_file_read_probe, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_file_write_probe, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_file_open_probe, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_2nd_file_open_probe, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_getattr_probe, false);
+    // kretprobe
+    bpf_program__set_autoload(obj->progs.netdata_fs_file_read_retprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_file_write_retprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_file_open_retprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_2nd_file_open_retprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_getattr_retprobe, false);
+ }
+
+#endif
+
 /*****************************************************************
  *
  *  COMMON FUNCTIONS
