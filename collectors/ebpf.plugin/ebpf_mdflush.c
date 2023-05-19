@@ -251,6 +251,13 @@ static int ebpf_mdflush_load_bpf(ebpf_module_t *em)
             ret = -1;
         }
     }
+#ifdef LIBBPF_MAJOR_VERSION
+    else {
+        mdflush_bpf_obj = mdflush_bpf__open();
+        if (!mdflush_bpf_obj)
+            ret = -1;
+    }
+#endif
 
     return ret;
 }
