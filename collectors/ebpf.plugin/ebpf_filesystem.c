@@ -486,6 +486,10 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
                     em->thread_name = saved_name;
                     em->kernels = kernels;
                     return -1;
+                } else {
+                    if (ebpf_load_and_attach(&fs_maps[i], efp->fs_obj,
+                        efp->functions, NULL))
+                        return -1;
                 }
             }
 #endif
