@@ -60,7 +60,7 @@ pthread_mutex_t plot_mutex;
  *
  * @param obj is the main structure for bpf objects.
  */
-static inline void ebpf_cachestat_set_hash_table(struct disk_bpf *obj)
+static inline void ebpf_disk_set_hash_table(struct disk_bpf *obj)
  {
     disk_maps[NETDATA_DISK_IO].map_fd = bpf_map__fd(obj->maps.tbl_disk_iocall);
  }
@@ -806,7 +806,7 @@ static int ebpf_disk_load_bpf(ebpf_module_t *em)
         else {
             ret = ebpf_disk_load_and_attach(disk_bpf_obj);
             if (!ret)
-                ebpf_cachestat_set_hash_table(disk_bpf_obj);
+                ebpf_disk_set_hash_table(disk_bpf_obj);
         }
     }
 #endif
