@@ -103,9 +103,8 @@ static inline int ebpf_load_probes(struct mdflush_bpf *obj)
  * @param obj the loaded object structure.
  * @param em the structure with configuration
  */
-static inline int ebpf_load_and_attach(struct mdflush_bpf *obj, ebpf_module_t *em)
+static inline int ebpf_mdflush_load_and_attach(struct mdflush_bpf *obj, ebpf_module_t *em)
 {
-    netdata_ebpf_targets_t *mt = em->targets;
     int mode = em->targets[NETDATA_MD_FLUSH_REQUEST].mode;
     if (mode == EBPF_LOAD_TRAMPOLINE) { // trampoline
         ebpf_disable_probes(obj);
@@ -348,6 +347,19 @@ static int ebpf_mdflush_load_bpf(ebpf_module_t *em)
         mdflush_bpf_obj = mdflush_bpf__open();
         if (!mdflush_bpf_obj)
             ret = -1;
+        else {
+            ret = ebpf_mdflush_load_and_attach(mdflush_bpf_obj, em);
+            if (ret && em->targets[NETDATA_MD_FLUSH_REQUEST].mode == EBPF_LOAD_TRAMPOLINE) {
+                mdflush_bpf__destroy(mdflush_bpf_obj);
+                mdflush_bpf_obj = mdflush_bpf__open();
+                if (!mdflush_bpf_obj)
+                    ret = -1;
+                else {
+                    em->targets[NETDATA_MD_FLUSH_REQUEST].mode = EBPF_LOAD_PROBE;
+                    ret = ebpf_mdflush_load_and_attach(mdflush_bpf_obj, em);
+                }
+            }
+        }
     }
 #endif
 
