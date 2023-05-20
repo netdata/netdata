@@ -6,9 +6,11 @@
 
 **Merged pull requests:**
 
+- Free context when establishing ACLK connection [\#15073](https://github.com/netdata/netdata/pull/15073) ([stelfrag](https://github.com/stelfrag))
 - Update Security doc [\#15072](https://github.com/netdata/netdata/pull/15072) ([tkatsoulas](https://github.com/tkatsoulas))
 - Update netdata-security.md [\#15068](https://github.com/netdata/netdata/pull/15068) ([cakrit](https://github.com/cakrit))
 - Update netdata-security.md [\#15067](https://github.com/netdata/netdata/pull/15067) ([cakrit](https://github.com/cakrit))
+- Simplify loop in alert checkpoint [\#15065](https://github.com/netdata/netdata/pull/15065) ([MrZammler](https://github.com/MrZammler))
 - Update CODEOWNERS [\#15064](https://github.com/netdata/netdata/pull/15064) ([cakrit](https://github.com/cakrit))
 - Update netdata-security.md [\#15063](https://github.com/netdata/netdata/pull/15063) ([sashwathn](https://github.com/sashwathn))
 - Fix CodeQL warning  [\#15062](https://github.com/netdata/netdata/pull/15062) ([stelfrag](https://github.com/stelfrag))
@@ -416,11 +418,6 @@
 ## [v1.38.0](https://github.com/netdata/netdata/tree/v1.38.0) (2023-02-06)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.37.1...v1.38.0)
-
-**Merged pull requests:**
-
-- Updated w1sensor.chart.py [\#14435](https://github.com/netdata/netdata/pull/14435) ([martindue](https://github.com/martindue))
-- replication to streaming transition when there are gaps [\#14434](https://github.com/netdata/netdata/pull/14434) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
