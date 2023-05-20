@@ -299,7 +299,7 @@ static int ebpf_fs_attach_kprobe(struct filesystem_bpf *obj, const char **functi
  *  @param functions  array with function names.
  *  @param bf         sttruct with btf file loaded.
  */
-static inline int ebpf_load_and_attach(ebpf_local_maps_t *map, struct filesystem_bpf *obj,
+static inline int ebpf_fs_load_and_attach(ebpf_local_maps_t *map, struct filesystem_bpf *obj,
                                        const char **functions, struct btf *bf)
 {
     if (bf) {
@@ -487,7 +487,7 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
                     em->kernels = kernels;
                     return -1;
                 } else {
-                    if (ebpf_load_and_attach(&fs_maps[i], efp->fs_obj,
+                    if (ebpf_fs_load_and_attach(&fs_maps[i], efp->fs_obj,
                         efp->functions, NULL))
                         return -1;
                 }

@@ -155,7 +155,7 @@ static inline void ebpf_hardirq_set_hash_table(struct hardirq_bpf *obj)
  *
  * Load and attach bpf software.
  */
-static inline int ebpf_load_and_attach(struct hardirq_bpf *obj)
+static inline int ebpf_hardirq_load_and_attach(struct hardirq_bpf *obj)
 {
     int ret = hardirq_bpf__load(obj);
     if (ret) {
@@ -590,7 +590,7 @@ static int ebpf_hardirq_load_bpf(ebpf_module_t *em)
         if (!hardirq_bpf_obj)
             ret = -1;
         else {
-            ret = ebpf_load_and_attach(hardirq_bpf_obj);
+            ret = ebpf_hardirq_load_and_attach(hardirq_bpf_obj);
             if (!ret)
                 ebpf_hardirq_set_hash_table(hardirq_bpf_obj);
         }
