@@ -9,6 +9,8 @@
 #include "streaming.h"
 #include "h2o_utils.h"
 
+#include "dyn_conf.h"
+
 static h2o_globalconf_t config;
 static h2o_context_t ctx;
 static h2o_accept_ctx_t accept_ctx;
@@ -18,6 +20,7 @@ static h2o_accept_ctx_t accept_ctx;
 #define NBUF_INITIAL_SIZE_RESP (4096)
 #define API_V1_PREFIX "/api/v1/"
 #define HOST_SELECT_PREFIX "/host/"
+#define CONFIG_PREFIX "/api/v2/config"
 
 #define HTTPD_CONFIG_SECTION "httpd"
 #define HTTPD_ENABLED_DEFAULT false
@@ -312,6 +315,135 @@ static int hdl_stream(h2o_handler_t *self, h2o_req_t *req)
     return 0;
 }
 
+static int dyncfg_top(h2o_req_t *req)
+{
+        if (!h2o_memis(req->method.base, req->method.len, H2O_STRLIT("GET"))) {
+            error_report("netdata_dynamic_configuration: method is not GET");
+            req->res.status = HTTP_RESP_METHOD_NOT_ALLOWED;
+            req->res.reason = HTTP_RESP_METHOD_NOT_ALLOWED_STR;
+            h2o_send_inline(req, H2O_STRLIT(HTTP_RESP_METHOD_NOT_ALLOWED_STR));
+            return 0;
+        }
+
+        req->res.status = 200;
+        req->res.reason = "OK";
+        json_object *modules = get_list_of_modules_json();
+        json_object *wrapper = json_object_new_object();
+        json_object_object_add(wrapper, "configurable_modules", modules);
+        const char *str = json_object_to_json_string_ext(wrapper, JSON_C_TO_STRING_PRETTY);
+
+        h2o_add_header(&req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL, CONTENT_JSON_UTF8);        
+        h2o_send_inline(req, str, strlen(str));
+        json_object_put(modules);
+        return 0;
+}
+
+static int dyncfg_module_top(h2o_req_t *req, struct configurable_module *mod)
+{
+    if (h2o_memis(req->method.base, req->method.len, H2O_STRLIT("GET"))) {
+        json_object *cfg = get_config_of_module_json(mod);
+        if (cfg == NULL) {
+            error_report("netdata_dynamic_configuration: failed to get config of module");
+            req->res.status = HTTP_RESP_INTERNAL_SERVER_ERROR;
+            req->res.reason = HTTP_RESP_INTERNAL_SERVER_ERROR_STR;
+            h2o_send_inline(req, H2O_STRLIT(HTTP_RESP_INTERNAL_SERVER_ERROR_STR));
+            return 0;
+        }
+        req->res.status = 200;
+        req->res.reason = "OK";
+        const char *str = json_object_to_json_string_ext(cfg, JSON_C_TO_STRING_PRETTY);
+        h2o_add_header(&req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL, CONTENT_JSON_UTF8);
+        h2o_send_inline(req, str, strlen(str));
+        json_object_put(cfg);
+        return 0;
+    }
+    if (h2o_memis(req->method.base, req->method.len, H2O_STRLIT("POST")) || h2o_memis(req->method.base, req->method.len, H2O_STRLIT("PUT"))) {
+        char *str = iovec_to_cstr(&req->entity);
+        json_object *cfg = json_tokener_parse(str);
+        if (cfg == NULL) {
+            error_report("netdata_dynamic_configuration: failed to parse json");
+            req->res.status = HTTP_RESP_BAD_REQUEST;
+            req->res.reason = HTTP_RESP_BAD_REQUEST_STR;
+            h2o_send_inline(req, H2O_STRLIT(HTTP_RESP_BAD_REQUEST_STR));
+            return 0;
+        }
+
+        if (set_module_config_json(mod, cfg) != 0) {
+            error_report("netdata_dynamic_configuration: failed to set module configuration");
+            req->res.status = HTTP_RESP_BAD_REQUEST;
+            req->res.reason = HTTP_RESP_BAD_REQUEST_STR;
+            h2o_send_inline(req, H2O_STRLIT(HTTP_RESP_BAD_REQUEST_STR));
+            return 0;
+        }
+        req->res.status = 200;
+        req->res.reason = "OK";
+        h2o_send_inline(req, H2O_STRLIT("OK"));
+        return 0;
+    }
+
+    error_report("netdata_dynamic_configuration: method is not GET, POST or PUT");
+    req->res.status = HTTP_RESP_METHOD_NOT_ALLOWED;
+    req->res.reason = HTTP_RESP_METHOD_NOT_ALLOWED_STR;
+    h2o_send_inline(req, H2O_STRLIT(HTTP_RESP_METHOD_NOT_ALLOWED_STR));
+    return 0;
+}
+
+static int netdata_dyncfg(h2o_handler_t *self, h2o_req_t *req)
+{
+    UNUSED(self);
+
+    if (!h2o_memis(req->path_normalized.base, MIN(req->path_normalized.len, strlen(CONFIG_PREFIX)), H2O_STRLIT(CONFIG_PREFIX))) {
+        error_report("netdata_dynamic_configuration: path does not start with " CONFIG_PREFIX);
+        return -1;
+    }
+
+    h2o_iovec_t path = h2o_iovec_init(req->path_normalized.base + strlen(CONFIG_PREFIX), req->path_normalized.len - strlen(CONFIG_PREFIX));
+    if (path.len > 1 && path.base[0] == '/') {
+        path.base++;
+        path.len--;
+    }
+    if (path.len == 0) {
+        return dyncfg_top(req);
+    }
+
+    h2o_iovec_t iovec_mod = path;
+    // find / in path
+    size_t end_loc = h2o_strstr(path.base, path.len, "/", 1);
+    if (end_loc != SIZE_MAX)
+        iovec_mod.len = end_loc;
+
+    char *c_mod = iovec_to_cstr(&iovec_mod);
+    struct configurable_module *mod = get_module_by_name(c_mod);
+    freez(c_mod);
+    if (mod == NULL) {
+        BUFFER *b = buffer_create(128, NULL);
+        buffer_sprintf(b, "netdata_dynamic_configuration: requested module %s not found", c_mod);
+        error_report(buffer_tostring(b));
+        req->res.status = HTTP_RESP_NOT_FOUND;
+        req->res.reason = HTTP_RESP_NOT_FOUND_STR;
+        h2o_send_inline(req, buffer_tostring(b), b->len);
+        buffer_free(b);
+        return 0;
+    }
+
+
+    path.base += iovec_mod.len;
+    path.len -= iovec_mod.len;
+    if (path.len > 1 && path.base[0] == '/') {
+        path.base++;
+        path.len--;
+    }
+    if (path.len == 0) {
+        return dyncfg_module_top(req, mod);
+    }
+
+    req->res.status = 200;
+    req->res.reason = "OK";
+    h2o_send_inline(req, H2O_STRLIT("you should never see this!\n"));
+    return 0;
+
+}
+
 #define POLL_INTERVAL 100
 
 void *httpd_main(void *ptr) {
@@ -331,6 +463,10 @@ void *httpd_main(void *ptr) {
     pathconf = h2o_config_register_path(hostconf, "/netdata.conf", 0);
     h2o_handler_t *handler = h2o_create_handler(pathconf, sizeof(*handler));
     handler->on_req = hdl_netdata_conf;
+
+    pathconf = h2o_config_register_path(hostconf, CONFIG_PREFIX, 0);
+    handler = h2o_create_handler(pathconf, sizeof(*handler));
+    handler->on_req = netdata_dyncfg;
 
     pathconf = h2o_config_register_path(hostconf, NETDATA_STREAM_URL, 0);
     handler = h2o_create_handler(pathconf, sizeof(*handler));
