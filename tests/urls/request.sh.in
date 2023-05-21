@@ -296,16 +296,25 @@ netdata_run_original_tests() {
 ####                                                                                        ####
 ################################################################################################
 
-if [ -n "$1" ]; then
-    MURL="$1"
-fi
+ANCIENTTESTS=0
+while [ -n "${1}" ]; do
+    case "${1}" in
+        "--url") MURL="$2" ;;
+        "--old") ANCIENTTESTS=1 ;;
+    esac
+    shift 1
+done
+
+echo "$MURL"
 
 netdata_create_directory $OUTDIR
 netdata_create_directory $OUTEDIR
 netdata_create_directory $OUTOPTDIR
 netdata_create_directory $ERRDIR
 
-netdata_run_original_tests
+if [ "${ANCIENTTESTS}" == "1" ]; then
+    netdata_run_original_tests
+fi
 
 echo -e "${GREEN}ALL the URLS got 200 as answer! ${NOCOLOR}"
 
