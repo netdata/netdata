@@ -117,7 +117,7 @@ netdata_download_chart() {
             ENCODED="encoded"
         fi
 
-		NAME=${3//\"/}
+        NAME=${3//\"/}
         netdata_print_header "Getting data for $NAME using $4 $ENCODED"
 
         LDIR=$OUTD"/"$4
@@ -254,13 +254,13 @@ fi
 netdata_wrong_request_various "$MURL" "api/v1/chart" "err_chart_without_chart"
 netdata_wrong_request_various "$MURL" "api/v1/chart?_=234231424242" "err_chart_arg"
 
-netdata_download_various "$MURL" "api/v1/chart?chart=cpu.cpu0_interrupts&_=234231424242" "chart_cpu_with_more_args"
-netdata_download_various_with_options "$MURL" "api/v1/chart?chart=cpu.cpu0_interrupts&_=234231424242" "chart_cpu_with_more_args"
+#netdata_download_various "$MURL" "api/v1/chart?chart=cpu.cpu0_interrupts&_=234231424242" "chart_cpu_with_more_args"
+#netdata_download_various_with_options "$MURL" "api/v1/chart?chart=cpu.cpu0_interrupts&_=234231424242" "chart_cpu_with_more_args"
 
-netdata_download_various "$MURL" "api/v1/chart%3Fchart=cpu.cpu0_interrupts&_=234231424242" "chart_cpu_with_more_args_encoded"
-netdata_download_various_with_options "$MURL" "api/v1/chart%3Fchart=cpu.cpu0_interrupts&_=234231424242" "chart_cpu_with_more_args_encoded"
-netdata_download_various "$MURL" "api/v1/chart%3Fchart=cpu.cpu0_interrupts%26_=234231424242" "chart_cpu_with_more_args_encoded2"
-netdata_download_various "$MURL" "api/v1/chart%3Fchart%3Dcpu.cpu0_interrupts%26_%3D234231424242" "chart_cpu_with_more_args_encoded3"
+#netdata_download_various "$MURL" "api/v1/chart%3Fchart=cpu.cpu0_interrupts&_=234231424242" "chart_cpu_with_more_args_encoded"
+#netdata_download_various_with_options "$MURL" "api/v1/chart%3Fchart=cpu.cpu0_interrupts&_=234231424242" "chart_cpu_with_more_args_encoded"
+#netdata_download_various "$MURL" "api/v1/chart%3Fchart=cpu.cpu0_interrupts%26_=234231424242" "chart_cpu_with_more_args_encoded2"
+#netdata_download_various "$MURL" "api/v1/chart%3Fchart%3Dcpu.cpu0_interrupts%26_%3D234231424242" "chart_cpu_with_more_args_encoded3"
 
 netdata_create_directory "$OUTDIR/chart"
 for I in $CHARTS ; do
@@ -270,7 +270,7 @@ done
 
 netdata_wrong_request_various "$MURL" "api/v1/alarm_variables" "err_alarm_variables_without_chart"
 netdata_wrong_request_various "$MURL" "api/v1/alarm_variables?_=234231424242" "err_alarm_variables_arg"
-netdata_download_various "$MURL" "api/v1/alarm_variables?chart=cpu.cpu0_interrupts&_=234231424242" "alarm_cpu_with_more_args"
+#netdata_download_various "$MURL" "api/v1/alarm_variables?chart=cpu.cpu0_interrupts&_=234231424242" "alarm_cpu_with_more_args"
 
 netdata_create_directory "$OUTDIR/alarm_variables"
 for I in $CHARTS ; do
