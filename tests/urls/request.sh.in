@@ -327,12 +327,14 @@ netdata_run_functions_tests() {
 ANCIENTTESTS=0
 CONTEXTS=0
 FUNCTIONS=0
+ACLK=0
 while [ -n "${1}" ]; do
     case "${1}" in
         "--url") MURL="$2" ;;
         "--old") ANCIENTTESTS=1 ;;
         "--contexts") CONTEXTS=1 ;;
         "--functions") FUNCTIONS=1 ;;
+        "--aclk") ACLK=1 ;;
     esac
     shift 1
 done
@@ -354,6 +356,10 @@ fi
 
 if [ "${FUNCTIONS}" == "1" ]; then
     netdata_run_functions_tests
+fi
+
+if [ "${ACLK}" == "1" ]; then
+    netdata_download_various "$MURL" "api/v1/aclk"  "aclk"
 fi
 
 echo -e "${GREEN}ALL the URLS got 200 as answer! ${NOCOLOR}"
