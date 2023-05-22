@@ -520,9 +520,6 @@ rm -rf "${RPM_BUILD_ROOT}"
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network
 %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network-helper.sh
 
-# debugfs plugin
-%caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/debugfs.plugin
-
 # Enforce 0644 for files and 0755 for directories
 # for the netdata web directory
 %defattr(0644,root,root,0755)
@@ -800,6 +797,20 @@ Conflicts: netdata <= %{version}
 %else
 %caps(cap_sys_admin=ep) %{_libexecdir}/%{name}/plugins.d/perf.plugin
 %endif
+
+%package plugin-debugfs
+Summary: The debugfs metrics collector for the Netdata Agent
+Group: Applications/System
+Requires: netdata = %{version}
+Conflicts: netdata <= %{version}
+
+%description plugin-debugfs
+ This plugin allows the Netdata Agent to collect Linux kernel metrics exposed through debugfs.
+
+%files plugin-debugfs
+%defattr(0750,root,netdata,0750)
+# CAP_DAC_READ_SEARCH required for data collection.
+%caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/debugfs.plugin
 
 %changelog
 * Fri Apr 07 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-19

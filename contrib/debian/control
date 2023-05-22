@@ -171,3 +171,13 @@ Conflicts: netdata (< ${source:Version})
 Description: The perf metrics collector for the Netdata Agent
  This plugin allows the Netdata to collect metrics from the Linux perf
  subsystem.
+
+Package: netdata-plugin-debugfs
+Architecture: any
+Depends: ${shlibs:Debends},
+         libcap2-bin,
+         netdata (>= ${source:Version})
+Conflicts: netdata (< ${source:Version})
+Description: The debugfs metrics collector for the Netdata Agent
+ This plugin allows the Netdata Agent to collect Linux kernel metrics
+ exposed through debugfs.
