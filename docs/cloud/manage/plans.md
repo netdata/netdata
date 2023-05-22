@@ -19,7 +19,7 @@ The plan is an attribute that is directly attached to your space(s) and that dic
 
 Netdata Cloud plans, with the exception of Community, work as subscriptions and overall consist of two pricing components:
 
-* A flat fee component, that is a price per space, and
+* A flat fee component, that is applied on yearly subscriptions for the [comitted-nodes](#committed-nodes) charte (space subscription fee has been waived off)
 * An on-demand metered component, that is related to your usage of Netdata which directly links to the [number of nodes you have running](#running-nodes-and-billing)
 
 Netdata provides two billing frequency options:
