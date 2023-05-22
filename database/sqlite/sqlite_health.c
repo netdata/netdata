@@ -398,7 +398,7 @@ void sql_health_alarm_log_count(RRDHOST *host) {
 /* Health related SQL queries
    Cleans up the health_log table on a non-claimed host
 */
-#define SQL_CLEANUP_HEALTH_LOG_NOT_CLAIMED(guid,guid2,limit) "DELETE from health_log_%s where unique_id in (SELECT unique_id from health_log_%s order by unique_id asc LIMIT %lu);", guid, guid2, limit
+#define SQL_CLEANUP_HEALTH_LOG_NOT_CLAIMED(guid,limit) "DELETE FROM health_log_%s ORDER BY unique_id ASC LIMIT %lu;", guid, limit
 void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host, size_t rotate_every) {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -413,7 +413,7 @@ void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host, size_t rotate_every
     char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG_NOT_CLAIMED(uuid_str, uuid_str, (unsigned long int) (host->health.health_log_entries_written - rotate_every)));
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG_NOT_CLAIMED(uuid_str, (unsigned long int) (host->health.health_log_entries_written - rotate_every)));
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
@@ -433,7 +433,6 @@ void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host, size_t rotate_every
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, "aclk_alert_%s", uuid_str);
     if (unlikely(table_exists_in_database(command))) {
-        info("DES table aclk_alert does not exist");
         sql_aclk_alert_clean_dead_entries(host);
     }
 }
