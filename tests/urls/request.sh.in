@@ -109,7 +109,7 @@ netdata_download_contexts() {
     curl -v -k --create-dirs -o "$OUTDIR/contexts.out" "$1" 2> "$OUTDIR/contexts.err"
     netdata_test_download "$OUTDIR/contexts.err" "$1"
 
-     grep ":{" tests/contexts.out | cut -d: -f1| cut -d\" -f2| sort
+    grep ":{" tests/contexts.out | cut -d: -f1| cut -d\" -f2 | sort
 }
 
 #Test options for a specific chart
@@ -301,7 +301,9 @@ netdata_run_original_tests() {
 netdata_run_context_tests() {
     CTXS=$( netdata_download_contexts "$MURL/api/v1/contexts")
     for I in $CTXS ; do
-        echo "$I"
+        if [ "${I}" != "contexts" ]; then
+            netdata_download_various "$MURL" "/api/v1/context?context=$I" "$I"
+        fi
     done
 }
 
