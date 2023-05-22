@@ -109,6 +109,9 @@ struct rrdcalc {
     STRING *host_labels;                 // the label read from an alarm file
     SIMPLE_PATTERN *host_labels_pattern; // the simple pattern of labels
 
+    STRING *chart_labels;                 // the chart label read from an alarm file
+    SIMPLE_PATTERN *chart_labels_pattern; // the simple pattern of chart labels
+
     // ------------------------------------------------------------------------
     // runtime information
 
@@ -168,6 +171,7 @@ struct rrdcalc {
 #define rrdcalc_dimensions(rc) string2str((rc)->dimensions)
 #define rrdcalc_foreachdim(rc) string2str((rc)->foreach_dimension)
 #define rrdcalc_host_labels(rc) string2str((rc)->host_labels)
+#define rrdcalc_chart_labels(rc) string2str((rc)->chart_labels)
 
 #define foreach_rrdcalc_in_rrdhost_read(host, rc) \
     dfe_start_read((host)->rrdcalc_root_index, rc) \
@@ -206,6 +210,7 @@ struct alert_config {
     STRING *options;
     STRING *repeat;
     STRING *host_labels;
+    STRING *chart_labels;
 
     STRING *p_db_lookup_dimensions;
     STRING *p_db_lookup_method;
