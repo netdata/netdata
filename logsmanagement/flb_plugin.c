@@ -83,7 +83,6 @@ struct flb_lib_out_cb {
 
 typedef struct flb_lib_ctx flb_ctx_t;
 
-static flb_ctx_t *ctx;
 static flb_ctx_t *(*flb_create)(void);
 static int (*flb_service_set)(flb_ctx_t *ctx, ...);
 static int (*flb_start)(flb_ctx_t *ctx);
@@ -104,16 +103,18 @@ static int (*flb_output_set)(flb_ctx_t *ctx, int ffd, ...);
 static msgpack_unpack_return (*dl_msgpack_unpack_next)(msgpack_unpacked* result, const char* data, size_t len, size_t* off);
 static void (*dl_msgpack_zone_free)(msgpack_zone* zone);
 
+static flb_ctx_t *ctx = NULL;
+static void *flb_lib_handle = NULL;
+
 int flb_init(flb_srvc_config_t flb_srvc_config){
     int rc = 0;
-    void *handle = NULL;
     char *dl_error;
 
     char *flb_lib_path = strdupz_path_subpath(netdata_configured_stock_config_dir, "/../libfluent-bit.so");
-    if (unlikely(NULL == (handle = dlopen(flb_lib_path, RTLD_LAZY)))){
+    if (unlikely(NULL == (flb_lib_handle = dlopen(flb_lib_path, RTLD_LAZY)))){
         if ((dl_error = dlerror()) != NULL) 
             collector_error("dlopen() libfluent-bit.so error: %s", dl_error);
-        m_assert(handle, "dlopen() libfluent-bit.so error");
+        m_assert(flb_lib_handle, "dlopen() libfluent-bit.so error");
         rc = -1;
         goto do_return;
     }
@@ -122,7 +123,7 @@ int flb_init(flb_srvc_config_t flb_srvc_config){
 
     /* Load Fluent-Bit functions from the shared library */
     #define load_function(FUNC_NAME){\
-        *(void **) (&FUNC_NAME) = dlsym(handle, LOGS_MANAG_STR(FUNC_NAME));\
+        *(void **) (&FUNC_NAME) = dlsym(flb_lib_handle, LOGS_MANAG_STR(FUNC_NAME));\
         if ((dl_error = dlerror()) != NULL) {\
             collector_error("dlerror loading %s: %s", LOGS_MANAG_STR(FUNC_NAME), dl_error);\
             rc = -1;\
@@ -144,13 +145,13 @@ int flb_init(flb_srvc_config_t flb_srvc_config){
     // load_function(flb_filter_set);
     load_function(flb_output);
     load_function(flb_output_set);
-    *(void **) (&dl_msgpack_unpack_next) = dlsym(handle, "msgpack_unpack_next");
+    *(void **) (&dl_msgpack_unpack_next) = dlsym(flb_lib_handle, "msgpack_unpack_next");
     if ((dl_error = dlerror()) != NULL) {
         collector_error("dlerror loading msgpack_unpack_next: %s", dl_error);
         rc = -1;
         goto do_return;
     } 
-    *(void **) (&dl_msgpack_zone_free) = dlsym(handle, "msgpack_zone_free");
+    *(void **) (&dl_msgpack_zone_free) = dlsym(flb_lib_handle, "msgpack_zone_free");
     if ((dl_error = dlerror()) != NULL) {
         collector_error("dlerror loading msgpack_zone_free: %s", dl_error);
         rc = -1;
@@ -180,7 +181,7 @@ int flb_init(flb_srvc_config_t flb_srvc_config){
 do_return:
     freez(flb_lib_path);
     if(unlikely(rc)){
-        dlclose(handle);
+        dlclose(flb_lib_handle);
         return rc;
     } else return 0;
 }
@@ -190,9 +191,13 @@ int flb_run(void){
     else return -1;
 }
 
-void flb_stop_and_cleanup(void){
-    flb_stop(ctx);
-    flb_destroy(ctx);
+void flb_terminate(void){
+    if(ctx){
+        flb_stop(ctx);
+        flb_destroy(ctx);
+    }
+    if(flb_lib_handle) 
+        dlclose(flb_lib_handle);
 }
 
 static void flb_complete_buff_item(struct File_info *p_file_info){

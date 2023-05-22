@@ -1061,6 +1061,8 @@ static void logsmanagement_main_cleanup(void *ptr) {
 
     collector_info("cleaning up...");
 
+    flb_terminate();
+
     if(p_file_infos_arr){
         for(int i = 0; i < p_file_infos_arr->count; i++){
             p_file_info_destroy(p_file_infos_arr->data[i]);
@@ -1133,7 +1135,6 @@ void *logsmanagement_main(void *ptr) {
 
     if(db_init()){
         collector_error("db_init() failed - logs management will be disabled");
-        flb_stop_and_cleanup();
         goto cleanup;
     }
     

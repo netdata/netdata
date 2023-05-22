@@ -22,7 +22,7 @@ typedef struct {
 
 int flb_init(flb_srvc_config_t flb_srvc_config);
 int flb_run(void);
-void flb_stop_and_cleanup(void);
+void flb_terminate(void);
 void flb_complete_item_timer_timeout_cb(uv_timer_t *handle);
 int flb_add_input(struct File_info *const p_file_info);
 int flb_add_fwd_input(Flb_socket_config_t *const forward_in_config);
