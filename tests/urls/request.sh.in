@@ -307,6 +307,17 @@ netdata_run_context_tests() {
     done
 }
 
+netdata_run_functions_tests() {
+    CTXS=$( netdata_download_endpoints "$MURL/api/v1/functions" "functions")
+    for I in $CTXS ; do
+        if [ "${I}" != "functions" ]; then
+            netdata_download_various "$MURL" "/api/v1/function?function=$I" "$I"
+        fi
+    done
+}
+
+################################################################################################
+
 ################################################################################################
 ####                                                                                        ####
 ####                                    MAIN ROUTINE                                        ####
@@ -315,13 +326,13 @@ netdata_run_context_tests() {
 
 ANCIENTTESTS=0
 CONTEXTS=0
-PROCESSESS=0
+FUNCTIONS=0
 while [ -n "${1}" ]; do
     case "${1}" in
         "--url") MURL="$2" ;;
         "--old") ANCIENTTESTS=1 ;;
         "--contexts") CONTEXTS=1 ;;
-        "--processes") PROCESSES=1 ;;
+        "--functions") FUNCTIONS=1 ;;
     esac
     shift 1
 done
@@ -339,6 +350,10 @@ fi
 
 if [ "${CONTEXTS}" == "1" ]; then
     netdata_run_context_tests
+fi
+
+if [ "${FUNCTIONS}" == "1" ]; then
+    netdata_run_functions_tests
 fi
 
 echo -e "${GREEN}ALL the URLS got 200 as answer! ${NOCOLOR}"
