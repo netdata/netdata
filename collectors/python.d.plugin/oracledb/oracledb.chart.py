@@ -336,7 +336,6 @@ class Service(SimpleService):
         if self.conn:
             self.conn.close()
             self.conn = None
-        
         if HAS_ORACLE_NEW:
             try:
                 self.conn = cx_Oracle.connect(f'{self.user}/{self.password}@tcps://{self.server}/{self.service}')
