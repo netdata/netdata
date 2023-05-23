@@ -1027,11 +1027,10 @@ static inline int compare_active_alerts(const void * a, const void * b) {
     else
         return strcmp(active_alerts_a->name, active_alerts_b->name);
 }
-
+#ifdef ENABLE_ACLK
 #define BATCH_ALLOCATED 10
 void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
 {
-#ifdef ENABLE_ACLK
     struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
     if (unlikely(!wc)) {
         log_access("ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT REQUEST RECEIVED FOR INVALID NODE", rrdhost_hostname(host));
