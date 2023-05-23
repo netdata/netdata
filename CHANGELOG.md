@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Python Dependency Migration - OracleDB Python Module [\#15074](https://github.com/netdata/netdata/pull/15074) ([EricAndrechek](https://github.com/EricAndrechek))
 - Free context when establishing ACLK connection [\#15073](https://github.com/netdata/netdata/pull/15073) ([stelfrag](https://github.com/stelfrag))
 - Update Security doc [\#15072](https://github.com/netdata/netdata/pull/15072) ([tkatsoulas](https://github.com/tkatsoulas))
 - Update netdata-security.md [\#15068](https://github.com/netdata/netdata/pull/15068) ([cakrit](https://github.com/cakrit))
@@ -36,6 +37,7 @@
 - Update chart documentation [\#15010](https://github.com/netdata/netdata/pull/15010) ([Ancairon](https://github.com/Ancairon))
 - Honor maximum message size limit of MQTT server [\#15009](https://github.com/netdata/netdata/pull/15009) ([underhood](https://github.com/underhood))
 - libjudy: remove JudyLTablesGen [\#14984](https://github.com/netdata/netdata/pull/14984) ([mochaaP](https://github.com/mochaaP))
+- Use chart labels to filter alerts [\#14982](https://github.com/netdata/netdata/pull/14982) ([MrZammler](https://github.com/MrZammler))
 - Remove Fedora 36 from CI and platform support. [\#14938](https://github.com/netdata/netdata/pull/14938) ([Ferroin](https://github.com/Ferroin))
 - make zlib compulsory dep [\#14928](https://github.com/netdata/netdata/pull/14928) ([underhood](https://github.com/underhood))
 - Remove old logic for handling of legacy stock config files. [\#14829](https://github.com/netdata/netdata/pull/14829) ([Ferroin](https://github.com/Ferroin))
@@ -408,8 +410,6 @@
 - Fix agent build failure on FreeBSD 14.0 due to new tcpstat struct [\#14446](https://github.com/netdata/netdata/pull/14446) ([Dim-P](https://github.com/Dim-P))
 - minor fix in the metadata of libnetdata/ebpf AND log documents [\#14445](https://github.com/netdata/netdata/pull/14445) ([tkatsoulas](https://github.com/tkatsoulas))
 - Roles permissions docs [\#14444](https://github.com/netdata/netdata/pull/14444) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- Only load required charts for rrdvars [\#14443](https://github.com/netdata/netdata/pull/14443) ([MrZammler](https://github.com/MrZammler))
-- Typos in in notification docs [\#14440](https://github.com/netdata/netdata/pull/14440) ([iorvd](https://github.com/iorvd))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
