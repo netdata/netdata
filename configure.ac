@@ -378,6 +378,25 @@ AM_CONDITIONAL([LINUX], [test "${build_target}" = "linux"])
 AC_MSG_RESULT([Host OS: ${build_target}])
 
 # -----------------------------------------------------------------------------
+# hardening
+
+HARDENING_CFLAGS=""
+
+if ! echo "${originalCFLAGS}" | grep -q '-fstack-protector'; then
+    AX_CHECK_COMPILE_FLAG(
+        [-fstack-protector-strong],
+        [HARDENING_CFLAGS="${HARDENING_CFLAGS} -fstack-protector-strong"],
+        [AX_CHECK_COMPILE_FLAG(
+            [-fstack-protector],
+            [HARDENING_CFLAGS="${HARDENING_CFLAGS} -fstack-protector"],
+            ,
+            [-Werror],
+        )],
+        [-Werror],
+    )
+fi
+
+# -----------------------------------------------------------------------------
 # backtrace
 
 AC_SEARCH_LIBS([backtrace], [execinfo], [AC_DEFINE([HAVE_BACKTRACE], [1], [backtrace availability])])
@@ -1724,7 +1743,7 @@ CFLAGS="${originalCFLAGS} ${OPTIONAL_LTO_CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${O
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
     ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PUBSUB_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} \
     ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_YAML_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${JUDY_CFLAGS} \
-    ${OPTIONAL_ACLK_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_OS_DEP_CFLAGS} ${HTTPD_CFLAGS}"
+    ${OPTIONAL_ACLK_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_OS_DEP_CFLAGS} ${HTTPD_CFLAGS} ${HARDENING_CFLAGS}"
 
 CXXFLAGS="${CFLAGS} ${OPTIONAL_KINESIS_CXXFLAGS} ${CPP_STD_FLAG}"
 
