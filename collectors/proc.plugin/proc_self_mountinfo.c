@@ -363,8 +363,12 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
 
             struct mountinfo *mt;
             for(mt = root; mt; mt = mt->next) {
-                if(unlikely(mt->major == mi->major && mt->minor == mi->minor && !(mi->flags & MOUNTINFO_IS_BIND)))
-                    mi->flags |= MOUNTINFO_IS_BIND;
+                if(unlikely(mt->major == mi->major && mt->minor == mi->minor && !(mi->flags & MOUNTINFO_IS_BIND))) {
+                    if(strlen(mi->mount_point) < strlen(mt->mount_point))
+                        mt->flags |= MOUNTINFO_IS_BIND;
+                    else
+                        mi->flags |= MOUNTINFO_IS_BIND;
+                }
             }
         }
         else {
