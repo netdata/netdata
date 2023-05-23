@@ -163,7 +163,7 @@ REQ_BODY="$(cat << EOF
 EOF
 )"
 
-# send the anonymous statistics to the Netdata PostHog
+# send the anonymous statistics to Netdata
 if [ -n "$(command -v curl 2> /dev/null)" ]; then
   curl --silent -o /dev/null --write-out '%{http_code}' -X POST --max-time 2 --header "Content-Type: application/json" -d "${REQ_BODY}" https://us-east1-netdata-analytics-bi.cloudfunctions.net/ingest_agent_events
 else
