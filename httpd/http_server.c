@@ -185,6 +185,7 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
     // individual response generators and thus remove the need to "emulate"
     // the old webserver calling this function here and in ACLK
     struct web_client w;
+    memset(&w, 0, sizeof(w));
     w.response.data = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
     w.response.header = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
     w.url_query_string_decoded = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
