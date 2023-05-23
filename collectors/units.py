@@ -206,18 +206,20 @@ def main() -> None:
     with open(sys.argv[1], encoding="utf-8") as csvfile:
         rows = csv.reader(csvfile, delimiter=",", quotechar='"')
         for row in rows:
+            if row[0] == "metric" and row[3] == "unit":
+                continue
             print("-----")
-            print(row[0])
-            print(f"  {row[1]}")
-            print(f"  {row[2]}")
+            print(f"Metric: {row[0]}")
+            print(f"  Scope: {row[1]}")
+            print(f"  Dimensions: {row[2]}")
             old_unit = row[3]
             converted_unit = convert_unit(row[0], old_unit)
-            print(f"  {old_unit} ----> {converted_unit}")
-            print(f"  {row[4]}")
-            print(f"  {row[5]}")
-            print(f"  {row[6]}")
-            print(f"  {row[7]}")
-            print(f"  {row[8]}")
+            print(f"  Unit: {old_unit} ----> {converted_unit}")
+            print(f"  Description: {row[4]}")
+            print(f"  Chart type: {row[5]}")
+            print(f"  Labels: {row[6]}")
+            print(f"  Plugin: {row[7]}")
+            print(f"  Module: {row[8]}")
 
 
 if __name__ == "__main__":
