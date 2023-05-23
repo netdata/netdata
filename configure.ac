@@ -396,6 +396,24 @@ if ! echo "${originalCFLAGS}" | grep -q '-fstack-protector'; then
     )
 fi
 
+if ! echo "${originalCFLAGS}" | grep -q '-fcf-protection'; then
+    AX_CHECK_COMPILE_FLAG(
+        [-fcf-protection=full],
+        [HARDENING_CFLAGS="${HARDENING_CFLAGS} -fcf-protection=full"],
+        ,
+        [-Werror],
+    )
+fi
+
+if ! echo "${originalCFLAGS}" | grep -q '-mbranch-protection'; then
+    AX_CHECK_COMPILE_FLAG(
+        [-mbranch-protection=standard],
+        [HARDENING_CFLAGS="${HARDENING_CFLAGS} -mbranch-protection=standard"],
+        ,
+        [-Werror],
+    )
+fi
+
 # -----------------------------------------------------------------------------
 # backtrace
 
