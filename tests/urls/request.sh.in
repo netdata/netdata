@@ -47,7 +47,7 @@ netdata_create_directory() {
         mkdir "$1"
 		TEST=$?
         if [ $TEST -ne  0 ]; then
-            netdata_print_error "Cannot create directory  $?"
+            netdata_print_error "Cannot create directory  ${TEST}"
         fi
     else
         echo "Working with directory $OUTDIR"
@@ -59,7 +59,7 @@ netdata_test_download(){
     grep "HTTP/1.1 200 OK" "$1" 2>/dev/null 1>/dev/null
 	TEST=$?
     if [ $TEST -ne 0 ]; then
-        netdata_print_error "Cannot do download of the page $2" $?
+        netdata_print_error "Cannot do download of the page $2 ${TEST}"
         exit 1
     fi
 }
@@ -69,7 +69,7 @@ netdata_error_test(){
     grep "HTTP/1.1 200 OK" "$1" 2>/dev/null 1>/dev/null
 	TEST=$?
     if [ $TEST -eq 0 ]; then
-        netdata_print_error "The page $2 did not answer with an error" $?
+        netdata_print_error "The page $2 did not answer with an error ${TEST}"
         exit 1
     fi
 }
@@ -109,7 +109,7 @@ netdata_download_endpoints() {
     curl -v -k --create-dirs -o "$OUTDIR/$2.out" "$1" 2> "$OUTDIR/$2.err"
     netdata_test_download "$OUTDIR/$2.err" "$1"
 
-    grep ":{" tests/$2.out | cut -d: -f1| cut -d\" -f2 | sort
+    grep ":{" "tests/$2.out" | cut -d: -f1| cut -d\" -f2 | sort
 }
 
 #Test options for a specific chart
@@ -353,7 +353,7 @@ netdata_create_directory $OUTOPTDIR
 netdata_create_directory $ERRDIR
 
 if [ "${ANCIENTTESTS}" == "1" ]; then
-    netdata_run_original_tests
+    netdata_run_original_tests "$@"
 fi
 
 if [ "${CONTEXTS}" == "1" ]; then
