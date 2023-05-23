@@ -2,6 +2,7 @@
 
 #include "sqlite_health.h"
 #include "sqlite_functions.h"
+#include "sqlite_db_migration.h"
 
 #define MAX_HEALTH_SQL_SIZE 2048
 #define sqlite3_bind_string_or_null(res,key,param) ((key) ? sqlite3_bind_text(res, param, string2str(key), -1, SQLITE_STATIC) : sqlite3_bind_null(res, param))
@@ -20,7 +21,7 @@ int sql_create_health_log_table(RRDHOST *host) {
         return 1;
     }
 
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CREATE_HEALTH_LOG_TABLE(uuid_str));
@@ -53,7 +54,7 @@ void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
         return;
     }
 
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_UPDATE_HEALTH_LOG(uuid_str));
@@ -128,7 +129,7 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
         return;
     }
 
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_INSERT_HEALTH_LOG(uuid_str));
@@ -358,55 +359,6 @@ void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
 }
 
 /* Health related SQL queries
-   Cleans up the health_log table.
-*/
-#define SQL_CLEANUP_HEALTH_LOG(guid,guid2,limit) "DELETE from health_log_%s where unique_id in (SELECT unique_id from health_log_%s order by unique_id asc LIMIT %lu);", guid, guid2, limit
-void sql_health_alarm_log_cleanup(RRDHOST *host) {
-    sqlite3_stmt *res = NULL;
-    static size_t rotate_every = 0;
-    int rc;
-    char command[MAX_HEALTH_SQL_SIZE + 1];
-
-    if(unlikely(rotate_every == 0)) {
-        rotate_every = (size_t)config_get_number(CONFIG_SECTION_HEALTH, "rotate log every lines", 2000);
-        if(rotate_every < 100) rotate_every = 100;
-    }
-
-    if(likely(host->health.health_log_entries_written < rotate_every)) {
-        return;
-    }
-
-    if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            error_report("Database has not been initialized");
-        return;
-    }
-
-    char uuid_str[GUID_LEN + 1];
-    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
-
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG(uuid_str, uuid_str, (unsigned long int) (host->health.health_log_entries_written - rotate_every)));
-
-    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to cleanup health log table");
-        return;
-    }
-
-    rc = sqlite3_step_monitored(res);
-    if (unlikely(rc != SQLITE_DONE))
-        error_report("Failed to cleanup health log table, rc = %d", rc);
-
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement to cleanup health log table");
-
-    host->health.health_log_entries_written = rotate_every;
-
-    sql_aclk_alert_clean_dead_entries(host);
-}
-
-/* Health related SQL queries
    Get a count of rows from health log table
 */
 #define SQL_COUNT_HEALTH_LOG(guid) "SELECT count(1) FROM health_log_%s;", guid
@@ -421,7 +373,7 @@ void sql_health_alarm_log_count(RRDHOST *host) {
         return;
     }
 
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_COUNT_HEALTH_LOG(uuid_str));
@@ -441,6 +393,114 @@ void sql_health_alarm_log_count(RRDHOST *host) {
         error_report("Failed to finalize the prepared statement to count health log entries from db");
 
     info("HEALTH [%s]: Table health_log_%s, contains %lu entries.", rrdhost_hostname(host), uuid_str, (unsigned long int) host->health.health_log_entries_written);
+}
+
+/* Health related SQL queries
+   Cleans up the health_log table on a non-claimed host
+*/
+#define SQL_CLEANUP_HEALTH_LOG_NOT_CLAIMED(guid,limit) "DELETE FROM health_log_%s ORDER BY unique_id ASC LIMIT %lu;", guid, limit
+void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host, size_t rotate_every) {
+    sqlite3_stmt *res = NULL;
+    int rc;
+    char command[MAX_HEALTH_SQL_SIZE + 1];
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            error_report("Database has not been initialized");
+        return;
+    }
+
+    char uuid_str[UUID_STR_LEN];
+    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
+
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG_NOT_CLAIMED(uuid_str, (unsigned long int) (host->health.health_log_entries_written - rotate_every)));
+
+    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to cleanup health log table");
+        return;
+    }
+
+    rc = sqlite3_step_monitored(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to cleanup health log table, rc = %d", rc);
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement to cleanup health log table");
+
+    host->health.health_log_entries_written = rotate_every;
+
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, "aclk_alert_%s", uuid_str);
+    if (unlikely(table_exists_in_database(command))) {
+        sql_aclk_alert_clean_dead_entries(host);
+    }
+}
+
+/* Health related SQL queries
+   Cleans up the health_log table on a claimed host
+*/
+#define SQL_CLEANUP_HEALTH_LOG_CLAIMED(guid, guid2, guid3, limit) "DELETE from health_log_%s WHERE unique_id NOT IN (SELECT filtered_alert_unique_id FROM aclk_alert_%s) AND unique_id IN (SELECT unique_id FROM health_log_%s ORDER BY unique_id asc LIMIT %lu);", guid, guid2, guid3, limit
+void sql_health_alarm_log_cleanup_claimed(RRDHOST *host, size_t rotate_every) {
+    sqlite3_stmt *res = NULL;
+    int rc;
+    char command[MAX_HEALTH_SQL_SIZE + 1];
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            error_report("Database has not been initialized");
+        return;
+    }
+
+    char uuid_str[UUID_STR_LEN];
+    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, "aclk_alert_%s", uuid_str);
+
+    if (!table_exists_in_database(command)) {
+        sql_health_alarm_log_cleanup_not_claimed(host, rotate_every);
+        return;
+    }
+
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG_CLAIMED(uuid_str, uuid_str, uuid_str, (unsigned long int) (host->health.health_log_entries_written - rotate_every)));
+
+    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to cleanup health log table");
+        return;
+    }
+
+    rc = sqlite3_step_monitored(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to cleanup health log table, rc = %d", rc);
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement to cleanup health log table");
+
+    sql_health_alarm_log_count(host);
+
+    sql_aclk_alert_clean_dead_entries(host);
+}
+
+/* Health related SQL queries
+   Cleans up the health_log table.
+*/
+void sql_health_alarm_log_cleanup(RRDHOST *host) {
+    static size_t rotate_every = 0;
+
+    if(unlikely(rotate_every == 0)) {
+        rotate_every = (size_t)config_get_number(CONFIG_SECTION_HEALTH, "rotate log every lines", 2000);
+        if(rotate_every < 100) rotate_every = 100;
+    }
+
+    if(likely(host->health.health_log_entries_written < rotate_every)) {
+        return;
+    }
+
+    if (!claimed()) {
+        sql_health_alarm_log_cleanup_not_claimed(host, rotate_every);
+    } else
+        sql_health_alarm_log_cleanup_claimed(host, rotate_every);
 }
 
 #define SQL_INJECT_REMOVED(guid, guid2) "insert into health_log_%s (hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, " \
@@ -608,7 +668,7 @@ void sql_check_removed_alerts_state(char *uuid_str)
 /* Health related SQL queries
    Load from the health log table
 */
-#define SQL_LOAD_HEALTH_LOG(guid,limit) "SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type, chart_context FROM (SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type, chart_context FROM health_log_%s order by unique_id desc limit %u) order by unique_id asc;", guid, limit
+#define SQL_LOAD_HEALTH_LOG(guid) "SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type, chart_context FROM health_log_%s group by alarm_id having max(alarm_event_id);", guid
 void sql_health_alarm_log_load(RRDHOST *host) {
     sqlite3_stmt *res = NULL;
     int ret;
@@ -623,12 +683,12 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         return;
     }
 
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
     sql_check_removed_alerts_state(uuid_str);
 
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_LOAD_HEALTH_LOG(uuid_str, host->health_log.max));
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_LOAD_HEALTH_LOG(uuid_str));
 
     ret = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(ret != SQLITE_OK)) {
@@ -1076,7 +1136,7 @@ int alert_hash_and_store_config(
     EVP_MD_CTX_destroy(evpctx);
     fatal_assert(hash_len > sizeof(uuid_t));
 
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower(*((uuid_t *)&hash_value), uuid_str);
     uuid_copy(hash_id, *((uuid_t *)&hash_value));
 
@@ -1090,4 +1150,204 @@ int alert_hash_and_store_config(
 #endif
 
     return 1;
+}
+
+#define SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT "SELECT new_status FROM health_log_%s WHERE alarm_id = %u AND unique_id != %u AND flags & %d ORDER BY unique_id DESC LIMIT 1"
+int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_STATUS *last_executed_status)
+{
+    int rc = 0, ret = -1;
+    char command[MAX_HEALTH_SQL_SIZE + 1];
+
+    char uuid_str[UUID_STR_LEN];
+    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
+
+    sqlite3_stmt *res = NULL;
+
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT, uuid_str, ae->alarm_id, ae->unique_id, HEALTH_ENTRY_FLAG_EXEC_RUN);
+
+    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement when trying to get last executed status");
+        return ret;
+    }
+
+    ret = 0;
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+        *last_executed_status  = (RRDCALC_STATUS) sqlite3_column_int(res, 0);
+        ret = 1;
+    }
+
+     rc = sqlite3_finalize(res);
+     if (unlikely(rc != SQLITE_OK))
+         error_report("Failed to finalize the statement.");
+
+     return ret;
+}
+
+#define SQL_SELECT_HEALTH_LOG(guid) "SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type, chart_context FROM health_log_%s WHERE 1=1 ", guid
+void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *chart) {
+
+    buffer_strcat(wb, "[");
+
+    unsigned int max = host->health_log.max;
+    unsigned int count = 0;
+
+    sqlite3_stmt *res = NULL;
+    int rc;
+
+    BUFFER *command = buffer_create(MAX_HEALTH_SQL_SIZE, NULL);
+    char uuid_str[UUID_STR_LEN];
+    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
+
+    buffer_sprintf(command, SQL_SELECT_HEALTH_LOG(uuid_str));
+
+    if (chart) {
+        char chart_sql[MAX_HEALTH_SQL_SIZE + 1];
+        snprintfz(chart_sql, MAX_HEALTH_SQL_SIZE, "AND chart = '%s' ", chart);
+        buffer_strcat(command, chart_sql);
+    }
+
+    if (after) {
+        char after_sql[MAX_HEALTH_SQL_SIZE + 1];
+        snprintfz(after_sql, MAX_HEALTH_SQL_SIZE, "AND unique_id > %u ", after);
+        buffer_strcat(command, after_sql);
+    }
+
+    {
+        char limit_sql[MAX_HEALTH_SQL_SIZE + 1];
+        snprintfz(limit_sql, MAX_HEALTH_SQL_SIZE, "ORDER BY unique_id DESC LIMIT %u ", max);
+        buffer_strcat(command, limit_sql);
+    }
+
+    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(command), -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement SQL_SELECT_HEALTH_LOG");
+        return;
+    }
+
+    while (sqlite3_step(res) == SQLITE_ROW) {
+
+        char old_value_string[100 + 1];
+        char new_value_string[100 + 1];
+
+        char config_hash_id[UUID_STR_LEN];
+        uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 4)), config_hash_id);
+
+        char *edit_command = health_edit_command_from_source((char *)sqlite3_column_text(res, 18));
+
+        if (count)
+            buffer_sprintf(wb, ",");
+
+        count++;
+
+        buffer_sprintf(
+            wb,
+            "\n\t{\n"
+            "\t\t\"hostname\": \"%s\",\n"
+            "\t\t\"utc_offset\": %d,\n"
+            "\t\t\"timezone\": \"%s\",\n"
+            "\t\t\"unique_id\": %u,\n"
+            "\t\t\"alarm_id\": %u,\n"
+            "\t\t\"alarm_event_id\": %u,\n"
+            "\t\t\"config_hash_id\": \"%s\",\n"
+            "\t\t\"name\": \"%s\",\n"
+            "\t\t\"chart\": \"%s\",\n"
+            "\t\t\"context\": \"%s\",\n"
+            "\t\t\"family\": \"%s\",\n"
+            "\t\t\"class\": \"%s\",\n"
+            "\t\t\"component\": \"%s\",\n"
+            "\t\t\"type\": \"%s\",\n"
+            "\t\t\"processed\": %s,\n"
+            "\t\t\"updated\": %s,\n"
+            "\t\t\"exec_run\": %lu,\n"
+            "\t\t\"exec_failed\": %s,\n"
+            "\t\t\"exec\": \"%s\",\n"
+            "\t\t\"recipient\": \"%s\",\n"
+            "\t\t\"exec_code\": %d,\n"
+            "\t\t\"source\": \"%s\",\n"
+            "\t\t\"command\": \"%s\",\n"
+            "\t\t\"units\": \"%s\",\n"
+            "\t\t\"when\": %lu,\n"
+            "\t\t\"duration\": %lu,\n"
+            "\t\t\"non_clear_duration\": %lu,\n"
+            "\t\t\"status\": \"%s\",\n"
+            "\t\t\"old_status\": \"%s\",\n"
+            "\t\t\"delay\": %d,\n"
+            "\t\t\"delay_up_to_timestamp\": %lu,\n"
+            "\t\t\"updated_by_id\": %u,\n"
+            "\t\t\"updates_id\": %u,\n"
+            "\t\t\"value_string\": \"%s\",\n"
+            "\t\t\"old_value_string\": \"%s\",\n"
+            "\t\t\"last_repeat\": \"%lu\",\n"
+            "\t\t\"silenced\": \"%s\",\n",
+            sqlite3_column_text(res, 0),
+            host->utc_offset,
+            rrdhost_abbrev_timezone(host),
+            (unsigned int) sqlite3_column_int64(res, 1),
+            (unsigned int) sqlite3_column_int64(res, 2),
+            (unsigned int) sqlite3_column_int64(res, 3),
+            config_hash_id,
+            sqlite3_column_text(res, 13),
+            sqlite3_column_text(res, 14),
+            sqlite3_column_text(res, 31),
+            sqlite3_column_text(res, 15),
+            sqlite3_column_text(res, 28) ? (const char *) sqlite3_column_text(res, 28) : (char *) "Unknown",
+            sqlite3_column_text(res, 29) ? (const char *) sqlite3_column_text(res, 29) : (char *) "Unknown",
+            sqlite3_column_text(res, 30) ? (const char *) sqlite3_column_text(res, 30) : (char *) "Unknown",
+            (sqlite3_column_int64(res, 10) & HEALTH_ENTRY_FLAG_PROCESSED)?"true":"false",
+            (sqlite3_column_int64(res, 10) & HEALTH_ENTRY_FLAG_UPDATED)?"true":"false",
+            (long unsigned int)sqlite3_column_int64(res, 11),
+            (sqlite3_column_int64(res, 10) & HEALTH_ENTRY_FLAG_EXEC_FAILED)?"true":"false",
+            sqlite3_column_text(res, 16) ? (const char *) sqlite3_column_text(res, 16) : string2str(host->health.health_default_exec),
+            sqlite3_column_text(res, 17) ? (const char *) sqlite3_column_text(res, 17) : string2str(host->health.health_default_recipient),
+            sqlite3_column_int(res, 21),
+            sqlite3_column_text(res, 18),
+            edit_command,
+            sqlite3_column_text(res, 19),
+            (long unsigned int)sqlite3_column_int64(res, 7),
+            (long unsigned int)sqlite3_column_int64(res, 8),
+            (long unsigned int)sqlite3_column_int64(res, 9),
+            rrdcalc_status2string(sqlite3_column_int(res, 22)),
+            rrdcalc_status2string(sqlite3_column_int(res, 23)),
+            sqlite3_column_int(res, 24),
+            (long unsigned int)sqlite3_column_int64(res, 12),
+            (unsigned int)sqlite3_column_int64(res, 5),
+            (unsigned int)sqlite3_column_int64(res, 6),
+            sqlite3_column_type(res, 25) == SQLITE_NULL ? "-" : format_value_and_unit(new_value_string, 100, sqlite3_column_double(res, 25), (char *) sqlite3_column_text(res, 19), -1),
+            sqlite3_column_type(res, 26) == SQLITE_NULL ? "-" : format_value_and_unit(old_value_string, 100, sqlite3_column_double(res, 26), (char *) sqlite3_column_text(res, 19), -1),
+            (long unsigned int)sqlite3_column_int64(res, 27),
+            (sqlite3_column_int64(res, 10) & HEALTH_ENTRY_FLAG_SILENCED)?"true":"false");
+
+        health_string2json(wb, "\t\t", "info", (char *) sqlite3_column_text(res, 20), ",\n");
+
+        if(unlikely(sqlite3_column_int64(res, 10) & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION)) {
+            buffer_strcat(wb, "\t\t\"no_clear_notification\": true,\n");
+        }
+
+        buffer_strcat(wb, "\t\t\"value\":");
+        if (sqlite3_column_type(res, 25) == SQLITE_NULL)
+            buffer_strcat(wb, "null");
+        else
+            buffer_print_netdata_double(wb, sqlite3_column_double(res, 25));
+        buffer_strcat(wb, ",\n");
+
+        buffer_strcat(wb, "\t\t\"old_value\":");
+        if (sqlite3_column_type(res, 26) == SQLITE_NULL)
+            buffer_strcat(wb, "null");
+        else
+            buffer_print_netdata_double(wb, sqlite3_column_double(res, 26));
+        buffer_strcat(wb, "\n");
+
+        buffer_strcat(wb, "\t}");
+
+        freez(edit_command);
+    }
+
+    buffer_strcat(wb, "\n]");
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement for SQL_SELECT_HEALTH_LOG");
+
+    buffer_free(command);
 }

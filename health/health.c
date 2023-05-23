@@ -412,17 +412,13 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     // find the previous notification for the same alarm
     // which we have run the exec script
     // exception: alarms with HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION set
+    RRDCALC_STATUS last_executed_status = -3;
     if(likely(!(ae->flags & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION))) {
-        uint32_t id = ae->alarm_id;
-        ALARM_ENTRY *t;
-        for(t = ae->next; t ; t = t->next) {
-            if(t->alarm_id == id && t->flags & HEALTH_ENTRY_FLAG_EXEC_RUN)
-                break;
-        }
+        int ret = sql_health_get_last_executed_event(host, ae, &last_executed_status);
 
-        if(likely(t)) {
+        if (likely(ret == 1)) {
             // we have executed this alarm notification in the past
-            if(t && t->new_status == ae->new_status) {
+            if(last_executed_status == ae->new_status) {
                 // don't send the notification for the same status again
                 debug(D_HEALTH, "Health not sending again notification for alarm '%s.%s' status %s", ae_chart_name(ae), ae_name(ae)
                       , rrdcalc_status2string(ae->new_status));
@@ -561,6 +557,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
         ae->flags |= HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
         ae->exec_spawn_serial = spawn_enq_cmd(command_to_run);
         enqueue_alarm_notify_in_progress(ae);
+        health_alarm_log_save(host, ae);
     } else {
         error("Failed to format command arguments");
     }
@@ -628,35 +625,32 @@ static inline void health_alarm_log_process(RRDHOST *host) {
     // remember this for the next iteration
     host->health_last_processed_id = first_waiting;
 
-    bool cleanup_excess_log_entries = host->health_log.count > host->health_log.max;
-
-    if (!cleanup_excess_log_entries)
-        return;
-
-    // cleanup excess entries in the log
+    //delete those that are updated, no in progress execution, and is not repeating
     netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
 
-    ALARM_ENTRY *last = NULL;
-    unsigned int count = host->health_log.max * 2 / 3;
-    for(ae = host->health_log.alarms; ae && count ; count--, last = ae, ae = ae->next) ;
+    ALARM_ENTRY *prev = host->health_log.alarms;
+    for(ae = host->health_log.alarms; ae ; ae = ae->next) {
 
-    if(ae && last && last->next == ae)
-        last->next = NULL;
-    else
-        ae = NULL;
+        if((likely(!(ae->flags & HEALTH_ENTRY_FLAG_IS_REPEATING)) &&
+           (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) &&
+           (ae->flags & HEALTH_ENTRY_FLAG_SAVED) &&
+           !(ae->flags & HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS))
+            ||
+           ((ae->new_status == RRDCALC_STATUS_REMOVED) &&
+           (ae->flags & HEALTH_ENTRY_FLAG_SAVED) &&
+           (ae->when + 3600 < now_realtime_sec())))
+            {
 
-    while(ae) {
-        debug(D_HEALTH, "Health removing alarm log entry with id: %u", ae->unique_id);
-
-        ALARM_ENTRY *t = ae->next;
-
-        if(likely(!(ae->flags & HEALTH_ENTRY_FLAG_IS_REPEATING))) {
-            health_alarm_wait_for_execution(ae);
+            if (ae == host->health_log.alarms) {
+                host->health_log.alarms = ae->next;
+                prev = ae->next;
+            } else {
+                prev->next = ae->next;
+            }
             health_alarm_log_free_one_nochecks_nounlink(ae);
-            host->health_log.count--;
-        }
-
-        ae = t;
+            ae = prev;
+        } else
+            prev = ae;
     }
 
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
@@ -904,8 +898,24 @@ static int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
         return 0;
 }
 
+static void sql_health_postpone_queue_removed(RRDHOST *host __maybe_unused) {
+#ifdef ENABLE_ACLK
+    if (netdata_cloud_setting) {
+        struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *)host->aclk_sync_host_config;
+        if (unlikely(!wc)) {
+            return;
+        }
+
+        if (wc->alert_queue_removed >= 1) {
+            wc->alert_queue_removed+=6;
+        }
+    }
+#endif
+}
+
 static void health_execute_delayed_initializations(RRDHOST *host) {
     RRDSET *st;
+    bool must_postpone = false;
 
     if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION)) return;
     rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
@@ -941,8 +951,11 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
                 rrdvar_store_for_chart(host, st);
         }
         rrddim_foreach_done(rd);
+        must_postpone = true;
     }
     rrdset_foreach_done(st);
+    if (must_postpone)
+        sql_health_postpone_queue_removed(host);
 }
 
 /**
