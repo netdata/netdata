@@ -328,6 +328,7 @@ ANCIENTTESTS=0
 CONTEXTS=0
 FUNCTIONS=0
 ACLK=0
+ML=0
 while [ -n "${1}" ]; do
     case "${1}" in
         "--url") MURL="$2" ;;
@@ -335,6 +336,7 @@ while [ -n "${1}" ]; do
         "--contexts") CONTEXTS=1 ;;
         "--functions") FUNCTIONS=1 ;;
         "--aclk") ACLK=1 ;;
+        "--ml") ML=1 ;;
     esac
     shift 1
 done
@@ -360,6 +362,11 @@ fi
 
 if [ "${ACLK}" == "1" ]; then
     netdata_download_various "$MURL" "api/v1/aclk"  "aclk"
+fi
+
+if [ "${ML}" == "1" ]; then
+    netdata_download_various "$MURL" "api/v1/metric_correlations"  "metric_correlations"
+    netdata_download_various "$MURL" "api/v1/weights"  "weights"
 fi
 
 echo -e "${GREEN}ALL the URLS got 200 as answer! ${NOCOLOR}"
