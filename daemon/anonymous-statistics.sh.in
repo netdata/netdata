@@ -74,7 +74,6 @@ NETDATA_PREBUILT_DISTRO="${42}"
 # define body of request to be sent
 REQ_BODY="$(cat << EOF
 {
-    "api_key": "mqkwGT0JNFqO-zX2t0mW6Tec9yooaVu7xCBlXtHnt5Y",
     "event": "${ACTION} ${ACTION_RESULT}",
     "properties": {
         "distinct_id": "${NETDATA_REGISTRY_UNIQUE_ID}",
