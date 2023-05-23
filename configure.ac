@@ -414,6 +414,36 @@ if ! echo "${originalCFLAGS}" | grep -q '-mbranch-protection'; then
     )
 fi
 
+if ! echo "${originalCFLAGS}" | grep -q '-D_FORTIFY_SOURCE'; then
+    # This complex set of checks is needed because there is no clean
+    # way to verify _FORTIFY_SOURCE support without having to check for
+    # the required compiler builtins.
+    AC_CHECK_DECLS(
+        [__builtin_constant_p, __builtin_object_size, __builtin___memcpy_chk, __builtin___memmove_chk, __builtin___mempcpy_chk,
+         __builtin___memset_chk, __builtin___snprintf_chk, __builtin___sprintf_chk, __builtin___stpcpy_chk, __builtin___strcat_chk,
+         __builtin___strcpy_chk, __builtin___strncat_chk, __builtin___strncpy_chk, __builtin___vsnprintf_chk, __builtin___vsprintf_chk],
+        [HAVE_FORTIFY_SOURCE=2]
+    )
+
+    if test "x${HAVE_FORTIFY_SOURCE}" = "x2"; then
+        AC_CHECK_DECL(
+            __builtin_dynamic_object_size,
+            [AX_CHECK_COMPILE_FLAG(
+                [-D_FORTIFY_SOURCE=3],
+                [HARDENING_CFLAGS="${HARDENING_CFLAGS} -D_FORTIFY_SOURCE=3"],
+                ,
+                [-Werror],
+            )],
+            [AX_CHECK_COMPILE_FLAG(
+                [-D_FORTIFY_SOURCE=2],
+                [HARDENING_CFLAGS="${HARDENING_CFLAGS} -D_FORTIFY_SOURCE=2"],
+                ,
+                [-Werror],
+            )],
+        )
+    fi
+fi
+
 # -----------------------------------------------------------------------------
 # backtrace
 
