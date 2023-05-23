@@ -316,6 +316,25 @@ netdata_run_functions_tests() {
     done
 }
 
+usage() {
+    cat << HEREDOC
+
+USAGE: ./request.sh [options]
+       where options include:
+
+  --url         Netdata address. Default: http://127.0.0.1:19999
+  --old         Test netdata.conf, /info, /charts, /chart, /alarm_variables,
+                /badge, /allmetrics, /badge, /alarms, /alarm_log, and /data
+  --contexts    Query all contexts available (/contexts and /context)
+  --functions   Query all functions available (/functions and /function)
+  --aclk        Query ACLK endpoint (/aclk)
+  --ml          Query Machine Learning endpoint (/metric_correlations)
+  --dbengine    Query DBEngine endpoint (/dbengine_stats) 
+  --v2          Query all endpoints present in V2 api: /data, /nodes
+                /contexts, and /weights
+HEREDOC
+}
+
 ################################################################################################
 
 ################################################################################################
@@ -341,6 +360,14 @@ while [ -n "${1}" ]; do
         "--ml") ML=1 ;;
         "--dbengine") DBE=1 ;;
         "--v2") V2=1 ;;
+        "--help") 
+            usage 
+            exit 0
+            ;;
+        *)
+            usage
+            exit 1
+            ;;
     esac
     shift 1
 done
