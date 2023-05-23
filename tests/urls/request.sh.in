@@ -364,10 +364,6 @@ while [ -n "${1}" ]; do
             usage 
             exit 0
             ;;
-        *)
-            usage
-            exit 1
-            ;;
     esac
     shift 1
 done
