@@ -10,6 +10,7 @@
 // based on their context.
 struct rrdcalctemplate {
     uuid_t config_hash_id;
+    uuid_t transition_id;
 
     STRING *name;
 

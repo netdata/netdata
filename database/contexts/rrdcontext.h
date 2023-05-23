@@ -301,6 +301,54 @@ typedef struct query_target_request {
     void *interrupt_callback_data;
 } QUERY_TARGET_REQUEST;
 
+//typedef struct alert_target_request {
+//    size_t version;
+//
+//    const char *scope_nodes;
+//    const char *scope_contexts;
+//
+//    // selecting / filtering metrics to be queried
+//    RRDHOST *host;                      // the host to be queried (can be NULL, hosts will be used)
+//    RRDCONTEXT_ACQUIRED *rca;           // the context to be queried (can be NULL)
+//    RRDINSTANCE_ACQUIRED *ria;          // the instance to be queried (can be NULL)
+//    RRDMETRIC_ACQUIRED *rma;            // the metric to be queried (can be NULL)
+//    RRDSET *st;                         // the chart to be queried (NULL, for context queries)
+//    const char *nodes;                  // hosts simple pattern
+//    const char *contexts;               // contexts simple pattern (context queries)
+//    const char *instances;                 // charts simple pattern (for context queries)
+//    const char *dimensions;             // dimensions simple pattern
+//    const char *chart_label_key;        // select only the chart having this label key
+//    const char *labels;                 // select only the charts having this combo of label key:value
+//    const char *alerts;                 // select only the charts having this combo of alert name:status
+//
+//    time_t after;                       // the requested timeframe
+//    time_t before;                      // the requested timeframe
+//    size_t points;                      // the requested number of points to be returned
+//
+//    uint32_t format;                    // DATASOURCE_FORMAT
+//    RRDR_OPTIONS options;
+//    time_t timeout_ms;                     // the timeout of the query in milliseconds
+//
+//    size_t tier;
+//    QUERY_SOURCE query_source;
+//    STORAGE_PRIORITY priority;
+//
+//    // resampling metric values across time
+//    time_t resampling_time;
+//
+//    // grouping metric values across time
+//    RRDR_TIME_GROUPING time_group_method;
+//    const char *time_group_options;
+//
+//    // group by across multiple time-series
+//    struct group_by_pass group_by[MAX_QUERY_GROUP_BY_PASSES];
+//
+//    usec_t received_ut;
+//
+//    qt_interrupt_callback_t interrupt_callback;
+//    void *interrupt_callback_data;
+//} ALERT_TARGET_REQUEST;
+
 #define GROUP_BY_MAX_LABEL_KEYS 10
 
 struct query_tier_statistics {
@@ -475,6 +523,27 @@ struct api_v2_contexts_request {
     void *interrupt_callback_data;
 };
 
+struct api_v2_alerts_request {
+    char *scope_nodes;
+    char *scope_contexts;
+    char *nodes;
+    char *contexts;
+    char *config_hash;
+    char *state;
+    SIMPLE_PATTERN *config_hash_pattern;
+    char *transition_id;
+    time_t alert_id;
+    uint32_t last;
+    char *alert_name;
+    SIMPLE_PATTERN *alert_name_pattern;
+    ALERT_OPTIONS options;
+    time_t after;
+    time_t before;
+    char *q;
+};
+
+ssize_t get_alert_index(Pvoid_t JudyHS, uuid_t *uuid);
+
 typedef enum __attribute__ ((__packed__)) {
     CONTEXTS_V2_DEBUG           = (1 << 0),
     CONTEXTS_V2_MINIFY          = (1 << 1),
@@ -490,6 +559,7 @@ typedef enum __attribute__ ((__packed__)) {
 } CONTEXTS_V2_OPTIONS;
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_OPTIONS options);
+int alerts_to_json_v2(BUFFER *wb, struct api_v2_alerts_request *req, CONTEXTS_V2_OPTIONS options);
 
 RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o);
 void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time_t now_s, bool info);

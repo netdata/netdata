@@ -1128,6 +1128,7 @@ void *health_main(void *ptr) {
                             rc->last_status_change = now;
                             rc->last_updated = now;
                             rc->value = NAN;
+//                            uuid_copy(rc->transition_id, ae->transition_id);
 
 #ifdef ENABLE_ACLK
                             if (netdata_cloud_enabled)
@@ -1396,6 +1397,7 @@ void *health_main(void *ptr) {
                         rc->last_status_change = now;
                         rc->old_status = rc->status;
                         rc->status = status;
+                        rc->ae = ae;
                     }
 
                     rc->last_updated = now;
