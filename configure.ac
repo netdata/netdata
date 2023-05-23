@@ -396,6 +396,15 @@ if ! echo "${originalCFLAGS}" | grep -q '-fstack-protector'; then
     )
 fi
 
+if ! echo "${originalCFLAGS}" | grep -q '-fno-stack-clash-protection'; then
+    AX_CHECK_COMPILE_FLAG(
+        [-fstack-clash-protection],
+        [HARDENING_CFLAGS="${HARDENING_CFLAGS} -fstack-clash-protection"],
+        ,
+        [-Werror],
+    )
+fi
+
 if ! echo "${originalCFLAGS}" | grep -q '-fcf-protection'; then
     AX_CHECK_COMPILE_FLAG(
         [-fcf-protection=full],
