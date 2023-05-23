@@ -2031,6 +2031,6 @@ int hash256_string(const unsigned char *string, size_t size, char *hash) {
         EVP_MD_CTX_destroy(ctx);
         return 0;
     }
-
+    EVP_MD_CTX_destroy(ctx);
     return 1;
 }

@@ -1038,6 +1038,7 @@ static inline int compare_active_alerts(const void * a, const void * b) {
         return strcmp(active_alerts_a->name, active_alerts_b->name);
 }
 
+#define BATCH_ALLOCATED 10
 void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
 {
 #ifdef ENABLE_ACLK
@@ -1047,7 +1048,6 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
         return;
     }
 
-    //TODO: make sure all pending events are sent.
     if (rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS)) {
         //postpone checkpoint send
         wc->alert_checkpoint_req++;
@@ -1055,13 +1055,11 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
         return;
     }
 
-    //TODO: lock rc here, or make sure it's called when health decides
-    //count them
     RRDCALC *rc;
     uint32_t cnt = 0;
     size_t len = 0;
-    active_alerts_t *active_alerts = NULL;
 
+    active_alerts_t *active_alerts = callocz(BATCH_ALLOCATED, sizeof(active_alerts_t));
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
@@ -1069,32 +1067,20 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
         if (rc->status == RRDCALC_STATUS_WARNING ||
             rc->status == RRDCALC_STATUS_CRITICAL) {
 
+            if (cnt && !(cnt % BATCH_ALLOCATED)) {
+                active_alerts = reallocz(active_alerts, (BATCH_ALLOCATED * ((cnt / BATCH_ALLOCATED) + 1)) * sizeof(active_alerts_t));
+            }
+
+            active_alerts[cnt].name = (char *)rrdcalc_name(rc);
+            len += string_strlen(rc->name);
+            active_alerts[cnt].chart = (char *)rrdcalc_chart_name(rc);
+            len += string_strlen(rc->chart);
+            active_alerts[cnt].status = rc->status;
+            len++;
             cnt++;
         }
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
-
-    if (cnt) {
-        active_alerts = callocz(cnt, sizeof(active_alerts_t));
-        cnt = 0;
-        foreach_rrdcalc_in_rrdhost_read(host, rc) {
-            if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
-                continue;
-
-            if (rc->status == RRDCALC_STATUS_WARNING ||
-                rc->status == RRDCALC_STATUS_CRITICAL) {
-
-                active_alerts[cnt].name = (char *)rrdcalc_name(rc);
-                len += string_strlen(rc->name);
-                active_alerts[cnt].chart = (char *)rrdcalc_chart_name(rc);
-                len += string_strlen(rc->chart);
-                active_alerts[cnt].status = rc->status;
-                len++;
-                cnt++;
-            }
-        }
-        foreach_rrdcalc_in_rrdhost_done(rc);
-    }
 
     BUFFER *alarms_to_hash;
     if (cnt) {
@@ -1114,6 +1100,7 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
         buffer_strcat(alarms_to_hash, "");
         len = 0;
     }
+    freez(active_alerts);
 
     char hash[SHA256_DIGEST_LENGTH + 1];
     if (hash256_string((const unsigned char *)buffer_tostring(alarms_to_hash), len, hash)) {
@@ -1126,6 +1113,7 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
         alarm_checkpoint.checksum = (char *)hash;
 
         aclk_send_provide_alarm_checkpoint(&alarm_checkpoint);
+        freez(claim_id);
         log_access("ACLK RES [%s (%s)]: ALERTS CHECKPOINT SENT", wc->node_id, rrdhost_hostname(host));
     } else {
         log_access("ACLK RES [%s (%s)]: FAILED TO CREATE ALERTS CHECKPOINT HASH", wc->node_id, rrdhost_hostname(host));

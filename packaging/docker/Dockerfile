@@ -104,7 +104,8 @@ RUN chown -R root:root \
     chmod 0755 /usr/libexec/netdata/plugins.d/*.plugin && \
     chmod 4755 \
         /usr/libexec/netdata/plugins.d/cgroup-network \
-        /usr/libexec/netdata/plugins.d/apps.plugin && \
+        /usr/libexec/netdata/plugins.d/apps.plugin \
+        /usr/libexec/netdata/plugins.d/debugfs.plugin && \
     if [ -f /usr/libexec/netdata/plugins.d/freeipmi.plugin ]; then \
         chmod 4755 /usr/libexec/netdata/plugins.d/freeipmi.plugin; \
     fi && \

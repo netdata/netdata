@@ -74,6 +74,9 @@ collectors/ebpf.plugin/reset_netdata_trace.sh
 !ebpf.plugin/
 collectors/ebpf.plugin/includes/
 
+debugfs.plugin
+!debugfs.plugin/
+
 # protoc generated files
 *.pb.cc
 *.pb.h

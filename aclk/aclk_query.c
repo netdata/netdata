@@ -216,7 +216,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) 
     }
 
     // send msg.
-    aclk_http_msg_v2(query_thr->client, query->callback_topic, query->msg_id, t, query->created, w->response.code, local_buffer->buffer, local_buffer->len);
+    w->response.code = aclk_http_msg_v2(query_thr->client, query->callback_topic, query->msg_id, t, query->created, w->response.code, local_buffer->buffer, local_buffer->len);
 
     struct timeval tv;
 

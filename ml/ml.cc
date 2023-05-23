@@ -1565,7 +1565,7 @@ void ml_init()
     for (size_t idx = 0; idx != Cfg.num_training_threads; idx++) {
         ml_training_thread_t *training_thread = &Cfg.training_threads[idx];
 
-        size_t max_elements_needed_for_training = Cfg.max_train_samples * (Cfg.lag_n + 1);
+        size_t max_elements_needed_for_training = (size_t) Cfg.max_train_samples * (size_t) (Cfg.lag_n + 1);
         training_thread->training_cns = new calculated_number_t[max_elements_needed_for_training]();
         training_thread->scratch_training_cns = new calculated_number_t[max_elements_needed_for_training]();
 
