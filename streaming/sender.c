@@ -617,8 +617,8 @@ static int rrdpush_http_upgrade_prelude(RRDHOST *host, struct sender_state *s) {
         0,
         1000);
 
-    if (!bytes) {
-        error_report("No response from remote");
+    if (bytes <= 0) {
+        error_report("Error reading from remote");
         return 1;
     }
 
