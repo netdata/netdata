@@ -45,7 +45,8 @@ Conflicts: netdata-core,
 Recommends: netdata-plugin-ebpf,
             netdata-plugin-apps,
             netdata-plugin-pythond,
-            netdata-plugin-go
+            netdata-plugin-go,
+            netdata-plugin-debugfs
 Suggests: netdata-plugin-cups,
           netdata-plugin-freeipmi,
           netdata-plugin-nfacct,

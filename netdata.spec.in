@@ -154,6 +154,7 @@ Recommends: netdata-plugin-ebpf
 Recommends: netdata-plugin-apps
 Recommends: netdata-plugin-pythond
 Recommends: netdata-plugin-go
+Recommends: netdata-plugin-debugfs
 %if 0%{?_have_freeipmi}
 Suggests:   netdata-plugin-freeipmi
 %endif
