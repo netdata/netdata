@@ -426,7 +426,7 @@ void sql_health_alarm_log_count(RRDHOST *host) {
     int rc;
     char command[MAX_HEALTH_SQL_SIZE + 1];
 
-    if (unlikely(!db_meta)) {
+    if (unlikely(!db_health)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             error_report("Database has not been initialized");
         return;
@@ -437,13 +437,12 @@ void sql_health_alarm_log_count(RRDHOST *host) {
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_COUNT_HEALTH_LOG(uuid_str));
 
-    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_health, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to count health log entries from db");
         return;
     }
 
-    if (unlikely(!db_health)) {
     rc = sqlite3_step_monitored(res);
     if (likely(rc == SQLITE_ROW))
         host->health.health_log_entries_written = (size_t) sqlite3_column_int64(res, 0);
@@ -464,7 +463,7 @@ void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host, size_t rotate_every
     int rc;
     char command[MAX_HEALTH_SQL_SIZE + 1];
 
-    if (unlikely(!db_meta)) {
+    if (unlikely(!db_health)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             error_report("Database has not been initialized");
         return;
@@ -1227,7 +1226,7 @@ int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_S
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT, uuid_str, ae->alarm_id, ae->unique_id, HEALTH_ENTRY_FLAG_EXEC_RUN);
 
-    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_health, command, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement when trying to get last executed status");
         return ret;
@@ -1281,7 +1280,7 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
         buffer_strcat(command, limit_sql);
     }
 
-    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(command), -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_health, buffer_tostring(command), -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement SQL_SELECT_HEALTH_LOG");
         return;
