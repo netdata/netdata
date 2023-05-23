@@ -329,6 +329,7 @@ CONTEXTS=0
 FUNCTIONS=0
 ACLK=0
 ML=0
+DBE=0
 while [ -n "${1}" ]; do
     case "${1}" in
         "--url") MURL="$2" ;;
@@ -337,6 +338,7 @@ while [ -n "${1}" ]; do
         "--functions") FUNCTIONS=1 ;;
         "--aclk") ACLK=1 ;;
         "--ml") ML=1 ;;
+        "--dbengine") DBE=1 ;;
     esac
     shift 1
 done
@@ -368,6 +370,11 @@ if [ "${ML}" == "1" ]; then
     netdata_download_various "$MURL" "api/v1/metric_correlations"  "metric_correlations"
     netdata_download_various "$MURL" "api/v1/weights"  "weights"
 fi
+
+if [ "${DBE}" == "1" ]; then
+    netdata_download_various "$MURL" "api/v1/dbengine_stats"  "dbengine_stats"
+fi
+
 
 echo -e "${GREEN}ALL the URLS got 200 as answer! ${NOCOLOR}"
 
