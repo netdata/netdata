@@ -12,7 +12,7 @@ static int return_int_cb(void *data, int argc, char **argv, char **column)
 }
 
 
-static int table_exists_in_database(const char *table)
+int table_exists_in_database(const char *table)
 {
     char *err_msg = NULL;
     char sql[128];
