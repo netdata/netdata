@@ -1222,6 +1222,7 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(command), -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement SQL_SELECT_HEALTH_LOG");
+        buffer_free(command);
         return;
     }
 
