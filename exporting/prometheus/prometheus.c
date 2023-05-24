@@ -470,10 +470,12 @@ static void generate_as_collected_prom_metric(BUFFER *wb, struct gen_parameters 
     if (!homogeneous)
         buffer_sprintf(wb, "_%s", p->dimension);
 
-    buffer_sprintf(wb, "%s{chart=\"%s\",family=\"%s\"", p->suffix, p->chart, p->family);
+    buffer_sprintf(wb, "%s{chart=\"%s\"", p->suffix, p->chart);
 
     if (homogeneous)
         buffer_sprintf(wb, ",dimension=\"%s\"", p->dimension);
+
+    buffer_sprintf(wb, "family=\"%s\"", p->family);
 
     buffer_sprintf(wb, "%s} ", p->labels);
 
