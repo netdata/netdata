@@ -284,7 +284,7 @@ Configure individual connectors and override any global settings with the follow
     and names are human friendly labels (also unique). Most charts and metrics have the same ID and name, but in several
     cases they are different: disks with device-mapper, interrupts, QoS classes, statsd synthetic charts, etc.
 
--   `send configured labels = yes | no` controls if labels defined in the `[host labels]` section in `netdata.conf`
+-   `send configured labels = yes | no` controls if host labels defined in the `[host labels]` section in `netdata.conf`
     should be sent to the external database
 
 -   `send automatic labels = yes | no` controls if automatically created labels, like `_os_name` or `_architecture`
