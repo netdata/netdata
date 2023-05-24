@@ -470,12 +470,12 @@ static void generate_as_collected_prom_metric(BUFFER *wb, struct gen_parameters 
     if (!homogeneous)
         buffer_sprintf(wb, "_%s", p->dimension);
 
-    buffer_sprintf(wb, "%s{chart=\"%s\",family=\"%s\"", p->suffix, p->chart, p->family);
+    buffer_sprintf(wb, "%s{chart=\"%s\"", p->suffix, p->chart);
 
     if (homogeneous)
         buffer_sprintf(wb, ",dimension=\"%s\"", p->dimension);
 
-    buffer_sprintf(wb, "%s} ", p->labels);
+    buffer_sprintf(wb, ",family=\"%s\"%s} ", p->family, p->labels);
 
     if (prometheus_collector)
         buffer_sprintf(
@@ -713,30 +713,30 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                             if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
                                 buffer_sprintf(
                                     wb,
-                                    "%s_%s%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " NETDATA_DOUBLE_FORMAT
+                                    "%s_%s%s%s{chart=\"%s\",dimension=\"%s\",family=\"%s\"%s} " NETDATA_DOUBLE_FORMAT
                                     " %llu\n",
                                     prefix,
                                     context,
                                     units,
                                     suffix,
                                     chart,
-                                    family,
                                     dimension,
+                                    family,
                                     labels,
                                     value,
                                     last_time * MSEC_PER_SEC);
                             else
                                 buffer_sprintf(
                                     wb,
-                                    "%s_%s%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " NETDATA_DOUBLE_FORMAT
+                                    "%s_%s%s%s{chart=\"%s\",dimension=\"%s\",family=\"%s\"%s} " NETDATA_DOUBLE_FORMAT
                                     "\n",
                                     prefix,
                                     context,
                                     units,
                                     suffix,
                                     chart,
-                                    family,
                                     dimension,
+                                    family,
                                     labels,
                                     value);
                         }
