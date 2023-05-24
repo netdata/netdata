@@ -1373,3 +1373,70 @@ void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path
     netdata_log_health("[%s]: Read health configuration.", rrdhost_hostname(host));
     sql_store_hashes = 0;
 }
+
+void health_config_setup_rc_from_api(RRDHOST *host, RRDCALC *rcv, char *chart, char *context, char *lookup, char *calc, char *warn, char *crit)
+{
+    rcv->name = string_strdupz("virtual");
+
+    if (chart) {
+        rcv->chart = string_strdupz(chart);
+        RRDSET *st;
+        rrdset_foreach_write(st, host) {
+            if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))
+                continue;
+
+            if ((rcv->chart != st->id) && (rcv->chart != st->name))
+                continue;
+            else {
+                rcv->rrdset = st;
+                rcv->units = string_dup(st->units);
+            }
+        }
+        rrdset_foreach_done(st);
+
+    } else if (context) {
+
+
+    }
+
+    if (lookup) {
+        health_parse_db_lookup(0, NULL, lookup, &rcv->group, &rcv->after, &rcv->before,
+                           &rcv->update_every, &rcv->options, &rcv->dimensions, &rcv->foreach_dimension);
+
+        if(rcv->foreach_dimension)
+            rcv->foreach_dimension_pattern = health_pattern_from_foreach(rrdcalc_foreachdim(rcv));
+    }
+
+    if (calc) {
+        const char *failed_at = NULL;
+        int error = 0;
+        rcv->calculation = expression_parse(calc, &failed_at, &error);
+        rcv->calculation->status = &rcv->status;
+        rcv->calculation->myself = &rcv->value;
+        rcv->calculation->after = &rcv->db_after;
+        rcv->calculation->before = &rcv->db_before;
+        rcv->calculation->rrdcalc = rcv;
+    }
+
+    if (warn) {
+        const char *failed_at = NULL;
+        int error = 0;
+        rcv->warning = expression_parse(warn, &failed_at, &error);
+        rcv->warning->status = &rcv->status;
+        rcv->warning->myself = &rcv->value;
+        rcv->warning->after = &rcv->db_after;
+        rcv->warning->before = &rcv->db_before;
+        rcv->warning->rrdcalc = rcv;
+    }
+
+    if (crit) {
+        const char *failed_at = NULL;
+        int error = 0;
+        rcv->warning = expression_parse(crit, &failed_at, &error);
+        rcv->critical->status = &rcv->status;
+        rcv->critical->myself = &rcv->value;
+        rcv->critical->after = &rcv->db_after;
+        rcv->critical->before = &rcv->db_before;
+        rcv->critical->rrdcalc = rcv;
+    }
+}

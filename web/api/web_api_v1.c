@@ -443,6 +443,56 @@ inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_clien
     return 200;
 }
 
+inline int web_client_api_request_v1_alarm_eval(RRDHOST *host, struct web_client *w, char *url) {
+    char *chart = NULL;
+    char *context = NULL;
+    char *lookup = NULL;
+    char *calc = NULL;
+    char *warn = NULL;
+    char *crit = NULL;
+
+    buffer_flush(w->response.data);
+    buffer_sprintf(w->response.data, "{");
+
+    while(url) {
+        char *value = strsep_skip_consecutive_separators(&url, "&");
+        if(!value || !*value) continue;
+
+        char *name = strsep_skip_consecutive_separators(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        debug(D_WEB_CLIENT, "%llu: API v1 alarm_eval query param '%s' with value '%s'", w->id, name, value);
+
+        if(!strcmp(name, "chart")) {
+            chart = value;
+        }
+        else if(!strcmp(name, "context")) {
+            context = value;
+        }
+        else if(!strcmp(name, "lookup")) {
+            lookup = value;
+        }
+        else if(!strcmp(name, "calc")) {
+            calc = value;
+        }
+        else if(!strcmp(name, "warn")) {
+            warn = value;
+        }
+        else if(!strcmp(name, "crit")) {
+            crit = value;
+        }
+    }
+
+    health_virtual_run(host, w->response.data, chart, context, lookup, calc, warn, crit);
+
+    buffer_sprintf(w->response.data, "\n}\n");
+    w->response.data->content_type = CT_APPLICATION_JSON;
+    buffer_no_cacheable(w->response.data);
+
+    return 200;
+}
+
 inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client *w, char *url) {
     uint32_t after = 0;
     char *chart = NULL;
@@ -1564,6 +1614,7 @@ static struct web_api_command api_commands_v1[] = {
         { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_log,       0              },
         { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_variables, 0              },
         { "alarm_count",     0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_count,     0              },
+        { "alarm_eval",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_eval,      0              },
         { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_allmetrics,      0              },
 
 #if defined(ENABLE_ML)

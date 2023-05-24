@@ -25,6 +25,7 @@ int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client *w, cha
 int web_client_api_request_single_chart(RRDHOST *host, struct web_client *w, char *url, void callback(RRDSET *st, BUFFER *buf));
 int web_client_api_request_v1_alarm_variables(RRDHOST *host, struct web_client *w, char *url);
 int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_client *w, char *url);
+int web_client_api_request_v1_alarm_eval(RRDHOST *host, struct web_client *w, char *url);
 int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w, char *url);
 int web_client_api_request_v1_chart(RRDHOST *host, struct web_client *w, char *url);
 int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *w, char *url);

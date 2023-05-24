@@ -539,7 +539,8 @@ set(HEALTH_PLUGIN_FILES
         health/health.h
         health/health_config.c
         health/health_json.c
-        health/health_log.c)
+        health/health_log.c
+        health/health_virtual.c)
 
 set(IDLEJITTER_PLUGIN_FILES
         collectors/idlejitter.plugin/plugin_idlejitter.c

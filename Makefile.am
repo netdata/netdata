@@ -249,6 +249,7 @@ HEALTH_PLUGIN_FILES = \
     health/health_config.c \
     health/health_json.c \
     health/health_log.c \
+    health/health_virtual.c \
     $(NULL)
 
 ML_FILES = \
