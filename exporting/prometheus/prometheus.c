@@ -328,9 +328,9 @@ void format_host_labels_prometheus(struct instance *instance, RRDHOST *host)
 
 /**
  * Format host labels for the Prometheus exporter
+ * We are using a structure instead a direct buffer to expand options quickly.
  *
- * @param instance an instance data structure.
- * @param host a data collecting host.
+ * @param labels_buffer is the buffer used to add labels.
  */
 
 struct format_prometheus_chart_label_callback {
