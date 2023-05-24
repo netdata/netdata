@@ -1256,7 +1256,7 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_m
 
     char *core_attach = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_CORE_ATTACH, EBPF_CFG_ATTACH_TRAMPOLINE);
     netdata_ebpf_program_loaded_t fill_lm = ebpf_convert_core_type(core_attach, modules->mode);
-    ebpf_update_target_with_conf(modules, fill_lm);
+    ebpf_update_target_value(modules, fill_lm);
 
     value = ebpf_convert_collect_pid_to_string(modules->apps_level);
     char *collect_pid = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_COLLECT_PID, value);
