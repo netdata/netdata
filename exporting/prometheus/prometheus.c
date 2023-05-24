@@ -368,7 +368,7 @@ void format_chart_labels_prometheus(struct format_prometheus_chart_label_callbac
     else {
         plabel->labels_buffer = buffer_create(1024, NULL);
     }
-    buffer_sprintf(plabel->labels_buffer, "chart=\"%s\",family=\"%s\",dimension=\"%s\"", chart, family, dim);
+    buffer_sprintf(plabel->labels_buffer, "chart=\"%s\",dimension=\"%s\",family=\"%s\"", chart, dim, family);
 
     rrdlabels_walkthrough_read(st->rrdlabels, format_prometheus_chart_label_callback, plabel);
 }
