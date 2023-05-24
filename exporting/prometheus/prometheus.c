@@ -326,6 +326,53 @@ void format_host_labels_prometheus(struct instance *instance, RRDHOST *host)
     rrdlabels_walkthrough_read(host->rrdlabels, format_prometheus_label_callback, &tmp);
 }
 
+/**
+ * Format host labels for the Prometheus exporter
+ *
+ * @param instance an instance data structure.
+ * @param host a data collecting host.
+ */
+
+struct format_prometheus_chart_label_callback {
+    BUFFER *labels_buffer;
+};
+
+static int format_prometheus_chart_label_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
+    struct format_prometheus_chart_label_callback *d = (struct format_prometheus_chart_label_callback *)data;
+
+    (void)ls;
+
+    if (name[0] == '_' )
+        return 1;
+
+    char k[PROMETHEUS_ELEMENT_MAX + 1];
+    char v[PROMETHEUS_ELEMENT_MAX + 1];
+
+    prometheus_name_copy(k, name, PROMETHEUS_ELEMENT_MAX);
+    prometheus_label_copy(v, value, PROMETHEUS_ELEMENT_MAX);
+
+    if (*k && *v) {
+        buffer_sprintf(d->labels_buffer, ",%s=\"%s\"", k, v);
+    }
+    return 1;
+}
+
+void format_chart_labels_prometheus(struct format_prometheus_chart_label_callback *plabel,
+                                    const char *chart,
+                                    const char *family,
+                                    const char *dim,
+                                    RRDSET *st)
+{
+    if (likely(plabel->labels_buffer))
+        buffer_reset(plabel->labels_buffer);
+    else {
+        plabel->labels_buffer = buffer_create(1024, NULL);
+    }
+    buffer_sprintf(plabel->labels_buffer, "chart=\"%s\",family=\"%s\",dimension=\"%s\"", chart, family, dim);
+
+    rrdlabels_walkthrough_read(st->rrdlabels, format_prometheus_chart_label_callback, plabel);
+}
+
 struct host_variables_callback_options {
     RRDHOST *host;
     BUFFER *wb;
@@ -564,6 +611,10 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
     // for each chart
     RRDSET *st;
+
+    static struct format_prometheus_chart_label_callback plabels = {
+        .labels_buffer = NULL,
+    };
     rrdset_foreach_read(st, host) {
 
         if (likely(can_send_rrdset(instance, st, filter))) {
@@ -694,6 +745,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                 (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
                                 PROMETHEUS_ELEMENT_MAX);
 
+                            format_chart_labels_prometheus(&plabels, chart, family, dimension, st);
+
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP))
                                 buffer_sprintf(
                                     wb,
@@ -713,30 +766,26 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                             if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
                                 buffer_sprintf(
                                     wb,
-                                    "%s_%s%s%s{chart=\"%s\",dimension=\"%s\",family=\"%s\"%s} " NETDATA_DOUBLE_FORMAT
+                                    "%s_%s%s%s{%s%s} " NETDATA_DOUBLE_FORMAT
                                     " %llu\n",
                                     prefix,
                                     context,
                                     units,
                                     suffix,
-                                    chart,
-                                    dimension,
-                                    family,
+                                    buffer_tostring(plabels.labels_buffer),
                                     labels,
                                     value,
                                     last_time * MSEC_PER_SEC);
                             else
                                 buffer_sprintf(
                                     wb,
-                                    "%s_%s%s%s{chart=\"%s\",dimension=\"%s\",family=\"%s\"%s} " NETDATA_DOUBLE_FORMAT
+                                    "%s_%s%s%s{%s%s} " NETDATA_DOUBLE_FORMAT
                                     "\n",
                                     prefix,
                                     context,
                                     units,
                                     suffix,
-                                    chart,
-                                    dimension,
-                                    family,
+                                    buffer_tostring(plabels.labels_buffer),
                                     labels,
                                     value);
                         }
