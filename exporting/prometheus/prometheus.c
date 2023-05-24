@@ -475,9 +475,7 @@ static void generate_as_collected_prom_metric(BUFFER *wb, struct gen_parameters 
     if (homogeneous)
         buffer_sprintf(wb, ",dimension=\"%s\"", p->dimension);
 
-    buffer_sprintf(wb, "family=\"%s\"", p->family);
-
-    buffer_sprintf(wb, "%s} ", p->labels);
+    buffer_sprintf(wb, ",family=\"%s\"%s} ", p->family, p->labels);
 
     if (prometheus_collector)
         buffer_sprintf(
