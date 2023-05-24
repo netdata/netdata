@@ -509,9 +509,17 @@ static void generate_as_collected_prom_help(BUFFER *wb, struct gen_parameters *p
  * @param p parameters for generating the metric string.
  * @param homogeneous a flag for homogeneous charts.
  * @param prometheus_collector a flag for metrics from prometheus collector.
+ * @param chart_labels the dictionary with chart labels
  */
-static void generate_as_collected_prom_metric(BUFFER *wb, struct gen_parameters *p, int homogeneous, int prometheus_collector)
+static void generate_as_collected_prom_metric(BUFFER *wb,
+                                              struct gen_parameters *p,
+                                              int homogeneous,
+                                              int prometheus_collector,
+                                              DICTIONARY *chart_labels)
 {
+    struct format_prometheus_chart_label_callback local_label;
+    local_label.labels_buffer = wb;
+
     buffer_sprintf(wb, "%s_%s", p->prefix, p->context);
 
     if (!homogeneous)
@@ -522,7 +530,11 @@ static void generate_as_collected_prom_metric(BUFFER *wb, struct gen_parameters 
     if (homogeneous)
         buffer_sprintf(wb, ",dimension=\"%s\"", p->dimension);
 
-    buffer_sprintf(wb, ",family=\"%s\"%s} ", p->family, p->labels);
+    buffer_sprintf(wb, ",family=\"%s\"", p->family);
+
+    rrdlabels_walkthrough_read(chart_labels, format_prometheus_chart_label_callback, &local_label);
+
+    buffer_sprintf(wb, "%s} ", p->labels);
 
     if (prometheus_collector)
         buffer_sprintf(
@@ -706,7 +718,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
                                 buffer_sprintf(wb, "# TYPE %s_%s%s %s\n", prefix, context, suffix, p.type);
 
-                            generate_as_collected_prom_metric(wb, &p, homogeneous, prometheus_collector);
+                            generate_as_collected_prom_metric(wb, &p, homogeneous, prometheus_collector, st->rrdlabels);
                         }
                         else {
                             // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
@@ -724,7 +736,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                 buffer_sprintf(
                                     wb, "# TYPE %s_%s_%s%s %s\n", prefix, context, dimension, suffix, p.type);
 
-                            generate_as_collected_prom_metric(wb, &p, homogeneous, prometheus_collector);
+                            generate_as_collected_prom_metric(wb, &p, homogeneous, prometheus_collector, st->rrdlabels);
                         }
                     }
                     else {
