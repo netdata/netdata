@@ -3,13 +3,9 @@
 #include "health.h"
 
 void health_virtual_run(RRDHOST *host, BUFFER *wb, char *chart, char *context, char *lookup, char *calc, char *warn, char *crit) {
-    log_health("DES hello [%s] [%s] [%s] [%s]", chart, context, lookup, calc);
-
     RRDCALC *rcv = callocz(1, sizeof(RRDCALC));
 
     health_config_setup_rc_from_api(host, rcv, chart, context, lookup, calc, warn, crit);
-
-    log_health("DES [%s]", string2str(rcv->chart));
 
     if (unlikely(RRDCALC_HAS_DB_LOOKUP(rcv))) {
 
@@ -29,7 +25,7 @@ void health_virtual_run(RRDHOST *host, BUFFER *wb, char *chart, char *context, c
             rcv->value = NAN;
             //rcv->run_flags |= RRDCALC_FLAG_DB_ERROR;
 
-            log_health("DES Health on host '%s', alarm '%s.%s': database lookup returned error %d",
+            log_health("Health on host '%s', alarm '%s.%s': database lookup returned error %d",
                   rrdhost_hostname(host), rrdcalc_chart_name(rcv), rrdcalc_name(rcv), ret
                   );
         } else
@@ -41,13 +37,13 @@ void health_virtual_run(RRDHOST *host, BUFFER *wb, char *chart, char *context, c
             rcv->run_flags |= RRDCALC_FLAG_DB_NAN;
 
             log_health(
-                  "DES Health on host '%s', alarm '%s.%s': database lookup returned empty value (possibly value is not collected yet)",
+                  "Health on host '%s', alarm '%s.%s': database lookup returned empty value (possibly value is not collected yet)",
                   rrdhost_hostname(host), rrdcalc_chart_name(rcv), rrdcalc_name(rcv)
                   );
         } else
             rcv->run_flags &= ~RRDCALC_FLAG_DB_NAN;
 
-        log_health("DES Health on host '%s', alarm '%s.%s': database lookup gave value " NETDATA_DOUBLE_FORMAT,
+        log_health("Health on host '%s', alarm '%s.%s': database lookup gave value " NETDATA_DOUBLE_FORMAT,
               rrdhost_hostname(host), rrdcalc_chart_name(rcv), rrdcalc_name(rcv), rcv->value
               );
 
@@ -61,14 +57,14 @@ void health_virtual_run(RRDHOST *host, BUFFER *wb, char *chart, char *context, c
             rcv->value = NAN;
             rcv->run_flags |= RRDCALC_FLAG_CALC_ERROR;
 
-            log_health("DES Health on host '%s', alarm '%s.%s': expression '%s' failed: %s",
+            log_health("Health on host '%s', alarm '%s.%s': expression '%s' failed: %s",
                   rrdhost_hostname(host), rrdcalc_chart_name(rcv), rrdcalc_name(rcv),
                   rcv->calculation->parsed_as, buffer_tostring(rcv->calculation->error_msg)
                   );
         } else {
             rcv->run_flags &= ~RRDCALC_FLAG_CALC_ERROR;
 
-            log_health("DES Health on host '%s', alarm '%s.%s': expression '%s' gave value "
+            log_health("Health on host '%s', alarm '%s.%s': expression '%s' gave value "
                   NETDATA_DOUBLE_FORMAT
                   ": %s (source: %s)", rrdhost_hostname(host), rrdcalc_chart_name(rcv), rrdcalc_name(rcv),
                   rcv->calculation->parsed_as, rcv->calculation->result,
@@ -86,19 +82,8 @@ void health_virtual_run(RRDHOST *host, BUFFER *wb, char *chart, char *context, c
             // calculation failed
             rcv->run_flags |= RRDCALC_FLAG_WARN_ERROR;
 
-            /* debug(D_HEALTH, */
-            /*       "Health on host '%s', alarm '%s.%s': warning expression failed with error: %s", */
-            /*       rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc), */
-            /*       buffer_tostring(rc->warning->error_msg) */
-            /*       ); */
         } else {
             rcv->run_flags &= ~RRDCALC_FLAG_WARN_ERROR;
-            /* debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': warning expression gave value " */
-            /*       NETDATA_DOUBLE_FORMAT */
-            /*       ": %s (source: %s)", rrdhost_hostname(host), rrdcalc_chart_name(rc), */
-            /*       rrdcalc_name(rc), rc->warning->result, buffer_tostring(rc->warning->error_msg), rrdcalc_source(rc) */
-            /*       ); */
-            /* warning_status = rrdcalc_value2status(rc->warning->result); */
             buffer_sprintf(wb, "%s\n\t\t\"%s\": %0.5" NETDATA_DOUBLE_MODIFIER, /*helper->counter?",":*/",", "warning", (NETDATA_DOUBLE)rcv->warning->result);
         }
     }
