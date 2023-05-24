@@ -289,6 +289,7 @@ static int hdl_netdata_conf(h2o_handler_t *self, h2o_req_t *req)
 static int hdl_stream(h2o_handler_t *self, h2o_req_t *req)
 {
     UNUSED(self);
+    info("Streaming request trough h2o received");
     h2o_stream_conn_t *conn = mallocz(sizeof(*conn));
     h2o_stream_conn_t_init(conn);
 
