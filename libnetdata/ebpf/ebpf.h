@@ -40,6 +40,8 @@
 
 #define EBPF_CFG_PROGRAM_PATH "btf path"
 
+#define EBPF_CFG_MAPS_PER_CORE "maps per core"
+
 #define EBPF_CFG_UPDATE_EVERY "update every"
 #define EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT 10
 #define EBPF_CFG_PID_SIZE "pid table size"
@@ -77,6 +79,7 @@
  *
  */
 enum netdata_ebpf_kernel_versions {
+    NETDATA_EBPF_KERNEL_4_06 = 263680,  //  264960 = 4 * 65536 +  6 * 256
     NETDATA_EBPF_KERNEL_4_11 = 264960,  //  264960 = 4 * 65536 + 15 * 256
     NETDATA_EBPF_KERNEL_4_14 = 265728,  //  264960 = 4 * 65536 + 14 * 256
     NETDATA_EBPF_KERNEL_4_15 = 265984,  //  265984 = 4 * 65536 + 15 * 256
@@ -196,6 +199,9 @@ typedef struct ebpf_local_maps {
     uint32_t user_input;
     uint32_t type;
     int map_fd;
+#ifdef LIBBPF_MAJOR_VERSION
+    enum bpf_map_type map_type;
+#endif
 } ebpf_local_maps_t;
 
 typedef struct ebpf_specify_name {
@@ -243,6 +249,9 @@ typedef struct ebpf_plugin_stats {
     uint64_t memlock_kern; // The same information reported by bpftool, but it is not accurated
                            // https://lore.kernel.org/linux-mm/20230112155326.26902-5-laoar.shao@gmail.com/T/
     uint32_t hash_tables; // Number of hash tables used on the system.
+
+    uint32_t hash_percpu; // Number of threads running per cpu maps
+    uint32_t hash_unique; // Number of threads running an unique map for all cores.
 } ebpf_plugin_stats_t;
 
 typedef enum ebpf_stats_action {
@@ -296,6 +305,7 @@ typedef struct ebpf_module {
     // charts
     char memory_usage[NETDATA_EBPF_CHART_MEM_LENGTH];
     char memory_allocations[NETDATA_EBPF_CHART_MEM_LENGTH];
+    int maps_per_core;
 } ebpf_module_t;
 
 int ebpf_get_kernel_version();
@@ -348,6 +358,7 @@ typedef struct ebpf_filesystem_partitions {
 
     ebpf_addresses_t addresses;
     uint64_t kernels;
+    ebpf_local_maps_t *fs_maps;
 } ebpf_filesystem_partitions_t;
 
 typedef struct ebpf_sync_syscalls {
@@ -365,6 +376,7 @@ typedef struct ebpf_sync_syscalls {
 #else
     void *sync_obj;
 #endif
+    ebpf_local_maps_t *sync_maps;
 } ebpf_sync_syscalls_t;
 
 void ebpf_histogram_dimension_cleanup(char **ptr, size_t length);
@@ -391,6 +403,8 @@ void ebpf_adjust_thread_load(ebpf_module_t *mod, struct btf *file);
 struct btf *ebpf_parse_btf_file(const char *filename);
 struct btf *ebpf_load_btf_file(char *path, char *filename);
 int ebpf_is_function_inside_btf(struct btf *file, char *function);
+void ebpf_update_map_type(struct bpf_map *map, ebpf_local_maps_t *w);
+void ebpf_define_map_type(ebpf_local_maps_t *maps, int maps_per_core, int kver);
 #endif
 
 void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report, ebpf_local_maps_t *maps);

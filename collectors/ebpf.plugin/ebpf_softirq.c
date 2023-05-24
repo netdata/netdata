@@ -16,7 +16,10 @@ static ebpf_local_maps_t softirq_maps[] = {
         .internal_input = NETDATA_SOFTIRQ_MAX_IRQS,
         .user_input = 0,
         .type = NETDATA_EBPF_MAP_STATIC,
-        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED
+        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+        .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
     },
     /* end */
     {
@@ -24,7 +27,10 @@ static ebpf_local_maps_t softirq_maps[] = {
         .internal_input = 0,
         .user_input = 0,
         .type = NETDATA_EBPF_MAP_CONTROLLER,
-        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED
+        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+        .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
     }
 };
 
@@ -94,10 +100,21 @@ static void softirq_cleanup(void *ptr)
  *  MAIN LOOP
  *****************************************************************/
 
-static void softirq_read_latency_map()
+/**
+ * Read Latency Map
+ *
+ * Read data from kernel ring to plot for users.
+ *
+ * @param maps_per_core do I need to read all cores?
+ */
+static void softirq_read_latency_map(int maps_per_core)
 {
     int fd = softirq_maps[SOFTIRQ_MAP_LATENCY].map_fd;
     int i;
+    size_t length = sizeof(softirq_ebpf_val_t);
+    if (maps_per_core)
+        length *= ebpf_nprocs;
+
     for (i = 0; i < NETDATA_SOFTIRQ_MAX_IRQS; i++) {
         int test = bpf_map_lookup_elem(fd, &i, softirq_ebpf_vals);
         if (unlikely(test < 0)) {
@@ -106,12 +123,13 @@ static void softirq_read_latency_map()
 
         uint64_t total_latency = 0;
         int cpu_i;
-        int end = ebpf_nprocs;
+        int end = (maps_per_core) ? ebpf_nprocs : 1;
         for (cpu_i = 0; cpu_i < end; cpu_i++) {
             total_latency += softirq_ebpf_vals[cpu_i].latency/1000;
         }
 
         softirq_vals[i].latency = total_latency;
+        memset(softirq_ebpf_vals, 0, length);
     }
 }
 
@@ -172,6 +190,7 @@ static void softirq_collector(ebpf_module_t *em)
     heartbeat_init(&hb);
     int update_every = em->update_every;
     int counter = update_every - 1;
+    int maps_per_core = em->maps_per_core;
     //This will be cancelled by its parent
     while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
@@ -179,7 +198,7 @@ static void softirq_collector(ebpf_module_t *em)
             continue;
 
         counter = 0;
-        softirq_read_latency_map();
+        softirq_read_latency_map(maps_per_core);
         pthread_mutex_lock(&lock);
 
         // write dims now for all hitherto discovered IRQs.
@@ -212,6 +231,9 @@ void *ebpf_softirq_thread(void *ptr)
         goto endsoftirq;
     }
 
+#ifdef LIBBPF_MAJOR_VERSION
+    ebpf_define_map_type(em->maps, em->maps_per_core, running_on_kernel);
+#endif
     em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
     if (!em->probe_links) {
         goto endsoftirq;
