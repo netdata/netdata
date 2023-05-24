@@ -300,12 +300,15 @@ void stream_process(h2o_stream_conn_t *conn, int initial)
             w.client_ip[peername_len] = 0;
             w.user_agent = conn->user_agent;
 
-            rrdpush_receiver_thread_spawn(&w, conn->url, conn);
-            // http_code returned is ignored as there is nobody to get it after HTTP upgrade
-            // so it lost any sense with h2o streaming mode
-            freez(conn->url);
+            rc = rrdpush_receiver_thread_spawn(&w, conn->url, conn);
+            if (rc != HTTP_RESP_OK) {
+                error_report("HTTPD Failed to spawn the receiver thread %d", rc);
+                conn->state = STREAM_CLOSE;
+                stream_on_close(conn);
+            } else {
+                conn->state = STREAM_ACTIVE;
+            }
             buffer_free(w.response.data);
-            conn->state = STREAM_ACTIVE;
             /* FALLTHROUGH */
         case STREAM_ACTIVE:
             break;
