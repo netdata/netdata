@@ -118,15 +118,15 @@ void add_metric(
     label->set_name("chart");
     label->set_value(chart);
 
-    label = timeseries->add_labels();
-    label->set_name("family");
-    label->set_value(family);
-
     if (dimension) {
         label = timeseries->add_labels();
         label->set_name("dimension");
         label->set_value(dimension);
     }
+
+    label = timeseries->add_labels();
+    label->set_name("family");
+    label->set_value(family);
 
     label = timeseries->add_labels();
     label->set_name("instance");
