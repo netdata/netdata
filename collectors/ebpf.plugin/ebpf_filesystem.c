@@ -487,7 +487,7 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
                     em->kernels = kernels;
                     return -1;
                 } else {
-                    if (ebpf_fs_load_and_attach(&fs_maps[i], efp->fs_obj,
+                    if (ebpf_fs_load_and_attach(em->maps, efp->fs_obj,
                         efp->functions, NULL))
                         return -1;
                 }
