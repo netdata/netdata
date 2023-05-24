@@ -211,6 +211,17 @@ netdata_download_allmetrics() {
     done
 }
 
+# Original tests
+netdata_run_v2_tests() {
+    netdata_download_various "$MURL" "api/v2/data"  "data_v2"
+    for FMT in "max" "min" "sum" "avg" "percentage" ;
+    do
+        netdata_download_various "$MURL" "api/v2/data?aggregation=${FMT}"  "data_v2_aggregation_${FMT}"
+    done
+    netdata_download_various "$MURL" "api/v2/nodes"  "nodes_v2"
+    netdata_download_various "$MURL" "api/v2/contexts"  "contexts_v2"
+    netdata_download_various "$MURL" "api/v2/weights"  "weights_v2"
+}
 
 # Original tests
 netdata_run_original_tests() {
@@ -401,10 +412,7 @@ if [ "${DBE}" == "1" ]; then
 fi
 
 if [ "${V2}" == "1" ]; then
-    netdata_download_various "$MURL" "api/v2/data"  "data_v2"
-    netdata_download_various "$MURL" "api/v2/nodes"  "nodes_v2"
-    netdata_download_various "$MURL" "api/v2/contexts"  "contexts_v2"
-    netdata_download_various "$MURL" "api/v2/weights"  "weights_v2"
+    netdata_run_v2_tests "$@"
 fi
 
 echo -e "${GREEN}ALL the URLS got 200 as answer! ${NOCOLOR}"
