@@ -186,7 +186,7 @@ ebpf_module_t ebpf_modules[] = {
       .apps_routine = NULL, .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &mdflush_config,
       .config_file = NETDATA_DIRECTORY_MDFLUSH_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
-      .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL,
+      .load = EBPF_LOAD_LEGACY, .targets = mdflush_targets, .probe_links = NULL, .objects = NULL,
       .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_every = EBPF_DEFAULT_UPDATE_EVERY,
       .global_charts = 0, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO, .apps_level = NETDATA_APPS_NOT_SET,
