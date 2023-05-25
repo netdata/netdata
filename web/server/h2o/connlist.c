@@ -116,22 +116,41 @@ static void conn_list_garbage_collect_unsafe(conn_list_t *list)
     }
 }
 
+static inline int conn_list_iter_remove(conn_list_iter_t *iter, h2o_stream_conn_t *conn)
+{
+    if (unlikely(iter->idx == iter->list->capacity))
+        return -1;
+
+    if (iter->idx && iter->idx % CONN_LIST_MEMPOOL_SIZE == 0) {
+        iter->leaf = iter->leaf->next;
+    }
+
+    if(conn == iter->leaf->conn[iter->idx % CONN_LIST_MEMPOOL_SIZE]) {
+        iter->leaf->conn[iter->idx % CONN_LIST_MEMPOOL_SIZE] = NULL;
+
+        iter->idx++;
+        return 1;
+    }
+
+    iter->idx++;
+    return 0;
+}
+
 int conn_list_remove_conn(conn_list_t *list, h2o_stream_conn_t *conn)
 {
     pthread_mutex_lock(&list->lock);
     conn_list_iter_t iter;
     conn_list_iter_create_unsafe(&iter, list);
-    h2o_stream_conn_t *c;
-    while (conn_list_iter_next_unsafe(&iter, &c)) {
-        if (c == conn) {
-            iter.leaf->conn[iter.idx % CONN_LIST_MEMPOOL_SIZE] = NULL;
-            list->size--;
-            conn_list_garbage_collect_unsafe(list);
-            pthread_mutex_unlock(&list->lock);
-            return 1;
-        }
+    int rc;
+    while (!(rc = conn_list_iter_remove(&iter, conn)));
+    if (rc == -1) {
+        pthread_mutex_unlock(&list->lock);
+        error_report("conn_list_remove_conn: conn not found");
+        return 0;
     }
+    list->size--;
+    conn_list_garbage_collect_unsafe(list);
     pthread_mutex_unlock(&list->lock);
-    return 0;
+    return 1;
 }
 
