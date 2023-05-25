@@ -239,17 +239,19 @@ static int netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req)
 
     int ret = _netdata_uberhandler(req, &host);
 
-    char host_uuid_str[UUID_STR_LEN];
-    uuid_unparse_lower(host->host_uuid, host_uuid_str);
-
     if (!ret) {
+        char host_uuid_str[UUID_STR_LEN];
+
+        if (host != NULL)
+            uuid_unparse_lower(host->host_uuid, host_uuid_str);
+
         log_access("HTTPD OK method: " PRINTF_H2O_IOVEC_FMT
                    ", path: " PRINTF_H2O_IOVEC_FMT
                    ", as host: %s"
                    ", response: %d",
                    PRINTF_H2O_IOVEC(&req->method),
                    PRINTF_H2O_IOVEC(&req->input.path),
-                   host == localhost ? "localhost" : host_uuid_str,
+                   host == NULL ? "unknown" : (host == localhost ? "localhost" : host_uuid_str),
                    req->res.status);
     } else {
         log_access("HTTPD %d"
