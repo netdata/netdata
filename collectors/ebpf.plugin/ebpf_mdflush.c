@@ -332,6 +332,8 @@ static void mdflush_collector(ebpf_module_t *em)
  * Load BPF files.
  *
  * @param em the structure with configuration
+ *
+ * @return It returns 0 on success and -1 otherwise.
  */
 static int ebpf_mdflush_load_bpf(ebpf_module_t *em)
 {
