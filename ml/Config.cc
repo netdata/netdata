@@ -25,10 +25,10 @@ void ml_config_load(ml_config_t *cfg) {
      * Read values
      */
 
-    unsigned max_train_samples = config_get_number(config_section_ml, "maximum num samples to train", 4 * 3600);
+    unsigned max_train_samples = config_get_number(config_section_ml, "maximum num samples to train", 6 * 3600);
     unsigned min_train_samples = config_get_number(config_section_ml, "minimum num samples to train", 1 * 900);
-    unsigned train_every = config_get_number(config_section_ml, "train every", 1 * 3600);
-    unsigned num_models_to_use = config_get_number(config_section_ml, "number of models per dimension", 2);
+    unsigned train_every = config_get_number(config_section_ml, "train every", 3 * 3600);
+    unsigned num_models_to_use = config_get_number(config_section_ml, "number of models per dimension", 9);
 
     unsigned diff_n = config_get_number(config_section_ml, "num samples to diff", 1);
     unsigned smooth_n = config_get_number(config_section_ml, "num samples to smooth", 3);
@@ -86,7 +86,7 @@ void ml_config_load(ml_config_t *cfg) {
         error("invalid min/max train samples found (%u >= %u)", min_train_samples, max_train_samples);
 
         min_train_samples = 1 * 3600;
-        max_train_samples = 4 * 3600;
+        max_train_samples = 6 * 3600;
     }
 
     /*
