@@ -13,6 +13,8 @@ Simple patterns can be used to exclude mounts from showed statistics based on pa
 
 By default, Netdata will enable monitoring metrics only when they are not zero. If they are constantly zero they are ignored. Metrics that will start having values, after Netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though).
 
+Netdata will try to detect mounts that are duplicates (i.e. from the same device), or binds, and will not display charts for them, as the device is usually already monitored.
+
 To configure this plugin, you need to edit the configuration file `netdata.conf`. You can do so by using the `edit config` script.  
 
 > ### Info

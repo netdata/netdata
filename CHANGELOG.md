@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- Add chart labels to Prometheus. [\#15099](https://github.com/netdata/netdata/pull/15099) ([thiagoftsm](https://github.com/thiagoftsm))
+- Invert order in remote write [\#15097](https://github.com/netdata/netdata/pull/15097) ([thiagoftsm](https://github.com/thiagoftsm))
+- fix cockroachdb alarms [\#15095](https://github.com/netdata/netdata/pull/15095) ([ilyam8](https://github.com/ilyam8))
+- Address issue with Thanos Receiver [\#15094](https://github.com/netdata/netdata/pull/15094) ([thiagoftsm](https://github.com/thiagoftsm))
+- Create category overview pages for learn's restructure [\#15091](https://github.com/netdata/netdata/pull/15091) ([Ancairon](https://github.com/Ancairon))
+- Release buffer in case of error -- CID 385075 [\#15090](https://github.com/netdata/netdata/pull/15090) ([stelfrag](https://github.com/stelfrag))
+- mentioned waive off of space subscription price [\#15082](https://github.com/netdata/netdata/pull/15082) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Python Dependency Migration - OracleDB Python Module [\#15074](https://github.com/netdata/netdata/pull/15074) ([EricAndrechek](https://github.com/EricAndrechek))
 - Free context when establishing ACLK connection [\#15073](https://github.com/netdata/netdata/pull/15073) ([stelfrag](https://github.com/stelfrag))
 - Update Security doc [\#15072](https://github.com/netdata/netdata/pull/15072) ([tkatsoulas](https://github.com/tkatsoulas))
@@ -21,6 +28,7 @@
 - fix\(debugfs/zswap\): don't collect metrics if Zswap is disabled [\#15054](https://github.com/netdata/netdata/pull/15054) ([ilyam8](https://github.com/ilyam8))
 - Comment out default `role_recipients_*` values [\#15047](https://github.com/netdata/netdata/pull/15047) ([jamgregory](https://github.com/jamgregory))
 - Small update ml defaults [\#15046](https://github.com/netdata/netdata/pull/15046) ([andrewm4894](https://github.com/andrewm4894))
+- Better cleanup of health log table [\#15045](https://github.com/netdata/netdata/pull/15045) ([MrZammler](https://github.com/MrZammler))
 - Fix handling of permissions in static installs. [\#15042](https://github.com/netdata/netdata/pull/15042) ([Ferroin](https://github.com/Ferroin))
 - Update tor.chart.py [\#15041](https://github.com/netdata/netdata/pull/15041) ([jmphilippe](https://github.com/jmphilippe))
 - Wording fix in interact with charts doc [\#15040](https://github.com/netdata/netdata/pull/15040) ([Ancairon](https://github.com/Ancairon))
@@ -40,8 +48,10 @@
 - Use chart labels to filter alerts [\#14982](https://github.com/netdata/netdata/pull/14982) ([MrZammler](https://github.com/MrZammler))
 - Remove Fedora 36 from CI and platform support. [\#14938](https://github.com/netdata/netdata/pull/14938) ([Ferroin](https://github.com/Ferroin))
 - make zlib compulsory dep [\#14928](https://github.com/netdata/netdata/pull/14928) ([underhood](https://github.com/underhood))
+- Try to detect bind mounts [\#14831](https://github.com/netdata/netdata/pull/14831) ([MrZammler](https://github.com/MrZammler))
 - Remove old logic for handling of legacy stock config files. [\#14829](https://github.com/netdata/netdata/pull/14829) ([Ferroin](https://github.com/Ferroin))
 - fix infiniband bytes counters multiplier and divisor [\#14748](https://github.com/netdata/netdata/pull/14748) ([ilyam8](https://github.com/ilyam8))
+- New eBPF option [\#14691](https://github.com/netdata/netdata/pull/14691) ([thiagoftsm](https://github.com/thiagoftsm))
 - initial minimal h2o webserver integration [\#14585](https://github.com/netdata/netdata/pull/14585) ([underhood](https://github.com/underhood))
 
 ## [v1.39.1](https://github.com/netdata/netdata/tree/v1.39.1) (2023-05-18)
@@ -396,20 +406,6 @@
 - Correct link to ansible playbook [\#14468](https://github.com/netdata/netdata/pull/14468) ([cakrit](https://github.com/cakrit))
 - Moved contents of get started to installer readme [\#14467](https://github.com/netdata/netdata/pull/14467) ([cakrit](https://github.com/cakrit))
 - Add markdown files in Learn [\#14466](https://github.com/netdata/netdata/pull/14466) ([Ancairon](https://github.com/Ancairon))
-- Virtual hosts for data collection [\#14464](https://github.com/netdata/netdata/pull/14464) ([ktsaou](https://github.com/ktsaou))
-- Memory management eBPF [\#14462](https://github.com/netdata/netdata/pull/14462) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add contents of packaging/installer/readme.md [\#14461](https://github.com/netdata/netdata/pull/14461) ([cakrit](https://github.com/cakrit))
-- Add mention of cloud in next steps UI etc [\#14459](https://github.com/netdata/netdata/pull/14459) ([cakrit](https://github.com/cakrit))
-- Fix links and add to learn [\#14458](https://github.com/netdata/netdata/pull/14458) ([cakrit](https://github.com/cakrit))
-- Add export for people running their own registry [\#14457](https://github.com/netdata/netdata/pull/14457) ([cakrit](https://github.com/cakrit))
-- Support installing extra packages in Docker images at runtime. [\#14456](https://github.com/netdata/netdata/pull/14456) ([Ferroin](https://github.com/Ferroin))
-- Prevent crash when running '-W createdataset' [\#14455](https://github.com/netdata/netdata/pull/14455) ([MrZammler](https://github.com/MrZammler))
-- remove deprecated python.d collectors announced in v1.38.0 [\#14454](https://github.com/netdata/netdata/pull/14454) ([ilyam8](https://github.com/ilyam8))
-- Update static build dependencies [\#14450](https://github.com/netdata/netdata/pull/14450) ([tkatsoulas](https://github.com/tkatsoulas))
-- do not report dimensions that failed to be queried [\#14447](https://github.com/netdata/netdata/pull/14447) ([ktsaou](https://github.com/ktsaou))
-- Fix agent build failure on FreeBSD 14.0 due to new tcpstat struct [\#14446](https://github.com/netdata/netdata/pull/14446) ([Dim-P](https://github.com/Dim-P))
-- minor fix in the metadata of libnetdata/ebpf AND log documents [\#14445](https://github.com/netdata/netdata/pull/14445) ([tkatsoulas](https://github.com/tkatsoulas))
-- Roles permissions docs [\#14444](https://github.com/netdata/netdata/pull/14444) ([hugovalente-pm](https://github.com/hugovalente-pm))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 

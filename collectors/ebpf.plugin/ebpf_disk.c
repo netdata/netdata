@@ -14,10 +14,25 @@ struct config disk_config = { .first_section = NULL,
 
 static ebpf_local_maps_t disk_maps[] = {{.name = "tbl_disk_iocall", .internal_input = NETDATA_DISK_HISTOGRAM_LENGTH,
                                          .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
-                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                         .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
+                                        },
+                                        {.name = "tmp_disk_tp_stat", .internal_input = 8192, .user_input = 8192,
+                                         .type = NETDATA_EBPF_MAP_STATIC,
+                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                         .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
+                                        },
                                         {.name = NULL, .internal_input = 0, .user_input = 0,
                                          .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
+                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                         .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                         }};
 static avl_tree_lock disk_tree;
 netdata_ebpf_disks_t *disk_list = NULL;
 
@@ -503,11 +518,12 @@ static void ebpf_fill_plot_disks(netdata_ebpf_disks_t *ptr)
 /**
  * Read hard disk table
  *
- * @param table file descriptor for table
- *
  * Read the table with number of calls for all functions
+ *
+ * @param table file descriptor for table
+ * @param maps_per_core do I need to read all cores?
  */
-static void read_hard_disk_tables(int table)
+static void read_hard_disk_tables(int table, int maps_per_core)
 {
     netdata_idx_t *values = disk_hash_values;
     block_key_t key = {};
@@ -548,7 +564,7 @@ static void read_hard_disk_tables(int table)
 
         uint64_t total = 0;
         int i;
-        int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
+        int end = (maps_per_core) ? 1 : ebpf_nprocs;
         for (i = 0; i < end; i++) {
             total += values[i];
         }
@@ -690,6 +706,7 @@ static void disk_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
     int counter = update_every - 1;
+    int maps_per_core = em->maps_per_core;
     while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
 
@@ -697,7 +714,7 @@ static void disk_collector(ebpf_module_t *em)
             continue;
 
         counter = 0;
-        read_hard_disk_tables(disk_maps[NETDATA_DISK_READ].map_fd);
+        read_hard_disk_tables(disk_maps[NETDATA_DISK_READ].map_fd, maps_per_core);
         pthread_mutex_lock(&lock);
         ebpf_remove_pointer_from_plot_disk(em);
         ebpf_latency_send_hd_data(update_every);
@@ -774,6 +791,9 @@ void *ebpf_disk_thread(void *ptr)
         goto enddisk;
     }
 
+#ifdef LIBBPF_MAJOR_VERSION
+    ebpf_define_map_type(disk_maps, em->maps_per_core, running_on_kernel);
+#endif
     em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
     if (!em->probe_links) {
         goto enddisk;

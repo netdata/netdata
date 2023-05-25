@@ -16,7 +16,10 @@ static ebpf_local_maps_t oomkill_maps[] = {
         .internal_input = NETDATA_OOMKILL_MAX_ENTRIES,
         .user_input = 0,
         .type = NETDATA_EBPF_MAP_STATIC,
-        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED
+        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+        .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
     },
     /* end */
     {
@@ -24,7 +27,10 @@ static ebpf_local_maps_t oomkill_maps[] = {
         .internal_input = 0,
         .user_input = 0,
         .type = NETDATA_EBPF_MAP_CONTROLLER,
-        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED
+        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+        .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
     }
 };
 
@@ -285,6 +291,8 @@ static void ebpf_update_oomkill_cgroup(int32_t *keys, uint32_t total)
 
 /**
 * Main loop for this collector.
+ *
+ * @param em the thread main structure.
 */
 static void oomkill_collector(ebpf_module_t *em)
 {
@@ -384,6 +392,9 @@ void *ebpf_oomkill_thread(void *ptr)
         goto endoomkill;
     }
 
+#ifdef LIBBPF_MAJOR_VERSION
+    ebpf_define_map_type(em->maps, em->maps_per_core, running_on_kernel);
+#endif
     em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
     if (!em->probe_links) {
         goto endoomkill;

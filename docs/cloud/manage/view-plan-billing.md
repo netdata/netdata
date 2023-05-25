@@ -115,6 +115,8 @@ Every time you purchase or renew a Plan, two separate Invoices are generated:
 
 - One Invoice includes the recurring fees of the Plan you have chosen
 
+  We have waived off the space subscription free ($0.00), so the only recurring fee will be on annual plans for the committed nodes.
+
 - The other Invoice includes your monthly “On Demand - Usage”.
 
   Right after the activation of your subscription, you will receive a zero value Invoice since you had no usage when you subscribed.

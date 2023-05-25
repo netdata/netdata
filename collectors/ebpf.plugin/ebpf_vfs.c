@@ -17,15 +17,31 @@ netdata_publish_vfs_t *vfs_vector = NULL;
 
 static ebpf_local_maps_t vfs_maps[] = {{.name = "tbl_vfs_pid", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
                                         .user_input = 0, .type = NETDATA_EBPF_MAP_RESIZABLE | NETDATA_EBPF_MAP_PID,
-                                        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                        .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
+                                       },
                                        {.name = "tbl_vfs_stats", .internal_input = NETDATA_VFS_COUNTER,
                                         .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
-                                        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                        .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                        },
                                        {.name = "vfs_ctrl", .internal_input = NETDATA_CONTROLLER_END,
                                         .user_input = 0,
                                         .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
-                                       {.name = NULL, .internal_input = 0, .user_input = 0}};
+                                        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                        .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                       },
+                                       {.name = NULL, .internal_input = 0, .user_input = 0,
+#ifdef LIBBPF_MAJOR_VERSION
+                                        .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                       }};
 
 struct config vfs_config = { .first_section = NULL,
     .last_section = NULL,
@@ -293,17 +309,21 @@ static int ebpf_vfs_attach_probe(struct vfs_bpf *obj)
 }
 
 /**
- * Adjust Map Size
+ * Adjust Size
  *
  * Resize maps according input from users.
  *
  * @param obj is the main structure for bpf objects.
  * @param em  structure with configuration
  */
-static void ebpf_vfs_adjust_map_size(struct vfs_bpf *obj, ebpf_module_t *em)
+static void ebpf_vfs_adjust_map(struct vfs_bpf *obj, ebpf_module_t *em)
 {
     ebpf_update_map_size(obj->maps.tbl_vfs_pid, &vfs_maps[NETDATA_VFS_PID],
                          em, bpf_map__name(obj->maps.tbl_vfs_pid));
+
+    ebpf_update_map_type(obj->maps.tbl_vfs_pid, &vfs_maps[NETDATA_VFS_PID]);
+    ebpf_update_map_type(obj->maps.tbl_vfs_stats, &vfs_maps[NETDATA_VFS_ALL]);
+    ebpf_update_map_type(obj->maps.vfs_ctrl, &vfs_maps[NETDATA_VFS_CTRL]);
 }
 
 /**
@@ -356,7 +376,7 @@ static inline int ebpf_vfs_load_and_attach(struct vfs_bpf *obj, ebpf_module_t *e
         ebpf_vfs_disable_trampoline(obj);
     }
 
-    ebpf_vfs_adjust_map_size(obj, em);
+    ebpf_vfs_adjust_map(obj, em);
 
     if (!em->apps_charts && !em->cgroup_charts)
         ebpf_vfs_disable_release_task(obj);
@@ -475,23 +495,30 @@ static void ebpf_vfs_send_data(ebpf_module_t *em)
 
 /**
  * Read the hash table and store data to allocated vectors.
+ *
+ * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_vfs_read_global_table()
+static void ebpf_vfs_read_global_table(int maps_per_core)
 {
     uint64_t idx;
     netdata_idx_t res[NETDATA_VFS_COUNTER];
 
     netdata_idx_t *val = vfs_hash_values;
+    size_t length = sizeof(netdata_idx_t);
+    if (maps_per_core)
+        length *= ebpf_nprocs;
+
     int fd = vfs_maps[NETDATA_VFS_ALL].map_fd;
     for (idx = 0; idx < NETDATA_VFS_COUNTER; idx++) {
         uint64_t total = 0;
         if (!bpf_map_lookup_elem(fd, &idx, val)) {
             int i;
-            int end = ebpf_nprocs;
+            int end = (maps_per_core) ? ebpf_nprocs : 1;
             for (i = 0; i < end; i++)
                 total += val[i];
         }
         res[idx] = total;
+        memset(val, 0, length);
     }
 
     vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_UNLINK].ncall = res[NETDATA_KEY_CALLS_VFS_UNLINK];
@@ -723,9 +750,9 @@ void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
  *
  * @param out the vector with read values.
  */
-static void vfs_apps_accumulator(netdata_publish_vfs_t *out)
+static void vfs_apps_accumulator(netdata_publish_vfs_t *out, int maps_per_core)
 {
-    int i, end = (running_on_kernel >= NETDATA_KERNEL_V4_15) ? ebpf_nprocs : 1;
+    int i, end = (maps_per_core) ? ebpf_nprocs : 1;
     netdata_publish_vfs_t *total = &out[0];
     for (i = 1; i < end; i++) {
         netdata_publish_vfs_t *w = &out[i];
@@ -771,12 +798,15 @@ static void vfs_fill_pid(uint32_t current_pid, netdata_publish_vfs_t *publish)
 /**
  * Read the hash table and store data to allocated vectors.
  */
-static void ebpf_vfs_read_apps()
+static void ebpf_vfs_read_apps(int maps_per_core)
 {
     struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     netdata_publish_vfs_t *vv = vfs_vector;
     int fd = vfs_maps[NETDATA_VFS_PID].map_fd;
-    size_t length = sizeof(netdata_publish_vfs_t) * ebpf_nprocs;
+    size_t length = sizeof(netdata_publish_vfs_t);
+    if (maps_per_core)
+        length *= ebpf_nprocs;
+
     while (pids) {
         uint32_t key = pids->pid;
 
@@ -785,7 +815,7 @@ static void ebpf_vfs_read_apps()
             continue;
         }
 
-        vfs_apps_accumulator(vv);
+        vfs_apps_accumulator(vv, maps_per_core);
 
         vfs_fill_pid(key, vv);
 
@@ -799,14 +829,18 @@ static void ebpf_vfs_read_apps()
 /**
  * Update cgroup
  *
- * Update cgroup data based in
+ * Update cgroup data based in PID.
+ *
+ * @param maps_per_core do I need to read all cores?
  */
-static void read_update_vfs_cgroup()
+static void read_update_vfs_cgroup(int maps_per_core)
 {
     ebpf_cgroup_target_t *ect ;
     netdata_publish_vfs_t *vv = vfs_vector;
     int fd = vfs_maps[NETDATA_VFS_PID].map_fd;
-    size_t length = sizeof(netdata_publish_vfs_t) * ebpf_nprocs;
+    size_t length = sizeof(netdata_publish_vfs_t);
+    if (maps_per_core)
+        length *= ebpf_nprocs;
 
     pthread_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
@@ -821,7 +855,7 @@ static void read_update_vfs_cgroup()
             } else {
                 memset(vv, 0, length);
                 if (!bpf_map_lookup_elem(fd, &pid, vv)) {
-                    vfs_apps_accumulator(vv);
+                    vfs_apps_accumulator(vv, maps_per_core);
 
                     memcpy(out, vv, sizeof(netdata_publish_vfs_t));
                 }
@@ -1458,6 +1492,7 @@ static void vfs_collector(ebpf_module_t *em)
     heartbeat_init(&hb);
     int update_every = em->update_every;
     int counter = update_every - 1;
+    int maps_per_core = em->maps_per_core;
     while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_exit_plugin || ++counter != update_every)
@@ -1465,20 +1500,20 @@ static void vfs_collector(ebpf_module_t *em)
 
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
-        ebpf_vfs_read_global_table();
+        ebpf_vfs_read_global_table(maps_per_core);
         pthread_mutex_lock(&collect_data_mutex);
         if (apps)
-            ebpf_vfs_read_apps();
+            ebpf_vfs_read_apps(maps_per_core);
+
+        if (cgroups)
+            read_update_vfs_cgroup(maps_per_core);
+
+        pthread_mutex_lock(&lock);
 
 #ifdef NETDATA_DEV_MODE
         if (ebpf_aral_vfs_pid)
             ebpf_send_data_aral_chart(ebpf_aral_vfs_pid, em);
 #endif
-
-        if (cgroups)
-            read_update_vfs_cgroup();
-
-        pthread_mutex_lock(&lock);
 
         ebpf_vfs_send_data(em);
         fflush(stdout);
@@ -1843,6 +1878,10 @@ static void ebpf_vfs_allocate_global_vectors(int apps)
  */
 static int ebpf_vfs_load_bpf(ebpf_module_t *em)
 {
+#ifdef LIBBPF_MAJOR_VERSION
+    ebpf_define_map_type(em->maps, em->maps_per_core, running_on_kernel);
+#endif
+
     int ret = 0;
     ebpf_adjust_apps_cgroup(em, em->targets[NETDATA_EBPF_VFS_WRITE].mode);
     if (em->load & EBPF_LOAD_LEGACY) {
