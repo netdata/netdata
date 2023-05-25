@@ -258,10 +258,8 @@ void stream_process(h2o_stream_conn_t *conn, int initial)
         pthread_mutex_lock(&conn->rx_buf_lock);
         char *insert_loc = rbuf_get_linear_insert_range(conn->rx, &insert_max);
         if (insert_loc == NULL) {
-            info("RX buffer full, temporarily stopping the reading until consumer (streaming thread) reads some data");
             pthread_cond_broadcast(&conn->rx_buf_cond);
             pthread_mutex_unlock(&conn->rx_buf_lock);
-            h2o_socket_read_stop(conn->sock);
             return;
         }
         insert_max = MIN(insert_max, conn->sock->input->size);
