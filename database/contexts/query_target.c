@@ -1049,7 +1049,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     qt->window.before = qt->request.before;
 
     qt->window.options = qt->request.options;
-    if(query_target_has_percentage_of_instance(qt))
+    if(query_target_has_percentage_of_group(qt))
         qt->window.options &= ~RRDR_OPTION_PERCENTAGE;
 
     rrdr_relative_window_to_absolute(&qt->window.after, &qt->window.before, &qt->window.now);
