@@ -6,10 +6,12 @@
 
 **Merged pull requests:**
 
+- /api/v2/data percentage calculation on grouped queries [\#15100](https://github.com/netdata/netdata/pull/15100) ([ktsaou](https://github.com/ktsaou))
 - Add chart labels to Prometheus. [\#15099](https://github.com/netdata/netdata/pull/15099) ([thiagoftsm](https://github.com/thiagoftsm))
 - Invert order in remote write [\#15097](https://github.com/netdata/netdata/pull/15097) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix cockroachdb alarms [\#15095](https://github.com/netdata/netdata/pull/15095) ([ilyam8](https://github.com/ilyam8))
 - Address issue with Thanos Receiver [\#15094](https://github.com/netdata/netdata/pull/15094) ([thiagoftsm](https://github.com/thiagoftsm))
+- update ml defaults to 24h [\#15093](https://github.com/netdata/netdata/pull/15093) ([andrewm4894](https://github.com/andrewm4894))
 - Create category overview pages for learn's restructure [\#15091](https://github.com/netdata/netdata/pull/15091) ([Ancairon](https://github.com/Ancairon))
 - Release buffer in case of error -- CID 385075 [\#15090](https://github.com/netdata/netdata/pull/15090) ([stelfrag](https://github.com/stelfrag))
 - mentioned waive off of space subscription price [\#15082](https://github.com/netdata/netdata/pull/15082) ([hugovalente-pm](https://github.com/hugovalente-pm))
@@ -403,9 +405,6 @@
 - Add sbindir\_POST template for v235 service file [\#14471](https://github.com/netdata/netdata/pull/14471) ([MrZammler](https://github.com/MrZammler))
 - Fix random crash on agent shutdown [\#14470](https://github.com/netdata/netdata/pull/14470) ([stelfrag](https://github.com/stelfrag))
 - Move ansible md [\#14469](https://github.com/netdata/netdata/pull/14469) ([cakrit](https://github.com/cakrit))
-- Correct link to ansible playbook [\#14468](https://github.com/netdata/netdata/pull/14468) ([cakrit](https://github.com/cakrit))
-- Moved contents of get started to installer readme [\#14467](https://github.com/netdata/netdata/pull/14467) ([cakrit](https://github.com/cakrit))
-- Add markdown files in Learn [\#14466](https://github.com/netdata/netdata/pull/14466) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
