@@ -328,6 +328,7 @@ class Service(SimpleService):
         self.password = configuration.get('password')
         self.server = configuration.get('server')
         self.service = configuration.get('service')
+        self.protocol = configuration.get('protocol', 'tcps')
         self.alive = False
         self.conn = None
         self.active_tablespaces = set()
@@ -338,7 +339,7 @@ class Service(SimpleService):
             self.conn = None
         if HAS_ORACLE_NEW:
             try:
-                self.conn = cx_Oracle.connect(f'{self.user}/{self.password}@tcps://{self.server}/{self.service}')
+                self.conn = cx_Oracle.connect(f'{self.user}/{self.password}@{self.protocol}://{self.server}/{self.service}')
             except cx_Oracle.DatabaseError as error:
                 self.error(error)
                 return False
