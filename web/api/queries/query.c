@@ -2764,19 +2764,16 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     }
 
     // make sure there are valid group-by methods
-    bool query_has_percentage_of_group = false;
-    for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES - 1 ;g++) {
+    for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
         if(!(qt->request.group_by[g].group_by & SUPPORTED_GROUP_BY_METHODS))
             qt->request.group_by[g].group_by = (g == 0) ? RRDR_GROUP_BY_DIMENSION : RRDR_GROUP_BY_NONE;
-
-        if(qt->request.group_by[g].group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE)
-            query_has_percentage_of_group = true;
-
-        if(qt->request.group_by[g].aggregation == RRDR_GROUP_BY_FUNCTION_PERCENTAGE)
-            query_has_percentage_of_group = true;
     }
 
-    // merge all group-by options to upper levels
+    bool query_has_percentage_of_group = query_target_has_percentage_of_group(qt);
+
+    // merge all group-by options to upper levels,
+    // so that the top level has all the groupings of the inner levels,
+    // and each subsequent level has all the groupings of its inner levels.
     for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES - 1 ;g++) {
         if(qt->request.group_by[g].group_by == RRDR_GROUP_BY_NONE)
             continue;
@@ -2925,8 +2922,8 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             qm->status |= RRDR_DIMENSION_GROUPED;
 
             if(query_has_percentage_of_group)
-                // when the query has percentage of instance
-                // there will be no hidden dimensions in the final query
+                // when the query has percentage of group
+                // there will be no hidden dimensions in the final query,
                 // so we have to remove the hidden flag from all dimensions
                 entries[pos].od |= qm->status & ~RRDR_DIMENSION_HIDDEN;
             else
@@ -2944,12 +2941,10 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                            qt->id, qt->window.after, qt->window.before, added, qt->window.points);
             goto cleanup;
         }
-
-        bool hidden_dimension_on_percentage_of_group = hidden_dimensions && ((group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE) || (aggregation_method == RRDR_GROUP_BY_FUNCTION_PERCENTAGE));
-
-        // prevent double cleanup in case of error
+        // prevent double free at cleanup in case of error
         added = 0;
 
+        // link this RRDR
         if(!last_r)
             first_r = last_r = r;
         else
@@ -2964,7 +2959,7 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         r->gbc = onewayalloc_callocz(owa, r->n * r->d, sizeof(*r->gbc));
         r->dqp = onewayalloc_callocz(owa, r->d, sizeof(STORAGE_POINT));
 
-        if(hidden_dimension_on_percentage_of_group)
+        if(hidden_dimensions && ((group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE) || (aggregation_method == RRDR_GROUP_BY_FUNCTION_PERCENTAGE)))
             // this is where we are going to group the hidden dimensions
             r->vh = onewayalloc_mallocz(owa, r->n * r->d * sizeof(*r->vh));
 
@@ -3016,7 +3011,7 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                 co[d] = RRDR_VALUE_EMPTY;
 
                 if(vh)
-                    *vh = NAN;
+                    vh[d] = NAN;
             }
         }
     }
