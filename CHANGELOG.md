@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- percentage-of-group: fix uninitialized array vh [\#15106](https://github.com/netdata/netdata/pull/15106) ([ktsaou](https://github.com/ktsaou))
 - fix the units when returning percentage of a group [\#15105](https://github.com/netdata/netdata/pull/15105) ([ktsaou](https://github.com/ktsaou))
 - /api/v2/data percentage calculation on grouped queries [\#15100](https://github.com/netdata/netdata/pull/15100) ([ktsaou](https://github.com/ktsaou))
 - Add chart labels to Prometheus. [\#15099](https://github.com/netdata/netdata/pull/15099) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -404,7 +405,6 @@
 - Add a file to Learn [\#14473](https://github.com/netdata/netdata/pull/14473) ([Ancairon](https://github.com/Ancairon))
 - fix a possible bug with an image in the md file [\#14472](https://github.com/netdata/netdata/pull/14472) ([Ancairon](https://github.com/Ancairon))
 - Add sbindir\_POST template for v235 service file [\#14471](https://github.com/netdata/netdata/pull/14471) ([MrZammler](https://github.com/MrZammler))
-- Fix random crash on agent shutdown [\#14470](https://github.com/netdata/netdata/pull/14470) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
