@@ -34,7 +34,7 @@ REPOCONFIG_RPM_URL_PREFIX="https://repo.netdata.cloud/repos/repoconfig"
 REPOCONFIG_RPM_VERSION="2-1"
 START_TIME="$(date +%s)"
 STATIC_INSTALL_ARCHES="x86_64 armv7l aarch64 ppc64le"
-TELEMETRY_URL="https://app.posthog.com/capture/"
+TELEMETRY_URL="https://us-east1-netdata-analytics-bi.cloudfunctions.net/ingest_agent_events"
 
 # ======================================================================
 # Defaults for environment variables
@@ -63,7 +63,6 @@ else
 fi
 
 NETDATA_TARBALL_BASEURL="${NETDATA_TARBALL_BASEURL:-https://github.com/netdata/netdata-nightlies/releases}"
-TELEMETRY_API_KEY="${NETDATA_POSTHOG_API_KEY:-mqkwGT0JNFqO-zX2t0mW6Tec9yooaVu7xCBlXtHnt5Y}"
 
 if echo "${0}" | grep -q 'kickstart-static64'; then
   NETDATA_FORCE_METHOD='static'
@@ -267,7 +266,6 @@ telemetry_event() {
 
   REQ_BODY="$(cat << EOF
 {
-  "api_key": "${TELEMETRY_API_KEY}",
   "event": "${1}",
   "properties": {
     "distinct_id": "${DISTINCT_ID}",
