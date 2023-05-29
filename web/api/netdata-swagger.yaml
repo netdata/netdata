@@ -241,6 +241,7 @@ paths:
             A comma separated list of the groupings required.
             All possible values can be combined together, except `selected`. If `selected` is given in the list, all others are ignored.
             The order they are placed in the list is currently ignored.
+            This parameter is also accepted as `group_by[0]` and `group_by[1]` when multiple grouping passes are required.
           required: false
           schema:
             type: array
@@ -261,6 +262,7 @@ paths:
           in: query
           description: |
             A comma separated list of the label keys to group by their values. The order of the labels in the list is respected.
+            This parameter is also accepted as `group_by_label[0]` and `group_by_label[1]` when multiple grouping passes are required.
           required: false
           schema:
             type: string
@@ -271,6 +273,7 @@ paths:
           description: |
             The aggregation function to apply when grouping metrics together.
             When option `raw` is given, `average` and `avg` behave like `sum` and the caller is expected to calculate the average.
+            This parameter is also accepted as `aggregation[0]` and `aggregation[1]` when multiple grouping passes are required.
           required: false
           schema:
             type: string
@@ -280,6 +283,7 @@ paths:
               - avg
               - average
               - sum
+              - percentage
             default: average
         - $ref: '#/components/parameters/scopeNodes'
         - $ref: '#/components/parameters/scopeContexts'
@@ -2741,8 +2745,13 @@ components:
               type: integer
             count:
               description: |
-                The number of metrics aggregated into this point. This exists only when the option `raw` is given to the query.
+                The number of metrics aggregated into this point.
+                This exists only when the option `raw` is given to the query and the final aggregation point is NOT `percentage`.
               type: integer
+            hidden:
+              description: |
+                The sum of the non-selected dimensions aggregated for this group item point.
+                This exists only when the option `raw` is given to the query and the final aggregation method is `percentage`.
         data:
           type: array
           items:
