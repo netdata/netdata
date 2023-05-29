@@ -1046,7 +1046,7 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
 
     if (rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS)) {
         //postpone checkpoint send
-        wc->alert_checkpoint_req++;
+        wc->alert_checkpoint_req+=3;
         log_access("ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT POSTPONED", rrdhost_hostname(host));
         return;
     }
