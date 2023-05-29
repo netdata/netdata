@@ -23,6 +23,7 @@ To manage your **personal alert notification silencing rule settings**, you will
 1. You will be presented with a table of the configured alert notification silencing rules for:
   * the space (if aren't an **observer**)
   * yourself
+  
   You will be able to:
    1. **Add a new** alert notification silencing rule configuration.
       - Choose if it applies to **All users** or **Myself** (All users is only available for **administrators** and **managers**)
