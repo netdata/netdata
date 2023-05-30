@@ -1157,20 +1157,80 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
     return web_client_socket_is_now_used_for_streaming(w);
 }
 
+void rrdpush_reset_destinations_postpone_time(RRDHOST *host) {
+    struct rrdpush_destinations *d;
+    for (d = host->destinations; d; d = d->next)
+        d->postpone_reconnection_until = 0;
+}
+
+static struct {
+    STREAM_HANDSHAKE err;
+    const char *str;
+} handshake_errors[] = {
+    { STREAM_HANDSHAKE_OK_V5, "OK_V5" },
+    { STREAM_HANDSHAKE_OK_V4, "OK_V4" },
+    { STREAM_HANDSHAKE_OK_V3, "OK_V3" },
+    { STREAM_HANDSHAKE_OK_V2, "OK_V2" },
+    { STREAM_HANDSHAKE_OK_V1, "OK_V1" },
+    { STREAM_HANDSHAKE_ERROR_BAD_HANDSHAKE, "ERROR_BAD_HANDSHAKE" },
+    { STREAM_HANDSHAKE_ERROR_LOCALHOST, "ERROR_LOCALHOST" },
+    { STREAM_HANDSHAKE_ERROR_ALREADY_CONNECTED, "ERROR_ALREADY_CONNECTED" },
+    { STREAM_HANDSHAKE_ERROR_DENIED, "ERROR_DENIED" },
+    { STREAM_HANDSHAKE_ERROR_SEND_TIMEOUT, "ERROR_SEND_TIMEOUT" },
+    { STREAM_HANDSHAKE_ERROR_RECEIVE_TIMEOUT, "ERROR_RECEIVE_TIMEOUT" },
+    { STREAM_HANDSHAKE_ERROR_INVALID_CERTIFICATE, "ERROR_INVALID_CERTIFICATE" },
+    { STREAM_HANDSHAKE_ERROR_SSL_ERROR, "ERROR_SSL_ERROR" },
+    { STREAM_HANDSHAKE_ERROR_CANT_CONNECT, "ERROR_CANT_CONNECT" },
+    { 0, NULL },
+};
+
+const char *stream_handshake_error_to_string(STREAM_HANDSHAKE handshake_error) {
+    for(size_t i = 0; handshake_errors[i].str ; i++) {
+        if(handshake_error == handshake_errors[i].err)
+            return handshake_errors[i].str;
+    }
+
+    return "";
+}
+
+static struct {
+    STREAM_CAPABILITIES cap;
+    const char *str;
+} capability_names[] = {
+    { STREAM_CAP_V1, "V1" },
+    { STREAM_CAP_V2, "V2" },
+    { STREAM_CAP_VN, "VN" },
+    { STREAM_CAP_VCAPS, "VCAPS" },
+    { STREAM_CAP_HLABELS, "HLABELS" },
+    { STREAM_CAP_CLAIM, "CLAIM" },
+    { STREAM_CAP_CLABELS, "CLABELS" },
+    { STREAM_CAP_COMPRESSION, "COMPRESSION" },
+    { STREAM_CAP_FUNCTIONS, "FUNCTIONS" },
+    { STREAM_CAP_REPLICATION, "REPLICATION" },
+    { STREAM_CAP_BINARY, "BINARY" },
+    { STREAM_CAP_INTERPOLATED, "INTERPOLATED" },
+    { STREAM_CAP_IEEE754, "IEEE754" },
+    { 0 , NULL },
+};
+
 static void stream_capabilities_to_string(BUFFER *wb, STREAM_CAPABILITIES caps) {
-    if(caps & STREAM_CAP_V1) buffer_strcat(wb, "V1 ");
-    if(caps & STREAM_CAP_V2) buffer_strcat(wb, "V2 ");
-    if(caps & STREAM_CAP_VN) buffer_strcat(wb, "VN ");
-    if(caps & STREAM_CAP_VCAPS) buffer_strcat(wb, "VCAPS ");
-    if(caps & STREAM_CAP_HLABELS) buffer_strcat(wb, "HLABELS ");
-    if(caps & STREAM_CAP_CLAIM) buffer_strcat(wb, "CLAIM ");
-    if(caps & STREAM_CAP_CLABELS) buffer_strcat(wb, "CLABELS ");
-    if(caps & STREAM_CAP_COMPRESSION) buffer_strcat(wb, "COMPRESSION ");
-    if(caps & STREAM_CAP_FUNCTIONS) buffer_strcat(wb, "FUNCTIONS ");
-    if(caps & STREAM_CAP_REPLICATION) buffer_strcat(wb, "REPLICATION ");
-    if(caps & STREAM_CAP_BINARY) buffer_strcat(wb, "BINARY ");
-    if(caps & STREAM_CAP_INTERPOLATED) buffer_strcat(wb, "INTERPOLATED ");
-    if(caps & STREAM_CAP_IEEE754) buffer_strcat(wb, "IEEE754 ");
+    for(size_t i = 0; capability_names[i].str ; i++) {
+        if(caps & capability_names[i].cap) {
+            buffer_strcat(wb, capability_names[i].str);
+            buffer_strcat(wb, " ");
+        }
+    }
+}
+
+void stream_capabilities_to_json_array(BUFFER *wb, STREAM_CAPABILITIES caps, const char *key) {
+    buffer_json_member_add_array(wb, key);
+
+    for(size_t i = 0; capability_names[i].str ; i++) {
+        if(caps & capability_names[i].cap)
+            buffer_json_add_array_item_string(wb, capability_names[i].str);
+    }
+
+    buffer_json_array_close(wb);
 }
 
 void log_receiver_capabilities(struct receiver_state *rpt) {

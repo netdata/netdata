@@ -1096,6 +1096,8 @@ static bool rrdhost_set_sender(RRDHOST *host) {
     }
     netdata_mutex_unlock(&host->sender->mutex);
 
+    rrdpush_reset_destinations_postpone_time(host);
+
     return ret;
 }
 
@@ -1108,6 +1110,8 @@ static void rrdhost_clear_sender___while_having_sender_mutex(RRDHOST *host) {
         host->sender->exit.reason = NULL;
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN | RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
     }
+
+    rrdpush_reset_destinations_postpone_time(host);
 }
 
 static bool rrdhost_sender_should_exit(struct sender_state *s) {

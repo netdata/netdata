@@ -359,12 +359,44 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
             buffer_json_member_add_uint64(wb, "hops", receiver_hops);
             buffer_json_member_add_boolean(wb, "online", host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED));
             buffer_json_member_add_boolean(wb, "replicating", rrdhost_receiver_replicating_charts(host));
+            if(host != localhost && host->receiver) {
+                buffer_json_member_add_object(wb, "source");
+
+                char buf[1024 + 1];
+                snprintfz(buf, 1024, "%s:%s", host->receiver->client_ip ? host->receiver->client_ip : "", host->receiver->client_port ? host->receiver->client_port : "");
+                buffer_json_member_add_string(wb, "connection", buf);
+                stream_capabilities_to_json_array(wb, host->receiver->capabilities, "capabilities");
+
+                buffer_json_object_close(wb);
+            }
             buffer_json_object_close(wb); // collection
 
+            bool sender_connected = rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED);
             buffer_json_member_add_object(wb, "streaming");
             buffer_json_member_add_uint64(wb, "hops", host->sender ? host->sender->hops : receiver_hops + 1);
-            buffer_json_member_add_boolean(wb, "online", rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED));
-            buffer_json_member_add_boolean(wb, "replicating", rrdhost_sender_replicating_charts(host));
+            buffer_json_member_add_boolean(wb, "online", sender_connected);
+            buffer_json_member_add_boolean(wb, "replicating", sender_connected && rrdhost_sender_replicating_charts(host));
+
+            if(host->sender) {
+                buffer_json_member_add_object(wb, "destination");
+                buffer_json_member_add_string(wb, "connected_to", sender_connected ? host->sender->connected_to : "");
+                stream_capabilities_to_json_array(wb, sender_connected ? host->sender->capabilities : 0, "capabilities");
+
+                buffer_json_member_add_array(wb, "candidates");
+                struct rrdpush_destinations *d;
+                for(d = host->destinations ; d ; d = d->next) {
+                    buffer_json_add_array_item_object(wb);
+                    buffer_json_member_add_string(wb, "destination", string2str(d->destination));
+                    buffer_json_member_add_string(wb, "error", d->last_error);
+                    buffer_json_member_add_time_t(wb, "next_check", d->postpone_reconnection_until);
+                    buffer_json_member_add_string(wb, "last_handshake", stream_handshake_error_to_string(d->last_handshake));
+                    buffer_json_object_close(wb);
+                }
+                buffer_json_array_close(wb);
+
+                buffer_json_object_close(wb); // destination
+            }
+
             buffer_json_object_close(wb); // streaming
 
             buffer_json_object_close(wb); // status

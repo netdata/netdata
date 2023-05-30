@@ -474,6 +474,8 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
         aclk_queue_node_info(rpt->host, true);
 
+        rrdpush_reset_destinations_postpone_time(host);
+
         set_this = true;
     }
 
@@ -516,6 +518,8 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
 
         if(signal_rrdcontext)
             rrdcontext_host_child_disconnected(host);
+
+        rrdpush_reset_destinations_postpone_time(host);
     }
 }
 
