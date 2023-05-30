@@ -43,19 +43,10 @@ static void chown_open_file(int fd, uid_t uid, gid_t gid) {
     }
 }
 
-void create_needed_dir(const char *dir, uid_t uid, gid_t gid)
+void change_dir_ownership(const char *dir, uid_t uid, gid_t gid)
 {
-    // attempt to create the directory
-    if(mkdir(dir, 0755) == 0) {
-        // we created it
-
-        // chown it to match the required user
-        if(chown(dir, uid, gid) == -1)
-            error("Cannot chown directory '%s' to %u:%u", dir, (unsigned int)uid, (unsigned int)gid);
-    }
-    else if(errno != EEXIST)
-        // log an error only if the directory does not exist
-        error("Cannot create directory '%s'", dir);
+    if (chown(dir, uid, gid) == -1)
+        error("Cannot chown directory '%s' to %u:%u", dir, (unsigned int)uid, (unsigned int)gid);
 }
 
 void clean_directory(char *dirname)
@@ -75,11 +66,11 @@ void clean_directory(char *dirname)
 }
 
 void prepare_required_directories(uid_t uid, gid_t gid) {
-    create_needed_dir(netdata_configured_cache_dir, uid, gid);
-    create_needed_dir(netdata_configured_varlib_dir, uid, gid);
-    create_needed_dir(netdata_configured_lock_dir, uid, gid);
-    create_needed_dir(netdata_configured_log_dir, uid, gid);
-    create_needed_dir(claimingdirectory, uid, gid);
+    change_dir_ownership(netdata_configured_cache_dir, uid, gid);
+    change_dir_ownership(netdata_configured_varlib_dir, uid, gid);
+    change_dir_ownership(netdata_configured_lock_dir, uid, gid);
+    change_dir_ownership(netdata_configured_log_dir, uid, gid);
+    change_dir_ownership(claimingdirectory, uid, gid);
 
     clean_directory(netdata_configured_lock_dir);
 }
