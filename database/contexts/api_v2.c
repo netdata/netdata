@@ -352,6 +352,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
                 buffer_json_member_add_string_or_empty(wb, "osVersion", host->system_info->host_os_version);
             }
 
+            time_t now = now_realtime_sec();
             buffer_json_member_add_object(wb, "status");
 
             size_t receiver_hops = host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1;
@@ -395,9 +396,12 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
                     else
                         buffer_json_member_add_string(wb, "destination", string2str(d->destination));
 
-                    buffer_json_member_add_string(wb, "error", d->last_error);
-                    buffer_json_member_add_time_t(wb, "next_check", d->postpone_reconnection_until);
+                    buffer_json_member_add_time_t(wb, "last_check", d->last_attempt);
+                    buffer_json_member_add_time_t(wb, "last_check_secs_ago", now - d->last_attempt);
+                    buffer_json_member_add_string(wb, "last_error", d->last_error);
                     buffer_json_member_add_string(wb, "last_handshake", stream_handshake_error_to_string(d->last_handshake));
+                    buffer_json_member_add_time_t(wb, "next_check", d->postpone_reconnection_until);
+                    buffer_json_member_add_time_t(wb, "next_check_in_secs", (d->postpone_reconnection_until > now) ? d->postpone_reconnection_until - now : 0);
                     buffer_json_object_close(wb);
                 }
                 buffer_json_array_close(wb);

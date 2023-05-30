@@ -568,6 +568,7 @@ int connect_to_one_of_destinations(
         if (reconnects_counter)
             *reconnects_counter += 1;
 
+        d->last_attempt = now;
         sock = connect_to_this(string2str(d->destination), default_port, timeout);
 
         if (sock != -1) {

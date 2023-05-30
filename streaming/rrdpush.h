@@ -281,6 +281,7 @@ struct rrdpush_destinations {
     bool ssl;
 
     const char *last_error;
+    time_t last_attempt;
     time_t postpone_reconnection_until;
     STREAM_HANDSHAKE last_handshake;
 
