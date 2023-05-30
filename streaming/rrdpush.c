@@ -602,10 +602,10 @@ bool destinations_init_add_one(char *entry, void *data) {
     char *colon_ssl = strstr(entry, ":SSL");
     if(colon_ssl) {
         *colon_ssl = '\0';
-        d->ssl = NETDATA_SSL_FORCE;
+        d->ssl = true;
     }
     else
-        d->ssl = NETDATA_SSL_OPTIONAL;
+        d->ssl = false;
 
     d->destination = string_strdupz(entry);
 

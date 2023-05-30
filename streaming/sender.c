@@ -504,34 +504,32 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
         return false;
     }
 
-    bool connection_to_ssl_parent = (host->destination && (host->destination->ssl & NETDATA_SSL_FORCE));
-
     // info("STREAM %s [send to %s]: initializing communication...", rrdhost_hostname(host), s->connected_to);
 
 #ifdef ENABLE_HTTPS
-    if(connection_to_ssl_parent && netdata_ssl_client_ctx) {
-        host->sender->ssl.flags = NETDATA_SSL_START;
-        if (!host->sender->ssl.conn){
-            host->sender->ssl.conn = SSL_new(netdata_ssl_client_ctx);
-            if(!host->sender->ssl.conn){
-                error("Failed to allocate SSL structure.");
-                host->sender->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+    host->sender->ssl.conn = NULL;
+    host->sender->ssl.flags = NETDATA_SSL_START;
+    if(host->destination && host->destination->ssl) {
+        if (netdata_ssl_client_ctx) {
+            if (!host->sender->ssl.conn) {
+                host->sender->ssl.conn = SSL_new(netdata_ssl_client_ctx);
+                if (!host->sender->ssl.conn) {
+                    error("Failed to allocate SSL structure.");
+                    host->sender->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+                }
+            } else
+                SSL_clear(host->sender->ssl.conn);
+
+            if (host->sender->ssl.conn) {
+                if (SSL_set_fd(host->sender->ssl.conn, s->rrdpush_sender_socket) != 1) {
+                    error("Failed to set the socket to the SSL on socket fd %d.", s->rrdpush_sender_socket);
+                    host->sender->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+                } else
+                    host->sender->ssl.flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
             }
         }
         else
-            SSL_clear(host->sender->ssl.conn);
-
-        if (host->sender->ssl.conn) {
-            if (SSL_set_fd(host->sender->ssl.conn, s->rrdpush_sender_socket) != 1) {
-                error("Failed to set the socket to the SSL on socket fd %d.", s->rrdpush_sender_socket);
-                host->sender->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
-            }
-            else
-                host->sender->ssl.flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
-        }
-    }
-    else {
-        host->sender->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+            host->sender->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
     }
 #endif
 
@@ -651,7 +649,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     rrdpush_clean_encoded(&se);
 
 #ifdef ENABLE_HTTPS
-    if (connection_to_ssl_parent && host->sender->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
+    if (host->sender->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
         ERR_clear_error();
         SSL_set_connect_state(host->sender->ssl.conn);
         int err = SSL_connect(host->sender->ssl.conn);
@@ -1204,7 +1202,7 @@ void *rrdpush_sender_thread(void *ptr) {
 
 #ifdef ENABLE_HTTPS
     for(struct rrdpush_destinations *d = s->host->destinations; d ; d = d->next) {
-        if (d->ssl & NETDATA_SSL_FORCE) {
+        if (d->ssl) {
             // we need to initialize SSL
 
             static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;

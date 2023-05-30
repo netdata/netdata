@@ -387,7 +387,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
                 for(d = host->destinations ; d ; d = d->next) {
                     buffer_json_add_array_item_object(wb);
 
-                    if(d->ssl == NETDATA_SSL_FORCE) {
+                    if(d->ssl) {
                         char buf[1024 + 1];
                         snprintfz(buf, 1024, "%s:SSL", string2str(d->destination));
                         buffer_json_member_add_string(wb, "destination", buf);
