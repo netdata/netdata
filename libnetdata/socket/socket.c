@@ -973,14 +973,19 @@ ssize_t netdata_ssl_read(SSL *ssl, void *buf, size_t num) {
 
     int bytes, err;
 
-    bytes = SSL_read(ssl, buf, (int)num);
-    err = SSL_get_error(ssl, bytes);
+    do {
+        err = SSL_ERROR_NONE;
+        bytes = SSL_read(ssl, buf, (int)num);
 
-    if(unlikely(bytes <= 0)) {
-        if (err == SSL_ERROR_WANT_WRITE || err == SSL_ERROR_WANT_READ) {
-            bytes = 0;
-        } else
-            error_limit(&erl, "SSL_write() returned %d bytes, SSL error %d", bytes, err);
+        if(bytes <= 0)
+            err = SSL_get_error(ssl, bytes);
+
+    } while(err == SSL_ERROR_WANT_READ);
+
+    if(bytes <= 0) {
+        char msg[256];
+        ERR_error_string_n(err, msg, sizeof(msg));
+        error_limit(&erl, "SSL_read() returned %d bytes, SSL error %d, message: %s", bytes, err, msg);
     }
 
     return bytes;
