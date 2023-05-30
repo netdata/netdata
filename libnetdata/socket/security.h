@@ -1,16 +1,18 @@
 #ifndef NETDATA_SECURITY_H
 # define NETDATA_SECURITY_H
 
-# define NETDATA_SSL_HANDSHAKE_COMPLETE 0    //All the steps were successful
-# define NETDATA_SSL_START 1                 //Starting handshake, conn variable is NULL
-# define NETDATA_SSL_WANT_READ 2             //The connection wanna read from socket
-# define NETDATA_SSL_WANT_WRITE 4            //The connection wanna write on socket
-# define NETDATA_SSL_NO_HANDSHAKE 8          //Continue without encrypt connection.
-# define NETDATA_SSL_OPTIONAL 16             //Flag to define the HTTP request
-# define NETDATA_SSL_FORCE 32                //We only accepts HTTPS request
-# define NETDATA_SSL_INVALID_CERTIFICATE 64  //Accepts invalid certificate
-# define NETDATA_SSL_VALID_CERTIFICATE 128  //Accepts invalid certificate
-# define NETDATA_SSL_PROXY_HTTPS 256        //Proxy is using HTTPS
+typedef enum __attribute__((packed)) {
+    NETDATA_SSL_HANDSHAKE_COMPLETE  = (0 << 0), // All the steps were successful
+    NETDATA_SSL_START               = (1 << 0), // Starting handshake, conn variable is NULL
+    NETDATA_SSL_WANT_READ           = (1 << 2), // The connection wanna read from socket
+    NETDATA_SSL_WANT_WRITE          = (1 << 3), // The connection wanna write on socket
+    NETDATA_SSL_NO_HANDSHAKE        = (1 << 4), // Continue without encrypt connection.
+    NETDATA_SSL_OPTIONAL            = (1 << 5), // Flag to define the HTTP request
+    NETDATA_SSL_FORCE               = (1 << 6), // We only accept HTTPS request
+    NETDATA_SSL_INVALID_CERTIFICATE = (1 << 7), // Accept invalid certificate
+    NETDATA_SSL_VALID_CERTIFICATE   = (1 << 8), // Accept only valid certificate
+    NETDATA_SSL_PROXY_HTTPS         = (1 << 9), // Proxy is using HTTPS
+} NETDATA_SSL_HANDSHAKE;
 
 #define NETDATA_SSL_CONTEXT_SERVER 0
 #define NETDATA_SSL_CONTEXT_STREAMING 1
@@ -38,8 +40,8 @@
 #endif
 
 struct netdata_ssl {
-    SSL *conn; //SSL connection
-    uint32_t flags; //The flags for SSL connection
+    SSL *conn;                   // SSL connection
+    NETDATA_SSL_HANDSHAKE flags; // The flags for SSL connection
 };
 
 extern SSL_CTX *netdata_ssl_exporting_ctx;
@@ -55,7 +57,7 @@ int ssl_security_location_for_context(SSL_CTX *ctx,char *file,char *path);
 void security_openssl_library();
 void security_clean_openssl();
 void security_start_ssl(int selector);
-int security_process_accept(SSL *ssl,int msg);
+NETDATA_SSL_HANDSHAKE security_process_accept(SSL *ssl,int msg);
 int security_test_certificate(SSL *ssl);
 SSL_CTX * security_initialize_openssl_client();
 

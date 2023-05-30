@@ -278,6 +278,7 @@ struct receiver_state {
 
 struct rrdpush_destinations {
     STRING *destination;
+    NETDATA_SSL_HANDSHAKE ssl;
 
     const char *last_error;
     time_t postpone_reconnection_until;

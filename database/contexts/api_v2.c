@@ -386,7 +386,15 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
                 struct rrdpush_destinations *d;
                 for(d = host->destinations ; d ; d = d->next) {
                     buffer_json_add_array_item_object(wb);
-                    buffer_json_member_add_string(wb, "destination", string2str(d->destination));
+
+                    if(d->ssl == NETDATA_SSL_FORCE) {
+                        char buf[1024 + 1];
+                        snprintfz(buf, 1024, "%s:SSL", string2str(d->destination));
+                        buffer_json_member_add_string(wb, "destination", buf);
+                    }
+                    else
+                        buffer_json_member_add_string(wb, "destination", string2str(d->destination));
+
                     buffer_json_member_add_string(wb, "error", d->last_error);
                     buffer_json_member_add_time_t(wb, "next_check", d->postpone_reconnection_until);
                     buffer_json_member_add_string(wb, "last_handshake", stream_handshake_error_to_string(d->last_handshake));

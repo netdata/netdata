@@ -49,7 +49,6 @@ bool default_rrdpush_enable_replication = true;
 time_t default_rrdpush_seconds_to_replicate = 86400;
 time_t default_rrdpush_replication_step = 600;
 #ifdef ENABLE_HTTPS
-int netdata_use_ssl_on_stream = NETDATA_SSL_OPTIONAL;
 char *netdata_ssl_ca_path = NULL;
 char *netdata_ssl_ca_file = NULL;
 #endif
@@ -137,16 +136,6 @@ int rrdpush_init() {
     }
 
 #ifdef ENABLE_HTTPS
-    if (netdata_use_ssl_on_stream == NETDATA_SSL_OPTIONAL) {
-        if (default_rrdpush_destination){
-            char *test = strstr(default_rrdpush_destination,":SSL");
-            if(test){
-                *test = 0X00;
-                netdata_use_ssl_on_stream = NETDATA_SSL_FORCE;
-            }
-        }
-    }
-
     bool invalid_certificate = appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "ssl skip certificate verification", CONFIG_BOOLEAN_NO);
 
     if(invalid_certificate == CONFIG_BOOLEAN_YES){
@@ -610,6 +599,14 @@ bool destinations_init_add_one(char *entry, void *data) {
     struct destinations_init_tmp *t = data;
 
     struct rrdpush_destinations *d = callocz(1, sizeof(struct rrdpush_destinations));
+    char *colon_ssl = strstr(entry, ":SSL");
+    if(colon_ssl) {
+        *colon_ssl = '\0';
+        d->ssl = NETDATA_SSL_FORCE;
+    }
+    else
+        d->ssl = NETDATA_SSL_OPTIONAL;
+
     d->destination = string_strdupz(entry);
 
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(struct rrdpush_destinations), __ATOMIC_RELAXED);

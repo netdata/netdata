@@ -29,7 +29,6 @@
 #endif
 
 extern struct config stream_config;
-extern int netdata_use_ssl_on_stream;
 extern char *netdata_ssl_ca_path;
 extern char *netdata_ssl_ca_file;
 
@@ -505,10 +504,12 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
         return false;
     }
 
+    bool connection_to_ssl_parent = (host->destination && (host->destination->ssl & NETDATA_SSL_FORCE));
+
     // info("STREAM %s [send to %s]: initializing communication...", rrdhost_hostname(host), s->connected_to);
 
 #ifdef ENABLE_HTTPS
-    if(netdata_ssl_client_ctx){
+    if(connection_to_ssl_parent && netdata_ssl_client_ctx) {
         host->sender->ssl.flags = NETDATA_SSL_START;
         if (!host->sender->ssl.conn){
             host->sender->ssl.conn = SSL_new(netdata_ssl_client_ctx);
@@ -517,18 +518,16 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
                 host->sender->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
             }
         }
-        else{
+        else
             SSL_clear(host->sender->ssl.conn);
-        }
 
-        if (host->sender->ssl.conn)
-        {
+        if (host->sender->ssl.conn) {
             if (SSL_set_fd(host->sender->ssl.conn, s->rrdpush_sender_socket) != 1) {
                 error("Failed to set the socket to the SSL on socket fd %d.", s->rrdpush_sender_socket);
                 host->sender->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
-            } else{
-                host->sender->ssl.flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
             }
+            else
+                host->sender->ssl.flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
         }
     }
     else {
@@ -652,37 +651,30 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     rrdpush_clean_encoded(&se);
 
 #ifdef ENABLE_HTTPS
-    if (!host->sender->ssl.flags) {
+    if (connection_to_ssl_parent && host->sender->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
         ERR_clear_error();
         SSL_set_connect_state(host->sender->ssl.conn);
         int err = SSL_connect(host->sender->ssl.conn);
-        if (err != 1){
+        if (err != 1) {
             err = SSL_get_error(host->sender->ssl.conn, err);
             error("SSL cannot connect with the server:  %s ",ERR_error_string((long)SSL_get_error(host->sender->ssl.conn,err),NULL));
-            if (netdata_use_ssl_on_stream == NETDATA_SSL_FORCE) {
-                worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
-                rrdpush_sender_thread_close_socket(host);
-                host->destination->last_error = "SSL error";
-                host->destination->last_handshake = STREAM_HANDSHAKE_ERROR_SSL_ERROR;
-                host->destination->postpone_reconnection_until = now_realtime_sec() + 5 * 60;
-                return false;
-            }
-            else {
-                host->sender->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
-            }
+            worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
+            rrdpush_sender_thread_close_socket(host);
+            host->destination->last_error = "SSL error";
+            host->destination->last_handshake = STREAM_HANDSHAKE_ERROR_SSL_ERROR;
+            host->destination->postpone_reconnection_until = now_realtime_sec() + 5 * 60;
+            return false;
         }
         else {
-            if (netdata_use_ssl_on_stream == NETDATA_SSL_FORCE) {
-                if (netdata_ssl_validate_server == NETDATA_SSL_VALID_CERTIFICATE) {
-                    if ( security_test_certificate(host->sender->ssl.conn)) {
-                        worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
-                        error("Closing the stream connection, because the server SSL certificate is not valid.");
-                        rrdpush_sender_thread_close_socket(host);
-                        host->destination->last_error = "invalid SSL certificate";
-                        host->destination->last_handshake = STREAM_HANDSHAKE_ERROR_INVALID_CERTIFICATE;
-                        host->destination->postpone_reconnection_until = now_realtime_sec() + 5 * 60;
-                        return false;
-                    }
+            if (netdata_ssl_validate_server == NETDATA_SSL_VALID_CERTIFICATE) {
+                if (security_test_certificate(host->sender->ssl.conn)) {
+                    worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
+                    error("Closing the stream connection, because the server SSL certificate is not valid.");
+                    rrdpush_sender_thread_close_socket(host);
+                    host->destination->last_error = "invalid SSL certificate";
+                    host->destination->last_handshake = STREAM_HANDSHAKE_ERROR_INVALID_CERTIFICATE;
+                    host->destination->postpone_reconnection_until = now_realtime_sec() + 5 * 60;
+                    return false;
                 }
             }
         }
@@ -1211,14 +1203,21 @@ void *rrdpush_sender_thread(void *ptr) {
     }
 
 #ifdef ENABLE_HTTPS
-    if (netdata_use_ssl_on_stream & NETDATA_SSL_FORCE ) {
-        static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
-        netdata_spinlock_lock(&sp);
-        if(!netdata_ssl_client_ctx) {
-            security_start_ssl(NETDATA_SSL_CONTEXT_STREAMING);
-            ssl_security_location_for_context(netdata_ssl_client_ctx, netdata_ssl_ca_file, netdata_ssl_ca_path);
+    for(struct rrdpush_destinations *d = s->host->destinations; d ; d = d->next) {
+        if (d->ssl & NETDATA_SSL_FORCE) {
+            // we need to initialize SSL
+
+            static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
+            netdata_spinlock_lock(&sp);
+            if(!netdata_ssl_client_ctx) {
+                security_start_ssl(NETDATA_SSL_CONTEXT_STREAMING);
+                ssl_security_location_for_context(netdata_ssl_client_ctx, netdata_ssl_ca_file, netdata_ssl_ca_path);
+            }
+            netdata_spinlock_unlock(&sp);
+
+            // stop the loop
+            break;
         }
-        netdata_spinlock_unlock(&sp);
     }
 #endif
 

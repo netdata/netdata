@@ -278,33 +278,28 @@ void security_clean_openssl()
  * @return it returns 0 case it performs the handshake, 8 case it is clean connection
  *  and another integer power of 2 otherwise.
  */
-int security_process_accept(SSL *ssl,int msg) {
+NETDATA_SSL_HANDSHAKE security_process_accept(SSL *ssl,int msg) {
     int sock = SSL_get_fd(ssl);
     int test;
     if (msg > 0x17)
-    {
         return NETDATA_SSL_NO_HANDSHAKE;
-    }
 
     ERR_clear_error();
     if ((test = SSL_accept(ssl)) <= 0) {
-         int sslerrno = SSL_get_error(ssl, test);
-         switch(sslerrno) {
+         int ssl_errno = SSL_get_error(ssl, test);
+         switch(ssl_errno) {
              case SSL_ERROR_WANT_READ:
-             {
                  error("SSL handshake did not finish and it wanna read on socket %d!", sock);
                  return NETDATA_SSL_WANT_READ;
-             }
+
              case SSL_ERROR_WANT_WRITE:
-             {
                  error("SSL handshake did not finish and it wanna read on socket %d!", sock);
                  return NETDATA_SSL_WANT_WRITE;
-             }
+
              case SSL_ERROR_NONE:
              case SSL_ERROR_SSL:
              case SSL_ERROR_SYSCALL:
-             default:
-			 {
+             default: {
                  u_long err;
                  char buf[256];
                  int counter = 0;
@@ -318,9 +313,7 @@ int security_process_accept(SSL *ssl,int msg) {
     }
 
     if (SSL_is_init_finished(ssl))
-    {
         debug(D_WEB_CLIENT_ACCESS,"SSL Handshake finished %s errno %d on socket fd %d", ERR_error_string((long)SSL_get_error(ssl, test), NULL), errno, sock);
-    }
 
     return NETDATA_SSL_HANDSHAKE_COMPLETE;
 }
