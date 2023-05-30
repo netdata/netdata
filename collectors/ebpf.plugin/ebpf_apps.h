@@ -213,7 +213,8 @@ size_t read_processes_statistic_using_pid_on_target(ebpf_process_stat_t **ep,
 
 size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int fd, struct ebpf_pid_on_target *pids);
 
-void collect_data_for_all_processes(int tbl_pid_stats_fd);
+void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core);
+void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core);
 
 extern ebpf_process_stat_t **global_process_stats;
 extern netdata_publish_cachestat_t **cachestat_pid;
@@ -235,6 +236,7 @@ extern void ebpf_aral_init(void);
 
 extern ebpf_process_stat_t *ebpf_process_stat_get(void);
 extern void ebpf_process_stat_release(ebpf_process_stat_t *stat);
+extern ebpf_process_stat_t *process_stat_vector;
 
 extern ARAL *ebpf_aral_socket_pid;
 void ebpf_socket_aral_init();

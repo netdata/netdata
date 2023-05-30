@@ -99,8 +99,6 @@ accepts the following values:
 -   `return`: In the `return` mode, the eBPF collector monitors the same kernel functions as `entry`, but also creates new
     charts for the return of these functions, such as errors. Monitoring function returns can help in debugging software,
     such as failing to close file descriptors or creating zombie processes.
--   `update every`:  Number of seconds used for eBPF to send data for Netdata.
--   `pid table size`: Defines the maximum number of PIDs stored inside the application hash table.
 
 #### Integration with `apps.plugin`
 
@@ -114,11 +112,6 @@ If you want to enable `apps.plugin` integration, change the "apps" setting to "y
 [global]
    apps = yes
 ```
-
-When the integration is enabled, eBPF collector allocates memory for each process running. The total allocated memory
-has direct relationship with the kernel version. When the eBPF plugin is running on kernels newer than `4.15`, it uses
-per-cpu maps to speed up the update of hash tables. This also implies storing data for the same PID for each processor
-it runs.
 
 #### Integration with `cgroups.plugin`
 
@@ -138,6 +131,13 @@ If you do not need to monitor specific metrics for your `cgroups`, you can enabl
 `ebpf.d.conf`, and then disable the plugin for a specific `thread` by following the steps in the
 [Configuration](#configuring-ebpfplugin) section.
 
+#### Maps per Core
+
+When netdata is running on kernels newer than `4.6` users are allowed to modify how the `ebpf.plugin` creates maps (hash or 
+array). When `maps per core` is defined as `yes`, plugin will create a map per core on host, on the other hand,
+when the value is set as `no` only one hash table will be created, this option will use less memory, but it also can
+increase overhead for processes.
+
 #### Collect PID
 
 When one of the previous integrations is enabled, `ebpf.plugin` will use Process Identifier (`PID`) to identify the
@@ -156,6 +156,16 @@ The threads that have integration with other collectors have an internal clean u
 `trampoline` or a `kprobe` to `release_task` internal function. To avoid `overload` on this function, `ebpf.plugin`
 will only enable these threads integrated with other collectors when the kernel is compiled with
 `CONFIG_DEBUG_INFO_BTF`, unless you enable them manually.
+
+#### Collection period
+
+The plugin uses the option `update every` to define the number of seconds used for eBPF to send data for Netdata. The default value
+is 5 seconds.
+
+#### PID table size
+
+The option `pid table size` defines the maximum number of PIDs stored inside the application hash table. The default value
+is defined according [kernel](https://elixir.bootlin.com/linux/v6.0.19/source/include/linux/threads.h#L28) source code.
 
 #### Integration Dashboard Elements
 
@@ -880,13 +890,23 @@ These are tracepoints related to [OOM](https://en.wikipedia.org/wiki/Out_of_memo
 eBPF monitoring is complex and produces a large volume of metrics. We've discovered scenarios where the eBPF plugin
 significantly increases kernel memory usage by several hundred MB.
 
-If your node is experiencing high memory usage and there is no obvious culprit to be found in the `apps.mem` chart,
-consider testing for high kernel memory usage by [disabling eBPF monitoring](#configuring-ebpfplugin). Next,
-[restart Netdata](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) with `sudo systemctl restart netdata` to see if system memory
-usage (see the `system.ram` chart) has dropped significantly.
+When the integration with apps or cgroup is enabled, the eBPF collector allocates memory for each process running. If your
+node is experiencing high memory usage and there is no obvious culprit to be found in the `apps.mem` chart, consider:
 
-Beginning with `v1.31`, kernel memory usage is configurable via the [`pid table size` setting](#ebpf-load-mode)
+- Modify [maps per core](#maps-per-core) to use only one map.
+- Disable [integration with apps](#integration-with-appsplugin).
+- Disable [integration with cgroup](#integration-with-cgroupsplugin).
+
+If with these changes you still suspect eBPF using too much memory, and there is no obvious culprit to be found 
+in the `apps.mem` chart, consider testing for high kernel memory usage by [disabling eBPF monitoring](#configuring-ebpfplugin).
+Next, [restart Netdata](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) with
+`sudo systemctl restart netdata` to see if system memory usage (see the `system.ram` chart) has dropped significantly.
+
+Beginning with `v1.31`, kernel memory usage is configurable via the [`pid table size` setting](#pid-table-size)
 in `ebpf.conf`.
+
+The total memory usage is a well known [issue](https://lore.kernel.org/all/167821082315.1693.6957546778534183486.git-patchwork-notify@kernel.org/) 
+for eBPF, this is not a bug present in plugin.
 
 ### SELinux
 

@@ -42,6 +42,16 @@ enum netdata_filesystem_table {
     NETDATA_ADDR_FS_TABLE
 };
 
+enum netdata_filesystem_localfs_idx {
+    NETDATA_FS_LOCALFS_EXT4,
+    NETDATA_FS_LOCALFS_XFS,
+    NETDATA_FS_LOCALFS_NFS,
+    NETDATA_FS_LOCALFS_ZFS,
+    NETDATA_FS_LOCALFS_BTRFS,
+
+    NETDATA_FS_LOCALFS_END,
+};
+
 void *ebpf_filesystem_thread(void *ptr);
 extern struct config fs_config;
 

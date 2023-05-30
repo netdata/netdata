@@ -354,8 +354,14 @@ void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
 {
     if (ae->flags & HEALTH_ENTRY_FLAG_SAVED)
         sql_health_alarm_log_update(host, ae);
-    else
+    else {
         sql_health_alarm_log_insert(host, ae);
+#ifdef ENABLE_ACLK
+        if (netdata_cloud_setting) {
+            sql_queue_alarm_to_aclk(host, ae, 0);
+        }
+#endif
+    }
 }
 
 /* Health related SQL queries
