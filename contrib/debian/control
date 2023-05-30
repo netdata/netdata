@@ -42,6 +42,17 @@ Conflicts: netdata-core,
            netdata-plugins-bash,
            netdata-plugins-python,
            netdata-web
+Recommends: netdata-plugin-ebpf,
+            netdata-plugin-apps,
+            netdata-plugin-pythond,
+            netdata-plugin-go,
+            netdata-plugin-debugfs
+Suggests: netdata-plugin-cups,
+          netdata-plugin-freeipmi,
+          netdata-plugin-nfacct,
+          netdata-plugin-chartsd,
+          netdata-plugin-slabinfo,
+          netdata-plugin-perf
 Pre-Depends: dpkg (>= 1.17.14)
 Description: real-time charts for system monitoring
  Netdata is a daemon that collects data in realtime (per second)
@@ -54,14 +65,120 @@ Architecture: any
 Depends: cups,
          ${shlibs:Depends},
          netdata (>= ${source:Version})
-Description: The Common Unix Printing System plugin for metrics collection from cupsd
+Description: The CUPS metrics collection plugin for the Netdata Agent
+ This plugin allows the Netdata Agent to collect metrics from the Common
+ UNIX Printing System.
 
 Package: netdata-plugin-freeipmi
 Architecture: any
 Depends: freeipmi,
          ${shlibs:Depends},
-         netdata (= ${source:Version})
-Description: FreeIPMI - The Intelligent Platform Management System.
- The IPMI specification defines a set of interfaces for platform management.
- It is implemented by a number vendors for system management. The features of IPMI that most users will be interested in
- are sensor monitoring, system event monitoring, power control, and serial-over-LAN (SOL).
+         netdata (>= ${source:Version})
+Description: The FreeIPMI metrics collection plugin for the Netdata Agent
+ This plugin allows the Netdata Agent to collect metrics from hardware
+ using FreeIPMI.
+
+Package: netdata-plugin-nfacct
+Architecture: any
+Depends: ${shlibs:Depends},
+         netdata (>= ${source:Version})
+Conflicts: netdata (< ${source:Version})
+Description: The NFACCT metrics collection plugin for the Netdata Agent
+ This plugin allows the Netdata Agent to collect metrics from the firewall
+ using NFACCT objects.
+
+Package: netdata-plugin-chartsd
+Architecture: all
+Depends: bash,
+         netdata (>= ${source:Version})
+Conflicts: netdata (< ${source:Version})
+Suggests: apcupsd, nut, iw, sudo
+Description: The charts.d metrics collection plugin for the Netdata Agent
+ This plugin adds a selection of additional collectors written in shell
+ script to the Netdata Agent. It includes collectors for NUT, APCUPSD,
+ LibreSWAN, OpenSIPS, and Wireless access point statistics.
+
+Package: netdata-plugin-ebpf
+Architecture: any
+Depends: ${shlibs:Depends},
+         netdata (>= ${source:Version})
+Recommends: netdata-ebpf-code-legacy (>= ${source:Version}),
+            netdata-plugin-apps (>= ${source:Version})
+Conflicts: netdata (< ${source:Version})
+Description: The eBPF metrics collection plugin for the Netdata Agent
+ This plugin allows the Netdata Agent to use eBPF code to collect more
+ detailed kernel-level metrics for the system.
+
+Package: netdata-ebpf-code-legacy
+Architecture: i386 amd64
+Depends: netdata-plugin-ebpf (= ${source:Version})
+Conflicts: netdata (< ${source:Version})
+Description: Compiled eBPF legacy code for the Netdata eBPF plugin
+ This package provides the pre-compiled eBPF legacy code for use by
+ the Netdata eBPF plugin.  This code is only needed when using the eBPF
+ plugin with kernel that do not include BTF support (mostly kernel
+ versions lower than 5.10)..
+
+Package: netdata-plugin-pythond
+Architecture: all
+Depends: ${shlibs:Depends},
+         netdata (>= ${source:Version})
+Suggests: sudo
+Conflicts: netdata (< ${source:Version})
+Description: The python.d metrics collection plugin for the Netdata Agent
+ Many of the collectors provided by this package are also available
+ in netdata-plugin-god. In msot cases, you probably want to use those
+ versions instead of the Python versions.
+
+Package: netdata-plugin-go
+Architecture: any
+Depends: ${shlibs:Depends},
+         libcap2-bin,
+         netdata (>= ${source:Version})
+Suggests: nvme-cli, sudo
+Conflicts: netdata (< ${source:Version})
+Description: The go.d metrics collection plugin for the Netdata Agent
+ This plugin adds a selection of additional collectors written in Go to
+ the Netdata Agent. A significant percentage of the application specific
+ collectors provided by Netdata are part of this plugin, so most users
+ will want it installed.
+
+Package: netdata-plugin-apps
+Architecture: any
+Depends: ${shlibs:Depends},
+         libcap2-bin,
+         netdata (>= ${source:Version})
+Conflicts: netdata (< ${source:Version})
+Description: The per-application metrics collection plugin for the Netdata Agent
+ This plugin allows the Netdata Agent to collect per-application and
+ per-user metrics without using cgroups.
+
+Package: netdata-plugin-slabinfo
+Architecture: any
+Depends: ${shlibs:Depends},
+         libcap2-bin,
+         netdata (>= ${source:Version})
+Conflicts: netdata (< ${source:Version})
+Description: The slabinfo metrics collector for the Netdata Agent
+ This plugin allows the Netdata Agent to collect perfromance and
+ utilization metrics for the Linux kernel’s SLAB allocator.
+
+Package: netdata-plugin-perf
+Architecture: any
+Depends: ${shlibs:Depends},
+         libcap2-bin,
+         netdata (>= ${source:Version})
+Conflicts: netdata (< ${source:Version})
+Description: The perf metrics collector for the Netdata Agent
+ This plugin allows the Netdata to collect metrics from the Linux perf
+ subsystem.
+
+Package: netdata-plugin-debugfs
+Architecture: any
+Depends: ${shlibs:Debends},
+         libcap2-bin,
+         netdata (>= ${source:Version})
+Conflicts: netdata (< ${source:Version})
+Description: The debugfs metrics collector for the Netdata Agent
+ This plugin allows the Netdata Agent to collect Linux kernel metrics
+ exposed through debugfs.
