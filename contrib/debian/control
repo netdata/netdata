@@ -99,7 +99,7 @@ Description: The charts.d metrics collection plugin for the Netdata Agent
  LibreSWAN, OpenSIPS, and Wireless access point statistics.
 
 Package: netdata-plugin-ebpf
-Architecture: any
+Architecture: amd64
 Depends: ${shlibs:Depends},
          netdata (>= ${source:Version})
 Recommends: netdata-ebpf-code-legacy (>= ${source:Version}),
@@ -110,7 +110,7 @@ Description: The eBPF metrics collection plugin for the Netdata Agent
  detailed kernel-level metrics for the system.
 
 Package: netdata-ebpf-code-legacy
-Architecture: i386 amd64
+Architecture: amd64
 Depends: netdata-plugin-ebpf (= ${source:Version})
 Conflicts: netdata (< ${source:Version})
 Description: Compiled eBPF legacy code for the Netdata eBPF plugin
