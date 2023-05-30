@@ -719,7 +719,7 @@ confirm_root_support() {
     fi
 
     if [ -z "${ROOTCMD}" ]; then
-      fatal "We need root privileges to continue, but cannot find a way to gain them (we support sudo, doas, and pkexec). Either re-run this script as root, or set \$ROOTCMD to a command that can be used to gain root privileges." F0201
+      fatal "This script needs root privileges to install Netdata, but cannot find a way to gain them (we support sudo, doas, and pkexec). Either re-run this script as root, or set \$ROOTCMD to a command that can be used to gain root privileges." F0201
     fi
   fi
 }
@@ -1344,7 +1344,7 @@ common_dnf_opts() {
 }
 
 try_package_install() {
-  failed_refresh_msg="Failed to refresh repository metadata. ${BADNET_MSG} or by misconfiguration of one or more rpackage repositories in the system package manager configuration."
+  failed_refresh_msg="Failed to refresh repository metadata. ${BADNET_MSG} or incompatibilities with one or more third-party package repositories in the system package manager configuration."
 
   if [ -z "${DISTRO_COMPAT_NAME}" ] || [ "${DISTRO_COMPAT_NAME}" = "unknown" ]; then
     warning "Unable to determine Linux distribution for native packages."
@@ -1487,7 +1487,7 @@ try_package_install() {
     if [ -n "${repo_subcmd}" ]; then
       # shellcheck disable=SC2086
       if ! run_as_root env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts}; then
-        fatal "${failed_refresh_msg}" F0205
+        fatal "${failed_refresh_msg} In most cases, disabling any third-party repositories on the system and re-running the installer with the same options should work. If that does not work, consider using a static build with the --static-only option instead of native packages." F0205
       fi
     fi
   else
