@@ -1950,7 +1950,7 @@ ssize_t web_client_receive(struct web_client *w)
         if ( ( w->ssl.conn ) && (w->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE)) {
             bytes = netdata_ssl_read(w->ssl.conn, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
             web_client_enable_wait_from_ssl(w, bytes);
-        } else {
+        }else {
             bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
         }
     }
