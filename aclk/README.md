@@ -1,15 +1,4 @@
-<!--
-title: "Agent-Cloud link (ACLK)"
-description: "The Agent-Cloud link (ACLK) is the mechanism responsible for connecting a Netdata agent to Netdata Cloud."
-date: "2020-05-11"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/aclk/README.md"
-sidebar_label: "Agent-Cloud link (ACLK)"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Configuration"
--->
-
-# Agent-cloud link (ACLK)
+# Agent-Cloud link (ACLK)
 
 The Agent-Cloud link (ACLK) is the mechanism responsible for securely connecting a Netdata Agent to your web browser
 through Netdata Cloud. The ACLK establishes an outgoing secure WebSocket (WSS) connection to Netdata Cloud on port
@@ -20,29 +9,22 @@ The Cloud App lives at app.netdata.cloud which currently resolves to the followi
 - 54.198.178.11
 - 44.207.131.212
 - 44.196.50.41 
- 
-:::caution
 
-This list of IPs can change without notice, we strongly advise you to whitelist following domains `api.netdata.cloud`, `mqtt.netdata.cloud`, if
-this is not an option in your case always verify the current domain resolution (e.g via the `host` command).
+> ### Caution
+>
+>This list of IPs can change without notice, we strongly advise you to whitelist following domains `api.netdata.cloud`, `mqtt.netdata.cloud`, if this is not an option in your case always verify the current domain resolution (e.g via the `host` command).
 
-:::
-
-For a guide to connecting a node using the ACLK, plus additional troubleshooting and reference information, read our [get
-started with Cloud](https://github.com/netdata/netdata/blob/master/docs/cloud/get-started.md) guide or the full [connect to Cloud
+For a guide to connecting a node using the ACLK, plus additional troubleshooting and reference information, read our [connect to Cloud
 documentation](https://github.com/netdata/netdata/blob/master/claim/README.md).
 
 ## Data privacy
+
 [Data privacy](https://netdata.cloud/privacy/) is very important to us. We firmly believe that your data belongs to
 you. This is why **we don't store any metric data in Netdata Cloud**.
 
-All the data that you see in the web browser when using Netdata Cloud, is actually streamed directly from the Netdata Agent to the Netdata Cloud dashboard. 
-The data passes through our systems, but it isn't stored.
+All the data that you see in the web browser when using Netdata Cloud, is actually streamed directly from the Netdata Agent to the Netdata Cloud dashboard. The data passes through our systems, but it isn't stored.
 
-However, to be able to offer the stunning visualizations and advanced functionality of Netdata Cloud, it does store a limited number of _metadata_.
-
-Read more about [Data privacy in the Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/cloud/data-privacy.md) in the documentation.
-
+However, to be able to offer the stunning visualizations and advanced functionality of Netdata Cloud, it does store a limited number of _metadata_. Read more about our [security and privacy design](https://github.com/netdata/netdata/blob/master/docs/netdata-security.md).
 
 ## Enable and configure the ACLK
 

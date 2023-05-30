@@ -1,0 +1,80 @@
+#!/sbin/openrc-run
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+NETDATA_OWNER="@netdata_user_POST@:@netdata_user_POST@"
+NETDATA_PIDFILE="@localstatedir_POST@/run/netdata/netdata.pid"
+
+description="Run the Netdata system monitoring agent."
+
+extra_started_commands="reload rotate save"
+description_reload="Reload health configuration."
+description_rotate="Reopen log files."
+description_save="Force sync of database to disk."
+
+command_prefix="@sbindir_POST@"
+command="${command_prefix}/netdata"
+command_args="-P ${NETDATA_PIDFILE} ${NETDATA_EXTRA_ARGS}"
+command_args_foreground="-D"
+start_stop_daemon_args="-u ${NETDATA_OWNER}"
+
+depend() {
+    use logger
+    need net
+    after apache2 squid nginx mysql named opensips upsd hostapd postfix lm_sensors
+}
+
+start_pre() {
+    checkpath -o ${NETDATA_OWNER} -d @localstatedir_POST@/cache/netdata @localstatedir_POST@/run/netdata
+
+    if [ -z "${supervisor}" ]; then
+        pidfile="${NETDATA_PIDFILE}"
+    fi
+}
+
+stop_pre() {
+    if [ "0${NETDATA_FORCE_EXIT}" -eq 1 ]; then
+        retry="TERM/${NETDATA_WAIT_EXIT_TIMEOUT:-60}/KILL/1"
+    else
+        retry="TERM/${NETDATA_WAIT_EXIT_TIMEOUT:-60}"
+    fi
+}
+
+run_cmd() {
+    cmd="${1}"
+    msg="${2}"
+    failmsg="${3}"
+    signal="${4}"
+
+    ebegin "${msg}"
+    if [ "${NETDATA_USE_NETDATACLI}" = 1 ]; then
+        "${command_prefix}/netdatacli" "${cmd}" >/dev/null
+        eend $? "${failmsg}"
+    elif [ "${supervisor}" = "supervise-daemon" ]; then
+        supervise-daemon "${RC_SVCNAME}" --signal "${signal}"
+        eend $? "${failmsg}"
+    else
+        start-stop-daemon --signal "${signal}" --pidfile "${pidfile}"
+        eend $? "${failmsg}"
+    fi
+}
+
+reload() {
+    run_cmd reload-health \
+            "Reloading Netdata health configuration" \
+            "Failed to reload Netdata health configuration" \
+            SIGUSR2
+}
+
+rotate() {
+    run_cmd reopen-logs \
+            "Reopening Netdata log files" \
+            "Failed to reopen Netdata log files" \
+            SIGHUP
+}
+
+save() {
+    run_cmd save-database \
+            "Saving Netdata database" \
+            "Failed to save Netdata database" \
+            SIGUSR1
+}

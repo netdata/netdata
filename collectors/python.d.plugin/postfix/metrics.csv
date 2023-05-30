@@ -1,0 +1,3 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+postfix.qemails,,emails,emails,Postfix Queue Emails,line,,python.d.plugin,postfix
+postfix.qsize,,size,KiB,Postfix Queue Emails Size,area,,python.d.plugin,postfix

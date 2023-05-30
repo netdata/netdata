@@ -4,8 +4,8 @@ description: "Package maintainers and power users may be interested in manually 
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/source.md"
 sidebar_label: "Manually build Netdata from source"
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Installation"
+learn_rel_path: "Installation/Package maintainers"
+sidebar_position: 100
 -->
 
 # Manually build Netdata from source
@@ -233,7 +233,7 @@ using glibc or musl. To use one of these:
 
 Alternatively, you may wish to build the eBPF code locally yourself. For
 instructions, please consult [the README file for our kernel-collector
-repository](https://github.com/netdata/kernel-collector/blob/master/README.md),
+repository](https://github.com/netdata/kernel-collector/#readme),
 which outlines both the required dependencies, as well as multiple
 options for building the code.
 

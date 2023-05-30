@@ -41,8 +41,10 @@ int default_multidb_disk_quota_mb = 256;
 
 #if defined(ENV32BIT)
 int default_rrdeng_page_cache_mb = 16;
+int default_rrdeng_extent_cache_mb = 0;
 #else
 int default_rrdeng_page_cache_mb = 32;
+int default_rrdeng_extent_cache_mb = 0;
 #endif
 
 // ----------------------------------------------------------------------------
@@ -161,7 +163,7 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(uuid_compare(rd->metric_uuid, *mrg_metric_uuid(main_mrg, metric)) != 0) {
+    if(uuid_memcmp(&rd->metric_uuid, mrg_metric_uuid(main_mrg, metric)) != 0) {
         char uuid1[UUID_STR_LEN + 1];
         char uuid2[UUID_STR_LEN + 1];
 
@@ -253,6 +255,7 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
     struct rrdeng_collect_handle *handle;
 
     handle = callocz(1, sizeof(struct rrdeng_collect_handle));
+    handle->common.backend = STORAGE_ENGINE_BACKEND_DBENGINE;
     handle->metric = metric;
     handle->page = NULL;
     handle->data = NULL;
@@ -772,6 +775,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle,
         rrddim_handle->start_time_s = handle->start_time_s;
         rrddim_handle->end_time_s = handle->end_time_s;
         rrddim_handle->priority = priority;
+        rrddim_handle->backend = STORAGE_ENGINE_BACKEND_DBENGINE;
 
         pg_cache_preload(handle);
 
@@ -787,6 +791,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle,
         rrddim_handle->start_time_s = handle->start_time_s;
         rrddim_handle->end_time_s = 0;
         rrddim_handle->priority = priority;
+        rrddim_handle->backend = STORAGE_ENGINE_BACKEND_DBENGINE;
     }
 }
 

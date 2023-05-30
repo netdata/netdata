@@ -1,0 +1,2 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+tor.traffic,,"read, write",KiB/s,Tor Traffic,area,,python.d.plugin,tor

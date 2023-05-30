@@ -41,7 +41,12 @@ static struct {
         , {"natural-points"    , 0    , RRDR_OPTION_NATURAL_POINTS}
         , {"virtual-points"    , 0    , RRDR_OPTION_VIRTUAL_POINTS}
         , {"all-dimensions"    , 0    , RRDR_OPTION_ALL_DIMENSIONS}
-        , {"plan"              , 0    , RRDR_OPTION_SHOW_PLAN}
+        , {"details"           , 0    , RRDR_OPTION_SHOW_DETAILS}
+        , {"debug"             , 0    , RRDR_OPTION_DEBUG}
+        , {"plan"              , 0    , RRDR_OPTION_DEBUG}
+        , {"minify"            , 0    , RRDR_OPTION_MINIFY}
+        , {"group-by-labels"   , 0    , RRDR_OPTION_GROUP_BY_LABELS}
+        , {"label-quotes"      , 0    , RRDR_OPTION_LABEL_QUOTES}
         , {NULL                , 0    , 0}
 };
 
@@ -53,6 +58,7 @@ static struct {
         {  DATASOURCE_FORMAT_DATATABLE_JSON , 0 , DATASOURCE_DATATABLE_JSON}
         , {DATASOURCE_FORMAT_DATATABLE_JSONP, 0 , DATASOURCE_DATATABLE_JSONP}
         , {DATASOURCE_FORMAT_JSON           , 0 , DATASOURCE_JSON}
+        , {DATASOURCE_FORMAT_JSON2          , 0 , DATASOURCE_JSON2}
         , {DATASOURCE_FORMAT_JSONP          , 0 , DATASOURCE_JSONP}
         , {DATASOURCE_FORMAT_SSV            , 0 , DATASOURCE_SSV}
         , {DATASOURCE_FORMAT_CSV            , 0 , DATASOURCE_CSV}
@@ -63,7 +69,9 @@ static struct {
         , {DATASOURCE_FORMAT_SSV_COMMA      , 0 , DATASOURCE_SSV_COMMA}
         , {DATASOURCE_FORMAT_CSV_JSON_ARRAY , 0 , DATASOURCE_CSV_JSON_ARRAY}
         , {DATASOURCE_FORMAT_CSV_MARKDOWN   , 0 , DATASOURCE_CSV_MARKDOWN}
-        , {                                 NULL, 0, 0}
+
+        // terminator
+        , {NULL, 0, 0}
 };
 
 static struct {
@@ -170,7 +178,7 @@ inline RRDR_OPTIONS web_client_api_request_v1_data_options(char *o) {
     RRDR_OPTIONS ret = 0x00000000;
     char *tok;
 
-    while(o && *o && (tok = mystrsep(&o, ", |"))) {
+    while(o && *o && (tok = strsep_skip_consecutive_separators(&o, ", |"))) {
         if(!*tok) continue;
 
         uint32_t hash = simple_hash(tok);
@@ -254,11 +262,11 @@ inline uint32_t web_client_api_request_v1_data_google_format(char *name) {
 int web_client_api_request_v1_alarms_select (char *url) {
     int all = 0;
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if (!value || !*value) continue;
 
-        if(!strcmp(value, "all")) all = 1;
-        else if(!strcmp(value, "active")) all = 0;
+        if(!strcmp(value, "all") || !strcmp(value, "all=true")) all = 1;
+        else if(!strcmp(value, "active") || !strcmp(value, "active=true")) all = 0;
     }
 
     return all;
@@ -292,10 +300,10 @@ inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_clien
     buffer_sprintf(w->response.data, "[");
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -333,10 +341,10 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
     char *chart = NULL;
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if (!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -346,7 +354,7 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
 
     buffer_flush(w->response.data);
     w->response.data->content_type = CT_APPLICATION_JSON;
-    health_alarm_log2json(host, w->response.data, after, chart);
+    sql_health_alarm_log2json(host, w->response.data, after, chart);
     return HTTP_RESP_OK;
 }
 
@@ -357,10 +365,10 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
     buffer_flush(w->response.data);
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -401,38 +409,6 @@ inline int web_client_api_request_v1_alarm_variables(RRDHOST *host, struct web_c
     return web_client_api_request_single_chart(host, w, url, health_api_v1_chart_variables2json);
 }
 
-static RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o) {
-    RRDCONTEXT_TO_JSON_OPTIONS options = RRDCONTEXT_OPTION_NONE;
-    char *tok;
-
-    while(o && *o && (tok = mystrsep(&o, ", |"))) {
-        if(!*tok) continue;
-
-        if(!strcmp(tok, "full") || !strcmp(tok, "all"))
-            options |= RRDCONTEXT_OPTIONS_ALL;
-        else if(!strcmp(tok, "charts") || !strcmp(tok, "instances"))
-            options |= RRDCONTEXT_OPTION_SHOW_INSTANCES;
-        else if(!strcmp(tok, "dimensions") || !strcmp(tok, "metrics"))
-            options |= RRDCONTEXT_OPTION_SHOW_METRICS;
-        else if(!strcmp(tok, "queue"))
-            options |= RRDCONTEXT_OPTION_SHOW_QUEUED;
-        else if(!strcmp(tok, "flags"))
-            options |= RRDCONTEXT_OPTION_SHOW_FLAGS;
-        else if(!strcmp(tok, "uuids"))
-            options |= RRDCONTEXT_OPTION_SHOW_UUIDS;
-        else if(!strcmp(tok, "deleted"))
-            options |= RRDCONTEXT_OPTION_SHOW_DELETED;
-        else if(!strcmp(tok, "labels"))
-            options |= RRDCONTEXT_OPTION_SHOW_LABELS;
-        else if(!strcmp(tok, "deepscan"))
-            options |= RRDCONTEXT_OPTION_DEEPSCAN;
-        else if(!strcmp(tok, "hidden"))
-            options |= RRDCONTEXT_OPTION_SHOW_HIDDEN;
-    }
-
-    return options;
-}
-
 static int web_client_api_request_v1_context(RRDHOST *host, struct web_client *w, char *url) {
     char *context = NULL;
     RRDCONTEXT_TO_JSON_OPTIONS options = RRDCONTEXT_OPTION_NONE;
@@ -443,10 +419,10 @@ static int web_client_api_request_v1_context(RRDHOST *host, struct web_client *w
     buffer_flush(w->response.data);
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -476,13 +452,15 @@ static int web_client_api_request_v1_context(RRDHOST *host, struct web_client *w
     SIMPLE_PATTERN *chart_dimensions_pattern = NULL;
 
     if(chart_label_key)
-        chart_label_key_pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+        chart_label_key_pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT, true);
 
     if(chart_labels_filter)
-        chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+        chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT,
+                                                            true);
 
     if(dimensions) {
-        chart_dimensions_pattern = simple_pattern_create(buffer_tostring(dimensions), ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+        chart_dimensions_pattern = simple_pattern_create(buffer_tostring(dimensions), ",|\t\r\n\f\v",
+                                                         SIMPLE_PATTERN_EXACT, true);
         buffer_free(dimensions);
     }
 
@@ -505,10 +483,10 @@ static int web_client_api_request_v1_contexts(RRDHOST *host, struct web_client *
     buffer_flush(w->response.data);
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -532,13 +510,15 @@ static int web_client_api_request_v1_contexts(RRDHOST *host, struct web_client *
     SIMPLE_PATTERN *chart_dimensions_pattern = NULL;
 
     if(chart_label_key)
-        chart_label_key_pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+        chart_label_key_pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT, true);
 
     if(chart_labels_filter)
-        chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+        chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT,
+                                                            true);
 
     if(dimensions) {
-        chart_dimensions_pattern = simple_pattern_create(buffer_tostring(dimensions), ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+        chart_dimensions_pattern = simple_pattern_create(buffer_tostring(dimensions), ",|\t\r\n\f\v",
+                                                         SIMPLE_PATTERN_EXACT, true);
         buffer_free(dimensions);
     }
 
@@ -565,18 +545,8 @@ inline int web_client_api_request_v1_chart(RRDHOST *host, struct web_client *w, 
     return web_client_api_request_single_chart(host, w, url, rrd_stats_api_v1_chart);
 }
 
-void fix_google_param(char *s) {
-    if(unlikely(!s)) return;
-
-    for( ; *s ;s++) {
-        if(!isalnum(*s) && *s != '.' && *s != '_' && *s != '-')
-            *s = '_';
-    }
-}
-
-
 // returns the HTTP code
-inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *url) {
+static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *url) {
     debug(D_WEB_CLIENT, "%llu: API v1 data with URL '%s'", w->id, url);
 
     int ret = HTTP_RESP_BAD_REQUEST;
@@ -609,10 +579,10 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     RRDR_OPTIONS options = 0;
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -658,10 +628,10 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             char *tqx_name, *tqx_value;
 
             while(value) {
-                tqx_value = mystrsep(&value, ";");
+                tqx_value = strsep_skip_consecutive_separators(&value, ";");
                 if(!tqx_value || !*tqx_value) continue;
 
-                tqx_name = mystrsep(&tqx_value, ":");
+                tqx_name = strsep_skip_consecutive_separators(&tqx_value, ":");
                 if(!tqx_name || !*tqx_name) continue;
                 if(!tqx_value || !*tqx_value) continue;
 
@@ -722,15 +692,16 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     long      group_time = (group_time_str && *group_time_str)?str2l(group_time_str):0;
 
     QUERY_TARGET_REQUEST qtr = {
+            .version = 1,
             .after = after,
             .before = before,
             .host = host,
             .st = st,
-            .hosts = NULL,
+            .nodes = NULL,
             .contexts = context,
-            .charts = chart,
+            .instances = chart,
             .dimensions = (dimensions)?buffer_tostring(dimensions):NULL,
-            .timeout = timeout,
+            .timeout_ms = timeout,
             .points = points,
             .format = format,
             .options = options,
@@ -739,9 +710,11 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             .resampling_time = group_time,
             .tier = tier,
             .chart_label_key = chart_label_key,
-            .charts_labels_filter = chart_labels_filter,
+            .labels = chart_labels_filter,
             .query_source = QUERY_SOURCE_API_DATA,
             .priority = STORAGE_PRIORITY_NORMAL,
+            .interrupt_callback = web_client_interrupt_callback,
+            .interrupt_callback_data = w,
     };
     qt = query_target_create(&qtr);
 
@@ -751,21 +724,11 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         goto cleanup;
     }
 
-    if (timeout) {
-        struct timeval now;
-        now_realtime_timeval(&now);
-        int inqueue = (int)dt_usec(&w->tv_in, &now) / 1000;
-        timeout -= inqueue;
-        if (timeout <= 0) {
-            buffer_flush(w->response.data);
-            buffer_strcat(w->response.data, "Query timeout exceeded");
-            ret = HTTP_RESP_BACKEND_FETCH_FAILED;
-            goto cleanup;
-        }
+    web_client_timeout_checkpoint_set(w, timeout);
+    if(web_client_timeout_checkpoint_and_check(w, NULL)) {
+        ret = w->response.code;
+        goto cleanup;
     }
-
-    debug(D_WEB_CLIENT, "%llu: API command 'data' for chart '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%u', format '%u', options '0x%08x'"
-          , w->id, chart, (dimensions)?buffer_tostring(dimensions):"", after, before , points, group, format, options);
 
     if(outFileName && *outFileName) {
         buffer_sprintf(w->response.header, "Content-Disposition: attachment; filename=\"%s\"\r\n", outFileName);
@@ -814,10 +777,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         buffer_strcat(w->response.data, ");");
 
 cleanup:
-    if(qt && qt->used) {
-        internal_error(true, "QUERY_TARGET: left non-released on query '%s'", qt->id);
-        query_target_release(qt);
-    }
+    query_target_release(qt);
     onewayalloc_destroy(owa);
     buffer_free(dimensions);
     return ret;
@@ -886,10 +846,10 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     buffer_no_cacheable(w->response.data);
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if (!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if (!name || !*name) continue;
         if (!value || !*value) continue;
 
@@ -1013,8 +973,8 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     }
 }
 
-static inline void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host, BUFFER *wb) {
-    buffer_json_member_add_object(wb, "alarms");
+void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host, BUFFER *wb, const char *key) {
+    buffer_json_member_add_object(wb, key);
 
     size_t normal = 0, warning = 0, critical = 0;
     RRDCALC *rc;
@@ -1042,6 +1002,22 @@ static inline void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST
     buffer_json_object_close(wb);
 }
 
+static inline void web_client_api_request_v1_info_mirrored_hosts_status(BUFFER *wb, RRDHOST *host) {
+    buffer_json_add_array_item_object(wb);
+
+    buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
+    buffer_json_member_add_uint64(wb, "hops", host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
+    buffer_json_member_add_boolean(wb, "reachable", (host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)));
+
+    buffer_json_member_add_string(wb, "guid", host->machine_guid);
+    buffer_json_member_add_uuid(wb, "node_id", host->node_id);
+    rrdhost_aclk_state_lock(host);
+    buffer_json_member_add_string(wb, "claim_id", host->aclk_state.claimed_id);
+    rrdhost_aclk_state_unlock(host);
+
+    buffer_json_object_close(wb);
+}
+
 static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
     RRDHOST *host;
 
@@ -1054,27 +1030,22 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
 
     buffer_json_member_add_array(wb, "mirrored_hosts_status");
     rrdhost_foreach_read(host) {
-        buffer_json_add_array_item_object(wb);
-
-        buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
-        buffer_json_member_add_uint64(wb, "hops", host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
-        buffer_json_member_add_boolean(wb, "reachable", (host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)));
-
-        buffer_json_member_add_string(wb, "guid", host->machine_guid);
-        buffer_json_member_add_uuid(wb, "node_id", host->node_id);
-        rrdhost_aclk_state_lock(host);
-        buffer_json_member_add_string(wb, "claim_id", host->aclk_state.claimed_id);
-        rrdhost_aclk_state_unlock(host);
-
-        buffer_json_object_close(wb);
+        if ((host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) {
+            web_client_api_request_v1_info_mirrored_hosts_status(wb, host);
+        }
+    }
+    rrdhost_foreach_read(host) {
+        if ((host != localhost && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) {
+            web_client_api_request_v1_info_mirrored_hosts_status(wb, host);
+        }
     }
     buffer_json_array_close(wb);
 
     rrd_unlock();
 }
 
-static inline void host_labels2json(RRDHOST *host, BUFFER *wb) {
-    buffer_json_member_add_object(wb, "host_labels");
+void host_labels2json(RRDHOST *host, BUFFER *wb, const char *key) {
+    buffer_json_member_add_object(wb, key);
     rrdlabels_to_buffer_json_members(host->rrdlabels, wb);
     buffer_json_object_close(wb);
 }
@@ -1113,7 +1084,7 @@ static void host_collectors(RRDHOST *host, BUFFER *wb) {
 
 extern int aclk_connected;
 inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb) {
-    buffer_json_initialize(wb, "\"", "\"", 0, true);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
 
     buffer_json_member_add_string(wb, "version", rrdhost_program_version(host));
     buffer_json_member_add_string(wb, "uid", host->machine_guid);
@@ -1121,7 +1092,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_json_member_add_uint64(wb, "hosts-available", rrdhost_hosts_available());
     web_client_api_request_v1_info_mirrored_hosts(wb);
 
-    web_client_api_request_v1_info_summary_alarm_statuses(host, wb);
+    web_client_api_request_v1_info_summary_alarm_statuses(host, wb, "alarms");
 
     buffer_json_member_add_string_or_empty(wb, "os_name", host->system_info->host_os_name);
     buffer_json_member_add_string_or_empty(wb, "os_id", host->system_info->host_os_id);
@@ -1154,7 +1125,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_json_member_add_string_or_omit(wb, "cloud_instance_type", host->system_info->cloud_instance_type);
     buffer_json_member_add_string_or_omit(wb, "cloud_instance_region", host->system_info->cloud_instance_region);
 
-    host_labels2json(host, wb);
+    host_labels2json(host, wb, "host_labels");
     host_functions2json(host, wb);
     host_collectors(host, wb);
 
@@ -1182,8 +1153,10 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 #endif
 
     buffer_json_member_add_string(wb, "memory-mode", rrd_memory_mode_name(host->rrd_memory_mode));
+#ifdef ENABLE_DBENGINE
     buffer_json_member_add_uint64(wb, "multidb-disk-quota", default_multidb_disk_quota_mb);
     buffer_json_member_add_uint64(wb, "page-cache-size", default_rrdeng_page_cache_mb);
+#endif // ENABLE_DBENGINE
     buffer_json_member_add_boolean(wb, "web-enabled", web_server_mode != WEB_SERVER_MODE_NONE);
     buffer_json_member_add_boolean(wb, "stream-enabled", default_rrdpush_enabled);
 
@@ -1217,7 +1190,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
 #if defined(ENABLE_ML)
     buffer_json_member_add_object(wb, "ml-info");
-    ml_get_host_info(host, wb);
+    ml_host_get_info(host, wb);
     buffer_json_object_close(wb);
 #endif
 
@@ -1232,17 +1205,16 @@ int web_client_api_request_v1_ml_info(RRDHOST *host, struct web_client *w, char 
     if (!netdata_ready)
         return HTTP_RESP_BACKEND_FETCH_FAILED;
 
-    char *s = ml_get_host_runtime_info(host);
-    if (!s)
-        s = strdupz("{\"error\": \"json string is empty\" }\n");
-
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
-    buffer_strcat(wb, s);
+
+    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    ml_host_get_detection_info(host, wb);
+    buffer_json_finalize(wb);
+
     buffer_no_cacheable(wb);
 
-    freez(s);
     return HTTP_RESP_OK;
 }
 
@@ -1252,20 +1224,15 @@ int web_client_api_request_v1_ml_models(RRDHOST *host, struct web_client *w, cha
     if (!netdata_ready)
         return HTTP_RESP_BACKEND_FETCH_FAILED;
 
-    char *s = ml_get_host_models(host);
-    if (!s)
-        s = strdupz("{\"error\": \"json string is empty\" }\n");
-
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
-    buffer_strcat(wb, s);
+    ml_host_get_models(host, wb);
     buffer_no_cacheable(wb);
 
-    freez(s);
     return HTTP_RESP_OK;
 }
-#endif
+#endif // ENABLE_ML
 
 inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
@@ -1297,89 +1264,14 @@ static int web_client_api_request_v1_aclk_state(RRDHOST *host, struct web_client
     return HTTP_RESP_OK;
 }
 
-static int web_client_api_request_v1_weights_internal(RRDHOST *host, struct web_client *w, char *url, WEIGHTS_METHOD method, WEIGHTS_FORMAT format) {
-    if (!netdata_ready)
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
-
-    long long baseline_after = 0, baseline_before = 0, after = 0, before = 0, points = 0;
-    RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO | RRDR_OPTION_NULL2ZERO;
-    int options_count = 0;
-    RRDR_TIME_GROUPING group = RRDR_GROUPING_AVERAGE;
-    int timeout = 0;
-    size_t tier = 0;
-    const char *group_options = NULL, *contexts_str = NULL;
-
-    while (url) {
-        char *value = mystrsep(&url, "&");
-        if (!value || !*value)
-            continue;
-
-        char *name = mystrsep(&value, "=");
-        if (!name || !*name)
-            continue;
-        if (!value || !*value)
-            continue;
-
-        if (!strcmp(name, "baseline_after"))
-            baseline_after = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "baseline_before"))
-            baseline_before = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "after") || !strcmp(name, "highlight_after"))
-            after = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "before") || !strcmp(name, "highlight_before"))
-            before = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "points") || !strcmp(name, "max_points"))
-            points = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "timeout"))
-            timeout = (int) strtoul(value, NULL, 0);
-
-        else if(!strcmp(name, "group"))
-            group = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
-
-        else if(!strcmp(name, "options")) {
-            if(!options_count) options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NULL2ZERO;
-            options |= web_client_api_request_v1_data_options(value);
-            options_count++;
-        }
-
-        else if(!strcmp(name, "method"))
-            method = weights_string_to_method(value);
-
-        else if(!strcmp(name, "context") || !strcmp(name, "contexts"))
-            contexts_str = value;
-
-        else if(!strcmp(name, "tier")) {
-            tier = str2ul(value);
-            if(tier < storage_tiers)
-                options |= RRDR_OPTION_SELECTED_TIER;
-            else
-                tier = 0;
-        }
-    }
-
-    BUFFER *wb = w->response.data;
-    buffer_flush(wb);
-    wb->content_type = CT_APPLICATION_JSON;
-
-    SIMPLE_PATTERN *contexts = (contexts_str) ? simple_pattern_create(contexts_str, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
-
-    int ret = web_api_v1_weights(host, wb, method, format, group, group_options, baseline_after, baseline_before, after, before, points, options, contexts, tier, timeout);
-
-    simple_pattern_free(contexts);
-    return ret;
-}
-
 int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_client *w, char *url) {
-    return web_client_api_request_v1_weights_internal(host, w, url, default_metric_correlations_method, WEIGHTS_FORMAT_CHARTS);
+    return web_client_api_request_weights(host, w, url, default_metric_correlations_method,
+                                          WEIGHTS_FORMAT_CHARTS, 1);
 }
 
 int web_client_api_request_v1_weights(RRDHOST *host, struct web_client *w, char *url) {
-    return web_client_api_request_v1_weights_internal(host, w, url, WEIGHTS_METHOD_ANOMALY_RATE, WEIGHTS_FORMAT_CONTEXTS);
+    return web_client_api_request_weights(host, w, url, WEIGHTS_METHOD_ANOMALY_RATE,
+                                          WEIGHTS_FORMAT_CONTEXTS, 1);
 }
 
 int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char *url) {
@@ -1390,11 +1282,11 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
     const char *function = NULL;
 
     while (url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if (!value || !*value)
             continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if (!name || !*name)
             continue;
 
@@ -1422,7 +1314,7 @@ int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, cha
     wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
 
-    buffer_json_initialize(wb, "\"", "\"", 0, true);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
     host_functions2json(host, wb);
     buffer_json_finalize(wb);
 
@@ -1528,85 +1420,55 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
 #define ACL_DEV_OPEN_ACCESS 0
 #endif
 
-static struct api_command {
-    const char *command;
-    uint32_t hash;
-    WEB_CLIENT_ACL acl;
-    int (*callback)(RRDHOST *host, struct web_client *w, char *url);
-} api_commands[] = {
-        { "info",            0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_info                       },
-        { "data",            0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_data                       },
-        { "chart",           0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_chart                      },
-        { "charts",          0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_charts                     },
-        { "context",         0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_context                    },
-        { "contexts",        0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_contexts                   },
+static struct web_api_command api_commands_v1[] = {
+        { "info",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_info                       },
+        { "data",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_data                       },
+        { "chart",           0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_chart                      },
+        { "charts",          0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_charts                     },
+        { "context",         0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_context                    },
+        { "contexts",        0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_contexts                   },
 
         // registry checks the ACL by itself, so we allow everything
         { "registry",        0, WEB_CLIENT_ACL_NOCHECK,                         web_client_api_request_v1_registry                   },
 
         // badges can be fetched with both dashboard and badge permissions
-        { "badge.svg",       0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_badge },
+        { "badge.svg",       0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC | WEB_CLIENT_ACL_BADGE, web_client_api_request_v1_badge },
 
-        { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_alarms                     },
-        { "alarms_values",   0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_alarms_values             },
-        { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_alarm_log                 },
-        { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_alarm_variables           },
-        { "alarm_count",     0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_alarm_count               },
-        { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_allmetrics                },
+        { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarms                     },
+        { "alarms_values",   0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarms_values             },
+        { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_log                 },
+        { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_variables           },
+        { "alarm_count",     0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_count               },
+        { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_allmetrics                },
 
 #if defined(ENABLE_ML)
-      { "ml_info",         0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_ml_info            },
-      { "ml_models",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_models          },
+        { "ml_info",         0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_ml_info            },
+        { "ml_models",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_models          },
 #endif
 
         { "manage/health",       0, WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_ACLK,      web_client_api_request_v1_mgmt_health           },
-        { "aclk",                0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_aclk_state            },
-        { "metric_correlations", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_metric_correlations   },
-        { "weights",             0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_weights               },
+        { "aclk",                0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_aclk_state            },
+        { "metric_correlations", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_metric_correlations   },
+        { "weights",             0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_weights               },
 
         { "function",            0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_function },
         { "functions",            0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_functions },
 
-        { "dbengine_stats",      0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_dbengine_stats },
+        { "dbengine_stats",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_dbengine_stats },
 
         // terminator
         { NULL,              0, WEB_CLIENT_ACL_NONE,      NULL },
 };
 
-inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url) {
+inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url_path_endpoint) {
     static int initialized = 0;
-    int i;
 
     if(unlikely(initialized == 0)) {
         initialized = 1;
 
-        for(i = 0; api_commands[i].command ; i++)
-            api_commands[i].hash = simple_hash(api_commands[i].command);
+        for(int i = 0; api_commands_v1[i].command ; i++)
+            api_commands_v1[i].hash = simple_hash(api_commands_v1[i].command);
     }
 
-    // get the command
-    if(url) {
-        debug(D_WEB_CLIENT, "%llu: Searching for API v1 command '%s'.", w->id, url);
-        uint32_t hash = simple_hash(url);
-
-        for(i = 0; api_commands[i].command ;i++) {
-            if(unlikely(hash == api_commands[i].hash && !strcmp(url, api_commands[i].command))) {
-                if(unlikely(api_commands[i].acl != WEB_CLIENT_ACL_NOCHECK) &&  !(w->acl & api_commands[i].acl))
-                    return web_client_permission_denied(w);
-
-                //return api_commands[i].callback(host, w, url);
-                return api_commands[i].callback(host, w, (w->decoded_query_string + 1));
-            }
-        }
-
-        buffer_flush(w->response.data);
-        buffer_strcat(w->response.data, "Unsupported v1 API command: ");
-        buffer_strcat_htmlescape(w->response.data, url);
-        return HTTP_RESP_NOT_FOUND;
-    }
-    else {
-        buffer_flush(w->response.data);
-        buffer_sprintf(w->response.data, "Which API v1 command?");
-        return HTTP_RESP_BAD_REQUEST;
-    }
+    return web_client_api_request_vX(host, w, url_path_endpoint, api_commands_v1);
 }

@@ -1,0 +1,18 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+varnish.session_connection,,"accepted, dropped",connections/s,Connections Statistics,line,,python.d.plugin,varnish
+varnish.client_requests,,received,requests/s,Client Requests,line,,python.d.plugin,varnish
+varnish.all_time_hit_rate,,"hit, miss, hitpass",percentage,All History Hit Rate Ratio,stacked,,python.d.plugin,varnish
+varnish.current_poll_hit_rate,,"hit, miss, hitpass",percentage,Current Poll Hit Rate Ratio,stacked,,python.d.plugin,varnish
+varnish.cached_objects_expired,,objects,expired/s,Expired Objects,line,,python.d.plugin,varnish
+varnish.cached_objects_nuked,,objects,nuked/s,Least Recently Used Nuked Objects,line,,python.d.plugin,varnish
+varnish.threads_total,,None,number,Number Of Threads In All Pools,line,,python.d.plugin,varnish
+varnish.threads_statistics,,"created, failed, limited",threads/s,Threads Statistics,line,,python.d.plugin,varnish
+varnish.threads_queue_len,,in queue,requests,Current Queue Length,line,,python.d.plugin,varnish
+varnish.backend_connections,,"successful, unhealthy, reused, closed, recycled, failed",connections/s,Backend Connections Statistics,line,,python.d.plugin,varnish
+varnish.backend_requests,,sent,requests/s,Requests To The Backend,line,,python.d.plugin,varnish
+varnish.esi_statistics,,"errors, warnings",problems/s,ESI Statistics,line,,python.d.plugin,varnish
+varnish.memory_usage,,"free, allocated",MiB,Memory Usage,stacked,,python.d.plugin,varnish
+varnish.uptime,,uptime,seconds,Uptime,line,,python.d.plugin,varnish
+varnish.backend,Backend,"header, body",kilobits/s,Backend {backend_name},area,,python.d.plugin,varnish
+varnish.storage_usage,Storage,"free, allocated",KiB,Storage {storage_name} Usage,stacked,,python.d.plugin,varnish
+varnish.storage_alloc_objs,Storage,allocated,objects,Storage {storage_name} Allocated Objects,line,,python.d.plugin,varnish

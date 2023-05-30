@@ -1,18 +1,11 @@
-<!--
-title: "Install Netdata"
-description: "Download and install the open-source Netdata monitoring agent on physical/virtual servers, Linux (Ubuntu/Debian/CentOS/etc), Docker, Kubernetes, and many others, often with one command."
-sidebar_label: "Install Netdata"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/README.md"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Getting started"
-sidebar_position: "1"
--->
-
 import { OneLineInstallWget, OneLineInstallCurl } from '@site/src/components/OneLineInstall/'
 import { InstallRegexLink, InstallBoxRegexLink } from '@site/src/components/InstallRegexLink/'
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
+
+# Install Netdata
+
+This document will guide you through installing the open-source Netdata monitoring Agent on Linux, Docker, Kubernetes, and many others, often with one command.
 
 ## Get started
 
@@ -28,24 +21,26 @@ Docker), and many other operating systems (FreeBSD, macOS), with no `sudo` requi
 
 To install Netdata in minutes on your platform:
 
-1. Sign up to https://app.netdata.cloud/
+1. Sign up to <https://app.netdata.cloud/>
 2. You will be presented with an empty space, and a prompt to "Connect Nodes" with the install command for each platform
 3. Select the platform you want to install Netdata to, copy and paste the script into your node's terminal, and run it
 
-Upon installation completing successfully, you should be able to see the node live in your Netdata Space and live charts in the Overview tab. [Read more about the cloud features](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md).
+Upon installation completing successfully, you should be able to see the node live in your Netdata Space and live charts
+in the Overview tab. [Read more about the cloud features](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md).
 
-Where you go from here is based on your use case, immediate needs, and experience with monitoring and troubleshooting, 
+Where you go from here is based on your use case, immediate needs, and experience with monitoring and troubleshooting,
 but we have some hints on what you might want to do next.
 
 ### What's next?
 
-Explore our [general advanced installation options and troubleshooting](#advanced-installation-options-and-troubleshooting), specific options for the [single line installer](#install-on-linux-with-one-line-installer), or [other installation methods](#other-installation-methods).
+Explore our [general advanced installation options and troubleshooting](#advanced-installation-options-and-troubleshooting), specific options
+for the [single line installer](#install-on-linux-with-one-line-installer), or [other installation methods](#other-installation-methods).
 
 #### Agent user interface
 
 To access the UI provided by the locally installed agent, open a browser and navigate to `http://NODE:19999`, replacing `NODE` with either `localhost` or
-the hostname/IP address of the remote node. You can also read more about [how the agent dashboard works](https://github.com/netdata/netdata/blob/master/docs/dashboard/how-dashboard-works.md), or dive directly into the many ways
-to [interact with charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.md).
+the hostname/IP address of the remote node. You can also read more about
+[the agent dashboard](https://github.com/netdata/netdata/blob/master/web/gui/README.md).
 
 #### Configuration
 
@@ -63,18 +58,18 @@ or read about its requirements to configure your endpoint to publish metrics in 
 #### Alarms & notifications
 
 Netdata comes with hundreds of preconfigured alarms, designed by our monitoring gurus in parallel with our open-source
-community, but you may want to [edit alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) or 
+community, but you may want to [edit alarms](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) or
 [enable notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to customize your Netdata experience.
 
 #### Make your deployment production ready
 
-Both [securing Netdata](https://github.com/netdata/netdata/blob/master/docs/configure/secure-nodes.md) and [setting up replication](https://github.com/netdata/netdata/blob/master/streaming/README.md) are strongly recommended.
+Go through our [deployment strategies](https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/deployment-strategies.md),
+for suggested configuration changes for production deployments.
 
-
-## Install on Linux with one-line installer 
+## Install on Linux with one-line installer
 
 The **recommended** way to install Netdata on a Linux node (physical, virtual, container, IoT) is our one-line
-[kickstart script](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md).  
+[kickstart script](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md).
 This script automatically installs dependencies and builds Netdata from its source code.
 
 To install, copy the script, paste it into your node's terminal, and hit `Enter` to begin the installation process.
@@ -92,12 +87,10 @@ To install, copy the script, paste it into your node's terminal, and hit `Enter`
   </TabItem>
 </Tabs>
 
-:::note
-If you plan to also claim the node to Netdata Cloud, 
-make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space, 
-and `YOUR_ROOM_ID` with the ID of the room you are willing to claim to.
-You can leave the room id blank to have your node claimed to the default "All nodes" room.
-:::
+> ### Note
+>
+> If you plan to also claim the node to Netdata Cloud, make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space, and `YOUR_ROOM_ID` with the ID of the room you are claiming to.
+> You can leave the room id blank to have your node claimed to the default "All nodes" room.
 
 Jump down to [what's next](#whats-next) to learn how to view your new dashboard and take your next steps monitoring and
 troubleshooting with Netdata.
@@ -107,36 +100,44 @@ troubleshooting with Netdata.
 <InstallRegexLink>
   <InstallBoxRegexLink
     to="[](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md)"
-    os="Run with Docker" 
+    os="Run with Docker"
     svg="docker" />
   <InstallBoxRegexLink
     to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kubernetes.md)"
-    os="Deploy on Kubernetes" 
+    os="Deploy on Kubernetes"
     svg="kubernetes" />
    <InstallBoxRegexLink
     to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/macos.md)"
-    os="Install on macOS" 
+    os="Install on macOS"
     svg="macos" />
   <InstallBoxRegexLink
+    to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/packages.md)"
+    os="Native DEB/RPM packages"
+    svg="linux" />
+  <InstallBoxRegexLink
     to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md)"
-    os="Linux from Git" 
+    os="Linux from Git"
     svg="linux" />
   <InstallBoxRegexLink
     to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/source.md)"
     os="Linux from source"
     svg="linux" />
   <InstallBoxRegexLink
-    to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/offline.md)" 
+    to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/offline.md)"
     os="Linux for offline nodes"
     svg="linux" />
 </InstallRegexLink>
 
+- [Native DEB/RPM packages](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/packages.md)
 - [Run with Docker](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md)
 - [Deploy on Kubernetes](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kubernetes.md)
 - [Install on macOS](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/macos.md)
 - [Linux from Git](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md)
 - [Linux from source](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/source.md)
 - [Linux for offline nodes](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/offline.md)
+
+The full list of all installation methods for various systems is available in [Netdata Learn](https://learn.netdata.cloud),
+under [Installation](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/installation-overview.md).
 
 ## Advanced installation options and troubleshooting
 
@@ -183,16 +184,16 @@ the community helps fix any bugs that might have been introduced in previous rel
 
 **Pros of using nightly releases:**
 
--   Get the latest features and bug fixes as soon as they're available
--   Receive security-related fixes immediately
--   Use stable, fully-tested code that's always improving
--   Leverage the same Netdata experience our community is using
+- Get the latest features and bug fixes as soon as they're available
+- Receive security-related fixes immediately
+- Use stable, fully-tested code that's always improving
+- Leverage the same Netdata experience our community is using
 
 **Pros of using stable releases:**
 
--   Protect yourself from the rare instance when major bugs slip through our testing and negatively affect a Netdata
+- Protect yourself from the rare instance when major bugs slip through our testing and negatively affect a Netdata
     installation
--   Retain more control over the Netdata version you use
+- Retain more control over the Netdata version you use
 
 ### Anonymous statistics
 
@@ -255,5 +256,3 @@ both.
 Our current build process has some issues when using certain configurations of the `clang` C compiler on Linux. See [the
 section on `nonrepresentable section on output`
 errors](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md#nonrepresentable-section-on-output-errors) for a workaround.
-
-

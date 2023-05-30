@@ -130,18 +130,20 @@ static inline void init_rrd(const char *name, ZRAM_DEVICE *d, int update_every) 
 
 static int init_devices(DICTIONARY *devices, unsigned int zram_id, int update_every) {
     int count = 0;
-    DIR *dir = opendir("/dev");
     struct dirent *de;
     struct stat st;
-    char filename[FILENAME_MAX + 1];
     procfile *ff = NULL;
     ZRAM_DEVICE device;
+    char filename[FILENAME_MAX + 1];
+
+    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/dev");
+    DIR *dir = opendir(filename);
 
     if (unlikely(!dir))
         return 0;
     while ((de = readdir(dir)))
     {
-        snprintfz(filename, FILENAME_MAX, "/dev/%s", de->d_name);
+        snprintfz(filename, FILENAME_MAX, "%s/dev/%s", netdata_configured_host_prefix, de->d_name);
         if (unlikely(stat(filename, &st) != 0))
         {
             collector_error("ZRAM : Unable to stat %s: %s", filename, strerror(errno));
@@ -150,7 +152,7 @@ static int init_devices(DICTIONARY *devices, unsigned int zram_id, int update_ev
         if (major(st.st_rdev) == zram_id)
         {
             collector_info("ZRAM : Found device %s", filename);
-            snprintfz(filename, FILENAME_MAX, "/sys/block/%s/mm_stat", de->d_name);
+            snprintfz(filename, FILENAME_MAX, "%s/sys/block/%s/mm_stat", netdata_configured_host_prefix, de->d_name);
             ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
             if (ff == NULL)
             {
@@ -249,10 +251,14 @@ int do_sys_block_zram(int update_every, usec_t dt) {
     if (unlikely(!initialized))
     {
         initialized = 1;
-        ff = procfile_open("/proc/devices", " \t:", PROCFILE_FLAG_DEFAULT);
+
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/devices");
+
+        ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
         if (ff == NULL)
         {
-            collector_error("Cannot read /proc/devices");
+            collector_error("Cannot read %s", filename);
             return 1;
         }
         ff = procfile_readall(ff);

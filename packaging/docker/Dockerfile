@@ -51,7 +51,9 @@ RUN mkdir -p /app/usr/sbin/ \
     mv /usr/sbin/netdatacli    /app/usr/sbin/ && \
     mv packaging/docker/run.sh        /app/usr/sbin/ && \
     mv packaging/docker/health.sh     /app/usr/sbin/ && \
-    cp -rp /deps/* /app/usr/local/ && \
+    mkdir -p /deps/etc && \
+    cp -rp /deps/etc /app/usr/local/etc && \
+    chmod -R o+rX /app && \
     chmod +x /app/usr/sbin/run.sh
 
 #####################################################################
@@ -102,7 +104,8 @@ RUN chown -R root:root \
     chmod 0755 /usr/libexec/netdata/plugins.d/*.plugin && \
     chmod 4755 \
         /usr/libexec/netdata/plugins.d/cgroup-network \
-        /usr/libexec/netdata/plugins.d/apps.plugin && \
+        /usr/libexec/netdata/plugins.d/apps.plugin \
+        /usr/libexec/netdata/plugins.d/debugfs.plugin && \
     if [ -f /usr/libexec/netdata/plugins.d/freeipmi.plugin ]; then \
         chmod 4755 /usr/libexec/netdata/plugins.d/freeipmi.plugin; \
     fi && \
@@ -116,6 +119,8 @@ RUN chown -R root:root \
 
 ENV NETDATA_LISTENER_PORT 19999
 EXPOSE $NETDATA_LISTENER_PORT
+
+ENV NETDATA_EXTRA_APK_PACKAGES=""
 
 ENTRYPOINT ["/usr/sbin/run.sh"]
 

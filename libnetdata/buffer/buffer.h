@@ -3,11 +3,16 @@
 #ifndef NETDATA_WEB_BUFFER_H
 #define NETDATA_WEB_BUFFER_H 1
 
+#include "../string/utf8.h"
 #include "../libnetdata.h"
+
+#ifdef ENABLE_HTTPD
+#include "h2o/memory.h"
+#endif
 
 #define WEB_DATA_LENGTH_INCREASE_STEP 1024
 
-#define BUFFER_JSON_MAX_DEPTH 32
+#define BUFFER_JSON_MAX_DEPTH 32 // max is 255
 
 extern const char hex_digits[16];
 extern const char base64_digits[64];
@@ -71,7 +76,8 @@ typedef struct web_buffer {
     struct {
         char key_quote[BUFFER_QUOTE_MAX_SIZE + 1];
         char value_quote[BUFFER_QUOTE_MAX_SIZE + 1];
-        int depth;
+        int8_t depth;
+        bool minify;
         BUFFER_JSON_NODE stack[BUFFER_JSON_MAX_DEPTH];
     } json;
 } BUFFER;
@@ -127,12 +133,18 @@ void buffer_char_replace(BUFFER *wb, char from, char to);
 
 void buffer_print_sn_flags(BUFFER *wb, SN_FLAGS flags, bool send_anomaly_bit);
 
+#ifdef ENABLE_HTTPD
+h2o_iovec_t buffer_to_h2o_iovec(BUFFER *wb);
+#endif
+
 static inline void buffer_need_bytes(BUFFER *buffer, size_t needed_free_size) {
     if(unlikely(buffer->len + needed_free_size >= buffer->size))
         buffer_increase(buffer, needed_free_size + 1);
 }
 
-void buffer_json_initialize(BUFFER *wb, const char *key_quote, const char *value_quote, int depth, bool add_anonymous_object);
+void buffer_json_initialize(BUFFER *wb, const char *key_quote, const char *value_quote, int depth,
+                            bool add_anonymous_object, bool minify);
+
 void buffer_json_finalize(BUFFER *wb);
 
 static inline void _buffer_json_depth_push(BUFFER *wb, BUFFER_JSON_NODE_TYPE type) {
@@ -146,6 +158,35 @@ static inline void _buffer_json_depth_push(BUFFER *wb, BUFFER_JSON_NODE_TYPE typ
 
 static inline void _buffer_json_depth_pop(BUFFER *wb) {
     wb->json.depth--;
+}
+
+static inline void buffer_fast_charcat(BUFFER *wb, const char c) {
+
+    buffer_need_bytes(wb, 2);
+    *(&wb->buffer[wb->len]) = c;
+    wb->len += 1;
+    wb->buffer[wb->len] = '\0';
+
+    buffer_overflow_check(wb);
+}
+
+static inline void buffer_fast_rawcat(BUFFER *wb, const char *txt, size_t len) {
+    if(unlikely(!txt || !*txt || !len)) return;
+
+    buffer_need_bytes(wb, len + 1);
+
+    const char *t = txt;
+    const char *e = &txt[len];
+
+    char *d = &wb->buffer[wb->len];
+
+    while(t != e)
+        *d++ = *t++;
+
+    wb->len += len;
+    wb->buffer[wb->len] = '\0';
+
+    buffer_overflow_check(wb);
 }
 
 static inline void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
@@ -197,21 +238,81 @@ static inline void buffer_strcat(BUFFER *wb, const char *txt) {
     buffer_overflow_check(wb);
 }
 
-static inline void buffer_json_strcat(BUFFER *wb, const char *txt) {
+static inline void buffer_strncat(BUFFER *wb, const char *txt, size_t len) {
     if(unlikely(!txt || !*txt)) return;
 
     const char *t = txt;
     while(*t) {
-        buffer_need_bytes(wb, 100);
+        buffer_need_bytes(wb, len);
         char *s = &wb->buffer[wb->len];
         char *d = s;
-        const char *e = &wb->buffer[wb->size - 1]; // remove 1 to make room for the escape character
+        const char *e = &wb->buffer[wb->len + len];
+
+        while(*t && d < e)
+            *d++ = *t++;
+
+        wb->len += d - s;
+    }
+
+    buffer_need_bytes(wb, 1);
+    wb->buffer[wb->len] = '\0';
+
+    buffer_overflow_check(wb);
+}
+
+static inline void buffer_json_strcat(BUFFER *wb, const char *txt) {
+    if(unlikely(!txt || !*txt)) return;
+
+    const unsigned char *t = (const unsigned char *)txt;
+    while(*t) {
+        buffer_need_bytes(wb, 110);
+        unsigned char *s = (unsigned char *)&wb->buffer[wb->len];
+        unsigned char *d = s;
+        const unsigned char *e = (unsigned char *)&wb->buffer[wb->size - 10]; // make room for the max escape sequence
 
         while(*t && d < e) {
-            if(unlikely(*t == '\\' || *t == '\"'))
-                *d++ = '\\';
+#ifdef BUFFER_JSON_ESCAPE_UTF
+            if(unlikely(IS_UTF8_STARTBYTE(*t) && IS_UTF8_BYTE(t[1]))) {
+                // UTF-8 multi-byte encoded character
 
-            *d++ = *t++;
+                // find how big this character is (2-4 bytes)
+                size_t utf_character_size = 2;
+                while(utf_character_size < 4 && t[utf_character_size] && IS_UTF8_BYTE(t[utf_character_size]) && !IS_UTF8_STARTBYTE(t[utf_character_size]))
+                    utf_character_size++;
+
+                uint32_t code_point = 0;
+                for (size_t i = 0; i < utf_character_size; i++) {
+                    code_point <<= 6;
+                    code_point |= (t[i] & 0x3F);
+                }
+
+                t += utf_character_size;
+
+                // encode as \u escape sequence
+                *d++ = '\\';
+                *d++ = 'u';
+                *d++ = hex_digits[(code_point >> 12) & 0xf];
+                *d++ = hex_digits[(code_point >> 8) & 0xf];
+                *d++ = hex_digits[(code_point >> 4) & 0xf];
+                *d++ = hex_digits[code_point & 0xf];
+            }
+            else
+#endif
+            if(unlikely(*t < ' ')) {
+                uint32_t v = *t++;
+                *d++ = '\\';
+                *d++ = 'u';
+                *d++ = hex_digits[(v >> 12) & 0xf];
+                *d++ = hex_digits[(v >> 8) & 0xf];
+                *d++ = hex_digits[(v >> 4) & 0xf];
+                *d++ = hex_digits[v & 0xf];
+            }
+            else {
+                if (unlikely(*t == '\\' || *t == '\"'))
+                    *d++ = '\\';
+
+                *d++ = *t++;
+            }
         }
 
         wb->len += d - s;
@@ -563,10 +664,12 @@ static inline void buffer_print_spaces(BUFFER *wb, size_t spaces) {
 
 static inline void buffer_print_json_comma_newline_spacing(BUFFER *wb) {
     if(wb->json.stack[wb->json.depth].count)
-        buffer_fast_strcat(wb, ",\n", 2);
-    else
-        buffer_fast_strcat(wb, "\n", 1);
+        buffer_fast_strcat(wb, ",", 1);
 
+    if(wb->json.minify)
+        return;
+
+    buffer_fast_strcat(wb, "\n", 1);
     buffer_print_spaces(wb, wb->json.depth + 1);
 }
 
@@ -610,8 +713,10 @@ static inline void buffer_json_object_close(BUFFER *wb) {
     assert(wb->json.depth >= 0 && "BUFFER JSON: nothing is open to close it");
     assert(wb->json.stack[wb->json.depth].type == BUFFER_JSON_OBJECT && "BUFFER JSON: an object is not open to close it");
 #endif
-    buffer_fast_strcat(wb, "\n", 1);
-    buffer_print_spaces(wb, wb->json.depth);
+    if(!wb->json.minify) {
+        buffer_fast_strcat(wb, "\n", 1);
+        buffer_print_spaces(wb, wb->json.depth);
+    }
     buffer_fast_strcat(wb, "}", 1);
     _buffer_json_depth_pop(wb);
 }
@@ -709,11 +814,45 @@ static inline void buffer_json_add_array_item_double(BUFFER *wb, NETDATA_DOUBLE 
     wb->json.stack[wb->json.depth].count++;
 }
 
+static inline void buffer_json_add_array_item_int64(BUFFER *wb, int64_t value) {
+    if(wb->json.stack[wb->json.depth].count)
+        buffer_fast_strcat(wb, ",", 1);
+
+    buffer_print_int64(wb, value);
+    wb->json.stack[wb->json.depth].count++;
+}
+
 static inline void buffer_json_add_array_item_uint64(BUFFER *wb, uint64_t value) {
     if(wb->json.stack[wb->json.depth].count)
         buffer_fast_strcat(wb, ",", 1);
 
     buffer_print_uint64(wb, value);
+    wb->json.stack[wb->json.depth].count++;
+}
+
+static inline void buffer_json_add_array_item_time_t(BUFFER *wb, time_t value) {
+    if(wb->json.stack[wb->json.depth].count)
+        buffer_fast_strcat(wb, ",", 1);
+
+    buffer_print_int64(wb, value);
+    wb->json.stack[wb->json.depth].count++;
+}
+
+static inline void buffer_json_add_array_item_time_ms(BUFFER *wb, time_t value) {
+    if(wb->json.stack[wb->json.depth].count)
+        buffer_fast_strcat(wb, ",", 1);
+
+    buffer_print_int64(wb, value);
+    buffer_fast_strcat(wb, "000", 3);
+    wb->json.stack[wb->json.depth].count++;
+}
+
+static inline void buffer_json_add_array_item_time_t2ms(BUFFER *wb, time_t value) {
+    if(wb->json.stack[wb->json.depth].count)
+        buffer_fast_strcat(wb, ",", 1);
+
+    buffer_print_int64(wb, value);
+    buffer_fast_strcat(wb, "000", 3);
     wb->json.stack[wb->json.depth].count++;
 }
 
@@ -732,6 +871,16 @@ static inline void buffer_json_member_add_time_t(BUFFER *wb, const char *key, ti
     buffer_print_json_key(wb, key);
     buffer_fast_strcat(wb, ":", 1);
     buffer_print_int64(wb, value);
+
+    wb->json.stack[wb->json.depth].count++;
+}
+
+static inline void buffer_json_member_add_time_t2ms(BUFFER *wb, const char *key, time_t value) {
+    buffer_print_json_comma_newline_spacing(wb);
+    buffer_print_json_key(wb, key);
+    buffer_fast_strcat(wb, ":", 1);
+    buffer_print_int64(wb, value);
+    buffer_fast_strcat(wb, "000", 3);
 
     wb->json.stack[wb->json.depth].count++;
 }

@@ -366,20 +366,22 @@ static uint32_t ebpf_select_index(uint32_t kernels, int is_rhf, uint32_t kver)
  *     V - The kernel version in string format.
  *
  *  @param out       the vector where the name will be stored
- *  @param path
  *  @param len       the size of the out vector.
+ *  @param path      where the binaries are stored
  *  @param kver      the kernel version
  *  @param name      the eBPF program name.
  *  @param is_return is return or entry ?
  */
-static void ebpf_mount_name(char *out, size_t len, char *path, uint32_t kver, const char *name, int is_return)
+static void ebpf_mount_name(char *out, size_t len, char *path, uint32_t kver, const char *name,
+                            int is_return, int is_rhf)
 {
     char *version = ebpf_select_kernel_name(kver);
-    snprintfz(out, len, "%s/ebpf.d/%cnetdata_ebpf_%s.%s.o",
+    snprintfz(out, len, "%s/ebpf.d/%cnetdata_ebpf_%s.%s%s.o",
               path,
               (is_return) ? 'r' : 'p',
               name,
-              version);
+              version,
+              (is_rhf != -1) ? ".rhf" : "");
 }
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -439,7 +441,7 @@ void ebpf_update_stats(ebpf_plugin_stats_t *report, ebpf_module_t *em)
     report->threads++;
 
     // It is not necessary to report more information.
-    if (!em->enabled)
+    if (em->enabled != NETDATA_THREAD_EBPF_RUNNING)
         return;
 
     report->running++;
@@ -452,6 +454,91 @@ void ebpf_update_stats(ebpf_plugin_stats_t *report, ebpf_module_t *em)
         report->core++;
 
     ebpf_stats_targets(report, em->targets);
+}
+
+/**
+ * Update Kernel memory with memory
+ *
+ * This algorithm is an adaptation of https://elixir.bootlin.com/linux/v6.1.14/source/tools/bpf/bpftool/common.c#L402
+ * to get 'memlock' data and update report.
+ *
+ * @param report  the output structure
+ * @param map     pointer to a map.
+ * @param action  What action will be done with this map.
+ */
+void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *map, ebpf_stats_action_t action)
+{
+    char filename[FILENAME_MAX+1];
+    snprintfz(filename, FILENAME_MAX, "/proc/self/fdinfo/%d", map->map_fd);
+    procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
+    if(unlikely(!ff)) {
+        error("Cannot open %s", filename);
+        return;
+    }
+
+    ff = procfile_readall(ff);
+    if(unlikely(!ff))
+        return;
+
+    unsigned long j, lines = procfile_lines(ff);
+    char *memlock = { "memlock" };
+    for (j = 0; j < lines ; j++) {
+        char *cmp = procfile_lineword(ff, j,0);
+        if (!strncmp(memlock, cmp, 7)) {
+            uint64_t memsize = (uint64_t) str2l(procfile_lineword(ff, j,1));
+            switch (action) {
+                case EBPF_ACTION_STAT_ADD: {
+                    report->memlock_kern += memsize;
+                    report->hash_tables += 1;
+#ifdef NETDATA_DEV_MODE
+                    info("Hash table %u: %s (FD = %d) is consuming %lu bytes totalizing %lu bytes",
+                         report->hash_tables, map->name, map->map_fd, memsize, report->memlock_kern);
+#endif
+                    break;
+                }
+                case EBPF_ACTION_STAT_REMOVE: {
+                    report->memlock_kern -= memsize;
+                    report->hash_tables -= 1;
+#ifdef NETDATA_DEV_MODE
+                    info("Hash table %s (FD = %d) was removed releasing %lu bytes, now we have %u tables loaded totalizing %lu bytes.",
+                         map->name, map->map_fd, memsize, report->hash_tables, report->memlock_kern);
+#endif
+                    break;
+                }
+                default: {
+                    break;
+                }
+            }
+            break;
+        }
+    }
+
+    procfile_close(ff);
+}
+
+/**
+ * Update Kernel memory with memory
+ *
+ * This algorithm is an adaptation of https://elixir.bootlin.com/linux/v6.1.14/source/tools/bpf/bpftool/common.c#L402
+ * to get 'memlock' data and update report.
+ *
+ * @param report  the output structure
+ * @param map     pointer to a map. Last map must fish with name = NULL
+ */
+void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report, ebpf_local_maps_t *maps)
+{
+    if (!maps)
+        return;
+
+    ebpf_local_maps_t *map;
+    int i = 0;
+    for (map = &maps[i]; maps[i].name; i++, map = &maps[i]) {
+        int fd = map->map_fd;
+        if (fd == ND_EBPF_MAP_FD_NOT_INITIALIZED)
+            continue;
+
+        ebpf_update_kernel_memory(report, map, EBPF_ACTION_STAT_ADD);
+    }
 }
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -696,7 +783,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
 
     uint32_t idx = ebpf_select_index(em->kernels, is_rhf, kver);
 
-    ebpf_mount_name(lpath, 4095, plugins_dir, idx, em->thread_name, em->mode);
+    ebpf_mount_name(lpath, 4095, plugins_dir, idx, em->thread_name, em->mode, is_rhf);
 
     // When this function is called ebpf.plugin is using legacy code, so we should reset the variable
     em->load &= ~ NETDATA_EBPF_LOAD_METHODS;

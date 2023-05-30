@@ -7,7 +7,7 @@ learn_status: "Published"
 learn_rel_path: "Integrations/Export"
 -->
 
-# Prometheus remote write exporting connector
+# Export metrics to Prometheus remote write providers
 
 The Prometheus remote write exporting connector uses the exporting engine to send Netdata metrics to your choice of more
 than 20 external storage providers for long-term archiving and further analysis.

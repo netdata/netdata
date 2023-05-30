@@ -3,8 +3,6 @@
 #include "ebpf.h"
 #include "ebpf_cachestat.h"
 
-netdata_publish_cachestat_t **cachestat_pid;
-
 static char *cachestat_counter_dimension_name[NETDATA_CACHESTAT_END] = { "ratio", "dirty", "hit",
                                                                          "miss" };
 static netdata_syscall_stat_t cachestat_counter_aggregated_data[NETDATA_CACHESTAT_END];
@@ -46,10 +44,6 @@ static char *account_page[NETDATA_CACHESTAT_ACCOUNT_DIRTY_END] ={ "account_page_
                                                                   "__set_page_dirty", "__folio_mark_dirty"  };
 
 #ifdef LIBBPF_MAJOR_VERSION
-#include "includes/cachestat.skel.h" // BTF code
-
-static struct cachestat_bpf *bpf_obj = NULL;
-
 /**
  * Disable probe
  *
@@ -333,20 +327,14 @@ static inline int ebpf_cachestat_load_and_attach(struct cachestat_bpf *obj, ebpf
 static void ebpf_cachestat_free(ebpf_module_t *em)
 {
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPING;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
-
-    ebpf_cleanup_publish_syscall(cachestat_counter_publish_aggregated);
 
     freez(cachestat_vector);
     freez(cachestat_values);
 
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        cachestat_bpf__destroy(bpf_obj);
-#endif
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -502,7 +490,7 @@ static void cachestat_fill_pid(uint32_t current_pid, netdata_cachestat_pid_t *pu
 {
     netdata_publish_cachestat_t *curr = cachestat_pid[current_pid];
     if (!curr) {
-        curr = callocz(1, sizeof(netdata_publish_cachestat_t));
+        curr = ebpf_publish_cachestat_get();
         cachestat_pid[current_pid] = curr;
 
         cachestat_save_pid_values(curr, publish);
@@ -521,7 +509,7 @@ static void read_apps_table()
 {
     netdata_cachestat_pid_t *cv = cachestat_vector;
     uint32_t key;
-    struct pid_stat *pids = root_of_pids;
+    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     int fd = cachestat_maps[NETDATA_CACHESTAT_PID_STATS].map_fd;
     size_t length = sizeof(netdata_cachestat_pid_t)*ebpf_nprocs;
     while (pids) {
@@ -589,7 +577,7 @@ static void ebpf_update_cachestat_cgroup()
  */
 void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    struct target *root = ptr;
+    struct ebpf_target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_CACHESTAT_HIT_RATIO_CHART,
                                "Hit ratio",
                                EBPF_COMMON_DIMENSION_PERCENTAGE,
@@ -694,7 +682,7 @@ static void cachestat_send_global(netdata_publish_cachestat_t *publish)
  * @param publish  output structure.
  * @param root     structure with listed IPs
  */
-void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct pid_on_target *root)
+void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_pid_on_target *root)
 {
     memcpy(&publish->prev, &publish->current,sizeof(publish->current));
     memset(&publish->current, 0, sizeof(publish->current));
@@ -720,9 +708,9 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct pid_on
  *
  * @param root the target list.
 */
-void ebpf_cache_send_apps_data(struct target *root)
+void ebpf_cache_send_apps_data(struct ebpf_target *root)
 {
-    struct target *w;
+    struct ebpf_target *w;
     collected_number value;
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_CACHESTAT_HIT_RATIO_CHART);
@@ -1092,6 +1080,11 @@ static void cachestat_collector(ebpf_module_t *em)
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_cache_send_apps_data(apps_groups_root_target);
 
+#ifdef NETDATA_DEV_MODE
+        if (ebpf_aral_cachestat_pid)
+            ebpf_send_data_aral_chart(ebpf_aral_cachestat_pid, em);
+#endif
+
         if (cgroups)
             ebpf_cachestat_send_cgroup_data(update_every);
 
@@ -1167,10 +1160,11 @@ static void ebpf_create_memory_charts(ebpf_module_t *em)
  */
 static void ebpf_cachestat_allocate_global_vectors(int apps)
 {
-    if (apps)
+    if (apps) {
         cachestat_pid = callocz((size_t)pid_max, sizeof(netdata_publish_cachestat_t *));
-
-    cachestat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_cachestat_pid_t));
+        ebpf_cachestat_aral_init();
+        cachestat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_cachestat_pid_t));
+    }
 
     cachestat_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
@@ -1232,11 +1226,11 @@ static int ebpf_cachestat_load_bpf(ebpf_module_t *em)
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else {
-        bpf_obj = cachestat_bpf__open();
-        if (!bpf_obj)
+        cachestat_bpf_obj = cachestat_bpf__open();
+        if (!cachestat_bpf_obj)
             ret = -1;
         else
-            ret = ebpf_cachestat_load_and_attach(bpf_obj, em);
+            ret = ebpf_cachestat_load_and_attach(cachestat_bpf_obj, em);
     }
 #endif
 
@@ -1265,7 +1259,6 @@ void *ebpf_cachestat_thread(void *ptr)
     ebpf_update_pid_table(&cachestat_maps[NETDATA_CACHESTAT_PID_STATS], em);
 
     if (ebpf_cachestat_set_internal_value()) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endcachestat;
     }
 
@@ -1273,7 +1266,6 @@ void *ebpf_cachestat_thread(void *ptr)
     ebpf_adjust_thread_load(em, default_btf);
 #endif
     if (ebpf_cachestat_load_bpf(em)) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endcachestat;
     }
 
@@ -1289,7 +1281,13 @@ void *ebpf_cachestat_thread(void *ptr)
 
     pthread_mutex_lock(&lock);
     ebpf_update_stats(&plugin_statistics, em);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
     ebpf_create_memory_charts(em);
+#ifdef NETDATA_DEV_MODE
+    if (ebpf_aral_cachestat_pid)
+        ebpf_statistic_create_aral_chart(NETDATA_EBPF_CACHESTAT_ARAL_NAME, em);
+#endif
+
     pthread_mutex_unlock(&lock);
 
     cachestat_collector(em);

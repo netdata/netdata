@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/System metrics"
 -->
 
-# perf.plugin
+# Monitor CPU performance statistics (perf.plugin)
 
 `perf.plugin` collects system-wide CPU performance statistics from Performance Monitoring Units (PMU) using
 the `perf_event_open()` system call.

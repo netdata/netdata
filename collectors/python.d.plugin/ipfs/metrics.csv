@@ -1,0 +1,5 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+ipfs.bandwidth,,"in, out",kilobits/s,IPFS Bandwidth,line,,python.d.plugin,ipfs
+ipfs.peers,,peers,peers,IPFS Peers,line,,python.d.plugin,ipfs
+ipfs.repo_size,,"avail, size",GiB,IPFS Repo Size,area,,python.d.plugin,ipfs
+ipfs.repo_objects,,"objects, pinned, recursive_pins",objects,IPFS Repo Objects,line,,python.d.plugin,ipfs

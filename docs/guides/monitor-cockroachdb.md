@@ -115,4 +115,4 @@ cd /etc/netdata/ # Replace with your Netdata configuration directory, if not /et
 ./edit-config health.d/cockroachdb.conf # You may need to use `sudo` for write privileges
 ```
 
-For more information about editing the defaults or writing new alarm entities, see our documentation on [configuring health alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md).
+For more information about editing the defaults or writing new alarm entities, see our documentation on [configuring health alarms](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md).

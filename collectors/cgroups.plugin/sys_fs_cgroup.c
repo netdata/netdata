@@ -449,70 +449,70 @@ void read_cgroup_plugin_configuration() {
             config_get("plugin:cgroups", "enable by default cgroups matching",
             // ----------------------------------------------------------------
 
-                    " !*/init.scope "                      // ignore init.scope
-                    " !/system.slice/run-*.scope "         // ignore system.slice/run-XXXX.scope
-                    " *.scope "                            // we need all other *.scope for sure
+                       " !*/init.scope "                      // ignore init.scope
+                       " !/system.slice/run-*.scope "         // ignore system.slice/run-XXXX.scope
+                       " *.scope "                            // we need all other *.scope for sure
 
-            // ----------------------------------------------------------------
+                       // ----------------------------------------------------------------
 
-                    " /machine.slice/*.service "           // #3367 systemd-nspawn
+                       " /machine.slice/*.service "           // #3367 systemd-nspawn
 
-            // ----------------------------------------------------------------
+                       // ----------------------------------------------------------------
 
-                    " */kubepods/pod*/* "                   // k8s containers
-                    " */kubepods/*/pod*/* "                 // k8s containers
-                    " */*-kubepods-pod*/* "                 // k8s containers
-                    " */*-kubepods-*-pod*/* "               // k8s containers
-                    " !*kubepods* !*kubelet* "              // all other k8s cgroups
+                       " */kubepods/pod*/* "                   // k8s containers
+                       " */kubepods/*/pod*/* "                 // k8s containers
+                       " */*-kubepods-pod*/* "                 // k8s containers
+                       " */*-kubepods-*-pod*/* "               // k8s containers
+                       " !*kubepods* !*kubelet* "              // all other k8s cgroups
 
-            // ----------------------------------------------------------------
+                       // ----------------------------------------------------------------
 
-                    " !*/vcpu* "                           // libvirtd adds these sub-cgroups
-                    " !*/emulator "                        // libvirtd adds these sub-cgroups
-                    " !*.mount "
-                    " !*.partition "
-                    " !*.service "
-                    " !*.socket "
-                    " !*.slice "
-                    " !*.swap "
-                    " !*.user "
-                    " !/ "
-                    " !/docker "
-                    " !*/libvirt "
-                    " !/lxc "
-                    " !/lxc/*/* "                          //  #1397 #2649
-                    " !/lxc.monitor* "
-                    " !/lxc.pivot "
-                    " !/lxc.payload "
-                    " !/machine "
-                    " !/qemu "
-                    " !/system "
-                    " !/systemd "
-                    " !/user "
-                    " * "                                  // enable anything else
-            ), NULL, SIMPLE_PATTERN_EXACT);
+                       " !*/vcpu* "                           // libvirtd adds these sub-cgroups
+                       " !*/emulator "                        // libvirtd adds these sub-cgroups
+                       " !*.mount "
+                       " !*.partition "
+                       " !*.service "
+                       " !*.socket "
+                       " !*.slice "
+                       " !*.swap "
+                       " !*.user "
+                       " !/ "
+                       " !/docker "
+                       " !*/libvirt "
+                       " !/lxc "
+                       " !/lxc/*/* "                          //  #1397 #2649
+                       " !/lxc.monitor* "
+                       " !/lxc.pivot "
+                       " !/lxc.payload "
+                       " !/machine "
+                       " !/qemu "
+                       " !/system "
+                       " !/systemd "
+                       " !/user "
+                       " * "                                  // enable anything else
+            ), NULL, SIMPLE_PATTERN_EXACT, true);
 
     enabled_cgroup_names = simple_pattern_create(
             config_get("plugin:cgroups", "enable by default cgroups names matching",
-                    " * "
-            ), NULL, SIMPLE_PATTERN_EXACT);
+                       " * "
+            ), NULL, SIMPLE_PATTERN_EXACT, true);
 
     search_cgroup_paths = simple_pattern_create(
             config_get("plugin:cgroups", "search for cgroups in subpaths matching",
-                    " !*/init.scope "                      // ignore init.scope
-                    " !*-qemu "                            //  #345
-                    " !*.libvirt-qemu "                    //  #3010
-                    " !/init.scope "
-                    " !/system "
-                    " !/systemd "
-                    " !/user "
-                    " !/user.slice "
-                    " !/lxc/*/* "                          //  #2161 #2649
-                    " !/lxc.monitor "
-                    " !/lxc.payload/*/* "
-                    " !/lxc.payload.* "
-                    " * "
-            ), NULL, SIMPLE_PATTERN_EXACT);
+                       " !*/init.scope "                      // ignore init.scope
+                       " !*-qemu "                            //  #345
+                       " !*.libvirt-qemu "                    //  #3010
+                       " !/init.scope "
+                       " !/system "
+                       " !/systemd "
+                       " !/user "
+                       " !/user.slice "
+                       " !/lxc/*/* "                          //  #2161 #2649
+                       " !/lxc.monitor "
+                       " !/lxc.payload/*/* "
+                       " !/lxc.payload.* "
+                       " * "
+            ), NULL, SIMPLE_PATTERN_EXACT, true);
 
     snprintfz(filename, FILENAME_MAX, "%s/cgroup-name.sh", netdata_configured_primary_plugins_dir);
     cgroups_rename_script = config_get("plugin:cgroups", "script to get cgroup names", filename);
@@ -522,37 +522,37 @@ void read_cgroup_plugin_configuration() {
 
     enabled_cgroup_renames = simple_pattern_create(
             config_get("plugin:cgroups", "run script to rename cgroups matching",
-                    " !/ "
-                    " !*.mount "
-                    " !*.socket "
-                    " !*.partition "
-                    " /machine.slice/*.service "          // #3367 systemd-nspawn
-                    " !*.service "
-                    " !*.slice "
-                    " !*.swap "
-                    " !*.user "
-                    " !init.scope "
-                    " !*.scope/vcpu* "                    // libvirtd adds these sub-cgroups
-                    " !*.scope/emulator "                 // libvirtd adds these sub-cgroups
-                    " *.scope "
-                    " *docker* "
-                    " *lxc* "
-                    " *qemu* "
-                    " */kubepods/pod*/* "                   // k8s containers
-                    " */kubepods/*/pod*/* "                 // k8s containers
-                    " */*-kubepods-pod*/* "                 // k8s containers
-                    " */*-kubepods-*-pod*/* "               // k8s containers
-                    " !*kubepods* !*kubelet* "              // all other k8s cgroups
-                    " *.libvirt-qemu "                    // #3010
-                    " * "
-            ), NULL, SIMPLE_PATTERN_EXACT);
+                       " !/ "
+                       " !*.mount "
+                       " !*.socket "
+                       " !*.partition "
+                       " /machine.slice/*.service "          // #3367 systemd-nspawn
+                       " !*.service "
+                       " !*.slice "
+                       " !*.swap "
+                       " !*.user "
+                       " !init.scope "
+                       " !*.scope/vcpu* "                    // libvirtd adds these sub-cgroups
+                       " !*.scope/emulator "                 // libvirtd adds these sub-cgroups
+                       " *.scope "
+                       " *docker* "
+                       " *lxc* "
+                       " *qemu* "
+                       " */kubepods/pod*/* "                   // k8s containers
+                       " */kubepods/*/pod*/* "                 // k8s containers
+                       " */*-kubepods-pod*/* "                 // k8s containers
+                       " */*-kubepods-*-pod*/* "               // k8s containers
+                       " !*kubepods* !*kubelet* "              // all other k8s cgroups
+                       " *.libvirt-qemu "                    // #3010
+                       " * "
+            ), NULL, SIMPLE_PATTERN_EXACT, true);
 
     if(cgroup_enable_systemd_services) {
         systemd_services_cgroups = simple_pattern_create(
                 config_get("plugin:cgroups", "cgroups to match as systemd services",
-                        " !/system.slice/*/*.service "
-                        " /system.slice/*.service "
-                ), NULL, SIMPLE_PATTERN_EXACT);
+                           " !/system.slice/*/*.service "
+                           " /system.slice/*.service "
+                ), NULL, SIMPLE_PATTERN_EXACT, true);
     }
 
     mountinfo_free_all(root);
@@ -1769,13 +1769,13 @@ static inline void substitute_dots_in_id(char *s) {
 // ----------------------------------------------------------------------------
 // parse k8s labels
 
-char *k8s_parse_resolved_name_and_labels(DICTIONARY *labels, char *data) {
+char *cgroup_parse_resolved_name_and_labels(DICTIONARY *labels, char *data) {
     // the first word, up to the first space is the name
-    char *name = mystrsep(&data, " ");
+    char *name = strsep_skip_consecutive_separators(&data, " ");
 
     // the rest are key=value pairs separated by comma
     while(data) {
-        char *pair = mystrsep(&data, ",");
+        char *pair = strsep_skip_consecutive_separators(&data, ",");
         rrdlabels_add_pair(labels, pair, RRDLABEL_SRC_AUTO| RRDLABEL_SRC_K8S);
     }
 
@@ -1898,19 +1898,21 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
             break;
     }
 
-    if(cg->pending_renames || cg->processed) return;
-    if(!new_name || !*new_name || *new_name == '\n') return;
-    if(!(new_name = trim(new_name))) return;
+    if (cg->pending_renames || cg->processed)
+        return;
+    if (!new_name || !*new_name || *new_name == '\n')
+        return;
+    if (!(new_name = trim(new_name)))
+        return;
 
     char *name = new_name;
-    if (!strncmp(new_name, "k8s_", 4)) {
-        if(!cg->chart_labels) cg->chart_labels = rrdlabels_create();
 
-        // read the new labels and remove the obsolete ones
-        rrdlabels_unmark_all(cg->chart_labels);
-        name = k8s_parse_resolved_name_and_labels(cg->chart_labels, new_name);
-        rrdlabels_remove_all_unmarked(cg->chart_labels);
-    }
+    if (!cg->chart_labels)
+        cg->chart_labels = rrdlabels_create();
+    // read the new labels and remove the obsolete ones
+    rrdlabels_unmark_all(cg->chart_labels);
+    name = cgroup_parse_resolved_name_and_labels(cg->chart_labels, new_name);
+    rrdlabels_remove_all_unmarked(cg->chart_labels);
 
     freez(cg->chart_title);
     cg->chart_title = cgroup_title_strdupz(name);
@@ -1950,7 +1952,7 @@ static void is_cgroup_procs_exist(netdata_ebpf_cgroup_shm_body_t *out, char *id)
 }
 
 static inline void convert_cgroup_to_systemd_service(struct cgroup *cg) {
-    char buffer[CGROUP_CHARTID_LINE_MAX];
+    char buffer[CGROUP_CHARTID_LINE_MAX + 1];
     cg->options |= CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE;
     strncpyz(buffer, cg->id, CGROUP_CHARTID_LINE_MAX);
     char *s = buffer;
@@ -2605,7 +2607,7 @@ static inline void discovery_process_first_time_seen_cgroup(struct cgroup *cg) {
     }
     cg->first_time_seen = 0;
 
-    char comm[TASK_COMM_LEN];
+    char comm[TASK_COMM_LEN + 1];
 
     if (cg->container_orchestrator == CGROUPS_ORCHESTRATOR_UNSET) {
         if (strstr(cg->id, "kubepods")) {
@@ -2713,6 +2715,16 @@ static inline void discovery_process_cgroup(struct cgroup *cg) {
         return;
     }
 
+    if (!cg->chart_labels)
+        cg->chart_labels = rrdlabels_create();
+
+    if (!k8s_is_kubepod(cg)) {
+        rrdlabels_add(cg->chart_labels, "cgroup_name", cg->chart_id, RRDLABEL_SRC_AUTO);
+        if (!dictionary_get(cg->chart_labels, "image")) {
+            rrdlabels_add(cg->chart_labels, "image", "", RRDLABEL_SRC_AUTO);
+        }
+    }
+
     worker_is_busy(WORKER_DISCOVERY_PROCESS_NETWORK);
     read_cgroup_network_interfaces(cg);
 }
@@ -2784,10 +2796,10 @@ void cgroup_discovery_worker(void *ptr)
     worker_register_job_name(WORKER_DISCOVERY_LOCK,               "lock");
 
     entrypoint_parent_process_comm = simple_pattern_create(
-        " runc:[* " // http://terenceli.github.io/%E6%8A%80%E6%9C%AF/2021/12/28/runc-internals-3)
-        " exe ", // https://github.com/falcosecurity/falco/blob/9d41b0a151b83693929d3a9c84f7c5c85d070d3a/rules/falco_rules.yaml#L1961
-        NULL,
-        SIMPLE_PATTERN_EXACT);
+            " runc:[* " // http://terenceli.github.io/%E6%8A%80%E6%9C%AF/2021/12/28/runc-internals-3)
+            " exe ", // https://github.com/falcosecurity/falco/blob/9d41b0a151b83693929d3a9c84f7c5c85d070d3a/rules/falco_rules.yaml#L1961
+            NULL,
+            SIMPLE_PATTERN_EXACT, true);
 
     while (service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
@@ -3676,7 +3688,10 @@ void update_cgroup_charts(int update_every) {
 
         if(likely(cg->cpuacct_stat.updated && cg->cpuacct_stat.enabled == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_cpu)) {
-                snprintfz(title, CHART_TITLE_MAX, "CPU Usage (100%% = 1 core)");
+                snprintfz(
+                    title,
+                    CHART_TITLE_MAX,
+                    k8s_is_kubepod(cg) ? "CPU Usage (100%% = 1000 mCPU)" : "CPU Usage (100%% = 1 core)");
 
                 cg->st_cpu = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3879,7 +3894,11 @@ void update_cgroup_charts(int update_every) {
             unsigned int i;
 
             if(unlikely(!cg->st_cpu_per_core)) {
-                snprintfz(title, CHART_TITLE_MAX, "CPU Usage (100%% = 1 core) Per Core");
+                snprintfz(
+                    title,
+                    CHART_TITLE_MAX,
+                    k8s_is_kubepod(cg) ? "CPU Usage (100%% = 1000 mCPU) Per Core" :
+                                         "CPU Usage (100%% = 1 core) Per Core");
 
                 cg->st_cpu_per_core = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -4771,6 +4790,7 @@ static void cgroup_main_cleanup(void *ptr) {
     }
 
     if (shm_cgroup_ebpf.header) {
+        shm_cgroup_ebpf.header->cgroup_root_count = 0;
         munmap(shm_cgroup_ebpf.header, shm_cgroup_ebpf.header->body_length);
     }
 

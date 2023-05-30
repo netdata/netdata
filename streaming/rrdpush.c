@@ -190,8 +190,8 @@ static inline bool should_send_chart_matching(RRDSET *st, RRDSET_FLAGS flags) {
             else
                 rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_IGNORE);
         }
-        else if(simple_pattern_matches(host->rrdpush_send_charts_matching, rrdset_id(st)) ||
-            simple_pattern_matches(host->rrdpush_send_charts_matching, rrdset_name(st)))
+        else if(simple_pattern_matches_string(host->rrdpush_send_charts_matching, st->id) ||
+            simple_pattern_matches_string(host->rrdpush_send_charts_matching, st->name))
 
             rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_SEND);
         else
@@ -321,9 +321,11 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
                        (unsigned long long)db_last_time_t,
                        (unsigned long long)now);
 
-        rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
-        rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
-        rrdhost_sender_replicating_charts_plus_one(st->rrdhost);
+        if(!rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS)) {
+            rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
+            rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+            rrdhost_sender_replicating_charts_plus_one(st->rrdhost);
+        }
         replication_progress = true;
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
@@ -723,7 +725,7 @@ int rrdpush_receiver_too_busy_now(struct web_client *w) {
 }
 
 void *rrdpush_receiver_thread(void *ptr);
-int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
+int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_string) {
 
     if(!service_running(ABILITY_STREAMING_CONNECTIONS))
         return rrdpush_receiver_too_busy_now(w);
@@ -755,11 +757,11 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
 
     // parse the parameters and fill rpt and rpt->system_info
 
-    while(url) {
-        char *value = mystrsep(&url, "&");
+    while(decoded_query_string) {
+        char *value = strsep_skip_consecutive_separators(&decoded_query_string, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -941,7 +943,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     {
         SIMPLE_PATTERN *key_allow_from = simple_pattern_create(
                 appconfig_get(&stream_config, rpt->key, "allow from", "*"),
-                NULL, SIMPLE_PATTERN_EXACT);
+                NULL, SIMPLE_PATTERN_EXACT, true);
 
         if(key_allow_from) {
             if(!simple_pattern_matches(key_allow_from, w->client_ip)) {
@@ -988,7 +990,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     {
         SIMPLE_PATTERN *machine_allow_from = simple_pattern_create(
                 appconfig_get(&stream_config, rpt->machine_guid, "allow from", "*"),
-                NULL, SIMPLE_PATTERN_EXACT);
+                NULL, SIMPLE_PATTERN_EXACT, true);
 
         if(machine_allow_from) {
             if(!simple_pattern_matches(machine_allow_from, w->client_ip)) {

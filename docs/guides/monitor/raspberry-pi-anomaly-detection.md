@@ -1,12 +1,6 @@
-<!--
-title: "Unsupervised anomaly detection for Raspberry Pi monitoring"
-sidebar_label: "Unsupervised anomaly detection for Raspberry Pi monitoring"
-description: "Use a low-overhead machine learning algorithm and an open-source monitoring tool to detect anomalous metrics on a Raspberry Pi."
-image: /img/seo/guides/monitor/raspberry-pi-anomaly-detection.png
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/raspberry-pi-anomaly-detection.md
-learn_status: "Published"
-learn_rel_path: "Miscellaneous"
--->
+# Anomaly detection for RPi monitoring
+
+Learn how to use a low-overhead machine learning algorithm alongside Netdata to detect anomalous metrics on a Raspberry Pi.
 
 We love IoT and edge at Netdata, we also love machine learning. Even better if we can combine the two to ease the pain
 of monitoring increasingly complex systems.
@@ -63,7 +57,6 @@ Now you're ready to enable the collector and [restart Netdata](https://github.co
 
 ```bash
 sudo ./edit-config python.d.conf
-# set `anomalies: no` to `anomalies: yes`
 
 # restart netdata
 sudo systemctl restart netdata

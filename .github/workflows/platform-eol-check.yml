@@ -1,0 +1,153 @@
+---
+# Auto-generate issues for EOL of platforms that are approaching their EOL date.
+# Uses https://endoflife.date and their new API to check for EOL dates.
+#
+# Issues are created when the EOL date is within the next 30 days.
+name: Check Platform EOL
+on:  # Run weekly and whenever manually triggered
+  schedule:
+    - cron: '0 3 * * 1'
+  workflow_dispatch: null
+concurrency:  # Simple single-instance concurrency.
+  group: eol-check-${{ github.repository }}
+  cancel-in-progress: true
+jobs:
+  # Prepare the build matrix.
+  # This uses output from .github/scripts/gen-matrix-eol-check.py
+  matrix:
+    name: Prepare Build Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v3
+      - name: Prepare tools
+        id: prepare
+        run: |
+          sudo apt-get update && sudo apt-get install -y python3-ruamel.yaml
+      - name: Read build matrix
+        id: set-matrix
+        run: |
+          matrix="$(.github/scripts/gen-matrix-eol-check.py)"
+          echo "Generated matrix: ${matrix}"
+          echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Failed to generate build matrix for platform EOL checks:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Build matrix generation for scheduled platform EOL check has failed:
+              Checkout: ${{ steps.checkout.outcome }}
+              Prepare Tools: ${{ steps.prepare.outcome }}
+              Read Build Matrix: ${{ steps.set-matrix.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name == 'schedule'
+            && github.repository == 'netdata/netdata'
+          }}
+
+  eol-check:
+    name: EOL Check
+    runs-on: ubuntu-latest
+    needs:
+      - matrix
+    strategy:
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
+      fail-fast: false  # We want to check everything, so don’t bail on the first failure.
+      max-parallel: 2  # Cap of two jobs at a time to limit impact on other CI.
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v3
+      # Actually check the EOL date for the platform.
+      - name: Check EOL Date
+        id: check
+        shell: sh {0}
+        run: |
+          d="$(.github/scripts/platform-impending-eol.py ${{ matrix.distro }} ${{ matrix.release }})"
+          case $? in
+            0) echo "pending=false" >> "${GITHUB_OUTPUT}" ;;
+            1)
+              echo "pending=true" >> "${GITHUB_OUTPUT}"
+              echo "date=${d}" >> "${GITHUB_OUTPUT}"
+              ;;
+            2)
+              echo "pending=false" >> "${GITHUB_OUTPUT}"
+              echo "::info::No EOL information found for ${{ matrix.full_name }}"
+              ;;
+            *)
+              echo "::error::Failed to check EOL date for ${{ matrix.full_name }}"
+              exit 1
+              ;;
+          esac
+      # Figure out the issue title.
+      # This is it’s own step so we only have to set it in one place.
+      - name: Determine Issue Title
+        id: title
+        if: steps.check.outputs.pending == 'true'
+        run: |
+          echo "title=[Platform EOL]: ${{ matrix.full_name }} will be EOL soon." >> "${GITHUB_OUTPUT}"
+      # Check if there is an existing issue in the repo for the platform EOL.
+      # The actual command line to make the check is unfortunately
+      # complicated because GitHub thinks that it’s sensible to exit
+      # with a status of 0 if there are no results for a search.
+      - name: Check for Existing Issue
+        id: existing
+        if: steps.check.outputs.pending == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          count=$(gh issue list -R netdata/netdata -s all -S '${{ steps.title.outputs.title }} in:title' --json 'id' -q '. | length')
+          if [ "${count}" -ge 1 ]; then
+            echo 'exists=true' >> "${GITHUB_OUTPUT}"
+          else
+            echo 'exists=false' >> "${GITHUB_OUTPUT}"
+          fi
+      # If the platform is near EOL and there is no existing issue, create one.
+      - name: Create EOL Issue
+        id: create-issue
+        if: steps.check.outputs.pending == 'true' && steps.existing.outputs.exists == 'false'
+        uses: imjohnbo/issue-bot@v3
+        with:
+          assignees: Ferroin, tkatsoulas
+          labels: area/packaging, needs triage
+          title: ${{ steps.title.outputs.title }}
+          body: |
+            Based on information from https://endoflife.date/${{ matrix.distro }}, upstream support for ${{ matrix.full_name }} will be ending on ${{ steps.check.outputs.date }}. A PR should be created to remove this platform from our platform support document, CI, and packaging code.
+
+            - [ ] Remove platform from `packaging/PLATFORM_SUPPORT.md`
+            - [ ] Remove platform from `.github/data/distros.yml`
+            - [ ] Remove platform package builder from helper-images repo (if applicable).
+            - [ ] Verify any other platform support code that needs to be cleaned up.
+      # Send a notification to Slack if a job failed.
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Platform EOL check failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: A scheduled check for the EOL status of ${{ matrix.full_name }} has failed.
+              Checkout: ${{ steps.checkout.outcome }}
+              Check EOL Status: ${{ steps.check.outcome }}
+              Generate Issue Title: ${{ steps.title.outcome }}
+              Check for Existing Issue: ${{ steps.existing.outcome }}
+              Create Issue: ${{ steps.create-issue.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name == 'schedule'
+            && github.repository == 'netdata/netdata'
+          }}

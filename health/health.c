@@ -347,6 +347,15 @@ static void health_reload_host(RRDHOST *host) {
         rrdcalctemplate_link_matching_templates_to_rrdset(st);
     }
     rrdset_foreach_done(st);
+
+#ifdef ENABLE_ACLK
+    if (netdata_cloud_setting) {
+        struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *)host->aclk_sync_host_config;
+        if (likely(wc)) {
+            wc->alert_queue_removed = SEND_REMOVED_AFTER_HEALTH_LOOPS;
+        }
+    }
+#endif
 }
 
 /**
@@ -357,19 +366,11 @@ static void health_reload_host(RRDHOST *host) {
 void health_reload(void) {
     sql_refresh_hashes();
 
-    rrd_rdlock();
-
     RRDHOST *host;
-    rrdhost_foreach_read(host)
+    dfe_start_reentrant(rrdhost_root_index, host){
         health_reload_host(host);
-
-    rrd_unlock();
-
-#ifdef ENABLE_ACLK
-    if (netdata_cloud_setting) {
-        aclk_alert_reloaded = 1;
     }
-#endif
+    dfe_done(host);
 }
 
 // ----------------------------------------------------------------------------
@@ -411,17 +412,13 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     // find the previous notification for the same alarm
     // which we have run the exec script
     // exception: alarms with HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION set
+    RRDCALC_STATUS last_executed_status = -3;
     if(likely(!(ae->flags & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION))) {
-        uint32_t id = ae->alarm_id;
-        ALARM_ENTRY *t;
-        for(t = ae->next; t ; t = t->next) {
-            if(t->alarm_id == id && t->flags & HEALTH_ENTRY_FLAG_EXEC_RUN)
-                break;
-        }
+        int ret = sql_health_get_last_executed_event(host, ae, &last_executed_status);
 
-        if(likely(t)) {
+        if (likely(ret == 1)) {
             // we have executed this alarm notification in the past
-            if(t && t->new_status == ae->new_status) {
+            if(last_executed_status == ae->new_status) {
                 // don't send the notification for the same status again
                 debug(D_HEALTH, "Health not sending again notification for alarm '%s.%s' status %s", ae_chart_name(ae), ae_name(ae)
                       , rrdcalc_status2string(ae->new_status));
@@ -560,6 +557,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
         ae->flags |= HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
         ae->exec_spawn_serial = spawn_enq_cmd(command_to_run);
         enqueue_alarm_notify_in_progress(ae);
+        health_alarm_log_save(host, ae);
     } else {
         error("Failed to format command arguments");
     }
@@ -627,35 +625,32 @@ static inline void health_alarm_log_process(RRDHOST *host) {
     // remember this for the next iteration
     host->health_last_processed_id = first_waiting;
 
-    bool cleanup_excess_log_entries = host->health_log.count > host->health_log.max;
-
-    if (!cleanup_excess_log_entries)
-        return;
-
-    // cleanup excess entries in the log
+    //delete those that are updated, no in progress execution, and is not repeating
     netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
 
-    ALARM_ENTRY *last = NULL;
-    unsigned int count = host->health_log.max * 2 / 3;
-    for(ae = host->health_log.alarms; ae && count ; count--, last = ae, ae = ae->next) ;
+    ALARM_ENTRY *prev = host->health_log.alarms;
+    for(ae = host->health_log.alarms; ae ; ae = ae->next) {
 
-    if(ae && last && last->next == ae)
-        last->next = NULL;
-    else
-        ae = NULL;
+        if((likely(!(ae->flags & HEALTH_ENTRY_FLAG_IS_REPEATING)) &&
+           (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) &&
+           (ae->flags & HEALTH_ENTRY_FLAG_SAVED) &&
+           !(ae->flags & HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS))
+            ||
+           ((ae->new_status == RRDCALC_STATUS_REMOVED) &&
+           (ae->flags & HEALTH_ENTRY_FLAG_SAVED) &&
+           (ae->when + 3600 < now_realtime_sec())))
+            {
 
-    while(ae) {
-        debug(D_HEALTH, "Health removing alarm log entry with id: %u", ae->unique_id);
-
-        ALARM_ENTRY *t = ae->next;
-
-        if(likely(!(ae->flags & HEALTH_ENTRY_FLAG_IS_REPEATING))) {
-            health_alarm_wait_for_execution(ae);
+            if (ae == host->health_log.alarms) {
+                host->health_log.alarms = ae->next;
+                prev = ae->next;
+            } else {
+                prev->next = ae->next;
+            }
             health_alarm_log_free_one_nochecks_nounlink(ae);
-            host->health_log.count--;
-        }
-
-        ae = t;
+            ae = prev;
+        } else
+            prev = ae;
     }
 
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
@@ -753,7 +748,8 @@ static void health_main_cleanup(void *ptr) {
     log_health("Health thread ended.");
 }
 
-static void initialize_health(RRDHOST *host, int is_localhost) {
+static void initialize_health(RRDHOST *host)
+{
     if(!host->health.health_enabled ||
         rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH) ||
         !service_running(SERVICE_HEALTH))
@@ -780,24 +776,12 @@ static void initialize_health(RRDHOST *host, int is_localhost) {
     else
         host->health_log.max = (unsigned int)n;
 
-    conf_enabled_alarms = simple_pattern_create(config_get(CONFIG_SECTION_HEALTH, "enabled alarms", "*"), NULL, SIMPLE_PATTERN_EXACT);
+    conf_enabled_alarms = simple_pattern_create(config_get(CONFIG_SECTION_HEALTH, "enabled alarms", "*"), NULL,
+                                                SIMPLE_PATTERN_EXACT, true);
 
     netdata_rwlock_init(&host->health_log.alarm_log_rwlock);
 
     char filename[FILENAME_MAX + 1];
-
-    if(!is_localhost) {
-        int r = mkdir(host->varlib_dir, 0775);
-        if (r != 0 && errno != EEXIST)
-            error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), host->varlib_dir);
-    }
-
-    {
-        snprintfz(filename, FILENAME_MAX, "%s/health", host->varlib_dir);
-        int r = mkdir(filename, 0775);
-        if(r != 0 && errno != EEXIST)
-            error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), filename);
-    }
 
     snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
     host->health.health_default_exec = string_strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
@@ -815,7 +799,7 @@ static void initialize_health(RRDHOST *host, int is_localhost) {
 
     // link the loaded alarms to their charts
     RRDSET *st;
-    rrdset_foreach_write(st, host) {
+    rrdset_foreach_reentrant(st, host) {
         if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))
             continue;
 
@@ -850,11 +834,11 @@ static SILENCE_TYPE check_silenced(RRDCALC *rc, const char *host, SILENCERS *sil
 
     for (s = silencers->silencers; s!=NULL; s=s->next){
         if (
-                (!s->alarms_pattern || (rc->name && s->alarms_pattern && simple_pattern_matches(s->alarms_pattern, rrdcalc_name(rc)))) &&
-                (!s->contexts_pattern || (rc->rrdset && rc->rrdset->context && s->contexts_pattern && simple_pattern_matches(s->contexts_pattern, rrdset_context(rc->rrdset)))) &&
-                (!s->hosts_pattern || (host && s->hosts_pattern && simple_pattern_matches(s->hosts_pattern,host))) &&
-                (!s->charts_pattern || (rc->chart && s->charts_pattern && simple_pattern_matches(s->charts_pattern, rrdcalc_chart_name(rc)))) &&
-                (!s->families_pattern || (rc->rrdset && rc->rrdset->family && s->families_pattern && simple_pattern_matches(s->families_pattern, rrdset_family(rc->rrdset))))
+                (!s->alarms_pattern || (rc->name && s->alarms_pattern && simple_pattern_matches_string(s->alarms_pattern, rc->name))) &&
+                (!s->contexts_pattern || (rc->rrdset && rc->rrdset->context && s->contexts_pattern && simple_pattern_matches_string(s->contexts_pattern, rc->rrdset->context))) &&
+                (!s->hosts_pattern || (host && s->hosts_pattern && simple_pattern_matches(s->hosts_pattern, host))) &&
+                (!s->charts_pattern || (rc->chart && s->charts_pattern && simple_pattern_matches_string(s->charts_pattern, rc->chart))) &&
+                (!s->families_pattern || (rc->rrdset && rc->rrdset->family && s->families_pattern && simple_pattern_matches_string(s->families_pattern, rc->rrdset->family)))
                 ) {
             debug(D_HEALTH, "Alarm matches command API silence entry %s:%s:%s:%s:%s", s->alarms,s->charts, s->contexts, s->hosts, s->families);
             if (unlikely(silencers->stype == STYPE_NONE)) {
@@ -914,8 +898,24 @@ static int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
         return 0;
 }
 
+static void sql_health_postpone_queue_removed(RRDHOST *host __maybe_unused) {
+#ifdef ENABLE_ACLK
+    if (netdata_cloud_setting) {
+        struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *)host->aclk_sync_host_config;
+        if (unlikely(!wc)) {
+            return;
+        }
+
+        if (wc->alert_queue_removed >= 1) {
+            wc->alert_queue_removed+=6;
+        }
+    }
+#endif
+}
+
 static void health_execute_delayed_initializations(RRDHOST *host) {
     RRDSET *st;
+    bool must_postpone = false;
 
     if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION)) return;
     rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
@@ -951,8 +951,11 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
                 rrdvar_store_for_chart(host, st);
         }
         rrddim_foreach_done(rd);
+        must_postpone = true;
     }
     rrdset_foreach_done(st);
+    if (must_postpone)
+        sql_health_postpone_queue_removed(host);
 }
 
 /**
@@ -990,9 +993,7 @@ void *health_main(void *ptr) {
     rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts();
 
     unsigned int loop = 0;
-#ifdef ENABLE_ACLK
-    unsigned int marked_aclk_reload_loop = 0;
-#endif
+
     while(service_running(SERVICE_HEALTH)) {
         loop++;
         debug(D_HEALTH, "Health monitoring iteration no %u started", loop);
@@ -1021,15 +1022,8 @@ void *health_main(void *ptr) {
             }
         }
 
-#ifdef ENABLE_ACLK
-        if (aclk_alert_reloaded && !marked_aclk_reload_loop)
-            marked_aclk_reload_loop = loop;
-#endif
-
         worker_is_busy(WORKER_HEALTH_JOB_RRD_LOCK);
-        rrd_rdlock();
-
-        rrdhost_foreach_read(host) {
+        dfe_start_reentrant(rrdhost_root_index, host) {
 
             if(unlikely(!service_running(SERVICE_HEALTH)))
                 break;
@@ -1037,11 +1031,8 @@ void *health_main(void *ptr) {
             if (unlikely(!host->health.health_enabled))
                 continue;
 
-            if (unlikely(!rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH))) {
-                rrd_unlock();
-                initialize_health(host, host == localhost);
-                rrd_rdlock();
-            }
+            if (unlikely(!rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)))
+                initialize_health(host);
 
             health_execute_delayed_initializations(host);
 
@@ -1135,7 +1126,7 @@ void *health_main(void *ptr) {
                             rc->value = NAN;
 
 #ifdef ENABLE_ACLK
-                            if (netdata_cloud_setting && likely(!aclk_alert_reloaded))
+                            if (netdata_cloud_setting)
                                 sql_queue_alarm_to_aclk(host, ae, 1);
 #endif
                         }
@@ -1506,9 +1497,28 @@ void *health_main(void *ptr) {
                 }
                 break;
             }
-        } //for each host
+#ifdef ENABLE_ACLK
+            if (netdata_cloud_setting) {
+                struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *)host->aclk_sync_host_config;
+                if (unlikely(!wc)) {
+                    continue;
+                }
 
-        rrd_unlock();
+                if (wc->alert_queue_removed == 1) {
+                    sql_queue_removed_alerts_to_aclk(host);
+                } else if (wc->alert_queue_removed > 1) {
+                    wc->alert_queue_removed--;
+                }
+
+                if (wc->alert_checkpoint_req == 1) {
+                    aclk_push_alarm_checkpoint(host);
+                } else if (wc->alert_checkpoint_req > 1) {
+                    wc->alert_checkpoint_req--;
+                }
+            }
+#endif
+        }
+        dfe_done(host);
 
         // wait for all notifications to finish before allowing health to be cleaned up
         ALARM_ENTRY *ae;
@@ -1518,22 +1528,6 @@ void *health_main(void *ptr) {
 
             health_alarm_wait_for_execution(ae);
         }
-
-#ifdef ENABLE_ACLK
-        if (netdata_cloud_setting && unlikely(aclk_alert_reloaded) && loop > (marked_aclk_reload_loop + 2)) {
-            rrdhost_foreach_read(host) {
-                if(unlikely(!service_running(SERVICE_HEALTH)))
-                    break;
-
-                if (unlikely(!host->health.health_enabled))
-                    continue;
-
-                sql_queue_removed_alerts_to_aclk(host);
-            }
-            aclk_alert_reloaded = 0;
-            marked_aclk_reload_loop = 0;
-        }
-#endif
 
         if(unlikely(!service_running(SERVICE_HEALTH)))
             break;

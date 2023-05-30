@@ -1,15 +1,8 @@
-<!--
-title: "LAMP stack monitoring (Linux, Apache, MySQL, PHP) with Netdata"
-sidebar_label: "LAMP stack monitoring (Linux, Apache, MySQL, PHP) with Netdata"
-description: "Set up robust LAMP stack monitoring (Linux, Apache, MySQL, PHP) in just a few minutes using a free, open-source monitoring tool that collects metrics every second."
-image: /img/seo/guides/monitor/lamp-stack.png
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/lamp-stack.md
-learn_status: "Published"
-learn_rel_path: "Miscellaneous"
--->
 import { OneLineInstallWget } from '@site/src/components/OneLineInstall/'
 
-# LAMP stack monitoring (Linux, Apache, MySQL, PHP) with Netdata
+# LAMP stack monitoring with Netdata
+
+Set up robust LAMP stack monitoring (Linux, Apache, MySQL, PHP) in a few minutes using Netdata.
 
 The LAMP stack is the "hello world" for deploying dynamic web applications. It's fast, flexible, and reliable, which
 means a developer or sysadmin won't go far in their career without interacting with the stack and its services.
@@ -171,10 +164,9 @@ If the Netdata Agent isn't already open in your browser, open a new tab and navi
 Netdata automatically organizes all metrics and charts onto a single page for easy navigation. Peek at gauges to see
 overall system performance, then scroll down to see more. Click-and-drag with your mouse to pan _all_ charts back and
 forth through different time intervals, or hold `SHIFT` and use the scrollwheel (or two-finger scroll) to zoom in and
-out. Check out our doc on [interacting with charts](https://github.com/netdata/netdata/blob/master/docs/visualize/interact-dashboards-charts.md) for all the details.
+out. Check out our doc on [interacting with charts](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md) for all the details.
 
-![The Netdata
-dashboard](https://user-images.githubusercontent.com/1153921/109520555-98e17800-7a69-11eb-86ec-16f689da4527.png)
+![The Netdata dashboard](https://user-images.githubusercontent.com/1153921/109520555-98e17800-7a69-11eb-86ec-16f689da4527.png)
 
 The **System Overview** section, which you can also see in the right-hand menu, contains key hardware monitoring charts,
 including CPU utilization, memory page faults, network monitoring, and much more. The **Applications** section shows you
@@ -211,7 +203,7 @@ shows any alarms currently triggered, while the **All** tab displays a list of _
 ![An example of LAMP stack
 alarms](https://user-images.githubusercontent.com/1153921/109524120-5883f900-7a6d-11eb-830e-0e7baaa28163.png)
 
-[Tweak alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) based on your infrastructure monitoring needs, and to see these alarms
+[Tweak alarms](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) based on your infrastructure monitoring needs, and to see these alarms
 in other places, like your inbox or a Slack channel, [enable a notification
 method](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md).
 

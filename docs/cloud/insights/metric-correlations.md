@@ -8,6 +8,8 @@ learn_topic_type: "Tasks"
 learn_rel_path: "Operations"
 -->
 
+# Metric Correlations
+
 The Metric Correlations (MC) feature lets you quickly find metrics and charts related to a particular window of interest that you want to explore further. By displaying the standard Netdata dashboard, filtered to show only charts that are relevant to the window of interest, you can get to the root cause sooner.
 
 Because Metric Correlations uses every available metric from your infrastructure, with as high as 1-second granularity, you get the most accurate insights using every possible metric.
@@ -51,9 +53,9 @@ Behind the scenes, Netdata will aggregate the raw data as needed such that arbit
 
 ### Data
 
-Netdata is different from typical observability agents since, in addition to just collecting raw metric values, it will by default also assign an "[Anomaly Bit](/docs/agent/ml#anomaly-bit)" related to each collected metric each second. This bit will be 0 for "normal" and 1 for "anomalous". This means that each metric also natively has an "[Anomaly Rate](/docs/agent/ml#anomaly-rate)" associated with it and, as such, MC can be run against the raw metric values or their corresponding anomaly rates.
+Netdata is different from typical observability agents since, in addition to just collecting raw metric values, it will by default also assign an "[Anomaly Bit](https://github.com/netdata/netdata/tree/master/ml#anomaly-bit---100--anomalous-0--normal)" related to each collected metric each second. This bit will be 0 for "normal" and 1 for "anomalous". This means that each metric also natively has an "[Anomaly Rate](https://github.com/netdata/netdata/tree/master/ml#anomaly-rate---averageanomaly-bit)" associated with it and, as such, MC can be run against the raw metric values or their corresponding anomaly rates.
 
-**Note**: Read more [here](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/anomaly-detection.md) to learn more about the native anomaly detection features within netdata.
+**Note**: Read more [here](https://github.com/netdata/netdata/blob/master/ml/README.md) to learn more about the native anomaly detection features within netdata.
 
 - `Metrics` - Run MC on the raw metric values.
 - `Anomaly Rate` - Run MC on the corresponding anomaly rate for each metric.
@@ -72,7 +74,7 @@ Should you still want to, disabling nodes for Metric Correlation on the agent is
 
 ## Usage tips!
 
-- When running Metric Correlations from the [Overview tab](https://learn.netdata.cloud/docs/cloud/visualize/overview#overview) across multiple nodes, you might find better results if you iterate on the initial results by grouping by node to then filter to nodes of interest and run the Metric Correlations again. So a typical workflow in this case would be to:
+- When running Metric Correlations from the [Overview tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md#overview-and-single-node-view) across multiple nodes, you might find better results if you iterate on the initial results by grouping by node to then filter to nodes of interest and run the Metric Correlations again. So a typical workflow in this case would be to:
   - If unsure which nodes you are interested in then run MC on all nodes. 
   - Within the initial results returned group the most interesting chart by node to see if the changes are across all nodes or a subset of nodes.
   - If you see a subset of nodes clearly jump out when you group by node, then filter for just those nodes of interest and run the MC again. This will result in less aggregation needing to be done by Netdata and so should help give clearer results as you interact with the slider.
@@ -81,7 +83,3 @@ Should you still want to, disabling nodes for Metric Correlation on the agent is
   - `Volume` might favour picking up more sparse metrics that were relatively flat and then came to life with some spikes (or vice versa). This is because for such metrics that just don't have that many different values in them, it is impossible to construct a cumulative distribution that can then be compared. So `Volume` might be useful in spotting examples of metrics turning on or off. ![example where volume captured network traffic turning on](https://user-images.githubusercontent.com/2178292/182336924-d02fd3d3-7f09-41da-9cfc-809d01396d9d.png)
   - `KS2` since it relies on the full distribution might be better at highlighting more complex changes that `Volume` is unable to capture. For example a change in the variation of a metric might be picked up easily by `KS2` but missed (or just much lower scored) by `Volume` since the averages might remain not all that different between baseline and highlight even if their variance has changed a lot. ![example where KS2 captured a change in entropy distribution that volume alone might not have picked up](https://user-images.githubusercontent.com/2178292/182338289-59b61e6b-089d-431c-bc8e-bd19ba6ad5a5.png)
 - Use `Volume` and `Anomaly Rate` together to ask what metrics have turned most anomalous from baseline to highlighted window. You can expand the embedded anomaly rate chart once you have results to see this more clearly. ![example where Volume and Anomaly Rate together help show what dimensions where most anomalous](https://user-images.githubusercontent.com/2178292/182338666-6d19fa92-89d3-4d61-804c-8f10982114f5.png)
-
-## What's next?
-
-You can read more about all the ML powered capabilities of Netdata [here](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/anomaly-detection.md). If you aren't yet familiar with the power of Netdata Cloud's visualization features, check out the [Nodes view](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md) and learn how to [build new dashboards](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md).

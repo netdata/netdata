@@ -1,0 +1,36 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+smartd_log.read_error_rate,,a dimension per device,value,Read Error Rate,line,,python.d.plugin,smartd_log
+smartd_log.seek_error_rate,,a dimension per device,value,Seek Error Rate,line,,python.d.plugin,smartd_log
+smartd_log.soft_read_error_rate,,a dimension per device,errors,Soft Read Error Rate,line,,python.d.plugin,smartd_log
+smartd_log.write_error_rate,,a dimension per device,value,Write Error Rate,line,,python.d.plugin,smartd_log
+smartd_log.read_total_err_corrected,,a dimension per device,errors,Read Error Corrected,line,,python.d.plugin,smartd_log
+smartd_log.read_total_unc_errors,,a dimension per device,errors,Read Error Uncorrected,line,,python.d.plugin,smartd_log
+smartd_log.write_total_err_corrected,,a dimension per device,errors,Write Error Corrected,line,,python.d.plugin,smartd_log
+smartd_log.write_total_unc_errors,,a dimension per device,errors,Write Error Uncorrected,line,,python.d.plugin,smartd_log
+smartd_log.verify_total_err_corrected,,a dimension per device,errors,Verify Error Corrected,line,,python.d.plugin,smartd_log
+smartd_log.verify_total_unc_errors,,a dimension per device,errors,Verify Error Uncorrected,line,,python.d.plugin,smartd_log
+smartd_log.sata_interface_downshift,,a dimension per device,events,SATA Interface Downshift,line,,python.d.plugin,smartd_log
+smartd_log.udma_crc_error_count,,a dimension per device,errors,UDMA CRC Error Count,line,,python.d.plugin,smartd_log
+smartd_log.throughput_performance,,a dimension per device,value,Throughput Performance,line,,python.d.plugin,smartd_log
+smartd_log.seek_time_performance,,a dimension per device,value,Seek Time Performance,line,,python.d.plugin,smartd_log
+smartd_log.start_stop_count,,a dimension per device,events,Start/Stop Count,line,,python.d.plugin,smartd_log
+smartd_log.power_on_hours_count,,a dimension per device,hours,Power-On Hours Count,line,,python.d.plugin,smartd_log
+smartd_log.power_cycle_count,,a dimension per device,events,Power Cycle Count,line,,python.d.plugin,smartd_log
+smartd_log.unexpected_power_loss,,a dimension per device,events,Unexpected Power Loss,line,,python.d.plugin,smartd_log
+smartd_log.spin_up_time,,a dimension per device,ms,Spin-Up Time,line,,python.d.plugin,smartd_log
+smartd_log.spin_up_retries,,a dimension per device,retries,Spin-up Retries,line,,python.d.plugin,smartd_log
+smartd_log.calibration_retries,,a dimension per device,retries,Calibration Retries,line,,python.d.plugin,smartd_log
+smartd_log.airflow_temperature_celsius,,a dimension per device,celsius,Airflow Temperature Celsius,line,,python.d.plugin,smartd_log
+smartd_log.temperature_celsius,,"a dimension per device",celsius,Temperature,line,,python.d.plugin,smartd_log
+smartd_log.reallocated_sectors_count,,a dimension per device,sectors,Reallocated Sectors Count,line,,python.d.plugin,smartd_log
+smartd_log.reserved_block_count,,a dimension per device,percentage,Reserved Block Count,line,,python.d.plugin,smartd_log
+smartd_log.program_fail_count,,a dimension per device,errors,Program Fail Count,line,,python.d.plugin,smartd_log
+smartd_log.erase_fail_count,,a dimension per device,failures,Erase Fail Count,line,,python.d.plugin,smartd_log
+smartd_log.wear_leveller_worst_case_erase_count,,a dimension per device,erases,Wear Leveller Worst Case Erase Count,line,,python.d.plugin,smartd_log
+smartd_log.unused_reserved_nand_blocks,,a dimension per device,blocks,Unused Reserved NAND Blocks,line,,python.d.plugin,smartd_log
+smartd_log.reallocation_event_count,,a dimension per device,events,Reallocation Event Count,line,,python.d.plugin,smartd_log
+smartd_log.current_pending_sector_count,,a dimension per device,sectors,Current Pending Sector Count,line,,python.d.plugin,smartd_log
+smartd_log.offline_uncorrectable_sector_count,,a dimension per device,sectors,Offline Uncorrectable Sector Count,line,,python.d.plugin,smartd_log
+smartd_log.percent_lifetime_used,,a dimension per device,percentage,Percent Lifetime Used,line,,python.d.plugin,smartd_log
+smartd_log.media_wearout_indicator,,a dimension per device,percentage,Media Wearout Indicator,line,,python.d.plugin,smartd_log
+smartd_log.nand_writes_1gib,,a dimension per device,GiB,NAND Writes,line,,python.d.plugin,smartd_log

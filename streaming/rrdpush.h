@@ -186,11 +186,16 @@ struct sender_state {
     } replication;
 
     struct {
+        bool pending_data;
         size_t buffer_used_percentage;          // the current utilization of the sending buffer
         usec_t last_flush_time_ut;              // the last time the sender flushed the sending buffer in USEC
         time_t last_buffer_recreate_s;          // true when the sender buffer should be re-created
     } atomic;
 };
+
+#define rrdpush_sender_pipe_has_pending_data(sender) __atomic_load_n(&(sender)->atomic.pending_data, __ATOMIC_RELAXED)
+#define rrdpush_sender_pipe_set_pending_data(sender) __atomic_store_n(&(sender)->atomic.pending_data, true, __ATOMIC_RELAXED)
+#define rrdpush_sender_pipe_clear_pending_data(sender) __atomic_store_n(&(sender)->atomic.pending_data, false, __ATOMIC_RELAXED)
 
 #define rrdpush_sender_last_buffer_recreate_get(sender) __atomic_load_n(&(sender)->atomic.last_buffer_recreate_s, __ATOMIC_RELAXED)
 #define rrdpush_sender_last_buffer_recreate_set(sender, value) __atomic_store_n(&(sender)->atomic.last_buffer_recreate_s, value, __ATOMIC_RELAXED)
@@ -326,7 +331,7 @@ void rrdpush_claimed_id(RRDHOST *host);
 #define THREAD_TAG_STREAM_RECEIVER "RCVR" // "[host]" is appended
 #define THREAD_TAG_STREAM_SENDER "SNDR" // "[host]" is appended
 
-int rrdpush_receiver_thread_spawn(struct web_client *w, char *url);
+int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_string);
 void rrdpush_sender_thread_stop(RRDHOST *host, const char *reason, bool wait);
 
 void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQUIRED *rva);

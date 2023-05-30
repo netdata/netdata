@@ -1,18 +1,7 @@
-<!--
-title: "Install Netdata on Kubernetes"
-description: "Deploy Netdata to monitor a Kubernetes cluster to monitor the health, performance, resource utilization, and application metrics of a Kubernetes cluster in real time."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/kubernetes.md"
-sidebar_label: "Install Netdata on Kubernetes"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Installation"
-sidebar_position: 60
--->
-
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Deploy Kubernetes monitoring with Netdata
+# Install Netdata on Kubernetes
 
 This document details how to install Netdata on an existing Kubernetes (k8s) cluster, and connect it to Netdata Cloud. Read our [Kubernetes visualizations](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md) documentation, to see what you will get.
 
@@ -56,9 +45,9 @@ The installation process securely connects your Kubernetes cluster to stream met
   helm install netdata netdata/netdata 
   ```
 
-  > :bookmark_tabs: Note
+  > ### Note
   >  
-  > If you plan to connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
+  > If you plan to connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's Nodes tab.
 
   For more installation options, please read our [Netdata Helm chart for Kubernetes](https://github.com/netdata/helmchart/blob/master/charts/netdata/README.md) reference.
 

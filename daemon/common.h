@@ -41,6 +41,11 @@
 // the netdata webserver(s)
 #include "web/server/web_server.h"
 
+// the new h2o based netdata webserver
+#ifdef ENABLE_HTTPD
+#include "httpd/http_server.h"
+#endif
+
 // streaming metrics between netdata servers
 #include "streaming/rrdpush.h"
 
@@ -58,7 +63,8 @@
 #include "exporting/exporting_engine.h"
 
 // the netdata API
-#include "web/api/web_api_v1.h"
+#include "web/server/web_client.h"
+#include "web/rtc/webrtc.h"
 
 // all data collection plugins
 #include "collectors/all.h"

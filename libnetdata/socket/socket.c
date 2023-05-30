@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE // for POLLRDHUP
+#endif
+
+#ifndef __BSD_VISIBLE
+#define __BSD_VISIBLE // for POLLRDHUP
+#endif
+
 #include "../libnetdata.h"
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -10,6 +18,46 @@
 #else
 #define LARGE_SOCK_SIZE 4096
 #endif
+
+bool fd_is_socket(int fd) {
+    int type;
+    socklen_t len = sizeof(type);
+    if (getsockopt(fd, SOL_SOCKET, SO_TYPE, &type, &len) == -1)
+        return false;
+
+    return true;
+}
+
+bool sock_has_output_error(int fd) {
+    if(fd < 0) {
+        //internal_error(true, "invalid socket %d", fd);
+        return false;
+    }
+
+//    if(!fd_is_socket(fd)) {
+//        //internal_error(true, "fd %d is not a socket", fd);
+//        return false;
+//    }
+
+    short int errors = POLLERR | POLLHUP | POLLNVAL;
+
+#ifdef POLLRDHUP
+    errors |= POLLRDHUP;
+#endif
+
+    struct pollfd pfd = {
+            .fd = fd,
+            .events = POLLOUT | errors,
+            .revents = 0,
+    };
+
+    if(poll(&pfd, 1, 0) == -1) {
+        //internal_error(true, "poll() failed");
+        return false;
+    }
+
+    return ((pfd.revents & errors) || !(pfd.revents & POLLOUT));
+}
 
 int sock_setnonblock(int fd) {
     int flags;
@@ -923,23 +971,17 @@ int connect_to_one_of_urls(const char *destination, int default_port, struct tim
 ssize_t netdata_ssl_read(SSL *ssl, void *buf, size_t num) {
     error_limit_static_thread_var(erl, 1, 0);
 
-    int bytes, err, retries = 0;
+    int bytes, err;
 
-    //do {
     bytes = SSL_read(ssl, buf, (int)num);
     err = SSL_get_error(ssl, bytes);
-    retries++;
-        //} while (bytes <= 0 && err == SSL_ERROR_WANT_READ);
 
     if(unlikely(bytes <= 0)) {
         if (err == SSL_ERROR_WANT_WRITE || err == SSL_ERROR_WANT_READ) {
             bytes = 0;
         } else
-            error("SSL_write() returned %d bytes, SSL error %d", bytes, err);
+            error_limit(&erl, "SSL_write() returned %d bytes, SSL error %d", bytes, err);
     }
-
-    if(retries > 1)
-        error_limit(&erl, "SSL_read() retried %d times", retries);
 
     return bytes;
 }
@@ -947,28 +989,17 @@ ssize_t netdata_ssl_read(SSL *ssl, void *buf, size_t num) {
 ssize_t netdata_ssl_write(SSL *ssl, const void *buf, size_t num) {
     error_limit_static_thread_var(erl, 1, 0);
 
-    int bytes, err, retries = 0;
-    size_t total = 0;
+    int bytes, err;
 
-    //do {
-    bytes = SSL_write(ssl, (uint8_t *)buf + total, (int)(num - total));
+    bytes = SSL_write(ssl, (uint8_t *)buf, (int)num);
     err = SSL_get_error(ssl, bytes);
-    retries++;
-
-    if(bytes > 0)
-        total += bytes;
-
-    //} while ((bytes <= 0 && (err == SSL_ERROR_WANT_WRITE)) || (bytes > 0 && total < num));
 
     if(unlikely(bytes <= 0)) {
         if (err == SSL_ERROR_WANT_WRITE || err == SSL_ERROR_WANT_READ) {
             bytes = 0;
         } else
-            error("SSL_write() returned %d bytes, SSL error %d", bytes, err);
+            error_limit(&erl, "SSL_write() returned %d bytes, SSL error %d", bytes, err);
     }
-
-    if(retries > 1)
-        error_limit(&erl, "SSL_write() retried %d times", retries);
 
     return bytes;
 }
@@ -1118,8 +1149,8 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
  *                        update the client_host if uninitialized - ensure the hostsize is the number
  *                        of *writable* bytes (i.e. be aware of the strdup used to compact the pollinfo).
  */
-extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsize, SIMPLE_PATTERN *access_list,
-                              const char *patname, int allow_dns)
+int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsize, SIMPLE_PATTERN *access_list,
+                       const char *patname, int allow_dns)
 {
     debug(D_LISTENER,"checking %s... (allow_dns=%d)", patname, allow_dns);
     if (!access_list)

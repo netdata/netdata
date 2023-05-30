@@ -8,6 +8,7 @@ SUBDIRS = \
     cgroups.plugin \
     charts.d.plugin \
     cups.plugin \
+    debugfs.plugin \
     diskspace.plugin \
     timex.plugin \
     ioping.plugin \

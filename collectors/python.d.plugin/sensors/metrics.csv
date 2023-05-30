@@ -1,0 +1,8 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+sensors.temperature,chip,a dimension per sensor,Celsius,Temperature,line,,python.d.plugin,sensors
+sensors.voltage,chip,a dimension per sensor,Volts,Voltage,line,,python.d.plugin,sensors
+sensors.current,chip,a dimension per sensor,Ampere,Current,line,,python.d.plugin,sensors
+sensors.power,chip,a dimension per sensor,Watt,Power,line,,python.d.plugin,sensors
+sensors.fan,chip,a dimension per sensor,Rotations/min,Fans speed,line,,python.d.plugin,sensors
+sensors.energy,chip,a dimension per sensor,Joule,Energy,line,,python.d.plugin,sensors
+sensors.humidity,chip,a dimension per sensor,Percent,Humidity,line,,python.d.plugin,sensors

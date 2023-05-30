@@ -354,16 +354,16 @@ void analytics_alarms_notifications(void)
     buffer_free(b);
 }
 
-void analytics_get_install_type(void)
+static void analytics_get_install_type(struct rrdhost_system_info *system_info)
 {
-    if (localhost->system_info->install_type == NULL) {
+    if (system_info->install_type == NULL) {
         analytics_set_data_str(&analytics_data.netdata_install_type, "unknown");
     } else {
-        analytics_set_data_str(&analytics_data.netdata_install_type, localhost->system_info->install_type);
+        analytics_set_data_str(&analytics_data.netdata_install_type, system_info->install_type);
     }
 
-    if (localhost->system_info->prebuilt_dist != NULL) {
-        analytics_set_data_str(&analytics_data.netdata_prebuilt_distro, localhost->system_info->prebuilt_dist);
+    if (system_info->prebuilt_dist != NULL) {
+        analytics_set_data_str(&analytics_data.netdata_prebuilt_distro, system_info->prebuilt_dist);
     }
 }
 
@@ -632,7 +632,7 @@ static const char *verify_required_directory(const char *dir)
  * This is called after the rrdinit
  * These values will be sent on the START event
  */
-void set_late_global_environment()
+void set_late_global_environment(struct rrdhost_system_info *system_info)
 {
     analytics_set_data(&analytics_data.netdata_config_stream_enabled, default_rrdpush_enabled ? "true" : "false");
     analytics_set_data_str(&analytics_data.netdata_config_memory_mode, (char *)rrd_memory_mode_name(default_rrd_memory_mode));
@@ -676,7 +676,7 @@ void set_late_global_environment()
         buffer_free(bi);
     }
 
-    analytics_get_install_type();
+    analytics_get_install_type(system_info);
 }
 
 void get_system_timezone(void)

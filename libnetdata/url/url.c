@@ -17,7 +17,7 @@ char to_hex(char code) {
     return hex[code & 15];
 }
 
-/* Returns a url-encoded version of str */
+/* Returns an url-encoded version of str */
 /* IMPORTANT: be sure to free() the returned string after use */
 char *url_encode(char *str) {
     char *buf, *pbuf;
@@ -33,8 +33,8 @@ char *url_encode(char *str) {
 
         else{
             *pbuf++ = '%';
-            *pbuf++ = to_hex(*str >> 4);
-            *pbuf++ = to_hex(*str & 15);
+            *pbuf++ = to_hex((char)(*str >> 4));
+            *pbuf++ = to_hex((char)(*str & 15));
         }
 
         str++;
@@ -55,9 +55,9 @@ char *url_encode(char *str) {
  *
  *  @return The character decoded on success and 0 otherwise
  */
-char url_percent_escape_decode(char *s) {
+char url_percent_escape_decode(const char *s) {
     if(likely(s[1] && s[2]))
-        return from_hex(s[1]) << 4 | from_hex(s[2]);
+        return (char)(from_hex(s[1]) << 4 | from_hex(s[2]));
     return 0;
 }
 
@@ -98,7 +98,7 @@ char url_utf8_get_byte_length(char c) {
  *
  * @return count of bytes written to *d
  */
-char url_decode_multibyte_utf8(char *s, char *d, char *d_end) {
+char url_decode_multibyte_utf8(const char *s, char *d, const char *d_end) {
     char first_byte = url_percent_escape_decode(s);
 
     if(unlikely(!first_byte || !IS_UTF8_STARTBYTE(first_byte)))
@@ -189,9 +189,9 @@ unsigned char *utf8_check(unsigned char *s)
     return NULL;
 }
 
-char *url_decode_r(char *to, char *url, size_t size) {
-    char *s = url,           // source
-         *d = to,            // destination
+char *url_decode_r(char *to, const char *url, size_t size) {
+    const char *s = url;     // source
+    char *d = to,            // destination
          *e = &to[size - 1]; // destination end
 
     while(*s && d < e) {
@@ -236,31 +236,45 @@ fail_cleanup:
     return NULL;
 }
 
-/**
- * Is request complete?
- *
- * Check whether the request is complete.
- * This function cannot check all the requests METHODS, for example, case you are working with POST, it will fail.
- *
- * @param begin is the first character of the sequence to analyse.
- * @param end is the last character of the sequence
- * @param length is the length of the total of bytes read, it is not the difference between end and begin.
- *
- * @return It returns 1 when the request is complete and 0 otherwise.
- */
-inline int url_is_request_complete(char *begin, char *end, size_t length) {
+inline bool url_is_request_complete(char *begin, char *end, size_t length, char **post_payload, size_t *post_payload_size) {
+    if (begin == end || length < 4)
+        return false;
 
-    if ( begin == end) {
-        //Message cannot be complete when first and last address are the same
-        return 0;
+    if(likely(strncmp(begin, "GET ", 4)) == 0) {
+        return strstr(end - 4, "\r\n\r\n");
     }
+    else if(unlikely(strncmp(begin, "POST ", 5) == 0)) {
+        char *cl = strstr(begin, "Content-Length: ");
+        if(!cl) return false;
+        cl = &cl[16];
 
-    //This math to verify  the last is valid, because we are discarding the POST
-    if (length > 4) {
-        begin = end - 4;
+        size_t content_length = str2ul(cl);
+
+        char *payload = strstr(cl, "\r\n\r\n");
+        if(!payload) return false;
+        payload += 4;
+
+        size_t payload_length = length - (payload - begin);
+
+        if(payload_length == content_length) {
+            if(post_payload && post_payload_size) {
+                if (*post_payload)
+                    freez(*post_payload);
+
+                *post_payload = mallocz(payload_length + 1);
+                memcpy(*post_payload, payload, payload_length);
+                (*post_payload)[payload_length] = '\0';
+
+                *post_payload_size = payload_length;
+            }
+            return true;
+        }
+
+        return false;
     }
-
-    return (strstr(begin, "\r\n\r\n"))?1:0;
+    else {
+        return strstr(end - 4, "\r\n\r\n");
+    }
 }
 
 /**
@@ -282,110 +296,4 @@ inline char *url_find_protocol(char *s) {
     }
 
     return s;
-}
-
-/**
- * Map query string
- *
- * Map the query string fields that will be decoded.
- * This functions must be called after to check the presence of query strings,
- * here we are assuming that you already tested this.
- *
- * @param out the pointer to pointers that will be used to map
- * @param url the input url that we are decoding.
- *
- * @return It returns the number of total variables in the query string.
- */
-int url_map_query_string(char **out, char *url) {
-    (void)out;
-    (void)url;
-    int count = 0;
-
-    //First we try to parse considering that there was not URL encode process
-    char *moveme = url;
-    char *ptr;
-
-    //We always we have at least one here, so I can set this.
-    out[count++] = moveme;
-    while(moveme) {
-        ptr = strchr((moveme+1), '&');
-        if(ptr) {
-            out[count++] = ptr;
-        }
-
-        moveme = ptr;
-    }
-
-    //I could not find any '&', so I am assuming now it is like '%26'
-    if (count == 1) {
-        moveme = url;
-        while(moveme) {
-            ptr = strchr((moveme+1), '%');
-            if(ptr) {
-                char *test = (ptr+1);
-                if (!strncmp(test, "3f", 2) || !strncmp(test, "3F", 2)) {
-                    out[count++] = ptr;
-                }
-            }
-            moveme = ptr;
-        }
-    }
-
-    return count;
-}
-
-/**
- * Parse query string
- *
- * Parse the query string mapped and store it inside output.
- *
- * @param output is a vector where I will store the string.
- * @param max is the maximum length of the output
- * @param map the map done by the function url_map_query_string.
- * @param total the total number of variables inside map
- *
- * @return It returns 0 on success and -1 otherwise
- */
-int url_parse_query_string(char *output, size_t max, char **map, int total) {
-    if(!total) {
-        return 0;
-    }
-
-    int counter, next;
-    size_t length;
-    char *end;
-    char *begin = map[0];
-    char save;
-    size_t copied = 0;
-    for(counter = 0, next=1 ; next <= total ; ++counter, ++next) {
-        if (next != total) {
-            end = map[next];
-            length = (size_t) (end - begin);
-            save = *end;
-            *end = 0x00;
-        } else {
-            length = strlen(begin);
-            end = NULL;
-        }
-        length++;
-
-        if (length > (max - copied)) {
-            error("Parsing query string: we cannot parse a query string so big");
-            break;
-        }
-
-        if(!url_decode_r(output, begin, length)) {
-            return -1;
-        }
-        length = strlen(output);
-        copied += length;
-        output += length;
-
-        begin = end;
-        if (begin) {
-            *begin = save;
-        }
-    }
-
-    return 0;
 }

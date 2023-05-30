@@ -51,7 +51,6 @@ extern long web_client_streaming_rate_t;
 extern LISTEN_SOCKETS api_sockets;
 void web_client_update_acl_matches(struct web_client *w);
 void web_server_log_connection(struct web_client *w, const char *msg);
-void web_client_initialize_connection(struct web_client *w);
 struct web_client *web_client_create_on_listenfd(int listener);
 
 #include "web_client_cache.h"

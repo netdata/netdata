@@ -264,11 +264,11 @@ struct engine *read_exporting_config()
             prometheus_exporter_instance->config.options &= ~EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
 
         prometheus_exporter_instance->config.charts_pattern = simple_pattern_create(
-            prometheus_config_get("send charts matching", "*"),
-            NULL,
-            SIMPLE_PATTERN_EXACT);
+                prometheus_config_get("send charts matching", "*"),
+                NULL,
+                SIMPLE_PATTERN_EXACT, true);
         prometheus_exporter_instance->config.hosts_pattern = simple_pattern_create(
-            prometheus_config_get("send hosts matching", "localhost *"), NULL, SIMPLE_PATTERN_EXACT);
+                prometheus_config_get("send hosts matching", "localhost *"), NULL, SIMPLE_PATTERN_EXACT, true);
 
         prometheus_exporter_instance->config.prefix = prometheus_config_get("prefix", global_exporting_prefix);
 
@@ -369,10 +369,12 @@ struct engine *read_exporting_config()
         tmp_instance->config.timeoutms = exporter_get_number(instance_name, "timeout ms", 10000);
 
         tmp_instance->config.charts_pattern =
-            simple_pattern_create(exporter_get(instance_name, "send charts matching", "*"), NULL, SIMPLE_PATTERN_EXACT);
+                simple_pattern_create(exporter_get(instance_name, "send charts matching", "*"), NULL,
+                                      SIMPLE_PATTERN_EXACT,
+                                      true);
 
         tmp_instance->config.hosts_pattern = simple_pattern_create(
-            exporter_get(instance_name, "send hosts matching", "localhost *"), NULL, SIMPLE_PATTERN_EXACT);
+                exporter_get(instance_name, "send hosts matching", "localhost *"), NULL, SIMPLE_PATTERN_EXACT, true);
 
         char *data_source = exporter_get(instance_name, "data source", "average");
 

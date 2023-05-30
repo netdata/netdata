@@ -1,0 +1,15 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+memcached.cache,,"available, used",MiB,Cache Size,stacked,,python.d.plugin,memcached
+memcached.net,,"in, out",kilobits/s,Network,area,,python.d.plugin,memcached
+memcached.connections,,"current, rejected, total",connections/s,Connections,line,,python.d.plugin,memcached
+memcached.items,,"current,total",items,Items,line,,python.d.plugin,memcached
+memcached.evicted_reclaimed,,"reclaimed, evicted", items,Evicted and Reclaimed Items,line,,python.d.plugin,memcached
+memcached.get,,"hints, misses",requests,Get Requests,stacked,,python.d.plugin,memcached
+memcached.get_rate,,rate,requests/s,Get Request Rate,line,,python.d.plugin,memcached
+memcached.set_rate,,rate,requests/s,Set Request Rate,line,,python.d.plugin,memcached
+memcached.delete,,"hits, misses",requests,Delete Requests,stacked,,python.d.plugin,memcached
+memcached.cas,,"hits, misses, bad value",requests,Check and Set Requests,stacked,,python.d.plugin,memcached
+memcached.increment,,"hits, misses",requests,Increment Requests,stacked,,python.d.plugin,memcached
+memcached.decrement,,"hits, misses",requests,Decrement Requests,stacked,,python.d.plugin,memcached
+memcached.touch,,"hits, misses",requests,Touch Requests,stacked,,python.d.plugin,memcached
+memcached.touch_rate,,rate,requests/s,Touch Request Rate,line,,python.d.plugin,memcached

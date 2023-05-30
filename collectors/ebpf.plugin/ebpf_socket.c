@@ -5,6 +5,9 @@
 #include "ebpf.h"
 #include "ebpf_socket.h"
 
+// ----------------------------------------------------------------------------
+// ARAL vectors used to speed up processing
+
 /*****************************************************************
  *
  *  GLOBAL VARIABLES
@@ -58,7 +61,6 @@ static netdata_idx_t *socket_hash_values = NULL;
 static netdata_syscall_stat_t socket_aggregated_data[NETDATA_MAX_SOCKET_VECTOR];
 static netdata_publish_syscall_t socket_publish_aggregated[NETDATA_MAX_SOCKET_VECTOR];
 
-ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
 static ebpf_bandwidth_t *bandwidth_vector = NULL;
 
 pthread_mutex_t nv_mutex;
@@ -97,10 +99,6 @@ struct netdata_static_thread socket_threads = {
 };
 
 #ifdef LIBBPF_MAJOR_VERSION
-#include "includes/socket.skel.h" // BTF code
-
-static struct socket_bpf *bpf_obj = NULL;
-
 /**
  * Disable Probe
  *
@@ -454,7 +452,6 @@ static inline void clean_internal_socket_plot(netdata_socket_plot_t *ptr)
  * Clean socket plot
  *
  * Clean the allocated data for inbound and outbound vectors.
- */
 static void clean_allocated_socket_plot()
 {
     if (!network_viewer_opt.enabled)
@@ -476,12 +473,12 @@ static void clean_allocated_socket_plot()
     }
     clean_internal_socket_plot(&plot[outbound_vectors.last]);
 }
+ */
 
 /**
  * Clean network ports allocated during initialization.
  *
  * @param ptr a pointer to the link list.
- */
 static void clean_network_ports(ebpf_network_viewer_port_list_t *ptr)
 {
     if (unlikely(!ptr))
@@ -494,6 +491,7 @@ static void clean_network_ports(ebpf_network_viewer_port_list_t *ptr)
         ptr = next;
     }
 }
+ */
 
 /**
  * Clean service names
@@ -501,7 +499,6 @@ static void clean_network_ports(ebpf_network_viewer_port_list_t *ptr)
  * Clean the allocated link list that stores names.
  *
  * @param names the link list.
- */
 static void clean_service_names(ebpf_network_viewer_dim_name_t *names)
 {
     if (unlikely(!names))
@@ -514,12 +511,12 @@ static void clean_service_names(ebpf_network_viewer_dim_name_t *names)
         names = next;
     }
 }
+ */
 
 /**
  * Clean hostnames
  *
  * @param hostnames the hostnames to clean
- */
 static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
 {
     if (unlikely(!hostnames))
@@ -533,19 +530,7 @@ static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
         hostnames = next;
     }
 }
-
-/**
- * Cleanup publish syscall
- *
- * @param nps list of structures to clean
  */
-void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps)
-{
-    while (nps) {
-        freez(nps->algorithm);
-        nps = nps->next;
-    }
-}
 
 /**
  * Clean port Structure
@@ -596,15 +581,8 @@ static void clean_ip_structure(ebpf_network_viewer_ip_list_t **clean)
  */
 static void ebpf_socket_free(ebpf_module_t *em )
 {
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    if (em->thread->enabled == NETDATA_THREAD_EBPF_RUNNING) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
-        return;
-    }
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-
-    ebpf_cleanup_publish_syscall(socket_publish_aggregated);
+    /* We can have thousands of sockets to clean, so we are transferring
+     * for OS the responsibility while we do not use ARAL here
     freez(socket_hash_values);
 
     freez(bandwidth_vector);
@@ -616,25 +594,17 @@ static void ebpf_socket_free(ebpf_module_t *em )
 
     clean_port_structure(&listen_ports);
 
-    ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled = 0;
-
     clean_network_ports(network_viewer_opt.included_port);
     clean_network_ports(network_viewer_opt.excluded_port);
     clean_service_names(network_viewer_opt.names);
     clean_hostnames(network_viewer_opt.included_hostnames);
     clean_hostnames(network_viewer_opt.excluded_hostnames);
+     */
 
     pthread_mutex_destroy(&nv_mutex);
 
-    freez(socket_threads.thread);
-
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        socket_bpf__destroy(bpf_obj);
-#endif
-
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -648,8 +618,10 @@ static void ebpf_socket_free(ebpf_module_t *em )
 static void ebpf_socket_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    pthread_mutex_lock(&nv_mutex);
     if (socket_threads.thread)
         netdata_thread_cancel(*socket_threads.thread);
+    pthread_mutex_unlock(&nv_mutex);
     ebpf_socket_free(em);
 }
 
@@ -662,8 +634,7 @@ static void ebpf_socket_exit(void *ptr)
  */
 void ebpf_socket_cleanup(void *ptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    ebpf_socket_free(em);
+    UNUSED(ptr);
 }
 
 /*****************************************************************
@@ -958,7 +929,7 @@ static void ebpf_socket_send_data(ebpf_module_t *em)
  *
  * @return it returns the sum of all PIDs
  */
-long long ebpf_socket_sum_values_for_pids(struct pid_on_target *root, size_t offset)
+long long ebpf_socket_sum_values_for_pids(struct ebpf_pid_on_target *root, size_t offset)
 {
     long long ret = 0;
     while (root) {
@@ -980,11 +951,11 @@ long long ebpf_socket_sum_values_for_pids(struct pid_on_target *root, size_t off
  * @param em   the structure with thread information
  * @param root the target list.
  */
-void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
+void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
 {
     UNUSED(em);
 
-    struct target *w;
+    struct ebpf_target *w;
     collected_number value;
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_CONNECTION_TCP_V4);
@@ -1217,7 +1188,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
  */
 void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    struct target *root = ptr;
+    struct ebpf_target *root = ptr;
     int order = 20080;
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_CONNECTION_TCP_V4,
                                "Calls to tcp_v4_connection", EBPF_COMMON_DIMENSION_CONNECTIONS,
@@ -2156,10 +2127,11 @@ void *ebpf_socket_read_hash(void *ptr)
     heartbeat_init(&hb);
     int fd_ipv4 = socket_maps[NETDATA_SOCKET_TABLE_IPV4].map_fd;
     int fd_ipv6 = socket_maps[NETDATA_SOCKET_TABLE_IPV6].map_fd;
-    while (!ebpf_exit_plugin) {
+    // This thread is cancelled from another thread
+    for (;;) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_exit_plugin)
-           continue;
+           break;
 
         pthread_mutex_lock(&nv_mutex);
         ebpf_read_socket_hash_table(fd_ipv4, AF_INET);
@@ -2227,7 +2199,7 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
 {
     ebpf_socket_publish_apps_t *curr = socket_bandwidth_curr[current_pid];
     if (!curr) {
-        curr = callocz(1, sizeof(ebpf_socket_publish_apps_t));
+        curr = ebpf_socket_stat_get();
         socket_bandwidth_curr[current_pid] = curr;
     }
 
@@ -2275,7 +2247,7 @@ static void ebpf_socket_update_apps_data()
     int fd = socket_maps[NETDATA_SOCKET_TABLE_BANDWIDTH].map_fd;
     ebpf_bandwidth_t *eb = bandwidth_vector;
     uint32_t key;
-    struct pid_stat *pids = root_of_pids;
+    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     while (pids) {
         key = pids->pid;
 
@@ -2794,8 +2766,7 @@ void ebpf_socket_update_cgroup_algorithm()
     int i;
     for (i = 0; i < NETDATA_MAX_SOCKET_VECTOR; i++) {
         netdata_publish_syscall_t *ptr = &socket_publish_aggregated[i];
-        freez(ptr->algorithm);
-        ptr->algorithm = strdupz(ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
+        ptr->algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX];
     }
 }
 
@@ -2904,6 +2875,11 @@ static void socket_collector(ebpf_module_t *em)
         if (socket_apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_socket_send_apps_data(em, apps_groups_root_target);
 
+#ifdef NETDATA_DEV_MODE
+        if (ebpf_aral_socket_pid)
+            ebpf_send_data_aral_chart(ebpf_aral_socket_pid, em);
+#endif
+
         if (cgroups)
             ebpf_socket_send_cgroup_data(update_every);
 
@@ -2947,10 +2923,11 @@ static void ebpf_socket_allocate_global_vectors(int apps)
     memset(socket_publish_aggregated, 0 ,NETDATA_MAX_SOCKET_VECTOR * sizeof(netdata_publish_syscall_t));
     socket_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
 
-    if (apps)
+    if (apps) {
+        ebpf_socket_aral_init();
         socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
-
-    bandwidth_vector = callocz((size_t)ebpf_nprocs, sizeof(ebpf_bandwidth_t));
+        bandwidth_vector = callocz((size_t)ebpf_nprocs, sizeof(ebpf_bandwidth_t));
+    }
 
     socket_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_socket_t));
     if (network_viewer_opt.enabled) {
@@ -3722,7 +3699,7 @@ static void link_hostnames(char *parse)
         ebpf_network_viewer_hostname_list_t *hostname = callocz(1 , sizeof(ebpf_network_viewer_hostname_list_t));
         hostname->value = strdupz(parse);
         hostname->hash = simple_hash(parse);
-        hostname->value_pattern = simple_pattern_create(parse, NULL, SIMPLE_PATTERN_EXACT);
+        hostname->value_pattern = simple_pattern_create(parse, NULL, SIMPLE_PATTERN_EXACT, true);
 
         link_hostname((!neg)?&network_viewer_opt.included_hostnames:&network_viewer_opt.excluded_hostnames,
                       hostname);
@@ -3888,11 +3865,11 @@ static int ebpf_socket_load_bpf(ebpf_module_t *em)
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else {
-        bpf_obj = socket_bpf__open();
-        if (!bpf_obj)
+        socket_bpf_obj = socket_bpf__open();
+        if (!socket_bpf_obj)
             ret = -1;
         else
-            ret = ebpf_socket_load_and_attach(bpf_obj, em);
+            ret = ebpf_socket_load_and_attach(socket_bpf_obj, em);
     }
 #endif
 
@@ -3922,7 +3899,6 @@ void *ebpf_socket_thread(void *ptr)
     parse_table_size_options(&socket_config);
 
     if (pthread_mutex_init(&nv_mutex, NULL)) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         error("Cannot initialize local mutex");
         goto endsocket;
     }
@@ -3945,7 +3921,6 @@ void *ebpf_socket_thread(void *ptr)
     ebpf_adjust_thread_load(em, default_btf);
 #endif
     if (ebpf_socket_load_bpf(em)) {
-        em->enabled = CONFIG_BOOLEAN_NO;
         pthread_mutex_unlock(&lock);
         goto endsocket;
     }
@@ -3964,6 +3939,12 @@ void *ebpf_socket_thread(void *ptr)
     ebpf_create_global_charts(em);
 
     ebpf_update_stats(&plugin_statistics, em);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
+
+#ifdef NETDATA_DEV_MODE
+    if (ebpf_aral_socket_pid)
+        ebpf_statistic_create_aral_chart(NETDATA_EBPF_SOCKET_ARAL_NAME, em);
+#endif
 
     pthread_mutex_unlock(&lock);
 

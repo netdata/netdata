@@ -1,14 +1,4 @@
-<!--
-title: "Build new dashboards"
-description: >-
-    "Design new dashboards that target your infrastructure's unique needs and share them with your team for
-    targeted visual anomaly detection or incident response."
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md"
-sidebar_label: "Build new dashboards"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Operations/Visualizations"
--->
+# Build new dashboards
 
 With Netdata Cloud, you can build new dashboards that target your infrastructure's unique needs. Put key metrics from
 any number of distributed systems in one place for a bird's eye view of your infrastructure.
@@ -25,7 +15,7 @@ dashboards](https://user-images.githubusercontent.com/1153921/108529360-a2145d00
 In the modal, give your new dashboard a name, and click **+ Add**.
 
 Click the **Add Chart** button to add your first chart card. From the dropdown, select either *All Nodes** or a specific
-node. If you select **All Nodes**, you will add a [composite chart](/docs/cloud/visualize/overview#composite-charts) to
+node. If you select **All Nodes**, you will add a [composite chart](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md) to
 your new dashboard. Next, select the context. You'll see a preview of the chart before you finish adding it.
 
 The **Add Text** button creates a new card with user-defined text, which you can use to describe or document a
@@ -44,12 +34,11 @@ of any number of **cards**, which can contain charts or text.
 ### Chart cards
 
 Click the **Add Chart** button to add your first chart card. From the dropdown, select either *All Nodes** or a specific
-node. If you select **All Nodes**, you will add a [composite chart](/docs/cloud/visualize/overview#composite-charts) to
+node. If you select **All Nodes**, you will add a [composite chart](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md) to
 your new dashboard. Next, select the context. You'll see a preview of the chart before you finish adding it.
 
 The charts you add to any dashboard are fully interactive, just like the charts in an Agent dashboard or a single node's
-dashboard in Cloud. Zoom in and out, highlight timeframes, and more. See our 
-[Agent dashboard docs](https://learn.netdata.cloud/docs/agent/web#using-charts) for all the shortcuts.
+dashboard in Cloud. Zoom in and out, highlight timeframes, and more.
 
 Charts also synchronize as you interact with them, even across contexts _or_ nodes.
 
@@ -81,7 +70,7 @@ dashboards.
 ## Pin dashboards
 
 Click on the **Pin** button in any dashboard to put those charts into a separate panel at the bottom of the screen. You
-can now navigate through Netdata Cloud freely, individual Cloud dashboards, the Nodes view, different War Rooms, or even
+can now navigate through Netdata Cloud freely, individual Cloud dashboards, the Nodes tab, different War Rooms, or even
 different Spaces, and have those valuable metrics follow you.
 
 Pinning dashboards helps you correlate potentially related charts across your infrastructure, no matter how you

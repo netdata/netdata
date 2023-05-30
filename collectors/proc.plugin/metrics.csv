@@ -1,0 +1,271 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+system.cpu,,"guest_nice, guest, steal, softirq, irq, user, system, nice, iowait, idle",percentage,Total CPU utilization,stacked,,proc.plugin,/proc/stat
+cpu.cpu,cpu core,"guest_nice, guest, steal, softirq, irq, user, system, nice, iowait, idle",percentage,Core utilization,stacked,cpu,proc.plugin,/proc/stat
+system.intr,,interrupts,interrupts/s,CPU Interrupts,line,,proc.plugin,/proc/stat
+system.ctxt,,switches,context switches/s,CPU Context Switches,line,,proc.plugin,/proc/stat
+system.forks,,started,processes/s,Started Processes,line,,proc.plugin,/proc/stat
+system.processes,,"running, blocked",processes,System Processes,line,,proc.plugin,/proc/stat
+cpu.core_throttling,,a dimension per cpu core,events/s,Core Thermal Throttling Events,line,,proc.plugin,/proc/stat
+cpu.package_throttling,,a dimension per package,events/s,Package Thermal Throttling Events,line,,proc.plugin,/proc/stat
+cpu.cpufreq,,a dimension per cpu core,MHz,Current CPU Frequency,line,,proc.plugin,/proc/stat
+cpuidle.cpu_cstate_residency_time,cpu core,a dimension per c-state,percentage,C-state residency time,stacked,cpu,proc.plugin,/proc/stat
+system.entropy,,entropy,entropy,Available Entropy,line,,proc.plugin,/proc/sys/kernel/random/entropy_avail
+system.uptime,,uptime,seconds,System Uptime,line,,proc.plugin,/proc/uptime
+system.swapio,,"in, out",KiB/s,Swap I/O,area,,proc.plugin,/proc/vmstat
+system.pgpgio,,"in, out",KiB/s,Memory Paged from/to disk,area,,proc.plugin,/proc/vmstat
+system.pgfaults,,"minor, major",faults/s,Memory Page Faults,line,,proc.plugin,/proc/vmstat
+system.interrupts,,a dimension per device,interrupts/s,System interrupts,stacked,,proc.plugin,/proc/interrupts
+cpu.interrupts,cpu core,a dimension per device,interrupts/s,CPU interrupts,stacked,cpu,proc.plugin,/proc/interrupts
+system.load,,"load1, load5, load15",load,System Load Average,line,,proc.plugin,/proc/loadavg
+system.active_processes,,active,processes,System Active Processes,line,,proc.plugin,/proc/loadavg
+system.cpu_some_pressure,,"some10, some60, some300",percentage,"CPU some pressure",line,,proc.plugin,/proc/pressure
+system.cpu_some_pressure_stall_time,,time,ms,"CPU some pressure stall time",line,,proc.plugin,/proc/pressure
+system.cpu_full_pressure,,"some10, some60, some300",percentage,"CPU full pressure",line,,proc.plugin,/proc/pressure
+system.cpu_full_pressure_stall_time,,time,ms,"CPU full pressure stall time",line,,proc.plugin,/proc/pressure
+system.memory_some_pressure,,"some10, some60, some300",percentage,"Memory some pressure",line,,proc.plugin,/proc/pressure
+system.memory_some_pressure_stall_time,,time,ms,"Memory some pressure stall time",line,,proc.plugin,/proc/pressure
+system.memory_full_pressure,,"some10, some60, some300",percentage,"Memory full pressure",line,,proc.plugin,/proc/pressure
+system.memory_full_pressure_stall_time,,time,ms,"Memory full pressure stall time",line,,proc.plugin,/proc/pressure
+system.io_some_pressure,,"some10, some60, some300",percentage,"I/O some pressure",line,,proc.plugin,/proc/pressure
+system.io_some_pressure_stall_time,,time,ms,"I/O some pressure stall time",line,,proc.plugin,/proc/pressure
+system.io_full_pressure,,"some10, some60, some300",percentage,"I/O some pressure",line,,proc.plugin,/proc/pressure
+system.io_full_pressure_stall_time,,time,ms,"I/O some pressure stall time",line,,proc.plugin,/proc/pressure
+system.softirqs,,a dimension per softirq,softirqs/s,System softirqs,stacked,,proc.plugin,/proc/softirqs
+cpu.softirqs,cpu core,a dimension per softirq,softirqs/s,CPU softirqs,stacked,cpu,proc.plugin,/proc/softirqs
+system.softnet_stat,,"processed, dropped, squeezed, received_rps, flow_limit_count",events/s,System softnet_stat,line,,proc.plugin,/proc/net/softnet_stat
+cpu.softnet_stat,cpu core,"processed, dropped, squeezed, received_rps, flow_limit_count",events/s,CPU softnet_stat,line,,proc.plugin,/proc/net/softnet_stat
+system.ram,,"free, used, cached, buffers",MiB,System RAM,stacked,,proc.plugin,/proc/meminfo
+mem.available,,avail,MiB,Available RAM for applications,area,,proc.plugin,/proc/meminfo
+system.swap,,"free, used",MiB,System Swap,stacked,,proc.plugin,/proc/meminfo
+mem.hwcorrupt,,HardwareCorrupted,MiB,Corrupted Memory detected by ECC,line,,proc.plugin,/proc/meminfo
+mem.commited,,Commited_AS,MiB,Committed (Allocated) Memory,area,,proc.plugin,/proc/meminfo
+mem.writeback,,"Dirty, Writeback, FuseWriteback, NfsWriteback, Bounce",MiB,Writeback Memory,line,,proc.plugin,/proc/meminfo
+mem.kernel,,"Slab, KernelStack, PageTables, VmallocUsed, Percpu",MiB,Memory Used by Kernel,stacked,,proc.plugin,/proc/meminfo
+mem.slab,,"reclaimable, unreclaimable",MiB,Reclaimable Kernel Memory,stacked,,proc.plugin,/proc/meminfo
+mem.hugepage,,"free, used, surplus, reserved",MiB,Dedicated HugePages Memory,stacked,,proc.plugin,/proc/meminfo
+mem.transparent_hugepages,,"anonymous, shmem",MiB,Transparent HugePages Memory,stacked,,proc.plugin,/proc/meminfo
+mem.balloon,,"inflate, deflate, migrate",KiB/s,Memory Ballooning Operations,line,,proc.plugin,/proc/vmstat
+mem.zswapio,,"in, out",KiB/s,ZSwap I/O,area,,proc.plugin,/proc/vmstat
+mem.ksm_cow,,"swapin, write",KiB/s,KSM Copy On Write Operations,line,,proc.plugin,/proc/vmstat
+mem.thp_faults,,"alloc, fallback, fallback_charge",events/s,Transparent Huge Page Fault Allocations,line,,proc.plugin,/proc/vmstat
+mem.thp_file,,"alloc, fallback, mapped, fallback_charge",events/s,Transparent Huge Page File Allocations,line,,proc.plugin,/proc/vmstat
+mem.thp_zero,,"alloc, failed",events/s,Transparent Huge Zero Page Allocations,line,,proc.plugin,/proc/vmstat
+mem.thp_collapse,,"alloc, failed",events/s,Transparent Huge Pages Collapsed by khugepaged,line,,proc.plugin,/proc/vmstat
+mem.thp_split,,"split, failed, split_pmd, split_deferred",events/s,Transparent Huge Page Splits,line,,proc.plugin,/proc/vmstat
+mem.thp_swapout,,"swapout, fallback",events/s,Transparent Huge Pages Swap Out,line,,proc.plugin,/proc/vmstat
+mem.thp_compact,,"success, fail, stall",events/s,Transparent Huge Pages Compaction,line,,proc.plugin,/proc/vmstat
+mem.pagetype_global,,a dimension per pagesize,B,System orders available,stacked,,proc.plugin,/proc/pagetypeinfo
+mem.pagetype,"node, zone, type",a dimension per pagesize,B,"pagetype_Node{node}_{zone}_{type}",stacked,"node_id, node_zone, node_type",proc.plugin,/proc/pagetypeinfo
+mem.oom_kill,,kills,kills/s,Out of Memory Kills,line,,proc.plugin,/proc/vmstat
+mem.numa,,"local, foreign, interleave, other, pte_updates, huge_pte_updates, hint_faults, hint_faults_local, pages_migrated",events/s,NUMA events,line,,proc.plugin,/proc/vmstat
+mem.ecc_ce,,a dimension per mem controller,errors,ECC Memory Correctable Errors,line,,proc.plugin,/sys/devices/system/edac/mc
+mem.ecc_ue,,a dimension per mem controller,errors,ECC Memory Uncorrectable Errors,line,,proc.plugin,/sys/devices/system/edac/mc
+mem.numa_nodes,numa node,"hit, miss, local, foreign, interleave, other",events/s,NUMA events,line,numa_node,proc.plugin,/sys/devices/system/node
+mem.ksm,,"shared, unshared, sharing, volatile",MiB,Kernel Same Page Merging,stacked,,proc.plugin,/sys/kernel/mm/ksm
+mem.ksm_savings,,"savings, offered",MiB,Kernel Same Page Merging Savings,area,,proc.plugin,/sys/kernel/mm/ksm
+mem.ksm_ratios,,savings,percentage,Kernel Same Page Merging Effectiveness,line,,proc.plugin,/sys/kernel/mm/ksm
+mem.zram_usage,zram device,"compressed, metadata",MiB,ZRAM Memory Usage,area,device,proc.plugin,/sys/block/zram
+mem.zram_savings,zram device,"savings, original",MiB,ZRAM Memory Savings,area,device,proc.plugin,/sys/block/zram
+mem.zram_ratio,zram device,ratio,ratio,ZRAM Compression Ratio (original to compressed),line,device,proc.plugin,/sys/block/zram
+mem.zram_efficiency,zram device,percent,percentage,ZRAM Efficiency,line,device,proc.plugin,/sys/block/zram
+system.ipc_semaphores,,semaphores,semaphores,IPC Semaphores,area,,proc.plugin,ipc
+system.ipc_semaphore_arrays,,arrays,arrays,IPC Semaphore Arrays,area,,proc.plugin,ipc
+system.message_queue_message,,a dimension per queue,messages,IPC Message Queue Number of Messages,stacked,,proc.plugin,ipc
+system.message_queue_bytes,,a dimension per queue,bytes,IPC Message Queue Used Bytes,stacked,,proc.plugin,ipc
+system.shared_memory_segments,,segments,segments,IPC Shared Memory Number of Segments,stacked,,proc.plugin,ipc
+system.shared_memory_bytes,,bytes,bytes,IPC Shared Memory Used Bytes,stacked,,proc.plugin,ipc
+system.io,,"in, out",KiB/s,Disk I/O,area,,proc.plugin,/proc/diskstats
+disk.io,disk,"reads, writes",KiB/s,Disk I/O Bandwidth,area,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk_ext.io,disk,discards,KiB/s,Amount of Discarded Data,area,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.ops,disk,"reads, writes",operations/s,Disk Completed I/O Operations,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk_ext.ops,disk,"discards, flushes",operations/s,Disk Completed Extended I/O Operations,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.qops,disk,operations,operations,Disk Current I/O Operations,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.backlog,disk,backlog,milliseconds,Disk Backlog,area,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.busy,disk,busy,milliseconds,Disk Busy Time,area,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.util,disk,utilization,% of time working,Disk Utilization Time,area,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.mops,disk,"reads, writes",merged operations/s,Disk Merged Operations,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk_ext.mops,disk,discards,merged operations/s,Disk Merged Discard Operations,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.iotime,disk,"reads, writes",milliseconds/s,Disk Total I/O Time,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk_ext.iotime,disk,"discards, flushes",milliseconds/s,Disk Total I/O Time for Extended Operations,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.await,disk,"reads, writes",milliseconds/operation,Average Completed I/O Operation Time,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk_ext.await,disk,"discards, flushes",milliseconds/operation,Average Completed Extended I/O Operation Time,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.avgsz,disk,"reads, writes",KiB/operation,Average Completed I/O Operation Bandwidth,area,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk_ext.avgsz,disk,discards,KiB/operation,Average Amount of Discarded Data,area,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.svctm,disk,svctm,milliseconds/operation,Average Service Time,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.bcache_cache_alloc,disk,"ununsed, dirty, clean, metadata, undefined",percentage,BCache Cache Allocations,stacked,,proc.plugin,/proc/diskstats
+disk.bcache_hit_ratio,disk,"5min, 1hour, 1day, ever",percentage,BCache Cache Hit Ratio,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.bcache_rates,disk,"congested, writeback",KiB/s,BCache Rates,area,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.bcache_size,disk,dirty,MiB,BCache Cache Sizes,area,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.bcache_usage,disk,avail,percentage,BCache Cache Usage,area,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.bcache_cache_read_races,disk,"races, errors",operations/s,BCache Cache Read Races,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.bcache,disk,"hits, misses, collisions, readaheads",operations/s,BCache Cache I/O Operations,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+disk.bcache_bypass,disk,"hits, misses",operations/s,BCache Cache Bypass I/O Operations,line,"device, mount_point, device_type",proc.plugin,/proc/diskstats
+md.health,,a dimension per md array,failed disks,Faulty Devices In MD,line,,proc.plugin,/proc/mdstat
+md.disks,md array,"inuse, down",disks,Disks Stats,stacked,"device, raid_level",proc.plugin,/proc/mdstat
+md.mismatch_cnt,md array,count,unsynchronized blocks,Mismatch Count,line,"device, raid_level",proc.plugin,/proc/mdstat
+md.status,md array,"check, resync, recovery, reshape",percent,Current Status,line,"device, raid_level",proc.plugin,/proc/mdstat
+md.expected_time_until_operation_finish,md array,finish_in,seconds,Approximate Time Until Finish,line,"device, raid_level",proc.plugin,/proc/mdstat
+md.operation_speed,md array,speed,KiB/s,Operation Speed,line,"device, raid_level",proc.plugin,/proc/mdstat
+md.nonredundant,md array,available,boolean,Nonredundant Array Availability,line,"device, raid_level",proc.plugin,/proc/mdstat
+system.net,,"received, sent",kilobits/s,Physical Network Interfaces Aggregated Bandwidth,area,,proc.plugin,/proc/net/dev
+net.net,network device,"received, sent",kilobits/s,Bandwidth,area,"interface_type, device",proc.plugin,/proc/net/dev
+net.speed,network device,speed,kilobits/s,Interface Speed,line,"interface_type, device",proc.plugin,/proc/net/dev
+net.duplex,network device,"full, half, unknown",state,Interface Duplex State,line,"interface_type, device",proc.plugin,/proc/net/dev
+net.operstate,network device,"up, down, notpresent, lowerlayerdown, testing, dormant, unknown",state,Interface Operational State,line,"interface_type, device",proc.plugin,/proc/net/dev
+net.carrier,network device,"up, down",state,Interface Physical Link State,line,"interface_type, device",proc.plugin,/proc/net/dev
+net.mtu,network device,mtu,octets,Interface MTU,line,"interface_type, device",proc.plugin,/proc/net/dev
+net.packets,network device,"received, sent, multicast",packets/s,Packets,line,"interface_type, device",proc.plugin,/proc/net/dev
+net.errors,network device,"inbound, outbound",errors/s,Interface Errors,line,"interface_type, device",proc.plugin,/proc/net/dev
+net.drops,network device,"inbound, outbound",drops/s,Interface Drops,line,"interface_type, device",proc.plugin,/proc/net/dev
+net.fifo,network device,"receive, transmit",errors,Interface FIFO Buffer Errors,line,"interface_type, device",proc.plugin,/proc/net/dev
+net.compressed,network device,"received, sent",packets/s,Compressed Packets,line,"interface_type, device",proc.plugin,/proc/net/dev
+net.events,network device,"frames, collisions, carrier",events/s,Network Interface Events,line,"interface_type, device",proc.plugin,/proc/net/dev
+wireless.status,wireless device,status,status,Internal status reported by interface.,line,,proc.plugin,/proc/net/wireless
+wireless.link_quality,wireless device,link_quality,value,"Overall quality of the link. This is an aggregate value, and depends on the driver and hardware.",line,,proc.plugin,/proc/net/wireless
+wireless.signal_level,wireless device,signal_level,dBm,"The signal level is the wireless signal power level received by the wireless client. The closer the value is to 0, the stronger the signal.",line,,proc.plugin,/proc/net/wireless
+wireless.noise_level,wireless device,noise_level,dBm,"The noise level indicates the amount of background noise in your environment. The closer the value to 0, the greater the noise level.",line,,proc.plugin,/proc/net/wireless
+wireless.discarded_packets,wireless device,"nwid, crypt, frag, retry, misc",packets/s,"Packet discarded in the wireless adapter due to wireless specific problems.",line,,proc.plugin,/proc/net/wireless
+wireless.missed_beacons,wireless device,missed_beacons,frames/s,Number of missed beacons.,line,,proc.plugin,/proc/net/wireless
+ib.bytes,infiniband port,"Received, Sent",kilobits/s,Bandwidth usage,area,,proc.plugin,/sys/class/infiniband
+ib.packets,infiniband port,"Received, Sent, Mcast_rcvd, Mcast_sent, Ucast_rcvd, Ucast_sent",packets/s,Packets Statistics,area,,proc.plugin,/sys/class/infiniband
+ib.errors,infiniband port,"Pkts_malformated, Pkts_rcvd_discarded, Pkts_sent_discarded, Tick_Wait_to_send, Pkts_missed_resource, Buffer_overrun, Link_Downed, Link_recovered, Link_integrity_err, Link_minor_errors, Pkts_rcvd_with_EBP, Pkts_rcvd_discarded_by_switch, Pkts_sent_discarded_by_switch",errors/s,Error Counters,line,,proc.plugin,/sys/class/infiniband
+ib.hwerrors,infiniband port,"Duplicated_packets, Pkt_Seq_Num_gap, Ack_timer_expired, Drop_missing_buffer, Drop_out_of_sequence, NAK_sequence_rcvd, CQE_err_Req, CQE_err_Resp, CQE_Flushed_err_Req, CQE_Flushed_err_Resp, Remote_access_err_Req, Remote_access_err_Resp, Remote_invalid_req, Local_length_err_Resp, RNR_NAK_Packets, CNP_Pkts_ignored, RoCE_ICRC_Errors",errors/s,Hardware Errors,line,,proc.plugin,/sys/class/infiniband
+ib.hwpackets,infiniband port,"RoCEv2_Congestion_sent, RoCEv2_Congestion_rcvd, IB_Congestion_handled, ATOMIC_req_rcvd, Connection_req_rcvd, Read_req_rcvd, Write_req_rcvd, RoCE_retrans_adaptive, RoCE_retrans_timeout, RoCE_slow_restart, RoCE_slow_restart_congestion, RoCE_slow_restart_count",packets/s,Hardware Packets Statistics,line,,proc.plugin,/sys/class/infiniband
+system.ip,,"received, sent",kilobits/s,IP Bandwidth,area,,proc.plugin,/proc/net/netstat
+ip.inerrors,,"noroutes, truncated, checksum",packets/s,IP Input Errors,line,,proc.plugin,/proc/net/netstat
+ip.mcast,,"received, sent",kilobits/s,IP Multicast Bandwidth,area,,proc.plugin,/proc/net/netstat
+ip.bcast,,"received, sent",kilobits/s,IP Broadcast Bandwidth,area,,proc.plugin,/proc/net/netstat
+ip.mcastpkts,,"received, sent",packets/s,IP Multicast Packets,line,,proc.plugin,/proc/net/netstat
+ip.bcastpkts,,"received, sent",packets/s,IP Broadcast Packets,line,,proc.plugin,/proc/net/netstat
+ip.ecnpkts,,"CEP, NoECTP, ECTP0, ECTP1",packets/s,IP ECN Statistics,line,,proc.plugin,/proc/net/netstat
+ip.tcpmemorypressures,,pressures,events/s,TCP Memory Pressures,line,,proc.plugin,/proc/net/netstat
+ip.tcpconnaborts,,"baddata, userclosed, nomemory, timeout, linger, failed",connections/s,TCP Connection Aborts,line,,proc.plugin,/proc/net/netstat
+ip.tcpreorders,,"timestamp, sack, fack, reno",packets/s,TCP Reordered Packets by Detection Method,line,,proc.plugin,/proc/net/netstat
+ip.tcpofo,,"inqueue, dropped, merged, pruned",packets/s,TCP Out-Of-Order Queue,line,,proc.plugin,/proc/net/netstat
+ip.tcpsyncookies,,"received, sent, failed",packets/s,TCP SYN Cookies,line,,proc.plugin,/proc/net/netstat
+ip.tcp_syn_queue,,"drops, cookies",packets/s,TCP SYN Queue Issues,line,,proc.plugin,/proc/net/netstat
+ip.tcp_accept_queue,,"overflows, drops",packets/s,TCP Accept Queue Issues,line,,proc.plugin,/proc/net/netstat
+ipv4.packets,,"received, sent, forwarded, delivered",packets/s,IPv4 Packets,line,,proc.plugin,/proc/net/netstat
+ipv4.fragsout,,"ok, failed, created",packets/s,IPv4 Fragments Sent,line,,proc.plugin,/proc/net/netstat
+ipv4.fragsin,,"ok, failed, all",packets/s,IPv4 Fragments Reassembly,line,,proc.plugin,/proc/net/netstat
+ipv4.errors,,"InDiscards, OutDiscards, InHdrErrors, OutNoRoutes, InAddrErrors, InUnknownProtos",packets/s,IPv4 Errors,line,,proc.plugin,/proc/net/netstat
+ipv4.icmp,,"received, sent",packets/s,IPv4 ICMP Packets,line,,proc.plugin,/proc/net/netstat
+ipv4.icmp_errors,,"InErrors, OutErrors, InCsumErrors",packets/s,IPv4 ICMP Errors,line,,proc.plugin,/proc/net/netstat
+ipv4.icmpmsg,,"InEchoReps, OutEchoReps, InDestUnreachs, OutDestUnreachs, InRedirects, OutRedirects, InEchos, OutEchos, InRouterAdvert, OutRouterAdvert, InRouterSelect, OutRouterSelect, InTimeExcds, OutTimeExcds, InParmProbs, OutParmProbs, InTimestamps, OutTimestamps, InTimestampReps, OutTimestampReps",packets/s,IPv4 ICMP Messages,line,,proc.plugin,/proc/net/netstat
+ipv4.tcpsock,,connections,active connections,IPv4 TCP Connections,line,,proc.plugin,/proc/net/netstat
+ipv4.tcppackets,,"received, sent",packets/s,IPv4 TCP Packets,line,,proc.plugin,/proc/net/netstat
+ipv4.tcperrors,,"InErrs, InCsumErrors, RetransSegs",packets/s,IPv4 TCP Errors,line,,proc.plugin,/proc/net/netstat
+ipv4.tcpopens,,"active, passive",connections/s,IPv4 TCP Opens,line,,proc.plugin,/proc/net/netstat
+ipv4.tcphandshake,,"EstabResets, OutRsts, AttemptFails, SynRetrans",events/s,IPv4 TCP Handshake Issues,line,,proc.plugin,/proc/net/netstat
+ipv4.udppackets,,"received, sent",packets/s,IPv4 UDP Packets,line,,proc.plugin,/proc/net/netstat
+ipv4.udperrors,,"RcvbufErrors, SndbufErrors, InErrors, NoPorts, InCsumErrors, IgnoredMulti",events/s,IPv4 UDP Errors,line,,proc.plugin,/proc/net/netstat
+ipv4.udplite,,"received, sent",packets/s,IPv4 UDPLite Packets,line,,proc.plugin,/proc/net/netstat
+ipv4.udplite_errors,,"RcvbufErrors, SndbufErrors, InErrors, NoPorts, InCsumErrors, IgnoredMulti",packets/s,IPv4 UDPLite Errors,line,,proc.plugin,/proc/net/netstat
+system.ipv6,,"received, sent",kilobits/s,IPv6 Bandwidth,area,,proc.plugin,/proc/net/netstat
+system.ipv6,,"received, sent, forwarded, delivers",packets/s,IPv6 Packets,line,,proc.plugin,/proc/net/netstat
+ipv6.fragsout,,"ok, failed, all",packets/s,IPv6 Fragments Sent,line,,proc.plugin,/proc/net/netstat
+ipv6.fragsin,,"ok, failed, timeout, all",packets/s,IPv6 Fragments Reassembly,line,,proc.plugin,/proc/net/netstat
+ipv6.errors,,"InDiscards, OutDiscards, InHdrErrors, InAddrErrors, InUnknownProtos, InTooBigErrors, InTruncatedPkts, InNoRoutes, OutNoRoutes",packets/s,IPv6 Errors,line,,proc.plugin,/proc/net/netstat
+ipv6.udppackets,,"received, sent",packets/s,IPv6 UDP Packets,line,,proc.plugin,/proc/net/netstat
+ipv6.udperrors,,"RcvbufErrors, SndbufErrors, InErrors, NoPorts, InCsumErrors, IgnoredMulti",events/s,IPv6 UDP Errors,line,,proc.plugin,/proc/net/netstat
+ipv6.udplitepackets,,"received, sent",packets/s,IPv6 UDPlite Packets,line,,proc.plugin,/proc/net/netstat
+ipv6.udpliteerrors,,"RcvbufErrors, SndbufErrors, InErrors, NoPorts, InCsumErrors",events/s,IPv6 UDP Lite Errors,line,,proc.plugin,/proc/net/netstat
+ipv6.mcast,,"received, sent",kilobits/s,IPv6 Multicast Bandwidth,area,,proc.plugin,/proc/net/netstat
+ipv6.bcast,,"received, sent",kilobits/s,IPv6 Broadcast Bandwidth,area,,proc.plugin,/proc/net/netstat
+ipv6.mcastpkts,,"received, sent",packets/s,IPv6 Multicast Packets,line,,proc.plugin,/proc/net/netstat
+ipv6.icmp,,"received, sent",messages/s,IPv6 ICMP Messages,line,,proc.plugin,/proc/net/netstat
+ipv6.icmpredir,,"received, sent",redirects/s,IPv6 ICMP Redirects,line,,proc.plugin,/proc/net/netstat
+ipv6.icmperrors,,"InErrors, OutErrors, InCsumErrors, InDestUnreachs, InPktTooBigs, InTimeExcds, InParmProblems, OutDestUnreachs, OutPktTooBigs, OutTimeExcds, OutParmProblems",errors/s,IPv6 ICMP Errors,line,,proc.plugin,/proc/net/netstat
+ipv6.icmpechos,,"InEchos, OutEchos, InEchoReplies, OutEchoReplies",messages/s,IPv6 ICMP Echo,line,,proc.plugin,/proc/net/netstat
+ipv6.groupmemb,,"InQueries, OutQueries, InResponses, OutResponses, InReductions, OutReductions",messages/s,IPv6 ICMP Group Membership,line,,proc.plugin,/proc/net/netstat
+ipv6.icmprouter,,"InSolicits, OutSolicits, InAdvertisements, OutAdvertisements",messages/s,IPv6 Router Messages,line,,proc.plugin,/proc/net/netstat
+ipv6.icmpneighbor,,"InSolicits, OutSolicits, InAdvertisements, OutAdvertisements",messages/s,IPv6 Neighbor Messages,line,,proc.plugin,/proc/net/netstat
+ipv6.icmpmldv2,,"received, sent",reports/s,IPv6 ICMP MLDv2 Reports,line,,proc.plugin,/proc/net/netstat
+ipv6.icmptypes,,"InType1, InType128, InType129, InType136, OutType1, OutType128, OutType129, OutType133, OutType135, OutType143",messages/s,IPv6 ICMP Types,line,,proc.plugin,/proc/net/netstat
+ipv6.ect,,"InNoECTPkts, InECT1Pkts, InECT0Pkts, InCEPkts",packets/s,IPv6 ECT Packets,line,,proc.plugin,/proc/net/netstat
+ipv6.ect,,"InNoECTPkts, InECT1Pkts, InECT0Pkts, InCEPkts",packets/s,IPv6 ECT Packets,line,,proc.plugin,/proc/net/netstat
+ipv4.sockstat_sockets,,used,sockets,IPv4 Sockets Used,line,,proc.plugin,/proc/net/sockstat
+ipv4.sockstat_tcp_sockets,,"alloc, orphan, inuse, timewait",sockets,IPv4 TCP Sockets,line,,proc.plugin,/proc/net/sockstat
+ipv4.sockstat_tcp_mem,,mem,KiB,IPv4 TCP Sockets Memory,area,,proc.plugin,/proc/net/sockstat
+ipv4.sockstat_udp_sockets,,inuse,sockets,IPv4 UDP Sockets,line,,proc.plugin,/proc/net/sockstat
+ipv4.sockstat_udp_mem,,mem,sockets,IPv4 UDP Sockets Memory,line,,proc.plugin,/proc/net/sockstat
+ipv4.sockstat_udplite_sockets,,inuse,sockets,IPv4 UDPLITE Sockets,line,,proc.plugin,/proc/net/sockstat
+ipv4.sockstat_raw_sockets,,inuse,sockets,IPv4 RAW Sockets,line,,proc.plugin,/proc/net/sockstat
+ipv4.sockstat_frag_sockets,,inuse,fragments,IPv4 FRAG Sockets,line,,proc.plugin,/proc/net/sockstat
+ipv4.sockstat_frag_mem,,mem,KiB,IPv4 FRAG Sockets Memory,area,,proc.plugin,/proc/net/sockstat
+ipv6.sockstat6_tcp_sockets,,inuse,sockets,IPv6 TCP Sockets,line,,proc.plugin,/proc/net/sockstat6
+ipv6.sockstat6_udp_sockets,,inuse,sockets,IPv6 UDP Sockets,line,,proc.plugin,/proc/net/sockstat6
+ipv6.sockstat6_udplite_sockets,,inuse,sockets,IPv6 UDPLITE Sockets,line,,proc.plugin,/proc/net/sockstat6
+ipv6.sockstat6_raw_sockets,,inuse,sockets,IPv6 RAW Sockets,line,,proc.plugin,/proc/net/sockstat6
+ipv6.sockstat6_frag_sockets,,inuse,fragments,IPv6 FRAG Sockets,line,,proc.plugin,/proc/net/sockstat6
+ipvs.sockets,,connections,connections/s,IPVS New Connections,line,,proc.plugin,/proc/net/ip_vs_stats
+ipvs.packets,,"received, sent",packets/s,IPVS Packets,line,,proc.plugin,/proc/net/ip_vs_stats
+ipvs.net,,"received, sent",kilobits/s,IPVS Bandwidth,area,,proc.plugin,/proc/net/ip_vs_stats
+nfs.net,,"udp, tcp",operations/s,NFS Client Network,stacked,,proc.plugin,/proc/net/rpc/nfs
+nfs.rpc,,"calls, retransmits, auth_refresh",calls/s,NFS Client Remote Procedure Calls Statistics,line,,proc.plugin,/proc/net/rpc/nfs
+nfs.proc2,,a dimension per proc2 call,calls/s,NFS v2 Client Remote Procedure Calls,stacked,,proc.plugin,/proc/net/rpc/nfs
+nfs.proc3,,a dimension per proc3 call,calls/s,NFS v3 Client Remote Procedure Calls,stacked,,proc.plugin,/proc/net/rpc/nfs
+nfs.proc4,,a dimension per proc4 call,calls/s,NFS v4 Client Remote Procedure Calls,stacked,,proc.plugin,/proc/net/rpc/nfs
+nfsd.readcache,,"hits, misses, nocache",reads/s,NFS Server Read Cache,stacked,,proc.plugin,/proc/net/rpc/nfsd
+nfsd.filehandles,,stale,handles/s,NFS Server File Handles,line,,proc.plugin,/proc/net/rpc/nfsd
+nfsd.io,,"read, write",kilobytes/s,NFS Server I/O,area,,proc.plugin,/proc/net/rpc/nfsd
+nfsd.threads,,threads,threads,NFS Server Threads,line,,proc.plugin,/proc/net/rpc/nfsd
+nfsd.net,,"udp, tcp",packets/s,NFS Server Network Statistics,line,,proc.plugin,/proc/net/rpc/nfsd
+nfsd.rpc,,"calls, bad_format, bad_auth",calls/s,NFS Server Remote Procedure Calls Statistics,line,,proc.plugin,/proc/net/rpc/nfsd
+nfsd.proc2,,a dimension per proc2 call,calls/s,NFS v2 Server Remote Procedure Calls,stacked,,proc.plugin,/proc/net/rpc/nfsd
+nfsd.proc3,,a dimension per proc3 call,calls/s,NFS v3 Server Remote Procedure Calls,stacked,,proc.plugin,/proc/net/rpc/nfsd
+nfsd.proc4,,a dimension per proc4 call,calls/s,NFS v4 Server Remote Procedure Calls,stacked,,proc.plugin,/proc/net/rpc/nfsd
+nfsd.proc4ops,,a dimension per proc4 operation,operations/s,NFS v4 Server Operations,stacked,,proc.plugin,/proc/net/rpc/nfsd
+sctp.established,,established,associations,SCTP current total number of established associations,line,,proc.plugin,/proc/net/sctp/snmp
+sctp.transitions,,"active, passive, aborted, shutdown",transitions/s,SCTP Association Transitions,line,,proc.plugin,/proc/net/sctp/snmp
+sctp.packets,,"received, sent",packets/s,SCTP Packets,line,,proc.plugin,/proc/net/sctp/snmp
+sctp.packet_errors,,"invalid, checksum",packets/s,SCTP Packet Errors,line,,proc.plugin,/proc/net/sctp/snmp
+sctp.fragmentation,,"reassembled, fragmented",packets/s,SCTP Fragmentation,line,,proc.plugin,/proc/net/sctp/snmp
+netfilter.conntrack_sockets,,connections,active connections,Connection Tracker Connections,line,,proc.plugin,/proc/net/stat/nf_conntrack
+netfilter.conntrack_new,,"new, ignore, invalid",connections/s,Connection Tracker New Connections,line,,proc.plugin,/proc/net/stat/nf_conntrack
+netfilter.conntrack_changes,,"inserted, deleted, delete_list",changes/s,Connection Tracker Changes,line,,proc.plugin,/proc/net/stat/nf_conntrack
+netfilter.conntrack_expect,,"created, deleted, new",expectations/s,Connection Tracker Expectations,line,,proc.plugin,/proc/net/stat/nf_conntrack
+netfilter.conntrack_search,,"searched, restarted, found",searches/s,Connection Tracker Searches,line,,proc.plugin,/proc/net/stat/nf_conntrack
+netfilter.conntrack_errors,,"icmp_error, error_failed, drop, early_drop",events/s,Connection Tracker Errors,line,,proc.plugin,/proc/net/stat/nf_conntrack
+netfilter.synproxy_syn_received,,received,packets/s,SYNPROXY SYN Packets received,line,,proc.plugin,/proc/net/stat/synproxy
+netfilter.synproxy_conn_reopened,,reopened,connections/s,SYNPROXY Connections Reopened,line,,proc.plugin,/proc/net/stat/synproxy
+netfilter.synproxy_cookies,,"valid, invalid, retransmits",cookies/s,SYNPROXY TCP Cookies,line,,proc.plugin,/proc/net/stat/synproxy
+zfspool.state,zfs pool,"online, degraded, faulted, offline, removed, unavail, suspended",boolean,"ZFS pool state",line,pool,proc.plugin,/proc/spl/kstat/zfs
+zfs.arc_size,,"arcsz, target, min, max",MiB,"ZFS ARC Size",area,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.l2_size,,"actual, size",MiB,"ZFS L2 ARC Size",area,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.reads,,"arc, demand, prefetch, metadata, l2",reads/s,"ZFS Reads",area,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.bytes,,"read, write",KiB/s,"ZFS ARC L2 Read/Write Rate",area,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.hits,,"hits, misses",percentage,"ZFS ARC Hits",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.hits_rate,,"hits, misses",events/s,"ZFS ARC Hits Rate",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.dhits,,"hits, misses",percentage,"ZFS Demand Hits",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.dhits_rate,,"hits, misses",events/s,"ZFS Demand Hits Rate",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.phits,,"hits, misses",percentage,"ZFS Prefetch Hits",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.phits_rate,,"hits, misses",events/s,"ZFS Prefetch Hits Rate",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.mhits,,"hits, misses",percentage,"ZFS Metadata Hits",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.mhits_rate,,"hits, misses",events/s,"ZFS Metadata Hits Rate",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.l2hits,,"hits, misses",percentage,"ZFS L2 Hits",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.l2hits_rate,,"hits, misses",events/s,"ZFS L2 Hits Rate",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.list_hits,,"mfu, mfu_ghost, mru, mru_ghost",hits/s,"ZFS List Hits",area,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.arc_size_breakdown,,"recent, frequent",percentage,"ZFS ARC Size Breakdown",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.memory_ops,,"direct, throttled, indirect",operations/s,"ZFS Memory Operations",line,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.important_ops,,"evict_skip, deleted, mutex_miss, hash_collisions",operations/s,"ZFS Important Operations",line,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.actual_hits,,"hits, misses",percentage,"ZFS Actual Cache Hits",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.actual_hits_rate,,"hits, misses",events/s,"ZFS Actual Cache Hits Rate",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.demand_data_hits,,"hits, misses",percentage,"ZFS Data Demand Efficiency",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.demand_data_hits_rate,,"hits, misses",events/s,"ZFS Data Demand Efficiency Rate",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.prefetch_data_hits,,"hits, misses",percentage,"ZFS Data Prefetch Efficiency",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.prefetch_data_hits_rate,,"hits, misses",events/s,"ZFS Data Prefetch Efficiency Rate",stacked,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.hash_elements,,"current, max",elements,"ZFS ARC Hash Elements",line,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+zfs.hash_chains,,"current, max",chains,"ZFS ARC Hash Chains",line,,proc.plugin,/proc/spl/kstat/zfs/arcstats
+btrfs.disk,btrfs filesystem,"unallocated, data_free, data_used, meta_free, meta_used, sys_free, sys_used",MiB,"BTRFS Physical Disk Allocation",stacked,"filesystem_uuid, filesystem_label",proc.plugin,/sys/fs/btrfs
+btrfs.data,btrfs filesystem,"free, used",MiB,"BTRFS Data Allocation",stacked,"filesystem_uuid, filesystem_label",proc.plugin,/sys/fs/btrfs
+btrfs.metadata,btrfs filesystem,"free, used, reserved",MiB,"BTRFS Metadata Allocation",stacked,"filesystem_uuid, filesystem_label",proc.plugin,/sys/fs/btrfs
+btrfs.system,btrfs filesystem,"free, used",MiB,"BTRFS System Allocation",stacked,"filesystem_uuid, filesystem_label",proc.plugin,/sys/fs/btrfs
+btrfs.commits,btrfs filesystem,commits,commits,"BTRFS Commits",line,"filesystem_uuid, filesystem_label",proc.plugin,/sys/fs/btrfs
+btrfs.commits_perc_time,btrfs filesystem,commits,percentage,"BTRFS Commits Time Share",line,"filesystem_uuid, filesystem_label",proc.plugin,/sys/fs/btrfs
+btrfs.commit_timings,btrfs filesystem,"last, max",ms,"BTRFS Commit Timings",line,"filesystem_uuid, filesystem_label",proc.plugin,/sys/fs/btrfs
+btrfs.device_errors,btrfs device,"write_errs, read_errs, flush_errs, corruption_errs, generation_errs",errors,"BTRFS Device Errors",line,"device_id, filesystem_uuid, filesystem_label",proc.plugin,/sys/fs/btrfs
+powersupply.capacity,power device,capacity,percentage,Battery capacity,line,device,proc.plugin,/sys/class/power_supply
+powersupply.charge,power device,"empty_design, empty, now, full, full_design",Ah,Battery charge,line,device,proc.plugin,/sys/class/power_supply
+powersupply.energy,power device,"empty_design, empty, now, full, full_design",Wh,Battery energy,line,device,proc.plugin,/sys/class/power_supply
+powersupply.voltage,power device,"min_design, min, now, max, max_design",V,Power supply voltage,line,device,proc.plugin,/sys/class/power_supply

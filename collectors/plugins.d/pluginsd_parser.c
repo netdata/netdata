@@ -409,6 +409,7 @@ static PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, size_t nu
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
     rrdcontext_host_child_connected(host);
+    schedule_node_info_update(host);
 
     return PARSER_RC_OK;
 }
@@ -1692,10 +1693,10 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
         flags = SN_EMPTY_SLOT;
 
         if(u->v2.ml_locked)
-            ml_is_anomalous(rd, u->v2.end_time, 0, false);
+            ml_dimension_is_anomalous(rd, u->v2.end_time, 0, false);
     }
     else if(u->v2.ml_locked) {
-        if (ml_is_anomalous(rd, u->v2.end_time, value, true)) {
+        if (ml_dimension_is_anomalous(rd, u->v2.end_time, value, true)) {
             // clear anomaly bit: 0 -> is anomalous, 1 -> not anomalous
             flags &= ~((storage_number) SN_FLAG_NOT_ANOMALOUS);
         }
@@ -1901,6 +1902,12 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     return count;
 }
 
+PARSER_RC pluginsd_exit(char **words __maybe_unused, size_t num_words __maybe_unused, void *user __maybe_unused)
+{
+    info("PLUGINSD: plugin called EXIT.");
+    return PARSER_RC_STOP;
+}
+
 static void pluginsd_keywords_init_internal(PARSER *parser, PLUGINSD_KEYWORDS types, void (*add_func)(PARSER *parser, char *keyword, keyword_function func)) {
 
     if (types & PARSER_INIT_PLUGINSD) {
@@ -1911,6 +1918,8 @@ static void pluginsd_keywords_init_internal(PARSER *parser, PLUGINSD_KEYWORDS ty
         add_func(parser, PLUGINSD_KEYWORD_HOST_DEFINE_END, pluginsd_host_define_end);
         add_func(parser, PLUGINSD_KEYWORD_HOST_LABEL, pluginsd_host_labels);
         add_func(parser, PLUGINSD_KEYWORD_HOST, pluginsd_host);
+
+        add_func(parser, PLUGINSD_KEYWORD_EXIT, pluginsd_exit);
     }
 
     if (types & (PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING)) {

@@ -74,6 +74,9 @@ collectors/ebpf.plugin/reset_netdata_trace.sh
 !ebpf.plugin/
 collectors/ebpf.plugin/includes/
 
+debugfs.plugin
+!debugfs.plugin/
+
 # protoc generated files
 *.pb.cc
 *.pb.h
@@ -115,19 +118,20 @@ web/gui/version.txt
 /node_modules/
 /coverage/
 
-system/netdata-lsb
-system/netdata-openrc
-system/netdata-init-d
-system/netdata.logrotate
-system/netdata.service
-system/netdata.service.*
-system/netdata-updater.service
-!system/netdata.service.in
-!system/netdata.service.*.in
-system/netdata.plist
-system/netdata-freebsd
-system/netdata.crontab
 system/install-service.sh
+system/netdata.logrotate
+system/cron/netdata-updater-daily
+system/freebsd/rc.d/netdata
+system/initd/init.d/netdata
+system/launchd/netdata.plist
+system/lsb/init.d/netdata
+system/openrc/init.d/netdata
+system/runit/run
+system/systemd/netdata.service
+system/systemd/netdata.service.*
+system/systemd/netdata-updater.service
+!system/systemd/netdata.service.in
+!system/systemd/netdata.service.*.in
 
 daemon/anonymous-statistics.sh
 daemon/get-kubernetes-labels.sh
@@ -227,10 +231,6 @@ Session.*.vim
 
 # Jupyter notebook checkpoints
 .ipynb_checkpoints
-
-# Judy stuff
-JudyLTables.c
-judyltablesgen
 
 # m4 generated ksys
 database/engine/journalfile_v2.ksy

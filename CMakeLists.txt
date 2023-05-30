@@ -86,7 +86,6 @@ pkg_check_modules(ZLIB REQUIRED zlib)
 set(NETDATA_COMMON_CFLAGS ${NETDATA_COMMON_CFLAGS} ${ZLIB_CFLAGS_OTHER})
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${ZLIB_LIBRARIES})
 set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${ZLIB_INCLUDE_DIRS})
-# set(NETDATA_REQUIRED_DEFINES "${NETDATA_REQUIRED_DEFINES} -DNETDATA_WITH_ZLIB=1")
 
 # -----------------------------------------------------------------------------
 # libuv multi-platform support library with a focus on asynchronous I/O
@@ -352,8 +351,7 @@ ENDIF()
 # Detect ml dependencies
 file(STRINGS "${CMAKE_SOURCE_DIR}/config.h" DEFINE_ENABLE_ML REGEX "^#define ENABLE_ML 1$")
 IF(DEFINE_ENABLE_ML MATCHES ".+" AND
-   EXISTS "${CMAKE_SOURCE_DIR}/ml/dlib/dlib/all/source.cpp" AND
-   EXISTS "${CMAKE_SOURCE_DIR}/ml/json/single_include/nlohmann/json.hpp")
+   EXISTS "${CMAKE_SOURCE_DIR}/ml/dlib/dlib/all/source.cpp")
     set(ENABLE_ML True)
     list(APPEND NETDATA_COMMON_CFLAGS "-DDLIB_NO_GUI_SUPPORT")
     list(APPEND NETDATA_COMMON_INCLUDE_DIRS "ml/dlib")
@@ -388,34 +386,13 @@ set(LIBJUDY_SOURCES
         libnetdata/libjudy/src/JudyL/JudyLNextEmpty.c
         libnetdata/libjudy/src/JudyL/JudyLPrev.c
         libnetdata/libjudy/src/JudyL/JudyLPrevEmpty.c
-        JudyLTables.c
+        libnetdata/libjudy/src/JudyL/JudyLTables.c
         libnetdata/libjudy/src/JudyHS/JudyHS.c)
 
 ADD_LIBRARY(judy STATIC
              ${LIBJUDY_SOURCES})
 
-ADD_EXECUTABLE(judyltablesgen
-    libnetdata/libjudy/src/JudyL/JudyLTablesGen.c)
-
-target_include_directories(judyltablesgen PUBLIC
-    libnetdata/libjudy/src
-    libnetdata/libjudy/src/JudyCommon)
-
-target_compile_options(judyltablesgen PUBLIC
-    -Wno-format
-    -Wno-format-security)
-
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/libnetdata/libjudy/src)
-
-target_compile_definitions(judyltablesgen PUBLIC
-    JU_64BIT
-    JUDYL)
-
-add_custom_command(
-  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/JudyLTables.c
-  COMMAND judyltablesgen
-  DEPENDS judyltablesgen
-  )
 
 target_include_directories(judy PUBLIC
     libnetdata/libjudy/src
@@ -514,6 +491,7 @@ set(LIBNETDATA_FILES
         libnetdata/worker_utilization/worker_utilization.h
 		libnetdata/parser/parser.h
 		libnetdata/parser/parser.c
+        libnetdata/http/http_defs.h
         )
 
 IF(ENABLE_PLUGIN_EBPF)
@@ -528,6 +506,13 @@ target_include_directories(libnetdata BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
 
 set(APPS_PLUGIN_FILES
         collectors/apps.plugin/apps_plugin.c)
+
+set(DEBUGFS_PLUGIN_FILES
+        collectors/debugfs.plugin/debugfs_plugin.c
+        collectors/debugfs.plugin/debugfs_plugin.h
+        collectors/debugfs.plugin/debugfs_extfrag.c
+        collectors/debugfs.plugin/debugfs_zswap.c
+        )
 
 set(FREEBSD_PLUGIN_FILES
         collectors/freebsd.plugin/plugin_freebsd.c
@@ -718,12 +703,21 @@ set(STATSD_PLUGIN_FILES
         )
 
 set(RRD_PLUGIN_FILES
+        database/contexts/api_v1.c
+        database/contexts/api_v2.c
+        database/contexts/context.c
+        database/contexts/instance.c
+        database/contexts/internal.h
+        database/contexts/metric.c
+        database/contexts/query_scope.c
+        database/contexts/query_target.c
+        database/contexts/rrdcontext.c
+        database/contexts/rrdcontext.h
+        database/contexts/worker.c
         database/rrdcalc.c
         database/rrdcalc.h
         database/rrdcalctemplate.c
         database/rrdcalctemplate.h
-        database/rrdcontext.c
-        database/rrdcontext.h
         database/rrddim.c
         database/rrddimvar.c
         database/rrddimvar.h
@@ -747,7 +741,7 @@ set(RRD_PLUGIN_FILES
         database/sqlite/sqlite_metadata.h
         database/sqlite/sqlite_functions.c
         database/sqlite/sqlite_functions.h
-		database/sqlite/sqlite_context.c
+        database/sqlite/sqlite_context.c
         database/sqlite/sqlite_context.h
         database/sqlite/sqlite_db_migration.c
         database/sqlite/sqlite_db_migration.h
@@ -796,8 +790,12 @@ set(WEB_PLUGIN_FILES
         )
 
 set(API_PLUGIN_FILES
+        web/api/web_api.c
+        web/api/web_api.h
         web/api/web_api_v1.c
         web/api/web_api_v1.h
+        web/api/web_api_v2.c
+        web/api/web_api_v2.h
         web/api/badges/web_buffer_svg.c
         web/api/badges/web_buffer_svg.h
         web/api/exporters/allmetrics.c
@@ -851,6 +849,8 @@ set(API_PLUGIN_FILES
         web/api/formatters/rrdset2json.c
         web/api/formatters/rrdset2json.h
         web/api/health/health_cmdapi.c
+        web/rtc/webrtc.c
+        web/rtc/webrtc.h
         )
 
 set(STREAMING_PLUGIN_FILES
@@ -874,6 +874,8 @@ set(ACLK_ALWAYS_BUILD
         aclk/aclk_proxy.h
         aclk/aclk.c
         aclk/aclk.h
+        aclk/aclk_capas.c
+        aclk/aclk_capas.h
         )
 
 set(ACLK_FILES
@@ -897,8 +899,6 @@ set(ACLK_FILES
         aclk/aclk_alarm_api.h
         aclk/aclk_contexts_api.c
         aclk/aclk_contexts_api.h
-        aclk/aclk_capas.c
-        aclk/aclk_capas.h
         aclk/schema-wrappers/connection.cc
         aclk/schema-wrappers/connection.h
         aclk/schema-wrappers/node_connection.cc
@@ -922,6 +922,8 @@ set(ACLK_FILES
         aclk/schema-wrappers/schema_wrappers.h
         aclk/schema-wrappers/schema_wrapper_utils.cc
         aclk/schema-wrappers/schema_wrapper_utils.h
+        aclk/schema-wrappers/agent_cmds.cc
+        aclk/schema-wrappers/agent_cmds.h
         aclk/helpers/mqtt_wss_pal.h
         aclk/helpers/ringbuffer_pal.h
         )
@@ -1033,24 +1035,10 @@ set(ML_FILES
 IF(ENABLE_ML)
     message(STATUS "ML: enabled")
     list(APPEND ML_FILES
-            ml/ADCharts.h
-            ml/ADCharts.cc
-            ml/Chart.h
-            ml/Chart.cc
-            ml/Config.h
+            ml/ad_charts.h
+            ml/ad_charts.cc
             ml/Config.cc
-            ml/Dimension.h
-            ml/Dimension.cc
-            ml/Host.h
-            ml/Host.cc
-            ml/Mutex.h
-            ml/Query.h
-            ml/KMeans.h
-            ml/KMeans.cc
-            ml/SamplesBuffer.h
-            ml/SamplesBuffer.cc
             ml/dlib/dlib/all/source.cpp
-            ml/json/single_include/nlohmann/json.hpp
             ml/ml.cc
             ml/ml-private.h
     )
@@ -1259,6 +1247,7 @@ set(ACLK_PROTO_DEFS
         aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto
         aclk/aclk-schemas/proto/context/v1/context.proto
         aclk/aclk-schemas/proto/context/v1/stream.proto
+        aclk/aclk-schemas/proto/agent/v1/cmds.proto
         )
 PROTOBUF_ACLK_GENERATE_CPP(ACLK_PROTO_BUILT_SRCS ACLK_PROTO_BUILT_HDRS ${ACLK_PROTO_DEFS})
 
@@ -1379,6 +1368,21 @@ target_link_libraries (netdatacli libnetdata ${NETDATA_COMMON_LIBRARIES})
 target_include_directories(netdatacli PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
 target_include_directories(netdatacli BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
 target_compile_options(netdatacli PUBLIC ${NETDATA_COMMON_CFLAGS})
+
+
+# -----------------------------------------------------------------------------
+# debugfs.plugin
+
+IF(ENABLE_PLUGIN_DEBUGFS)
+    message(STATUS "debugfs.plugin: enabled")
+    add_executable(debugfs.plugin ${GENERATED_CONFIG_H} ${DEBUGFS_PLUGIN_FILES})
+    target_link_libraries (debugfs.plugin libnetdata ${NETDATA_COMMON_LIBRARIES} ${CAP_LIBRARIES})
+    target_include_directories(debugfs.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${CAP_INCLUDE_DIRS})
+    target_include_directories(debugfs.plugin BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
+    target_compile_options(debugfs.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${CAP_CFLAGS_OTHER})
+ELSE()
+    message(STATUS "debugfs.plugin: disabled")
+ENDIF()
 
 
 # -----------------------------------------------------------------------------

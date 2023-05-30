@@ -9,9 +9,9 @@
 
 static int is_matches_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN *filter) {
     if (instance->config.options & EXPORTING_OPTION_SEND_NAMES) {
-        return simple_pattern_matches(filter, rrdset_name(st));
+        return simple_pattern_matches_string(filter, st->name);
     }
-    return simple_pattern_matches(filter, rrdset_id(st));
+    return simple_pattern_matches_string(filter, st->id);
 }
 
 /**
@@ -514,7 +514,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     int allhosts,
     PROMETHEUS_OUTPUT_OPTIONS output_options)
 {
-    SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT);
+    SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT, true);
 
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
     prometheus_label_copy(hostname, rrdhost_hostname(host), PROMETHEUS_ELEMENT_MAX);

@@ -1,0 +1,23 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+oracledb.session_count,,"total, active",sessions,Session Count,line,,python.d.plugin,oracledb
+oracledb.session_limit_usage,,usage,%,Session Limit Usage,area,,python.d.plugin,oracledb
+oracledb.logons,,logons,events/s,Logons,area,,python.d.plugin,oracledb
+oracledb.physical_disk_read_writes,,"reads, writes",events/s,Physical Disk Reads/Writes,area,,python.d.plugin,oracledb
+oracledb.sorts_on_disks,,sorts,events/s,Sorts On Disk,line,,python.d.plugin,oracledb
+oracledb.full_table_scans,,full table scans,events/s,Full Table Scans,line,,python.d.plugin,oracledb
+oracledb.database_wait_time_ratio,,wait time ratio,%,Database Wait Time Ratio,line,,python.d.plugin,oracledb
+oracledb.shared_pool_free_memory,,free memory,%,Shared Pool Free Memory,line,,python.d.plugin,oracledb
+oracledb.in_memory_sorts_ratio,,in-memory sorts,%,In-Memory Sorts Ratio,line,,python.d.plugin,oracledb
+oracledb.sql_service_response_time,,time,seconds,SQL Service Response Time,line,,python.d.plugin,oracledb
+oracledb.user_rollbacks,,rollbacks,events/s,User Rollbacks,line,,python.d.plugin,oracledb
+oracledb.enqueue_timeouts,,enqueue timeouts,events/s,Enqueue Timeouts,line,,python.d.plugin,oracledb
+oracledb.cache_hit_ration,,"buffer, cursor, library, row",%,Cache Hit Ratio,stacked,,python.d.plugin,oracledb
+oracledb.global_cache_blocks,,"corrupted, lost",events/s,Global Cache Blocks Events,area,,python.d.plugin,oracledb
+oracledb.activity,,"parse count, execute count, user commits, user rollbacks",events/s,Activities,stacked,,python.d.plugin,oracledb
+oracledb.wait_time,,"application, configuration, administrative, concurrency, commit, network, user I/O, system I/O, scheduler, other",ms,Wait Time,stacked,,python.d.plugin,oracledb
+oracledb.tablespace_size,,a dimension per active tablespace,KiB,Size,line,,python.d.plugin,oracledb
+oracledb.tablespace_usage,,a dimension per active tablespace,KiB,Usage,line,,python.d.plugin,oracledb
+oracledb.tablespace_usage_in_percent,,a dimension per active tablespace,%,Usage,line,,python.d.plugin,oracledb
+oracledb.allocated_size,,a dimension per active tablespace,B,Size,line,,python.d.plugin,oracledb
+oracledb.allocated_usage,,a dimension per active tablespace,B,Usage,line,,python.d.plugin,oracledb
+oracledb.allocated_usage_in_percent,,a dimension per active tablespace,%,Usage,line,,python.d.plugin,oracledb

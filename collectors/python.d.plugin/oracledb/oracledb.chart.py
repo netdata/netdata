@@ -8,11 +8,17 @@ from copy import deepcopy
 from bases.FrameworkServices.SimpleService import SimpleService
 
 try:
-    import cx_Oracle
+    import oracledb as cx_Oracle
 
-    HAS_ORACLE = True
+    HAS_ORACLE_NEW = True
+    HAS_ORACLE_OLD = False
 except ImportError:
-    HAS_ORACLE = False
+    HAS_ORACLE_NEW = False
+    try:
+        import cx_Oracle
+        HAS_ORACLE_OLD = True
+    except ImportError:
+        HAS_ORACLE_OLD = False
 
 ORDER = [
     'session_count',
@@ -187,7 +193,7 @@ CHARTS = {
     },
 }
 
-CX_CONNECT_STRING = "{0}/{1}@//{2}/{3}"
+CX_CONNECT_STRING_OLD = "{0}/{1}@//{2}/{3}"
 
 QUERY_SYSTEM = '''
 SELECT
@@ -330,18 +336,24 @@ class Service(SimpleService):
         if self.conn:
             self.conn.close()
             self.conn = None
-
-        try:
-            self.conn = cx_Oracle.connect(
-                CX_CONNECT_STRING.format(
-                    self.user,
-                    self.password,
-                    self.server,
-                    self.service,
-                ))
-        except cx_Oracle.DatabaseError as error:
-            self.error(error)
-            return False
+        if HAS_ORACLE_NEW:
+            try:
+                self.conn = cx_Oracle.connect(f'{self.user}/{self.password}@tcps://{self.server}/{self.service}')
+            except cx_Oracle.DatabaseError as error:
+                self.error(error)
+                return False
+        else:
+            try:
+                self.conn = cx_Oracle.connect(
+                    CX_CONNECT_STRING_OLD.format(
+                        self.user,
+                        self.password,
+                        self.server,
+                        self.service,
+                    ))
+            except cx_Oracle.DatabaseError as error:
+                self.error(error)
+                return False
 
         self.alive = True
         return True
@@ -350,15 +362,15 @@ class Service(SimpleService):
         return self.connect()
 
     def check(self):
-        if not HAS_ORACLE:
-            self.error("'cx_Oracle' package is needed to use oracledb module")
+        if not HAS_ORACLE_NEW and not HAS_ORACLE_OLD:
+            self.error("'oracledb' package is needed to use oracledb module")
             return False
 
         if not all([
             self.user,
             self.password,
             self.server,
-            self.service,
+            self.service
         ]):
             self.error("one of these parameters is not specified: user, password, server, service")
             return False

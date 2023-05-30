@@ -33,6 +33,9 @@
 #define NETDATA_SYSTEMD_FD_CLOSE_CONTEXT "services.fd_close"
 #define NETDATA_SYSTEMD_FD_CLOSE_ERR_CONTEXT "services.fd_close_error"
 
+// ARAL name
+#define NETDATA_EBPF_FD_ARAL_NAME "ebpf_fd"
+
 typedef struct netdata_fd_stat {
     uint32_t open_call;                    // Open syscalls (open and openat)
     uint32_t close_call;                   // Close syscall (close)
@@ -80,8 +83,8 @@ enum fd_close_syscall {
 
 void *ebpf_fd_thread(void *ptr);
 void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr);
+void ebpf_fd_release(netdata_fd_stat_t *stat);
 extern struct config fd_config;
-extern netdata_fd_stat_t **fd_pid;
 extern netdata_ebpf_targets_t fd_targets[];
 
 #endif /* NETDATA_EBPF_FD_H */

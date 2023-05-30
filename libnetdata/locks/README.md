@@ -7,6 +7,8 @@ learn_topic_type: "Tasks"
 learn_rel_path: "Developers/libnetdata"
 -->
 
+# Locks
+
 ## How to trace netdata locks
 
 To enable tracing rwlocks in netdata, compile netdata by setting `CFLAGS="-DNETDATA_TRACE_RWLOCKS=1"`, like this:

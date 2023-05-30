@@ -47,18 +47,18 @@ static void oomkill_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 static void oomkill_write_data(int32_t *keys, uint32_t total)
 {
     // for each app, see if it was OOM killed. record as 1 if so otherwise 0.
-    struct target *w;
+    struct ebpf_target *w;
     for (w = apps_groups_root_target; w != NULL; w = w->next) {
         if (likely(w->exposed && w->processes)) {
             bool was_oomkilled = false;
-            struct pid_on_target *pids = w->root_pid;
+            struct ebpf_pid_on_target *pids = w->root_pid;
             while (pids) {
                 uint32_t j;
                 for (j = 0; j < total; j++) {
@@ -299,27 +299,28 @@ static void oomkill_collector(ebpf_module_t *em)
     int counter = update_every - 1;
     while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
-        if (!ebpf_exit_plugin || ++counter != update_every)
+        if (ebpf_exit_plugin || ++counter != update_every)
             continue;
 
         counter = 0;
-        pthread_mutex_lock(&collect_data_mutex);
-        pthread_mutex_lock(&lock);
 
         uint32_t count = oomkill_read_data(keys);
-        if (cgroups && count)
-            ebpf_update_oomkill_cgroup(keys, count);
+        if (!count)
+            continue;
 
-        // write everything from the ebpf map.
-        if (cgroups)
+        pthread_mutex_lock(&collect_data_mutex);
+        pthread_mutex_lock(&lock);
+        if (cgroups) {
+            ebpf_update_oomkill_cgroup(keys, count);
+            // write everything from the ebpf map.
             ebpf_oomkill_send_cgroup_data(update_every);
+        }
 
         if (em->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
             write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_OOMKILL_CHART);
             oomkill_write_data(keys, count);
             write_end_chart();
         }
-
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
     }
@@ -334,7 +335,7 @@ static void oomkill_collector(ebpf_module_t *em)
  */
 void ebpf_oomkill_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    struct target *root = ptr;
+    struct ebpf_target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_OOMKILL_CHART,
                                "OOM kills",
                                EBPF_COMMON_DIMENSION_KILLS,
@@ -361,37 +362,36 @@ void *ebpf_oomkill_thread(void *ptr)
     em->maps = oomkill_maps;
 
 #define NETDATA_DEFAULT_OOM_DISABLED_MSG "Disabling OOMKILL thread, because"
-    if (unlikely(!all_pids || !em->apps_charts)) {
+    if (unlikely(!ebpf_all_pids || !em->apps_charts)) {
         // When we are not running integration with apps, we won't fill necessary variables for this thread to run, so
         // we need to disable it.
-        if (em->thread->enabled)
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (em->enabled)
             info("%s apps integration is completely disabled.", NETDATA_DEFAULT_OOM_DISABLED_MSG);
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+        goto endoomkill;
     } else if (running_on_kernel < NETDATA_EBPF_KERNEL_4_14) {
-        if (em->thread->enabled)
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (em->enabled)
             info("%s kernel does not have necessary tracepoints.", NETDATA_DEFAULT_OOM_DISABLED_MSG);
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
-    }
-
-    if (em->thread->enabled == NETDATA_THREAD_EBPF_STOPPED) {
         goto endoomkill;
     }
 
     if (ebpf_enable_tracepoints(oomkill_tracepoints) == 0) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endoomkill;
     }
 
     em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
     if (!em->probe_links) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endoomkill;
     }
 
     pthread_mutex_lock(&lock);
     ebpf_update_stats(&plugin_statistics, em);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
     pthread_mutex_unlock(&lock);
 
     oomkill_collector(em);

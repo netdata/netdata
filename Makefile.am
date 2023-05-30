@@ -37,6 +37,8 @@ EXTRA_DIST = \
     build/m4/ax_c_mallopt.m4 \
     build/m4/tcmalloc.m4 \
     build/m4/ax_c__generic.m4 \
+    build/m4/ax_compiler_vendor.m4 \
+    build/m4/ax_cxx_compile_stdcxx.m4 \
     ml/dlib \
     README.md \
     LICENSE \
@@ -52,7 +54,6 @@ SUBDIRS = \
 dist_noinst_DATA = \
     CHANGELOG.md \
     cppcheck.sh \
-    configs.signatures \
     contrib \
     docs \
     mqtt_websockets \
@@ -73,12 +74,15 @@ dist_noinst_DATA = \
     packaging/installer/UPDATE.md \
     packaging/jsonc.checksums \
     packaging/jsonc.version \
+    packaging/yaml.checksums \
+    packaging/yaml.version \
     packaging/libbpf.checksums \
     packaging/libbpf.version \
     packaging/protobuf.checksums \
     packaging/protobuf.version \
     packaging/version \
     database/engine/journalfile_v2.ksy.in \
+    httpd/h2o \
     $(NULL)
 
 # until integrated within build
@@ -113,10 +117,11 @@ SUBDIRS += \
 AM_CFLAGS = \
     $(OPTIONAL_MATH_CFLAGS) \
     $(OPTIONAL_NFACCT_CFLAGS) \
-    $(OPTIONAL_ZLIB_CFLAGS) \
+    $(ZLIB_CFLAGS) \
     $(OPTIONAL_UUID_CFLAGS) \
     $(OPTIONAL_MQTT_CFLAGS) \
     $(OPTIONAL_LIBCAP_LIBS) \
+    $(OPTIONAL_DATACHANNEL_CFLAGS) \
     $(OPTIONAL_IPMIMONITORING_CFLAGS) \
     $(OPTIONAL_CUPS_CFLAGS) \
     $(OPTIONAL_XENSTAT_CFLAGS) \
@@ -192,6 +197,7 @@ LIBNETDATA_FILES = \
     libnetdata/string/utf8.h \
     libnetdata/worker_utilization/worker_utilization.c \
     libnetdata/worker_utilization/worker_utilization.h \
+    libnetdata/http/http_defs.h \
     $(NULL)
 
 if ENABLE_PLUGIN_EBPF
@@ -203,6 +209,14 @@ endif
 
 APPS_PLUGIN_FILES = \
     collectors/apps.plugin/apps_plugin.c \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+
+DEBUGFS_PLUGIN_FILES = \
+    collectors/debugfs.plugin/debugfs_plugin.c \
+    collectors/debugfs.plugin/debugfs_plugin.h \
+    collectors/debugfs.plugin/debugfs_extfrag.c \
+    collectors/debugfs.plugin/debugfs_zswap.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
@@ -235,37 +249,18 @@ ML_FILES = \
 if ENABLE_ML
 
 ML_FILES += \
-    ml/ADCharts.h \
-    ml/ADCharts.cc \
-    ml/Config.h \
+    ml/ad_charts.h \
+    ml/ad_charts.cc \
     ml/Config.cc \
-    ml/Chart.cc \
-    ml/Chart.h \
-    ml/Stats.h \
-    ml/Dimension.cc \
-    ml/Dimension.h \
-    ml/Host.h \
-    ml/Host.cc \
-    ml/Mutex.h \
-    ml/Queue.h \
-    ml/Query.h \
-    ml/KMeans.h \
-    ml/KMeans.cc \
-    ml/SamplesBuffer.h \
-    ml/SamplesBuffer.cc \
     ml/dlib/dlib/all/source.cpp \
-    ml/json/single_include/nlohmann/json.hpp \
-    ml/ml.cc \
     ml/ml-private.h \
+    ml/ml.cc \
     $(NULL)
 
 # Disable warnings from dlib library
 ml/dlib/dlib/all/source.$(OBJEXT) : CXXFLAGS += -Wno-sign-compare -Wno-type-limits -Wno-aggressive-loop-optimizations -Wno-stringop-overflow -Wno-psabi
 
 # Disable ml warnings
-ml/Dimension.$(OBJEXT) : CXXFLAGS += -Wno-psabi
-ml/Host.$(OBJEXT) : CXXFLAGS += -Wno-psabi
-ml/KMeans.$(OBJEXT) : CXXFLAGS += -Wno-psabi
 ml/ml.$(OBJEXT) : CXXFLAGS += -Wno-psabi
 
 endif
@@ -427,12 +422,21 @@ PLUGINSD_PLUGIN_FILES = \
     $(NULL)
 
 RRD_PLUGIN_FILES = \
+    database/contexts/rrdcontext.c \
+    database/contexts/rrdcontext.h \
+    database/contexts/metric.c \
+    database/contexts/instance.c \
+    database/contexts/context.c \
+    database/contexts/worker.c \
+    database/contexts/query_target.c \
+    database/contexts/query_scope.c \
+    database/contexts/api_v1.c \
+    database/contexts/api_v2.c \
+    database/contexts/internal.h \
     database/rrdcalc.c \
     database/rrdcalc.h \
     database/rrdcalctemplate.c \
     database/rrdcalctemplate.h \
-    database/rrdcontext.c \
-    database/rrdcontext.h \
     database/rrddim.c \
     database/rrddimvar.c \
     database/rrddimvar.h \
@@ -505,14 +509,9 @@ libjudy_a_SOURCES = libnetdata/libjudy/src/Judy.h \
     libnetdata/libjudy/src/JudyL/JudyLNextEmpty.c \
     libnetdata/libjudy/src/JudyL/JudyLPrev.c \
     libnetdata/libjudy/src/JudyL/JudyLPrevEmpty.c \
+    libnetdata/libjudy/src/JudyL/JudyLTables.c \
     libnetdata/libjudy/src/JudyHS/JudyHS.c \
     $(NULL)
-
-nodist_libjudy_a_SOURCES = JudyLTables.c
-
-BUILT_SOURCES += JudyLTables.c
-
-CLEANFILES += JudyLTables.c
 
 libjudy_a_CFLAGS = $(LIBJUDY_CFLAGS) -DJUDYL -I$(abs_top_srcdir)/libnetdata/libjudy/src -I$(abs_top_srcdir)/libnetdata/libjudy/src/JudyCommon -Wno-sign-compare -Wno-implicit-fallthrough
 
@@ -522,16 +521,6 @@ libnetdata/libjudy/src/JudyL/libjudy_a-JudyLNext.$(OBJEXT) : CFLAGS += -DJUDYNEX
 libnetdata/libjudy/src/JudyL/libjudy_a-JudyLNextEmpty.$(OBJEXT) : CFLAGS += -DJUDYNEXT
 libnetdata/libjudy/src/JudyL/libjudy_a-JudyLByCount.$(OBJEXT) : CFLAGS +=  -DNOSMARTJBB -DNOSMARTJBU -DNOSMARTJLB
 libnetdata/libjudy/src/JudyL/libjudy_a-j__udyLGet.$(OBJEXT) : CFLAGS +=  -DJUDYGETINLINE
-
-noinst_PROGRAMS = judyltablesgen
-
-judyltablesgen_SOURCES = libnetdata/libjudy/src/JudyL/JudyLTablesGen.c
-judyltablesgen_CFLAGS = $(LIBJUDY_CFLAGS) -DJUDYL -I$(abs_top_srcdir)/libnetdata/libjudy/src -I$(abs_top_srcdir)/libnetdata/libjudy/src/JudyCommon -Wno-sign-compare -Wno-implicit-fallthrough
-
-$(builddir)/judyltablesgen$(EXEEXT) : CFLAGS += -Wno-format -Wno-format-security
-
-JudyLTables.c: $(abs_top_srcdir)/libnetdata/libjudy/src/JudyL/JudyLTablesGen.c $(builddir)/judyltablesgen$(EXEEXT)
-	$(builddir)/judyltablesgen$(EXEEXT)
 
 libjudy_a-JudyLTables.$(OBJEXT) : CFLAGS += -I$(abs_top_srcdir)/libnetdata/libjudy/src/JudyL
 
@@ -628,8 +617,12 @@ API_PLUGIN_FILES = \
     web/api/formatters/rrdset2json.h \
     web/api/health/health_cmdapi.c \
     web/api/health/health_cmdapi.h \
+    web/api/web_api.c \
+    web/api/web_api.h \
     web/api/web_api_v1.c \
     web/api/web_api_v1.h \
+    web/api/web_api_v2.c \
+    web/api/web_api_v2.h \
     $(NULL)
 
 STREAMING_PLUGIN_FILES = \
@@ -663,6 +656,8 @@ STATSD_PLUGIN_FILES = \
     $(NULL)
 
 WEB_PLUGIN_FILES = \
+    web/rtc/webrtc.c \
+    web/rtc/webrtc.h \
     web/server/web_client.c \
     web/server/web_client.h \
     web/server/web_server.c \
@@ -700,8 +695,6 @@ ACLK_FILES = \
     aclk/aclk_alarm_api.h \
     aclk/aclk_contexts_api.c \
     aclk/aclk_contexts_api.h \
-    aclk/aclk_capas.c \
-    aclk/aclk_capas.h \
     aclk/helpers/mqtt_wss_pal.h \
     aclk/helpers/ringbuffer_pal.h \
     aclk/schema-wrappers/connection.cc \
@@ -727,6 +720,8 @@ ACLK_FILES = \
     aclk/schema-wrappers/context_stream.h \
     aclk/schema-wrappers/context.cc \
     aclk/schema-wrappers/context.h \
+    aclk/schema-wrappers/agent_cmds.cc \
+    aclk/schema-wrappers/agent_cmds.h \
     $(NULL)
 
 noinst_LIBRARIES += libmqttwebsockets.a
@@ -748,7 +743,8 @@ libmqttwebsockets_a_SOURCES = \
     mqtt_websockets/c-rbuf/src/ringbuffer_internal.h \
     mqtt_websockets/c_rhash/src/c_rhash.c \
     mqtt_websockets/c_rhash/include/c_rhash.h \
-    mqtt_websockets/c_rhash/src/c_rhash_internal.h
+    mqtt_websockets/c_rhash/src/c_rhash_internal.h \
+    $(NULL)
 
 libmqttwebsockets_a_CFLAGS = $(CFLAGS) -DMQTT_WSS_CUSTOM_ALLOC -DRBUF_CUSTOM_MALLOC -DMQTT_WSS_CPUSTATS -I$(srcdir)/aclk/helpers -I$(srcdir)/mqtt_websockets/c_rhash/include
 
@@ -769,6 +765,7 @@ ACLK_PROTO_DEFINITIONS = \
     aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto \
     aclk/aclk-schemas/proto/context/v1/context.proto \
     aclk/aclk-schemas/proto/context/v1/stream.proto \
+    aclk/aclk-schemas/proto/agent/v1/cmds.proto \
     $(NULL)
 
 dist_noinst_DATA += $(ACLK_PROTO_DEFINITIONS)
@@ -793,6 +790,8 @@ ACLK_PROTO_BUILT_FILES = aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
     aclk/aclk-schemas/proto/context/v1/context.pb.h \
     aclk/aclk-schemas/proto/context/v1/stream.pb.cc \
     aclk/aclk-schemas/proto/context/v1/stream.pb.h \
+    aclk/aclk-schemas/proto/agent/v1/cmds.pb.cc \
+    aclk/aclk-schemas/proto/agent/v1/cmds.pb.h \
     $(NULL)
 
 BUILT_SOURCES += $(ACLK_PROTO_BUILT_FILES)
@@ -839,6 +838,10 @@ aclk/aclk-schemas/proto/context/v1/stream.pb.cc \
 aclk/aclk-schemas/proto/context/v1/stream.pb.h: aclk/aclk-schemas/proto/context/v1/stream.proto
 	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
 
+aclk/aclk-schemas/proto/agent/v1/cmds.pb.cc \
+aclk/aclk-schemas/proto/agent/v1/cmds.pb.h: aclk/aclk-schemas/proto/agent/v1/cmds.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
 endif #ENABLE_ACLK
 
 ACLK_ALWAYS_BUILD_FILES = \
@@ -847,6 +850,8 @@ ACLK_ALWAYS_BUILD_FILES = \
     aclk/aclk_proxy.h \
     aclk/aclk.c \
     aclk/aclk.h \
+    aclk/aclk_capas.c \
+    aclk/aclk_capas.h \
     $(NULL)
 
 SPAWN_PLUGIN_FILES = \
@@ -929,6 +934,123 @@ DAEMON_FILES = \
     daemon/unit_test.h \
     $(NULL)
 
+HTTPD_FILES = \
+    httpd/http_server.c \
+    httpd/http_server.h \
+    httpd/h2o_utils.c \
+    httpd/h2o_utils.h \
+    $(NULL)
+
+libh2o_dir = httpd/h2o
+
+libh2o_a_SOURCES = \
+    $(libh2o_dir)/deps/cloexec/cloexec.c \
+    $(libh2o_dir)/deps/libgkc/gkc.c \
+    $(libh2o_dir)/deps/libyrmcds/close.c \
+    $(libh2o_dir)/deps/libyrmcds/connect.c \
+    $(libh2o_dir)/deps/libyrmcds/recv.c \
+    $(libh2o_dir)/deps/libyrmcds/send.c \
+    $(libh2o_dir)/deps/libyrmcds/send_text.c \
+    $(libh2o_dir)/deps/libyrmcds/socket.c \
+    $(libh2o_dir)/deps/libyrmcds/strerror.c \
+    $(libh2o_dir)/deps/libyrmcds/text_mode.c \
+    $(libh2o_dir)/deps/picohttpparser/picohttpparser.c \
+    $(libh2o_dir)/lib/common/cache.c \
+    $(libh2o_dir)/lib/common/file.c \
+    $(libh2o_dir)/lib/common/filecache.c \
+    $(libh2o_dir)/lib/common/hostinfo.c \
+    $(libh2o_dir)/lib/common/http1client.c \
+    $(libh2o_dir)/lib/common/memcached.c \
+    $(libh2o_dir)/lib/common/memory.c \
+    $(libh2o_dir)/lib/common/multithread.c \
+    $(libh2o_dir)/lib/common/serverutil.c \
+    $(libh2o_dir)/lib/common/socket.c \
+    $(libh2o_dir)/lib/common/socketpool.c \
+    $(libh2o_dir)/lib/common/string.c \
+    $(libh2o_dir)/lib/common/time.c \
+    $(libh2o_dir)/lib/common/timeout.c \
+    $(libh2o_dir)/lib/common/url.c \
+    $(libh2o_dir)/lib/core/config.c \
+    $(libh2o_dir)/lib/core/configurator.c \
+    $(libh2o_dir)/lib/core/context.c \
+    $(libh2o_dir)/lib/core/headers.c \
+    $(libh2o_dir)/lib/core/logconf.c \
+    $(libh2o_dir)/lib/core/proxy.c \
+    $(libh2o_dir)/lib/core/request.c \
+    $(libh2o_dir)/lib/core/token.c \
+    $(libh2o_dir)/lib/core/util.c \
+    $(libh2o_dir)/lib/handler/access_log.c \
+    $(libh2o_dir)/lib/handler/chunked.c \
+    $(libh2o_dir)/lib/handler/compress.c \
+    $(libh2o_dir)/lib/handler/compress/gzip.c \
+    $(libh2o_dir)/lib/handler/errordoc.c \
+    $(libh2o_dir)/lib/handler/expires.c \
+    $(libh2o_dir)/lib/handler/fastcgi.c \
+    $(libh2o_dir)/lib/handler/file.c \
+    $(libh2o_dir)/lib/handler/headers.c \
+    $(libh2o_dir)/lib/handler/mimemap.c \
+    $(libh2o_dir)/lib/handler/proxy.c \
+    $(libh2o_dir)/lib/handler/redirect.c \
+    $(libh2o_dir)/lib/handler/reproxy.c \
+    $(libh2o_dir)/lib/handler/throttle_resp.c \
+    $(libh2o_dir)/lib/handler/status.c \
+    $(libh2o_dir)/lib/handler/headers_util.c \
+    $(libh2o_dir)/lib/handler/status/events.c \
+    $(libh2o_dir)/lib/handler/status/requests.c \
+    $(libh2o_dir)/lib/handler/http2_debug_state.c \
+    $(libh2o_dir)/lib/handler/status/durations.c \
+    $(libh2o_dir)/lib/handler/configurator/access_log.c \
+    $(libh2o_dir)/lib/handler/configurator/compress.c \
+    $(libh2o_dir)/lib/handler/configurator/errordoc.c \
+    $(libh2o_dir)/lib/handler/configurator/expires.c \
+    $(libh2o_dir)/lib/handler/configurator/fastcgi.c \
+    $(libh2o_dir)/lib/handler/configurator/file.c \
+    $(libh2o_dir)/lib/handler/configurator/headers.c \
+    $(libh2o_dir)/lib/handler/configurator/proxy.c \
+    $(libh2o_dir)/lib/handler/configurator/redirect.c \
+    $(libh2o_dir)/lib/handler/configurator/reproxy.c \
+    $(libh2o_dir)/lib/handler/configurator/throttle_resp.c \
+    $(libh2o_dir)/lib/handler/configurator/status.c \
+    $(libh2o_dir)/lib/handler/configurator/http2_debug_state.c \
+    $(libh2o_dir)/lib/handler/configurator/headers_util.c \
+    $(libh2o_dir)/lib/http1.c \
+    $(libh2o_dir)/lib/tunnel.c \
+    $(libh2o_dir)/lib/http2/cache_digests.c \
+    $(libh2o_dir)/lib/http2/casper.c \
+    $(libh2o_dir)/lib/http2/connection.c \
+    $(libh2o_dir)/lib/http2/frame.c \
+    $(libh2o_dir)/lib/http2/hpack.c \
+    $(libh2o_dir)/lib/http2/scheduler.c \
+    $(libh2o_dir)/lib/http2/stream.c \
+    $(libh2o_dir)/lib/http2/http2_debug_state.c \
+    $(NULL)
+
+libh2o_a_INCLUDES = \
+    -I$(srcdir)/$(libh2o_dir)/include \
+    -I$(srcdir)/$(libh2o_dir)/deps/cloexec \
+    -I$(srcdir)/$(libh2o_dir)/deps/brotli/enc \
+    -I$(srcdir)/$(libh2o_dir)/deps/golombset \
+    -I$(srcdir)/$(libh2o_dir)/deps/libgkc \
+    -I$(srcdir)/$(libh2o_dir)/deps/libyrmcds \
+    -I$(srcdir)/$(libh2o_dir)/deps/klib \
+    -I$(srcdir)/$(libh2o_dir)/deps/neverbleed \
+    -I$(srcdir)/$(libh2o_dir)/deps/picohttpparser \
+    -I$(srcdir)/$(libh2o_dir)/deps/picotest \
+    -I$(srcdir)/$(libh2o_dir)/deps/yaml/include \
+    -I$(srcdir)/$(libh2o_dir)/deps/yoml \
+    $(NULL)
+
+if ENABLE_HTTPD
+noinst_LIBRARIES += libh2o.a
+
+# until h2o updates support for OpenSSL 3.0 we silence the warnings
+libh2o_a_CFLAGS = $(CFLAGS) -Wno-deprecated-declarations -Wno-unused-parameter -Wno-sign-compare -Wno-missing-field-initializers -DH2O_USE_LIBUV=0 $(libh2o_a_INCLUDES)
+
+if LINUX
+    libh2o_a_CFLAGS += -D_GNU_SOURCE
+endif
+endif #ENABLE_HTTPD
+
 NETDATA_FILES = \
     collectors/all.h \
     $(DAEMON_FILES) \
@@ -978,15 +1100,17 @@ endif
 NETDATA_COMMON_LIBS = \
     $(OPTIONAL_MATH_LIBS) \
     $(OPTIONAL_BPF_LIBS) \
-    $(OPTIONAL_ZLIB_LIBS) \
+    $(ZLIB_LIBS) \
     $(OPTIONAL_SSL_LIBS) \
     $(OPTIONAL_UUID_LIBS) \
     $(OPTIONAL_MQTT_LIBS) \
     $(OPTIONAL_UV_LIBS) \
     $(OPTIONAL_LZ4_LIBS) \
+    $(OPTIONAL_DATACHANNEL_LIBS) \
     libjudy.a \
     $(OPTIONAL_SSL_LIBS) \
     $(OPTIONAL_JSONC_LIBS) \
+    $(OPTIONAL_YAML_LIBS) \
     $(OPTIONAL_ATOMIC_LIBS) \
     $(OPTIONAL_DL_LIBS) \
     $(NULL)
@@ -995,13 +1119,23 @@ if ENABLE_ACLK
     NETDATA_COMMON_LIBS += libmqttwebsockets.a
 endif
 
+if ENABLE_HTTPD
+    NETDATA_FILES += $(HTTPD_FILES)
+    NETDATA_COMMON_LIBS += libh2o.a
+endif
+
 if LINK_STATIC_JSONC
     NETDATA_COMMON_LIBS += $(abs_top_srcdir)/externaldeps/jsonc/libjson-c.a
 endif
 
+if LINK_STATIC_YAML
+    NETDATA_COMMON_LIBS += $(abs_top_srcdir)/externaldeps/libyaml/libyaml.a
+endif
+
 NETDATACLI_FILES = \
     daemon/commands.h \
-    $(LIBNETDATA_FILES) \
+    libnetdata/buffer/buffer.c \
+    libnetdata/buffer/buffer.h \
     cli/cli.c \
     cli/cli.h \
     $(NULL)
@@ -1037,6 +1171,15 @@ if ENABLE_PLUGIN_APPS
     plugins_PROGRAMS += apps.plugin
     apps_plugin_SOURCES = $(APPS_PLUGIN_FILES)
     apps_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(OPTIONAL_LIBCAP_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_DEBUGFS
+    plugins_PROGRAMS += debugfs.plugin
+    debugfs_plugin_SOURCES = $(DEBUGFS_PLUGIN_FILES)
+    debugfs_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_LIBCAP_LIBS) \
         $(NULL)

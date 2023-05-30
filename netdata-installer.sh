@@ -710,6 +710,70 @@ bundle_jsonc() {
 bundle_jsonc
 
 # -----------------------------------------------------------------------------
+build_yaml() {
+  env_cmd=''
+
+  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
+    env_cmd="env CFLAGS='-fPIC -pipe -Wno-unused-value' CXXFLAGS='-fPIC -pipe' LDFLAGS="
+  fi
+
+  cd "${1}" > /dev/null || return 1
+  run eval "${env_cmd} ./configure --disable-shared --disable-dependency-tracking --with-pic"
+  run eval "${env_cmd} ${make} ${MAKEOPTS}"
+  cd - > /dev/null || return 1
+}
+
+copy_yaml() {
+  target_dir="${PWD}/externaldeps/libyaml"
+
+  run mkdir -p "${target_dir}" || return 1
+
+  run cp "${1}/src/.libs/libyaml.a" "${target_dir}/libyaml.a" || return 1
+  run cp "${1}/include/yaml.h" "${target_dir}/" || return 1
+}
+
+bundle_yaml() {
+  if pkg-config yaml-0.1; then
+    return 0
+  fi
+
+  if [ -z "$(command -v cmake)" ]; then
+    run_failed "Could not find cmake, which is required to build YAML. Critical error."
+    return 0
+  fi
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling YAML."
+
+  progress "Prepare YAML"
+
+  YAML_PACKAGE_VERSION="$(cat packaging/yaml.version)"
+
+  tmp="$(mktemp -d -t netdata-yaml-XXXXXX)"
+  YAML_PACKAGE_BASENAME="yaml-${YAML_PACKAGE_VERSION}.tar.gz"
+
+  if fetch_and_verify "yaml" \
+    "https://github.com/yaml/libyaml/releases/download/${YAML_PACKAGE_VERSION}/${YAML_PACKAGE_BASENAME}" \
+    "${YAML_PACKAGE_BASENAME}" \
+    "${tmp}" \
+    "${NETDATA_LOCAL_TARBALL_OVERRIDE_YAML}"; then
+    if run tar --no-same-owner -xf "${tmp}/${YAML_PACKAGE_BASENAME}" -C "${tmp}" &&
+      build_yaml "${tmp}/yaml-${YAML_PACKAGE_VERSION}" &&
+      copy_yaml "${tmp}/yaml-${YAML_PACKAGE_VERSION}" &&
+      rm -rf "${tmp}"; then
+      run_ok "YAML built and prepared."
+    else
+      run_failed "Failed to build YAML, critical error."
+    fi
+  else
+    run_failed "Unable to fetch sources for YAML, critical error."
+  fi
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
+}
+
+bundle_yaml
+
+# -----------------------------------------------------------------------------
 
 get_kernel_version() {
   r="$(uname -r | cut -f 1 -d '-')"
@@ -993,63 +1057,6 @@ fi
 [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Installing Netdata."
 
 # -----------------------------------------------------------------------------
-
-# shellcheck disable=SC2230
-md5sum="$(command -v md5sum 2> /dev/null || command -v md5 2> /dev/null)"
-
-deleted_stock_configs=0
-if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-done" ]; then
-
-  progress "Backup existing netdata configuration before installing it"
-
-  config_signature_matches() {
-    md5="${1}"
-    file="${2}"
-
-    if [ -f "configs.signatures" ]; then
-      grep "\['${md5}'\]='${file}'" "configs.signatures" > /dev/null
-      return $?
-    fi
-
-    return 1
-  }
-
-  # clean up stock config files from the user configuration directory
-  (find -L "${NETDATA_PREFIX}/etc/netdata" -type f -not -path '*/\.*' -not -path "${NETDATA_PREFIX}/etc/netdata/orig/*" \( -name '*.conf.old' -o -name '*.conf' -o -name '*.conf.orig' -o -name '*.conf.installer_backup.*' \)) | while IFS= read -r  x; do
-    if [ -f "${x}" ]; then
-      # find it relative filename
-      f=$("$x" | sed "${NETDATA_PREFIX}/etc/netdata/")
-
-      # find the stock filename
-      t=$("${f}" | sed ".conf.installer_backup.*/.conf")
-      t=$("${t}" | sed ".conf.old/.conf")
-      t=$("${t}" | sed ".conf.orig/.conf")
-      t=$("${t}" | sed "orig//")
-
-      if [ -z "${md5sum}" ] || [ ! -x "${md5sum}" ]; then
-        # we don't have md5sum - keep it
-        echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED}is not known to distribution${TPUT_RESET}. Keeping it."
-      else
-        # find its checksum
-        md5="$(${md5sum} < "${x}" | cut -d ' ' -f 1)"
-
-        if config_signature_matches "${md5}" "${t}"; then
-	  # it is a stock version - remove it
-          echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' is stock version of '${t}'."
-          run rm -f "${x}"
-	  # shellcheck disable=SC2030
-          deleted_stock_configs=$((deleted_stock_configs + 1))
-        else
-          # edited by user - keep it
-          echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED} does not match stock of${TPUT_RESET} ${TPUT_CYAN}'${t}'${TPUT_RESET}. Keeping it."
-        fi
-      fi
-    fi
-  done
-fi
-touch "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-done"
-
-# -----------------------------------------------------------------------------
 progress "Install netdata"
 
 if ! run $make install; then
@@ -1059,7 +1066,7 @@ fi
 # -----------------------------------------------------------------------------
 progress "Fix generated files permissions"
 
-run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name \*.conf -a \! -name \*.service -a \! -name \*.timer -a \! -name \*.logrotate -a \! -name \.install-type -exec chmod 755 {} \;
+run chmod 755 ./system/*/init.d/netdata ./system/*/rc.d/netdata ./system/runit/run ./system/install-service.sh
 
 # -----------------------------------------------------------------------------
 progress "Creating standard user and groups for netdata"
@@ -1147,16 +1154,8 @@ fi
 # --- stock conf dir ----
 
 [ ! -d "${NETDATA_STOCK_CONFIG_DIR}" ] && mkdir -p "${NETDATA_STOCK_CONFIG_DIR}"
-
-helplink="000.-.USE.THE.orig.LINK.TO.COPY.AND.EDIT.STOCK.CONFIG.FILES"
-# shellcheck disable=SC2031
-[ ${deleted_stock_configs} -eq 0 ] && helplink=""
-for link in "orig" "${helplink}"; do
-  if [ -n "${link}" ]; then
-    [ -L "${NETDATA_USER_CONFIG_DIR}/${link}" ] && run rm -f "${NETDATA_USER_CONFIG_DIR}/${link}"
-    run ln -s "${NETDATA_STOCK_CONFIG_DIR}" "${NETDATA_USER_CONFIG_DIR}/${link}"
-  fi
-done
+[ -L "${NETDATA_USER_CONFIG_DIR}/orig" ] && run rm -f "${NETDATA_USER_CONFIG_DIR}/orig"
+run ln -s "${NETDATA_STOCK_CONFIG_DIR}" "${NETDATA_USER_CONFIG_DIR}/orig"
 
 # --- web dir ----
 
@@ -1227,6 +1226,23 @@ if [ "$(id -u)" -eq 0 ]; then
     if [ $capabilities -eq 0 ]; then
       # fix apps.plugin to be setuid to root
       run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+    fi
+  fi
+
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin"
+    capabilities=0
+    if ! iscontainer && command -v setcap 1> /dev/null 2>&1; then
+      run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin"
+      if run setcap cap_dac_read_search+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin"; then
+        # if we managed to setcap, but we fail to execute debugfs.plugin setuid to root
+        "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin" -t > /dev/null 2>&1 && capabilities=1 || capabilities=0
+      fi
+    fi
+
+    if [ $capabilities -eq 0 ]; then
+      # fix debugfs.plugin to be setuid to root
+      run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin"
     fi
   fi
 
@@ -1497,6 +1513,11 @@ remove_old_ebpf() {
     echo >&2 "Removing old eBPF programs installed in old directory."
     rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/rnetdata_ebpf"*.?.*.o
     rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf"*.?.*.o
+  fi
+
+  # Remove old eBPF programs that did not have "rhf" suffix
+  if [ ! -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.d/pnetdata_ebpf_process.3.10.rhf.o" ]; then
+    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.d/"*.o
   fi
 
   # Remove old reject list from previous directory

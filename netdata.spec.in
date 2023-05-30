@@ -27,6 +27,20 @@ AutoReqProv: yes
 %global _have_ebpf 0
 %endif
 
+# Disable FreeIPMI on Amazon Linux
+%if 0%{?amzn}
+%global _have_freeipmi 0
+%else
+%global _have_freeipmi 1
+%endif
+
+# Disable the NFACCT plugin on Amazon Linux
+%if 0%{?amzn}
+%global _have_nfacct 0
+%else
+%global _have_nfacct 1
+%endif
+
 # Mitigate the cross-distro mayhem by strictly defining the libexec destination
 %define _prefix /usr
 %define _sysconfdir /etc
@@ -34,71 +48,19 @@ AutoReqProv: yes
 %define _libexecdir /usr/libexec
 %define _libdir /usr/lib
 
+# Fedora doesn’t define this, but other distros do
+%{!?_presetdir:%global _presetdir %{_libdir}/systemd/system-preset}
+
 # Redefine centos_ver to standardize on a single macro
 %{?rhel:%global centos_ver %rhel}
 
 #
 # Conditional build:
-%bcond_without  systemd  # systemd
 %bcond_without  netns    # build with netns support (cgroup-network)
 
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
 %else
-%undefine	with_systemd
 %undefine	with_netns
-%endif
-
-%if %{with systemd}
-%if 0%{?suse_version}
-%global netdata_initd_buildrequires \
-BuildRequires: systemd-rpm-macros \
-%{nil}
-%global netdata_initd_requires \
-%{?systemd_requires} \
-%{nil}
-%global netdata_init_post %service_add_post netdata.service \
-/sbin/service netdata restart > /dev/null 2>&1 \
-%{nil}
-%global netdata_init_preun %service_del_preun netdata.service \
-/sbin/service netdata stop > /dev/null 2>&1 \
-%{nil}
-%global netdata_init_postun %service_del_postun netdata.service
-%else
-%global netdata_initd_buildrequires \
-BuildRequires: systemd
-%global netdata_initd_requires \
-Requires(preun):  systemd-units \
-Requires(postun): systemd-units \
-Requires(post):   systemd-units \
-%{nil}
-%global netdata_init_post %systemd_post netdata.service \
-/usr/bin/systemctl enable netdata.service \
-/usr/bin/systemctl daemon-reload \
-/usr/bin/systemctl restart netdata.service \
-%{nil}
-%global netdata_init_preun %systemd_preun netdata.service
-%global netdata_init_postun %systemd_postun_with_restart netdata.service
-%endif
-%else
-%global netdata_initd_buildrequires %{nil}
-%global netdata_initd_requires \
-Requires(post):   chkconfig \
-%{nil}
-%global netdata_init_post \
-/sbin/chkconfig --add netdata \
-/sbin/service netdata restart > /dev/null 2>&1 \
-%{nil}
-%global netdata_init_preun %{nil} \
-if [ $1 = 0 ]; then \
-        /sbin/service netdata stop > /dev/null 2>&1 \
-        /sbin/chkconfig --del netdata \
-fi \
-%{nil}
-%global netdata_init_postun %{nil} \
-if [ $1 != 0 ]; then \
-        /sbin/service netdata condrestart 2>&1 > /dev/null \
-fi \
-%{nil}
 %endif
 
 Summary:	Real-time performance monitoring, done right!
@@ -127,7 +89,7 @@ BuildRequires: git-core
 BuildRequires: autoconf
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
 BuildRequires: autoconf-archive
-%if 0%{?rhel} <= 8
+%if 0%{?rhel} <= 8 && 0%{?amzn} < 2023
 BuildRequires: autogen
 %endif
 %endif
@@ -145,12 +107,14 @@ BuildRequires: protobuf-devel
 BuildRequires: libprotobuf-c-devel
 BuildRequires: liblz4-devel
 BuildRequires: libjson-c-devel
+BuildRequires: libyaml-devel
 %else
 %if 0%{?fedora}
 BuildRequires: protobuf-devel
 BuildRequires: protobuf-c-devel
 BuildRequires: lz4-devel
 BuildRequires: json-c-devel
+BuildRequires: libyaml-devel
 %else
 %if 0%{?centos_ver} >= 8
 BuildRequires: protobuf-devel
@@ -158,11 +122,16 @@ BuildRequires: protobuf-c-devel
 %endif
 BuildRequires: lz4-devel
 BuildRequires: json-c-devel
+BuildRequires: libyaml-devel
 %endif
 %endif
 
 # Core build requirements for service install
-%{netdata_initd_buildrequires}
+%if 0%{?suse_version}
+BuildRequires: systemd-rpm-macros
+%else
+BuildRequires: systemd
+%endif
 
 # Runtime dependencies
 #
@@ -180,24 +149,36 @@ Requires: python3
 Requires(pre): /usr/sbin/groupadd
 Requires(pre): /usr/sbin/useradd
 
-%{netdata_initd_requires}
-
 # #####################################################################
 # Functionality-dependent package dependencies
 # #####################################################################
-# Note: Some or all of the Packages may be found in the EPEL repo, 
+# Note: Some or all of the Packages may be found in the EPEL repo,
 # rather than the standard ones
 
+# epbf dependencies
+%if 0%{?_have_ebpf}
+%if 0%{?suse_version}
+BuildRequires:	libelf-devel
+%else
+BuildRequires:	elfutils-libelf-devel
+%endif
+%endif
+# end - ebpf dependencies
+
 # nfacct plugin dependencies
+%if %{_have_nfacct}
 BuildRequires:  libmnl-devel
 %if 0%{?fedora} || 0%{?suse_version} >= 1140
 BuildRequires:  libnetfilter_acct-devel
+%endif
 %endif
 
 # end nfacct plugin dependencies
 
 # freeipmi plugin dependencies
+%if %{_have_freeipmi}
 BuildRequires:  freeipmi-devel
+%endif
 # end - freeipmi plugin dependencies
 
 # CUPS plugin dependencies
@@ -287,15 +268,21 @@ install -m 755 -p packaging/installer/netdata-updater.sh "${RPM_BUILD_ROOT}%{_li
 # ###########################################################
 # logrotate settings
 install -m 755 -d "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d"
-install -m 644 -p system/netdata.logrotate "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/%{name}"
+install -m 644 -p system/logrotate/netdata "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/%{name}"
 
 # ###########################################################
 # Install freeipmi
+%if %{_have_freeipmi}
 install -m 4750 -p freeipmi.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/freeipmi.plugin"
+%endif
 
 # ###########################################################
 # Install apps.plugin
 install -m 4750 -p apps.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/apps.plugin"
+
+# ###########################################################
+# Install debugfs.plugin
+install -m 0750 -p debugfs.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/debugfs.plugin"
 
 # ###########################################################
 # Install perf.plugin
@@ -328,15 +315,10 @@ install -m 755 -d "${RPM_BUILD_ROOT}%{_localstatedir}/lib/%{name}/registry"
 
 # ###########################################################
 # Install netdata service
-%if %{with systemd}
 install -m 755 -d "${RPM_BUILD_ROOT}%{_unitdir}"
-install -m 644 -p system/netdata.service "${RPM_BUILD_ROOT}%{_unitdir}/netdata.service"
-%else
-# install SYSV init stuff
-install -d "${RPM_BUILD_ROOT}/etc/rc.d/init.d"
-install -m 755 system/netdata-init-d \
-        "${RPM_BUILD_ROOT}/etc/rc.d/init.d/netdata"
-%endif
+install -m 644 -p system/systemd/netdata.service "${RPM_BUILD_ROOT}%{_unitdir}/netdata.service"
+install -m 755 -d "${RPM_BUILD_ROOT}%{_presetdir}"
+install -m 644 -p system/systemd/50-netdata.preset "${RPM_BUILD_ROOT}%{_presetdir}/50-netdata.preset"
 
 # ############################################################
 # Package Go within netdata (TBD: Package it separately)
@@ -454,13 +436,25 @@ for item in docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C; do
 done
 
 %post
-%{netdata_init_post}
+%if 0%{?suse_version}
+%service_add_post netdata.service
+%else
+%systemd_post netdata.service
+%endif
 
 %preun
-%{netdata_init_preun}
+%if 0%{?suse_version}
+%service_del_preun netdata.service
+%else
+%systemd_preun netdata.service
+%endif
 
 %postun
-%{netdata_init_postun}
+%if 0%{?suse_version}
+%service_del_postun netdata.service
+%else
+%systemd_postun_with_restart netdata.service
+%endif
 
 %clean
 rm -rf "${RPM_BUILD_ROOT}"
@@ -479,11 +473,8 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_sbindir}/netdatacli
 %{_sbindir}/netdata-claim.sh
 
-%if %{with systemd}
 %{_unitdir}/netdata.service
-%else
-%{_sysconfdir}/rc.d/init.d/netdata
-%endif
+%{_presetdir}/50-netdata.preset
 
 %defattr(0750,root,netdata,0750)
 
@@ -514,11 +505,11 @@ rm -rf "${RPM_BUILD_ROOT}"
 # %caps(cap_perfmon=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/perf.plugin
 %caps(cap_sys_admin=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/perf.plugin
 
-# perf plugin
-%caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/slabinfo.plugin
+# debugfs plugin
+%caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/debugfs.plugin
 
-# freeipmi files
-%attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
+# slabinfo plugin
+%caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/slabinfo.plugin
 
 # go.d.plugin (the capability required for wireguard module)
 %caps(cap_net_admin,cap_net_raw=eip) %{_libexecdir}/%{name}/plugins.d/go.d.plugin
@@ -537,7 +528,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}/registry
 
 # Free IPMI belongs to a different sub-package
+%if %{_have_freeipmi}
 %exclude %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
+%endif
 
 # CUPS belongs to a different sub package
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
@@ -557,6 +550,7 @@ Use this plugin to enable metrics collection from cupsd, the daemon running when
 %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cups.plugin
 %endif
 
+%if %{_have_freeipmi}
 %package plugin-freeipmi
 Summary: FreeIPMI - The Intelligent Platform Management System
 Group: Applications/System
@@ -565,14 +559,20 @@ Requires: netdata = %{version}
 
 %description plugin-freeipmi
  The IPMI specification defines a set of interfaces for platform management.
-It is implemented by a number vendors for system management. The features of IPMI that most users will be interested in 
+It is implemented by a number vendors for system management. The features of IPMI that most users will be interested in
 are sensor monitoring, system event monitoring, power control, and serial-over-LAN (SOL).
 
 %files plugin-freeipmi
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
+%endif
 
 %changelog
-* Wed Feb 03 2022 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-16
+* Tue Mar 21 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-18
+- Fix systemd handling to follow BCP.
+- Drop pre-systemd init support.
+* Thu Feb 16 2023 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-17
+- Added eBPF build dependency
+* Fri Feb 03 2022 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-16
 - Bundle updater script in native packages.
 * Mon Oct 11 2021 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-15
 - Remove support code for legacy ACLK implementation.
@@ -609,9 +609,8 @@ First draft refactor on package dependencies section
 * Wed Jan 02 2019 Pawel Krupa <pkrupa@redhat.com> - 0.0.0-3
 - Temporary set version statically
 - Fix changelog ordering
-- Comment-out node.d configuration directory 
+- Comment-out node.d configuration directory
 * Wed Jan 02 2019 Pawel Krupa <pkrupa@redhat.com> - 0.0.0-2
 - Fix permissions for log files
 * Sun Nov 15 2015 Alon Bar-Lev <alonbl@redhat.com> - 0.0.0-1
 - Initial add.
-

@@ -95,7 +95,7 @@ static STRING *rrdcalc_replace_variables_with_rrdset_labels(const char *line, RR
             temp = buf;
         }
         else if (!strncmp(var, RRDCALC_VAR_LABEL, RRDCALC_VAR_LABEL_LEN)) {
-            char label_val[RRDCALC_VAR_MAX + 1] = { 0 };
+            char label_val[RRDCALC_VAR_MAX + RRDCALC_VAR_LABEL_LEN + 1] = { 0 };
             strcpy(label_val, var+RRDCALC_VAR_LABEL_LEN);
             label_val[i - RRDCALC_VAR_LABEL_LEN - 1] = '\0';
 
@@ -359,13 +359,18 @@ static inline bool rrdcalc_check_if_it_matches_rrdset(RRDCALC *rc, RRDSET *st) {
         && (rc->chart != st->name))
         return false;
 
-    if (rc->module_pattern && !simple_pattern_matches(rc->module_pattern, rrdset_module_name(st)))
+    if (rc->module_pattern && !simple_pattern_matches_string(rc->module_pattern, st->module_name))
         return false;
 
-    if (rc->plugin_pattern && !simple_pattern_matches(rc->plugin_pattern, rrdset_plugin_name(st)))
+    if (rc->plugin_pattern && !simple_pattern_matches_string(rc->plugin_pattern, st->module_name))
         return false;
 
-    if (st->rrdhost->rrdlabels && rc->host_labels_pattern && !rrdlabels_match_simple_pattern_parsed(st->rrdhost->rrdlabels, rc->host_labels_pattern, '='))
+    if (st->rrdhost->rrdlabels && rc->host_labels_pattern && !rrdlabels_match_simple_pattern_parsed(
+            st->rrdhost->rrdlabels, rc->host_labels_pattern, '=', NULL))
+        return false;
+
+    if (st->rrdlabels && rc->chart_labels_pattern && !rrdlabels_match_simple_pattern_parsed(
+            st->rrdlabels, rc->chart_labels_pattern, '=', NULL))
         return false;
 
     return true;
@@ -604,11 +609,13 @@ static void rrdcalc_free_internals(RRDCALC *rc) {
     string_freez(rc->host_labels);
     string_freez(rc->module_match);
     string_freez(rc->plugin_match);
+    string_freez(rc->chart_labels);
 
     simple_pattern_free(rc->foreach_dimension_pattern);
     simple_pattern_free(rc->host_labels_pattern);
     simple_pattern_free(rc->module_pattern);
     simple_pattern_free(rc->plugin_pattern);
+    simple_pattern_free(rc->chart_labels_pattern);
 }
 
 static void rrdcalc_rrdhost_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdcalc, void *rrdhost __maybe_unused) {
@@ -741,7 +748,7 @@ void rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(RRDHOST *host
         if (!rc->host_labels)
             continue;
 
-        if(!rrdlabels_match_simple_pattern_parsed(host->rrdlabels, rc->host_labels_pattern, '=')) {
+        if(!rrdlabels_match_simple_pattern_parsed(host->rrdlabels, rc->host_labels_pattern, '=', NULL)) {
             log_health("Health configuration for alarm '%s' cannot be applied, because the host %s does not have the label(s) '%s'",
                  rrdcalc_name(rc),
                  rrdhost_hostname(host),
@@ -754,18 +761,15 @@ void rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(RRDHOST *host
 }
 
 void rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts() {
-    rrd_rdlock();
-
     RRDHOST *host;
-    rrdhost_foreach_read(host) {
+    dfe_start_reentrant(rrdhost_root_index, host) {
         if (unlikely(!host->health.health_enabled))
             continue;
 
         if (host->rrdlabels)
             rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(host);
     }
-
-    rrd_unlock();
+    dfe_done(host);
 }
 
 void rrdcalc_unlink_all_rrdset_alerts(RRDSET *st) {

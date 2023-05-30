@@ -41,6 +41,22 @@ bool is_storage_engine_shared(STORAGE_INSTANCE *engine __maybe_unused) {
     return false;
 }
 
+RRDHOST *find_host_by_node_id(char *node_id) {
+    uuid_t node_uuid;
+    if (unlikely(!node_id || uuid_parse(node_id, node_uuid)))
+        return NULL;
+
+    RRDHOST *host, *ret = NULL;
+    dfe_start_read(rrdhost_root_index, host) {
+        if (host->node_id && !(uuid_memcmp(host->node_id, &node_uuid))) {
+            ret = host;
+            break;
+        }
+    }
+    dfe_done(host);
+
+    return ret;
+}
 
 // ----------------------------------------------------------------------------
 // RRDHOST indexes management
@@ -60,6 +76,26 @@ static inline void rrdhost_init() {
             DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE,
             &dictionary_stats_category_rrdhost, 0);
     }
+}
+
+RRDHOST_ACQUIRED *rrdhost_find_and_acquire(const char *machine_guid) {
+    debug(D_RRD_CALLS, "rrdhost_find_and_acquire() host %s", machine_guid);
+
+    return (RRDHOST_ACQUIRED *)dictionary_get_and_acquire_item(rrdhost_root_index, machine_guid);
+}
+
+RRDHOST *rrdhost_acquired_to_rrdhost(RRDHOST_ACQUIRED *rha) {
+    if(unlikely(!rha))
+        return NULL;
+
+    return (RRDHOST *) dictionary_acquired_item_value((const DICTIONARY_ITEM *)rha);
+}
+
+void rrdhost_acquired_release(RRDHOST_ACQUIRED *rha) {
+    if(unlikely(!rha))
+        return;
+
+    dictionary_acquired_item_release(rrdhost_root_index, (const DICTIONARY_ITEM *)rha);
 }
 
 // ----------------------------------------------------------------------------
@@ -104,20 +140,6 @@ inline RRDHOST *rrdhost_find_by_hostname(const char *hostname) {
     return dictionary_get(rrdhost_root_index_hostname, hostname);
 }
 
-static inline RRDHOST *rrdhost_index_add_hostname(RRDHOST *host) {
-    if(!host->hostname) return host;
-
-    RRDHOST *ret_hostname = dictionary_set(rrdhost_root_index_hostname, rrdhost_hostname(host), host, sizeof(RRDHOST));
-    if(ret_hostname == host)
-        rrdhost_option_set(host, RRDHOST_OPTION_INDEXED_HOSTNAME);
-    else {
-        rrdhost_option_clear(host, RRDHOST_OPTION_INDEXED_HOSTNAME);
-        error("RRDHOST: %s() host with hostname '%s' is already indexed", __FUNCTION__, rrdhost_hostname(host));
-    }
-
-    return host;
-}
-
 static inline void rrdhost_index_del_hostname(RRDHOST *host) {
     if(unlikely(!host->hostname)) return;
 
@@ -127,6 +149,24 @@ static inline void rrdhost_index_del_hostname(RRDHOST *host) {
 
         rrdhost_option_clear(host, RRDHOST_OPTION_INDEXED_HOSTNAME);
     }
+}
+
+static inline RRDHOST *rrdhost_index_add_hostname(RRDHOST *host) {
+    if(!host->hostname) return host;
+
+    RRDHOST *ret_hostname = dictionary_set(rrdhost_root_index_hostname, rrdhost_hostname(host), host, sizeof(RRDHOST));
+    if(ret_hostname == host)
+        rrdhost_option_set(host, RRDHOST_OPTION_INDEXED_HOSTNAME);
+    else {
+        //have the same hostname but it's not the same host
+        //keep the new one only if the old one is orphan or archived
+        if (rrdhost_flag_check(ret_hostname, RRDHOST_FLAG_ORPHAN) || rrdhost_flag_check(ret_hostname, RRDHOST_FLAG_ARCHIVED)) {
+            rrdhost_index_del_hostname(ret_hostname);
+            rrdhost_index_add_hostname(host);
+        }
+    }
+
+    return host;
 }
 
 // ----------------------------------------------------------------------------
@@ -225,7 +265,8 @@ static void rrdhost_initialize_rrdpush_sender(RRDHOST *host,
         rrdpush_destinations_init(host);
 
         host->rrdpush_send_api_key = strdupz(rrdpush_api_key);
-        host->rrdpush_send_charts_matching = simple_pattern_create(rrdpush_send_charts_matching, NULL, SIMPLE_PATTERN_EXACT);
+        host->rrdpush_send_charts_matching = simple_pattern_create(rrdpush_send_charts_matching, NULL,
+                                                                   SIMPLE_PATTERN_EXACT, true);
 
         rrdhost_option_set(host, RRDHOST_OPTION_SENDER_ENABLED);
     }
@@ -329,10 +370,8 @@ int is_legacy = 1;
         rrdhost_option_set(host, RRDHOST_OPTION_DELETE_ORPHAN_HOST);
 
     char filename[FILENAME_MAX + 1];
-    if(is_localhost) {
+    if(is_localhost)
         host->cache_dir  = strdupz(netdata_configured_cache_dir);
-        host->varlib_dir = strdupz(netdata_configured_varlib_dir);
-    }
     else {
         // this is not localhost - append our GUID to localhost path
         if (is_in_multihost) { // don't append to cache dir in multihost
@@ -349,9 +388,6 @@ int is_legacy = 1;
             if(r != 0 && errno != EEXIST)
                 error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), host->cache_dir);
         }
-
-        snprintfz(filename, FILENAME_MAX, "%s/%s", netdata_configured_varlib_dir, host->machine_guid);
-        host->varlib_dir = strdupz(filename);
     }
 
     // this is also needed for custom host variables - not only health
@@ -366,7 +402,6 @@ int is_legacy = 1;
     rrdfamily_index_init(host);
     rrdcalctemplate_index_init(host);
     rrdcalc_rrdhost_index_init(host);
-    metaqueue_host_update_info(host);
 
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
@@ -498,7 +533,6 @@ int is_legacy = 1;
                  " (to '%s' with api key '%s')"
                  ", health %s"
                  ", cache_dir '%s'"
-                 ", varlib_dir '%s'"
                  ", alarms default handler '%s'"
                  ", alarms default recipient '%s'"
          , rrdhost_hostname(host)
@@ -517,20 +551,17 @@ int is_legacy = 1;
          , host->rrdpush_send_api_key?host->rrdpush_send_api_key:""
          , host->health.health_enabled?"enabled":"disabled"
          , host->cache_dir
-         , host->varlib_dir
          , string2str(host->health.health_default_exec)
          , string2str(host->health.health_default_recipient)
     );
 
-    if(!archived)
-        rrdhost_flag_set(host,RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
-
-    rrdhost_load_rrdcontext_data(host);
-    if (!archived) {
+    if(!archived) {
+        metaqueue_host_update_info(host);
+        rrdhost_load_rrdcontext_data(host);
+//        rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
         ml_host_new(host);
-        ml_start_anomaly_detection_threads(host);
     } else
-        rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED | RRDHOST_FLAG_ORPHAN);
+        rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD | RRDHOST_FLAG_ARCHIVED | RRDHOST_FLAG_ORPHAN);
 
     return host;
 }
@@ -582,6 +613,8 @@ static void rrdhost_update(RRDHOST *host
     if(strcmp(rrdhost_hostname(host), hostname) != 0) {
         info("Host '%s' has been renamed to '%s'. If this is not intentional it may mean multiple hosts are using the same machine_guid.", rrdhost_hostname(host), hostname);
         rrdhost_init_hostname(host, hostname, true);
+    } else {
+        rrdhost_index_add_hostname(host);
     }
 
     if(strcmp(rrdhost_program_name(host), program_name) != 0) {
@@ -643,7 +676,6 @@ static void rrdhost_update(RRDHOST *host
         host->rrdpush_replication_step = rrdpush_replication_step;
 
         ml_host_new(host);
-        ml_start_anomaly_detection_threads(host);
         
         rrdhost_load_rrdcontext_data(host);
         info("Host %s is not in archived mode anymore", rrdhost_hostname(host));
@@ -681,6 +713,10 @@ RRDHOST *rrdhost_find_or_create(
 
     RRDHOST *host = rrdhost_find_by_guid(guid);
     if (unlikely(host && host->rrd_memory_mode != mode && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) {
+
+        if (likely(!archived && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)))
+            return host;
+
         /* If a legacy memory mode instantiates all dbengine state must be discarded to avoid inconsistencies */
         error("Archived host '%s' has memory mode '%s', but the wanted one is '%s'. Discarding archived state.",
               rrdhost_hostname(host), rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
@@ -720,31 +756,30 @@ RRDHOST *rrdhost_find_or_create(
         );
     }
     else {
-
-        rrdhost_update(host
-           , hostname
-           , registry_hostname
-           , guid
-           , os
-           , timezone
-           , abbrev_timezone
-           , utc_offset
-           , tags
-           , program_name
-           , program_version
-           , update_every
-           , history
-           , mode
-           , health_enabled
-           , rrdpush_enabled
-           , rrdpush_destination
-           , rrdpush_api_key
-           , rrdpush_send_charts_matching
-           , rrdpush_enable_replication
-           , rrdpush_seconds_to_replicate
-           , rrdpush_replication_step
-           , system_info);
-
+        if (likely(!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)))
+            rrdhost_update(host
+               , hostname
+               , registry_hostname
+               , guid
+               , os
+               , timezone
+               , abbrev_timezone
+               , utc_offset
+               , tags
+               , program_name
+               , program_version
+               , update_every
+               , history
+               , mode
+               , health_enabled
+               , rrdpush_enabled
+               , rrdpush_destination
+               , rrdpush_api_key
+               , rrdpush_send_charts_matching
+               , rrdpush_enable_replication
+               , rrdpush_seconds_to_replicate
+               , rrdpush_replication_step
+               , system_info);
     }
 
     return host;
@@ -924,8 +959,10 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
     rrdhost_init();
 
     if (unlikely(sql_init_database(DB_CHECK_NONE, system_info ? 0 : 1))) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+            set_late_global_environment(system_info);
             fatal("Failed to initialize SQLite");
+        }
         info("Skipping SQLITE metadata initialization since memory mode is not dbengine");
     }
 
@@ -1146,7 +1183,6 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     rrdcalctemplate_index_destroy(host);
 
     // cleanup ML resources
-    ml_stop_anomaly_detection_threads(host);
     ml_host_delete(host);
 
     freez(host->exporting_flags);
@@ -1168,21 +1204,6 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
         return;
     }
 
-#ifdef ENABLE_ACLK
-    struct aclk_database_worker_config *wc =  host->dbsync_worker;
-    if (wc && !netdata_exit) {
-        struct aclk_database_cmd cmd;
-        memset(&cmd, 0, sizeof(cmd));
-        cmd.opcode = ACLK_DATABASE_ORPHAN_HOST;
-        struct aclk_completion compl ;
-        init_aclk_completion(&compl );
-        cmd.completion = &compl ;
-        aclk_database_enq_cmd(wc, &cmd);
-        wait_for_aclk_completion(&compl );
-        destroy_aclk_completion(&compl );
-    }
-#endif
-
     // ------------------------------------------------------------------------
     // free it
 
@@ -1198,7 +1219,6 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     string_freez(host->program_version);
     rrdhost_system_info_free(host->system_info);
     freez(host->cache_dir);
-    freez(host->varlib_dir);
     freez(host->rrdpush_send_api_key);
     freez(host->rrdpush_send_destination);
     rrdpush_destinations_free(host);
@@ -1220,10 +1240,6 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     string_freez(host->hostname);
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(RRDHOST), __ATOMIC_RELAXED);
     freez(host);
-#ifdef ENABLE_ACLK
-    if (wc)
-        wc->is_orphan = 0;
-#endif
 }
 
 void rrdhost_free_all(void) {
@@ -1241,11 +1257,10 @@ void rrdhost_free_all(void) {
 
 void rrd_finalize_collection_for_all_hosts(void) {
     RRDHOST *host;
-    rrd_wrlock();
-    rrdhost_foreach_read(host) {
+    dfe_start_reentrant(rrdhost_root_index, host) {
         rrdhost_finalize_collection(host);
     }
-    rrd_unlock();
+    dfe_done(host);
 }
 
 // ----------------------------------------------------------------------------
@@ -1270,25 +1285,25 @@ struct rrdhost_system_info *rrdhost_labels_to_system_info(DICTIONARY *labels) {
     struct rrdhost_system_info *info = callocz(1, sizeof(struct rrdhost_system_info));
     info->hops = 1;
 
-    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->cloud_provider_type, "_cloud_provider_type");
-    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->cloud_instance_type, "_cloud_instance_type");
-    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->cloud_instance_region, "_cloud_instance_region");
-    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->host_os_name, "_os_name");
-    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->host_os_version, "_os_version");
-    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->kernel_version, "_kernel_version");
-    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->host_cores, "_system_cores");
-    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->host_cpu_freq, "_system_cpu_freq");
-    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->host_ram_total, "_system_ram_total");
-    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->host_disk_space, "_system_disk_space");
-    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->architecture, "_architecture");
-    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->virtualization, "_virtualization");
-    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->container, "_container");
-    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->container_detection, "_container_detection");
-    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->virt_detection, "_virt_detection");
-    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->is_k8s_node, "_is_k8s_node");
-    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->install_type, "_install_type");
-    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->prebuilt_arch, "_prebuilt_arch");
-    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->prebuilt_dist, "_prebuilt_dist");
+    rrdlabels_get_value_strdup_or_null(labels, &info->cloud_provider_type, "_cloud_provider_type");
+    rrdlabels_get_value_strdup_or_null(labels, &info->cloud_instance_type, "_cloud_instance_type");
+    rrdlabels_get_value_strdup_or_null(labels, &info->cloud_instance_region, "_cloud_instance_region");
+    rrdlabels_get_value_strdup_or_null(labels, &info->host_os_name, "_os_name");
+    rrdlabels_get_value_strdup_or_null(labels, &info->host_os_version, "_os_version");
+    rrdlabels_get_value_strdup_or_null(labels, &info->kernel_version, "_kernel_version");
+    rrdlabels_get_value_strdup_or_null(labels, &info->host_cores, "_system_cores");
+    rrdlabels_get_value_strdup_or_null(labels, &info->host_cpu_freq, "_system_cpu_freq");
+    rrdlabels_get_value_strdup_or_null(labels, &info->host_ram_total, "_system_ram_total");
+    rrdlabels_get_value_strdup_or_null(labels, &info->host_disk_space, "_system_disk_space");
+    rrdlabels_get_value_strdup_or_null(labels, &info->architecture, "_architecture");
+    rrdlabels_get_value_strdup_or_null(labels, &info->virtualization, "_virtualization");
+    rrdlabels_get_value_strdup_or_null(labels, &info->container, "_container");
+    rrdlabels_get_value_strdup_or_null(labels, &info->container_detection, "_container_detection");
+    rrdlabels_get_value_strdup_or_null(labels, &info->virt_detection, "_virt_detection");
+    rrdlabels_get_value_strdup_or_null(labels, &info->is_k8s_node, "_is_k8s_node");
+    rrdlabels_get_value_strdup_or_null(labels, &info->install_type, "_install_type");
+    rrdlabels_get_value_strdup_or_null(labels, &info->prebuilt_arch, "_prebuilt_arch");
+    rrdlabels_get_value_strdup_or_null(labels, &info->prebuilt_dist, "_prebuilt_dist");
 
     return info;
 }
@@ -1372,7 +1387,7 @@ void rrdhost_set_is_parent_label(int count) {
         //queue a node info
 #ifdef ENABLE_ACLK
         if (netdata_cloud_setting) {
-            aclk_queue_node_info(localhost);
+            aclk_queue_node_info(localhost, false);
         }
 #endif
     }
@@ -1443,7 +1458,7 @@ void rrdhost_finalize_collection(RRDHOST *host) {
     info("RRD: 'host:%s' stopping data collection...", rrdhost_hostname(host));
 
     RRDSET *st;
-    rrdset_foreach_write(st, host)
+    rrdset_foreach_read(st, host)
         rrdset_finalize_collection(st, true);
     rrdset_foreach_done(st);
 }

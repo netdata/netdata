@@ -13,7 +13,6 @@ static char *vfs_id_names[NETDATA_KEY_PUBLISH_VFS_END] = { "vfs_unlink", "vfs_re
 static netdata_idx_t *vfs_hash_values = NULL;
 static netdata_syscall_stat_t vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_END];
 static netdata_publish_syscall_t vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_END];
-netdata_publish_vfs_t **vfs_pid = NULL;
 netdata_publish_vfs_t *vfs_vector = NULL;
 
 static ebpf_local_maps_t vfs_maps[] = {{.name = "tbl_vfs_pid", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
@@ -46,10 +45,6 @@ netdata_ebpf_targets_t vfs_targets[] = { {.name = "vfs_write", .mode = EBPF_LOAD
                                          {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 #ifdef LIBBPF_MAJOR_VERSION
-#include "includes/vfs.skel.h" // BTF code
-
-static struct vfs_bpf *bpf_obj = NULL;
-
 /**
  * Disable probe
  *
@@ -397,20 +392,11 @@ static inline int ebpf_vfs_load_and_attach(struct vfs_bpf *obj, ebpf_module_t *e
  */
 static void ebpf_vfs_free(ebpf_module_t *em)
 {
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-
     freez(vfs_hash_values);
     freez(vfs_vector);
 
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        vfs_bpf__destroy(bpf_obj);
-#endif
-
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -540,7 +526,7 @@ static void ebpf_vfs_read_global_table()
  * @param swap output structure
  * @param root link list with structure to be used
  */
-static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, struct pid_on_target *root)
+static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, struct ebpf_pid_on_target *root)
 {
     netdata_publish_vfs_t accumulator;
     memset(&accumulator, 0, sizeof(accumulator));
@@ -606,9 +592,9 @@ static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, struct pid_on_target *
  * @param em   the structure with thread information
  * @param root the target list.
  */
-void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct target *root)
+void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
 {
-    struct target *w;
+    struct ebpf_target *w;
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             ebpf_vfs_sum_pids(&w->vfs, w->root_pid);
@@ -775,7 +761,7 @@ static void vfs_fill_pid(uint32_t current_pid, netdata_publish_vfs_t *publish)
 {
     netdata_publish_vfs_t *curr = vfs_pid[current_pid];
     if (!curr) {
-        curr = callocz(1, sizeof(netdata_publish_vfs_t));
+        curr = ebpf_vfs_get();
         vfs_pid[current_pid] = curr;
     }
 
@@ -787,7 +773,7 @@ static void vfs_fill_pid(uint32_t current_pid, netdata_publish_vfs_t *publish)
  */
 static void ebpf_vfs_read_apps()
 {
-    struct pid_stat *pids = root_of_pids;
+    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     netdata_publish_vfs_t *vv = vfs_vector;
     int fd = vfs_maps[NETDATA_VFS_PID].map_fd;
     size_t length = sizeof(netdata_publish_vfs_t) * ebpf_nprocs;
@@ -926,88 +912,88 @@ static void ebpf_create_specific_vfs_charts(char *type, ebpf_module_t *em)
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NETDATA_CGROUP_VFS_UNLINK_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5500,
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_UNLINK],
-                      1, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS, "Write to disk",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NETDATA_CGROUP_VFS_WRITE_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5501,
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_WRITE],
-                      1, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR, "Fails to write",
                           EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NETDATA_CGROUP_VFS_WRITE_ERROR_CONTEXT,
                           NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5502,
                           ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_WRITE],
-                          1, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+                          1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
     }
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_READ_CALLS, "Read from disk",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NETDATA_CGROUP_VFS_READ_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5503,
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_READ],
-                      1, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR, "Fails to read",
                           EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NETDATA_CGROUP_VFS_READ_ERROR_CONTEXT,
                           NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5504,
                           ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_READ],
-                          1, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+                          1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
     }
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES, "Bytes written on disk",
                       EBPF_COMMON_DIMENSION_BYTES, NETDATA_VFS_CGROUP_GROUP, NETDATA_CGROUP_VFS_WRITE_BYTES_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5505,
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_WRITE],
-                      1, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_READ_BYTES, "Bytes read from disk",
                       EBPF_COMMON_DIMENSION_BYTES, NETDATA_VFS_CGROUP_GROUP, NETDATA_CGROUP_VFS_READ_BYTES_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5506,
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_READ],
-                      1, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_FSYNC, "Calls for <code>vfs_fsync</code>",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NETDATA_CGROUP_VFS_FSYNC_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5507,
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_FSYNC],
-                      1, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR, "Sync error",
                           EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NETDATA_CGROUP_VFS_FSYNC_ERROR_CONTEXT,
                           NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5508,
                           ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_FSYNC],
-                          1, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+                          1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
     }
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_OPEN, "Calls for <code>vfs_open</code>",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NETDATA_CGROUP_VFS_OPEN_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5509,
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_OPEN],
-                      1, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR, "Open error",
                           EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NETDATA_CGROUP_VFS_OPEN_ERROR_CONTEXT,
                           NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5510,
                           ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_OPEN],
-                          1, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+                          1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
     }
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_CREATE, "Calls for <code>vfs_create</code>",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NETDATA_CGROUP_VFS_CREATE_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5511,
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_CREATE],
-                      1, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR, "Create error",
                           EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NETDATA_CGROUP_VFS_CREATE_ERROR_CONTEXT,
                           NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5512,
                           ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_CREATE],
-                          1, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+                          1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
     }
 }
 
@@ -1484,6 +1470,11 @@ static void vfs_collector(ebpf_module_t *em)
         if (apps)
             ebpf_vfs_read_apps();
 
+#ifdef NETDATA_DEV_MODE
+        if (ebpf_aral_vfs_pid)
+            ebpf_send_data_aral_chart(ebpf_aral_vfs_pid, em);
+#endif
+
         if (cgroups)
             read_update_vfs_cgroup();
 
@@ -1683,7 +1674,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
  **/
 void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    struct target *root = ptr;
+    struct ebpf_target *root = ptr;
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_DELETED,
                                "Files deleted",
@@ -1825,14 +1816,16 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
  */
 static void ebpf_vfs_allocate_global_vectors(int apps)
 {
+    if (apps) {
+        ebpf_vfs_aral_init();
+        vfs_pid = callocz((size_t)pid_max, sizeof(netdata_publish_vfs_t *));
+        vfs_vector = callocz(ebpf_nprocs, sizeof(netdata_publish_vfs_t));
+    }
+
     memset(vfs_aggregated_data, 0, sizeof(vfs_aggregated_data));
     memset(vfs_publish_aggregated, 0, sizeof(vfs_publish_aggregated));
 
     vfs_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
-    vfs_vector = callocz(ebpf_nprocs, sizeof(netdata_publish_vfs_t));
-
-    if (apps)
-        vfs_pid = callocz((size_t)pid_max, sizeof(netdata_publish_vfs_t *));
 }
 
 /*****************************************************************
@@ -1860,11 +1853,11 @@ static int ebpf_vfs_load_bpf(ebpf_module_t *em)
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else {
-        bpf_obj = vfs_bpf__open();
-        if (!bpf_obj)
+        vfs_bpf_obj = vfs_bpf__open();
+        if (!vfs_bpf_obj)
             ret = -1;
         else
-            ret = ebpf_vfs_load_and_attach(bpf_obj, em);
+            ret = ebpf_vfs_load_and_attach(vfs_bpf_obj, em);
     }
 #endif
 
@@ -1895,7 +1888,6 @@ void *ebpf_vfs_thread(void *ptr)
     ebpf_adjust_thread_load(em, default_btf);
 #endif
     if (ebpf_vfs_load_bpf(em)) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endvfs;
     }
 
@@ -1910,6 +1902,12 @@ void *ebpf_vfs_thread(void *ptr)
     pthread_mutex_lock(&lock);
     ebpf_create_global_charts(em);
     ebpf_update_stats(&plugin_statistics, em);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
+#ifdef NETDATA_DEV_MODE
+    if (ebpf_aral_vfs_pid)
+        ebpf_statistic_create_aral_chart(NETDATA_EBPF_VFS_ARAL_NAME, em);
+#endif
+
     pthread_mutex_unlock(&lock);
 
     vfs_collector(em);

@@ -19,6 +19,7 @@ declare -a package_tree=(
   libuuid-devel
   libmnl-devel
   json-c-devel
+  libyaml-devel
   libuv-devel
   lz4-devel
   openssl-devel

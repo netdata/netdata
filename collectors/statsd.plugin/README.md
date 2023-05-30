@@ -7,6 +7,8 @@ learn_status: "Published"
 learn_rel_path: "Integrations/Monitor/Anything"
 -->
 
+# StatsD
+
 [StatsD](https://github.com/statsd/statsd) is a system to collect data from any application. Applications send metrics to it, 
 usually via non-blocking UDP communication, and StatsD servers collect these metrics, perform a few simple calculations on 
 them and push them to backend time-series databases.
@@ -317,7 +319,6 @@ For example, if you want to monitor the application `myapp` using StatsD and Net
 	private charts = no
 	gaps when not collected = no
 	history = 60
-# 	memory mode = ram	
 
 [dictionary]
     m1 = metric1
@@ -982,7 +983,7 @@ At this point, you have used StatsD to gather metrics for k6, creating a whole n
 Netdata dashboard in the process. Moreover, you can further customize the icon of the particular section, 
 as well as the description for each chart.
 
-To edit the section, please follow the Netdata [documentation](https://learn.netdata.cloud/docs/agent/web/gui#customizing-the-local-dashboard).
+To edit the section, please follow the Netdata [documentation](https://github.com/netdata/netdata/blob/master/web/gui/README.md#customizing-the-local-dashboard).
 
 While the following configuration will be placed in a new file, as the documentation suggests, it is 
 instructing to use `dashboard_info.js` as a template. Open the file and see how the rest of sections and collectors have been defined.

@@ -1,20 +1,12 @@
-<!--
-title: "Distributed data architecture"
-description: "Netdata's distributed data architecture stores metrics on individual nodes for high performance and scalability using all your granular metrics."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/store/distributed-data-architecture.md"
-sidebar_label: "Distributed data architecture"
-learn_status: "Published"
-learn_topic_type: "Concepts"
-learn_rel_path: "Concepts"
--->
-
 # Distributed data architecture
 
-Netdata uses a distributed data architecture to help you collect and store per-second metrics from any number of nodes.
+Learn how Netdata's distributed data architecture enables us to store metrics on the edge nodes for security, high performance and scalability.
+
+This way, it helps you collect and store per-second metrics from any number of nodes.
 Every node in your infrastructure, whether it's one or a thousand, stores the metrics it collects.
 
 Netdata Cloud bridges the gap between many distributed databases by _centralizing the interface_ you use to query and
-visualize your nodes' metrics. When you [look at charts in Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/visualize/interact-dashboards-charts.md)
+visualize your nodes' metrics. When you [look at charts in Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md)
 , the metrics values are queried directly from that node's database and securely streamed to Netdata Cloud, which
 proxies them to your browser.
 
@@ -77,16 +69,7 @@ When you use the database engine to store your metrics, you can always perform a
 Netdata Cloud does not store metric values.
 
 To enable certain features, such as [viewing active alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alarms.md)
-or [filtering by hostname/service](https://learn.netdata.cloud/docs/cloud/war-rooms#node-filter), Netdata Cloud does
+or [filtering by hostname/service](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md), Netdata Cloud does
 store configured alarms, their status, and a list of active collectors.
 
 Netdata does not and never will sell your personal data or data about your deployment.
-
-## What's next?
-
-You can configure the Netdata Agent to store days, weeks, or months worth of distributed, per-second data by
-[configuring the database engine](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md). Use our calculator to determine the system
-resources required to retain your desired amount of metrics, and expand or contract the database by editing a single
-setting.
-
-

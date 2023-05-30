@@ -1,14 +1,6 @@
-<!--
-title: "Spaces"
-description: >-
-      "Organize your infrastructure monitoring on Netdata Cloud by creating Spaces, then groupingyour
-      Agent-monitored nodes."
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md"
-sidebar_label: "Spaces"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Operations"
--->
+# Netdata Cloud Spaces
+
+Organize your multi-organization infrastructure monitoring on Netdata Cloud by creating Spaces to completely isolate access to your Agent-monitored nodes.
 
 A Space is a high-level container. It's a collaboration space where you can organize team members, access levels and the
 nodes you want to monitor.
@@ -70,8 +62,9 @@ will open a side tab in which you can:
 
 6. _Manage your bookmarks*_, click on the **Bookmarks** tab to add or remove bookmarks that you need.
 
-:::note \* This action requires admin rights for this space
-:::
+> ### Note
+>
+> \* This action requires admin rights for this space
 
 ## Obsoleting offline nodes from a Space
 
@@ -84,8 +77,3 @@ Netdata admin users now have the ability to remove obsolete nodes from a space.
 - If the obsoleted nodes eventually become live or online once more they will be automatically re-added to the space
 
 ![Obsoleting an offline node](https://user-images.githubusercontent.com/24860547/173087202-70abfd2d-f0eb-4959-bd0f-74aeee2a2a5a.gif)
-
-## What's next?
-
-Once you configured your Spaces, it's time to set up
-your [War Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md).

@@ -1764,7 +1764,7 @@ PGC *pgc_create(const char *name,
     cache->config.max_dirty_pages_per_call = max_dirty_pages_per_flush;
     cache->config.pgc_save_init_cb = pgc_save_init_cb;
     cache->config.pgc_save_dirty_cb = pgc_save_dirty_cb;
-    cache->config.max_pages_per_inline_eviction = (max_pages_per_inline_eviction < 2) ? 2 : max_pages_per_inline_eviction;
+    cache->config.max_pages_per_inline_eviction = max_pages_per_inline_eviction;
     cache->config.max_skip_pages_per_inline_eviction = (max_skip_pages_per_inline_eviction < 2) ? 2 : max_skip_pages_per_inline_eviction;
     cache->config.max_flushes_inline = (max_flushes_inline < 1) ? 1 : max_flushes_inline;
     cache->config.partitions = partitions < 1 ? (size_t)get_netdata_cpus() : partitions;
@@ -2092,7 +2092,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
 
     struct section_pages *sp = *section_pages_pptr;
     if(!netdata_spinlock_trylock(&sp->migration_to_v2_spinlock)) {
-        internal_fatal(true, "DBENGINE: migration to journal v2 is already running for this section");
+        info("DBENGINE: migration to journal v2 for datafile %u is postponed, another jv2 indexer is already running for this section", datafile_fileno);
         pgc_ll_unlock(cache, &cache->hot);
         return;
     }

@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Remotes/Devices"
 -->
 
-# cups.plugin
+# Printers (cups.plugin)
 
 `cups.plugin` collects Common Unix Printing System (CUPS) metrics.
 

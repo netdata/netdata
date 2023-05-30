@@ -8,7 +8,7 @@ learn_rel_path: "Integrations/Notify/Agent alert notifications"
 learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
-# Broser pop up agent alert notifications
+# Browser pop up agent alert notifications
 
 The Netdata dashboard shows HTML notifications, when it is open.
 

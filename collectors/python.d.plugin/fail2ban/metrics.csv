@@ -1,0 +1,4 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+fail2ban.faile_attempts,,a dimension per jail,attempts/s,Failed attempts,line,,python.d.plugin,fail2ban
+fail2ban.bans,,a dimension per jail,bans/s,Bans,line,,python.d.plugin,fail2ban
+fail2ban.banned_ips,,a dimension per jail,ips,Banned IP addresses (since the last restart of netdata),line,,python.d.plugin,fail2ban

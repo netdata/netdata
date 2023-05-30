@@ -22,7 +22,10 @@ typedef enum web_client_acl {
     WEB_CLIENT_ACL_SSL_FORCE    = (1 << 7),
     WEB_CLIENT_ACL_SSL_DEFAULT  = (1 << 8),
     WEB_CLIENT_ACL_ACLK         = (1 << 9),
+    WEB_CLIENT_ACL_WEBRTC       = (1 << 10),
 } WEB_CLIENT_ACL;
+
+#define WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC (WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK | WEB_CLIENT_ACL_WEBRTC)
 
 #define WEB_CLIENT_ACL_ALL 0xFFFF
 
@@ -73,6 +76,9 @@ ssize_t netdata_ssl_write(SSL *ssl, const void *buf, size_t num);
 ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
 ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
 #endif
+
+bool fd_is_socket(int fd);
+bool sock_has_output_error(int fd);
 
 int sock_setnonblock(int fd);
 int sock_delnonblock(int fd);

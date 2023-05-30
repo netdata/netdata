@@ -33,4 +33,6 @@ void aclk_query_threads_cleanup(struct aclk_query_threads *query_threads);
 
 const char *aclk_query_get_name(aclk_query_type_t qt, int unknown_ok);
 
+int mark_pending_req_cancelled(const char *msg_id);
+
 #endif //NETDATA_AGENT_CLOUD_LINK_H

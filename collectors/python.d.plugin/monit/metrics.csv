@@ -1,0 +1,13 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+monit.filesystems,,a dimension per target,filesystems,Filesystems,line,,python.d.plugin,monit
+monit.directories,,a dimension per target,directories,Directories,line,,python.d.plugin,monit
+monit.files,,a dimension per target,files,Files,line,,python.d.plugin,monit
+monit.fifos,,a dimension per target,pipes,Pipes (fifo),line,,python.d.plugin,monit
+monit.programs,,a dimension per target,programs,Programs statuses,line,,python.d.plugin,monit
+monit.services,,a dimension per target,processes,Processes statuses,line,,python.d.plugin,monit
+monit.process_uptime,,a dimension per target,seconds,Processes uptime,line,,python.d.plugin,monit
+monit.process_threads,,a dimension per target,threads,Processes threads,line,,python.d.plugin,monit
+monit.process_childrens,,a dimension per target,children,Child processes,line,,python.d.plugin,monit
+monit.hosts,,a dimension per target,hosts,Hosts,line,,python.d.plugin,monit
+monit.host_latency,,a dimension per target,milliseconds,Hosts latency,line,,python.d.plugin,monit
+monit.networks,,a dimension per target,interfaces,Network interfaces and addresses,line,,python.d.plugin,monit

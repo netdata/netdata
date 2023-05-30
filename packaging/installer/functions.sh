@@ -470,21 +470,21 @@ install_non_systemd_init() {
   if [ -d /etc/init.d ] && [ ! -f /etc/init.d/netdata ]; then
     if expr "${key}" : "^(gentoo|alpine).*"; then
       echo >&2 "Installing OpenRC init file..."
-      run cp system/netdata-openrc /etc/init.d/netdata &&
+      run cp system/openrc/init.d/netdata /etc/init.d/netdata &&
         run chmod 755 /etc/init.d/netdata &&
         run rc-update add netdata default &&
         return 0
 
     elif expr "${key}" : "^devuan*" || [ "${key}" = "debian-7" ] || [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
       echo >&2 "Installing LSB init file..."
-      run cp system/netdata-lsb /etc/init.d/netdata &&
+      run cp system/lsb/init.d/netdata /etc/init.d/netdata &&
         run chmod 755 /etc/init.d/netdata &&
         run update-rc.d netdata defaults &&
         run update-rc.d netdata enable &&
         return 0
     elif expr "${key}" : "^(amzn-201[5678]|ol|CentOS release 6|Red Hat Enterprise Linux Server release 6|Scientific Linux CERN SLC release 6|CloudLinux Server release 6).*"; then
       echo >&2 "Installing init.d file..."
-      run cp system/netdata-init-d /etc/init.d/netdata &&
+      run cp system/initd/init.d/netdata /etc/init.d/netdata &&
         run chmod 755 /etc/init.d/netdata &&
         run chkconfig netdata on &&
         return 0
@@ -582,7 +582,7 @@ install_netdata_service() {
           echo >&2 "Installing MacOS X plist file..."
           # This is used by netdata-installer.sh
           # shellcheck disable=SC2034
-          run cp system/netdata.plist /Library/LaunchDaemons/com.github.netdata.plist &&
+          run cp system/launchd/netdata.plist /Library/LaunchDaemons/com.github.netdata.plist &&
             run launchctl load /Library/LaunchDaemons/com.github.netdata.plist &&
             NETDATA_START_CMD="launchctl start com.github.netdata" &&
             NETDATA_STOP_CMD="launchctl stop com.github.netdata"
@@ -592,7 +592,7 @@ install_netdata_service() {
       elif [ "${uname}" = "FreeBSD" ]; then
         # This is used by netdata-installer.sh
         # shellcheck disable=SC2034
-        run cp system/netdata-freebsd /etc/rc.d/netdata && NETDATA_START_CMD="service netdata start" &&
+        run cp system/freebsd/rc.d/netdata /etc/rc.d/netdata && NETDATA_START_CMD="service netdata start" &&
           NETDATA_STOP_CMD="service netdata stop" &&
           NETDATA_INSTALLER_START_CMD="service netdata onestart" &&
           myret=$?
@@ -621,7 +621,7 @@ install_netdata_service() {
           fi
 
           echo >&2 "Installing systemd service..."
-          run cp system/netdata.service "${SYSTEMD_DIRECTORY}/netdata.service" &&
+          run cp system/systemd/netdata.service "${SYSTEMD_DIRECTORY}/netdata.service" &&
             run systemctl daemon-reload &&
             ${ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED} &&
             return 0
@@ -845,10 +845,12 @@ restart_netdata() {
 # install netdata logrotate
 
 install_netdata_logrotate() {
+  src="${NETDATA_PREFIX}/usr/lib/netdata/system/logrotate/netdata"
+
   if [ "${UID}" -eq 0 ]; then
     if [ -d /etc/logrotate.d ]; then
       if [ ! -f /etc/logrotate.d/netdata ]; then
-        run cp system/netdata.logrotate /etc/logrotate.d/netdata
+        run cp "${src}" /etc/logrotate.d/netdata
       fi
 
       if [ -f /etc/logrotate.d/netdata ]; then
@@ -916,32 +918,29 @@ portable_add_user() {
   [ -z "${homedir}" ] && homedir="/tmp"
 
   # Check if user exists
-  if cut -d ':' -f 1 < /etc/passwd | grep "^${username}$" 1> /dev/null 2>&1; then
-    echo >&2 "User '${username}' already exists."
-    return 0
+  if command -v getent > /dev/null 2>&1; then
+    if getent passwd "${username}" > /dev/null 2>&1; then
+        echo >&2 "User '${username}' already exists."
+        return 0
+    fi
+  else
+    if cut -d ':' -f 1 < /etc/passwd | grep "^${username}$" 1> /dev/null 2>&1; then
+        echo >&2 "User '${username}' already exists."
+        return 0
+    fi
   fi
 
   echo >&2 "Adding ${username} user account with home ${homedir} ..."
 
   nologin="$(command -v nologin || echo '/bin/false')"
 
-  # Linux
   if command -v useradd 1> /dev/null 2>&1; then
     run useradd -r -g "${username}" -c "${username}" -s "${nologin}" --no-create-home -d "${homedir}" "${username}" && return 0
-  fi
-
-  # FreeBSD
-  if command -v pw 1> /dev/null 2>&1; then
+  elif command -v pw 1> /dev/null 2>&1; then
     run pw useradd "${username}" -d "${homedir}" -g "${username}" -s "${nologin}" && return 0
-  fi
-
-  # BusyBox
-  if command -v adduser 1> /dev/null 2>&1; then
+  elif command -v adduser 1> /dev/null 2>&1; then
     run adduser -h "${homedir}" -s "${nologin}" -D -G "${username}" "${username}" && return 0
-  fi
-
-  # mac OS
-  if command -v sysadminctl 1> /dev/null 2>&1; then
+  elif command -v sysadminctl 1> /dev/null 2>&1; then
     run sysadminctl -addUser "${username}" && return 0
   fi
 
@@ -964,20 +963,11 @@ portable_add_group() {
   # Linux
   if command -v groupadd 1> /dev/null 2>&1; then
     run groupadd -r "${groupname}" && return 0
-  fi
-
-  # FreeBSD
-  if command -v pw 1> /dev/null 2>&1; then
+  elif command -v pw 1> /dev/null 2>&1; then
     run pw groupadd "${groupname}" && return 0
-  fi
-
-  # BusyBox
-  if command -v addgroup 1> /dev/null 2>&1; then
+  elif command -v addgroup 1> /dev/null 2>&1; then
     run addgroup "${groupname}" && return 0
-  fi
-
-  # mac OS
-  if command -v dseditgroup 1> /dev/null 2>&1; then
+  elif command -v dseditgroup 1> /dev/null 2>&1; then
     dseditgroup -o create "${groupname}" && return 0
   fi
 
@@ -1008,20 +998,11 @@ portable_add_user_to_group() {
     # Linux
     if command -v usermod 1> /dev/null 2>&1; then
       run usermod -a -G "${groupname}" "${username}" && return 0
-    fi
-
-    # FreeBSD
-    if command -v pw 1> /dev/null 2>&1; then
+    elif command -v pw 1> /dev/null 2>&1; then
       run pw groupmod "${groupname}" -m "${username}" && return 0
-    fi
-
-    # BusyBox
-    if command -v addgroup 1> /dev/null 2>&1; then
+    elif command -v addgroup 1> /dev/null 2>&1; then
       run addgroup "${username}" "${groupname}" && return 0
-    fi
-
-    # mac OS
-    if command -v dseditgroup 1> /dev/null 2>&1; then
+    elif command -v dseditgroup 1> /dev/null 2>&1; then
       dseditgroup -u "${username}" "${groupname}" && return 0
     fi
 
@@ -1076,8 +1057,8 @@ install_netdata_updater() {
   fi
 
   if issystemd && [ -n "$(get_systemd_service_dir)" ]; then
-    cat "${NETDATA_SOURCE_DIR}/system/netdata-updater.timer" > "$(get_systemd_service_dir)/netdata-updater.timer"
-    cat "${NETDATA_SOURCE_DIR}/system/netdata-updater.service" > "$(get_systemd_service_dir)/netdata-updater.service"
+    cat "${NETDATA_SOURCE_DIR}/system/systemd/netdata-updater.timer" > "$(get_systemd_service_dir)/netdata-updater.timer"
+    cat "${NETDATA_SOURCE_DIR}/system/systemd/netdata-updater.service" > "$(get_systemd_service_dir)/netdata-updater.service"
   fi
 
   sed -i -e "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" || return 1

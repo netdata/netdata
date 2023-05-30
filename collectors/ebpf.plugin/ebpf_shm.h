@@ -27,6 +27,9 @@
 #define NETDATA_SYSTEMD_SHM_DT_CONTEXT "services.shmdt"
 #define NETDATA_SYSTEMD_SHM_CTL_CONTEXT "services.shmctl"
 
+// ARAL name
+#define NETDATA_EBPF_SHM_ARAL_NAME "ebpf_shm"
+
 typedef struct netdata_publish_shm {
     uint64_t get;
     uint64_t at;
@@ -50,10 +53,9 @@ enum shm_counters {
     NETDATA_SHM_END
 };
 
-extern netdata_publish_shm_t **shm_pid;
-
 void *ebpf_shm_thread(void *ptr);
 void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr);
+void ebpf_shm_release(netdata_publish_shm_t *stat);
 extern netdata_ebpf_targets_t shm_targets[];
 
 extern struct config shm_config;

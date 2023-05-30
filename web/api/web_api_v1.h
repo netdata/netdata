@@ -3,11 +3,9 @@
 #ifndef NETDATA_WEB_API_V1_H
 #define NETDATA_WEB_API_V1_H 1
 
-#include "daemon/common.h"
-#include "web/api/badges/web_buffer_svg.h"
-#include "web/api/formatters/rrd2json.h"
-#include "web/api/health/health_cmdapi.h"
-#include "web/api/queries/weights.h"
+#include "web_api.h"
+
+struct web_client;
 
 RRDR_OPTIONS web_client_api_request_v1_data_options(char *o);
 void web_client_api_request_v1_data_options_to_buffer_json_array(BUFFER *wb, const char *key, RRDR_OPTIONS options);
@@ -24,14 +22,16 @@ int web_client_api_request_v1_alarm_variables(RRDHOST *host, struct web_client *
 int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_client *w, char *url);
 int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w, char *url);
 int web_client_api_request_v1_chart(RRDHOST *host, struct web_client *w, char *url);
-int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *url);
 int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *w, char *url);
 int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url);
-int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url);
+int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url_path_endpoint);
 int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb);
 
 void web_client_api_v1_init(void);
 void web_client_api_v1_management_init(void);
+
+void host_labels2json(RRDHOST *host, BUFFER *wb, const char *key);
+void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host, BUFFER *wb, const char *key);
 
 extern char *api_secret;
 

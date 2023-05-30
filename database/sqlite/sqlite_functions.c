@@ -49,7 +49,6 @@ const char *database_config[] = {
 const char *database_cleanup[] = {
     "DELETE FROM chart WHERE chart_id NOT IN (SELECT chart_id FROM dimension);",
     "DELETE FROM host WHERE host_id NOT IN (SELECT host_id FROM chart);",
-    "DELETE FROM chart_label WHERE chart_id NOT IN (SELECT chart_id FROM chart);",
     "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);",
     "DELETE FROM host_info WHERE host_id NOT IN (SELECT host_id FROM host);",
     "DELETE FROM host_label WHERE host_id NOT IN (SELECT host_id FROM host);",
@@ -117,7 +116,6 @@ int execute_insert(sqlite3_stmt *res)
             break;
         }
     }
-
     return rc;
 }
 
@@ -154,6 +152,12 @@ static void release_statement(void *statement)
 #endif
     if (unlikely(rc = sqlite3_finalize((sqlite3_stmt *) statement) != SQLITE_OK))
         error_report("Failed to finalize statement, rc = %d", rc);
+}
+
+void initialize_thread_key_pool(void)
+{
+    for (int i = 0; i < MAX_PREPARED_STATEMENTS; i++)
+        (void)pthread_key_create(&key_pool[i], release_statement);
 }
 
 int prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **statement)
@@ -448,8 +452,7 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
 
     info("SQLite database initialization completed");
 
-    for (int i = 0; i < MAX_PREPARED_STATEMENTS; i++)
-        (void)pthread_key_create(&key_pool[i], release_statement);
+    initialize_thread_key_pool();
 
     rc = sqlite3_create_function(db_meta, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC, 0, sqlite_uuid_parse, 0, 0);
     if (unlikely(rc != SQLITE_OK))
@@ -505,14 +508,15 @@ skip:
         error_report("Failed to finalize statement %s, rc = %d", sql, rc);
     return result;
 }
-
-void db_execute(const char *cmd)
+// Return 0 OK
+// Return 1 Failed
+int db_execute(sqlite3 *db, const char *cmd)
 {
     int rc;
     int cnt = 0;
     while (cnt < SQL_MAX_RETRY) {
         char *err_msg;
-        rc = sqlite3_exec_monitored(db_meta, cmd, 0, 0, &err_msg);
+        rc = sqlite3_exec_monitored(db, cmd, 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
             error_report("Failed to execute '%s', rc = %d (%s) -- attempt %d", cmd, rc, err_msg, cnt);
             sqlite3_free(err_msg);
@@ -527,6 +531,7 @@ void db_execute(const char *cmd)
 
         ++cnt;
     }
+    return (rc != SQLITE_OK);
 }
 
 static inline void set_host_node_id(RRDHOST *host, uuid_t *node_id)
@@ -540,7 +545,7 @@ static inline void set_host_node_id(RRDHOST *host, uuid_t *node_id)
         return;
     }
 
-    struct aclk_database_worker_config *wc = host->dbsync_worker;
+    struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
 
     if (unlikely(!host->node_id))
         host->node_id = mallocz(sizeof(*host->node_id));
@@ -594,7 +599,7 @@ int update_node_id(uuid_t *host_id, uuid_t *node_id)
     rrd_wrlock();
     host = rrdhost_find_by_guid(host_guid);
     if (likely(host))
-            set_host_node_id(host, node_id);
+        set_host_node_id(host, node_id);
     rrd_unlock();
 
 failed:
@@ -602,48 +607,6 @@ failed:
         error_report("Failed to finalize the prepared statement when storing node instance information");
 
     return rc - 1;
-}
-
-#define SQL_SELECT_HOSTNAME_BY_NODE_ID  "SELECT h.hostname FROM node_instance ni, " \
-"host h WHERE ni.host_id = h.host_id AND ni.node_id = @node_id;"
-
-char *get_hostname_by_node_id(char *node)
-{
-    sqlite3_stmt *res = NULL;
-    char  *hostname = NULL;
-    int rc;
-
-    if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            error_report("Database has not been initialized");
-        return NULL;
-    }
-
-    uuid_t node_id;
-    if (uuid_parse(node, node_id))
-        return NULL;
-
-    rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_HOSTNAME_BY_NODE_ID, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to fetch hostname by node id");
-        return NULL;
-    }
-
-    rc = sqlite3_bind_blob(res, 1, &node_id, sizeof(node_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id parameter to select node instance information");
-        goto failed;
-    }
-
-    rc = sqlite3_step_monitored(res);
-    if (likely(rc == SQLITE_ROW))
-        hostname = strdupz((char *)sqlite3_column_text(res, 0));
-
-failed:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when search for hostname by node id");
-
-    return hostname;
 }
 
 #define SQL_SELECT_HOST_BY_NODE_ID  "select host_id from node_instance where node_id = @node_id;"
@@ -684,7 +647,7 @@ failed:
     return (rc == SQLITE_ROW) ? 0 : -1;
 }
 
-#define SQL_SELECT_NODE_ID  "select node_id from node_instance where host_id = @host_id and node_id not null;"
+#define SQL_SELECT_NODE_ID  "SELECT node_id FROM node_instance WHERE host_id = @host_id AND node_id IS NOT NULL;"
 
 int get_node_id(uuid_t *host_id, uuid_t *node_id)
 {
@@ -720,8 +683,8 @@ failed:
     return (rc == SQLITE_ROW) ? 0 : -1;
 }
 
-#define SQL_INVALIDATE_NODE_INSTANCES "update node_instance set node_id = NULL where exists " \
-    "(select host_id from node_instance where host_id = @host_id and (@claim_id is null or claim_id <> @claim_id));"
+#define SQL_INVALIDATE_NODE_INSTANCES "UPDATE node_instance SET node_id = NULL WHERE EXISTS " \
+    "(SELECT host_id FROM node_instance WHERE host_id = @host_id AND (@claim_id IS NULL OR claim_id <> @claim_id));"
 
 void invalidate_node_instances(uuid_t *host_id, uuid_t *claim_id)
 {
@@ -765,8 +728,8 @@ failed:
         error_report("Failed to finalize the prepared statement when invalidating node instance information");
 }
 
-#define SQL_GET_NODE_INSTANCE_LIST "select ni.node_id, ni.host_id, h.hostname " \
-    "from node_instance ni, host h where ni.host_id = h.host_id;"
+#define SQL_GET_NODE_INSTANCE_LIST "SELECT ni.node_id, ni.host_id, h.hostname " \
+    "FROM node_instance ni, host h WHERE ni.host_id = h.host_id AND h.hops >=0;"
 
 struct node_instance_list *get_node_list(void)
 {
@@ -805,13 +768,18 @@ struct node_instance_list *get_node_list(void)
             uuid_copy(node_list[row].node_id, *((uuid_t *)sqlite3_column_blob(res, 0)));
         if (sqlite3_column_bytes(res, 1) == sizeof(uuid_t)) {
             uuid_t *host_id = (uuid_t *)sqlite3_column_blob(res, 1);
-            uuid_copy(node_list[row].host_id, *host_id);
-            node_list[row].queryable = 1;
             uuid_unparse_lower(*host_id, host_guid);
             RRDHOST *host = rrdhost_find_by_guid(host_guid);
-            node_list[row].live = host && (host == localhost || host->receiver) ? 1 : 0;
+            if (rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)) {
+                info("ACLK: 'host:%s' skipping get node list because context is initializing", rrdhost_hostname(host));
+                continue;
+            }
+            uuid_copy(node_list[row].host_id, *host_id);
+            node_list[row].queryable = 1;
+            node_list[row].live = (host && (host == localhost || host->receiver
+                                            || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)))) ? 1 : 0;
             node_list[row].hops = (host && host->system_info) ? host->system_info->hops :
-                                  uuid_compare(*host_id, localhost->host_uuid) ? 1 : 0;
+                                  uuid_memcmp(host_id, &localhost->host_uuid) ? 1 : 0;
             node_list[row].hostname =
                 sqlite3_column_bytes(res, 2) ? strdupz((char *)sqlite3_column_text(res, 2)) : NULL;
         }
@@ -950,6 +918,10 @@ int bind_text_null(sqlite3_stmt *res, int position, const char *text, bool can_b
 int sql_metadata_cache_stats(int op)
 {
     int count, dummy;
+
+    if (unlikely(!db_meta))
+        return 0;
+
     netdata_thread_disable_cancelability();
     sqlite3_db_status(db_meta, op, &count, &dummy, 0);
     netdata_thread_enable_cancelability();

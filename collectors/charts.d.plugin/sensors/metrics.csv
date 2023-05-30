@@ -1,0 +1,8 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+sensors.temp,sensor chip,"{filename}",Celsius,"Temperature",line,,charts.d.plugin,sensors
+sensors.volt,sensor chip,"{filename}",Volts,"Voltage",line,,charts.d.plugin,sensors
+sensors.curr,sensor chip,"{filename}",Ampere,"Current",line,,charts.d.plugin,sensors
+sensors.power,sensor chip,"{filename}",Watt,"Power",line,,charts.d.plugin,sensors
+sensors.fans,sensor chip,"{filename}","Rotations / Minute","Fans Speed",line,,charts.d.plugin,sensors
+sensors.energy,sensor chip,"{filename}",Joule,"Energy",area,,charts.d.plugin,sensors
+sensors.humidity,sensor chip,"{filename}",Percent,"Humidity",line,,charts.d.plugin,sensors

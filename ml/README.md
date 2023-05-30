@@ -12,11 +12,15 @@ learn_rel_path: "Configuration"
 
 ## Overview
 
+Machine learning is a subfield of artificial intelligence that enables computers to learn and improve from experience without being explicitly programmed. In monitoring, machine learning can be used to detect patterns and anomalies in large datasets, enabling users to identify potential issues before they become critical. The importance of machine learning in monitoring lies in its ability to analyze vast amounts of data in real-time and provide actionable insights that can help optimize system performance and prevent downtime. Machine learning can also improve the efficiency and scalability of monitoring systems, enabling organizations to monitor complex infrastructures and applications with ease.
+
+The primary goal of implementing machine learning features in Netdata is to enable users to detect and alert on anomalies in their systems with advanced anomaly detection capabilities. Netdata's machine learning features are designed to be highly customizable and scalable, so users can tailor the ML models and training process to their specific requirements and monitor systems of any size or complexity.
+
 As of [`v1.32.0`](https://github.com/netdata/netdata/releases/tag/v1.32.0), Netdata comes with ML powered [anomaly detection](https://en.wikipedia.org/wiki/Anomaly_detection) capabilities built into it and available to use out of the box, with zero configuration required (ML was enabled by default in `v1.35.0-29-nightly` in [this PR](https://github.com/netdata/netdata/pull/13158), previously it required a one line config change).
 
 🚧 **Note**: If you would like to get involved and help us with some feedback, email us at analytics-ml-team@netdata.cloud, comment on the [beta launch post](https://community.netdata.cloud/t/anomaly-advisor-beta-launch/2717) in the Netdata community, or come join us in the [🤖-ml-powered-monitoring](https://discord.gg/4eRSEUpJnc) channel of the Netdata discord.
 
-Once ML is enabled, Netdata will begin training a model for each dimension. By default this model is a [k-means clustering](https://en.wikipedia.org/wiki/K-means_clustering) model trained on the most recent 4 hours of data. Rather than just using the most recent value of each raw metric, the model works on a preprocessed ["feature vector"](#feature-vector) of recent smoothed and differenced values. This should enable the model to detect a wider range of potentially anomalous patterns in recent observations as opposed to just point anomalies like big spikes or drops. ([This infographic](https://user-images.githubusercontent.com/2178292/144414415-275a3477-5b47-43d6-8959-509eb48ebb20.png) shows some different types of anomalies.) 
+Once ML is enabled, Netdata will begin training a model for each dimension. By default this model is a [k-means clustering](https://en.wikipedia.org/wiki/K-means_clustering) model trained on the most recent 4 hours of data. Rather than just using the most recent value of each raw metric, the model works on a preprocessed ["feature vector"](#feature-vector) of recent smoothed and differenced values. This enables the model to detect a wider range of potentially anomalous patterns in recent observations as opposed to just point anomalies like big spikes or drops. ([This infographic](https://user-images.githubusercontent.com/2178292/144414415-275a3477-5b47-43d6-8959-509eb48ebb20.png) shows some different types of anomalies). 
 
 The sections below will introduce some of the main concepts: 
 - anomaly bit
@@ -114,7 +118,9 @@ To enable or disable anomaly detection:
 2. In the `[ml]` section, set `enabled = yes` to enable or `enabled = no` to disable.
 3. Restart netdata (typically `sudo systemctl restart netdata`).
 
-**Note**: If you would like to learn more about configuring Netdata please see [the configuration guide](https://github.com/netdata/netdata/blob/master/docs/guides/step-by-step/step-04.md).
+> 📑 Note
+> 
+> If you would like to learn more about configuring Netdata please see the [Configuration section](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) of our documentation.
 
 Below is a list of all the available configuration params and their default values.
 
@@ -124,7 +130,7 @@ Below is a list of all the available configuration params and their default valu
 	# maximum num samples to train = 14400
 	# minimum num samples to train = 3600
 	# train every = 3600
-	# number of models per dimension = 1
+	# number of models per dimension = 2
 	# dbengine anomaly rate every = 30
 	# num samples to diff = 1
 	# num samples to smooth = 3
@@ -137,6 +143,8 @@ Below is a list of all the available configuration params and their default valu
 	# anomaly detection grouping duration = 300
 	# hosts to skip from training = !*
 	# charts to skip from training = netdata.*
+	# dimension anomaly rate suppression window = 900
+	# dimension anomaly rate suppression threshold = 450    
 ```
 
 ### Configuration Examples
@@ -181,7 +189,7 @@ This example assumes 3 child nodes [streaming](https://github.com/netdata/netdat
 - `maximum num samples to train`: (`3600`/`86400`) This is the maximum amount of time you would like to train each model on. For example, the default of `14400` trains on the preceding 4 hours of data, assuming an `update every` of 1 second.
 - `minimum num samples to train`: (`900`/`21600`) This is the minimum amount of data required to be able to train a model. For example, the default of `900` implies that once at least 15 minutes of data is available for training, a model is trained, otherwise it is skipped and checked again at the next training run.
 - `train every`: (`1800`/`21600`) This is how often each model will be retrained. For example, the default of `3600` means that each model is retrained every hour. Note: The training of all models is spread out across the `train every` period for efficiency, so in reality, it means that each model will be trained in a staggered manner within each `train every` period.
-- `number of models per dimension`: (`1`/`168`) This is the number of trained models that will be used for scoring. For example the default `number of models per dimension = 1` means that just the most recently trained model (covering up to the most recent `maximum num samples to train` of training data) for the dimension will be used to determine the corresponding anomaly bit. Alternatively, if you have `train every = 3600` and `number of models per dimension = 24` this means that netdata will store and use the last 24 trained models for each dimension when determining the anomaly bit, this means that for the latest feature vector in this configuration to be considered anomalous it would need to look anomalous across _all_ the models trained for that dimension in the last 24 hours. As such, increasing `number of models per dimension` may reduce some false positives since it will result in more models (covering a wider time frame of training) being used during scoring.
+- `number of models per dimension`: (`1`/`168`) This is the number of trained models that will be used for scoring. For example the default `number of models per dimension = 2` means that the two most recently trained models (covering up to the most recent `maximum num samples to train` of training data) for the dimension will be used to determine the corresponding anomaly bit. Alternatively, if you have `train every = 3600` and `number of models per dimension = 24` this means that netdata will store and use the last 24 trained models for each dimension when determining the anomaly bit, this means that for the latest feature vector in this configuration to be considered anomalous it would need to look anomalous across _all_ the models trained for that dimension in the last 24 hours. As such, increasing `number of models per dimension` may reduce some false positives since it will result in more models (covering a wider time frame of training) being used during scoring.
 - `dbengine anomaly rate every`: (`30`/`900`) This is how often netdata will aggregate all the anomaly bits into a single chart (`anomaly_detection.anomaly_rates`). The aggregation into a single chart allows enabling anomaly rate ranking over _all_ metrics with one API call as opposed to a call per chart.
 - `num samples to diff`: (`0`/`1`) This is a `0` or `1` to determine if you want the model to operate on differences of the raw data or just the raw data. For example, the default of `1` means that we take differences of the raw values. Using differences is more general and works on dimensions that might naturally tend to have some trends or cycles in them that is normal behavior to which we don't want to be too sensitive.
 - `num samples to smooth`: (`0`/`5`) This is a small integer that controls the amount of smoothing applied as part of the feature processing used by the model. For example, the default of `3` means that the rolling average of the last 3 values is used. Smoothing like this helps the model be a little more robust to spiky types of dimensions that naturally "jump" up or down as part of their normal behavior.
@@ -266,3 +274,4 @@ The anomaly rate across all dimensions of a node.
 - You should benchmark Netdata resource usage before and after enabling ML. Typical overhead ranges from 1-2% additional CPU at most.
 - The "anomaly bit" has been implemented to be a building block to underpin many more ML based use cases that we plan to deliver soon.
 - At its core Netdata uses an approach and problem formulation very similar to the Netdata python [anomalies collector](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/anomalies/README.md), just implemented in a much much more efficient and scalable way in the agent in c++. So if you would like to learn more about the approach and are familiar with Python that is a useful resource to explore, as is the corresponding [deep dive tutorial](https://nbviewer.org/github/netdata/community/blob/main/netdata-agent-api/netdata-pandas/anomalies_collector_deepdive.ipynb) where the default model used is PCA instead of K-Means but the overall approach and formulation is similar.
+- Check out our ML related blog posts over at [https://blog.netdata.cloud](https://blog.netdata.cloud/tags/machine-learning)

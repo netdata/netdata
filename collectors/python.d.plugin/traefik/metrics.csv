@@ -1,0 +1,9 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+traefik.response_statuses,,"success, error, redirect, bad, other",requests/s,Response statuses,stacked,,python.d.plugin,traefik
+traefik.response_codes,,"2xx, 5xx, 3xx, 4xx, 1xx, other",requests/s,Responses by codes,stacked,,python.d.plugin,traefik
+traefik.detailed_response_codes,,a dimension for each response code family,requests/s,Detailed response codes,stacked,,python.d.plugin,traefik
+traefik.requests,,requests,requests/s,Requests,line,,python.d.plugin,traefik
+traefik.total_response_time,,response,seconds,Total response time,line,,python.d.plugin,traefik
+traefik.average_response_time,,response,milliseconds,Average response time,line,,python.d.plugin,traefik
+traefik.average_response_time_per_iteration,,response,milliseconds,Average response time per iteration,line,,python.d.plugin,traefik
+traefik.uptime,,uptime,seconds,Uptime,line,,python.d.plugin,traefik

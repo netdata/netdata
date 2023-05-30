@@ -1,0 +1,13 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+dovecot.sessions,,active sessions,number,Dovecot Active Sessions,line,,python.d.plugin,dovecot
+dovecot.logins,,logins,number,Dovecot Logins,line,,python.d.plugin,dovecot
+dovecot.commands,,commands,commands,Dovecot Commands,line,,python.d.plugin,dovecot
+dovecot.faults,,"minor, major",faults,Dovecot Page Faults,line,,python.d.plugin,dovecot
+dovecot.context_switches,,"voluntary, involuntary",switches,Dovecot Context Switches,line,,python.d.plugin,dovecot
+dovecot.io,,"read, write",KiB/s,Dovecot Disk I/O,area,,python.d.plugin,dovecot
+dovecot.net,,"read, write",kilobits/s,Dovecot Network Bandwidth,area,,python.d.plugin,dovecot
+dovecot.syscalls,,"read, write",syscalls/s,Dovecot Number of SysCalls,line,,python.d.plugin,dovecot
+dovecot.lookup,,"path, attr",number/s,Dovecot Lookups,stacked,,python.d.plugin,dovecot
+dovecot.cache,,hits,hits/s,Dovecot Cache Hits,line,,python.d.plugin,dovecot
+dovecot.auth,,"ok, failed",attempts,Dovecot Authentications,stacked,,python.d.plugin,dovecot
+dovecot.auth_cache,,"hit, miss",number,Dovecot Authentication Cache,stacked,,python.d.plugin,dovecot

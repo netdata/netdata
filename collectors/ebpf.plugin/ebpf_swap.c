@@ -7,12 +7,10 @@ static char *swap_dimension_name[NETDATA_SWAP_END] = { "read", "write" };
 static netdata_syscall_stat_t swap_aggregated_data[NETDATA_SWAP_END];
 static netdata_publish_syscall_t swap_publish_aggregated[NETDATA_SWAP_END];
 
-netdata_publish_swap_t *swap_vector = NULL;
-
 static netdata_idx_t swap_hash_values[NETDATA_SWAP_END];
 static netdata_idx_t *swap_values = NULL;
 
-netdata_publish_swap_t **swap_pid = NULL;
+netdata_publish_swap_t *swap_vector = NULL;
 
 struct config swap_config = { .first_section = NULL,
     .last_section = NULL,
@@ -39,10 +37,6 @@ netdata_ebpf_targets_t swap_targets[] = { {.name = "swap_readpage", .mode = EBPF
                                            {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 #ifdef LIBBPF_MAJOR_VERSION
-#include "includes/swap.skel.h" // BTF code
-
-static struct swap_bpf *bpf_obj = NULL;
-
 /**
  * Disable probe
  *
@@ -224,21 +218,11 @@ static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t 
  */
 static void ebpf_swap_free(ebpf_module_t *em)
 {
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-
-    ebpf_cleanup_publish_syscall(swap_publish_aggregated);
-
     freez(swap_vector);
     freez(swap_values);
 
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        swap_bpf__destroy(bpf_obj);
-#endif
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -341,7 +325,7 @@ static void read_apps_table()
 {
     netdata_publish_swap_t *cv = swap_vector;
     uint32_t key;
-    struct pid_stat *pids = root_of_pids;
+    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     int fd = swap_maps[NETDATA_PID_SWAP_TABLE].map_fd;
     size_t length = sizeof(netdata_publish_swap_t)*ebpf_nprocs;
     while (pids) {
@@ -410,7 +394,7 @@ static void ebpf_swap_read_global_table()
  * @param swap
  * @param root
  */
-static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct pid_on_target *root)
+static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct ebpf_pid_on_target *root)
 {
     uint64_t local_read = 0;
     uint64_t local_write = 0;
@@ -435,9 +419,9 @@ static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct pid_on_targe
  *
  * @param root the target list.
 */
-void ebpf_swap_send_apps_data(struct target *root)
+void ebpf_swap_send_apps_data(struct ebpf_target *root)
 {
-    struct target *w;
+    struct ebpf_target *w;
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             ebpf_swap_sum_pids(&w->swap, w->root_pid);
@@ -707,7 +691,7 @@ static void swap_collector(ebpf_module_t *em)
  */
 void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    struct target *root = ptr;
+    struct ebpf_target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_MEM_SWAP_READ_CHART,
                                "Calls to function <code>swap_readpage</code>.",
                                EBPF_COMMON_DIMENSION_CALL,
@@ -768,7 +752,7 @@ static void ebpf_create_swap_charts(int update_every)
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
-                      202,
+                      NETDATA_CHART_PRIO_SYSTEM_SWAP_CALLS,
                       ebpf_create_global_dimension,
                       swap_publish_aggregated, NETDATA_SWAP_END,
                       update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
@@ -829,7 +813,6 @@ void *ebpf_swap_thread(void *ptr)
     ebpf_adjust_thread_load(em, default_btf);
 #endif
    if (ebpf_swap_load_bpf(em)) {
-       em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endswap;
     }
 
@@ -842,6 +825,7 @@ void *ebpf_swap_thread(void *ptr)
     pthread_mutex_lock(&lock);
     ebpf_create_swap_charts(em->update_every);
     ebpf_update_stats(&plugin_statistics, em);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
     pthread_mutex_unlock(&lock);
 
     swap_collector(em);

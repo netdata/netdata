@@ -1,14 +1,3 @@
-<!--
-title: "Configure the Netdata Agent"
-description: "Netdata is zero-configuration for most users, but complex infrastructures may require you to tweak some of the Agent's granular settings."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/configure/nodes.md"
-sidebar_label: "Configuration"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Configuration"
-sidebar_position: 30
--->
-
 # Configure the Netdata Agent
 
 Netdata's zero-configuration collection, storage, and visualization features work for many users, infrastructures, and
@@ -24,7 +13,7 @@ anomaly, or change in infrastructure affects how their Agents should perform.
 ## The Netdata config directory
 
 On most Linux systems, using our [recommended one-line
-installation](https://github.com/netdata/netdata/blob/master/docs/get-started.md#install-on-linux-with-one-line-installer), the **Netdata config
+installation](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#install-on-linux-with-one-line-installer), the **Netdata config
 directory** is `/etc/netdata/`. The config directory contains several configuration files with the `.conf` extension, a
 few directories, and a shell script named `edit-config`.
 
@@ -52,7 +41,7 @@ exist.
 - `apps_groups.conf` is a configuration file for changing how applications/processes are grouped when viewing the
   **Application** charts from [`apps.plugin`](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md) or
   [`ebpf.plugin`](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/README.md).
-- `health.d/` is a directory that contains [health configuration files](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md).
+- `health.d/` is a directory that contains [health configuration files](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md).
 - `health_alarm_notify.conf` enables and configures [alarm notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md).
 - `statsd.d/` is a directory for configuring Netdata's [statsd collector](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/README.md).
 - `stream.conf` configures [parent-child streaming](https://github.com/netdata/netdata/blob/master/streaming/README.md) between separate nodes running the Agent.
@@ -74,31 +63,32 @@ See [configure agent containers](https://github.com/netdata/netdata/blob/master/
 
 The **recommended way to easily and safely edit Netdata's configuration** is with the `edit-config` script. This script
 opens existing Netdata configuration files using your system's `$EDITOR`. If the file doesn't yet exist in your config
-directory, the script copies the stock version from `/usr/lib/netdata/conf.d` and opens it for editing.
+directory, the script copies the stock version from `/usr/lib/netdata/conf.d` (or wherever the symlink `orig` under the config directory leads to)
+to the proper place in the config directory and opens the copy for editing. 
 
-Run `edit-config` without any options to see details on its usage and a list of all the configuration files you can
-edit.
+If you have trouble running the script, you can manually copy the file and edit the copy.
+
+e.g. `cp /usr/lib/netdata/conf.d/go.d/bind.conf /etc/netdata/go.d/bind.conf; vi /etc/netdata/go.d/bind.conf`
+
+Run `edit-config` without options, to see details on its usage, or `edit-config --list` to see a list of all the configuration 
+files you can edit.
 
 ```bash
-./edit-config
 USAGE:
-  ./edit-config FILENAME
+  ./edit-config [options] FILENAME
 
   Copy and edit the stock config file named: FILENAME
   if FILENAME is already copied, it will be edited as-is.
 
-  The EDITOR shell variable is used to define the editor to be used.
-
-  Stock config files at: '/usr/lib/netdata/conf.d'
+  Stock config files at: '/etc/netdata/../../usr/lib/netdata/conf.d'
   User  config files at: '/etc/netdata'
 
-  Available files in '/usr/lib/netdata/conf.d' to copy and edit:
+  The editor to use can be specified either by setting the EDITOR
+  environment variable, or by using the --editor option.
 
-./apps_groups.conf                  ./health.d/phpfpm.conf
-./aws_kinesis.conf                  ./health.d/pihole.conf
-./charts.d/ap.conf                  ./health.d/portcheck.conf
-./charts.d/apcupsd.conf             ./health.d/postgres.conf
-...
+  The file to edit can also be specified using the --file option.
+
+  For a list of known config files, run './edit-config --list'
 ```
 
 To edit `netdata.conf`, run `./edit-config netdata.conf`. You may need to elevate your privileges with `sudo` or another
@@ -147,29 +137,3 @@ wget -O /etc/netdata/netdata.conf http://localhost:19999/netdata.conf
 # or
 curl -o /etc/netdata/netdata.conf http://NODE:19999/netdata.conf
 ```
-
-## What's next?
-
-Learn more about [starting, stopping, or restarting](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) the Netdata daemon to apply
-configuration changes.
-
-Apply some [common configuration changes](https://github.com/netdata/netdata/blob/master/docs/configure/common-changes.md) to quickly tweak the Agent's behavior.
-
-[Add security to your node](https://github.com/netdata/netdata/blob/master/docs/configure/secure-nodes.md) with what you've learned about the Netdata config directory
-and `edit-config`. We put together a few security best practices based on how you use the Netdata.
-
-You can also take what you've learned about node configuration to enable or enhance features:
-
--   [Enable new collectors](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md) or tweak their behavior.
--   [Configure existing health alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) or create new ones.
--   [Enable notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to receive updates about the health of your
-    infrastructure.
--   Change [the long-term metrics retention period](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md) using the database engine.
-
-### Related reference documentation
-
-- [Netdata Agent · Daemon](https://github.com/netdata/netdata/blob/master/daemon/README.md)
-- [Netdata Agent · Health monitoring](https://github.com/netdata/netdata/blob/master/health/README.md)
-- [Netdata Agent · Notifications](https://github.com/netdata/netdata/blob/master/health/notifications/README.md)
-
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fconfigure%2Fnodes&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

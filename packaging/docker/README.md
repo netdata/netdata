@@ -1,11 +1,9 @@
 <!--
 title: "Install Netdata with Docker"
-date: "2020-04-23"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/docker/README.md"
-sidebar_label: "Install Netdata with Docker"
+sidebar_label: "Docker"
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Installation"
+learn_rel_path: "Installation/Installation methods"
 sidebar_position: 40
 -->
 
@@ -32,24 +30,6 @@ Our POWER8+ Docker images do not support our FreeIPMI collector. This is a techn
 and unfortunately not something we can realistically work around.
 
 ## Create a new Netdata Agent container
-
-> :bookmark_tabs: Note
->
-> All `docker run` commands and `docker-compose` configurations explicitly set the `nofile` limit.
-> This is required on some distros until [14177](https://github.com/netdata/netdata/issues/14177) is resolved.
-> Failure to do so may cause a task running in a container to hang and consume 100% of the CPU core.
->  
-> <details>
-> <summary>What are these "some distros"?</summary>
->
-> If `LimitNOFILE=infinity` results in an open file limit of 1073741816:
->
-> ```bash
-> [fedora37 ~]$ docker run --rm busybox grep open /proc/self/limits
-> Max open files            1073741816           1073741816           files
-> ```
->  
-> </details>
 
 You can create a new Agent container using either `docker run` or `docker-compose`. After using either method, you can
 visit the Agent dashboard `http://NODE:19999`.
@@ -80,13 +60,12 @@ docker run -d --name=netdata \
   --restart unless-stopped \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
-  --ulimit nofile=4096 \
   netdata/netdata
 ```
 
-> :bookmark_tabs: Note
+> ### Note
 >  
-> If you plan to Claim the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
+> If you plan to Claim the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's Nodes tab.
 
 </TabItem>
 <TabItem value="docker compose" label="docker-compose">
@@ -111,9 +90,6 @@ docker run -d --name=netdata \
         - SYS_PTRACE
       security_opt:
         - apparmor:unconfined
-      ulimits:
-        nofile:
-          soft: 4096
       volumes:
         - netdataconfig:/etc/netdata
         - netdatalib:/var/lib/netdata
@@ -156,6 +132,20 @@ Additionally, for each stable release, three tags are pushed, one with the full 
 (for example, `v1`). The tags for the minor versions and major versions are updated whenever a release is published
 that would match that tag (for example, if `v1.30.1` were to be published, the `v1.30` tag would be updated to
 point to that instead of `v1.30.0`).
+
+## Adding extra packages at runtime
+
+By default, the official Netdata container images do not include a number of optional runtime dependencies. You
+can add these dependencies, or any other APK packages, at runtime by listing them in the environment variable
+`NETDATA_EXTRA_APK_PACKAGES`.
+
+Commonly useful packages include:
+
+- `apcupsd`: For monitoring APC UPS devices.
+- `libvirt-daemon`: For resolving cgroup names for libvirt domains.
+- `lm-sensors`: For monitoring hardware sensors.
+- `msmtp`: For email alert support.
+- `netcat-openbsd`: For IRC alert support.
 
 ## Health Checks
 
@@ -231,7 +221,6 @@ docker run -d --name=netdata \
   --restart unless-stopped \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
-  --ulimit nofile=4096 \
   netdata/netdata
 ```
 
@@ -253,9 +242,6 @@ services:
       - SYS_PTRACE
     security_opt:
       - apparmor:unconfined
-    ulimits:
-      nofile:
-        soft: 4096
     volumes:
       - ./netdataconfig/netdata:/etc/netdata:ro
       - netdatalib:/var/lib/netdata
@@ -345,17 +331,17 @@ your machine from within the container. Please read the following carefully.
 #### Docker socket proxy (safest option)
 
 Deploy a Docker socket proxy that accepts and filters out requests using something like
-[HAProxy](https://github.com/netdata/netdata/blob/master/docs/Running-behind-haproxy.md) so that it restricts connections to read-only access to the CONTAINERS
+[HAProxy](https://github.com/netdata/netdata/blob/master/docs/Running-behind-haproxy.md) or
+[CetusGuard](https://github.com/hectorm/cetusguard) so that it restricts connections to read-only access to the `/containers`
 endpoint.
 
 The reason it's safer to expose the socket to the proxy is because Netdata has a TCP port exposed outside the Docker
 network. Access to the proxy container is limited to only within the network.
 
-Below is [an example repository (and image)](https://github.com/Tecnativa/docker-socket-proxy) that provides a proxy to
-the socket.
+Here are two examples, the first using [a Docker image based on HAProxy](https://github.com/Tecnativa/docker-socket-proxy)
+and the second using [CetusGuard](https://github.com/hectorm/cetusguard).
 
-You run the Docker Socket Proxy in its own Docker Compose file and leave it on a private network that you can add to
-other services that require access.
+##### Docker Socket Proxy (HAProxy)
 
 ```yaml
 version: '3'
@@ -370,12 +356,39 @@ services:
   proxy:
     image: tecnativa/docker-socket-proxy
     volumes:
-     - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - CONTAINERS=1
-
 ```
 **Note:** Replace `2375` with the port of your proxy.
+
+##### CetusGuard
+
+```yaml
+version: '3'
+services:
+  netdata:
+    image: netdata/netdata
+    # ... rest of your config ...
+    ports:
+      - 19999:19999
+    environment:
+      - DOCKER_HOST=cetusguard:2375
+  cetusguard:
+    image: hectorm/cetusguard:v1
+    read_only: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      CETUSGUARD_BACKEND_ADDR: unix:///var/run/docker.sock
+      CETUSGUARD_FRONTEND_ADDR: tcp://:2375
+      CETUSGUARD_RULES: |
+        ! Inspect a container
+        GET %API_PREFIX_CONTAINERS%/%CONTAINER_ID_OR_NAME%/json
+```
+
+You can run the socket proxy in its own Docker Compose file and leave it on a private network that you can add to
+other services that require access.
 
 #### Giving group access to the Docker socket (less safe)
 
@@ -522,9 +535,6 @@ services:
       - SYS_PTRACE
     security_opt:
       - apparmor:unconfined
-    ulimits:
-      nofile:
-        soft: 4096
     volumes:
       - netdatalib:/var/lib/netdata
       - netdatacache:/var/cache/netdata
@@ -547,4 +557,4 @@ Caddyfile.
 ## Publish a test image to your own repository
 
 At Netdata, we provide multiple ways of testing your Docker images using your own repositories.
-You may either use the command line tools available or take advantage of our GitHub Acions infrastructure.
+You may either use the command line tools available or take advantage of our GitHub Actions infrastructure.

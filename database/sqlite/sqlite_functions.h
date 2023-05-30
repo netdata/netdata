@@ -55,7 +55,8 @@ int bind_text_null(sqlite3_stmt *res, int position, const char *text, bool can_b
 int prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **statement);
 int execute_insert(sqlite3_stmt *res);
 int exec_statement_with_uuid(const char *sql, uuid_t *uuid);
-void db_execute(const char *cmd);
+int db_execute(sqlite3 *database, const char *cmd);
+void initialize_thread_key_pool(void);
 
 // Look up functions
 int get_node_id(uuid_t *host_id, uuid_t *node_id);

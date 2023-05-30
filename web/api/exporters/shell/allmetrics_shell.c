@@ -24,12 +24,12 @@ static inline size_t shell_name_copy(char *d, const char *s, size_t usable) {
 
 void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_string, BUFFER *wb) {
     analytics_log_shell();
-    SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT);
+    SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT, true);
 
     // for each chart
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        if (filter && !simple_pattern_matches(filter, rrdset_name(st)))
+        if (filter && !simple_pattern_matches_string(filter, st->name))
             continue;
 
         NETDATA_DOUBLE total = 0.0;
@@ -97,7 +97,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
 
 void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_string, BUFFER *wb) {
     analytics_log_json();
-    SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT);
+    SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT, true);
 
     buffer_strcat(wb, "{");
 
@@ -107,7 +107,7 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
     // for each chart
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        if (filter && !(simple_pattern_matches(filter, rrdset_id(st)) || simple_pattern_matches(filter, rrdset_name(st))))
+        if (filter && !(simple_pattern_matches_string(filter, st->id) || simple_pattern_matches_string(filter, st->name)))
             continue;
 
         if(rrdset_is_available_for_viewers(st)) {

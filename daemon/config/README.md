@@ -4,8 +4,7 @@ description: "The Netdata Agent's daemon is installed preconfigured to collect t
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/daemon/config/README.md"
 sidebar_label: "Daemon"
 learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "References/Configuration"
+learn_rel_path: "Configuration"
 learn_doc_purpose: "Explain the daemon options, the log files, the process scheduling, virtual memory, explain how the netdata.conf is used and backlink to the netdata.conf file reference"
 -->
 
@@ -108,12 +107,9 @@ Please note that your data history will be lost if you have modified `history` p
 |           delete orphan hosts files           |   `yes`    | Set to `no` to disable non-responsive host removal.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 |              enable zero metrics              |    `no`    | Set to `yes` to show charts when all their metrics are zero.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
-:::info
-
-The multiplication of all the **enabled** tiers  `dbengine tier N update every iterations` values  must be less than `65535`.
-
-:::
-
+> ### Info
+>
+>The multiplication of all the **enabled** tiers  `dbengine tier N update every iterations` values  must be less than `65535`.
 
 ### [directories] section options
 

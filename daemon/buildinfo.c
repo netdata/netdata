@@ -20,6 +20,12 @@
 #endif
 #endif
 
+#ifdef ENABLE_HTTPD
+#define FEAT_HTTPD 1
+#else
+#define FEAT_HTTPD 0
+#endif
+
 #ifdef ENABLE_DBENGINE
 #define FEAT_DBENGINE 1
 #else
@@ -89,12 +95,6 @@
 #define FEAT_LIBCAP 0
 #endif
 
-#ifdef NETDATA_WITH_ZLIB
-#define FEAT_ZLIB 1
-#else
-#define FEAT_ZLIB 0
-#endif
-
 #ifdef STORAGE_WITH_MATH
 #define FEAT_LIBM 1
 #else
@@ -113,6 +113,12 @@
 #define FEAT_APPS_PLUGIN 1
 #else
 #define FEAT_APPS_PLUGIN 0
+#endif
+
+#ifdef ENABLE_DEBUGFS_PLUGIN
+#define FEAT_DEBUGFS_PLUGIN 1
+#else
+#define FEAT_DEBUGFS_PLUGIN 0
 #endif
 
 #ifdef HAVE_FREEIPMI
@@ -275,6 +281,7 @@ void print_build_info(void) {
     printf("    TLS Host Verification:      %s\n", FEAT_YES_NO(FEAT_TLS_HOST_VERIFY));
     printf("    Machine Learning:           %s\n", FEAT_YES_NO(FEAT_ML));
     printf("    Stream Compression:         %s\n", FEAT_YES_NO(FEAT_STREAM_COMPRESSION));
+    printf("    HTTPD (h2o):                %s\n", FEAT_YES_NO(FEAT_HTTPD));
 
     printf("Libraries:\n");
     printf("    protobuf:                %s%s\n", FEAT_YES_NO(FEAT_PROTOBUF), FEAT_PROTOBUF_BUNDLED);
@@ -284,12 +291,13 @@ void print_build_info(void) {
     printf("    libcrypto:               %s\n", FEAT_YES_NO(FEAT_CRYPTO));
     printf("    libm:                    %s\n", FEAT_YES_NO(FEAT_LIBM));
     printf("    tcalloc:                 %s\n", FEAT_YES_NO(FEAT_TCMALLOC));
-    printf("    zlib:                    %s\n", FEAT_YES_NO(FEAT_ZLIB));
+    printf("    zlib:                    %s\n", FEAT_YES_NO(1));
 
     printf("Plugins:\n");
     printf("    apps:                    %s\n", FEAT_YES_NO(FEAT_APPS_PLUGIN));
     printf("    cgroup Network Tracking: %s\n", FEAT_YES_NO(FEAT_CGROUP_NET));
     printf("    CUPS:                    %s\n", FEAT_YES_NO(FEAT_CUPS));
+    printf("    debugfs:                 %s\n", FEAT_YES_NO(FEAT_DEBUGFS_PLUGIN));
     printf("    EBPF:                    %s\n", FEAT_YES_NO(FEAT_EBPF));
     printf("    IPMI:                    %s\n", FEAT_YES_NO(FEAT_IPMI));
     printf("    NFACCT:                  %s\n", FEAT_YES_NO(FEAT_NFACCT));
@@ -328,7 +336,8 @@ void print_build_info_json(void) {
 
     printf("    \"tls-host-verify\": %s,\n",   FEAT_JSON_BOOL(FEAT_TLS_HOST_VERIFY));
     printf("    \"machine-learning\": %s\n",   FEAT_JSON_BOOL(FEAT_ML));
-    printf("    \"stream-compression\": %s\n",   FEAT_JSON_BOOL(FEAT_STREAM_COMPRESSION));
+    printf("    \"stream-compression\": %s\n", FEAT_JSON_BOOL(FEAT_STREAM_COMPRESSION));
+    printf("    \"httpd-h2o\": %s\n",          FEAT_JSON_BOOL(FEAT_HTTPD));
     printf("  },\n");
 
     printf("  \"libs\": {\n");
@@ -340,13 +349,14 @@ void print_build_info_json(void) {
     printf("    \"libcrypto\": %s,\n",        FEAT_JSON_BOOL(FEAT_CRYPTO));
     printf("    \"libm\": %s,\n",             FEAT_JSON_BOOL(FEAT_LIBM));
     printf("    \"tcmalloc\": %s,\n",         FEAT_JSON_BOOL(FEAT_TCMALLOC));
-    printf("    \"zlib\": %s\n",              FEAT_JSON_BOOL(FEAT_ZLIB));
+    printf("    \"zlib\": %s\n",              FEAT_JSON_BOOL(1));
     printf("  },\n");
 
     printf("  \"plugins\": {\n");
     printf("    \"apps\": %s,\n",             FEAT_JSON_BOOL(FEAT_APPS_PLUGIN));
     printf("    \"cgroup-net\": %s,\n",       FEAT_JSON_BOOL(FEAT_CGROUP_NET));
     printf("    \"cups\": %s,\n",             FEAT_JSON_BOOL(FEAT_CUPS));
+    printf("    \"debugfs\": %s,\n",          FEAT_JSON_BOOL(FEAT_DEBUGFS_PLUGIN));
     printf("    \"ebpf\": %s,\n",             FEAT_JSON_BOOL(FEAT_EBPF));
     printf("    \"ipmi\": %s,\n",             FEAT_JSON_BOOL(FEAT_IPMI));
     printf("    \"nfacct\": %s,\n",           FEAT_JSON_BOOL(FEAT_NFACCT));
@@ -417,12 +427,13 @@ void analytics_build_info(BUFFER *b) {
 #ifdef ENABLE_TCMALLOC
     add_to_bi(b, "tcalloc");
 #endif
-#ifdef NETDATA_WITH_ZLIB
     add_to_bi(b, "zlib");
-#endif
 
 #ifdef ENABLE_APPS_PLUGIN
     add_to_bi(b, "apps");
+#endif
+#ifdef ENABLE_DEBUGFS_PLUGIN
+    add_to_bi(b, "debugfs");
 #endif
 #ifdef HAVE_SETNS
     add_to_bi(b, "cgroup Network Tracking");
