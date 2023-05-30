@@ -6,8 +6,10 @@
 
 **Merged pull requests:**
 
+- Only queue an alert to the cloud when it's inserted [\#15110](https://github.com/netdata/netdata/pull/15110) ([MrZammler](https://github.com/MrZammler))
 - percentage-of-group: fix uninitialized array vh [\#15106](https://github.com/netdata/netdata/pull/15106) ([ktsaou](https://github.com/ktsaou))
 - fix the units when returning percentage of a group [\#15105](https://github.com/netdata/netdata/pull/15105) ([ktsaou](https://github.com/ktsaou))
+- oracledb: make conn protocol configurable [\#15104](https://github.com/netdata/netdata/pull/15104) ([ilyam8](https://github.com/ilyam8))
 - /api/v2/data percentage calculation on grouped queries [\#15100](https://github.com/netdata/netdata/pull/15100) ([ktsaou](https://github.com/ktsaou))
 - Add chart labels to Prometheus. [\#15099](https://github.com/netdata/netdata/pull/15099) ([thiagoftsm](https://github.com/thiagoftsm))
 - Invert order in remote write [\#15097](https://github.com/netdata/netdata/pull/15097) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -16,6 +18,7 @@
 - update ml defaults to 24h [\#15093](https://github.com/netdata/netdata/pull/15093) ([andrewm4894](https://github.com/andrewm4894))
 - Create category overview pages for learn's restructure [\#15091](https://github.com/netdata/netdata/pull/15091) ([Ancairon](https://github.com/Ancairon))
 - Release buffer in case of error -- CID 385075 [\#15090](https://github.com/netdata/netdata/pull/15090) ([stelfrag](https://github.com/stelfrag))
+- update agent telemetry url to be cloud function instead of posthog [\#15085](https://github.com/netdata/netdata/pull/15085) ([andrewm4894](https://github.com/andrewm4894))
 - mentioned waive off of space subscription price [\#15082](https://github.com/netdata/netdata/pull/15082) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Python Dependency Migration - OracleDB Python Module [\#15074](https://github.com/netdata/netdata/pull/15074) ([EricAndrechek](https://github.com/EricAndrechek))
 - Free context when establishing ACLK connection [\#15073](https://github.com/netdata/netdata/pull/15073) ([stelfrag](https://github.com/stelfrag))
@@ -402,9 +405,6 @@
 - Remove obsolete or redundant docs [\#14476](https://github.com/netdata/netdata/pull/14476) ([cakrit](https://github.com/cakrit))
 - Incorporate interoperability and fix edit link [\#14475](https://github.com/netdata/netdata/pull/14475) ([cakrit](https://github.com/cakrit))
 - Upgrade demo sites to the getting started section [\#14474](https://github.com/netdata/netdata/pull/14474) ([cakrit](https://github.com/cakrit))
-- Add a file to Learn [\#14473](https://github.com/netdata/netdata/pull/14473) ([Ancairon](https://github.com/Ancairon))
-- fix a possible bug with an image in the md file [\#14472](https://github.com/netdata/netdata/pull/14472) ([Ancairon](https://github.com/Ancairon))
-- Add sbindir\_POST template for v235 service file [\#14471](https://github.com/netdata/netdata/pull/14471) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
