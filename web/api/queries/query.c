@@ -3168,7 +3168,10 @@ static void rrdr2rrdr_group_by_partial_trimming(RRDR *r) {
 }
 
 static void rrdr2rrdr_group_by_calculate_percentage_of_group(RRDR *r) {
-    if(!r->vh || query_target_aggregatable(r->internal.qt))
+    if(!r->vh)
+        return;
+
+    if(query_target_aggregatable(r->internal.qt) && query_has_group_by_aggregation_percentage(r->internal.qt))
         return;
 
     for(size_t i = 0; i < r->n ;i++) {

@@ -244,24 +244,6 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
     //info("RRD2JSON(): %s: END", r->st->id);
 }
 
-static bool query_has_group_by_aggregation_percentage(QUERY_TARGET *qt) {
-
-    // backwards compatibility
-    // If the request was made with group_by = "percentage-of-instance"
-    // we need to send back "raw" output with "count"
-    // otherwise, we need to send back "raw" output with "hidden"
-
-    for(int g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
-        if(qt->request.group_by[g].group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE)
-            return false;
-
-        if(qt->request.group_by[g].aggregation == RRDR_GROUP_BY_FUNCTION_PERCENTAGE)
-            return true;
-    }
-
-    return false;
-}
-
 void rrdr2json_v2(RRDR *r, BUFFER *wb) {
     QUERY_TARGET *qt = r->internal.qt;
     RRDR_OPTIONS options = qt->window.options;
