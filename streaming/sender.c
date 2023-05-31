@@ -507,7 +507,6 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     // info("STREAM %s [send to %s]: initializing communication...", rrdhost_hostname(host), s->connected_to);
 
 #ifdef ENABLE_HTTPS
-    host->sender->ssl.conn = NULL;
     host->sender->ssl.flags = NETDATA_SSL_START;
     if(host->destination && host->destination->ssl) {
         if (netdata_ssl_client_ctx) {

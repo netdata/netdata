@@ -31,9 +31,20 @@ void receiver_state_free(struct receiver_state *rpt) {
     freez(rpt->program_version);
 
 #ifdef ENABLE_HTTPS
-    if(rpt->ssl.conn)
+    if(rpt->ssl.conn) {
+        if(rpt->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
+            int ret = SSL_shutdown(rpt->ssl.conn);
+            if(ret == 0)
+                SSL_shutdown(rpt->ssl.conn);
+        }
+
         SSL_free(rpt->ssl.conn);
+    }
 #endif
+
+    if(rpt->fd != -1) {
+        close(rpt->fd);
+    }
 
 #ifdef ENABLE_COMPRESSION
     if (rpt->decompressor)
@@ -589,7 +600,7 @@ static void rrdhost_reset_destinations(RRDHOST *host) {
         d->postpone_reconnection_until = 0;
 }
 
-static int rrdpush_receive(struct receiver_state *rpt)
+static void rrdpush_receive(struct receiver_state *rpt)
 {
     rpt->config.mode = default_rrd_memory_mode;
     rpt->config.history = default_rrd_history_entries;
@@ -693,14 +704,12 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
         if(!host) {
             rrdpush_receive_log_status(rpt, "failed to find/create host structure", "INTERNAL ERROR DROPPING CONNECTION");
-            close(rpt->fd);
-            return 1;
+            goto cleanup;
         }
 
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
             rrdpush_receive_log_status(rpt, "host is initializing", "INITIALIZATION IN PROGRESS RETRY LATER");
-            close(rpt->fd);
-            return 1;
+            goto cleanup;
         }
 
         // system_info has been consumed by the host structure
@@ -708,8 +717,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
         if(!rrdhost_set_receiver(host, rpt)) {
             rrdpush_receive_log_status(rpt, "host is already served by another receiver", "DUPLICATE RECEIVER DROPPING CONNECTION");
-            close(rpt->fd);
-            return 1;
+            goto cleanup;
         }
     }
 
@@ -787,8 +795,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
                 rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
 
             rrdpush_receive_log_status(rpt, "cannot reply back", "CANT REPLY DROPPING CONNECTION");
-            close(rpt->fd);
-            return 0;
+            goto cleanup;
         }
     }
 
@@ -854,9 +861,8 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     rrdhost_set_is_parent_label(--localhost->connected_children_count);
 
-    // cleanup
-    close(rpt->fd);
-    return (int)count;
+cleanup:
+    ;
 }
 
 static void rrdpush_receiver_thread_cleanup(void *ptr) {

@@ -213,8 +213,6 @@ int mysendfile(struct web_client *w, char *filename);
 void web_client_build_http_header(struct web_client *w);
 char *strip_control_characters(char *url);
 
-int web_client_socket_is_now_used_for_streaming(struct web_client *w);
-
 void web_client_zero(struct web_client *w);
 struct web_client *web_client_create(size_t *statistics_memory_accounting);
 void web_client_free(struct web_client *w);

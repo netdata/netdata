@@ -722,6 +722,32 @@ int rrdpush_receiver_too_busy_now(struct web_client *w) {
     return HTTP_RESP_SERVICE_UNAVAILABLE;
 }
 
+static void rrdpush_receiver_takeover_web_connection(struct web_client *w, struct receiver_state *rpt) {
+    rpt->fd                = w->ifd;
+
+#ifdef ENABLE_HTTPS
+    rpt->ssl.conn          = w->ssl.conn;
+    rpt->ssl.flags         = w->ssl.flags;
+
+    w->ssl.conn = NULL;
+    w->ssl.flags = NETDATA_SSL_START;
+#endif
+
+    WEB_CLIENT_IS_DEAD(w);
+
+    if(web_server_mode == WEB_SERVER_MODE_STATIC_THREADED) {
+        web_client_flag_set(w, WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET);
+    }
+    else {
+        if(w->ifd == w->ofd)
+            w->ifd = w->ofd = -1;
+        else
+            w->ifd = -1;
+    }
+
+    buffer_flush(w->response.data);
+}
+
 void *rrdpush_receiver_thread(void *ptr);
 int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_string) {
 
@@ -739,19 +765,11 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
     rpt->system_info = callocz(1, sizeof(struct rrdhost_system_info));
     rpt->system_info->hops = rpt->hops;
 
-    rpt->fd                = w->ifd;
+    rpt->fd                = -1;
     rpt->client_ip         = strdupz(w->client_ip);
     rpt->client_port       = strdupz(w->client_port);
 
     rpt->config.update_every = default_rrd_update_every;
-
-#ifdef ENABLE_HTTPS
-    rpt->ssl.conn          = w->ssl.conn;
-    rpt->ssl.flags         = w->ssl.flags;
-
-    w->ssl.conn = NULL;
-    w->ssl.flags = NETDATA_SSL_START;
-#endif
 
     // parse the parameters and fill rpt and rpt->system_info
 
@@ -1009,6 +1027,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
 
     if (strcmp(rpt->machine_guid, localhost->machine_guid) == 0) {
 
+        rrdpush_receiver_takeover_web_connection(w, rpt);
+
         rrdpush_receive_log_status(
                 rpt,
                 "machine GUID is my own",
@@ -1030,9 +1050,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
             );
         }
 
-        close(rpt->fd);
         receiver_state_free(rpt);
-        return web_client_socket_is_now_used_for_streaming(w);
+        return HTTP_RESP_OK;
     }
 
     if(unlikely(web_client_streaming_rate_t > 0)) {
@@ -1136,6 +1155,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
 
     debug(D_SYSTEM, "starting STREAM receive thread.");
 
+    rrdpush_receiver_takeover_web_connection(w, rpt);
+
     char tag[FILENAME_MAX + 1];
     snprintfz(tag, FILENAME_MAX, THREAD_TAG_STREAM_RECEIVER "[%s,[%s]:%s]", rpt->hostname, w->client_ip, w->client_port);
 
@@ -1152,7 +1173,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
     }
 
     // prevent the caller from closing the streaming socket
-    return web_client_socket_is_now_used_for_streaming(w);
+    return HTTP_RESP_OK;
 }
 
 void rrdpush_reset_destinations_postpone_time(RRDHOST *host) {
