@@ -6,7 +6,10 @@
 
 **Merged pull requests:**
 
+- Fix handling of eBPF plugin for DEB packages. [\#15117](https://github.com/netdata/netdata/pull/15117) ([Ferroin](https://github.com/Ferroin))
+- initial draft for the silencing docs [\#15112](https://github.com/netdata/netdata/pull/15112) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Only queue an alert to the cloud when it's inserted [\#15110](https://github.com/netdata/netdata/pull/15110) ([MrZammler](https://github.com/MrZammler))
+- percentage of group is now aggregatable at cloud across multiple nodes [\#15109](https://github.com/netdata/netdata/pull/15109) ([ktsaou](https://github.com/ktsaou))
 - percentage-of-group: fix uninitialized array vh [\#15106](https://github.com/netdata/netdata/pull/15106) ([ktsaou](https://github.com/ktsaou))
 - fix the units when returning percentage of a group [\#15105](https://github.com/netdata/netdata/pull/15105) ([ktsaou](https://github.com/ktsaou))
 - oracledb: make conn protocol configurable [\#15104](https://github.com/netdata/netdata/pull/15104) ([ilyam8](https://github.com/ilyam8))
@@ -29,6 +32,7 @@
 - Update CODEOWNERS [\#15064](https://github.com/netdata/netdata/pull/15064) ([cakrit](https://github.com/cakrit))
 - Update netdata-security.md [\#15063](https://github.com/netdata/netdata/pull/15063) ([sashwathn](https://github.com/sashwathn))
 - Fix CodeQL warning  [\#15062](https://github.com/netdata/netdata/pull/15062) ([stelfrag](https://github.com/stelfrag))
+- Improve some of the error messages in the kickstart script. [\#15061](https://github.com/netdata/netdata/pull/15061) ([Ferroin](https://github.com/Ferroin))
 - Fix memory leak when sending alerts checkoint [\#15060](https://github.com/netdata/netdata/pull/15060) ([stelfrag](https://github.com/stelfrag))
 - bump go.d.plugin to v0.53.0 [\#15059](https://github.com/netdata/netdata/pull/15059) ([ilyam8](https://github.com/ilyam8))
 - Fix ACLK memleak [\#15055](https://github.com/netdata/netdata/pull/15055) ([underhood](https://github.com/underhood))
@@ -402,9 +406,6 @@
 - Make the introduction a category link [\#14485](https://github.com/netdata/netdata/pull/14485) ([Ancairon](https://github.com/Ancairon))
 - Update AD title [\#14484](https://github.com/netdata/netdata/pull/14484) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix coverity issues [\#14480](https://github.com/netdata/netdata/pull/14480) ([stelfrag](https://github.com/stelfrag))
-- Remove obsolete or redundant docs [\#14476](https://github.com/netdata/netdata/pull/14476) ([cakrit](https://github.com/cakrit))
-- Incorporate interoperability and fix edit link [\#14475](https://github.com/netdata/netdata/pull/14475) ([cakrit](https://github.com/cakrit))
-- Upgrade demo sites to the getting started section [\#14474](https://github.com/netdata/netdata/pull/14474) ([cakrit](https://github.com/cakrit))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
