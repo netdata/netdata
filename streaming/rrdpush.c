@@ -769,6 +769,11 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
     rpt->client_ip         = strdupz(w->client_ip);
     rpt->client_port       = strdupz(w->client_port);
 
+#ifdef ENABLE_HTTPS
+    rpt->ssl.conn = NULL;
+    rpt->ssl.flags = NETDATA_SSL_START;
+#endif
+
     rpt->config.update_every = default_rrd_update_every;
 
     // parse the parameters and fill rpt and rpt->system_info
