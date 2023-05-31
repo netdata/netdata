@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Fix package versioning issues. [\#15125](https://github.com/netdata/netdata/pull/15125) ([Ferroin](https://github.com/Ferroin))
+- Revert "percentage of group is now aggregatable at cloud across multiple nodes" [\#15122](https://github.com/netdata/netdata/pull/15122) ([ktsaou](https://github.com/ktsaou))
 - Fix handling of eBPF plugin for DEB packages. [\#15117](https://github.com/netdata/netdata/pull/15117) ([Ferroin](https://github.com/Ferroin))
 - initial draft for the silencing docs [\#15112](https://github.com/netdata/netdata/pull/15112) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Only queue an alert to the cloud when it's inserted [\#15110](https://github.com/netdata/netdata/pull/15110) ([MrZammler](https://github.com/MrZammler))
@@ -405,7 +407,6 @@
 - Update Demo-Sites.md [\#14488](https://github.com/netdata/netdata/pull/14488) ([Ancairon](https://github.com/Ancairon))
 - Make the introduction a category link [\#14485](https://github.com/netdata/netdata/pull/14485) ([Ancairon](https://github.com/Ancairon))
 - Update AD title [\#14484](https://github.com/netdata/netdata/pull/14484) ([thiagoftsm](https://github.com/thiagoftsm))
-- Fix coverity issues [\#14480](https://github.com/netdata/netdata/pull/14480) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
