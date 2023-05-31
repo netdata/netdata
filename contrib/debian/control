@@ -82,7 +82,7 @@ Package: netdata-plugin-nfacct
 Architecture: any
 Depends: ${shlibs:Depends},
          netdata (= ${source:Version})
-Conflicts: netdata (< ${source:Version})
+Conflicts: netdata (<< ${source:Version})
 Description: The NFACCT metrics collection plugin for the Netdata Agent
  This plugin allows the Netdata Agent to collect metrics from the firewall
  using NFACCT objects.
@@ -91,7 +91,7 @@ Package: netdata-plugin-chartsd
 Architecture: all
 Depends: bash,
          netdata (= ${source:Version})
-Conflicts: netdata (< ${source:Version})
+Conflicts: netdata (<< ${source:Version})
 Suggests: apcupsd, nut, iw, sudo
 Description: The charts.d metrics collection plugin for the Netdata Agent
  This plugin adds a selection of additional collectors written in shell
@@ -104,7 +104,7 @@ Depends: ${shlibs:Depends},
          netdata (= ${source:Version})
 Recommends: netdata-ebpf-code-legacy (= ${source:Version}),
             netdata-plugin-apps (= ${source:Version})
-Conflicts: netdata (< ${source:Version})
+Conflicts: netdata (<< ${source:Version})
 Description: The eBPF metrics collection plugin for the Netdata Agent
  This plugin allows the Netdata Agent to use eBPF code to collect more
  detailed kernel-level metrics for the system.
@@ -112,7 +112,7 @@ Description: The eBPF metrics collection plugin for the Netdata Agent
 Package: netdata-ebpf-code-legacy
 Architecture: amd64
 Depends: netdata-plugin-ebpf (= ${source:Version})
-Conflicts: netdata (< ${source:Version})
+Conflicts: netdata (<< ${source:Version})
 Description: Compiled eBPF legacy code for the Netdata eBPF plugin
  This package provides the pre-compiled eBPF legacy code for use by
  the Netdata eBPF plugin.  This code is only needed when using the eBPF
@@ -124,7 +124,7 @@ Architecture: all
 Depends: ${shlibs:Depends},
          netdata (= ${source:Version})
 Suggests: sudo
-Conflicts: netdata (< ${source:Version})
+Conflicts: netdata (<< ${source:Version})
 Description: The python.d metrics collection plugin for the Netdata Agent
  Many of the collectors provided by this package are also available
  in netdata-plugin-god. In msot cases, you probably want to use those
@@ -136,7 +136,7 @@ Depends: ${shlibs:Depends},
          libcap2-bin,
          netdata (= ${source:Version})
 Suggests: nvme-cli, sudo
-Conflicts: netdata (< ${source:Version})
+Conflicts: netdata (<< ${source:Version})
 Description: The go.d metrics collection plugin for the Netdata Agent
  This plugin adds a selection of additional collectors written in Go to
  the Netdata Agent. A significant percentage of the application specific
@@ -148,7 +148,7 @@ Architecture: any
 Depends: ${shlibs:Depends},
          libcap2-bin,
          netdata (= ${source:Version})
-Conflicts: netdata (< ${source:Version})
+Conflicts: netdata (<< ${source:Version})
 Description: The per-application metrics collection plugin for the Netdata Agent
  This plugin allows the Netdata Agent to collect per-application and
  per-user metrics without using cgroups.
@@ -158,7 +158,7 @@ Architecture: any
 Depends: ${shlibs:Depends},
          libcap2-bin,
          netdata (= ${source:Version})
-Conflicts: netdata (< ${source:Version})
+Conflicts: netdata (<< ${source:Version})
 Description: The slabinfo metrics collector for the Netdata Agent
  This plugin allows the Netdata Agent to collect perfromance and
  utilization metrics for the Linux kernel’s SLAB allocator.
@@ -168,7 +168,7 @@ Architecture: any
 Depends: ${shlibs:Depends},
          libcap2-bin,
          netdata (= ${source:Version})
-Conflicts: netdata (< ${source:Version})
+Conflicts: netdata (<< ${source:Version})
 Description: The perf metrics collector for the Netdata Agent
  This plugin allows the Netdata to collect metrics from the Linux perf
  subsystem.
@@ -178,7 +178,7 @@ Architecture: any
 Depends: ${shlibs:Debends},
          libcap2-bin,
          netdata (= ${source:Version})
-Conflicts: netdata (< ${source:Version})
+Conflicts: netdata (<< ${source:Version})
 Description: The debugfs metrics collector for the Netdata Agent
  This plugin allows the Netdata Agent to collect Linux kernel metrics
  exposed through debugfs.
