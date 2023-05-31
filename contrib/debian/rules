@@ -151,7 +151,7 @@ override_dh_install:
 	#
 	if [ $(HAVE_EBPF) -eq 1 ]; then \
 		mkdir -p $(TOP)-ebpf-code-legacy/usr/libexec/netdata/plugins.d/; \
-		packaging/bundle-ebpf.sh . ${TOP}-ebpf-code-legacy/usr/libexec/netdata/plugins.d/; \
+		packaging/bundle-ebpf.sh . ${TOP}-ebpf-code-legacy/usr/libexec/netdata/plugins.d/ force; \
 	fi
 
 	# Install go to it's own package directory
