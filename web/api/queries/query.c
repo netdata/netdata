@@ -2992,7 +2992,7 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         // initialize partial trimming
         r->partial_data_trimming.max_update_every = update_every_max;
         r->partial_data_trimming.expected_after =
-                (!query_target_aggregatable(qt) &&
+                (!(qt->window.options & RRDR_OPTION_RETURN_RAW) &&
                  qt->window.before >= qt->window.now - update_every_max) ?
                 qt->window.before - update_every_max :
                 qt->window.before;
@@ -3168,7 +3168,7 @@ static void rrdr2rrdr_group_by_partial_trimming(RRDR *r) {
 }
 
 static void rrdr2rrdr_group_by_calculate_percentage_of_group(RRDR *r) {
-    if(!r->vh || query_target_aggregatable(r->internal.qt))
+    if(!r->vh)
         return;
 
     for(size_t i = 0; i < r->n ;i++) {
@@ -3191,10 +3191,7 @@ static void rrdr2rrdr_group_by_calculate_percentage_of_group(RRDR *r) {
     }
 }
 
-static void rrd2rrdr_convert_values_to_percentage_of_total(RRDR *r) {
-    if(!(r->internal.qt->window.options & RRDR_OPTION_PERCENTAGE) || query_target_aggregatable(r->internal.qt))
-        return;
-
+static void rrd2rrdr_convert_to_percentage(RRDR *r) {
     size_t global_min_max_values = 0;
     NETDATA_DOUBLE global_min = NAN, global_max = NAN;
 
@@ -3292,7 +3289,8 @@ static RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
 
     if(!r_tmp->group_by.r) {
         // v1 query
-        rrd2rrdr_convert_values_to_percentage_of_total(r_tmp);
+        if(options & RRDR_OPTION_PERCENTAGE)
+            rrd2rrdr_convert_to_percentage(r_tmp);
         return r_tmp;
     }
     // v2 query
@@ -3332,7 +3330,7 @@ static RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
         if(qt->request.group_by[g].group_by != RRDR_GROUP_BY_NONE)
             aggregation = qt->request.group_by[g].aggregation;
 
-    if(!query_target_aggregatable(qt) && r->partial_data_trimming.expected_after < qt->window.before)
+    if(!(options & RRDR_OPTION_RETURN_RAW) && r->partial_data_trimming.expected_after < qt->window.before)
         rrdr2rrdr_group_by_partial_trimming(r);
 
     // apply averaging, remove RRDR_VALUE_EMPTY, find the non-zero dimensions, min and max
@@ -3424,7 +3422,8 @@ static RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
         qt->window.options &= ~RRDR_OPTION_NONZERO;
     }
 
-    rrd2rrdr_convert_values_to_percentage_of_total(r);
+    if(options & RRDR_OPTION_PERCENTAGE && !(options & RRDR_OPTION_RETURN_RAW))
+        rrd2rrdr_convert_to_percentage(r);
 
     // update query instance counts in query host and query context
     {
