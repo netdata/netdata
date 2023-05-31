@@ -102,8 +102,8 @@ Package: netdata-plugin-ebpf
 Architecture: amd64
 Depends: ${shlibs:Depends},
          netdata (>= ${source:Version})
-Recommends: netdata-ebpf-code-legacy (>= ${source:Version}),
-            netdata-plugin-apps (>= ${source:Version})
+Recommends: netdata-ebpf-code-legacy (= ${source:Version}),
+            netdata-plugin-apps (= ${source:Version})
 Conflicts: netdata (< ${source:Version})
 Description: The eBPF metrics collection plugin for the Netdata Agent
  This plugin allows the Netdata Agent to use eBPF code to collect more
