@@ -617,7 +617,7 @@ Summary: The NFACCT metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: libmnl
 Requires: netdata = %{version}
-Conflicts: netdata <= %{version}
+Conflicts: netdata < %{version}
 %if 0%{?fedora} || 0%{?suse_version} >= 1140
 Requires: libnetfilter_acct
 %endif
@@ -634,7 +634,7 @@ Summary: The charts.d metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: bash
 Requires: netdata = %{version}
-Conflicts: netdata <= %{version}
+Conflicts: netdata < %{version}
 %if 0%{?centos_ver} != 7
 Suggests: nut
 Suggests: apcupsd
@@ -660,7 +660,7 @@ It includes collectors for NUT, APCUPSD, LibreSWAN, OpenSIPS, and Wireless acces
 Summary: The eBPF metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: netdata = %{version}
-Conflicts: netdata <= %{version}
+Conflicts: netdata < %{version}
 %if 0%{?centos_ver} != 7
 Recommends: netdata-plugin-apps = %{version}
 Recommends: netdata-ebpf-legacy-code >= %{version}
@@ -683,7 +683,7 @@ Requires: netdata-ebpf-legacy-code >= %{version}
 Summary: Compiled eBPF legacy code for the Netdata eBPF plugin
 Group: Applications/System
 Requires: netdata-plugin-ebpf = %{version}
-Conflicts: netdata <= %{version}
+Conflicts: netdata < %{version}
 
 %description ebpf-legacy-code
  This package provides the pre-compiled eBPF legacy code for use by the Netdata eBPF plugin.
@@ -699,7 +699,7 @@ This code is only needed when using the eBPF plugin with kernel versions before 
 Summary: The python.d metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: netdata = %{version}
-Conflicts: netdata <= %{version}
+Conflicts: netdata < %{version}
 %if 0%{?centos_ver} == 7 || 0%{?centos_ver} == 6
 Requires: python
 %else
@@ -730,7 +730,7 @@ want to use those versions instead of the Python versions.
 Summary: The go.d metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: netdata = %{version}
-Conflicts: netdata <= %{version}
+Conflicts: netdata < %{version}
 %if 0%{?centos_ver} != 7
 Suggests: nvme-cli
 Suggests: sudo
@@ -754,7 +754,7 @@ so most users will want it installed.
 Summary: The per-application metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: netdata = %{version}
-Conflicts: netdata <= %{version}
+Conflicts: netdata < %{version}
 
 %description plugin-apps
  This plugin allows the Netdata Agent to collect per-application and per-user metrics without using cgroups.
@@ -770,7 +770,7 @@ Conflicts: netdata <= %{version}
 Summary: The slabinfo metrics collector for the Netdata Agent
 Group: Applications/System
 Requires: netdata = %{version}
-Conflicts: netdata <= %{version}
+Conflicts: netdata < %{version}
 
 %description plugin-slabinfo
  This plugin allows the Netdata Agent to collect perfromance and utilization metrics for the Linux kernel’s SLAB allocator.
@@ -784,7 +784,7 @@ Conflicts: netdata <= %{version}
 Summary: The perf metrics collector for the Netdata Agent
 Group: Applications/System
 Requires: netdata = %{version}
-Conflicts: netdata <= %{version}
+Conflicts: netdata < %{version}
 
 %description plugin-perf
  This plugin allows the Netdata to collect metrics from the Linux perf subsystem.
@@ -803,7 +803,7 @@ Conflicts: netdata <= %{version}
 Summary: The debugfs metrics collector for the Netdata Agent
 Group: Applications/System
 Requires: netdata = %{version}
-Conflicts: netdata <= %{version}
+Conflicts: netdata < %{version}
 
 %description plugin-debugfs
  This plugin allows the Netdata Agent to collect Linux kernel metrics exposed through debugfs.
