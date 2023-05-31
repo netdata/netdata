@@ -1133,7 +1133,7 @@ static bool rrdhost_sender_should_exit(struct sender_state *s) {
 
     if(unlikely(rrdhost_flag_check(s->host, RRDHOST_FLAG_ORPHAN))) {
         if(!s->exit.reason)
-            s->exit.reason = "RECEIVER LEFT";
+            s->exit.reason = "RECEIVER LEFT (ORPHAN HOST)";
         return true;
     }
 

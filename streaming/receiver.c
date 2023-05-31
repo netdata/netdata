@@ -32,11 +32,11 @@ void receiver_state_free(struct receiver_state *rpt) {
 
 #ifdef ENABLE_HTTPS
     if(rpt->ssl.conn) {
-        if(rpt->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
-            int ret = SSL_shutdown(rpt->ssl.conn);
-            if(ret == 0)
-                SSL_shutdown(rpt->ssl.conn);
-        }
+//        if(rpt->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
+//            int ret = SSL_shutdown(rpt->ssl.conn);
+//            if(ret == 0)
+//                SSL_shutdown(rpt->ssl.conn);
+//        }
 
         SSL_free(rpt->ssl.conn);
     }
@@ -519,10 +519,8 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
             signal_rrdcontext = true;
             rrdpush_receiver_replication_reset(host);
 
-            if (host->receiver == rpt)
-                host->receiver = NULL;
-
             rrdhost_flag_set(host, RRDHOST_FLAG_ORPHAN);
+            host->receiver = NULL;
         }
 
         netdata_mutex_unlock(&host->receiver_lock);
