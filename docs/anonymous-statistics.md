@@ -8,8 +8,8 @@ learn_rel_path: "Configuration"
 
 # Anonymous telemetry events
 
-By default, Netdata collects anonymous usage information from the open-source monitoring agent using the open-source
-product analytics platform [PostHog](https://github.com/PostHog/posthog). We use their [cloud enterprise platform](https://posthog.com/product).
+By default, Netdata collects anonymous usage information from the open-source monitoring agent. For agent events like start,stop,crash etc we use our own cloud function in GCP. For frontend telemetry (pageviews etc.) on the agent dashboard itself we use the open-source
+product analytics platform [PostHog](https://github.com/PostHog/posthog).
 
 We are strongly committed to your [data privacy](https://netdata.cloud/privacy/).
 
@@ -52,7 +52,7 @@ variable is controlled via the [opt-out mechanism](#opt-out).
 ## Agent Backend - Anonymous Statistics Script
 
 Every time the daemon is started or stopped and every time a fatal condition is encountered, Netdata uses the anonymous
-statistics script to collect system information and send it to the Netdata PostHog via an http call. The information collected for all
+statistics script to collect system information and send it to the Netdata telemetry cloud function via an http call. The information collected for all
 events is:
 
 -   Netdata version
