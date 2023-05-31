@@ -244,12 +244,12 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
     //info("RRD2JSON(): %s: END", r->st->id);
 }
 
-
 void rrdr2json_v2(RRDR *r, BUFFER *wb) {
     QUERY_TARGET *qt = r->internal.qt;
     RRDR_OPTIONS options = qt->window.options;
 
-    bool expose_gbc = query_target_aggregatable(qt);
+    bool send_fourth_number = query_target_aggregatable(qt);
+    bool fourth_number_is_vh = send_fourth_number && r->vh && query_has_group_by_aggregation_percentage(qt);
 
     buffer_json_member_add_object(wb, "result");
 
@@ -270,8 +270,12 @@ void rrdr2json_v2(RRDR *r, BUFFER *wb) {
     buffer_json_member_add_uint64(wb, "value", 0);
     buffer_json_member_add_uint64(wb, "arp", 1);
     buffer_json_member_add_uint64(wb, "pa", 2);
-    if(expose_gbc)
-        buffer_json_member_add_uint64(wb, "count", 3);
+    if(send_fourth_number) {
+        if(fourth_number_is_vh)
+            buffer_json_member_add_uint64(wb, "hidden", 3);
+        else
+            buffer_json_member_add_uint64(wb, "count", 3);
+    }
     buffer_json_object_close(wb);
 
     buffer_json_member_add_array(wb, "data");
@@ -286,6 +290,7 @@ void rrdr2json_v2(RRDR *r, BUFFER *wb) {
         // for each line in the array
         for (i = start; i != end; i += step) {
             NETDATA_DOUBLE *cn = &r->v[ i * r->d ];
+            NETDATA_DOUBLE *ch = fourth_number_is_vh ? &r->vh[i * r->d ] : NULL;
             RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
             NETDATA_DOUBLE *ar = &r->ar[ i * r->d ];
             uint32_t *gbc = &r->gbc [ i * r->d ];
@@ -325,8 +330,12 @@ void rrdr2json_v2(RRDR *r, BUFFER *wb) {
                 buffer_json_add_array_item_uint64(wb, o);
 
                 // add the count
-                if(expose_gbc)
-                    buffer_json_add_array_item_uint64(wb, gbc[d]);
+                if(send_fourth_number) {
+                    if(fourth_number_is_vh)
+                        buffer_json_add_array_item_double(wb, ch[d]);
+                    else
+                        buffer_json_add_array_item_uint64(wb, gbc[d]);
+                }
 
                 buffer_json_array_close(wb); // point
             }
