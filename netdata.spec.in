@@ -616,7 +616,7 @@ Requires: netdata = %{version}
 Summary: The NFACCT metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: libmnl
-Requires: netdata >= %{version}
+Requires: netdata = %{version}
 Conflicts: netdata < %{version}
 %if 0%{?fedora} || 0%{?suse_version} >= 1140
 Requires: libnetfilter_acct
@@ -633,7 +633,7 @@ Requires: libnetfilter_acct
 Summary: The charts.d metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: bash
-Requires: netdata >= %{version}
+Requires: netdata = %{version}
 Conflicts: netdata < %{version}
 %if 0%{?centos_ver} != 7
 Suggests: nut
@@ -659,7 +659,7 @@ It includes collectors for NUT, APCUPSD, LibreSWAN, OpenSIPS, and Wireless acces
 %package plugin-ebpf
 Summary: The eBPF metrics collection plugin for the Netdata Agent
 Group: Applications/System
-Requires: netdata >= %{version}
+Requires: netdata = %{version}
 Conflicts: netdata < %{version}
 %if 0%{?centos_ver} != 7
 Recommends: netdata-plugin-apps = %{version}
@@ -698,7 +698,7 @@ This code is only needed when using the eBPF plugin with kernel versions before 
 %package plugin-pythond
 Summary: The python.d metrics collection plugin for the Netdata Agent
 Group: Applications/System
-Requires: netdata >= %{version}
+Requires: netdata = %{version}
 Conflicts: netdata < %{version}
 %if 0%{?centos_ver} == 7 || 0%{?centos_ver} == 6
 Requires: python
@@ -729,7 +729,7 @@ want to use those versions instead of the Python versions.
 %package plugin-go
 Summary: The go.d metrics collection plugin for the Netdata Agent
 Group: Applications/System
-Requires: netdata >= %{version}
+Requires: netdata = %{version}
 Conflicts: netdata < %{version}
 %if 0%{?centos_ver} != 7
 Suggests: nvme-cli
@@ -753,7 +753,7 @@ so most users will want it installed.
 %package plugin-apps
 Summary: The per-application metrics collection plugin for the Netdata Agent
 Group: Applications/System
-Requires: netdata >= %{version}
+Requires: netdata = %{version}
 Conflicts: netdata < %{version}
 
 %description plugin-apps
@@ -769,7 +769,7 @@ Conflicts: netdata < %{version}
 %package plugin-slabinfo
 Summary: The slabinfo metrics collector for the Netdata Agent
 Group: Applications/System
-Requires: netdata >= %{version}
+Requires: netdata = %{version}
 Conflicts: netdata < %{version}
 
 %description plugin-slabinfo
@@ -802,7 +802,7 @@ Conflicts: netdata < %{version}
 %package plugin-debugfs
 Summary: The debugfs metrics collector for the Netdata Agent
 Group: Applications/System
-Requires: netdata >= %{version}
+Requires: netdata = %{version}
 Conflicts: netdata < %{version}
 
 %description plugin-debugfs
