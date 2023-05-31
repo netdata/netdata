@@ -127,19 +127,21 @@ static void bit_code_init(bit_code_t<Word> *bc, Word *buffer, Word capacity) {
     bc->prev_xor = 0;
     bc->prev_xor_lzc = 0;
 
-    // reserve two words:
+    // reserved two words:
     //     Buffer[0] -> number of entries written
     //     Buffer[1] -> number of bits written
 
-    bc->bs.position += 2 * sizeof(Word);
+    bc->bs.position += 2 * bit_size<Word>();
 }
 
 template<typename Word>
 static bool bit_code_read(bit_code_t<Word> *bc, Word *number) {
     bit_stream_t<Word> *bs = &bc->bs;
 
+    bc->entries++;
+
     // read the first number
-    if (bs->position == 0) {
+    if (bc->entries == 1) {
         bool ok = bit_stream_read(bs, number, bit_size<Word>());
         bc->prev_number = *number;
         return ok;
@@ -165,7 +167,7 @@ static bool bit_code_read(bit_code_t<Word> *bc, Word *number) {
     }
 
     if (!same_xor_lzc) {
-        if (!bit_stream_read(bs, &xor_lzc, bit_size<Word>() == 32 ? 5 : 6)) {
+        if (!bit_stream_read(bs, &xor_lzc, (bit_size<Word>() == 32) ? 5 : 6)) {
             return false;        
         }
     }
@@ -193,7 +195,7 @@ static bool bit_code_write(bit_code_t<Word> *bc, const Word number) {
     bc->entries++;
 
     // this is the first number we are writing
-    if (position == 0) {
+    if (bc->entries == 1) {
         bc->prev_number = number;
         return bit_stream_write(bs, number, bit_size<Word>());
     }
@@ -213,7 +215,7 @@ static bool bit_code_write(bit_code_t<Word> *bc, const Word number) {
 
     Word xor_value = bc->prev_number ^ number;
     // FIXME: Use SFINAE
-    Word xor_lzc = __builtin_clz(xor_value);
+    Word xor_lzc = (bit_size<Word>() == 32) ? __builtin_clz(xor_value) : __builtin_clzll(xor_value);
     Word is_xor_lzc_same = (xor_lzc == bc->prev_xor_lzc) ? 1 : 0;
 
     if (is_xor_lzc_same) {
@@ -227,7 +229,7 @@ static bool bit_code_write(bit_code_t<Word> *bc, const Word number) {
             goto RET_FALSE;
         }
         
-        if (bit_stream_write(bs, xor_lzc, bit_size<Word>() == 32 ? 5 : 6) == false) {
+        if (bit_stream_write(bs, xor_lzc, (bit_size<Word>() == 32) ? 5 : 6) == false) {
             goto RET_FALSE;
         }
     }
@@ -275,7 +277,8 @@ static bool bit_code_info(bit_code_t<Word> *bc, Word *num_entries_written,
                                                 Word *num_bits_written) {
     bit_stream_t<Word> *bs = &bc->bs;
 
-    if (bs->capacity < 2) {
+    assert(bs->position == 2 * bit_size<Word>());
+    if (bs->capacity < (2 * bit_size<Word>())) {
         return false;
     }
 
@@ -313,9 +316,12 @@ static size_t gorilla_decode(Word *dst, Word dst_len, const Word *src, Word src_
     bit_code_init(&bcr, (Word *) src, src_len);
 
     Word num_entries;
-    if (!bit_code_info(&bcr, &num_entries, (Word *) NULL))
+    if (!bit_code_info(&bcr, &num_entries, (Word *) NULL)) {
         return 0;
-    num_entries = std::min(num_entries, std::min(src_len, dst_len));
+    }
+    if (num_entries > dst_len) {
+        return false;
+    }
     
     for (size_t i = 0; i != num_entries; i++) {
         if (!bit_code_read(&bcr, &dst[i]))
@@ -346,6 +352,15 @@ static std::vector<Word> random_vector(const uint8_t *data, size_t size) {
     return V;
 }
 
+template<typename Word>
+static void check_equal_buffers(Word *lhs, Word lhs_size, Word *rhs, Word rhs_size) {
+    assert((lhs_size == rhs_size) && "Buffers have different size.");
+
+    for (size_t i = 0; i != lhs_size; i++) {
+        assert((lhs[i] == rhs[i]) && "Buffers differ");
+    }
+}
+
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
     // 32-bit tests
     {
@@ -353,56 +368,38 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
             return 0;
 
         std::vector<uint32_t> RandomData = random_vector<uint32_t>(Data, Size);
-        std::vector<uint32_t> EncodedData;
+        std::vector<uint32_t> EncodedData(10 * RandomData.capacity(), 0);
+        std::vector<uint32_t> DecodedData(10 * RandomData.capacity(), 0);
 
-        EncodedData.reserve(2 * RandomData.capacity());
-
-        std::vector<uint32_t> DecodedData;
-        DecodedData.reserve(RandomData.capacity());
-
-        size_t num_entries_written = gorilla_encode_u32(EncodedData.data(), EncodedData.capacity(),
+        size_t num_entries_written = gorilla_encode_u32(EncodedData.data(), EncodedData.size(),
                                                         RandomData.data(), RandomData.size());
-        if (num_entries_written != RandomData.size()) {
-            for (size_t idx = 0; idx != RandomData.size(); idx++) {
-                fprintf(stderr, "RandomData[%zu] = %u\n", idx, RandomData[idx]);
-            }
-            fflush(stderr);
-        }
-        assert(num_entries_written == RandomData.size());
+        size_t num_entries_read = gorilla_decode_u32(DecodedData.data(), DecodedData.size(),
+                                                     EncodedData.data(), EncodedData.size());
 
-        gorilla_decode_u32(DecodedData.data(), DecodedData.capacity(),
-                           EncodedData.data(), EncodedData.size());
-
-        assert(DecodedData == EncodedData);
+        assert(num_entries_written == num_entries_read);
+        check_equal_buffers(RandomData.data(), (uint32_t) RandomData.size(),
+                            DecodedData.data(), (uint32_t) RandomData.size());
     }
 
+    // 64-bit tests
     {
         if (Size < 8)
             return 0;
 
         std::vector<uint64_t> RandomData = random_vector<uint64_t>(Data, Size);
-        std::vector<uint64_t> EncodedData;
+        std::vector<uint64_t> EncodedData(10 * RandomData.capacity(), 0);
+        std::vector<uint64_t> DecodedData(10 * RandomData.capacity(), 0);
 
-        EncodedData.reserve(2 * RandomData.capacity());
-
-        std::vector<uint64_t> DecodedData;
-        DecodedData.reserve(RandomData.capacity());
-
-        size_t num_entries_written = gorilla_encode_u64(EncodedData.data(), EncodedData.capacity(),
+        size_t num_entries_written = gorilla_encode_u64(EncodedData.data(), EncodedData.size(),
                                                         RandomData.data(), RandomData.size());
-        if (num_entries_written != RandomData.size()) {
-            for (size_t idx = 0; idx != RandomData.size(); idx++) {
-                fprintf(stderr, "RandomData[%zu] = %lu\n", idx, RandomData[idx]);
-            }
-            fflush(stderr);
-        }
-        assert(num_entries_written == RandomData.size());
+        size_t num_entries_read = gorilla_decode_u64(DecodedData.data(), DecodedData.size(),
+                                                     EncodedData.data(), EncodedData.size());
 
-        gorilla_decode_u64(DecodedData.data(), DecodedData.capacity(),
-                           EncodedData.data(), EncodedData.size());
-
-        assert(DecodedData == EncodedData);
+        assert(num_entries_written == num_entries_read);
+        check_equal_buffers(RandomData.data(), (uint64_t) RandomData.size(),
+                            DecodedData.data(), (uint64_t) RandomData.size());
     }
+
     return 0;
 }
 
