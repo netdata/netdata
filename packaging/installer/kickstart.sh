@@ -26,6 +26,7 @@ KICKSTART_SOURCE="$(
     echo "$(pwd -P)/${self##*/}"
 )"
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
+DEFAULT_PLUGIN_PACKAGES="netdata-plugin-go netdata-plugin-python netdata-plugin-apps netdata-plugin-ebpf"
 PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 PUBLIC_CLOUD_URL="https://app.netdata.cloud"
 REPOCONFIG_DEB_URL_PREFIX="https://repo.netdata.cloud/repos/repoconfig"
@@ -718,7 +719,7 @@ confirm_root_support() {
     fi
 
     if [ -z "${ROOTCMD}" ]; then
-      fatal "We need root privileges to continue, but cannot find a way to gain them (we support sudo, doas, and pkexec). Either re-run this script as root, or set \$ROOTCMD to a command that can be used to gain root privileges." F0201
+      fatal "This script needs root privileges to install Netdata, but cannot find a way to gain them (we support sudo, doas, and pkexec). Either re-run this script as root, or set \$ROOTCMD to a command that can be used to gain root privileges." F0201
     fi
   fi
 }
@@ -1343,7 +1344,7 @@ common_dnf_opts() {
 }
 
 try_package_install() {
-  failed_refresh_msg="Failed to refresh repository metadata. ${BADNET_MSG} or by misconfiguration of one or more rpackage repositories in the system package manager configuration."
+  failed_refresh_msg="Failed to refresh repository metadata. ${BADNET_MSG} or incompatibilities with one or more third-party package repositories in the system package manager configuration."
 
   if [ -z "${DISTRO_COMPAT_NAME}" ] || [ "${DISTRO_COMPAT_NAME}" = "unknown" ]; then
     warning "Unable to determine Linux distribution for native packages."
@@ -1398,6 +1399,9 @@ try_package_install() {
       common_rpm_opts
       common_dnf_opts
       repo_prefix="el/${SYSVERSION}"
+      if [ "${SYSVERSION}" -lt 8 ]; then
+        explicitly_install_native_plugins=1
+      fi
       ;;
     fedora|ol)
       common_rpm_opts
@@ -1483,7 +1487,7 @@ try_package_install() {
     if [ -n "${repo_subcmd}" ]; then
       # shellcheck disable=SC2086
       if ! run_as_root env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts}; then
-        fatal "${failed_refresh_msg}" F0205
+        fatal "${failed_refresh_msg} In most cases, disabling any third-party repositories on the system and re-running the installer with the same options should work. If that does not work, consider using a static build with the --static-only option instead of native packages." F0205
       fi
     fi
   else
@@ -1532,6 +1536,14 @@ try_package_install() {
       run_as_root env ${env} ${pm_cmd} ${uninstall_subcmd} ${pkg_install_opts} "${repoconfig_name}"
     fi
     return 2
+  fi
+
+  if [ -n "${explicitly_install_native_plugins}" ]; then
+    progress "Installing external plugins."
+    # shellcheck disable=SC2086
+    if ! run_as_root env ${env} ${pm_cmd} install ${DEFAULT_PLUGIN_PACKAGES}; then
+      warning "Failed to install external plugin packages. Some collectors may not be available."
+    fi
   fi
 }
 

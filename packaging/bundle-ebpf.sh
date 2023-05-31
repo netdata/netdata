@@ -15,5 +15,5 @@ if [ -x "${PLUGINDIR}/ebpf.plugin" ] ; then
         mkdir "${PLUGINDIR}/ebpf.d"
     fi
     # shellcheck disable=SC2046
-    cp -a $(find "${SRCDIR}/tmp/ebpf" -mindepth 1 -maxdepth 1) "${PLUGINDIR}/ebpf.d"
+    cp -r $(find "${SRCDIR}/tmp/ebpf" -mindepth 1 -maxdepth 1) "${PLUGINDIR}/ebpf.d"
 fi

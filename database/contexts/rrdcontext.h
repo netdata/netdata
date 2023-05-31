@@ -524,6 +524,24 @@ bool rrdcontext_retention_match(RRDCONTEXT_ACQUIRED *rca, time_t after, time_t b
 
 #define query_target_aggregatable(qt) ((qt)->window.options & RRDR_OPTION_RETURN_RAW)
 
+static inline bool query_has_group_by_aggregation_percentage(QUERY_TARGET *qt) {
+
+    // backwards compatibility
+    // If the request was made with group_by = "percentage-of-instance"
+    // we need to send back "raw" output with "count"
+    // otherwise, we need to send back "raw" output with "hidden"
+
+    for(int g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
+        if(qt->request.group_by[g].group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE)
+            return false;
+
+        if(qt->request.group_by[g].aggregation == RRDR_GROUP_BY_FUNCTION_PERCENTAGE)
+            return true;
+    }
+
+    return false;
+}
+
 static inline bool query_target_has_percentage_of_group(QUERY_TARGET *qt) {
     for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
         if (qt->request.group_by[g].group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE)

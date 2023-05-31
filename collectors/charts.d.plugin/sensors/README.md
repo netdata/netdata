@@ -21,13 +21,15 @@ One chart for every sensor chip found and each of the above will be created.
 
 ## Enable the collector
 
+If using [our official native DEB/RPM packages](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/packages.md), make sure `netdata-plugin-chartsd` is installed.
+
 The `sensors` collector is disabled by default.
 
-To enable the collector, you need to edit the configuration file of `charts.d/sensors.conf`. You can do so by using the `edit config` script.  
+To enable the collector, you need to edit the configuration file of `charts.d/sensors.conf`. You can do so by using the `edit config` script.
 
 > ### Info
 >
-> To edit configuration files in a safe way, we provide the [`edit config` script](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) located in your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) (typically is `/etc/netdata`) that creates the proper file and opens it in an editor automatically.  
+> To edit configuration files in a safe way, we provide the [`edit config` script](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) located in your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) (typically is `/etc/netdata`) that creates the proper file and opens it in an editor automatically.
 > It is recommended to use this way for configuring Netdata.
 >
 > Please also note that after most configuration changes you will need to [restart the Agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for the changes to take effect.

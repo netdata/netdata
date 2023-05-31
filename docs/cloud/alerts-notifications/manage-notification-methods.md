@@ -27,7 +27,8 @@ Notes:
 ### Steps
 
 1. Click on the **Space settings** cog (located above your profile icon)
-1. Click on the **Notification** tab
+1. Click on the **Alerts & Notification** tab on the left hand-side
+1. Click on the **Notification Methods** tab
 1. You will be presented with a table of the configured notification methods for the space. You will be able to:
    1. **Add a new** notification method configuration.
       - Choose the service from the list of the available ones, you'll may see a list of unavailable options if your plan doesn't allow some of them (you will see on the
@@ -42,7 +43,7 @@ Notes:
       - Service specific inputs
    1. **Enable/Disable** a given notification method configuration.
       - Use the toggle to enable or disable the notification method configuration
-   1. **Delete an existing** notification method configuartion. Netdata provided ones can't be deleted, e.g. Email
+   1. **Delete an existing** notification method configuration. Netdata provided ones can't be deleted, e.g. Email
       - Use the trash icon to delete your configuration 
 
 ## Manage user notification settings
