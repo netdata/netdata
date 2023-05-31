@@ -11,7 +11,7 @@
 /* Health related SQL queries
    Creates a health log table in sqlite, one per host guid
 */
-#define SQL_CREATE_HEALTH_LOG_TABLE(guid) "CREATE TABLE IF NOT EXISTS health_log_%s(hostname text, unique_id int, alarm_id int, alarm_event_id int, config_hash_id blob, updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, flags int, exec_run_timestamp int, delay_up_to_timestamp int, name text, chart text, family text, exec text, recipient text, source text, units text, info text, exec_code int, new_status real, old_status real, delay int, new_value double, old_value double, last_repeat int, class text, component text, type text, chart_context text, event_hash_id blob);", guid
+#define SQL_CREATE_HEALTH_LOG_TABLE(guid) "CREATE TABLE IF NOT EXISTS health_log_%s(hostname text, unique_id int, alarm_id int, alarm_event_id int, config_hash_id blob, updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, flags int, exec_run_timestamp int, delay_up_to_timestamp int, name text, chart text, family text, exec text, recipient text, source text, units text, info text, exec_code int, new_status real, old_status real, delay int, new_value double, old_value double, last_repeat int, class text, component text, type text, chart_context text, transition_id blob);", guid
 int sql_create_health_log_table(RRDHOST *host) {
     int rc;
     char command[MAX_HEALTH_SQL_SIZE + 1];
@@ -117,7 +117,7 @@ failed:
     "config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, " \
     "exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, " \
     "units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, " \
-    "class, component, type, chart_context, event_hash_id) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);", guid
+    "class, component, type, chart_context, transition_id) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);", guid
 
 void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
     sqlite3_stmt *res = NULL;
@@ -337,9 +337,9 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
         goto failed;
     }
 
-    rc = sqlite3_bind_blob(res, 33, &ae->event_hash_id, sizeof(ae->event_hash_id), SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, 33, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind event_hash_id parameter for SQL_INSERT_HEALTH_LOG");
+        error_report("Failed to bind transition_id parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
@@ -511,7 +511,7 @@ void sql_health_alarm_log_cleanup(RRDHOST *host) {
 }
 
 #define SQL_INJECT_REMOVED(guid, guid2) "insert into health_log_%s (hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, " \
-"delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type, chart_context, event_hash_id) " \
+"delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type, chart_context, transition_id) " \
 "select hostname, ?1, ?2, ?3, config_hash_id, 0, ?4, unixepoch(), 0, 0, flags, exec_run_timestamp, " \
 "unixepoch(), name, chart, family, exec, recipient, source, units, info, exec_code, -2, new_status, delay, NULL, new_value, 0, class, component, type, chart_context, ?5 " \
 "from health_log_%s where unique_id = ?6", guid, guid2
@@ -557,9 +557,9 @@ void sql_inject_removed_status(char *uuid_str, uint32_t alarm_id, uint32_t alarm
         goto failed;
     }
 
-    uuid_t event_hash_id;
-    uuid_generate_random(event_hash_id);
-    rc = sqlite3_bind_blob(res, 5, &event_hash_id, sizeof(event_hash_id), SQLITE_STATIC);
+    uuid_t transition_id;
+    uuid_generate_random(transition_id);
+    rc = sqlite3_bind_blob(res, 5, &transition_id, sizeof(transition_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind config_hash_id parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
@@ -683,7 +683,7 @@ void sql_check_removed_alerts_state(char *uuid_str)
 /* Health related SQL queries
    Load from the health log table
 */
-#define SQL_LOAD_HEALTH_LOG(guid) "SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type, chart_context, event_hash_id FROM health_log_%s group by alarm_id having max(alarm_event_id);", guid
+#define SQL_LOAD_HEALTH_LOG(guid) "SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type, chart_context, transition_id FROM health_log_%s group by alarm_id having max(alarm_event_id);", guid
 void sql_health_alarm_log_load(RRDHOST *host) {
     sqlite3_stmt *res = NULL;
     int ret;
@@ -854,7 +854,7 @@ void sql_health_alarm_log_load(RRDHOST *host) {
             ae->chart_context = NULL;
 
          if (sqlite3_column_type(res, 32) != SQLITE_NULL)
-            uuid_copy(ae->event_hash_id, *((uuid_t *) sqlite3_column_blob(res, 32)));
+            uuid_copy(ae->transition_id, *((uuid_t *) sqlite3_column_blob(res, 32)));
 
         char value_string[100 + 1];
         string_freez(ae->old_value_string);
@@ -1202,7 +1202,7 @@ int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_S
      return ret;
 }
 
-#define SQL_SELECT_HEALTH_LOG(guid) "SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type, chart_context, event_hash_id FROM health_log_%s WHERE 1=1 ", guid
+#define SQL_SELECT_HEALTH_LOG(guid) "SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type, chart_context, transition_id FROM health_log_%s WHERE 1=1 ", guid
 void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *chart) {
 
     buffer_strcat(wb, "[");
@@ -1251,9 +1251,9 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
         char config_hash_id[UUID_STR_LEN];
         uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 4)), config_hash_id);
 
-        char event_hash_id[UUID_STR_LEN] = {0};
+        char transition_id[UUID_STR_LEN] = {0};
         if (sqlite3_column_type(res, 32) != SQLITE_NULL)
-            uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 32)), event_hash_id);
+            uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 32)), transition_id);
 
         char *edit_command = health_edit_command_from_source((char *)sqlite3_column_text(res, 18));
 
@@ -1272,7 +1272,7 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
             "\t\t\"alarm_id\": %u,\n"
             "\t\t\"alarm_event_id\": %u,\n"
             "\t\t\"config_hash_id\": \"%s\",\n"
-            "\t\t\"event_hash_id\": \"%s\",\n"
+            "\t\t\"transition_id\": \"%s\",\n"
             "\t\t\"name\": \"%s\",\n"
             "\t\t\"chart\": \"%s\",\n"
             "\t\t\"context\": \"%s\",\n"
@@ -1310,7 +1310,7 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
             (unsigned int) sqlite3_column_int64(res, 2),
             (unsigned int) sqlite3_column_int64(res, 3),
             config_hash_id,
-            event_hash_id,
+            transition_id,
             sqlite3_column_text(res, 13),
             sqlite3_column_text(res, 14),
             sqlite3_column_text(res, 31),

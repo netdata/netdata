@@ -74,8 +74,8 @@ struct alarm_log_entry {
 
     char *chart_context;
 
-    char *event_hash;
     uint64_t event_id;
+    char *transition_id;  
 };
 
 struct send_alarm_checkpoint {

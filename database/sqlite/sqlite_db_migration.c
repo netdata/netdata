@@ -200,8 +200,8 @@ static int do_migration_v7_v8(sqlite3 *database, const char *name)
 
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
          char *table = strdupz((char *) sqlite3_column_text(res, 0));
-         if (!column_exists_in_table(table, "event_hash_id")) {
-             snprintfz(sql, 255, "ALTER TABLE %s ADD event_hash_id blob", table);
+         if (!column_exists_in_table(table, "transition_id")) {
+             snprintfz(sql, 255, "ALTER TABLE %s ADD transition_id blob", table);
              sqlite3_exec_monitored(database, sql, 0, 0, NULL);
          }
          freez(table);

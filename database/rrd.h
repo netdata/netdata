@@ -977,7 +977,7 @@ struct alarm_entry {
     uint32_t alarm_id;
     uint32_t alarm_event_id;
     uuid_t config_hash_id;
-    uuid_t event_hash_id;
+    uuid_t transition_id;
 
     time_t when;
     time_t duration;
