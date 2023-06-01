@@ -1206,7 +1206,7 @@ claim() {
 set_auto_updates() {
   if run_as_root [ -x "${INSTALL_PREFIX}/usr/libexec/netdata/netdata-updater.sh" ]; then
     updater="${INSTALL_PREFIX}/usr/libexec/netdata/netdata-updater.sh"
-  elif run_as_root  [-x "${INSTALL_PREFIX}/netdata/usr/libexec/netdata/netdata-updater.sh" ]; then
+  elif run_as_root  [ -x "${INSTALL_PREFIX}/netdata/usr/libexec/netdata/netdata-updater.sh" ]; then
     updater="${INSTALL_PREFIX}/netdata/usr/libexec/netdata/netdata-updater.sh"
   else
     warning "Could not find netdata-updater.sh. This means that auto-updates cannot (currently) be enabled on this system. See https://learn.netdata.cloud/docs/agent/packaging/installer/update for more information about updating Netdata."
