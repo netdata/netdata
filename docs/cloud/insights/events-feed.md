@@ -37,13 +37,13 @@ At a high-level view, these are the domains from which the Events feed will prov
 | User Added to Space | A user was added to the Space from an invitation (user accepted the invitation).| User `John Smith` was **added** to this space by invite of `Alan Doe` |
 | User Removed from Space | A user was added to the Space from an invitation. | User `John Smith` was **removed** from this space by `Alan Doe` |
 | User Added to Room | A user was added to a room on the Space. | User `John Smith` was **added** to room `DB servers` |
-| User Removed from Room | A user was removed to a room on the Space. | User `John Smith` was **removed** from room `DB Servers` by `Alan Doe` |
-| User Space Properties Changed | The properties of a user on the Space have changed, e.g. change user role | User role for `John Smith` were **changed** to `troubleshooter` by `Alan Doe` |
-| Node Added To Room |The node was added to a room on the Space. | Node `ip-xyz.ec2.internal` was **added** to room `DB Servers` by `John Doe` |
-| Node Removed To Room |The node was removed from a room on the Space. | Node `ip-xyz.ec2.internal` was **removed** from room `DB Servers` by `John Doe` |
-| Silencing Rule Created |A new alert notification silencing rule was created on the Space. | Silencing rule `DB Servers schedule silencing` on rooms `All nodes` and `DB Servers` was **created** by `John Smith` |
-| Silencing Rule Changed |An existing alert notification silencing rule was modified on the Space. | Silencing rule `DB Servers schedule silencing` on rooms `All nodes` and `DB Servers` was **changed** by `John Doe` |
-| Silencing Rule Deleted |An existing alert notifications silencing rule was removed from the Space. | Silencing rule `DB Servers schedule silencing` on rooms `All nodes` and `DB Servers` was **changed** by `Alan Smith` |
+| User Removed from Room | A user was removed from a room on the Space. | User `John Smith` was **removed** from room `DB Servers` by `Alan Doe` |
+| User Space Properties Changed | The properties of a user on the Space have changed, e.g. change user role | User role for `John Smith` was **changed** to `troubleshooter` by `Alan Doe` |
+| Node Added To Room | The node was added to a room on the Space. | Node `ip-xyz.ec2.internal` was **added** to room `DB Servers` by `John Doe` |
+| Node Removed To Room | The node was removed from a room on the Space. | Node `ip-xyz.ec2.internal` was **removed** from room `DB Servers` by `John Doe` |
+| Silencing Rule Created | A new alert notification silencing rule was created on the Space. | Silencing rule `DB Servers schedule silencing` on rooms `All nodes` and `DB Servers` was **created** by `John Smith` |
+| Silencing Rule Changed | An existing alert notification silencing rule was modified on the Space. | Silencing rule `DB Servers schedule silencing` on rooms `All nodes` and `DB Servers` was **changed** by `John Doe` |
+| Silencing Rule Deleted | An existing alert notifications silencing rule was removed from the Space. | Silencing rule `DB Servers schedule silencing` on rooms `All nodes` and `DB Servers` was **changed** by `Alan Smith` |
 
 ### Topology events
 
