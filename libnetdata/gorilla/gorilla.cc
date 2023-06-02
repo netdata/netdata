@@ -4,7 +4,6 @@
 #include <climits>
 #include <cstdio>
 #include <cstring>
-#include <vector>
 
 using std::size_t;
 
@@ -332,78 +331,6 @@ static size_t gorilla_decode(Word *dst, Word dst_len, const Word *src, Word src_
 }
 
 /*
- * Internal code used for fuzzing the library
-*/
-
-template<typename Word>
-static std::vector<Word> random_vector(const uint8_t *data, size_t size) {
-    std::vector<Word> V;
-
-    V.reserve(1024);
-
-    while (size >= sizeof(Word)) {
-        size -= sizeof(Word);
-
-        Word w;
-        memcpy(&w, &data[size], sizeof(Word));
-        V.push_back(w);
-    }
-
-    return V;
-}
-
-template<typename Word>
-static void check_equal_buffers(Word *lhs, Word lhs_size, Word *rhs, Word rhs_size) {
-    assert((lhs_size == rhs_size) && "Buffers have different size.");
-
-    for (size_t i = 0; i != lhs_size; i++) {
-        assert((lhs[i] == rhs[i]) && "Buffers differ");
-    }
-}
-
-extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
-    // 32-bit tests
-    {
-        if (Size < 4)
-            return 0;
-
-        std::vector<uint32_t> RandomData = random_vector<uint32_t>(Data, Size);
-        std::vector<uint32_t> EncodedData(10 * RandomData.capacity(), 0);
-        std::vector<uint32_t> DecodedData(10 * RandomData.capacity(), 0);
-
-        size_t num_entries_written = gorilla_encode_u32(EncodedData.data(), EncodedData.size(),
-                                                        RandomData.data(), RandomData.size());
-        size_t num_entries_read = gorilla_decode_u32(DecodedData.data(), DecodedData.size(),
-                                                     EncodedData.data(), EncodedData.size());
-
-        assert(num_entries_written == num_entries_read);
-        check_equal_buffers(RandomData.data(), (uint32_t) RandomData.size(),
-                            DecodedData.data(), (uint32_t) RandomData.size());
-    }
-
-    // 64-bit tests
-    {
-        if (Size < 8)
-            return 0;
-
-        std::vector<uint64_t> RandomData = random_vector<uint64_t>(Data, Size);
-        std::vector<uint64_t> EncodedData(10 * RandomData.capacity(), 0);
-        std::vector<uint64_t> DecodedData(10 * RandomData.capacity(), 0);
-
-        size_t num_entries_written = gorilla_encode_u64(EncodedData.data(), EncodedData.size(),
-                                                        RandomData.data(), RandomData.size());
-        size_t num_entries_read = gorilla_decode_u64(DecodedData.data(), DecodedData.size(),
-                                                     EncodedData.data(), EncodedData.size());
-
-        assert(num_entries_written == num_entries_read);
-        check_equal_buffers(RandomData.data(), (uint64_t) RandomData.size(),
-                            DecodedData.data(), (uint64_t) RandomData.size());
-    }
-
-    return 0;
-}
-
-/*
  * Low-level public API
 */
 
@@ -496,3 +423,196 @@ size_t gorilla_encode_u64(uint64_t *dst, size_t dst_len, const uint64_t *src, si
 size_t gorilla_decode_u64(uint64_t *dst, size_t dst_len, const uint64_t *src, size_t src_len) {
     return gorilla_decode(dst, (uint64_t) dst_len, src, (uint64_t) src_len);
 }
+
+/*
+ * Internal code used for fuzzing the library
+*/
+
+#ifdef ENABLE_FUZZER
+
+#include <vector>
+
+template<typename Word>
+static std::vector<Word> random_vector(const uint8_t *data, size_t size) {
+    std::vector<Word> V;
+
+    V.reserve(1024);
+
+    while (size >= sizeof(Word)) {
+        size -= sizeof(Word);
+
+        Word w;
+        memcpy(&w, &data[size], sizeof(Word));
+        V.push_back(w);
+    }
+
+    return V;
+}
+
+template<typename Word>
+static void check_equal_buffers(Word *lhs, Word lhs_size, Word *rhs, Word rhs_size) {
+    assert((lhs_size == rhs_size) && "Buffers have different size.");
+
+    for (size_t i = 0; i != lhs_size; i++) {
+        assert((lhs[i] == rhs[i]) && "Buffers differ");
+    }
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
+    // 32-bit tests
+    {
+        if (Size < 4)
+            return 0;
+
+        std::vector<uint32_t> RandomData = random_vector<uint32_t>(Data, Size);
+        std::vector<uint32_t> EncodedData(10 * RandomData.capacity(), 0);
+        std::vector<uint32_t> DecodedData(10 * RandomData.capacity(), 0);
+
+        size_t num_entries_written = gorilla_encode_u32(EncodedData.data(), EncodedData.size(),
+                                                        RandomData.data(), RandomData.size());
+        size_t num_entries_read = gorilla_decode_u32(DecodedData.data(), DecodedData.size(),
+                                                     EncodedData.data(), EncodedData.size());
+
+        assert(num_entries_written == num_entries_read);
+        check_equal_buffers(RandomData.data(), (uint32_t) RandomData.size(),
+                            DecodedData.data(), (uint32_t) RandomData.size());
+    }
+
+    // 64-bit tests
+    {
+        if (Size < 8)
+            return 0;
+
+        std::vector<uint64_t> RandomData = random_vector<uint64_t>(Data, Size);
+        std::vector<uint64_t> EncodedData(10 * RandomData.capacity(), 0);
+        std::vector<uint64_t> DecodedData(10 * RandomData.capacity(), 0);
+
+        size_t num_entries_written = gorilla_encode_u64(EncodedData.data(), EncodedData.size(),
+                                                        RandomData.data(), RandomData.size());
+        size_t num_entries_read = gorilla_decode_u64(DecodedData.data(), DecodedData.size(),
+                                                     EncodedData.data(), EncodedData.size());
+
+        assert(num_entries_written == num_entries_read);
+        check_equal_buffers(RandomData.data(), (uint64_t) RandomData.size(),
+                            DecodedData.data(), (uint64_t) RandomData.size());
+    }
+
+    return 0;
+}
+
+#endif /* ENABLE_FUZZER */
+
+#ifdef ENABLE_BENCHMARK
+
+#include <benchmark/benchmark.h>
+#include <random>
+
+static size_t NumItems = 1024;
+
+static void BM_EncodeU32Numbers(benchmark::State& state) {
+    std::random_device rd;
+    std::mt19937 mt(rd());
+    std::uniform_int_distribution<uint32_t> dist(0x0, 0x0000FFFF);
+
+    std::vector<uint32_t> RandomData;
+    for (size_t idx = 0; idx != NumItems; idx++) {
+        RandomData.push_back(dist(mt));
+    }
+    std::vector<uint32_t> EncodedData(10 * RandomData.capacity(), 0);
+
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(
+        gorilla_encode_u32(EncodedData.data(), EncodedData.size(),
+                                  RandomData.data(), RandomData.size())
+        );
+        benchmark::ClobberMemory();
+    }
+
+    state.SetItemsProcessed(NumItems * state.iterations());
+    state.SetBytesProcessed(NumItems * state.iterations() * sizeof(uint32_t));
+}
+BENCHMARK(BM_EncodeU32Numbers);
+
+static void BM_DecodeU32Numbers(benchmark::State& state) {
+    std::random_device rd;
+    std::mt19937 mt(rd());
+    std::uniform_int_distribution<uint32_t> dist(0x0, 0xFFFFFFFF);
+
+    std::vector<uint32_t> RandomData;
+    for (size_t idx = 0; idx != NumItems; idx++) {
+        RandomData.push_back(dist(mt));
+    }
+    std::vector<uint32_t> EncodedData(10 * RandomData.capacity(), 0);
+    std::vector<uint32_t> DecodedData(10 * RandomData.capacity(), 0);
+
+    gorilla_encode_u32(EncodedData.data(), EncodedData.size(),
+                       RandomData.data(), RandomData.size());
+
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(
+            gorilla_decode_u32(DecodedData.data(), DecodedData.size(),
+                               EncodedData.data(), EncodedData.size())
+        );
+        benchmark::ClobberMemory();
+    }
+
+    state.SetItemsProcessed(NumItems * state.iterations());
+    state.SetBytesProcessed(NumItems * state.iterations() * sizeof(uint32_t));
+}
+// Register the function as a benchmark
+BENCHMARK(BM_DecodeU32Numbers);
+
+static void BM_EncodeU64Numbers(benchmark::State& state) {
+    std::random_device rd;
+    std::mt19937 mt(rd());
+    std::uniform_int_distribution<uint64_t> dist(0x0, 0x0000FFFF);
+
+    std::vector<uint64_t> RandomData;
+    for (size_t idx = 0; idx != 1024; idx++) {
+        RandomData.push_back(dist(mt));
+    }
+    std::vector<uint64_t> EncodedData(10 * RandomData.capacity(), 0);
+
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(
+        gorilla_encode_u64(EncodedData.data(), EncodedData.size(),
+                                  RandomData.data(), RandomData.size())
+        );
+        benchmark::ClobberMemory();
+    }
+
+    state.SetItemsProcessed(NumItems * state.iterations());
+    state.SetBytesProcessed(NumItems * state.iterations() * sizeof(uint64_t));
+}
+BENCHMARK(BM_EncodeU64Numbers);
+
+static void BM_DecodeU64Numbers(benchmark::State& state) {
+    std::random_device rd;
+    std::mt19937 mt(rd());
+    std::uniform_int_distribution<uint64_t> dist(0x0, 0xFFFFFFFF);
+
+    std::vector<uint64_t> RandomData;
+    for (size_t idx = 0; idx != 1024; idx++) {
+        RandomData.push_back(dist(mt));
+    }
+    std::vector<uint64_t> EncodedData(10 * RandomData.capacity(), 0);
+    std::vector<uint64_t> DecodedData(10 * RandomData.capacity(), 0);
+
+    gorilla_encode_u64(EncodedData.data(), EncodedData.size(),
+                       RandomData.data(), RandomData.size());
+
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(
+            gorilla_decode_u64(DecodedData.data(), DecodedData.size(),
+                               EncodedData.data(), EncodedData.size())
+        );
+        benchmark::ClobberMemory();
+    }
+
+    state.SetItemsProcessed(NumItems * state.iterations());
+    state.SetBytesProcessed(NumItems * state.iterations() * sizeof(uint64_t));
+}
+// Register the function as a benchmark
+BENCHMARK(BM_DecodeU64Numbers);
+
+#endif /* ENABLE_BENCHMARK */
