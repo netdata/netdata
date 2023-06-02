@@ -16,7 +16,7 @@ to use, write and understand.
 So, Netdata supports **simple patterns**.
 
 Simple patterns are a space separated list of words, that can have `*`
-as a wildcard. Each world may use any number of `*`. Simple patterns
+as a wildcard. Each word may use any number of `*`. Simple patterns
 allow **negative** matches by prefixing a word with `!`.
 
 So, `pattern = !*bad* *` will match anything, except all those that
