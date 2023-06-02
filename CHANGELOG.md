@@ -6,9 +6,12 @@
 
 **Merged pull requests:**
 
+- fix: allow square brackets in label value [\#15131](https://github.com/netdata/netdata/pull/15131) ([ilyam8](https://github.com/ilyam8))
+- Fix bundling of eBPF legacy code for DEB packages. [\#15127](https://github.com/netdata/netdata/pull/15127) ([Ferroin](https://github.com/Ferroin))
 - Percentage of group aggregatable at cloud - fixed for backwards compatibility [\#15126](https://github.com/netdata/netdata/pull/15126) ([ktsaou](https://github.com/ktsaou))
 - Fix package versioning issues. [\#15125](https://github.com/netdata/netdata/pull/15125) ([Ferroin](https://github.com/Ferroin))
 - Revert "percentage of group is now aggregatable at cloud across multiple nodes" [\#15122](https://github.com/netdata/netdata/pull/15122) ([ktsaou](https://github.com/ktsaou))
+- add netdata demo rooms to the list of demo urls [\#15120](https://github.com/netdata/netdata/pull/15120) ([andrewm4894](https://github.com/andrewm4894))
 - Fix handling of eBPF plugin for DEB packages. [\#15117](https://github.com/netdata/netdata/pull/15117) ([Ferroin](https://github.com/Ferroin))
 - initial draft for the silencing docs [\#15112](https://github.com/netdata/netdata/pull/15112) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Only queue an alert to the cloud when it's inserted [\#15110](https://github.com/netdata/netdata/pull/15110) ([MrZammler](https://github.com/MrZammler))
@@ -24,6 +27,7 @@
 - update ml defaults to 24h [\#15093](https://github.com/netdata/netdata/pull/15093) ([andrewm4894](https://github.com/andrewm4894))
 - Create category overview pages for learn's restructure [\#15091](https://github.com/netdata/netdata/pull/15091) ([Ancairon](https://github.com/Ancairon))
 - Release buffer in case of error -- CID 385075 [\#15090](https://github.com/netdata/netdata/pull/15090) ([stelfrag](https://github.com/stelfrag))
+- health: remove "families" from alarms config [\#15086](https://github.com/netdata/netdata/pull/15086) ([ilyam8](https://github.com/ilyam8))
 - update agent telemetry url to be cloud function instead of posthog [\#15085](https://github.com/netdata/netdata/pull/15085) ([andrewm4894](https://github.com/andrewm4894))
 - mentioned waive off of space subscription price [\#15082](https://github.com/netdata/netdata/pull/15082) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Python Dependency Migration - OracleDB Python Module [\#15074](https://github.com/netdata/netdata/pull/15074) ([EricAndrechek](https://github.com/EricAndrechek))
@@ -405,9 +409,6 @@
 - Fix crash when child connects [\#14492](https://github.com/netdata/netdata/pull/14492) ([stelfrag](https://github.com/stelfrag))
 - Plans docs [\#14491](https://github.com/netdata/netdata/pull/14491) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Try making it landing page of getting started directly [\#14489](https://github.com/netdata/netdata/pull/14489) ([cakrit](https://github.com/cakrit))
-- Update Demo-Sites.md [\#14488](https://github.com/netdata/netdata/pull/14488) ([Ancairon](https://github.com/Ancairon))
-- Make the introduction a category link [\#14485](https://github.com/netdata/netdata/pull/14485) ([Ancairon](https://github.com/Ancairon))
-- Update AD title [\#14484](https://github.com/netdata/netdata/pull/14484) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
