@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- fix a typo in `libnetdata/simple_pattern/README.md` [\#15135](https://github.com/netdata/netdata/pull/15135) ([n0099](https://github.com/n0099))
+- updated events docs and minor fix on silecing rules table [\#15134](https://github.com/netdata/netdata/pull/15134) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- Provide necessary permission for the kickstart to run the netdata-updater script [\#15132](https://github.com/netdata/netdata/pull/15132) ([tkatsoulas](https://github.com/tkatsoulas))
 - fix: allow square brackets in label value [\#15131](https://github.com/netdata/netdata/pull/15131) ([ilyam8](https://github.com/ilyam8))
 - Fix bundling of eBPF legacy code for DEB packages. [\#15127](https://github.com/netdata/netdata/pull/15127) ([Ferroin](https://github.com/Ferroin))
 - Percentage of group aggregatable at cloud - fixed for backwards compatibility [\#15126](https://github.com/netdata/netdata/pull/15126) ([ktsaou](https://github.com/ktsaou))
@@ -406,9 +409,6 @@
 - added Challenge secret and rooms object on the payload [\#14496](https://github.com/netdata/netdata/pull/14496) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Category overview pages [\#14495](https://github.com/netdata/netdata/pull/14495) ([Ancairon](https://github.com/Ancairon))
 - JSON internal API, IEEE754 base64/hex streaming, weights endpoint optimization [\#14493](https://github.com/netdata/netdata/pull/14493) ([ktsaou](https://github.com/ktsaou))
-- Fix crash when child connects [\#14492](https://github.com/netdata/netdata/pull/14492) ([stelfrag](https://github.com/stelfrag))
-- Plans docs [\#14491](https://github.com/netdata/netdata/pull/14491) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- Try making it landing page of getting started directly [\#14489](https://github.com/netdata/netdata/pull/14489) ([cakrit](https://github.com/cakrit))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
