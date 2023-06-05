@@ -119,7 +119,8 @@ enum ebpf_main_index {
     EBPF_OPTION_GLOBAL_CHART,
     EBPF_OPTION_RETURN_MODE,
     EBPF_OPTION_LEGACY,
-    EBPF_OPTION_CORE
+    EBPF_OPTION_CORE,
+    EBPF_OPTION_UNITTEST
 };
 
 typedef struct ebpf_tracepoint {

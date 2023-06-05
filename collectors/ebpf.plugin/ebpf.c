@@ -2097,6 +2097,7 @@ static void ebpf_parse_args(int argc, char **argv)
         {"return",         no_argument,    0,  0 },
         {"legacy",         no_argument,    0,  0 },
         {"core",           no_argument,    0,  0 },
+        {"unittest",       no_argument,    0,  0 },
         {0, 0, 0, 0}
     };
 
@@ -2286,6 +2287,9 @@ static void ebpf_parse_args(int argc, char **argv)
                 info("EBPF running with \"CO-RE\" code, because it was started with the option \"[-]-core\".");
 #endif
                 break;
+            }
+            case EBPF_OPTION_UNITTEST: {
+                exit(0);
             }
             default: {
                 break;
