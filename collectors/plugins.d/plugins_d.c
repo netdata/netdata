@@ -72,7 +72,7 @@ static void pluginsd_worker_thread_cleanup(void *arg)
             info("PLUGINSD: 'host:%s', waiting for data collection child process pid %d to exit...",
                  rrdhost_hostname(cd->host), pid);
 
-            waitid(P_PID, (id_t)pid, &info, WEXITED);
+            netdata_waitid(P_PID, (id_t)pid, &info, WEXITED);
         }
     }
 }
