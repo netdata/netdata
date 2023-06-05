@@ -5,4 +5,5 @@
 
 void ebpf_ut_initialize_structure(netdata_run_mode_t mode);
 int ebpf_ut_load_real_binary();
+void ebpf_ut_cleanup_memory();
 #endif

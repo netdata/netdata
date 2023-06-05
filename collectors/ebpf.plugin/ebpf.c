@@ -2341,10 +2341,10 @@ static void ebpf_parse_args(int argc, char **argv)
                     goto unittest;
 
                 ebpf_ut_initialize_structure(MODE_ENTRY);
-
                 if (ebpf_ut_load_real_binary())
                     goto unittest;
 
+                ebpf_ut_cleanup_memory();
                 exit_code = 0;
 unittest:
                 exit(exit_code);

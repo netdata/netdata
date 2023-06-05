@@ -22,6 +22,16 @@ void ebpf_ut_initialize_structure(netdata_run_mode_t mode)
 }
 
 /**
+ * Clean UP Memory
+ *
+ * Clean up  allocated data during unit test;
+ */
+void ebpf_ut_cleanup_memory()
+{
+    freez((void *)test_em.thread_name);
+}
+
+/**
  * Load Binary
  *
  * Test load of legacy eBPF programs.
