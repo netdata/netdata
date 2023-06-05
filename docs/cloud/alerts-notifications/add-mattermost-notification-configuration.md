@@ -4,12 +4,12 @@ From the Cloud interface, you can manage your space's notification settings and 
 
 ## Prerequisites
 
-To add Mattermost notification configurations you need
+To add Mattermost notification configurations you need:
 
 - A Netdata Cloud account
 - Access to the space as an **administrator**
 - Space needs to be on **Business** plan or higher
-- Have a Mattermost app on your workspace to receive the webhooks, for mode details check [how to configure this on Mattermost](#settings-on-mattermost)
+- Have a Mattermost app on your workspace to receive the webhooks, for more details check [how to configure this on Mattermost](#settings-on-mattermost)
 
 ## Steps
 
