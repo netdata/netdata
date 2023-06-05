@@ -82,7 +82,7 @@ int netdata_waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options) {
 
         netdata_popen_tracking_lock();
         DOUBLE_LINKED_LIST_FOREACH_FORWARD(netdata_popen_root, mp, prev, next) {
-            if(unlikely(mp->pid == id))
+            if(unlikely(mp->pid == (pid_t)id))
                 break;
         }
 
