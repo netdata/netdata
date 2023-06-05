@@ -1021,9 +1021,11 @@ static void netdata_ssl_error(const char *call, int err) {
             code = "SSL_ERROR_WANT_CLIENT_HELLO_CB";
             break;
 
+#ifdef SSL_ERROR_WANT_RETRY_VERIFY
         case SSL_ERROR_WANT_RETRY_VERIFY:
             code = "SSL_ERROR_WANT_RETRY_VERIFY";
             break;
+#endif
 
         default:
             code = "SSL_ERROR_UNKNOWN";
