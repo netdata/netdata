@@ -2060,6 +2060,48 @@ static inline void ebpf_load_thread_config()
 }
 
 /**
+ * Check Conditions
+ *
+ * This function checks kernel that plugin is running and permissions.
+ *
+ * @return It returns 0 on success and -1 otherwise
+ */
+int ebpf_check_conditions()
+{
+    if (!has_condition_to_run(running_on_kernel)) {
+        error("The current collector cannot run on this kernel.");
+        return -1;
+    }
+
+    if (!am_i_running_as_root()) {
+        error(
+            "ebpf.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities..",
+            (unsigned int)getuid(), (unsigned int)geteuid());
+        return -1;
+    }
+
+    return 0;
+}
+
+/**
+ * Adjust memory
+ *
+ * Adjust memory values to load eBPF programs.
+ *
+ * @return It returns 0 on success and -1 otherwise
+ */
+int ebpf_adjust_memory_limit()
+{
+    struct rlimit r = { RLIM_INFINITY, RLIM_INFINITY };
+    if (setrlimit(RLIMIT_MEMLOCK, &r)) {
+        error("Setrlimit(RLIMIT_MEMLOCK)");
+        return -1;
+    }
+
+    return 0;
+}
+
+/**
  * Parse arguments given from user.
  *
  * @param argc the number of arguments
@@ -2289,7 +2331,17 @@ static void ebpf_parse_args(int argc, char **argv)
                 break;
             }
             case EBPF_OPTION_UNITTEST: {
-                exit(0);
+                // if we cannot run until the end, we will cancel the unittest
+                int exit_code = ECANCELED;
+                if (ebpf_check_conditions())
+                    goto unittest;
+
+                if (ebpf_adjust_memory_limit())
+                    goto unittest;
+
+                exit_code = 0;
+unittest:
+                exit(exit_code);
             }
             default: {
                 break;
@@ -2509,17 +2561,8 @@ int main(int argc, char **argv)
     ebpf_parse_args(argc, argv);
     ebpf_manage_pid(getpid());
 
-    if (!has_condition_to_run(running_on_kernel)) {
-        error("The current collector cannot run on this kernel.");
+    if (ebpf_check_conditions())
         return 2;
-    }
-
-    if (!am_i_running_as_root()) {
-        error(
-            "ebpf.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities..",
-            (unsigned int)getuid(), (unsigned int)geteuid());
-        return 3;
-    }
 
     // set name
     program_name = "ebpf.plugin";
@@ -2531,11 +2574,8 @@ int main(int argc, char **argv)
     error_log_errors_per_period = 100;
     error_log_throttle_period = 3600;
 
-    struct rlimit r = { RLIM_INFINITY, RLIM_INFINITY };
-    if (setrlimit(RLIMIT_MEMLOCK, &r)) {
-        error("Setrlimit(RLIMIT_MEMLOCK)");
-        return 4;
-    }
+    if (ebpf_adjust_memory_limit())
+        return 3;
 
     signal(SIGINT, ebpf_stop_threads);
     signal(SIGQUIT, ebpf_stop_threads);
