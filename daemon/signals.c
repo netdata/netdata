@@ -196,11 +196,11 @@ static void reap_children() {
         i.si_pid = 0;
         if (waitid(P_ALL, (id_t)0, &i, WEXITED|WNOHANG|WNOWAIT) == -1) {
             if (errno != ECHILD) // This shouldn't happen with WNOHANG but does.
-                error("SIGNAL: waitid() reports there are no unwaited-for child processes.");
+                info("SIGNAL: waitid() failed, there are no unwaited-for child processes.");
             return;
         }
         else if (i.si_pid == 0) {
-            error("SIGNAL: waitid() succeeded, but pid 0 is returned");
+            info("SIGNAL: waitid() succeeded, but no unwaited-for child processes are reported.");
             // No child exited.
             return;
         }

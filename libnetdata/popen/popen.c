@@ -415,8 +415,12 @@ int netdata_pclose(FILE *fp_child_input, FILE *fp_child_output, pid_t pid) {
                 return(info.si_status);
 
             case CLD_KILLED:
-                if(info.si_status == 15) {
-                    info("child pid %d killed by signal %d.", info.si_pid, info.si_status);
+                if(info.si_status == SIGTERM) {
+                    info("child pid %d killed by SIGTERM", info.si_pid);
+                    return(0);
+                }
+                else if(info.si_status == SIGPIPE) {
+                    info("child pid %d killed by SIGPIPE.", info.si_pid);
                     return(0);
                 }
                 else {
