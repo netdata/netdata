@@ -1048,7 +1048,7 @@ ssize_t netdata_ssl_read(SSL *ssl, void *buf, size_t num) {
 
     if(unlikely(bytes <= 0)) {
         err = SSL_get_error(ssl, bytes);
-        if (err == SSL_ERROR_WANT_WRITE || err == SSL_ERROR_WANT_READ)
+        if (err == SSL_ERROR_WANT_READ)
             bytes = 0;
         else
             netdata_ssl_error(__FUNCTION__, err);
@@ -1066,7 +1066,7 @@ ssize_t netdata_ssl_write(SSL *ssl, const void *buf, size_t num) {
 
     if(unlikely(bytes <= 0)) {
         err = SSL_get_error(ssl, bytes);
-        if (err == SSL_ERROR_WANT_WRITE || err == SSL_ERROR_WANT_READ)
+        if (err == SSL_ERROR_WANT_WRITE)
             bytes = 0;
         else
             netdata_ssl_error(__FUNCTION__, err);
