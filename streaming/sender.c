@@ -542,7 +542,7 @@ unsigned char alpn_proto_list[] = {
 static int rrdpush_http_upgrade_prelude(RRDHOST *host, struct sender_state *s) {
 
     char http[HTTP_HEADER_SIZE + 1];
-    int eol = snprintfz(http, HTTP_HEADER_SIZE,
+    snprintfz(http, HTTP_HEADER_SIZE,
             "GET " NETDATA_STREAM_URL HTTP_1_1 HTTP_ENDL
             "Upgrade: " NETDATA_STREAM_PROTO_NAME HTTP_ENDL
             "Connection: Upgrade"
