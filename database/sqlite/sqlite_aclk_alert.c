@@ -285,7 +285,7 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
     buffer_sprintf(sql, "select aa.sequence_id, hl.unique_id, hl.alarm_id, hl.config_hash_id, hl.updated_by_id, hl.when_key, " \
         " hl.duration, hl.non_clear_duration, hl.flags, hl.exec_run_timestamp, hl.delay_up_to_timestamp, hl.name,  " \
         " hl.chart, hl.family, hl.exec, hl.recipient, hl.source, hl.units, hl.info, hl.exec_code, hl.new_status,  " \
-        " hl.old_status, hl.delay, hl.new_value, hl.old_value, hl.last_repeat, hl.chart_context  " \
+        " hl.old_status, hl.delay, hl.new_value, hl.old_value, hl.last_repeat, hl.chart_context, hl.transition_id, hl.alarm_event_id  " \
         " from health_log_%s hl, aclk_alert_%s aa " \
         " where hl.unique_id = aa.alert_unique_id and aa.date_submitted is null " \
         " order by aa.sequence_id asc limit %d;", wc->uuid_str, wc->uuid_str, limit);
@@ -394,6 +394,13 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
         alarm_log.chart_context = sqlite3_column_type(res, 26) == SQLITE_NULL ?
                                       strdupz((char *)"") :
                                       strdupz((char *)sqlite3_column_text(res, 26));
+
+        uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 27)), uuid_str);
+        alarm_log.transition_id = sqlite3_column_type(res, 27) == SQLITE_NULL ?
+                                      strdupz((char *)"") :
+                                      strdupz((char *)uuid_str);
+
+        alarm_log.event_id = (time_t) sqlite3_column_int64(res, 28);
 
         aclk_send_alarm_log_entry(&alarm_log);
 
@@ -749,6 +756,8 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
     char *edit_command = ae->source ? health_edit_command_from_source(ae_source(ae)) : strdupz("UNKNOWN=0=UNKNOWN");
     char config_hash_id[UUID_STR_LEN];
     uuid_unparse_lower(ae->config_hash_id, config_hash_id);
+    char transition_id[UUID_STR_LEN];
+    uuid_unparse_lower(ae->transition_id, transition_id);
 
     alarm_log->chart = strdupz(ae_chart_name(ae));
     alarm_log->name = strdupz(ae_name(ae));
@@ -789,6 +798,9 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
     alarm_log->updated = (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) ? 1 : 0;
     alarm_log->rendered_info = strdupz(ae_info(ae));
     alarm_log->chart_context = strdupz(ae_chart_context(ae));
+
+    alarm_log->transition_id = strdupz((char *)transition_id);
+    alarm_log->event_id = (uint64_t) ae->alarm_event_id;
 
     freez(edit_command);
 }

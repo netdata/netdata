@@ -1852,6 +1852,11 @@ int main (int argc, char **argv) {
         fflush(stdout);
 
         // restart check (14400 seconds)
-        if(now_monotonic_sec() - started_t > 14400) exit(0);
+        if (now_monotonic_sec() - started_t > 14400) {
+            fprintf(stdout, "EXIT\n");
+            fflush(stdout);
+            exit(0);
+        }
     }
 }
+

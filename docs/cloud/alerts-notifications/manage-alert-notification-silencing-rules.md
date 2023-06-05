@@ -55,4 +55,4 @@ To manage your **personal alert notification silencing rule settings**, you will
 | Third party maintenance | All Rooms | * | * | `httpcheck_posthog_netdata_cloud.request_status` | * | * | This rule silences this specific alert since third party partner will be undergoing maintenance. |
 | Intended stress usage on CPU | All Rooms | * | * | * | `system.cpu` | * | This rule silences specific alerts across all nodes and their CPU cores. |
 | Silence role webmaster | All Rooms | * | * | * | * | `webmaster` | This rule silences all alerts configured with the role `webmaster`. |
-| Silence alert on node | All Rooms | `child1` | * | `httpcheck_posthog_netdata_cloud.request_status` | * | * | * | This rule silences the specific alert on the `child1` node. |
+| Silence alert on node | All Rooms | `child1` | * | `httpcheck_posthog_netdata_cloud.request_status` | * | * | This rule silences the specific alert on the `child1` node. |

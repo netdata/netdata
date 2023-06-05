@@ -240,5 +240,7 @@ int main(int argc, char **argv)
         }
     }
 
+    fprintf(stdout, "EXIT\n");
+    fflush(stdout);
     return 0;
 }
