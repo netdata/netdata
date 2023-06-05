@@ -167,27 +167,27 @@ static inline PARSER_FGETS_RESULT parser_fgets(char *s, int size, FILE *stream) 
             return PARSER_FGETS_RESULT_OK;
         }
         else if(fds[0].revents & POLLERR) {
-            error("PARSER: read failed: POLLERR.\n");
+            error("PARSER: read failed: POLLERR.");
             return PARSER_FGETS_RESULT_ERROR;
         }
         else if(fds[0].revents & POLLHUP) {
-            error("PARSER: read failed: POLLHUP.\n");
+            error("PARSER: read failed: POLLHUP.");
             return PARSER_FGETS_RESULT_ERROR;
         }
         else if(fds[0].revents & POLLNVAL) {
-            error("PARSER: read failed: POLLNVAL.\n");
+            error("PARSER: read failed: POLLNVAL.");
             return PARSER_FGETS_RESULT_ERROR;
         }
 
-        error("PARSER: poll() returned positive number, but POLLIN|POLLERR|POLLHUP|POLLNVAL are not set.\n");
+        error("PARSER: poll() returned positive number, but POLLIN|POLLERR|POLLHUP|POLLNVAL are not set.");
         return PARSER_FGETS_RESULT_ERROR;
     }
     else if (ret == 0) {
-        error("PARSER: timeout while waiting for data.\n");
+        error("PARSER: timeout while waiting for data.");
         return PARSER_FGETS_RESULT_TIMEOUT;
     }
 
-    error("PARSER: poll() failed with code %d.\n", ret);
+    error("PARSER: poll() failed with code %d.", ret);
     return PARSER_FGETS_RESULT_ERROR;
 }
 
