@@ -629,9 +629,9 @@ static const char *verify_required_directory(const char *dir)
 }
 
 static const char *verify_or_create_required_directory(const char *dir) {
-    int result = 0
+    int result;
 
-    result = mkdir(dir, 0755)
+    result = mkdir(dir, 0755);
 
     if (result != 0 && errno != EEXIST)
         fatal("Cannot create required directory '%s'", dir);
