@@ -562,7 +562,7 @@ bool stop_streaming_receiver(RRDHOST *host, const char *reason) {
               "thread %d takes too long to stop, giving up..."
         , rrdhost_hostname(host)
         , host->receiver->client_ip, host->receiver->client_port
-        , gettid());
+        , host->receiver->tid);
     else
         ret = true;
 
@@ -887,7 +887,8 @@ void *rrdpush_receiver_thread(void *ptr) {
     worker_register_job_custom_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION, "replication completion", "%", WORKER_METRIC_ABSOLUTE);
 
     struct receiver_state *rpt = (struct receiver_state *)ptr;
-    info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
+    rpt->tid = gettid();
+    info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, rpt->tid);
 
     rrdpush_receive(rpt);
 

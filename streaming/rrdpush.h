@@ -221,6 +221,7 @@ struct sender_state {
 
 struct receiver_state {
     RRDHOST *host;
+    pid_t tid;
     netdata_thread_t thread;
     int fd;
     char *key;
