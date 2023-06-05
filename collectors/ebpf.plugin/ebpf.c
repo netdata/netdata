@@ -6,6 +6,7 @@
 
 #include "ebpf.h"
 #include "ebpf_socket.h"
+#include "ebpf_unittest.h"
 #include "libnetdata/required_dummies.h"
 
 /*****************************************************************
@@ -2339,6 +2340,7 @@ static void ebpf_parse_args(int argc, char **argv)
                 if (ebpf_adjust_memory_limit())
                     goto unittest;
 
+                ebpf_ut_initialize_structure(MODE_ENTRY);
                 exit_code = 0;
 unittest:
                 exit(exit_code);
