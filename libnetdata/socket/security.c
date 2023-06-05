@@ -11,6 +11,80 @@ const char *tls_version=NULL;
 const char *tls_ciphers=NULL;
 int netdata_ssl_validate_server =  NETDATA_SSL_VALID_CERTIFICATE;
 
+
+void security_log_ssl_error_queue(const char *call) {
+    error_limit_static_thread_var(erl, 1, 0);
+    unsigned long err;
+    while((err = ERR_get_error())) {
+        char *code;
+
+        switch (err) {
+            case SSL_ERROR_NONE:
+                code = "SSL_ERROR_NONE";
+                break;
+
+            case SSL_ERROR_SSL:
+                code = "SSL_ERROR_SSL";
+                break;
+
+            case SSL_ERROR_WANT_READ:
+                code = "SSL_ERROR_WANT_READ";
+                break;
+
+            case SSL_ERROR_WANT_WRITE:
+                code = "SSL_ERROR_WANT_WRITE";
+                break;
+
+            case SSL_ERROR_WANT_X509_LOOKUP:
+                code = "SSL_ERROR_WANT_X509_LOOKUP";
+                break;
+
+            case SSL_ERROR_SYSCALL:
+                code = "SSL_ERROR_SYSCALL";
+                break;
+
+            case SSL_ERROR_ZERO_RETURN:
+                code = "SSL_ERROR_ZERO_RETURN";
+                break;
+
+            case SSL_ERROR_WANT_CONNECT:
+                code = "SSL_ERROR_WANT_CONNECT";
+                break;
+
+            case SSL_ERROR_WANT_ACCEPT:
+                code = "SSL_ERROR_WANT_ACCEPT";
+                break;
+
+            case SSL_ERROR_WANT_ASYNC:
+                code = "SSL_ERROR_WANT_ASYNC";
+                break;
+
+            case SSL_ERROR_WANT_ASYNC_JOB:
+                code = "SSL_ERROR_WANT_ASYNC_JOB";
+                break;
+
+            case SSL_ERROR_WANT_CLIENT_HELLO_CB:
+                code = "SSL_ERROR_WANT_CLIENT_HELLO_CB";
+                break;
+
+#ifdef SSL_ERROR_WANT_RETRY_VERIFY
+            case SSL_ERROR_WANT_RETRY_VERIFY:
+                code = "SSL_ERROR_WANT_RETRY_VERIFY";
+                break;
+#endif
+
+            default:
+                code = "SSL_ERROR_UNKNOWN";
+                break;
+        }
+
+        char str[1024 + 1];
+        ERR_error_string_n(err, str, 1024);
+        str[1024] = '\0';
+        error_limit(&erl, "%s() returned SSL error %lu (%s): %s", call, err, code, str);
+    }
+}
+
 /**
  * Info Callback
  *
@@ -296,19 +370,9 @@ NETDATA_SSL_HANDSHAKE security_process_accept(SSL *ssl,int msg) {
                  error("SSL handshake did not finish and it wanna read on socket %d!", sock);
                  return NETDATA_SSL_WANT_WRITE;
 
-             case SSL_ERROR_NONE:
-             case SSL_ERROR_SSL:
-             case SSL_ERROR_SYSCALL:
-             default: {
-                 u_long err;
-                 char buf[256];
-                 int counter = 0;
-                 while ((err = ERR_get_error()) != 0) {
-                     ERR_error_string_n(err, buf, sizeof(buf));
-                     error("%d SSL Handshake error (%s) on socket %d", counter++, ERR_error_string((long)SSL_get_error(ssl, test), NULL), sock);
-			     }
+             default:
+                 security_log_ssl_error_queue("SSL_accept");
                  return NETDATA_SSL_NO_HANDSHAKE;
-			 }
          }
     }
 

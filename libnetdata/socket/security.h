@@ -61,5 +61,7 @@ NETDATA_SSL_HANDSHAKE security_process_accept(SSL *ssl,int msg);
 int security_test_certificate(SSL *ssl);
 SSL_CTX * security_initialize_openssl_client();
 
+void security_log_ssl_error_queue(const char *call);
+
 # endif //ENABLE_HTTPS
 #endif //NETDATA_SECURITY_H

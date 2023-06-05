@@ -968,77 +968,6 @@ int connect_to_one_of_urls(const char *destination, int default_port, struct tim
 
 
 #ifdef ENABLE_HTTPS
-
-static void netdata_ssl_error(const char *call, int err) {
-    char *code;
-
-    switch(err) {
-        case SSL_ERROR_NONE:
-            code = "SSL_ERROR_NONE";
-            break;
-
-        case SSL_ERROR_SSL:
-            code = "SSL_ERROR_SSL";
-            break;
-
-        case SSL_ERROR_WANT_READ:
-            code = "SSL_ERROR_WANT_READ";
-            break;
-
-        case SSL_ERROR_WANT_WRITE:
-            code = "SSL_ERROR_WANT_WRITE";
-            break;
-
-        case SSL_ERROR_WANT_X509_LOOKUP:
-            code = "SSL_ERROR_WANT_X509_LOOKUP";
-            break;
-
-        case SSL_ERROR_SYSCALL:
-            code = "SSL_ERROR_SYSCALL";
-            break;
-
-        case SSL_ERROR_ZERO_RETURN:
-            code = "SSL_ERROR_ZERO_RETURN";
-            break;
-
-        case SSL_ERROR_WANT_CONNECT:
-            code = "SSL_ERROR_WANT_CONNECT";
-            break;
-
-        case SSL_ERROR_WANT_ACCEPT:
-            code = "SSL_ERROR_WANT_ACCEPT";
-            break;
-
-        case SSL_ERROR_WANT_ASYNC:
-            code = "SSL_ERROR_WANT_ASYNC";
-            break;
-
-        case SSL_ERROR_WANT_ASYNC_JOB:
-            code = "SSL_ERROR_WANT_ASYNC_JOB";
-            break;
-
-        case SSL_ERROR_WANT_CLIENT_HELLO_CB:
-            code = "SSL_ERROR_WANT_CLIENT_HELLO_CB";
-            break;
-
-#ifdef SSL_ERROR_WANT_RETRY_VERIFY
-        case SSL_ERROR_WANT_RETRY_VERIFY:
-            code = "SSL_ERROR_WANT_RETRY_VERIFY";
-            break;
-#endif
-
-        default:
-            code = "SSL_ERROR_UNKNOWN";
-            break;
-    }
-
-    char str[1024 + 1];
-    ERR_error_string_n(err, str, 1024);
-    str[1024] = '\0';
-    error_limit_static_thread_var(erl, 1, 0);
-    error_limit(&erl, "%s() returned SSL error %d (%s): %s", call, err, code, str);
-}
-
 ssize_t netdata_ssl_read(SSL *ssl, void *buf, size_t num) {
     errno = 0;
 
@@ -1051,7 +980,7 @@ ssize_t netdata_ssl_read(SSL *ssl, void *buf, size_t num) {
         if (err == SSL_ERROR_WANT_READ)
             bytes = 0;
         else
-            netdata_ssl_error(__FUNCTION__, err);
+            security_log_ssl_error_queue("SSL_read");
     }
 
     return bytes;
@@ -1069,7 +998,7 @@ ssize_t netdata_ssl_write(SSL *ssl, const void *buf, size_t num) {
         if (err == SSL_ERROR_WANT_WRITE)
             bytes = 0;
         else
-            netdata_ssl_error(__FUNCTION__, err);
+            security_log_ssl_error_queue("SSL_write");
     }
 
     return bytes;

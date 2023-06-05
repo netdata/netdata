@@ -95,17 +95,13 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
                 stats->receptions++;
                 continue;
             } else {
-                int sslerrno = SSL_get_error(connector_specific_data->conn, (int) r);
-                u_long sslerr = ERR_get_error();
-                char buf[256];
-                switch (sslerrno) {
+                int ssl_errno = SSL_get_error(connector_specific_data->conn, (int) r);
+                switch (ssl_errno) {
                     case SSL_ERROR_WANT_READ:
                     case SSL_ERROR_WANT_WRITE:
                         goto endloop;
                     default:
-                        ERR_error_string_n(sslerr, buf, sizeof(buf));
-                        error("SSL error (%s)",
-                              ERR_error_string((long)SSL_get_error(connector_specific_data->conn, (int)r), NULL));
+                        security_log_ssl_error_queue("SSL_read");
                         goto endloop;
                 }
             }
@@ -345,10 +341,7 @@ void simple_connector_worker(void *instance_p)
                             SSL_set_connect_state(connector_specific_data->conn);
                             int err = SSL_connect(connector_specific_data->conn);
                             if (err != 1) {
-                                err = SSL_get_error(connector_specific_data->conn, err);
-                                error(
-                                    "SSL cannot connect with the server:  %s ",
-                                    ERR_error_string((long)SSL_get_error(connector_specific_data->conn, err), NULL));
+                                security_log_ssl_error_queue("SSL_connect");
                                 connector_specific_data->flags = NETDATA_SSL_NO_HANDSHAKE;
                             } else {
                                 info("Exporting established a SSL connection.");

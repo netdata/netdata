@@ -659,8 +659,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
         SSL_set_connect_state(host->sender->ssl.conn);
         int err = SSL_connect(host->sender->ssl.conn);
         if (err != 1) {
-            err = SSL_get_error(host->sender->ssl.conn, err);
-            error("SSL cannot connect with the server:  %s ",ERR_error_string((long)SSL_get_error(host->sender->ssl.conn,err),NULL));
+            security_log_ssl_error_queue("SSL_connect");
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
             rrdpush_sender_thread_close_socket(host);
             host->destination->last_error = "SSL error";
