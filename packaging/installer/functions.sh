@@ -507,10 +507,12 @@ run_install_service_script() {
     tmpdir="${TMPDIR:-/tmp}"
   fi
 
+  INST_SVC_SCRIPT="${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh"
+
   # shellcheck disable=SC2154
   save_path="${tmpdir}/netdata-service-cmds"
   # shellcheck disable=SC2068
-  "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" --save-cmds "${save_path}" ${@}
+  "${INST_SVC_SCRIPT}" --save-cmds "${save_path}" ${@}
 
   case $? in
     0)
@@ -547,7 +549,7 @@ run_install_service_script() {
       ;;
     4)
       if [ -z "${NETDATA_SERVICE_WARNED_4}" ]; then
-        warning "Detected a supported system service manager, but failed to install Netdata as a system service. Usually this is a result of incorrect permissions. Manually running ${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh may provide more information about the exact issue."
+        warning "Detected a supported system service manager, but failed to install Netdata as a system service. Usually this is a result of incorrect permissions. Manually running ${INST_SVC_SCRIPT} may provide more information about the exact issue."
         NETDATA_SERVICE_WARNED_4=1
       fi
       ;;
@@ -555,6 +557,12 @@ run_install_service_script() {
       if [ -z "${NETDATA_SERVICE_WARNED_5}" ]; then
         warning "We do not support managing Netdata as a system service on this platform. Manual setup will be required."
         NETDATA_SERVICE_WARNED_5=1
+      fi
+      ;;
+    6)
+      if [ -z "${NETDATA_SERVICE_WARNED_6}" ]; then
+        warning "Existing Netdata service file found, not overwriting it. To manually install the upstream service files, run ${INST_SVC_SCRIPT} as root with the '--force' option as root."
+        NETDATA_SERVICE_WARNED_6=1
       fi
       ;;
   esac

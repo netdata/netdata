@@ -11,6 +11,7 @@
 # 3 - Detected system service type, but type not supported.
 # 4 - Detected system service type, but could not install due to other issues.
 # 5 - Platform not supported.
+# 6 - Detected existing service script, refusing to overwrite.
 
 set -e
 
@@ -28,10 +29,12 @@ SCRIPT_SOURCE="$(
 DUMP_CMDS=0
 ENABLE="auto"
 EXPORT_CMDS=0
+FORCE=0
 INSTALL=1
 LINUX_INIT_TYPES="systemd openrc lsb initd runit"
 PLATFORM="$(uname -s)"
 SHOW_SVC_TYPE=0
+SKIP_INSTALL=0
 SVC_SOURCE="@libsysdir_POST@"
 SVC_TYPE="detect"
 WSL_ERROR_MSG="We appear to be running in WSL and were unable to find a usable service manager. We currently support systemd, LSB init scripts, and traditional init.d style init scripts when running under WSL."
@@ -101,6 +104,17 @@ valid_types() {
   esac
 }
 
+check_service_files() {
+  if [ "${FORCE}" -eq 1 ] || [ "${SKIP_INSTALL}" -eq 1 ]; then
+    for f in "${@}"; do
+      if [ -f "${f}" ]; then
+        error "Found existing service file at ${f}, refusing to continue. If you wish to overwrite it, you must pass the --force option to the service install script."
+        exit 6
+      fi
+    done
+  fi
+}
+
 install_generic_service() {
   svc_path="${1}"
   svc_type_name="${2}"
@@ -108,14 +122,16 @@ install_generic_service() {
   svc_enable_hook="${4}"
   svc_disable_hook="${5}"
 
-  info "Installing ${svc_type_name} service file."
   if [ ! -f "${svc_file}" ] && [ "${ENABLE}" = "auto" ]; then
     ENABLE="enable"
   fi
 
-  if ! install -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/${svc_path}/netdata" "${svc_file}"; then
-    error "Failed to install service file."
-    exit 4
+  if [ "${FORCE}" -eq 1 ] || [ "${SKIP_INSTALL}" -eq 0 ] || [ ! -f "${svc_file}" ]; then
+    info "Installing ${svc_type_name} service file."
+    if ! install -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/${svc_path}/netdata" "${svc_file}"; then
+      error "Failed to install service file."
+      exit 4
+    fi
   fi
 
   case "${ENABLE}" in
@@ -157,15 +173,17 @@ usage() {
 USAGE: install-service.sh [options]
        where options include:
 
-  --source      Specify where to find the service files to install (default ${SVC_SOURCE}).
-  --type        Specify the type of service file to install. Specify a type of 'help' to get a list of valid types for your platform.
-  --show-type   Display information about what service managers are detected.
-  --cmds        Additionally print a list of commands for starting and stopping the agent with the detected service type.
-  --export-cmds Export the variables that would be printed by the --cmds option.
-  --cmds-only   Don't install, just handle the --cmds or --export-cmds option.
-  --enable      Explicitly enable the service on install (default is to enable if not already installed).
-  --disable     Explicitly disable the service on install.
-  --help        Print this help information.
+  --source       Specify where to find the service files to install (default ${SVC_SOURCE}).
+  --type         Specify the type of service file to install. Specify a type of 'help' to get a list of valid types for your platform.
+  --show-type    Display information about what service managers are detected.
+  --cmds         Additionally print a list of commands for starting and stopping the agent with the detected service type.
+  --export-cmds  Export the variables that would be printed by the --cmds option.
+  --cmds-only    Don't install, just handle the --cmds or --export-cmds option.
+  --enable       Explicitly enable the service on install (default is to enable if not already installed).
+  --disable      Explicitly disable the service on install.
+  --force        Install even if we would not normally.
+  --skip-install Skip installing scripts if they are already present, but still enable/disable the service as it normally would be.
+  --help         Print this help information.
 HEREDOC
 }
 
@@ -238,7 +256,9 @@ get_systemd_service_dir() {
 install_systemd_service() {
   SRCFILE="${SVC_SOURCE}/systemd/netdata.service"
   PRESET_FILE="${SVC_SOURCE}/systemd/50-netdata.preset"
-  SVCDIR="$(get_systemd_service_dir)"
+  svcdir="$(get_systemd_service_dir)"
+  svc_file="${svcdir}/netdata.service"
+  preset_file="${svcdir}/50-netdata.preset"
 
   if [ "$(systemctl --version | head -n 1 | cut -f 2 -d ' ')" -le 235 ]; then
     SRCFILE="${SVC_SOURCE}/systemd/netdata.service.v235"
@@ -256,15 +276,19 @@ install_systemd_service() {
     fi
   fi
 
-  info "Installing systemd service..."
-  if ! install -p -m 0644 -o 0 -g 0 "${SRCFILE}" "${SVCDIR}/netdata.service"; then
-    error "Failed to install systemd service file."
-    exit 4
-  fi
+  check_service_files "${svc_file}" "${preset_file}"
 
-  if [ -f "${PRESET_FILE}" ]; then
-    if ! install -p -m 0644 -o 0 -g 0 "${PRESET_FILE}" "${SVCDIR}-preset/50-netdata.preset"; then
-      warning "Failed to install netdata preset file."
+  if [ "${FORCE}" -eq 1 ] || [ "${SKIP_INSTALL}" -eq 0 ] || [ ! -f "${svc_file}" ]; then
+    info "Installing systemd service..."
+    if ! install -p -m 0644 -o 0 -g 0 "${SRCFILE}" "${svc_file}"; then
+      error "Failed to install systemd service file."
+      exit 4
+    fi
+
+    if [ -f "${PRESET_FILE}" ]; then
+      if ! install -p -m 0644 -o 0 -g 0 "${PRESET_FILE}" "${preset_file}"; then
+        warning "Failed to install netdata preset file."
+      fi
     fi
   fi
 
@@ -352,9 +376,11 @@ disable_openrc() {
 }
 
 install_openrc_service() {
+  check_service_files /etc/init.d/netdata
+
   install_generic_service openrc/init.d OpenRC /etc/init.d/netdata enable_openrc disable_openrc
 
-  if [ ! -f /etc/conf.d/netdata ]; then
+  if [ ! -f /etc/conf.d/netdata ] && [ "${SKIP_INSTALL}" -eq 0 ]; then
     info "Installing OpenRC configuration file."
 
     if ! install -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/openrc/conf.d/netdata" "/etc/conf.d/netdata"; then
@@ -418,6 +444,8 @@ disable_lsb() {
 }
 
 install_lsb_service() {
+  check_service_files /etc/init.d/netdata
+
   install_generic_service lsb/init.d LSB /etc/init.d/netdata enable_lsb disable_lsb
 }
 
@@ -473,6 +501,8 @@ disable_initd() {
 }
 
 install_initd_service() {
+  check_service_files /etc/init.d/netdata
+
   install_generic_service initd/init.d init.d /etc/init.d/netdata enable_initd disable_initd
 }
 
@@ -533,14 +563,18 @@ install_runit_service() {
 
   svc_file="${svc_dir}/run"
 
-  info "Installing runit service file."
   if [ ! -f "${svc_file}" ] && [ "${ENABLE}" = "auto" ]; then
     ENABLE="enable"
   fi
 
-  if ! install -D -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/runit/run" "${svc_file}"; then
-    error "Failed to install service file."
-    exit 4
+  check_service_files "${svc_file}"
+
+  if [ "${FORCE}" -eq 1 ] || [ "${SKIP_INSTALL}" -eq 0 ] || [ ! -f "${svc_file}" ]; then
+    info "Installing runit service file."
+    if ! install -D -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/runit/run" "${svc_file}"; then
+      error "Failed to install service file."
+      exit 4
+    fi
   fi
 
   case ${ENABLE} in
@@ -611,6 +645,8 @@ disable_freebsd() {
 }
 
 install_freebsd_service() {
+  check_service_files /usr/local/etc/rc.d/netdata
+
   install_generic_service freebsd/rc.d "FreeBSD rc.d" /usr/local/etc/rc.d/netdata enable_freebsd disable_freebsd
 }
 
@@ -624,15 +660,21 @@ freebsd_cmds() {
 # macOS support functions
 
 install_darwin_service() {
-  info "Installing macOS plist file for launchd."
-  if ! install -C -S -p -m 0644 -o 0 -g 0 system/launchd/netdata.plist /Library/LaunchDaemons/com.github.netdata.plist; then
-    error "Failed to copy plist file."
-    exit 4
-  fi
+  svc_file="/Library/LaucnhDaemons/com.github.netdata.plist"
 
-  if ! launchctl load /Library/LaunchDaemons/com.github.netdata.plist; then
-    error "Failed to load plist file."
-    exit 4
+  check_service_files "${svc_file}"
+
+  if [ "${FORCE}" -eq 1 ] || [ "${SKIP_INSTALL}" -eq 0 ] || [ ! -f "${svc_file}" ]; then
+    info "Installing macOS plist file for launchd."
+    if ! install -C -S -p -m 0644 -o 0 -g 0 system/launchd/netdata.plist "${svc_file}"; then
+      error "Failed to copy plist file."
+      exit 4
+    fi
+
+    if ! launchctl load "${svc_file}"; then
+      error "Failed to load plist file."
+      exit 4
+    fi
   fi
 }
 
@@ -770,6 +812,8 @@ parse_args() {
           shift 1
         fi
         ;;
+      "--force" | "-f") FORCE=1 ;;
+      "--skip-install") SKIP_INSTALL=1 ;;
       "--cmds" | "-c") DUMP_CMDS=1 ;;
       "--cmds-only") INSTALL=0 ;;
       "--export-cmds") EXPORT_CMDS=1 ;;
