@@ -812,7 +812,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     if(!rrdpush_sender_connect_ssl(s))
         return false;
 
-    if (rrdpush_http_upgrade_prelude(host, s)) {
+    if (s->parent_using_h2o && rrdpush_http_upgrade_prelude(host, s)) {
         rrdpush_sender_thread_close_socket(host);
         host->destination->last_error = "failure to negotiate HTTP upgrade to streaming protocol";
         return false;
@@ -1383,6 +1383,9 @@ void *rrdpush_sender_thread(void *ptr) {
         &stream_config, CONFIG_SECTION_STREAM,
         "initial clock resync iterations",
         remote_clock_resync_iterations); // TODO: REMOVE FOR SLEW / GAPFILLING
+
+    s->parent_using_h2o = appconfig_get_boolean(
+        &stream_config, CONFIG_SECTION_STREAM, "parent using h2o", false);
 
     // initialize rrdpush globals
     rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
