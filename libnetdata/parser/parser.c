@@ -137,7 +137,7 @@ static inline PARSER_FGETS_RESULT parser_fgets(char *s, int size, FILE *stream) 
     errno = 0;
 
     struct pollfd fds[1];
-    int timeout_msecs = 10 * 60 * MSEC_PER_SEC;
+    int timeout_msecs = 2 * 60 * MSEC_PER_SEC;
 
     fds[0].fd = fileno(stream);
     fds[0].events = POLLIN;
