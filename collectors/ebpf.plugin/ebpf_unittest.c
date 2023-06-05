@@ -11,7 +11,7 @@ ebpf_module_t test_em;
  */
 void ebpf_ut_initialize_structure(netdata_run_mode_t mode)
 {
-    memset(&em, 0, sizeof(ebpf_module_t));
+    memset(&test_em, 0, sizeof(ebpf_module_t));
     test_em.thread_name = strdupz("process");
     test_em.config_name = test_em.thread_name;
     test_em.kernels = NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_10 |
@@ -19,4 +19,34 @@ void ebpf_ut_initialize_structure(netdata_run_mode_t mode)
     test_em.pid_map_size = ND_EBPF_DEFAULT_PID_SIZE;
     test_em.apps_level = NETDATA_APPS_LEVEL_REAL_PARENT;
     test_em.mode = mode;
+}
+
+/**
+ * Load Binary
+ *
+ * Test load of legacy eBPF programs.
+ *
+ * @return It returns 0 on success and -1 otherwise.
+ */
+static int ebpf_ut_load_binary()
+{
+    test_em.probe_links = ebpf_load_program(ebpf_plugin_dir, &test_em, running_on_kernel, isrh, &test_em.objects);
+    if (!test_em.probe_links)
+        return -1;
+
+    ebpf_unload_legacy_code(test_em.objects, test_em.probe_links);
+
+    return 0;
+}
+
+/**
+ * Load Real Binary
+ *
+ * Load an existent binary inside plugin directory.
+ *
+ * @return It returns 0 on success and -1 otherwise.
+ */
+int ebpf_ut_load_real_binary()
+{
+    return ebpf_ut_load_binary();
 }

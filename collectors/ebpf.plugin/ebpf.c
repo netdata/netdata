@@ -579,7 +579,7 @@ static void ebpf_exit()
  * @param objects       objects loaded from eBPF programs
  * @param probe_links   links from loader
  */
-static void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe_links)
+void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe_links)
 {
     if (!probe_links || !objects)
         return;
@@ -2341,6 +2341,10 @@ static void ebpf_parse_args(int argc, char **argv)
                     goto unittest;
 
                 ebpf_ut_initialize_structure(MODE_ENTRY);
+
+                if (ebpf_ut_load_real_binary())
+                    goto unittest;
+
                 exit_code = 0;
 unittest:
                 exit(exit_code);
