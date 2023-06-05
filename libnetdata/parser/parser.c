@@ -124,9 +124,36 @@ void parser_destroy(PARSER *parser)
  *
  */
 
+#include <poll.h>
+#include <stdio.h>
+
+char *parser_fgets(char *s, int size, FILE *stream) {
+    struct pollfd fds[1];
+    int timeout_msecs = 10 * 60 * MSEC_PER_SEC;
+
+    fds[0].fd = fileno(stream);
+    fds[0].events = POLLIN;
+
+    int ret = poll(fds, 1, timeout_msecs);
+
+    if (ret > 0) {
+        /* There is data to read */
+        if (fds[0].revents & POLLIN) {
+            return fgets(s, size, stream);
+        }
+    }
+    else if (ret == 0)
+        info("PARSER: timeout, no data to read.\n");
+
+    else
+        error("PARSER: failed to read.\n");
+
+    return NULL;
+}
+
 int parser_next(PARSER *parser, char *buffer, size_t buffer_size)
 {
-    char *tmp = fgets(buffer, (int)buffer_size, (FILE *)parser->fp_input);
+    char *tmp = parser_fgets(buffer, (int)buffer_size, (FILE *)parser->fp_input);
 
     if (unlikely(!tmp)) {
         if (feof((FILE *)parser->fp_input))

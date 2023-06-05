@@ -147,7 +147,7 @@ static void reap_child(pid_t pid) {
     siginfo_t i;
 
     errno = 0;
-    debug(D_CHILDS, "SIGNAL: Reaping pid: %d...", pid);
+    debug(D_CHILDS, "SIGNAL: reap_child(%d)...", pid);
     if (waitid(P_PID, (id_t)pid, &i, WEXITED|WNOHANG) == -1) {
         if (errno != ECHILD)
             error("SIGNAL: waitid(%d): failed to wait for child", pid);
@@ -163,25 +163,25 @@ static void reap_child(pid_t pid) {
 
     switch (i.si_code) {
         case CLD_EXITED:
-            info("SIGNAL: child %d exited: %d", pid, i.si_status);
+            info("SIGNAL: reap_child(%d) exited with code: %d", pid, i.si_status);
             break;
         case CLD_KILLED:
-            info("SIGNAL: child %d killed by signal: %d", pid, i.si_status);
+            info("SIGNAL: reap_child(%d) killed by signal: %d", pid, i.si_status);
             break;
         case CLD_DUMPED:
-            info("SIGNAL: child %d dumped core by signal: %d", pid, i.si_status);
+            info("SIGNAL: reap_child(%d) dumped core by signal: %d", pid, i.si_status);
             break;
         case CLD_STOPPED:
-            info("SIGNAL: child %d stopped by signal: %d", pid, i.si_status);
+            info("SIGNAL: reap_child(%d) stopped by signal: %d", pid, i.si_status);
             break;
         case CLD_TRAPPED:
-            info("SIGNAL: child %d trapped by signal: %d", pid, i.si_status);
+            info("SIGNAL: reap_child(%d) trapped by signal: %d", pid, i.si_status);
             break;
         case CLD_CONTINUED:
-            info("SIGNAL: child %d continued by signal: %d", pid, i.si_status);
+            info("SIGNAL: reap_child(%d) continued by signal: %d", pid, i.si_status);
             break;
         default:
-            info("SIGNAL: child %d gave us a SIGCHLD with code %d and status %d.", pid, i.si_code, i.si_status);
+            info("SIGNAL: reap_child(%d) gave us a SIGCHLD with code %d and status %d.", pid, i.si_code, i.si_status);
             break;
     }
 }
@@ -275,7 +275,7 @@ void signals_handle(void) {
                                 break;
 
                             case NETDATA_SIGNAL_CHILD:
-                                info("SIGNAL: Received %s. Checking children processes.", name);
+                                info("SIGNAL: Received %s. Checking for exited children processes.", name);
                                 reap_children();
                                 break;
 
