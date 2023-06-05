@@ -343,7 +343,11 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
         //alarm_log.sequence_id = (uint64_t) sqlite3_column_int64(res, 0);
         alarm_log.when = (time_t) sqlite3_column_int64(res, 5);
 
-        uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 3)), uuid_str);
+        if(sqlite3_column_type(res, 3) == SQLITE_NULL)
+            uuid_str[0] = '\0';
+        else
+            uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 3)), uuid_str);
+
         alarm_log.config_hash = strdupz((char *)uuid_str);
 
         alarm_log.utc_offset = wc->host->utc_offset;
@@ -395,7 +399,11 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
                                       strdupz((char *)"") :
                                       strdupz((char *)sqlite3_column_text(res, 26));
 
-        uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 27)), uuid_str);
+        if(sqlite3_column_type(res, 27) == SQLITE_NULL)
+            uuid_str[0] = '\0';
+        else
+            uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 27)), uuid_str);
+
         alarm_log.transition_id = sqlite3_column_type(res, 27) == SQLITE_NULL ?
                                       strdupz((char *)"") :
                                       strdupz((char *)uuid_str);
