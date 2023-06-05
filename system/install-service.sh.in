@@ -115,6 +115,27 @@ check_service_files() {
   fi
 }
 
+check_file() {
+  # Check if a given file should be updated.
+  svc_file="${1}"
+  svc_file_src="${2}"
+
+  # Always update if --force was specified.
+  [ "${FORCE}" -eq 1 ] && return 1
+
+  # Always update if the file does not exist.
+  [ ! -f "${svc_file}" ] && return 1
+
+  # Skip updating if the file exists and --skip-install was specifed.
+  [ "${SKIP_INSTALL}" -eq 1 ] && return 0
+
+  # Skip updating if the file is byte-for-byte identical to the soruce file.
+  cmp --silent -- "${svc_file_src}" "${svc_file}" || return 1
+
+  # Otherwise skip updating
+  return 0
+}
+
 install_generic_service() {
   svc_path="${1}"
   svc_type_name="${2}"
@@ -122,13 +143,15 @@ install_generic_service() {
   svc_enable_hook="${4}"
   svc_disable_hook="${5}"
 
+  svc_file_src="${SVC_SOURCE}/${svc_path}/netdata"
+
   if [ ! -f "${svc_file}" ] && [ "${ENABLE}" = "auto" ]; then
     ENABLE="enable"
   fi
 
-  if [ "${FORCE}" -eq 1 ] || [ "${SKIP_INSTALL}" -eq 0 ] || [ ! -f "${svc_file}" ]; then
+  if ! check_file "${svc_file}" "${svc_file_src}"; then
     info "Installing ${svc_type_name} service file."
-    if ! install -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/${svc_path}/netdata" "${svc_file}"; then
+    if ! install -p -m 0755 -o 0 -g 0 "${svc_file_src}" "${svc_file}"; then
       error "Failed to install service file."
       exit 4
     fi
@@ -255,7 +278,7 @@ get_systemd_service_dir() {
 
 install_systemd_service() {
   SRCFILE="${SVC_SOURCE}/systemd/netdata.service"
-  PRESET_FILE="${SVC_SOURCE}/systemd/50-netdata.preset"
+  PRESET_SRCFILE="${SVC_SOURCE}/systemd/50-netdata.preset"
   svcdir="$(get_systemd_service_dir)"
   svc_file="${svcdir}/netdata.service"
   preset_file="${svcdir}/50-netdata.preset"
@@ -276,25 +299,33 @@ install_systemd_service() {
     fi
   fi
 
-  check_service_files "${svc_file}" "${preset_file}"
+  check_service_files "${svc_file}"
 
-  if [ "${FORCE}" -eq 1 ] || [ "${SKIP_INSTALL}" -eq 0 ] || [ ! -f "${svc_file}" ]; then
+  if ! check_file "${svc_file}" "${SRCFILE}"; then
     info "Installing systemd service..."
     if ! install -p -m 0644 -o 0 -g 0 "${SRCFILE}" "${svc_file}"; then
       error "Failed to install systemd service file."
       exit 4
+    else
+      need_reload=1
     fi
+  fi
 
-    if [ -f "${PRESET_FILE}" ]; then
-      if ! install -p -m 0644 -o 0 -g 0 "${PRESET_FILE}" "${preset_file}"; then
+  if [ -f "${PRESET_SRCFILE}" ]; then
+    if ! check_file "${preset_file}" "${PRESET_SRCFILE}"; then
+      if ! install -p -m 0644 -o 0 -g 0 "${PRESET_SRCFILE}" "${preset_file}"; then
         warning "Failed to install netdata preset file."
+      else
+        need_reload=1
       fi
     fi
   fi
 
   if [ "$(check_systemd)" = "YES" ]; then
-    if ! systemctl daemon-reload; then
-      warning "Failed to reload systemd unit files."
+    if [ -n "${need_reload}" ]; then
+      if ! systemctl daemon-reload; then
+        warning "Failed to reload systemd unit files."
+      fi
     fi
 
     if ! systemctl "${ENABLE}" netdata; then
@@ -562,6 +593,7 @@ install_runit_service() {
   fi
 
   svc_file="${svc_dir}/run"
+  svc_src_file="${SVC_SOURCE}/runit/run"
 
   if [ ! -f "${svc_file}" ] && [ "${ENABLE}" = "auto" ]; then
     ENABLE="enable"
@@ -569,9 +601,9 @@ install_runit_service() {
 
   check_service_files "${svc_file}"
 
-  if [ "${FORCE}" -eq 1 ] || [ "${SKIP_INSTALL}" -eq 0 ] || [ ! -f "${svc_file}" ]; then
+  if ! check_file "${svc_file}" "${svc_src_file}"; then
     info "Installing runit service file."
-    if ! install -D -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/runit/run" "${svc_file}"; then
+    if ! install -D -p -m 0755 -o 0 -g 0 "${svc_src_file}" "${svc_file}"; then
       error "Failed to install service file."
       exit 4
     fi
@@ -661,12 +693,13 @@ freebsd_cmds() {
 
 install_darwin_service() {
   svc_file="/Library/LaucnhDaemons/com.github.netdata.plist"
+  svc_src_file="${SVC_SOURCE}/launchd/netdata.plist"
 
   check_service_files "${svc_file}"
 
-  if [ "${FORCE}" -eq 1 ] || [ "${SKIP_INSTALL}" -eq 0 ] || [ ! -f "${svc_file}" ]; then
+  if ! check_file "${svc_file}" "${svc_src_file}"; then
     info "Installing macOS plist file for launchd."
-    if ! install -C -S -p -m 0644 -o 0 -g 0 system/launchd/netdata.plist "${svc_file}"; then
+    if ! install -C -S -p -m 0644 -o 0 -g 0 "${svc_src_file}" "${svc_file}"; then
       error "Failed to copy plist file."
       exit 4
     fi
