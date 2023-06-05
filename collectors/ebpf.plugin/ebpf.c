@@ -2340,11 +2340,20 @@ static void ebpf_parse_args(int argc, char **argv)
                 if (ebpf_adjust_memory_limit())
                     goto unittest;
 
+                // Load binary in entry mode
                 ebpf_ut_initialize_structure(MODE_ENTRY);
                 if (ebpf_ut_load_real_binary())
                     goto unittest;
 
                 ebpf_ut_cleanup_memory();
+
+                // Do not load a binary in entry mode
+                ebpf_ut_initialize_structure(MODE_ENTRY);
+                if (ebpf_ut_load_fake_binary())
+                    goto unittest;
+
+                ebpf_ut_cleanup_memory();
+
                 exit_code = 0;
 unittest:
                 exit(exit_code);
