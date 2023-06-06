@@ -277,6 +277,7 @@ install -m 644 -p system/netdata.conf "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}"
 # ###########################################################
 # Install updater script
 install -m 755 -p packaging/installer/netdata-updater.sh "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/netdata-updater.sh"
+packaging/installer/netdata-updater.sh --write-updater-config "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}/netdata-updater.conf"
 
 # ###########################################################
 # logrotate settings
@@ -480,6 +481,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %files
 %doc README.md
 %config(noreplace) %{_sysconfdir}/%{name}/netdata.conf
+%attr(0644,root,netdata) %{_sysconfdir}/%{name}/netdata-updater.conf
 %attr(0755,root,netdata) %{_sysconfdir}/%{name}/edit-config
 %attr(0644,root,netdata) %{_sysconfdir}/%{name}/.install-type
 %dir %{_sysconfdir}/%{name}/health.d

@@ -1067,6 +1067,8 @@ install_netdata_updater() {
   echo >&2 "Update script is located at ${TPUT_GREEN}${TPUT_BOLD}${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh${TPUT_RESET}"
   echo >&2
 
+  "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" --write-updater-config
+
   return 0
 }
 
