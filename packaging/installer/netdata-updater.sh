@@ -105,6 +105,14 @@ exit_reason() {
   fi
 }
 
+is_integer () {
+  case "${1#[+-]}" in
+    *[!0123456789]*) return 1 ;;
+    '')              return 1 ;;
+    *)               return 0 ;;
+  esac
+}
+
 issystemd() {
   # if the directory /lib/systemd/system OR /usr/lib/systemd/system (SLES 12.x) does not exit, it is not systemd
   if [ ! -d /lib/systemd/system ] && [ ! -d /usr/lib/systemd/system ]; then
@@ -914,7 +922,11 @@ done
 # and disconnecting/reconnecting at the same time (or near to).
 # But only we're not a controlling terminal (tty)
 # Randomly sleep between 1s and 60m
-if [ ! -t 1 ] && [ -z "${NETDATA_NOT_RUNNING_FROM_CRON}" ] && [ "${NETDATA_UPDATER_JITTER}" -gt 1 ]; then
+if [ ! -t 1 ] && \
+   [ -z "${GITHUB_ACTIONS}" ] && \
+   [ -z "${NETDATA_NOT_RUNNING_FROM_CRON}" ] && \
+   is_integer "${NETDATA_UPDATER_JITTER}" && \
+   [ "${NETDATA_UPDATER_JITTER}" -gt 1 ]; then
     rnd="$(awk "
       BEGIN { srand()
               printf(\"%d\\n\", ${NETDATA_UPDATER_JITTER} * rand())
