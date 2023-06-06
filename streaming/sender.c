@@ -484,39 +484,15 @@ static bool rrdpush_sender_connect_ssl(struct sender_state *s) {
     RRDHOST *host = s->host;
     bool ssl_required = host->destination && host->destination->ssl;
 
-    if(host->sender->ssl.conn)
-        SSL_free(host->sender->ssl.conn);
-
-    host->sender->ssl = NETDATA_SSL_UNSET_CONNECTION;
+    netdata_ssl_close(&host->sender->ssl);
 
     if(!ssl_required)
         return true;
 
-    if (netdata_ssl_streaming_sender_ctx) {
-        host->sender->ssl.conn = SSL_new(netdata_ssl_streaming_sender_ctx);
-        if (!host->sender->ssl.conn) {
-            error("Failed to allocate SSL structure.");
-            host->sender->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
-        }
-        else {
-            if (SSL_set_fd(host->sender->ssl.conn, s->rrdpush_sender_socket) != 1) {
-                error("Failed to set the socket to the SSL on socket fd %d.", s->rrdpush_sender_socket);
-                host->sender->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
-            } else
-                host->sender->ssl.flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
-        }
-    }
-    else
-        host->sender->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
-
-    if (SSL_handshake_complete(&host->sender->ssl)) {
-        ERR_clear_error();
-        SSL_set_connect_state(host->sender->ssl.conn);
-        int err = SSL_connect(host->sender->ssl.conn);
-        if (err != 1) {
+    if (netdata_ssl_open(&host->sender->ssl, netdata_ssl_streaming_sender_ctx, s->rrdpush_sender_socket)) {
+        if(!netdata_ssl_connect(&host->sender->ssl)) {
             // couldn't connect
 
-            security_log_ssl_error_queue("SSL_connect");
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
             rrdpush_sender_thread_close_socket(host);
             host->destination->last_error = "SSL error";
@@ -826,7 +802,7 @@ static ssize_t attempt_to_send(struct sender_state *s) {
 
 #ifdef ENABLE_HTTPS
     if(SSL_handshake_complete(&s->ssl))
-        ret = netdata_ssl_write(s->ssl.conn, chunk, outstanding);
+        ret = netdata_ssl_write(&s->ssl, chunk, outstanding);
     else
         ret = send(s->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
 #else
@@ -862,7 +838,7 @@ static ssize_t attempt_read(struct sender_state *s) {
 #ifdef ENABLE_HTTPS
     if (SSL_handshake_complete(&s->ssl)) {
         size_t desired = sizeof(s->read_buffer) - s->read_len - 1;
-        ret = netdata_ssl_read(s->ssl.conn, s->read_buffer, desired);
+        ret = netdata_ssl_read(&s->ssl, s->read_buffer, desired);
         if (ret > 0 ) {
             s->read_len += (int)ret;
             return ret;
@@ -1185,7 +1161,7 @@ void rrdpush_initialize_ssl_ctx(RRDHOST *host) {
         if (d->ssl) {
             // we need to initialize SSL
 
-            security_start_ssl(NETDATA_SSL_STREAMING_SENDER_CTX);
+            netdata_ssl_initialize_ctx(NETDATA_SSL_STREAMING_SENDER_CTX);
             ssl_security_location_for_context(netdata_ssl_streaming_sender_ctx, netdata_ssl_ca_file, netdata_ssl_ca_path);
 
             // stop the loop

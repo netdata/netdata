@@ -31,18 +31,11 @@ void receiver_state_free(struct receiver_state *rpt) {
     freez(rpt->program_version);
 
 #ifdef ENABLE_HTTPS
-    if(rpt->ssl.conn) {
-//        if(rpt->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
-//            int ret = SSL_shutdown(rpt->ssl.conn);
-//            if(ret == 0)
-//                SSL_shutdown(rpt->ssl.conn);
-//        }
-
-        SSL_free(rpt->ssl.conn);
-    }
+    netdata_ssl_close(&rpt->ssl);
 #endif
 
     if(rpt->fd != -1) {
+        internal_error(true, "closing socket...");
         close(rpt->fd);
     }
 
@@ -113,7 +106,7 @@ static int read_stream(struct receiver_state *r, char* buffer, size_t size) {
 
 #ifdef ENABLE_HTTPS
     if (SSL_handshake_complete(&r->ssl))
-        return (int)netdata_ssl_read(r->ssl.conn, buffer, size);
+        return (int)netdata_ssl_read(&r->ssl, buffer, size);
 #endif
 
     ssize_t bytes_read = read(r->fd, buffer, size);

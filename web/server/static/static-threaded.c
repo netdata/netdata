@@ -212,56 +212,30 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
 
 #ifdef ENABLE_HTTPS
     if ((!web_client_check_unix(w)) && (netdata_ssl_web_server_ctx)) {
-        if( sock_delnonblock(w->ifd) < 0 ){
-            error("Web server cannot remove the non-blocking flag from socket %d",w->ifd);
-        }
+        sock_delnonblock(w->ifd);
 
         //Read the first 7 bytes from the message, but the message
         //is not removed from the queue, because we are using MSG_PEEK
         char test[8];
-        if ( recv(w->ifd,test, 7,MSG_PEEK) == 7 ) {
-            test[7] = 0x00;
+        if ( recv(w->ifd,test, 7, MSG_PEEK) == 7 ) {
+            test[7] = '\0';
         }
         else {
-            //Case I do not have success to read 7 bytes,
-            //this means that the mensage was not completely read, so
-            //I cannot identify it yet.
+            // we couldn't read 7 bytes
             sock_setnonblock(w->ifd);
             goto cleanup;
         }
 
-        //The next two ifs are not together because I am reusing SSL structure
-        if (!w->ssl.conn)
-        {
-            w->ssl.conn = SSL_new(netdata_ssl_web_server_ctx);
-            if ( w->ssl.conn ) {
-                SSL_set_accept_state(w->ssl.conn);
-            } else {
-                error("Failed to create SSL context on socket fd %d.", w->ifd);
-                if (test[0] < 0x18){
-                    WEB_CLIENT_IS_DEAD(w);
-                    sock_setnonblock(w->ifd);
-                    goto cleanup;
-                }
-            }
+        if(netdata_ssl_open(&w->ssl, netdata_ssl_web_server_ctx, w->ifd)) {
+            SSL_set_accept_state(w->ssl.conn);
+            netdata_ssl_accept(&w->ssl, (int) test[0]);
         }
-
-        if (w->ssl.conn) {
-            if (SSL_set_fd(w->ssl.conn, w->ifd) != 1) {
-                error("Failed to set the socket to the SSL on socket fd %d.", w->ifd);
-                //The client is not set dead, because I received a normal HTTP request
-                //instead a Client Hello(HTTPS).
-                if ( test[0] < 0x18 ){
-                    WEB_CLIENT_IS_DEAD(w);
-                }
-            }
-            else{
-                w->ssl.flags = security_process_accept(w->ssl.conn, (int)test[0]);
-            }
-        }
+        else if(test[0] < 0x18)
+            WEB_CLIENT_IS_DEAD(w);
 
         sock_setnonblock(w->ifd);
-    } else{
+    }
+    else {
         w->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
     }
 #endif
@@ -526,7 +500,7 @@ void *socket_listen_main_static_threaded(void *ptr) {
         fatal("LISTENER: no listen sockets available.");
 
 #ifdef ENABLE_HTTPS
-    security_start_ssl(NETDATA_SSL_WEB_SERVER_CTX);
+            netdata_ssl_initialize_ctx(NETDATA_SSL_WEB_SERVER_CTX);
 #endif
     // 6 threads is the optimal value
     // since 6 are the parallel connections browsers will do

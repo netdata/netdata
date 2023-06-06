@@ -482,7 +482,7 @@ void netdata_cleanup_and_exit(int ret) {
 
 #ifdef ENABLE_HTTPS
     delta_shutdown_time("free openssl structures");
-    security_clean_openssl();
+    netdata_ssl_cleanup();
 #endif
 
     delta_shutdown_time("remove incomplete shutdown file");
@@ -834,7 +834,7 @@ static void security_init(){
     tls_version    = config_get(CONFIG_SECTION_WEB, "tls version",  "1.3");
     tls_ciphers    = config_get(CONFIG_SECTION_WEB, "tls ciphers",  "none");
 
-    security_openssl_library();
+    netdata_ssl_initialize_openssl();
 }
 #endif
 

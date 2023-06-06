@@ -967,42 +967,6 @@ int connect_to_one_of_urls(const char *destination, int default_port, struct tim
 }
 
 
-#ifdef ENABLE_HTTPS
-ssize_t netdata_ssl_read(SSL *ssl, void *buf, size_t num) {
-    errno = 0;
-
-    int bytes, err;
-
-    bytes = SSL_read(ssl, buf, (int)num);
-
-    if(unlikely(bytes <= 0)) {
-        err = SSL_get_error(ssl, bytes);
-        security_log_ssl_error_queue("SSL_read");
-        if (err == SSL_ERROR_WANT_READ)
-            bytes = 0;
-    }
-
-    return bytes;
-}
-
-ssize_t netdata_ssl_write(SSL *ssl, const void *buf, size_t num) {
-    errno = 0;
-
-    int bytes, err;
-
-    bytes = SSL_write(ssl, (uint8_t *)buf, (int)num);
-
-    if(unlikely(bytes <= 0)) {
-        err = SSL_get_error(ssl, bytes);
-        security_log_ssl_error_queue("SSL_write");
-        if (err == SSL_ERROR_WANT_WRITE)
-            bytes = 0;
-    }
-
-    return bytes;
-}
-#endif
-
 // --------------------------------------------------------------------------------------------------------------------
 // helpers to send/receive data in one call, in blocking mode, with a timeout
 
@@ -1046,7 +1010,7 @@ ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
 
 #ifdef ENABLE_HTTPS
     if (SSL_handshake_complete(ssl))
-        return netdata_ssl_read(ssl->conn, buf, len);
+        return netdata_ssl_read(ssl, buf, len);
 #endif
 
     return recv(sockfd, buf, len, flags);
@@ -1088,7 +1052,7 @@ ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
 #ifdef ENABLE_HTTPS
     if(ssl->conn) {
         if (SSL_handshake_complete(ssl)) {
-            return netdata_ssl_write(ssl->conn, buf, len);
+            return netdata_ssl_write(ssl, buf, len);
         }
         else {
             error("cannot write to SSL connection - connection is not ready.");

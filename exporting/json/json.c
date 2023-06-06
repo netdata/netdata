@@ -71,10 +71,10 @@ int init_json_http_instance(struct instance *instance)
     instance->connector_specific_data = connector_specific_data;
 
 #ifdef ENABLE_HTTPS
-    connector_specific_data->flags = NETDATA_SSL_START;
-    connector_specific_data->conn = NULL;
+    connector_specific_data->ssl.flags = NETDATA_SSL_START;
+    connector_specific_data->ssl.conn = NULL;
     if (instance->config.options & EXPORTING_OPTION_USE_TLS) {
-        security_start_ssl(NETDATA_SSL_EXPORTING_CTX);
+        netdata_ssl_initialize_ctx(NETDATA_SSL_EXPORTING_CTX);
     }
 #endif
 

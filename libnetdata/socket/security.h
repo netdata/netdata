@@ -12,6 +12,7 @@ typedef enum __attribute__((packed)) {
     NETDATA_SSL_INVALID_CERTIFICATE = (1 << 7), // Accept invalid certificate
     NETDATA_SSL_VALID_CERTIFICATE   = (1 << 8), // Accept only valid certificate
     NETDATA_SSL_PROXY_HTTPS         = (1 << 9), // Proxy is using HTTPS
+    NETDATA_SSL_HANDSHAKE_ERROR     = (1 << 10), // The connection has encountered an error
 } NETDATA_SSL_HANDSHAKE;
 
 #define NETDATA_SSL_WEB_SERVER_CTX 0
@@ -58,14 +59,21 @@ extern const char *tls_ciphers;
 extern int netdata_ssl_validate_server;
 int ssl_security_location_for_context(SSL_CTX *ctx,char *file,char *path);
 
-void security_openssl_library();
-void security_clean_openssl();
-void security_start_ssl(int selector);
-NETDATA_SSL_HANDSHAKE security_process_accept(SSL *ssl,int msg);
+void netdata_ssl_initialize_openssl();
+void netdata_ssl_cleanup();
+void netdata_ssl_initialize_ctx(int selector);
 int security_test_certificate(SSL *ssl);
-SSL_CTX * security_create_openssl_client(unsigned long mode);
+SSL_CTX * netdata_ssl_create_client_ctx(unsigned long mode);
 
-void security_log_ssl_error_queue(const char *call);
+bool netdata_ssl_connect(struct netdata_ssl *ssl);
+void netdata_ssl_accept(struct netdata_ssl *ssl, int msg);
+
+bool netdata_ssl_open(struct netdata_ssl *ssl, SSL_CTX *ctx, int fd);
+void netdata_ssl_close(struct netdata_ssl *ssl);
+void netdata_ssl_log_error_queue(const char *call, struct netdata_ssl *ssl);
+
+ssize_t netdata_ssl_read(struct netdata_ssl *ssl, void *buf, size_t num);
+ssize_t netdata_ssl_write(struct netdata_ssl *ssl, const void *buf, size_t num);
 
 # endif //ENABLE_HTTPS
 #endif //NETDATA_SECURITY_H
