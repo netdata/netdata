@@ -1771,11 +1771,11 @@ static inline void substitute_dots_in_id(char *s) {
 
 char *cgroup_parse_resolved_name_and_labels(DICTIONARY *labels, char *data) {
     // the first word, up to the first space is the name
-    char *name = mystrsep(&data, " ");
+    char *name = strsep_skip_consecutive_separators(&data, " ");
 
     // the rest are key=value pairs separated by comma
     while(data) {
-        char *pair = mystrsep(&data, ",");
+        char *pair = strsep_skip_consecutive_separators(&data, ",");
         rrdlabels_add_pair(labels, pair, RRDLABEL_SRC_AUTO| RRDLABEL_SRC_K8S);
     }
 
@@ -1952,7 +1952,7 @@ static void is_cgroup_procs_exist(netdata_ebpf_cgroup_shm_body_t *out, char *id)
 }
 
 static inline void convert_cgroup_to_systemd_service(struct cgroup *cg) {
-    char buffer[CGROUP_CHARTID_LINE_MAX];
+    char buffer[CGROUP_CHARTID_LINE_MAX + 1];
     cg->options |= CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE;
     strncpyz(buffer, cg->id, CGROUP_CHARTID_LINE_MAX);
     char *s = buffer;
@@ -2607,7 +2607,7 @@ static inline void discovery_process_first_time_seen_cgroup(struct cgroup *cg) {
     }
     cg->first_time_seen = 0;
 
-    char comm[TASK_COMM_LEN];
+    char comm[TASK_COMM_LEN + 1];
 
     if (cg->container_orchestrator == CGROUPS_ORCHESTRATOR_UNSET) {
         if (strstr(cg->id, "kubepods")) {
@@ -4790,6 +4790,7 @@ static void cgroup_main_cleanup(void *ptr) {
     }
 
     if (shm_cgroup_ebpf.header) {
+        shm_cgroup_ebpf.header->cgroup_root_count = 0;
         munmap(shm_cgroup_ebpf.header, shm_cgroup_ebpf.header->body_length);
     }
 

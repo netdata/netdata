@@ -1,0 +1,4 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+mem.slabmemory,,a dimension per cache,B,"Memory Usage",line,,slabinfo.plugin,
+mem.slabfilling,,a dimension per cache,%,"Object Filling",line,,slabinfo.plugin,
+mem.slabwaste,,a dimension per cache,B,"Memory waste",line,,slabinfo.plugin,

@@ -9,13 +9,10 @@ The Cloud App lives at app.netdata.cloud which currently resolves to the followi
 - 54.198.178.11
 - 44.207.131.212
 - 44.196.50.41 
- 
-:::caution
 
-This list of IPs can change without notice, we strongly advise you to whitelist following domains `api.netdata.cloud`, `mqtt.netdata.cloud`, if
-this is not an option in your case always verify the current domain resolution (e.g via the `host` command).
-
-:::
+> ### Caution
+>
+>This list of IPs can change without notice, we strongly advise you to whitelist following domains `api.netdata.cloud`, `mqtt.netdata.cloud`, if this is not an option in your case always verify the current domain resolution (e.g via the `host` command).
 
 For a guide to connecting a node using the ACLK, plus additional troubleshooting and reference information, read our [connect to Cloud
 documentation](https://github.com/netdata/netdata/blob/master/claim/README.md).

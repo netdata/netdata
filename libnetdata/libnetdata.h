@@ -176,9 +176,7 @@ extern "C" {
 #include <stdint.h>
 #endif
 
-#ifdef NETDATA_WITH_ZLIB
 #include <zlib.h>
-#endif
 
 #ifdef HAVE_CAPABILITY
 #include <sys/capability.h>
@@ -491,11 +489,6 @@ typedef struct storage_point {
 void netdata_fix_chart_id(char *s);
 void netdata_fix_chart_name(char *s);
 
-void strreverse(char* begin, char* end);
-char *mystrsep(char **ptr, char *s);
-char *trim(char *s); // remove leading and trailing spaces; may return NULL
-char *trim_all(char *buffer); // like trim(), but also remove duplicate spaces inside the string; may return NULL
-
 int madvise_sequential(void *mem, size_t len);
 int madvise_random(void *mem, size_t len);
 int madvise_dontfork(void *mem, size_t len);
@@ -672,10 +665,10 @@ extern char *netdata_configured_host_prefix;
 #include "worker_utilization/worker_utilization.h"
 #include "parser/parser.h"
 #include "yaml.h"
+#include "http/http_defs.h"
 
-// BEWARE: Outside of the C code this also exists in alarm-notify.sh
-#define DEFAULT_CLOUD_BASE_URL "https://api.netdata.cloud"
-#define DEFAULT_CLOUD_UI_URL "https://app.netdata.cloud"
+// BEWARE: this exists in alarm-notify.sh
+#define DEFAULT_CLOUD_BASE_URL "https://app.netdata.cloud"
 
 #define RRD_STORAGE_TIERS 5
 
@@ -788,6 +781,7 @@ typedef enum {
 #endif
 void timing_action(TIMING_ACTION action, TIMING_STEP step);
 
+int hash256_string(const unsigned char *string, size_t size, char *hash);
 # ifdef __cplusplus
 }
 # endif

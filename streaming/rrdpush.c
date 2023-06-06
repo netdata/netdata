@@ -725,7 +725,7 @@ int rrdpush_receiver_too_busy_now(struct web_client *w) {
 }
 
 void *rrdpush_receiver_thread(void *ptr);
-int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
+int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_string) {
 
     if(!service_running(ABILITY_STREAMING_CONNECTIONS))
         return rrdpush_receiver_too_busy_now(w);
@@ -757,11 +757,11 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
 
     // parse the parameters and fill rpt and rpt->system_info
 
-    while(url) {
-        char *value = mystrsep(&url, "&");
+    while(decoded_query_string) {
+        char *value = strsep_skip_consecutive_separators(&decoded_query_string, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 

@@ -4,12 +4,12 @@ From the Cloud interface, you can manage your space's notification settings and 
 
 ## Prerequisites
 
-To add discord notification configurations you need
+To add webhook notification configurations you need:
 
 - A Netdata Cloud account
 - Access to the space as an **administrator**
 - Space needs to be on **Pro** plan or higher
-- Have an app that allows you to receive webhooks following a predefined schema, for mode details check [how to create the webhook service](#webhook-service)
+- Have an app that allows you to receive webhooks following a predefined schema, for more details check [how to create the webhook service](#webhook-service)
 
 ## Steps
 
@@ -24,8 +24,8 @@ To add discord notification configurations you need
       - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
    1. **Integration configuration** are the specific notification integration required settings, which vary by notification method. For webhook:
       - Webhook URL - webhook URL is the url of the service that Netdata will send notifications to. In order to keep the communication secured, we only accept HTTPS urls. Check [how to create the webhook service](#webhook-service).
-      - Extra headers - these are optional key-value pairs that you can set to be included in the HTTP requests sent to the webhook URL. For mode details check [Extra headers](#extra-headers)
-      - Authentication Mechanism - Netdata webhook integration supports 3 different authentication mechanisms. For mode details check [Authentication mechanisms](#authentication-mechanisms):
+      - Extra headers - these are optional key-value pairs that you can set to be included in the HTTP requests sent to the webhook URL. For more details check [Extra headers](#extra-headers)
+      - Authentication Mechanism - Netdata webhook integration supports 3 different authentication mechanisms. For more details check [Authentication mechanisms](#authentication-mechanisms):
          - Mutual TLS (recommended) - default authentication mechanism used if no other method is selected.
          - Basic - the client sends a request with an Authorization header that includes a base64-encoded string in the format **username:password**. These will settings will be required inputs.
          - Bearer - the client sends a request with an Authorization header that includes a **bearer token**. This setting will be a required input.
@@ -134,7 +134,7 @@ nsjoQAm6OwpTN5362vE9SYu1twz7KdzBlUkDhePEOgQkWfLHBJWwB+PvB1j/cUA3
 ```bash
 server {
     listen 443 ssl default_server;
-    
+
     # ... existing SSL configuration for server authentication ...
     ssl_verify_client on;
     ssl_client_certificate /path/to/Netdata_CA.pem;

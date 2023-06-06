@@ -1,0 +1,4 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+retroshare.bandwidth,,"Upload, Download",kilobits/s,RetroShare Bandwidth,area,,python.d.plugin,retroshare
+retroshare.peers,,"All friends, Connected friends",peers,RetroShare Peers,line,,python.d.plugin,retroshare
+retroshare.dht,,"DHT nodes estimated, RS nodes estimated",peers,Retroshare DHT,line,,python.d.plugin,retroshare

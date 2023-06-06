@@ -1,0 +1,51 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+system.cpu,,"user, nice, system, idle",percentage,"Total CPU utilization",stacked,,macos.plugin,mach_smi
+system.ram,,"active, wired, throttled, compressor, inactive, purgeable, speculative, free",MiB,"System RAM",stacked,,macos.plugin,mach_smi
+system.swapio,,"io, out",KiB/s,"Swap I/O",area,,macos.plugin,mach_smi
+mem.pgfaults,,"memory, cow, pagein, pageout, compress, decompress, zero_fill, reactivate, purge",faults/s,"Memory Page Faults",line,,macos.plugin,mach_smi
+system.load,,"load1, load5, load15",load,"System Load Average",line,,macos.plugin,sysctl
+system.swap,,"free, used",MiB,"System Swap",stacked,,macos.plugin,sysctl
+system.ipv4,,"received, sent",kilobits/s,"IPv4 Bandwidth",area,,macos.plugin,sysctl
+ipv4.tcppackets,,"received, sent",packets/s,"IPv4 TCP Packets",line,,macos.plugin,sysctl
+ipv4.tcperrors,,"InErrs, InCsumErrors, RetransSegs",packets/s,"IPv4 TCP Errors",line,,macos.plugin,sysctl
+ipv4.tcphandshake,,"EstabResets, ActiveOpens, PassiveOpens, AttemptFails",events/s,"IPv4 TCP Handshake Issues",line,,macos.plugin,sysctl
+ipv4.tcpconnaborts,,"baddata, userclosed, nomemory, timeout",connections/s,"TCP Connection Aborts",line,,macos.plugin,sysctl
+ipv4.tcpofo,,inqueue,packets/s,"TCP Out-Of-Order Queue",line,,macos.plugin,sysctl
+ipv4.tcpsyncookies,,"received, sent, failed",packets/s,"TCP SYN Cookies",line,,macos.plugin,sysctl
+ipv4.ecnpkts,,"CEP, NoECTP",packets/s,"IPv4 ECN Statistics",line,,macos.plugin,sysctl
+ipv4.udppackets,,"received, sent",packets/s,"IPv4 UDP Packets",line,,macos.plugin,sysctl
+ipv4.udperrors,,"RcvbufErrors, InErrors, NoPorts, InCsumErrors, IgnoredMulti",events/s,"IPv4 UDP Errors",line,,macos.plugin,sysctl
+ipv4.icmp,,"received, sent",packets/s,"IPv4 ICMP Packets",line,,macos.plugin,sysctl
+ipv4.icmp_errors,,"InErrors, OutErrors, InCsumErrors",packets/s,"IPv4 ICMP Errors",line,,macos.plugin,sysctl
+ipv4.icmpmsg,,"InEchoReps, OutEchoReps, InEchos, OutEchos",packets/s,"IPv4 ICMP Messages",line,,macos.plugin,sysctl
+ipv4.packets,,"received, sent, forwarded, delivered",packets/s,"IPv4 Packets",line,,macos.plugin,sysctl
+ipv4.fragsout,,"ok, failed, created",packets/s,"IPv4 Fragments Sent",line,,macos.plugin,sysctl
+ipv4.fragsin,,"ok, failed, all",packets/s,"IPv4 Fragments Reassembly",line,,macos.plugin,sysctl
+ipv4.errors,,"InDiscards, OutDiscards, InHdrErrors, OutNoRoutes, InAddrErrors, InUnknownProtos",packets/s,"IPv4 Errors",line,,macos.plugin,sysctl
+ipv6.packets,,"received, sent, forwarded, delivers",packets/s,"IPv6 Packets",line,,macos.plugin,sysctl
+ipv6.fragsout,,"ok, failed, all",packets/s,"IPv6 Fragments Sent",line,,macos.plugin,sysctl
+ipv6.fragsin,,"ok, failed, timeout, all",packets/s,"IPv6 Fragments Reassembly",line,,macos.plugin,sysctl
+ipv6.errors,,"InDiscards, OutDiscards, InHdrErrors, InAddrErrors, InTruncatedPkts, InNoRoutes, OutNoRoutes",packets/s,"IPv6 Errors",line,,macos.plugin,sysctl
+ipv6.icmp,,"received, sent",messages/s,"IPv6 ICMP Messages",line,,macos.plugin,sysctl
+ipv6.icmpredir,,"received, sent",redirects/s,"IPv6 ICMP Redirects",line,,macos.plugin,sysctl
+ipv6.icmperrors,,"InErrors, OutErrors, InCsumErrors, InDestUnreachs, InPktTooBigs, InTimeExcds, InParmProblems, OutDestUnreachs, OutTimeExcds, OutParmProblems",errors/s,"IPv6 ICMP Errors",line,,macos.plugin,sysctl
+ipv6.icmpechos,,"InEchos, OutEchos, InEchoReplies, OutEchoReplies",messages/s,"IPv6 ICMP Echo",line,,macos.plugin,sysctl
+ipv6.icmprouter,,"InSolicits, OutSolicits, InAdvertisements, OutAdvertisements",messages/s,"IPv6 Router Messages",line,,macos.plugin,sysctl
+ipv6.icmpneighbor,,"InSolicits, OutSolicits, InAdvertisements, OutAdvertisements",messages/s,"IPv6 Neighbor Messages",line,,macos.plugin,sysctl
+ipv6.icmptypes,,"InType1, InType128, InType129, InType136, OutType1, OutType128, OutType129, OutType133, OutType135, OutType143",messages/s,"IPv6 ICMP Types",line,,macos.plugin,sysctl
+system.uptime,,uptime,seconds,"System Uptime",line,,macos.plugin,sysctl
+disk.io,disk,"read, writes",KiB/s,"Disk I/O Bandwidth",area,,macos.plugin,iokit
+disk.ops,disk,"read, writes",operations/s,"Disk Completed I/O Operations",line,,macos.plugin,iokit
+disk.util,disk,utilization,% of time working,"Disk Utilization Time",area,,macos.plugin,iokit
+disk.iotime,disk,"reads, writes",milliseconds/s,"Disk Total I/O Time",line,,macos.plugin,iokit
+disk.await,disk,"reads, writes",milliseconds/operation,"Average Completed I/O Operation Time",line,,macos.plugin,iokit
+disk.avgsz,disk,"reads, writes",KiB/operation,"Average Completed I/O Operation Bandwidth",line,,macos.plugin,iokit
+disk.svctm,disk,svctm,milliseconds/operation,"Average Service Time",line,,macos.plugin,iokit
+system.io,,"in, out",KiB/s,"Disk I/O",area,,macos.plugin,iokit
+disk.space,mount point,"avail, used, reserved_for_root",GiB,"Disk Space Usage for {mounted dir} [{mounted filesystem}]",stacked,,macos.plugin,iokit
+disk.inodes,mount point,"avail, used, reserved_for_root",inodes,"Disk Files (inodes) Usage for {mounted dir} [{mounted filesystem}]",stacked,,macos.plugin,iokit
+net.net,network device,"received, sent",kilobits/s,"Bandwidth",area,,macos.plugin,iokit
+net.packets,network device,"received, sent, multicast_received, multicast_sent",packets/s,"Packets",line,,macos.plugin,iokit
+net.errors,network device,"inbound, outbound",errors/s,"Interface Errors",line,,macos.plugin,iokit
+net.drops,network device,inbound,drops/s,"Interface Drops",line,,macos.plugin,iokit
+net.events,network device,"frames, collisions, carrier",events/s,"Network Interface Events",line,,macos.plugin,iokit

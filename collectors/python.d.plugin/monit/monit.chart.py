@@ -99,7 +99,7 @@ CHARTS = {
         'lines': []
     },
     'process_children': {
-        'options': ['processes childrens', 'Child processes', 'childrens', 'applications',
+        'options': ['processes childrens', 'Child processes', 'children', 'applications',
                     'monit.process_childrens', 'line'],
         'lines': []
     },

@@ -4,7 +4,7 @@ From the Cloud interface, you can manage your space's notification settings and 
 
 ## Prerequisites
 
-To add Opsgenie notification configurations you need
+To add Opsgenie notification configurations you need:
 
 - A Netdata Cloud account
 - Access to the space as an **administrator**

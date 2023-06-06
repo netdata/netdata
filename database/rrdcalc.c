@@ -369,6 +369,10 @@ static inline bool rrdcalc_check_if_it_matches_rrdset(RRDCALC *rc, RRDSET *st) {
             st->rrdhost->rrdlabels, rc->host_labels_pattern, '=', NULL))
         return false;
 
+    if (st->rrdlabels && rc->chart_labels_pattern && !rrdlabels_match_simple_pattern_parsed(
+            st->rrdlabels, rc->chart_labels_pattern, '=', NULL))
+        return false;
+
     return true;
 }
 
@@ -605,11 +609,13 @@ static void rrdcalc_free_internals(RRDCALC *rc) {
     string_freez(rc->host_labels);
     string_freez(rc->module_match);
     string_freez(rc->plugin_match);
+    string_freez(rc->chart_labels);
 
     simple_pattern_free(rc->foreach_dimension_pattern);
     simple_pattern_free(rc->host_labels_pattern);
     simple_pattern_free(rc->module_pattern);
     simple_pattern_free(rc->plugin_pattern);
+    simple_pattern_free(rc->chart_labels_pattern);
 }
 
 static void rrdcalc_rrdhost_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdcalc, void *rrdhost __maybe_unused) {

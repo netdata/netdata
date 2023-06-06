@@ -1,12 +1,12 @@
-# Nodes view
+# Nodes tab
 
-The Nodes view lets you see and customize key metrics from any number of Agent-monitored nodes and seamlessly navigate
+The Nodes tab lets you see and customize key metrics from any number of Agent-monitored nodes and seamlessly navigate
 to any node's dashboard for troubleshooting performance issues or anomalies using Netdata's highly-granular metrics.
 
-![The Nodes view in Netdata
+![The Nodes tab in Netdata
 Cloud](https://user-images.githubusercontent.com/1153921/119035218-2eebb700-b964-11eb-8b74-4ec2df0e457c.png)
 
-Each War Room's Nodes view is populated based on the nodes you added to that specific War Room. Each node occupies a
+Each War Room's Nodes tab is populated based on the nodes you added to that specific War Room. Each node occupies a
 single row, first featuring that node's alarm status (yellow for warnings, red for critical alarms) and operating
 system, some essential information about the node, followed by columns of user-defined key metrics represented in
 real-time charts.

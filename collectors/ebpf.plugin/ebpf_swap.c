@@ -7,12 +7,10 @@ static char *swap_dimension_name[NETDATA_SWAP_END] = { "read", "write" };
 static netdata_syscall_stat_t swap_aggregated_data[NETDATA_SWAP_END];
 static netdata_publish_syscall_t swap_publish_aggregated[NETDATA_SWAP_END];
 
-netdata_publish_swap_t *swap_vector = NULL;
-
 static netdata_idx_t swap_hash_values[NETDATA_SWAP_END];
 static netdata_idx_t *swap_values = NULL;
 
-netdata_publish_swap_t **swap_pid = NULL;
+netdata_publish_swap_t *swap_vector = NULL;
 
 struct config swap_config = { .first_section = NULL,
     .last_section = NULL,
@@ -23,26 +21,38 @@ struct config swap_config = { .first_section = NULL,
 static ebpf_local_maps_t swap_maps[] = {{.name = "tbl_pid_swap", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
                                          .user_input = 0,
                                          .type = NETDATA_EBPF_MAP_RESIZABLE | NETDATA_EBPF_MAP_PID,
-                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                         .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
+                                        },
                                         {.name = "swap_ctrl", .internal_input = NETDATA_CONTROLLER_END,
                                          .user_input = 0,
                                          .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                         .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                        },
                                         {.name = "tbl_swap", .internal_input = NETDATA_SWAP_END,
                                          .user_input = 0,
                                          .type = NETDATA_EBPF_MAP_STATIC,
-                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
-                                        {.name = NULL, .internal_input = 0, .user_input = 0}};
+                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                         .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                        },
+                                        {.name = NULL, .internal_input = 0, .user_input = 0,
+#ifdef LIBBPF_MAJOR_VERSION
+                                         .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                        }};
 
 netdata_ebpf_targets_t swap_targets[] = { {.name = "swap_readpage", .mode = EBPF_LOAD_TRAMPOLINE},
                                            {.name = "swap_writepage", .mode = EBPF_LOAD_TRAMPOLINE},
                                            {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 #ifdef LIBBPF_MAJOR_VERSION
-#include "includes/swap.skel.h" // BTF code
-
-static struct swap_bpf *bpf_obj = NULL;
-
 /**
  * Disable probe
  *
@@ -139,17 +149,21 @@ static void ebpf_swap_set_hash_tables(struct swap_bpf *obj)
 }
 
 /**
- * Adjust Map Size
+ * Adjust Map
  *
  * Resize maps according input from users.
  *
  * @param obj is the main structure for bpf objects.
  * @param em  structure with configuration
  */
-static void ebpf_swap_adjust_map_size(struct swap_bpf *obj, ebpf_module_t *em)
+static void ebpf_swap_adjust_map(struct swap_bpf *obj, ebpf_module_t *em)
 {
     ebpf_update_map_size(obj->maps.tbl_pid_swap, &swap_maps[NETDATA_PID_SWAP_TABLE],
                          em, bpf_map__name(obj->maps.tbl_pid_swap));
+
+    ebpf_update_map_type(obj->maps.tbl_pid_swap, &swap_maps[NETDATA_PID_SWAP_TABLE]);
+    ebpf_update_map_type(obj->maps.tbl_swap, &swap_maps[NETDATA_SWAP_GLOBAL_TABLE]);
+    ebpf_update_map_type(obj->maps.swap_ctrl, &swap_maps[NETDATA_SWAP_CONTROLLER]);
 }
 
 /**
@@ -188,7 +202,7 @@ static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t 
         ebpf_swap_disable_trampoline(obj);
     }
 
-    ebpf_swap_adjust_map_size(obj, em);
+    ebpf_swap_adjust_map(obj, em);
 
     if (!em->apps_charts && !em->cgroup_charts)
         ebpf_swap_disable_release_task(obj);
@@ -224,21 +238,11 @@ static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t 
  */
 static void ebpf_swap_free(ebpf_module_t *em)
 {
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-
-    ebpf_cleanup_publish_syscall(swap_publish_aggregated);
-
     freez(swap_vector);
     freez(swap_values);
 
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        swap_bpf__destroy(bpf_obj);
-#endif
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -267,10 +271,11 @@ static void ebpf_swap_exit(void *ptr)
  * Sum all values read from kernel and store in the first address.
  *
  * @param out the vector with read values.
+ * @param maps_per_core do I need to read all cores?
  */
-static void swap_apps_accumulator(netdata_publish_swap_t *out)
+static void swap_apps_accumulator(netdata_publish_swap_t *out, int maps_per_core)
 {
-    int i, end = (running_on_kernel >= NETDATA_KERNEL_V4_15) ? ebpf_nprocs : 1;
+    int i, end = (maps_per_core) ? ebpf_nprocs : 1;
     netdata_publish_swap_t *total = &out[0];
     for (i = 1; i < end; i++) {
         netdata_publish_swap_t *w = &out[i];
@@ -302,13 +307,17 @@ static void swap_fill_pid(uint32_t current_pid, netdata_publish_swap_t *publish)
  * Update cgroup
  *
  * Update cgroup data based in
+ *
+ * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_update_swap_cgroup()
+static void ebpf_update_swap_cgroup(int maps_per_core)
 {
     ebpf_cgroup_target_t *ect ;
     netdata_publish_swap_t *cv = swap_vector;
     int fd = swap_maps[NETDATA_PID_SWAP_TABLE].map_fd;
-    size_t length = sizeof(netdata_publish_swap_t)*ebpf_nprocs;
+    size_t length = sizeof(netdata_publish_swap_t);
+    if (maps_per_core)
+        length *= ebpf_nprocs;
     pthread_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
@@ -322,9 +331,12 @@ static void ebpf_update_swap_cgroup()
             } else {
                 memset(cv, 0, length);
                 if (!bpf_map_lookup_elem(fd, &pid, cv)) {
-                    swap_apps_accumulator(cv);
+                    swap_apps_accumulator(cv, maps_per_core);
 
                     memcpy(out, cv, sizeof(netdata_publish_swap_t));
+
+                    // We are cleaning to avoid passing data read from one process to other.
+                    memset(cv, 0, length);
                 }
             }
         }
@@ -336,14 +348,18 @@ static void ebpf_update_swap_cgroup()
  * Read APPS table
  *
  * Read the apps table and store data inside the structure.
+ *
+ * @param maps_per_core do I need to read all cores?
  */
-static void read_apps_table()
+static void read_swap_apps_table(int maps_per_core)
 {
     netdata_publish_swap_t *cv = swap_vector;
     uint32_t key;
     struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     int fd = swap_maps[NETDATA_PID_SWAP_TABLE].map_fd;
-    size_t length = sizeof(netdata_publish_swap_t)*ebpf_nprocs;
+    size_t length = sizeof(netdata_publish_swap_t);
+    if (maps_per_core)
+        length *= ebpf_nprocs;
     while (pids) {
         key = pids->pid;
 
@@ -352,7 +368,7 @@ static void read_apps_table()
             continue;
         }
 
-        swap_apps_accumulator(cv);
+        swap_apps_accumulator(cv, maps_per_core);
 
         swap_fill_pid(key, cv);
 
@@ -381,8 +397,10 @@ static void swap_send_global()
  * Read global counter
  *
  * Read the table with number of calls to all functions
+ *
+ * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_swap_read_global_table()
+static void ebpf_swap_read_global_table(int maps_per_core)
 {
     netdata_idx_t *stored = swap_values;
     netdata_idx_t *val = swap_hash_values;
@@ -392,7 +410,7 @@ static void ebpf_swap_read_global_table()
     for (i = NETDATA_KEY_SWAP_READPAGE_CALL; i < end; i++) {
         if (!bpf_map_lookup_elem(fd, &i, stored)) {
             int j;
-            int last = ebpf_nprocs;
+            int last = (maps_per_core) ? ebpf_nprocs : 1;
             netdata_idx_t total = 0;
             for (j = 0; j < last; j++)
                 total += stored[j];
@@ -662,6 +680,7 @@ static void swap_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
     int counter = update_every - 1;
+    int maps_per_core = em->maps_per_core;
     while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_exit_plugin || ++counter != update_every)
@@ -669,13 +688,13 @@ static void swap_collector(ebpf_module_t *em)
 
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
-        ebpf_swap_read_global_table();
+        ebpf_swap_read_global_table(maps_per_core);
         pthread_mutex_lock(&collect_data_mutex);
         if (apps)
-            read_apps_table();
+            read_swap_apps_table(maps_per_core);
 
         if (cgroup)
-            ebpf_update_swap_cgroup();
+            ebpf_update_swap_cgroup(maps_per_core);
 
         pthread_mutex_lock(&lock);
 
@@ -768,7 +787,7 @@ static void ebpf_create_swap_charts(int update_every)
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
-                      202,
+                      NETDATA_CHART_PRIO_SYSTEM_SWAP_CALLS,
                       ebpf_create_global_dimension,
                       swap_publish_aggregated, NETDATA_SWAP_END,
                       update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
@@ -783,6 +802,10 @@ static void ebpf_create_swap_charts(int update_every)
  */
 static int ebpf_swap_load_bpf(ebpf_module_t *em)
 {
+#ifdef LIBBPF_MAJOR_VERSION
+    ebpf_define_map_type(em->maps, em->maps_per_core, running_on_kernel);
+#endif
+
     int ret = 0;
     ebpf_adjust_apps_cgroup(em, em->targets[NETDATA_KEY_SWAP_READPAGE_CALL].mode);
     if (em->load & EBPF_LOAD_LEGACY) {
@@ -829,7 +852,6 @@ void *ebpf_swap_thread(void *ptr)
     ebpf_adjust_thread_load(em, default_btf);
 #endif
    if (ebpf_swap_load_bpf(em)) {
-       em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endswap;
     }
 

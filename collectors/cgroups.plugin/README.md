@@ -120,8 +120,9 @@ container names. To do this, ensure `podman system service` is running and Netda
 to `/run/podman/podman.sock` (the default permissions as specified by upstream are `0600`, with owner `root`, so you
 will have to adjust the configuration).
 
-[docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy) can also be used to give Netdata restricted
-access to the socket. Note that `PODMAN_HOST` in Netdata's environment should be set to the proxy's URL in this case.
+[Docker Socket Proxy (HAProxy)](https://github.com/Tecnativa/docker-socket-proxy) or [CetusGuard](https://github.com/hectorm/cetusguard)
+can also be used to give Netdata restricted access to the socket. Note that `PODMAN_HOST` in Netdata's environment should
+be set to the proxy's URL in this case.
 
 ### Charts with zero metrics
 

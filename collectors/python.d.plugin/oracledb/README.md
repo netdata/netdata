@@ -13,8 +13,7 @@ Monitors the performance and health metrics of the Oracle database.
 
 ## Requirements
 
--   `cx_Oracle` package.
--   Oracle Client (using `cx_Oracle` requires Oracle Client libraries to be installed).
+-   `oracledb` package.
 
 It produces following charts:
 
@@ -53,18 +52,13 @@ It produces following charts:
 
 To use the Oracle module do the following:
 
-1.  Install `cx_Oracle` package ([link](https://cx-oracle.readthedocs.io/en/latest/user_guide/installation.html)).
+1.  Install `oracledb` package ([link](https://python-oracledb.readthedocs.io/en/latest/user_guide/installation.html)).
 
-2.  Install Oracle Client libraries
-    ([link](https://cx-oracle.readthedocs.io/en/latest/user_guide/installation.html#install-oracle-client)).
-
-3.  Create a read-only `netdata` user with proper access to your Oracle Database Server.
+2.  Create a read-only `netdata` user with proper access to your Oracle Database Server.
 
 Connect to your Oracle database with an administrative user and execute:
 
-```
-ALTER SESSION SET "_ORACLE_SCRIPT"=true;
-
+```SQL
 CREATE USER netdata IDENTIFIED BY <PASSWORD>;
 
 GRANT CONNECT TO netdata;
@@ -87,6 +81,7 @@ local:
   password: 'secret'
   server: 'localhost:1521'
   service: 'XE'
+
 
 remote:
   user: 'netdata'

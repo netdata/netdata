@@ -18,7 +18,7 @@ struct web_api_command {
 
 struct web_client;
 
-int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url, struct web_api_command *api_commands);
+int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_path_endpoint, struct web_api_command *api_commands);
 
 static inline void fix_google_param(char *s) {
     if(unlikely(!s || !*s)) return;

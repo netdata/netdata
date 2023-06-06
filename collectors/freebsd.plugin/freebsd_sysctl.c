@@ -1618,7 +1618,7 @@ int do_net_isr(int update_every, usec_t dt) {
                         all_softnet_charts[i].netisr_cpuid,
                         NULL,
                         "softnet_stat",
-                        NULL,
+                        "cpu.softnet_stat",
                         "Per CPU netisr statistics",
                         "events/s",
                         "freebsd.plugin",

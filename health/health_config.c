@@ -32,6 +32,7 @@
 #define HEALTH_REPEAT_KEY "repeat"
 #define HEALTH_HOST_LABEL_KEY "host labels"
 #define HEALTH_FOREACH_KEY "foreach"
+#define HEALTH_CHART_LABEL_KEY "chart labels"
 
 static inline int health_parse_delay(
         size_t line, const char *filename, char *string,
@@ -190,6 +191,49 @@ static inline int isvariableterm(const char s) {
         return 0;
 
     return 1;
+}
+
+// If needed, add a prefix key to all possible values in the range
+static inline char *health_config_add_key_to_values(char *value) {
+    BUFFER *wb = buffer_create(HEALTH_CONF_MAX_LINE + 1, NULL);
+    char key[HEALTH_CONF_MAX_LINE + 1];
+    char data[HEALTH_CONF_MAX_LINE + 1];
+
+    char *s = value;
+    size_t i = 0;
+
+    while(*s) {
+        if (*s == '=') {
+            //hold the key
+            data[i]='\0';
+            strncpyz(key, data, HEALTH_CONF_MAX_LINE);
+            i=0;
+        } else if (*s == ' ') {
+            data[i]='\0';
+            if (data[0]=='!')
+                buffer_snprintf(wb, HEALTH_CONF_MAX_LINE, "!%s=%s ", key, data + 1);
+            else
+                buffer_snprintf(wb, HEALTH_CONF_MAX_LINE, "%s=%s ", key, data);
+            i=0;
+        } else {
+            data[i++] = *s;
+        }
+        s++;
+    }
+
+    data[i]='\0';
+    if (data[0]) {
+        if (data[0]=='!')
+            buffer_snprintf(wb, HEALTH_CONF_MAX_LINE, "!%s=%s ", key, data + 1);
+        else
+            buffer_snprintf(wb, HEALTH_CONF_MAX_LINE, "%s=%s ", key, data);
+    }
+
+    char *final = mallocz(HEALTH_CONF_MAX_LINE + 1);
+    strncpyz(final, buffer_tostring(wb), HEALTH_CONF_MAX_LINE);
+    buffer_free(wb);
+
+    return final;
 }
 
 static inline void parse_variables_and_store_in_health_rrdvars(char *value, size_t len) {
@@ -453,6 +497,7 @@ static inline void alert_config_free(struct alert_config *cfg)
     string_freez(cfg->host_labels);
     string_freez(cfg->p_db_lookup_dimensions);
     string_freez(cfg->p_db_lookup_method);
+    string_freez(cfg->chart_labels);
     freez(cfg);
 }
 
@@ -489,7 +534,8 @@ static int health_readfile(const char *filename, void *data) {
             hash_delay = 0,
             hash_options = 0,
             hash_repeat = 0,
-            hash_host_label = 0;
+            hash_host_label = 0,
+            hash_chart_label = 0;
 
     char buffer[HEALTH_CONF_MAX_LINE + 1];
 
@@ -521,6 +567,7 @@ static int health_readfile(const char *filename, void *data) {
         hash_options = simple_uhash(HEALTH_OPTIONS_KEY);
         hash_repeat = simple_uhash(HEALTH_REPEAT_KEY);
         hash_host_label = simple_uhash(HEALTH_HOST_LABEL_KEY);
+        hash_chart_label = simple_uhash(HEALTH_CHART_LABEL_KEY);
     }
 
     FILE *fp = fopen(filename, "r");
@@ -937,6 +984,27 @@ static int health_readfile(const char *filename, void *data) {
                 rc->module_match = string_strdupz(value);
                 rc->module_pattern = simple_pattern_create(rrdcalc_module_match(rc), NULL, SIMPLE_PATTERN_EXACT, true);
             }
+            else if(hash == hash_chart_label && !strcasecmp(key, HEALTH_CHART_LABEL_KEY)) {
+                alert_cfg->chart_labels = string_strdupz(value);
+                if(rc->chart_labels) {
+                    if(strcmp(rrdcalc_chart_labels(rc), value) != 0)
+                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'.",
+                              line, filename, rrdcalc_name(rc), key, value, value);
+
+                    string_freez(rc->chart_labels);
+                    simple_pattern_free(rc->chart_labels_pattern);
+                }
+
+                {
+                    char *tmp = simple_pattern_trim_around_equal(value);
+                    char *tmp_2 = health_config_add_key_to_values(tmp);
+                    rc->chart_labels = string_strdupz(tmp_2);
+                    freez(tmp);
+                    freez(tmp_2);
+                }
+                rc->chart_labels_pattern = simple_pattern_create(rrdcalc_chart_labels(rc), NULL, SIMPLE_PATTERN_EXACT,
+                                                                true);
+            }
             else {
                 error("Health configuration at line %zu of file '%s' for alarm '%s' has unknown key '%s'.",
                         line, filename, rrdcalc_name(rc), key);
@@ -1186,7 +1254,29 @@ static int health_readfile(const char *filename, void *data) {
                     rt->host_labels = string_strdupz(tmp);
                     freez(tmp);
                 }
+
                 rt->host_labels_pattern = simple_pattern_create(rrdcalctemplate_host_labels(rt), NULL,
+                                                                SIMPLE_PATTERN_EXACT, true);
+            }
+            else if(hash == hash_chart_label && !strcasecmp(key, HEALTH_CHART_LABEL_KEY)) {
+                alert_cfg->chart_labels = string_strdupz(value);
+                if(rt->chart_labels) {
+                    if(strcmp(rrdcalctemplate_chart_labels(rt), value) != 0)
+                        error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                              line, filename, rrdcalctemplate_name(rt), key, rrdcalctemplate_chart_labels(rt), value, value);
+
+                    string_freez(rt->chart_labels);
+                    simple_pattern_free(rt->chart_labels_pattern);
+                }
+
+                {
+                    char *tmp = simple_pattern_trim_around_equal(value);
+                    char *tmp_2 = health_config_add_key_to_values(tmp);
+                    rt->chart_labels = string_strdupz(tmp_2);
+                    freez(tmp);
+                    freez(tmp_2);
+                }
+                rt->chart_labels_pattern = simple_pattern_create(rrdcalctemplate_chart_labels(rt), NULL,
                                                                 SIMPLE_PATTERN_EXACT, true);
             }
             else {

@@ -7,6 +7,7 @@ SUBDIRS = \
     api \
     gui \
     server \
+    rtc \
     $(NULL)
 
 usersslconfigdir=$(configdir)/ssl

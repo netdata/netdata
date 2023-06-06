@@ -3,16 +3,11 @@
 #include "ebpf.h"
 #include "ebpf_dcstat.h"
 
-// ----------------------------------------------------------------------------
-// ARAL vectors used to speed up processing
-ARAL *ebpf_aral_dcstat_pid = NULL;
-
 static char *dcstat_counter_dimension_name[NETDATA_DCSTAT_IDX_END] = { "ratio", "reference", "slow", "miss" };
 static netdata_syscall_stat_t dcstat_counter_aggregated_data[NETDATA_DCSTAT_IDX_END];
 static netdata_publish_syscall_t dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_END];
 
 netdata_dcstat_pid_t *dcstat_vector = NULL;
-netdata_publish_dcstat_t **dcstat_pid = NULL;
 
 static netdata_idx_t dcstat_hash_values[NETDATA_DCSTAT_IDX_END];
 static netdata_idx_t *dcstat_values = NULL;
@@ -24,19 +19,35 @@ struct config dcstat_config = { .first_section = NULL,
         .rwlock = AVL_LOCK_INITIALIZER } };
 
 ebpf_local_maps_t dcstat_maps[] = {{.name = "dcstat_global", .internal_input = NETDATA_DIRECTORY_CACHE_END,
-                                           .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
-                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
-                                          {.name = "dcstat_pid", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
-                                           .user_input = 0,
-                                           .type = NETDATA_EBPF_MAP_RESIZABLE | NETDATA_EBPF_MAP_PID,
-                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
-                                          {.name = "dcstat_ctrl", .internal_input = NETDATA_CONTROLLER_END,
-                                           .user_input = 0,
-                                           .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
-                                          {.name = NULL, .internal_input = 0, .user_input = 0,
-                                           .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
+                                    .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                    .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                    .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                   },
+                                   {.name = "dcstat_pid", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
+                                    .user_input = 0,
+                                    .type = NETDATA_EBPF_MAP_RESIZABLE | NETDATA_EBPF_MAP_PID,
+                                    .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                    .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
+                                   },
+                                   {.name = "dcstat_ctrl", .internal_input = NETDATA_CONTROLLER_END,
+                                    .user_input = 0,
+                                    .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                    .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                    .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                   },
+                                   {.name = NULL, .internal_input = 0, .user_input = 0,
+                                    .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                    .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                    .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                    }};
 
 static ebpf_specify_name_t dc_optional_name[] = { {.program_name = "netdata_lookup_fast",
                                                    .function_to_attach = "lookup_fast",
@@ -49,10 +60,6 @@ netdata_ebpf_targets_t dc_targets[] = { {.name = "lookup_fast", .mode = EBPF_LOA
                                         {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 #ifdef LIBBPF_MAJOR_VERSION
-#include "includes/dc.skel.h" // BTF code
-
-static struct dc_bpf *bpf_obj = NULL;
-
 /**
  * Disable probe
  *
@@ -147,10 +154,14 @@ static int ebpf_dc_attach_probes(struct dc_bpf *obj)
  * @param obj is the main structure for bpf objects.
  * @param em  structure with configuration
  */
-static void ebpf_dc_adjust_map_size(struct dc_bpf *obj, ebpf_module_t *em)
+static void ebpf_dc_adjust_map(struct dc_bpf *obj, ebpf_module_t *em)
 {
     ebpf_update_map_size(obj->maps.dcstat_pid, &dcstat_maps[NETDATA_DCSTAT_PID_STATS],
                          em, bpf_map__name(obj->maps.dcstat_pid));
+
+    ebpf_update_map_type(obj->maps.dcstat_global, &dcstat_maps[NETDATA_DCSTAT_GLOBAL_STATS]);
+    ebpf_update_map_type(obj->maps.dcstat_pid, &dcstat_maps[NETDATA_DCSTAT_PID_STATS]);
+    ebpf_update_map_type(obj->maps.dcstat_ctrl, &dcstat_maps[NETDATA_DCSTAT_CTRL]);
 }
 
 /**
@@ -224,7 +235,7 @@ static inline int ebpf_dc_load_and_attach(struct dc_bpf *obj, ebpf_module_t *em)
         ebpf_dc_disable_trampoline(obj);
     }
 
-    ebpf_dc_adjust_map_size(obj, em);
+    ebpf_dc_adjust_map(obj, em);
 
     if (!em->apps_charts && !em->cgroup_charts)
         ebpf_dc_disable_release_task(obj);
@@ -298,23 +309,16 @@ void ebpf_dcstat_clean_names()
 static void ebpf_dcstat_free(ebpf_module_t *em )
 {
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPING;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     freez(dcstat_vector);
     freez(dcstat_values);
 
-    ebpf_cleanup_publish_syscall(dcstat_counter_publish_aggregated);
-
     ebpf_dcstat_clean_names();
 
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        dc_bpf__destroy(bpf_obj);
-#endif
-
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -329,46 +333,6 @@ static void ebpf_dcstat_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     ebpf_dcstat_free(em);
-}
-
-/*****************************************************************
- *
- *  ARAL FUNCTIONS
- *
- *****************************************************************/
-
-/**
- * eBPF directory cache Aral init
- *
- * Initiallize array allocator that will be used when integration with apps is enabled.
- */
-static inline void ebpf_dcstat_aral_init()
-{
-    ebpf_aral_dcstat_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_DCSTAT_ARAL_NAME, sizeof(netdata_publish_dcstat_t));
-}
-
-/**
- * eBPF publish dcstat get
- *
- * Get a netdata_publish_dcstat_t entry to be used with a specific PID.
- *
- * @return it returns the address on success.
- */
-netdata_publish_dcstat_t *ebpf_publish_dcstat_get(void)
-{
-    netdata_publish_dcstat_t *target = aral_mallocz(ebpf_aral_dcstat_pid);
-    memset(target, 0, sizeof(netdata_publish_dcstat_t));
-    return target;
-}
-
-/**
- * eBPF dcstat release
- *
- * @param stat Release a target after usage.
- */
-void ebpf_dcstat_release(netdata_publish_dcstat_t *stat)
-{
-    aral_freez(ebpf_aral_dcstat_pid, stat);
 }
 
 /*****************************************************************
@@ -438,10 +402,11 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
  * Sum all values read from kernel and store in the first address.
  *
  * @param out the vector with read values.
+ * @param maps_per_core do I need to read all cores?
  */
-static void dcstat_apps_accumulator(netdata_dcstat_pid_t *out)
+static void dcstat_apps_accumulator(netdata_dcstat_pid_t *out, int maps_per_core)
 {
-    int i, end = (running_on_kernel >= NETDATA_KERNEL_V4_15) ? ebpf_nprocs : 1;
+    int i, end = (maps_per_core) ? ebpf_nprocs : 1;
     netdata_dcstat_pid_t *total = &out[0];
     for (i = 1; i < end; i++) {
         netdata_dcstat_pid_t *w = &out[i];
@@ -484,17 +449,22 @@ static void dcstat_fill_pid(uint32_t current_pid, netdata_dcstat_pid_t *publish)
 }
 
 /**
- * Read APPS table
+ * Read Directory Cache APPS table
  *
  * Read the apps table and store data inside the structure.
+ *
+ * @param maps_per_core do I need to read all cores?
  */
-static void read_apps_table()
+static void read_dc_apps_table(int maps_per_core)
 {
     netdata_dcstat_pid_t *cv = dcstat_vector;
     uint32_t key;
     struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     int fd = dcstat_maps[NETDATA_DCSTAT_PID_STATS].map_fd;
-    size_t length = sizeof(netdata_dcstat_pid_t)*ebpf_nprocs;
+    size_t length = sizeof(netdata_dcstat_pid_t);
+    if (maps_per_core)
+        length *= ebpf_nprocs;
+
     while (pids) {
         key = pids->pid;
 
@@ -503,7 +473,7 @@ static void read_apps_table()
             continue;
         }
 
-        dcstat_apps_accumulator(cv);
+        dcstat_apps_accumulator(cv, maps_per_core);
 
         dcstat_fill_pid(key, cv);
 
@@ -517,9 +487,11 @@ static void read_apps_table()
 /**
  * Update cgroup
  *
- * Update cgroup data based in
+ * Update cgroup data based in collected PID.
+ *
+ * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_update_dc_cgroup()
+static void ebpf_update_dc_cgroup(int maps_per_core)
 {
     netdata_dcstat_pid_t *cv = dcstat_vector;
     int fd = dcstat_maps[NETDATA_DCSTAT_PID_STATS].map_fd;
@@ -542,7 +514,7 @@ static void ebpf_update_dc_cgroup()
                     continue;
                 }
 
-                dcstat_apps_accumulator(cv);
+                dcstat_apps_accumulator(cv, maps_per_core);
 
                 memcpy(out, cv, sizeof(netdata_dcstat_pid_t));
             }
@@ -555,8 +527,10 @@ static void ebpf_update_dc_cgroup()
  * Read global table
  *
  * Read the table with number of calls for all functions
+ *
+ * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_dc_read_global_table()
+static void ebpf_dc_read_global_table(int maps_per_core)
 {
     uint32_t idx;
     netdata_idx_t *val = dcstat_hash_values;
@@ -566,7 +540,7 @@ static void ebpf_dc_read_global_table()
     for (idx = NETDATA_KEY_DC_REFERENCE; idx < NETDATA_DIRECTORY_CACHE_END; idx++) {
         if (!bpf_map_lookup_elem(fd, &idx, stored)) {
             int i;
-            int end = ebpf_nprocs;
+            int end = (maps_per_core) ? ebpf_nprocs: 1;
             netdata_idx_t total = 0;
             for (i = 0; i < end; i++)
                 total += stored[i];
@@ -1030,6 +1004,7 @@ static void dcstat_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
     int counter = update_every - 1;
+    int maps_per_core = em->maps_per_core;
     while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
 
@@ -1038,13 +1013,13 @@ static void dcstat_collector(ebpf_module_t *em)
 
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
-        ebpf_dc_read_global_table();
+        ebpf_dc_read_global_table(maps_per_core);
         pthread_mutex_lock(&collect_data_mutex);
         if (apps)
-            read_apps_table();
+            read_dc_apps_table(maps_per_core);
 
         if (cgroups)
-            ebpf_update_dc_cgroup();
+            ebpf_update_dc_cgroup(maps_per_core);
 
         pthread_mutex_lock(&lock);
 
@@ -1140,6 +1115,10 @@ static void ebpf_dcstat_allocate_global_vectors(int apps)
  */
 static int ebpf_dcstat_load_bpf(ebpf_module_t *em)
 {
+#ifdef LIBBPF_MAJOR_VERSION
+    ebpf_define_map_type(dcstat_maps, em->maps_per_core, running_on_kernel);
+#endif
+
     int ret = 0;
     ebpf_adjust_apps_cgroup(em, em->targets[NETDATA_DC_TARGET_LOOKUP_FAST].mode);
     if (em->load & EBPF_LOAD_LEGACY) {
@@ -1150,11 +1129,11 @@ static int ebpf_dcstat_load_bpf(ebpf_module_t *em)
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else {
-        bpf_obj = dc_bpf__open();
-        if (!bpf_obj)
+        dc_bpf_obj = dc_bpf__open();
+        if (!dc_bpf_obj)
             ret = -1;
         else
-            ret = ebpf_dc_load_and_attach(bpf_obj, em);
+            ret = ebpf_dc_load_and_attach(dc_bpf_obj, em);
     }
 #endif
 
@@ -1188,7 +1167,6 @@ void *ebpf_dcstat_thread(void *ptr)
     ebpf_adjust_thread_load(em, default_btf);
 #endif
     if (ebpf_dcstat_load_bpf(em)) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto enddcstat;
     }
 

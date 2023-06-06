@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "web_api_v2.h"
+#include "../rtc/webrtc.h"
 
 static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unused, struct web_client *w, char *url, CONTEXTS_V2_OPTIONS options) {
     struct api_v2_contexts_request req = { 0 };
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -110,10 +111,10 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
     size_t group_by_idx = 0, group_by_label_idx = 0, aggregation_idx = 0;
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -161,10 +162,10 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
             char *tqx_name, *tqx_value;
 
             while(value) {
-                tqx_value = mystrsep(&value, ";");
+                tqx_value = strsep_skip_consecutive_separators(&value, ";");
                 if(!tqx_value || !*tqx_value) continue;
 
-                tqx_name = mystrsep(&tqx_value, ":");
+                tqx_name = strsep_skip_consecutive_separators(&tqx_value, ":");
                 if(!tqx_name || !*tqx_name) continue;
                 if(!tqx_value || !*tqx_value) continue;
 
@@ -235,7 +236,7 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
     time_t    before = (before_str && *before_str)?str2l(before_str):0;
     time_t    after  = (after_str  && *after_str) ?str2l(after_str):-600;
     size_t    points = (points_str && *points_str)?str2u(points_str):0;
-    time_t    timeout = (timeout_str && *timeout_str)?str2l(timeout_str): 0;
+    int       timeout = (timeout_str && *timeout_str)?str2i(timeout_str): 0;
     time_t    resampling_time = (resampling_time_str && *resampling_time_str) ? str2l(resampling_time_str) : 0;
 
     QUERY_TARGET_REQUEST qtr = {
@@ -281,17 +282,10 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
         goto cleanup;
     }
 
-    if (timeout) {
-        struct timeval now;
-        now_realtime_timeval(&now);
-        int inqueue = (int)dt_usec(&w->tv_in, &now) / 1000;
-        timeout -= inqueue;
-        if (timeout <= 0) {
-            buffer_flush(w->response.data);
-            buffer_strcat(w->response.data, "Query timeout exceeded");
-            ret = HTTP_RESP_BACKEND_FETCH_FAILED;
-            goto cleanup;
-        }
+    web_client_timeout_checkpoint_set(w, timeout);
+    if(web_client_timeout_checkpoint_and_check(w, NULL)) {
+        ret = w->response.code;
+        goto cleanup;
     }
 
     if(outFileName && *outFileName) {
@@ -347,20 +341,24 @@ cleanup:
     return ret;
 }
 
-
+static int web_client_api_request_v2_webrtc(RRDHOST *host __maybe_unused, struct web_client *w, char *url __maybe_unused) {
+    return webrtc_new_connection(w->post_payload, w->response.data);
+}
 
 static struct web_api_command api_commands_v2[] = {
-        {"data", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_data},
-        {"nodes", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_nodes},
-        {"contexts", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_contexts},
-        {"weights", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_weights},
-        {"q", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_q},
+        {"data", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_data},
+        {"nodes", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_nodes},
+        {"contexts", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_contexts},
+        {"weights", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_weights},
+        {"q", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_q},
+
+        {"rtc_offer", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_webrtc},
 
         // terminator
         {NULL, 0, WEB_CLIENT_ACL_NONE, NULL},
 };
 
-inline int web_client_api_request_v2(RRDHOST *host, struct web_client *w, char *url) {
+inline int web_client_api_request_v2(RRDHOST *host, struct web_client *w, char *url_path_endpoint) {
     static int initialized = 0;
 
     if(unlikely(initialized == 0)) {
@@ -370,5 +368,5 @@ inline int web_client_api_request_v2(RRDHOST *host, struct web_client *w, char *
             api_commands_v2[i].hash = simple_hash(api_commands_v2[i].command);
     }
 
-    return web_client_api_request_vX(host, w, url, api_commands_v2);
+    return web_client_api_request_vX(host, w, url_path_endpoint, api_commands_v2);
 }

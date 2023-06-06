@@ -1,0 +1,20 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+opensips.dialogs_active,,"active, early",dialogs,"OpenSIPS Active Dialogs",area,,charts.d.plugin,opensips
+opensips.users,,"registered, location, contacts, expires",users,"OpenSIPS Users",line,,charts.d.plugin,opensips
+opensips.registrar,,"accepted, rejected",registrations/s,"OpenSIPS Registrar",line,,charts.d.plugin,opensips
+opensips.transactions,,"UAS, UAC",transactions/s,"OpenSIPS Transactions",line,,charts.d.plugin,opensips
+opensips.core_rcv,,"requests, replies",queries/s,"OpenSIPS Core Receives",line,,charts.d.plugin,opensips
+opensips.core_fwd,,"requests, replies",queries/s,"OpenSIPS Core Forwards",line,,charts.d.plugin,opensips
+opensips.core_drop,,"requests, replies",queries/s,"OpenSIPS Core Drops",line,,charts.d.plugin,opensips
+opensips.core_err,,"requests, replies",queries/s,"OpenSIPS Core Errors",line,,charts.d.plugin,opensips
+opensips.core_bad,,"bad_URIs_rcvd, unsupported_methods, bad_msg_hdr",queries/s,"OpenSIPS Core Bad",line,,charts.d.plugin,opensips
+opensips.tm_replies,,"received, relayed, local",replies/s,"OpenSIPS TM Replies",line,,charts.d.plugin,opensips
+opensips.transactions_status,,"2xx, 3xx, 4xx, 5xx, 6xx",transactions/s,"OpenSIPS Transactions Status",line,,charts.d.plugin,opensips
+opensips.transactions_inuse,,inuse,transactions,"OpenSIPS InUse Transactions",line,,charts.d.plugin,opensips
+opensips.sl_replies,,"1xx, 2xx, 3xx, 4xx, 5xx, 6xx, sent, error, ACKed",replies/s,OpenSIPS SL Replies,line,,charts.d.plugin,opensips
+opensips.dialogs,,"processed, expire, failed",dialogs/s,"OpenSIPS Dialogs",line,,charts.d.plugin,opensips
+opensips.net_waiting,,"UDP, TCP",kilobytes,"OpenSIPS Network Waiting",line,,charts.d.plugin,opensips
+opensips.uri_checks,,"positive, negative","checks / sec","OpenSIPS URI Checks",line,,charts.d.plugin,opensips
+opensips.traces,,"requests, replies","traces / sec","OpenSIPS Traces",line,,charts.d.plugin,opensips
+opensips.shmem,,"total, used, real_used, max_used, free",kilobytes,"OpenSIPS Shared Memory",line,,charts.d.plugin,opensips
+opensips.shmem_fragment,,fragments,fragments,"OpenSIPS Shared Memory Fragmentation",line,,charts.d.plugin,opensips

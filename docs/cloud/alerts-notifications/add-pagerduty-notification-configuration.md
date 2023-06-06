@@ -4,12 +4,12 @@ From the Cloud interface, you can manage your space's notification settings and 
 
 ## Prerequisites
 
-To add PagerDuty notification configurations you need
+To add PagerDuty notification configurations you need:
 
 - A Cloud account
 - Access to the space as and **administrator**
 - Space needs to be on **Business** plan or higher
-- Have a PagerDuty service to receive events, for mode details check [how to configure this on PagerDuty](#settings-on-pagerduty)
+- Have a PagerDuty service to receive events, for more details check [how to configure this on PagerDuty](#settings-on-pagerduty)
 
 ## Steps
 

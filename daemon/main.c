@@ -148,10 +148,6 @@ static void service_to_buffer(BUFFER *wb, SERVICE_TYPE service) {
         buffer_strcat(wb, "MAINTENANCE ");
     if(service & SERVICE_COLLECTORS)
         buffer_strcat(wb, "COLLECTORS ");
-    if(service & SERVICE_ML_TRAINING)
-        buffer_strcat(wb, "ML_TRAINING ");
-    if(service & SERVICE_ML_PREDICTION)
-        buffer_strcat(wb, "ML_PREDICTION ");
     if(service & SERVICE_REPLICATION)
         buffer_strcat(wb, "REPLICATION ");
     if(service & ABILITY_DATA_QUERIES)
@@ -174,6 +170,8 @@ static void service_to_buffer(BUFFER *wb, SERVICE_TYPE service) {
         buffer_strcat(wb, "ANALYTICS ");
     if(service & SERVICE_EXPORTERS)
         buffer_strcat(wb, "EXPORTERS ");
+    if(service & SERVICE_HTTPD)
+        buffer_strcat(wb, "HTTPD ");
 }
 
 static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
@@ -313,6 +311,8 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
         timeout = false;                                \
     }
 
+void web_client_cache_destroy(void);
+
 void netdata_cleanup_and_exit(int ret) {
     usec_t started_ut = now_monotonic_usec();
     usec_t last_ut = started_ut;
@@ -340,6 +340,15 @@ void netdata_cleanup_and_exit(int ret) {
     }
 #endif
 
+    delta_shutdown_time("close webrtc connections");
+
+    webrtc_close_all_connections();
+
+    delta_shutdown_time("disable ML detection and training threads");
+
+    ml_stop_threads();
+    ml_fini();
+
     delta_shutdown_time("disable maintenance, new queries, new web requests, new streaming connections and aclk");
 
     service_signal_exit(
@@ -351,14 +360,14 @@ void netdata_cleanup_and_exit(int ret) {
             | SERVICE_ACLKSYNC
             );
 
-    delta_shutdown_time("stop replication, exporters, ML training, health and web servers threads");
+    delta_shutdown_time("stop replication, exporters, health and web servers threads");
 
     timeout = !service_wait_exit(
             SERVICE_REPLICATION
             | SERVICE_EXPORTERS
-            | SERVICE_ML_TRAINING
             | SERVICE_HEALTH
             | SERVICE_WEB_SERVER
+            | SERVICE_HTTPD
             , 3 * USEC_PER_SEC);
 
     delta_shutdown_time("stop collectors and streaming threads");
@@ -368,11 +377,10 @@ void netdata_cleanup_and_exit(int ret) {
             | SERVICE_STREAMING
             , 3 * USEC_PER_SEC);
 
-    delta_shutdown_time("stop ML prediction and context threads");
+    delta_shutdown_time("stop context thread");
 
     timeout = !service_wait_exit(
-            SERVICE_ML_PREDICTION
-            | SERVICE_CONTEXT
+            SERVICE_CONTEXT
             , 3 * USEC_PER_SEC);
 
     delta_shutdown_time("stop maintenance thread");
@@ -380,6 +388,10 @@ void netdata_cleanup_and_exit(int ret) {
     timeout = !service_wait_exit(
             SERVICE_MAINTENANCE
             , 3 * USEC_PER_SEC);
+
+    delta_shutdown_time("clear web client cache");
+
+    web_client_cache_destroy();
 
     delta_shutdown_time("clean rrdhost database");
 
@@ -564,8 +576,6 @@ void web_server_config_options(void)
     web_allow_mgmt_dns         =
         make_dns_decision(CONFIG_SECTION_WEB, "allow management by dns","heuristic",web_allow_mgmt_from);
 
-
-#ifdef NETDATA_WITH_ZLIB
     web_enable_gzip = config_get_boolean(CONFIG_SECTION_WEB, "enable gzip compression", web_enable_gzip);
 
     char *s = config_get(CONFIG_SECTION_WEB, "gzip compression strategy", "default");
@@ -593,7 +603,6 @@ void web_server_config_options(void)
         error("Invalid compression level %d. Valid levels are 1 (fastest) to 9 (best ratio). Proceeding with level 9 (best compression).", web_gzip_level);
         web_gzip_level = 9;
     }
-#endif /* NETDATA_WITH_ZLIB */
 }
 
 
@@ -1975,6 +1984,14 @@ int main(int argc, char **argv) {
 
         if(web_server_mode != WEB_SERVER_MODE_NONE)
             api_listen_sockets_setup();
+
+#ifdef ENABLE_HTTPD
+        delta_startup_time("initialize httpd server");
+        for (int i = 0; static_threads[i].name; i++) {
+            if (static_threads[i].start_routine == httpd_main)
+                static_threads[i].enabled = httpd_is_enabled();
+        }
+#endif
     }
 
     delta_startup_time("set resource limits");
@@ -2030,13 +2047,16 @@ int main(int argc, char **argv) {
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
     get_system_info(system_info);
+    (void) registry_get_this_machine_guid();
     system_info->hops = 0;
     get_install_type(&system_info->install_type, &system_info->prebuilt_arch, &system_info->prebuilt_dist);
 
     delta_startup_time("initialize RRD structures");
 
-    if(rrd_init(netdata_configured_hostname, system_info, false))
+    if(rrd_init(netdata_configured_hostname, system_info, false)) {
+        set_late_global_environment(system_info);
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
+    }
 
     delta_startup_time("check for incomplete shutdown");
 
@@ -2078,8 +2098,7 @@ int main(int argc, char **argv) {
 
     netdata_zero_metrics_enabled = config_get_boolean_ondemand(CONFIG_SECTION_DB, "enable zero metrics", CONFIG_BOOLEAN_NO);
 
-    set_late_global_environment();
-
+    set_late_global_environment(system_info);
     for (i = 0; static_threads[i].name != NULL ; i++) {
         struct netdata_static_thread *st = &static_threads[i];
 
@@ -2090,6 +2109,7 @@ int main(int argc, char **argv) {
         }
         else debug(D_SYSTEM, "Not starting thread %s.", st->name);
     }
+    ml_start_threads();
 
     // ------------------------------------------------------------------------
     // Initialize netdata agent command serving from cli and signals
@@ -2138,6 +2158,11 @@ int main(int argc, char **argv) {
             close(fd);
     }
 #endif
+
+    // ------------------------------------------------------------------------
+    // initialize WebRTC
+
+    webrtc_initialize();
 
     // ------------------------------------------------------------------------
     // unblock signals

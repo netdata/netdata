@@ -87,7 +87,7 @@ int rrdset2value_api_v1(
 );
 
 static inline bool rrdr_dimension_should_be_exposed(RRDR_DIMENSION_FLAGS rrdr_dim_flags, RRDR_OPTIONS options) {
-    if(unlikely(options & RRDR_OPTION_RETURN_RAW))
+    if(unlikely((options & RRDR_OPTION_RETURN_RAW) && (rrdr_dim_flags & RRDR_DIMENSION_QUERIED)))
         return true;
 
     if(unlikely(rrdr_dim_flags & RRDR_DIMENSION_HIDDEN)) return false;

@@ -108,7 +108,7 @@ struct rrdcontext_to_json_v2_data {
 
     struct {
         FTS_MATCH host_match;
-        char host_uuid_buffer[UUID_STR_LEN];
+        char host_node_id_str[UUID_STR_LEN];
         SIMPLE_PATTERN *pattern;
         FTS_INDEX fts;
     } q;
@@ -271,7 +271,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
         if(ctl->q.pattern && (
                 full_text_search_string(&ctl->q.fts, ctl->q.pattern, host->hostname) ||
                 full_text_search_char(&ctl->q.fts, ctl->q.pattern, host->machine_guid) ||
-                (ctl->q.pattern && full_text_search_char(&ctl->q.fts, ctl->q.pattern, ctl->q.host_uuid_buffer)))) {
+                (ctl->q.pattern && full_text_search_char(&ctl->q.fts, ctl->q.pattern, ctl->q.host_node_id_str)))) {
             ctl->q.host_match = FTS_MATCHED_HOST;
             do_contexts = true;
         }
@@ -497,7 +497,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
     ssize_t ret = query_scope_foreach_host(ctl.nodes.scope_pattern, ctl.nodes.pattern,
                              rrdcontext_to_json_v2_add_host, &ctl,
-                             &ctl.versions, ctl.q.host_uuid_buffer);
+                             &ctl.versions, ctl.q.host_node_id_str);
 
     if(unlikely(ret < 0)) {
         buffer_flush(wb);

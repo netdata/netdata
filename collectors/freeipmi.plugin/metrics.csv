@@ -1,0 +1,10 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+ipmi.sel,,events,events,"IPMI Events",area,,freeipmi.plugin,
+ipmi.sensors_states,,"nominal, critical, warning",sensors,"IPMI Sensors State",line,,freeipmi.plugin,
+ipmi.temperatures_c,,a dimension per sensor,Celsius,"System Celsius Temperatures read by IPMI",line,,freeipmi.plugin,
+ipmi.temperatures_f,,a dimension per sensor,Fahrenheit,"System Celsius Temperatures read by IPMI",line,,freeipmi.plugin,
+ipmi.voltages,,a dimension per sensor,Volts,"System Voltages read by IPMI",line,,freeipmi.plugin,
+ipmi.amps,,a dimension per sensor,Amps,"System Current read by IPMI",line,,freeipmi.plugin,
+ipmi.rpm,,a dimension per sensor,RPM,"System Fans read by IPMI",line,,freeipmi.plugin,
+ipmi.watts,,a dimension per sensor,Watts,"System Power read by IPMI",line,,freeipmi.plugin,
+ipmi.percent,,a dimension per sensor,%,"System Metrics read by IPMI",line,,freeipmi.plugin,

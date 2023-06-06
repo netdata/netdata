@@ -17,14 +17,20 @@ static ebpf_local_maps_t hardirq_maps[] = {
         .internal_input = NETDATA_HARDIRQ_MAX_IRQS,
         .user_input = 0,
         .type = NETDATA_EBPF_MAP_STATIC,
-        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED
+        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+        .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
     },
     {
         .name = "tbl_hardirq_static",
         .internal_input = HARDIRQ_EBPF_STATIC_END,
         .user_input = 0,
         .type = NETDATA_EBPF_MAP_STATIC,
-        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED
+        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+        .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
     },
     /* end */
     {
@@ -32,7 +38,10 @@ static ebpf_local_maps_t hardirq_maps[] = {
         .internal_input = 0,
         .user_input = 0,
         .type = NETDATA_EBPF_MAP_CONTROLLER,
-        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED
+        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+        .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
     }
 };
 
@@ -187,15 +196,11 @@ void ebpf_hardirq_release(hardirq_val_t *stat)
  */
 static void ebpf_hardirq_free(ebpf_module_t *em)
 {
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-
     for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
         ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
     }
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -314,7 +319,9 @@ static int hardirq_parse_interrupts(char *irq_name, int irq)
  */
 static int hardirq_read_latency_map(int mapfd)
 {
-    hardirq_ebpf_static_val_t hardirq_ebpf_vals[ebpf_nprocs + 1];
+    static hardirq_ebpf_static_val_t *hardirq_ebpf_vals = NULL;
+    if (!hardirq_ebpf_vals)
+        hardirq_ebpf_vals = callocz(ebpf_nprocs + 1, sizeof(hardirq_ebpf_static_val_t));
 
     hardirq_ebpf_key_t key = {};
     hardirq_ebpf_key_t next_key = {};
@@ -390,7 +397,9 @@ static int hardirq_read_latency_map(int mapfd)
 
 static void hardirq_read_latency_static_map(int mapfd)
 {
-    hardirq_ebpf_static_val_t hardirq_ebpf_static_vals[ebpf_nprocs + 1];
+    static hardirq_ebpf_static_val_t *hardirq_ebpf_static_vals = NULL;
+    if (!hardirq_ebpf_static_vals)
+        hardirq_ebpf_static_vals = callocz(ebpf_nprocs + 1, sizeof(hardirq_ebpf_static_val_t));
 
     uint32_t i;
     for (i = 0; i < HARDIRQ_EBPF_STATIC_END; i++) {
@@ -489,9 +498,12 @@ static inline void hardirq_write_static_dims()
 
 /**
 * Main loop for this collector.
+ *
+ * @param em the main thread structure.
 */
 static void hardirq_collector(ebpf_module_t *em)
 {
+    memset(&hardirq_pub, 0, sizeof(hardirq_pub));
     avl_init_lock(&hardirq_pub, hardirq_val_cmp);
     ebpf_hardirq_aral_init();
 
@@ -549,13 +561,14 @@ void *ebpf_hardirq_thread(void *ptr)
     em->maps = hardirq_maps;
 
     if (ebpf_enable_tracepoints(hardirq_tracepoints) == 0) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endhardirq;
     }
 
+#ifdef LIBBPF_MAJOR_VERSION
+    ebpf_define_map_type(em->maps, em->maps_per_core, running_on_kernel);
+#endif
     em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
     if (!em->probe_links) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endhardirq;
     }
 

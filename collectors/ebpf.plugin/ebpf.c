@@ -28,11 +28,22 @@ int running_on_kernel = 0;
 int ebpf_nprocs;
 int isrh = 0;
 int main_thread_id = 0;
+int process_pid_fd = -1;
 
 pthread_mutex_t lock;
 pthread_mutex_t ebpf_exit_cleanup;
 pthread_mutex_t collect_data_mutex;
-pthread_cond_t collect_data_cond_var;
+
+struct netdata_static_thread cgroup_integration_thread = {
+    .name = "EBPF CGROUP INT",
+    .config_section = NULL,
+    .config_name = NULL,
+    .env_name = NULL,
+    .enabled = 1,
+    .thread = NULL,
+    .init_routine = NULL,
+    .start_routine = NULL
+};
 
 ebpf_module_t ebpf_modules[] = {
     { .thread_name = "process", .config_name = "process", .enabled = 0, .start_routine = ebpf_process_thread,
@@ -43,7 +54,8 @@ ebpf_module_t ebpf_modules[] = {
       .config_file = NETDATA_PROCESS_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_10 |
                   NETDATA_V5_14,
-      .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL, .thread = NULL},
+      .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
     { .thread_name = "socket", .config_name = "socket", .enabled = 0, .start_routine = ebpf_socket_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
@@ -51,7 +63,8 @@ ebpf_module_t ebpf_modules[] = {
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &socket_config,
       .config_file = NETDATA_NETWORK_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
-      .load = EBPF_LOAD_LEGACY, .targets = socket_targets, .probe_links = NULL, .objects = NULL, .thread = NULL},
+      .load = EBPF_LOAD_LEGACY, .targets = socket_targets, .probe_links = NULL, .objects = NULL,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
     { .thread_name = "cachestat", .config_name = "cachestat", .enabled = 0, .start_routine = ebpf_cachestat_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
@@ -60,7 +73,8 @@ ebpf_module_t ebpf_modules[] = {
       .config_file = NETDATA_CACHESTAT_CONFIG_FILE,
       .kernels = NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18|
                  NETDATA_V5_4 | NETDATA_V5_14 | NETDATA_V5_15 | NETDATA_V5_16,
-      .load = EBPF_LOAD_LEGACY, .targets = cachestat_targets, .probe_links = NULL, .objects = NULL, .thread = NULL},
+      .load = EBPF_LOAD_LEGACY, .targets = cachestat_targets, .probe_links = NULL, .objects = NULL,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
     { .thread_name = "sync", .config_name = "sync", .enabled = 0, .start_routine = ebpf_sync_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
@@ -68,7 +82,8 @@ ebpf_module_t ebpf_modules[] = {
       .config_file = NETDATA_SYNC_CONFIG_FILE,
       // All syscalls have the same kernels
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
-      .load = EBPF_LOAD_LEGACY, .targets = sync_targets, .probe_links = NULL, .objects = NULL, .thread = NULL},
+      .load = EBPF_LOAD_LEGACY, .targets = sync_targets, .probe_links = NULL, .objects = NULL,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
     { .thread_name = "dc", .config_name = "dc", .enabled = 0, .start_routine = ebpf_dcstat_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
@@ -76,7 +91,8 @@ ebpf_module_t ebpf_modules[] = {
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &dcstat_config,
       .config_file = NETDATA_DIRECTORY_DCSTAT_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
-      .load = EBPF_LOAD_LEGACY, .targets = dc_targets, .probe_links = NULL, .objects = NULL, .thread = NULL},
+      .load = EBPF_LOAD_LEGACY, .targets = dc_targets, .probe_links = NULL, .objects = NULL,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
     { .thread_name = "swap", .config_name = "swap", .enabled = 0, .start_routine = ebpf_swap_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
@@ -84,7 +100,8 @@ ebpf_module_t ebpf_modules[] = {
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &swap_config,
       .config_file = NETDATA_DIRECTORY_SWAP_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
-      .load = EBPF_LOAD_LEGACY, .targets = swap_targets, .probe_links = NULL, .objects = NULL, .thread = NULL},
+      .load = EBPF_LOAD_LEGACY, .targets = swap_targets, .probe_links = NULL, .objects = NULL,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
     { .thread_name = "vfs", .config_name = "vfs", .enabled = 0, .start_routine = ebpf_vfs_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
@@ -92,28 +109,32 @@ ebpf_module_t ebpf_modules[] = {
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &vfs_config,
       .config_file = NETDATA_DIRECTORY_VFS_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
-      .load = EBPF_LOAD_LEGACY, .targets = vfs_targets, .probe_links = NULL, .objects = NULL, .thread = NULL},
+      .load = EBPF_LOAD_LEGACY, .targets = vfs_targets, .probe_links = NULL, .objects = NULL,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
     { .thread_name = "filesystem", .config_name = "filesystem", .enabled = 0, .start_routine = ebpf_filesystem_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .apps_routine = NULL, .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &fs_config,
       .config_file = NETDATA_FILESYSTEM_CONFIG_FILE,
       //We are setting kernels as zero, because we load eBPF programs according the kernel running.
-      .kernels = 0, .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL, .thread = NULL },
+      .kernels = 0, .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES },
     { .thread_name = "disk", .config_name = "disk", .enabled = 0, .start_routine = ebpf_disk_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .apps_routine = NULL, .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &disk_config,
       .config_file = NETDATA_DISK_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
-      .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL, .thread = NULL},
+      .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
     { .thread_name = "mount", .config_name = "mount", .enabled = 0, .start_routine = ebpf_mount_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .apps_routine = NULL, .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &mount_config,
       .config_file = NETDATA_MOUNT_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
-      .load = EBPF_LOAD_LEGACY, .targets = mount_targets, .probe_links = NULL, .objects = NULL, .thread = NULL},
+      .load = EBPF_LOAD_LEGACY, .targets = mount_targets, .probe_links = NULL, .objects = NULL,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
     { .thread_name = "fd", .config_name = "fd", .enabled = 0, .start_routine = ebpf_fd_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
@@ -122,21 +143,24 @@ ebpf_module_t ebpf_modules[] = {
       .config_file = NETDATA_FD_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_11 |
                   NETDATA_V5_14,
-     .load = EBPF_LOAD_LEGACY, .targets = fd_targets, .probe_links = NULL, .objects = NULL, .thread = NULL},
+      .load = EBPF_LOAD_LEGACY, .targets = fd_targets, .probe_links = NULL, .objects = NULL,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
     { .thread_name = "hardirq", .config_name = "hardirq", .enabled = 0, .start_routine = ebpf_hardirq_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .apps_routine = NULL, .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &hardirq_config,
       .config_file = NETDATA_HARDIRQ_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
-      .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL, .thread = NULL},
+      .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
     { .thread_name = "softirq", .config_name = "softirq", .enabled = 0, .start_routine = ebpf_softirq_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .apps_routine = NULL, .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &softirq_config,
       .config_file = NETDATA_SOFTIRQ_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
-      .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL, .thread = NULL},
+      .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
     { .thread_name = "oomkill", .config_name = "oomkill", .enabled = 0, .start_routine = ebpf_oomkill_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
@@ -144,7 +168,8 @@ ebpf_module_t ebpf_modules[] = {
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &oomkill_config,
       .config_file = NETDATA_OOMKILL_CONFIG_FILE,
       .kernels =  NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
-      .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL, .thread = NULL},
+      .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
     { .thread_name = "shm", .config_name = "shm", .enabled = 0, .start_routine = ebpf_shm_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
@@ -152,19 +177,21 @@ ebpf_module_t ebpf_modules[] = {
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &shm_config,
       .config_file = NETDATA_DIRECTORY_SHM_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
-      .load = EBPF_LOAD_LEGACY, .targets = shm_targets, .probe_links = NULL, .objects = NULL, .thread = NULL},
+      .load = EBPF_LOAD_LEGACY, .targets = shm_targets, .probe_links = NULL, .objects = NULL,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
     { .thread_name = "mdflush", .config_name = "mdflush", .enabled = 0, .start_routine = ebpf_mdflush_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .apps_routine = NULL, .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &mdflush_config,
       .config_file = NETDATA_DIRECTORY_MDFLUSH_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
-      .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL, .thread = NULL},
+      .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_every = EBPF_DEFAULT_UPDATE_EVERY,
       .global_charts = 0, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO, .apps_level = NETDATA_APPS_NOT_SET,
       .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0, .apps_routine = NULL, .maps = NULL,
       .pid_map_size = 0, .names = NULL, .cfg = NULL, .config_name = NULL, .kernels = 0, .load = EBPF_LOAD_LEGACY,
-      .targets = NULL, .probe_links = NULL, .objects = NULL, .thread = NULL},
+      .targets = NULL, .probe_links = NULL, .objects = NULL, .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
 };
 
 struct netdata_static_thread ebpf_threads[] = {
@@ -349,7 +376,8 @@ ebpf_filesystem_partitions_t localfs[] =
       .flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION,
       .enabled = CONFIG_BOOLEAN_YES,
       .addresses = {.function = NULL, .addr = 0},
-      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4},
+      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4,
+      .fs_maps = NULL},
      {.filesystem = "xfs",
       .optional_filesystem = NULL,
       .family = "xfs",
@@ -358,7 +386,8 @@ ebpf_filesystem_partitions_t localfs[] =
       .flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION,
       .enabled = CONFIG_BOOLEAN_YES,
       .addresses = {.function = NULL, .addr = 0},
-      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4},
+      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4,
+      .fs_maps = NULL},
      {.filesystem = "nfs",
       .optional_filesystem = "nfs4",
       .family = "nfs",
@@ -367,7 +396,8 @@ ebpf_filesystem_partitions_t localfs[] =
       .flags = NETDATA_FILESYSTEM_ATTR_CHARTS,
       .enabled = CONFIG_BOOLEAN_YES,
       .addresses = {.function = NULL, .addr = 0},
-      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4},
+      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4,
+      .fs_maps = NULL},
      {.filesystem = "zfs",
       .optional_filesystem = NULL,
       .family = "zfs",
@@ -376,7 +406,8 @@ ebpf_filesystem_partitions_t localfs[] =
       .flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION,
       .enabled = CONFIG_BOOLEAN_YES,
       .addresses = {.function = NULL, .addr = 0},
-      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4},
+      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4,
+      .fs_maps = NULL},
      {.filesystem = "btrfs",
       .optional_filesystem = NULL,
       .family = "btrfs",
@@ -385,7 +416,8 @@ ebpf_filesystem_partitions_t localfs[] =
       .flags = NETDATA_FILESYSTEM_FILL_ADDRESS_TABLE,
       .enabled = CONFIG_BOOLEAN_YES,
       .addresses = {.function = "btrfs_file_operations", .addr = 0},
-      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_10},
+      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_10,
+      .fs_maps = NULL},
      {.filesystem = NULL,
       .optional_filesystem = NULL,
       .family = NULL,
@@ -394,43 +426,50 @@ ebpf_filesystem_partitions_t localfs[] =
       .flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION,
       .enabled = CONFIG_BOOLEAN_YES,
       .addresses = {.function = NULL, .addr = 0},
-      .kernels = 0}};
+      .kernels = 0, .fs_maps = NULL}};
 
 ebpf_sync_syscalls_t local_syscalls[] = {
     {.syscall = NETDATA_SYSCALLS_SYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
 #ifdef LIBBPF_MAJOR_VERSION
-        .sync_obj = NULL
+     .sync_obj = NULL,
 #endif
+      .sync_maps = NULL
     },
     {.syscall = NETDATA_SYSCALLS_SYNCFS, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
 #ifdef LIBBPF_MAJOR_VERSION
-        .sync_obj = NULL
+     .sync_obj = NULL,
 #endif
+     .sync_maps = NULL
     },
     {.syscall = NETDATA_SYSCALLS_MSYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
 #ifdef LIBBPF_MAJOR_VERSION
-        .sync_obj = NULL
+     .sync_obj = NULL,
 #endif
+     .sync_maps = NULL
     },
     {.syscall = NETDATA_SYSCALLS_FSYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
 #ifdef LIBBPF_MAJOR_VERSION
-        .sync_obj = NULL
+     .sync_obj = NULL,
 #endif
+     .sync_maps = NULL
     },
     {.syscall = NETDATA_SYSCALLS_FDATASYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
 #ifdef LIBBPF_MAJOR_VERSION
-        .sync_obj = NULL
+     .sync_obj = NULL,
 #endif
+     .sync_maps = NULL
     },
     {.syscall = NETDATA_SYSCALLS_SYNC_FILE_RANGE, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
 #ifdef LIBBPF_MAJOR_VERSION
-        .sync_obj = NULL
+     .sync_obj = NULL,
 #endif
+     .sync_maps = NULL
     },
     {.syscall = NULL, .enabled = CONFIG_BOOLEAN_NO, .objects = NULL, .probe_links = NULL,
 #ifdef LIBBPF_MAJOR_VERSION
-        .sync_obj = NULL
+     .sync_obj = NULL,
 #endif
+     .sync_maps = NULL
     }
 };
 
@@ -451,6 +490,14 @@ ebpf_plugin_stats_t plugin_statistics = {.core = 0, .legacy = 0, .running = 0, .
 
 #ifdef LIBBPF_MAJOR_VERSION
 struct btf *default_btf = NULL;
+struct cachestat_bpf *cachestat_bpf_obj = NULL;
+struct dc_bpf *dc_bpf_obj = NULL;
+struct fd_bpf *fd_bpf_obj = NULL;
+struct mount_bpf *mount_bpf_obj = NULL;
+struct shm_bpf *shm_bpf_obj = NULL;
+struct socket_bpf *socket_bpf_obj = NULL;
+struct swap_bpf *bpf_obj = NULL;
+struct vfs_bpf *vfs_bpf_obj = NULL;
 #else
 void *default_btf = NULL;
 #endif
@@ -515,10 +562,12 @@ static void ebpf_exit()
 #endif
     printf("DISABLE\n");
 
+    pthread_mutex_lock(&mutex_cgroup_shm);
     if (shm_ebpf_cgroup.header) {
-        munmap(shm_ebpf_cgroup.header, shm_ebpf_cgroup.header->body_length);
+        ebpf_unmap_cgroup_shared_memory();
         shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
     }
+    pthread_mutex_unlock(&mutex_cgroup_shm);
 
     exit(0);
 }
@@ -545,6 +594,126 @@ static void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link 
         bpf_object__close(objects);
 }
 
+/**
+ * Unload Unique maps
+ *
+ * This function unload all BPF maps from threads using one unique BPF object.
+ */
+static void ebpf_unload_unique_maps()
+{
+    int i;
+    for (i = 0; ebpf_modules[i].thread_name; i++) {
+        if (ebpf_modules[i].enabled != NETDATA_THREAD_EBPF_STOPPED) {
+            if (ebpf_modules[i].enabled != NETDATA_THREAD_EBPF_NOT_RUNNING)
+                error("Cannot unload maps for thread %s, because it is not stopped.", ebpf_modules[i].thread_name);
+
+            continue;
+        }
+
+        ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
+        switch (i) {
+            case EBPF_MODULE_CACHESTAT_IDX: {
+#ifdef LIBBPF_MAJOR_VERSION
+                if (cachestat_bpf_obj)
+                    cachestat_bpf__destroy(cachestat_bpf_obj);
+#endif
+                break;
+            }
+            case EBPF_MODULE_DCSTAT_IDX: {
+#ifdef LIBBPF_MAJOR_VERSION
+                if (dc_bpf_obj)
+                    dc_bpf__destroy(dc_bpf_obj);
+#endif
+                break;
+            }
+            case EBPF_MODULE_FD_IDX: {
+#ifdef LIBBPF_MAJOR_VERSION
+                if (fd_bpf_obj)
+                    fd_bpf__destroy(fd_bpf_obj);
+#endif
+                break;
+            }
+            case EBPF_MODULE_MOUNT_IDX: {
+#ifdef LIBBPF_MAJOR_VERSION
+                if (mount_bpf_obj)
+                    mount_bpf__destroy(mount_bpf_obj);
+#endif
+                break;
+            }
+            case EBPF_MODULE_SHM_IDX: {
+#ifdef LIBBPF_MAJOR_VERSION
+                if (shm_bpf_obj)
+                    shm_bpf__destroy(shm_bpf_obj);
+#endif
+                break;
+            }
+            case EBPF_MODULE_SOCKET_IDX: {
+#ifdef LIBBPF_MAJOR_VERSION
+                if (socket_bpf_obj)
+                    socket_bpf__destroy(socket_bpf_obj);
+#endif
+                break;
+            }
+            case EBPF_MODULE_SWAP_IDX: {
+#ifdef LIBBPF_MAJOR_VERSION
+                if (bpf_obj)
+                    swap_bpf__destroy(bpf_obj);
+#endif
+                break;
+            }
+            case EBPF_MODULE_VFS_IDX: {
+#ifdef LIBBPF_MAJOR_VERSION
+                if (vfs_bpf_obj)
+                    vfs_bpf__destroy(vfs_bpf_obj);
+#endif
+                break;
+            }
+            case EBPF_MODULE_PROCESS_IDX:
+            case EBPF_MODULE_DISK_IDX:
+            case EBPF_MODULE_HARDIRQ_IDX:
+            case EBPF_MODULE_SOFTIRQ_IDX:
+            case EBPF_MODULE_OOMKILL_IDX:
+            case EBPF_MODULE_MDFLUSH_IDX:
+            default:
+                continue;
+        }
+    }
+}
+
+/**
+ * Unload filesystem maps
+ *
+ * This function unload all BPF maps from filesystem thread.
+ */
+static void ebpf_unload_filesystems()
+{
+    if (ebpf_modules[EBPF_MODULE_FILESYSTEM_IDX].enabled == NETDATA_THREAD_EBPF_NOT_RUNNING ||
+        ebpf_modules[EBPF_MODULE_SYNC_IDX].enabled == NETDATA_THREAD_EBPF_RUNNING)
+        return;
+
+    int i;
+    for (i = 0; localfs[i].filesystem != NULL; i++) {
+        ebpf_unload_legacy_code(localfs[i].objects, localfs[i].probe_links);
+    }
+}
+
+/**
+ * Unload sync maps
+ *
+ * This function unload all BPF maps from sync thread.
+ */
+static void ebpf_unload_sync()
+{
+    if (ebpf_modules[EBPF_MODULE_SYNC_IDX].enabled == NETDATA_THREAD_EBPF_NOT_RUNNING ||
+        ebpf_modules[EBPF_MODULE_SYNC_IDX].enabled == NETDATA_THREAD_EBPF_RUNNING)
+        return;
+
+    int i;
+    for (i = 0; local_syscalls[i].syscall != NULL; i++) {
+        ebpf_unload_legacy_code(local_syscalls[i].objects, local_syscalls[i].probe_links);
+    }
+}
+
 int ebpf_exit_plugin = 0;
 /**
  * Close the collector gracefully
@@ -556,7 +725,6 @@ static void ebpf_stop_threads(int sig)
     UNUSED(sig);
     static int only_one = 0;
 
-    int i;
     // Child thread should be closed by itself.
     pthread_mutex_lock(&ebpf_exit_cleanup);
     if (main_thread_id != gettid() || only_one) {
@@ -564,13 +732,26 @@ static void ebpf_stop_threads(int sig)
         return;
     }
     only_one = 1;
-    for (i = 0; ebpf_threads[i].name != NULL; i++) {
-        if (ebpf_threads[i].enabled != NETDATA_THREAD_EBPF_STOPPED)
-            netdata_thread_cancel(*ebpf_threads[i].thread);
+    int i;
+    for (i = 0; ebpf_modules[i].thread_name != NULL; i++) {
+        if (ebpf_modules[i].enabled == NETDATA_THREAD_EBPF_RUNNING) {
+            netdata_thread_cancel(*ebpf_modules[i].thread->thread);
+#ifdef NETDATA_DEV_MODE
+            info("Sending cancel for thread %s", ebpf_modules[i].thread_name);
+#endif
+        }
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
+    pthread_mutex_lock(&mutex_cgroup_shm);
+    netdata_thread_cancel(*cgroup_integration_thread.thread);
+#ifdef NETDATA_DEV_MODE
+    info("Sending cancel for thread %s", cgroup_integration_thread.name);
+#endif
+    pthread_mutex_unlock(&mutex_cgroup_shm);
+
     ebpf_exit_plugin = 1;
+
     usec_t max = USEC_PER_SEC, step = 100000;
     while (i && max) {
         max -= step;
@@ -578,42 +759,18 @@ static void ebpf_stop_threads(int sig)
         i = 0;
         int j;
         pthread_mutex_lock(&ebpf_exit_cleanup);
-        for (j = 0; ebpf_threads[j].name != NULL; j++) {
-            if (ebpf_threads[j].enabled != NETDATA_THREAD_EBPF_STOPPED)
+        for (j = 0; ebpf_modules[j].thread_name != NULL; j++) {
+            if (ebpf_modules[j].enabled == NETDATA_THREAD_EBPF_RUNNING)
                 i++;
         }
         pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 
-    if (!i)  {
-        //Unload threads(except sync and filesystem)
-        pthread_mutex_lock(&ebpf_exit_cleanup);
-        for (i = 0; ebpf_threads[i].name != NULL; i++) {
-            if (ebpf_threads[i].enabled == NETDATA_THREAD_EBPF_STOPPED && i != EBPF_MODULE_FILESYSTEM_IDX &&
-                i != EBPF_MODULE_SYNC_IDX)
-                ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
-        }
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
-
-        //Unload filesystem
-        pthread_mutex_lock(&ebpf_exit_cleanup);
-        if (ebpf_threads[EBPF_MODULE_FILESYSTEM_IDX].enabled  == NETDATA_THREAD_EBPF_STOPPED) {
-            for (i = 0; localfs[i].filesystem != NULL; i++) {
-                ebpf_unload_legacy_code(localfs[i].objects, localfs[i].probe_links);
-            }
-        }
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
-
-        //Unload Sync
-        pthread_mutex_lock(&ebpf_exit_cleanup);
-        if (ebpf_threads[EBPF_MODULE_SYNC_IDX].enabled  == NETDATA_THREAD_EBPF_STOPPED) {
-            for (i = 0; local_syscalls[i].syscall != NULL; i++) {
-                ebpf_unload_legacy_code(local_syscalls[i].objects, local_syscalls[i].probe_links);
-            }
-        }
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
-
-    }
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    ebpf_unload_unique_maps();
+    ebpf_unload_filesystems();
+    ebpf_unload_sync();
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     ebpf_exit();
 }
@@ -623,6 +780,58 @@ static void ebpf_stop_threads(int sig)
  *  FUNCTIONS TO CREATE CHARTS
  *
  *****************************************************************/
+
+/**
+ * Create apps charts
+ *
+ * Call ebpf_create_chart to create the charts on apps submenu.
+ *
+ * @param root a pointer for the targets.
+ */
+static void ebpf_create_apps_charts(struct ebpf_target *root)
+{
+    if (unlikely(!ebpf_all_pids))
+        return;
+
+    struct ebpf_target *w;
+    int newly_added = 0;
+
+    for (w = root; w; w = w->next) {
+        if (w->target)
+            continue;
+
+        if (unlikely(w->processes && (debug_enabled || w->debug_enabled))) {
+            struct ebpf_pid_on_target *pid_on_target;
+
+            fprintf(
+                stderr, "ebpf.plugin: target '%s' has aggregated %u process%s:", w->name, w->processes,
+                (w->processes == 1) ? "" : "es");
+
+            for (pid_on_target = w->root_pid; pid_on_target; pid_on_target = pid_on_target->next) {
+                fprintf(stderr, " %d", pid_on_target->pid);
+            }
+
+            fputc('\n', stderr);
+        }
+
+        if (!w->exposed && w->processes) {
+            newly_added++;
+            w->exposed = 1;
+            if (debug_enabled || w->debug_enabled)
+                debug_log_int("%s just added - regenerating charts.", w->name);
+        }
+    }
+
+    if (!newly_added)
+        return;
+
+    int counter;
+    for (counter = 0; ebpf_modules[counter].thread_name; counter++) {
+        ebpf_module_t *current = &ebpf_modules[counter];
+        if (current->enabled == NETDATA_THREAD_EBPF_RUNNING && current->apps_charts && current->apps_routine)
+            current->apps_routine(current, root);
+    }
+}
 
 /**
  * Get a value from a structure.
@@ -1044,7 +1253,7 @@ void ebpf_global_labels(netdata_syscall_stat_t *is, netdata_publish_syscall_t *p
 
         pio[i].dimension = dim[i];
         pio[i].name = name[i];
-        pio[i].algorithm = strdupz(ebpf_algorithms[algorithm[i]]);
+        pio[i].algorithm = ebpf_algorithms[algorithm[i]];
         if (publish_prev) {
             publish_prev->next = &pio[i];
         }
@@ -1442,21 +1651,13 @@ static void read_local_addresses()
  * Start Pthread Variable
  *
  * This function starts all pthread variables.
- *
- * @return It returns 0 on success and -1.
  */
-int ebpf_start_pthread_variables()
+void ebpf_start_pthread_variables()
 {
     pthread_mutex_init(&lock, NULL);
     pthread_mutex_init(&ebpf_exit_cleanup, NULL);
     pthread_mutex_init(&collect_data_mutex, NULL);
-
-    if (pthread_cond_init(&collect_data_cond_var, NULL)) {
-        error("Cannot start conditional variable to control Apps charts.");
-        return -1;
-    }
-
-    return 0;
+    pthread_mutex_init(&mutex_cgroup_shm, NULL);
 }
 
 /**
@@ -1565,6 +1766,21 @@ static inline void epbf_update_load_mode(char *str, netdata_ebpf_load_mode_t ori
 }
 
 /**
+ * Update Map per core
+ *
+ * Define the map type used with some hash tables.
+ */
+static void ebpf_update_map_per_core()
+{
+    int i;
+    int value = appconfig_get_boolean(&collector_config, EBPF_GLOBAL_SECTION,
+                                      EBPF_CFG_MAPS_PER_CORE, CONFIG_BOOLEAN_YES);
+    for (i = 0; ebpf_modules[i].thread_name; i++) {
+        ebpf_modules[i].maps_per_core = value;
+    }
+}
+
+/**
  * Read collector values
  *
  * @param disable_apps    variable to store information related to apps.
@@ -1616,6 +1832,8 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups,
     // We are using the same pattern for cgroup and apps
     enabled = appconfig_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_CGROUP, CONFIG_BOOLEAN_NO);
     *disable_cgroups =  (enabled == CONFIG_BOOLEAN_NO)?CONFIG_BOOLEAN_YES:CONFIG_BOOLEAN_NO;
+
+    ebpf_update_map_per_core();
 
     // Read ebpf programs section
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION,
@@ -2320,10 +2538,7 @@ int main(int argc, char **argv)
     signal(SIGTERM, ebpf_stop_threads);
     signal(SIGPIPE, ebpf_stop_threads);
 
-    if (ebpf_start_pthread_variables()) {
-        error("Cannot start mutex to control overall charts.");
-        ebpf_exit();
-    }
+    ebpf_start_pthread_variables();
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     if(verify_netdata_host_prefix() == -1) ebpf_exit(6);
@@ -2342,6 +2557,12 @@ int main(int argc, char **argv)
 
     ebpf_set_static_routine();
 
+    cgroup_integration_thread.thread = mallocz(sizeof(netdata_thread_t));
+    cgroup_integration_thread.start_routine = ebpf_cgroup_integration;
+
+    netdata_thread_create(cgroup_integration_thread.thread, cgroup_integration_thread.name,
+                          NETDATA_THREAD_OPTION_DEFAULT, ebpf_cgroup_integration, NULL);
+
     int i;
     for (i = 0; ebpf_threads[i].name != NULL; i++) {
         struct netdata_static_thread *st = &ebpf_threads[i];
@@ -2352,33 +2573,42 @@ int main(int argc, char **argv)
         if (em->enabled || !i) {
             st->thread = mallocz(sizeof(netdata_thread_t));
             em->thread_id = i;
-            st->enabled = NETDATA_THREAD_EBPF_RUNNING;
+            em->enabled = NETDATA_THREAD_EBPF_RUNNING;
             netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, em);
         } else {
-            st->enabled = NETDATA_THREAD_EBPF_STOPPED;
+            em->enabled = NETDATA_THREAD_EBPF_NOT_RUNNING;
         }
     }
 
     usec_t step = USEC_PER_SEC;
-    int counter = NETDATA_EBPF_CGROUP_UPDATE - 1;
     heartbeat_t hb;
     heartbeat_init(&hb);
+    int update_apps_every = (int) EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT;
+    int update_apps_list = update_apps_every - 1;
+    int process_maps_per_core = ebpf_modules[EBPF_MODULE_PROCESS_IDX].maps_per_core;
     //Plugin will be killed when it receives a signal
     while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
 
-        // We are using a small heartbeat time to wake up thread,
-        // but we should not update so frequently the shared memory data
-        if (++counter >=  NETDATA_EBPF_CGROUP_UPDATE) {
-            counter = 0;
-            if (!shm_ebpf_cgroup.header)
-                ebpf_map_cgroup_shared_memory();
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (ebpf_modules[i].enabled == NETDATA_THREAD_EBPF_RUNNING && process_pid_fd != -1) {
+            pthread_mutex_lock(&collect_data_mutex);
+            if (++update_apps_list == update_apps_every) {
+                update_apps_list = 0;
+                cleanup_exited_pids();
+                collect_data_for_all_processes(process_pid_fd, process_maps_per_core);
 
-            ebpf_parse_cgroup_shm_data();
+                pthread_mutex_lock(&lock);
+                ebpf_create_apps_charts(apps_groups_root_target);
+                pthread_mutex_unlock(&lock);
+            }
+            pthread_mutex_unlock(&collect_data_mutex);
         }
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 
     ebpf_stop_threads(0);
 
     return 0;
 }
+

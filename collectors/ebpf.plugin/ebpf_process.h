@@ -56,6 +56,13 @@ enum netdata_ebpf_load_mode_stats{
     NETDATA_EBPF_LOAD_STAT_END
 };
 
+enum netdata_ebpf_thread_per_core{
+    NETDATA_EBPF_THREAD_PER_CORE,
+    NETDATA_EBPF_THREAD_UNIQUE,
+
+    NETDATA_EBPF_PER_CORE_END
+};
+
 // Index from kernel
 typedef enum ebpf_process_index {
     NETDATA_KEY_CALLS_DO_EXIT,

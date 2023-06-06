@@ -36,6 +36,26 @@
 #define NETDATA_EBPF_OLD_CONFIG_FILE "ebpf.conf"
 #define NETDATA_EBPF_CONFIG_FILE "ebpf.d.conf"
 
+#ifdef LIBBPF_MAJOR_VERSION // BTF code
+#include "includes/cachestat.skel.h"
+#include "includes/dc.skel.h"
+#include "includes/fd.skel.h"
+#include "includes/mount.skel.h"
+#include "includes/shm.skel.h"
+#include "includes/socket.skel.h"
+#include "includes/swap.skel.h"
+#include "includes/vfs.skel.h"
+
+extern struct cachestat_bpf *cachestat_bpf_obj;
+extern struct dc_bpf *dc_bpf_obj;
+extern struct fd_bpf *fd_bpf_obj;
+extern struct mount_bpf *mount_bpf_obj;
+extern struct shm_bpf *shm_bpf_obj;
+extern struct socket_bpf *socket_bpf_obj;
+extern struct swap_bpf *bpf_obj;
+extern struct vfs_bpf *vfs_bpf_obj;
+#endif
+
 typedef struct netdata_syscall_stat {
     unsigned long bytes;               // total number of bytes
     uint64_t call;                     // total number of calls
@@ -108,12 +128,6 @@ typedef struct ebpf_tracepoint {
     char *event;
 } ebpf_tracepoint_t;
 
-enum ebpf_threads_status {
-    NETDATA_THREAD_EBPF_RUNNING,
-    NETDATA_THREAD_EBPF_STOPPING,
-    NETDATA_THREAD_EBPF_STOPPED
-};
-
 // Copied from musl header
 #ifndef offsetof
 #if __GNUC__ > 3
@@ -145,6 +159,7 @@ enum ebpf_threads_status {
 #define NETDATA_EBPF_LOAD_METHOD "ebpf_load_methods"
 #define NETDATA_EBPF_KERNEL_MEMORY "ebpf_kernel_memory"
 #define NETDATA_EBPF_HASH_TABLES_LOADED "ebpf_hash_tables_count"
+#define NETDATA_EBPF_HASH_TABLES_PER_CORE "ebpf_hash_tables_per_core"
 
 // Log file
 #define NETDATA_DEVELOPER_LOG_FILE "developer.log"
@@ -178,9 +193,9 @@ extern int ebpf_nprocs;
 extern int running_on_kernel;
 extern int isrh;
 extern char *ebpf_plugin_dir;
+extern int process_pid_fd;
 
 extern pthread_mutex_t collect_data_mutex;
-extern pthread_cond_t collect_data_cond_var;
 
 // Common functions
 void ebpf_global_labels(netdata_syscall_stat_t *is,
@@ -242,8 +257,6 @@ void ebpf_create_charts_on_apps(char *name,
                                        char *module);
 
 void write_end_chart();
-
-void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps);
 
 int ebpf_enable_tracepoint(ebpf_tracepoint_t *tp);
 int ebpf_disable_tracepoint(ebpf_tracepoint_t *tp);

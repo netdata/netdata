@@ -360,6 +360,18 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
             else {
                 mi->st_dev = 0;
             }
+
+            //try to detect devices with same minor and major modes. Within these,
+            //the larger mount point is considered a bind.
+            struct mountinfo *mt;
+            for(mt = root; mt; mt = mt->next) {
+                if(unlikely(mt->major == mi->major && mt->minor == mi->minor && !(mi->flags & MOUNTINFO_IS_BIND))) {
+                    if(strlen(mi->root) < strlen(mt->root))
+                        mt->flags |= MOUNTINFO_IS_BIND;
+                    else
+                        mi->flags |= MOUNTINFO_IS_BIND;
+                }
+            }
         }
         else {
             mi->filesystem = NULL;

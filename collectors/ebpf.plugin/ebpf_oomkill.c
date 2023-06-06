@@ -16,7 +16,10 @@ static ebpf_local_maps_t oomkill_maps[] = {
         .internal_input = NETDATA_OOMKILL_MAX_ENTRIES,
         .user_input = 0,
         .type = NETDATA_EBPF_MAP_STATIC,
-        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED
+        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+        .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
     },
     /* end */
     {
@@ -24,7 +27,10 @@ static ebpf_local_maps_t oomkill_maps[] = {
         .internal_input = 0,
         .user_input = 0,
         .type = NETDATA_EBPF_MAP_CONTROLLER,
-        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED
+        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+        .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
     }
 };
 
@@ -47,7 +53,7 @@ static void oomkill_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -285,6 +291,8 @@ static void ebpf_update_oomkill_cgroup(int32_t *keys, uint32_t total)
 
 /**
 * Main loop for this collector.
+ *
+ * @param em the thread main structure.
 */
 static void oomkill_collector(ebpf_module_t *em)
 {
@@ -303,23 +311,24 @@ static void oomkill_collector(ebpf_module_t *em)
             continue;
 
         counter = 0;
-        pthread_mutex_lock(&collect_data_mutex);
-        pthread_mutex_lock(&lock);
 
         uint32_t count = oomkill_read_data(keys);
-        if (cgroups && count)
-            ebpf_update_oomkill_cgroup(keys, count);
+        if (!count)
+            continue;
 
-        // write everything from the ebpf map.
-        if (cgroups)
+        pthread_mutex_lock(&collect_data_mutex);
+        pthread_mutex_lock(&lock);
+        if (cgroups) {
+            ebpf_update_oomkill_cgroup(keys, count);
+            // write everything from the ebpf map.
             ebpf_oomkill_send_cgroup_data(update_every);
+        }
 
         if (em->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
             write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_OOMKILL_CHART);
             oomkill_write_data(keys, count);
             write_end_chart();
         }
-
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
     }
@@ -364,29 +373,30 @@ void *ebpf_oomkill_thread(void *ptr)
     if (unlikely(!ebpf_all_pids || !em->apps_charts)) {
         // When we are not running integration with apps, we won't fill necessary variables for this thread to run, so
         // we need to disable it.
-        if (em->thread->enabled)
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (em->enabled)
             info("%s apps integration is completely disabled.", NETDATA_DEFAULT_OOM_DISABLED_MSG);
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+        goto endoomkill;
     } else if (running_on_kernel < NETDATA_EBPF_KERNEL_4_14) {
-        if (em->thread->enabled)
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (em->enabled)
             info("%s kernel does not have necessary tracepoints.", NETDATA_DEFAULT_OOM_DISABLED_MSG);
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
-    }
-
-    if (em->thread->enabled == NETDATA_THREAD_EBPF_STOPPED) {
         goto endoomkill;
     }
 
     if (ebpf_enable_tracepoints(oomkill_tracepoints) == 0) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endoomkill;
     }
 
+#ifdef LIBBPF_MAJOR_VERSION
+    ebpf_define_map_type(em->maps, em->maps_per_core, running_on_kernel);
+#endif
     em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
     if (!em->probe_links) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endoomkill;
     }
 

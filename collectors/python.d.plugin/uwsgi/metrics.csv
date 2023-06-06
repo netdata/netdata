@@ -1,0 +1,9 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+uwsgi.requests,,a dimension per worker,requests/s,Requests,stacked,,python.d.plugin,uwsgi
+uwsgi.tx,,a dimension per worker,KiB/s,Transmitted data,stacked,,python.d.plugin,uwsgi
+uwsgi.avg_rt,,a dimension per worker,milliseconds,Average request time,line,,python.d.plugin,uwsgi
+uwsgi.memory_rss,,a dimension per worker,MiB,RSS (Resident Set Size),stacked,,python.d.plugin,uwsgi
+uwsgi.memory_vsz,,a dimension per worker,MiB,VSZ (Virtual Memory Size),stacked,,python.d.plugin,uwsgi
+uwsgi.exceptions,,exceptions,exceptions,Exceptions,line,,python.d.plugin,uwsgi
+uwsgi.harakiris,,harakiris,harakiris,Harakiris,line,,python.d.plugin,uwsgi
+uwsgi.respawns,,respawns,respawns,Respawns,line,,python.d.plugin,uwsgi

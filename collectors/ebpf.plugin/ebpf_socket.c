@@ -7,7 +7,6 @@
 
 // ----------------------------------------------------------------------------
 // ARAL vectors used to speed up processing
-ARAL *ebpf_aral_socket_pid = NULL;
 
 /*****************************************************************
  *
@@ -28,41 +27,72 @@ static ebpf_local_maps_t socket_maps[] = {{.name = "tbl_bandwidth",
                                            .internal_input = NETDATA_COMPILED_CONNECTIONS_ALLOWED,
                                            .user_input = NETDATA_MAXIMUM_CONNECTIONS_ALLOWED,
                                            .type = NETDATA_EBPF_MAP_RESIZABLE | NETDATA_EBPF_MAP_PID,
-                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                           .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
+                                          },
                                           {.name = "tbl_global_sock",
                                            .internal_input = NETDATA_SOCKET_COUNTER,
                                            .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
-                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                           .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                          },
                                           {.name = "tbl_lports",
                                            .internal_input = NETDATA_SOCKET_COUNTER,
                                            .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
-                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                           .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
+                                           },
                                           {.name = "tbl_conn_ipv4",
                                            .internal_input = NETDATA_COMPILED_CONNECTIONS_ALLOWED,
                                            .user_input = NETDATA_MAXIMUM_CONNECTIONS_ALLOWED,
                                            .type = NETDATA_EBPF_MAP_STATIC,
-                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                           .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
+                                          },
                                           {.name = "tbl_conn_ipv6",
                                            .internal_input = NETDATA_COMPILED_CONNECTIONS_ALLOWED,
                                            .user_input = NETDATA_MAXIMUM_CONNECTIONS_ALLOWED,
                                            .type = NETDATA_EBPF_MAP_STATIC,
-                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                           .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
+                                          },
                                           {.name = "tbl_nv_udp",
                                            .internal_input = NETDATA_COMPILED_UDP_CONNECTIONS_ALLOWED,
                                            .user_input = NETDATA_MAXIMUM_UDP_CONNECTIONS_ALLOWED,
                                            .type = NETDATA_EBPF_MAP_STATIC,
-                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                           .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
+                                          },
                                           {.name = "socket_ctrl", .internal_input = NETDATA_CONTROLLER_END,
                                            .user_input = 0,
                                            .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
-                                          {.name = NULL, .internal_input = 0, .user_input = 0}};
+                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                           .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                          },
+                                          {.name = NULL, .internal_input = 0, .user_input = 0,
+#ifdef LIBBPF_MAJOR_VERSION
+        .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                          }};
 
 static netdata_idx_t *socket_hash_values = NULL;
 static netdata_syscall_stat_t socket_aggregated_data[NETDATA_MAX_SOCKET_VECTOR];
 static netdata_publish_syscall_t socket_publish_aggregated[NETDATA_MAX_SOCKET_VECTOR];
 
-ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
 static ebpf_bandwidth_t *bandwidth_vector = NULL;
 
 pthread_mutex_t nv_mutex;
@@ -101,10 +131,6 @@ struct netdata_static_thread socket_threads = {
 };
 
 #ifdef LIBBPF_MAJOR_VERSION
-#include "includes/socket.skel.h" // BTF code
-
-static struct socket_bpf *bpf_obj = NULL;
-
 /**
  * Disable Probe
  *
@@ -368,7 +394,7 @@ static void ebpf_socket_set_hash_tables(struct socket_bpf *obj)
  * @param obj is the main structure for bpf objects.
  * @param em  structure with configuration
  */
-static void ebpf_socket_adjust_map_size(struct socket_bpf *obj, ebpf_module_t *em)
+static void ebpf_socket_adjust_map(struct socket_bpf *obj, ebpf_module_t *em)
 {
     ebpf_update_map_size(obj->maps.tbl_bandwidth, &socket_maps[NETDATA_SOCKET_TABLE_BANDWIDTH],
                          em, bpf_map__name(obj->maps.tbl_bandwidth));
@@ -381,6 +407,15 @@ static void ebpf_socket_adjust_map_size(struct socket_bpf *obj, ebpf_module_t *e
 
     ebpf_update_map_size(obj->maps.tbl_nv_udp, &socket_maps[NETDATA_SOCKET_TABLE_UDP],
                          em, bpf_map__name(obj->maps.tbl_nv_udp));
+
+
+    ebpf_update_map_type(obj->maps.tbl_bandwidth, &socket_maps[NETDATA_SOCKET_TABLE_BANDWIDTH]);
+    ebpf_update_map_type(obj->maps.tbl_conn_ipv4, &socket_maps[NETDATA_SOCKET_TABLE_IPV4]);
+    ebpf_update_map_type(obj->maps.tbl_conn_ipv6, &socket_maps[NETDATA_SOCKET_TABLE_IPV6]);
+    ebpf_update_map_type(obj->maps.tbl_nv_udp, &socket_maps[NETDATA_SOCKET_TABLE_UDP]);
+    ebpf_update_map_type(obj->maps.socket_ctrl, &socket_maps[NETDATA_SOCKET_TABLE_CTRL]);
+    ebpf_update_map_type(obj->maps.tbl_global_sock, &socket_maps[NETDATA_SOCKET_GLOBAL]);
+    ebpf_update_map_type(obj->maps.tbl_lports, &socket_maps[NETDATA_SOCKET_LPORTS]);
 }
 
 /**
@@ -409,13 +444,13 @@ static inline int ebpf_socket_load_and_attach(struct socket_bpf *obj, ebpf_modul
         ebpf_socket_disable_specific_probe(obj, em->mode);
     }
 
+    ebpf_socket_adjust_map(obj, em);
+
     int ret = socket_bpf__load(obj);
     if (ret) {
         fprintf(stderr, "failed to load BPF object: %d\n", ret);
         return ret;
     }
-
-    ebpf_socket_adjust_map_size(obj, em);
 
     if (test == EBPF_LOAD_TRAMPOLINE) {
         ret = socket_bpf__attach(obj);
@@ -432,46 +467,6 @@ static inline int ebpf_socket_load_and_attach(struct socket_bpf *obj, ebpf_modul
     return ret;
 }
 #endif
-
-/*****************************************************************
- *
- *  ARAL FUNCTIONS
- *
- *****************************************************************/
-
-/**
- * eBPF socket Aral init
- *
- * Initiallize array allocator that will be used when integration with apps is enabled.
- */
-static inline void ebpf_socket_aral_init()
-{
-    ebpf_aral_socket_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_SOCKET_ARAL_NAME, sizeof(ebpf_socket_publish_apps_t));
-}
-
-/**
- * eBPF socket get
- *
- * Get a ebpf_socket_publish_apps_t entry to be used with a specific PID.
- *
- * @return it returns the address on success.
- */
-ebpf_socket_publish_apps_t *ebpf_socket_stat_get(void)
-{
-    ebpf_socket_publish_apps_t *target = aral_mallocz(ebpf_aral_socket_pid);
-    memset(target, 0, sizeof(ebpf_socket_publish_apps_t));
-    return target;
-}
-
-/**
- * eBPF socket release
- *
- * @param stat Release a target after usage.
- */
-void ebpf_socket_release(ebpf_socket_publish_apps_t *stat)
-{
-    aral_freez(ebpf_aral_socket_pid, stat);
-}
 
 /*****************************************************************
  *
@@ -498,7 +493,6 @@ static inline void clean_internal_socket_plot(netdata_socket_plot_t *ptr)
  * Clean socket plot
  *
  * Clean the allocated data for inbound and outbound vectors.
- */
 static void clean_allocated_socket_plot()
 {
     if (!network_viewer_opt.enabled)
@@ -520,12 +514,12 @@ static void clean_allocated_socket_plot()
     }
     clean_internal_socket_plot(&plot[outbound_vectors.last]);
 }
+ */
 
 /**
  * Clean network ports allocated during initialization.
  *
  * @param ptr a pointer to the link list.
- */
 static void clean_network_ports(ebpf_network_viewer_port_list_t *ptr)
 {
     if (unlikely(!ptr))
@@ -538,6 +532,7 @@ static void clean_network_ports(ebpf_network_viewer_port_list_t *ptr)
         ptr = next;
     }
 }
+ */
 
 /**
  * Clean service names
@@ -545,7 +540,6 @@ static void clean_network_ports(ebpf_network_viewer_port_list_t *ptr)
  * Clean the allocated link list that stores names.
  *
  * @param names the link list.
- */
 static void clean_service_names(ebpf_network_viewer_dim_name_t *names)
 {
     if (unlikely(!names))
@@ -558,12 +552,12 @@ static void clean_service_names(ebpf_network_viewer_dim_name_t *names)
         names = next;
     }
 }
+ */
 
 /**
  * Clean hostnames
  *
  * @param hostnames the hostnames to clean
- */
 static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
 {
     if (unlikely(!hostnames))
@@ -577,19 +571,7 @@ static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
         hostnames = next;
     }
 }
-
-/**
- * Cleanup publish syscall
- *
- * @param nps list of structures to clean
  */
-void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps)
-{
-    while (nps) {
-        freez(nps->algorithm);
-        nps = nps->next;
-    }
-}
 
 /**
  * Clean port Structure
@@ -640,15 +622,8 @@ static void clean_ip_structure(ebpf_network_viewer_ip_list_t **clean)
  */
 static void ebpf_socket_free(ebpf_module_t *em )
 {
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    if (em->thread->enabled == NETDATA_THREAD_EBPF_RUNNING) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
-        return;
-    }
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-
-    ebpf_cleanup_publish_syscall(socket_publish_aggregated);
+    /* We can have thousands of sockets to clean, so we are transferring
+     * for OS the responsibility while we do not use ARAL here
     freez(socket_hash_values);
 
     freez(bandwidth_vector);
@@ -660,25 +635,17 @@ static void ebpf_socket_free(ebpf_module_t *em )
 
     clean_port_structure(&listen_ports);
 
-    ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled = 0;
-
     clean_network_ports(network_viewer_opt.included_port);
     clean_network_ports(network_viewer_opt.excluded_port);
     clean_service_names(network_viewer_opt.names);
     clean_hostnames(network_viewer_opt.included_hostnames);
     clean_hostnames(network_viewer_opt.excluded_hostnames);
+     */
 
     pthread_mutex_destroy(&nv_mutex);
 
-    freez(socket_threads.thread);
-
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        socket_bpf__destroy(bpf_obj);
-#endif
-
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -692,8 +659,10 @@ static void ebpf_socket_free(ebpf_module_t *em )
 static void ebpf_socket_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    pthread_mutex_lock(&nv_mutex);
     if (socket_threads.thread)
         netdata_thread_cancel(*socket_threads.thread);
+    pthread_mutex_unlock(&nv_mutex);
     ebpf_socket_free(em);
 }
 
@@ -706,8 +675,7 @@ static void ebpf_socket_exit(void *ptr)
  */
 void ebpf_socket_cleanup(void *ptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    ebpf_socket_free(em);
+    UNUSED(ptr);
 }
 
 /*****************************************************************
@@ -2061,17 +2029,23 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
  *
  * @param fd                 the hash table with data.
  * @param family             the family associated to the hash table
+ * @param maps_per_core      do I need to read all cores?
  *
  * @return it returns 0 on success and -1 otherwise.
  */
-static void ebpf_read_socket_hash_table(int fd, int family)
+static void ebpf_read_socket_hash_table(int fd, int family, int maps_per_core)
 {
     netdata_socket_idx_t key = {};
     netdata_socket_idx_t next_key = {};
 
     netdata_socket_t *values = socket_values;
-    size_t length = ebpf_nprocs*sizeof(netdata_socket_t);
-    int test, end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
+    size_t length = sizeof(netdata_socket_t);
+    int test, end;
+    if (maps_per_core) {
+        length *= ebpf_nprocs;
+        end = ebpf_nprocs;
+    } else
+        end = 1;
 
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         // We need to reset the values when we are working on kernel 4.15 or newer, because kernel does not create
@@ -2195,19 +2169,22 @@ static void read_listen_table()
 void *ebpf_socket_read_hash(void *ptr)
 {
     netdata_thread_cleanup_push(ebpf_socket_cleanup, ptr);
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     heartbeat_t hb;
     heartbeat_init(&hb);
     int fd_ipv4 = socket_maps[NETDATA_SOCKET_TABLE_IPV4].map_fd;
     int fd_ipv6 = socket_maps[NETDATA_SOCKET_TABLE_IPV6].map_fd;
-    while (!ebpf_exit_plugin) {
+    int maps_per_core = em->maps_per_core;
+    // This thread is cancelled from another thread
+    for (;;) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_exit_plugin)
-           continue;
+           break;
 
         pthread_mutex_lock(&nv_mutex);
-        ebpf_read_socket_hash_table(fd_ipv4, AF_INET);
-        ebpf_read_socket_hash_table(fd_ipv6, AF_INET6);
+        ebpf_read_socket_hash_table(fd_ipv4, AF_INET, maps_per_core);
+        ebpf_read_socket_hash_table(fd_ipv6, AF_INET6, maps_per_core);
         pthread_mutex_unlock(&nv_mutex);
     }
 
@@ -2217,23 +2194,30 @@ void *ebpf_socket_read_hash(void *ptr)
 
 /**
  * Read the hash table and store data to allocated vectors.
+ *
+ * @param maps_per_core      do I need to read all cores?
  */
-static void read_hash_global_tables()
+static void read_hash_global_tables(int maps_per_core)
 {
     uint64_t idx;
     netdata_idx_t res[NETDATA_SOCKET_COUNTER];
 
     netdata_idx_t *val = socket_hash_values;
+    size_t length = sizeof(netdata_idx_t);
+    if (maps_per_core)
+        length *= ebpf_nprocs;
+
     int fd = socket_maps[NETDATA_SOCKET_GLOBAL].map_fd;
     for (idx = 0; idx < NETDATA_SOCKET_COUNTER; idx++) {
         if (!bpf_map_lookup_elem(fd, &idx, val)) {
             uint64_t total = 0;
             int i;
-            int end = ebpf_nprocs;
+            int end = (maps_per_core) ? ebpf_nprocs : 1;
             for (i = 0; i < end; i++)
                 total += val[i];
 
             res[idx] = total;
+            memset(socket_hash_values, 0, length);
         } else {
             res[idx] = 0;
         }
@@ -2292,9 +2276,9 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
  *
  * @param out the vector with the values to sum
  */
-void ebpf_socket_bandwidth_accumulator(ebpf_bandwidth_t *out)
+void ebpf_socket_bandwidth_accumulator(ebpf_bandwidth_t *out, int maps_per_core)
 {
-    int i, end = (running_on_kernel >= NETDATA_KERNEL_V4_15) ? ebpf_nprocs : 1;
+    int i, end = (maps_per_core) ? ebpf_nprocs : 1;
     ebpf_bandwidth_t *total = &out[0];
     for (i = 1; i < end; i++) {
         ebpf_bandwidth_t *move = &out[i];
@@ -2313,13 +2297,18 @@ void ebpf_socket_bandwidth_accumulator(ebpf_bandwidth_t *out)
 
 /**
  *  Update the apps data reading information from the hash table
+ *
+ * @param maps_per_core      do I need to read all cores?
  */
-static void ebpf_socket_update_apps_data()
+static void ebpf_socket_update_apps_data(int maps_per_core)
 {
     int fd = socket_maps[NETDATA_SOCKET_TABLE_BANDWIDTH].map_fd;
     ebpf_bandwidth_t *eb = bandwidth_vector;
     uint32_t key;
     struct ebpf_pid_stat *pids = ebpf_root_of_pids;
+    size_t length = sizeof(ebpf_bandwidth_t);
+    if (maps_per_core)
+        length *= ebpf_nprocs;
     while (pids) {
         key = pids->pid;
 
@@ -2328,9 +2317,11 @@ static void ebpf_socket_update_apps_data()
             continue;
         }
 
-        ebpf_socket_bandwidth_accumulator(eb);
+        ebpf_socket_bandwidth_accumulator(eb, maps_per_core);
 
         ebpf_socket_fill_publish_apps(key, eb);
+
+        memset(eb, 0, length);
 
         pids = pids->next;
     }
@@ -2339,14 +2330,20 @@ static void ebpf_socket_update_apps_data()
 /**
  * Update cgroup
  *
- * Update cgroup data based in
+ * Update cgroup data based in PIDs.
+ *
+ * @param maps_per_core      do I need to read all cores?
  */
-static void ebpf_update_socket_cgroup()
+static void ebpf_update_socket_cgroup(int maps_per_core)
 {
     ebpf_cgroup_target_t *ect ;
 
     ebpf_bandwidth_t *eb = bandwidth_vector;
     int fd = socket_maps[NETDATA_SOCKET_TABLE_BANDWIDTH].map_fd;
+
+    size_t length = sizeof(ebpf_bandwidth_t);
+    if (maps_per_core)
+        length *= ebpf_nprocs;
 
     pthread_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
@@ -2370,7 +2367,7 @@ static void ebpf_update_socket_cgroup()
                 publish->call_tcp_v6_connection = in->call_tcp_v6_connection;
             } else {
                 if (!bpf_map_lookup_elem(fd, &pid, eb)) {
-                    ebpf_socket_bandwidth_accumulator(eb);
+                    ebpf_socket_bandwidth_accumulator(eb, maps_per_core);
 
                     memcpy(out, eb, sizeof(ebpf_bandwidth_t));
 
@@ -2384,6 +2381,8 @@ static void ebpf_update_socket_cgroup()
                     publish->call_close = out->close;
                     publish->call_tcp_v4_connection = out->tcp_v4_connection;
                     publish->call_tcp_v6_connection = out->tcp_v6_connection;
+
+                    memset(eb, 0, length);
                 }
             }
         }
@@ -2838,8 +2837,7 @@ void ebpf_socket_update_cgroup_algorithm()
     int i;
     for (i = 0; i < NETDATA_MAX_SOCKET_VECTOR; i++) {
         netdata_publish_syscall_t *ptr = &socket_publish_aggregated[i];
-        freez(ptr->algorithm);
-        ptr->algorithm = strdupz(ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
+        ptr->algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX];
     }
 }
 
@@ -2918,6 +2916,7 @@ static void socket_collector(ebpf_module_t *em)
 
     int socket_global_enabled = em->global_charts;
     int update_every = em->update_every;
+    int maps_per_core = em->maps_per_core;
     int counter = update_every - 1;
     while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
@@ -2928,15 +2927,15 @@ static void socket_collector(ebpf_module_t *em)
         netdata_apps_integration_flags_t socket_apps_enabled = em->apps_charts;
         if (socket_global_enabled) {
             read_listen_table();
-            read_hash_global_tables();
+            read_hash_global_tables(maps_per_core);
         }
 
         pthread_mutex_lock(&collect_data_mutex);
         if (socket_apps_enabled)
-            ebpf_socket_update_apps_data();
+            ebpf_socket_update_apps_data(maps_per_core);
 
         if (cgroups)
-            ebpf_update_socket_cgroup();
+            ebpf_update_socket_cgroup(maps_per_core);
 
         if (network_connection)
             calculate_nv_plot();
@@ -3928,6 +3927,10 @@ void parse_table_size_options(struct config *cfg)
  */
 static int ebpf_socket_load_bpf(ebpf_module_t *em)
 {
+#ifdef LIBBPF_MAJOR_VERSION
+    ebpf_define_map_type(em->maps, em->maps_per_core, running_on_kernel);
+#endif
+
     int ret = 0;
 
     if (em->load & EBPF_LOAD_LEGACY) {
@@ -3938,11 +3941,11 @@ static int ebpf_socket_load_bpf(ebpf_module_t *em)
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else {
-        bpf_obj = socket_bpf__open();
-        if (!bpf_obj)
+        socket_bpf_obj = socket_bpf__open();
+        if (!socket_bpf_obj)
             ret = -1;
         else
-            ret = ebpf_socket_load_and_attach(bpf_obj, em);
+            ret = ebpf_socket_load_and_attach(socket_bpf_obj, em);
     }
 #endif
 
@@ -3972,7 +3975,6 @@ void *ebpf_socket_thread(void *ptr)
     parse_table_size_options(&socket_config);
 
     if (pthread_mutex_init(&nv_mutex, NULL)) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         error("Cannot initialize local mutex");
         goto endsocket;
     }
@@ -3995,7 +3997,6 @@ void *ebpf_socket_thread(void *ptr)
     ebpf_adjust_thread_load(em, default_btf);
 #endif
     if (ebpf_socket_load_bpf(em)) {
-        em->enabled = CONFIG_BOOLEAN_NO;
         pthread_mutex_unlock(&lock);
         goto endsocket;
     }

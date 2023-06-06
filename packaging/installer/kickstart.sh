@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F0512
+# Next unused error code: F0515
 
 # ======================================================================
 # Constants
@@ -26,6 +26,7 @@ KICKSTART_SOURCE="$(
     echo "$(pwd -P)/${self##*/}"
 )"
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
+DEFAULT_PLUGIN_PACKAGES="netdata-plugin-go netdata-plugin-python netdata-plugin-apps netdata-plugin-ebpf"
 PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 PUBLIC_CLOUD_URL="https://app.netdata.cloud"
 REPOCONFIG_DEB_URL_PREFIX="https://repo.netdata.cloud/repos/repoconfig"
@@ -34,7 +35,7 @@ REPOCONFIG_RPM_URL_PREFIX="https://repo.netdata.cloud/repos/repoconfig"
 REPOCONFIG_RPM_VERSION="2-1"
 START_TIME="$(date +%s)"
 STATIC_INSTALL_ARCHES="x86_64 armv7l aarch64 ppc64le"
-TELEMETRY_URL="https://app.posthog.com/capture/"
+TELEMETRY_URL="https://us-east1-netdata-analytics-bi.cloudfunctions.net/ingest_agent_events"
 
 # ======================================================================
 # Defaults for environment variables
@@ -63,7 +64,6 @@ else
 fi
 
 NETDATA_TARBALL_BASEURL="${NETDATA_TARBALL_BASEURL:-https://github.com/netdata/netdata-nightlies/releases}"
-TELEMETRY_API_KEY="${NETDATA_POSTHOG_API_KEY:-mqkwGT0JNFqO-zX2t0mW6Tec9yooaVu7xCBlXtHnt5Y}"
 
 if echo "${0}" | grep -q 'kickstart-static64'; then
   NETDATA_FORCE_METHOD='static'
@@ -267,7 +267,6 @@ telemetry_event() {
 
   REQ_BODY="$(cat << EOF
 {
-  "api_key": "${TELEMETRY_API_KEY}",
   "event": "${1}",
   "properties": {
     "distinct_id": "${DISTINCT_ID}",
@@ -720,7 +719,7 @@ confirm_root_support() {
     fi
 
     if [ -z "${ROOTCMD}" ]; then
-      fatal "We need root privileges to continue, but cannot find a way to gain them (we support sudo, doas, and pkexec). Either re-run this script as root, or set \$ROOTCMD to a command that can be used to gain root privileges." F0201
+      fatal "This script needs root privileges to install Netdata, but cannot find a way to gain them (we support sudo, doas, and pkexec). Either re-run this script as root, or set \$ROOTCMD to a command that can be used to gain root privileges." F0201
     fi
   fi
 }
@@ -746,7 +745,7 @@ confirm() {
 update() {
   updater="${ndprefix}/usr/libexec/netdata/netdata-updater.sh"
 
-  if [ -x "${updater}" ]; then
+  if run_as_root test -x "${updater}"; then
     if [ "${DRY_RUN}" -eq 1 ]; then
       progress "Would attempt to update existing installation by running the updater script located at: ${updater}"
       return 0
@@ -972,7 +971,7 @@ handle_existing_install() {
         claim
         ret=$?
       elif [ "${ACTION}" = "claim" ]; then
-        fatal "User asked to claim, but did not proide a claiming token." F0202
+        fatal "User asked to claim, but did not provide a claiming token." F0202
       else
         progress "Not attempting to claim existing install at ${ndprefix} (no claiming token provided)."
       fi
@@ -1010,7 +1009,7 @@ handle_existing_install() {
           trap - EXIT
           exit $ret
         elif [ "${ACTION}" = "claim" ]; then
-          fatal "User asked to claim, but did not proide a claiming token." F0202
+          fatal "User asked to claim, but did not provide a claiming token." F0202
         else
           fatal "Found an existing netdata install at ${ndprefix}, but the install type is '${INSTALL_TYPE}', which is not supported by this script, refusing to proceed." F0103
         fi
@@ -1120,7 +1119,6 @@ claim() {
     progress "Attempting to claim agent to ${NETDATA_CLAIM_URL}"
   fi
 
-  progress "Attempting to claim agent to ${NETDATA_CLAIM_URL}"
   if command -v netdata-claim.sh > /dev/null 2>&1; then
     NETDATA_CLAIM_PATH="$(command -v netdata-claim.sh)"
   elif [ -z "${INSTALL_PREFIX}" ] || [ "${INSTALL_PREFIX}" = "/" ]; then
@@ -1137,8 +1135,29 @@ claim() {
     NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/netdata/usr/sbin/netdata-claim.sh"
   fi
 
-  if [ ! -x "${NETDATA_CLAIM_PATH}" ]; then
-    fatal "Unable to find usable claiming script. Reinstalling Netdata may resolve this." F050B
+  err_msg=
+  err_code=
+  if [ -z "${NETDATA_CLAIM_PATH}" ]; then
+    err_msg="Unable to claim node: could not find usable claiming script. Reinstalling Netdata may resolve this."
+    err_code=F050B
+  elif [ ! -e "${NETDATA_CLAIM_PATH}" ]; then
+    err_msg="Unable to claim node: ${NETDATA_CLAIM_PATH} does not exist."
+    err_code=F0512
+  elif [ ! -f "${NETDATA_CLAIM_PATH}" ]; then
+    err_msg="Unable to claim node: ${NETDATA_CLAIM_PATH} is not a file."
+    err_code=F0513
+  elif [ ! -x "${NETDATA_CLAIM_PATH}" ]; then
+    err_msg="Unable to claim node: claiming script at ${NETDATA_CLAIM_PATH} is not executable. Reinstalling Netdata may resolve this."
+    err_code=F0514
+  fi
+
+  if [ -n "$err_msg" ]; then
+    if [ "${ACTION}" = "claim" ]; then
+      fatal "$err_msg" "$err_code"
+    else
+      warning "$err_msg"
+      return 1
+    fi
   fi
 
   if ! is_netdata_running; then
@@ -1172,7 +1191,7 @@ claim() {
     *) warning "Failed to claim node for an unknown reason. This usually means either networking problems or a bug. Please retry claiming later, and if you still see this message file a bug report at ${AGENT_BUG_REPORT_URL}" ;;
   esac
 
-  if [ -z "${NETDATA_NEW_INSTALL}" ]; then
+  if [ "${ACTION}" = "claim" ]; then
     deferred_warnings
     printf >&2 "%s\n" "For community support, you can connect with us on:"
     support_list
@@ -1185,9 +1204,9 @@ claim() {
 # ======================================================================
 # Auto-update handling code.
 set_auto_updates() {
-  if [ -x "${INSTALL_PREFIX}/usr/libexec/netdata/netdata-updater.sh" ]; then
+  if run_as_root test -x "${INSTALL_PREFIX}/usr/libexec/netdata/netdata-updater.sh"; then
     updater="${INSTALL_PREFIX}/usr/libexec/netdata/netdata-updater.sh"
-  elif [ -x "${INSTALL_PREFIX}/netdata/usr/libexec/netdata/netdata-updater.sh" ]; then
+  elif run_as_root test -x "${INSTALL_PREFIX}/netdata/usr/libexec/netdata/netdata-updater.sh"; then
     updater="${INSTALL_PREFIX}/netdata/usr/libexec/netdata/netdata-updater.sh"
   else
     warning "Could not find netdata-updater.sh. This means that auto-updates cannot (currently) be enabled on this system. See https://learn.netdata.cloud/docs/agent/packaging/installer/update for more information about updating Netdata."
@@ -1198,7 +1217,7 @@ set_auto_updates() {
     if [ "${DRY_RUN}" -eq 1 ]; then
       progress "Would have attempted to enable automatic updates."
     # This first case is for catching using a new kickstart script with an old build. It can be safely removed after v1.34.0 is released.
-    elif ! grep -q '\-\-enable-auto-updates' "${updater}"; then
+    elif ! run_as_root grep -q '\-\-enable-auto-updates' "${updater}"; then
       echo
     elif ! run_as_root "${updater}" --enable-auto-updates "${NETDATA_AUTO_UPDATE_TYPE}"; then
       warning "Failed to enable auto updates. Netdata will still work, but you will need to update manually."
@@ -1325,7 +1344,7 @@ common_dnf_opts() {
 }
 
 try_package_install() {
-  failed_refresh_msg="Failed to refresh repository metadata. ${BADNET_MSG} or by misconfiguration of one or more rpackage repositories in the system package manager configuration."
+  failed_refresh_msg="Failed to refresh repository metadata. ${BADNET_MSG} or incompatibilities with one or more third-party package repositories in the system package manager configuration."
 
   if [ -z "${DISTRO_COMPAT_NAME}" ] || [ "${DISTRO_COMPAT_NAME}" = "unknown" ]; then
     warning "Unable to determine Linux distribution for native packages."
@@ -1380,6 +1399,9 @@ try_package_install() {
       common_rpm_opts
       common_dnf_opts
       repo_prefix="el/${SYSVERSION}"
+      if [ "${SYSVERSION}" -lt 8 ]; then
+        explicitly_install_native_plugins=1
+      fi
       ;;
     fedora|ol)
       common_rpm_opts
@@ -1465,7 +1487,7 @@ try_package_install() {
     if [ -n "${repo_subcmd}" ]; then
       # shellcheck disable=SC2086
       if ! run_as_root env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts}; then
-        fatal "${failed_refresh_msg}" F0205
+        fatal "${failed_refresh_msg} In most cases, disabling any third-party repositories on the system and re-running the installer with the same options should work. If that does not work, consider using a static build with the --static-only option instead of native packages." F0205
       fi
     fi
   else
@@ -1514,6 +1536,14 @@ try_package_install() {
       run_as_root env ${env} ${pm_cmd} ${uninstall_subcmd} ${pkg_install_opts} "${repoconfig_name}"
     fi
     return 2
+  fi
+
+  if [ -n "${explicitly_install_native_plugins}" ]; then
+    progress "Installing external plugins."
+    # shellcheck disable=SC2086
+    if ! run_as_root env ${env} ${pm_cmd} install ${DEFAULT_PLUGIN_PACKAGES}; then
+      warning "Failed to install external plugin packages. Some collectors may not be available."
+    fi
   fi
 }
 

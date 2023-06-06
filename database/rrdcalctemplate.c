@@ -51,6 +51,11 @@ bool rrdcalctemplate_check_rrdset_conditions(RRDCALCTEMPLATE *rt, RRDSET *st, RR
                                                                                             '=', NULL))
         return false;
 
+    if(st->rrdlabels && rt->chart_labels_pattern && !rrdlabels_match_simple_pattern_parsed(st->rrdlabels,
+                                                                                            rt->chart_labels_pattern,
+                                                                                            '=', NULL))
+        return false;
+
     return true;
 }
 
@@ -120,8 +125,10 @@ static void rrdcalctemplate_free_internals(RRDCALCTEMPLATE *rt) {
     string_freez(rt->dimensions);
     string_freez(rt->foreach_dimension);
     string_freez(rt->host_labels);
+    string_freez(rt->chart_labels);
     simple_pattern_free(rt->foreach_dimension_pattern);
     simple_pattern_free(rt->host_labels_pattern);
+    simple_pattern_free(rt->chart_labels_pattern);
 }
 
 void rrdcalctemplate_free_unused_rrdcalctemplate_loaded_from_config(RRDCALCTEMPLATE *rt) {

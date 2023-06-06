@@ -1,0 +1,9 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+tomcat.accesses,,"accesses, errors",requests/s,Requests,area,,python.d.plugin,tomcat
+tomcat.bandwidth,,"sent, received",KiB/s,Bandwidth,area,,python.d.plugin,tomcat
+tomcat.processing_time,,processing time,seconds,processing time,area,,python.d.plugin,tomcat
+tomcat.threads,,"current, busy",current threads,Threads,area,,python.d.plugin,tomcat
+tomcat.jvm,,"free, eden, survivor, tenured, code cache, compressed, metaspace",MiB,JVM Memory Pool Usage,stacked,,python.d.plugin,tomcat
+tomcat.jvm_eden,,"used, committed, max",MiB,Eden Memory Usage,area,,python.d.plugin,tomcat
+tomcat.jvm_survivor,,"used, committed, max",MiB,Survivor Memory Usage,area,,python.d.plugin,tomcat
+tomcat.jvm_tenured,,"used, committed, max",MiB,Tenured Memory Usage,area,,python.d.plugin,tomcat

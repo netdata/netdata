@@ -85,6 +85,7 @@ typedef enum rrdr_group_by_function {
     RRDR_GROUP_BY_FUNCTION_MIN,
     RRDR_GROUP_BY_FUNCTION_MAX,
     RRDR_GROUP_BY_FUNCTION_SUM,
+    RRDR_GROUP_BY_FUNCTION_PERCENTAGE,
 } RRDR_GROUP_BY_FUNCTION;
 
 RRDR_GROUP_BY_FUNCTION group_by_aggregate_function_parse(const char *s);

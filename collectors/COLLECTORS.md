@@ -342,8 +342,6 @@ configure any of these collectors according to your setup and infrastructure.
   any HTTP endpoint's availability and response time.
 - [Lighttpd](https://github.com/netdata/go.d.plugin/blob/master/modules/lighttpd/README.md): Collect web server
   performance metrics using the `server-status?auto` endpoint.
-- [Lighttpd2](https://github.com/netdata/go.d.plugin/blob/master/modules/lighttpd2/README.md): Collect web server
-  performance metrics using the `server-status?format=plain` endpoint.
 - [Litespeed](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/litespeed/README.md): Collect
   web server data (network, connection,
   requests, cache) by reading `.rtreport*` files.
@@ -666,7 +664,7 @@ $ sudo systemctl restart netdata
 - [SSH](https://github.com/Yaser-Amiri/netdata-ssh-module): Monitor failed authentication requests of an SSH server.
 - [ClickHouse](https://github.com/netdata/community/tree/main/collectors/python.d.plugin/clickhouse):
   Monitor [ClickHouse](https://clickhouse.com/) database.
-- [Ethtool](https://github.com/ghanapunq/netdata_ethtool_plugin): Monitor network interface with ethtool.
+- [Ethtool](https://github.com/ghanapunq/netdata_ethtool_plugin): Monitor network interfaces with ethtool.
 - [netdata-needrestart](https://github.com/nodiscc/netdata-needrestart) - Check/graph the number of processes/services/kernels that should be restarted after upgrading packages.
 - [netdata-debsecan](https://github.com/nodiscc/netdata-debsecan) - Check/graph the number of CVEs in currently installed packages.
 - [netdata-logcount](https://github.com/nodiscc/netdata-logcount) - Check/graph the number of syslog messages, by level over time.

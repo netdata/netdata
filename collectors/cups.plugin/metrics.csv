@@ -1,0 +1,7 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+cups.dests_state,,"idle, printing, stopped",dests,"Destinations by state",stacked,,cups.plugin,
+cups.dests_option,,"total, acceptingjobs, shared",dests,"Destinations by option",line,,cups.plugin,
+cups.job_num,,"pending, held, processing",jobs,"Active jobs",stacked,,cups.plugin,
+cups.job_size,,"pending, held, processing",KB,"Active jobs size",stacked,,cups.plugin,
+cups.destination_job_num,destination,"pending, held, processing",jobs,"Active jobs of {destination}",stacked,,cups.plugin,
+cups.destination_job_size,destination,"pending, held, processing",KB,"Active jobs size of {destination}",stacked,,cups.plugin,

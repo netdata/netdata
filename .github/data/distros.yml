@@ -36,9 +36,6 @@ include:
   - <<: *alpine
     version: "3.15"
     eol_check: true
-  - <<: *alpine
-    version: "3.14"
-    eol_check: true
 
   - distro: archlinux
     version: latest
@@ -162,13 +159,6 @@ include:
     packages:
       <<: *fedora_packages
       repo_distro: fedora/37
-    test:
-      ebpf-core: true
-  - <<: *fedora
-    version: "36"
-    packages:
-      <<: *fedora_packages
-      repo_distro: fedora/36
     test:
       ebpf-core: true
 

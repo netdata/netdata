@@ -496,7 +496,7 @@ typedef ssize_t (*foreach_host_cb_t)(void *data, RRDHOST *host, bool queryable);
 ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hosts_sp,
                                   foreach_host_cb_t cb, void *data,
                                   struct query_versions *versions,
-                                  char *host_uuid_buffer);
+                                  char *host_node_id_str);
 
 typedef ssize_t (*foreach_context_cb_t)(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context);
 ssize_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, SIMPLE_PATTERN *scope_contexts_sp, SIMPLE_PATTERN *contexts_sp, foreach_context_cb_t cb, bool queryable_host, void *data);
@@ -524,10 +524,32 @@ bool rrdcontext_retention_match(RRDCONTEXT_ACQUIRED *rca, time_t after, time_t b
 
 #define query_target_aggregatable(qt) ((qt)->window.options & RRDR_OPTION_RETURN_RAW)
 
-static inline bool query_target_has_percentage_of_instance(QUERY_TARGET *qt) {
-    for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++)
+static inline bool query_has_group_by_aggregation_percentage(QUERY_TARGET *qt) {
+
+    // backwards compatibility
+    // If the request was made with group_by = "percentage-of-instance"
+    // we need to send back "raw" output with "count"
+    // otherwise, we need to send back "raw" output with "hidden"
+
+    for(int g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
         if(qt->request.group_by[g].group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE)
+            return false;
+
+        if(qt->request.group_by[g].aggregation == RRDR_GROUP_BY_FUNCTION_PERCENTAGE)
             return true;
+    }
+
+    return false;
+}
+
+static inline bool query_target_has_percentage_of_group(QUERY_TARGET *qt) {
+    for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
+        if (qt->request.group_by[g].group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE)
+            return true;
+
+        if (qt->request.group_by[g].aggregation == RRDR_GROUP_BY_FUNCTION_PERCENTAGE)
+            return true;
+    }
 
     return false;
 }
@@ -536,14 +558,17 @@ static inline bool query_target_needs_all_dimensions(QUERY_TARGET *qt) {
     if(qt->request.options & RRDR_OPTION_PERCENTAGE)
         return true;
 
-    return query_target_has_percentage_of_instance(qt);
+    return query_target_has_percentage_of_group(qt);
 }
 
 static inline bool query_target_has_percentage_units(QUERY_TARGET *qt) {
-    if(qt->window.time_group_method == RRDR_GROUPING_CV || query_target_needs_all_dimensions(qt))
+    if(qt->window.time_group_method == RRDR_GROUPING_CV)
         return true;
 
-    return false;
+    if((qt->request.options & RRDR_OPTION_PERCENTAGE) && !(qt->window.options & RRDR_OPTION_RETURN_RAW))
+        return true;
+
+    return query_target_has_percentage_of_group(qt);
 }
 
 #endif // NETDATA_RRDCONTEXT_H

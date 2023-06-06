@@ -87,12 +87,10 @@ To install, copy the script, paste it into your node's terminal, and hit `Enter`
   </TabItem>
 </Tabs>
 
-:::note
-If you plan to also claim the node to Netdata Cloud,
-make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space,
-and `YOUR_ROOM_ID` with the ID of the room you are willing to claim to.
-You can leave the room id blank to have your node claimed to the default "All nodes" room.
-:::
+> ### Note
+>
+> If you plan to also claim the node to Netdata Cloud, make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space, and `YOUR_ROOM_ID` with the ID of the room you are claiming to.
+> You can leave the room id blank to have your node claimed to the default "All nodes" room.
 
 Jump down to [what's next](#whats-next) to learn how to view your new dashboard and take your next steps monitoring and
 troubleshooting with Netdata.

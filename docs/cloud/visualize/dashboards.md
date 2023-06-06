@@ -1,15 +1,3 @@
-<!--
-title: "Build new dashboards"
-description: >-
-    "Design new dashboards that target your infrastructure's unique needs and share them with your team for
-    targeted visual anomaly detection or incident response."
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md"
-sidebar_label: "Build new dashboards"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Operations/Visualizations"
--->
-
 # Build new dashboards
 
 With Netdata Cloud, you can build new dashboards that target your infrastructure's unique needs. Put key metrics from
@@ -82,7 +70,7 @@ dashboards.
 ## Pin dashboards
 
 Click on the **Pin** button in any dashboard to put those charts into a separate panel at the bottom of the screen. You
-can now navigate through Netdata Cloud freely, individual Cloud dashboards, the Nodes view, different War Rooms, or even
+can now navigate through Netdata Cloud freely, individual Cloud dashboards, the Nodes tab, different War Rooms, or even
 different Spaces, and have those valuable metrics follow you.
 
 Pinning dashboards helps you correlate potentially related charts across your infrastructure, no matter how you

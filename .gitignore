@@ -74,6 +74,9 @@ collectors/ebpf.plugin/reset_netdata_trace.sh
 !ebpf.plugin/
 collectors/ebpf.plugin/includes/
 
+debugfs.plugin
+!debugfs.plugin/
+
 # protoc generated files
 *.pb.cc
 *.pb.h
@@ -230,10 +233,6 @@ Session.*.vim
 
 # Jupyter notebook checkpoints
 .ipynb_checkpoints
-
-# Judy stuff
-JudyLTables.c
-judyltablesgen
 
 # m4 generated ksys
 database/engine/journalfile_v2.ksy

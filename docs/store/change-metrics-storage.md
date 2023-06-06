@@ -3,6 +3,8 @@
 The Netdata Agent uses a custom made time-series database (TSDB), named the 
 [`dbengine`](https://github.com/netdata/netdata/blob/master/database/engine/README.md), to store metrics.
 
+To see the number of metrics stored and the retention in days per tier, use the `/api/v1/dbengine_stats` endpoint. 
+
 To increase or decrease the metric retention time, you just [configure](#configure-metric-retention) 
 the number of storage tiers and the space allocated to each one. The effect of these two parameters 
 on the maximum retention and the memory used by Netdata is described in detail, below. 
@@ -73,6 +75,7 @@ usually constant over time (affecting compression efficiency). The number of res
 through time (because it has to break pages prematurely, increasing the metadata overhead). But the actual 
 numbers should not deviate significantly from the above. 
 
+To see the number of metrics stored and the retention in days per tier, use the `/api/v1/dbengine_stats` endpoint. 
 
 ### Effect of storage tiers and retention on memory usage
 
@@ -123,6 +126,8 @@ The Netdata parent in our production infrastructure at the time of writing:
  - The metrics include moderately ephemeral Kubernetes containers, leading to an ephemerality factor of about 4
  - 3 tiers are used for retention
  - The `dbengine page cache size MB` in `netdata.conf` is configured to be 4GB
+
+Netdata parents can end up collecting millions of metrics per second. See also [scaling dedicated parent nodes](#scaling-dedicated-parent-nodes).
 
 The rule of thumb calculation for this set up gives us
 ```
@@ -190,3 +195,13 @@ All new child nodes are automatically transferred to the multihost dbengine inst
 space. If you want to migrate a child node from its legacy dbengine instance to the multihost dbengine instance, you
 must delete the instance's directory, which is located in `/var/cache/netdata/MACHINE_GUID/dbengine`, after stopping the
 Agent.
+
+## Scaling dedicated parent nodes
+
+When you use streaming in medium to large infrastructures, you can have potentially millions of metrics per second reaching each parent node.
+In the lab we have reliably collected 1 million metrics/sec with 16cores and 32GB RAM.
+
+Our suggestion for scaling parents is to have them running on dedicated VMs, using a maximum of 50% of cpu, and ensuring you have enough RAM 
+for the desired retention. When your infrastructure can lead a parent to exceed these characteristics, split the load to multiple parents that
+do not communicate with each other. With each child sending data to only one of the parents, you can still have replication, high availability,
+and infrastructure level observability via the Netdata Cloud UI. 
