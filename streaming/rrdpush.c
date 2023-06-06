@@ -1162,8 +1162,9 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
 
     rrdpush_receiver_takeover_web_connection(w, rpt);
 
-    char tag[FILENAME_MAX + 1];
-    snprintfz(tag, FILENAME_MAX, THREAD_TAG_STREAM_RECEIVER "[%s,[%s]:%s]", rpt->hostname, w->client_ip, w->client_port);
+    char tag[NETDATA_THREAD_TAG_MAX + 1];
+    snprintfz(tag, NETDATA_THREAD_TAG_MAX, THREAD_TAG_STREAM_RECEIVER "[%s]", rpt->hostname);
+    tag[NETDATA_THREAD_TAG_MAX] = '\0';
 
     if(netdata_thread_create(&rpt->thread, tag, NETDATA_THREAD_OPTION_DEFAULT, rrdpush_receiver_thread, (void *)rpt)) {
         rrdpush_receive_log_status(

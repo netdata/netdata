@@ -334,12 +334,6 @@ static char *receiver_next_line(struct receiver_state *r, char *buffer, size_t b
     return NULL;
 }
 
-static void streaming_parser_thread_cleanup(void *ptr) {
-    PARSER *parser = (PARSER *)ptr;
-    rrd_collector_finished();
-    parser_destroy(parser);
-}
-
 bool plugin_is_enabled(struct plugind *cd);
 
 static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, int fd, void *ssl) {
@@ -363,7 +357,7 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
 
     // this keeps the parser with its current value
     // so, parser needs to be allocated before pushing it
-    netdata_thread_cleanup_push(streaming_parser_thread_cleanup, parser);
+    netdata_thread_cleanup_push(pluginsd_process_thread_cleanup, parser);
 
     parser_add_keyword(parser, "CLAIMED_ID", streaming_claimed_id);
 
