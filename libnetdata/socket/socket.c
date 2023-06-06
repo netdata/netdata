@@ -1031,28 +1031,12 @@ ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
             return -1;
         }
 
-        if(!retval) {
+        if(!retval)
             // timeout
-
-#ifdef ENABLE_HTTPS
-            if(SSL_handshake_complete(ssl) && SSL_pending(ssl->conn))
-                // connection is SSL and has data to read
-                break;
-#endif
-
             return 0;
-        }
 
-        if(fd.events & POLLIN) {
-
-#ifdef ENABLE_HTTPS
-            if(SSL_handshake_complete(ssl) && !SSL_pending(ssl->conn))
-                // connection is SSL but does not have any data to read
-                continue;
-#endif
-
+        if(fd.events & POLLIN)
             break;
-        }
     }
 
 #ifdef ENABLE_HTTPS
