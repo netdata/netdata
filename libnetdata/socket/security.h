@@ -2,11 +2,11 @@
 # define NETDATA_SECURITY_H
 
 typedef enum __attribute__((packed)) {
-    NETDATA_SSL_NOT_SSL = 1,        // This connection is not SSL
-    NETDATA_SSL_HANDSHAKE_INIT,     // SSL handshake is initialized
-    NETDATA_SSL_HANDSHAKE_FAILED,   // SSL handshake failed
-    NETDATA_SSL_HANDSHAKE_COMPLETE, // SSL handshake successful
-} NETDATA_SSL_HANDSHAKE;
+    NETDATA_SSL_STATE_NOT_SSL = 1,  // This connection is not SSL
+    NETDATA_SSL_STATE_INIT,         // SSL handshake is initialized
+    NETDATA_SSL_STATE_FAILED,       // SSL handshake failed
+    NETDATA_SSL_STATE_COMPLETE,     // SSL handshake successful
+} NETDATA_SSL_STATE;
 
 #define NETDATA_SSL_WEB_SERVER_CTX 0
 #define NETDATA_SSL_STREAMING_SENDER_CTX 1
@@ -33,14 +33,14 @@ typedef enum __attribute__((packed)) {
 #include <openssl/decoder.h>
 #endif
 
-struct netdata_ssl {
-    SSL *conn;                   // SSL connection
-    NETDATA_SSL_HANDSHAKE flags; // The flags for SSL connection
-};
+typedef struct netdata_ssl {
+    SSL *conn;               // SSL connection
+    NETDATA_SSL_STATE state; // The state for SSL connection
+} NETDATA_SSL;
 
-#define NETDATA_SSL_UNSET_CONNECTION (struct netdata_ssl){ .conn = NULL, .flags = NETDATA_SSL_NOT_SSL }
+#define NETDATA_SSL_UNSET_CONNECTION (NETDATA_SSL){ .conn = NULL, .state = NETDATA_SSL_STATE_NOT_SSL }
 
-#define SSL_connection(ssl) ((ssl)->conn && (ssl)->flags != NETDATA_SSL_NOT_SSL)
+#define SSL_connection(ssl) ((ssl)->conn && (ssl)->state != NETDATA_SSL_STATE_NOT_SSL)
 
 extern SSL_CTX *netdata_ssl_exporting_ctx;
 extern SSL_CTX *netdata_ssl_streaming_sender_ctx;
@@ -58,15 +58,15 @@ void netdata_ssl_initialize_ctx(int selector);
 int security_test_certificate(SSL *ssl);
 SSL_CTX * netdata_ssl_create_client_ctx(unsigned long mode);
 
-bool netdata_ssl_connect(struct netdata_ssl *ssl);
-bool netdata_ssl_accept(struct netdata_ssl *ssl);
+bool netdata_ssl_connect(NETDATA_SSL *ssl);
+bool netdata_ssl_accept(NETDATA_SSL *ssl);
 
-bool netdata_ssl_open(struct netdata_ssl *ssl, SSL_CTX *ctx, int fd);
-void netdata_ssl_close(struct netdata_ssl *ssl);
-void netdata_ssl_log_error_queue(const char *call, struct netdata_ssl *ssl);
+bool netdata_ssl_open(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd);
+void netdata_ssl_close(NETDATA_SSL *ssl);
+void netdata_ssl_log_error_queue(const char *call, NETDATA_SSL *ssl);
 
-ssize_t netdata_ssl_read(struct netdata_ssl *ssl, void *buf, size_t num);
-ssize_t netdata_ssl_write(struct netdata_ssl *ssl, const void *buf, size_t num);
+ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num);
+ssize_t netdata_ssl_write(NETDATA_SSL *ssl, const void *buf, size_t num);
 
 # endif //ENABLE_HTTPS
 #endif //NETDATA_SECURITY_H

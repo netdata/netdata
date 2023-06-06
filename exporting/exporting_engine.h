@@ -126,7 +126,7 @@ struct simple_connector_data {
     struct simple_connector_buffer *last_buffer;
 
 #ifdef ENABLE_HTTPS
-    struct netdata_ssl ssl;
+    NETDATA_SSL ssl;
 #endif
 };
 

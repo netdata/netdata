@@ -170,7 +170,7 @@ struct web_client {
     size_t pollinfo_filecopy_slot;      // POLLINFO slot of the file read
 
 #ifdef ENABLE_HTTPS
-    struct netdata_ssl ssl;
+    NETDATA_SSL ssl;
 #endif
 
     struct {                            // A callback to check if the query should be interrupted / stopped

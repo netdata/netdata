@@ -727,7 +727,7 @@ static void rrdpush_receiver_takeover_web_connection(struct web_client *w, struc
 
 #ifdef ENABLE_HTTPS
     rpt->ssl.conn          = w->ssl.conn;
-    rpt->ssl.flags         = w->ssl.flags;
+    rpt->ssl.state         = w->ssl.state;
 
     w->ssl = NETDATA_SSL_UNSET_CONNECTION;
 #endif

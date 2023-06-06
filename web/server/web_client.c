@@ -2038,7 +2038,7 @@ void web_client_zero(struct web_client *w) {
     BUFFER *b6 = w->url_query_string_decoded;
 
 #ifdef ENABLE_HTTPS
-    struct netdata_ssl ssl = w->ssl;
+    NETDATA_SSL ssl = w->ssl;
 #endif
 
     size_t use_count = w->use_count;

@@ -166,7 +166,7 @@ struct sender_state {
     struct compressor_state *compressor;
 #endif
 #ifdef ENABLE_HTTPS
-    struct netdata_ssl ssl;                     // structure used to encrypt the connection
+    NETDATA_SSL ssl;                     // structure used to encrypt the connection
 #endif
 
     struct {
@@ -267,7 +267,7 @@ struct receiver_state {
     } config;
 
 #ifdef ENABLE_HTTPS
-    struct netdata_ssl ssl;
+    NETDATA_SSL ssl;
 #endif
 #ifdef ENABLE_COMPRESSION
     unsigned int rrdpush_compression;

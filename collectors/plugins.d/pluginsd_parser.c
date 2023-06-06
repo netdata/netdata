@@ -11,7 +11,7 @@ static int send_to_plugin(const char *txt, void *data) {
         return 0;
 
 #ifdef ENABLE_HTTPS
-    struct netdata_ssl *ssl = parser->ssl_output;
+    NETDATA_SSL *ssl = parser->ssl_output;
     if(ssl) {
         if(SSL_connection(ssl))
             return (int)netdata_ssl_write(ssl, (void *)txt, strlen(txt));
