@@ -378,7 +378,7 @@ void analytics_https(void)
 
     buffer_strcat(b, netdata_ssl_streaming_sender_ctx &&
                      rrdhost_flag_check(localhost, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED) &&
-                     SSL_handshake_complete(&localhost->sender->ssl) ? "streaming|" : "|");
+                     SSL_connection(&localhost->sender->ssl) ? "streaming|" : "|");
 
     buffer_strcat(b, netdata_ssl_web_server_ctx ? "web" : "");
 #else

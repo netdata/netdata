@@ -501,7 +501,7 @@ static bool rrdpush_sender_connect_ssl(struct sender_state *s) {
             return false;
         }
 
-        if (netdata_ssl_validate_server == NETDATA_SSL_VALID_CERTIFICATE &&
+        if (netdata_ssl_validate_certificate &&
             security_test_certificate(host->sender->ssl.conn)) {
             // certificate is not valid
 
@@ -801,7 +801,7 @@ static ssize_t attempt_to_send(struct sender_state *s) {
     debug(D_STREAM, "STREAM: Sending data. Buffer r=%zu w=%zu s=%zu, next chunk=%zu", cb->read, cb->write, cb->size, outstanding);
 
 #ifdef ENABLE_HTTPS
-    if(SSL_handshake_complete(&s->ssl))
+    if(SSL_connection(&s->ssl))
         ret = netdata_ssl_write(&s->ssl, chunk, outstanding);
     else
         ret = send(s->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
@@ -836,7 +836,7 @@ static ssize_t attempt_read(struct sender_state *s) {
     ssize_t ret = 0;
 
 #ifdef ENABLE_HTTPS
-    if (SSL_handshake_complete(&s->ssl)) {
+    if (SSL_connection(&s->ssl)) {
         size_t desired = sizeof(s->read_buffer) - s->read_len - 1;
         ret = netdata_ssl_read(&s->ssl, s->read_buffer, desired);
         if (ret > 0 ) {

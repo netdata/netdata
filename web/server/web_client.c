@@ -788,12 +788,10 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
             //  web_client_enable_deflate(w, 0);
         }
     }
-#ifdef ENABLE_HTTPS
     else if(hash == hash_forwarded_proto && !strcasecmp(s, "X-Forwarded-Proto")) {
         if(strcasestr(v, "https"))
-            w->ssl.flags |= NETDATA_SSL_PROXY_HTTPS;
+            w->flags |= WEB_CLIENT_FLAG_PROXY_HTTPS;
     }
-#endif
     else if(hash == hash_forwarded_host && !strcasecmp(s, "X-Forwarded-Host")) {
         char buffer[NI_MAXHOST];
         strncpyz(buffer, v, ((size_t)(ve - v) < sizeof(buffer) - 1 ? (size_t)(ve - v) : sizeof(buffer) - 1));
@@ -833,7 +831,7 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
         s = &s[7];
 
 #ifdef ENABLE_HTTPS
-        if (!SSL_handshake_complete(&w->ssl) && web_client_is_using_ssl_force(w)) {
+        if (!SSL_connection(&w->ssl) && web_client_is_using_ssl_force(w)) {
             w->header_parse_tries = 0;
             w->header_parse_last_size = 0;
             web_client_disable_wait_receive(w);
@@ -975,7 +973,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
 #ifdef ENABLE_HTTPS
                 if ( (!web_client_check_unix(w)) && (netdata_ssl_web_server_ctx) ) {
-                    if ((w->ssl.conn) && ((w->ssl.flags & NETDATA_SSL_NO_HANDSHAKE) && (web_client_is_using_ssl_force(w) || web_client_is_using_ssl_default(w)) && (w->mode != WEB_CLIENT_MODE_STREAM))  ) {
+                    if (!w->ssl.conn && (web_client_is_using_ssl_force(w) || web_client_is_using_ssl_default(w)) && (w->mode != WEB_CLIENT_MODE_STREAM)) {
                         w->header_parse_tries = 0;
                         w->header_parse_last_size = 0;
                         web_client_disable_wait_receive(w);
@@ -1005,10 +1003,11 @@ static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
     if ((!web_client_check_unix(w)) && (netdata_ssl_web_server_ctx)) {
-        if (SSL_handshake_complete(&w->ssl)) {
+        if (SSL_connection(&w->ssl)) {
             bytes = netdata_ssl_write(&w->ssl, buf, len) ;
             web_client_enable_wait_from_ssl(w, bytes);
-        } else
+        }
+        else
             bytes = send(w->ofd,buf, len , flags);
     } else
         bytes = send(w->ofd,buf, len , flags);
@@ -1149,7 +1148,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
     if ( (!web_client_check_unix(w)) && (netdata_ssl_web_server_ctx) ) {
-        if (SSL_handshake_complete(&w->ssl)) {
+        if (SSL_connection(&w->ssl)) {
             bytes = netdata_ssl_write(&w->ssl, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output));
             web_client_enable_wait_from_ssl(w, bytes);
         }
@@ -1252,11 +1251,11 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
             if(!url) { //no delim found
                 debug(D_WEB_CLIENT, "%llu: URL doesn't end with / generating redirect.", w->id);
                 char *protocol, *url_host;
+                protocol = (
 #ifdef ENABLE_HTTPS
-                protocol = (SSL_handshake_complete(&w->ssl) || (w->ssl.flags & NETDATA_SSL_PROXY_HTTPS)) ? "https" : "http";
-#else
-                protocol = "http";
+                        SSL_connection(&w->ssl) ||
 #endif
+                        (w->flags & WEB_CLIENT_FLAG_PROXY_HTTPS)) ? "https" : "http";
 
                 url_host = w->forwarded_host;
                 if(!url_host) {
@@ -1941,10 +1940,11 @@ ssize_t web_client_receive(struct web_client *w)
 
 #ifdef ENABLE_HTTPS
     if ( (!web_client_check_unix(w)) && (netdata_ssl_web_server_ctx) ) {
-        if (SSL_handshake_complete(&w->ssl)) {
+        if (SSL_connection(&w->ssl)) {
             bytes = netdata_ssl_read(&w->ssl, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
             web_client_enable_wait_from_ssl(w, bytes);
-        }else {
+        }
+        else {
             bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
         }
     }

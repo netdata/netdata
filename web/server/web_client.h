@@ -52,6 +52,8 @@ typedef enum web_client_flags {
 
     WEB_CLIENT_FLAG_SSL_WAIT_RECEIVE = 1 << 11, // if set, we are waiting more input data from an ssl conn
     WEB_CLIENT_FLAG_SSL_WAIT_SEND = 1 << 12,    // if set, we have data to send to the client from an ssl conn
+
+    WEB_CLIENT_FLAG_PROXY_HTTPS = 1 << 13, // if set, the client reaches us via an https proxy
 } WEB_CLIENT_FLAGS;
 
 #define web_client_flag_check(w, flag) ((w)->flags & (flag))

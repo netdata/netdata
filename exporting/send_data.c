@@ -82,7 +82,7 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
         ssize_t r;
 #ifdef ENABLE_HTTPS
         if (exporting_tls_is_enabled(instance->config.type, options) &&
-                SSL_handshake_complete(&connector_specific_data->ssl)) {
+            SSL_connection(&connector_specific_data->ssl)) {
 
             r = netdata_ssl_read(&connector_specific_data->ssl, &response->buffer[response->len],
                                  (int) (response->size - response->len));
@@ -161,7 +161,7 @@ void simple_connector_send_buffer(
 
 #ifdef ENABLE_HTTPS
     if (exporting_tls_is_enabled(instance->config.type, options) &&
-            SSL_handshake_complete(&connector_specific_data->ssl)) {
+        SSL_connection(&connector_specific_data->ssl)) {
 
         if (header_len)
             header_sent_bytes = netdata_ssl_write(&connector_specific_data->ssl, buffer_tostring(header), header_len);

@@ -13,7 +13,7 @@ static int send_to_plugin(const char *txt, void *data) {
 #ifdef ENABLE_HTTPS
     struct netdata_ssl *ssl = parser->ssl_output;
     if(ssl) {
-        if(SSL_handshake_complete(ssl))
+        if(SSL_connection(ssl))
             return (int)netdata_ssl_write(ssl, (void *)txt, strlen(txt));
 
         error("PLUGINSD: cannot send command (SSL)");

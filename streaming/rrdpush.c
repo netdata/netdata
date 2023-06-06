@@ -136,12 +136,12 @@ int rrdpush_init() {
     }
 
 #ifdef ENABLE_HTTPS
-    bool invalid_certificate = appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "ssl skip certificate verification", CONFIG_BOOLEAN_NO);
+    bool skip_validation = appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "ssl skip certificate verification", CONFIG_BOOLEAN_NO);
 
-    if(invalid_certificate == CONFIG_BOOLEAN_YES){
-        if(netdata_ssl_validate_server == NETDATA_SSL_VALID_CERTIFICATE){
+    if(skip_validation == CONFIG_BOOLEAN_YES){
+        if(netdata_ssl_validate_certificate) {
             info("Netdata is configured to accept invalid SSL certificate.");
-            netdata_ssl_validate_server = NETDATA_SSL_INVALID_CERTIFICATE;
+            netdata_ssl_validate_certificate = false;
         }
     }
 

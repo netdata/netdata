@@ -9,7 +9,7 @@ const char *netdata_ssl_security_key =NULL;
 const char *netdata_ssl_security_cert =NULL;
 const char *tls_version=NULL;
 const char *tls_ciphers=NULL;
-int netdata_ssl_validate_server =  NETDATA_SSL_VALID_CERTIFICATE;
+bool netdata_ssl_validate_certificate =  true;
 
 bool netdata_ssl_open(struct netdata_ssl *ssl, SSL_CTX *ctx, int fd) {
     if(ssl->conn) {
@@ -27,25 +27,25 @@ bool netdata_ssl_open(struct netdata_ssl *ssl, SSL_CTX *ctx, int fd) {
     if(!ssl->conn) {
         if(!ctx) {
             internal_error(true, "SSL: not CTX given");
-            ssl->flags = NETDATA_SSL_NO_HANDSHAKE;
+            ssl->flags = NETDATA_SSL_HANDSHAKE_FAILED;
             return false;
         }
 
         ssl->conn = SSL_new(ctx);
         if (!ssl->conn) {
             netdata_ssl_log_error_queue("SSL_new", ssl);
-            ssl->flags = NETDATA_SSL_NO_HANDSHAKE;
+            ssl->flags = NETDATA_SSL_HANDSHAKE_FAILED;
             return false;
         }
     }
 
     if(SSL_set_fd(ssl->conn, fd) != 1) {
         netdata_ssl_log_error_queue("SSL_set_fd", ssl);
-        ssl->flags = NETDATA_SSL_NO_HANDSHAKE;
+        ssl->flags = NETDATA_SSL_HANDSHAKE_FAILED;
         return false;
     }
 
-    ssl->flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
+    ssl->flags = NETDATA_SSL_OPEN;
 
     ERR_clear_error();
 
@@ -54,7 +54,7 @@ bool netdata_ssl_open(struct netdata_ssl *ssl, SSL_CTX *ctx, int fd) {
 
 void netdata_ssl_close(struct netdata_ssl *ssl) {
     if(ssl->conn) {
-        if(SSL_handshake_complete(ssl)) {
+        if(SSL_connection(ssl)) {
             int ret = SSL_shutdown(ssl->conn);
             if(ret == 0)
                 SSL_shutdown(ssl->conn);
@@ -81,7 +81,7 @@ void netdata_ssl_log_error_queue(const char *call, struct netdata_ssl *ssl) {
 
             case SSL_ERROR_SSL:
                 code = "SSL_ERROR_SSL";
-                ssl->flags = NETDATA_SSL_HANDSHAKE_ERROR;
+                ssl->flags = NETDATA_SSL_HANDSHAKE_FAILED;
                 break;
 
             case SSL_ERROR_WANT_READ:
@@ -98,7 +98,7 @@ void netdata_ssl_log_error_queue(const char *call, struct netdata_ssl *ssl) {
 
             case SSL_ERROR_SYSCALL:
                 code = "SSL_ERROR_SYSCALL";
-                ssl->flags = NETDATA_SSL_HANDSHAKE_ERROR;
+                ssl->flags = NETDATA_SSL_HANDSHAKE_FAILED;
                 break;
 
             case SSL_ERROR_ZERO_RETURN:
@@ -194,8 +194,8 @@ ssize_t netdata_ssl_write(struct netdata_ssl *ssl, const void *buf, size_t num) 
 }
 
 bool netdata_ssl_connect(struct netdata_ssl *ssl) {
-    if(unlikely(!ssl->conn || ssl->flags != NETDATA_SSL_HANDSHAKE_COMPLETE)) {
-        internal_error(true, "SSL: trying to connect using an invalid SSL connection");
+    if(unlikely(!ssl->conn || ssl->flags != NETDATA_SSL_OPEN)) {
+        internal_error(true, "SSL: trying to connect using an invalid SSL structure");
         return false;
     }
 
@@ -203,49 +203,50 @@ bool netdata_ssl_connect(struct netdata_ssl *ssl) {
 
     int err = SSL_connect(ssl->conn);
     if (err != 1) {
+        int ssl_errno = SSL_get_error(ssl->conn, err);
         netdata_ssl_log_error_queue("SSL_connect", ssl);
-        ssl->flags = NETDATA_SSL_NO_HANDSHAKE;
+        switch(ssl_errno) {
+            case SSL_ERROR_WANT_READ:
+            case SSL_ERROR_WANT_WRITE:
+                ssl->flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
+                return true;
+
+            default:
+                ssl->flags = NETDATA_SSL_HANDSHAKE_FAILED;
+                return false;
+        }
     }
 
+    ssl->flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
     return true;
 }
 
-void netdata_ssl_accept(struct netdata_ssl *ssl, int msg) {
-    int err;
-    if (msg > 0x17) {
-        ssl->flags = NETDATA_SSL_NO_HANDSHAKE;
-        return;
+bool netdata_ssl_accept(struct netdata_ssl *ssl) {
+    if(unlikely(!ssl->conn || ssl->flags != NETDATA_SSL_OPEN)) {
+        internal_error(true, "SSL: trying to accept a connection using an invalid SSL structure");
+        return false;
     }
-
-    ERR_clear_error();
 
     SSL_set_accept_state(ssl->conn);
 
+    int err;
     if ((err = SSL_accept(ssl->conn)) <= 0) {
         int ssl_errno = SSL_get_error(ssl->conn, err);
         netdata_ssl_log_error_queue("SSL_accept", ssl);
         switch(ssl_errno) {
             case SSL_ERROR_WANT_READ:
-                ssl->flags = NETDATA_SSL_WANT_READ;
-                return;
-
             case SSL_ERROR_WANT_WRITE:
-                ssl->flags = NETDATA_SSL_WANT_WRITE;
-                return;
+                ssl->flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
+                return true;
 
             default:
-                ssl->flags = NETDATA_SSL_NO_HANDSHAKE;
-                return;
+                ssl->flags = NETDATA_SSL_HANDSHAKE_FAILED;
+                return false;
         }
     }
 
-    if (SSL_is_init_finished(ssl->conn)) {
-        int sock = SSL_get_fd(ssl->conn);
-        debug(D_WEB_CLIENT_ACCESS, "SSL Handshake finished %s errno %d on socket fd %d",
-              ERR_error_string((long) SSL_get_error(ssl->conn, err), NULL), errno, sock);
-    }
-
     ssl->flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
+    return true;
 }
 
 /**

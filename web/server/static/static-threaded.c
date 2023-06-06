@@ -226,17 +226,17 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
             goto cleanup;
         }
 
-        if(netdata_ssl_open(&w->ssl, netdata_ssl_web_server_ctx, w->ifd)) {
-            SSL_set_accept_state(w->ssl.conn);
-            netdata_ssl_accept(&w->ssl, (int) test[0]);
+        if(test[0] > 0x17) {
+            // no SSL
+            netdata_ssl_close(&w->ssl); // free any previous SSL data
         }
-        else if(test[0] < 0x18)
-            WEB_CLIENT_IS_DEAD(w);
+        else {
+            // SSL
+            if(!netdata_ssl_open(&w->ssl, netdata_ssl_web_server_ctx, w->ifd) || !netdata_ssl_accept(&w->ssl))
+                WEB_CLIENT_IS_DEAD(w);
+        }
 
         sock_setnonblock(w->ifd);
-    }
-    else {
-        w->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
     }
 #endif
 

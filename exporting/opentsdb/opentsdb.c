@@ -21,8 +21,7 @@ int init_opentsdb_telnet_instance(struct instance *instance)
     instance->connector_specific_data = connector_specific_data;
 
 #ifdef ENABLE_HTTPS
-    connector_specific_data->ssl.flags = NETDATA_SSL_START;
-    connector_specific_data->ssl.conn = NULL;
+    connector_specific_data->ssl = NETDATA_SSL_UNSET_CONNECTION;
     if (instance->config.options & EXPORTING_OPTION_USE_TLS) {
         netdata_ssl_initialize_ctx(NETDATA_SSL_EXPORTING_CTX);
     }
@@ -77,8 +76,7 @@ int init_opentsdb_http_instance(struct instance *instance)
 
     struct simple_connector_data *connector_specific_data = callocz(1, sizeof(struct simple_connector_data));
 #ifdef ENABLE_HTTPS
-    connector_specific_data->ssl.flags = NETDATA_SSL_START;
-    connector_specific_data->ssl.conn = NULL;
+    connector_specific_data->ssl = NETDATA_SSL_UNSET_CONNECTION;
     if (instance->config.options & EXPORTING_OPTION_USE_TLS) {
         netdata_ssl_initialize_ctx(NETDATA_SSL_EXPORTING_CTX);
     }
