@@ -64,7 +64,7 @@ static inline int count_fields(const char *line, const char delimiter){
     const char *ptr;
     int cnt, fQuote;
 
-    for (cnt = 1, fQuote = 0, ptr = line; *ptr != '\n' && *ptr != '\0'; ptr++ ){
+    for (cnt = 1, fQuote = 0, ptr = line; *ptr != '\n' && *ptr != '\r' && *ptr != '\0'; ptr++ ){
         if (fQuote) {
             if (*ptr == '\"') {
                 if ( ptr[1] == '\"' ) {
@@ -465,7 +465,7 @@ Web_log_parser_config_t *read_web_log_parser_config(const char *log_format, cons
 /**
  * @brief Parse a web log line to extract individual fields.
  * @param[in] wblp_config Configuration that specifies how to parse the line.
- * @param[in] line Web log record to be parsed. '\n' or '\0' terminated.
+ * @param[in] line Web log record to be parsed. '\n', '\r' or '\0' terminated.
  * @param[out] log_line_parsed Struct that stores the results of parsing.
  */
 static void parse_web_log_line( const Web_log_parser_config_t *wblp_config, 
@@ -488,12 +488,13 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
         while(  *offset != '"' && 
                 *offset != delimiter && 
                 *offset != '\n' &&
-                *offset != '\0') { offset++; };
+                *offset != '\0' &&
+                *offset != '\r') { offset++; };
 
         field_size = (size_t) (offset - field);
 
         #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-        debug(D_LOGS_MANAG, "Field %d: %.*s", i, (int)field_size, field);
+        debug(D_LOGS_MANAG, "Field[%d]:%.*s", i, (int)field_size, field);
         #endif
 
         if(fields_format[i] == CUSTOM){
@@ -556,10 +557,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
             //     memmove(parsed[i], parsed[i]+1, strlen(parsed[i]));
             // }
 
-            // field_size = field_size > VHOST_MAX_LEN ? VHOST_MAX_LEN : field_size;
-            snprintf( log_line_parsed->vhost, 
-                      field_size > (VHOST_MAX_LEN - 1) ? VHOST_MAX_LEN : (field_size + 1), 
-                      "%.*s", (int) field_size, field);
+            snprintfz(log_line_parsed->vhost, VHOST_MAX_LEN, "%.*s", (int) field_size, field);
 
             if(verify){
                 // if(field_size >= VHOST_MAX_LEN){
@@ -606,9 +604,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
             }
 
             char port_d[PORT_MAX_LEN];
-            snprintf( port_d, 
-                      port_size > (PORT_MAX_LEN - 1) ? PORT_MAX_LEN : (port_size + 1), 
-                      "%.*s", (int) port_size, port);
+            snprintfz( port_d, PORT_MAX_LEN, "%.*s", (int) port_size, port);
 
             if(likely(str2int(&log_line_parsed->port, port_d, 10) == STR2XX_SUCCESS)){
                 if(verify){
@@ -646,10 +642,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
                 goto next_item;
             }
 
-            // field_size = field_size > REQ_SCHEME_MAX_LEN ? REQ_SCHEME_MAX_LEN : field_size;
-            snprintf( log_line_parsed->req_scheme, 
-                      field_size > (REQ_SCHEME_MAX_LEN - 1) ? REQ_SCHEME_MAX_LEN : (field_size + 1), 
-                      "%.*s", (int) field_size, field); 
+            snprintfz(log_line_parsed->req_scheme, REQ_SCHEME_MAX_LEN, "%.*s", (int) field_size, field); 
 
             if(verify){
                 if(unlikely( strcmp(log_line_parsed->req_scheme, "http") && 
@@ -678,10 +671,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
                 goto next_item;
             }
 
-            // field_size = field_size > REQ_CLIENT_MAX_LEN ? REQ_CLIENT_MAX_LEN : field_size;
-            snprintf(log_line_parsed->req_client, 
-                     field_size > (REQ_CLIENT_MAX_LEN - 1) ? REQ_CLIENT_MAX_LEN : (field_size + 1), 
-                     "%.*s", (int)field_size, field);
+            snprintfz(log_line_parsed->req_client, REQ_CLIENT_MAX_LEN, "%.*s", (int)field_size, field);
 
             if(verify){
                 int regex_rc = regexec(&req_client_regex, log_line_parsed->req_client, 0, NULL, 0);
@@ -724,10 +714,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
             }
             else{
 
-                // field_size = field_size > REQ_METHOD_MAX_LEN ? REQ_METHOD_MAX_LEN : field_size;
-                snprintf( log_line_parsed->req_method, 
-                          field_size > (REQ_METHOD_MAX_LEN - 1) ? REQ_METHOD_MAX_LEN : (field_size + 1), 
-                          "%.*s", (int)field_size, field); 
+                snprintfz( log_line_parsed->req_method, REQ_METHOD_MAX_LEN, "%.*s", (int)field_size, field); 
 
                 if(verify){
                     if( unlikely( 
@@ -786,10 +773,15 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
             
             if(fields_format[i] == REQ) {
                 if(*offset == '"') offset++;
-                if(*offset != '\n') {while(*(offset + 1) == delimiter) {offset++;};} // Consume extra whitespace characters
+                if(*offset != '\n' && *offset != '\r') {
+                    while(*(offset + 1) == delimiter) {offset++;}; // Consume extra whitespace characters
+                }
                 field = ++offset; 
                 if(*field == '"') { field++; offset++; }; // Remove any double quotes
-                while(*offset != '"' && *offset != delimiter && *offset != '\n') { offset++; };
+                while(  *offset != '"' && 
+                        *offset != delimiter && 
+                        *offset != '\n' && 
+                        *offset != '\r') { offset++; };
                 field_size = (size_t) (offset - field);
             } 
             else goto next_item;
@@ -800,9 +792,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
             debug(D_LOGS_MANAG, "Item %d (type: REQ or REQ_URL):%.*s", i, (int)field_size, field);
             #endif
 
-            snprintf( log_line_parsed->req_URL, 
-                      field_size > (REQ_URL_MAX_LEN - 1) ? REQ_URL_MAX_LEN : (field_size + 1), 
-                      "%.*s", (int)field_size, field);
+            snprintfz( log_line_parsed->req_URL, REQ_URL_MAX_LEN, "%.*s", (int)field_size, field);
 
             // if(unlikely(field[0] ==  '-' && field_size == 1)){
             //     log_line_parsed->req_method[0] = '\0';
@@ -817,10 +807,15 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
 
             if(fields_format[i] == REQ) {
                 if(*offset == '"') offset++;
-                if(*offset != '\n') {while(*(offset + 1) == delimiter) {offset++;};} // Consume extra whitespace characters
+                if(*offset != '\n' && *offset != '\r') {
+                    while(*(offset + 1) == delimiter) {offset++;}; // Consume extra whitespace characters
+                }
                 field = ++offset; 
                 if(*field == '"') { field++; offset++; }; // Remove any double quotes
-                while(*offset != '"' && *offset != delimiter && *offset != '\n') { offset++; };
+                while(  *offset != '"' && 
+                        *offset != delimiter && 
+                        *offset != '\n' && 
+                        *offset != '\r') { offset++; };
                 field_size = (size_t) (offset - field);
             } 
             else goto next_item;
@@ -859,10 +854,10 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
                     log_line_parsed->req_proto[0] = '\0';
                     log_line_parsed->parsing_errors++;
                 }
-                else snprintf(  log_line_parsed->req_proto, req_proto_num_size + 1, 
+                else snprintfz(  log_line_parsed->req_proto, req_proto_num_size + 1, 
                                 "%.*s", (int)req_proto_num_size, &field[REQ_PROTO_PREF_SIZE]); 
             }
-            else snprintf(  log_line_parsed->req_proto, req_proto_num_size + 1, 
+            else snprintfz(  log_line_parsed->req_proto, req_proto_num_size + 1, 
                             "%.*s", (int)req_proto_num_size, &field[REQ_PROTO_PREF_SIZE]); 
 
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
@@ -880,8 +875,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
             #endif
 
             char req_size_d[REQ_SIZE_MAX_LEN];
-            snprintf( req_size_d, field_size > (REQ_SIZE_MAX_LEN - 1) ? REQ_SIZE_MAX_LEN : field_size + 1, 
-                      "%.*s", (int) field_size, field);
+            snprintfz( req_size_d, REQ_SIZE_MAX_LEN, "%.*s", (int) field_size, field);
 
             if(field[0] ==  '-' && field_size == 1) { 
                 log_line_parsed->req_size = 0; // Request size can be '-' 
@@ -923,9 +917,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
             float f = 0;
 
             char req_proc_time_d[REQ_PROC_TIME_MAX_LEN];
-            snprintf( req_proc_time_d, 
-                      field_size > (REQ_PROC_TIME_MAX_LEN - 1) ? REQ_PROC_TIME_MAX_LEN : field_size + 1, 
-                      "%.*s", (int) field_size, field);
+            snprintfz( req_proc_time_d, REQ_PROC_TIME_MAX_LEN, "%.*s", (int) field_size, field);
 
             if(memchr(field, '.', field_size)){ // nginx time is in seconds with a milliseconds resolution.
                 if(likely(str2float(&f, req_proc_time_d) == STR2XX_SUCCESS)){ 
@@ -977,9 +969,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
             }
 
             char resp_code_d[REQ_RESP_CODE_MAX_LEN];
-            snprintf( resp_code_d, 
-                      field_size > (REQ_RESP_CODE_MAX_LEN - 1) ? REQ_RESP_CODE_MAX_LEN : field_size + 1, 
-                      "%.*s", (int)field_size, field);
+            snprintfz( resp_code_d, REQ_RESP_CODE_MAX_LEN, "%.*s", (int)field_size, field);
 
             if(likely(str2int(&log_line_parsed->resp_code, resp_code_d, 10) == STR2XX_SUCCESS)){  
                 if(verify){
@@ -1020,9 +1010,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
             #endif
 
             char resp_size_d[REQ_RESP_SIZE_MAX_LEN];
-            snprintf( resp_size_d, 
-                      field_size > (REQ_RESP_SIZE_MAX_LEN - 1) ? REQ_RESP_SIZE_MAX_LEN : field_size + 1, 
-                      "%.*s", (int)field_size, field);
+            snprintfz( resp_size_d, REQ_RESP_SIZE_MAX_LEN, "%.*s", (int)field_size, field);
 
             if(field[0] ==  '-' && field_size == 1) { 
                 log_line_parsed->resp_size = 0; // Response size can be '-' 
@@ -1072,9 +1060,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
             float f = 0;
 
             char ups_resp_time_d[UPS_RESP_TIME_MAX_LEN];
-            snprintf( ups_resp_time_d, 
-                      field_size > (UPS_RESP_TIME_MAX_LEN - 1) ? UPS_RESP_TIME_MAX_LEN : field_size + 1, 
-                      "%.*s", (int)field_size, field);
+            snprintfz( ups_resp_time_d, UPS_RESP_TIME_MAX_LEN, "%.*s", (int)field_size, field);
 
             if(memchr(field, '.', field_size)){ // nginx time is in seconds with a milliseconds resolution.
                 if(likely(str2float(&f, ups_resp_time_d) == STR2XX_SUCCESS)){ 
@@ -1126,9 +1112,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
             debug(D_LOGS_MANAG, "SSL_PROTO field size:%zu", field_size);
             #endif
 
-            snprintf( log_line_parsed->ssl_proto, 
-                      field_size > (SSL_PROTO_MAX_LEN - 1) ? SSL_PROTO_MAX_LEN : (field_size + 1), 
-                      "%.*s", (int)field_size, field); 
+            snprintfz( log_line_parsed->ssl_proto, SSL_PROTO_MAX_LEN, "%.*s", (int)field_size, field); 
 
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
             debug(D_LOGS_MANAG, "log_line_parsed->ssl_proto:%s", log_line_parsed->ssl_proto);
@@ -1166,9 +1150,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
                 log_line_parsed->parsing_errors++;
             }
 
-            snprintf( log_line_parsed->ssl_cipher, 
-                      field_size > (SSL_CIPHER_SUITE_MAX_LEN - 1) ? SSL_CIPHER_SUITE_MAX_LEN : (field_size + 1), 
-                      "%.*s", (int)field_size, field);
+            snprintfz( log_line_parsed->ssl_cipher, SSL_CIPHER_SUITE_MAX_LEN, "%.*s", (int)field_size, field);
 
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
             debug(D_LOGS_MANAG, "before: SSL_CIPHER_SUITE:%s", log_line_parsed->ssl_cipher);
@@ -1245,25 +1227,28 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
             m_assert(*++second_part == '+', "Invalid TIME second_part");
 
             char *second_part_end = ++second_part;
-            while(*second_part_end != ']' && *second_part_end != ' ' && *second_part != '\n') {second_part_end++; };
+            while(  *second_part_end != ']' && 
+                    *second_part_end != ' ' && 
+                    *second_part != '\n' && 
+                    *second_part != '\r') {second_part_end++;};
             size_t second_part_size = second_part_end - second_part;
 
             // TODO: Get rid of strndup() - find alternative that doesn't require strtol()
             second_part = strndup(second_part, second_part_size); 
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            debug(D_LOGS_MANAG, "TIME 2nd part: %.*s\n", (int)second_part_size, second_part);
+            debug(D_LOGS_MANAG, "TIME 2nd part: %.*s", (int)second_part_size, second_part);
             #endif
             
             long int timezone = strtol(second_part, NULL, 10);
             long int timezone_h = timezone / 100;
             long int timezone_m = timezone % 100;
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            debug(D_LOGS_MANAG, "Timezone: int:%ld, hrs:%ld, mins:%ld\n", timezone, timezone_h, timezone_m);
+            debug(D_LOGS_MANAG, "Timezone: int:%ld, hrs:%ld, mins:%ld", timezone, timezone_h, timezone_m);
             #endif
 
             log_line_parsed->timestamp = (int64_t) mktime(&ltm) + (int64_t) timezone_h * 3600 + (int64_t) timezone_m * 60;
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            debug(D_LOGS_MANAG, "Extracted TIME:%lu\n", log_line_parsed->timestamp);
+            debug(D_LOGS_MANAG, "Extracted TIME:%ld", log_line_parsed->timestamp);
             #endif
 
             //if(verify){} ??
@@ -1281,7 +1266,7 @@ next_item:
         if(unlikely(*offset == '"')) offset++;
 
         /* Consume extra whitespace characters */
-        if(*offset != '\n' && *offset != '\0') {while(*(offset + 1) == delimiter) {offset++;};} 
+        if(*offset != '\n' && *offset != '\0' && *offset != '\r') {while(*(offset + 1) == delimiter) {offset++;};} 
         else break;
         field = ++offset;
     }

@@ -12,11 +12,9 @@
 #define NETDATA_CHART_PRIO_CIRC_BUFF_MEM_COM    NETDATA_CHART_PRIO_LOGS_STATS_BASE + 4
 #define NETDATA_CHART_PRIO_COMPR_RATIO          NETDATA_CHART_PRIO_LOGS_STATS_BASE + 5
 #define NETDATA_CHART_PRIO_DISK_USAGE           NETDATA_CHART_PRIO_LOGS_STATS_BASE + 6
+#define NETDATA_CHART_PRIO_DB_TIMINGS           NETDATA_CHART_PRIO_LOGS_STATS_BASE + 7
 
 #define NETDATA_CHART_PRIO_LOGS_INCR            100  /**< PRIO increment step from one log source to another **/
-
-#define WORKER_JOB_COLLECT                      0
-#define WORKER_JOB_UPDATE                       1
 
 #define FUNCTION_LOGSMANAGEMENT_HELP_SHORT      "Query of logs management engine running on this node"
 #define FUNCTION_LOGSMANAGEMENT_HELP_LONG       \
@@ -92,6 +90,10 @@ struct Stats_chart_data{
     RRDSET *st_disk_usage;
     RRDDIM **dim_disk_usage;
     collected_number *num_disk_usage_arr;
+
+    RRDSET *st_db_timings;
+    RRDDIM **dim_db_timings_write, **dim_db_timings_rotate;
+    collected_number *num_db_timings_write, *num_db_timings_rotate;
 };
 
 static struct Stats_chart_data *stats_chart_data;
@@ -570,6 +572,25 @@ void *logsmanagement_plugin_main(void *ptr){
     stats_chart_data->dim_disk_usage = callocz(p_file_infos_arr->count, sizeof(RRDDIM));
     stats_chart_data->num_disk_usage_arr = callocz(p_file_infos_arr->count, sizeof(collected_number));
 
+    /* DB timings - initialise */
+    stats_chart_data->st_db_timings = rrdset_create_localhost(
+            stats_chart_data->rrd_type
+            , "database_timings"
+            , NULL
+            , "logsmanagement.plugin"
+            , NULL
+            , "Database timings"
+            , "ns"
+            , "logsmanagement.plugin"
+            , NULL
+            , NETDATA_CHART_PRIO_DB_TIMINGS 
+            , g_logs_manag_config.update_every
+            , RRDSET_TYPE_STACKED
+    );
+    stats_chart_data->dim_db_timings_write = callocz(p_file_infos_arr->count, sizeof(RRDDIM));
+    stats_chart_data->dim_db_timings_rotate = callocz(p_file_infos_arr->count, sizeof(RRDDIM));
+    stats_chart_data->num_db_timings_write = callocz(p_file_infos_arr->count, sizeof(collected_number));
+    stats_chart_data->num_db_timings_rotate = callocz(p_file_infos_arr->count, sizeof(collected_number));
 
     chart_data_arr = callocz(p_file_infos_arr->count, sizeof(struct Chart_meta *));
 
@@ -606,6 +627,16 @@ void *logsmanagement_plugin_main(void *ptr){
         stats_chart_data->dim_disk_usage[i] = 
             rrddim_add( stats_chart_data->st_disk_usage, 
                         p_file_info->chart_name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        /* DB timings - add dimensions */
+        char *dim_db_timings_name = mallocz(snprintf(NULL, 0, "%s_rotate", p_file_info->chart_name) + 1);
+        sprintf(dim_db_timings_name, "%s_write", p_file_info->chart_name);
+        stats_chart_data->dim_db_timings_write[i] = 
+            rrddim_add( stats_chart_data->st_db_timings, dim_db_timings_name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        sprintf(dim_db_timings_name, "%s_rotate", p_file_info->chart_name);
+        stats_chart_data->dim_db_timings_rotate[i] = 
+            rrddim_add( stats_chart_data->st_db_timings, dim_db_timings_name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        freez(dim_db_timings_name);
 
         chart_data_arr[i] = callocz(1, sizeof(struct Chart_meta));
         memcpy(chart_data_arr[i], &chart_types[p_file_info->log_type], sizeof(struct Chart_meta));
@@ -713,6 +744,17 @@ void *logsmanagement_plugin_main(void *ptr){
                                   stats_chart_data->dim_disk_usage[i], 
                                   stats_chart_data->num_disk_usage_arr[i]);
 
+            /* DB write duration stats - update*/
+            stats_chart_data->num_db_timings_write[i] = 
+                __atomic_exchange_n(&p_file_info->db_write_duration, 0, __ATOMIC_RELAXED);
+            stats_chart_data->num_db_timings_rotate[i] = 
+                __atomic_exchange_n(&p_file_info->db_rotate_duration, 0, __ATOMIC_RELAXED);
+            rrddim_set_by_pointer(stats_chart_data->st_db_timings, 
+                                  stats_chart_data->dim_db_timings_write[i], 
+                                  stats_chart_data->num_db_timings_write[i]);
+            rrddim_set_by_pointer(stats_chart_data->st_db_timings, 
+                                  stats_chart_data->dim_db_timings_rotate[i], 
+                                  stats_chart_data->num_db_timings_rotate[i]);
 
             uv_mutex_lock(p_file_info->parser_metrics_mut);
 
@@ -734,6 +776,7 @@ void *logsmanagement_plugin_main(void *ptr){
         rrdset_done(stats_chart_data->st_circ_buff_mem_compressed);
         rrdset_done(stats_chart_data->st_compression_ratio);
         rrdset_done(stats_chart_data->st_disk_usage);
+        rrdset_done(stats_chart_data->st_db_timings);
     }
 
 cleanup:

@@ -459,8 +459,8 @@ void web_log_chart_update(struct File_info *p_file_info, struct Chart_meta *char
                     chart_data->dim_ports[chart_data->port_size - 1] = rrddim_add(chart_data->st_port, 
                         "invalid", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     } else {
-                        char port_name[6] = "";
-                        snprintf(port_name, 6, "%d", chart_data->ports[chart_data->port_size - 1]);
+                        char port_name[PORT_MAX_LEN] = "";
+                        snprintfz(port_name, PORT_MAX_LEN, "%d", chart_data->ports[chart_data->port_size - 1] % (10 * (PORT_MAX_LEN - 1)));
                         chart_data->dim_ports[chart_data->port_size - 1] = rrddim_add(chart_data->st_port, 
                             port_name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     }

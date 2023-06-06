@@ -26,14 +26,8 @@
 #include "parser.h"
 #include "flb_plugin.h"
 
-/* Extra options and includes when building with stress test support */
-#if defined(LOGS_MANAGEMENT_STRESS_TEST) 
-#define NETDATA_CONF_ENABLE_LOGS_MANAGEMENT_DEFAULT 1
-#if LOGS_MANAGEMENT_STRESS_TEST == 1
+#if defined(LOGS_MANAGEMENT_STRESS_TEST) && LOGS_MANAGEMENT_STRESS_TEST == 1
 #include "query_test.h"
-#endif
-#else 
-#define NETDATA_CONF_ENABLE_LOGS_MANAGEMENT_DEFAULT 0
 #endif  // defined(LOGS_MANAGEMENT_STRESS_TEST)
 
 static struct config log_management_config = {
@@ -48,6 +42,7 @@ static struct config log_management_config = {
             .rwlock = AVL_LOCK_INITIALIZER
     }
 };
+
 
 struct File_infos_arr *p_file_infos_arr = NULL;
 
@@ -89,12 +84,30 @@ static bool metrics_dict_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused,
 
 static void p_file_info_destroy(struct File_info *p_file_info){
 
+    if(unlikely(!p_file_info)){
+        collector_info("p_file_info_destroy() called but p_file_info == NULL - already destroyed?");
+        return;
+    }
+
     collector_info("[%s]: p_file_info_destroy() cleanup", p_file_info->chart_name ? p_file_info->chart_name : "Unknown");
+
+    if(p_file_info->db_writer_thread){
+        uv_thread_join(p_file_info->db_writer_thread);
+        m_assert(0, "db_writer_thread joined");
+    }   
 
     freez((void *) p_file_info->chart_name);
     freez(p_file_info->filename);
     freez((void *) p_file_info->file_basename);
     freez((void *) p_file_info->stream_guid);
+
+    freez((void *) p_file_info->db_dir);
+    freez((void *) p_file_info->db_metadata);
+
+    for(int i = 1; i <= BLOB_MAX_FILES; i++){
+        uv_fs_t close_req;
+        uv_fs_close(NULL, &close_req, p_file_info->blob_handles[i], NULL);
+    }
 
     if(p_file_info->circ_buff) circ_buff_destroy(p_file_info->circ_buff);
     
@@ -142,8 +155,7 @@ static void p_file_info_destroy(struct File_info *p_file_info){
         freez(p_file_info->parser_config);
     }
 
-    // freez(p_file_info->parser_metrics_mut); // not yet allocated
-    // freez(p_file_info->log_parser_thread); // not yet allocated
+    if(p_file_info->parser_metrics_mut) freez(p_file_info->parser_metrics_mut); 
 
     Flb_output_config_t *output_next = p_file_info->flb_outputs;
     while(output_next){
@@ -175,7 +187,7 @@ static int logs_manag_config_load(Flb_socket_config_t **forward_in_config_p){
     char temp_path[FILENAME_MAX + 1];
     int rc = 0;
 
-    if(!config_get_boolean(CONFIG_SECTION_LOGS_MANAGEMENT, "enabled", NETDATA_CONF_ENABLE_LOGS_MANAGEMENT_DEFAULT)){
+    if(!config_get_boolean(CONFIG_SECTION_LOGS_MANAGEMENT, "enabled", ENABLE_LOGS_MANAGEMENT_DEFAULT)){
         collector_info("CONFIG: Logs management disabled due to configuration option.");
         rc = -1;
     }
@@ -258,18 +270,17 @@ static int logs_manag_config_load(Flb_socket_config_t **forward_in_config_p){
     collector_info( "CONFIG: global logs management collected logs rate chart enable: %d", 
                     g_logs_manag_config.enable_collected_logs_rate);
 
-    /* TODO: save defaults as macros in logsmanagement_conf.h . */
     *forward_in_config_p = (Flb_socket_config_t *) callocz(1, sizeof(Flb_socket_config_t));
     const int fwd_enable = config_get_boolean(CONFIG_SECTION_LOGS_MANAGEMENT, "forward in enable", 0);
     
-    (*forward_in_config_p)->unix_path = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, "forward in unix path", "");
+    (*forward_in_config_p)->unix_path = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, "forward in unix path", FLB_FORWARD_UNIX_PATH_DEFAULT);
     collector_info("forward in unix path = %s", (*forward_in_config_p)->unix_path);
-    (*forward_in_config_p)->unix_perm = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, "forward in unix perm", "0644");
+    (*forward_in_config_p)->unix_perm = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, "forward in unix perm", FLB_FORWARD_UNIX_PERM_DEFAULT);
     collector_info("forward in unix perm = %s", (*forward_in_config_p)->unix_perm);
     // TODO: Check if listen is in valid format
-    (*forward_in_config_p)->listen = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, "forward in listen", "0.0.0.0");
+    (*forward_in_config_p)->listen = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, "forward in listen", FLB_FORWARD_ADDR_DEFAULT);
     collector_info("forward in listen = %s", (*forward_in_config_p)->listen);
-    (*forward_in_config_p)->port = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, "forward in port", "24224");
+    (*forward_in_config_p)->port = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, "forward in port", FLB_FORWARD_PORT_DEFAULT);
     collector_info("forward in port = %s", (*forward_in_config_p)->port);
 
     snprintfz(temp_path, FILENAME_MAX, "%s/fluentbit.log", netdata_configured_log_dir);
@@ -288,15 +299,7 @@ static int logs_manag_config_load(Flb_socket_config_t **forward_in_config_p){
                                                 "fluent bit log level", flb_srvc_config.log_level);
 
 
-    if(!fwd_enable){
-        // TODO: Expected minor memory leak by not freeing the following?
-        // freez((*forward_in_config_p)->unix_path);
-        // freez((*forward_in_config_p)->unix_perm);
-        // freez((*forward_in_config_p)->listen);
-        // freez((*forward_in_config_p)->port);
-        freez(*forward_in_config_p);
-        *forward_in_config_p = NULL;
-    }
+    if(!fwd_enable) flb_socket_config_destroy((*forward_in_config_p));
 
     return rc;
 }
@@ -339,7 +342,9 @@ static int flb_output_param_get_cb(void *entry, void *data){
  * @param config_section Section to read configuration from.
  * @todo How to handle duplicate entries?
  */
-static void logs_management_init(uv_loop_t *main_loop, struct section *config_section){
+static void logs_management_init(uv_loop_t *main_loop, 
+                                struct section *config_section, 
+                                Flb_socket_config_t *forward_in_config){
 
     struct File_info *p_file_info = callocz(1, sizeof(struct File_info));
 
@@ -390,13 +395,15 @@ static void logs_management_init(uv_loop_t *main_loop, struct section *config_se
      * ------------------------------------------------------------------------- */
     char *source = appconfig_get(&log_management_config, config_section->name, "log source", "local");
     if(!source || !*source) p_file_info->log_source = LOG_SOURCE_LOCAL; // Default
-    else{
-        if(!strcasecmp(source, "forward")) p_file_info->log_source = LOG_SOURCE_FORWARD;
-        // else if (!strcasecmp(source, "tcp")) p_file_info->log_source = TCP;
-        else p_file_info->log_source = LOG_SOURCE_LOCAL;
-    }
+    else if(!strcasecmp(source, "forward")) p_file_info->log_source = LOG_SOURCE_FORWARD;
+    else p_file_info->log_source = LOG_SOURCE_LOCAL;
     freez(source);
     collector_info("[%s]: log source = %s", p_file_info->chart_name, log_src_t_str[p_file_info->log_source]);
+
+    if(p_file_info->log_source == LOG_SOURCE_FORWARD && !forward_in_config){
+        collector_info("[%s]: forward_in_config == NULL - this log source will be disabled", p_file_info->chart_name);
+        return p_file_info_destroy(p_file_info);
+    }
 
 
     /* -------------------------------------------------------------------------
@@ -429,21 +436,17 @@ static void logs_management_init(uv_loop_t *main_loop, struct section *config_se
         switch(p_file_info->log_type){
             case FLB_GENERIC:
                 if(!strcmp(p_file_info->chart_name, "Netdata error.log")){
-                    // TODO: Use netdata_configured_log_dir instead of hard-coded paths.
-                    const char * const netdata_error_path_default[] = {
-                        "/var/log/netdata/error.log",
-                        "/opt/netdata/var/log/netdata/error.log", /* error.log of static builds */
-                        NULL
-                    };
-                    int i = 0;
-                    while(netdata_error_path_default[i] && access(netdata_error_path_default[i], R_OK)){i++;};
-                    if(!netdata_error_path_default[i]){
-                        collector_error("[%s]: Netdata error.log path invalid, unknown or needs permissions", p_file_info->chart_name);
+                    char path[FILENAME_MAX + 1];
+                    snprintfz(path, FILENAME_MAX, "%s/error.log", netdata_configured_log_dir);
+                    if(access(path, R_OK)) {
+                        collector_error("[%s]: Netdata error.log path (%s) invalid, unknown or needs permissions", 
+                            p_file_info->chart_name, path);
                         return p_file_info_destroy(p_file_info);
-                    } else p_file_info->filename = strdupz(netdata_error_path_default[i]);
+                    } else p_file_info->filename = strdupz(path);
                 } else if(!strcasecmp(p_file_info->chart_name, "Netdata fluentbit.log")){
                     if(access(flb_srvc_config.log_path, R_OK)){
-                        collector_error("[%s]: Netdata fluentbit.log path invalid, unknown or needs permissions", p_file_info->chart_name);
+                        collector_error("[%s]: Netdata fluentbit.log path (%s) invalid, unknown or needs permissions", 
+                            p_file_info->chart_name, flb_srvc_config.log_path);
                         return p_file_info_destroy(p_file_info);
                     } else p_file_info->filename = strdupz(flb_srvc_config.log_path);
                 } else if(!strcasecmp(p_file_info->chart_name, "Auth.log tail")){
@@ -476,6 +479,7 @@ static void logs_management_init(uv_loop_t *main_loop, struct section *config_se
                     const char * const apache_access_path_default[] = {
                         "/var/log/apache/access.log",
                         "/var/log/apache2/access.log", /* Debian, Ubuntu */
+                        "/var/log/apache2/access_log", /* Gentoo ? */
                         "/var/log/httpd/access_log",  /* RHEL, Red Hat, CentOS, Fedora */
                         "/var/log/httpd-access.log",   /* FreeBSD */
                         NULL
@@ -1083,14 +1087,14 @@ static void logsmanagement_main_cleanup(void *ptr) {
  * @todo Any cleanup required on program exit? 
  */
 void *logsmanagement_main(void *ptr) {
-    UNUSED(ptr);
     netdata_thread_cleanup_push(logsmanagement_main_cleanup, ptr);
 
     Flb_socket_config_t *forward_in_config = NULL;
-    if(logs_manag_config_load(&forward_in_config)) goto cleanup;
 
     uv_loop_t *main_loop = mallocz(sizeof(uv_loop_t));
     fatal_assert(uv_loop_init(main_loop) == 0);
+
+    if(logs_manag_config_load(&forward_in_config)) goto cleanup;
 
     /* Static asserts */
     #pragma GCC diagnostic push
@@ -1110,17 +1114,20 @@ void *logsmanagement_main(void *ptr) {
         goto cleanup;
     }
 
+    if(flb_add_fwd_input(forward_in_config)){
+        collector_error("flb_add_fwd_input() failed - logs management forward input will be disabled");
+        flb_socket_config_destroy(forward_in_config);
+    }
+
     /* Initialize logs management for each configuration section  */
     struct section *config_section = log_management_config.first_section;
     do {
-        logs_management_init(main_loop, config_section);
+        logs_management_init(main_loop, config_section, forward_in_config);
         config_section = config_section->next;
     } while(config_section);
-    if(p_file_infos_arr->count == 0) goto cleanup; // No log sources - nothing to do
-
-    if(flb_add_fwd_input(forward_in_config)){
-        collector_error("flb_add_fwd_input() failed - logs management forward input will be disabled");
-        goto cleanup;
+    if(p_file_infos_arr->count == 0){
+        collector_info("No valid configuration could be found for any log source - logs management will be disabled");
+        goto cleanup; // No log sources - nothing to do
     }
 
     /* Run Fluent Bit engine
@@ -1147,7 +1154,7 @@ void *logsmanagement_main(void *ptr) {
     debug(D_LOGS_MANAG, "LZ4 version: %s\n", LZ4_versionString());
 #if defined(D_LOGS_MANAG)
     char *sqlite_version = db_get_sqlite_version();
-    debug(D_LOGS_MANAG, "SQLITE version: %s\n", sqlite_version);
+    debug(D_LOGS_MANAG, "SQLITE version: %s\n", sqlite_version ? sqlite_version : "NULL");
     freez(sqlite_version);
 #endif // defined(D_LOGS_MANAG)
 
@@ -1168,6 +1175,10 @@ void *logsmanagement_main(void *ptr) {
     collector_error("uv_run(main_loop, ...); - no handles or requests - exiting");
 
 cleanup:
+    flb_socket_config_destroy(forward_in_config);
+    uv_stop(main_loop);
+    uv_loop_close(main_loop);
+    freez(main_loop);
     netdata_thread_cleanup_pop(1);
     return NULL;
 }

@@ -88,8 +88,9 @@ LOGS_QUERY_RESULT_TYPE execute_logs_manag_query(logs_query_params_t *p_query_par
         return INVALID_REQUEST_ERROR;
     }
 
-    /* Find p_file_infos for this query according to chart_names or filenames if the former is not valid. Only one of 
-     * the two will be used, not both charts_names and filenames can be mixed. */
+    /* Find p_file_infos for this query according to chart_names or filenames 
+     * if the former is not valid. Only one of the two will be used, 
+     * charts_names and filenames cannot be mixed. */
     if(p_query_params->chart_name[0]){
         int pfi_off = 0;
         for(int cn_off = 0; p_query_params->chart_name[cn_off]; cn_off++) {
@@ -138,7 +139,7 @@ LOGS_QUERY_RESULT_TYPE execute_logs_manag_query(logs_query_params_t *p_query_par
 #endif // MEASURE_QUERY_TIME
 
     /* Search DB(s) first */
-    db_search_compound(p_query_params, p_file_infos);
+    db_search(p_query_params, p_file_infos);
 
 #if MEASURE_QUERY_TIME
     const msec_t db_search_time = now_realtime_msec();

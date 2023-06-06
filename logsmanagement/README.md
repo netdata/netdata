@@ -473,11 +473,11 @@ Example configuration of a `flb_docker_events` type parent log collection:
 Any children streaming to this collection must be set up to use one of the [default `json` or `docker` parsers](https://github.com/fluent/fluent-bit/blob/master/conf/parsers.conf), to send the collected log as structured messages, so they can be parsed by the parent:
 
 ```
-fluent-bit -R ~/fluent-bit/conf/parsers.conf -i docker_events -p Parser=json -o forward -F record_modifier -p 'Record="stream guid 6ce266f5-2704-444d-a301-2423b9d30737' -m '*'
+fluent-bit -R ~/fluent-bit/conf/parsers.conf -i docker_events -p Parser=json -o forward -F record_modifier -p 'Record="stream guid" 6ce266f5-2704-444d-a301-2423b9d30737' -m '*'
 ``` 
 or
 ```
-fluent-bit -R ~/fluent-bit/conf/parsers.conf -i docker_events -p Parser=docker -o forward -F record_modifier -p 'Record="stream guid 6ce266f5-2704-444d-a301-2423b9d30737' -m '*'
+fluent-bit -R ~/fluent-bit/conf/parsers.conf -i docker_events -p Parser=docker -o forward -F record_modifier -p 'Record="stream guid" 6ce266f5-2704-444d-a301-2423b9d30737' -m '*'
 ```
 
 If instead the user desires to stream to a parent that collects logs into an `flb_generic` log collection, then a parser is not necessary and the unstructured logs can also be streamed in their original JSON format:

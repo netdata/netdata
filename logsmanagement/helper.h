@@ -118,17 +118,17 @@ static inline str2xx_errno str2int(int *out, char *s, int base) {
     long l = strtol(s, &end, base);
     /* Both checks are needed because INT_MAX == LONG_MAX is possible. */
     if (unlikely(l > INT_MAX || (errno == ERANGE && l == LONG_MAX))){
-        // debug(D_LOGS_MANAG, "str2int error: STR2XX_OVERFLOW");
+        debug(D_LOGS_MANAG, "str2int error: STR2XX_OVERFLOW");
         // m_assert(0, "str2int error: STR2XX_OVERFLOW");
         return STR2XX_OVERFLOW;
     }
     if (unlikely(l < INT_MIN || (errno == ERANGE && l == LONG_MIN))){
-        // debug(D_LOGS_MANAG, "str2int error: STR2XX_UNDERFLOW");
+        debug(D_LOGS_MANAG, "str2int error: STR2XX_UNDERFLOW");
         // m_assert(0, "str2int error: STR2XX_UNDERFLOW");
         return STR2XX_UNDERFLOW;
     }
     if (unlikely(*end != '\0')){
-        // debug(D_LOGS_MANAG, "str2int error: STR2XX_INCONVERTIBLE 2");
+        debug(D_LOGS_MANAG, "str2int error: STR2XX_INCONVERTIBLE 2");
         // m_assert(0, "str2int error: STR2XX_INCONVERTIBLE 2");
         return STR2XX_INCONVERTIBLE;
     }
@@ -147,17 +147,17 @@ static inline str2xx_errno str2float(float *out, char *s) {
     float f = strtof(s, &end);
     /* Both checks are needed because INT_MAX == LONG_MAX is possible. */
     if (unlikely((errno == ERANGE && f == HUGE_VALF))){
-        // debug(D_LOGS_MANAG, "str2float error: STR2XX_OVERFLOW\n");
+        debug(D_LOGS_MANAG, "str2float error: STR2XX_OVERFLOW\n");
         // m_assert(0, "str2float error: STR2XX_OVERFLOW");
         return STR2XX_OVERFLOW;
     }
     if (unlikely((errno == ERANGE && f == -HUGE_VALF))){
-        // debug(D_LOGS_MANAG, "str2float error: STR2XX_UNDERFLOW\n");
+        debug(D_LOGS_MANAG, "str2float error: STR2XX_UNDERFLOW\n");
         // m_assert(0, "str2float error: STR2XX_UNDERFLOW");
         return STR2XX_UNDERFLOW;
     }
     if (unlikely((*end != '\0'))){
-        // debug(D_LOGS_MANAG, "str2float error: STR2XX_INCONVERTIBLE 2\n");
+        debug(D_LOGS_MANAG, "str2float error: STR2XX_INCONVERTIBLE 2\n");
         // m_assert(0, "str2float error: STR2XX_INCONVERTIBLE");
         return STR2XX_INCONVERTIBLE;
     }

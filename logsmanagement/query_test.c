@@ -101,10 +101,9 @@ void test_execute_query_thread(void *args) {
     if (unlikely(rc < 0)) {
         debug(D_LOGS_MANAG, "file_open() error: %s (%d) %s\n", query_params.filename[0], rc, uv_strerror(rc));
         m_assert(rc >= 0, "uv_fs_open() failed");
-    } else {
-        debug(D_LOGS_MANAG, "Opened file: %s\n", query_params.filename[0]);
-        file_handle = open_req.result;  // open_req->result of a uv_fs_t is the file descriptor in case of the uv_fs_open
-    }
+    } 
+    debug(D_LOGS_MANAG, "Opened file: %s\n", query_params.filename[0]);
+    file_handle = open_req.result;  // open_req->result of a uv_fs_t is the file descriptor in case of the uv_fs_open
     uv_fs_req_cleanup(&open_req);
 
     // Run queries and compare results with log file data

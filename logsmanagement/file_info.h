@@ -52,6 +52,18 @@ typedef struct flb_socket_config {
     char *port;
 } Flb_socket_config_t;
 
+#define flb_socket_config_destroy(config){\
+    if(config){\
+        freez(config->mode);\
+        freez(config->unix_path);\
+        freez(config->unix_perm);\
+        freez(config->listen);\
+        freez(config->port);\
+        freez(config);\
+        config = NULL;\
+    }\
+}
+
 typedef struct syslog_parser_config {
     char *log_format;
     Flb_socket_config_t *socket_config;
@@ -89,15 +101,18 @@ struct File_info {
     const char *db_dir;                             /**< Path to metadata DB and compressed log BLOBs directory **/
     const char *db_metadata;                        /**< Path to metadata DB file **/
     uv_mutex_t *db_mut;                             /**< DB access mutex **/
+    uv_thread_t *db_writer_thread;                  /**< Thread responsible for handling the DB writes **/
     uv_file blob_handles[BLOB_MAX_FILES + 1];       /**< File handles for BLOB files. Item 0 not used - just for matching 1-1 with DB ids **/
-    logs_manag_db_mode_t db_mode;                   /**< DB mode. **/
+    logs_manag_db_mode_t db_mode;                   /**< DB mode as enum. **/
     int blob_write_handle_offset;                   /**< File offset denoting HEAD of currently open database BLOB file **/
     int buff_flush_to_db_interval;                  /**< Frequency at which RAM buffers of this log source will be flushed to the database **/
     int64_t blob_max_size;                          /**< When the size of a BLOB exceeds this value, the BLOB gets rotated. **/
     int64_t blob_total_size;                        /**< This is the total disk space that all BLOBs occupy (for this log source) **/
-    
+    int64_t db_write_duration;                      /**< Holds timing details related to duration of DB write operations **/
+    int64_t db_rotate_duration;                     /**< Holds timing details related to duration of DB rorate operations **/
+    sqlite3_stmt *stmt_retrieve_log_msg_metadata;   /**< SQLITE3 statement used to retrieve metadata from database during queries **/
+
     /* Struct members related to log parsing */
-    uv_thread_t *log_parser_thread;                 /**< Log parsing thread. **/ 
     Log_parser_config_t *parser_config;             /**< Configuration to be user by log parser - read from logsmanagement.conf **/ 
     Log_parser_cus_config_t **parser_cus_config;    /**< Array of custom log parsing configurations **/
     Log_parser_metrics_t *parser_metrics;           /**< Extracted metrics **/

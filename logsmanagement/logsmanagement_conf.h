@@ -15,6 +15,12 @@
 #define MiB * 1048576ULL
 #define GiB * 1073741824ULL
 
+#if !defined(LOGS_MANAGEMENT_STRESS_TEST)
+#define ENABLE_LOGS_MANAGEMENT_DEFAULT 0            /**< Whether to enable or not logs management in netdata.conf by default */
+#else 
+#define ENABLE_LOGS_MANAGEMENT_DEFAULT 1            /**< Whether to enable or not logs management in netdata.conf by default, if stress tests are enabled */
+#endif
+
 #define MAX_LOG_MSG_SIZE 50 MiB                     /**< Maximum allowable log message size (in Bytes) to be stored in message queue and DB. **/
 
 #define MAX_CUS_CHARTS_PER_SOURCE 100               /**< Hard limit of maximum custom charts per log source **/
@@ -23,7 +29,11 @@
 
 #define UPDATE_TIMEOUT_DEFAULT 10                   /**< Default timeout to use to update charts if they haven't been updated in the meantime. **/
 
+#if !defined(LOGS_MANAGEMENT_STRESS_TEST)
 #define ENABLE_COLLECTED_LOGS_TOTAL_DEFAULT 0       /**< Default value to enable (or not) metrics of total collected log records **/
+#else 
+#define ENABLE_COLLECTED_LOGS_TOTAL_DEFAULT 1       /**< Default value to enable (or not) metrics of total collected log records, if stress tests are enabled **/
+#endif
 #define ENABLE_COLLECTED_LOGS_RATE_DEFAULT 1        /**< Default value to enable (or not) metrics of rate of collected log records */
 
 /* -------------------------------------------------------------------------- */
@@ -46,8 +56,13 @@ typedef enum {
 
 #define DISK_SPACE_LIMIT_DEFAULT 500                    /**< Global default configuration maximum database disk space limit per log source **/
 
+#if !defined(LOGS_MANAGEMENT_STRESS_TEST)
 #define GLOBAL_DB_MODE_DEFAULT_STR "none"               /**< db mode string to be used as global default in configuration **/
 #define GLOBAL_DB_MODE_DEFAULT LOGS_MANAG_DB_MODE_NONE  /**< db mode to be used as global default, matching GLOBAL_DB_MODE_DEFAULT_STR **/
+#else 
+#define GLOBAL_DB_MODE_DEFAULT_STR "full"               /**< db mode string to be used as global default in configuration, if stress tests are enabled **/
+#define GLOBAL_DB_MODE_DEFAULT LOGS_MANAG_DB_MODE_FULL  /**< db mode to be used as global default, matching GLOBAL_DB_MODE_DEFAULT_STR, if stress tests are enabled **/
+#endif
 
 /* -------------------------------------------------------------------------- */
 
@@ -84,6 +99,18 @@ typedef enum {
 /* -------------------------------------------------------------------------- */
 
 #define KERNEL_LOGS_COLLECT_INIT_WAIT 5                 /**< Wait time (in sec) before kernel log collection starts. Required in order to skip collection and processing of pre-existing logs at Netdata boot. **/
+
+/* -------------------------------------------------------------------------- */
+
+
+/* -------------------------------------------------------------------------- */
+/*                         Fluent Bit Forward config                          */
+/* -------------------------------------------------------------------------- */
+
+#define FLB_FORWARD_UNIX_PATH_DEFAULT ""                 /**< Default path for Forward unix socket configuration, see also https://docs.fluentbit.io/manual/pipeline/inputs/forward#configuration-parameters **/
+#define FLB_FORWARD_UNIX_PERM_DEFAULT "0644"             /**< Default permissions for Forward unix socket configuration, see also https://docs.fluentbit.io/manual/pipeline/inputs/forward#configuration-parameters **/
+#define FLB_FORWARD_ADDR_DEFAULT "0.0.0.0"               /**< Default listen address for Forward socket configuration, see also https://docs.fluentbit.io/manual/pipeline/inputs/forward#configuration-parameters **/
+#define FLB_FORWARD_PORT_DEFAULT "24224"                 /**< Default listen port for Forward socket configuration, see also https://docs.fluentbit.io/manual/pipeline/inputs/forward#configuration-parameters **/
 
 /* -------------------------------------------------------------------------- */
 

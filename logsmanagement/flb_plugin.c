@@ -29,6 +29,13 @@
 #define FLB_FALSE  0
 #define FLB_TRUE   !FLB_FALSE
 
+/* For similar reasons, (re)define the following macros from "flb_lib.h": */
+/* Lib engine status */
+#define FLB_LIB_ERROR     -1
+#define FLB_LIB_NONE       0
+#define FLB_LIB_OK         1
+#define FLB_LIB_NO_CONFIG_MAP 2
+
 /* Following structs are the same as defined in fluent-bit/flb_lib.h and 
  * fluent-bit/flb_time.h, but need to be redefined due to use of dlsym().  */
 
@@ -193,8 +200,9 @@ int flb_run(void){
 
 void flb_terminate(void){
     if(ctx){
-        flb_stop(ctx);
+        if(ctx->status == 1) flb_stop(ctx);
         flb_destroy(ctx);
+        ctx = NULL;
     }
     if(flb_lib_handle) 
         dlclose(flb_lib_handle);
@@ -505,9 +513,9 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                                 if(bytes_remain) --sz;
                                 c++; // skip new line and space chars
 
-                                DICTIONARY *dict;
+                                DICTIONARY *dict = NULL;
                                 char *str = NULL;
-                                size_t str_len;
+                                size_t str_len = 0;
                                 if(!strncmp(c, subsys_str, subsys_str_len)){
                                     dict = p_file_info->parser_metrics->kernel->subsystem;
                                     str = &c[subsys_str_len];
@@ -1075,7 +1083,7 @@ skip_collect_and_drop_logs:
  * @brief Add a Fluent-Bit input that outputs to the "lib" Fluent-Bit plugin.
  * @param[in] p_file_info Pointer to the log source struct where the input will
  * be registered to.
- * @return 0 on success, a negative number for any errors.
+ * @return 0 on success, a negative number for any errors (see enum).
  */
 int flb_add_input(struct File_info *const p_file_info){
 
@@ -1096,8 +1104,6 @@ int flb_add_input(struct File_info *const p_file_info){
     char tag_s[tag_max_size];
     snprintfz(tag_s, tag_max_size, "%u", tag++);
 
-    // TODO: freez(callback) on error
-    struct flb_lib_out_cb *callback = mallocz(sizeof(struct flb_lib_out_cb));
 
     switch(p_file_info->log_type){
         case FLB_GENERIC:
@@ -1255,15 +1261,6 @@ int flb_add_input(struct File_info *const p_file_info){
         }
     }
 
-    /* Set up "lib" output */
-    callback->cb = flb_collect_logs_cb;
-    callback->data = p_file_info;
-    p_file_info->flb_lib_output = flb_output(ctx, "lib", callback);
-    if(p_file_info->flb_lib_output < 0 ) return FLB_OUTPUT_ERROR;
-    if(flb_output_set(ctx, p_file_info->flb_lib_output, 
-        "Match", tag_s,
-        NULL) != 0) return FLB_OUTPUT_SET_ERROR; 
-
     /* Set up user-configured outputs */
     for(Flb_output_config_t *output = p_file_info->flb_outputs; output; output = output->next){
         debug(D_LOGS_MANAG, "setting up user output [%s]", output->plugin);
@@ -1280,50 +1277,74 @@ int flb_add_input(struct File_info *const p_file_info){
                 NULL) != 0) return FLB_OUTPUT_SET_ERROR; 
         }
     }
+
+    /* Set up "lib" output */
+    struct flb_lib_out_cb *callback = mallocz(sizeof(struct flb_lib_out_cb));
+    callback->cb = flb_collect_logs_cb;
+    callback->data = p_file_info;
+    if(((p_file_info->flb_lib_output = flb_output(ctx, "lib", callback)) < 0) ||
+        (flb_output_set(ctx, p_file_info->flb_lib_output, "Match", tag_s, NULL) != 0)){
+        freez(callback);
+        return FLB_OUTPUT_ERROR;
+    }
         
     return SUCCESS;
 }
 
+/**
+ * @brief Add a Fluent-Bit Forward input.
+ * @details This creates a unix or network socket to accept logs using 
+ * Fluent Bit's Forward protocol. For more information see:
+ * https://docs.fluentbit.io/manual/pipeline/inputs/forward
+ * @param[in] forward_in_config Configuration of the Forward input socket.
+ * @return 0 on success, -1 on error.
+ */
 int flb_add_fwd_input(Flb_socket_config_t *forward_in_config){
+    struct flb_lib_out_cb *callback = NULL;
+    int input, output;
 
     if(forward_in_config == NULL){
         debug(D_LOGS_MANAG, "forward: forward_in_config is NULL");
+        collector_info("forward_in_config is NULL");
         return 0;
     }
 
-    debug(D_LOGS_MANAG, "forward: Setting up flb_add_fwd_input()");
+    do{
+        debug(D_LOGS_MANAG, "forward: Setting up flb_add_fwd_input()");
+        
+        if((input = flb_input(ctx, "forward", NULL)) < 0) break;
 
-    int input = flb_input(ctx, "forward", NULL);
-    if(input < 0 ) return -1;
-    if( forward_in_config->unix_path && *forward_in_config->unix_path && 
-        forward_in_config->unix_perm && *forward_in_config->unix_perm){
-        if(flb_input_set(ctx, input, 
-            "Tag_Prefix", "fwd",
-            "Unix_Path", forward_in_config->unix_path,
-            "Unix_Perm", forward_in_config->unix_perm,
-            NULL) != 0) return -1;
-    } else if(  forward_in_config->listen && *forward_in_config->listen &&
-                forward_in_config->port && *forward_in_config->port){
-        if(flb_input_set(ctx, input, 
-            "Tag_Prefix", "fwd",
-            "Listen", forward_in_config->listen,
-            "Port", forward_in_config->port,
-            NULL) != 0) return -1;
-    } else return -1; // should never reach this line
+        if( forward_in_config->unix_path && *forward_in_config->unix_path && 
+            forward_in_config->unix_perm && *forward_in_config->unix_perm){
+            if(flb_input_set(ctx, input, 
+                "Tag_Prefix", "fwd",
+                "Unix_Path", forward_in_config->unix_path,
+                "Unix_Perm", forward_in_config->unix_perm,
+                NULL) != 0) break;
+        } else if( forward_in_config->listen && *forward_in_config->listen &&
+                   forward_in_config->port && *forward_in_config->port){
+            if(flb_input_set(ctx, input, 
+                "Tag_Prefix", "fwd",
+                "Listen", forward_in_config->listen,
+                "Port", forward_in_config->port,
+                NULL) != 0) break;
+        } else break; // should never reach this line
 
-    // TODO: freez(callback) on error
-    struct flb_lib_out_cb *callback = mallocz(sizeof(struct flb_lib_out_cb));
+        callback = mallocz(sizeof(struct flb_lib_out_cb));
 
-    /* Set up output */
-    callback->cb = flb_collect_logs_cb;
-    callback->data = NULL;
-    int output = flb_output(ctx, "lib", callback);
-    if(output < 0 ) return -1;
-    if(flb_output_set(ctx, output, 
-        "Match", "fwd*",
-        NULL) != 0) return -1; 
+        /* Set up output */
+        callback->cb = flb_collect_logs_cb;
+        callback->data = NULL;
+        if((output = flb_output(ctx, "lib", callback)) < 0) break;
+        if(flb_output_set(ctx, output, 
+            "Match", "fwd*",
+            NULL) != 0) break; 
 
-    debug(D_LOGS_MANAG, "forward: Set up flb_add_fwd_input() with success");
+        debug(D_LOGS_MANAG, "forward: Set up flb_add_fwd_input() with success");
+        return 0;
+    } while(0);
 
-    return 0;
+    /* Error */
+    if(callback) freez(callback);
+    return -1;
 }
