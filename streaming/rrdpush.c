@@ -140,7 +140,7 @@ int rrdpush_init() {
 
     if(skip_validation == CONFIG_BOOLEAN_YES){
         if(netdata_ssl_validate_certificate) {
-            info("Netdata is configured to accept invalid SSL certificate.");
+            info("Netdata is configured to skip SSL certificates validation.");
             netdata_ssl_validate_certificate = false;
         }
     }

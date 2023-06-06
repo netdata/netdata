@@ -447,6 +447,9 @@ void netdata_ssl_initialize_ctx(int selector) {
                             SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |
                             // SSL_MODE_AUTO_RETRY |
                             0);
+
+                    if(netdata_ssl_web_server_ctx && !netdata_ssl_validate_certificate)
+                        SSL_CTX_set_verify(netdata_ssl_web_server_ctx, SSL_VERIFY_NONE, NULL);
                 }
             }
             break;
@@ -462,13 +465,20 @@ void netdata_ssl_initialize_ctx(int selector) {
                         SSL_MODE_AUTO_RETRY |
                         0
                 );
+
+                if(netdata_ssl_streaming_sender_ctx && !netdata_ssl_validate_certificate)
+                    SSL_CTX_set_verify(netdata_ssl_streaming_sender_ctx, SSL_VERIFY_NONE, NULL);
             }
             break;
         }
 
         case NETDATA_SSL_EXPORTING_CTX: {
-            if(!netdata_ssl_exporting_ctx)
+            if(!netdata_ssl_exporting_ctx) {
                 netdata_ssl_exporting_ctx = netdata_ssl_create_client_ctx(0);
+
+                if(netdata_ssl_exporting_ctx && !netdata_ssl_validate_certificate)
+                    SSL_CTX_set_verify(netdata_ssl_exporting_ctx, SSL_VERIFY_NONE, NULL);
+            }
             break;
         }
     }
