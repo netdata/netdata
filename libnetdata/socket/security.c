@@ -245,26 +245,42 @@ static inline bool is_handshake_initialized(NETDATA_SSL *ssl, const char *op) {
     }
 }
 
+#define WANT_READ_WRITE_TIMEOUT_MS 10
+
+static inline bool catch_want_read_write_should_retry(NETDATA_SSL *ssl, int err) {
+    int ssl_errno = SSL_get_error(ssl->conn, err);
+    if(ssl_errno == SSL_ERROR_WANT_READ || ssl_errno == SSL_ERROR_WANT_WRITE) {
+        struct pollfd pfds[1] = { [0] = {
+                .fd = SSL_get_rfd(ssl->conn),
+                .events = (short)(((ssl_errno == SSL_ERROR_WANT_READ ) ? POLLIN  : 0) |
+                                  ((ssl_errno == SSL_ERROR_WANT_WRITE) ? POLLOUT : 0)),
+        }};
+
+        if(poll(pfds, 1, WANT_READ_WRITE_TIMEOUT_MS) <= 0)
+            return false; // timeout (0) or error (<0)
+
+        return true; // we have activity, so we should retry
+    }
+
+    return false; // an unknown error
+}
+
 bool netdata_ssl_connect(NETDATA_SSL *ssl) {
     if(unlikely(!is_handshake_initialized(ssl, "connect")))
         return false;
 
     SSL_set_connect_state(ssl->conn);
 
-    int err = SSL_connect(ssl->conn);
-    if (err != 1) {
-        int ssl_errno = SSL_get_error(ssl->conn, err);
-        netdata_ssl_log_error_queue("SSL_connect", ssl);
-        switch(ssl_errno) {
-            case SSL_ERROR_WANT_READ:
-            case SSL_ERROR_WANT_WRITE:
-                ssl->state = NETDATA_SSL_STATE_COMPLETE;
-                return true;
+    int err;
+    while ((err = SSL_connect(ssl->conn)) != 1) {
+        if(!catch_want_read_write_should_retry(ssl, err))
+            break;
+    }
 
-            default:
-                ssl->state = NETDATA_SSL_STATE_FAILED;
-                return false;
-        }
+    if (err != 1) {
+        netdata_ssl_log_error_queue("SSL_connect", ssl);
+        ssl->state = NETDATA_SSL_STATE_FAILED;
+        return false;
     }
 
     ssl->state = NETDATA_SSL_STATE_COMPLETE;
@@ -278,19 +294,15 @@ bool netdata_ssl_accept(NETDATA_SSL *ssl) {
     SSL_set_accept_state(ssl->conn);
 
     int err;
-    if ((err = SSL_accept(ssl->conn)) <= 0) {
-        int ssl_errno = SSL_get_error(ssl->conn, err);
-        netdata_ssl_log_error_queue("SSL_accept", ssl);
-        switch(ssl_errno) {
-            case SSL_ERROR_WANT_READ:
-            case SSL_ERROR_WANT_WRITE:
-                ssl->state = NETDATA_SSL_STATE_COMPLETE;
-                return true;
+    while ((err = SSL_accept(ssl->conn)) != 1) {
+        if(!catch_want_read_write_should_retry(ssl, err))
+            break;
+    }
 
-            default:
-                ssl->state = NETDATA_SSL_STATE_FAILED;
-                return false;
-        }
+    if (err != 1) {
+        netdata_ssl_log_error_queue("SSL_accept", ssl);
+        ssl->state = NETDATA_SSL_STATE_FAILED;
+        return false;
     }
 
     ssl->state = NETDATA_SSL_STATE_COMPLETE;
