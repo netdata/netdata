@@ -217,10 +217,6 @@ void web_client_zero(struct web_client *w);
 struct web_client *web_client_create(size_t *statistics_memory_accounting);
 void web_client_free(struct web_client *w);
 
-#ifdef ENABLE_HTTPS
-void web_client_reuse_ssl(struct web_client *w);
-#endif
-
 #include "web/api/web_api_v1.h"
 #include "web/api/web_api_v2.h"
 #include "daemon/common.h"

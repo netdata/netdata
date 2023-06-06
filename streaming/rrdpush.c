@@ -729,8 +729,7 @@ static void rrdpush_receiver_takeover_web_connection(struct web_client *w, struc
     rpt->ssl.conn          = w->ssl.conn;
     rpt->ssl.flags         = w->ssl.flags;
 
-    w->ssl.conn = NULL;
-    w->ssl.flags = NETDATA_SSL_START;
+    w->ssl = NETDATA_SSL_UNSET_CONNECTION;
 #endif
 
     WEB_CLIENT_IS_DEAD(w);
@@ -770,8 +769,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
     rpt->client_port       = strdupz(w->client_port);
 
 #ifdef ENABLE_HTTPS
-    rpt->ssl.conn = NULL;
-    rpt->ssl.flags = NETDATA_SSL_START;
+    rpt->ssl = NETDATA_SSL_UNSET_CONNECTION;
 #endif
 
     rpt->config.update_every = default_rrd_update_every;

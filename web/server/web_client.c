@@ -2031,7 +2031,7 @@ void web_client_decode_path_and_query_string(struct web_client *w, const char *p
 }
 
 #ifdef ENABLE_HTTPS
-void web_client_reuse_ssl(struct web_client *w) {
+static void web_client_reuse_ssl(struct web_client *w) {
     if (netdata_ssl_srv_ctx) {
         if (w->ssl.conn) {
             SSL_SESSION *session = SSL_get_session(w->ssl.conn);
@@ -2046,6 +2046,12 @@ void web_client_reuse_ssl(struct web_client *w) {
             SSL_free(old);
         }
     }
+    else if(w->ssl.conn) {
+        SSL_free(w->ssl.conn);
+        w->ssl.conn = NULL;
+    }
+
+    w->ssl.flags = NETDATA_SSL_START;
 }
 #endif
 
@@ -2064,7 +2070,7 @@ void web_client_zero(struct web_client *w) {
 
 #ifdef ENABLE_HTTPS
     web_client_reuse_ssl(w);
-    SSL *ssl = w->ssl.conn;
+    struct netdata_ssl ssl = w->ssl;
 #endif
 
     size_t use_count = w->use_count;
@@ -2078,9 +2084,7 @@ void web_client_zero(struct web_client *w) {
     w->use_count = use_count;
 
 #ifdef ENABLE_HTTPS
-    w->ssl.conn = ssl;
-    w->ssl.flags = NETDATA_SSL_START;
-    debug(D_WEB_CLIENT_ACCESS,"Reusing SSL structure with (w->ssl = NULL, w->accepted = %u)", w->ssl.flags);
+    w->ssl = ssl;
 #endif
 
     // restore the pointers of the buffers
@@ -2094,6 +2098,11 @@ void web_client_zero(struct web_client *w) {
 
 struct web_client *web_client_create(size_t *statistics_memory_accounting) {
     struct web_client *w = (struct web_client *)callocz(1, sizeof(struct web_client));
+
+#ifdef ENABLE_HTTPS
+    w->ssl = NETDATA_SSL_UNSET_CONNECTION;
+#endif
+
     w->use_count = 1;
     w->statistics.memory_accounting = statistics_memory_accounting;
 

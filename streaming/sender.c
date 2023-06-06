@@ -508,11 +508,10 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
 
 #ifdef ENABLE_HTTPS
 
-    if(host->sender->ssl.conn && !host->destination->ssl) {
+    if(host->sender->ssl.conn && !host->destination->ssl)
         SSL_free(host->sender->ssl.conn);
-        host->sender->ssl.conn = NULL;
-    }
-    host->sender->ssl.flags = NETDATA_SSL_START;
+
+    host->sender->ssl = NETDATA_SSL_UNSET_CONNECTION;
 
     if(host->destination && host->destination->ssl) {
         if (netdata_ssl_client_ctx) {

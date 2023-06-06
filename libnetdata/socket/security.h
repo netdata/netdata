@@ -44,6 +44,8 @@ struct netdata_ssl {
     NETDATA_SSL_HANDSHAKE flags; // The flags for SSL connection
 };
 
+#define NETDATA_SSL_UNSET_CONNECTION (struct netdata_ssl){ .conn = NULL, .flags = NETDATA_SSL_START }
+
 extern SSL_CTX *netdata_ssl_exporting_ctx;
 extern SSL_CTX *netdata_ssl_client_ctx;
 extern SSL_CTX *netdata_ssl_srv_ctx;

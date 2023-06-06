@@ -104,11 +104,6 @@ struct web_client *web_client_get_from_cache(void) {
         // allocate it
         w = web_client_create(&netdata_buffers_statistics.buffers_web);
 
-#ifdef ENABLE_HTTPS
-        w->ssl.flags = NETDATA_SSL_START;
-        debug(D_WEB_CLIENT_ACCESS,"Starting SSL structure with (w->ssl = NULL, w->accepted = %u)", w->ssl.flags);
-#endif
-
         netdata_spinlock_lock(&web_clients_cache.used.spinlock);
         web_clients_cache.used.allocated++;
     }
