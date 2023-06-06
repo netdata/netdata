@@ -55,17 +55,23 @@ void security_log_ssl_error_queue(const char *call) {
                 code = "SSL_ERROR_WANT_ACCEPT";
                 break;
 
+#ifdef SSL_ERROR_WANT_ASYNC
             case SSL_ERROR_WANT_ASYNC:
                 code = "SSL_ERROR_WANT_ASYNC";
                 break;
+#endif
 
+#ifdef SSL_ERROR_WANT_ASYNC_JOB
             case SSL_ERROR_WANT_ASYNC_JOB:
                 code = "SSL_ERROR_WANT_ASYNC_JOB";
                 break;
+#endif
 
+#ifdef SSL_ERROR_WANT_CLIENT_HELLO_CB
             case SSL_ERROR_WANT_CLIENT_HELLO_CB:
                 code = "SSL_ERROR_WANT_CLIENT_HELLO_CB";
                 break;
+#endif
 
 #ifdef SSL_ERROR_WANT_RETRY_VERIFY
             case SSL_ERROR_WANT_RETRY_VERIFY:
