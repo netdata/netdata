@@ -45,7 +45,7 @@ bool netdata_ssl_open(struct netdata_ssl *ssl, SSL_CTX *ctx, int fd) {
         return false;
     }
 
-    ssl->flags = NETDATA_SSL_OPEN;
+    ssl->flags = NETDATA_SSL_HANDSHAKE_INIT;
 
     ERR_clear_error();
 
@@ -149,11 +149,37 @@ void netdata_ssl_log_error_queue(const char *call, struct netdata_ssl *ssl) {
     }
 }
 
-ssize_t netdata_ssl_read(struct netdata_ssl *ssl, void *buf, size_t num) {
-    if(unlikely(!ssl->conn || ssl->flags != NETDATA_SSL_HANDSHAKE_COMPLETE)) {
-        internal_error(true, "SSL: trying to read from an invalid SSL connection");
-        return -1;
+static inline bool is_handshake_complete(struct netdata_ssl *ssl, const char *op) {
+    if(unlikely(!ssl->conn)) {
+        internal_error(true, "SSL: trying to %s on a NULL connection", op);
+        return false;
     }
+
+    switch(ssl->flags) {
+        case NETDATA_SSL_NOT_SSL: {
+            internal_error(true, "SSL: trying to %s on non-SSL connection", op);
+            return false;
+        }
+
+        case NETDATA_SSL_HANDSHAKE_INIT: {
+            internal_error(true, "SSL: trying to %s on an incomplete connection", op);
+            return false;
+        }
+
+        case NETDATA_SSL_HANDSHAKE_FAILED: {
+            internal_error(true, "SSL: trying to %s on a failed connection", op);
+            return false;
+        }
+
+        case NETDATA_SSL_HANDSHAKE_COMPLETE: {
+            return true;
+        }
+    }
+}
+
+ssize_t netdata_ssl_read(struct netdata_ssl *ssl, void *buf, size_t num) {
+    if(unlikely(!is_handshake_complete(ssl, "read")))
+        return -1;
 
     errno = 0;
 
@@ -172,10 +198,8 @@ ssize_t netdata_ssl_read(struct netdata_ssl *ssl, void *buf, size_t num) {
 }
 
 ssize_t netdata_ssl_write(struct netdata_ssl *ssl, const void *buf, size_t num) {
-    if(unlikely(!ssl->conn || ssl->flags != NETDATA_SSL_HANDSHAKE_COMPLETE)) {
-        internal_error(true, "SSL: trying to write to an invalid SSL connection");
+    if(unlikely(!is_handshake_complete(ssl, "write")))
         return -1;
-    }
 
     errno = 0;
 
@@ -193,11 +217,37 @@ ssize_t netdata_ssl_write(struct netdata_ssl *ssl, const void *buf, size_t num) 
     return bytes;
 }
 
-bool netdata_ssl_connect(struct netdata_ssl *ssl) {
-    if(unlikely(!ssl->conn || ssl->flags != NETDATA_SSL_OPEN)) {
-        internal_error(true, "SSL: trying to connect using an invalid SSL structure");
+static inline bool is_handshake_initialized(struct netdata_ssl *ssl, const char *op) {
+    if(unlikely(!ssl->conn)) {
+        internal_error(true, "SSL: trying to %s on a NULL connection", op);
         return false;
     }
+
+    switch(ssl->flags) {
+        case NETDATA_SSL_NOT_SSL: {
+            internal_error(true, "SSL: trying to %s on non-SSL connection", op);
+            return false;
+        }
+
+        case NETDATA_SSL_HANDSHAKE_INIT: {
+            return true;
+        }
+
+        case NETDATA_SSL_HANDSHAKE_FAILED: {
+            internal_error(true, "SSL: trying to %s on a failed connection", op);
+            return false;
+        }
+
+        case NETDATA_SSL_HANDSHAKE_COMPLETE: {
+            internal_error(true, "SSL: trying to %s on an complete connection", op);
+            return false;
+        }
+    }
+}
+
+bool netdata_ssl_connect(struct netdata_ssl *ssl) {
+    if(unlikely(!is_handshake_initialized(ssl, "connect")))
+        return false;
 
     SSL_set_connect_state(ssl->conn);
 
@@ -222,10 +272,8 @@ bool netdata_ssl_connect(struct netdata_ssl *ssl) {
 }
 
 bool netdata_ssl_accept(struct netdata_ssl *ssl) {
-    if(unlikely(!ssl->conn || ssl->flags != NETDATA_SSL_OPEN)) {
-        internal_error(true, "SSL: trying to accept a connection using an invalid SSL structure");
+    if(unlikely(!is_handshake_initialized(ssl, "accept")))
         return false;
-    }
 
     SSL_set_accept_state(ssl->conn);
 

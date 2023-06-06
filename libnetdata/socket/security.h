@@ -2,10 +2,10 @@
 # define NETDATA_SECURITY_H
 
 typedef enum __attribute__((packed)) {
-    NETDATA_SSL_NOT_SSL             = (1 << 0), // This connection is not SSL
-    NETDATA_SSL_OPEN                = (1 << 1), // SSL is OPEN
-    NETDATA_SSL_HANDSHAKE_FAILED    = (1 << 2), // SSL handshake failed
-    NETDATA_SSL_HANDSHAKE_COMPLETE  = (1 << 3), // SSL handshake successful
+    NETDATA_SSL_NOT_SSL = 1,        // This connection is not SSL
+    NETDATA_SSL_HANDSHAKE_INIT,     // SSL handshake is initialized
+    NETDATA_SSL_HANDSHAKE_FAILED,   // SSL handshake failed
+    NETDATA_SSL_HANDSHAKE_COMPLETE, // SSL handshake successful
 } NETDATA_SSL_HANDSHAKE;
 
 #define NETDATA_SSL_WEB_SERVER_CTX 0
@@ -40,7 +40,7 @@ struct netdata_ssl {
 
 #define NETDATA_SSL_UNSET_CONNECTION (struct netdata_ssl){ .conn = NULL, .flags = NETDATA_SSL_NOT_SSL }
 
-#define SSL_connection(ssl) ((ssl)->conn && !((ssl)->flags & NETDATA_SSL_NOT_SSL))
+#define SSL_connection(ssl) ((ssl)->conn && (ssl)->flags != NETDATA_SSL_NOT_SSL)
 
 extern SSL_CTX *netdata_ssl_exporting_ctx;
 extern SSL_CTX *netdata_ssl_streaming_sender_ctx;
