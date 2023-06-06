@@ -82,6 +82,10 @@ static bool metrics_dict_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused,
     return true;
 }
 
+/** 
+ * @brief Cleanup p_file_info struct
+ * @param p_file_info The struct of File_info type to be cleaned up.
+ * @todo  Pass p_file_info by reference, so that it can be set to NULL. */
 static void p_file_info_destroy(struct File_info *p_file_info){
 
     if(unlikely(!p_file_info)){
@@ -175,7 +179,6 @@ static void p_file_info_destroy(struct File_info *p_file_info){
     }
     
     freez(p_file_info);
-    p_file_info = NULL;
 }
 
 /**
@@ -316,7 +319,7 @@ static int flb_output_param_get_cb(void *entry, void *data){
     
     if(!strncasecmp(option->name, param_prefix, param_prefix_len)){ // param->name looks like "output 1 host"
         char *param_key = &option->name[param_prefix_len]; // param_key should look like " host"
-        while(*param_key && *param_key == ' ') param_key++; // remove whitespace so it looks like "host"
+        while(*param_key == ' ') param_key++; // remove whitespace so it looks like "host"
         
         if(*param_key && strcasecmp(param_key, FLB_OUTPUT_PLUGIN_NAME_KEY)){ // ignore param_key "plugin" 
             // debug(D_LOGS_MANAG, "config_option: name[%s], value[%s]", option->name, option->value);

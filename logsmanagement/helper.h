@@ -9,9 +9,6 @@
 
 #include "libnetdata/libnetdata.h"
 #include <assert.h>
-#include <stdarg.h>
-#include <string.h>
-#include <sys/time.h>
 
 #define LOGS_MANAG_STR_HELPER(x) #x
 #define LOGS_MANAG_STR(x) LOGS_MANAG_STR_HELPER(x)

@@ -32,7 +32,6 @@ The Netdata logs management engine enables collection, processing, storage, stre
 
 ![Logs management pipeline](https://github.com/netdata/netdata/assets/5953192/dd73382c-af4b-4840-a3fe-1ba5069304e8 "Logs management pipeline")
 
-
 The [Fluent Bit](https://github.com/fluent/fluent-bit) project has been used as the logs collection and exporting / streaming engine, due to its stability and the variety of [collection (input) plugins](https://docs.fluentbit.io/manual/pipeline/inputs) that it offers. Each collected log record passes through the Fluent Bit engine first, before it gets buffered, parsed, compressed and (optionally) stored locally by the logs management engine. It can also be streamed to another Netdata or Fluent Bit instance (using Fluent Bit's [Forward](https://docs.fluentbit.io/manual/pipeline/outputs/forward) protocol), or exported using any other [Fluent Bit output](https://docs.fluentbit.io/manual/pipeline/outputs).
 
 A bespoke circular buffering implementation has been used to maximize performance and optimize memory utilization. More technical details about how it works can be found [here](https://github.com/netdata/netdata/pull/13291#buffering).
@@ -49,8 +48,6 @@ To configure Netdata's logs management engine properly, please make sure you are
 </a>
 
 The following log collectors are supported at the moment. The table will be updated as more collectors are added:
-
-
 |  Collector    	| Log type      		| Description  |
 | ------------  	| ------------  		| ------------ |
 | kernel logs (kmsg)| `flb_kmsg`    		| Collection of new kernel ring buffer logs.|
@@ -68,9 +65,9 @@ The following log collectors are supported at the moment. The table will be upda
 </a>
 
 Netdata logs management introduces minimal additional package dependencies and those are actually [Fluent Bit dependencies](https://docs.fluentbit.io/manual/installation/requirements). The only extra build-time dependencies are:
- - `flex` 
- - `bison` 
- - `musl-fts-dev` (Alpine Linux only)
+- `flex` 
+- `bison` 
+- `musl-fts-dev` (Alpine Linux only)
 
 However, there may be some exceptions to this rule as more collectors are added to the logs management engine, so if a specific collector is disabled due to missing dependencies, please refer to this section or check [Troubleshooting](#troubleshooting).
 
@@ -291,7 +288,6 @@ _How to configure streaming if child is Netdata?_
 _What about Fluent-Bit retries, if network is down? Logs received out of order?_
 
 _Compression via gzip_
-
 
 Netdata supports 2 streaming configurations:
 1. `syslog` messages over Unix or network sockets. 

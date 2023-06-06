@@ -197,8 +197,7 @@ try_to_acquire_space:
         goto try_to_acquire_space;
     }
         
-    m_assert(available_text_space || 
-            (!available_text_space && buff->allow_dropped_logs), "!available_text_space == 0 && !buff->allow_dropped_logs");
+    m_assert(available_text_space || buff->allow_dropped_logs, "!available_text_space == 0 && !buff->allow_dropped_logs");
     return available_text_space;
 }
 
@@ -233,7 +232,7 @@ int circ_buff_insert(Circ_buff_t *const buff){
 
         buff->parse = buff->parse - buff->tail;
         head = buff->head = buff->num_of_items++;
-        tail = buff->tail = buff->read = 0;
+        buff->tail = buff->read = 0;
         buff->full = 0; 
 
         __atomic_add_fetch(&buff->buff_realloc_cnt, 1, __ATOMIC_RELAXED);

@@ -1257,7 +1257,6 @@ int flb_add_input(struct File_info *const p_file_info){
         default: {
             m_assert(0, "default: case in flb_add_input() error");
             return DEFAULT_ERROR; // Shouldn't reach here
-            break;
         }
     }
 
