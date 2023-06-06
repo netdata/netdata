@@ -179,11 +179,25 @@ static inline bool is_handshake_complete(NETDATA_SSL *ssl, const char *op) {
     return false;
 }
 
+/*
+ * netdata_ssl_read() should return the same as read():
+ *
+ * Positive value: The read() function succeeded and read some bytes. The exact number of bytes read is returned.
+ *
+ * Zero: For files and sockets, a return value of zero signifies end-of-file (EOF), meaning no more data is available
+ *       for reading. For sockets, this usually means the other side has closed the connection.
+ *
+ * -1: An error occurred. The specific error can be found by examining the errno variable.
+ *     EAGAIN or EWOULDBLOCK: The file descriptor is in non-blocking mode, and the read operation would block.
+ *     (These are often the same value, but can be different on some systems.)
+ */
+
 ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num) {
     if(unlikely(!is_handshake_complete(ssl, "read")))
         return -1;
 
     errno = 0;
+    ssl->ssl_errno = 0;
 
     int bytes, err;
 
@@ -192,18 +206,37 @@ ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num) {
     if(unlikely(bytes <= 0)) {
         err = SSL_get_error(ssl->conn, bytes);
         netdata_ssl_log_error_queue("SSL_read", ssl);
-        if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE)
-            bytes = 0;
+        if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+            ssl->ssl_errno = err;
+            errno = EWOULDBLOCK;
+            bytes = -1;  // according to read() or recv()
+        }
+        else
+            bytes = -1;
     }
 
     return bytes;
 }
+
+/*
+ * netdata_ssl_write() should return the same as write():
+ *
+ * Positive value: The write() function succeeded and wrote some bytes. The exact number of bytes written is returned.
+ *
+ * Zero: It's technically possible for write() to return zero, indicating that zero bytes were written. However, for a
+ * socket, this generally does not happen unless the size of the data to be written is zero.
+ *
+ * -1: An error occurred. The specific error can be found by examining the errno variable.
+ *     EAGAIN or EWOULDBLOCK: The file descriptor is in non-blocking mode, and the write operation would block.
+ *     (These are often the same value, but can be different on some systems.)
+ */
 
 ssize_t netdata_ssl_write(NETDATA_SSL *ssl, const void *buf, size_t num) {
     if(unlikely(!is_handshake_complete(ssl, "write")))
         return -1;
 
     errno = 0;
+    ssl->ssl_errno = 0;
 
     int bytes, err;
 
@@ -212,8 +245,13 @@ ssize_t netdata_ssl_write(NETDATA_SSL *ssl, const void *buf, size_t num) {
     if(unlikely(bytes <= 0)) {
         err = SSL_get_error(ssl->conn, bytes);
         netdata_ssl_log_error_queue("SSL_write", ssl);
-        if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE)
-            bytes = 0;
+        if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+            ssl->ssl_errno = err;
+            errno = EWOULDBLOCK;
+            bytes = -1; // according to write() or send()
+        }
+        else
+            bytes = -1;
     }
 
     return bytes;

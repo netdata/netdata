@@ -81,23 +81,11 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
     while (*sock != -1 && errno != EWOULDBLOCK) {
         ssize_t r;
 #ifdef ENABLE_HTTPS
-        if (exporting_tls_is_enabled(instance->config.type, options) &&
-            SSL_connection(&connector_specific_data->ssl)) {
-
+        if (SSL_connection(&connector_specific_data->ssl))
             r = netdata_ssl_read(&connector_specific_data->ssl, &response->buffer[response->len],
                                  (int) (response->size - response->len));
-
-            if (likely(r > 0)) {
-                // we received some data
-                response->len += r;
-                stats->received_bytes += r;
-                stats->receptions++;
-                continue;
-            }
-        }
-        else {
+        else
             r = recv(*sock, &response->buffer[response->len], response->size - response->len, MSG_DONTWAIT);
-        }
 #else
         r = recv(*sock, &response->buffer[response->len], response->size - response->len, MSG_DONTWAIT);
 #endif
@@ -106,11 +94,13 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
             response->len += r;
             stats->received_bytes += r;
             stats->receptions++;
-        } else if (r == 0) {
+        }
+        else if (r == 0) {
             error("EXPORTING: '%s' closed the socket", instance->config.destination);
             close(*sock);
             *sock = -1;
-        } else {
+        }
+        else {
             // failed to receive data
             if (errno != EAGAIN && errno != EWOULDBLOCK) {
                 error("EXPORTING: cannot receive data from '%s'.", instance->config.destination);
@@ -160,8 +150,7 @@ void simple_connector_send_buffer(
     size_t buffer_len = buffer_strlen(buffer);
 
 #ifdef ENABLE_HTTPS
-    if (exporting_tls_is_enabled(instance->config.type, options) &&
-        SSL_connection(&connector_specific_data->ssl)) {
+    if (SSL_connection(&connector_specific_data->ssl)) {
 
         if (header_len)
             header_sent_bytes = netdata_ssl_write(&connector_specific_data->ssl, buffer_tostring(header), header_len);

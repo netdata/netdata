@@ -1830,14 +1830,10 @@ void pluginsd_process_thread_cleanup(void *ptr) {
     PARSER *parser = (PARSER *)ptr;
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *)parser->user;
 
-    internal_error(true, "PARSER: cleanup START (chart: %s, lock: %s)", u->st ? "YES" : "NO", u->v2.locked_data_collection ? "YES" : "NO");
-
     pluginsd_cleanup_v2(parser->user);
     pluginsd_host_define_cleanup(parser->user);
 
     rrd_collector_finished();
-
-    internal_error(true, "PARSER: cleanup END (chart: %s, lock: %s)", u->st ? "YES" : "NO", u->v2.locked_data_collection ? "YES" : "NO");
 
     parser_destroy(parser);
 }

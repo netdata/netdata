@@ -104,13 +104,18 @@ static int read_stream(struct receiver_state *r, char* buffer, size_t size) {
         return 0;
     }
 
+    ssize_t bytes_read;
+
 #ifdef ENABLE_HTTPS
     if (SSL_connection(&r->ssl))
-        return (int)netdata_ssl_read(&r->ssl, buffer, size);
+        bytes_read = netdata_ssl_read(&r->ssl, buffer, size);
+    else
+        bytes_read = read(r->fd, buffer, size);
+#else
+    bytes_read = read(r->fd, buffer, size);
 #endif
 
-    ssize_t bytes_read = read(r->fd, buffer, size);
-    if(bytes_read == 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINPROGRESS)) {
+    if((bytes_read == 0 || bytes_read == -1) && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINPROGRESS)) {
         error("STREAM: %s(): timeout while waiting for data on socket!", __FUNCTION__);
         bytes_read = -3;
     }
@@ -122,23 +127,6 @@ static int read_stream(struct receiver_state *r, char* buffer, size_t size) {
         error("STREAM: %s() failed to read from socket!", __FUNCTION__);
         bytes_read = -2;
     }
-
-//    do {
-//        bytes_read = (int) fread(buffer, 1, size, fp);
-//        if (unlikely(bytes_read <= 0)) {
-//            if(feof(fp)) {
-//                internal_error(true, "%s(): fread() failed with EOF", __FUNCTION__);
-//                bytes_read = -2;
-//            }
-//            else if(ferror(fp)) {
-//                internal_error(true, "%s(): fread() failed with ERROR", __FUNCTION__);
-//                bytes_read = -3;
-//            }
-//            else bytes_read = 0;
-//        }
-//        else
-//            worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, bytes_read);
-//    } while(bytes_read == 0);
 
     return (int)bytes_read;
 }

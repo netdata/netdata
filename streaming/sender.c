@@ -319,6 +319,11 @@ static void rrdpush_sender_after_connect(RRDHOST *host) {
 }
 
 static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
+#ifdef ENABLE_HTTPS
+    if(SSL_connection(&host->sender->ssl))
+        netdata_ssl_close(&host->sender->ssl);
+#endif
+
     if(host->sender->rrdpush_sender_socket != -1) {
         close(host->sender->rrdpush_sender_socket);
         host->sender->rrdpush_sender_socket = -1;
@@ -833,25 +838,17 @@ static ssize_t attempt_to_send(struct sender_state *s) {
 }
 
 static ssize_t attempt_read(struct sender_state *s) {
-    ssize_t ret = 0;
+    ssize_t ret;
 
 #ifdef ENABLE_HTTPS
-    if (SSL_connection(&s->ssl)) {
-        size_t desired = sizeof(s->read_buffer) - s->read_len - 1;
-        ret = netdata_ssl_read(&s->ssl, s->read_buffer, desired);
-        if (ret > 0 ) {
-            s->read_len += (int)ret;
-            return ret;
-        }
-
-        if (ret == -1) {
-            worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
-            rrdpush_sender_thread_close_socket(s->host);
-        }
-        return ret;
-    }
-#endif
+    if (SSL_connection(&s->ssl))
+        ret = netdata_ssl_read(&s->ssl, s->read_buffer + s->read_len, sizeof(s->read_buffer) - s->read_len - 1);
+    else
+        ret = recv(s->rrdpush_sender_socket, s->read_buffer + s->read_len, sizeof(s->read_buffer) - s->read_len - 1,MSG_DONTWAIT);
+#else
     ret = recv(s->rrdpush_sender_socket, s->read_buffer + s->read_len, sizeof(s->read_buffer) - s->read_len - 1,MSG_DONTWAIT);
+#endif
+
     if (ret > 0) {
         s->read_len += ret;
         return ret;
@@ -859,6 +856,12 @@ static ssize_t attempt_read(struct sender_state *s) {
 
     if (ret < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR))
         return ret;
+
+#ifdef ENABLE_HTTPS
+    if (SSL_connection(&s->ssl))
+        worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
+    else
+#endif
 
     if (ret == 0 || errno == ECONNRESET) {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_PARENT_CLOSED);
@@ -868,6 +871,7 @@ static ssize_t attempt_read(struct sender_state *s) {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR);
         error("STREAM %s [send to %s]: error during receive (%zd) - closing connection.", rrdhost_hostname(s->host), s->connected_to, ret);
     }
+
     rrdpush_sender_thread_close_socket(s->host);
 
     return ret;

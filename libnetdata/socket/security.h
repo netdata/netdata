@@ -36,6 +36,7 @@ typedef enum __attribute__((packed)) {
 typedef struct netdata_ssl {
     SSL *conn;               // SSL connection
     NETDATA_SSL_STATE state; // The state for SSL connection
+    unsigned long ssl_errno; // The SSL errno of the last SSL call
 } NETDATA_SSL;
 
 #define NETDATA_SSL_UNSET_CONNECTION (NETDATA_SSL){ .conn = NULL, .state = NETDATA_SSL_STATE_NOT_SSL }
