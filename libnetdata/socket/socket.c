@@ -1032,11 +1032,27 @@ ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
         }
 
         if(!retval) {
+#ifdef ENABLE_HTTPS
+            if (ssl->conn && ssl->flags == NETDATA_SSL_HANDSHAKE_COMPLETE && SSL_pending(ssl->conn))
+                break;
+#endif
+
             // timeout
             return 0;
         }
 
-        if(fd.events & POLLIN) break;
+        if(fd.events & POLLIN) {
+#ifdef ENABLE_HTTPS
+            if (ssl->conn && ssl->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
+                if(SSL_pending(ssl->conn))
+                    break;
+                else
+                    continue;
+            }
+            else
+#endif
+                break;
+        }
     }
 
 #ifdef ENABLE_HTTPS
