@@ -514,9 +514,9 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     host->sender->ssl = NETDATA_SSL_UNSET_CONNECTION;
 
     if(host->destination && host->destination->ssl) {
-        if (netdata_ssl_client_ctx) {
+        if (netdata_ssl_streaming_sender_ctx) {
             if (!host->sender->ssl.conn) {
-                host->sender->ssl.conn = SSL_new(netdata_ssl_client_ctx);
+                host->sender->ssl.conn = SSL_new(netdata_ssl_streaming_sender_ctx);
                 if (!host->sender->ssl.conn) {
                     error("Failed to allocate SSL structure.");
                     host->sender->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
@@ -1209,9 +1209,9 @@ void *rrdpush_sender_thread(void *ptr) {
 
             static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
             netdata_spinlock_lock(&sp);
-            if(!netdata_ssl_client_ctx) {
-                security_start_ssl(NETDATA_SSL_CONTEXT_STREAMING);
-                ssl_security_location_for_context(netdata_ssl_client_ctx, netdata_ssl_ca_file, netdata_ssl_ca_path);
+            if(!netdata_ssl_streaming_sender_ctx) {
+                security_start_ssl(NETDATA_SSL_STREAMING_SENDER_CTX);
+                ssl_security_location_for_context(netdata_ssl_streaming_sender_ctx, netdata_ssl_ca_file, netdata_ssl_ca_path);
             }
             netdata_spinlock_unlock(&sp);
 

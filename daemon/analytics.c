@@ -376,11 +376,11 @@ void analytics_https(void)
 #ifdef ENABLE_HTTPS
     analytics_exporting_connectors_ssl(b);
 
-    buffer_strcat(b, netdata_ssl_client_ctx &&
-            rrdhost_flag_check(localhost, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED) &&
-            SSL_handshake_complete(&localhost->sender->ssl) ? "streaming|" : "|");
+    buffer_strcat(b, netdata_ssl_streaming_sender_ctx &&
+                     rrdhost_flag_check(localhost, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED) &&
+                     SSL_handshake_complete(&localhost->sender->ssl) ? "streaming|" : "|");
 
-    buffer_strcat(b, netdata_ssl_srv_ctx ? "web" : "");
+    buffer_strcat(b, netdata_ssl_web_server_ctx ? "web" : "");
 #else
     buffer_strcat(b, "||");
 #endif

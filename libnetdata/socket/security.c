@@ -3,8 +3,8 @@
 #ifdef ENABLE_HTTPS
 
 SSL_CTX *netdata_ssl_exporting_ctx =NULL;
-SSL_CTX *netdata_ssl_client_ctx =NULL;
-SSL_CTX *netdata_ssl_srv_ctx =NULL;
+SSL_CTX *netdata_ssl_streaming_sender_ctx =NULL;
+SSL_CTX *netdata_ssl_web_server_ctx =NULL;
 const char *netdata_ssl_security_key =NULL;
 const char *netdata_ssl_security_cert =NULL;
 const char *tls_version=NULL;
@@ -288,27 +288,34 @@ void security_start_ssl(int selector) {
     netdata_spinlock_lock(&sp);
 
     switch (selector) {
-        case NETDATA_SSL_CONTEXT_SERVER: {
-            if(!netdata_ssl_srv_ctx) {
+        case NETDATA_SSL_WEB_SERVER_CTX: {
+            if(!netdata_ssl_web_server_ctx) {
                 struct stat statbuf;
                 if (stat(netdata_ssl_security_key, &statbuf) || stat(netdata_ssl_security_cert, &statbuf))
                     info("To use encryption it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
                 else {
-                    netdata_ssl_srv_ctx = security_initialize_openssl_server();
-                    SSL_CTX_set_mode(netdata_ssl_srv_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);
+                    netdata_ssl_web_server_ctx = security_initialize_openssl_server();
+                    SSL_CTX_set_mode(netdata_ssl_web_server_ctx,
+                                     SSL_MODE_ENABLE_PARTIAL_WRITE |
+                                     // SSL_MODE_AUTO_RETRY |
+                                     0
+                                     );
                 }
             }
             break;
         }
 
-        case NETDATA_SSL_CONTEXT_STREAMING: {
-            if(!netdata_ssl_client_ctx) {
-                netdata_ssl_client_ctx = security_initialize_openssl_client();
+        case NETDATA_SSL_STREAMING_SENDER_CTX: {
+            if(!netdata_ssl_streaming_sender_ctx) {
+                netdata_ssl_streaming_sender_ctx = security_initialize_openssl_client();
                 //This is necessary for the stream, because it is working sometimes with nonblock socket.
                 //It returns the bitmask after to change, there is not any description of errors in the documentation
-                SSL_CTX_set_mode(netdata_ssl_client_ctx,
-                                 SSL_MODE_ENABLE_PARTIAL_WRITE | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |
-                                 SSL_MODE_AUTO_RETRY);
+                SSL_CTX_set_mode(netdata_ssl_streaming_sender_ctx,
+                                 SSL_MODE_ENABLE_PARTIAL_WRITE |
+                                 SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |
+                                 SSL_MODE_AUTO_RETRY |
+                                 0
+                                 );
             }
             break;
         }
@@ -330,12 +337,12 @@ void security_start_ssl(int selector) {
  */
 void security_clean_openssl()
 {
-    if (netdata_ssl_srv_ctx) {
-        SSL_CTX_free(netdata_ssl_srv_ctx);
+    if (netdata_ssl_web_server_ctx) {
+        SSL_CTX_free(netdata_ssl_web_server_ctx);
     }
 
-    if (netdata_ssl_client_ctx) {
-        SSL_CTX_free(netdata_ssl_client_ctx);
+    if (netdata_ssl_streaming_sender_ctx) {
+        SSL_CTX_free(netdata_ssl_streaming_sender_ctx);
     }
 
     if (netdata_ssl_exporting_ctx) {

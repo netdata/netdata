@@ -14,8 +14,8 @@ typedef enum __attribute__((packed)) {
     NETDATA_SSL_PROXY_HTTPS         = (1 << 9), // Proxy is using HTTPS
 } NETDATA_SSL_HANDSHAKE;
 
-#define NETDATA_SSL_CONTEXT_SERVER 0
-#define NETDATA_SSL_CONTEXT_STREAMING 1
+#define NETDATA_SSL_WEB_SERVER_CTX 0
+#define NETDATA_SSL_STREAMING_SENDER_CTX 1
 #define NETDATA_SSL_CONTEXT_EXPORTING 2
 
 # ifdef ENABLE_HTTPS
@@ -49,8 +49,8 @@ struct netdata_ssl {
 #define SSL_handshake_complete(ssl) ((ssl)->conn && (ssl)->flags == NETDATA_SSL_HANDSHAKE_COMPLETE)
 
 extern SSL_CTX *netdata_ssl_exporting_ctx;
-extern SSL_CTX *netdata_ssl_client_ctx;
-extern SSL_CTX *netdata_ssl_srv_ctx;
+extern SSL_CTX *netdata_ssl_streaming_sender_ctx;
+extern SSL_CTX *netdata_ssl_web_server_ctx;
 extern const char *netdata_ssl_security_key;
 extern const char *netdata_ssl_security_cert;
 extern const char *tls_version;

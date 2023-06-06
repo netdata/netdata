@@ -211,7 +211,7 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
     }
 
 #ifdef ENABLE_HTTPS
-    if ((!web_client_check_unix(w)) && (netdata_ssl_srv_ctx)) {
+    if ((!web_client_check_unix(w)) && (netdata_ssl_web_server_ctx)) {
         if( sock_delnonblock(w->ifd) < 0 ){
             error("Web server cannot remove the non-blocking flag from socket %d",w->ifd);
         }
@@ -233,7 +233,7 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
         //The next two ifs are not together because I am reusing SSL structure
         if (!w->ssl.conn)
         {
-            w->ssl.conn = SSL_new(netdata_ssl_srv_ctx);
+            w->ssl.conn = SSL_new(netdata_ssl_web_server_ctx);
             if ( w->ssl.conn ) {
                 SSL_set_accept_state(w->ssl.conn);
             } else {
@@ -526,7 +526,7 @@ void *socket_listen_main_static_threaded(void *ptr) {
         fatal("LISTENER: no listen sockets available.");
 
 #ifdef ENABLE_HTTPS
-    security_start_ssl(NETDATA_SSL_CONTEXT_SERVER);
+    security_start_ssl(NETDATA_SSL_WEB_SERVER_CTX);
 #endif
     // 6 threads is the optimal value
     // since 6 are the parallel connections browsers will do
