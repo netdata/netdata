@@ -9,10 +9,14 @@
 /* _XOPEN_SOURCE 700 required by strptime (POSIX 2004) and strndup (POSIX 2008)
  * Will need to find a cleaner way of doing this, as currently defining
  * _XOPEN_SOURCE 700 causes issues on Centos 7 and most probably MacOS and 
- * FreeBSD as well */
+ * FreeBSD as well. */
 #define _XOPEN_SOURCE 700 
+/* _BSD_SOURCE (glibc <= 2.19) and _DEFAULT_SOURCE (glibc >= 2.20) are required 
+ * to silence "warning: implicit declaration of function ‘strsep’;" that is 
+ * included through libnetdata/inlined.h.  */
+#define _BSD_SOURCE
+#define _DEFAULT_SOURCE 
 #include <time.h>
-#include <sys/time.h>
 #endif
 #endif // SKIP_WEB_LOG_TIME_PARSING
 
