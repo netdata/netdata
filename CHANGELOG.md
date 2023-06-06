@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- send EXIT before exiting in freeipmi and debugfs plugins [\#15140](https://github.com/netdata/netdata/pull/15140) ([ilyam8](https://github.com/ilyam8))
+- minor - fix syntax in config.ac [\#15139](https://github.com/netdata/netdata/pull/15139) ([underhood](https://github.com/underhood))
 - fix a typo in `libnetdata/simple_pattern/README.md` [\#15135](https://github.com/netdata/netdata/pull/15135) ([n0099](https://github.com/n0099))
 - updated events docs and minor fix on silecing rules table [\#15134](https://github.com/netdata/netdata/pull/15134) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Provide necessary permission for the kickstart to run the netdata-updater script [\#15132](https://github.com/netdata/netdata/pull/15132) ([tkatsoulas](https://github.com/tkatsoulas))
@@ -17,6 +19,7 @@
 - add netdata demo rooms to the list of demo urls [\#15120](https://github.com/netdata/netdata/pull/15120) ([andrewm4894](https://github.com/andrewm4894))
 - Fix handling of eBPF plugin for DEB packages. [\#15117](https://github.com/netdata/netdata/pull/15117) ([Ferroin](https://github.com/Ferroin))
 - initial draft for the silencing docs [\#15112](https://github.com/netdata/netdata/pull/15112) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- Generate, store and transmit a unique alert event\_hash\_id [\#15111](https://github.com/netdata/netdata/pull/15111) ([MrZammler](https://github.com/MrZammler))
 - Only queue an alert to the cloud when it's inserted [\#15110](https://github.com/netdata/netdata/pull/15110) ([MrZammler](https://github.com/MrZammler))
 - percentage of group is now aggregatable at cloud across multiple nodes [\#15109](https://github.com/netdata/netdata/pull/15109) ([ktsaou](https://github.com/ktsaou))
 - percentage-of-group: fix uninitialized array vh [\#15106](https://github.com/netdata/netdata/pull/15106) ([ktsaou](https://github.com/ktsaou))
@@ -407,8 +410,6 @@
 - Correct title of contribute to doccumentation [\#14498](https://github.com/netdata/netdata/pull/14498) ([cakrit](https://github.com/cakrit))
 - Delete getting-started-overview.md [\#14497](https://github.com/netdata/netdata/pull/14497) ([Ancairon](https://github.com/Ancairon))
 - added Challenge secret and rooms object on the payload [\#14496](https://github.com/netdata/netdata/pull/14496) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- Category overview pages [\#14495](https://github.com/netdata/netdata/pull/14495) ([Ancairon](https://github.com/Ancairon))
-- JSON internal API, IEEE754 base64/hex streaming, weights endpoint optimization [\#14493](https://github.com/netdata/netdata/pull/14493) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
