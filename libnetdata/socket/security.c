@@ -175,6 +175,8 @@ static inline bool is_handshake_complete(NETDATA_SSL *ssl, const char *op) {
             return true;
         }
     }
+
+    return false;
 }
 
 ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num) {
@@ -243,6 +245,8 @@ static inline bool is_handshake_initialized(NETDATA_SSL *ssl, const char *op) {
             return false;
         }
     }
+
+    return false;
 }
 
 #define WANT_READ_WRITE_TIMEOUT_MS 10
