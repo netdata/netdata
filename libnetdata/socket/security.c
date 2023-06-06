@@ -360,20 +360,18 @@ NETDATA_SSL_HANDSHAKE security_process_accept(SSL *ssl,int msg) {
 
     ERR_clear_error();
     if ((test = SSL_accept(ssl)) <= 0) {
-         int ssl_errno = SSL_get_error(ssl, test);
-         switch(ssl_errno) {
+        int ssl_errno = SSL_get_error(ssl, test);
+        security_log_ssl_error_queue("SSL_accept");
+        switch(ssl_errno) {
              case SSL_ERROR_WANT_READ:
-                 error("SSL handshake did not finish and it wanna read on socket %d!", sock);
                  return NETDATA_SSL_WANT_READ;
 
              case SSL_ERROR_WANT_WRITE:
-                 error("SSL handshake did not finish and it wanna read on socket %d!", sock);
                  return NETDATA_SSL_WANT_WRITE;
 
              default:
-                 security_log_ssl_error_queue("SSL_accept");
                  return NETDATA_SSL_NO_HANDSHAKE;
-         }
+        }
     }
 
     if (SSL_is_init_finished(ssl))

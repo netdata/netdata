@@ -94,16 +94,9 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
                 stats->received_bytes += r;
                 stats->receptions++;
                 continue;
-            } else {
-                int ssl_errno = SSL_get_error(connector_specific_data->conn, (int) r);
-                switch (ssl_errno) {
-                    case SSL_ERROR_WANT_READ:
-                    case SSL_ERROR_WANT_WRITE:
-                        goto endloop;
-                    default:
-                        security_log_ssl_error_queue("SSL_read");
-                        goto endloop;
-                }
+            }
+            else {
+                security_log_ssl_error_queue("SSL_read");
             }
         } else {
             r = recv(*sock, &response->buffer[response->len], response->size - response->len, MSG_DONTWAIT);
