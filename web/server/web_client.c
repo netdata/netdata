@@ -374,26 +374,23 @@ int mysendfile(struct web_client *w, char *filename) {
     while(!done) {
         // check if the file exists
         if (lstat(webfilename, &statbuf) != 0) {
-            debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not found, redirecting to index.html", w->id, webfilename);
-            char *protocol, *url_host;
-#ifdef ENABLE_HTTPS
-            protocol = ((w->ssl.conn && !w->ssl.flags) || w->ssl.flags & NETDATA_SSL_PROXY_HTTPS) ? "https" : "http";
-#else
-            protocol = "http";
-#endif
-            url_host = w->forwarded_host;
-            if(!url_host) {
-                url_host = w->server_host;
-                if(!url_host) url_host = "";
+            debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not found.", w->id, webfilename);
+            char *dot = strrchr(filename, '.');
+            if (!dot) {
+                //likely a directory, return index.html
+                snprintfz(webfilename, FILENAME_MAX, "%s/index.html", netdata_configured_web_dir);
+                lstat(webfilename, &statbuf);
+            } else {
+                w->response.data->content_type = CT_TEXT_HTML;
+                buffer_strcat(w->response.data, "File does not exist, or is not accessible: ");
+                buffer_strcat_htmlescape(w->response.data, webfilename);
+                return HTTP_RESP_NOT_FOUND;
             }
-
-            buffer_sprintf(w->response.header, "Location: %s://%s/%s\r\n", protocol, url_host, "index.html");
-            buffer_strcat(w->response.data, "Permanent redirect");
-            return HTTP_RESP_REDIR_PERM;
         }
 
         if ((statbuf.st_mode & S_IFMT) == S_IFDIR) {
             snprintfz(webfilename, FILENAME_MAX, "%s/%s/index.html", netdata_configured_web_dir, filename);
+            info("DES re-doing it to [%s]", webfilename);
             continue;
         }
 
