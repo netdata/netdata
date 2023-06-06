@@ -255,6 +255,29 @@ int rrdcalc_status_to_proto_enum(RRDCALC_STATUS status)
 #endif
 }
 
+static inline char *sqlite3_uuid_unparse_strdupz(sqlite3_stmt *res, int iCol) {
+    char uuid_str[UUID_STR_LEN];
+
+    if(sqlite3_column_type(res, iCol) == SQLITE_NULL)
+        uuid_str[0] = '\0';
+    else
+        uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, iCol)), uuid_str);
+
+    return strdupz(uuid_str);
+}
+
+static inline char *sqlite3_text_strdupz_empty(sqlite3_stmt *res, int iCol) {
+    char *ret;
+
+    if(sqlite3_column_type(res, iCol) == SQLITE_NULL)
+        ret = "";
+    else
+        ret = (char *)sqlite3_column_text(res, iCol);
+
+    return strdupz(ret);
+}
+
+
 void aclk_push_alert_event(struct aclk_sync_host_config *wc)
 {
 #ifndef ENABLE_ACLK
@@ -321,7 +344,6 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
         }
     }
 
-    char uuid_str[UUID_STR_LEN];
     uint64_t  first_sequence_id = 0;
     uint64_t  last_sequence_id = 0;
     static __thread uint64_t log_first_sequence_id = 0;
@@ -343,8 +365,7 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
         //alarm_log.sequence_id = (uint64_t) sqlite3_column_int64(res, 0);
         alarm_log.when = (time_t) sqlite3_column_int64(res, 5);
 
-        uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 3)), uuid_str);
-        alarm_log.config_hash = strdupz((char *)uuid_str);
+        alarm_log.config_hash = sqlite3_uuid_unparse_strdupz(res, 3);
 
         alarm_log.utc_offset = wc->host->utc_offset;
         alarm_log.timezone = strdupz(rrdhost_abbrev_timezone(wc->host));
@@ -387,18 +408,10 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
         alarm_log.old_value = (NETDATA_DOUBLE) sqlite3_column_double(res, 24);
 
         alarm_log.updated = (sqlite3_column_int64(res, 8) & HEALTH_ENTRY_FLAG_UPDATED) ? 1 : 0;
-        alarm_log.rendered_info = sqlite3_column_type(res, 18) == SQLITE_NULL ?
-                                      strdupz((char *)"") :
-                                      strdupz((char *)sqlite3_column_text(res, 18));
+        alarm_log.rendered_info = sqlite3_text_strdupz_empty(res, 18);
 
-        alarm_log.chart_context = sqlite3_column_type(res, 26) == SQLITE_NULL ?
-                                      strdupz((char *)"") :
-                                      strdupz((char *)sqlite3_column_text(res, 26));
-
-        uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 27)), uuid_str);
-        alarm_log.transition_id = sqlite3_column_type(res, 27) == SQLITE_NULL ?
-                                      strdupz((char *)"") :
-                                      strdupz((char *)uuid_str);
+        alarm_log.chart_context = sqlite3_text_strdupz_empty(res, 26);
+        alarm_log.transition_id = sqlite3_uuid_unparse_strdupz(res, 27);
 
         alarm_log.event_id = (time_t) sqlite3_column_int64(res, 28);
 
