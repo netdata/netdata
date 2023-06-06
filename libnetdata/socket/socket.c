@@ -999,12 +999,13 @@ ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
             // timeout
             return 0;
 
-        if(fd.events & POLLIN) {
+        if(fd.revents & POLLIN) {
 #ifdef ENABLE_HTTPS
-            char buf[1024 + 1];
-            if (!SSL_connection(ssl) || (SSL_connection(ssl) && SSL_peek(ssl->conn, buf, 1024) > 0))
-#endif
+            if (!SSL_connection(ssl) || (SSL_connection(ssl) && SSL_pending(ssl->conn) > 0))
                 break;
+#else
+            break;
+#endif
         }
     }
 
@@ -1046,7 +1047,7 @@ ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
             return 0;
         }
 
-        if(fd.events & POLLOUT) break;
+        if(fd.revents & POLLOUT) break;
     }
 
 #ifdef ENABLE_HTTPS

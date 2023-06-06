@@ -320,8 +320,7 @@ static void rrdpush_sender_after_connect(RRDHOST *host) {
 
 static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
 #ifdef ENABLE_HTTPS
-    if(SSL_connection(&host->sender->ssl))
-        netdata_ssl_close(&host->sender->ssl);
+    netdata_ssl_close(&host->sender->ssl);
 #endif
 
     if(host->sender->rrdpush_sender_socket != -1) {
@@ -700,6 +699,12 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
 
     // info("STREAM %s [send to %s]: waiting response from remote netdata...", rrdhost_hostname(host), s->connected_to);
 
+    if(sock_setnonblock(s->rrdpush_sender_socket) < 0)
+        error("STREAM %s [send to %s]: cannot set non-blocking mode for socket.", rrdhost_hostname(host), s->connected_to);
+
+    if(sock_enlarge_out(s->rrdpush_sender_socket) < 0)
+        error("STREAM %s [send to %s]: cannot enlarge the socket buffer.", rrdhost_hostname(host), s->connected_to);
+
     bytes = recv_timeout(
 #ifdef ENABLE_HTTPS
         &host->sender->ssl,
@@ -735,12 +740,6 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
 #endif  //ENABLE_COMPRESSION
 
     log_sender_capabilities(s);
-
-    if(sock_setnonblock(s->rrdpush_sender_socket) < 0)
-        error("STREAM %s [send to %s]: cannot set non-blocking mode for socket.", rrdhost_hostname(host), s->connected_to);
-
-    if(sock_enlarge_out(s->rrdpush_sender_socket) < 0)
-        error("STREAM %s [send to %s]: cannot enlarge the socket buffer.", rrdhost_hostname(host), s->connected_to);
 
     debug(D_STREAM, "STREAM: Connected on fd %d...", s->rrdpush_sender_socket);
 
