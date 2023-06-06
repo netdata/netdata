@@ -839,7 +839,7 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
         s = &s[7];
 
 #ifdef ENABLE_HTTPS
-        if (w->ssl.flags != NETDATA_SSL_HANDSHAKE_COMPLETE && web_client_is_using_ssl_force(w)) {
+        if (!SSL_handshake_complete(&w->ssl) && web_client_is_using_ssl_force(w)) {
             w->header_parse_tries = 0;
             w->header_parse_last_size = 0;
             web_client_disable_wait_receive(w);
@@ -1011,7 +1011,7 @@ static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
     if ((!web_client_check_unix(w)) && (netdata_ssl_srv_ctx)) {
-        if (w->ssl.conn && w->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
+        if (SSL_handshake_complete(&w->ssl)) {
             bytes = netdata_ssl_write(w->ssl.conn, buf, len) ;
             web_client_enable_wait_from_ssl(w, bytes);
         } else
@@ -1155,7 +1155,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
     if ( (!web_client_check_unix(w)) && (netdata_ssl_srv_ctx) ) {
-        if ( ( w->ssl.conn ) && ( w->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE ) ) {
+        if (SSL_handshake_complete(&w->ssl)) {
             bytes = netdata_ssl_write(w->ssl.conn, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output));
             web_client_enable_wait_from_ssl(w, bytes);
         }
@@ -1259,7 +1259,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
                 debug(D_WEB_CLIENT, "%llu: URL doesn't end with / generating redirect.", w->id);
                 char *protocol, *url_host;
 #ifdef ENABLE_HTTPS
-                protocol = ((w->ssl.conn && w->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE) || (w->ssl.flags & NETDATA_SSL_PROXY_HTTPS)) ? "https" : "http";
+                protocol = (SSL_handshake_complete(&w->ssl) || (w->ssl.flags & NETDATA_SSL_PROXY_HTTPS)) ? "https" : "http";
 #else
                 protocol = "http";
 #endif
@@ -1947,7 +1947,7 @@ ssize_t web_client_receive(struct web_client *w)
 
 #ifdef ENABLE_HTTPS
     if ( (!web_client_check_unix(w)) && (netdata_ssl_srv_ctx) ) {
-        if ( ( w->ssl.conn ) && (w->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE)) {
+        if (SSL_handshake_complete(&w->ssl)) {
             bytes = netdata_ssl_read(w->ssl.conn, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
             web_client_enable_wait_from_ssl(w, bytes);
         }else {

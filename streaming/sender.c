@@ -653,7 +653,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     rrdpush_clean_encoded(&se);
 
 #ifdef ENABLE_HTTPS
-    if (host->sender->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
+    if (SSL_handshake_complete(&host->sender->ssl)) {
         ERR_clear_error();
         SSL_set_connect_state(host->sender->ssl.conn);
         int err = SSL_connect(host->sender->ssl.conn);
@@ -812,9 +812,8 @@ static ssize_t attempt_to_send(struct sender_state *s) {
     debug(D_STREAM, "STREAM: Sending data. Buffer r=%zu w=%zu s=%zu, next chunk=%zu", cb->read, cb->write, cb->size, outstanding);
 
 #ifdef ENABLE_HTTPS
-    SSL *conn = s->ssl.conn ;
-    if(conn && s->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE)
-        ret = netdata_ssl_write(conn, chunk, outstanding);
+    if(SSL_handshake_complete(&s->ssl))
+        ret = netdata_ssl_write(s->ssl.conn, chunk, outstanding);
     else
         ret = send(s->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
 #else
@@ -848,7 +847,7 @@ static ssize_t attempt_read(struct sender_state *s) {
     ssize_t ret = 0;
 
 #ifdef ENABLE_HTTPS
-    if (s->ssl.conn && s->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
+    if (SSL_handshake_complete(&s->ssl)) {
         size_t desired = sizeof(s->read_buffer) - s->read_len - 1;
         ret = netdata_ssl_read(s->ssl.conn, s->read_buffer, desired);
         if (ret > 0 ) {

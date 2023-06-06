@@ -1032,31 +1032,31 @@ ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
         }
 
         if(!retval) {
+            // timeout
+
 #ifdef ENABLE_HTTPS
-            if (ssl->conn && ssl->flags == NETDATA_SSL_HANDSHAKE_COMPLETE && SSL_pending(ssl->conn))
+            if(SSL_handshake_complete(ssl) && SSL_pending(ssl->conn))
+                // connection is SSL and has data to read
                 break;
 #endif
 
-            // timeout
             return 0;
         }
 
         if(fd.events & POLLIN) {
+
 #ifdef ENABLE_HTTPS
-            if (ssl->conn && ssl->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
-                if(SSL_pending(ssl->conn))
-                    break;
-                else
-                    continue;
-            }
-            else
+            if(SSL_handshake_complete(ssl) && !SSL_pending(ssl->conn))
+                // connection is SSL but does not have any data to read
+                continue;
 #endif
-                break;
+
+            break;
         }
     }
 
 #ifdef ENABLE_HTTPS
-    if (ssl->conn && ssl->flags == NETDATA_SSL_HANDSHAKE_COMPLETE)
+    if (SSL_handshake_complete(ssl))
         return netdata_ssl_read(ssl->conn, buf, len);
 #endif
 
@@ -1098,7 +1098,7 @@ ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
 
 #ifdef ENABLE_HTTPS
     if(ssl->conn) {
-        if (ssl->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
+        if (SSL_handshake_complete(ssl)) {
             return netdata_ssl_write(ssl->conn, buf, len);
         }
         else {

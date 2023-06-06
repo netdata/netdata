@@ -375,7 +375,11 @@ void analytics_https(void)
     BUFFER *b = buffer_create(30, NULL);
 #ifdef ENABLE_HTTPS
     analytics_exporting_connectors_ssl(b);
-    buffer_strcat(b, netdata_ssl_client_ctx && rrdhost_flag_check(localhost, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED) && localhost->sender->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE ? "streaming|" : "|");
+
+    buffer_strcat(b, netdata_ssl_client_ctx &&
+            rrdhost_flag_check(localhost, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED) &&
+            SSL_handshake_complete(&localhost->sender->ssl) ? "streaming|" : "|");
+
     buffer_strcat(b, netdata_ssl_srv_ctx ? "web" : "");
 #else
     buffer_strcat(b, "||");

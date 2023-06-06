@@ -112,7 +112,7 @@ static int read_stream(struct receiver_state *r, char* buffer, size_t size) {
     }
 
 #ifdef ENABLE_HTTPS
-    if (r->ssl.conn && r->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE)
+    if (SSL_handshake_complete(&r->ssl))
         return (int)netdata_ssl_read(r->ssl.conn, buffer, size);
 #endif
 

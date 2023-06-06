@@ -46,6 +46,8 @@ struct netdata_ssl {
 
 #define NETDATA_SSL_UNSET_CONNECTION (struct netdata_ssl){ .conn = NULL, .flags = NETDATA_SSL_START }
 
+#define SSL_handshake_complete(ssl) ((ssl)->conn && (ssl)->flags == NETDATA_SSL_HANDSHAKE_COMPLETE)
+
 extern SSL_CTX *netdata_ssl_exporting_ctx;
 extern SSL_CTX *netdata_ssl_client_ctx;
 extern SSL_CTX *netdata_ssl_srv_ctx;
