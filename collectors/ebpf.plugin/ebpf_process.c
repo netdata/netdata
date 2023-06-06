@@ -1265,8 +1265,7 @@ void *ebpf_process_thread(void *ptr)
     set_local_pointers();
     em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
     if (!em->probe_links) {
-        pthread_mutex_unlock(&lock);
-        goto endprocess;
+        em->enabled = em->global_charts = em->apps_charts = em->cgroup_charts = NETDATA_THREAD_EBPF_STOPPING;
     }
 
     int algorithms[NETDATA_KEY_PUBLISH_PROCESS_END] = {
@@ -1295,7 +1294,6 @@ void *ebpf_process_thread(void *ptr)
 
     process_collector(em);
 
-endprocess:
     pthread_mutex_lock(&ebpf_exit_cleanup);
     if (em->enabled == NETDATA_THREAD_EBPF_RUNNING)
         ebpf_update_disabled_plugin_stats(em);
