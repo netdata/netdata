@@ -162,7 +162,7 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
     unsigned int fn_off = 0, cn_off = 0;
 
     while(function){
-        char *value = mystrsep((char **) &function, " ");
+        char *value = strsep_skip_consecutive_separators((char **) &function, " ");
         if (!value || !*value) continue;
         else if(!strcmp(value, "help")){
             buffer_sprintf(dest_wb, FUNCTION_LOGSMANAGEMENT_HELP_LONG);
@@ -202,7 +202,7 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
             return status;
         }
 
-        char *key = mystrsep(&value, ":");
+        char *key = strsep_skip_consecutive_separators(&value, ":");
         if(!key || !*key) continue;
         if(!value || !*value) continue;
 
@@ -211,7 +211,7 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
         if(*value == '_'){
             value++;
             value[strlen(value)] = ' '; 
-            value = mystrsep(&value, "_");
+            value = strsep_skip_consecutive_separators(&value, "_");
             function = strrchr(value, 0);
             function++;
         }

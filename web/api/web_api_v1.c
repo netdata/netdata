@@ -1475,10 +1475,10 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
     unsigned int fn_off = 0, cn_off = 0;
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if (!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
