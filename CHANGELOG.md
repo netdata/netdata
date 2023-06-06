@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Check null transition id and config hash [\#15147](https://github.com/netdata/netdata/pull/15147) ([stelfrag](https://github.com/stelfrag))
 - send EXIT before exiting in freeipmi and debugfs plugins [\#15140](https://github.com/netdata/netdata/pull/15140) ([ilyam8](https://github.com/ilyam8))
 - minor - fix syntax in config.ac [\#15139](https://github.com/netdata/netdata/pull/15139) ([underhood](https://github.com/underhood))
 - fix a typo in `libnetdata/simple_pattern/README.md` [\#15135](https://github.com/netdata/netdata/pull/15135) ([n0099](https://github.com/n0099))
@@ -409,7 +410,6 @@
 - Reorganize contents of Getting Started [\#14499](https://github.com/netdata/netdata/pull/14499) ([cakrit](https://github.com/cakrit))
 - Correct title of contribute to doccumentation [\#14498](https://github.com/netdata/netdata/pull/14498) ([cakrit](https://github.com/cakrit))
 - Delete getting-started-overview.md [\#14497](https://github.com/netdata/netdata/pull/14497) ([Ancairon](https://github.com/Ancairon))
-- added Challenge secret and rooms object on the payload [\#14496](https://github.com/netdata/netdata/pull/14496) ([hugovalente-pm](https://github.com/hugovalente-pm))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
