@@ -641,10 +641,10 @@ int db_init() {
 
             const int log_source_occurences = sqlite3_column_int(stmt_search_if_log_source_exists, 0);
             switch (log_source_occurences) {
-                case 0:  /* Log collection metadata not found in main DB - create a new record */
+                case 0: { /* Log collection metadata not found in main DB - create a new record */
                                         
                     /* Create directory of collection of logs for the particular 
-                    * log source (in the form of a UUID) and bind it. */
+                     * log source (in the form of a UUID) and bind it. */
                     uuid_t uuid;
                     uuid_generate(uuid);
                     char uuid_str[GUID_LEN + 1];      // ex. "1b4e28ba-2fa1-11d2-883f-0016d3cca427" + "\0"
@@ -676,19 +676,22 @@ int db_init() {
                     }
                     
                     break;
+                }
                     
-                case 1:  /* File metadata found in DB */
+                case 1: { /* File metadata found in DB */
                     p_file_info->db_dir = mallocz((size_t)sqlite3_column_bytes(stmt_search_if_log_source_exists, 2) + 1);
                     sprintf((char*) p_file_info->db_dir, "%s", sqlite3_column_text(stmt_search_if_log_source_exists, 2));
                     break;
+                }
                     
-                default:  /* Error, file metadata can exist either 0 or 1 times in DB */
+                default: { /* Error, file metadata can exist either 0 or 1 times in DB */
                     m_assert(0, "Same file stored in DB more than once!");
                     collector_error("[%s]: Record encountered multiple times in DB " MAIN_COLLECTIONS_TABLE " table \n",
                                     p_file_info->filename);
                     throw_error(p_file_info->chart_name, ERR_TYPE_OTHER, rc, __LINE__, __FILE__, __FUNCTION__);
                     uv_mutex_unlock(p_file_info->db_mut);
                     goto return_error;
+                }
             }
             rc = sqlite3_reset(stmt_search_if_log_source_exists);
             do_sqlite_error_check(p_file_info, rc, SQLITE_OK);
