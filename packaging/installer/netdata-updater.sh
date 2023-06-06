@@ -831,7 +831,7 @@ write_config() {
 	# random number of seconds up to NETDATA_UPDATER_JITTER before
 	# actually running the update. The default is 3600 (one
 	# hour). Most users should not need to change this.
-	NETDATA_UPDATER_JITTER="${NETDATA_UPDATER_JITTER}"
+	#NETDATA_UPDATER_JITTER="${NETDATA_UPDATER_JITTER}"
 	EOF
 }
 

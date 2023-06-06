@@ -137,7 +137,7 @@ override_dh_install:
 	# Copy the updater script
 	#
 	cp -v packaging/installer/netdata-updater.sh $(TOP)/usr/libexec/netdata/netdata-updater.sh
-	packaging/installer/netdata-updater.sh $(TOP)/etc/netdata/netdata-updater.conf
+	packaging/installer/netdata-updater.sh --write-updater-config $(TOP)/etc/netdata/netdata-updater.conf
 
 	# Move files that local user shouldn't be editing to /usr/share/netdata
 	#
