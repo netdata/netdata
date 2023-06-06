@@ -1823,6 +1823,8 @@ int main (int argc, char **argv) {
 
     if(debug) fprintf(stderr, "freeipmi.plugin: starting data collection\n");
 
+    static bool create_avail_chart = true;
+
     time_t started_t = now_monotonic_sec();
 
     size_t iteration = 0;
@@ -1832,6 +1834,20 @@ int main (int argc, char **argv) {
     heartbeat_init(&hb);
     for(iteration = 0; 1 ; iteration++) {
         usec_t dt = heartbeat_next(&hb, step);
+
+        if (create_avail_chart) {
+            create_avail_chart = false;
+            fprintf(
+                stdout,
+                "CHART netdata.freeipmi_availability_status '' 'Plugin availability status' 'status' plugins netdata.plugin_availability_status line 146000 %d\n"
+                "DIMENSION available '' absolute 1 1\n",
+                netdata_update_every);
+        }
+        fprintf(
+            stdout,
+            "BEGIN netdata.freeipmi_availability_status\n"
+            "SET available = 1\n"
+            "END\n");
 
         if(debug && iteration)
             fprintf(stderr, "freeipmi.plugin: iteration %zu, dt %llu usec, sensors collected %zu, sensors sent to netdata %zu \n"
