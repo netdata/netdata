@@ -108,11 +108,12 @@ void pluginsd_rrdset_cleanup(RRDSET *st) {
     st->pluginsd.pos = 0;
 }
 
-static inline void pluginsd_set_chart_from_parent(void *user, RRDSET *st, const char *keyword) {
+static inline void pluginsd_unlock_previous_chart(void *user, const char *keyword, bool stale) {
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
 
     if(unlikely(pluginsd_unlock_rrdset_data_collection(user))) {
-        error("PLUGINSD: 'host:%s/chart:%s/' stale data collection lock found during %s; it has been unlocked",
+        if(stale)
+            error("PLUGINSD: 'host:%s/chart:%s/' stale data collection lock found during %s; it has been unlocked",
               rrdhost_hostname(u->st->rrdhost), rrdset_id(u->st), keyword);
     }
 
@@ -120,9 +121,16 @@ static inline void pluginsd_set_chart_from_parent(void *user, RRDSET *st, const 
         ml_chart_update_end(u->st);
         u->v2.ml_locked = false;
 
-        error("PLUGINSD: 'host:%s/chart:%s/' stale ML lock found during %s, it has been unlocked",
+        if(stale)
+            error("PLUGINSD: 'host:%s/chart:%s/' stale ML lock found during %s, it has been unlocked",
               rrdhost_hostname(u->st->rrdhost), rrdset_id(u->st), keyword);
     }
+}
+
+static inline void pluginsd_set_chart_from_parent(void *user, RRDSET *st, const char *keyword) {
+    PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
+
+    pluginsd_unlock_previous_chart(user, keyword, true);
 
     if(st) {
         size_t dims = dictionary_entries(st->rrddim_root_index);
@@ -1783,12 +1791,7 @@ PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_
     // ------------------------------------------------------------------------
     // unblock data collection
 
-    ml_chart_update_end(st);
-    u->v2.ml_locked = false;
-
-    timing_step(TIMING_STEP_END2_ML);
-
-    pluginsd_unlock_rrdset_data_collection(user);
+    pluginsd_unlock_previous_chart(user, PLUGINSD_KEYWORD_END_V2, false);
     rrdcontext_collected_rrdset(st);
     store_metric_collection_completed();
 
@@ -1825,11 +1828,17 @@ PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_
 
 static void pluginsd_process_thread_cleanup(void *ptr) {
     PARSER *parser = (PARSER *)ptr;
+    PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *)parser->user;
+
+    internal_error(true, "PARSER: cleanup START (chart: %s, lock: %s)", u->st ? "YES" : "NO", u->v2.locked_data_collection ? "YES" : "NO");
 
     pluginsd_cleanup_v2(parser->user);
     pluginsd_host_define_cleanup(parser->user);
 
     rrd_collector_finished();
+
+    internal_error(true, "PARSER: cleanup END (chart: %s, lock: %s)", u->st ? "YES" : "NO", u->v2.locked_data_collection ? "YES" : "NO");
+
     parser_destroy(parser);
 }
 
