@@ -118,7 +118,7 @@ int init_prometheus_remote_write_instance(struct instance *instance)
     simple_connector_data->flags = NETDATA_SSL_START;
     simple_connector_data->conn = NULL;
     if (instance->config.options & EXPORTING_OPTION_USE_TLS) {
-        security_start_ssl(NETDATA_SSL_CONTEXT_EXPORTING);
+        security_start_ssl(NETDATA_SSL_EXPORTING_CTX);
     }
 #endif
 

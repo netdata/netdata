@@ -23,7 +23,7 @@ int init_graphite_instance(struct instance *instance)
     connector_specific_data->flags = NETDATA_SSL_START;
     connector_specific_data->conn = NULL;
     if (instance->config.options & EXPORTING_OPTION_USE_TLS) {
-        security_start_ssl(NETDATA_SSL_CONTEXT_EXPORTING);
+        security_start_ssl(NETDATA_SSL_EXPORTING_CTX);
     }
 #endif
 

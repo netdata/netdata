@@ -16,7 +16,7 @@ typedef enum __attribute__((packed)) {
 
 #define NETDATA_SSL_WEB_SERVER_CTX 0
 #define NETDATA_SSL_STREAMING_SENDER_CTX 1
-#define NETDATA_SSL_CONTEXT_EXPORTING 2
+#define NETDATA_SSL_EXPORTING_CTX 2
 
 # ifdef ENABLE_HTTPS
 
@@ -63,7 +63,7 @@ void security_clean_openssl();
 void security_start_ssl(int selector);
 NETDATA_SSL_HANDSHAKE security_process_accept(SSL *ssl,int msg);
 int security_test_certificate(SSL *ssl);
-SSL_CTX * security_initialize_openssl_client();
+SSL_CTX * security_create_openssl_client(unsigned long mode);
 
 void security_log_ssl_error_queue(const char *call);
 

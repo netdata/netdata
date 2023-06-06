@@ -160,43 +160,13 @@ int tls_select_version(const char *lversion) {
 #endif
 
 /**
- * OpenSSL common options
- *
- * Clients and SERVER have common options, this function is responsible to set them in the context.
- *
- * @param ctx the initialized SSL context.
- * @param side 0 means server, and 1 client.
- */
-void security_openssl_common_options(SSL_CTX *ctx, int side) {
-#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_110
-    if (!side) {
-        int version =  tls_select_version(tls_version) ;
-#endif
-#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
-        SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
-#else
-        SSL_CTX_set_min_proto_version(ctx, TLS1_VERSION);
-        SSL_CTX_set_max_proto_version(ctx, version);
-
-        if(tls_ciphers  && strcmp(tls_ciphers, "none") != 0) {
-            if (!SSL_CTX_set_cipher_list(ctx, tls_ciphers)) {
-                error("SSL error. cannot set the cipher list");
-            }
-        }
-    }
-#endif
-
-    SSL_CTX_set_mode(ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
-}
-
-/**
  * Initialize Openssl Client
  *
  * Starts the client context with TLS 1.2.
  *
  * @return It returns the context on success or NULL otherwise
  */
-SSL_CTX * security_initialize_openssl_client() {
+SSL_CTX * security_create_openssl_client(unsigned long mode) {
     SSL_CTX *ctx;
 #if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
     ctx = SSL_CTX_new(SSLv23_client_method());
@@ -218,6 +188,9 @@ SSL_CTX * security_initialize_openssl_client() {
 #endif
     }
 
+    if(mode)
+        SSL_CTX_set_mode(ctx, mode);
+
     return ctx;
 }
 
@@ -228,7 +201,7 @@ SSL_CTX * security_initialize_openssl_client() {
  *
  * @return It returns the context on success or NULL otherwise
  */
-static SSL_CTX * security_initialize_openssl_server() {
+static SSL_CTX * security_create_openssl_server(unsigned long mode) {
     SSL_CTX *ctx;
     char lerror[512];
 	static int netdata_id_context = 1;
@@ -251,7 +224,19 @@ static SSL_CTX * security_initialize_openssl_server() {
 
     SSL_CTX_use_certificate_chain_file(ctx, netdata_ssl_security_cert);
 #endif
-    security_openssl_common_options(ctx, 0);
+
+#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+    SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
+#else
+    SSL_CTX_set_min_proto_version(ctx, TLS1_VERSION);
+    SSL_CTX_set_max_proto_version(ctx, tls_select_version(tls_version));
+
+    if(tls_ciphers  && strcmp(tls_ciphers, "none") != 0) {
+        if (!SSL_CTX_set_cipher_list(ctx, tls_ciphers)) {
+            error("SSL error. cannot set the cipher list");
+        }
+    }
+#endif
 
     SSL_CTX_use_PrivateKey_file(ctx, netdata_ssl_security_key,SSL_FILETYPE_PEM);
 
@@ -269,6 +254,8 @@ static SSL_CTX * security_initialize_openssl_server() {
 	SSL_CTX_set_verify_depth(ctx,1);
 #endif
     debug(D_WEB_CLIENT,"SSL GLOBAL CONTEXT STARTED\n");
+
+    SSL_CTX_set_mode(ctx, mode);
 
     return ctx;
 }
@@ -294,12 +281,11 @@ void security_start_ssl(int selector) {
                 if (stat(netdata_ssl_security_key, &statbuf) || stat(netdata_ssl_security_cert, &statbuf))
                     info("To use encryption it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
                 else {
-                    netdata_ssl_web_server_ctx = security_initialize_openssl_server();
-                    SSL_CTX_set_mode(netdata_ssl_web_server_ctx,
-                                     SSL_MODE_ENABLE_PARTIAL_WRITE |
-                                     // SSL_MODE_AUTO_RETRY |
-                                     0
-                                     );
+                    netdata_ssl_web_server_ctx = security_create_openssl_server(
+                            SSL_MODE_ENABLE_PARTIAL_WRITE |
+                            SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |
+                            // SSL_MODE_AUTO_RETRY |
+                            0);
                 }
             }
             break;
@@ -307,22 +293,21 @@ void security_start_ssl(int selector) {
 
         case NETDATA_SSL_STREAMING_SENDER_CTX: {
             if(!netdata_ssl_streaming_sender_ctx) {
-                netdata_ssl_streaming_sender_ctx = security_initialize_openssl_client();
                 //This is necessary for the stream, because it is working sometimes with nonblock socket.
                 //It returns the bitmask after to change, there is not any description of errors in the documentation
-                SSL_CTX_set_mode(netdata_ssl_streaming_sender_ctx,
-                                 SSL_MODE_ENABLE_PARTIAL_WRITE |
-                                 SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |
-                                 SSL_MODE_AUTO_RETRY |
-                                 0
-                                 );
+                netdata_ssl_streaming_sender_ctx = security_create_openssl_client(
+                        SSL_MODE_ENABLE_PARTIAL_WRITE |
+                        SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |
+                        SSL_MODE_AUTO_RETRY |
+                        0
+                        );
             }
             break;
         }
 
-        case NETDATA_SSL_CONTEXT_EXPORTING: {
+        case NETDATA_SSL_EXPORTING_CTX: {
             if(!netdata_ssl_exporting_ctx)
-                netdata_ssl_exporting_ctx = security_initialize_openssl_client();
+                netdata_ssl_exporting_ctx = security_create_openssl_client(0);
             break;
         }
     }
