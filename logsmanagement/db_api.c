@@ -1039,8 +1039,7 @@ int db_init() {
                     uv_mutex_unlock(p_file_info->db_mut);
                     goto return_error;
                 }
-                const uv_stat_t *const statbuf = uv_fs_get_statbuf(&stat_req);
-                const int64_t blob_filesize = (int64_t) statbuf->st_size;
+                const int64_t blob_filesize = (int64_t) stat_req.statbuf.st_size;
                 uv_fs_req_cleanup(&stat_req);
                 
                 do{

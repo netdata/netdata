@@ -194,8 +194,7 @@ static inline char *read_last_line(const char *filename, int max_line_width){
         uv_fs_req_cleanup(&stat_req);
         return NULL;
     }
-    uv_stat_t *statbuf = uv_fs_get_statbuf(&stat_req);
-    end_pos = statbuf->st_size;
+    end_pos = stat_req.statbuf.st_size;
     uv_fs_req_cleanup(&stat_req);
 
     if(end_pos == 0) return NULL;

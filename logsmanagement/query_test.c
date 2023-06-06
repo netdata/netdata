@@ -155,12 +155,11 @@ void test_execute_query_thread(void *args) {
         m_assert(!rc, "uv_fs_stat() failed");
     } else {
         // Request succeeded; get filesize
-        uv_stat_t *statbuf = uv_fs_get_statbuf(&stat_req);
-        // debug(D_LOGS_MANAG, "Size of %s: %lldKB\n", query_params.filename, (long long)statbuf->st_size / 1000);
-        if (statbuf->st_size != (uint64_t) file_offset){
+        // debug(D_LOGS_MANAG, "Size of %s: %lldKB\n", query_params.filename, (long long)stat_req.statbuf.st_size / 1000);
+        if (stat_req.statbuf.st_size != (uint64_t) file_offset){
             debug(D_LOGS_MANAG, "Mismatch between log filesize (%" PRIu64 ") and data size returned from query (%" PRIu64 ") for: %s\n",
-                        statbuf->st_size, (uint64_t) file_offset, query_params.filename[0]);
-            m_assert(statbuf->st_size == (uint64_t) file_offset, "Mismatch between log filesize and data size in DB!");
+                        stat_req.statbuf.st_size, (uint64_t) file_offset, query_params.filename[0]);
+            m_assert(stat_req.statbuf.st_size == (uint64_t) file_offset, "Mismatch between log filesize and data size in DB!");
         }
         debug(D_LOGS_MANAG, "Log filesize and data size from query match for %s\n", query_params.filename[0]);
     }
