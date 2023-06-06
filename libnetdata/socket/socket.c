@@ -999,14 +999,8 @@ ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
             // timeout
             return 0;
 
-        if(fd.revents & POLLIN) {
-#ifdef ENABLE_HTTPS
-            if (!SSL_connection(ssl) || (SSL_connection(ssl) && SSL_pending(ssl->conn) > 0))
-                break;
-#else
+        if(fd.revents & POLLIN)
             break;
-#endif
-        }
     }
 
 #ifdef ENABLE_HTTPS
