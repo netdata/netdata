@@ -615,12 +615,8 @@ Requires: netdata = %{version}
 %package plugin-nfacct
 Summary: The NFACCT metrics collection plugin for the Netdata Agent
 Group: Applications/System
-Requires: libmnl
 Requires: netdata = %{version}
 Conflicts: netdata < %{version}
-%if 0%{?fedora} || 0%{?suse_version} >= 1140
-Requires: libnetfilter_acct
-%endif
 
 %description plugin-nfacct
  This plugin allows the Netdata Agent to collect metrics from the firewall using NFACCT objects.
