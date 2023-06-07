@@ -473,7 +473,6 @@ struct configurable_module module = {
     .submodules = NULL,
     .submodule_count = 0,
     .schema = NULL,
-    .get_current_config_cb = get_current_config_http_check,
     .set_config_cb = set_current_config_http_check,
 };
 
@@ -485,6 +484,12 @@ void *httpd_main(void *ptr) {
     // TODO this should be done from main in future
     dyn_conf_init();
 
+    json_object *obj = json_object_new_object();
+    json_object *o = json_object_new_string("I'am http_check and this is my current configuration");
+    json_object_object_add(obj, "info", o);
+    o = json_object_new_int(5);
+    json_object_object_add(obj, "update_every", o);
+    module.default_config = obj;
     register_module(&module);
 
     h2o_pathconf_t *pathconf;

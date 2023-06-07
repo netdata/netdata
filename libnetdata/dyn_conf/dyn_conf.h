@@ -18,13 +18,15 @@ struct submodule
 };
 
 struct configurable_module {
+    pthread_mutex_t lock;
     char *name;
     struct submodule *submodules;
     size_t submodule_count;
     const char *schema;
 
-    // caller is responsible to free the json_object provided
-    json_object * (*get_current_config_cb)(void);
+    json_object *config;
+    json_object *default_config;
+
     int (*set_config_cb)(json_object *cfg);
 };
 

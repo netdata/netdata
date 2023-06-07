@@ -27,18 +27,18 @@ json_object *get_list_of_modules_json()
     return obj;
 }
 
-struct configurable_module *get_module_by_name(const char *name)
+inline struct configurable_module *get_module_by_name(const char *name)
 {
     return dictionary_get(modules_dict, name);
 }
 
 json_object *get_config_of_module_json(struct configurable_module *module)
 {
-    if (module->get_current_config_cb == NULL) {
-        return NULL;
-    }
-
-    return module->get_current_config_cb();
+    pthread_mutex_lock(&module->lock);
+    json_object *cfg;
+    json_object_deep_copy(module->config, &cfg, NULL);
+    pthread_mutex_unlock(&module->lock);
+    return cfg;
 }
 
 int store_config(const char *module_name, const char *submodule_name, const char *cfg_idx, json_object *cfg)
@@ -115,6 +115,12 @@ const char *set_module_config_json(struct configurable_module *module, json_obje
         return "module has no set_config_cb callback";
     }
 
+    pthread_mutex_lock(&module->lock);
+    if (module->config != module->default_config)
+        json_object_put(module->config);
+    module->config = cfg;
+    pthread_mutex_unlock(&module->lock);
+
     module->set_config_cb(cfg);
 
     return NULL;
@@ -127,10 +133,18 @@ int register_module(struct configurable_module *module)
         return 1;
     }
 
-    if (dictionary_set(modules_dict, module->name, module, sizeof(module))) {
-        error_report("DYNCFG failed to register module \"%s\"", module->name);
-        return 1;
+    pthread_mutex_init(&module->lock, NULL);
+
+    module->config = load_config(module->name, NULL, NULL);
+    if (module->config == NULL) {
+        module->config = module->default_config;
+        if (module->config == NULL) {
+            error_report("DYNCFG module \"%s\" has no default config", module->name);
+            return 1;
+        }
     }
+
+    dictionary_set(modules_dict, module->name, module, sizeof(module));
 
     return 0;
 }
