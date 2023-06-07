@@ -5,74 +5,31 @@
 #define DYN_CONF_PATH_MAX (4096)
 #define DYN_CONF_DIR VARLIB_DIR "/etc"
 
-// TODO this is hardcoded for now, as virtual module during development
-// as demo, in future this callback should exist within the module/plugin itself
-json_object *http_check_config = NULL;
+DICTIONARY *modules_dict = NULL;
 
-json_object *get_current_config_http_check()
+static int _get_list_of_modules_json_cb(const DICTIONARY_ITEM *item, void *entry, void *data)
 {
-    if (http_check_config == NULL) {
-        http_check_config = json_object_new_object();
-        json_object *sub = json_object_new_string("I'am http_check and this is my current configuration");
-        json_object_object_add(http_check_config, "info", sub);
-        sub = json_object_new_int(5);
-        json_object_object_add(http_check_config, "update_every", sub);
-    }
-    json_object *copy = NULL;
-    json_object_deep_copy(http_check_config, &copy, NULL);
-    return copy;
-}
+    json_object *obj = (json_object *)data;
+    struct configurable_module *module = (struct configurable_module *)entry;
 
-int set_current_config_http_check(json_object *cfg)
-{
-    json_object_put(http_check_config);
-    http_check_config = cfg;
+    json_object *module_name = json_object_new_string(module->name);
+    json_object_array_add(obj, module_name);
+
     return 0;
 }
-
-// TODO this has to be created dynamically in future
-// e.g. plugins registering their modules
-
-struct configurable_module modules[] = {
-    {
-        .name = "http_check",
-        .submodules = NULL,
-        .submodule_count = 0,
-        .schema = NULL,
-        .get_current_config_cb = get_current_config_http_check,
-        .set_config_cb = set_current_config_http_check,
-    },
-    {
-        .name = NULL,
-        .submodules = NULL,
-        .submodule_count = 0,
-        .schema = NULL,
-        .get_current_config_cb = NULL,
-        .set_config_cb = NULL
-    }
-};
 
 json_object *get_list_of_modules_json()
 {
     json_object *obj = json_object_new_array();
 
-    for (int i = 0; modules[i].name != NULL; i++) {
-        json_object *module = json_object_new_string(modules[i].name);
-        json_object_array_add(obj, module);
-    }
+    dictionary_walkthrough_read(modules_dict, _get_list_of_modules_json_cb, obj);
 
     return obj;
 }
 
 struct configurable_module *get_module_by_name(const char *name)
 {
-    for (int i = 0; modules[i].name != NULL; i++) {
-        if (strcmp(modules[i].name, name) == 0) {
-            return &modules[i];
-        }
-    }
-
-    return NULL;
+    return dictionary_get(modules_dict, name);
 }
 
 json_object *get_config_of_module_json(struct configurable_module *module)
@@ -84,7 +41,7 @@ json_object *get_config_of_module_json(struct configurable_module *module)
     return module->get_current_config_cb();
 }
 
-int store_config(const char *module_name, const char submodule_name, const char cfg_idx, json_object *cfg)
+int store_config(const char *module_name, const char *submodule_name, const char *cfg_idx, json_object *cfg)
 {
     BUFFER *filename = buffer_create(DYN_CONF_PATH_MAX, NULL);
     buffer_sprintf(filename, DYN_CONF_DIR "/%s", module_name);
@@ -127,30 +84,67 @@ int store_config(const char *module_name, const char submodule_name, const char 
     return 0;
 }
 
-// TODO return meaningful error to webserver so it can be passed to HTTP api client
-int set_module_config_json(struct configurable_module *module, json_object *cfg)
+json_object *load_config(const char *module_name, const char *submodule_name, const char *cfg_idx)
+{
+    BUFFER *filename = buffer_create(DYN_CONF_PATH_MAX, NULL);
+    buffer_sprintf(filename, DYN_CONF_DIR "/%s", module_name);
+    if (submodule_name != NULL)
+        buffer_sprintf(filename, "/%s", submodule_name);
+
+    if (cfg_idx != NULL)
+        buffer_sprintf(filename, "/%s", cfg_idx);
+
+    buffer_strcat(filename, ".json");
+
+    json_object *ret = json_object_from_file(buffer_tostring(filename));
+    if (ret == NULL)
+        error_report("DYNCFG load_config: failed to load config from %s, json_error: %s", buffer_tostring(filename), json_util_get_last_err());
+
+    return ret;
+}
+
+const char *set_module_config_json(struct configurable_module *module, json_object *cfg)
 {
     if (store_config(module->name, NULL, NULL, cfg)) {
-        error_report("DYNCFG could not store config for module %s", module->name);
-        return -1;
+        error_report("DYNCFG could not store config for module \"%s\"", module->name);
+        return "could not store config on disk";
     }
 
     if (module->set_config_cb == NULL) {
-        return -1;
+        error_report("DYNCFG module \"%s\" has no set_config_cb", module->name);
+        return "module has no set_config_cb callback";
     }
 
     module->set_config_cb(cfg);
 
+    return NULL;
+}
+
+int register_module(struct configurable_module *module)
+{
+    if (get_module_by_name(module->name) != NULL) {
+        error_report("DYNCFG module \"%s\" already registered", module->name);
+        return 1;
+    }
+
+    if (dictionary_set(modules_dict, module->name, module, sizeof(module))) {
+        error_report("DYNCFG failed to register module \"%s\"", module->name);
+        return 1;
+    }
+
     return 0;
 }
 
-int dyn_conf_init()
+int dyn_conf_init(void)
 {
-    if (mkdir(buffer_tostring(DYN_CONF_DIR), 0755) == -1) {
+    if (mkdir(DYN_CONF_DIR, 0755) == -1) {
         if (errno != EEXIST) {
             error("failed to create directory for dynamic configuration");
             return 1;
         }
     }
+
+    modules_dict = dictionary_create(DICT_OPTION_VALUE_LINK_DONT_CLONE);
+
     return 0;
 }

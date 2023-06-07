@@ -30,9 +30,17 @@ struct configurable_module {
 
 //int has_module
 
+// API to be used by modules
+int register_module(struct configurable_module *module);
+
+
+// API to be used by the web server
 json_object *get_list_of_modules_json();
 struct configurable_module *get_module_by_name(const char *name);
 json_object *get_config_of_module_json(struct configurable_module *module);
-int set_module_config_json(struct configurable_module *module, json_object *cfg);
+const char *set_module_config_json(struct configurable_module *module, json_object *cfg);
+
+// API to be used by main netdata process, initialization and destruction etc.
+int dyn_conf_init(void);
 
 #endif // HTTPD_CONFIGURATION_H

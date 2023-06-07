@@ -366,11 +366,12 @@ static int dyncfg_module_top(h2o_req_t *req, struct configurable_module *mod)
             return 0;
         }
 
-        if (set_module_config_json(mod, cfg) != 0) {
+        const char *e_reason;
+        if ((e_reason = set_module_config_json(mod, cfg)) != NULL) {
             error_report("netdata_dynamic_configuration: failed to set module configuration");
-            req->res.status = HTTP_RESP_BAD_REQUEST;
-            req->res.reason = HTTP_RESP_BAD_REQUEST_STR;
-            h2o_send_inline(req, H2O_STRLIT(HTTP_RESP_BAD_REQUEST_STR));
+            req->res.status = HTTP_RESP_INTERNAL_SERVER_ERROR;
+            req->res.reason = HTTP_RESP_INTERNAL_SERVER_ERROR_STR;
+            h2o_send_inline(req, e_reason, strlen(e_reason));
             return 0;
         }
         req->res.status = 200;
@@ -442,10 +443,49 @@ static int netdata_dyncfg(h2o_handler_t *self, h2o_req_t *req)
 
 }
 
+// TODO this is hardcoded for now, as virtual module during development
+// as demo, in future this callback should exist within the module/plugin itself
+json_object *http_check_config = NULL;
+
+json_object *get_current_config_http_check()
+{
+    if (http_check_config == NULL) {
+        http_check_config = json_object_new_object();
+        json_object *sub = json_object_new_string("I'am http_check and this is my current configuration");
+        json_object_object_add(http_check_config, "info", sub);
+        sub = json_object_new_int(5);
+        json_object_object_add(http_check_config, "update_every", sub);
+    }
+    json_object *copy = NULL;
+    json_object_deep_copy(http_check_config, &copy, NULL);
+    return copy;
+}
+
+int set_current_config_http_check(json_object *cfg)
+{
+    json_object_put(http_check_config);
+    http_check_config = cfg;
+    return 0;
+}
+
+struct configurable_module module = {
+    .name = "http_check",
+    .submodules = NULL,
+    .submodule_count = 0,
+    .schema = NULL,
+    .get_current_config_cb = get_current_config_http_check,
+    .set_config_cb = set_current_config_http_check,
+};
+
 #define POLL_INTERVAL 100
 
 void *httpd_main(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+
+    // TODO this should be done from main in future
+    dyn_conf_init();
+
+    register_module(&module);
 
     h2o_pathconf_t *pathconf;
     h2o_hostconf_t *hostconf;
