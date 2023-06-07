@@ -77,4 +77,5 @@ void invalidate_node_instances(uuid_t *host_id, uuid_t *claim_id);
 // Provide statistics
 int sql_metadata_cache_stats(int op);
 
+void sql_drop_table(const char *table);
 #endif //NETDATA_SQLITE_FUNCTIONS_H

@@ -11,7 +11,6 @@ static int return_int_cb(void *data, int argc, char **argv, char **column)
     return 0;
 }
 
-
 int table_exists_in_database(const char *table)
 {
     char *err_msg = NULL;
@@ -214,6 +213,50 @@ static int do_migration_v7_v8(sqlite3 *database, const char *name)
     return 0;
 }
 
+static int do_migration_v8_v9(sqlite3 *database, const char *name)
+{
+    UNUSED(name);
+    info("Running database migration %s", name);
+
+    //create a single health log table
+    if (sql_create_health_log_table() == 1) {
+        error_report("Failed to create health_log table needed for migration");
+        return 1;
+    }
+
+    char sql[256];
+    int rc;
+    sqlite3_stmt *res = NULL;
+    DICTIONARY *dict_tables = dictionary_create(DICT_OPTION_NONE);
+
+    snprintfz(sql, 255, "SELECT name FROM sqlite_schema WHERE type ='table' AND name LIKE 'health_log_%%';");
+    rc = sqlite3_prepare_v2(database, sql, -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement to alter health_log tables");
+        return 1;
+    }
+
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+         char *table = strdupz((char *) sqlite3_column_text(res, 0));
+         if (health_migrate_old_health_log_table(table)) {
+             dictionary_set(dict_tables, table, NULL, 0);
+         }
+         freez(table);
+    }
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("DES Failed to finalize statement when copying health_log tables, rc = %d", rc);
+
+    char *table = NULL;
+    dfe_start_read(dict_tables, table) {
+        sql_drop_table(table_dfe.name);
+    }
+    dfe_done(table);
+    dictionary_destroy(dict_tables);
+
+    return 0;
+}
 
 static int do_migration_noop(sqlite3 *database, const char *name)
 {
@@ -266,6 +309,7 @@ DATABASE_FUNC_MIGRATION_LIST migration_action[] = {
     {.name = "v5 to v6",  .func = do_migration_v5_v6},
     {.name = "v6 to v7",  .func = do_migration_v6_v7},
     {.name = "v7 to v8",  .func = do_migration_v7_v8},
+    {.name = "v8 to v9",  .func = do_migration_v8_v9},
     // the terminator of this array
     {.name = NULL, .func = NULL}
 };

@@ -318,7 +318,7 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
 
         // Try to create tables
         if (wc->host)
-            sql_create_health_log_table(wc->host);
+            sql_create_health_log_table(); //might remove
 
         BUFFER *sql_fix = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
         buffer_sprintf(sql_fix, TABLE_ACLK_ALERT, wc->uuid_str);

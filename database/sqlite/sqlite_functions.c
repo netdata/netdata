@@ -3,7 +3,7 @@
 #include "sqlite_functions.h"
 #include "sqlite_db_migration.h"
 
-#define DB_METADATA_VERSION 8
+#define DB_METADATA_VERSION 9
 
 const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS host(host_id BLOB PRIMARY KEY, hostname TEXT NOT NULL, "
@@ -926,4 +926,20 @@ int sql_metadata_cache_stats(int op)
     sqlite3_db_status(db_meta, op, &count, &dummy, 0);
     netdata_thread_enable_cancelability();
     return count;
+}
+
+#define SQL_DROP_TABLE "DROP table %s;"
+
+void sql_drop_table(const char *table)
+{
+    if (!table)
+        return;
+
+    char wstr[255];
+    snprintfz(wstr, 254, SQL_DROP_TABLE, table);
+
+    int rc = sqlite3_exec_monitored(db_meta, wstr, 0, 0, NULL);
+    if (rc != SQLITE_OK) {
+        error_report("DES SQLite error during drop table operation for %s, rc = %d", table, rc);
+    }
 }

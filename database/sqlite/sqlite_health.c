@@ -11,30 +11,27 @@
 /* Health related SQL queries
    Creates a health log table in sqlite, one per host guid
 */
-#define SQL_CREATE_HEALTH_LOG_TABLE(guid) "CREATE TABLE IF NOT EXISTS health_log_%s(hostname text, unique_id int, alarm_id int, alarm_event_id int, config_hash_id blob, updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, flags int, exec_run_timestamp int, delay_up_to_timestamp int, name text, chart text, family text, exec text, recipient text, source text, units text, info text, exec_code int, new_status real, old_status real, delay int, new_value double, old_value double, last_repeat int, class text, component text, type text, chart_context text, transition_id blob);", guid
-int sql_create_health_log_table(RRDHOST *host) {
+#define SQL_CREATE_HEALTH_LOG_TABLE "CREATE TABLE IF NOT EXISTS health_log (hostname text, host_id blob, unique_id int, alarm_id int, alarm_event_id int, config_hash_id blob, updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, flags int, exec_run_timestamp int, delay_up_to_timestamp int, name text, chart text, family text, exec text, recipient text, source text, units text, info text, exec_code int, new_status real, old_status real, delay int, new_value double, old_value double, last_repeat int, class text, component text, type text, chart_context text, transition_id blob);"
+int sql_create_health_log_table(void) {
     int rc;
     char command[MAX_HEALTH_SQL_SIZE + 1];
 
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            error_report("HEALTH [%s]: Database has not been initialized", rrdhost_hostname(host));
+            error_report("HEALTH [N/A]: Database has not been initialized.");
         return 1;
     }
 
-    char uuid_str[UUID_STR_LEN];
-    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
-
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CREATE_HEALTH_LOG_TABLE(uuid_str));
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CREATE_HEALTH_LOG_TABLE);
 
     rc = db_execute(db_meta, command);
     if (unlikely(rc))
-        error_report("HEALTH [%s]: SQLite error during creation of health log table", rrdhost_hostname(host));
+        error_report("HEALTH [N/A]: SQLite error during creation of health log table.");
     else {
-        snprintfz(command, MAX_HEALTH_SQL_SIZE, "CREATE INDEX IF NOT EXISTS health_log_index_%s ON health_log_%s (unique_id); ", uuid_str, uuid_str);
+        snprintfz(command, MAX_HEALTH_SQL_SIZE, "CREATE INDEX IF NOT EXISTS health_log_index ON health_log (unique_id); ");
         rc = db_execute(db_meta, command);
         if (unlikely(unlikely(rc)))
-            error_report("HEALTH [%s]: SQLite error during creation of health log table index", rrdhost_hostname(host));
+            error_report("HEALTH [N/A]: SQLite error during creation of health log table index.");
     }
 
     return rc;
@@ -62,7 +59,7 @@ void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        sql_create_health_log_table(host);
+        sql_create_health_log_table(); //might remove
         rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("HEALTH [%s]: Failed to prepare statement for SQL_INSERT_HEALTH_LOG", rrdhost_hostname(host));
@@ -137,7 +134,7 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        sql_create_health_log_table(host);
+        sql_create_health_log_table(); //might remove
         rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("HEALTH [%s]: Failed to prepare statement for SQL_INSERT_HEALTH_LOG", rrdhost_hostname(host));
@@ -1381,4 +1378,59 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
         error_report("Failed to finalize statement for SQL_SELECT_HEALTH_LOG");
 
     buffer_free(command);
+}
+
+#define SQL_COPY_HEALTH_LOG(table) "INSERT INTO health_log (hostname, host_id, unique_id, alarm_id, alarm_event_id, " \
+    "config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, " \
+    "exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, " \
+    "units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, " \
+    "class, component, type, chart_context, transition_id) " \
+    "SELECT hostname, ?1, unique_id, alarm_id, alarm_event_id, " \
+    "config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, " \
+    "exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, " \
+    "units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, " \
+    "class, component, type, chart_context, transition_id from %s; ", table
+int health_migrate_old_health_log_table(char *table) {
+    if (!table)
+        return 0;
+
+    //table should contain guid. We need to
+    //keep it in the new table along with it's data
+    //health_log_UUID
+    char *uuid_from_table = strdupz(table + 11);
+    uuid_t uuid;
+    if (uuid_parse_fix(uuid_from_table, uuid)) {
+        freez(uuid_from_table);
+        return 0;
+    }
+
+    char command[MAX_HEALTH_SQL_SIZE + 1];
+    sqlite3_stmt *res = NULL;
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_COPY_HEALTH_LOG(table));
+    int rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to copy health log, rc = %d", rc);
+        freez(uuid_from_table);
+        return 0;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &uuid, sizeof(uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        rc = sqlite3_finalize(res);
+        if (unlikely(rc != SQLITE_OK))
+            error_report("Failed to reset statement to copy health log table, rc = %d", rc);
+        freez(uuid_from_table);
+        return 0;
+    }
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE)) {
+        error_report("Failed to execute SQL_COPY_HEALTH_LOG, rc = %d", rc);
+        rc = sqlite3_finalize(res);
+        if (unlikely(rc != SQLITE_OK))
+            error_report("Failed to reset statement to copy health log table, rc = %d", rc);
+        freez(uuid_from_table);
+    }
+
+    return 1;
 }
