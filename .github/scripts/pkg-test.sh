@@ -14,7 +14,7 @@ install_debian_like() {
 
   # Install Netdata
   # Strange quoting is required here so that glob matching works.
-  apt-get install -y $(find /netdata/artifacts -type f -name 'netdata*.deb' ! -name '*dbgsym*') || exit 3
+  apt-get install -y $(find /netdata/artifacts -type f -name 'netdata*.deb' ! -name '*dbgsym*' ! -name '*cups*' ! -name '*freeipmi*') || exit 3
 
   # Install testing tools
   apt-get install -y --no-install-recommends curl "${netcat}" jq || exit 1
