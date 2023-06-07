@@ -234,10 +234,9 @@ ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num) {
         if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
             ssl->ssl_errno = err;
             errno = EWOULDBLOCK;
-            bytes = -1;  // according to read() or recv()
         }
-        else
-            bytes = -1;
+
+        bytes = -1;  // according to read() or recv()
     }
 
     return bytes;
@@ -273,10 +272,9 @@ ssize_t netdata_ssl_write(NETDATA_SSL *ssl, const void *buf, size_t num) {
         if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
             ssl->ssl_errno = err;
             errno = EWOULDBLOCK;
-            bytes = -1; // according to write() or send()
         }
-        else
-            bytes = -1;
+
+        bytes = -1; // according to write() or send()
     }
 
     return bytes;

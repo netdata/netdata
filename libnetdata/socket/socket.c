@@ -14,6 +14,16 @@
 SOCKET_PEERS socket_peers(int sock_fd) {
     SOCKET_PEERS peers;
 
+    if(sock_fd < 0) {
+        strncpyz(peers.peer.ip, "unknown", sizeof(peers.peer.ip) - 1);
+        peers.peer.port = 0;
+
+        strncpyz(peers.local.ip, "unknown", sizeof(peers.local.ip) - 1);
+        peers.local.port = 0;
+
+        return peers;
+    }
+
     struct sockaddr_storage addr;
     socklen_t addr_len = sizeof(addr);
 
