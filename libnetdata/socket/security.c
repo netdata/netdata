@@ -90,9 +90,9 @@ void netdata_ssl_close(NETDATA_SSL *ssl) {
         }
 
         SSL_free(ssl->conn);
-    }
 
-    ERR_clear_error();
+        ERR_clear_error();
+    }
 
     *ssl = NETDATA_SSL_UNSET_CONNECTION;
 }

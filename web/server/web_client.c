@@ -113,10 +113,6 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
         // leave w->post_payload
     }
 
-#ifdef ENABLE_HTTPS
-    netdata_ssl_close(&w->ssl);
-#endif
-
     freez(w->server_host);
     w->server_host = NULL;
 
