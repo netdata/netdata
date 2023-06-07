@@ -42,7 +42,7 @@ Depends: adduser,
          netdata-plugin-apps,
          netdata-plugin-pythond,
          netdata-plugin-go,
-         netdata-plugin-debugfs
+         netdata-plugin-debugfs,
          netdata-plugin-cups,
          netdata-plugin-freeipmi,
          netdata-plugin-nfacct,
