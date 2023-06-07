@@ -502,7 +502,7 @@ void *socket_listen_main_static_threaded(void *ptr) {
     netdata_ssl_validate_certificate = !config_get_boolean(CONFIG_SECTION_WEB, "ssl skip certificate verification", !netdata_ssl_validate_certificate);
 
     if(!netdata_ssl_validate_certificate_sender)
-        info("SSL: web server will skip SSL certificates validation.");
+        info("SSL: web server will skip SSL certificates verification.");
 
 #ifdef ENABLE_HTTPS
     netdata_ssl_initialize_ctx(NETDATA_SSL_WEB_SERVER_CTX);
