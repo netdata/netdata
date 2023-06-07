@@ -12,32 +12,15 @@ const char *tls_ciphers=NULL;
 bool netdata_ssl_validate_certificate =  true;
 bool netdata_ssl_validate_certificate_sender =  true;
 
-static char *netdata_ssl_ip_and_port(NETDATA_SSL *ssl, int *port) {
-    if(unlikely(!ssl->conn)) {
-        if(port)
-            *port = 0;
+static SOCKET_PEERS netdata_ssl_peers(NETDATA_SSL *ssl) {
+    int sock_fd;
 
-        return NULL;
-    }
+    if(unlikely(!ssl->conn))
+        sock_fd = -1;
+    else
+        sock_fd = SSL_get_rfd(ssl->conn);
 
-    int sock_fd = SSL_get_rfd(ssl->conn);
-
-    struct sockaddr_in peer_addr;
-    socklen_t peer_addr_len = sizeof(peer_addr);
-
-    if (getpeername(sock_fd, (struct sockaddr *)&peer_addr, &peer_addr_len) < 0) {
-        error("SSL: getpeername() failed");
-
-        if(port)
-            *port = 0;
-
-        return NULL;
-    }
-
-    if(port)
-        *port = ntohs(peer_addr.sin_port);
-
-    return inet_ntoa(peer_addr.sin_addr);
+    return socket_peers(sock_fd);
 }
 
 bool netdata_ssl_open(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd) {
@@ -174,10 +157,9 @@ void netdata_ssl_log_error_queue(const char *call, NETDATA_SSL *ssl) {
         char str[1024 + 1];
         ERR_error_string_n(err, str, 1024);
         str[1024] = '\0';
-        int port = 0;
-        char *ip = netdata_ssl_ip_and_port(ssl, &port);
+        SOCKET_PEERS peers = netdata_ssl_peers(ssl);
         error_limit(&erl, "SSL: %s() on socket with peer %s:%d returned error %lu (%s): %s",
-                    call, ip?ip:"unknown", port, err, code, str);
+                    call, peers.peer.ip, peers.peer.port, err, code, str);
     }
 }
 
@@ -189,23 +171,20 @@ static inline bool is_handshake_complete(NETDATA_SSL *ssl, const char *op) {
 
     switch(ssl->state) {
         case NETDATA_SSL_STATE_NOT_SSL: {
-            int port = 0;
-            char *ip = netdata_ssl_ip_and_port(ssl, &port);
-            error("SSL: on socket with peer %s:%d, attempt to %s on non-SSL connection", ip?ip:"unknown", port, op);
+            SOCKET_PEERS peers = netdata_ssl_peers(ssl);
+            error("SSL: on socket with peer %s:%d, attempt to %s on non-SSL connection", peers.peer.ip, peers.peer.port, op);
             return false;
         }
 
         case NETDATA_SSL_STATE_INIT: {
-            int port = 0;
-            char *ip = netdata_ssl_ip_and_port(ssl, &port);
-            error("SSL: on socket with peer %s:%d, attempt to %s on an incomplete connection", ip?ip:"unknown", port, op);
+            SOCKET_PEERS peers = netdata_ssl_peers(ssl);
+            error("SSL: on socket with peer %s:%d, attempt to %s on an incomplete connection", peers.peer.ip, peers.peer.port, op);
             return false;
         }
 
         case NETDATA_SSL_STATE_FAILED: {
-            int port = 0;
-            char *ip = netdata_ssl_ip_and_port(ssl, &port);
-            error("SSL: on socket with peer %s:%d, attempt to %s on a failed connection", ip?ip:"unknown", port, op);
+            SOCKET_PEERS peers = netdata_ssl_peers(ssl);
+            error("SSL: on socket with peer %s:%d, attempt to %s on a failed connection", peers.peer.ip, peers.peer.port, op);
             return false;
         }
 
@@ -303,9 +282,8 @@ static inline bool is_handshake_initialized(NETDATA_SSL *ssl, const char *op) {
 
     switch(ssl->state) {
         case NETDATA_SSL_STATE_NOT_SSL: {
-            int port = 0;
-            char *ip = netdata_ssl_ip_and_port(ssl, &port);
-            error("SSL: on socket with peer %s:%d, attempt to %s on non-SSL connection", ip?ip:"unknown", port, op);
+            SOCKET_PEERS peers = netdata_ssl_peers(ssl);
+            error("SSL: on socket with peer %s:%d, attempt to %s on non-SSL connection", peers.peer.ip, peers.peer.port, op);
             return false;
         }
 
@@ -314,16 +292,14 @@ static inline bool is_handshake_initialized(NETDATA_SSL *ssl, const char *op) {
         }
 
         case NETDATA_SSL_STATE_FAILED: {
-            int port = 0;
-            char *ip = netdata_ssl_ip_and_port(ssl, &port);
-            error("SSL: on socket with peer %s:%d, attempt to %s on a failed connection", ip?ip:"unknown", port, op);
+            SOCKET_PEERS peers = netdata_ssl_peers(ssl);
+            error("SSL: on socket with peer %s:%d, attempt to %s on a failed connection", peers.peer.ip, peers.peer.port, op);
             return false;
         }
 
         case NETDATA_SSL_STATE_COMPLETE: {
-            int port = 0;
-            char *ip = netdata_ssl_ip_and_port(ssl, &port);
-            error("SSL: on socket with peer %s:%d, attempt to %s on an complete connection", ip?ip:"unknown", port, op);
+            SOCKET_PEERS peers = netdata_ssl_peers(ssl);
+            error("SSL: on socket with peer %s:%d, attempt to %s on an complete connection", peers.peer.ip, peers.peer.port, op);
             return false;
         }
     }

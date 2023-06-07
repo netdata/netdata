@@ -217,4 +217,22 @@ void poll_events(LISTEN_SOCKETS *sockets
         , size_t max_tcp_sockets
 );
 
+#ifndef INET6_ADDRSTRLEN
+#define INET6_ADDRSTRLEN 46
+#endif
+
+typedef struct socket_peers {
+    struct {
+        char ip[INET6_ADDRSTRLEN];
+        int port;
+    } local;
+
+    struct {
+        char ip[INET6_ADDRSTRLEN];
+        int port;
+    } peer;
+} SOCKET_PEERS;
+
+SOCKET_PEERS socket_peers(int sock_fd);
+
 #endif //NETDATA_SOCKET_H
