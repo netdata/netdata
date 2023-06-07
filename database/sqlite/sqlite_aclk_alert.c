@@ -7,35 +7,6 @@
 #include "../../aclk/aclk_alarm_api.h"
 #endif
 
-#define SQL_GET_ALERT_REMOVE_TIME "SELECT when_key FROM health_log_%s WHERE alarm_id = %u " \
-                                  "AND unique_id > %u AND unique_id < %u " \
-                                  "AND new_status = -2;"
-
-time_t removed_when(uint32_t alarm_id, uint32_t before_unique_id, uint32_t after_unique_id, char *uuid_str) {
-    sqlite3_stmt *res = NULL;
-    time_t when = 0;
-    char sql[ACLK_SYNC_QUERY_SIZE];
-
-    snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1, SQL_GET_ALERT_REMOVE_TIME, uuid_str, alarm_id, after_unique_id, before_unique_id);
-
-    int rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement when trying to find removed gap.");
-        return 0;
-    }
-
-    rc = sqlite3_step_monitored(res);
-    if (likely(rc == SQLITE_ROW)) {
-        when = (time_t) sqlite3_column_int64(res, 0);
-    }
-
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize statement when trying to find removed gap, rc = %d", rc);
-
-    return when;
-}
-
 #define SQL_UPDATE_FILTERED_ALERT "UPDATE aclk_alert_%s SET filtered_alert_unique_id = %u where filtered_alert_unique_id = %u"
 
 void update_filtered(ALARM_ENTRY *ae, uint32_t unique_id, char *uuid_str) {
@@ -142,20 +113,6 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
         goto done;
     }
 
-    //detect a long off period of the agent, TODO make global
-    if (ae->new_status == RRDCALC_STATUS_WARNING || ae->new_status == RRDCALC_STATUS_CRITICAL) {
-        time_t when = removed_when(ae->alarm_id, ae->unique_id, unique_id, uuid_str);
-
-        if (when && (when + (time_t)MAX_REMOVED_PERIOD) < ae->when) {
-            send = 1;
-            goto done;
-        } else {
-            send = 0;
-            update_filtered(ae, unique_id, uuid_str);
-            goto done;
-        }
-    }
-     
 done:
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
