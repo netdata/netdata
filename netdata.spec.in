@@ -11,7 +11,7 @@
 AutoReqProv: yes
 
 # This is temporary and should eventually be resolved. This bypasses
-# the default rhel __os_install_post which throws a python compile
+# the default rhel __os_install_p,ost which throws a python compile
 # error.
 %global __os_install_post %{nil}
 
@@ -147,25 +147,25 @@ Requires(pre): /usr/sbin/useradd
 # to support weak dependencies. Explicitly requiring our default plugins
 # makes it impossible to properly test the packages prior to upload,
 # so we just skip depending on them on CentOS 7.
-%if 0%{?centos_ver} != 7
 %if 0%{?_have_ebpf}
-Recommends: netdata-plugin-ebpf
+Requires: netdata-plugin-ebpf
 %endif
-Recommends: netdata-plugin-apps
-Recommends: netdata-plugin-pythond
-Recommends: netdata-plugin-go
-Recommends: netdata-plugin-debugfs
+Requires: netdata-plugin-apps
+Requires: netdata-plugin-pythond
+Requires: netdata-plugin-go
+Requires: netdata-plugin-debugfs
 %if 0%{?_have_freeipmi}
-Suggests:   netdata-plugin-freeipmi
+Requires:   netdata-plugin-freeipmi
 %endif
 %if 0%{?_have_nfacct}
-Suggests:   netdata-plugin-nfacct
+Requires:   netdata-plugin-nfacct
 %endif
-Suggests:   netdata-plugin-cups
-Suggests:   netdata-plugin-chartsd
-Suggests:   netdata-plugin-slabinfo
-Suggests:   netdata-plugin-perf
+%if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
+Requires:   netdata-plugin-cups
 %endif
+Requires:   netdata-plugin-chartsd
+Requires:   netdata-plugin-slabinfo
+Requires:   netdata-plugin-perf
 
 # #####################################################################
 # Functionality-dependent package dependencies
@@ -593,6 +593,12 @@ Requires: netdata = %{version}
 %description plugin-cups
  This plugin allows the Netdata Agent to collect metrics from the Common UNIX Printing System.
 
+%pre plugin-cups
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
+
 %files plugin-cups
 %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cups.plugin
 %endif
@@ -607,6 +613,12 @@ Requires: netdata = %{version}
 %description plugin-freeipmi
  This plugin allows the Netdata Agent to collect metrics from hardware using FreeIPMI.
 
+%pre plugin-freeipmi
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
+
 %files plugin-freeipmi
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 %endif
@@ -615,15 +627,17 @@ Requires: netdata = %{version}
 %package plugin-nfacct
 Summary: The NFACCT metrics collection plugin for the Netdata Agent
 Group: Applications/System
-Requires: libmnl
 Requires: netdata = %{version}
 Conflicts: netdata < %{version}
-%if 0%{?fedora} || 0%{?suse_version} >= 1140
-Requires: libnetfilter_acct
-%endif
 
 %description plugin-nfacct
  This plugin allows the Netdata Agent to collect metrics from the firewall using NFACCT objects.
+
+%pre plugin-nfacct
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
 
 %files plugin-nfacct
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/nfacct.plugin
@@ -645,6 +659,12 @@ Suggests: sudo
 %description plugin-chartsd
  This plugin adds a selection of additional collectors written in shell script to the Netdata Agent.
 It includes collectors for NUT, APCUPSD, LibreSWAN, OpenSIPS, and Wireless access point statistics.
+
+%pre plugin-chartsd
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
 
 %files plugin-chartsd
 %defattr(0750,root,netdata,0750)
@@ -672,6 +692,12 @@ Requires: netdata-ebpf-legacy-code >= %{version}
 %description plugin-ebpf
  This plugin allows the Netdata Agent to use eBPF code to collect more detailed kernel-level metrics for the system.
 
+%pre plugin-ebpf
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
+
 %files plugin-ebpf
 %defattr(4750,root,netdata,4750)
 %{_libexecdir}/%{name}/plugins.d/ebpf.plugin
@@ -687,7 +713,13 @@ Conflicts: netdata < %{version}
 
 %description ebpf-legacy-code
  This package provides the pre-compiled eBPF legacy code for use by the Netdata eBPF plugin.
-This code is only needed when using the eBPF plugin with kernel versions before 5.10.
+ This code is only needed when using the eBPF plugin with kernel versions before 5.10.
+
+%pre ebpf-legacy-code
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
 
 %files ebpf-legacy-code
 %defattr(0640,root,netdata,0640)
@@ -718,6 +750,12 @@ Suggests: sudo
 Many of the collectors provided by this package are also available in netdata-plugin-go. In msot cases, you probably
 want to use those versions instead of the Python versions.
 
+%pre plugin-pythond
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
+
 %files plugin-pythond
 %defattr(0750,root,netdata,0750)
 %{_libexecdir}/%{name}/plugins.d/python.d.plugin
@@ -741,6 +779,12 @@ Suggests: sudo
 A significant percentage of the application specific collectors provided by Netdata are part of this plugin,
 so most users will want it installed.
 
+%pre plugin-go
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
+
 %files plugin-go
 %defattr(0750,root,netdata,0750)
 # CAP_NET_ADMIN needed for WireGuard collector
@@ -759,6 +803,12 @@ Conflicts: netdata < %{version}
 %description plugin-apps
  This plugin allows the Netdata Agent to collect per-application and per-user metrics without using cgroups.
 
+%pre plugin-apps
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
+
 %files plugin-apps
 %defattr(0750,root,netdata,0750)
 # CAP_DAC_READ_SEARCH and CAP_SYS_PTRACE needed for data collection by the plugin.
@@ -775,6 +825,12 @@ Conflicts: netdata < %{version}
 %description plugin-slabinfo
  This plugin allows the Netdata Agent to collect perfromance and utilization metrics for the Linux kernel’s SLAB allocator.
 
+%pre plugin-slabinfo
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
+
 %files plugin-slabinfo
 %defattr(0750,root,netdata,0750)
 # CAP_DAC_READ_SEARCH needed to access the files the plugin reads to collect data.
@@ -788,6 +844,12 @@ Conflicts: netdata < %{version}
 
 %description plugin-perf
  This plugin allows the Netdata to collect metrics from the Linux perf subsystem.
+
+%pre plugin-perf
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
 
 %files plugin-perf
 %defattr(0750,root,netdata,0750)
@@ -807,6 +869,12 @@ Conflicts: netdata < %{version}
 
 %description plugin-debugfs
  This plugin allows the Netdata Agent to collect Linux kernel metrics exposed through debugfs.
+
+%pre plugin-debugfs
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
 
 %files plugin-debugfs
 %defattr(0750,root,netdata,0750)
