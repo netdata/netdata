@@ -2,6 +2,9 @@
 
 #include "dyn_conf.h"
 
+#define DYN_CONF_PATH_MAX (4096)
+#define DYN_CONF_DIR VARLIB_DIR "/etc"
+
 // TODO this is hardcoded for now, as virtual module during development
 // as demo, in future this callback should exist within the module/plugin itself
 json_object *http_check_config = NULL;
@@ -81,11 +84,73 @@ json_object *get_config_of_module_json(struct configurable_module *module)
     return module->get_current_config_cb();
 }
 
+int store_config(const char *module_name, const char submodule_name, const char cfg_idx, json_object *cfg)
+{
+    BUFFER *filename = buffer_create(DYN_CONF_PATH_MAX, NULL);
+    buffer_sprintf(filename, DYN_CONF_DIR "/%s", module_name);
+    if (mkdir(buffer_tostring(filename), 0755) == -1) {
+        if (errno != EEXIST) {
+            error("DYNCFG store_config: failed to create module directory %s", buffer_tostring(filename));
+            buffer_free(filename);
+            return 1;
+        }
+    }
+
+    if (submodule_name != NULL) {
+        buffer_sprintf(filename, "/%s", submodule_name);
+        if (mkdir(buffer_tostring(filename), 0755) == -1) {
+            if (errno != EEXIST) {
+                error("DYNCFG store_config: failed to create submodule directory %s", buffer_tostring(filename));
+                buffer_free(filename);
+                return 1;
+            }
+        }
+    }
+
+    if (cfg_idx != NULL)
+        buffer_sprintf(filename, "/%s", cfg_idx);
+
+    buffer_strcat(filename, ".json");
+
+
+    error_report("DYNCFG store_config: %s", buffer_tostring(filename));
+
+    // TODO check what permissions json_object_to_file_ext uses
+    // if not satisfactory then use json_object_to_fd
+    if (json_object_to_file_ext(buffer_tostring(filename), cfg, JSON_C_TO_STRING_PRETTY)) {
+        error_report("DYNCFG store_config: failed to write config to %s, json_error: %s", buffer_tostring(filename), json_util_get_last_err());
+        buffer_free(filename);
+        return 1;
+    }
+
+    buffer_free(filename);
+    return 0;
+}
+
+// TODO return meaningful error to webserver so it can be passed to HTTP api client
 int set_module_config_json(struct configurable_module *module, json_object *cfg)
 {
+    if (store_config(module->name, NULL, NULL, cfg)) {
+        error_report("DYNCFG could not store config for module %s", module->name);
+        return -1;
+    }
+
     if (module->set_config_cb == NULL) {
         return -1;
     }
 
-    return module->set_config_cb(cfg);
+    module->set_config_cb(cfg);
+
+    return 0;
+}
+
+int dyn_conf_init()
+{
+    if (mkdir(buffer_tostring(DYN_CONF_DIR), 0755) == -1) {
+        if (errno != EEXIST) {
+            error("failed to create directory for dynamic configuration");
+            return 1;
+        }
+    }
+    return 0;
 }

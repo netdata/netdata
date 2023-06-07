@@ -3,7 +3,7 @@
 #ifndef HTTPD_CONFIGURATION_H
 #define HTTPD_CONFIGURATION_H
 
-#include "daemon/common.h"
+#include "../libnetdata.h"
 
 enum submodule_type {
     ARRAY,

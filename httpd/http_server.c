@@ -9,8 +9,6 @@
 #include "streaming.h"
 #include "h2o_utils.h"
 
-#include "dyn_conf.h"
-
 static h2o_globalconf_t config;
 static h2o_context_t ctx;
 static h2o_accept_ctx_t accept_ctx;
