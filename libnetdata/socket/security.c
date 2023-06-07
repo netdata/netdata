@@ -164,6 +164,8 @@ void netdata_ssl_log_error_queue(const char *call, NETDATA_SSL *ssl) {
 }
 
 static inline bool is_handshake_complete(NETDATA_SSL *ssl, const char *op) {
+    error_limit_static_thread_var(erl, 1, 0);
+
     if(unlikely(!ssl->conn)) {
         internal_error(true, "SSL: trying to %s on a NULL connection", op);
         return false;
@@ -172,19 +174,19 @@ static inline bool is_handshake_complete(NETDATA_SSL *ssl, const char *op) {
     switch(ssl->state) {
         case NETDATA_SSL_STATE_NOT_SSL: {
             SOCKET_PEERS peers = netdata_ssl_peers(ssl);
-            error("SSL: on socket with peer %s:%d, attempt to %s on non-SSL connection", peers.peer.ip, peers.peer.port, op);
+            error_limit(&erl, "SSL: on socket with peer %s:%d, attempt to %s on non-SSL connection", peers.peer.ip, peers.peer.port, op);
             return false;
         }
 
         case NETDATA_SSL_STATE_INIT: {
             SOCKET_PEERS peers = netdata_ssl_peers(ssl);
-            error("SSL: on socket with peer %s:%d, attempt to %s on an incomplete connection", peers.peer.ip, peers.peer.port, op);
+            error_limit(&erl, "SSL: on socket with peer %s:%d, attempt to %s on an incomplete connection", peers.peer.ip, peers.peer.port, op);
             return false;
         }
 
         case NETDATA_SSL_STATE_FAILED: {
             SOCKET_PEERS peers = netdata_ssl_peers(ssl);
-            error("SSL: on socket with peer %s:%d, attempt to %s on a failed connection", peers.peer.ip, peers.peer.port, op);
+            error_limit(&erl, "SSL: on socket with peer %s:%d, attempt to %s on a failed connection", peers.peer.ip, peers.peer.port, op);
             return false;
         }
 
@@ -275,6 +277,8 @@ ssize_t netdata_ssl_write(NETDATA_SSL *ssl, const void *buf, size_t num) {
 }
 
 static inline bool is_handshake_initialized(NETDATA_SSL *ssl, const char *op) {
+    error_limit_static_thread_var(erl, 1, 0);
+
     if(unlikely(!ssl->conn)) {
         internal_error(true, "SSL: trying to %s on a NULL connection", op);
         return false;
@@ -283,7 +287,7 @@ static inline bool is_handshake_initialized(NETDATA_SSL *ssl, const char *op) {
     switch(ssl->state) {
         case NETDATA_SSL_STATE_NOT_SSL: {
             SOCKET_PEERS peers = netdata_ssl_peers(ssl);
-            error("SSL: on socket with peer %s:%d, attempt to %s on non-SSL connection", peers.peer.ip, peers.peer.port, op);
+            error_limit(&erl, "SSL: on socket with peer %s:%d, attempt to %s on non-SSL connection", peers.peer.ip, peers.peer.port, op);
             return false;
         }
 
@@ -293,13 +297,13 @@ static inline bool is_handshake_initialized(NETDATA_SSL *ssl, const char *op) {
 
         case NETDATA_SSL_STATE_FAILED: {
             SOCKET_PEERS peers = netdata_ssl_peers(ssl);
-            error("SSL: on socket with peer %s:%d, attempt to %s on a failed connection", peers.peer.ip, peers.peer.port, op);
+            error_limit(&erl, "SSL: on socket with peer %s:%d, attempt to %s on a failed connection", peers.peer.ip, peers.peer.port, op);
             return false;
         }
 
         case NETDATA_SSL_STATE_COMPLETE: {
             SOCKET_PEERS peers = netdata_ssl_peers(ssl);
-            error("SSL: on socket with peer %s:%d, attempt to %s on an complete connection", peers.peer.ip, peers.peer.port, op);
+            error_limit(&erl, "SSL: on socket with peer %s:%d, attempt to %s on an complete connection", peers.peer.ip, peers.peer.port, op);
             return false;
         }
     }
