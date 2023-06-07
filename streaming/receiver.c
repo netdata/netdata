@@ -760,11 +760,6 @@ static void rrdpush_receive(struct receiver_state *rpt)
             rrdpush_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_ALREADY_STREAMING);
             goto cleanup;
         }
-
-        // test - to be removed
-        rrdpush_receive_log_status(rpt, "host is initializing", "INITIALIZATION IN PROGRESS RETRY LATER");
-        rrdpush_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_INITIALIZATION);
-        goto cleanup;
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
