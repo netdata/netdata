@@ -715,7 +715,7 @@ Conflicts: netdata < %{version}
  This package provides the pre-compiled eBPF legacy code for use by the Netdata eBPF plugin.
  This code is only needed when using the eBPF plugin with kernel versions before 5.10.
 
-%pre plugin-ebpf-legacy-code
+%pre ebpf-legacy-code
 
 if ! getent group netdata > /dev/null; then
   groupadd --system netdata
