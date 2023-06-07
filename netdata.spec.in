@@ -750,7 +750,7 @@ Suggests: sudo
 Many of the collectors provided by this package are also available in netdata-plugin-go. In msot cases, you probably
 want to use those versions instead of the Python versions.
 
-%pre plugin-plugin-pythond
+%pre plugin-pythond
 
 if ! getent group netdata > /dev/null; then
   groupadd --system netdata
