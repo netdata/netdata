@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Make plugin packages hard dependencies. [\#15160](https://github.com/netdata/netdata/pull/15160) ([Ferroin](https://github.com/Ferroin))
+- freeipmi: add availability status chart and alarm [\#15151](https://github.com/netdata/netdata/pull/15151) ([ilyam8](https://github.com/ilyam8))
 - Check null transition id and config hash [\#15147](https://github.com/netdata/netdata/pull/15147) ([stelfrag](https://github.com/stelfrag))
 - Mattermost cloud integration docs [\#15141](https://github.com/netdata/netdata/pull/15141) ([car12o](https://github.com/car12o))
 - send EXIT before exiting in freeipmi and debugfs plugins [\#15140](https://github.com/netdata/netdata/pull/15140) ([ilyam8](https://github.com/ilyam8))
@@ -20,6 +22,7 @@
 - Revert "percentage of group is now aggregatable at cloud across multiple nodes" [\#15122](https://github.com/netdata/netdata/pull/15122) ([ktsaou](https://github.com/ktsaou))
 - add netdata demo rooms to the list of demo urls [\#15120](https://github.com/netdata/netdata/pull/15120) ([andrewm4894](https://github.com/andrewm4894))
 - Fix handling of eBPF plugin for DEB packages. [\#15117](https://github.com/netdata/netdata/pull/15117) ([Ferroin](https://github.com/Ferroin))
+- Re-write of SSL support in Netdata; restoration of SIGCHLD; detection of stale plugins; streaming improvements [\#15113](https://github.com/netdata/netdata/pull/15113) ([ktsaou](https://github.com/ktsaou))
 - initial draft for the silencing docs [\#15112](https://github.com/netdata/netdata/pull/15112) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Generate, store and transmit a unique alert event\_hash\_id [\#15111](https://github.com/netdata/netdata/pull/15111) ([MrZammler](https://github.com/MrZammler))
 - Only queue an alert to the cloud when it's inserted [\#15110](https://github.com/netdata/netdata/pull/15110) ([MrZammler](https://github.com/MrZammler))
@@ -59,6 +62,7 @@
 - Update tor.chart.py [\#15041](https://github.com/netdata/netdata/pull/15041) ([jmphilippe](https://github.com/jmphilippe))
 - Wording fix in interact with charts doc [\#15040](https://github.com/netdata/netdata/pull/15040) ([Ancairon](https://github.com/Ancairon))
 - fatal in claim\(\) only if --claim-only is used [\#15039](https://github.com/netdata/netdata/pull/15039) ([ilyam8](https://github.com/ilyam8))
+- Update libbpf [\#15038](https://github.com/netdata/netdata/pull/15038) ([thiagoftsm](https://github.com/thiagoftsm))
 - Slight wording fix on the database readme [\#15034](https://github.com/netdata/netdata/pull/15034) ([Ancairon](https://github.com/Ancairon))
 - Update SQLITE to version 3.41.2 [\#15031](https://github.com/netdata/netdata/pull/15031) ([stelfrag](https://github.com/stelfrag))
 - Update troubleshooting-agent-with-cloud-connection.md [\#15029](https://github.com/netdata/netdata/pull/15029) ([cakrit](https://github.com/cakrit))
@@ -402,13 +406,6 @@
 - Move collectors under Integrations/Monitoring [\#14509](https://github.com/netdata/netdata/pull/14509) ([cakrit](https://github.com/cakrit))
 - Guides and collectors reorg and cleanup part 1 [\#14507](https://github.com/netdata/netdata/pull/14507) ([cakrit](https://github.com/cakrit))
 - replicating gaps [\#14506](https://github.com/netdata/netdata/pull/14506) ([ktsaou](https://github.com/ktsaou))
-- More learn reorg/reordering [\#14505](https://github.com/netdata/netdata/pull/14505) ([cakrit](https://github.com/cakrit))
-- Revert changes to platform support policy [\#14504](https://github.com/netdata/netdata/pull/14504) ([cakrit](https://github.com/cakrit))
-- Top level learn changes [\#14503](https://github.com/netdata/netdata/pull/14503) ([cakrit](https://github.com/cakrit))
-- Fix broken links in collectors/COLLECTORS.md [\#14502](https://github.com/netdata/netdata/pull/14502) ([Ancairon](https://github.com/Ancairon))
-- Update Demo-Sites.md [\#14501](https://github.com/netdata/netdata/pull/14501) ([cakrit](https://github.com/cakrit))
-- Member role on roles permissions docs [\#14500](https://github.com/netdata/netdata/pull/14500) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- Reorganize contents of Getting Started [\#14499](https://github.com/netdata/netdata/pull/14499) ([cakrit](https://github.com/cakrit))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
