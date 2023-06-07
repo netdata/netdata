@@ -76,8 +76,10 @@ dist_noinst_DATA = \
     packaging/jsonc.version \
     packaging/yaml.checksums \
     packaging/yaml.version \
-    packaging/libbpf.checksums \
-    packaging/libbpf.version \
+    packaging/current_libbpf.checksums \
+    packaging/current_libbpf.version \
+    packaging/libbpf_0_0_9.checksums \
+    packaging/libbpf_0_0_9.version \
     packaging/protobuf.checksums \
     packaging/protobuf.version \
     packaging/version \
