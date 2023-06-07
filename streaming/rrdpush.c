@@ -136,14 +136,10 @@ int rrdpush_init() {
     }
 
 #ifdef ENABLE_HTTPS
-    bool skip_validation = appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "ssl skip certificate verification", CONFIG_BOOLEAN_NO);
+    netdata_ssl_validate_certificate_sender = !appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "ssl skip certificate verification", !netdata_ssl_validate_certificate);
 
-    if(skip_validation == CONFIG_BOOLEAN_YES){
-        if(netdata_ssl_validate_certificate) {
-            info("Netdata is configured to skip SSL certificates validation.");
-            netdata_ssl_validate_certificate = false;
-        }
-    }
+    if(!netdata_ssl_validate_certificate_sender)
+        info("SSL: streaming senders will skip SSL certificates validation.");
 
     netdata_ssl_ca_path = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CApath", NULL);
     netdata_ssl_ca_file = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CAfile", NULL);

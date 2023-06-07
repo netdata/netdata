@@ -499,9 +499,15 @@ void *socket_listen_main_static_threaded(void *ptr) {
     if(!api_sockets.opened)
         fatal("LISTENER: no listen sockets available.");
 
+    netdata_ssl_validate_certificate = !config_get_boolean(CONFIG_SECTION_WEB, "ssl skip certificate verification", !netdata_ssl_validate_certificate);
+
+    if(!netdata_ssl_validate_certificate_sender)
+        info("SSL: web server will skip SSL certificates validation.");
+
 #ifdef ENABLE_HTTPS
-            netdata_ssl_initialize_ctx(NETDATA_SSL_WEB_SERVER_CTX);
+    netdata_ssl_initialize_ctx(NETDATA_SSL_WEB_SERVER_CTX);
 #endif
+
     // 6 threads is the optimal value
     // since 6 are the parallel connections browsers will do
     // so, if the machine has more CPUs, avoid using resources unnecessarily
@@ -515,6 +521,7 @@ void *socket_listen_main_static_threaded(void *ptr) {
     static_threaded_workers_count = config_get_number(CONFIG_SECTION_WEB, "web server threads", def_thread_count);
 
     if (static_threaded_workers_count < 1) static_threaded_workers_count = 1;
+
 #ifdef ENABLE_HTTPS
     // See https://github.com/netdata/netdata/issues/11081#issuecomment-831998240 for more details
     if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110) {

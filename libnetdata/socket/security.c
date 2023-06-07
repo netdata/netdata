@@ -10,6 +10,7 @@ const char *netdata_ssl_security_cert =NULL;
 const char *tls_version=NULL;
 const char *tls_ciphers=NULL;
 bool netdata_ssl_validate_certificate =  true;
+bool netdata_ssl_validate_certificate_sender =  true;
 
 bool netdata_ssl_open(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd) {
     if(ssl->conn) {
@@ -568,7 +569,7 @@ void netdata_ssl_initialize_ctx(int selector) {
                         0
                 );
 
-                if(netdata_ssl_streaming_sender_ctx && !netdata_ssl_validate_certificate)
+                if(netdata_ssl_streaming_sender_ctx && !netdata_ssl_validate_certificate_sender)
                     SSL_CTX_set_verify(netdata_ssl_streaming_sender_ctx, SSL_VERIFY_NONE, NULL);
             }
             break;

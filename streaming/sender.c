@@ -505,12 +505,12 @@ static bool rrdpush_sender_connect_ssl(struct sender_state *s) {
             return false;
         }
 
-        if (netdata_ssl_validate_certificate &&
+        if (netdata_ssl_validate_certificate_sender &&
             security_test_certificate(host->sender->ssl.conn)) {
             // certificate is not valid
 
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
-            error("Closing the stream connection, because the server SSL certificate is not valid.");
+            error("SSL: closing the stream connection, because the server SSL certificate is not valid.");
             rrdpush_sender_thread_close_socket(host);
             host->destination->last_error = "invalid SSL certificate";
             host->destination->last_handshake = STREAM_HANDSHAKE_ERROR_INVALID_CERTIFICATE;
