@@ -699,12 +699,6 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
 
     // info("STREAM %s [send to %s]: waiting response from remote netdata...", rrdhost_hostname(host), s->connected_to);
 
-    if(sock_setnonblock(s->rrdpush_sender_socket) < 0)
-        error("STREAM %s [send to %s]: cannot set non-blocking mode for socket.", rrdhost_hostname(host), s->connected_to);
-
-    if(sock_enlarge_out(s->rrdpush_sender_socket) < 0)
-        error("STREAM %s [send to %s]: cannot enlarge the socket buffer.", rrdhost_hostname(host), s->connected_to);
-
     bytes = recv_timeout(
 #ifdef ENABLE_HTTPS
         &host->sender->ssl,
@@ -724,6 +718,12 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
         host->destination->postpone_reconnection_until = now_realtime_sec() + 30;
         return false;
     }
+
+    if(sock_setnonblock(s->rrdpush_sender_socket) < 0)
+        error("STREAM %s [send to %s]: cannot set non-blocking mode for socket.", rrdhost_hostname(host), s->connected_to);
+
+    if(sock_enlarge_out(s->rrdpush_sender_socket) < 0)
+        error("STREAM %s [send to %s]: cannot enlarge the socket buffer.", rrdhost_hostname(host), s->connected_to);
 
     http[bytes] = '\0';
     debug(D_STREAM, "Response to sender from far end: %s", http);

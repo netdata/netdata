@@ -564,7 +564,7 @@ void netdata_ssl_initialize_ctx(int selector) {
                 netdata_ssl_streaming_sender_ctx = netdata_ssl_create_client_ctx(
                         SSL_MODE_ENABLE_PARTIAL_WRITE |
                         SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |
-                        SSL_MODE_AUTO_RETRY |
+                        // SSL_MODE_AUTO_RETRY |
                         0
                 );
 

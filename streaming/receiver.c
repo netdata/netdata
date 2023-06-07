@@ -761,12 +761,14 @@ static void rrdpush_receive(struct receiver_state *rpt)
         }
 
         debug(D_STREAM, "Initial response to %s: %s", rpt->client_ip, initial_response);
-        if(send_timeout(
+        ssize_t bytes_sent = send_timeout(
 #ifdef ENABLE_HTTPS
                 &rpt->ssl,
 #endif
-                rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
+                rpt->fd, initial_response, strlen(initial_response), 0, 60);
 
+        if(bytes_sent != (ssize_t)strlen(initial_response)) {
+            internal_error(true, "Cannot send response, got %zd bytes, expecting %zu bytes", bytes_sent, strlen(initial_response));
             rrdpush_receive_log_status(rpt, "cannot reply back", "CANT REPLY DROPPING CONNECTION");
             goto cleanup;
         }
