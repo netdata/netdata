@@ -321,7 +321,7 @@ static size_t gorilla_decode(Word *dst, Word dst_len, const Word *src, Word src_
         return 0;
     }
     if (num_entries > dst_len) {
-        return false;
+        return 0;
     }
     
     for (size_t i = 0; i != num_entries; i++) {
