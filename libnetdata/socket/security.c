@@ -24,6 +24,9 @@ static SOCKET_PEERS netdata_ssl_peers(NETDATA_SSL *ssl) {
 }
 
 bool netdata_ssl_open(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd) {
+    errno = 0;
+    ssl->ssl_errno = 0;
+
     if(ssl->conn) {
         if(!ctx || SSL_get_SSL_CTX(ssl->conn) != ctx) {
             SSL_free(ssl->conn);
@@ -65,6 +68,9 @@ bool netdata_ssl_open(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd) {
 }
 
 void netdata_ssl_close(NETDATA_SSL *ssl) {
+    errno = 0;
+    ssl->ssl_errno = 0;
+
     if(ssl->conn) {
         if(SSL_connection(ssl)) {
             int ret = SSL_shutdown(ssl->conn);
@@ -212,11 +218,11 @@ static inline bool is_handshake_complete(NETDATA_SSL *ssl, const char *op) {
  */
 
 ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num) {
-    if(unlikely(!is_handshake_complete(ssl, "read")))
-        return -1;
-
     errno = 0;
     ssl->ssl_errno = 0;
+
+    if(unlikely(!is_handshake_complete(ssl, "read")))
+        return -1;
 
     int bytes, err;
 
@@ -251,11 +257,11 @@ ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num) {
  */
 
 ssize_t netdata_ssl_write(NETDATA_SSL *ssl, const void *buf, size_t num) {
-    if(unlikely(!is_handshake_complete(ssl, "write")))
-        return -1;
-
     errno = 0;
     ssl->ssl_errno = 0;
+
+    if(unlikely(!is_handshake_complete(ssl, "write")))
+        return -1;
 
     int bytes, err;
 
@@ -313,7 +319,7 @@ static inline bool is_handshake_initialized(NETDATA_SSL *ssl, const char *op) {
 
 #define WANT_READ_WRITE_TIMEOUT_MS 10
 
-static inline bool catch_want_read_write_should_retry(NETDATA_SSL *ssl, int err) {
+static inline bool want_read_write_should_retry(NETDATA_SSL *ssl, int err) {
     int ssl_errno = SSL_get_error(ssl->conn, err);
     if(ssl_errno == SSL_ERROR_WANT_READ || ssl_errno == SSL_ERROR_WANT_WRITE) {
         struct pollfd pfds[1] = { [0] = {
@@ -332,6 +338,9 @@ static inline bool catch_want_read_write_should_retry(NETDATA_SSL *ssl, int err)
 }
 
 bool netdata_ssl_connect(NETDATA_SSL *ssl) {
+    errno = 0;
+    ssl->ssl_errno = 0;
+
     if(unlikely(!is_handshake_initialized(ssl, "connect")))
         return false;
 
@@ -339,7 +348,7 @@ bool netdata_ssl_connect(NETDATA_SSL *ssl) {
 
     int err;
     while ((err = SSL_connect(ssl->conn)) != 1) {
-        if(!catch_want_read_write_should_retry(ssl, err))
+        if(!want_read_write_should_retry(ssl, err))
             break;
     }
 
@@ -354,6 +363,9 @@ bool netdata_ssl_connect(NETDATA_SSL *ssl) {
 }
 
 bool netdata_ssl_accept(NETDATA_SSL *ssl) {
+    errno = 0;
+    ssl->ssl_errno = 0;
+
     if(unlikely(!is_handshake_initialized(ssl, "accept")))
         return false;
 
@@ -361,7 +373,7 @@ bool netdata_ssl_accept(NETDATA_SSL *ssl) {
 
     int err;
     while ((err = SSL_accept(ssl->conn)) != 1) {
-        if(!catch_want_read_write_should_retry(ssl, err))
+        if(!want_read_write_should_retry(ssl, err))
             break;
     }
 

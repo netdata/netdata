@@ -2082,6 +2082,10 @@ struct web_client *web_client_create(size_t *statistics_memory_accounting) {
 }
 
 void web_client_free(struct web_client *w) {
+#ifdef ENABLE_HTTPS
+    netdata_ssl_close(&w->ssl);
+#endif
+
     web_client_reset_allocations(w, true);
 
     __atomic_sub_fetch(w->statistics.memory_accounting, sizeof(struct web_client), __ATOMIC_RELAXED);
