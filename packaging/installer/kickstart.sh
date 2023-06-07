@@ -26,7 +26,7 @@ KICKSTART_SOURCE="$(
     echo "$(pwd -P)/${self##*/}"
 )"
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
-DEFAULT_PLUGIN_PACKAGES="netdata-plugin-go netdata-plugin-python netdata-plugin-apps netdata-plugin-ebpf"
+DEFAULT_PLUGIN_PACKAGES="netdata-plugin-go netdata-plugin-pythond netdata-plugin-apps netdata-plugin-ebpf"
 PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 PUBLIC_CLOUD_URL="https://app.netdata.cloud"
 REPOCONFIG_DEB_URL_PREFIX="https://repo.netdata.cloud/repos/repoconfig"
