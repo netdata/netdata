@@ -164,8 +164,8 @@ void netdata_ssl_log_error_queue(const char *call, NETDATA_SSL *ssl) {
         ERR_error_string_n(err, str, 1024);
         str[1024] = '\0';
         SOCKET_PEERS peers = netdata_ssl_peers(ssl);
-        error_limit(&erl, "SSL: %s() on socket with peer %s:%d returned error %lu (%s): %s",
-                    call, peers.peer.ip, peers.peer.port, err, code, str);
+        error_limit(&erl, "SSL: %s() on socket local [[%s]:%d] <-> remote [[%s]:%d], returned error %lu (%s): %s",
+                    call, peers.local.ip, peers.local.port, peers.peer.ip, peers.peer.port, err, code, str);
     }
 }
 
@@ -180,19 +180,22 @@ static inline bool is_handshake_complete(NETDATA_SSL *ssl, const char *op) {
     switch(ssl->state) {
         case NETDATA_SSL_STATE_NOT_SSL: {
             SOCKET_PEERS peers = netdata_ssl_peers(ssl);
-            error_limit(&erl, "SSL: on socket with peer %s:%d, attempt to %s on non-SSL connection", peers.peer.ip, peers.peer.port, op);
+            error_limit(&erl, "SSL: on socket local [[%s]:%d] <-> remote [[%s]:%d], attempt to %s on non-SSL connection",
+                        peers.local.ip, peers.local.port, peers.peer.ip, peers.peer.port, op);
             return false;
         }
 
         case NETDATA_SSL_STATE_INIT: {
             SOCKET_PEERS peers = netdata_ssl_peers(ssl);
-            error_limit(&erl, "SSL: on socket with peer %s:%d, attempt to %s on an incomplete connection", peers.peer.ip, peers.peer.port, op);
+            error_limit(&erl, "SSL: on socket local [[%s]:%d] <-> remote [[%s]:%d], attempt to %s on an incomplete connection",
+                        peers.local.ip, peers.local.port, peers.peer.ip, peers.peer.port, op);
             return false;
         }
 
         case NETDATA_SSL_STATE_FAILED: {
             SOCKET_PEERS peers = netdata_ssl_peers(ssl);
-            error_limit(&erl, "SSL: on socket with peer %s:%d, attempt to %s on a failed connection", peers.peer.ip, peers.peer.port, op);
+            error_limit(&erl, "SSL: on socket local [[%s]:%d] <-> remote [[%s]:%d], attempt to %s on a failed connection",
+                        peers.local.ip, peers.local.port, peers.peer.ip, peers.peer.port, op);
             return false;
         }
 
@@ -224,12 +227,10 @@ ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num) {
     if(unlikely(!is_handshake_complete(ssl, "read")))
         return -1;
 
-    int bytes, err;
-
-    bytes = SSL_read(ssl->conn, buf, (int)num);
+    int bytes = SSL_read(ssl->conn, buf, (int)num);
 
     if(unlikely(bytes <= 0)) {
-        err = SSL_get_error(ssl->conn, bytes);
+        int err = SSL_get_error(ssl->conn, bytes);
         netdata_ssl_log_error_queue("SSL_read", ssl);
         if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
             ssl->ssl_errno = err;
@@ -262,12 +263,10 @@ ssize_t netdata_ssl_write(NETDATA_SSL *ssl, const void *buf, size_t num) {
     if(unlikely(!is_handshake_complete(ssl, "write")))
         return -1;
 
-    int bytes, err;
-
-    bytes = SSL_write(ssl->conn, (uint8_t *)buf, (int)num);
+    int bytes = SSL_write(ssl->conn, (uint8_t *)buf, (int)num);
 
     if(unlikely(bytes <= 0)) {
-        err = SSL_get_error(ssl->conn, bytes);
+        int err = SSL_get_error(ssl->conn, bytes);
         netdata_ssl_log_error_queue("SSL_write", ssl);
         if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
             ssl->ssl_errno = err;
@@ -291,7 +290,8 @@ static inline bool is_handshake_initialized(NETDATA_SSL *ssl, const char *op) {
     switch(ssl->state) {
         case NETDATA_SSL_STATE_NOT_SSL: {
             SOCKET_PEERS peers = netdata_ssl_peers(ssl);
-            error_limit(&erl, "SSL: on socket with peer %s:%d, attempt to %s on non-SSL connection", peers.peer.ip, peers.peer.port, op);
+            error_limit(&erl, "SSL: on socket local [[%s]:%d] <-> remote [[%s]:%d], attempt to %s on non-SSL connection",
+                        peers.local.ip, peers.local.port, peers.peer.ip, peers.peer.port, op);
             return false;
         }
 
@@ -301,13 +301,15 @@ static inline bool is_handshake_initialized(NETDATA_SSL *ssl, const char *op) {
 
         case NETDATA_SSL_STATE_FAILED: {
             SOCKET_PEERS peers = netdata_ssl_peers(ssl);
-            error_limit(&erl, "SSL: on socket with peer %s:%d, attempt to %s on a failed connection", peers.peer.ip, peers.peer.port, op);
+            error_limit(&erl, "SSL: on socket local [[%s]:%d] <-> remote [[%s]:%d], attempt to %s on a failed connection",
+                        peers.local.ip, peers.local.port, peers.peer.ip, peers.peer.port, op);
             return false;
         }
 
         case NETDATA_SSL_STATE_COMPLETE: {
             SOCKET_PEERS peers = netdata_ssl_peers(ssl);
-            error_limit(&erl, "SSL: on socket with peer %s:%d, attempt to %s on an complete connection", peers.peer.ip, peers.peer.port, op);
+            error_limit(&erl, "SSL: on socket local [[%s]:%d] <-> remote [[%s]:%d], attempt to %s on an complete connection",
+                        peers.local.ip, peers.local.port, peers.peer.ip, peers.peer.port, op);
             return false;
         }
     }

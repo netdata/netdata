@@ -1828,7 +1828,6 @@ PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_
 
 void pluginsd_process_thread_cleanup(void *ptr) {
     PARSER *parser = (PARSER *)ptr;
-    PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *)parser->user;
 
     pluginsd_cleanup_v2(parser->user);
     pluginsd_host_define_cleanup(parser->user);
