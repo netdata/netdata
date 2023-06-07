@@ -160,7 +160,9 @@ Requires:   netdata-plugin-freeipmi
 %if 0%{?_have_nfacct}
 Requires:   netdata-plugin-nfacct
 %endif
+%if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
 Requires:   netdata-plugin-cups
+%endif
 Requires:   netdata-plugin-chartsd
 Requires:   netdata-plugin-slabinfo
 Requires:   netdata-plugin-perf
