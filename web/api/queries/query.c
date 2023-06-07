@@ -3291,7 +3291,6 @@ static void rrd2rrdr_convert_values_to_percentage_of_total(RRDR *r) {
 
 static RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
     QUERY_TARGET *qt = r_tmp->internal.qt;
-    RRDR_OPTIONS options = qt->window.options;
 
     if(!r_tmp->group_by.r) {
         // v1 query

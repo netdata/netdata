@@ -44,7 +44,7 @@ typedef struct parser {
     FILE *fp_input;                 // Input source e.g. stream
     FILE *fp_output;                // Stream to send commands to plugin
 #ifdef ENABLE_HTTPS
-    struct netdata_ssl *ssl_output;
+    NETDATA_SSL *ssl_output;
 #endif
     void *user;                     // User defined structure to hold extra state between calls
     uint32_t flags;

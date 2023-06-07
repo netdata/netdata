@@ -104,11 +104,6 @@ struct web_client *web_client_get_from_cache(void) {
         // allocate it
         w = web_client_create(&netdata_buffers_statistics.buffers_web);
 
-#ifdef ENABLE_HTTPS
-        w->ssl.flags = NETDATA_SSL_START;
-        debug(D_WEB_CLIENT_ACCESS,"Starting SSL structure with (w->ssl = NULL, w->accepted = %u)", w->ssl.flags);
-#endif
-
         netdata_spinlock_lock(&web_clients_cache.used.spinlock);
         web_clients_cache.used.allocated++;
     }
@@ -127,6 +122,11 @@ struct web_client *web_client_get_from_cache(void) {
 }
 
 void web_client_release_to_cache(struct web_client *w) {
+
+#ifdef ENABLE_HTTPS
+    netdata_ssl_close(&w->ssl);
+#endif
+
     // unlink it from the used
     netdata_spinlock_lock(&web_clients_cache.used.spinlock);
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(web_clients_cache.used.head, w, cache.prev, cache.next);

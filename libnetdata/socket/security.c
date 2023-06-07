@@ -3,13 +3,389 @@
 #ifdef ENABLE_HTTPS
 
 SSL_CTX *netdata_ssl_exporting_ctx =NULL;
-SSL_CTX *netdata_ssl_client_ctx =NULL;
-SSL_CTX *netdata_ssl_srv_ctx =NULL;
+SSL_CTX *netdata_ssl_streaming_sender_ctx =NULL;
+SSL_CTX *netdata_ssl_web_server_ctx =NULL;
 const char *netdata_ssl_security_key =NULL;
 const char *netdata_ssl_security_cert =NULL;
 const char *tls_version=NULL;
 const char *tls_ciphers=NULL;
-int netdata_ssl_validate_server =  NETDATA_SSL_VALID_CERTIFICATE;
+bool netdata_ssl_validate_certificate =  true;
+bool netdata_ssl_validate_certificate_sender =  true;
+
+static SOCKET_PEERS netdata_ssl_peers(NETDATA_SSL *ssl) {
+    int sock_fd;
+
+    if(unlikely(!ssl->conn))
+        sock_fd = -1;
+    else
+        sock_fd = SSL_get_rfd(ssl->conn);
+
+    return socket_peers(sock_fd);
+}
+
+bool netdata_ssl_open(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd) {
+    errno = 0;
+    ssl->ssl_errno = 0;
+
+    if(ssl->conn) {
+        if(!ctx || SSL_get_SSL_CTX(ssl->conn) != ctx) {
+            SSL_free(ssl->conn);
+            ssl->conn = NULL;
+        }
+        else if (SSL_clear(ssl->conn) == 0) {
+            netdata_ssl_log_error_queue("SSL_clear", ssl);
+            SSL_free(ssl->conn);
+            ssl->conn = NULL;
+        }
+    }
+
+    if(!ssl->conn) {
+        if(!ctx) {
+            internal_error(true, "SSL: not CTX given");
+            ssl->state = NETDATA_SSL_STATE_FAILED;
+            return false;
+        }
+
+        ssl->conn = SSL_new(ctx);
+        if (!ssl->conn) {
+            netdata_ssl_log_error_queue("SSL_new", ssl);
+            ssl->state = NETDATA_SSL_STATE_FAILED;
+            return false;
+        }
+    }
+
+    if(SSL_set_fd(ssl->conn, fd) != 1) {
+        netdata_ssl_log_error_queue("SSL_set_fd", ssl);
+        ssl->state = NETDATA_SSL_STATE_FAILED;
+        return false;
+    }
+
+    ssl->state = NETDATA_SSL_STATE_INIT;
+
+    ERR_clear_error();
+
+    return true;
+}
+
+void netdata_ssl_close(NETDATA_SSL *ssl) {
+    errno = 0;
+    ssl->ssl_errno = 0;
+
+    if(ssl->conn) {
+        if(SSL_connection(ssl)) {
+            int ret = SSL_shutdown(ssl->conn);
+            if(ret == 0)
+                SSL_shutdown(ssl->conn);
+        }
+
+        SSL_free(ssl->conn);
+
+        ERR_clear_error();
+    }
+
+    *ssl = NETDATA_SSL_UNSET_CONNECTION;
+}
+
+void netdata_ssl_log_error_queue(const char *call, NETDATA_SSL *ssl) {
+    error_limit_static_thread_var(erl, 1, 0);
+    unsigned long err;
+    while((err = ERR_get_error())) {
+        char *code;
+
+        switch (err) {
+            case SSL_ERROR_NONE:
+                code = "SSL_ERROR_NONE";
+                break;
+
+            case SSL_ERROR_SSL:
+                code = "SSL_ERROR_SSL";
+                ssl->state = NETDATA_SSL_STATE_FAILED;
+                break;
+
+            case SSL_ERROR_WANT_READ:
+                code = "SSL_ERROR_WANT_READ";
+                break;
+
+            case SSL_ERROR_WANT_WRITE:
+                code = "SSL_ERROR_WANT_WRITE";
+                break;
+
+            case SSL_ERROR_WANT_X509_LOOKUP:
+                code = "SSL_ERROR_WANT_X509_LOOKUP";
+                break;
+
+            case SSL_ERROR_SYSCALL:
+                code = "SSL_ERROR_SYSCALL";
+                ssl->state = NETDATA_SSL_STATE_FAILED;
+                break;
+
+            case SSL_ERROR_ZERO_RETURN:
+                code = "SSL_ERROR_ZERO_RETURN";
+                break;
+
+            case SSL_ERROR_WANT_CONNECT:
+                code = "SSL_ERROR_WANT_CONNECT";
+                break;
+
+            case SSL_ERROR_WANT_ACCEPT:
+                code = "SSL_ERROR_WANT_ACCEPT";
+                break;
+
+#ifdef SSL_ERROR_WANT_ASYNC
+            case SSL_ERROR_WANT_ASYNC:
+                code = "SSL_ERROR_WANT_ASYNC";
+                break;
+#endif
+
+#ifdef SSL_ERROR_WANT_ASYNC_JOB
+            case SSL_ERROR_WANT_ASYNC_JOB:
+                code = "SSL_ERROR_WANT_ASYNC_JOB";
+                break;
+#endif
+
+#ifdef SSL_ERROR_WANT_CLIENT_HELLO_CB
+            case SSL_ERROR_WANT_CLIENT_HELLO_CB:
+                code = "SSL_ERROR_WANT_CLIENT_HELLO_CB";
+                break;
+#endif
+
+#ifdef SSL_ERROR_WANT_RETRY_VERIFY
+            case SSL_ERROR_WANT_RETRY_VERIFY:
+                code = "SSL_ERROR_WANT_RETRY_VERIFY";
+                break;
+#endif
+
+            default:
+                code = "SSL_ERROR_UNKNOWN";
+                break;
+        }
+
+        char str[1024 + 1];
+        ERR_error_string_n(err, str, 1024);
+        str[1024] = '\0';
+        SOCKET_PEERS peers = netdata_ssl_peers(ssl);
+        error_limit(&erl, "SSL: %s() on socket local [[%s]:%d] <-> remote [[%s]:%d], returned error %lu (%s): %s",
+                    call, peers.local.ip, peers.local.port, peers.peer.ip, peers.peer.port, err, code, str);
+    }
+}
+
+static inline bool is_handshake_complete(NETDATA_SSL *ssl, const char *op) {
+    error_limit_static_thread_var(erl, 1, 0);
+
+    if(unlikely(!ssl->conn)) {
+        internal_error(true, "SSL: trying to %s on a NULL connection", op);
+        return false;
+    }
+
+    switch(ssl->state) {
+        case NETDATA_SSL_STATE_NOT_SSL: {
+            SOCKET_PEERS peers = netdata_ssl_peers(ssl);
+            error_limit(&erl, "SSL: on socket local [[%s]:%d] <-> remote [[%s]:%d], attempt to %s on non-SSL connection",
+                        peers.local.ip, peers.local.port, peers.peer.ip, peers.peer.port, op);
+            return false;
+        }
+
+        case NETDATA_SSL_STATE_INIT: {
+            SOCKET_PEERS peers = netdata_ssl_peers(ssl);
+            error_limit(&erl, "SSL: on socket local [[%s]:%d] <-> remote [[%s]:%d], attempt to %s on an incomplete connection",
+                        peers.local.ip, peers.local.port, peers.peer.ip, peers.peer.port, op);
+            return false;
+        }
+
+        case NETDATA_SSL_STATE_FAILED: {
+            SOCKET_PEERS peers = netdata_ssl_peers(ssl);
+            error_limit(&erl, "SSL: on socket local [[%s]:%d] <-> remote [[%s]:%d], attempt to %s on a failed connection",
+                        peers.local.ip, peers.local.port, peers.peer.ip, peers.peer.port, op);
+            return false;
+        }
+
+        case NETDATA_SSL_STATE_COMPLETE: {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/*
+ * netdata_ssl_read() should return the same as read():
+ *
+ * Positive value: The read() function succeeded and read some bytes. The exact number of bytes read is returned.
+ *
+ * Zero: For files and sockets, a return value of zero signifies end-of-file (EOF), meaning no more data is available
+ *       for reading. For sockets, this usually means the other side has closed the connection.
+ *
+ * -1: An error occurred. The specific error can be found by examining the errno variable.
+ *     EAGAIN or EWOULDBLOCK: The file descriptor is in non-blocking mode, and the read operation would block.
+ *     (These are often the same value, but can be different on some systems.)
+ */
+
+ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num) {
+    errno = 0;
+    ssl->ssl_errno = 0;
+
+    if(unlikely(!is_handshake_complete(ssl, "read")))
+        return -1;
+
+    int bytes = SSL_read(ssl->conn, buf, (int)num);
+
+    if(unlikely(bytes <= 0)) {
+        int err = SSL_get_error(ssl->conn, bytes);
+        netdata_ssl_log_error_queue("SSL_read", ssl);
+        if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+            ssl->ssl_errno = err;
+            errno = EWOULDBLOCK;
+        }
+
+        bytes = -1;  // according to read() or recv()
+    }
+
+    return bytes;
+}
+
+/*
+ * netdata_ssl_write() should return the same as write():
+ *
+ * Positive value: The write() function succeeded and wrote some bytes. The exact number of bytes written is returned.
+ *
+ * Zero: It's technically possible for write() to return zero, indicating that zero bytes were written. However, for a
+ * socket, this generally does not happen unless the size of the data to be written is zero.
+ *
+ * -1: An error occurred. The specific error can be found by examining the errno variable.
+ *     EAGAIN or EWOULDBLOCK: The file descriptor is in non-blocking mode, and the write operation would block.
+ *     (These are often the same value, but can be different on some systems.)
+ */
+
+ssize_t netdata_ssl_write(NETDATA_SSL *ssl, const void *buf, size_t num) {
+    errno = 0;
+    ssl->ssl_errno = 0;
+
+    if(unlikely(!is_handshake_complete(ssl, "write")))
+        return -1;
+
+    int bytes = SSL_write(ssl->conn, (uint8_t *)buf, (int)num);
+
+    if(unlikely(bytes <= 0)) {
+        int err = SSL_get_error(ssl->conn, bytes);
+        netdata_ssl_log_error_queue("SSL_write", ssl);
+        if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+            ssl->ssl_errno = err;
+            errno = EWOULDBLOCK;
+        }
+
+        bytes = -1; // according to write() or send()
+    }
+
+    return bytes;
+}
+
+static inline bool is_handshake_initialized(NETDATA_SSL *ssl, const char *op) {
+    error_limit_static_thread_var(erl, 1, 0);
+
+    if(unlikely(!ssl->conn)) {
+        internal_error(true, "SSL: trying to %s on a NULL connection", op);
+        return false;
+    }
+
+    switch(ssl->state) {
+        case NETDATA_SSL_STATE_NOT_SSL: {
+            SOCKET_PEERS peers = netdata_ssl_peers(ssl);
+            error_limit(&erl, "SSL: on socket local [[%s]:%d] <-> remote [[%s]:%d], attempt to %s on non-SSL connection",
+                        peers.local.ip, peers.local.port, peers.peer.ip, peers.peer.port, op);
+            return false;
+        }
+
+        case NETDATA_SSL_STATE_INIT: {
+            return true;
+        }
+
+        case NETDATA_SSL_STATE_FAILED: {
+            SOCKET_PEERS peers = netdata_ssl_peers(ssl);
+            error_limit(&erl, "SSL: on socket local [[%s]:%d] <-> remote [[%s]:%d], attempt to %s on a failed connection",
+                        peers.local.ip, peers.local.port, peers.peer.ip, peers.peer.port, op);
+            return false;
+        }
+
+        case NETDATA_SSL_STATE_COMPLETE: {
+            SOCKET_PEERS peers = netdata_ssl_peers(ssl);
+            error_limit(&erl, "SSL: on socket local [[%s]:%d] <-> remote [[%s]:%d], attempt to %s on an complete connection",
+                        peers.local.ip, peers.local.port, peers.peer.ip, peers.peer.port, op);
+            return false;
+        }
+    }
+
+    return false;
+}
+
+#define WANT_READ_WRITE_TIMEOUT_MS 10
+
+static inline bool want_read_write_should_retry(NETDATA_SSL *ssl, int err) {
+    int ssl_errno = SSL_get_error(ssl->conn, err);
+    if(ssl_errno == SSL_ERROR_WANT_READ || ssl_errno == SSL_ERROR_WANT_WRITE) {
+        struct pollfd pfds[1] = { [0] = {
+                .fd = SSL_get_rfd(ssl->conn),
+                .events = (short)(((ssl_errno == SSL_ERROR_WANT_READ ) ? POLLIN  : 0) |
+                                  ((ssl_errno == SSL_ERROR_WANT_WRITE) ? POLLOUT : 0)),
+        }};
+
+        if(poll(pfds, 1, WANT_READ_WRITE_TIMEOUT_MS) <= 0)
+            return false; // timeout (0) or error (<0)
+
+        return true; // we have activity, so we should retry
+    }
+
+    return false; // an unknown error
+}
+
+bool netdata_ssl_connect(NETDATA_SSL *ssl) {
+    errno = 0;
+    ssl->ssl_errno = 0;
+
+    if(unlikely(!is_handshake_initialized(ssl, "connect")))
+        return false;
+
+    SSL_set_connect_state(ssl->conn);
+
+    int err;
+    while ((err = SSL_connect(ssl->conn)) != 1) {
+        if(!want_read_write_should_retry(ssl, err))
+            break;
+    }
+
+    if (err != 1) {
+        netdata_ssl_log_error_queue("SSL_connect", ssl);
+        ssl->state = NETDATA_SSL_STATE_FAILED;
+        return false;
+    }
+
+    ssl->state = NETDATA_SSL_STATE_COMPLETE;
+    return true;
+}
+
+bool netdata_ssl_accept(NETDATA_SSL *ssl) {
+    errno = 0;
+    ssl->ssl_errno = 0;
+
+    if(unlikely(!is_handshake_initialized(ssl, "accept")))
+        return false;
+
+    SSL_set_accept_state(ssl->conn);
+
+    int err;
+    while ((err = SSL_accept(ssl->conn)) != 1) {
+        if(!want_read_write_should_retry(ssl, err))
+            break;
+    }
+
+    if (err != 1) {
+        netdata_ssl_log_error_queue("SSL_accept", ssl);
+        ssl->state = NETDATA_SSL_STATE_FAILED;
+        return false;
+    }
+
+    ssl->state = NETDATA_SSL_STATE_COMPLETE;
+    return true;
+}
 
 /**
  * Info Callback
@@ -20,7 +396,7 @@ int netdata_ssl_validate_server =  NETDATA_SSL_VALID_CERTIFICATE;
  * @param where the variable with the flags set.
  * @param ret the return of the caller
  */
-static void security_info_callback(const SSL *ssl, int where, int ret __maybe_unused) {
+static void netdata_ssl_info_callback(const SSL *ssl, int where, int ret __maybe_unused) {
     (void)ssl;
     if (where & SSL_CB_ALERT) {
         debug(D_WEB_CLIENT,"SSL INFO CALLBACK %s %s", SSL_alert_type_string(ret), SSL_alert_desc_string_long(ret));
@@ -32,8 +408,8 @@ static void security_info_callback(const SSL *ssl, int where, int ret __maybe_un
  *
  * Starts the openssl library for the Netdata.
  */
-void security_openssl_library()
-{
+void netdata_ssl_initialize_openssl() {
+
 #if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
 # if (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097)
     OPENSSL_config(NULL);
@@ -42,10 +418,13 @@ void security_openssl_library()
     SSL_load_error_strings();
 
     SSL_library_init();
+
 #else
+
     if (OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG, NULL) != 1) {
         error("SSL library cannot be initialized.");
     }
+
 #endif
 }
 
@@ -59,7 +438,7 @@ void security_openssl_library()
  *
  * @return it returns the version number.
  */
-int tls_select_version(const char *lversion) {
+static int netdata_ssl_select_tls_version(const char *lversion) {
     if (!strcmp(lversion, "1") || !strcmp(lversion, "1.0"))
         return TLS1_VERSION;
     else if (!strcmp(lversion, "1.1"))
@@ -80,43 +459,13 @@ int tls_select_version(const char *lversion) {
 #endif
 
 /**
- * OpenSSL common options
- *
- * Clients and SERVER have common options, this function is responsible to set them in the context.
- *
- * @param ctx the initialized SSL context.
- * @param side 0 means server, and 1 client.
- */
-void security_openssl_common_options(SSL_CTX *ctx, int side) {
-#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_110
-    if (!side) {
-        int version =  tls_select_version(tls_version) ;
-#endif
-#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
-        SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
-#else
-        SSL_CTX_set_min_proto_version(ctx, TLS1_VERSION);
-        SSL_CTX_set_max_proto_version(ctx, version);
-
-        if(tls_ciphers  && strcmp(tls_ciphers, "none") != 0) {
-            if (!SSL_CTX_set_cipher_list(ctx, tls_ciphers)) {
-                error("SSL error. cannot set the cipher list");
-            }
-        }
-    }
-#endif
-
-    SSL_CTX_set_mode(ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
-}
-
-/**
  * Initialize Openssl Client
  *
  * Starts the client context with TLS 1.2.
  *
  * @return It returns the context on success or NULL otherwise
  */
-SSL_CTX * security_initialize_openssl_client() {
+SSL_CTX * netdata_ssl_create_client_ctx(unsigned long mode) {
     SSL_CTX *ctx;
 #if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
     ctx = SSL_CTX_new(SSLv23_client_method());
@@ -138,6 +487,9 @@ SSL_CTX * security_initialize_openssl_client() {
 #endif
     }
 
+    if(mode)
+        SSL_CTX_set_mode(ctx, mode);
+
     return ctx;
 }
 
@@ -148,7 +500,7 @@ SSL_CTX * security_initialize_openssl_client() {
  *
  * @return It returns the context on success or NULL otherwise
  */
-static SSL_CTX * security_initialize_openssl_server() {
+static SSL_CTX * netdata_ssl_create_server_ctx(unsigned long mode) {
     SSL_CTX *ctx;
     char lerror[512];
 	static int netdata_id_context = 1;
@@ -171,7 +523,19 @@ static SSL_CTX * security_initialize_openssl_server() {
 
     SSL_CTX_use_certificate_chain_file(ctx, netdata_ssl_security_cert);
 #endif
-    security_openssl_common_options(ctx, 0);
+
+#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+    SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
+#else
+    SSL_CTX_set_min_proto_version(ctx, TLS1_VERSION);
+    SSL_CTX_set_max_proto_version(ctx, netdata_ssl_select_tls_version(tls_version));
+
+    if(tls_ciphers  && strcmp(tls_ciphers, "none") != 0) {
+        if (!SSL_CTX_set_cipher_list(ctx, tls_ciphers)) {
+            error("SSL error. cannot set the cipher list");
+        }
+    }
+#endif
 
     SSL_CTX_use_PrivateKey_file(ctx, netdata_ssl_security_key,SSL_FILETYPE_PEM);
 
@@ -183,12 +547,14 @@ static SSL_CTX * security_initialize_openssl_server() {
     }
 
 	SSL_CTX_set_session_id_context(ctx,(void*)&netdata_id_context,(unsigned int)sizeof(netdata_id_context));
-    SSL_CTX_set_info_callback(ctx,security_info_callback);
+    SSL_CTX_set_info_callback(ctx, netdata_ssl_info_callback);
 
 #if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_095)
 	SSL_CTX_set_verify_depth(ctx,1);
 #endif
     debug(D_WEB_CLIENT,"SSL GLOBAL CONTEXT STARTED\n");
+
+    SSL_CTX_set_mode(ctx, mode);
 
     return ctx;
 }
@@ -203,39 +569,54 @@ static SSL_CTX * security_initialize_openssl_server() {
  *      NETDATA_SSL_CONTEXT_STREAMING - Starts the streaming context.
  *      NETDATA_SSL_CONTEXT_EXPORTING - Starts the OpenTSDB context
  */
-void security_start_ssl(int selector) {
+void netdata_ssl_initialize_ctx(int selector) {
     static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
     netdata_spinlock_lock(&sp);
 
     switch (selector) {
-        case NETDATA_SSL_CONTEXT_SERVER: {
-            if(!netdata_ssl_srv_ctx) {
+        case NETDATA_SSL_WEB_SERVER_CTX: {
+            if(!netdata_ssl_web_server_ctx) {
                 struct stat statbuf;
                 if (stat(netdata_ssl_security_key, &statbuf) || stat(netdata_ssl_security_cert, &statbuf))
                     info("To use encryption it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
                 else {
-                    netdata_ssl_srv_ctx = security_initialize_openssl_server();
-                    SSL_CTX_set_mode(netdata_ssl_srv_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);
+                    netdata_ssl_web_server_ctx = netdata_ssl_create_server_ctx(
+                            SSL_MODE_ENABLE_PARTIAL_WRITE |
+                            SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |
+                            // SSL_MODE_AUTO_RETRY |
+                            0);
+
+                    if(netdata_ssl_web_server_ctx && !netdata_ssl_validate_certificate)
+                        SSL_CTX_set_verify(netdata_ssl_web_server_ctx, SSL_VERIFY_NONE, NULL);
                 }
             }
             break;
         }
 
-        case NETDATA_SSL_CONTEXT_STREAMING: {
-            if(!netdata_ssl_client_ctx) {
-                netdata_ssl_client_ctx = security_initialize_openssl_client();
+        case NETDATA_SSL_STREAMING_SENDER_CTX: {
+            if(!netdata_ssl_streaming_sender_ctx) {
                 //This is necessary for the stream, because it is working sometimes with nonblock socket.
                 //It returns the bitmask after to change, there is not any description of errors in the documentation
-                SSL_CTX_set_mode(netdata_ssl_client_ctx,
-                                 SSL_MODE_ENABLE_PARTIAL_WRITE | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |
-                                 SSL_MODE_AUTO_RETRY);
+                netdata_ssl_streaming_sender_ctx = netdata_ssl_create_client_ctx(
+                        SSL_MODE_ENABLE_PARTIAL_WRITE |
+                        SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |
+                        // SSL_MODE_AUTO_RETRY |
+                        0
+                );
+
+                if(netdata_ssl_streaming_sender_ctx && !netdata_ssl_validate_certificate_sender)
+                    SSL_CTX_set_verify(netdata_ssl_streaming_sender_ctx, SSL_VERIFY_NONE, NULL);
             }
             break;
         }
 
-        case NETDATA_SSL_CONTEXT_EXPORTING: {
-            if(!netdata_ssl_exporting_ctx)
-                netdata_ssl_exporting_ctx = security_initialize_openssl_client();
+        case NETDATA_SSL_EXPORTING_CTX: {
+            if(!netdata_ssl_exporting_ctx) {
+                netdata_ssl_exporting_ctx = netdata_ssl_create_client_ctx(0);
+
+                if(netdata_ssl_exporting_ctx && !netdata_ssl_validate_certificate)
+                    SSL_CTX_set_verify(netdata_ssl_exporting_ctx, SSL_VERIFY_NONE, NULL);
+            }
             break;
         }
     }
@@ -248,81 +629,26 @@ void security_start_ssl(int selector) {
  *
  * Clean all the allocated contexts from netdata.
  */
-void security_clean_openssl()
+void netdata_ssl_cleanup()
 {
-    if (netdata_ssl_srv_ctx) {
-        SSL_CTX_free(netdata_ssl_srv_ctx);
+    if (netdata_ssl_web_server_ctx) {
+        SSL_CTX_free(netdata_ssl_web_server_ctx);
+        netdata_ssl_web_server_ctx = NULL;
     }
 
-    if (netdata_ssl_client_ctx) {
-        SSL_CTX_free(netdata_ssl_client_ctx);
+    if (netdata_ssl_streaming_sender_ctx) {
+        SSL_CTX_free(netdata_ssl_streaming_sender_ctx);
+        netdata_ssl_streaming_sender_ctx = NULL;
     }
 
     if (netdata_ssl_exporting_ctx) {
         SSL_CTX_free(netdata_ssl_exporting_ctx);
+        netdata_ssl_exporting_ctx = NULL;
     }
 
 #if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
     ERR_free_strings();
 #endif
-}
-
-/**
- * Process accept
- *
- * Process the SSL handshake with the client case it is necessary.
- *
- * @param ssl is a pointer for the SSL structure
- * @param msg is a copy of the first 8 bytes of the initial message received
- *
- * @return it returns 0 case it performs the handshake, 8 case it is clean connection
- *  and another integer power of 2 otherwise.
- */
-int security_process_accept(SSL *ssl,int msg) {
-    int sock = SSL_get_fd(ssl);
-    int test;
-    if (msg > 0x17)
-    {
-        return NETDATA_SSL_NO_HANDSHAKE;
-    }
-
-    ERR_clear_error();
-    if ((test = SSL_accept(ssl)) <= 0) {
-         int sslerrno = SSL_get_error(ssl, test);
-         switch(sslerrno) {
-             case SSL_ERROR_WANT_READ:
-             {
-                 error("SSL handshake did not finish and it wanna read on socket %d!", sock);
-                 return NETDATA_SSL_WANT_READ;
-             }
-             case SSL_ERROR_WANT_WRITE:
-             {
-                 error("SSL handshake did not finish and it wanna read on socket %d!", sock);
-                 return NETDATA_SSL_WANT_WRITE;
-             }
-             case SSL_ERROR_NONE:
-             case SSL_ERROR_SSL:
-             case SSL_ERROR_SYSCALL:
-             default:
-			 {
-                 u_long err;
-                 char buf[256];
-                 int counter = 0;
-                 while ((err = ERR_get_error()) != 0) {
-                     ERR_error_string_n(err, buf, sizeof(buf));
-                     error("%d SSL Handshake error (%s) on socket %d", counter++, ERR_error_string((long)SSL_get_error(ssl, test), NULL), sock);
-			     }
-                 return NETDATA_SSL_NO_HANDSHAKE;
-			 }
-         }
-    }
-
-    if (SSL_is_init_finished(ssl))
-    {
-        debug(D_WEB_CLIENT_ACCESS,"SSL Handshake finished %s errno %d on socket fd %d", ERR_error_string((long)SSL_get_error(ssl, test), NULL), errno, sock);
-    }
-
-    return NETDATA_SSL_HANDSHAKE_COMPLETE;
 }
 
 /**

@@ -166,7 +166,7 @@ struct sender_state {
     struct compressor_state *compressor;
 #endif
 #ifdef ENABLE_HTTPS
-    struct netdata_ssl ssl;                     // structure used to encrypt the connection
+    NETDATA_SSL ssl;                     // structure used to encrypt the connection
 #endif
 
     struct {
@@ -221,6 +221,7 @@ struct sender_state {
 
 struct receiver_state {
     RRDHOST *host;
+    pid_t tid;
     netdata_thread_t thread;
     int fd;
     char *key;
@@ -266,7 +267,7 @@ struct receiver_state {
     } config;
 
 #ifdef ENABLE_HTTPS
-    struct netdata_ssl ssl;
+    NETDATA_SSL ssl;
 #endif
 #ifdef ENABLE_COMPRESSION
     unsigned int rrdpush_compression;
@@ -278,8 +279,10 @@ struct receiver_state {
 
 struct rrdpush_destinations {
     STRING *destination;
+    bool ssl;
 
     const char *last_error;
+    time_t last_attempt;
     time_t postpone_reconnection_until;
     STREAM_HANDSHAKE last_handshake;
 
@@ -351,7 +354,9 @@ void rrdpush_signal_sender_to_wake_up(struct sender_state *s);
 struct compressor_state *create_compressor();
 struct decompressor_state *create_decompressor();
 #endif
-
+void rrdpush_reset_destinations_postpone_time(RRDHOST *host);
+const char *stream_handshake_error_to_string(STREAM_HANDSHAKE handshake_error);
+void stream_capabilities_to_json_array(BUFFER *wb, STREAM_CAPABILITIES caps, const char *key);
 void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, const char *status);
 void log_receiver_capabilities(struct receiver_state *rpt);
 void log_sender_capabilities(struct sender_state *s);

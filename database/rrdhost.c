@@ -257,8 +257,7 @@ static void rrdhost_initialize_rrdpush_sender(RRDHOST *host,
         rrdhost_streaming_sender_structures_init(host);
 
 #ifdef ENABLE_HTTPS
-        host->sender->ssl.conn = NULL;
-        host->sender->ssl.flags = NETDATA_SSL_START;
+        host->sender->ssl = NETDATA_SSL_UNSET_CONNECTION;
 #endif
 
         host->rrdpush_send_destination = strdupz(rrdpush_destination);
