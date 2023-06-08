@@ -340,6 +340,7 @@ int is_legacy = 1;
 
     host->rrdpush_seconds_to_replicate = rrdpush_seconds_to_replicate;
     host->rrdpush_replication_step = rrdpush_replication_step;
+    host->rrdpush_receiver_replication_percent = 100.0;
 
     switch(memory_mode) {
         default:

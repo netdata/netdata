@@ -423,6 +423,58 @@ static void rrdpush_receiver_replication_reset(RRDHOST *host) {
     rrdhost_receiver_replicating_charts_zero(host);
 }
 
+void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST *host, const char *key, time_t now __maybe_unused) {
+    size_t receiver_hops = host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1;
+
+    netdata_mutex_lock(&host->receiver_lock);
+
+    buffer_json_member_add_object(wb, key);
+    buffer_json_member_add_uint64(wb, "hops", receiver_hops);
+
+    bool online = host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
+    buffer_json_member_add_boolean(wb, "online", online);
+
+    if(host->child_connect_time || host->child_disconnected_time) {
+        time_t since = MAX(host->child_connect_time, host->child_disconnected_time);
+        buffer_json_member_add_time_t(wb, "since", since);
+        buffer_json_member_add_time_t(wb, "age", now - since);
+    }
+
+    if(!online && host->rrdpush_last_receiver_exit_reason)
+        buffer_json_member_add_string(wb, "reason", host->rrdpush_last_receiver_exit_reason);
+
+    if(host != localhost && host->receiver) {
+        buffer_json_member_add_object(wb, "replication");
+        {
+            size_t instances = rrdhost_receiver_replicating_charts(host);
+            buffer_json_member_add_boolean(wb, "in_progress", instances);
+            buffer_json_member_add_double(wb, "completion", host->rrdpush_receiver_replication_percent);
+            buffer_json_member_add_uint64(wb, "instances", instances);
+        }
+        buffer_json_object_close(wb); // replication
+
+        buffer_json_member_add_object(wb, "source");
+        {
+
+            char buf[1024 + 1];
+            SOCKET_PEERS peers = socket_peers(host->receiver->fd);
+            bool ssl = SSL_connection(&host->receiver->ssl);
+
+            snprintfz(buf, 1024, "[%s]:%d%s", peers.local.ip, peers.local.port, ssl ? ":SSL" : "");
+            buffer_json_member_add_string(wb, "local", buf);
+
+            snprintfz(buf, 1024, "[%s]:%d%s", peers.peer.ip, peers.peer.port, ssl ? ":SSL" : "");
+            buffer_json_member_add_string(wb, "remote", buf);
+
+            stream_capabilities_to_json_array(wb, host->receiver->capabilities, "capabilities");
+        }
+        buffer_json_object_close(wb); // source
+    }
+    buffer_json_object_close(wb); // collection
+
+    netdata_mutex_unlock(&host->receiver_lock);
+}
+
 static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
     bool signal_rrdcontext = false;
     bool set_this = false;
@@ -496,6 +548,7 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
 
             rrdhost_flag_set(host, RRDHOST_FLAG_ORPHAN);
             host->receiver = NULL;
+            host->rrdpush_last_receiver_exit_reason = rpt->exit.reason;
         }
 
         netdata_mutex_unlock(&host->receiver_lock);
@@ -544,6 +597,18 @@ bool stop_streaming_receiver(RRDHOST *host, const char *reason) {
     netdata_mutex_unlock(&host->receiver_lock);
 
     return ret;
+}
+
+static void rrdpush_send_error_on_taken_over_connection(struct receiver_state *rpt, const char *msg) {
+    send_timeout(
+#ifdef ENABLE_HTTPS
+            &rpt->ssl,
+#endif
+            rpt->fd,
+            (char *)msg,
+            strlen(msg),
+            0,
+            5);
 }
 
 void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, const char *status) {
@@ -677,11 +742,13 @@ static void rrdpush_receive(struct receiver_state *rpt)
 
         if(!host) {
             rrdpush_receive_log_status(rpt, "failed to find/create host structure", "INTERNAL ERROR DROPPING CONNECTION");
+            rrdpush_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_INTERNAL_ERROR);
             goto cleanup;
         }
 
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
             rrdpush_receive_log_status(rpt, "host is initializing", "INITIALIZATION IN PROGRESS RETRY LATER");
+            rrdpush_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_INITIALIZATION);
             goto cleanup;
         }
 
@@ -690,6 +757,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
 
         if(!rrdhost_set_receiver(host, rpt)) {
             rrdpush_receive_log_status(rpt, "host is already served by another receiver", "DUPLICATE RECEIVER DROPPING CONNECTION");
+            rrdpush_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_ALREADY_STREAMING);
             goto cleanup;
         }
     }

@@ -375,7 +375,7 @@ bool rrdset_push_chart_definition_now(RRDSET *st) {
 
     BUFFER *wb = sender_start(host->sender);
     rrdpush_send_chart_definition(wb, st);
-    sender_commit(host->sender, wb);
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
     sender_thread_buffer_free();
 
     return true;
@@ -443,7 +443,7 @@ void rrdset_push_metrics_finished(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
         buffer_fast_strcat(rsb->wb, PLUGINSD_KEYWORD_END_V2 "\n", sizeof(PLUGINSD_KEYWORD_END_V2) - 1 + 1);
     }
 
-    sender_commit(st->rrdhost->sender, rsb->wb);
+    sender_commit(st->rrdhost->sender, rsb->wb, STREAM_TRAFFIC_TYPE_DATA);
 
     *rsb = (RRDSET_STREAM_BUFFER){ .wb = NULL, };
 }
@@ -483,7 +483,7 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
     if(unlikely(!exposed_upstream)) {
         BUFFER *wb = sender_start(host->sender);
         replication_in_progress = rrdpush_send_chart_definition(wb, st);
-        sender_commit(host->sender, wb);
+        sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
     }
 
     if(replication_in_progress)
@@ -514,7 +514,7 @@ void rrdpush_send_host_labels(RRDHOST *host) {
     rrdlabels_walkthrough_read(host->rrdlabels, send_labels_callback, wb);
     buffer_sprintf(wb, "OVERWRITE %s\n", "labels");
 
-    sender_commit(host->sender, wb);
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
 
     sender_thread_buffer_free();
 }
@@ -533,7 +533,7 @@ void rrdpush_claimed_id(RRDHOST *host)
     buffer_sprintf(wb, "CLAIMED_ID %s %s\n", host->machine_guid, (host->aclk_state.claimed_id ? host->aclk_state.claimed_id : "NULL") );
 
     rrdhost_aclk_state_unlock(host);
-    sender_commit(host->sender, wb);
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
 
     sender_thread_buffer_free();
 }
@@ -706,7 +706,7 @@ int rrdpush_receiver_permission_denied(struct web_client *w) {
     // we always respond with the same message and error code
     // to prevent an attacker from gaining info about the error
     buffer_flush(w->response.data);
-    buffer_sprintf(w->response.data, "You are not permitted to access this. Check the logs for more info.");
+    buffer_strcat(w->response.data, START_STREAMING_ERROR_NOT_PERMITTED);
     return HTTP_RESP_UNAUTHORIZED;
 }
 
@@ -714,7 +714,7 @@ int rrdpush_receiver_too_busy_now(struct web_client *w) {
     // we always respond with the same message and error code
     // to prevent an attacker from gaining info about the error
     buffer_flush(w->response.data);
-    buffer_sprintf(w->response.data, "The server is too busy now to accept this request. Try later.");
+    buffer_strcat(w->response.data, START_STREAMING_ERROR_BUSY_TRY_LATER);
     return HTTP_RESP_SERVICE_UNAVAILABLE;
 }
 
@@ -1146,7 +1146,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
 
             // Have not set WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET - caller should clean up
             buffer_flush(w->response.data);
-            buffer_strcat(w->response.data, "This GUID is already streaming to this server");
+            buffer_strcat(w->response.data, START_STREAMING_ERROR_ALREADY_STREAMING);
             receiver_state_free(rpt);
             return HTTP_RESP_CONFLICT;
         }
@@ -1191,15 +1191,18 @@ static struct {
     { STREAM_HANDSHAKE_OK_V3, "OK_V3" },
     { STREAM_HANDSHAKE_OK_V2, "OK_V2" },
     { STREAM_HANDSHAKE_OK_V1, "OK_V1" },
-    { STREAM_HANDSHAKE_ERROR_BAD_HANDSHAKE, "ERROR_BAD_HANDSHAKE" },
-    { STREAM_HANDSHAKE_ERROR_LOCALHOST, "ERROR_LOCALHOST" },
-    { STREAM_HANDSHAKE_ERROR_ALREADY_CONNECTED, "ERROR_ALREADY_CONNECTED" },
-    { STREAM_HANDSHAKE_ERROR_DENIED, "ERROR_DENIED" },
-    { STREAM_HANDSHAKE_ERROR_SEND_TIMEOUT, "ERROR_SEND_TIMEOUT" },
-    { STREAM_HANDSHAKE_ERROR_RECEIVE_TIMEOUT, "ERROR_RECEIVE_TIMEOUT" },
-    { STREAM_HANDSHAKE_ERROR_INVALID_CERTIFICATE, "ERROR_INVALID_CERTIFICATE" },
-    { STREAM_HANDSHAKE_ERROR_SSL_ERROR, "ERROR_SSL_ERROR" },
-    { STREAM_HANDSHAKE_ERROR_CANT_CONNECT, "ERROR_CANT_CONNECT" },
+    { STREAM_HANDSHAKE_ERROR_BAD_HANDSHAKE, "BAD HANDSHAKE" },
+    { STREAM_HANDSHAKE_ERROR_LOCALHOST, "LOCALHOST" },
+    { STREAM_HANDSHAKE_ERROR_ALREADY_CONNECTED, "ALREADY CONNECTED" },
+    { STREAM_HANDSHAKE_ERROR_DENIED, "DENIED" },
+    { STREAM_HANDSHAKE_ERROR_SEND_TIMEOUT, "SEND TIMEOUT" },
+    { STREAM_HANDSHAKE_ERROR_RECEIVE_TIMEOUT, "RECEIVE TIMEOUT" },
+    { STREAM_HANDSHAKE_ERROR_INVALID_CERTIFICATE, "INVALID CERTIFICATE" },
+    { STREAM_HANDSHAKE_ERROR_SSL_ERROR, "SSL ERROR" },
+    { STREAM_HANDSHAKE_ERROR_CANT_CONNECT, "CANT CONNECT" },
+    { STREAM_HANDSHAKE_BUSY_TRY_LATER, "BUSY TRY LATER" },
+    { STREAM_HANDSHAKE_INTERNAL_ERROR, "INTERNAL ERROR" },
+    { STREAM_HANDSHAKE_INITIALIZATION, "INITIALIZING" },
     { 0, NULL },
 };
 
