@@ -803,5 +803,8 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
 
     buffer_json_finalize(wb);
 
+    if(callback)
+        callback(wb, HTTP_RESP_OK, callback_data);
+
     return HTTP_RESP_OK;
 }
