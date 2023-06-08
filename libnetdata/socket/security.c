@@ -23,7 +23,7 @@ static SOCKET_PEERS netdata_ssl_peers(NETDATA_SSL *ssl) {
     return socket_peers(sock_fd);
 }
 
-bool netdata_ssl_open(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd) {
+bool netdata_ssl_open_ext(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd, const unsigned char *alpn_protos, unsigned int alpn_protos_len) {
     errno = 0;
     ssl->ssl_errno = 0;
 
@@ -52,6 +52,8 @@ bool netdata_ssl_open(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd) {
             ssl->state = NETDATA_SSL_STATE_FAILED;
             return false;
         }
+        if (alpn_protos && alpn_protos_len > 0)
+            SSL_set_alpn_protos(ssl->conn, alpn_protos, alpn_protos_len);
     }
 
     if(SSL_set_fd(ssl->conn, fd) != 1) {
@@ -65,6 +67,10 @@ bool netdata_ssl_open(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd) {
     ERR_clear_error();
 
     return true;
+}
+
+bool netdata_ssl_open(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd) {
+    return netdata_ssl_open_ext(ssl, ctx, fd, NULL, 0);
 }
 
 void netdata_ssl_close(NETDATA_SSL *ssl) {
