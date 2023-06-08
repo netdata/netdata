@@ -202,6 +202,7 @@ static inline char *health_config_add_key_to_values(char *value) {
     char *s = value;
     size_t i = 0;
 
+    key[0] = '\0';
     while(*s) {
         if (*s == '=') {
             //hold the key
