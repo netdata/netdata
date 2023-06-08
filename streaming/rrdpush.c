@@ -515,6 +515,17 @@ void rrdpush_send_host_labels(RRDHOST *host) {
     rrdlabels_walkthrough_read(host->rrdlabels, send_labels_callback, wb);
     buffer_sprintf(wb, "OVERWRITE %s\n", "labels");
 
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+
+    sender_thread_buffer_free();
+}
+
+void rrdpush_send_global_functions(RRDHOST *host) {
+    if(!stream_has_capability(host->sender, STREAM_CAP_FUNCTIONS))
+        return;
+
+    BUFFER *wb = sender_start(host->sender);
+
     rrd_functions_expose_global_rrdpush(host, wb);
 
     sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
@@ -522,8 +533,7 @@ void rrdpush_send_host_labels(RRDHOST *host) {
     sender_thread_buffer_free();
 }
 
-void rrdpush_claimed_id(RRDHOST *host)
-{
+void rrdpush_send_claimed_id(RRDHOST *host) {
     if(!stream_has_capability(host->sender, STREAM_CAP_CLAIM))
         return;
 

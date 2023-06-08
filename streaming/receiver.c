@@ -93,7 +93,7 @@ PARSER_RC streaming_claimed_id(char **words, size_t num_words, void *user)
 
     rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_CLAIMID |RRDHOST_FLAG_METADATA_UPDATE);
 
-    rrdpush_claimed_id(host);
+    rrdpush_send_claimed_id(host);
 
     return PARSER_RC_OK;
 }
