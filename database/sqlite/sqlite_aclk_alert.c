@@ -17,7 +17,7 @@ void update_filtered(ALARM_ENTRY *ae, uint32_t unique_id, char *uuid_str) {
 }
 
 #define SQL_SELECT_ALERT_BY_UNIQUE_ID "SELECT hl.unique_id FROM health_log hl, alert_hash ah WHERE hl.unique_id = %u " \
-                            "AND hl.config_hash_id = ah.hash_id AND host_id = @host_id" \
+                            "AND hl.config_hash_id = ah.hash_id AND host_id = @host_id " \
                             "AND ah.warn IS NULL AND ah.crit IS NULL;"
 
 static inline bool is_event_from_alert_variable_config(uint32_t unique_id, uuid_t *host_id) {
@@ -58,7 +58,7 @@ static inline bool is_event_from_alert_variable_config(uint32_t unique_id, uuid_
 
 #define SQL_SELECT_ALERT_BY_ID  "SELECT hl.new_status, hl.config_hash_id, hl.unique_id FROM health_log hl, aclk_alert_%s aa " \
                                 "WHERE hl.unique_id = aa.filtered_alert_unique_id " \
-                                "AND hl.alarm_id = %u AND host_id = @host_id" \
+                                "AND hl.alarm_id = %u AND host_id = @host_id " \
                                 "ORDER BY alarm_event_id DESC LIMIT 1;"
 
 int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
@@ -463,18 +463,26 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
     sqlite3_stmt *res = NULL;
     int rc;
 
-    buffer_sprintf(sql,"delete from aclk_alert_%s; " \
-                       "insert into aclk_alert_%s (alert_unique_id, date_created, filtered_alert_unique_id) " \
-                       "select unique_id alert_unique_id, unixepoch(), unique_id alert_unique_id from health_log " \
-                       "where new_status <> 0 and new_status <> -2 and config_hash_id is not null and updated_by_id = 0 " \
-                       "and host_id = @host_id order by unique_id asc on conflict (alert_unique_id) do nothing;", uuid_str, uuid_str);
+    netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
 
-    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
+    buffer_sprintf(sql, "delete from aclk_alert_%s; ", uuid_str);
+    if (unlikely(db_execute(db_meta, buffer_tostring(sql)))) {
+        netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+        buffer_free(sql);
+        return;
+    }
+
+    buffer_flush(sql);
+    buffer_sprintf(sql, "insert into aclk_alert_%s (alert_unique_id, date_created, filtered_alert_unique_id) " \
+                   "select unique_id alert_unique_id, unixepoch(), unique_id alert_unique_id from health_log " \
+                   "where new_status <> 0 and new_status <> -2 and config_hash_id is not null and updated_by_id = 0 " \
+                   "and host_id = @host_id order by unique_id asc on conflict (alert_unique_id) do nothing;", uuid_str);
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement when trying to queue existing alerts.");
         netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+        buffer_free(sql);
         return;
     }
 
@@ -483,6 +491,7 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
         error_report("Failed to bind host_id for when trying to queue existing alerts.");
         sqlite3_finalize(res);
         netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+        buffer_free(sql);
         return;
     }
 
