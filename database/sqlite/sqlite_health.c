@@ -417,7 +417,7 @@ void sql_health_alarm_log_count(RRDHOST *host) {
 /* Health related SQL queries
    Cleans up the health_log table on a non-claimed host
 */
-#define SQL_CLEANUP_HEALTH_LOG_NOT_CLAIMED(guid,limit) "DELETE FROM health_log_%s ORDER BY unique_id ASC LIMIT %lu;", guid, limit
+#define SQL_CLEANUP_HEALTH_LOG_NOT_CLAIMED(limit) "DELETE FROM health_log where host_id = @host_id ORDER BY unique_id ASC LIMIT %lu;", limit
 void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host, size_t rotate_every) {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -432,11 +432,18 @@ void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host, size_t rotate_every
     char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG_NOT_CLAIMED(uuid_str, (unsigned long int) (host->health.health_log_entries_written - rotate_every)));
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG_NOT_CLAIMED((unsigned long int) (host->health.health_log_entries_written - rotate_every)));
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to cleanup health log table");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id for SQL_CLEANUP_HEALTH_LOG_NOT_CLAIMED.");
+        sqlite3_finalize(res);
         return;
     }
 
@@ -459,7 +466,7 @@ void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host, size_t rotate_every
 /* Health related SQL queries
    Cleans up the health_log table on a claimed host
 */
-#define SQL_CLEANUP_HEALTH_LOG_CLAIMED(guid, guid2, guid3, limit) "DELETE from health_log_%s WHERE unique_id NOT IN (SELECT filtered_alert_unique_id FROM aclk_alert_%s) AND unique_id IN (SELECT unique_id FROM health_log_%s ORDER BY unique_id asc LIMIT %lu);", guid, guid2, guid3, limit
+#define SQL_CLEANUP_HEALTH_LOG_CLAIMED(guid, limit) "DELETE from health_log WHERE host_id = ?1 AND unique_id NOT IN (SELECT filtered_alert_unique_id FROM aclk_alert_%s) AND unique_id IN (SELECT unique_id FROM health_log WHERE host_id = ?2 ORDER BY unique_id asc LIMIT %lu);", guid, limit
 void sql_health_alarm_log_cleanup_claimed(RRDHOST *host, size_t rotate_every) {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -480,11 +487,25 @@ void sql_health_alarm_log_cleanup_claimed(RRDHOST *host, size_t rotate_every) {
         return;
     }
 
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG_CLAIMED(uuid_str, uuid_str, uuid_str, (unsigned long int) (host->health.health_log_entries_written - rotate_every)));
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG_CLAIMED(uuid_str, (unsigned long int) (host->health.health_log_entries_written - rotate_every)));
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to cleanup health log table");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind first host_id for SQL_CLEANUP_HEALTH_LOG_CLAIMED.");
+        sqlite3_finalize(res);
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 2, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind second host_id for SQL_CLEANUP_HEALTH_LOG_CLAIMED.");
+        sqlite3_finalize(res);
         return;
     }
 
