@@ -23,6 +23,7 @@ typedef void (*rrd_call_function_async_callback)(BUFFER *wb, int code, void *cal
 int rrd_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *name, rrd_call_function_async_callback, void *callback_data);
 
 void rrd_functions_expose_rrdpush(RRDSET *st, BUFFER *wb);
+void rrd_functions_expose_global_rrdpush(RRDHOST *host, BUFFER *wb);
 
 void chart_functions2json(RRDSET *st, BUFFER *wb, int tabs, const char *kq, const char *sq);
 void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst);

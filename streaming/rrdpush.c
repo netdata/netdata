@@ -504,6 +504,7 @@ static int send_labels_callback(const char *name, const char *value, RRDLABEL_SR
     buffer_sprintf(wb, "LABEL \"%s\" = %d \"%s\"\n", name, ls, value);
     return 1;
 }
+
 void rrdpush_send_host_labels(RRDHOST *host) {
     if(unlikely(!rrdhost_can_send_definitions_to_parent(host)
                  || !stream_has_capability(host->sender, STREAM_CAP_HLABELS)))
@@ -513,6 +514,8 @@ void rrdpush_send_host_labels(RRDHOST *host) {
 
     rrdlabels_walkthrough_read(host->rrdlabels, send_labels_callback, wb);
     buffer_sprintf(wb, "OVERWRITE %s\n", "labels");
+
+    rrd_functions_expose_global_rrdpush(host, wb);
 
     sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
 

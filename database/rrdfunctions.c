@@ -480,6 +480,22 @@ void rrd_functions_expose_rrdpush(RRDSET *st, BUFFER *wb) {
     dfe_done(tmp);
 }
 
+void rrd_functions_expose_global_rrdpush(RRDHOST *host, BUFFER *wb) {
+    struct rrd_collector_function *tmp;
+    dfe_start_read(host->functions, tmp) {
+        if(!(tmp->options & RRD_FUNCTION_GLOBAL))
+            continue;
+
+        buffer_sprintf(wb
+                , PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\"\n"
+                , tmp_dfe.name
+                , tmp->timeout
+                , string2str(tmp->help)
+        );
+    }
+    dfe_done(tmp);
+}
+
 struct rrd_function_call_wait {
     bool free_with_signal;
     bool data_are_ready;
