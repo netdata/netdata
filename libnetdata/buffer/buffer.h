@@ -921,4 +921,49 @@ static inline void buffer_json_array_close(BUFFER *wb) {
     _buffer_json_depth_pop(wb);
 }
 
+typedef enum {
+    RRDF_FIELD_OPTS_DEFAULT      = 0,
+    RRDF_FIELD_OPTS_UNIQUE_KEY   = (1 << 0), // the field is the unique key of the row
+    RRDF_FIELD_OPTS_VISIBLE      = (1 << 1), // the field should be visible by default
+    RRDF_FIELD_OPTS_SORTABLE     = (1 << 2), // the field should be sortable by users
+    RRDF_FIELD_OPTS_STICKY       = (1 << 3), // the field should be sticky
+    RRDF_FIELD_OPTS_RANGE        = (1 << 4), // the field is filtered by range, otherwise multi-select
+} RRDF_FIELD_OPTIONS;
+
+static inline void buffer_rrdf_table_add_field(
+        BUFFER *wb, size_t field_id, const char *key, const char *name, const char *type, const char *visualization,
+        const char *transform, size_t decimal_points, const char *units, NETDATA_DOUBLE max, const char *sort,
+        const char *pointer_to, const char *summary, RRDF_FIELD_OPTIONS options) {
+
+    buffer_json_member_add_object(wb, key);
+    {
+        buffer_json_member_add_uint64(wb, "index", field_id);
+        buffer_json_member_add_boolean(wb, "unique_key", options & RRDF_FIELD_OPTS_UNIQUE_KEY);
+        buffer_json_member_add_string(wb, "name", name);
+        buffer_json_member_add_boolean(wb, "visible", options & RRDF_FIELD_OPTS_VISIBLE);
+        buffer_json_member_add_string(wb, "type", type);
+        buffer_json_member_add_string_or_omit(wb, "units", units);
+        buffer_json_member_add_string(wb, "visualization", visualization);
+
+        buffer_json_member_add_object(wb, "value_options");
+        {
+            buffer_json_member_add_string_or_omit(wb, "units", units);
+            buffer_json_member_add_string(wb, "transform", transform);
+            buffer_json_member_add_uint64(wb, "decimal_points", decimal_points);
+        }
+        buffer_json_object_close(wb);
+
+        if (!isnan((NETDATA_DOUBLE) (max)))
+            buffer_json_member_add_double(wb, "max", (NETDATA_DOUBLE) (max));
+
+        buffer_json_member_add_string_or_omit(wb, "pointer_to", pointer_to);
+        buffer_json_member_add_string(wb, "sort", sort);
+        buffer_json_member_add_boolean(wb, "sortable", options & RRDF_FIELD_OPTS_SORTABLE);
+        buffer_json_member_add_boolean(wb, "sticky", options & RRDF_FIELD_OPTS_STICKY);
+        buffer_json_member_add_string(wb, "summary", summary);
+        buffer_json_member_add_string(wb, "filter", (options & RRDF_FIELD_OPTS_RANGE) ? "range" : "multiselect");
+    }
+    buffer_json_object_close(wb);
+}
+
 #endif /* NETDATA_WEB_BUFFER_H */

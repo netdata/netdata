@@ -36,4 +36,6 @@ int rrd_call_function_error(BUFFER *wb, const char *msg, int code);
 int rrdhost_function_streaming(BUFFER *wb, int timeout, const char *function, void *collector_data,
                                function_data_ready_callback callback, void *callback_data);
 
+#define RRDFUNCTIONS_STREAMING_HELP "Streaming status for parents and children."
+
 #endif // NETDATA_RRDFUNCTIONS_H

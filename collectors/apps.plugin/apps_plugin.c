@@ -4356,32 +4356,6 @@ static void apps_plugin_function_processes_help(const char *transaction) {
     pluginsd_function_result_end_to_stdout();
 }
 
-#define add_table_field(wb, key, name, visible, type, visualization, transform, decimal_points, units, max, sort, sortable, sticky, unique_key, pointer_to, summary, range) do { \
-    buffer_json_member_add_object(wb, key);                                                                     \
-    buffer_json_member_add_uint64(wb, "index", fields_added);                                                   \
-    buffer_json_member_add_boolean(wb, "unique_key", unique_key);                                               \
-    buffer_json_member_add_string(wb, "name", name);                                                            \
-    buffer_json_member_add_boolean(wb, "visible", visible);                                                     \
-    buffer_json_member_add_string(wb, "type", type);                                                            \
-    buffer_json_member_add_string_or_omit(wb, "units", (char*)(units));                                         \
-    buffer_json_member_add_string(wb, "visualization", visualization);                                          \
-    buffer_json_member_add_object(wb, "value_options");                                                         \
-    buffer_json_member_add_string_or_omit(wb, "units", (char*)(units));                                         \
-    buffer_json_member_add_string(wb, "transform", transform);                                                  \
-    buffer_json_member_add_uint64(wb, "decimal_points", decimal_points);                                        \
-    buffer_json_object_close(wb);                                                                               \
-    if(!isnan((NETDATA_DOUBLE)(max)))                                                                           \
-       buffer_json_member_add_double(wb, "max", (NETDATA_DOUBLE)(max));                                         \
-    buffer_json_member_add_string_or_omit(wb, "pointer_to", (char *)(pointer_to));                              \
-    buffer_json_member_add_string(wb, "sort", sort);                                                            \
-    buffer_json_member_add_boolean(wb, "sortable", sortable);                                                   \
-    buffer_json_member_add_boolean(wb, "sticky", sticky);                                                       \
-    buffer_json_member_add_string(wb, "summary", summary);                                                      \
-    buffer_json_member_add_string(wb, "filter", (range)?"range":"multiselect");                                 \
-    buffer_json_object_close(wb);                                                                               \
-    fields_added++;                                                                                             \
-} while(0)
-
 #define add_value_field_llu_with_max(wb, key, value) do {                                                       \
     unsigned long long _tmp = (value);                                                                          \
     key ## _max = (rows == 0) ? (_tmp) : MAX(key ## _max, _tmp);                                                \
@@ -4553,7 +4527,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
 
         rows++;
 
-        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_array(wb); // for each pid
 
         // IMPORTANT!
         // THE ORDER SHOULD BE THE SAME WITH THE FIELDS!
@@ -4649,94 +4623,196 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         add_value_field_llu_with_max(wb, Threads, p->num_threads);
         add_value_field_llu_with_max(wb, Uptime, p->uptime);
 
-        buffer_json_array_close(wb);
+        buffer_json_array_close(wb); // for each pid
     }
 
-    buffer_json_array_close(wb);
+    buffer_json_array_close(wb); // data
     buffer_json_member_add_object(wb, "columns");
 
     {
-        int fields_added = 0;
+        int field_id = 0;
 
         // IMPORTANT!
         // THE ORDER SHOULD BE THE SAME WITH THE VALUES!
-        add_table_field(wb, "PID", "Process ID", true, "integer", "value", "number", 0, NULL, NAN, "ascending", true, true, true, NULL, "count_unique", false);
-        add_table_field(wb, "Cmd", "Process Name", true, "string", "value", "none", 0, NULL, NAN, "ascending", true, true, false, NULL, "count_unique", false);
+        // wb, key, name, visible, type, visualization, transform, decimal_points, units, max, sort, sortable, sticky, unique_key, pointer_to, summary, range
+        buffer_rrdf_table_add_field(wb, field_id++, "PID", "Process ID", "integer", "value", "number", 0, NULL, NAN,
+                                    "ascending", NULL, "count_unique",
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_STICKY |
+                                    RRDF_FIELD_OPTS_UNIQUE_KEY);
+        buffer_rrdf_table_add_field(wb, field_id++, "Cmd", "Process Name", "string", "value", "none", 0, NULL, NAN,
+                                    "ascending", NULL, "count_unique",
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_STICKY);
 
 #ifdef NETDATA_DEV_MODE
-        add_table_field(wb, "CmdLine", "Command Line", false, "detail-string:Cmd", "value", "none", 0, NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
+        buffer_rrdf_table_add_field(wb, field_id++, "CmdLine", "Command Line", "detail-string:Cmd", "value", "none", 0,
+                                    NULL, NAN, "ascending", NULL, "count_unique", RRDF_FIELD_OPTS_SORTABLE);
 #endif
-        add_table_field(wb, "PPID", "Parent Process ID", false, "integer", "value", "number", 0, NULL, NAN, "ascending", true, false, false, "PID", "count_unique", false);
-        add_table_field(wb, "Category", "Category (apps_groups.conf)", true, "string", "value", "none", 0, NULL, NAN, "ascending", true, true, false, NULL, "count_unique", false);
-        add_table_field(wb, "User", "User Owner", true, "string", "value", "none", 0, NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
-        add_table_field(wb, "Uid", "User ID", false, "integer", "value", "number", 0, NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
-        add_table_field(wb, "Group", "Group Owner", false, "string", "value", "none", 0, NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
-        add_table_field(wb, "Gid", "Group ID", false, "integer", "value", "number", 0, NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
+        buffer_rrdf_table_add_field(wb, field_id++, "PPID", "Parent Process ID", "integer", "value", "number", 0, NULL,
+                                    NAN, "ascending", "PID", "count_unique", RRDF_FIELD_OPTS_SORTABLE);
+        buffer_rrdf_table_add_field(wb, field_id++, "Category", "Category (apps_groups.conf)", "string", "value",
+                                    "none",
+                                    0, NULL, NAN, "ascending", NULL, "count_unique",
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_STICKY);
+        buffer_rrdf_table_add_field(wb, field_id++, "User", "User Owner", "string", "value", "none", 0, NULL, NAN,
+                                    "ascending", NULL, "count_unique", RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_SORTABLE);
+        buffer_rrdf_table_add_field(wb, field_id++, "Uid", "User ID", "integer", "value", "number", 0, NULL, NAN,
+                                    "ascending", NULL, "count_unique", RRDF_FIELD_OPTS_SORTABLE);
+        buffer_rrdf_table_add_field(wb, field_id++, "Group", "Group Owner", "string", "value", "none", 0, NULL, NAN,
+                                    "ascending", NULL, "count_unique", RRDF_FIELD_OPTS_SORTABLE);
+        buffer_rrdf_table_add_field(wb, field_id++, "Gid", "Group ID", "integer", "value", "number", 0, NULL, NAN,
+                                    "ascending", NULL, "count_unique", RRDF_FIELD_OPTS_SORTABLE);
 
         // CPU utilization
-        add_table_field(wb, "CPU", "Total CPU Time (100% = 1 core)", true, "bar-with-integer", "bar", "number", 2, "%", CPU_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "UserCPU", "User CPU time (100% = 1 core)", false, "bar-with-integer", "bar", "number", 2, "%", UserCPU_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "SysCPU", "System CPU Time (100% = 1 core)", false, "bar-with-integer", "bar", "number", 2, "%", SysCPU_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "GuestCPU", "Guest CPU Time (100% = 1 core)", false, "bar-with-integer", "bar", "number", 2, "%", GuestCPU_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "CUserCPU", "Children User CPU Time (100% = 1 core)", false, "bar-with-integer", "bar", "number", 2, "%", CUserCPU_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "CSysCPU", "Children System CPU Time (100% = 1 core)", false, "bar-with-integer", "bar", "number", 2, "%", CSysCPU_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "CGuestCPU", "Children Guest CPU Time (100% = 1 core)", false, "bar-with-integer", "bar", "number", 2, "%", CGuestCPU_max, "descending", true, false, false, NULL, "sum", true);
+        buffer_rrdf_table_add_field(wb, field_id++, "CPU", "Total CPU Time (100% = 1 core)", "bar-with-integer", "bar",
+                                    "number", 2, "%", CPU_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
+        buffer_rrdf_table_add_field(wb, field_id++, "UserCPU", "User CPU time (100% = 1 core)", "bar-with-integer",
+                                    "bar", "number", 2, "%", UserCPU_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
+        buffer_rrdf_table_add_field(wb, field_id++, "SysCPU", "System CPU Time (100% = 1 core)", "bar-with-integer",
+                                    "bar", "number", 2, "%", SysCPU_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
+        buffer_rrdf_table_add_field(wb, field_id++, "GuestCPU", "Guest CPU Time (100% = 1 core)", "bar-with-integer",
+                                    "bar", "number", 2, "%", GuestCPU_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
+        buffer_rrdf_table_add_field(wb, field_id++, "CUserCPU", "Children User CPU Time (100% = 1 core)",
+                                    "bar-with-integer", "bar", "number", 2, "%", CUserCPU_max, "descending", NULL,
+                                    "sum",
+                                    RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
+        buffer_rrdf_table_add_field(wb, field_id++, "CSysCPU", "Children System CPU Time (100% = 1 core)",
+                                    "bar-with-integer", "bar", "number", 2, "%", CSysCPU_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
+        buffer_rrdf_table_add_field(wb, field_id++, "CGuestCPU", "Children Guest CPU Time (100% = 1 core)",
+                                    "bar-with-integer", "bar", "number", 2, "%", CGuestCPU_max, "descending", NULL,
+                                    "sum", RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
 
         // CPU context switches
-        add_table_field(wb, "vCtxSwitch", "Voluntary Context Switches", false, "bar-with-integer", "bar", "number", 2, "switches/s", VoluntaryCtxtSwitches_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "iCtxSwitch", "Involuntary Context Switches", false, "bar-with-integer", "bar", "number", 2, "switches/s", NonVoluntaryCtxtSwitches_max, "descending", true, false, false, NULL, "sum", true);
+        buffer_rrdf_table_add_field(wb, field_id++, "vCtxSwitch", "Voluntary Context Switches", "bar-with-integer",
+                                    "bar", "number", 2, "switches/s", VoluntaryCtxtSwitches_max, "descending", NULL,
+                                    "sum", RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
+        buffer_rrdf_table_add_field(wb, field_id++, "iCtxSwitch", "Involuntary Context Switches", "bar-with-integer",
+                                    "bar", "number", 2, "switches/s", NonVoluntaryCtxtSwitches_max, "descending", NULL,
+                                    "sum", RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
 
         // memory
         if(MemTotal)
-            add_table_field(wb, "Memory", "Memory Percentage", true, "bar-with-integer", "bar", "number", 2, "%", 100.0, "descending", true, false, false, NULL, "sum", true);
+            buffer_rrdf_table_add_field(wb, field_id++, "Memory", "Memory Percentage", "bar-with-integer", "bar",
+                                        "number", 2, "%", 100.0, "descending", NULL, "sum",
+                                        RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
 
-        add_table_field(wb, "Resident", "Resident Set Size", true, "bar-with-integer", "bar", "number", 2, "MiB", RSS_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "Shared", "Shared Pages", true, "bar-with-integer", "bar", "number", 2, "MiB", Shared_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "Virtual", "Virtual Memory Size", true, "bar-with-integer", "bar", "number", 2, "MiB", VMSize_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "Swap", "Swap Memory", false, "bar-with-integer", "bar", "number", 2, "MiB", Swap_max, "descending", true, false, false, NULL, "sum", true);
+        buffer_rrdf_table_add_field(wb, field_id++, "Resident", "Resident Set Size", "bar-with-integer", "bar",
+                                    "number",
+                                    2, "MiB", RSS_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
+        buffer_rrdf_table_add_field(wb, field_id++, "Shared", "Shared Pages", "bar-with-integer", "bar", "number", 2,
+                                    "MiB", Shared_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
+        buffer_rrdf_table_add_field(wb, field_id++, "Virtual", "Virtual Memory Size", "bar-with-integer", "bar",
+                                    "number", 2, "MiB", VMSize_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
+        buffer_rrdf_table_add_field(wb, field_id++, "Swap", "Swap Memory", "bar-with-integer", "bar", "number", 2,
+                                    "MiB",
+                                    Swap_max, "descending", NULL, "sum", RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
 
         // Physical I/O
-        add_table_field(wb, "PReads", "Physical I/O Reads", true, "bar-with-integer", "bar", "number", 2, "KiB/s", PReads_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "PWrites", "Physical I/O Writes", true, "bar-with-integer", "bar", "number", 2, "KiB/s", PWrites_max, "descending", true, false, false, NULL, "sum", true);
+        buffer_rrdf_table_add_field(wb, field_id++, "PReads", "Physical I/O Reads", "bar-with-integer", "bar", "number",
+                                    2, "KiB/s", PReads_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
+        buffer_rrdf_table_add_field(wb, field_id++, "PWrites", "Physical I/O Writes", "bar-with-integer", "bar",
+                                    "number", 2, "KiB/s", PWrites_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
 
         // Logical I/O
 #ifndef __FreeBSD__
-        add_table_field(wb, "LReads", "Logical I/O Reads", true, "bar-with-integer", "bar", "number", 2, "KiB/s", LReads_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "LWrites", "Logical I/O Writes", true, "bar-with-integer", "bar", "number", 2, "KiB/s", LWrites_max, "descending", true, false, false, NULL, "sum", true);
+        buffer_rrdf_table_add_field(wb, field_id++, "LReads", "Logical I/O Reads", "bar-with-integer", "bar", "number",
+                                    2, "KiB/s", LReads_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
+        buffer_rrdf_table_add_field(wb, field_id++, "LWrites", "Logical I/O Writes", "bar-with-integer", "bar",
+                                    "number",
+                                    2, "KiB/s", LWrites_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
 #endif
 
         // I/O calls
-        add_table_field(wb, "RCalls", "I/O Read Calls", true, "bar-with-integer", "bar", "number", 2, "calls/s", RCalls_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "WCalls", "I/O Write Calls", true, "bar-with-integer", "bar", "number", 2, "calls/s", WCalls_max, "descending", true, false, false, NULL, "sum", true);
+        buffer_rrdf_table_add_field(wb, field_id++, "RCalls", "I/O Read Calls", "bar-with-integer", "bar", "number", 2,
+                                    "calls/s", RCalls_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
+        buffer_rrdf_table_add_field(wb, field_id++, "WCalls", "I/O Write Calls", "bar-with-integer", "bar", "number", 2,
+                                    "calls/s", WCalls_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
 
         // minor page faults
-        add_table_field(wb, "MinFlt", "Minor Page Faults/s", false, "bar-with-integer", "bar", "number", 2, "pgflts/s", MinFlt_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "CMinFlt", "Children Minor Page Faults/s", false, "bar-with-integer", "bar", "number", 2, "pgflts/s", CMinFlt_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "TMinFlt", "Total Minor Page Faults/s", false, "bar-with-integer", "bar", "number", 2, "pgflts/s", TMinFlt_max, "descending", true, false, false, NULL, "sum", true);
+        buffer_rrdf_table_add_field(wb, field_id++, "MinFlt", "Minor Page Faults/s", "bar-with-integer", "bar",
+                                    "number",
+                                    2, "pgflts/s", MinFlt_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_RANGE | RRDF_FIELD_OPTS_SORTABLE);
+        buffer_rrdf_table_add_field(wb, field_id++, "CMinFlt", "Children Minor Page Faults/s", "bar-with-integer",
+                                    "bar",
+                                    "number", 2, "pgflts/s", CMinFlt_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_RANGE | RRDF_FIELD_OPTS_SORTABLE);
+        buffer_rrdf_table_add_field(wb, field_id++, "TMinFlt", "Total Minor Page Faults/s", "bar-with-integer", "bar",
+                                    "number", 2, "pgflts/s", TMinFlt_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_RANGE | RRDF_FIELD_OPTS_SORTABLE);
 
         // major page faults
-        add_table_field(wb, "MajFlt", "Major Page Faults/s", false, "bar-with-integer", "bar", "number", 2, "pgflts/s", MajFlt_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "CMajFlt", "Children Major Page Faults/s", false, "bar-with-integer", "bar", "number", 2, "pgflts/s", CMajFlt_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "TMajFlt", "Total Major Page Faults/s", true, "bar-with-integer", "bar", "number", 2, "pgflts/s", TMajFlt_max, "descending", true, false, false, NULL, "sum", true);
+        buffer_rrdf_table_add_field(wb, field_id++, "MajFlt", "Major Page Faults/s", "bar-with-integer", "bar",
+                                    "number",
+                                    2, "pgflts/s", MajFlt_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_RANGE | RRDF_FIELD_OPTS_SORTABLE);
+        buffer_rrdf_table_add_field(wb, field_id++, "CMajFlt", "Children Major Page Faults/s", "bar-with-integer",
+                                    "bar",
+                                    "number", 2, "pgflts/s", CMajFlt_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_RANGE | RRDF_FIELD_OPTS_SORTABLE);
+        buffer_rrdf_table_add_field(wb, field_id++, "TMajFlt", "Total Major Page Faults/s", "bar-with-integer", "bar",
+                                    "number", 2, "pgflts/s", TMajFlt_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
 
         // open file descriptors
-        add_table_field(wb, "FDs", "All Open File Descriptors", true, "bar-with-integer", "bar", "number", 0, "fds", FDs_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "Files", "Open Files", true, "bar-with-integer", "bar", "number", 0, "fds", Files_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "Pipes", "Open Pipes", true, "bar-with-integer", "bar", "number", 0, "fds", Pipes_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "Sockets", "Open Sockets", true, "bar-with-integer", "bar", "number", 0, "fds", Sockets_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "iNotiFDs", "Open iNotify Descriptors", false, "bar-with-integer", "bar", "number", 0, "fds", iNotiFDs_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "EventFDs", "Open Event Descriptors", false, "bar-with-integer", "bar", "number", 0, "fds", EventFDs_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "TimerFDs", "Open Timer Descriptors", false, "bar-with-integer", "bar", "number", 0, "fds", TimerFDs_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "SigFDs", "Open Signal Descriptors", false, "bar-with-integer", "bar", "number", 0, "fds", SigFDs_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "EvPollFDs", "Open Event Poll Descriptors", false, "bar-with-integer", "bar", "number", 0, "fds", EvPollFDs_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "OtherFDs", "Other Open Descriptors", false, "bar-with-integer", "bar", "number", 0, "fds", OtherFDs_max, "descending", true, false, false, NULL, "sum", true);
+        buffer_rrdf_table_add_field(wb, field_id++, "FDs", "All Open File Descriptors", "bar-with-integer", "bar",
+                                    "number", 0, "fds", FDs_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
+        buffer_rrdf_table_add_field(wb, field_id++, "Files", "Open Files", "bar-with-integer", "bar", "number", 0,
+                                    "fds",
+                                    Files_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
+        buffer_rrdf_table_add_field(wb, field_id++, "Pipes", "Open Pipes", "bar-with-integer", "bar", "number", 0,
+                                    "fds",
+                                    Pipes_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
+        buffer_rrdf_table_add_field(wb, field_id++, "Sockets", "Open Sockets", "bar-with-integer", "bar", "number", 0,
+                                    "fds", Sockets_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
+        buffer_rrdf_table_add_field(wb, field_id++, "iNotiFDs", "Open iNotify Descriptors", "bar-with-integer", "bar",
+                                    "number", 0, "fds", iNotiFDs_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_RANGE | RRDF_FIELD_OPTS_SORTABLE);
+        buffer_rrdf_table_add_field(wb, field_id++, "EventFDs", "Open Event Descriptors", "bar-with-integer", "bar",
+                                    "number", 0, "fds", EventFDs_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_RANGE | RRDF_FIELD_OPTS_SORTABLE);
+        buffer_rrdf_table_add_field(wb, field_id++, "TimerFDs", "Open Timer Descriptors", "bar-with-integer", "bar",
+                                    "number", 0, "fds", TimerFDs_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_RANGE | RRDF_FIELD_OPTS_SORTABLE);
+        buffer_rrdf_table_add_field(wb, field_id++, "SigFDs", "Open Signal Descriptors", "bar-with-integer", "bar",
+                                    "number", 0, "fds", SigFDs_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_RANGE | RRDF_FIELD_OPTS_SORTABLE);
+        buffer_rrdf_table_add_field(wb, field_id++, "EvPollFDs", "Open Event Poll Descriptors", "bar-with-integer",
+                                    "bar", "number", 0, "fds", EvPollFDs_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_RANGE | RRDF_FIELD_OPTS_SORTABLE);
+        buffer_rrdf_table_add_field(wb, field_id++, "OtherFDs", "Other Open Descriptors", "bar-with-integer", "bar",
+                                    "number", 0, "fds", OtherFDs_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_RANGE | RRDF_FIELD_OPTS_SORTABLE);
 
         // processes, threads, uptime
-        add_table_field(wb, "Processes", "Processes", true, "bar-with-integer", "bar", "number", 0, "processes", Processes_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "Threads", "Threads", true, "bar-with-integer", "bar", "number", 0, "threads", Threads_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "Uptime", "Uptime in seconds", true, "duration", "bar", "duration", 2, "seconds", Uptime_max, "descending", true, false, false, NULL, "max", true);
+        buffer_rrdf_table_add_field(wb, field_id++, "Processes", "Processes", "bar-with-integer", "bar", "number", 0,
+                                    "processes", Processes_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
+        buffer_rrdf_table_add_field(wb, field_id++, "Threads", "Threads", "bar-with-integer", "bar", "number", 0,
+                                    "threads", Threads_max, "descending", NULL, "sum",
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
+        buffer_rrdf_table_add_field(wb, field_id++, "Uptime", "Uptime in seconds", "duration", "bar", "duration", 2,
+                                    "seconds", Uptime_max, "descending", NULL, "max",
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_SORTABLE | RRDF_FIELD_OPTS_RANGE);
     }
-    buffer_json_object_close(wb);
+    buffer_json_object_close(wb); // columns
 
     buffer_json_member_add_string(wb, "default_sort_column", "CPU");
 

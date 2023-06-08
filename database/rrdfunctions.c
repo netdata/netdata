@@ -797,10 +797,32 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
     RRDHOST *host = localhost;
 
     buffer_flush(wb);
+    wb->content_type = CT_APPLICATION_JSON;
     buffer_json_initialize(wb, "\"", "\"", 0, true, false);
 
     buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
-
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "table");
+    buffer_json_member_add_time_t(wb, "update_every", 1);
+    buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_STREAMING_HELP);
+    buffer_json_member_add_array(wb, "data");
+    {
+        ;
+    }
+    buffer_json_array_close(wb); // data
+    buffer_json_member_add_object(wb, "columns");
+    {
+        size_t field_id = 0;
+        buffer_rrdf_table_add_field(wb, field_id++, "Node", "Hostname", "string", "value", "none", 0, NULL, NAN, "ascending", NULL, NULL, RRDF_FIELD_OPTS_VISIBLE|RRDF_FIELD_OPTS_UNIQUE_KEY|RRDF_FIELD_OPTS_SORTABLE|RRDF_FIELD_OPTS_STICKY);
+    }
+    buffer_json_object_close(wb); // columns
+    buffer_json_member_add_string(wb, "default_sort_column", "Node");
+    buffer_json_member_add_object(wb, "charts");
+    {
+        ;
+    }
+    buffer_json_object_close(wb); // charts
+    buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + 1);
     buffer_json_finalize(wb);
 
     if(callback)
