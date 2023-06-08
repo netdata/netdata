@@ -232,3 +232,8 @@ Session.*.vim
 # m4 generated ksys
 database/engine/journalfile_v2.ksy
 database/engine/journalfile_v2_virtmemb.ksy
+
+# gorilla benchmark & fuzz binaries
+libnetdata/gorilla/gorilla_benchmark
+libnetdata/gorilla/gorilla_fuzzer
+libnetdata/gorilla/fuzz-*.log

@@ -446,6 +446,8 @@ set(LIBNETDATA_FILES
         libnetdata/dictionary/dictionary.h
         libnetdata/eval/eval.c
         libnetdata/eval/eval.h
+        libnetdata/gorilla/gorilla.cc
+        libnetdata/gorilla/gorilla.h
         libnetdata/health/health.c
         libnetdata/health/health.h
         libnetdata/july/july.c

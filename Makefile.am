@@ -154,6 +154,8 @@ LIBNETDATA_FILES = \
     libnetdata/dictionary/dictionary.h \
     libnetdata/eval/eval.c \
     libnetdata/eval/eval.h \
+    libnetdata/gorilla/gorilla.h \
+    libnetdata/gorilla/gorilla.cc \
     libnetdata/inlined.h \
     libnetdata/july/july.c \
     libnetdata/july/july.h \
