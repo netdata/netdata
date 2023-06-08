@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Fix user and group handling in DEB packages. [\#15166](https://github.com/netdata/netdata/pull/15166) ([Ferroin](https://github.com/Ferroin))
+- change mandatory packages for RPMs [\#15165](https://github.com/netdata/netdata/pull/15165) ([tkatsoulas](https://github.com/tkatsoulas))
+- Fix CID 385073 -- Uninitialized scalar variable [\#15163](https://github.com/netdata/netdata/pull/15163) ([stelfrag](https://github.com/stelfrag))
+- api v2 nodes for streaming statuses [\#15162](https://github.com/netdata/netdata/pull/15162) ([ktsaou](https://github.com/ktsaou))
 - Restrict ebpf dep in DEB package to amd64 only. [\#15161](https://github.com/netdata/netdata/pull/15161) ([Ferroin](https://github.com/Ferroin))
 - Make plugin packages hard dependencies. [\#15160](https://github.com/netdata/netdata/pull/15160) ([Ferroin](https://github.com/Ferroin))
 - freeipmi: add availability status chart and alarm [\#15151](https://github.com/netdata/netdata/pull/15151) ([ilyam8](https://github.com/ilyam8))
@@ -17,6 +21,7 @@
 - updated events docs and minor fix on silecing rules table [\#15134](https://github.com/netdata/netdata/pull/15134) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Provide necessary permission for the kickstart to run the netdata-updater script [\#15132](https://github.com/netdata/netdata/pull/15132) ([tkatsoulas](https://github.com/tkatsoulas))
 - fix: allow square brackets in label value [\#15131](https://github.com/netdata/netdata/pull/15131) ([ilyam8](https://github.com/ilyam8))
+- Add library to encode/decode Gorilla compressed buffers. [\#15128](https://github.com/netdata/netdata/pull/15128) ([vkalintiris](https://github.com/vkalintiris))
 - Fix bundling of eBPF legacy code for DEB packages. [\#15127](https://github.com/netdata/netdata/pull/15127) ([Ferroin](https://github.com/Ferroin))
 - Percentage of group aggregatable at cloud - fixed for backwards compatibility [\#15126](https://github.com/netdata/netdata/pull/15126) ([ktsaou](https://github.com/ktsaou))
 - Fix package versioning issues. [\#15125](https://github.com/netdata/netdata/pull/15125) ([Ferroin](https://github.com/Ferroin))
@@ -402,10 +407,6 @@
 - Simplify parser README.md and add parser files to CMakeLists.txt [\#14523](https://github.com/netdata/netdata/pull/14523) ([stelfrag](https://github.com/stelfrag))
 - Link statically libnetfilter\_acct into our static builds [\#14516](https://github.com/netdata/netdata/pull/14516) ([tkatsoulas](https://github.com/tkatsoulas))
 - Fix broken links in markdown files [\#14513](https://github.com/netdata/netdata/pull/14513) ([Ancairon](https://github.com/Ancairon))
-- Make external plugins a category page in learn [\#14511](https://github.com/netdata/netdata/pull/14511) ([cakrit](https://github.com/cakrit))
-- Learn integrations category changes [\#14510](https://github.com/netdata/netdata/pull/14510) ([cakrit](https://github.com/cakrit))
-- Move collectors under Integrations/Monitoring [\#14509](https://github.com/netdata/netdata/pull/14509) ([cakrit](https://github.com/cakrit))
-- Guides and collectors reorg and cleanup part 1 [\#14507](https://github.com/netdata/netdata/pull/14507) ([cakrit](https://github.com/cakrit))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
