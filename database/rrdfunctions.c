@@ -774,3 +774,18 @@ void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst)
     }
     dfe_done(t);
 }
+
+int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const char *function __maybe_unused,
+                               void *collector_data __maybe_unused,
+                               function_data_ready_callback callback __maybe_unused, void *callback_data __maybe_unused) {
+    RRDHOST *host = localhost;
+
+    buffer_flush(wb);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+
+    buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
+
+    buffer_json_finalize(wb);
+
+    return HTTP_RESP_OK;
+}

@@ -1035,6 +1035,13 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
         return 1;
     }
 
+    // we register this only on localhost
+    // for the other nodes, the origin server should register it
+    rrd_collector_started(); // this creates a collector that runs for as long as netdata runs
+    rrd_collector_add_function(localhost, NULL, "streaming", 10,
+                               "Streaming status for a node", true,
+                               rrdhost_function_streaming, NULL);
+
     if (likely(system_info)) {
         migrate_localhost(&localhost->host_uuid);
         sql_aclk_sync_init();

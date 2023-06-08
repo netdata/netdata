@@ -32,4 +32,7 @@ uint8_t functions_format_to_content_type(const char *format);
 const char *functions_content_type_to_format(HTTP_CONTENT_TYPE content_type);
 int rrd_call_function_error(BUFFER *wb, const char *msg, int code);
 
+int rrdhost_function_streaming(BUFFER *wb, int timeout, const char *function, void *collector_data,
+                               function_data_ready_callback callback, void *callback_data);
+
 #endif // NETDATA_RRDFUNCTIONS_H
