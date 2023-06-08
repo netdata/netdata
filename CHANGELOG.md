@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Restrict ebpf dep in DEB package to amd64 only. [\#15161](https://github.com/netdata/netdata/pull/15161) ([Ferroin](https://github.com/Ferroin))
 - Make plugin packages hard dependencies. [\#15160](https://github.com/netdata/netdata/pull/15160) ([Ferroin](https://github.com/Ferroin))
 - freeipmi: add availability status chart and alarm [\#15151](https://github.com/netdata/netdata/pull/15151) ([ilyam8](https://github.com/ilyam8))
 - Check null transition id and config hash [\#15147](https://github.com/netdata/netdata/pull/15147) ([stelfrag](https://github.com/stelfrag))
@@ -405,7 +406,6 @@
 - Learn integrations category changes [\#14510](https://github.com/netdata/netdata/pull/14510) ([cakrit](https://github.com/cakrit))
 - Move collectors under Integrations/Monitoring [\#14509](https://github.com/netdata/netdata/pull/14509) ([cakrit](https://github.com/cakrit))
 - Guides and collectors reorg and cleanup part 1 [\#14507](https://github.com/netdata/netdata/pull/14507) ([cakrit](https://github.com/cakrit))
-- replicating gaps [\#14506](https://github.com/netdata/netdata/pull/14506) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
