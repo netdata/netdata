@@ -443,16 +443,16 @@ void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST *host, const char *key, time_t
     if(!online && host->rrdpush_last_receiver_exit_reason)
         buffer_json_member_add_string(wb, "reason", host->rrdpush_last_receiver_exit_reason);
 
-    buffer_json_member_add_object(wb, "replication");
-    {
-        size_t instances = rrdhost_receiver_replicating_charts(host);
-        buffer_json_member_add_boolean(wb, "in_progress", instances);
-        buffer_json_member_add_double(wb, "completion", host->rrdpush_receiver_replication_percent);
-        buffer_json_member_add_uint64(wb, "instances", instances);
-    }
-    buffer_json_object_close(wb);
-
     if(host != localhost && host->receiver) {
+        buffer_json_member_add_object(wb, "replication");
+        {
+            size_t instances = rrdhost_receiver_replicating_charts(host);
+            buffer_json_member_add_boolean(wb, "in_progress", instances);
+            buffer_json_member_add_double(wb, "completion", host->rrdpush_receiver_replication_percent);
+            buffer_json_member_add_uint64(wb, "instances", instances);
+        }
+        buffer_json_object_close(wb); // replication
+
         buffer_json_member_add_object(wb, "source");
         {
 
@@ -468,7 +468,7 @@ void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST *host, const char *key, time_t
 
             stream_capabilities_to_json_array(wb, host->receiver->capabilities, "capabilities");
         }
-        buffer_json_object_close(wb);
+        buffer_json_object_close(wb); // source
     }
     buffer_json_object_close(wb); // collection
 
