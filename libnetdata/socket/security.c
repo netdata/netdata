@@ -109,7 +109,7 @@ static void netdata_ssl_log_error_queue(const char *call, NETDATA_SSL *ssl, unsi
     } while((err = ERR_get_error()));
 }
 
-bool netdata_ssl_open(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd) {
+bool netdata_ssl_open_ext(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd, const unsigned char *alpn_protos, unsigned int alpn_protos_len) {
     errno = 0;
     ssl->ssl_errno = 0;
 
@@ -119,7 +119,7 @@ bool netdata_ssl_open(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd) {
             ssl->conn = NULL;
         }
         else if (SSL_clear(ssl->conn) == 0) {
-            netdata_ssl_log_error_queue("SSL_clear", ssl, SSL_ERROR_NONE);
+            netdata_ssl_log_error_queue("SSL_clear", ssl);
             SSL_free(ssl->conn);
             ssl->conn = NULL;
         }
@@ -134,14 +134,16 @@ bool netdata_ssl_open(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd) {
 
         ssl->conn = SSL_new(ctx);
         if (!ssl->conn) {
-            netdata_ssl_log_error_queue("SSL_new", ssl, SSL_ERROR_NONE);
+            netdata_ssl_log_error_queue("SSL_new", ssl);
             ssl->state = NETDATA_SSL_STATE_FAILED;
             return false;
         }
+        if (alpn_protos && alpn_protos_len > 0)
+            SSL_set_alpn_protos(ssl->conn, alpn_protos, alpn_protos_len);
     }
 
     if(SSL_set_fd(ssl->conn, fd) != 1) {
-        netdata_ssl_log_error_queue("SSL_set_fd", ssl, SSL_ERROR_NONE);
+        netdata_ssl_log_error_queue("SSL_set_fd", ssl);
         ssl->state = NETDATA_SSL_STATE_FAILED;
         return false;
     }
@@ -151,6 +153,10 @@ bool netdata_ssl_open(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd) {
     ERR_clear_error();
 
     return true;
+}
+
+bool netdata_ssl_open(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd) {
+    return netdata_ssl_open_ext(ssl, ctx, fd, NULL, 0);
 }
 
 void netdata_ssl_close(NETDATA_SSL *ssl) {
