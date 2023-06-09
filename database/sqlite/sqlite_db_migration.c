@@ -218,12 +218,6 @@ static int do_migration_v8_v9(sqlite3 *database, const char *name)
     UNUSED(name);
     info("Running database migration %s", name);
 
-    //create a single health log table
-    if (sql_create_health_log_table() == 1) {
-        error_report("Failed to create health_log table needed for migration");
-        return 1;
-    }
-
     char sql[256];
     int rc;
     sqlite3_stmt *res = NULL;

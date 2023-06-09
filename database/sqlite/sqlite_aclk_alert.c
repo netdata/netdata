@@ -283,10 +283,6 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (rc != SQLITE_OK) {
 
-        // Try to create tables
-        if (wc->host)
-            sql_create_health_log_table(); //might remove
-
         BUFFER *sql_fix = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
         buffer_sprintf(sql_fix, TABLE_ACLK_ALERT, wc->uuid_str);
         rc = db_execute(db_meta, buffer_tostring(sql_fix));

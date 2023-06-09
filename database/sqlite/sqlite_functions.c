@@ -43,6 +43,15 @@ const char *database_config[] = {
     "CREATE TRIGGER IF NOT EXISTS ins_host AFTER INSERT ON host BEGIN INSERT INTO node_instance (host_id, date_created)"
       " SELECT new.host_id, unixepoch() WHERE new.host_id NOT IN (SELECT host_id FROM node_instance); END;",
 
+    "CREATE TABLE IF NOT EXISTS health_log (host_id blob, unique_id int, alarm_id int, alarm_event_id int, "
+    "config_hash_id blob, updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, "
+    "flags int, exec_run_timestamp int, delay_up_to_timestamp int, name text, chart text, family text, exec text, "
+    "recipient text, source text, units text, info text, exec_code int, new_status real, old_status real, delay int, "
+    "new_value double, old_value double, last_repeat int, class text, component text, type text, chart_context text, "
+    "transition_id blob, insert_mark_timestamp int);",
+
+    "CREATE INDEX IF NOT EXISTS health_log_index ON health_log (unique_id);",
+
     NULL
 };
 

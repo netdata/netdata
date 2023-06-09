@@ -789,7 +789,6 @@ static void initialize_health(RRDHOST *host)
 
     // TODO: This needs to go to the metadata thread
     // Health should wait before accessing the table (needs to be created by the metadata thread)
-    sql_create_health_log_table();
     sql_health_alarm_log_load(host);
 
     // ------------------------------------------------------------------------
