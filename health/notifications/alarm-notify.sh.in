@@ -386,6 +386,7 @@ EMAIL_PLAINTEXT_ONLY=
 IRC_NICKNAME=
 IRC_REALNAME=
 IRC_NETWORK=
+IRC_NC="nc"
 IRC_PORT=6667
 
 # hangouts configs
@@ -1910,10 +1911,15 @@ send_irc() {
     *) color="#777777" ;;
     esac
 
+    if ! command -v ${IRC_NC} &> /dev/null; then
+      error "${IRC_NC} was not found to send the IRC message"
+      return 1
+    fi
+
     SNDMESSAGE="${MESSAGE//$'\n'/", "}"
     for CHANNEL in ${CHANNELS}; do
       error=0
-      send_alarm=$(echo -e "USER ${NICKNAME} guest ${REALNAME} ${SERVERNAME}\\nNICK ${NICKNAME}\\nJOIN ${CHANNEL}\\nPRIVMSG ${CHANNEL} :${SNDMESSAGE}\\nQUIT\\n" \  | nc "${NETWORK}" "${PORT}")
+      send_alarm=$(echo -e "USER ${NICKNAME} guest ${REALNAME} ${SERVERNAME}\\nNICK ${NICKNAME}\\nJOIN ${CHANNEL}\\nPRIVMSG ${CHANNEL} :${SNDMESSAGE}\\nQUIT\\n" \  | ${IRC_NC} "${NETWORK}" "${PORT}")
       reply_codes=$(echo "${send_alarm}" | cut -d ' ' -f 2 | grep -o '[0-9]*')
       for code in ${reply_codes}; do
         if [ "${code}" -ge 400 ] && [ "${code}" -le 599 ]; then
