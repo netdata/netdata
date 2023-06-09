@@ -600,7 +600,7 @@ bool stop_streaming_receiver(RRDHOST *host, const char *reason) {
 }
 
 static void rrdpush_send_error_on_taken_over_connection(struct receiver_state *rpt, const char *msg) {
-    send_timeout(
+    (void) send_timeout(
 #ifdef ENABLE_HTTPS
             &rpt->ssl,
 #endif

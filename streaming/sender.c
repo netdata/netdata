@@ -1101,7 +1101,7 @@ void rrdpush_signal_sender_to_wake_up(struct sender_state *s) {
 static NETDATA_DOUBLE rrdhost_sender_replication_completion(RRDHOST *host, time_t now, size_t *instances) {
     size_t charts = rrdhost_sender_replicating_charts(host);
     NETDATA_DOUBLE completion;
-    if(!charts || !host->sender->replication.oldest_request_after_t)
+    if(!charts || !host->sender || !host->sender->replication.oldest_request_after_t)
         completion = 100.0;
     else if(!host->sender->replication.latest_completed_before_t || host->sender->replication.latest_completed_before_t < host->sender->replication.oldest_request_after_t)
         completion = 0.0;
@@ -1159,8 +1159,7 @@ void rrdhost_sender_to_json(BUFFER *wb, RRDHOST *host, const char *key, time_t n
                 snprintfz(buf, 1024, "[%s]:%d%s", peers.peer.ip, peers.peer.port, ssl ? ":SSL" : "");
                 buffer_json_member_add_string(wb, "remote", buf);
 
-                stream_capabilities_to_json_array(wb, online ? host->sender->capabilities : 0,
-                                                  "capabilities");
+                stream_capabilities_to_json_array(wb, host->sender->capabilities, "capabilities");
 
                 buffer_json_member_add_object(wb, "traffic");
                 {
