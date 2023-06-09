@@ -166,3 +166,19 @@ and:
 ```bash
 /opt/netdata/usr/libexec/netdata/netdata-updater.sh --disable-auto-updates
 ```
+
+## Control runtime behavior of the updater script.
+
+Starting with v1.40.0, the `netdata-updater.sh` script supports a config file called `netdata-updater.conf`,
+located in the same directory as the main `netdata.conf` file. This file uses POSIX shell script syntax to define
+variables that are used by the updater.
+
+This configuration file can be edited [using our `edit-config`
+script](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md).
+
+The following configuration options are currently supported:
+
+- `NETDATA_UPDATER_JITTER`: Sets an upper limit in seconds on the random delay in the updater script when running
+  as a scheduled task. This random delay helps avoid issues resulting from too many nodes trying to reconnect to
+  the Cloud at the same time. The default value is 3600, which corresponds to one hour. Most users should not ever
+  need to change this.
