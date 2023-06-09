@@ -1159,8 +1159,7 @@ void rrdhost_sender_to_json(BUFFER *wb, RRDHOST *host, const char *key, time_t n
                 snprintfz(buf, 1024, "[%s]:%d%s", peers.peer.ip, peers.peer.port, ssl ? ":SSL" : "");
                 buffer_json_member_add_string(wb, "remote", buf);
 
-                stream_capabilities_to_json_array(wb, online ? host->sender->capabilities : 0,
-                                                  "capabilities");
+                stream_capabilities_to_json_array(wb, host->sender->capabilities, "capabilities");
 
                 buffer_json_member_add_object(wb, "traffic");
                 {
