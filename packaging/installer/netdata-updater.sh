@@ -820,21 +820,6 @@ update_legacy() {
   esac
 }
 
-# Write out our configuration file.
-write_config() {
-  confpath="${1:-$(basename "${ENVIRONMENT_FILE}")/netdata-updater.conf}"
-
-  cat > "${confpath}" <<-EOF
-	# Configuration for netdata-updater.sh script.
-	#
-	# When run non-interactively, the updater script will delay some
-	# random number of seconds up to NETDATA_UPDATER_JITTER before
-	# actually running the update. The default is 3600 (one
-	# hour). Most users should not need to change this.
-	#NETDATA_UPDATER_JITTER="${NETDATA_UPDATER_JITTER}"
-	EOF
-}
-
 logfile=
 ndtmpdir=
 
@@ -906,10 +891,6 @@ while [ -n "${1}" ]; do
       ;;
     --disable-auto-updates)
       disable_netdata_updater
-      exit $?
-      ;;
-    --write-updater-config)
-      write_config "${2}"
       exit $?
       ;;
     *) fatal "Unrecognized option ${1}" U001A ;;
