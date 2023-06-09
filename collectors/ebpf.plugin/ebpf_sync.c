@@ -403,7 +403,7 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
  */
 static void ebpf_sync_read_global_table(int maps_per_core)
 {
-    netdata_idx_t stored[ebpf_nprocs];
+    netdata_idx_t stored[NETDATA_MAX_PROCESSOR];
     uint32_t idx = NETDATA_SYNC_CALL;
     int i;
     for (i = 0; local_syscalls[i].syscall; i++) {
