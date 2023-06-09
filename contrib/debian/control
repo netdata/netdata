@@ -48,9 +48,10 @@ Pre-Depends: adduser,
              dpkg (>= 1.17.14),
              libcap2-bin (>=1:2.0),
              lsb-base (>= 3.1-23.2)
-Conflicts: netdata-plugins-bash,
+Conflicts: netdata-core
+           netdata-plugins-bash,
            netdata-plugins-python,
-           netdata-web,
+           netdata-web
 Suggests: netdata-plugin-cups,
           netdata-plugin-freeipmi
 Description: real-time charts for system monitoring
