@@ -5,11 +5,13 @@
 // ----------------------------------------------------------------------------
 // popen with tracking
 
-static pthread_mutex_t netdata_popen_tracking_mutex;
-static bool netdata_popen_tracking_enabled = false;
+static pthread_mutex_t netdata_popen_tracking_mutex = NETDATA_MUTEX_INITIALIZER;
 
 struct netdata_popen {
     pid_t pid;
+    bool reaped;
+    siginfo_t infop;
+    int waitid_ret;
     struct netdata_popen *next;
     struct netdata_popen *prev;
 };
@@ -18,29 +20,20 @@ static struct netdata_popen *netdata_popen_root = NULL;
 
 // myp_add_lock takes the lock if we're tracking.
 static void netdata_popen_tracking_lock(void) {
-    if(!netdata_popen_tracking_enabled)
-        return;
-
     netdata_mutex_lock(&netdata_popen_tracking_mutex);
 }
 
 // myp_add_unlock release the lock if we're tracking.
 static void netdata_popen_tracking_unlock(void) {
-    if(!netdata_popen_tracking_enabled)
-        return;
-
     netdata_mutex_unlock(&netdata_popen_tracking_mutex);
 }
 
 // myp_add_locked adds pid if we're tracking.
 // myp_add_lock must have been called previously.
 static void netdata_popen_tracking_add_pid_unsafe(pid_t pid) {
-    if(!netdata_popen_tracking_enabled)
-        return;
-
     struct netdata_popen *mp;
 
-    mp = mallocz(sizeof(struct netdata_popen));
+    mp = callocz(1, sizeof(struct netdata_popen));
     mp->pid = pid;
 
     DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(netdata_popen_root, mp, prev, next);
@@ -48,12 +41,9 @@ static void netdata_popen_tracking_add_pid_unsafe(pid_t pid) {
 
 // myp_del deletes pid if we're tracking.
 static void netdata_popen_tracking_del_pid(pid_t pid) {
-    if(!netdata_popen_tracking_enabled)
-        return;
-
     struct netdata_popen *mp;
 
-    netdata_mutex_lock(&netdata_popen_tracking_mutex);
+    netdata_popen_tracking_lock();
 
     DOUBLE_LINKED_LIST_FOREACH_FORWARD(netdata_popen_root, mp, prev, next) {
         if(unlikely(mp->pid == pid))
@@ -65,34 +55,15 @@ static void netdata_popen_tracking_del_pid(pid_t pid) {
         freez(mp);
     }
     else
-        error("Cannot find pid %d.", pid);
+        error("POPEN: Cannot find pid %d.", pid);
 
-    netdata_mutex_unlock(&netdata_popen_tracking_mutex);
-}
-
-// netdata_popen_tracking_init() should be called by apps which act as init
-// (pid 1) so that processes created by mypopen and mypopene
-// are tracked. This enables the reaper to ignore processes
-// which will be handled internally, by calling myp_reap, to
-// avoid issues with already reaped processes during wait calls.
-//
-// Callers should call myp_free() to clean up resources.
-void netdata_popen_tracking_init(void) {
-    info("process tracking enabled.");
-    netdata_popen_tracking_enabled = true;
-
-    if (netdata_mutex_init(&netdata_popen_tracking_mutex) != 0)
-        fatal("netdata_popen_tracking_init() mutex init failed.");
+    netdata_popen_tracking_unlock();
 }
 
 // myp_free cleans up any resources allocated for process
 // tracking.
 void netdata_popen_tracking_cleanup(void) {
-    if(!netdata_popen_tracking_enabled)
-        return;
-
-    netdata_mutex_lock(&netdata_popen_tracking_mutex);
-    netdata_popen_tracking_enabled = false;
+    netdata_popen_tracking_lock();
 
     while(netdata_popen_root) {
         struct netdata_popen *mp = netdata_popen_root;
@@ -100,26 +71,45 @@ void netdata_popen_tracking_cleanup(void) {
         freez(mp);
     }
 
-    netdata_mutex_unlock(&netdata_popen_tracking_mutex);
+    netdata_popen_tracking_unlock();
 }
 
-// myp_reap returns 1 if pid should be reaped, 0 otherwise.
-int netdata_popen_tracking_pid_shoud_be_reaped(pid_t pid) {
-    if(!netdata_popen_tracking_enabled)
-        return 0;
+int netdata_waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options) {
+    struct netdata_popen *mp = NULL;
 
-    netdata_mutex_lock(&netdata_popen_tracking_mutex);
+    if(idtype == P_PID && id != 0) {
+        // the caller is asking to waitid() for a specific child pid
 
-    int ret = 1;
-    struct netdata_popen *mp;
-    DOUBLE_LINKED_LIST_FOREACH_FORWARD(netdata_popen_root, mp, prev, next) {
-        if(unlikely(mp->pid == pid)) {
-            ret = 0;
-            break;
+        netdata_popen_tracking_lock();
+        DOUBLE_LINKED_LIST_FOREACH_FORWARD(netdata_popen_root, mp, prev, next) {
+            if(unlikely(mp->pid == (pid_t)id))
+                break;
+        }
+
+        if(!mp)
+            netdata_popen_tracking_unlock();
+    }
+
+    int ret;
+    if(mp && mp->reaped) {
+        // we have already reaped this child
+        ret = mp->waitid_ret;
+        *infop = mp->infop;
+    }
+    else {
+        // we haven't reaped this child yet
+        ret = waitid(idtype, id, infop, options);
+
+        if(mp && !mp->reaped) {
+            mp->reaped = true;
+            mp->infop = *infop;
+            mp->waitid_ret = ret;
         }
     }
 
-    netdata_mutex_unlock(&netdata_popen_tracking_mutex);
+    if(mp)
+        netdata_popen_tracking_unlock();
+
     return ret;
 }
 
@@ -404,7 +394,7 @@ int netdata_pclose(FILE *fp_child_input, FILE *fp_child_output, pid_t pid) {
 
     errno = 0;
 
-    ret = waitid(P_PID, (id_t) pid, &info, WEXITED);
+    ret = netdata_waitid(P_PID, (id_t) pid, &info, WEXITED);
     netdata_popen_tracking_del_pid(pid);
 
     if (ret != -1) {
@@ -415,8 +405,12 @@ int netdata_pclose(FILE *fp_child_input, FILE *fp_child_output, pid_t pid) {
                 return(info.si_status);
 
             case CLD_KILLED:
-                if(info.si_status == 15) {
-                    info("child pid %d killed by signal %d.", info.si_pid, info.si_status);
+                if(info.si_status == SIGTERM) {
+                    info("child pid %d killed by SIGTERM", info.si_pid);
+                    return(0);
+                }
+                else if(info.si_status == SIGPIPE) {
+                    info("child pid %d killed by SIGPIPE.", info.si_pid);
                     return(0);
                 }
                 else {
@@ -449,8 +443,4 @@ int netdata_pclose(FILE *fp_child_input, FILE *fp_child_output, pid_t pid) {
         error("Cannot waitid() for pid %d", pid);
     
     return 0;
-}
-
-int netdata_spawn_waitpid(pid_t pid) {
-    return netdata_pclose(NULL, NULL, pid);
 }

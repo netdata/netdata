@@ -68,10 +68,8 @@ int connect_to_one_of_urls(const char *destination, int default_port, struct tim
 
 
 #ifdef ENABLE_HTTPS
-ssize_t recv_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
-ssize_t send_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
-ssize_t netdata_ssl_read(SSL *ssl, void *buf, size_t num);
-ssize_t netdata_ssl_write(SSL *ssl, const void *buf, size_t num);
+ssize_t recv_timeout(NETDATA_SSL *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
+ssize_t send_timeout(NETDATA_SSL *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
 #else
 ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
 ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
@@ -218,5 +216,23 @@ void poll_events(LISTEN_SOCKETS *sockets
         , void *timer_data
         , size_t max_tcp_sockets
 );
+
+#ifndef INET6_ADDRSTRLEN
+#define INET6_ADDRSTRLEN 46
+#endif
+
+typedef struct socket_peers {
+    struct {
+        char ip[INET6_ADDRSTRLEN];
+        int port;
+    } local;
+
+    struct {
+        char ip[INET6_ADDRSTRLEN];
+        int port;
+    } peer;
+} SOCKET_PEERS;
+
+SOCKET_PEERS socket_peers(int sock_fd);
 
 #endif //NETDATA_SOCKET_H

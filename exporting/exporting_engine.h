@@ -126,8 +126,7 @@ struct simple_connector_data {
     struct simple_connector_buffer *last_buffer;
 
 #ifdef ENABLE_HTTPS
-    SSL *conn; //SSL connection
-    int flags; //The flags for SSL connection
+    NETDATA_SSL ssl;
 #endif
 };
 

@@ -352,21 +352,12 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
                 buffer_json_member_add_string_or_empty(wb, "osVersion", host->system_info->host_os_version);
             }
 
+            time_t now = now_realtime_sec();
             buffer_json_member_add_object(wb, "status");
-
-            size_t receiver_hops = host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1;
-            buffer_json_member_add_object(wb, "collection");
-            buffer_json_member_add_uint64(wb, "hops", receiver_hops);
-            buffer_json_member_add_boolean(wb, "online", host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED));
-            buffer_json_member_add_boolean(wb, "replicating", rrdhost_receiver_replicating_charts(host));
-            buffer_json_object_close(wb); // collection
-
-            buffer_json_member_add_object(wb, "streaming");
-            buffer_json_member_add_uint64(wb, "hops", host->sender ? host->sender->hops : receiver_hops + 1);
-            buffer_json_member_add_boolean(wb, "online", rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED));
-            buffer_json_member_add_boolean(wb, "replicating", rrdhost_sender_replicating_charts(host));
-            buffer_json_object_close(wb); // streaming
-
+            {
+                rrdhost_receiver_to_json(wb, host, "collection", now);
+                rrdhost_sender_to_json(wb, host, "streaming", now);
+            }
             buffer_json_object_close(wb); // status
         }
 

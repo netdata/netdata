@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include <poll.h>
+#include <stdio.h>
 
 #include "parser.h"
 #include "collectors/plugins.d/pluginsd_parser.h"
@@ -124,26 +126,77 @@ void parser_destroy(PARSER *parser)
  *
  */
 
-int parser_next(PARSER *parser, char *buffer, size_t buffer_size)
-{
-    char *tmp = fgets(buffer, (int)buffer_size, (FILE *)parser->fp_input);
+typedef enum {
+    PARSER_FGETS_RESULT_OK,
+    PARSER_FGETS_RESULT_TIMEOUT,
+    PARSER_FGETS_RESULT_ERROR,
+    PARSER_FGETS_RESULT_EOF,
+} PARSER_FGETS_RESULT;
 
-    if (unlikely(!tmp)) {
-        if (feof((FILE *)parser->fp_input))
-            error("PARSER: read failed: end of file");
+static inline PARSER_FGETS_RESULT parser_fgets(char *s, int size, FILE *stream) {
+    errno = 0;
 
-        else if (ferror((FILE *)parser->fp_input))
-            error("PARSER: read failed: input error");
+    struct pollfd fds[1];
+    int timeout_msecs = 2 * 60 * MSEC_PER_SEC;
 
-        else
-            error("PARSER: read failed: unknown error");
+    fds[0].fd = fileno(stream);
+    fds[0].events = POLLIN;
 
-        return 1;
+    int ret = poll(fds, 1, timeout_msecs);
+
+    if (ret > 0) {
+        /* There is data to read */
+        if (fds[0].revents & POLLIN) {
+            char *tmp = fgets(s, size, stream);
+
+            if(unlikely(!tmp)) {
+                if (feof(stream)) {
+                    error("PARSER: read failed: end of file.");
+                    return PARSER_FGETS_RESULT_EOF;
+                }
+
+                else if (ferror(stream)) {
+                    error("PARSER: read failed: input error.");
+                    return PARSER_FGETS_RESULT_ERROR;
+                }
+
+                error("PARSER: read failed: unknown error.");
+                return PARSER_FGETS_RESULT_ERROR;
+            }
+
+            return PARSER_FGETS_RESULT_OK;
+        }
+        else if(fds[0].revents & POLLERR) {
+            error("PARSER: read failed: POLLERR.");
+            return PARSER_FGETS_RESULT_ERROR;
+        }
+        else if(fds[0].revents & POLLHUP) {
+            error("PARSER: read failed: POLLHUP.");
+            return PARSER_FGETS_RESULT_ERROR;
+        }
+        else if(fds[0].revents & POLLNVAL) {
+            error("PARSER: read failed: POLLNVAL.");
+            return PARSER_FGETS_RESULT_ERROR;
+        }
+
+        error("PARSER: poll() returned positive number, but POLLIN|POLLERR|POLLHUP|POLLNVAL are not set.");
+        return PARSER_FGETS_RESULT_ERROR;
+    }
+    else if (ret == 0) {
+        error("PARSER: timeout while waiting for data.");
+        return PARSER_FGETS_RESULT_TIMEOUT;
     }
 
-    return 0;
+    error("PARSER: poll() failed with code %d.", ret);
+    return PARSER_FGETS_RESULT_ERROR;
 }
 
+int parser_next(PARSER *parser, char *buffer, size_t buffer_size) {
+    if(likely(parser_fgets(buffer, (int)buffer_size, (FILE *)parser->fp_input) == PARSER_FGETS_RESULT_OK))
+        return 0;
+
+    return 1;
+}
 
 /*
 * Takes an initialized parser object that has an unprocessed entry (by calling parser_next)
@@ -202,7 +255,6 @@ inline int parser_action(PARSER *parser, char *input)
     else
         rc = PARSER_RC_ERROR;
 
-#ifdef NETDATA_INTERNAL_CHECKS
     if(rc == PARSER_RC_ERROR) {
         BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
         for(size_t i = 0; i < num_words ;i++) {
@@ -214,12 +266,11 @@ inline int parser_action(PARSER *parser, char *input)
             buffer_fast_strcat(wb, "\"", 1);
         }
 
-        internal_error(true, "PLUGINSD: parser_action('%s') failed on line %zu: { %s } (quotes added to show parsing)",
+        error("PLUGINSD: parser_action('%s') failed on line %zu: { %s } (quotes added to show parsing)",
                        command, parser->line, buffer_tostring(wb));
 
         buffer_free(wb);
     }
-#endif
 
     return (rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP);
 }

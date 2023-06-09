@@ -76,8 +76,10 @@ dist_noinst_DATA = \
     packaging/jsonc.version \
     packaging/yaml.checksums \
     packaging/yaml.version \
-    packaging/libbpf.checksums \
-    packaging/libbpf.version \
+    packaging/current_libbpf.checksums \
+    packaging/current_libbpf.version \
+    packaging/libbpf_0_0_9.checksums \
+    packaging/libbpf_0_0_9.version \
     packaging/protobuf.checksums \
     packaging/protobuf.version \
     packaging/version \
@@ -152,6 +154,8 @@ LIBNETDATA_FILES = \
     libnetdata/dictionary/dictionary.h \
     libnetdata/eval/eval.c \
     libnetdata/eval/eval.h \
+    libnetdata/gorilla/gorilla.h \
+    libnetdata/gorilla/gorilla.cc \
     libnetdata/inlined.h \
     libnetdata/july/july.c \
     libnetdata/july/july.h \

@@ -52,6 +52,8 @@ typedef enum web_client_flags {
 
     WEB_CLIENT_FLAG_SSL_WAIT_RECEIVE = 1 << 11, // if set, we are waiting more input data from an ssl conn
     WEB_CLIENT_FLAG_SSL_WAIT_SEND = 1 << 12,    // if set, we have data to send to the client from an ssl conn
+
+    WEB_CLIENT_FLAG_PROXY_HTTPS = 1 << 13, // if set, the client reaches us via an https proxy
 } WEB_CLIENT_FLAGS;
 
 #define web_client_flag_check(w, flag) ((w)->flags & (flag))
@@ -168,7 +170,7 @@ struct web_client {
     size_t pollinfo_filecopy_slot;      // POLLINFO slot of the file read
 
 #ifdef ENABLE_HTTPS
-    struct netdata_ssl ssl;
+    NETDATA_SSL ssl;
 #endif
 
     struct {                            // A callback to check if the query should be interrupted / stopped
@@ -213,15 +215,9 @@ int mysendfile(struct web_client *w, char *filename);
 void web_client_build_http_header(struct web_client *w);
 char *strip_control_characters(char *url);
 
-int web_client_socket_is_now_used_for_streaming(struct web_client *w);
-
 void web_client_zero(struct web_client *w);
 struct web_client *web_client_create(size_t *statistics_memory_accounting);
 void web_client_free(struct web_client *w);
-
-#ifdef ENABLE_HTTPS
-void web_client_reuse_ssl(struct web_client *w);
-#endif
 
 #include "web/api/web_api_v1.h"
 #include "web/api/web_api_v2.h"

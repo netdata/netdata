@@ -153,9 +153,9 @@ static unsigned char label_values_char_map[256] = {
     [88] = 'X', // X keep
     [89] = 'Y', // Y keep
     [90] = 'Z', // Z keep
-    [91] = '_', // [
+    [91] = '[', // [ keep
     [92] = '/', // backslash convert \ to /
-    [93] = '_', // ]
+    [93] = ']', // ] keep
     [94] = '_', // ^
     [95] = '_', // _ keep
     [96] = '_', // `
@@ -1223,6 +1223,7 @@ int rrdlabels_unittest_sanitization() {
     errors += rrdlabels_unittest_sanitize_value("", "[none]");
     errors += rrdlabels_unittest_sanitize_value("1", "1");
     errors += rrdlabels_unittest_sanitize_value("  hello   world   ", "hello world");
+    errors += rrdlabels_unittest_sanitize_value("[none]", "[none]");
 
     // 2-byte UTF-8
     errors += rrdlabels_unittest_sanitize_value(" Ελλάδα ", "Ελλάδα");

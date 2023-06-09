@@ -1,20 +1,16 @@
 #ifndef NETDATA_SECURITY_H
 # define NETDATA_SECURITY_H
 
-# define NETDATA_SSL_HANDSHAKE_COMPLETE 0    //All the steps were successful
-# define NETDATA_SSL_START 1                 //Starting handshake, conn variable is NULL
-# define NETDATA_SSL_WANT_READ 2             //The connection wanna read from socket
-# define NETDATA_SSL_WANT_WRITE 4            //The connection wanna write on socket
-# define NETDATA_SSL_NO_HANDSHAKE 8          //Continue without encrypt connection.
-# define NETDATA_SSL_OPTIONAL 16             //Flag to define the HTTP request
-# define NETDATA_SSL_FORCE 32                //We only accepts HTTPS request
-# define NETDATA_SSL_INVALID_CERTIFICATE 64  //Accepts invalid certificate
-# define NETDATA_SSL_VALID_CERTIFICATE 128  //Accepts invalid certificate
-# define NETDATA_SSL_PROXY_HTTPS 256        //Proxy is using HTTPS
+typedef enum __attribute__((packed)) {
+    NETDATA_SSL_STATE_NOT_SSL = 1,  // This connection is not SSL
+    NETDATA_SSL_STATE_INIT,         // SSL handshake is initialized
+    NETDATA_SSL_STATE_FAILED,       // SSL handshake failed
+    NETDATA_SSL_STATE_COMPLETE,     // SSL handshake successful
+} NETDATA_SSL_STATE;
 
-#define NETDATA_SSL_CONTEXT_SERVER 0
-#define NETDATA_SSL_CONTEXT_STREAMING 1
-#define NETDATA_SSL_CONTEXT_EXPORTING 2
+#define NETDATA_SSL_WEB_SERVER_CTX 0
+#define NETDATA_SSL_STREAMING_SENDER_CTX 1
+#define NETDATA_SSL_EXPORTING_CTX 2
 
 # ifdef ENABLE_HTTPS
 
@@ -37,27 +33,42 @@
 #include <openssl/decoder.h>
 #endif
 
-struct netdata_ssl {
-    SSL *conn; //SSL connection
-    uint32_t flags; //The flags for SSL connection
-};
+typedef struct netdata_ssl {
+    SSL *conn;               // SSL connection
+    NETDATA_SSL_STATE state; // The state for SSL connection
+    unsigned long ssl_errno; // The SSL errno of the last SSL call
+} NETDATA_SSL;
+
+#define NETDATA_SSL_UNSET_CONNECTION (NETDATA_SSL){ .conn = NULL, .state = NETDATA_SSL_STATE_NOT_SSL }
+
+#define SSL_connection(ssl) ((ssl)->conn && (ssl)->state != NETDATA_SSL_STATE_NOT_SSL)
 
 extern SSL_CTX *netdata_ssl_exporting_ctx;
-extern SSL_CTX *netdata_ssl_client_ctx;
-extern SSL_CTX *netdata_ssl_srv_ctx;
+extern SSL_CTX *netdata_ssl_streaming_sender_ctx;
+extern SSL_CTX *netdata_ssl_web_server_ctx;
 extern const char *netdata_ssl_security_key;
 extern const char *netdata_ssl_security_cert;
 extern const char *tls_version;
 extern const char *tls_ciphers;
-extern int netdata_ssl_validate_server;
+extern bool netdata_ssl_validate_certificate;
+extern bool netdata_ssl_validate_certificate_sender;
 int ssl_security_location_for_context(SSL_CTX *ctx,char *file,char *path);
 
-void security_openssl_library();
-void security_clean_openssl();
-void security_start_ssl(int selector);
-int security_process_accept(SSL *ssl,int msg);
+void netdata_ssl_initialize_openssl();
+void netdata_ssl_cleanup();
+void netdata_ssl_initialize_ctx(int selector);
 int security_test_certificate(SSL *ssl);
-SSL_CTX * security_initialize_openssl_client();
+SSL_CTX * netdata_ssl_create_client_ctx(unsigned long mode);
+
+bool netdata_ssl_connect(NETDATA_SSL *ssl);
+bool netdata_ssl_accept(NETDATA_SSL *ssl);
+
+bool netdata_ssl_open(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd);
+void netdata_ssl_close(NETDATA_SSL *ssl);
+void netdata_ssl_log_error_queue(const char *call, NETDATA_SSL *ssl);
+
+ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num);
+ssize_t netdata_ssl_write(NETDATA_SSL *ssl, const void *buf, size_t num);
 
 # endif //ENABLE_HTTPS
 #endif //NETDATA_SECURITY_H

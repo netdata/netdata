@@ -5,14 +5,7 @@
 // ----------------------------------------------------------------------------
 
 inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
-
     sql_health_alarm_log_save(host, ae);
-
-#ifdef ENABLE_ACLK
-    if (netdata_cloud_setting) {
-        sql_queue_alarm_to_aclk(host, ae, 0);
-    }
-#endif
 }
 
 // ----------------------------------------------------------------------------
@@ -52,6 +45,8 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     ae->chart_context = string_dup(chart_context);
 
     uuid_copy(ae->config_hash_id, *((uuid_t *) config_hash_id));
+
+    uuid_generate_random(ae->transition_id);
 
     ae->family = string_dup(family);
     ae->classification = string_dup(class);

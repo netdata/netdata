@@ -1833,6 +1833,21 @@ int main (int argc, char **argv) {
     for(iteration = 0; 1 ; iteration++) {
         usec_t dt = heartbeat_next(&hb, step);
 
+        if (iteration) {
+            if (iteration == 1) {
+                fprintf(
+                    stdout,
+                    "CHART netdata.freeipmi_availability_status '' 'Plugin availability status' 'status' plugins netdata.plugin_availability_status line 146000 %d\n"
+                    "DIMENSION available '' absolute 1 1\n",
+                    netdata_update_every);
+            }
+            fprintf(
+                stdout,
+                "BEGIN netdata.freeipmi_availability_status\n"
+                "SET available = 1\n"
+                "END\n");
+        }
+
         if(debug && iteration)
             fprintf(stderr, "freeipmi.plugin: iteration %zu, dt %llu usec, sensors collected %zu, sensors sent to netdata %zu \n"
                     , iteration
@@ -1852,6 +1867,11 @@ int main (int argc, char **argv) {
         fflush(stdout);
 
         // restart check (14400 seconds)
-        if(now_monotonic_sec() - started_t > 14400) exit(0);
+        if (now_monotonic_sec() - started_t > 14400) {
+            fprintf(stdout, "EXIT\n");
+            fflush(stdout);
+            exit(0);
+        }
     }
 }
+

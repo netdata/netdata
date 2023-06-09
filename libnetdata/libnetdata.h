@@ -666,6 +666,7 @@ extern char *netdata_configured_host_prefix;
 #include "parser/parser.h"
 #include "yaml.h"
 #include "http/http_defs.h"
+#include "gorilla/gorilla.h"
 
 // BEWARE: this exists in alarm-notify.sh
 #define DEFAULT_CLOUD_BASE_URL "https://app.netdata.cloud"

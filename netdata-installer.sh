@@ -816,17 +816,6 @@ detect_libc() {
   return 0
 }
 
-rename_libbpf_packaging() {
-  if [ "$(get_kernel_version)" -ge "004014000" ]; then
-    cp packaging/current_libbpf.checksums packaging/libbpf.checksums
-    cp packaging/current_libbpf.version packaging/libbpf.version
-  else
-    cp packaging/libbpf_0_0_9.checksums packaging/libbpf.checksums
-    cp packaging/libbpf_0_0_9.version packaging/libbpf.version
-  fi
-}
-
-
 build_libbpf() {
   cd "${1}/src" > /dev/null || return 1
   mkdir root build
@@ -866,16 +855,20 @@ bundle_libbpf() {
 
   [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling libbpf."
 
-  rename_libbpf_packaging
-
   progress "Prepare libbpf"
 
-  LIBBPF_PACKAGE_VERSION="$(cat packaging/libbpf.version)"
+  if [ "$(get_kernel_version)" -ge "004014000" ]; then
+    LIBBPF_PACKAGE_VERSION="$(cat packaging/current_libbpf.version)"
+    LIBBPF_PACKAGE_COMPONENT="current_libbpf"
+  else
+    LIBBPF_PACKAGE_VERSION="$(cat packaging/libbpf_0_0_9.version)"
+    LIBBPF_PACKAGE_COMPONENT="libbpf_0_0_9"
+  fi
 
   tmp="$(mktemp -d -t netdata-libbpf-XXXXXX)"
   LIBBPF_PACKAGE_BASENAME="v${LIBBPF_PACKAGE_VERSION}.tar.gz"
 
-  if fetch_and_verify "libbpf" \
+  if fetch_and_verify "${LIBBPF_PACKAGE_COMPONENT}" \
     "https://github.com/netdata/libbpf/archive/${LIBBPF_PACKAGE_BASENAME}" \
     "${LIBBPF_PACKAGE_BASENAME}" \
     "${tmp}" \

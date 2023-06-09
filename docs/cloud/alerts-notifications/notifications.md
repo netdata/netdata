@@ -31,7 +31,7 @@ or add new alert that you see in Netdata Cloud, and receive via centralized aler
 
 </Callout>
 
-### Alert notifications
+## Alert notifications
 
 Netdata Cloud can send centralized alert notifications to your team whenever a node enters a warning, critical, or unreachable state. By enabling notifications, 
 you ensure no alert, on any node in your infrastructure, goes unnoticed by you or your team.
@@ -51,9 +51,9 @@ All users in a Space can personalize their notifications settings, for Personal 
 > ⚠️ Netdata Cloud supports different notification methods and their availability will depend on the plan you are at.
 > For more details check [Service classification](#service-classification) or [netdata.cloud/pricing](https://www.netdata.cloud/pricing).
 
-#### Service level
+### Service level
 
-##### Personal
+#### Personal
 
 The notifications methods classified as **Personal** are what we consider generic, meaning that these can't have specific rules for them set by the administrators.
 
@@ -63,7 +63,7 @@ manage what specific configurations they want for the Space / Room(s) and the de
 
 One example of such a notification method is the E-mail.
 
-##### System
+#### System
 
 For **System** notification methods, the destination of the channel will be a target that usually isn't specific to a single user, e.g. slack channel.
 
@@ -72,22 +72,48 @@ different targets depending on Rooms or Notification level settings.
 
 Some examples of such notification methods are: Webhook, PagerDuty, Slack.
 
-#### Service classification
+### Service classification
 
-##### Community
+#### Community
 
 Notification methods classified as Community can be used by everyone independent on the plan your space is at.
 These are: Email and discord
 
-##### Pro
+#### Pro
 
 Notification methods classified as Pro are only available for **Pro** and **Business** plans
 These are: webhook
 
-##### Business
+#### Business
 
 Notification methods classified as Business are only available for **Business** plans
 These are: PagerDuty, Slack, Opsgenie
+
+## Silencing Alert notifications
+
+Netdata Cloud provides you a Silencing Rule engine which allows you to mute alert notifications. This muting action is specific to alert state transition notifications, it doesn't include node unreachable state transitions.
+
+The Silencing Rule engine is flexible and allows you to enter silence rules for the two main entities involved on alert notifications and can be set using different attributes. The main entities you can enter are **Nodes** and **Alerts** which can be used in combination or isolation to target specific needs - see some examples [here](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-alert-notification-silencing-rules.md#silencing-rules-examples).
+
+### Scope definition for Nodes
+* **Space:** silencing the space, selecting `All Rooms`, silences all alert state transitions from any node claimed to the space.
+* **War Room:** silencing a specific room will silence all alert state transitions from any node in that room. Please note if the node belongs to 
+another room which isn't silenced it can trigger alert notifications to the users with membership to that other room.
+* **Node:** silencing a specific node can be done for the entire space, selecting `All Rooms`, or for specific war room(s). The main difference is
+if the node should be silenced for the entire space or just for specific rooms (when specific rooms are selected only users with membership to that room won't receive notifications).
+
+### Scope definition for Alerts
+* **Alert name:** silencing a specific alert name silences all alert state transitions for that specific alert. 
+* **Alert context:** silencing a specific alert context will silence all alert state transitions for alerts targeting that chart context, for more details check [alert configuration docs](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#alarm-line-on).
+* **Alert role:** silencing a specific alert role will silence all the alert state transitions for alerts that are configured to be specific role recipients, for more details check [alert configuration docs](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#alarm-line-to).
+
+Beside the above two main entities there are another two important settings that you can define on a silencing rule:
+* Who does the rule affect? **All user** in the space or **Myself**
+* When does is to apply? **Immediately** or on a **Schedule** (when setting immediately you can set duration)
+
+For further help on setting alert notification silencing rules go to [Manage Alert Notification Silencing Rules](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-alert-notification-silencing-rules.md).
+
+> ⚠️ This feature is only available for [Netdata paid plans](https://github.com/netdata/netdata/edit/master/docs/cloud/manage/plans.md).
 
 ## Flood protection
 
