@@ -349,6 +349,7 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
     for (i = 0; local_syscalls[i].syscall; i++) {
         ebpf_sync_syscalls_t *w = &local_syscalls[i];
         w->sync_maps = local_syscalls[i].sync_maps;
+        em->maps = local_syscalls[i].sync_maps;
         if (w->enabled) {
             if (em->load & EBPF_LOAD_LEGACY) {
                 if (ebpf_sync_load_legacy(w, em))
@@ -616,7 +617,6 @@ void *ebpf_sync_thread(void *ptr)
     netdata_thread_cleanup_push(ebpf_sync_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    em->maps = sync_maps;
 
     ebpf_set_sync_maps();
     ebpf_sync_parse_syscalls();
