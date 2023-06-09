@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "sqlite_health.h"
+#include "libnetdata/string/string.h"
 #include "sqlite_functions.h"
 #include "sqlite_db_migration.h"
 #include "uuid.h"
@@ -79,9 +80,9 @@ failed:
 */
 #define SQL_INSERT_HEALTH_LOG "INSERT INTO health_log (host_id, unique_id, alarm_id, alarm_event_id, " \
     "config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, " \
-    "exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, " \
+    "exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, " \
     "units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, " \
-    "class, component, type, chart_context, transition_id, insert_mark_timestamp) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
+    "chart_context, transition_id, insert_mark_timestamp) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
 
 void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
     sqlite3_stmt *res = NULL;
@@ -207,97 +208,73 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
         goto failed;
     }
 
-    rc = sqlite3_bind_string_or_null(res, ae->source, 19);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind source parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_string_or_null(res, ae->units, 20);
+    rc = sqlite3_bind_string_or_null(res, ae->units, 19);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host_id parameter to store node instance information");
         goto failed;
     }
 
-    rc = sqlite3_bind_string_or_null(res, ae->info, 21);
+    rc = sqlite3_bind_string_or_null(res, ae->info, 20);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind info parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_int(res, 22, ae->exec_code);
+    rc = sqlite3_bind_int(res, 21, ae->exec_code);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind exec_code parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_int(res, 23, ae->new_status);
+    rc = sqlite3_bind_int(res, 22, ae->new_status);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind new_status parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_int(res, 24, ae->old_status);
+    rc = sqlite3_bind_int(res, 23, ae->old_status);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind old_status parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_int(res, 25, ae->delay);
+    rc = sqlite3_bind_int(res, 24, ae->delay);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind delay parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_double(res, 26, ae->new_value);
+    rc = sqlite3_bind_double(res, 25, ae->new_value);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind new_value parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_double(res, 27, ae->old_value);
+    rc = sqlite3_bind_double(res, 26, ae->old_value);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind old_value parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_int64(res, 28, (sqlite3_int64) ae->last_repeat);
+    rc = sqlite3_bind_int64(res, 27, (sqlite3_int64) ae->last_repeat);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind last_repeat parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_string_or_null(res, ae->classification, 29);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind classification parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_string_or_null(res, ae->component, 30);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind component parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_string_or_null(res, ae->type, 31);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind type parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_string_or_null(res, ae->chart_context, 32);
+    rc = sqlite3_bind_string_or_null(res, ae->chart_context, 28);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind chart_context parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_blob(res, 33, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, 29, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind transition_id parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_int64(res, 34, now_monotonic_usec());
+    rc = sqlite3_bind_int64(res, 30, now_monotonic_usec());
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind transition_id parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
@@ -499,9 +476,9 @@ void sql_health_alarm_log_cleanup(RRDHOST *host) {
 }
 
 #define SQL_INJECT_REMOVED "insert into health_log (host_id, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, " \
-"delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type, chart_context, transition_id, insert_mark_timestamp) " \
+"delay_up_to_timestamp, name, chart, family, exec, recipient, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, chart_context, transition_id, insert_mark_timestamp) " \
 "select host_id, ?1, ?2, ?3, config_hash_id, 0, ?4, unixepoch(), 0, 0, flags, exec_run_timestamp, " \
-"unixepoch(), name, chart, family, exec, recipient, source, units, info, exec_code, -2, new_status, delay, NULL, new_value, 0, class, component, type, chart_context, ?5, ?6 " \
+"unixepoch(), name, chart, family, exec, recipient, units, info, exec_code, -2, new_status, delay, NULL, new_value, 0, chart_context, ?5, ?6 " \
 "from health_log where unique_id = ?7 and host_id = ?8;"
 #define SQL_INJECT_REMOVED_UPDATE "update health_log set flags = flags | ?1, updated_by_id = ?2 where unique_id = ?3 and host_id = ?4;"
 void sql_inject_removed_status(RRDHOST *host, uint32_t alarm_id, uint32_t alarm_event_id, uint32_t unique_id, uint32_t max_unique_id)
@@ -695,7 +672,7 @@ void sql_check_removed_alerts_state(RRDHOST *host)
 /* Health related SQL queries
    Load from the health log table
 */
-#define SQL_LOAD_HEALTH_LOG "SELECT unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type, chart_context, transition_id FROM health_log where host_id = @host_id group by alarm_id having max(alarm_event_id);"
+#define SQL_LOAD_HEALTH_LOG "SELECT hl.unique_id, hl.alarm_id, hl.alarm_event_id, hl.config_hash_id, hl.updated_by_id, hl.updates_id, hl.when_key, hl.duration, hl.non_clear_duration, hl.flags, hl.exec_run_timestamp, hl.delay_up_to_timestamp, hl.name, hl.chart, hl.family, hl.exec, hl.recipient, ah.source, hl.units, hl.info, hl.exec_code, hl.new_status, hl.old_status, hl.delay, hl.new_value, hl.old_value, hl.last_repeat, ah.class, ah.component, ah.type, hl.chart_context, hl.transition_id FROM health_log hl, alert_hash ah where hl.config_hash_id = ah.hash_id and host_id = @host_id group by hl.alarm_id having max(hl.alarm_event_id);"
 void sql_health_alarm_log_load(RRDHOST *host) {
     sqlite3_stmt *res = NULL;
     int ret;
@@ -915,8 +892,8 @@ void sql_health_alarm_log_load(RRDHOST *host) {
     "on_key, class, component, type, os, hosts, lookup, every, units, calc, families, plugin, module, " \
     "charts, green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels, " \
     "p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after, " \
-    "p_db_lookup_before, p_update_every) values (?1,unixepoch(),?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12," \
-    "?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34);"
+    "p_db_lookup_before, p_update_every, source) values (?1,unixepoch(),?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12," \
+    "?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35);"
 
 int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
 {
@@ -1096,6 +1073,10 @@ int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
+    rc = sqlite3_bind_string_or_null(res, cfg->source, ++param);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to store alert config, rc = %d", rc);
@@ -1218,7 +1199,7 @@ int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_S
      return ret;
 }
 
-#define SQL_SELECT_HEALTH_LOG "SELECT unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type, chart_context, transition_id FROM health_log WHERE host_id = @host_id "
+#define SQL_SELECT_HEALTH_LOG "SELECT hl.unique_id, hl.alarm_id, hl.alarm_event_id, hl.config_hash_id, hl.updated_by_id, hl.updates_id, hl.when_key, hl.duration, hl.non_clear_duration, hl.flags, hl.exec_run_timestamp, hl.delay_up_to_timestamp, hl.name, hl.chart, hl.family, hl.exec, hl.recipient, ah.source, hl.units, hl.info, hl.exec_code, hl.new_status, hl.old_status, hl.delay, hl.new_value, hl.old_value, hl.last_repeat, ah.class, ah.component, ah.type, hl.chart_context, hl.transition_id FROM health_log hl, alert_hash ah WHERE hl.config_hash_id = ah.hash_id and host_id = @host_id "
 void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *chart) {
 
     buffer_strcat(wb, "[");
@@ -1482,14 +1463,14 @@ void health_migrate_old_health_log_table_mark(uuid_t *uuid) {
 
 #define SQL_COPY_HEALTH_LOG(table) "INSERT INTO health_log (host_id, unique_id, alarm_id, alarm_event_id, " \
     "config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, " \
-    "exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, " \
+    "exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, " \
     "units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, " \
-    "class, component, type, chart_context, transition_id) " \
+    "chart_context, transition_id) " \
     "SELECT ?1, unique_id, alarm_id, alarm_event_id, " \
     "config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, " \
-    "exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, " \
+    "exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, " \
     "units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, " \
-    "class, component, type, chart_context, transition_id from %s; ", table
+    "chart_context, transition_id from %s; ", table
 int health_migrate_old_health_log_table(char *table) {
     if (!table)
         return 0;

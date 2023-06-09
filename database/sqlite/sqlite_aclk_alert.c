@@ -274,10 +274,10 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
 
     buffer_sprintf(sql, "select aa.sequence_id, hl.unique_id, hl.alarm_id, hl.config_hash_id, hl.updated_by_id, hl.when_key, " \
         " hl.duration, hl.non_clear_duration, hl.flags, hl.exec_run_timestamp, hl.delay_up_to_timestamp, hl.name,  " \
-        " hl.chart, hl.family, hl.exec, hl.recipient, hl.source, hl.units, hl.info, hl.exec_code, hl.new_status,  " \
+        " hl.chart, hl.family, hl.exec, hl.recipient, ha.source, hl.units, hl.info, hl.exec_code, hl.new_status,  " \
         " hl.old_status, hl.delay, hl.new_value, hl.old_value, hl.last_repeat, hl.chart_context, hl.transition_id, hl.alarm_event_id  " \
-        " from health_log hl, aclk_alert_%s aa " \
-        " where hl.unique_id = aa.alert_unique_id and aa.date_submitted is null and host_id = @host_id " \
+        " from health_log hl, aclk_alert_%s aa, alert_hash ha " \
+        " where hl.unique_id = aa.alert_unique_id and hl.config_hash_id = ha.hash_id and aa.date_submitted is null and host_id = @host_id " \
         " order by aa.sequence_id asc limit %d;", wc->uuid_str, limit);
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);

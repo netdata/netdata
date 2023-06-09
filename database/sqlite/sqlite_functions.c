@@ -32,7 +32,9 @@ const char *database_config[] = {
     "every text, units text, calc text, families text, plugin text, module text, charts text, green text, "
     "red text, warn text, crit text, exec text, to_key text, info text, delay text, options text, "
     "repeat text, host_labels text, p_db_lookup_dimensions text, p_db_lookup_method text, p_db_lookup_options int, "
-    "p_db_lookup_after int, p_db_lookup_before int, p_update_every int);",
+    "p_db_lookup_after int, p_db_lookup_before int, p_update_every int, source text);",
+
+    "CREATE INDEX IF NOT EXISTS alert_hash_index ON alert_hash (hash_id);",
 
     "CREATE TABLE IF NOT EXISTS host_info(host_id blob, system_key text NOT NULL, system_value text NOT NULL, "
     "date_created INT, PRIMARY KEY(host_id, system_key));",
@@ -46,9 +48,8 @@ const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS health_log (host_id blob, unique_id int, alarm_id int, alarm_event_id int, "
     "config_hash_id blob, updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, "
     "flags int, exec_run_timestamp int, delay_up_to_timestamp int, name text, chart text, family text, exec text, "
-    "recipient text, source text, units text, info text, exec_code int, new_status real, old_status real, delay int, "
-    "new_value double, old_value double, last_repeat int, class text, component text, type text, chart_context text, "
-    "transition_id blob, insert_mark_timestamp int);",
+    "recipient text, units text, info text, exec_code int, new_status real, old_status real, delay int, "
+    "new_value double, old_value double, last_repeat int, chart_context text, transition_id blob, insert_mark_timestamp int);",
 
     "CREATE INDEX IF NOT EXISTS health_log_index ON health_log (unique_id);",
 

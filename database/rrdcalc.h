@@ -211,6 +211,7 @@ struct alert_config {
     STRING *repeat;
     STRING *host_labels;
     STRING *chart_labels;
+    STRING *source;
 
     STRING *p_db_lookup_dimensions;
     STRING *p_db_lookup_method;
