@@ -447,20 +447,6 @@ static int netdata_dyncfg(h2o_handler_t *self, h2o_req_t *req)
 // as demo, in future this callback should exist within the module/plugin itself
 json_object *http_check_config = NULL;
 
-json_object *get_current_config_http_check()
-{
-    if (http_check_config == NULL) {
-        http_check_config = json_object_new_object();
-        json_object *sub = json_object_new_string("I'am http_check and this is my current configuration");
-        json_object_object_add(http_check_config, "info", sub);
-        sub = json_object_new_int(5);
-        json_object_object_add(http_check_config, "update_every", sub);
-    }
-    json_object *copy = NULL;
-    json_object_deep_copy(http_check_config, &copy, NULL);
-    return copy;
-}
-
 int set_current_config_http_check(json_object *cfg)
 {
     json_object_put(http_check_config);

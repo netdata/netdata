@@ -35,7 +35,7 @@ inline struct configurable_module *get_module_by_name(const char *name)
 json_object *get_config_of_module_json(struct configurable_module *module)
 {
     pthread_mutex_lock(&module->lock);
-    json_object *cfg;
+    json_object *cfg = NULL;
     json_object_deep_copy(module->config, &cfg, NULL);
     pthread_mutex_unlock(&module->lock);
     return cfg;
@@ -121,7 +121,9 @@ const char *set_module_config_json(struct configurable_module *module, json_obje
     module->config = cfg;
     pthread_mutex_unlock(&module->lock);
 
-    module->set_config_cb(cfg);
+    json_object *cfg_copy = NULL;
+    json_object_deep_copy(cfg, &cfg_copy, NULL);
+    module->set_config_cb(cfg_copy);
 
     return NULL;
 }
@@ -130,6 +132,11 @@ int register_module(struct configurable_module *module)
 {
     if (get_module_by_name(module->name) != NULL) {
         error_report("DYNCFG module \"%s\" already registered", module->name);
+        return 1;
+    }
+
+    if (module->set_config_cb == NULL) {
+        error_report("DYNCFG module \"%s\" has no set_config_cb", module->name);
         return 1;
     }
 
