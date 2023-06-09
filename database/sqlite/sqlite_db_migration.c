@@ -218,12 +218,25 @@ static int do_migration_v8_v9(sqlite3 *database, const char *name)
     UNUSED(name);
     info("Running database migration %s", name);
 
-    char sql[256];
+    char sql[2048];
     int rc;
     sqlite3_stmt *res = NULL;
+
+    //create the health_log table and it's index
+    snprintfz(sql, 2047, "CREATE TABLE IF NOT EXISTS health_log (host_id blob, unique_id int, alarm_id int, alarm_event_id int, " \
+              "config_hash_id blob, updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, " \
+              "flags int, exec_run_timestamp int, delay_up_to_timestamp int, name text, chart text, family text, exec text, " \
+              "recipient text, source text, units text, info text, exec_code int, new_status real, old_status real, delay int, " \
+              "new_value double, old_value double, last_repeat int, class text, component text, type text, chart_context text, " \
+              "transition_id blob, insert_mark_timestamp int);");
+    sqlite3_exec_monitored(database, sql, 0, 0, NULL);
+
+    snprintfz(sql, 2047, "CREATE INDEX IF NOT EXISTS health_log_index ON health_log (unique_id);");
+    sqlite3_exec_monitored(database, sql, 0, 0, NULL);
+
     DICTIONARY *dict_tables = dictionary_create(DICT_OPTION_NONE);
 
-    snprintfz(sql, 255, "SELECT name FROM sqlite_schema WHERE type ='table' AND name LIKE 'health_log_%%';");
+    snprintfz(sql, 2047, "SELECT name FROM sqlite_schema WHERE type ='table' AND name LIKE 'health_log_%%';");
     rc = sqlite3_prepare_v2(database, sql, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement to alter health_log tables");
