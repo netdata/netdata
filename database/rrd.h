@@ -924,6 +924,7 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
     // ACLK
     RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 21), // when set, we should send ACLK stream context updates
     RRDHOST_FLAG_ACLK_STREAM_ALERTS             = (1 << 22), // set when the receiver part is disconnected
+
     // Metadata
     RRDHOST_FLAG_METADATA_UPDATE                = (1 << 23), // metadata needs to be stored in the database
     RRDHOST_FLAG_METADATA_LABELS                = (1 << 24), // metadata needs to be stored in the database
@@ -1226,6 +1227,12 @@ struct rrdhost {
         DICTIONARY *hub_queue;
         DICTIONARY *pp_queue;
     } rrdctx;
+
+    struct {
+        SPINLOCK spinlock;
+        time_t first_time_s;
+        time_t last_time_s;
+    } retention;
 
     uuid_t  host_uuid;                              // Global GUID for this host
     uuid_t  *node_id;                               // Cloud node_id

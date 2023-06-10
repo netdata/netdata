@@ -355,7 +355,20 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
             time_t now = now_realtime_sec();
             buffer_json_member_add_object(wb, "status");
             {
-                rrdhost_receiver_to_json(wb, host, "collection", now);
+                bool online = host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
+
+                time_t first_time_s = 0, last_time_s = 0;
+                netdata_spinlock_lock(&host->retention.spinlock);
+                first_time_s = host->retention.first_time_s;
+                last_time_s = host->retention.last_time_s;
+                netdata_spinlock_unlock(&host->retention.spinlock);
+
+                buffer_json_member_add_object(wb, "retention");
+                buffer_json_member_add_time_t(wb, "from", first_time_s);
+                buffer_json_member_add_time_t(wb, "to", online ? now : last_time_s);
+                buffer_json_object_close(wb);
+
+                rrdhost_receiver_to_json(wb, host, "collection", now, online);
                 rrdhost_sender_to_json(wb, host, "streaming", now);
             }
             buffer_json_object_close(wb); // status

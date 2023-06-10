@@ -392,7 +392,7 @@ bool stop_streaming_receiver(RRDHOST *host, const char *reason);
 
 void sender_thread_buffer_free(void);
 
-void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST *host, const char *key, time_t now __maybe_unused);
+void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST *host, const char *key, time_t now __maybe_unused, bool online);
 void rrdhost_sender_to_json(BUFFER *wb, RRDHOST *host, const char *key, time_t now __maybe_unused);
 
 #include "replication.h"

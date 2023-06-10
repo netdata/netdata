@@ -423,7 +423,7 @@ static void rrdpush_receiver_replication_reset(RRDHOST *host) {
     rrdhost_receiver_replicating_charts_zero(host);
 }
 
-void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST *host, const char *key, time_t now __maybe_unused) {
+void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST *host, const char *key, time_t now __maybe_unused, bool online) {
     size_t receiver_hops = host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1;
 
     netdata_mutex_lock(&host->receiver_lock);
@@ -431,7 +431,6 @@ void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST *host, const char *key, time_t
     buffer_json_member_add_object(wb, key);
     buffer_json_member_add_uint64(wb, "hops", receiver_hops);
 
-    bool online = host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
     buffer_json_member_add_boolean(wb, "online", online);
 
     if(host->child_connect_time || host->child_disconnected_time) {

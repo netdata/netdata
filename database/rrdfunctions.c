@@ -813,7 +813,48 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
     buffer_json_member_add_object(wb, "columns");
     {
         size_t field_id = 0;
+
+        // Node
         buffer_rrdf_table_add_field(wb, field_id++, "Node", "Hostname", "string", "value", "none", 0, NULL, NAN, "ascending", NULL, NULL, RRDF_FIELD_OPTS_VISIBLE|RRDF_FIELD_OPTS_UNIQUE_KEY|RRDF_FIELD_OPTS_SORTABLE|RRDF_FIELD_OPTS_STICKY);
+
+        // retention
+        //  - from
+        //  - to
+
+        // Inbound
+        //  - hops
+        //  - online
+        //  - age
+        //  - replication
+        //  - replication completion
+        //  - replication instances
+        //  - srcIP
+        //  - srcPort
+        //  - dstIP
+        //  - dstPort
+        //  - SSL
+        //  - capabilities
+
+        // Outbound
+        //  - hops
+        //  - online
+        //  - age
+        //  - replication
+        //  - replication completion
+        //  - replication instances
+        //  - srcIP
+        //  - srcPort
+        //  - dstIP
+        //  - dstPort
+        //  - SSL
+        //  - capabilities
+        //  - compression
+        //  - traffic data
+        //  - traffic metadata
+        //  - traffic functions
+        //  - traffic replication
+        //  - last connect attempt
+        //  - last handshake message
     }
     buffer_json_object_close(wb); // columns
     buffer_json_member_add_string(wb, "default_sort_column", "Node");

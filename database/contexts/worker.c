@@ -167,6 +167,27 @@ uint64_t rrdcontext_version_hash_with_callback(
 // ----------------------------------------------------------------------------
 // retention recalculation
 
+static void rrdhost_update_cached_retention(RRDHOST *host, time_t first_time_s, time_t last_time_s, bool global) {
+    if(unlikely(!host))
+        return;
+
+    netdata_spinlock_lock(&host->retention.spinlock);
+
+    if(global) {
+        host->retention.first_time_s = first_time_s;
+        host->retention.last_time_s = last_time_s;
+    }
+    else {
+        if(!host->retention.first_time_s || first_time_s < host->retention.first_time_s)
+            host->retention.first_time_s = first_time_s;
+
+        if(!host->retention.last_time_s || last_time_s > host->retention.last_time_s)
+            host->retention.last_time_s = last_time_s;
+    }
+
+    netdata_spinlock_unlock(&host->retention.spinlock);
+}
+
 void rrdcontext_recalculate_context_retention(RRDCONTEXT *rc, RRD_FLAGS reason, bool worker_jobs) {
     rrdcontext_post_process_updates(rc, true, reason, worker_jobs);
 }
@@ -174,11 +195,22 @@ void rrdcontext_recalculate_context_retention(RRDCONTEXT *rc, RRD_FLAGS reason, 
 void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reason, bool worker_jobs) {
     if(unlikely(!host || !host->rrdctx.contexts)) return;
 
+    time_t first_time_s = 0;
+    time_t last_time_s = 0;
+
     RRDCONTEXT *rc;
     dfe_start_read(host->rrdctx.contexts, rc) {
-                rrdcontext_recalculate_context_retention(rc, reason, worker_jobs);
-            }
+        rrdcontext_recalculate_context_retention(rc, reason, worker_jobs);
+
+        if(!first_time_s || rc->first_time_s < first_time_s)
+            first_time_s = rc->first_time_s;
+
+        if(!last_time_s || rc->last_time_s > last_time_s)
+            last_time_s = rc->last_time_s;
+    }
     dfe_done(rc);
+
+    rrdhost_update_cached_retention(host, first_time_s, last_time_s, true);
 }
 
 static void rrdcontext_recalculate_retention_all_hosts(void) {
@@ -872,8 +904,13 @@ static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending _
                        sending ? (rc->queue.scheduled_dispatch_ut - rc->queue.queued_ut) / USEC_PER_MS : 0
         );
 
+        rrdhost_update_cached_retention(rc->rrdhost, rc->first_time_s, rc->last_time_s, false);
+
         return true;
     }
+
+    if(!(flags & RRD_FLAG_COLLECTED))
+        rrdhost_update_cached_retention(rc->rrdhost, rc->first_time_s, rc->last_time_s, false);
 
     return false;
 }
