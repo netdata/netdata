@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Fix coverity issues [\#15169](https://github.com/netdata/netdata/pull/15169) ([stelfrag](https://github.com/stelfrag))
 - Fix user and group handling in DEB packages. [\#15166](https://github.com/netdata/netdata/pull/15166) ([Ferroin](https://github.com/Ferroin))
 - change mandatory packages for RPMs [\#15165](https://github.com/netdata/netdata/pull/15165) ([tkatsoulas](https://github.com/tkatsoulas))
 - Fix CID 385073 -- Uninitialized scalar variable [\#15163](https://github.com/netdata/netdata/pull/15163) ([stelfrag](https://github.com/stelfrag))
@@ -406,7 +407,6 @@
 - fix setting go.d.plugin capabilities [\#14525](https://github.com/netdata/netdata/pull/14525) ([ilyam8](https://github.com/ilyam8))
 - Simplify parser README.md and add parser files to CMakeLists.txt [\#14523](https://github.com/netdata/netdata/pull/14523) ([stelfrag](https://github.com/stelfrag))
 - Link statically libnetfilter\_acct into our static builds [\#14516](https://github.com/netdata/netdata/pull/14516) ([tkatsoulas](https://github.com/tkatsoulas))
-- Fix broken links in markdown files [\#14513](https://github.com/netdata/netdata/pull/14513) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
