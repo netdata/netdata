@@ -154,18 +154,19 @@ Requires: netdata-plugin-apps
 Requires: netdata-plugin-pythond
 Requires: netdata-plugin-go
 Requires: netdata-plugin-debugfs
-%if 0%{?_have_freeipmi}
-Requires:   netdata-plugin-freeipmi
-%endif
+Requires: netdata-plugin-chartsd
+Requires: netdata-plugin-slabinfo
+Requires: netdata-plugin-perf
 %if 0%{?_have_nfacct}
 Requires:   netdata-plugin-nfacct
 %endif
-%if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
-Requires:   netdata-plugin-cups
+%if 0%{?_have_freeipmi} && 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
+Suggests:   netdata-plugin-freeipmi
 %endif
-Requires:   netdata-plugin-chartsd
-Requires:   netdata-plugin-slabinfo
-Requires:   netdata-plugin-perf
+%if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
+Suggests:   netdata-plugin-cups
+%endif
+
 
 # #####################################################################
 # Functionality-dependent package dependencies
