@@ -361,20 +361,23 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
             else {
                 char syscall[NETDATA_EBPF_MAX_SYSCALL_LENGTH];
                 ebpf_select_host_prefix(syscall, NETDATA_EBPF_MAX_SYSCALL_LENGTH, w->syscall, running_on_kernel);
-                w->sync_obj = sync_bpf__open();
-                if (!w->sync_obj) {
-                    errors++;
-                } else {
-                    if (ebpf_is_function_inside_btf(default_btf, syscall)) {
+                if (ebpf_is_function_inside_btf(default_btf, syscall)) {
+                    w->sync_obj = sync_bpf__open();
+                    if (!w->sync_obj) {
+                        w->enabled = false;
+                        errors++;
+                    } else {
                         if (ebpf_sync_load_and_attach(w->sync_obj, em, syscall, i)) {
+                            w->enabled = false;
                             errors++;
                         }
-                    } else {
-                        if (ebpf_sync_load_legacy(w, em))
-                            errors++;
                     }
-                    em->thread_name = saved_name;
+                } else {
+                    info("Cannot find syscall %s we are not going to monitor it.", syscall);
+                    w->enabled = false;
                 }
+
+                em->thread_name = saved_name;
             }
 #endif
         }
