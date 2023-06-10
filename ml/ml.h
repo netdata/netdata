@@ -40,6 +40,16 @@ int ml_dimension_load_models(RRDDIM *rd);
 
 void ml_update_global_statistics_charts(uint64_t models_consulted);
 
+struct ml_metrics_statistics {
+    size_t anomalous;
+    size_t normal;
+    size_t trained;
+    size_t pending;
+    size_t silenced;
+};
+
+bool ml_host_get_host_status(RRDHOST *rh, struct ml_metrics_statistics *mlm);
+
 #ifdef __cplusplus
 };
 #endif

@@ -455,6 +455,18 @@ typedef struct rrdhost_status {
     } db;
 
     struct {
+        bool enabled;
+
+        struct {
+            size_t anomalous;
+            size_t normal;
+            size_t trained;
+            size_t pending;
+            size_t silenced;
+        } metrics;
+    } ml;
+
+    struct {
         size_t hops;
         RRDHOST_COLLECTION_STATUS status;
         SOCKET_PEERS peers;

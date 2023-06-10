@@ -1724,6 +1724,18 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     s->db.online = rrdhost_is_online(host);
     rrdhost_retention(host, now, s->db.online, &s->db.first_time_s, &s->db.last_time_s);
 
+    // --- ml ---
+
+    struct ml_metrics_statistics mlm;
+    s->ml.enabled = ml_host_get_host_status(host, &mlm);
+    if(s->ml.enabled) {
+        s->ml.metrics.anomalous = mlm.anomalous;
+        s->ml.metrics.normal = mlm.normal;
+        s->ml.metrics.trained = mlm.trained;
+        s->ml.metrics.pending = mlm.pending;
+        s->ml.metrics.silenced = mlm.silenced;
+    }
+
     // --- collection ---
 
     s->collection.since = MAX(host->child_connect_time, host->child_disconnected_time);

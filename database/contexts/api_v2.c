@@ -474,6 +474,17 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
 
                 rrdhost_receiver_to_json(wb, &s, "collection");
                 rrdhost_sender_to_json(wb, &s, "streaming");
+
+                buffer_json_member_add_object(wb, "ml");
+                buffer_json_member_add_boolean(wb, "enabled", s.ml.enabled);
+                buffer_json_member_add_object(wb, "metrics");
+                buffer_json_member_add_uint64(wb, "anomalous", s.ml.metrics.anomalous);
+                buffer_json_member_add_uint64(wb, "normal", s.ml.metrics.normal);
+                buffer_json_member_add_uint64(wb, "trained", s.ml.metrics.trained);
+                buffer_json_member_add_uint64(wb, "pending", s.ml.metrics.pending);
+                buffer_json_member_add_uint64(wb, "silenced", s.ml.metrics.silenced);
+                buffer_json_object_close(wb); // metrics
+                buffer_json_object_close(wb); // ml
             }
             buffer_json_object_close(wb); // status
         }
