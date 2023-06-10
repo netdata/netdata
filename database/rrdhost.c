@@ -1698,7 +1698,7 @@ int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, ch
 static NETDATA_DOUBLE rrdhost_sender_replication_completion_unsafe(RRDHOST *host, time_t now, size_t *instances) {
     size_t charts = rrdhost_sender_replicating_charts(host);
     NETDATA_DOUBLE completion;
-    if(!charts || !host->sender->replication.oldest_request_after_t)
+    if(!charts || !host->sender || !host->sender->replication.oldest_request_after_t)
         completion = 100.0;
     else if(!host->sender->replication.latest_completed_before_t || host->sender->replication.latest_completed_before_t < host->sender->replication.oldest_request_after_t)
         completion = 0.0;
