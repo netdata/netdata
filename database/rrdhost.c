@@ -1694,3 +1694,133 @@ int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, ch
 
     return res;
 }
+
+static NETDATA_DOUBLE rrdhost_sender_replication_completion_unsafe(RRDHOST *host, time_t now, size_t *instances) {
+    size_t charts = rrdhost_sender_replicating_charts(host);
+    NETDATA_DOUBLE completion;
+    if(!charts || !host->sender->replication.oldest_request_after_t)
+        completion = 100.0;
+    else if(!host->sender->replication.latest_completed_before_t || host->sender->replication.latest_completed_before_t < host->sender->replication.oldest_request_after_t)
+        completion = 0.0;
+    else {
+        time_t total = now - host->sender->replication.oldest_request_after_t;
+        time_t current = host->sender->replication.latest_completed_before_t - host->sender->replication.oldest_request_after_t;
+        completion = (NETDATA_DOUBLE) current * 100.0 / (NETDATA_DOUBLE) total;
+    }
+
+    *instances = charts;
+
+    return completion;
+}
+
+void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
+    memset(s, 0, sizeof(*s));
+
+    s->host = host;
+    s->now = now;
+
+    // --- db ---
+
+    s->db.online = rrdhost_is_online(host);
+    rrdhost_retention(host, now, s->db.online, &s->db.first_time_s, &s->db.last_time_s);
+
+    // --- collection ---
+
+    s->collection.since = MAX(host->child_connect_time, host->child_disconnected_time);
+    s->collection.reason = (s->db.online) ? "" : host->rrdpush_last_receiver_exit_reason;
+
+    netdata_mutex_lock(&host->receiver_lock);
+    s->collection.hops = rrdhost_hops(host);
+    if (host->receiver) {
+        s->collection.replication.instances = rrdhost_receiver_replicating_charts(host);
+        s->collection.replication.completion = host->rrdpush_receiver_replication_percent;
+        s->collection.replication.in_progress = s->collection.replication.instances > 0;
+
+        s->collection.capabilities = host->receiver->capabilities;
+        s->collection.peers = socket_peers(host->receiver->fd);
+#ifdef ENABLE_HTTPS
+        s->collection.ssl = SSL_connection(&host->receiver->ssl);
+#endif
+    }
+    netdata_mutex_unlock(&host->receiver_lock);
+
+    if (s->db.online) {
+        if (host == localhost) {
+            s->collection.status = RRDHOST_COLLECTION_STATUS_LOCALHOST;
+            s->collection.since = netdata_start_time;
+        }
+
+        else if (s->collection.replication.in_progress)
+            s->collection.status = RRDHOST_COLLECTION_STATUS_REPLICATING;
+
+        else
+            s->collection.status = RRDHOST_COLLECTION_STATUS_ONLINE;
+    }
+    else {
+        if (!s->collection.since) {
+            s->collection.status = RRDHOST_COLLECTION_STATUS_ARCHIVED;
+            s->collection.since = s->db.last_time_s;
+        }
+
+        else
+            s->collection.status = RRDHOST_COLLECTION_STATUS_OFFLINE;
+    }
+
+    if(!s->collection.since)
+        s->collection.since = netdata_start_time;
+
+    if(!s->collection.reason)
+        s->collection.reason = "";
+
+
+    // --- streaming ---
+
+    if (!host->sender) {
+        s->streaming.status = RRDHOST_STREAMING_STATUS_NOT_ENABLED;
+        s->streaming.hops = s->collection.hops + 1;
+
+    }
+    else {
+        netdata_mutex_lock(&host->sender->mutex);
+
+        s->streaming.since = host->sender->last_state_since_t;
+        s->streaming.peers = socket_peers(host->sender->rrdpush_sender_socket);
+        s->streaming.ssl = SSL_connection(&host->sender->ssl);
+
+        memcpy(s->streaming.sent_bytes_on_this_connection_per_type,
+               host->sender->sent_bytes_on_this_connection_per_type,
+            MIN(sizeof(s->streaming.sent_bytes_on_this_connection_per_type),
+                sizeof(host->sender->sent_bytes_on_this_connection_per_type)));
+
+        if (rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED)) {
+            s->streaming.hops = host->sender->hops;
+            s->streaming.reason = "";
+            s->streaming.capabilities = host->sender->capabilities;
+
+            s->streaming.replication.completion = rrdhost_sender_replication_completion_unsafe(host, now, &s->streaming.replication.instances);
+            s->streaming.replication.in_progress = s->streaming.replication.instances > 0;
+
+            if(s->streaming.replication.in_progress)
+                s->streaming.status = RRDHOST_STREAMING_STATUS_REPLICATING;
+            else
+                s->streaming.status = RRDHOST_STREAMING_STATUS_ONLINE;
+
+#ifdef ENABLE_COMPRESSION
+            s->streaming.compression = (stream_has_capability(host->sender, STREAM_CAP_COMPRESSION) && host->sender->compressor);
+#endif
+        }
+        else {
+            s->streaming.status = RRDHOST_STREAMING_STATUS_OFFLINE;
+            s->streaming.hops = s->collection.hops + 1;
+            s->streaming.reason = host->sender->exit.reason;
+        }
+
+        netdata_mutex_unlock(&host->sender->mutex);
+    }
+
+    if(!s->streaming.since)
+        s->streaming.since = netdata_start_time;
+
+    if(!s->streaming.reason)
+        s->streaming.reason = "";
+}

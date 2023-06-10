@@ -245,6 +245,116 @@ void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t durati
     buffer_json_object_close(wb);
 }
 
+static void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *key) {
+    buffer_json_member_add_object(wb, key);
+    {
+        buffer_json_member_add_uint64(wb, "hops", s->collection.hops);
+        buffer_json_member_add_string(wb, "status", rrdhost_collection_status_to_string(s->collection.status));
+        buffer_json_member_add_time_t(wb, "since", s->collection.since);
+        buffer_json_member_add_time_t(wb, "age", s->now - s->collection.since);
+
+        if(s->collection.status == RRDHOST_COLLECTION_STATUS_OFFLINE)
+            buffer_json_member_add_string(wb, "reason", s->collection.reason);
+
+        if(s->collection.status == RRDHOST_COLLECTION_STATUS_REPLICATING || s->collection.status == RRDHOST_COLLECTION_STATUS_ONLINE) {
+            buffer_json_member_add_object(wb, "replication");
+            {
+                buffer_json_member_add_boolean(wb, "in_progress", s->collection.replication.in_progress);
+                buffer_json_member_add_double(wb, "completion", s->collection.replication.completion);
+                buffer_json_member_add_uint64(wb, "instances", s->collection.replication.instances);
+            }
+            buffer_json_object_close(wb); // replication
+
+            buffer_json_member_add_object(wb, "source");
+            {
+                char buf[1024 + 1];
+                snprintfz(buf, 1024, "[%s]:%d%s", s->collection.peers.local.ip, s->collection.peers.local.port, s->collection.ssl ? ":SSL" : "");
+                buffer_json_member_add_string(wb, "local", buf);
+
+                snprintfz(buf, 1024, "[%s]:%d%s", s->collection.peers.peer.ip, s->collection.peers.peer.port, s->collection.ssl ? ":SSL" : "");
+                buffer_json_member_add_string(wb, "remote", buf);
+
+                stream_capabilities_to_json_array(wb, s->collection.capabilities, "capabilities");
+            }
+            buffer_json_object_close(wb); // source
+        }
+    }
+    buffer_json_object_close(wb); // collection
+}
+
+static void rrdhost_sender_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *key) {
+    buffer_json_member_add_object(wb, key);
+
+    buffer_json_member_add_uint64(wb, "hops", s->streaming.hops);
+    buffer_json_member_add_string(wb, "status", rrdhost_streaming_status_to_string(s->streaming.status));
+    buffer_json_member_add_time_t(wb, "since", s->streaming.since);
+    buffer_json_member_add_time_t(wb, "age", s->now - s->streaming.since);
+
+    if(s->streaming.status == RRDHOST_STREAMING_STATUS_OFFLINE)
+        buffer_json_member_add_string(wb, "reason", s->streaming.reason);
+
+    if(s->streaming.status == RRDHOST_STREAMING_STATUS_REPLICATING || s->streaming.status == RRDHOST_STREAMING_STATUS_ONLINE) {
+        buffer_json_member_add_object(wb, "replication");
+        {
+            buffer_json_member_add_boolean(wb, "in_progress", s->streaming.replication.in_progress);
+            buffer_json_member_add_double(wb, "completion", s->streaming.replication.completion);
+            buffer_json_member_add_uint64(wb, "instances", s->streaming.replication.instances);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "destination");
+        {
+            char buf[1024 + 1];
+            snprintfz(buf, 1024, "[%s]:%d%s", s->streaming.peers.local.ip, s->streaming.peers.local.port, s->streaming.ssl ? ":SSL" : "");
+            buffer_json_member_add_string(wb, "local", buf);
+
+            snprintfz(buf, 1024, "[%s]:%d%s", s->streaming.peers.peer.ip, s->streaming.peers.peer.port, s->streaming.ssl ? ":SSL" : "");
+            buffer_json_member_add_string(wb, "remote", buf);
+
+            stream_capabilities_to_json_array(wb, s->streaming.capabilities, "capabilities");
+
+            buffer_json_member_add_object(wb, "traffic");
+            {
+                buffer_json_member_add_boolean(wb, "compression", s->streaming.compression);
+                buffer_json_member_add_uint64(wb, "data", s->streaming.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_DATA]);
+                buffer_json_member_add_uint64(wb, "metadata", s->streaming.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_METADATA]);
+                buffer_json_member_add_uint64(wb, "functions", s->streaming.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_FUNCTIONS]);
+                buffer_json_member_add_uint64(wb, "replication", s->streaming.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_REPLICATION]);
+            }
+            buffer_json_object_close(wb); // traffic
+
+            buffer_json_member_add_array(wb, "candidates");
+            struct rrdpush_destinations *d;
+            for (d = s->host->destinations; d; d = d->next) {
+                buffer_json_add_array_item_object(wb);
+                {
+
+                    if (d->ssl) {
+                        snprintfz(buf, 1024, "%s:SSL", string2str(d->destination));
+                        buffer_json_member_add_string(wb, "destination", buf);
+                    }
+                    else
+                        buffer_json_member_add_string(wb, "destination", string2str(d->destination));
+
+                    buffer_json_member_add_time_t(wb, "last_check", d->last_attempt);
+                    buffer_json_member_add_time_t(wb, "age", s->now - d->last_attempt);
+                    buffer_json_member_add_string(wb, "last_error", d->last_error);
+                    buffer_json_member_add_string(wb, "last_handshake",
+                                                  stream_handshake_error_to_string(d->last_handshake));
+                    buffer_json_member_add_time_t(wb, "next_check", d->postpone_reconnection_until);
+                    buffer_json_member_add_time_t(wb, "next_in",
+                                                  (d->postpone_reconnection_until > s->now) ?
+                                                  d->postpone_reconnection_until - s->now : 0);
+                }
+                buffer_json_object_close(wb); // each candidate
+            }
+            buffer_json_array_close(wb); // candidates
+        }
+        buffer_json_object_close(wb); // destination
+    }
+    buffer_json_object_close(wb); // streaming
+}
+
 static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool queryable_host) {
     if(!queryable_host || !host->rrdctx.contexts)
         // the host matches the 'scope_host' but does not match the 'host' patterns
@@ -353,23 +463,17 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
             }
 
             time_t now = now_realtime_sec();
-            buffer_json_member_add_object(wb, "status");
+            buffer_json_member_add_object(wb, "netdata");
             {
-                bool online = host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
-
-                time_t first_time_s = 0, last_time_s = 0;
-                netdata_spinlock_lock(&host->retention.spinlock);
-                first_time_s = host->retention.first_time_s;
-                last_time_s = host->retention.last_time_s;
-                netdata_spinlock_unlock(&host->retention.spinlock);
-
+                RRDHOST_STATUS s;
+                rrdhost_status(host, now, &s);
                 buffer_json_member_add_object(wb, "retention");
-                buffer_json_member_add_time_t(wb, "from", first_time_s);
-                buffer_json_member_add_time_t(wb, "to", online ? now : last_time_s);
+                buffer_json_member_add_time_t(wb, "from", s.db.first_time_s);
+                buffer_json_member_add_time_t(wb, "to", s.db.online ? now : s.db.last_time_s);
                 buffer_json_object_close(wb);
 
-                rrdhost_receiver_to_json(wb, host, "collection", now, online);
-                rrdhost_sender_to_json(wb, host, "streaming", now);
+                rrdhost_receiver_to_json(wb, &s, "collection");
+                rrdhost_sender_to_json(wb, &s, "streaming");
             }
             buffer_json_object_close(wb); // status
         }

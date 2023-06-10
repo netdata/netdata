@@ -795,47 +795,44 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
                                void *collector_data __maybe_unused,
                                function_data_ready_callback callback __maybe_unused, void *callback_data __maybe_unused) {
     time_t now = now_realtime_sec();
-    RRDHOST *host = localhost;
 
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
     buffer_json_initialize(wb, "\"", "\"", 0, true, false);
 
-    buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
+    buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(localhost));
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", 1);
     buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_STREAMING_HELP);
     buffer_json_member_add_array(wb, "data");
+
+    size_t max_collection_instances = 0;
     {
         RRDHOST *host;
-        dfe_start_read(rrdhost_root_index, host){
-                    bool online = host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
-                    size_t receiver_hops = host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1;
-
-                    time_t first_time_s = 0, last_time_s = 0;
-                    netdata_spinlock_lock(&host->retention.spinlock);
-                    first_time_s = host->retention.first_time_s;
-                    last_time_s = host->retention.last_time_s;
-                    netdata_spinlock_unlock(&host->retention.spinlock);
-
+        dfe_start_read(rrdhost_root_index, host) {
+                    RRDHOST_STATUS s;
+                    rrdhost_status(host, now, &s);
                     buffer_json_add_array_item_array(wb);
-                    buffer_json_add_array_item_string(wb, rrdhost_hostname(host)); // Node
-                    buffer_json_add_array_item_time_t(wb, first_time_s); // dbFrom
-                    buffer_json_add_array_item_time_t(wb, online ? now : last_time_s); // dbTo
-                    buffer_json_add_array_item_string(wb, online ? "online" : "offline"); // online
 
-                    if (host->child_connect_time || host->child_disconnected_time) {
-                        time_t since = MAX(host->child_connect_time, host->child_disconnected_time);
-                        buffer_json_add_array_item_time_t(wb, since); // since
-                        buffer_json_add_array_item_time_t(wb, now - since); // age
-                    } else {
-                        buffer_json_add_array_item_time_t(wb, 0); // since
-                        buffer_json_add_array_item_time_t(wb, 0); // agent
-                    }
+                    if(s.collection.replication.instances > max_collection_instances)
+                        max_collection_instances = s.collection.replication.instances;
 
-                    buffer_json_add_array_item_uint64(wb, receiver_hops); // hops
+                    // retention
+                    buffer_json_add_array_item_string(wb, rrdhost_hostname(s.host)); // Node
+                    buffer_json_add_array_item_time_t(wb, s.db.first_time_s); // dbFrom
+                    buffer_json_add_array_item_time_t(wb, s.db.last_time_s); // dbTo
 
+                    // collection
+                    buffer_json_add_array_item_string(wb, rrdhost_collection_status_to_string(s.collection.status)); // Status
+                    buffer_json_add_array_item_time_t(wb, s.collection.since); // Since
+                    buffer_json_add_array_item_time_t(wb, s.now - s.collection.since); // Age
+                    buffer_json_add_array_item_string(wb, s.collection.reason); // Reason
+                    buffer_json_add_array_item_uint64(wb, s.collection.hops); // Hops
+                    buffer_json_add_array_item_double(wb, s.collection.replication.completion); // InReplCompletion
+                    buffer_json_add_array_item_uint64(wb, s.collection.replication.instances); // InReplInstances
+
+                    // close
                     buffer_json_array_close(wb);
         }
         dfe_done(host);
@@ -864,7 +861,7 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
                                     RRDF_FIELD_SUMMARY_NONE, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE);
 
-        buffer_rrdf_table_add_field(wb, field_id++, "Online", "Data Collection Online Status",
+        buffer_rrdf_table_add_field(wb, field_id++, "Status", "Data Collection Online Status",
                                     RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_MULTISELECT,
@@ -882,16 +879,31 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE);
 
+        buffer_rrdf_table_add_field(wb, field_id++, "Reason", "Data Collection Online Status Reason",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE);
+
         buffer_rrdf_table_add_field(wb, field_id++, "Hops", "Data Collection Distance Hops from Origin Node",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE);
 
+        buffer_rrdf_table_add_field(wb, field_id++, "InReplCompletion", "Inbound Replication Completion",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    1, "%", 100.0, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "InReplInstances", "Inbound Replicating Instances",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    0, "instances", max_collection_instances, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE);
+
         // Inbound
-        //  - replication
-        //  - replication completion
-        //  - replication instances
         //  - srcIP
         //  - srcPort
         //  - dstIP
@@ -924,7 +936,18 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
     buffer_json_member_add_string(wb, "default_sort_column", "Node");
     buffer_json_member_add_object(wb, "charts");
     {
-        ;
+        // CPU chart
+        buffer_json_member_add_object(wb, "Age");
+        {
+            buffer_json_member_add_string(wb, "name", "Age");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Age");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb); // charts
     buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + 1);

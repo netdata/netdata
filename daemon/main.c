@@ -14,7 +14,7 @@ int netdata_anonymous_statistics_enabled;
 
 int libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
 bool ieee754_doubles = false;
-
+time_t netdata_start_time = 0;
 struct netdata_static_thread *static_threads;
 
 struct config netdata_config = {
@@ -1342,6 +1342,8 @@ void replication_initialize(void);
 int main(int argc, char **argv) {
     // initialize the system clocks
     clocks_init();
+    netdata_start_time = now_realtime_sec();
+
     usec_t started_ut = now_monotonic_usec();
     usec_t last_ut = started_ut;
     const char *prev_msg = NULL;

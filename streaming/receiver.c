@@ -423,57 +423,6 @@ static void rrdpush_receiver_replication_reset(RRDHOST *host) {
     rrdhost_receiver_replicating_charts_zero(host);
 }
 
-void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST *host, const char *key, time_t now __maybe_unused, bool online) {
-    size_t receiver_hops = host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1;
-
-    netdata_mutex_lock(&host->receiver_lock);
-
-    buffer_json_member_add_object(wb, key);
-    buffer_json_member_add_uint64(wb, "hops", receiver_hops);
-
-    buffer_json_member_add_boolean(wb, "online", online);
-
-    if(host->child_connect_time || host->child_disconnected_time) {
-        time_t since = MAX(host->child_connect_time, host->child_disconnected_time);
-        buffer_json_member_add_time_t(wb, "since", since);
-        buffer_json_member_add_time_t(wb, "age", now - since);
-    }
-
-    if(!online && host->rrdpush_last_receiver_exit_reason)
-        buffer_json_member_add_string(wb, "reason", host->rrdpush_last_receiver_exit_reason);
-
-    if(host != localhost && host->receiver) {
-        buffer_json_member_add_object(wb, "replication");
-        {
-            size_t instances = rrdhost_receiver_replicating_charts(host);
-            buffer_json_member_add_boolean(wb, "in_progress", instances);
-            buffer_json_member_add_double(wb, "completion", host->rrdpush_receiver_replication_percent);
-            buffer_json_member_add_uint64(wb, "instances", instances);
-        }
-        buffer_json_object_close(wb); // replication
-
-        buffer_json_member_add_object(wb, "source");
-        {
-
-            char buf[1024 + 1];
-            SOCKET_PEERS peers = socket_peers(host->receiver->fd);
-            bool ssl = SSL_connection(&host->receiver->ssl);
-
-            snprintfz(buf, 1024, "[%s]:%d%s", peers.local.ip, peers.local.port, ssl ? ":SSL" : "");
-            buffer_json_member_add_string(wb, "local", buf);
-
-            snprintfz(buf, 1024, "[%s]:%d%s", peers.peer.ip, peers.peer.port, ssl ? ":SSL" : "");
-            buffer_json_member_add_string(wb, "remote", buf);
-
-            stream_capabilities_to_json_array(wb, host->receiver->capabilities, "capabilities");
-        }
-        buffer_json_object_close(wb); // source
-    }
-    buffer_json_object_close(wb); // collection
-
-    netdata_mutex_unlock(&host->receiver_lock);
-}
-
 static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
     bool signal_rrdcontext = false;
     bool set_this = false;

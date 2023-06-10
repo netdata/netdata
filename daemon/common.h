@@ -112,6 +112,8 @@ extern int netdata_anonymous_statistics_enabled;
 extern int netdata_ready;
 extern int netdata_cloud_setting;
 
+extern time_t netdata_start_time;
+
 long get_netdata_cpus(void);
 
 #endif /* NETDATA_COMMON_H */

@@ -99,18 +99,6 @@ typedef enum {
 
 // ----------------------------------------------------------------------------
 
-typedef enum __attribute__((packed)) {
-    STREAM_TRAFFIC_TYPE_REPLICATION,
-    STREAM_TRAFFIC_TYPE_FUNCTIONS,
-    STREAM_TRAFFIC_TYPE_METADATA,
-    STREAM_TRAFFIC_TYPE_DATA,
-
-    // terminator
-    STREAM_TRAFFIC_TYPE_MAX,
-} STREAM_TRAFFIC_TYPE;
-
-// ----------------------------------------------------------------------------
-
 typedef struct {
     char *os_name;
     char *os_id;
@@ -145,9 +133,19 @@ struct decompressor_state {
 #endif
 
 // Thread-local storage
-    // Metric transmission: collector threads asynchronously fill the buffer, sender thread uses it.
+// Metric transmission: collector threads asynchronously fill the buffer, sender thread uses it.
 
-typedef enum {
+typedef enum __attribute__((packed)) {
+    STREAM_TRAFFIC_TYPE_REPLICATION,
+    STREAM_TRAFFIC_TYPE_FUNCTIONS,
+    STREAM_TRAFFIC_TYPE_METADATA,
+    STREAM_TRAFFIC_TYPE_DATA,
+
+    // terminator
+    STREAM_TRAFFIC_TYPE_MAX,
+} STREAM_TRAFFIC_TYPE;
+
+typedef enum __attribute__((packed)) {
     SENDER_FLAG_OVERFLOW     = (1 << 0), // The buffer has been overflown
     SENDER_FLAG_COMPRESSION  = (1 << 1), // The stream needs to have and has compression
 } SENDER_FLAGS;
@@ -392,9 +390,106 @@ bool stop_streaming_receiver(RRDHOST *host, const char *reason);
 
 void sender_thread_buffer_free(void);
 
-void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST *host, const char *key, time_t now __maybe_unused, bool online);
-void rrdhost_sender_to_json(BUFFER *wb, RRDHOST *host, const char *key, time_t now __maybe_unused);
-
 #include "replication.h"
+
+typedef enum __attribute__((packed)) {
+    RRDHOST_COLLECTION_STATUS_ARCHIVED,
+    RRDHOST_COLLECTION_STATUS_LOCALHOST,
+    RRDHOST_COLLECTION_STATUS_REPLICATING,
+    RRDHOST_COLLECTION_STATUS_ONLINE,
+    RRDHOST_COLLECTION_STATUS_OFFLINE,
+} RRDHOST_COLLECTION_STATUS;
+
+static inline const char *rrdhost_collection_status_to_string(RRDHOST_COLLECTION_STATUS status) {
+    switch(status) {
+        case RRDHOST_COLLECTION_STATUS_ARCHIVED:
+            return "archived";
+
+        case RRDHOST_COLLECTION_STATUS_LOCALHOST:
+            return "localhost";
+
+        case RRDHOST_COLLECTION_STATUS_REPLICATING:
+            return "replicating";
+
+        case RRDHOST_COLLECTION_STATUS_ONLINE:
+            return "online";
+
+        default:
+        case RRDHOST_COLLECTION_STATUS_OFFLINE:
+            return "offline";
+    }
+}
+
+typedef enum __attribute__((packed)) {
+    RRDHOST_STREAMING_STATUS_NOT_ENABLED,
+    RRDHOST_STREAMING_STATUS_REPLICATING,
+    RRDHOST_STREAMING_STATUS_ONLINE,
+    RRDHOST_STREAMING_STATUS_OFFLINE,
+} RRDHOST_STREAMING_STATUS;
+
+static inline const char *rrdhost_streaming_status_to_string(RRDHOST_STREAMING_STATUS status) {
+    switch(status) {
+        case RRDHOST_STREAMING_STATUS_NOT_ENABLED:
+            return "disabled";
+
+        case RRDHOST_STREAMING_STATUS_REPLICATING:
+            return "replicating";
+
+        case RRDHOST_STREAMING_STATUS_ONLINE:
+            return "online";
+
+        default:
+        case RRDHOST_STREAMING_STATUS_OFFLINE:
+            return "offline";
+    }
+}
+
+typedef struct rrdhost_status {
+    RRDHOST *host;
+    time_t now;
+
+    struct {
+        time_t first_time_s;
+        time_t last_time_s;
+        bool online;
+    } db;
+
+    struct {
+        size_t hops;
+        RRDHOST_COLLECTION_STATUS status;
+        SOCKET_PEERS peers;
+        bool ssl;
+        STREAM_CAPABILITIES capabilities;
+        time_t since;
+        const char *reason;
+
+        struct {
+            bool in_progress;
+            NETDATA_DOUBLE completion;
+            size_t instances;
+        } replication;
+    } collection;
+
+    struct {
+        size_t hops;
+        RRDHOST_STREAMING_STATUS status;
+        SOCKET_PEERS peers;
+        bool ssl;
+        bool compression;
+        STREAM_CAPABILITIES capabilities;
+        time_t since;
+        const char *reason;
+
+        struct {
+            bool in_progress;
+            NETDATA_DOUBLE completion;
+            size_t instances;
+        } replication;
+
+        size_t sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_MAX];
+    } streaming;
+} RRDHOST_STATUS;
+
+void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s);
 
 #endif //NETDATA_RRDPUSH_H

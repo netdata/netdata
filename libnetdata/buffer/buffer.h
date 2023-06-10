@@ -921,14 +921,14 @@ static inline void buffer_json_array_close(BUFFER *wb) {
     _buffer_json_depth_pop(wb);
 }
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     RRDF_FIELD_OPTS_NONE         = 0,
     RRDF_FIELD_OPTS_UNIQUE_KEY   = (1 << 0), // the field is the unique key of the row
     RRDF_FIELD_OPTS_VISIBLE      = (1 << 1), // the field should be visible by default
     RRDF_FIELD_OPTS_STICKY       = (1 << 2), // the field should be sticky
 } RRDF_FIELD_OPTIONS;
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     RRDF_FIELD_TYPE_INTEGER,
     RRDF_FIELD_TYPE_STRING,
     RRDF_FIELD_TYPE_DETAIL_STRING,
@@ -960,7 +960,7 @@ static inline const char *rrdf_field_type_to_string(RRDF_FIELD_TYPE type) {
     }
 }
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     RRDF_FIELD_VISUAL_VALUE,
     RRDF_FIELD_VISUAL_BAR,
 } RRDF_FIELD_VISUAL;
@@ -976,7 +976,7 @@ static inline const char *rrdf_field_visual_to_string(RRDF_FIELD_VISUAL visual) 
     }
 }
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     RRDF_FIELD_TRANSFORM_NONE,
     RRDF_FIELD_TRANSFORM_NUMBER,
     RRDF_FIELD_TRANSFORM_DURATION,
@@ -1000,7 +1000,7 @@ static inline const char *rrdf_field_transform_to_string(RRDF_FIELD_TRANSFORM tr
     }
 }
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     RRDF_FIELD_SORT_ASCENDING  = (1 << 0),
     RRDF_FIELD_SORT_DESCENDING = (1 << 1),
 
@@ -1015,7 +1015,7 @@ static inline const char *rrdf_field_sort_to_string(RRDF_FIELD_SORT sort) {
         return "ascending";
 }
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     RRDF_FIELD_SUMMARY_NONE,
     RRDF_FIELD_SUMMARY_SUM,
     RRDF_FIELD_SUMMARY_MAX,
@@ -1039,7 +1039,7 @@ static inline const char *rrdf_field_summary_to_string(RRDF_FIELD_SUMMARY summar
     }
 }
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     RRDF_FIELD_FILTER_RANGE,
     RRDF_FIELD_FILTER_MULTISELECT,
 } RRDF_FIELD_FILTER;
