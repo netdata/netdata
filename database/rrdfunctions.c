@@ -794,6 +794,7 @@ void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst)
 int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const char *function __maybe_unused,
                                void *collector_data __maybe_unused,
                                function_data_ready_callback callback __maybe_unused, void *callback_data __maybe_unused) {
+    time_t now = now_realtime_sec();
     RRDHOST *host = localhost;
 
     buffer_flush(wb);
@@ -807,7 +808,37 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
     buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_STREAMING_HELP);
     buffer_json_member_add_array(wb, "data");
     {
-        ;
+        RRDHOST *host;
+        dfe_start_read(rrdhost_root_index, host){
+                    bool online = host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
+                    size_t receiver_hops = host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1;
+
+                    time_t first_time_s = 0, last_time_s = 0;
+                    netdata_spinlock_lock(&host->retention.spinlock);
+                    first_time_s = host->retention.first_time_s;
+                    last_time_s = host->retention.last_time_s;
+                    netdata_spinlock_unlock(&host->retention.spinlock);
+
+                    buffer_json_add_array_item_array(wb);
+                    buffer_json_add_array_item_string(wb, rrdhost_hostname(host)); // Node
+                    buffer_json_add_array_item_time_t(wb, first_time_s); // dbFrom
+                    buffer_json_add_array_item_time_t(wb, online ? now : last_time_s); // dbTo
+                    buffer_json_add_array_item_string(wb, online ? "online" : "offline"); // online
+
+                    if (host->child_connect_time || host->child_disconnected_time) {
+                        time_t since = MAX(host->child_connect_time, host->child_disconnected_time);
+                        buffer_json_add_array_item_time_t(wb, since); // since
+                        buffer_json_add_array_item_time_t(wb, now - since); // age
+                    } else {
+                        buffer_json_add_array_item_time_t(wb, 0); // since
+                        buffer_json_add_array_item_time_t(wb, 0); // agent
+                    }
+
+                    buffer_json_add_array_item_uint64(wb, receiver_hops); // hops
+
+                    buffer_json_array_close(wb);
+        }
+        dfe_done(host);
     }
     buffer_json_array_close(wb); // data
     buffer_json_member_add_object(wb, "columns");
@@ -815,16 +846,49 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
         size_t field_id = 0;
 
         // Node
-        buffer_rrdf_table_add_field(wb, field_id++, "Node", "Hostname", "string", "value", "none", 0, NULL, NAN, "ascending", NULL, NULL, RRDF_FIELD_OPTS_VISIBLE|RRDF_FIELD_OPTS_UNIQUE_KEY|RRDF_FIELD_OPTS_SORTABLE|RRDF_FIELD_OPTS_STICKY);
+        buffer_rrdf_table_add_field(wb, field_id++, "Node", "Node's Hostname",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_NONE, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY);
 
-        // retention
-        //  - from
-        //  - to
+        buffer_rrdf_table_add_field(wb, field_id++, "dbFrom", "Data Retention From",
+                                    RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_TIMESTAMP,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_NONE, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "dbTo", "Data Retention To",
+                                    RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_TIMESTAMP,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_NONE, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Online", "Data Collection Online Status",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Since", "Last Data Collection Online Status Change",
+                                    RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_TIMESTAMP,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Age", "Last Data Collection Online Status Change Age",
+                                    RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Hops", "Data Collection Distance Hops from Origin Node",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE);
 
         // Inbound
-        //  - hops
-        //  - online
-        //  - age
         //  - replication
         //  - replication completion
         //  - replication instances
