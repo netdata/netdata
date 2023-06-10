@@ -43,6 +43,7 @@ typedef enum {
     STREAM_CAP_BINARY           = (1 << 13), // streaming supports binary data
     STREAM_CAP_INTERPOLATED     = (1 << 14), // streaming supports interpolated streaming of values
     STREAM_CAP_IEEE754          = (1 << 15), // streaming supports binary/hex transfer of double values
+    STREAM_CAP_DATA_WITH_ML     = (1 << 16), // streaming supports transferring anomaly bit
 
     STREAM_CAP_INVALID          = (1 << 30), // used as an invalid value for capabilities when this is set
     // this must be signed int, so don't use the last bit
@@ -55,7 +56,7 @@ typedef enum {
 #define STREAM_HAS_COMPRESSION 0
 #endif  // ENABLE_COMPRESSION
 
-STREAM_CAPABILITIES stream_our_capabilities();
+STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender);
 
 #define stream_has_capability(rpt, capability) ((rpt) && ((rpt)->capabilities & (capability)) == (capability))
 
@@ -382,7 +383,7 @@ void stream_capabilities_to_json_array(BUFFER *wb, STREAM_CAPABILITIES caps, con
 void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, const char *status);
 void log_receiver_capabilities(struct receiver_state *rpt);
 void log_sender_capabilities(struct sender_state *s);
-STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version);
+STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version, RRDHOST *host, bool sender);
 int32_t stream_capabilities_to_vn(uint32_t caps);
 
 void receiver_state_free(struct receiver_state *rpt);
@@ -393,7 +394,7 @@ void sender_thread_buffer_free(void);
 #include "replication.h"
 
 typedef enum __attribute__((packed)) {
-    RRDHOST_COLLECTION_STATUS_ARCHIVED,
+    RRDHOST_COLLECTION_STATUS_ARCHIVED = 0,
     RRDHOST_COLLECTION_STATUS_LOCALHOST,
     RRDHOST_COLLECTION_STATUS_REPLICATING,
     RRDHOST_COLLECTION_STATUS_ONLINE,
@@ -421,7 +422,7 @@ static inline const char *rrdhost_collection_status_to_string(RRDHOST_COLLECTION
 }
 
 typedef enum __attribute__((packed)) {
-    RRDHOST_STREAMING_STATUS_NOT_ENABLED,
+    RRDHOST_STREAMING_STATUS_NOT_ENABLED = 0,
     RRDHOST_STREAMING_STATUS_REPLICATING,
     RRDHOST_STREAMING_STATUS_ONLINE,
     RRDHOST_STREAMING_STATUS_OFFLINE,
@@ -444,6 +445,26 @@ static inline const char *rrdhost_streaming_status_to_string(RRDHOST_STREAMING_S
     }
 }
 
+typedef enum __attribute__((packed)) {
+    RRDHOST_ML_STATUS_DISABLED = 0,
+    RRDHOST_ML_STATUS_RECEIVED,
+    RRDHOST_ML_STATUS_RUNNING,
+} RRDHOST_ML_STATUS;
+
+static inline const char *rrdhost_ml_status_to_string(RRDHOST_ML_STATUS status) {
+    switch(status) {
+        case RRDHOST_ML_STATUS_RUNNING:
+            return "running";
+
+        case RRDHOST_ML_STATUS_RECEIVED:
+            return "received";
+
+        default:
+        case RRDHOST_ML_STATUS_DISABLED:
+            return "disabled";
+    }
+}
+
 typedef struct rrdhost_status {
     RRDHOST *host;
     time_t now;
@@ -455,7 +476,7 @@ typedef struct rrdhost_status {
     } db;
 
     struct {
-        bool enabled;
+        RRDHOST_ML_STATUS status;
 
         struct {
             size_t anomalous;

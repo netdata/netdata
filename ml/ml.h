@@ -49,6 +49,7 @@ struct ml_metrics_statistics {
 };
 
 bool ml_host_get_host_status(RRDHOST *rh, struct ml_metrics_statistics *mlm);
+bool ml_host_running(RRDHOST *rh);
 
 #ifdef __cplusplus
 };

@@ -498,7 +498,7 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
         host->destination->last_error = NULL;
         host->destination->last_handshake = version;
         host->destination->postpone_reconnection_until = 0;
-        s->capabilities = convert_stream_version_to_capabilities(version);
+        s->capabilities = convert_stream_version_to_capabilities(version, host, true);
         return true;
     }
 
@@ -591,7 +591,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     // info("STREAM %s [send to %s]: initializing communication...", rrdhost_hostname(host), s->connected_to);
 
     // reset our capabilities to default
-    s->capabilities = stream_our_capabilities();
+    s->capabilities = stream_our_capabilities(host, true);
 
 #ifdef  ENABLE_COMPRESSION
     // If we don't want compression, remove it from our capabilities

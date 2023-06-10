@@ -1309,6 +1309,14 @@ bool ml_host_get_host_status(RRDHOST *rh, struct ml_metrics_statistics *mlm) {
     return true;
 }
 
+bool ml_host_running(RRDHOST *rh) {
+    ml_host_t *host = (ml_host_t *) rh->ml_host;
+    if(!host)
+        return false;
+
+    return true;
+}
+
 void ml_host_get_models(RRDHOST *rh, BUFFER *wb)
 {
     UNUSED(rh);

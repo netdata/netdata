@@ -933,7 +933,7 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
         //  - last handshake message
 
         // ML
-        
+
     }
     buffer_json_object_close(wb); // columns
     buffer_json_member_add_string(wb, "default_sort_column", "Node");
