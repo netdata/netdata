@@ -1279,7 +1279,10 @@ static void stream_capabilities_to_string(BUFFER *wb, STREAM_CAPABILITIES caps) 
 }
 
 void stream_capabilities_to_json_array(BUFFER *wb, STREAM_CAPABILITIES caps, const char *key) {
-    buffer_json_member_add_array(wb, key);
+    if(key)
+        buffer_json_member_add_array(wb, key);
+    else
+        buffer_json_add_array_item_array(wb);
 
     for(size_t i = 0; capability_names[i].str ; i++) {
         if(caps & capability_names[i].cap)

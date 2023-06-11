@@ -137,7 +137,7 @@ struct decompressor_state {
 // Metric transmission: collector threads asynchronously fill the buffer, sender thread uses it.
 
 typedef enum __attribute__((packed)) {
-    STREAM_TRAFFIC_TYPE_REPLICATION,
+    STREAM_TRAFFIC_TYPE_REPLICATION = 0,
     STREAM_TRAFFIC_TYPE_FUNCTIONS,
     STREAM_TRAFFIC_TYPE_METADATA,
     STREAM_TRAFFIC_TYPE_DATA,

@@ -935,6 +935,7 @@ typedef enum __attribute__((packed)) {
     RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
     RRDF_FIELD_TYPE_DURATION,
     RRDF_FIELD_TYPE_TIMESTAMP,
+    RRDF_FIELD_TYPE_ARRAY,
 } RRDF_FIELD_TYPE;
 
 static inline const char *rrdf_field_type_to_string(RRDF_FIELD_TYPE type) {
@@ -957,12 +958,16 @@ static inline const char *rrdf_field_type_to_string(RRDF_FIELD_TYPE type) {
 
         case RRDF_FIELD_TYPE_TIMESTAMP:
             return "timestamp";
+
+        case RRDF_FIELD_TYPE_ARRAY:
+            return "timestamp";
     }
 }
 
 typedef enum __attribute__((packed)) {
     RRDF_FIELD_VISUAL_VALUE,
     RRDF_FIELD_VISUAL_BAR,
+    RRDF_FIELD_VISUAL_PILLS,
 } RRDF_FIELD_VISUAL;
 
 static inline const char *rrdf_field_visual_to_string(RRDF_FIELD_VISUAL visual) {
@@ -972,6 +977,9 @@ static inline const char *rrdf_field_visual_to_string(RRDF_FIELD_VISUAL visual) 
             return "value";
 
         case RRDF_FIELD_VISUAL_BAR:
+            return "bar";
+
+        case RRDF_FIELD_VISUAL_PILLS:
             return "bar";
     }
 }
