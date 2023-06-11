@@ -1226,6 +1226,8 @@ struct rrdhost {
         DICTIONARY *contexts;
         DICTIONARY *hub_queue;
         DICTIONARY *pp_queue;
+        uint32_t metrics;
+        uint32_t instances;
     } rrdctx;
 
     struct {

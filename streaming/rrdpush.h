@@ -473,6 +473,8 @@ typedef struct rrdhost_status {
         time_t first_time_s;
         time_t last_time_s;
         bool online;
+        size_t metrics;
+        size_t instances;
     } db;
 
     struct {

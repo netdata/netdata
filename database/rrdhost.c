@@ -1723,6 +1723,8 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
 
     s->db.online = rrdhost_is_online(host);
     rrdhost_retention(host, now, s->db.online, &s->db.first_time_s, &s->db.last_time_s);
+    s->db.metrics = host->rrdctx.metrics;
+    s->db.instances = host->rrdctx.instances;
 
     // --- collection ---
 

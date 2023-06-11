@@ -586,7 +586,7 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
     size_t min_priority_not_collected = LONG_MAX;
     size_t min_priority = LONG_MAX;
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
-    size_t instances_active = 0, instances_deleted = 0;
+    size_t instances_active = 0, instances_deleted = 0, metrics = 0;
     bool live_retention = true, currently_collected = false, hidden = true;
     if(dictionary_entries(rc->rrdinstances) > 0) {
         RRDINSTANCE *ri;
@@ -619,6 +619,7 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
                                    string2str(rc->units), string2str(ri->units));
 
                     instances_active++;
+                    metrics += dictionary_entries(ri->rrdmetrics);
 
                     if (ri->priority >= RRDCONTEXT_MINIMUM_ALLOWED_PRIORITY) {
                         if(rrd_flag_check(ri, RRD_FLAG_COLLECTED)) {
@@ -638,6 +639,8 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
                         max_last_time_t = ri->last_time_s;
                 }
         dfe_done(ri);
+
+        rc->stats.metrics = metrics;
 
         if(min_priority_collected != LONG_MAX)
             // use the collected priority
@@ -1119,6 +1122,17 @@ void *rrdcontext_main(void *ptr) {
 
                     if (host->rrdctx.contexts)
                         dictionary_garbage_collect(host->rrdctx.contexts);
+
+                    // calculate the number of metrics and instances in the host
+                    RRDCONTEXT *rc;
+                    uint32_t metrics = 0, instances = 0;
+                    dfe_start_read(host->rrdctx.contexts, rc) {
+                        metrics += rc->stats.metrics;
+                        instances += dictionary_entries(rc->rrdinstances);
+                    }
+                    dfe_done(rc);
+                    host->rrdctx.metrics = metrics;
+                    host->rrdctx.instances = instances;
                 }
                 dfe_done(host);
 

@@ -467,9 +467,11 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
             {
                 RRDHOST_STATUS s;
                 rrdhost_status(host, now, &s);
-                buffer_json_member_add_object(wb, "retention");
-                buffer_json_member_add_time_t(wb, "from", s.db.first_time_s);
-                buffer_json_member_add_time_t(wb, "to", s.db.online ? now : s.db.last_time_s);
+                buffer_json_member_add_object(wb, "db");
+                buffer_json_member_add_time_t(wb, "first_time_s", s.db.first_time_s);
+                buffer_json_member_add_time_t(wb, "last_time_s", s.db.last_time_s);
+                buffer_json_member_add_uint64(wb, "metrics", s.db.metrics);
+                buffer_json_member_add_uint64(wb, "instances", s.db.instances);
                 buffer_json_object_close(wb);
 
                 rrdhost_receiver_to_json(wb, &s, "collection");
