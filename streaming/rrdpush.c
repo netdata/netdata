@@ -76,8 +76,12 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
         // we have DATA_WITH_ML capability
         // we should remove the DATA_WITH_ML capability if our database does not have anomaly info
         // this can happen under these conditions: 1. we don't run ML, and 2. we don't receive ML
+        netdata_mutex_lock(&host->receiver_lock);
+
         if(!ml_host_running(host) && !stream_has_capability(host->receiver, STREAM_CAP_DATA_WITH_ML))
             ml_capability = false;
+
+        netdata_mutex_unlock(&host->receiver_lock);
     }
 
     return  STREAM_CAP_V1 |
