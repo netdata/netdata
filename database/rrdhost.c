@@ -1778,9 +1778,8 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     // --- streaming ---
 
     if (!host->sender) {
-        s->streaming.status = RRDHOST_STREAMING_STATUS_NOT_ENABLED;
+        s->streaming.status = RRDHOST_STREAMING_STATUS_DISABLED;
         s->streaming.hops = s->collection.hops + 1;
-
     }
     else {
         netdata_mutex_lock(&host->sender->mutex);
@@ -1830,7 +1829,13 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
 
     struct ml_metrics_statistics mlm;
     if(ml_host_get_host_status(host, &mlm)) {
-        s->ml.status = RRDHOST_ML_STATUS_RUNNING;
+        if(s->collection.status == RRDHOST_COLLECTION_STATUS_OFFLINE)
+            s->ml.status = RRDHOST_ML_STATUS_OFFLINE;
+        else if(s->collection.status == RRDHOST_COLLECTION_STATUS_ARCHIVED)
+            s->ml.status = RRDHOST_ML_STATUS_DISABLED;
+        else
+            s->ml.status = RRDHOST_ML_STATUS_RUNNING;
+
         s->ml.metrics.anomalous = mlm.anomalous;
         s->ml.metrics.normal = mlm.normal;
         s->ml.metrics.trained = mlm.trained;

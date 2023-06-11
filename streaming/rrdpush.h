@@ -422,7 +422,7 @@ static inline const char *rrdhost_collection_status_to_string(RRDHOST_COLLECTION
 }
 
 typedef enum __attribute__((packed)) {
-    RRDHOST_STREAMING_STATUS_NOT_ENABLED = 0,
+    RRDHOST_STREAMING_STATUS_DISABLED = 0,
     RRDHOST_STREAMING_STATUS_REPLICATING,
     RRDHOST_STREAMING_STATUS_ONLINE,
     RRDHOST_STREAMING_STATUS_OFFLINE,
@@ -430,7 +430,7 @@ typedef enum __attribute__((packed)) {
 
 static inline const char *rrdhost_streaming_status_to_string(RRDHOST_STREAMING_STATUS status) {
     switch(status) {
-        case RRDHOST_STREAMING_STATUS_NOT_ENABLED:
+        case RRDHOST_STREAMING_STATUS_DISABLED:
             return "disabled";
 
         case RRDHOST_STREAMING_STATUS_REPLICATING:
@@ -447,6 +447,7 @@ static inline const char *rrdhost_streaming_status_to_string(RRDHOST_STREAMING_S
 
 typedef enum __attribute__((packed)) {
     RRDHOST_ML_STATUS_DISABLED = 0,
+    RRDHOST_ML_STATUS_OFFLINE,
     RRDHOST_ML_STATUS_RECEIVED,
     RRDHOST_ML_STATUS_RUNNING,
 } RRDHOST_ML_STATUS;
@@ -455,6 +456,9 @@ static inline const char *rrdhost_ml_status_to_string(RRDHOST_ML_STATUS status) 
     switch(status) {
         case RRDHOST_ML_STATUS_RUNNING:
             return "running";
+
+        case RRDHOST_ML_STATUS_OFFLINE:
+            return "offline";
 
         case RRDHOST_ML_STATUS_RECEIVED:
             return "received";

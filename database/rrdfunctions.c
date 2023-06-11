@@ -882,16 +882,15 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
                     buffer_json_add_array_item_uint64(wb, s.streaming.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_REPLICATION]);
                     buffer_json_add_array_item_uint64(wb, s.streaming.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_FUNCTIONS]);
 
-                    buffer_json_add_array_item_array(wb);
+                    buffer_json_add_array_item_array(wb); // OutAttemptHandshake
                     time_t last_attempt = 0;
                     for(struct rrdpush_destinations *d = host->destinations; d ; d = d->next) {
                         if(d->last_attempt > last_attempt)
                             last_attempt = d->last_attempt;
 
-                        // OutAttemptHandshake
                         buffer_json_add_array_item_string(wb, stream_handshake_error_to_string(d->last_handshake));
                     }
-                    buffer_json_array_close(wb);
+                    buffer_json_array_close(wb); // // OutAttemptHandshake
                     buffer_json_add_array_item_time_t(wb, last_attempt); // OutAttemptSince
                     buffer_json_add_array_item_time_t(wb, s.now - last_attempt); // OutAttemptAge
 

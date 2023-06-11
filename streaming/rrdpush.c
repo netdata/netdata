@@ -69,10 +69,10 @@ static void load_stream_conf() {
 
 STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
 
-    // we can have DATA_WITH_ML when ieee754 is available
-    bool ml_capability = ieee754_doubles;
+    // we can have DATA_WITH_ML when INTERPOLATED is available
+    bool ml_capability = true;
 
-    if(ml_capability && host && sender) {
+    if(host && sender) {
         // we have DATA_WITH_ML capability
         // we should remove the DATA_WITH_ML capability if our database does not have anomaly info
         // this can happen under these conditions: 1. we don't run ML, and 2. we don't receive ML
@@ -1331,7 +1331,13 @@ STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version, RRDH
     if(caps & STREAM_CAP_V2)
         caps &= ~(STREAM_CAP_V1);
 
-    return caps & stream_our_capabilities(host, sender);
+    STREAM_CAPABILITIES common_caps = caps & stream_our_capabilities(host, sender);
+
+    if(!(common_caps & STREAM_CAP_INTERPOLATED))
+        // DATA WITH ML requires INTERPOLATED
+        common_caps &= ~STREAM_CAP_DATA_WITH_ML;
+
+    return common_caps;
 }
 
 int32_t stream_capabilities_to_vn(uint32_t caps) {
