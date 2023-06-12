@@ -228,7 +228,7 @@ static int do_migration_v8_v9(sqlite3 *database, const char *name)
               "flags int, exec_run_timestamp int, delay_up_to_timestamp int, name text, chart text, family text, exec text, " \
               "recipient text, units text, info text, exec_code int, new_status real, old_status real, delay int, " \
               "new_value double, old_value double, last_repeat int, chart_context text, " \
-              "transition_id blob, insert_mark_timestamp int);");
+              "transition_id blob, global_id int);");
     sqlite3_exec_monitored(database, sql, 0, 0, NULL);
 
     snprintfz(sql, 2047, "CREATE INDEX IF NOT EXISTS health_log_index ON health_log (unique_id);");
