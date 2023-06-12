@@ -716,12 +716,20 @@ static void ebpf_unload_filesystems()
 static void ebpf_unload_sync()
 {
     if (ebpf_modules[EBPF_MODULE_SYNC_IDX].enabled == NETDATA_THREAD_EBPF_NOT_RUNNING ||
-        ebpf_modules[EBPF_MODULE_SYNC_IDX].enabled == NETDATA_THREAD_EBPF_RUNNING ||
-        ebpf_modules[EBPF_MODULE_SYNC_IDX].load != EBPF_LOAD_LEGACY)
+        ebpf_modules[EBPF_MODULE_SYNC_IDX].enabled == NETDATA_THREAD_EBPF_RUNNING)
         return;
 
     int i;
     for (i = 0; local_syscalls[i].syscall != NULL; i++) {
+        if (!local_syscalls[i].enabled)
+            continue;
+
+#ifdef LIBBPF_MAJOR_VERSION
+        if (local_syscalls[i].sync_obj) {
+            sync_bpf__destroy(local_syscalls[i].sync_obj);
+            continue;
+        }
+#endif
         ebpf_unload_legacy_code(local_syscalls[i].objects, local_syscalls[i].probe_links);
     }
 }
