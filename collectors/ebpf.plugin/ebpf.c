@@ -612,7 +612,11 @@ static void ebpf_unload_unique_maps()
             continue;
         }
 
-        ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
+        if (ebpf_modules[i].load == EBPF_LOAD_LEGACY) {
+            ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
+            continue;
+        }
+
         switch (i) {
             case EBPF_MODULE_CACHESTAT_IDX: {
 #ifdef LIBBPF_MAJOR_VERSION
