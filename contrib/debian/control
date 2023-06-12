@@ -51,8 +51,7 @@ Pre-Depends: adduser,
 Conflicts: netdata-core,
            netdata-plugins-bash,
            netdata-plugins-python,
-           netdata-web,
-           netdata-base
+           netdata-web
 Suggests: netdata-plugin-cups,
           netdata-plugin-freeipmi
 Description: real-time charts for system monitoring
