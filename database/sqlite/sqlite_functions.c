@@ -430,6 +430,14 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     char buf[1024 + 1] = "";
     const char *list[2] = { buf, NULL };
 
+    rc = sqlite3_create_function(db_meta, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC, 0, sqlite_uuid_parse, 0, 0);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to register internal u2h function");
+
+    rc = sqlite3_create_function(db_meta, "now_usec", 1, SQLITE_ANY, 0, sqlite_now_usec, 0, 0);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to register internal now_usec function");
+
     int target_version = DB_METADATA_VERSION;
 
     if (likely(!memory))
@@ -479,14 +487,6 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
 
     initialize_thread_key_pool();
 
-    rc = sqlite3_create_function(db_meta, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC, 0, sqlite_uuid_parse, 0, 0);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to register internal u2h function");
-
-
-    rc = sqlite3_create_function(db_meta, "now_usec", 1, SQLITE_ANY, 0, sqlite_now_usec, 0, 0);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to register internal now_usec function");
     return 0;
 }
 

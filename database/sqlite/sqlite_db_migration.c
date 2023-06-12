@@ -259,7 +259,7 @@ static int do_migration_v8_v9(sqlite3 *database, const char *name)
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
-        error_report("DES Failed to finalize statement when copying health_log tables, rc = %d", rc);
+        error_report("Failed to finalize statement when copying health_log tables, rc = %d", rc);
 
     char *table = NULL;
     dfe_start_read(dict_tables, table) {
