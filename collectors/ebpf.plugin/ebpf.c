@@ -561,7 +561,8 @@ static void ebpf_exit()
 #ifdef NETDATA_INTERNAL_CHECKS
     error("Good bye world! I was PID %d", main_thread_id);
 #endif
-    printf("DISABLE\n");
+    fprintf(stdout, "EXIT\n");
+    fflush(stdout);
 
     pthread_mutex_lock(&mutex_cgroup_shm);
     if (shm_ebpf_cgroup.header) {
