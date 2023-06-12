@@ -346,7 +346,7 @@ static void sqlite_uuid_parse(sqlite3_context *context, int argc, sqlite3_value 
     sqlite3_result_blob(context, &uuid, sizeof(uuid_t), SQLITE_TRANSIENT);
 }
 
-static void sqlite_now_usec(sqlite3_context *context, int argc, sqlite3_value **argv)
+void sqlite_now_usec(sqlite3_context *context, int argc, sqlite3_value **argv)
 {
     if (argc != 1 ){
         sqlite3_result_null(context);
@@ -360,7 +360,6 @@ static void sqlite_now_usec(sqlite3_context *context, int argc, sqlite3_value **
 
     sqlite3_result_int64(context, (sqlite_int64) now_realtime_usec());
 }
-
 
 /*
  * Initialize the SQLite database
