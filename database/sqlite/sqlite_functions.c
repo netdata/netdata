@@ -346,6 +346,21 @@ static void sqlite_uuid_parse(sqlite3_context *context, int argc, sqlite3_value 
     sqlite3_result_blob(context, &uuid, sizeof(uuid_t), SQLITE_TRANSIENT);
 }
 
+static void sqlite_now_usec(sqlite3_context *context, int argc, sqlite3_value **argv)
+{
+    if (argc != 1 ){
+        sqlite3_result_null(context);
+        return ;
+    }
+
+    if (sqlite3_value_int(argv[0]) != 0) {
+        struct timespec req = {.tv_sec = 0, .tv_nsec = 1};
+        nanosleep(&req, NULL);
+    }
+
+    sqlite3_result_int64(context, (sqlite_int64) now_realtime_usec());
+}
+
 
 /*
  * Initialize the SQLite database
@@ -467,6 +482,11 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     rc = sqlite3_create_function(db_meta, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC, 0, sqlite_uuid_parse, 0, 0);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to register internal u2h function");
+
+
+    rc = sqlite3_create_function(db_meta, "now_usec", 1, SQLITE_ANY, 0, sqlite_now_usec, 0, 0);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to register internal now_usec function");
     return 0;
 }
 

@@ -1661,6 +1661,12 @@ int test_sqlite(void) {
         return 1;
     }
 
+    rc = sqlite3_exec_monitored(db_meta, "UPDATE MINE SET id1=now_usec();", 0, 0, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr,"Failed to test SQLite: Update with now_usec() failed\n");
+        return 1;
+    }
+
     BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE, NULL);
     char *uuid_str = "0000_000";
 
