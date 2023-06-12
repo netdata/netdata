@@ -929,6 +929,42 @@ typedef enum __attribute__((packed)) {
 } RRDF_FIELD_OPTIONS;
 
 typedef enum __attribute__((packed)) {
+    RRDF_FIELD_TYPE_INTEGER,
+    RRDF_FIELD_TYPE_STRING,
+    RRDF_FIELD_TYPE_DETAIL_STRING,
+    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+    RRDF_FIELD_TYPE_DURATION,
+    RRDF_FIELD_TYPE_TIMESTAMP,
+    RRDF_FIELD_TYPE_ARRAY,
+} RRDF_FIELD_TYPE;
+
+static inline const char *rrdf_field_type_to_string(RRDF_FIELD_TYPE type) {
+    switch(type) {
+        default:
+        case RRDF_FIELD_TYPE_INTEGER:
+            return "integer";
+
+        case RRDF_FIELD_TYPE_STRING:
+            return "string";
+
+        case RRDF_FIELD_TYPE_DETAIL_STRING:
+            return "detail-string";
+
+        case RRDF_FIELD_TYPE_BAR_WITH_INTEGER:
+            return "bar-with-integer";
+
+        case RRDF_FIELD_TYPE_DURATION:
+            return "duration";
+
+        case RRDF_FIELD_TYPE_TIMESTAMP:
+            return "timestamp";
+
+        case RRDF_FIELD_TYPE_ARRAY:
+            return "array";
+    }
+}
+
+typedef enum __attribute__((packed)) {
     RRDF_FIELD_VISUAL_VALUE,    // show the value, possibly applying a transformation
     RRDF_FIELD_VISUAL_BAR,      // show the value and a bar, respecting the max field to fill the bar at 100%
     RRDF_FIELD_VISUAL_PILL,     // array of values (transformation is respected)
@@ -1042,9 +1078,9 @@ static inline const char *rrdf_field_filter_to_string(RRDF_FIELD_FILTER filter) 
 }
 
 static inline void
-buffer_rrdf_table_add_field(BUFFER *wb, size_t field_id, const char *key, const char *name, RRDF_FIELD_VISUAL visual,
-                            RRDF_FIELD_TRANSFORM transform, size_t decimal_points, const char *units,
-                            NETDATA_DOUBLE max, RRDF_FIELD_SORT sort, const char *pointer_to,
+buffer_rrdf_table_add_field(BUFFER *wb, size_t field_id, const char *key, const char *name, RRDF_FIELD_TYPE type,
+                            RRDF_FIELD_VISUAL visual, RRDF_FIELD_TRANSFORM transform, size_t decimal_points,
+                            const char *units, NETDATA_DOUBLE max, RRDF_FIELD_SORT sort, const char *pointer_to,
                             RRDF_FIELD_SUMMARY summary, RRDF_FIELD_FILTER filter, RRDF_FIELD_OPTIONS options,
                             const char *default_value) {
 
@@ -1054,6 +1090,7 @@ buffer_rrdf_table_add_field(BUFFER *wb, size_t field_id, const char *key, const 
         buffer_json_member_add_boolean(wb, "unique_key", options & RRDF_FIELD_OPTS_UNIQUE_KEY);
         buffer_json_member_add_string(wb, "name", name);
         buffer_json_member_add_boolean(wb, "visible", options & RRDF_FIELD_OPTS_VISIBLE);
+        buffer_json_member_add_string(wb, "type", rrdf_field_type_to_string(type));
         buffer_json_member_add_string_or_omit(wb, "units", units);
         buffer_json_member_add_string(wb, "visualization", rrdf_field_visual_to_string(visual));
 
