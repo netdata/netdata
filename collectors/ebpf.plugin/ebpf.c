@@ -694,7 +694,8 @@ static void ebpf_unload_unique_maps()
 static void ebpf_unload_filesystems()
 {
     if (ebpf_modules[EBPF_MODULE_FILESYSTEM_IDX].enabled == NETDATA_THREAD_EBPF_NOT_RUNNING ||
-        ebpf_modules[EBPF_MODULE_SYNC_IDX].enabled == NETDATA_THREAD_EBPF_RUNNING)
+        ebpf_modules[EBPF_MODULE_FILESYSTEM_IDX].enabled == NETDATA_THREAD_EBPF_RUNNING ||
+        ebpf_modules[EBPF_MODULE_FILESYSTEM_IDX].load != EBPF_LOAD_LEGACY)
         return;
 
     int i;
@@ -711,7 +712,8 @@ static void ebpf_unload_filesystems()
 static void ebpf_unload_sync()
 {
     if (ebpf_modules[EBPF_MODULE_SYNC_IDX].enabled == NETDATA_THREAD_EBPF_NOT_RUNNING ||
-        ebpf_modules[EBPF_MODULE_SYNC_IDX].enabled == NETDATA_THREAD_EBPF_RUNNING)
+        ebpf_modules[EBPF_MODULE_SYNC_IDX].enabled == NETDATA_THREAD_EBPF_RUNNING ||
+        ebpf_modules[EBPF_MODULE_SYNC_IDX].load != EBPF_LOAD_LEGACY)
         return;
 
     int i;
