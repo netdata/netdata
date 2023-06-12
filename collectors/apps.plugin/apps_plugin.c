@@ -4637,52 +4637,53 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         // wb, key, name, visible, type, visualization, transform, decimal_points, units, max, sort, sortable, sticky, unique_key, pointer_to, summary, range
         buffer_rrdf_table_add_field(wb, field_id++, "PID", "Process ID", RRDF_FIELD_TYPE_INTEGER,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT_UNIQUE,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY |
                                     RRDF_FIELD_OPTS_UNIQUE_KEY, NULL);
+
         buffer_rrdf_table_add_field(wb, field_id++, "Cmd", "Process Name", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT_UNIQUE,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
 
 #ifdef NETDATA_DEV_MODE
         buffer_rrdf_table_add_field(wb, field_id++, "CmdLine", "Command Line", RRDF_FIELD_TYPE_DETAIL_STRING,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0,
-                                    NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT_UNIQUE,
+                                    NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 #endif
         buffer_rrdf_table_add_field(wb, field_id++, "PPID", "Parent Process ID", RRDF_FIELD_TYPE_INTEGER,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL,
-                                    NAN, RRDF_FIELD_SORT_ASCENDING, "PID", RRDF_FIELD_SUMMARY_COUNT_UNIQUE,
+                                    NAN, RRDF_FIELD_SORT_ASCENDING, "PID", RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
         buffer_rrdf_table_add_field(wb, field_id++, "Category", "Category (apps_groups.conf)", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE,
                                     RRDF_FIELD_TRANSFORM_NONE,
-                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT_UNIQUE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
         buffer_rrdf_table_add_field(wb, field_id++, "User", "User Owner", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT_UNIQUE,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
         buffer_rrdf_table_add_field(wb, field_id++, "Uid", "User ID", RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE,
                                     RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT_UNIQUE,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
         buffer_rrdf_table_add_field(wb, field_id++, "Group", "Group Owner", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT_UNIQUE,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
         buffer_rrdf_table_add_field(wb, field_id++, "Gid", "Group ID", RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE,
                                     RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT_UNIQUE,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 

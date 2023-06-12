@@ -960,14 +960,14 @@ static inline const char *rrdf_field_type_to_string(RRDF_FIELD_TYPE type) {
             return "timestamp";
 
         case RRDF_FIELD_TYPE_ARRAY:
-            return "timestamp";
+            return "array";
     }
 }
 
 typedef enum __attribute__((packed)) {
-    RRDF_FIELD_VISUAL_VALUE,
-    RRDF_FIELD_VISUAL_BAR,
-    RRDF_FIELD_VISUAL_PILL,
+    RRDF_FIELD_VISUAL_VALUE,    // show the value, possibly applying a transformation
+    RRDF_FIELD_VISUAL_BAR,      // show the value and a bar, respecting the max field to fill the bar at 100%
+    RRDF_FIELD_VISUAL_PILL,     // array of values (transformation is respected)
 } RRDF_FIELD_VISUAL;
 
 static inline const char *rrdf_field_visual_to_string(RRDF_FIELD_VISUAL visual) {
@@ -985,10 +985,10 @@ static inline const char *rrdf_field_visual_to_string(RRDF_FIELD_VISUAL visual) 
 }
 
 typedef enum __attribute__((packed)) {
-    RRDF_FIELD_TRANSFORM_NONE,
-    RRDF_FIELD_TRANSFORM_NUMBER,
-    RRDF_FIELD_TRANSFORM_DURATION,
-    RRDF_FIELD_TRANSFORM_DATETIME, // timestamp in ms
+    RRDF_FIELD_TRANSFORM_NONE,      // show the value as-is
+    RRDF_FIELD_TRANSFORM_NUMBER,    // show the value repsecting the decimal_points
+    RRDF_FIELD_TRANSFORM_DURATION,  // transform as duration in second to a human readable duration
+    RRDF_FIELD_TRANSFORM_DATETIME,  // UNIX epoch timestamp in ms
 } RRDF_FIELD_TRANSFORM;
 
 static inline const char *rrdf_field_transform_to_string(RRDF_FIELD_TRANSFORM transform) {
@@ -1024,26 +1024,40 @@ static inline const char *rrdf_field_sort_to_string(RRDF_FIELD_SORT sort) {
 }
 
 typedef enum __attribute__((packed)) {
-    RRDF_FIELD_SUMMARY_NONE,
-    RRDF_FIELD_SUMMARY_SUM,
-    RRDF_FIELD_SUMMARY_MAX,
-    RRDF_FIELD_SUMMARY_COUNT_UNIQUE,
+    RRDF_FIELD_SUMMARY_UNIQUECOUNT,     // Finds the number of unique values of a group of rows
+    RRDF_FIELD_SUMMARY_SUM,             // Sums the values of a group of rows
+    RRDF_FIELD_SUMMARY_MIN,             // Finds the minimum value of a group of rows
+    RRDF_FIELD_SUMMARY_MAX,             // Finds the maximum value of a group of rows
+    // RRDF_FIELD_SUMMARY_EXTENT,          // Finds the minimum and maximum values of a group of rows
+    RRDF_FIELD_SUMMARY_MEAN,            // Finds the mean/average value of a group of rows
+    RRDF_FIELD_SUMMARY_MEDIAN,          // Finds the median value of a group of rows
+    // RRDF_FIELD_SUMMARY_UNIQUE,         // Finds the unique values of a group of rows
+    RRDF_FIELD_SUMMARY_COUNT,           // Calculates the number of rows in a group
 } RRDF_FIELD_SUMMARY;
 
 static inline const char *rrdf_field_summary_to_string(RRDF_FIELD_SUMMARY summary) {
     switch(summary) {
         default:
-        case RRDF_FIELD_SUMMARY_NONE:
-            return "none";
+        case RRDF_FIELD_SUMMARY_COUNT:
+            return "count";
+
+        case RRDF_FIELD_SUMMARY_UNIQUECOUNT:
+            return "uniqueCount";
 
         case RRDF_FIELD_SUMMARY_SUM:
             return "sum";
 
+        case RRDF_FIELD_SUMMARY_MIN:
+            return "min";
+
+        case RRDF_FIELD_SUMMARY_MEAN:
+            return "mean";
+
+        case RRDF_FIELD_SUMMARY_MEDIAN:
+            return "median";
+
         case RRDF_FIELD_SUMMARY_MAX:
             return "max";
-
-        case RRDF_FIELD_SUMMARY_COUNT_UNIQUE:
-            return "count_unique";
     }
 }
 

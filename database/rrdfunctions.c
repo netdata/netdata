@@ -841,6 +841,12 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
                     buffer_json_add_array_item_string(wb, rrdhost_hostname(s.host)); // Node
                     buffer_json_add_array_item_uint64(wb, s.db.first_time_s * 1000); // dbFrom
                     buffer_json_add_array_item_uint64(wb, s.db.last_time_s * 1000); // dbTo
+
+                    if(s.db.first_time_s && s.db.last_time_s && s.db.last_time_s > s.db.first_time_s)
+                        buffer_json_add_array_item_uint64(wb, s.db.last_time_s - s.db.first_time_s); // dbDuration
+                    else
+                        buffer_json_add_array_item_string(wb, NULL); // dbDuration
+
                     buffer_json_add_array_item_uint64(wb, s.db.metrics); // dbMetrics
                     buffer_json_add_array_item_uint64(wb, s.db.instances); // dbInstances
 
@@ -959,21 +965,27 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
         buffer_rrdf_table_add_field(wb, field_id++, "Node", "Node's Hostname",
                                     RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_NONE, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
                                     NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "dbFrom", "DB Data Retention From",
                                     RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_NONE, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_SUMMARY_MIN, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "dbTo", "DB Data Retention To",
                                     RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_NONE, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "dbDuration", "DB Data Retention Duration",
+                                    RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "dbMetrics", "Time-series Metrics in the DB",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
@@ -989,24 +1001,23 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
 
         // --- statuses ---
 
-
         buffer_rrdf_table_add_field(wb, field_id++, "InStatus", "Data Collection Online Status",
                                     RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutStatus", "Streaming Online Status",
                                     RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
-        buffer_rrdf_table_add_field(wb, field_id++, "MLStatus", "ML Status",
+        buffer_rrdf_table_add_field(wb, field_id++, "MlStatus", "ML Status",
                                     RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         // --- collection ---
@@ -1014,31 +1025,31 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
         buffer_rrdf_table_add_field(wb, field_id++, "InSince", "Last Data Collection Status Change",
                                     RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME,
                                     0, NULL, NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_SUMMARY_MIN, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "InAge", "Last Data Collection Online Status Change Age",
                                     RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "InReason", "Data Collection Online Status Reason",
                                     RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "InHops", "Data Collection Distance Hops from Origin Node",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_SUMMARY_MIN, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "InReplCompletion", "Inbound Replication Completion",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
                                     1, "%", 100.0, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_SUMMARY_MIN, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "InReplInstances", "Inbound Replicating Instances",
@@ -1051,37 +1062,37 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
         buffer_rrdf_table_add_field(wb, field_id++, "InLocalIP", "Inbound Local IP",
                                     RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "InLocalPort", "Inbound Local Port",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "InRemoteIP", "Inbound Remote IP",
                                     RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "InRemotePort", "Inbound Remote Port",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "InSSL", "Inbound SSL Connection",
                                     RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "InCapabilities", "Inbound Connection Capabilities",
                                     RRDF_FIELD_TYPE_ARRAY, RRDF_FIELD_VISUAL_PILL, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         // --- streaming ---
@@ -1089,31 +1100,31 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
         buffer_rrdf_table_add_field(wb, field_id++, "OutSince", "Last Streaming Status Change",
                                     RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME,
                                     0, NULL, NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutAge", "Last Streaming Status Change Age",
                                     RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_SUMMARY_MIN, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutReason", "Streaming Status Reason",
                                     RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutHops", "Streaming Distance Hops from Origin Node",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_SUMMARY_MIN, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutReplCompletion", "Outbound Replication Completion",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
                                     1, "%", 100.0, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_SUMMARY_MIN, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutReplInstances", "Outbound Replicating Instances",
@@ -1126,43 +1137,43 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
         buffer_rrdf_table_add_field(wb, field_id++, "OutLocalIP", "Outbound Local IP",
                                     RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutLocalPort", "Outbound Local Port",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutRemoteIP", "Outbound Remote IP",
                                     RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutRemotePort", "Outbound Remote Port",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutSSL", "Outbound SSL Connection",
                                     RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutCompression", "Outbound Compressed Connection",
                                     RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutCapabilities", "Outbound Connection Capabilities",
                                     RRDF_FIELD_TYPE_ARRAY, RRDF_FIELD_VISUAL_PILL, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutTrafficData", "Outbound Metric Data Traffic",
@@ -1200,21 +1211,21 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
                                     "Outbound Connection Attempt Handshake Status",
                                     RRDF_FIELD_TYPE_ARRAY, RRDF_FIELD_VISUAL_PILL, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutAttemptSince",
                                     "Last Outbound Connection Attempt Status Change Time",
                                     RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME,
                                     0, NULL, NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT_UNIQUE, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutAttemptAge",
                                     "Last Outbound Connection Attempt Status Change Age",
                                     RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_SUMMARY_MIN, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         // --- ML ---
@@ -1263,20 +1274,127 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
     buffer_json_member_add_string(wb, "default_sort_column", "Node");
     buffer_json_member_add_object(wb, "charts");
     {
-        // CPU chart
-        buffer_json_member_add_object(wb, "Age");
+        // Data Collection Age chart
+        buffer_json_member_add_object(wb, "InAge");
         {
-            buffer_json_member_add_string(wb, "name", "Age");
+            buffer_json_member_add_string(wb, "name", "Data Collection Age");
             buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "Age");
+                buffer_json_add_array_item_string(wb, "InAge");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // Streaming Age chart
+        buffer_json_member_add_object(wb, "OutAge");
+        {
+            buffer_json_member_add_string(wb, "name", "Streaming Age");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "OutAge");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // DB Duration
+        buffer_json_member_add_object(wb, "dbDuration");
+        {
+            buffer_json_member_add_string(wb, "name", "Retention Duration");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "dbDuration");
             }
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb); // charts
+
+    buffer_json_member_add_array(wb, "default_chart1");
+    buffer_json_add_array_item_string(wb, "InAge");
+    buffer_json_add_array_item_string(wb, "Node");
+    buffer_json_array_close(wb);
+
+    buffer_json_member_add_array(wb, "default_chart2");
+    buffer_json_add_array_item_string(wb, "OutAge");
+    buffer_json_add_array_item_string(wb, "Node");
+    buffer_json_array_close(wb);
+
+    buffer_json_member_add_object(wb, "group_by");
+    {
+        buffer_json_member_add_object(wb, "Node");
+        {
+            buffer_json_member_add_string(wb, "name", "Node");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Node");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "InStatus");
+        {
+            buffer_json_member_add_string(wb, "name", "Nodes by Collection Status");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "InStatus");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "OutStatus");
+        {
+            buffer_json_member_add_string(wb, "name", "Nodes by Streaming Status");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "OutStatus");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "MlStatus");
+        {
+            buffer_json_member_add_string(wb, "name", "Nodes by ML Status");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "MlStatus");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "InRemoteIP");
+        {
+            buffer_json_member_add_string(wb, "name", "Nodes by Inbound IP");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "InRemoteIP");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "OutRemoteIP");
+        {
+            buffer_json_member_add_string(wb, "name", "Nodes by Outbound IP");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "OutRemoteIP");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // group_by
+
     buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + 1);
     buffer_json_finalize(wb);
 
