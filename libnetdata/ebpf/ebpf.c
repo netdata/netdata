@@ -856,8 +856,10 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
     em->load |= EBPF_LOAD_LEGACY;
 
     *obj = bpf_object__open_file(lpath, NULL);
+    if (!*obj)
+        return NULL;
+
     if (libbpf_get_error(obj)) {
-        error("Cannot open BPF object %s", lpath);
         bpf_object__close(*obj);
         return NULL;
     }
