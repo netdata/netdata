@@ -1725,6 +1725,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     rrdhost_retention(host, now, s->db.online, &s->db.first_time_s, &s->db.last_time_s);
     s->db.metrics = host->rrdctx.metrics;
     s->db.instances = host->rrdctx.instances;
+    s->db.contexts = dictionary_entries(host->rrdctx.contexts);
 
     // --- collection ---
 

@@ -808,7 +808,7 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
     buffer_json_member_add_array(wb, "data");
 
     size_t max_sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_MAX];
-    size_t max_db_metrics = 0, max_db_instances = 0;
+    size_t max_db_metrics = 0, max_db_instances = 0, max_db_contexts = 0;
     size_t max_collection_replication_instances = 0, max_streaming_replication_instances = 0;
     size_t max_ml_anomalous = 0, max_ml_normal = 0, max_ml_trained = 0, max_ml_pending = 0, max_ml_silenced = 0;
     {
@@ -823,6 +823,9 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
 
                     if(s.db.instances > max_db_instances)
                         max_db_instances = s.db.instances;
+
+                    if(s.db.contexts > max_db_contexts)
+                        max_db_contexts = s.db.contexts;
 
                     if(s.collection.replication.instances > max_collection_replication_instances)
                         max_collection_replication_instances = s.collection.replication.instances;
@@ -849,6 +852,7 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
 
                     buffer_json_add_array_item_uint64(wb, s.db.metrics); // dbMetrics
                     buffer_json_add_array_item_uint64(wb, s.db.instances); // dbInstances
+                    buffer_json_add_array_item_uint64(wb, s.db.contexts); // dbContexts
 
                     // statuses
                     buffer_json_add_array_item_string(wb, rrdhost_collection_status_to_string(s.collection.status)); // InStatus
@@ -996,6 +1000,12 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
         buffer_rrdf_table_add_field(wb, field_id++, "dbInstances", "Instances in the DB",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
                                     0, NULL, max_db_instances, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "dbContexts", "Contexts in the DB",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    0, NULL, max_db_contexts, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 

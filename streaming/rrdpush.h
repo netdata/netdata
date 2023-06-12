@@ -479,6 +479,7 @@ typedef struct rrdhost_status {
         bool online;
         size_t metrics;
         size_t instances;
+        size_t contexts;
     } db;
 
     struct {
