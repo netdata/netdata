@@ -404,23 +404,6 @@ static inline int ebpf_vfs_load_and_attach(struct vfs_bpf *obj, ebpf_module_t *e
  *****************************************************************/
 
 /**
- * Cachestat Free
- *
- * Cleanup variables after child threads to stop
- *
- * @param ptr thread data.
- */
-static void ebpf_vfs_free(ebpf_module_t *em)
-{
-    freez(vfs_hash_values);
-    freez(vfs_vector);
-
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-}
-
-/**
  * Exit
  *
  * Cancel thread and exit.
@@ -430,7 +413,17 @@ static void ebpf_vfs_free(ebpf_module_t *em)
 static void ebpf_vfs_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    ebpf_vfs_free(em);
+
+#ifdef LIBBPF_MAJOR_VERSION
+    if (vfs_bpf_obj)
+        vfs_bpf__destroy(vfs_bpf_obj);
+#endif
+    if (em->objects)
+        ebpf_unload_legacy_code(em->objects, em->probe_links);
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************

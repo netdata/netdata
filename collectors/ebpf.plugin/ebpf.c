@@ -632,8 +632,7 @@ static void ebpf_unload_unique_maps()
     int i;
     for (i = 0; ebpf_modules[i].thread_name; i++) {
         // These threads are cleaned with other functions
-        if ((i > EBPF_MODULE_SOCKET_IDX && i < EBPF_MODULE_VFS_IDX) ||
-            i == EBPF_MODULE_FILESYSTEM_IDX)
+        if (i > EBPF_MODULE_SOCKET_IDX && i < EBPF_MODULE_DISK_IDX)
             continue;
 
         if (ebpf_modules[i].enabled != NETDATA_THREAD_EBPF_STOPPED) {
@@ -677,13 +676,7 @@ static void ebpf_unload_unique_maps()
 #endif
                 break;
             }
-            case EBPF_MODULE_VFS_IDX: {
-#ifdef LIBBPF_MAJOR_VERSION
-                if (vfs_bpf_obj)
-                    vfs_bpf__destroy(vfs_bpf_obj);
-#endif
-                break;
-            }
+            case EBPF_MODULE_VFS_IDX:
             case EBPF_MODULE_SWAP_IDX:
             case EBPF_MODULE_DCSTAT_IDX:
             case EBPF_MODULE_PROCESS_IDX:
