@@ -496,6 +496,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
 
             buffer_json_member_add_object(wb, "ml");
             buffer_json_member_add_string(wb, "status", rrdhost_ml_status_to_string(s.ml.status));
+            buffer_json_member_add_string(wb, "type", rrdhost_ml_type_to_string(s.ml.type));
             if(s.ml.status == RRDHOST_ML_STATUS_RUNNING) {
                 buffer_json_member_add_object(wb, "metrics");
                 {

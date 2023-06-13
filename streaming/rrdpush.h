@@ -405,7 +405,7 @@ static inline const char *rrdhost_db_status_to_string(RRDHOST_DB_STATUS status) 
             return "initializing";
 
         case RRDHOST_DB_STATUS_QUERYABLE:
-            return "queryable";
+            return "online";
     }
 }
 
@@ -488,23 +488,39 @@ static inline const char *rrdhost_streaming_status_to_string(RRDHOST_STREAMING_S
 typedef enum __attribute__((packed)) {
     RRDHOST_ML_STATUS_DISABLED = 0,
     RRDHOST_ML_STATUS_OFFLINE,
-    RRDHOST_ML_STATUS_RECEIVED,
     RRDHOST_ML_STATUS_RUNNING,
 } RRDHOST_ML_STATUS;
 
 static inline const char *rrdhost_ml_status_to_string(RRDHOST_ML_STATUS status) {
     switch(status) {
         case RRDHOST_ML_STATUS_RUNNING:
-            return "running";
+            return "online";
 
         case RRDHOST_ML_STATUS_OFFLINE:
             return "offline";
 
-        case RRDHOST_ML_STATUS_RECEIVED:
+        default:
+        case RRDHOST_ML_STATUS_DISABLED:
+            return "disabled";
+    }
+}
+
+typedef enum __attribute__((packed)) {
+    RRDHOST_ML_TYPE_DISABLED = 0,
+    RRDHOST_ML_TYPE_SELF,
+    RRDHOST_ML_TYPE_RECEIVED,
+} RRDHOST_ML_TYPE;
+
+static inline const char *rrdhost_ml_type_to_string(RRDHOST_ML_TYPE type) {
+    switch(type) {
+        case RRDHOST_ML_TYPE_SELF:
+            return "self";
+
+        case RRDHOST_ML_TYPE_RECEIVED:
             return "received";
 
         default:
-        case RRDHOST_ML_STATUS_DISABLED:
+        case RRDHOST_ML_TYPE_DISABLED:
             return "disabled";
     }
 }
@@ -525,7 +541,7 @@ static inline const char *rrdhost_health_status_to_string(RRDHOST_HEALTH_STATUS 
             return "initializing";
 
         case RRDHOST_HEALTH_STATUS_RUNNING:
-            return "running";
+            return "online";
     }
 }
 
@@ -544,6 +560,7 @@ typedef struct rrdhost_status {
 
     struct {
         RRDHOST_ML_STATUS status;
+        RRDHOST_ML_TYPE type;
         struct ml_metrics_statistics metrics;
     } ml;
 
