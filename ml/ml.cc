@@ -992,7 +992,7 @@ ml_host_detect_once(ml_host_t *host)
     host->mls = {};
     ml_machine_learning_stats_t mls_copy = {};
 
-    {
+    if (host->ml_running) {
         netdata_mutex_lock(&host->mutex);
 
         /*
@@ -1036,6 +1036,8 @@ ml_host_detect_once(ml_host_t *host)
         mls_copy = host->mls;
 
         netdata_mutex_unlock(&host->mutex);
+    } else {
+        host->host_anomaly_rate = 0.0;
     }
 
     worker_is_busy(WORKER_JOB_DETECTION_DIM_CHART);
@@ -1213,15 +1215,14 @@ void ml_host_new(RRDHOST *rh)
 
     host->rh = rh;
     host->mls = ml_machine_learning_stats_t();
-    //host->ts = ml_training_stats_t();
+    host->host_anomaly_rate = 0.0;
 
     static std::atomic<size_t> times_called(0);
     host->training_queue = Cfg.training_threads[times_called++ % Cfg.num_training_threads].training_queue;
 
-    host->host_anomaly_rate = 0.0;
-
     netdata_mutex_init(&host->mutex);
 
+    host->ml_running = true;
     rh->ml_host = (rrd_ml_host_t *) host;
 }
 
@@ -1235,6 +1236,70 @@ void ml_host_delete(RRDHOST *rh)
 
     delete host;
     rh->ml_host = NULL;
+}
+
+void ml_host_start(RRDHOST *rh) {
+    ml_host_t *host = (ml_host_t *) rh->ml_host;
+    if (!host)
+        return;
+
+    host->ml_running = true;
+}
+
+void ml_host_stop(RRDHOST *rh) {
+    ml_host_t *host = (ml_host_t *) rh->ml_host;
+    if (!host || !host->ml_running)
+        return;
+
+    netdata_mutex_lock(&host->mutex);
+
+    // reset host stats
+    host->mls = ml_machine_learning_stats_t();
+
+    // reset charts/dims
+    void *rsp = NULL;
+    rrdset_foreach_read(rsp, host->rh) {
+        RRDSET *rs = static_cast<RRDSET *>(rsp);
+
+        ml_chart_t *chart = (ml_chart_t *) rs->ml_chart;
+        if (!chart)
+            continue;
+
+        // reset chart
+        chart->mls = ml_machine_learning_stats_t();
+
+        void *rdp = NULL;
+        rrddim_foreach_read(rdp, rs) {
+            RRDDIM *rd = static_cast<RRDDIM *>(rdp);
+
+            ml_dimension_t *dim = (ml_dimension_t *) rd->ml_dimension;
+            if (!dim)
+                continue;
+
+            netdata_mutex_lock(&dim->mutex);
+
+            // reset dim
+            // TODO: should we drop in-mem models, or mark them as stale? Is it
+            // okay to resume training straight away?
+
+            dim->mt = METRIC_TYPE_CONSTANT;
+            dim->ts = TRAINING_STATUS_UNTRAINED;
+            dim->last_training_time = 0;
+            dim->suppression_anomaly_counter = 0;
+            dim->suppression_window_counter = 0;
+            dim->cns.clear();
+
+            ml_kmeans_init(&dim->kmeans);
+
+            netdata_mutex_unlock(&dim->mutex);
+        }
+        rrddim_foreach_done(rdp);
+    }
+    rrdset_foreach_done(rsp);
+
+    netdata_mutex_unlock(&host->mutex);
+
+    host->ml_running = false;
 }
 
 void ml_host_get_info(RRDHOST *rh, BUFFER *wb)
@@ -1279,7 +1344,8 @@ void ml_host_get_detection_info(RRDHOST *rh, BUFFER *wb)
 
     netdata_mutex_lock(&host->mutex);
 
-    buffer_json_member_add_uint64(wb, "version", 1);
+    buffer_json_member_add_uint64(wb, "version", 2);
+    buffer_json_member_add_uint64(wb, "ml-running", host->ml_running);
     buffer_json_member_add_uint64(wb, "anomalous-dimensions", host->mls.num_anomalous_dimensions);
     buffer_json_member_add_uint64(wb, "normal-dimensions", host->mls.num_normal_dimensions);
     buffer_json_member_add_uint64(wb, "total-dimensions", host->mls.num_anomalous_dimensions +
@@ -1360,8 +1426,9 @@ void ml_dimension_new(RRDDIM *rd)
 
     dim->mt = METRIC_TYPE_CONSTANT;
     dim->ts = TRAINING_STATUS_UNTRAINED;
-
     dim->last_training_time = 0;
+    dim->suppression_anomaly_counter = 0;
+    dim->suppression_window_counter = 0;
 
     ml_kmeans_init(&dim->kmeans);
 
@@ -1395,6 +1462,10 @@ bool ml_dimension_is_anomalous(RRDDIM *rd, time_t curr_time, double value, bool 
 {
     ml_dimension_t *dim = (ml_dimension_t *) rd->ml_dimension;
     if (!dim)
+        return false;
+
+    ml_host_t *host = (ml_host_t *) rd->rrdset->rrdhost->ml_host;
+    if (!host->ml_running)
         return false;
 
     ml_chart_t *chart = (ml_chart_t *) rd->rrdset->ml_chart;

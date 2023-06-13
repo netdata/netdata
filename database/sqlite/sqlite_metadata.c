@@ -1485,7 +1485,6 @@ static inline void queue_metadata_cmd(enum metadata_opcode opcode, const void *p
     cmd.param[1] = param1;
     cmd.completion = NULL;
     metadata_enq_cmd(&metasync_worker, &cmd);
-
 }
 
 // Public
