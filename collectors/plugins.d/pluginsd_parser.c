@@ -402,6 +402,8 @@ static PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, size_t nu
             false
             );
 
+    rrdhost_option_set(host, RRDHOST_OPTION_VIRTUAL_HOST);
+
     if(host->rrdlabels) {
         rrdlabels_migrate_to_these(host->rrdlabels, u->host_define.rrdlabels);
     }

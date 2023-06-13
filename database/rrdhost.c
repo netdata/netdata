@@ -1719,133 +1719,197 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     s->host = host;
     s->now = now;
 
+    RRDHOST_FLAGS flags = __atomic_load_n(&host->flags, __ATOMIC_RELAXED);
+
     // --- db ---
 
-    s->db.online = rrdhost_is_online(host);
-    rrdhost_retention(host, now, s->db.online, &s->db.first_time_s, &s->db.last_time_s);
+    bool online = (host == localhost ||
+            !(flags & (RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED) ||
+            rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST)));
+
+    rrdhost_retention(host, now, online, &s->db.first_time_s, &s->db.last_time_s);
     s->db.metrics = host->rrdctx.metrics;
     s->db.instances = host->rrdctx.instances;
     s->db.contexts = dictionary_entries(host->rrdctx.contexts);
+    if(!s->db.first_time_s || !s->db.last_time_s || !s->db.metrics || !s->db.instances || !s->db.contexts ||
+            (flags & (RRDHOST_FLAG_PENDING_CONTEXT_LOAD|RRDHOST_FLAG_CONTEXT_LOAD_IN_PROGRESS)))
+        s->db.status = RRDHOST_DB_STATUS_INITIALIZING;
+    else
+        s->db.status = RRDHOST_DB_STATUS_QUERYABLE;
 
-    // --- collection ---
+    // --- ingest ---
 
-    s->collection.since = MAX(host->child_connect_time, host->child_disconnected_time);
-    s->collection.reason = (s->db.online) ? "" : host->rrdpush_last_receiver_exit_reason;
+    s->ingest.since = MAX(host->child_connect_time, host->child_disconnected_time);
+    s->ingest.reason = (online) ? "" : host->rrdpush_last_receiver_exit_reason;
 
     netdata_mutex_lock(&host->receiver_lock);
-    s->collection.hops = rrdhost_hops(host);
+    s->ingest.hops = (host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
+    bool has_receiver = false;
     if (host->receiver) {
-        s->collection.replication.instances = rrdhost_receiver_replicating_charts(host);
-        s->collection.replication.completion = host->rrdpush_receiver_replication_percent;
-        s->collection.replication.in_progress = s->collection.replication.instances > 0;
+        has_receiver = true;
+        s->ingest.replication.instances = rrdhost_receiver_replicating_charts(host);
+        s->ingest.replication.completion = host->rrdpush_receiver_replication_percent;
+        s->ingest.replication.in_progress = s->ingest.replication.instances > 0;
 
-        s->collection.capabilities = host->receiver->capabilities;
-        s->collection.peers = socket_peers(host->receiver->fd);
+        s->ingest.capabilities = host->receiver->capabilities;
+        s->ingest.peers = socket_peers(host->receiver->fd);
 #ifdef ENABLE_HTTPS
-        s->collection.ssl = SSL_connection(&host->receiver->ssl);
+        s->ingest.ssl = SSL_connection(&host->receiver->ssl);
 #endif
     }
     netdata_mutex_unlock(&host->receiver_lock);
 
-    if (s->db.online) {
-        if (host == localhost) {
-            s->collection.status = RRDHOST_COLLECTION_STATUS_LOCALHOST;
-            s->collection.since = netdata_start_time;
+    if (online) {
+        if(s->db.status == RRDHOST_DB_STATUS_INITIALIZING)
+            s->ingest.status = RRDHOST_INGEST_STATUS_INITIALIZING;
+
+        else if (host == localhost || rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST)) {
+            s->ingest.status = RRDHOST_INGEST_STATUS_ONLINE;
+            s->ingest.since = netdata_start_time;
         }
 
-        else if (s->collection.replication.in_progress)
-            s->collection.status = RRDHOST_COLLECTION_STATUS_REPLICATING;
+        else if (s->ingest.replication.in_progress)
+            s->ingest.status = RRDHOST_INGEST_STATUS_REPLICATING;
 
         else
-            s->collection.status = RRDHOST_COLLECTION_STATUS_ONLINE;
+            s->ingest.status = RRDHOST_INGEST_STATUS_ONLINE;
     }
     else {
-        if (!s->collection.since) {
-            s->collection.status = RRDHOST_COLLECTION_STATUS_ARCHIVED;
-            s->collection.since = s->db.last_time_s;
+        if (!s->ingest.since) {
+            s->ingest.status = RRDHOST_INGEST_STATUS_ARCHIVED;
+            s->ingest.since = s->db.last_time_s;
         }
 
         else
-            s->collection.status = RRDHOST_COLLECTION_STATUS_OFFLINE;
+            s->ingest.status = RRDHOST_INGEST_STATUS_OFFLINE;
     }
 
-    if(!s->collection.since)
-        s->collection.since = netdata_start_time;
+    if(host == localhost)
+        s->ingest.type = RRDHOST_INGEST_TYPE_LOCALHOST;
+    else if(has_receiver || rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED))
+        s->ingest.type = RRDHOST_INGEST_TYPE_CHILD;
+    else if(rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST))
+        s->ingest.type = RRDHOST_INGEST_TYPE_VIRTUAL;
+    else
+        s->ingest.type = RRDHOST_INGEST_TYPE_ARCHIVED;
 
-    if(!s->collection.reason)
-        s->collection.reason = "";
+    s->ingest.id = host->rrdpush_receiver_connection_counter;
+
+    if(!s->ingest.since)
+        s->ingest.since = netdata_start_time;
+
+    if(!s->ingest.reason)
+        s->ingest.reason = "";
 
 
-    // --- streaming ---
+    // --- stream ---
 
     if (!host->sender) {
-        s->streaming.status = RRDHOST_STREAMING_STATUS_DISABLED;
-        s->streaming.hops = s->collection.hops + 1;
+        s->stream.status = RRDHOST_STREAM_STATUS_DISABLED;
+        s->stream.hops = s->ingest.hops + 1;
     }
     else {
         netdata_mutex_lock(&host->sender->mutex);
 
-        s->streaming.since = host->sender->last_state_since_t;
-        s->streaming.peers = socket_peers(host->sender->rrdpush_sender_socket);
-        s->streaming.ssl = SSL_connection(&host->sender->ssl);
+        s->stream.since = host->sender->last_state_since_t;
+        s->stream.peers = socket_peers(host->sender->rrdpush_sender_socket);
+        s->stream.ssl = SSL_connection(&host->sender->ssl);
 
-        memcpy(s->streaming.sent_bytes_on_this_connection_per_type,
+        memcpy(s->stream.sent_bytes_on_this_connection_per_type,
                host->sender->sent_bytes_on_this_connection_per_type,
-            MIN(sizeof(s->streaming.sent_bytes_on_this_connection_per_type),
+            MIN(sizeof(s->stream.sent_bytes_on_this_connection_per_type),
                 sizeof(host->sender->sent_bytes_on_this_connection_per_type)));
 
         if (rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED)) {
-            s->streaming.hops = host->sender->hops;
-            s->streaming.reason = "";
-            s->streaming.capabilities = host->sender->capabilities;
+            s->stream.hops = host->sender->hops;
+            s->stream.reason = "";
+            s->stream.capabilities = host->sender->capabilities;
 
-            s->streaming.replication.completion = rrdhost_sender_replication_completion_unsafe(host, now, &s->streaming.replication.instances);
-            s->streaming.replication.in_progress = s->streaming.replication.instances > 0;
+            s->stream.replication.completion = rrdhost_sender_replication_completion_unsafe(host, now, &s->stream.replication.instances);
+            s->stream.replication.in_progress = s->stream.replication.instances > 0;
 
-            if(s->streaming.replication.in_progress)
-                s->streaming.status = RRDHOST_STREAMING_STATUS_REPLICATING;
+            if(s->stream.replication.in_progress)
+                s->stream.status = RRDHOST_STREAM_STATUS_REPLICATING;
             else
-                s->streaming.status = RRDHOST_STREAMING_STATUS_ONLINE;
+                s->stream.status = RRDHOST_STREAM_STATUS_ONLINE;
 
 #ifdef ENABLE_COMPRESSION
-            s->streaming.compression = (stream_has_capability(host->sender, STREAM_CAP_COMPRESSION) && host->sender->compressor);
+            s->stream.compression = (stream_has_capability(host->sender, STREAM_CAP_COMPRESSION) && host->sender->compressor);
 #endif
         }
         else {
-            s->streaming.status = RRDHOST_STREAMING_STATUS_OFFLINE;
-            s->streaming.hops = s->collection.hops + 1;
-            s->streaming.reason = host->sender->exit.reason;
+            s->stream.status = RRDHOST_STREAM_STATUS_OFFLINE;
+            s->stream.hops = s->ingest.hops + 1;
+            s->stream.reason = host->sender->exit.reason;
         }
 
         netdata_mutex_unlock(&host->sender->mutex);
     }
 
-    if(!s->streaming.since)
-        s->streaming.since = netdata_start_time;
+    s->stream.id = host->rrdpush_sender_connection_counter;
 
-    if(!s->streaming.reason)
-        s->streaming.reason = "";
+    if(!s->stream.since)
+        s->stream.since = netdata_start_time;
+
+    if(!s->stream.reason)
+        s->stream.reason = "";
 
     // --- ml ---
 
-    struct ml_metrics_statistics mlm;
-    if(ml_host_get_host_status(host, &mlm)) {
-        if(s->collection.status == RRDHOST_COLLECTION_STATUS_OFFLINE)
+    if(ml_host_get_host_status(host, &s->ml.metrics)) {
+        if(s->ingest.status == RRDHOST_INGEST_STATUS_OFFLINE || s->ingest.status == RRDHOST_INGEST_STATUS_ARCHIVED)
             s->ml.status = RRDHOST_ML_STATUS_OFFLINE;
-        else if(s->collection.status == RRDHOST_COLLECTION_STATUS_ARCHIVED)
-            s->ml.status = RRDHOST_ML_STATUS_DISABLED;
         else
             s->ml.status = RRDHOST_ML_STATUS_RUNNING;
-
-        s->ml.metrics.anomalous = mlm.anomalous;
-        s->ml.metrics.normal = mlm.normal;
-        s->ml.metrics.trained = mlm.trained;
-        s->ml.metrics.pending = mlm.pending;
-        s->ml.metrics.silenced = mlm.silenced;
     }
-    else if(stream_has_capability(&s->collection, STREAM_CAP_DATA_WITH_ML))
+    else if(stream_has_capability(&s->ingest, STREAM_CAP_DATA_WITH_ML))
         s->ml.status = RRDHOST_ML_STATUS_RECEIVED;
     else
+        // does not receive ML, does not run ML
         s->ml.status = RRDHOST_ML_STATUS_DISABLED;
 
+    // --- health ---
+
+    if(host->health.health_enabled) {
+        if(flags & RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION)
+            s->health.status = RRDHOST_HEALTH_STATUS_INITIALIZING;
+        else {
+            s->health.status = RRDHOST_HEALTH_STATUS_RUNNING;
+
+            RRDCALC *rc;
+            foreach_rrdcalc_in_rrdhost_read(host, rc) {
+                if (unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+                    continue;
+
+                switch (rc->status) {
+                    default:
+                    case RRDCALC_STATUS_REMOVED:
+                        break;
+
+                    case RRDCALC_STATUS_CLEAR:
+                        s->health.alerts.clear++;
+                        break;
+
+                    case RRDCALC_STATUS_WARNING:
+                        s->health.alerts.warning++;
+                        break;
+
+                    case RRDCALC_STATUS_CRITICAL:
+                        s->health.alerts.critical++;
+                        break;
+
+                    case RRDCALC_STATUS_UNDEFINED:
+                        s->health.alerts.undefined++;
+                        break;
+
+                    case RRDCALC_STATUS_UNINITIALIZED:
+                        s->health.alerts.uninitialized++;
+                        break;
+                }
+            }
+            foreach_rrdcalc_in_rrdhost_done(rc);
+        }
+    }
+    else
+        s->health.status = RRDHOST_HEALTH_STATUS_DISABLED;
 }

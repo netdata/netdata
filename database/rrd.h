@@ -7,6 +7,8 @@
 extern "C" {
 #endif
 
+#include "libnetdata/libnetdata.h"
+
 // non-existing structs instead of voids
 // to enable type checking at compile time
 typedef struct storage_instance STORAGE_INSTANCE;
@@ -94,6 +96,14 @@ extern RRD_MEMORY_MODE default_rrd_memory_mode;
 
 const char *rrd_memory_mode_name(RRD_MEMORY_MODE id);
 RRD_MEMORY_MODE rrd_memory_mode_id(const char *name);
+
+struct ml_metrics_statistics {
+    size_t anomalous;
+    size_t normal;
+    size_t trained;
+    size_t pending;
+    size_t silenced;
+};
 
 #include "daemon/common.h"
 #include "web/api/queries/query.h"
@@ -960,6 +970,8 @@ typedef enum __attribute__ ((__packed__)) {
     RRDHOST_OPTION_DELETE_ORPHAN_HOST       = (1 << 4), // delete the entire host when orphan
 
     RRDHOST_OPTION_REPLICATION              = (1 << 5), // when set, we support replication for this host
+
+    RRDHOST_OPTION_VIRTUAL_HOST             = (1 << 6), // when set, this host is a virtual one
 } RRDHOST_OPTIONS;
 
 #define rrdhost_option_check(host, flag) ((host)->options & (flag))
@@ -1163,6 +1175,9 @@ struct rrdhost {
     netdata_thread_t rrdpush_sender_thread;         // the sender thread
     size_t rrdpush_sender_replicating_charts;       // the number of charts currently being replicated to a parent
     void *aclk_sync_host_config;
+
+    uint32_t rrdpush_receiver_connection_counter;   // the number of times this receiver has connected
+    uint32_t rrdpush_sender_connection_counter;     // the number of times this sender has connected
 
     // ------------------------------------------------------------------------
     // streaming of data from remote hosts - rrdpush receiver
@@ -1530,9 +1545,6 @@ void set_host_properties(
 
 size_t get_tier_grouping(size_t tier);
 void store_metric_collection_completed(void);
-
-#define rrdhost_is_online(host) ((host) == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED))
-#define rrdhost_hops(host) ((host)->system_info ? (host)->system_info->hops : ((host) == localhost) ? 0 : 1)
 
 static inline void rrdhost_retention(RRDHOST *host, time_t now, bool online, time_t *from, time_t *to) {
     time_t first_time_s = 0, last_time_s = 0;

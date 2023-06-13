@@ -827,17 +827,17 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
                     if(s.db.contexts > max_db_contexts)
                         max_db_contexts = s.db.contexts;
 
-                    if(s.collection.replication.instances > max_collection_replication_instances)
-                        max_collection_replication_instances = s.collection.replication.instances;
+                    if(s.ingest.replication.instances > max_collection_replication_instances)
+                        max_collection_replication_instances = s.ingest.replication.instances;
 
-                    if(s.streaming.replication.instances > max_streaming_replication_instances)
-                        max_streaming_replication_instances = s.streaming.replication.instances;
+                    if(s.stream.replication.instances > max_streaming_replication_instances)
+                        max_streaming_replication_instances = s.stream.replication.instances;
 
                     for(int i = 0; i < STREAM_TRAFFIC_TYPE_MAX ;i++) {
-                        if (s.streaming.sent_bytes_on_this_connection_per_type[i] >
-                                max_sent_bytes_on_this_connection_per_type[i])
+                        if (s.stream.sent_bytes_on_this_connection_per_type[i] >
+                            max_sent_bytes_on_this_connection_per_type[i])
                             max_sent_bytes_on_this_connection_per_type[i] =
-                                    s.streaming.sent_bytes_on_this_connection_per_type[i];
+                                    s.stream.sent_bytes_on_this_connection_per_type[i];
                     }
 
                     // retention
@@ -855,54 +855,54 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
                     buffer_json_add_array_item_uint64(wb, s.db.contexts); // dbContexts
 
                     // statuses
-                    buffer_json_add_array_item_string(wb, rrdhost_collection_status_to_string(s.collection.status)); // InStatus
-                    buffer_json_add_array_item_string(wb, rrdhost_streaming_status_to_string(s.streaming.status)); // OutStatus
+                    buffer_json_add_array_item_string(wb, rrdhost_ingest_status_to_string(s.ingest.status)); // InStatus
+                    buffer_json_add_array_item_string(wb, rrdhost_streaming_status_to_string(s.stream.status)); // OutStatus
                     buffer_json_add_array_item_string(wb, rrdhost_ml_status_to_string(s.ml.status)); // MLStatus
 
                     // collection
-                    if(s.collection.since) {
-                        buffer_json_add_array_item_uint64(wb, s.collection.since * 1000); // InSince
-                        buffer_json_add_array_item_time_t(wb, s.now - s.collection.since); // InAge
+                    if(s.ingest.since) {
+                        buffer_json_add_array_item_uint64(wb, s.ingest.since * 1000); // InSince
+                        buffer_json_add_array_item_time_t(wb, s.now - s.ingest.since); // InAge
                     }
                     else {
                         buffer_json_add_array_item_string(wb, NULL); // InSince
                         buffer_json_add_array_item_string(wb, NULL); // InAge
                     }
-                    buffer_json_add_array_item_string(wb, s.collection.reason); // InReason
-                    buffer_json_add_array_item_uint64(wb, s.collection.hops); // InHops
-                    buffer_json_add_array_item_double(wb, s.collection.replication.completion); // InReplCompletion
-                    buffer_json_add_array_item_uint64(wb, s.collection.replication.instances); // InReplInstances
-                    buffer_json_add_array_item_string(wb, s.collection.peers.local.ip); // InLocalIP
-                    buffer_json_add_array_item_uint64(wb, s.collection.peers.local.port); // InLocalPort
-                    buffer_json_add_array_item_string(wb, s.collection.peers.peer.ip); // InRemoteIP
-                    buffer_json_add_array_item_uint64(wb, s.collection.peers.peer.port); // InRemotePort
-                    buffer_json_add_array_item_string(wb, s.collection.ssl ? "SSL" : "PLAIN"); // InSSL
-                    stream_capabilities_to_json_array(wb, s.collection.capabilities, NULL); // InCapabilities
+                    buffer_json_add_array_item_string(wb, s.ingest.reason); // InReason
+                    buffer_json_add_array_item_uint64(wb, s.ingest.hops); // InHops
+                    buffer_json_add_array_item_double(wb, s.ingest.replication.completion); // InReplCompletion
+                    buffer_json_add_array_item_uint64(wb, s.ingest.replication.instances); // InReplInstances
+                    buffer_json_add_array_item_string(wb, s.ingest.peers.local.ip); // InLocalIP
+                    buffer_json_add_array_item_uint64(wb, s.ingest.peers.local.port); // InLocalPort
+                    buffer_json_add_array_item_string(wb, s.ingest.peers.peer.ip); // InRemoteIP
+                    buffer_json_add_array_item_uint64(wb, s.ingest.peers.peer.port); // InRemotePort
+                    buffer_json_add_array_item_string(wb, s.ingest.ssl ? "SSL" : "PLAIN"); // InSSL
+                    stream_capabilities_to_json_array(wb, s.ingest.capabilities, NULL); // InCapabilities
 
                     // streaming
-                    if(s.streaming.since) {
-                        buffer_json_add_array_item_uint64(wb, s.streaming.since * 1000); // OutSince
-                        buffer_json_add_array_item_time_t(wb, s.now - s.streaming.since); // OutAge
+                    if(s.stream.since) {
+                        buffer_json_add_array_item_uint64(wb, s.stream.since * 1000); // OutSince
+                        buffer_json_add_array_item_time_t(wb, s.now - s.stream.since); // OutAge
                     }
                     else {
                         buffer_json_add_array_item_string(wb, NULL); // OutSince
                         buffer_json_add_array_item_string(wb, NULL); // OutAge
                     }
-                    buffer_json_add_array_item_string(wb, s.streaming.reason); // OutReason
-                    buffer_json_add_array_item_uint64(wb, s.streaming.hops); // OutHops
-                    buffer_json_add_array_item_double(wb, s.streaming.replication.completion); // OutReplCompletion
-                    buffer_json_add_array_item_uint64(wb, s.streaming.replication.instances); // OutReplInstances
-                    buffer_json_add_array_item_string(wb, s.streaming.peers.local.ip); // OutLocalIP
-                    buffer_json_add_array_item_uint64(wb, s.streaming.peers.local.port); // OutLocalPort
-                    buffer_json_add_array_item_string(wb, s.streaming.peers.peer.ip); // OutRemoteIP
-                    buffer_json_add_array_item_uint64(wb, s.streaming.peers.peer.port); // OutRemotePort
-                    buffer_json_add_array_item_string(wb, s.streaming.ssl ? "SSL" : "PLAIN"); // OutSSL
-                    buffer_json_add_array_item_string(wb, s.streaming.compression ? "COMPRESSED" : "UNCOMPRESSED"); // OutCompression
-                    stream_capabilities_to_json_array(wb, s.streaming.capabilities, NULL); // OutCapabilities
-                    buffer_json_add_array_item_uint64(wb, s.streaming.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_DATA]);
-                    buffer_json_add_array_item_uint64(wb, s.streaming.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_METADATA]);
-                    buffer_json_add_array_item_uint64(wb, s.streaming.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_REPLICATION]);
-                    buffer_json_add_array_item_uint64(wb, s.streaming.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_FUNCTIONS]);
+                    buffer_json_add_array_item_string(wb, s.stream.reason); // OutReason
+                    buffer_json_add_array_item_uint64(wb, s.stream.hops); // OutHops
+                    buffer_json_add_array_item_double(wb, s.stream.replication.completion); // OutReplCompletion
+                    buffer_json_add_array_item_uint64(wb, s.stream.replication.instances); // OutReplInstances
+                    buffer_json_add_array_item_string(wb, s.stream.peers.local.ip); // OutLocalIP
+                    buffer_json_add_array_item_uint64(wb, s.stream.peers.local.port); // OutLocalPort
+                    buffer_json_add_array_item_string(wb, s.stream.peers.peer.ip); // OutRemoteIP
+                    buffer_json_add_array_item_uint64(wb, s.stream.peers.peer.port); // OutRemotePort
+                    buffer_json_add_array_item_string(wb, s.stream.ssl ? "SSL" : "PLAIN"); // OutSSL
+                    buffer_json_add_array_item_string(wb, s.stream.compression ? "COMPRESSED" : "UNCOMPRESSED"); // OutCompression
+                    stream_capabilities_to_json_array(wb, s.stream.capabilities, NULL); // OutCapabilities
+                    buffer_json_add_array_item_uint64(wb, s.stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_DATA]);
+                    buffer_json_add_array_item_uint64(wb, s.stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_METADATA]);
+                    buffer_json_add_array_item_uint64(wb, s.stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_REPLICATION]);
+                    buffer_json_add_array_item_uint64(wb, s.stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_FUNCTIONS]);
 
                     buffer_json_add_array_item_array(wb); // OutAttemptHandshake
                     time_t last_attempt = 0;

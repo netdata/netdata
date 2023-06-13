@@ -248,78 +248,91 @@ void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t durati
 static void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *key) {
     buffer_json_member_add_object(wb, key);
     {
-        buffer_json_member_add_uint64(wb, "hops", s->collection.hops);
-        buffer_json_member_add_string(wb, "status", rrdhost_collection_status_to_string(s->collection.status));
-        buffer_json_member_add_time_t(wb, "since", s->collection.since);
-        buffer_json_member_add_time_t(wb, "age", s->now - s->collection.since);
+        buffer_json_member_add_uint64(wb, "id", s->ingest.id);
+        buffer_json_member_add_uint64(wb, "hops", s->ingest.hops);
+        buffer_json_member_add_string(wb, "type", rrdhost_ingest_type_to_string(s->ingest.type));
+        buffer_json_member_add_string(wb, "status", rrdhost_ingest_status_to_string(s->ingest.status));
+        buffer_json_member_add_time_t(wb, "since", s->ingest.since);
+        buffer_json_member_add_time_t(wb, "age", s->now - s->ingest.since);
 
-        if(s->collection.status == RRDHOST_COLLECTION_STATUS_OFFLINE)
-            buffer_json_member_add_string(wb, "reason", s->collection.reason);
+        if(s->ingest.type == RRDHOST_INGEST_TYPE_CHILD) {
+            if(s->ingest.status == RRDHOST_INGEST_STATUS_OFFLINE)
+                buffer_json_member_add_string(wb, "reason", s->ingest.reason);
 
-        if(s->collection.status == RRDHOST_COLLECTION_STATUS_REPLICATING || s->collection.status == RRDHOST_COLLECTION_STATUS_ONLINE) {
-            buffer_json_member_add_object(wb, "replication");
-            {
-                buffer_json_member_add_boolean(wb, "in_progress", s->collection.replication.in_progress);
-                buffer_json_member_add_double(wb, "completion", s->collection.replication.completion);
-                buffer_json_member_add_uint64(wb, "instances", s->collection.replication.instances);
+            if(s->ingest.status == RRDHOST_INGEST_STATUS_REPLICATING) {
+                buffer_json_member_add_object(wb, "replication");
+                {
+                    buffer_json_member_add_boolean(wb, "in_progress", s->ingest.replication.in_progress);
+                    buffer_json_member_add_double(wb, "completion", s->ingest.replication.completion);
+                    buffer_json_member_add_uint64(wb, "instances", s->ingest.replication.instances);
+                }
+                buffer_json_object_close(wb); // replication
             }
-            buffer_json_object_close(wb); // replication
 
-            buffer_json_member_add_object(wb, "source");
-            {
-                char buf[1024 + 1];
-                snprintfz(buf, 1024, "[%s]:%d%s", s->collection.peers.local.ip, s->collection.peers.local.port, s->collection.ssl ? ":SSL" : "");
-                buffer_json_member_add_string(wb, "local", buf);
+            if(s->ingest.status == RRDHOST_INGEST_STATUS_REPLICATING || s->ingest.status == RRDHOST_INGEST_STATUS_ONLINE) {
+                buffer_json_member_add_object(wb, "source");
+                {
+                    char buf[1024 + 1];
+                    snprintfz(buf, 1024, "[%s]:%d%s", s->ingest.peers.local.ip, s->ingest.peers.local.port, s->ingest.ssl ? ":SSL" : "");
+                    buffer_json_member_add_string(wb, "local", buf);
 
-                snprintfz(buf, 1024, "[%s]:%d%s", s->collection.peers.peer.ip, s->collection.peers.peer.port, s->collection.ssl ? ":SSL" : "");
-                buffer_json_member_add_string(wb, "remote", buf);
+                    snprintfz(buf, 1024, "[%s]:%d%s", s->ingest.peers.peer.ip, s->ingest.peers.peer.port, s->ingest.ssl ? ":SSL" : "");
+                    buffer_json_member_add_string(wb, "remote", buf);
 
-                stream_capabilities_to_json_array(wb, s->collection.capabilities, "capabilities");
+                    stream_capabilities_to_json_array(wb, s->ingest.capabilities, "capabilities");
+                }
+                buffer_json_object_close(wb); // source
             }
-            buffer_json_object_close(wb); // source
         }
     }
     buffer_json_object_close(wb); // collection
 }
 
 static void rrdhost_sender_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *key) {
+    if(s->stream.status == RRDHOST_STREAM_STATUS_DISABLED)
+        return;
+
     buffer_json_member_add_object(wb, key);
 
-    buffer_json_member_add_uint64(wb, "hops", s->streaming.hops);
-    buffer_json_member_add_string(wb, "status", rrdhost_streaming_status_to_string(s->streaming.status));
-    buffer_json_member_add_time_t(wb, "since", s->streaming.since);
-    buffer_json_member_add_time_t(wb, "age", s->now - s->streaming.since);
+    buffer_json_member_add_uint64(wb, "id", s->stream.id);
+    buffer_json_member_add_uint64(wb, "hops", s->stream.hops);
+    buffer_json_member_add_string(wb, "status", rrdhost_streaming_status_to_string(s->stream.status));
+    buffer_json_member_add_time_t(wb, "since", s->stream.since);
+    buffer_json_member_add_time_t(wb, "age", s->now - s->stream.since);
 
-    if(s->streaming.status == RRDHOST_STREAMING_STATUS_OFFLINE)
-        buffer_json_member_add_string(wb, "reason", s->streaming.reason);
+    if(s->stream.status == RRDHOST_STREAM_STATUS_OFFLINE)
+        buffer_json_member_add_string(wb, "reason", s->stream.reason);
 
-    if(s->streaming.status == RRDHOST_STREAMING_STATUS_REPLICATING || s->streaming.status == RRDHOST_STREAMING_STATUS_ONLINE) {
-        buffer_json_member_add_object(wb, "replication");
-        {
-            buffer_json_member_add_boolean(wb, "in_progress", s->streaming.replication.in_progress);
-            buffer_json_member_add_double(wb, "completion", s->streaming.replication.completion);
-            buffer_json_member_add_uint64(wb, "instances", s->streaming.replication.instances);
+    if(s->stream.status == RRDHOST_STREAM_STATUS_REPLICATING || s->stream.status == RRDHOST_STREAM_STATUS_ONLINE) {
+
+        if(s->stream.status == RRDHOST_STREAM_STATUS_REPLICATING) {
+            buffer_json_member_add_object(wb, "replication");
+            {
+                buffer_json_member_add_boolean(wb, "in_progress", s->stream.replication.in_progress);
+                buffer_json_member_add_double(wb, "completion", s->stream.replication.completion);
+                buffer_json_member_add_uint64(wb, "instances", s->stream.replication.instances);
+            }
+            buffer_json_object_close(wb);
         }
-        buffer_json_object_close(wb);
 
         buffer_json_member_add_object(wb, "destination");
         {
             char buf[1024 + 1];
-            snprintfz(buf, 1024, "[%s]:%d%s", s->streaming.peers.local.ip, s->streaming.peers.local.port, s->streaming.ssl ? ":SSL" : "");
+            snprintfz(buf, 1024, "[%s]:%d%s", s->stream.peers.local.ip, s->stream.peers.local.port, s->stream.ssl ? ":SSL" : "");
             buffer_json_member_add_string(wb, "local", buf);
 
-            snprintfz(buf, 1024, "[%s]:%d%s", s->streaming.peers.peer.ip, s->streaming.peers.peer.port, s->streaming.ssl ? ":SSL" : "");
+            snprintfz(buf, 1024, "[%s]:%d%s", s->stream.peers.peer.ip, s->stream.peers.peer.port, s->stream.ssl ? ":SSL" : "");
             buffer_json_member_add_string(wb, "remote", buf);
 
-            stream_capabilities_to_json_array(wb, s->streaming.capabilities, "capabilities");
+            stream_capabilities_to_json_array(wb, s->stream.capabilities, "capabilities");
 
             buffer_json_member_add_object(wb, "traffic");
             {
-                buffer_json_member_add_boolean(wb, "compression", s->streaming.compression);
-                buffer_json_member_add_uint64(wb, "data", s->streaming.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_DATA]);
-                buffer_json_member_add_uint64(wb, "metadata", s->streaming.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_METADATA]);
-                buffer_json_member_add_uint64(wb, "functions", s->streaming.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_FUNCTIONS]);
-                buffer_json_member_add_uint64(wb, "replication", s->streaming.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_REPLICATION]);
+                buffer_json_member_add_boolean(wb, "compression", s->stream.compression);
+                buffer_json_member_add_uint64(wb, "data", s->stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_DATA]);
+                buffer_json_member_add_uint64(wb, "metadata", s->stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_METADATA]);
+                buffer_json_member_add_uint64(wb, "functions", s->stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_FUNCTIONS]);
+                buffer_json_member_add_uint64(wb, "replication", s->stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_REPLICATION]);
             }
             buffer_json_object_close(wb); // traffic
 
@@ -353,6 +366,25 @@ static void rrdhost_sender_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *ke
         buffer_json_object_close(wb); // destination
     }
     buffer_json_object_close(wb); // streaming
+}
+
+static void agent_capabilities_to_json(BUFFER *wb, RRDHOST *host, const char *key) {
+    buffer_json_member_add_array(wb, key);
+
+    struct capability *capas = aclk_get_node_instance_capas(host);
+    struct capability *capa = capas;
+    while(capa->name != NULL) {
+        if(!capa->enabled)
+            continue;
+
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, capa->name);
+        buffer_json_add_array_item_uint64(wb, capa->version);
+        buffer_json_array_close(wb);
+        capa++;
+    }
+    buffer_json_array_close(wb);
+    freez(capas);
 }
 
 static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool queryable_host) {
@@ -415,83 +447,85 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
         buffer_json_node_add_v2(wb, host, ctl->nodes.ni++, 0);
 
         if(ctl->options & CONTEXTS_V2_NODES_DETAILED) {
-            buffer_json_member_add_string(wb, "version", rrdhost_program_version(host));
-            buffer_json_member_add_uint64(wb, "hops", host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
-            buffer_json_member_add_string(wb, "state", (host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)) ? "reachable" : "stale");
-            buffer_json_member_add_boolean(wb, "isDeleted", false);
+            buffer_json_member_add_string(wb, "v", rrdhost_program_version(host));
 
-            buffer_json_member_add_array(wb, "services");
-            buffer_json_array_close(wb);
-
-            buffer_json_member_add_array(wb, "nodeInstanceCapabilities");
-
-            struct capability *capas = aclk_get_node_instance_capas(host);
-            struct capability *capa = capas;
-            while(capa->name != NULL) {
-                buffer_json_add_array_item_object(wb);
-                buffer_json_member_add_string(wb, "name", capa->name);
-                buffer_json_member_add_uint64(wb, "version", capa->version);
-                buffer_json_member_add_boolean(wb, "enabled", capa->enabled);
-                buffer_json_object_close(wb);
-                capa++;
-            }
-            buffer_json_array_close(wb);
-            freez(capas);
-
-            web_client_api_request_v1_info_summary_alarm_statuses(host, wb, "alarmCounters");
-
-            host_labels2json(host, wb, "hostLabels");
-
-            buffer_json_member_add_object(wb, "mlInfo");
-            buffer_json_member_add_boolean(wb, "mlCapable", ml_capable(host));
-            buffer_json_member_add_boolean(wb, "mlEnabled", ml_enabled(host));
-            buffer_json_object_close(wb);
+            host_labels2json(host, wb, "labels");
 
             if(host->system_info) {
-                buffer_json_member_add_string_or_empty(wb, "architecture", host->system_info->architecture);
-                buffer_json_member_add_string_or_empty(wb, "kernelName", host->system_info->kernel_name);
-                buffer_json_member_add_string_or_empty(wb, "kernelVersion", host->system_info->kernel_version);
-                buffer_json_member_add_string_or_empty(wb, "cpuFrequency", host->system_info->host_cpu_freq);
-                buffer_json_member_add_string_or_empty(wb, "cpus", host->system_info->host_cores);
-                buffer_json_member_add_string_or_empty(wb, "memory", host->system_info->host_ram_total);
-                buffer_json_member_add_string_or_empty(wb, "diskSpace", host->system_info->host_disk_space);
-                buffer_json_member_add_string_or_empty(wb, "container", host->system_info->container);
-                buffer_json_member_add_string_or_empty(wb, "virtualization", host->system_info->virtualization);
-                buffer_json_member_add_string_or_empty(wb, "os", host->system_info->host_os_id);
-                buffer_json_member_add_string_or_empty(wb, "osName", host->system_info->host_os_name);
-                buffer_json_member_add_string_or_empty(wb, "osVersion", host->system_info->host_os_version);
+                buffer_json_member_add_object(wb, "hw");
+                {
+                    buffer_json_member_add_string_or_empty(wb, "architecture", host->system_info->architecture);
+                    buffer_json_member_add_string_or_empty(wb, "cpuFrequency", host->system_info->host_cpu_freq);
+                    buffer_json_member_add_string_or_empty(wb, "cpus", host->system_info->host_cores);
+                    buffer_json_member_add_string_or_empty(wb, "memory", host->system_info->host_ram_total);
+                    buffer_json_member_add_string_or_empty(wb, "diskSpace", host->system_info->host_disk_space);
+                    buffer_json_member_add_string_or_empty(wb, "virtualization", host->system_info->virtualization);
+                    buffer_json_member_add_string_or_empty(wb, "container", host->system_info->container);
+                }
+                buffer_json_object_close(wb);
+
+                buffer_json_member_add_object(wb, "os");
+                {
+                    buffer_json_member_add_string_or_empty(wb, "id", host->system_info->host_os_id);
+                    buffer_json_member_add_string_or_empty(wb, "nm", host->system_info->host_os_name);
+                    buffer_json_member_add_string_or_empty(wb, "v", host->system_info->host_os_version);
+                    buffer_json_member_add_object(wb, "kernel");
+                    buffer_json_member_add_string_or_empty(wb, "nm", host->system_info->kernel_name);
+                    buffer_json_member_add_string_or_empty(wb, "v", host->system_info->kernel_version);
+                    buffer_json_object_close(wb);
+                }
+                buffer_json_object_close(wb);
             }
 
             time_t now = now_realtime_sec();
-            buffer_json_member_add_object(wb, "netdata");
+            RRDHOST_STATUS s;
+            rrdhost_status(host, now, &s);
+            buffer_json_member_add_object(wb, "db");
             {
-                RRDHOST_STATUS s;
-                rrdhost_status(host, now, &s);
-                buffer_json_member_add_object(wb, "db");
-                buffer_json_member_add_time_t(wb, "first_time_s", s.db.first_time_s);
-                buffer_json_member_add_time_t(wb, "last_time_s", s.db.last_time_s);
+                buffer_json_member_add_string(wb, "status", rrdhost_db_status_to_string(s.db.status));
+                buffer_json_member_add_time_t(wb, "first_time", s.db.first_time_s);
+                buffer_json_member_add_time_t(wb, "last_time", s.db.last_time_s);
                 buffer_json_member_add_uint64(wb, "metrics", s.db.metrics);
                 buffer_json_member_add_uint64(wb, "instances", s.db.instances);
                 buffer_json_member_add_uint64(wb, "contexts", s.db.contexts);
-                buffer_json_object_close(wb);
+            }
+            buffer_json_object_close(wb);
 
-                rrdhost_receiver_to_json(wb, &s, "collection");
-                rrdhost_sender_to_json(wb, &s, "streaming");
+            rrdhost_receiver_to_json(wb, &s, "ingest");
+            rrdhost_sender_to_json(wb, &s, "stream");
 
-                buffer_json_member_add_object(wb, "ml");
-                buffer_json_member_add_string(wb, "status", rrdhost_ml_status_to_string(s.ml.status));
-                if(s.ml.status == RRDHOST_ML_STATUS_RUNNING) {
-                    buffer_json_member_add_object(wb, "metrics");
+            buffer_json_member_add_object(wb, "ml");
+            buffer_json_member_add_string(wb, "status", rrdhost_ml_status_to_string(s.ml.status));
+            if(s.ml.status == RRDHOST_ML_STATUS_RUNNING) {
+                buffer_json_member_add_object(wb, "metrics");
+                {
                     buffer_json_member_add_uint64(wb, "anomalous", s.ml.metrics.anomalous);
                     buffer_json_member_add_uint64(wb, "normal", s.ml.metrics.normal);
                     buffer_json_member_add_uint64(wb, "trained", s.ml.metrics.trained);
                     buffer_json_member_add_uint64(wb, "pending", s.ml.metrics.pending);
                     buffer_json_member_add_uint64(wb, "silenced", s.ml.metrics.silenced);
-                    buffer_json_object_close(wb); // metrics
                 }
-                buffer_json_object_close(wb); // ml
+                buffer_json_object_close(wb); // metrics
             }
-            buffer_json_object_close(wb); // status
+            buffer_json_object_close(wb); // ml
+
+            buffer_json_member_add_object(wb, "health");
+            {
+                buffer_json_member_add_string(wb, "status", rrdhost_health_status_to_string(s.health.status));
+                if(s.health.status == RRDHOST_HEALTH_STATUS_RUNNING) {
+                    buffer_json_member_add_object(wb, "alerts");
+                    {
+                        buffer_json_member_add_uint64(wb, "critical", s.health.alerts.critical);
+                        buffer_json_member_add_uint64(wb, "warning", s.health.alerts.warning);
+                        buffer_json_member_add_uint64(wb, "clear", s.health.alerts.clear);
+                        buffer_json_member_add_uint64(wb, "undefined", s.health.alerts.undefined);
+                        buffer_json_member_add_uint64(wb, "uninitialized", s.health.alerts.uninitialized);
+                    }
+                    buffer_json_object_close(wb); // alerts
+                }
+            }
+            buffer_json_object_close(wb); // health
+
         }
 
         buffer_json_object_close(wb);
@@ -540,6 +574,8 @@ void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time
     buffer_json_member_add_string(wb, "nm", rrdhost_hostname(localhost));
     buffer_json_member_add_time_t(wb, "now", now_s);
     buffer_json_member_add_uint64(wb, "ai", 0);
+    buffer_json_member_add_string(wb, "v", string2str(localhost->program_version));
+    agent_capabilities_to_json(wb, localhost, "cp");
 
     if(timings)
         buffer_json_query_timings(wb, "timings", timings);

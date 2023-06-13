@@ -1268,6 +1268,7 @@ static void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS
 
 void version_hashes_api_v2(BUFFER *wb, struct query_versions *versions) {
     buffer_json_member_add_object(wb, "versions");
+    buffer_json_member_add_uint64(wb, "routing_hard_hash", 1);
     buffer_json_member_add_uint64(wb, "nodes_hard_hash", dictionary_version(rrdhost_root_index));
     buffer_json_member_add_uint64(wb, "contexts_hard_hash", versions->contexts_hard_hash);
     buffer_json_member_add_uint64(wb, "contexts_soft_hash", versions->contexts_soft_hash);

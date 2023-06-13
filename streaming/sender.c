@@ -1106,6 +1106,7 @@ static bool rrdhost_set_sender(RRDHOST *host) {
     if(!host->sender->tid) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
         rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
+        host->rrdpush_sender_connection_counter++;
         host->sender->tid = gettid();
         host->sender->last_state_since_t = now_realtime_sec();
         host->sender->exit.reason = NULL;

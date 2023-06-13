@@ -394,53 +394,93 @@ void sender_thread_buffer_free(void);
 #include "replication.h"
 
 typedef enum __attribute__((packed)) {
-    RRDHOST_COLLECTION_STATUS_ARCHIVED = 0,
-    RRDHOST_COLLECTION_STATUS_LOCALHOST,
-    RRDHOST_COLLECTION_STATUS_REPLICATING,
-    RRDHOST_COLLECTION_STATUS_ONLINE,
-    RRDHOST_COLLECTION_STATUS_OFFLINE,
-} RRDHOST_COLLECTION_STATUS;
+    RRDHOST_DB_STATUS_INITIALIZING = 0,
+    RRDHOST_DB_STATUS_QUERYABLE,
+} RRDHOST_DB_STATUS;
 
-static inline const char *rrdhost_collection_status_to_string(RRDHOST_COLLECTION_STATUS status) {
+static inline const char *rrdhost_db_status_to_string(RRDHOST_DB_STATUS status) {
     switch(status) {
-        case RRDHOST_COLLECTION_STATUS_ARCHIVED:
+        default:
+        case RRDHOST_DB_STATUS_INITIALIZING:
+            return "initializing";
+
+        case RRDHOST_DB_STATUS_QUERYABLE:
+            return "queryable";
+    }
+}
+
+typedef enum __attribute__((packed)) {
+    RRDHOST_INGEST_STATUS_ARCHIVED = 0,
+    RRDHOST_INGEST_STATUS_INITIALIZING,
+    RRDHOST_INGEST_STATUS_REPLICATING,
+    RRDHOST_INGEST_STATUS_ONLINE,
+    RRDHOST_INGEST_STATUS_OFFLINE,
+} RRDHOST_INGEST_STATUS;
+
+static inline const char *rrdhost_ingest_status_to_string(RRDHOST_INGEST_STATUS status) {
+    switch(status) {
+        case RRDHOST_INGEST_STATUS_ARCHIVED:
             return "archived";
 
-        case RRDHOST_COLLECTION_STATUS_LOCALHOST:
-            return "localhost";
+        case RRDHOST_INGEST_STATUS_INITIALIZING:
+            return "initializing";
 
-        case RRDHOST_COLLECTION_STATUS_REPLICATING:
+        case RRDHOST_INGEST_STATUS_REPLICATING:
             return "replicating";
 
-        case RRDHOST_COLLECTION_STATUS_ONLINE:
+        case RRDHOST_INGEST_STATUS_ONLINE:
             return "online";
 
         default:
-        case RRDHOST_COLLECTION_STATUS_OFFLINE:
+        case RRDHOST_INGEST_STATUS_OFFLINE:
             return "offline";
     }
 }
 
 typedef enum __attribute__((packed)) {
-    RRDHOST_STREAMING_STATUS_DISABLED = 0,
-    RRDHOST_STREAMING_STATUS_REPLICATING,
-    RRDHOST_STREAMING_STATUS_ONLINE,
-    RRDHOST_STREAMING_STATUS_OFFLINE,
+    RRDHOST_INGEST_TYPE_LOCALHOST = 0,
+    RRDHOST_INGEST_TYPE_VIRTUAL,
+    RRDHOST_INGEST_TYPE_CHILD,
+    RRDHOST_INGEST_TYPE_ARCHIVED,
+} RRDHOST_INGEST_TYPE;
+
+static inline const char *rrdhost_ingest_type_to_string(RRDHOST_INGEST_TYPE type) {
+    switch(type) {
+        case RRDHOST_INGEST_TYPE_LOCALHOST:
+            return "localhost";
+
+        case RRDHOST_INGEST_TYPE_VIRTUAL:
+            return "virtual";
+
+        case RRDHOST_INGEST_TYPE_CHILD:
+            return "child";
+
+        default:
+        case RRDHOST_INGEST_TYPE_ARCHIVED:
+            return "archived";
+    }
+}
+
+typedef enum __attribute__((packed)) {
+    RRDHOST_STREAM_STATUS_DISABLED = 0,
+    RRDHOST_STREAM_STATUS_REPLICATING,
+    RRDHOST_STREAM_STATUS_ONLINE,
+    RRDHOST_STREAM_STATUS_OFFLINE,
 } RRDHOST_STREAMING_STATUS;
 
 static inline const char *rrdhost_streaming_status_to_string(RRDHOST_STREAMING_STATUS status) {
     switch(status) {
-        case RRDHOST_STREAMING_STATUS_DISABLED:
+        case RRDHOST_STREAM_STATUS_DISABLED:
             return "disabled";
 
-        case RRDHOST_STREAMING_STATUS_REPLICATING:
+        case RRDHOST_STREAM_STATUS_REPLICATING:
             return "replicating";
 
-        case RRDHOST_STREAMING_STATUS_ONLINE:
+        case RRDHOST_STREAM_STATUS_ONLINE:
             return "online";
 
         default:
-        case RRDHOST_STREAMING_STATUS_OFFLINE:
+        case RRDHOST_STREAM_STATUS_OFFLINE:
             return "offline";
     }
 }
@@ -469,14 +509,34 @@ static inline const char *rrdhost_ml_status_to_string(RRDHOST_ML_STATUS status) 
     }
 }
 
+typedef enum __attribute__((packed)) {
+    RRDHOST_HEALTH_STATUS_DISABLED = 0,
+    RRDHOST_HEALTH_STATUS_INITIALIZING,
+    RRDHOST_HEALTH_STATUS_RUNNING,
+} RRDHOST_HEALTH_STATUS;
+
+static inline const char *rrdhost_health_status_to_string(RRDHOST_HEALTH_STATUS status) {
+    switch(status) {
+        default:
+        case RRDHOST_HEALTH_STATUS_DISABLED:
+            return "disabled";
+
+        case RRDHOST_HEALTH_STATUS_INITIALIZING:
+            return "initializing";
+
+        case RRDHOST_HEALTH_STATUS_RUNNING:
+            return "running";
+    }
+}
+
 typedef struct rrdhost_status {
     RRDHOST *host;
     time_t now;
 
     struct {
+        RRDHOST_DB_STATUS status;
         time_t first_time_s;
         time_t last_time_s;
-        bool online;
         size_t metrics;
         size_t instances;
         size_t contexts;
@@ -484,22 +544,17 @@ typedef struct rrdhost_status {
 
     struct {
         RRDHOST_ML_STATUS status;
-
-        struct {
-            size_t anomalous;
-            size_t normal;
-            size_t trained;
-            size_t pending;
-            size_t silenced;
-        } metrics;
+        struct ml_metrics_statistics metrics;
     } ml;
 
     struct {
         size_t hops;
-        RRDHOST_COLLECTION_STATUS status;
+        RRDHOST_INGEST_TYPE  type;
+        RRDHOST_INGEST_STATUS status;
         SOCKET_PEERS peers;
         bool ssl;
         STREAM_CAPABILITIES capabilities;
+        uint32_t id;
         time_t since;
         const char *reason;
 
@@ -508,7 +563,7 @@ typedef struct rrdhost_status {
             NETDATA_DOUBLE completion;
             size_t instances;
         } replication;
-    } collection;
+    } ingest;
 
     struct {
         size_t hops;
@@ -517,6 +572,7 @@ typedef struct rrdhost_status {
         bool ssl;
         bool compression;
         STREAM_CAPABILITIES capabilities;
+        uint32_t id;
         time_t since;
         const char *reason;
 
@@ -527,7 +583,18 @@ typedef struct rrdhost_status {
         } replication;
 
         size_t sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_MAX];
-    } streaming;
+    } stream;
+
+    struct {
+        RRDHOST_HEALTH_STATUS status;
+        struct {
+            uint32_t undefined;
+            uint32_t uninitialized;
+            uint32_t clear;
+            uint32_t warning;
+            uint32_t critical;
+        } alerts;
+    } health;
 } RRDHOST_STATUS;
 
 void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s);
