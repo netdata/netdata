@@ -2672,7 +2672,7 @@ int main(int argc, char **argv)
         (void)heartbeat_next(&hb, step);
 
         pthread_mutex_lock(&ebpf_exit_cleanup);
-        if (ebpf_modules[i].enabled == NETDATA_THREAD_EBPF_RUNNING && process_pid_fd != -1) {
+        if (process_pid_fd != -1) {
             pthread_mutex_lock(&collect_data_mutex);
             if (++update_apps_list == update_apps_every) {
                 update_apps_list = 0;
