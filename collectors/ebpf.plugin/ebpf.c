@@ -704,6 +704,9 @@ static void ebpf_unload_filesystems()
 
     int i;
     for (i = 0; localfs[i].filesystem != NULL; i++) {
+        if (!localfs[i].objects)
+            continue;
+
         ebpf_unload_legacy_code(localfs[i].objects, localfs[i].probe_links);
     }
 }
