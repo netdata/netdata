@@ -632,7 +632,7 @@ static void ebpf_unload_unique_maps()
     int i;
     for (i = 0; ebpf_modules[i].thread_name; i++) {
         // These threads are cleaned with other functions
-        if (i > EBPF_MODULE_SOCKET_IDX && i < EBPF_MODULE_DISK_IDX)
+        if (i > EBPF_MODULE_SOCKET_IDX && i < EBPF_MODULE_MOUNT_IDX)
             continue;
 
         if (ebpf_modules[i].enabled != NETDATA_THREAD_EBPF_STOPPED) {
