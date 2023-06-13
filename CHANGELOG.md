@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- bump go.d.plugin to v0.53.1 [\#15179](https://github.com/netdata/netdata/pull/15179) ([ilyam8](https://github.com/ilyam8))
+- Update smartd\_log.conf [\#15171](https://github.com/netdata/netdata/pull/15171) ([TougeAI](https://github.com/TougeAI))
+- Change package conflicts policy on deb based packages [\#15170](https://github.com/netdata/netdata/pull/15170) ([tkatsoulas](https://github.com/tkatsoulas))
 - Fix coverity issues [\#15169](https://github.com/netdata/netdata/pull/15169) ([stelfrag](https://github.com/stelfrag))
 - Fix user and group handling in DEB packages. [\#15166](https://github.com/netdata/netdata/pull/15166) ([Ferroin](https://github.com/Ferroin))
 - change mandatory packages for RPMs [\#15165](https://github.com/netdata/netdata/pull/15165) ([tkatsoulas](https://github.com/tkatsoulas))
@@ -15,6 +18,7 @@
 - Make plugin packages hard dependencies. [\#15160](https://github.com/netdata/netdata/pull/15160) ([Ferroin](https://github.com/Ferroin))
 - freeipmi: add availability status chart and alarm [\#15151](https://github.com/netdata/netdata/pull/15151) ([ilyam8](https://github.com/ilyam8))
 - Check null transition id and config hash [\#15147](https://github.com/netdata/netdata/pull/15147) ([stelfrag](https://github.com/stelfrag))
+- eBPF unittest + bug fix [\#15146](https://github.com/netdata/netdata/pull/15146) ([thiagoftsm](https://github.com/thiagoftsm))
 - Mattermost cloud integration docs [\#15141](https://github.com/netdata/netdata/pull/15141) ([car12o](https://github.com/car12o))
 - send EXIT before exiting in freeipmi and debugfs plugins [\#15140](https://github.com/netdata/netdata/pull/15140) ([ilyam8](https://github.com/ilyam8))
 - minor - fix syntax in config.ac [\#15139](https://github.com/netdata/netdata/pull/15139) ([underhood](https://github.com/underhood))
@@ -405,8 +409,6 @@
 - Update role-based-access.md [\#14528](https://github.com/netdata/netdata/pull/14528) ([cakrit](https://github.com/cakrit))
 - added section to explain impacts on member role [\#14527](https://github.com/netdata/netdata/pull/14527) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - fix setting go.d.plugin capabilities [\#14525](https://github.com/netdata/netdata/pull/14525) ([ilyam8](https://github.com/ilyam8))
-- Simplify parser README.md and add parser files to CMakeLists.txt [\#14523](https://github.com/netdata/netdata/pull/14523) ([stelfrag](https://github.com/stelfrag))
-- Link statically libnetfilter\_acct into our static builds [\#14516](https://github.com/netdata/netdata/pull/14516) ([tkatsoulas](https://github.com/tkatsoulas))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
