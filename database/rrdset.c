@@ -1126,7 +1126,7 @@ static inline void rrdset_init_last_updated_time(RRDSET *st) {
 static __thread size_t rrdset_done_statistics_points_stored_per_tier[RRD_STORAGE_TIERS];
 
 static inline time_t tier_next_point_time_s(RRDDIM *rd, struct rrddim_tier *t, time_t now_s) {
-    time_t loop = (time_t)rd->update_every * (time_t)t->tier_grouping;
+    time_t loop = (time_t)rd->rrdset->update_every * (time_t)t->tier_grouping;
     return now_s + loop - ((now_s + loop) % loop);
 }
 
@@ -1231,7 +1231,7 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
     time_t now_s = (time_t)(point_end_time_ut / USEC_PER_SEC);
 
     STORAGE_POINT sp = {
-        .start_time_s = now_s - rd->update_every,
+        .start_time_s = now_s - rd->rrdset->update_every,
         .end_time_s = now_s,
         .min = n,
         .max = n,
@@ -2008,9 +2008,9 @@ time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
                         (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
         }
 
-        assert(rd->update_every == (int) prev_update_every_s &&
+        assert(rd->rrdset->update_every == (int) prev_update_every_s &&
                "chart's update every differs from the update every of its dimensions");
-        rd->update_every = st->update_every;
+        rd->rrdset->update_every = st->update_every;
     }
     rrddim_foreach_done(rd);
 

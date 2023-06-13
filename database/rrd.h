@@ -347,12 +347,8 @@ struct rrddim {
     bool updated;                                   // 1 when the dimension has been updated since the last processing
     bool exposed;                                   // 1 when set what have sent this dimension to the central netdata
 
-    collected_number multiplier;                    // the multiplier of the collected values
-    collected_number divisor;                       // the divider of the collected values
-
-    int update_every;                               // every how many seconds is this updated
-                                                    // TODO - remove update_every from rrddim
-                                                    //        it is always the same in rrdset
+    int32_t multiplier;                             // the multiplier of the collected values
+    int32_t divisor;                                // the divider of the collected values
 
     // ------------------------------------------------------------------------
     // operational state members

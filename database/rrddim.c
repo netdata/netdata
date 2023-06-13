@@ -46,8 +46,6 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     rd->divisor = ctr->divisor;
     if(!rd->divisor) rd->divisor = 1;
 
-    rd->update_every = st->update_every;
-
     rd->rrdset = st;
 
     if(rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST))
@@ -743,7 +741,7 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
     rd_on_file->multiplier = rd->multiplier;
     rd_on_file->divisor = rd->divisor;
     rd_on_file->entries = st->entries;
-    rd_on_file->update_every = rd->update_every;
+    rd_on_file->update_every = rd->rrdset->update_every;
     rd_on_file->memsize = size;
     rd_on_file->rrd_memory_mode = memory_mode;
     rd_on_file->cache_filename = strdupz(fullfilename);

@@ -337,7 +337,7 @@ ml_dimension_calculated_numbers(ml_training_thread_t *training_thread, ml_dimens
     // Figure out what our time window should be.
     training_response.query_before_t = training_response.last_entry_on_response;
     training_response.query_after_t = std::max(
-        training_response.query_before_t - static_cast<time_t>((max_n - 1) * dim->rd->update_every),
+        training_response.query_before_t - static_cast<time_t>((max_n - 1) * dim->rd->rrdset->update_every),
         training_response.first_entry_on_response
     );
 
@@ -781,7 +781,7 @@ ml_dimension_schedule_for_training(ml_dimension_t *dim, time_t curr_time)
         break;
     case TRAINING_STATUS_SILENCED:
     case TRAINING_STATUS_TRAINED:
-        if ((dim->last_training_time + (Cfg.train_every * dim->rd->update_every)) < curr_time) {
+        if ((dim->last_training_time + (Cfg.train_every * dim->rd->rrdset->update_every)) < curr_time) {
             schedule_for_training = true;
             dim->ts = TRAINING_STATUS_PENDING_WITH_MODEL;
         }
