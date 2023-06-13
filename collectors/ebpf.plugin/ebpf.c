@@ -540,6 +540,31 @@ ARAL *ebpf_allocate_pid_aral(char *name, size_t size)
  *****************************************************************/
 
 /**
+ * Wait to avoid possible coredumps while process is closing.
+ */
+static inline void ebpf_check_before2go()
+{
+    int i = EBPF_OPTION_ALL_CHARTS;
+    usec_t max = USEC_PER_SEC, step = 200000;
+    while (i && max) {
+        max -= step;
+        sleep_usec(step);
+        i = 0;
+        int j;
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        for (j = 0; ebpf_modules[j].thread_name != NULL; j++) {
+            if (ebpf_modules[j].enabled == NETDATA_THREAD_EBPF_RUNNING)
+                i++;
+        }
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
+    }
+
+    if (i) {
+        error("eBPF cannot unload all threads on time, but it will go away");
+    }
+}
+
+/**
  * Close the collector gracefully
  */
 static void ebpf_exit()
@@ -564,6 +589,7 @@ static void ebpf_exit()
     fprintf(stdout, "EXIT\n");
     fflush(stdout);
 
+    ebpf_check_before2go();
     pthread_mutex_lock(&mutex_cgroup_shm);
     if (shm_ebpf_cgroup.header) {
         ebpf_unmap_cgroup_shared_memory();
@@ -764,19 +790,7 @@ static void ebpf_stop_threads(int sig)
 
     ebpf_exit_plugin = 1;
 
-    usec_t max = USEC_PER_SEC, step = 100000;
-    while (i && max) {
-        max -= step;
-        sleep_usec(step);
-        i = 0;
-        int j;
-        pthread_mutex_lock(&ebpf_exit_cleanup);
-        for (j = 0; ebpf_modules[j].thread_name != NULL; j++) {
-            if (ebpf_modules[j].enabled == NETDATA_THREAD_EBPF_RUNNING)
-                i++;
-        }
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
-    }
+    ebpf_check_before2go();
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     ebpf_unload_unique_maps();
