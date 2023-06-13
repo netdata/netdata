@@ -344,11 +344,11 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
 
 void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host)
 {
-    se->os_name = (host->system_info->host_os_name)?url_encode(host->system_info->host_os_name):"";
-    se->os_id = (host->system_info->host_os_id)?url_encode(host->system_info->host_os_id):"";
-    se->os_version = (host->system_info->host_os_version)?url_encode(host->system_info->host_os_version):"";
-    se->kernel_name = (host->system_info->kernel_name)?url_encode(host->system_info->kernel_name):"";
-    se->kernel_version = (host->system_info->kernel_version)?url_encode(host->system_info->kernel_version):"";
+    se->os_name = (host->system_info->host_os_name)?url_encode(host->system_info->host_os_name):strdupz("");
+    se->os_id = (host->system_info->host_os_id)?url_encode(host->system_info->host_os_id):strdupz("");
+    se->os_version = (host->system_info->host_os_version)?url_encode(host->system_info->host_os_version):strdupz("");
+    se->kernel_name = (host->system_info->kernel_name)?url_encode(host->system_info->kernel_name):strdupz("");
+    se->kernel_version = (host->system_info->kernel_version)?url_encode(host->system_info->kernel_version):strdupz("");
 }
 
 void rrdpush_clean_encoded(stream_encoded_t *se)
