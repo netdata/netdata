@@ -90,6 +90,20 @@ void health_virtual_run(RRDHOST *host, BUFFER *wb, RRDCALC *rcv, time_t at) {
             rcv->status = RRDCALC_STATUS_WARNING;
         }
     }
+
+    if (likely(rcv->critical)) {
+        rcv->critical->value_at = at;
+
+        if (unlikely(!expression_evaluate(rcv->critical))) {
+            // calculation failed
+            rcv->run_flags |= RRDCALC_FLAG_CRIT_ERROR;
+
+        } else {
+            rcv->run_flags &= ~RRDCALC_FLAG_CRIT_ERROR;
+            buffer_json_member_add_double(wb, "crit", rcv->critical->result);
+            rcv->status = RRDCALC_STATUS_CRITICAL;
+        }
+    }
     buffer_json_object_close(wb);
 }
 
