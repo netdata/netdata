@@ -435,10 +435,11 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
 
     netdata_mutex_lock(&host->receiver_lock);
 
-    if (!host->receiver || host->receiver == rpt) {
+    if (!host->receiver) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
 
         host->rrdpush_receiver_connection_counter++;
+        __atomic_add_fetch(&localhost->connected_children_count, 1, __ATOMIC_RELAXED);
 
         host->receiver = rpt;
         rpt->host = host;
@@ -490,6 +491,9 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
 
         // Make sure that we detach this thread and don't kill a freshly arriving receiver
         if(host->receiver == rpt) {
+            __atomic_sub_fetch(&localhost->connected_children_count, 1, __ATOMIC_RELAXED);
+            rrdhost_flag_set(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
+
             host->trigger_chart_obsoletion_check = 0;
             host->child_connect_time = 0;
             host->child_disconnected_time = now_realtime_sec();
@@ -822,7 +826,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
         aclk_host_state_update(rpt->host, 1);
 #endif
 
-    rrdhost_set_is_parent_label(++localhost->connected_children_count);
+    rrdhost_set_is_parent_label();
 
     // let it reconnect to parent immediately
     rrdpush_reset_destinations_postpone_time(rpt->host);
@@ -834,8 +838,6 @@ static void rrdpush_receive(struct receiver_state *rpt)
                                     NULL
 #endif
                                     );
-
-    rrdhost_flag_set(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
 
     if(!rpt->exit.reason)
         rpt->exit.reason = "PARSER EXIT";
@@ -852,8 +854,6 @@ static void rrdpush_receive(struct receiver_state *rpt)
     if (netdata_cloud_setting)
         aclk_host_state_update(rpt->host, 0);
 #endif
-
-    rrdhost_set_is_parent_label(--localhost->connected_children_count);
 
 cleanup:
     ;
@@ -872,6 +872,8 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
     , gettid());
 
     receiver_state_free(rpt);
+
+    rrdhost_set_is_parent_label();
 }
 
 void *rrdpush_receiver_thread(void *ptr) {

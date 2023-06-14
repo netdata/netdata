@@ -311,7 +311,7 @@ void rrdlabels_copy(DICTIONARY *dst, DICTIONARY *src);
 void reload_host_labels(void);
 void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels);
 void rrdset_save_rrdlabels_to_sql(RRDSET *st);
-void rrdhost_set_is_parent_label(int count);
+void rrdhost_set_is_parent_label(void);
 int rrdlabels_unittest(void);
 
 // unfortunately this break when defined in exporting_engine.h

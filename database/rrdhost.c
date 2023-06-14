@@ -1385,10 +1385,11 @@ static void rrdhost_load_auto_labels(void) {
         rrdlabels_add(labels, "_streams_to", localhost->rrdpush_send_destination, RRDLABEL_SRC_AUTO);
 }
 
-void rrdhost_set_is_parent_label(int count) {
-    DICTIONARY *labels = localhost->rrdlabels;
+void rrdhost_set_is_parent_label(void) {
+    int count = __atomic_load_n(&localhost->connected_children_count, __ATOMIC_RELAXED);
 
     if (count == 0 || count == 1) {
+        DICTIONARY *labels = localhost->rrdlabels;
         rrdlabels_add(labels, "_is_parent", (count) ? "true" : "false", RRDLABEL_SRC_AUTO);
 
         //queue a node info
