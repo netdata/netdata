@@ -446,8 +446,11 @@ void netdata_cleanup_and_exit(int ret) {
                 for (size_t tier = 0; tier < storage_tiers; tier++)
                     running += rrdeng_collectors_running(multidb_ctx[tier]);
 
-                if(running)
-                    sleep_usec(100 * USEC_PER_MS);
+                if(running) {
+                    error_limit_static_thread_var(erl, 1, 100 * USEC_PER_MS);
+                    error_limit(&erl, "waiting for %zu collectors to finish", running);
+                    // sleep_usec(100 * USEC_PER_MS);
+                }
             }
 
             delta_shutdown_time("wait for dbengine main cache to finish flushing");
