@@ -1,11 +1,13 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.40.0](https://github.com/netdata/netdata/tree/v1.40.0) (2023-06-14)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.39.1...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.39.1...v1.40.0)
 
 **Merged pull requests:**
 
+- ebpf: disable sync by default [\#15190](https://github.com/netdata/netdata/pull/15190) ([ilyam8](https://github.com/ilyam8))
+- Add support for SUSE 15.5 [\#15189](https://github.com/netdata/netdata/pull/15189) ([tkatsoulas](https://github.com/tkatsoulas))
 - bump go.d.plugin to v0.53.2 [\#15184](https://github.com/netdata/netdata/pull/15184) ([ilyam8](https://github.com/ilyam8))
 - Do strdupz on empty string [\#15183](https://github.com/netdata/netdata/pull/15183) ([MrZammler](https://github.com/MrZammler))
 - set setuid for go.d.plugin in container [\#15180](https://github.com/netdata/netdata/pull/15180) ([ilyam8](https://github.com/ilyam8))
@@ -406,8 +408,6 @@
 - Roles docs: Add Early Bird and Member role [\#14537](https://github.com/netdata/netdata/pull/14537) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Fix broken Alma Linux entries in build matrix generation. [\#14536](https://github.com/netdata/netdata/pull/14536) ([Ferroin](https://github.com/Ferroin))
 - Re-index when machine guid changes [\#14535](https://github.com/netdata/netdata/pull/14535) ([MrZammler](https://github.com/MrZammler))
-- Use BoxListItemRegexLink component in docs/quickstart/insfrastructure.md [\#14533](https://github.com/netdata/netdata/pull/14533) ([Ancairon](https://github.com/Ancairon))
-- Update main metric retention docs [\#14530](https://github.com/netdata/netdata/pull/14530) ([cakrit](https://github.com/cakrit))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
