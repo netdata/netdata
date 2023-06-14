@@ -4,7 +4,6 @@
 #include "libnetdata/string/string.h"
 #include "sqlite_functions.h"
 #include "sqlite_db_migration.h"
-#include "uuid.h"
 
 #define MAX_HEALTH_SQL_SIZE 2048
 #define sqlite3_bind_string_or_null(res,key,param) ((key) ? sqlite3_bind_text(res, param, string2str(key), -1, SQLITE_STATIC) : sqlite3_bind_null(res, param))
@@ -12,7 +11,7 @@
 /* Health related SQL queries
    Updates an entry in the table
 */
-#define SQL_UPDATE_HEALTH_LOG "UPDATE health_log set updated_by_id = ?, flags = ?, exec_run_timestamp = ?, exec_code = ? where unique_id = ? AND host_id = ?;"
+#define SQL_UPDATE_HEALTH_LOG "UPDATE health_log_detail set updated_by_id = ?, flags = ?, exec_run_timestamp = ?, exec_code = ? where unique_id = ? AND alarm_id = ? and transition_id = ?;"
 void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -59,7 +58,13 @@ void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
         goto failed;
     }
 
-    rc = sqlite3_bind_blob(res, 6, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    rc = sqlite3_bind_int64(res, 6, (sqlite3_int64) ae->alarm_id);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind unique_id parameter for SQL_UPDATE_HEALTH_LOG");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_blob(res, 7, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host_id for SQL_UPDATE_HEALTH_LOG.");
         goto failed;
