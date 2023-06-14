@@ -632,7 +632,7 @@ static void ebpf_unload_unique_maps()
     int i;
     for (i = 0; ebpf_modules[i].thread_name; i++) {
         // These threads are cleaned with other functions
-        if (i > EBPF_MODULE_SOCKET_IDX && i < EBPF_MODULE_OOMKILL_IDX)
+        if (i > EBPF_MODULE_SOCKET_IDX)
             continue;
 
         if (ebpf_modules[i].enabled != NETDATA_THREAD_EBPF_STOPPED) {
@@ -647,36 +647,13 @@ static void ebpf_unload_unique_maps()
             continue;
         }
 
-        switch (i) {
-            case EBPF_MODULE_SHM_IDX: {
+        if (i == EBPF_MODULE_SOCKET_IDX) {
 #ifdef LIBBPF_MAJOR_VERSION
-                if (shm_bpf_obj)
-                    shm_bpf__destroy(shm_bpf_obj);
+            if (socket_bpf_obj)
+                socket_bpf__destroy(socket_bpf_obj);
 #endif
-                break;
-            }
-            case EBPF_MODULE_SOCKET_IDX: {
-#ifdef LIBBPF_MAJOR_VERSION
-                if (socket_bpf_obj)
-                    socket_bpf__destroy(socket_bpf_obj);
-#endif
-                break;
-            }
-            case EBPF_MODULE_MOUNT_IDX:
-            case EBPF_MODULE_FD_IDX:
-            case EBPF_MODULE_VFS_IDX:
-            case EBPF_MODULE_SWAP_IDX:
-            case EBPF_MODULE_DCSTAT_IDX:
-            case EBPF_MODULE_PROCESS_IDX:
-            case EBPF_MODULE_CACHESTAT_IDX:
-            case EBPF_MODULE_DISK_IDX:
-            case EBPF_MODULE_HARDIRQ_IDX:
-            case EBPF_MODULE_SOFTIRQ_IDX:
-            case EBPF_MODULE_OOMKILL_IDX:
-            case EBPF_MODULE_MDFLUSH_IDX:
-            default:
-                continue;
         }
+
     }
 }
 
