@@ -431,6 +431,7 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
 
     if (!host->receiver || host->receiver == rpt) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
+
         host->rrdpush_receiver_connection_counter++;
 
         host->receiver = rpt;

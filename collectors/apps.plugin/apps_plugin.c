@@ -5132,14 +5132,18 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
     }
     buffer_json_object_close(wb); // charts
 
-    buffer_json_member_add_array(wb, "default_chart1");
-    buffer_json_add_array_item_string(wb, "CPU");
-    buffer_json_add_array_item_string(wb, "Category");
-    buffer_json_array_close(wb);
+    buffer_json_member_add_array(wb, "default_charts");
+    {
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "CPU");
+        buffer_json_add_array_item_string(wb, "Category");
+        buffer_json_array_close(wb);
 
-    buffer_json_member_add_array(wb, "default_chart2");
-    buffer_json_add_array_item_string(wb, "Memory");
-    buffer_json_add_array_item_string(wb, "Category");
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "Memory");
+        buffer_json_add_array_item_string(wb, "Category");
+        buffer_json_array_close(wb);
+    }
     buffer_json_array_close(wb);
 
     buffer_json_member_add_object(wb, "group_by");

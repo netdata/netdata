@@ -1325,14 +1325,18 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
     }
     buffer_json_object_close(wb); // charts
 
-    buffer_json_member_add_array(wb, "default_chart1");
-    buffer_json_add_array_item_string(wb, "InAge");
-    buffer_json_add_array_item_string(wb, "Node");
-    buffer_json_array_close(wb);
+    buffer_json_member_add_array(wb, "default_charts");
+    {
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "InAge");
+        buffer_json_add_array_item_string(wb, "Node");
+        buffer_json_array_close(wb);
 
-    buffer_json_member_add_array(wb, "default_chart2");
-    buffer_json_add_array_item_string(wb, "OutAge");
-    buffer_json_add_array_item_string(wb, "Node");
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "OutAge");
+        buffer_json_add_array_item_string(wb, "Node");
+        buffer_json_array_close(wb);
+    }
     buffer_json_array_close(wb);
 
     buffer_json_member_add_object(wb, "group_by");
