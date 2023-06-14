@@ -85,7 +85,7 @@ install_suse_like() {
   zypper install -y --allow-unsigned-rpm /netdata/artifacts/netdata*.rpm || exit 1
 
   # Install testing tools
-  zypper install -y --no-recommends curl netcat-openbsd jq || exit 1
+  zypper install -y --allow-downgrade --no-recommends curl netcat-openbsd jq || exit 1
 }
 
 dump_log() {
