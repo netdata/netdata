@@ -1732,7 +1732,7 @@ install_zypper() {
 
   read -r -a zypper_opts <<< "$opts"
   # install the required packages
-  run ${sudo} zypper "${zypper_opts[@]}" install ${install_opts} "${@}"
+  run ${sudo} zypper "${zypper_opts[@]}" install "${install_opts}" "${@}"
 }
 
 # -----------------------------------------------------------------------------
