@@ -279,6 +279,44 @@ void rrdvar_store_for_chart(RRDHOST *host, RRDSET *st) {
     rrddim_foreach_done(rd);
 }
 
+int health_variable_lookup_and_query(STRING *variable, RRDCALC *rc, NETDATA_DOUBLE *result, time_t v_at) {
+    RRDSET *st = rc->rrdset;
+    if(!st) return 0;
+
+    RRDHOST *host = st->rrdhost;
+    const RRDVAR_ACQUIRED *rva;
+
+    rva = rrdvar_get_and_acquire(st->rrdvars, variable);
+    if(rva) {
+        int value_is_null = 0;
+        rrdset2value_api_v1(st, NULL, result, string2str(variable), 1,
+                            v_at, v_at, 0, NULL,
+                            0, 0,
+                            NULL,NULL,
+                            NULL, NULL, NULL,
+                            &value_is_null, NULL, 0, 0,
+                            QUERY_SOURCE_HEALTH, STORAGE_PRIORITY_LOW);
+        dictionary_acquired_item_release(st->rrdvars, (const DICTIONARY_ITEM *)rva);
+        return 1;
+    }
+
+    rva = rrdvar_get_and_acquire(rrdfamily_rrdvars_dict(st->rrdfamily), variable);
+    if(rva) {
+        *result = rrdvar2number(rva);
+        dictionary_acquired_item_release(rrdfamily_rrdvars_dict(st->rrdfamily), (const DICTIONARY_ITEM *)rva);
+        return 1;
+    }
+
+    rva = rrdvar_get_and_acquire(host->rrdvars, variable);
+    if(rva) {
+        *result = rrdvar2number(rva);
+        dictionary_acquired_item_release(host->rrdvars, (const DICTIONARY_ITEM *)rva);
+        return 1;
+    }
+
+    return 0;
+}
+
 int health_variable_lookup(STRING *variable, RRDCALC *rc, NETDATA_DOUBLE *result) {
     RRDSET *st = rc->rrdset;
     if(!st) return 0;

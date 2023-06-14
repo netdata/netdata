@@ -444,12 +444,8 @@ inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_clien
 }
 
 inline int web_client_api_request_v1_alarm_eval(RRDHOST *host, struct web_client *w, char *url) {
-    char *chart = NULL;
-    char *context = NULL;
-    char *lookup = NULL;
-    char *calc = NULL;
-    char *warn = NULL;
-    char *crit = NULL;
+    struct health_virtual *hv = callocz(1, sizeof(struct health_virtual));
+    hv->after = hv->before = 0;
 
     buffer_flush(w->response.data);
     buffer_sprintf(w->response.data, "{");
@@ -465,26 +461,25 @@ inline int web_client_api_request_v1_alarm_eval(RRDHOST *host, struct web_client
         debug(D_WEB_CLIENT, "%llu: API v1 alarm_eval query param '%s' with value '%s'", w->id, name, value);
 
         if(!strcmp(name, "chart")) {
-            chart = value;
+            hv->chart = value;
         }
-        else if(!strcmp(name, "context")) {
-            context = value;
-        }
-        else if(!strcmp(name, "lookup")) {
-            lookup = value;
-        }
-        else if(!strcmp(name, "calc")) {
-            calc = value;
-        }
-        else if(!strcmp(name, "warn")) {
-            warn = value;
-        }
-        else if(!strcmp(name, "crit")) {
-            crit = value;
-        }
+        else if(!strcmp(name, "context"))
+            hv->context = value;
+        else if(!strcmp(name, "lookup"))
+            hv->lookup = value;
+        else if(!strcmp(name, "calc"))
+            hv->calc = value;
+        else if(!strcmp(name, "warn"))
+            hv->warn = value;
+        else if(!strcmp(name, "crit"))
+            hv->crit = value;
+        else if(!strcmp(name, "after"))
+            hv->after = str2l(value);
+        else if(!strcmp(name, "before"))
+            hv->before = str2l(value);
     }
 
-    health_virtual_run(host, w->response.data, chart, context, lookup, calc, warn, crit);
+    health_virtual(host, w->response.data, hv);
 
     buffer_sprintf(w->response.data, "\n}\n");
     w->response.data->content_type = CT_APPLICATION_JSON;

@@ -179,6 +179,13 @@ static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *
         return n;
     }
 
+    if(exp->rrdcalc && exp->value_at && health_variable_lookup_and_query(v->name, exp->rrdcalc, &n, exp->value_at)) {
+        buffer_sprintf(exp->error_msg, "[ ${%s} = ", string2str(v->name));
+        print_parsed_as_constant(exp->error_msg, n);
+        buffer_strcat(exp->error_msg, " ] ");
+        return n;
+    }
+
     if(exp->rrdcalc && health_variable_lookup(v->name, exp->rrdcalc, &n)) {
         buffer_sprintf(exp->error_msg, "[ ${%s} = ", string2str(v->name));
         print_parsed_as_constant(exp->error_msg, n);

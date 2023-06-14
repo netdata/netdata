@@ -105,6 +105,17 @@ void sql_refresh_hashes(void);
 void health_add_host_labels(void);
 void health_string2json(BUFFER *wb, const char *prefix, const char *label, const char *value, const char *suffix);
 
-void health_virtual_run(RRDHOST *host, BUFFER *wb, char *chart, char *context, char *lookup, char *calc, char *warn, char *crit);
-void health_config_setup_rc_from_api(RRDHOST *host, RRDCALC *rcv, char *chart, char *context, char *lookup, char *calc, char *warn, char *crit);
+struct health_virtual {
+    char *chart;
+    char *context;
+    char *lookup;
+    char *calc;
+    char *warn;
+    char *crit;
+    time_t before;
+    time_t after;
+};
+
+void health_virtual(RRDHOST *host, BUFFER *wb, struct health_virtual *hv);
+void health_config_setup_rc_from_api(RRDHOST *host, RRDCALC *rcv, struct health_virtual *hv);
 #endif //NETDATA_HEALTH_H

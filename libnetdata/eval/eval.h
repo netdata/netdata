@@ -41,6 +41,8 @@ typedef struct eval_expression {
 
     // custom data to be used for looking up variables
     struct rrdcalc *rrdcalc;
+
+    time_t value_at;
 } EVAL_EXPRESSION;
 
 #define EVAL_VALUE_INVALID    0
@@ -83,5 +85,6 @@ const char *expression_strerror(int error);
 int expression_evaluate(EVAL_EXPRESSION *expression);
 
 int health_variable_lookup(STRING *variable, struct rrdcalc *rc, NETDATA_DOUBLE *result);
+int health_variable_lookup_and_query(STRING *variable, struct rrdcalc *rc, NETDATA_DOUBLE *result, time_t v_at);
 
 #endif //NETDATA_EVAL_H
