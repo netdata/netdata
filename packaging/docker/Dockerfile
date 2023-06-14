@@ -109,8 +109,8 @@ RUN chown -R root:root \
     if [ -f /usr/libexec/netdata/plugins.d/freeipmi.plugin ]; then \
         chmod 4755 /usr/libexec/netdata/plugins.d/freeipmi.plugin; \
     fi && \
-    if [ -f /usr/libexec/netdata/plugins.d/go.d.plugin ] && command -v setcap 1>/dev/null 2>&1; then \
-        setcap "cap_net_raw=eip" /usr/libexec/netdata/plugins.d/go.d.plugin 2>/dev/null; \
+    if [ -f /usr/libexec/netdata/plugins.d/go.d.plugin ]; then \
+        chmod 4755 /usr/libexec/netdata/plugins.d/go.d.plugin; \
     fi && \
     # Group write permissions due to: https://github.com/netdata/netdata/pull/6543
     find /var/lib/netdata /var/cache/netdata -type d -exec chmod 0770 {} \; && \
