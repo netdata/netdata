@@ -65,6 +65,10 @@ typedef struct parser {
         DICTIONARY *functions;
         usec_t smaller_timeout;
     } inflight;
+
+    struct {
+        SPINLOCK spinlock;
+    } writer;
 } PARSER;
 
 PARSER *parser_init(void *user, FILE *fp_input, FILE *fp_output, int fd, PARSER_INPUT_TYPE flags, void *ssl);
