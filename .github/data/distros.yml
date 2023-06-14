@@ -179,6 +179,7 @@ include:
       ebpf-core: true
   - <<: *opensuse
     version: "15.5"
+    base_image: opensuse/leap:15.5
     packages:
       <<: *opensuse_packages
       repo_distro: opensuse/15.5
