@@ -1396,7 +1396,7 @@ void health_config_setup_rc_from_api(BUFFER *wb, RRDHOST *host, RRDCALC *rcv, st
         rrdset_foreach_done(st);
 
     } else if (hv->context) {
-        buffer_json_member_add_string_or_omit(wb, "context", hv->context);
+        buffer_json_member_add_string(wb, "context", hv->context);
 
 
     }
@@ -1420,9 +1420,9 @@ void health_config_setup_rc_from_api(BUFFER *wb, RRDHOST *host, RRDCALC *rcv, st
             rcv->calculation->after = &rcv->db_after;
             rcv->calculation->before = &rcv->db_before;
             rcv->calculation->rrdcalc = rcv;
-            buffer_json_member_add_string_or_omit(wb, "calc", hv->calc);
+            buffer_json_member_add_string(wb, "calc", hv->calc);
         } else {
-            buffer_json_member_add_string_or_omit(wb, "calc_error", expression_strerror(error));
+            buffer_json_member_add_string(wb, "calc_error", expression_strerror(error));
         }
     }
 
@@ -1436,25 +1436,25 @@ void health_config_setup_rc_from_api(BUFFER *wb, RRDHOST *host, RRDCALC *rcv, st
             rcv->warning->after = &rcv->db_after;
             rcv->warning->before = &rcv->db_before;
             rcv->warning->rrdcalc = rcv;
-            buffer_json_member_add_string_or_omit(wb, "warn", hv->warn);
+            buffer_json_member_add_string(wb, "warn", hv->warn);
         } else {
-            buffer_json_member_add_string_or_omit(wb, "warn_error", expression_strerror(error));
+            buffer_json_member_add_string(wb, "warn_error", expression_strerror(error));
         }
     }
 
     if (hv->crit) {
         const char *failed_at = NULL;
         int error = 0;
-        rcv->warning = expression_parse(hv->crit, &failed_at, &error);
+        rcv->critical = expression_parse(hv->crit, &failed_at, &error);
         if (!error) {
             rcv->critical->status = &rcv->status;
             rcv->critical->myself = &rcv->value;
             rcv->critical->after = &rcv->db_after;
             rcv->critical->before = &rcv->db_before;
             rcv->critical->rrdcalc = rcv;
-            buffer_json_member_add_string_or_omit(wb, "crit", hv->warn);
+            buffer_json_member_add_string(wb, "crit", hv->warn);
         } else {
-            buffer_json_member_add_string_or_omit(wb, "crit_error", expression_strerror(error));
+            buffer_json_member_add_string(wb, "crit_error", expression_strerror(error));
         }
     }
 }
