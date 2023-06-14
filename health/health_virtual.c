@@ -3,13 +3,16 @@
 #include "health.h"
 
 void health_virtual_run(RRDHOST *host, BUFFER *wb, RRDCALC *rcv, time_t at) {
+    bool vraised_warn = false;
+    bool vraised_crit = false;
+
     buffer_json_add_array_item_object(wb);
     buffer_json_member_add_time_t(wb, "when", at);
 
     if (unlikely(RRDCALC_HAS_DB_LOOKUP(rcv))) {
         int value_is_null = 0;
         time_t before = at;
-        time_t after = before + rcv->after;
+        time_t after = before + rcv->after + 1;
 
         int ret = rrdset2value_api_v1(rcv->rrdset, NULL, &rcv->value, rrdcalc_dimensions(rcv), 1,
                                       after, before, rcv->group, NULL,
@@ -83,11 +86,13 @@ void health_virtual_run(RRDHOST *host, BUFFER *wb, RRDCALC *rcv, time_t at) {
         if (unlikely(!expression_evaluate(rcv->warning))) {
             // calculation failed
             rcv->run_flags |= RRDCALC_FLAG_WARN_ERROR;
-
         } else {
             rcv->run_flags &= ~RRDCALC_FLAG_WARN_ERROR;
             buffer_json_member_add_double(wb, "warn", rcv->warning->result);
-            rcv->status = RRDCALC_STATUS_WARNING;
+            if (rcv->warning->result) {
+                rcv->status = RRDCALC_STATUS_WARNING;
+                vraised_warn = true;
+            }
         }
     }
 
@@ -97,13 +102,19 @@ void health_virtual_run(RRDHOST *host, BUFFER *wb, RRDCALC *rcv, time_t at) {
         if (unlikely(!expression_evaluate(rcv->critical))) {
             // calculation failed
             rcv->run_flags |= RRDCALC_FLAG_CRIT_ERROR;
-
         } else {
             rcv->run_flags &= ~RRDCALC_FLAG_CRIT_ERROR;
             buffer_json_member_add_double(wb, "crit", rcv->critical->result);
-            rcv->status = RRDCALC_STATUS_CRITICAL;
+            if (rcv->critical->result) {
+                rcv->status = RRDCALC_STATUS_CRITICAL;
+                vraised_crit = true;
+            }
         }
     }
+
+    if (!vraised_warn && !vraised_crit)
+        rcv->status = RRDCALC_STATUS_CLEAR;
+
     buffer_json_object_close(wb);
 }
 
