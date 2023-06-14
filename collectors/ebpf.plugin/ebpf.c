@@ -632,7 +632,7 @@ static void ebpf_unload_unique_maps()
     int i;
     for (i = 0; ebpf_modules[i].thread_name; i++) {
         // These threads are cleaned with other functions
-        if (i > EBPF_MODULE_SOCKET_IDX && i < EBPF_MODULE_MOUNT_IDX)
+        if (i > EBPF_MODULE_SOCKET_IDX && i < EBPF_MODULE_HARDIRQ_IDX)
             continue;
 
         if (ebpf_modules[i].enabled != NETDATA_THREAD_EBPF_STOPPED) {
@@ -648,20 +648,6 @@ static void ebpf_unload_unique_maps()
         }
 
         switch (i) {
-            case EBPF_MODULE_FD_IDX: {
-#ifdef LIBBPF_MAJOR_VERSION
-                if (fd_bpf_obj)
-                    fd_bpf__destroy(fd_bpf_obj);
-#endif
-                break;
-            }
-            case EBPF_MODULE_MOUNT_IDX: {
-#ifdef LIBBPF_MAJOR_VERSION
-                if (mount_bpf_obj)
-                    mount_bpf__destroy(mount_bpf_obj);
-#endif
-                break;
-            }
             case EBPF_MODULE_SHM_IDX: {
 #ifdef LIBBPF_MAJOR_VERSION
                 if (shm_bpf_obj)
@@ -676,6 +662,8 @@ static void ebpf_unload_unique_maps()
 #endif
                 break;
             }
+            case EBPF_MODULE_MOUNT_IDX:
+            case EBPF_MODULE_FD_IDX:
             case EBPF_MODULE_VFS_IDX:
             case EBPF_MODULE_SWAP_IDX:
             case EBPF_MODULE_DCSTAT_IDX:
