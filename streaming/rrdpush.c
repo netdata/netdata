@@ -858,7 +858,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         else if(!strcmp(name, "ver") && (rpt->capabilities & STREAM_CAP_INVALID)) {
             int32_t received_version = strtoul(value, NULL, 0);
             rpt->capabilities = convert_stream_version_to_capabilities(received_version, NULL, false);
-            internal_error(true, "STREAM: received version %d, final capability %d", received_version, rpt->capabilities);
+            internal_error(true, "STREAM: received version %d (value '%s'), final capability %d", received_version, value, rpt->capabilities);
         }
 
         else {
