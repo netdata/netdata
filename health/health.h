@@ -117,5 +117,5 @@ struct health_virtual {
 };
 
 void health_virtual(RRDHOST *host, BUFFER *wb, struct health_virtual *hv);
-void health_config_setup_rc_from_api(RRDHOST *host, RRDCALC *rcv, struct health_virtual *hv);
+void health_config_setup_rc_from_api(BUFFER *wb, RRDHOST *host, RRDCALC *rcv, struct health_virtual *hv);
 #endif //NETDATA_HEALTH_H

@@ -7,11 +7,12 @@ void health_virtual_run(RRDHOST *host, BUFFER *wb, RRDCALC *rcv, time_t at) {
     buffer_json_member_add_time_t(wb, "when", at);
 
     if (unlikely(RRDCALC_HAS_DB_LOOKUP(rcv))) {
-
         int value_is_null = 0;
+        time_t before = at;
+        time_t after = before + rcv->after;
 
         int ret = rrdset2value_api_v1(rcv->rrdset, NULL, &rcv->value, rrdcalc_dimensions(rcv), 1,
-                                      rcv->after, rcv->before, rcv->group, NULL,
+                                      after, before, rcv->group, NULL,
                                       0, rcv->options,
                                       &rcv->db_after,&rcv->db_before,
                                       NULL, NULL, NULL,
@@ -97,22 +98,16 @@ void health_virtual(RRDHOST *host, BUFFER *wb, struct health_virtual *hv) {
     int min_run_every = (int)config_get_number(CONFIG_SECTION_HEALTH, "run at least every seconds", 10);
     if(min_run_every < 1) min_run_every = 1;
 
-    RRDCALC *rcv = callocz(1, sizeof(RRDCALC));
-
-    health_config_setup_rc_from_api(host, rcv, hv);
-
     buffer_json_initialize(wb, "\"", "\"", 0, false, false);
     buffer_json_member_add_string(wb, "host", rrdhost_hostname(host));
     buffer_json_member_add_int64(wb, "health_run_every", min_run_every);
     buffer_json_member_add_time_t(wb, "after", hv->after);
     buffer_json_member_add_time_t(wb, "before", hv->before);
     buffer_json_member_add_object(wb, "configuration");
-    buffer_json_member_add_string_or_omit(wb, "chart", hv->chart);
-    buffer_json_member_add_string_or_omit(wb, "context", hv->context);
-    buffer_json_member_add_string_or_omit(wb, "lookup", hv->lookup);
-    buffer_json_member_add_string_or_omit(wb, "calc", hv->calc);
-    buffer_json_member_add_string_or_omit(wb, "warn", hv->warn);
-    buffer_json_member_add_string_or_omit(wb, "crit", hv->crit);
+
+    RRDCALC *rcv = callocz(1, sizeof(RRDCALC));
+    health_config_setup_rc_from_api(wb, host, rcv, hv);
+
     buffer_json_object_close(wb);
     buffer_json_member_add_array(wb, string2str(rcv->chart));
 
