@@ -374,8 +374,10 @@ static void agent_capabilities_to_json(BUFFER *wb, RRDHOST *host, const char *ke
     struct capability *capas = aclk_get_node_instance_capas(host);
     struct capability *capa = capas;
     while(capa->name != NULL) {
-        if(!capa->enabled)
+        if(!capa->enabled) {
+            capa++;
             continue;
+        }
 
         buffer_json_add_array_item_array(wb);
         buffer_json_add_array_item_string(wb, capa->name);
