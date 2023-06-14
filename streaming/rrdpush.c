@@ -1210,9 +1210,10 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
 }
 
 void rrdpush_reset_destinations_postpone_time(RRDHOST *host) {
-    struct rrdpush_destinations *d;
-    for (d = host->destinations; d; d = d->next)
-        d->postpone_reconnection_until = 0;
+    uint32_t wait = (host->sender) ? host->sender->reconnect_delay : 5;
+    time_t now = now_realtime_sec();
+    for (struct rrdpush_destinations *d = host->destinations; d; d = d->next)
+        d->postpone_reconnection_until = now + wait;
 }
 
 static struct {

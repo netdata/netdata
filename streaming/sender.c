@@ -490,17 +490,18 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
             break;
         }
     }
-    const char *error = stream_responses[i].error;
-    int worker_job_id = stream_responses[i].worker_job_id;
-    time_t delay = stream_responses[i].postpone_reconnect_seconds;
 
     if(version >= STREAM_HANDSHAKE_OK_V1) {
         host->destination->last_error = NULL;
         host->destination->last_handshake = version;
-        host->destination->postpone_reconnection_until = 0;
+        host->destination->postpone_reconnection_until = now_realtime_sec() + s->reconnect_delay;
         s->capabilities = convert_stream_version_to_capabilities(version, host, true);
         return true;
     }
+
+    const char *error = stream_responses[i].error;
+    int worker_job_id = stream_responses[i].worker_job_id;
+    time_t delay = stream_responses[i].postpone_reconnect_seconds;
 
     worker_is_busy(worker_job_id);
     rrdpush_sender_thread_close_socket(host);

@@ -157,7 +157,7 @@ struct sender_state {
     SENDER_FLAGS flags;
     int timeout;
     int default_port;
-    usec_t reconnect_delay;
+    uint32_t reconnect_delay;
     char connected_to[CONNECTED_TO_SIZE + 1];   // We don't know which proxy we connect to, passed back from socket.c
     size_t begin;
     size_t reconnects_counter;

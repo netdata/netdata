@@ -104,16 +104,22 @@ static int read_stream(struct receiver_state *r, char* buffer, size_t size) {
         return 0;
     }
 
+    int tries = 100;
     ssize_t bytes_read;
 
+    do {
+        errno = 0;
+
 #ifdef ENABLE_HTTPS
-    if (SSL_connection(&r->ssl))
-        bytes_read = netdata_ssl_read(&r->ssl, buffer, size);
-    else
-        bytes_read = read(r->fd, buffer, size);
+        if (SSL_connection(&r->ssl))
+            bytes_read = netdata_ssl_read(&r->ssl, buffer, size);
+        else
+            bytes_read = read(r->fd, buffer, size);
 #else
-    bytes_read = read(r->fd, buffer, size);
+        bytes_read = read(r->fd, buffer, size);
 #endif
+
+    } while(bytes_read < 0 && errno == EINTR && tries--);
 
     if((bytes_read == 0 || bytes_read == -1) && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINPROGRESS)) {
         error("STREAM: %s(): timeout while waiting for data on socket!", __FUNCTION__);
@@ -583,11 +589,6 @@ void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, con
 
 }
 
-static void rrdhost_reset_destinations(RRDHOST *host) {
-    for (struct rrdpush_destinations *d = host->destinations; d; d = d->next)
-        d->postpone_reconnection_until = 0;
-}
-
 static void rrdpush_receive(struct receiver_state *rpt)
 {
     rpt->config.mode = default_rrd_memory_mode;
@@ -824,7 +825,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
     rrdhost_set_is_parent_label(++localhost->connected_children_count);
 
     // let it reconnect to parent immediately
-    rrdhost_reset_destinations(rpt->host);
+    rrdpush_reset_destinations_postpone_time(rpt->host);
 
     size_t count = streaming_parser(rpt, &cd, rpt->fd,
 #ifdef ENABLE_HTTPS
