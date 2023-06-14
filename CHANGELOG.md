@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- bump go.d.plugin to v0.53.2 [\#15184](https://github.com/netdata/netdata/pull/15184) ([ilyam8](https://github.com/ilyam8))
+- Do strdupz on empty string [\#15183](https://github.com/netdata/netdata/pull/15183) ([MrZammler](https://github.com/MrZammler))
+- set setuid for go.d.plugin in container [\#15180](https://github.com/netdata/netdata/pull/15180) ([ilyam8](https://github.com/ilyam8))
 - bump go.d.plugin to v0.53.1 [\#15179](https://github.com/netdata/netdata/pull/15179) ([ilyam8](https://github.com/ilyam8))
 - Update smartd\_log.conf [\#15171](https://github.com/netdata/netdata/pull/15171) ([TougeAI](https://github.com/TougeAI))
 - Change package conflicts policy on deb based packages [\#15170](https://github.com/netdata/netdata/pull/15170) ([tkatsoulas](https://github.com/tkatsoulas))
@@ -405,10 +408,6 @@
 - Re-index when machine guid changes [\#14535](https://github.com/netdata/netdata/pull/14535) ([MrZammler](https://github.com/MrZammler))
 - Use BoxListItemRegexLink component in docs/quickstart/insfrastructure.md [\#14533](https://github.com/netdata/netdata/pull/14533) ([Ancairon](https://github.com/Ancairon))
 - Update main metric retention docs [\#14530](https://github.com/netdata/netdata/pull/14530) ([cakrit](https://github.com/cakrit))
-- Add Debian 12 to our CI and platform support document. [\#14529](https://github.com/netdata/netdata/pull/14529) ([Ferroin](https://github.com/Ferroin))
-- Update role-based-access.md [\#14528](https://github.com/netdata/netdata/pull/14528) ([cakrit](https://github.com/cakrit))
-- added section to explain impacts on member role [\#14527](https://github.com/netdata/netdata/pull/14527) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- fix setting go.d.plugin capabilities [\#14525](https://github.com/netdata/netdata/pull/14525) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
