@@ -1233,7 +1233,7 @@ int alert_hash_and_store_config(
     return 1;
 }
 
-#define SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT "SELECT new_status FROM health_log WHERE alarm_id = %u AND unique_id != %u AND flags & %d AND host_id = @host_id ORDER BY unique_id DESC LIMIT 1"
+#define SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT "SELECT hld.new_status FROM health_log hl, health_log_detail hld WHERE hl.alarm_id = %u AND hld.unique_id != %u AND hld.flags & %d AND hl.host_id = @host_id and hl.health_log_id = hld.health_log_id ORDER BY hld.unique_id DESC LIMIT 1;"
 int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_STATUS *last_executed_status)
 {
     int rc = 0, ret = -1;
@@ -1268,7 +1268,7 @@ int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_S
      return ret;
 }
 
-#define SQL_SELECT_HEALTH_LOG "SELECT hl.unique_id, hl.alarm_id, hl.alarm_event_id, hl.config_hash_id, hl.updated_by_id, hl.updates_id, hl.when_key, hl.duration, hl.non_clear_duration, hl.flags, hl.exec_run_timestamp, hl.delay_up_to_timestamp, hl.name, hl.chart, hl.family, hl.exec, hl.recipient, ah.source, hl.units, hl.info, hl.exec_code, hl.new_status, hl.old_status, hl.delay, hl.new_value, hl.old_value, hl.last_repeat, ah.class, ah.component, ah.type, hl.chart_context, hl.transition_id FROM health_log hl, alert_hash ah WHERE hl.config_hash_id = ah.hash_id and host_id = @host_id "
+#define SQL_SELECT_HEALTH_LOG "SELECT hld.unique_id, hld.alarm_id, hld.alarm_event_id, hl.config_hash_id, hld.updated_by_id, hld.updates_id, hld.when_key, hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, hld.delay_up_to_timestamp, hl.name, hl.chart, hl.family, hl.exec, hl.recipient, ah.source, hl.units, hld.info, hld.exec_code, hld.new_status, hld.old_status, hld.delay, hld.new_value, hld.old_value, hld.last_repeat, ah.class, ah.component, ah.type, hl.chart_context, hld.transition_id FROM health_log hl, alert_hash ah, health_log_detail hld WHERE hl.config_hash_id = ah.hash_id and hl.health_log_id = hld.health_log_id and hl.host_id = @host_id "
 void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *chart) {
 
     buffer_strcat(wb, "[");
@@ -1284,19 +1284,19 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
 
     if (chart) {
         char chart_sql[MAX_HEALTH_SQL_SIZE + 1];
-        snprintfz(chart_sql, MAX_HEALTH_SQL_SIZE, "AND chart = '%s' ", chart);
+        snprintfz(chart_sql, MAX_HEALTH_SQL_SIZE, "AND hl.chart = '%s' ", chart);
         buffer_strcat(command, chart_sql);
     }
 
     if (after) {
         char after_sql[MAX_HEALTH_SQL_SIZE + 1];
-        snprintfz(after_sql, MAX_HEALTH_SQL_SIZE, "AND unique_id > %u ", after);
+        snprintfz(after_sql, MAX_HEALTH_SQL_SIZE, "AND hld.unique_id > %u ", after);
         buffer_strcat(command, after_sql);
     }
 
     {
         char limit_sql[MAX_HEALTH_SQL_SIZE + 1];
-        snprintfz(limit_sql, MAX_HEALTH_SQL_SIZE, "ORDER BY unique_id DESC LIMIT %u ", max);
+        snprintfz(limit_sql, MAX_HEALTH_SQL_SIZE, "ORDER BY hld.unique_id DESC LIMIT %u ", max);
         buffer_strcat(command, limit_sql);
     }
 
