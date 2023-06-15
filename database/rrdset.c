@@ -1996,6 +1996,8 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
 }
 
 time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
+    if(unlikely(update_every_s == st->update_every))
+        return st->update_every;
 
     internal_error(true, "RRDSET '%s' switching update every from %d to %d",
                    rrdset_id(st), (int)st->update_every, (int)update_every_s);
@@ -2012,10 +2014,6 @@ time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
                         rd->tiers[tier].db_collection_handle,
                         (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
         }
-
-        assert(rd->rrdset->update_every == (int) prev_update_every_s &&
-               "chart's update every differs from the update every of its dimensions");
-        rd->rrdset->update_every = st->update_every;
     }
     rrddim_foreach_done(rd);
 
