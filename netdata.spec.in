@@ -174,13 +174,21 @@ Suggests:   netdata-plugin-cups
 # Note: Some or all of the Packages may be found in the EPEL repo,
 # rather than the standard ones
 
-# nfacct plugin dependencies
+# epbf plugin dependencies
+%if 0%{?_have_ebpf}
+%if 0%{?suse_version}
+BuildRequires:	libelf-devel
+%else
+BuildRequires:	elfutils-libelf-devel
+%endif
+%endif
+# end ebpf plugin dependencies
 
+# nfacct plugin dependencies
 %if 0%{?_have_nfacct}
 BuildRequires:  libmnl-devel
 BuildRequires:  libnetfilter_acct-devel
 %endif
-
 # end nfacct plugin dependencies
 
 # freeipmi plugin dependencies
@@ -883,6 +891,8 @@ fi
 %caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/debugfs.plugin
 
 %changelog
+* Wed Jun 14 2023 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-20
+- Added eBPF build dependency (again)
 * Fri Apr 07 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-19
 - Split additional plugins out in their own packages.
 * Tue Mar 21 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-18
@@ -927,7 +937,7 @@ First draft refactor on package dependencies section
 * Wed Jan 02 2019 Pawel Krupa <pkrupa@redhat.com> - 0.0.0-3
 - Temporary set version statically
 - Fix changelog ordering
-- Comment-out node.d configuration directory 
+- Comment-out node.d configuration directory
 * Wed Jan 02 2019 Pawel Krupa <pkrupa@redhat.com> - 0.0.0-2
 - Fix permissions for log files
 * Sun Nov 15 2015 Alon Bar-Lev <alonbl@redhat.com> - 0.0.0-1
