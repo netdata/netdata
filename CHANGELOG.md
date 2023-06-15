@@ -1,5 +1,13 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.40.0...HEAD)
+
+**Merged pull requests:**
+
+- Redirect to index.html when a file is not found by web server [\#15143](https://github.com/netdata/netdata/pull/15143) ([MrZammler](https://github.com/MrZammler))
+
 ## [v1.40.0](https://github.com/netdata/netdata/tree/v1.40.0) (2023-06-14)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.39.1...v1.40.0)
@@ -407,7 +415,6 @@
 - Reorganize learn documents under Integrations part 2 [\#14538](https://github.com/netdata/netdata/pull/14538) ([cakrit](https://github.com/cakrit))
 - Roles docs: Add Early Bird and Member role [\#14537](https://github.com/netdata/netdata/pull/14537) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Fix broken Alma Linux entries in build matrix generation. [\#14536](https://github.com/netdata/netdata/pull/14536) ([Ferroin](https://github.com/Ferroin))
-- Re-index when machine guid changes [\#14535](https://github.com/netdata/netdata/pull/14535) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
