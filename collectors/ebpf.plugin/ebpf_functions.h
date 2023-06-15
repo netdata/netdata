@@ -24,6 +24,9 @@
 #define EBPF_THREAD_STATUS_RUNNING "running"
 #define EBPF_THREAD_STATUS_STOPPED "stopped"
 
+// function list
+#define EBPF_FUNCTION_ENABLE "enable"
+
 void *ebpf_function_thread(void *ptr);
 
 #endif
