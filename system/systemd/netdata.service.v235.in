@@ -7,8 +7,7 @@ After=network.target httpd.service squid.service nfs-server.service mysqld.servi
 
 [Service]
 Type=simple
-User=@netdata_user_POST@
-Group=netdata
+User=root
 RuntimeDirectory=netdata
 CacheDirectory=netdata
 StateDirectory=netdata
