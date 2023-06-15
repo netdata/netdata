@@ -154,7 +154,7 @@ struct dictionary {
         DICTIONARY_ITEM *list;          // the double linked list of all items in the dictionary
         netdata_rwlock_t rwlock;        // protect the linked-list
         pid_t writer_pid;               // the gettid() of the writer
-        size_t writer_depth;            // nesting of write locks
+        uint32_t writer_depth;          // nesting of write locks
     } items;
 
     struct dictionary_hooks *hooks;     // pointer to external function callbacks to be called at certain points
@@ -163,7 +163,7 @@ struct dictionary {
     DICTIONARY *master;                 // the master dictionary
     DICTIONARY *next;                   // linked list for delayed destruction (garbage collection of whole dictionaries)
 
-    size_t version;                     // the current version of the dictionary
+    uint32_t version;                   // the current version of the dictionary
                                         // it is incremented when:
                                         //   - item added
                                         //   - item removed
@@ -171,9 +171,9 @@ struct dictionary {
                                         //   - conflict callback returns true
                                         //   - function dictionary_version_increment() is called
 
-    long int entries;                   // how many items are currently in the index (the linked list may have more)
-    long int referenced_items;          // how many items of the dictionary are currently being used by 3rd parties
-    long int pending_deletion_items;    // how many items of the dictionary have been deleted, but have not been removed yet
+    int32_t entries;                   // how many items are currently in the index (the linked list may have more)
+    int32_t referenced_items;          // how many items of the dictionary are currently being used by 3rd parties
+    int32_t pending_deletion_items;    // how many items of the dictionary have been deleted, but have not been removed yet
 
 #ifdef NETDATA_DICTIONARY_VALIDATE_POINTERS
     netdata_mutex_t global_pointer_registry_mutex;
@@ -2096,7 +2096,7 @@ size_t dictionary_destroy(DICTIONARY *dict) {
 
         internal_error(
             true,
-            "DICTIONARY: delaying destruction of dictionary created from %s() %zu@%s, because it has %ld referenced items in it (%ld total).",
+            "DICTIONARY: delaying destruction of dictionary created from %s() %zu@%s, because it has %d referenced items in it (%d total).",
             dict->creation_function,
             dict->creation_line,
             dict->creation_file,
@@ -2842,7 +2842,7 @@ static usec_t dictionary_unittest_run_and_measure_time(DICTIONARY *dict, char *m
         }
     }
 
-    fprintf(stderr, " %zu errors, %ld (found %ld) items in dictionary, %ld (found %ld) referenced, %ld (found %ld) deleted, %llu usec \n",
+    fprintf(stderr, " %zu errors, %d (found %ld) items in dictionary, %d (found %ld) referenced, %d (found %ld) deleted, %llu usec \n",
             errs, dict?dict->entries:0, found_ok, dict?dict->referenced_items:0, found_referenced, dict?dict->pending_deletion_items:0, found_deleted, dt);
     *errors += errs;
     return dt;
@@ -2984,7 +2984,7 @@ static size_t unittest_check_dictionary(const char *label, DICTIONARY *dict, siz
             referenced++;
     }
 
-    fprintf(stderr, "DICT %-20s: dictionary active items reported %ld, counted %zu, expected %zu...\t\t\t",
+    fprintf(stderr, "DICT %-20s: dictionary active items reported %d, counted %zu, expected %zu...\t\t\t",
             label, dict->entries, active, active_items);
     if(active != active_items || active != (size_t)dict->entries) {
         fprintf(stderr, "FAILED\n");
@@ -3002,7 +3002,7 @@ static size_t unittest_check_dictionary(const char *label, DICTIONARY *dict, siz
     else
         fprintf(stderr, "OK\n");
 
-    fprintf(stderr, "DICT %-20s: dictionary referenced items reported %ld, counted %zu, expected %zu...\t\t",
+    fprintf(stderr, "DICT %-20s: dictionary referenced items reported %d, counted %zu, expected %zu...\t\t",
             label, dict->referenced_items, referenced, referenced_items);
     if(referenced != referenced_items || dict->referenced_items != (long int)referenced) {
         fprintf(stderr, "FAILED\n");
@@ -3011,7 +3011,7 @@ static size_t unittest_check_dictionary(const char *label, DICTIONARY *dict, siz
     else
         fprintf(stderr, "OK\n");
 
-    fprintf(stderr, "DICT %-20s: dictionary pending deletion items reported %ld, counted %zu, expected %zu...\t",
+    fprintf(stderr, "DICT %-20s: dictionary pending deletion items reported %d, counted %zu, expected %zu...\t",
             label, dict->pending_deletion_items, pending, pending_deletion);
     if(pending != pending_deletion || pending != (size_t)dict->pending_deletion_items) {
         fprintf(stderr, "FAILED\n");
@@ -3257,9 +3257,9 @@ static int dictionary_unittest_threads() {
             ", searches %zu"
             ", resets %zu"
             ", flushes %zu"
-            ", entries %ld"
-            ", referenced_items %ld"
-            ", pending deletions %ld"
+            ", entries %d"
+            ", referenced_items %d"
+            ", pending deletions %d"
             ", check spins %zu"
             ", insert spins %zu"
             ", delete spins %zu"
@@ -3418,9 +3418,9 @@ static int dictionary_unittest_view_threads() {
             ", deletes %zu"
             ", searches %zu"
             ", resets %zu"
-            ", entries %ld"
-            ", referenced_items %ld"
-            ", pending deletions %ld"
+            ", entries %d"
+            ", referenced_items %d"
+            ", pending deletions %d"
             ", check spins %zu"
             ", insert spins %zu"
             ", delete spins %zu"
@@ -3443,9 +3443,9 @@ static int dictionary_unittest_view_threads() {
             ", deletes %zu"
             ", searches %zu"
             ", resets %zu"
-            ", entries %ld"
-            ", referenced_items %ld"
-            ", pending deletions %ld"
+            ", entries %d"
+            ", referenced_items %d"
+            ", pending deletions %d"
             ", check spins %zu"
             ", insert spins %zu"
             ", delete spins %zu"
