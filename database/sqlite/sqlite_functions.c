@@ -2,6 +2,7 @@
 
 #include "sqlite_functions.h"
 #include "sqlite_db_migration.h"
+#include "uuid.h"
 
 #define DB_METADATA_VERSION 9
 
@@ -371,6 +372,16 @@ void sqlite_now_usec(sqlite3_context *context, int argc, sqlite3_value **argv)
     sqlite3_result_int64(context, (sqlite_int64) now_realtime_usec());
 }
 
+void sqlite_uuid_random(sqlite3_context *context, int argc, sqlite3_value **argv)
+{
+    (void)argc;
+    (void)argv;
+
+    uuid_t uuid;
+    uuid_generate_random(uuid);
+    sqlite3_result_blob(context, &uuid, sizeof(uuid_t), SQLITE_TRANSIENT);
+}
+
 /*
  * Initialize the SQLite database
  * Return 0 on success
@@ -446,6 +457,10 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     rc = sqlite3_create_function(db_meta, "now_usec", 1, SQLITE_ANY, 0, sqlite_now_usec, 0, 0);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to register internal now_usec function");
+
+    rc = sqlite3_create_function(db_meta, "uuid_random", 1, SQLITE_ANY, 0, sqlite_uuid_random, 0, 0);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to register internal uuid_random function");
 
     int target_version = DB_METADATA_VERSION;
 
