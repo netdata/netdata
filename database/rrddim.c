@@ -62,14 +62,14 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         size_t entries = st->entries;
         if(!entries) entries = 5;
 
-        rd->db = netdata_mmap(NULL, entries * sizeof(storage_number), MAP_PRIVATE, 1, false, NULL);
-        if(!rd->db) {
+        rd->db.data = netdata_mmap(NULL, entries * sizeof(storage_number), MAP_PRIVATE, 1, false, NULL);
+        if(!rd->db.data) {
             info("Failed to use memory mode ram for chart '%s', dimension '%s', falling back to alloc", rrdset_name(st), rrddim_name(rd));
             ctr->memory_mode = RRD_MEMORY_MODE_ALLOC;
         }
         else {
-            rd->memsize = entries * sizeof(storage_number);
-            __atomic_add_fetch(&rrddim_db_memory_size, rd->memsize, __ATOMIC_RELAXED);
+            rd->db.memsize = entries * sizeof(storage_number);
+            __atomic_add_fetch(&rrddim_db_memory_size, rd->db.memsize, __ATOMIC_RELAXED);
         }
     }
 
@@ -77,9 +77,9 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         size_t entries = st->entries;
         if(entries < 5) entries = 5;
 
-        rd->db = rrddim_alloc_db(entries);
-        rd->memsize = entries * sizeof(storage_number);
-        __atomic_add_fetch(&rrddim_db_memory_size, rd->memsize, __ATOMIC_RELAXED);
+        rd->db.data = rrddim_alloc_db(entries);
+        rd->db.memsize = entries * sizeof(storage_number);
+        __atomic_add_fetch(&rrddim_db_memory_size, rd->db.memsize, __ATOMIC_RELAXED);
     }
 
     rd->rrd_memory_mode = ctr->memory_mode;
@@ -221,13 +221,13 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         rd->tiers[tier].db_metric_handle = NULL;
     }
 
-    if(rd->db) {
-        __atomic_sub_fetch(&rrddim_db_memory_size, rd->memsize, __ATOMIC_RELAXED);
+    if(rd->db.data) {
+        __atomic_sub_fetch(&rrddim_db_memory_size, rd->db.memsize, __ATOMIC_RELAXED);
 
         if(rd->rrd_memory_mode == RRD_MEMORY_MODE_RAM)
-            netdata_munmap(rd->db, rd->memsize);
+            netdata_munmap(rd->db.data, rd->db.memsize);
         else
-            freez(rd->db);
+            freez(rd->db.data);
     }
 
     string_freez(rd->id);
@@ -637,8 +637,8 @@ size_t rrddim_memory_file_header_size(void) {
 }
 
 void rrddim_memory_file_update(RRDDIM *rd) {
-    if(!rd || !rd->rd_on_file) return;
-    struct rrddim_map_save_v019 *rd_on_file = rd->rd_on_file;
+    if(!rd || !rd->db.rd_on_file) return;
+    struct rrddim_map_save_v019 *rd_on_file = rd->db.rd_on_file;
 
     rd_on_file->last_collected_time.tv_sec = rd->last_collected_time.tv_sec;
     rd_on_file->last_collected_time.tv_usec = rd->last_collected_time.tv_usec;
@@ -646,33 +646,33 @@ void rrddim_memory_file_update(RRDDIM *rd) {
 }
 
 void rrddim_memory_file_free(RRDDIM *rd) {
-    if(!rd || !rd->rd_on_file) return;
+    if(!rd || !rd->db.rd_on_file) return;
 
     // needed for memory mode map, to save the latest state
     rrddim_memory_file_update(rd);
 
-    struct rrddim_map_save_v019 *rd_on_file = rd->rd_on_file;
+    struct rrddim_map_save_v019 *rd_on_file = rd->db.rd_on_file;
     __atomic_sub_fetch(&rrddim_db_memory_size, rd_on_file->memsize + strlen(rd_on_file->cache_filename), __ATOMIC_RELAXED);
     freez(rd_on_file->cache_filename);
     netdata_munmap(rd_on_file, rd_on_file->memsize);
 
     // remove the pointers from the RRDDIM
-    rd->rd_on_file = NULL;
-    rd->db = NULL;
+    rd->db.rd_on_file = NULL;
+    rd->db.data = NULL;
 }
 
 const char *rrddim_cache_filename(RRDDIM *rd) {
-    if(!rd || !rd->rd_on_file) return NULL;
-    struct rrddim_map_save_v019 *rd_on_file = rd->rd_on_file;
+    if(!rd || !rd->db.rd_on_file) return NULL;
+    struct rrddim_map_save_v019 *rd_on_file = rd->db.rd_on_file;
     return rd_on_file->cache_filename;
 }
 
 void rrddim_memory_file_save(RRDDIM *rd) {
-    if(!rd || !rd->rd_on_file) return;
+    if(!rd || !rd->db.rd_on_file) return;
 
     rrddim_memory_file_update(rd);
 
-    struct rrddim_map_save_v019 *rd_on_file = rd->rd_on_file;
+    struct rrddim_map_save_v019 *rd_on_file = rd->db.rd_on_file;
     if(rd_on_file->rrd_memory_mode != RRD_MEMORY_MODE_SAVE) return;
 
     memory_file_save(rd_on_file->cache_filename, rd_on_file, rd_on_file->memsize);
@@ -752,9 +752,9 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
 
     __atomic_add_fetch(&rrddim_db_memory_size, rd_on_file->memsize + strlen(rd_on_file->cache_filename), __ATOMIC_RELAXED);
 
-    rd->db = &rd_on_file->values[0];
-    rd->rd_on_file = rd_on_file;
-    rd->memsize = size;
+    rd->db.data = &rd_on_file->values[0];
+    rd->db.rd_on_file = rd_on_file;
+    rd->db.memsize = size;
     rrddim_memory_file_update(rd);
 
     return true;

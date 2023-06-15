@@ -389,9 +389,11 @@ struct rrddim {
     // TODO - they should be managed by storage engine
     //        (RRDDIM_DB_STATE ptr to an undefined structure, and a call to clean this up during destruction)
 
-    size_t memsize;                                 // the memory allocated for this dimension (without RRDDIM)
-    void *rd_on_file;                               // pointer to the header written on disk
-    storage_number *db;                             // the array of values
+    struct {
+        size_t memsize;                             // the memory allocated for this dimension (without RRDDIM)
+        void *rd_on_file;                           // pointer to the header written on disk
+        storage_number *data;                       // the array of values
+    } db;
 
     // ------------------------------------------------------------------------
 
