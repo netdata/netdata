@@ -580,9 +580,30 @@ void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time
     buffer_json_member_add_string(wb, "v", string2str(localhost->program_version));
 
     buffer_json_member_add_object(wb, "cloud");
-    buffer_json_member_add_string(wb, "status", cloud_status_to_string(cloud_status()));
-    agent_capabilities_to_json(wb, localhost, "capabilities");
-    buffer_json_object_close(wb);
+    {
+        size_t id = cloud_connection_id();
+        CLOUD_STATUS status = cloud_status();
+        time_t last_change = cloud_last_change();
+        time_t next_connect = cloud_next_connection_attempt();
+        buffer_json_member_add_uint64(wb, "id", id);
+        buffer_json_member_add_string(wb, "status", cloud_status_to_string(status));
+        buffer_json_member_add_time_t(wb, "since", last_change);
+        buffer_json_member_add_time_t(wb, "age", now_s - last_change);
+
+        if(status != CLOUD_STATUS_ONLINE)
+            buffer_json_member_add_string(wb, "reason", cloud_offline_reason());
+
+        if (status == CLOUD_STATUS_OFFLINE && next_connect > now_s) {
+            buffer_json_member_add_time_t(wb, "next_check", next_connect);
+            buffer_json_member_add_time_t(wb, "next_in", next_connect - now_s);
+        }
+
+        if(status != CLOUD_STATUS_DISABLED && cloud_base_url())
+            buffer_json_member_add_string(wb, "url", cloud_base_url());
+
+        agent_capabilities_to_json(wb, localhost, "capabilities");
+    }
+    buffer_json_object_close(wb); // cloud
 
     if(timings)
         buffer_json_query_timings(wb, "timings", timings);

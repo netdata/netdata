@@ -67,6 +67,9 @@ const char *cloud_status_to_string(CLOUD_STATUS status) {
         case CLOUD_STATUS_DISABLED:
             return "disabled";
 
+        case CLOUD_STATUS_BANNED:
+            return "banned";
+
         case CLOUD_STATUS_OFFLINE:
             return "offline";
 
@@ -77,14 +80,65 @@ const char *cloud_status_to_string(CLOUD_STATUS status) {
 
 CLOUD_STATUS cloud_status(void) {
 #ifdef ENABLE_ACLK
+    if(aclk_disable_runtime)
+        return CLOUD_STATUS_BANNED;
+
     if(aclk_connected)
         return CLOUD_STATUS_ONLINE;
 
     if(netdata_cloud_enabled)
         return CLOUD_STATUS_OFFLINE;
-    else
-        return CLOUD_STATUS_DISABLED;
+
+    return CLOUD_STATUS_DISABLED;
 #else
     return CLOUD_STATUS_DISABLED;
+#endif
+}
+
+time_t cloud_last_change(void) {
+#ifdef ENABLE_ACLK
+    time_t ret = MAX(last_conn_time_mqtt, last_disconnect_time);
+    if(!ret) ret = netdata_start_time;
+    return ret;
+#else
+    return netdata_start_time;
+#endif
+}
+
+time_t cloud_next_connection_attempt(void) {
+#ifdef ENABLE_ACLK
+    return next_connection_attempt;
+#else
+    return 0;
+#endif
+}
+
+size_t cloud_connection_id(void) {
+#ifdef ENABLE_ACLK
+    return aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0;
+#else
+    return 0;
+#endif
+}
+
+const char *cloud_offline_reason() {
+#ifdef ENABLE_ACLK
+    if(!netdata_cloud_enabled)
+        return "disabled";
+
+    if(aclk_disable_runtime)
+        return "banned";
+
+    return aclk_status_to_string();
+#else
+    return "disabled";
+#endif
+}
+
+const char *cloud_base_url() {
+#ifdef ENABLE_ACLK
+    return aclk_cloud_base_url;
+#else
+    return NULL;
 #endif
 }
