@@ -350,7 +350,7 @@ void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
 /* Health related SQL queries
    Get a count of rows from health log table
 */
-#define SQL_COUNT_HEALTH_LOG "SELECT count(1) FROM health_log where host_id = @host_id;"
+#define SQL_COUNT_HEALTH_LOG_DETAIL "SELECT count(1) FROM health_log_detail hld, health_log hl where hl.host_id = @host_id and hl.health_log_id = hld.health_log_id;"
 void sql_health_alarm_log_count(RRDHOST *host) {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -361,7 +361,7 @@ void sql_health_alarm_log_count(RRDHOST *host) {
         return;
     }
 
-    rc = sqlite3_prepare_v2(db_meta, SQL_COUNT_HEALTH_LOG, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_meta, SQL_COUNT_HEALTH_LOG_DETAIL, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to count health log entries from db");
         return;
@@ -382,7 +382,7 @@ void sql_health_alarm_log_count(RRDHOST *host) {
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize the prepared statement to count health log entries from db");
 
-    info("HEALTH [%s]: Table health_log contains %lu entries.", rrdhost_hostname(host), (unsigned long int) host->health.health_log_entries_written);
+    info("HEALTH [%s]: Table health_log_detail contains %lu entries.", rrdhost_hostname(host), (unsigned long int) host->health.health_log_entries_written);
 }
 
 /* Health related SQL queries
@@ -662,7 +662,7 @@ uint32_t sql_get_max_unique_id (RRDHOST *host)
      return max_unique_id;
 }
 
-#define SQL_SELECT_LAST_STATUSES "SELECT new_status, unique_id, alarm_id, alarm_event_id from health_log where host_id = @host_id group by alarm_id having max(alarm_event_id)"
+#define SQL_SELECT_LAST_STATUSES "SELECT hld.new_status, hld.unique_id, hld.alarm_id, hld.alarm_event_id from health_log hl, health_log_detail hld where hl.host_id = @host_id  and hl.last_transition_id = hld.transition_id;"
 void sql_check_removed_alerts_state(RRDHOST *host)
 {
     int rc;
@@ -705,7 +705,7 @@ void sql_check_removed_alerts_state(RRDHOST *host)
 /* Health related SQL queries
    Load from the health log table
 */
-#define SQL_LOAD_HEALTH_LOG "SELECT hl.unique_id, hl.alarm_id, hl.alarm_event_id, hl.config_hash_id, hl.updated_by_id, hl.updates_id, hl.when_key, hl.duration, hl.non_clear_duration, hl.flags, hl.exec_run_timestamp, hl.delay_up_to_timestamp, hl.name, hl.chart, hl.family, hl.exec, hl.recipient, ah.source, hl.units, hl.info, hl.exec_code, hl.new_status, hl.old_status, hl.delay, hl.new_value, hl.old_value, hl.last_repeat, ah.class, ah.component, ah.type, hl.chart_context, hl.transition_id FROM health_log hl, alert_hash ah where hl.config_hash_id = ah.hash_id and host_id = @host_id group by hl.alarm_id having max(hl.alarm_event_id);"
+#define SQL_LOAD_HEALTH_LOG "SELECT hld.unique_id, hld.alarm_id, hld.alarm_event_id, hl.config_hash_id, hld.updated_by_id, hld.updates_id, hld.when_key, hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, hld.delay_up_to_timestamp, hl.name, hl.chart, hl.family, hl.exec, hl.recipient, ah.source, hl.units, hld.info, hld.exec_code, hld.new_status, hld.old_status, hld.delay, hld.new_value, hld.old_value, hld.last_repeat, ah.class, ah.component, ah.type, hl.chart_context, hld.transition_id FROM health_log hl, alert_hash ah, health_log_detail hld where hl.config_hash_id = ah.hash_id and hl.host_id = @host_id and hl.last_transition_id = hld.transition_id;"
 void sql_health_alarm_log_load(RRDHOST *host) {
     sqlite3_stmt *res = NULL;
     int ret;
