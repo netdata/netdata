@@ -64,6 +64,11 @@ dist_webold_DATA = \
     $(srcdir)/old/index.html \
     $(NULL)
 
+webv0dir=$(webdir)/v0
+dist_webv0_DATA = \
+    $(srcdir)/old/index.html \
+    $(NULL)
+
 webstaticdir=$(webdir)/static/img
 dist_webstatic_DATA = \
     $(srcdir)/static/img/netdata-logomark.svg \
