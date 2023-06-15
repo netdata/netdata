@@ -83,7 +83,7 @@ failed:
 /* Health related SQL queries
    Inserts an entry in the table
 */
-#define SQL_INSERT_HEALTH_LOG "INSERT OR REPLACE INTO health_log (host_id, alarm_id, " \
+#define SQL_INSERT_HEALTH_LOG "INSERT INTO health_log (host_id, alarm_id, " \
     "config_hash_id, name, chart, family, exec, recipient, units, chart_context, last_transition_id) " \
     "VALUES (?,?,?,?,?,?,?,?,?,?,?) " \
     "ON CONFLICT (host_id, alarm_id) DO UPDATE SET last_transition_id = excluded.last_transition_id RETURNING health_log_id; "
@@ -514,13 +514,10 @@ void sql_health_alarm_log_cleanup(RRDHOST *host) {
         sql_health_alarm_log_cleanup_claimed(host, rotate_every);
 }
 
-#define SQL_INJECT_REMOVED "insert into health_log (host_id, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, " \
-"delay_up_to_timestamp, name, chart, family, exec, recipient, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, chart_context, transition_id, global_id) " \
-"select host_id, ?1, ?2, ?3, config_hash_id, 0, ?4, unixepoch(), 0, 0, flags, exec_run_timestamp, " \
-"unixepoch(), name, chart, family, exec, recipient, units, info, exec_code, -2, new_status, delay, NULL, new_value, 0, chart_context, ?5, now_usec(0) " \
-"from health_log where unique_id = ?6 and host_id = ?7;"
-#define SQL_INJECT_REMOVED_UPDATE "update health_log set flags = flags | ?1, updated_by_id = ?2 where unique_id = ?3 and host_id = ?4;"
-void sql_inject_removed_status(RRDHOST *host, uint32_t alarm_id, uint32_t alarm_event_id, uint32_t unique_id, uint32_t max_unique_id)
+#define SQL_INJECT_REMOVED "insert into health_log_detail (health_log_id, unique_id, alarm_id, alarm_event_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, transition_id, global_id) select health_log_id, ?1, ?2, ?3, 0, ?4, unixepoch(), 0, 0, flags, exec_run_timestamp, unixepoch(), info, exec_code, -2, new_status, delay, NULL, new_value, 0, ?5, now_usec(0) from health_log_detail where unique_id = ?6 and transition_id = ?7;"
+#define SQL_INJECT_REMOVED_UPDATE_DETAIL "update health_log_detail set flags = flags | ?1, updated_by_id = ?2 where unique_id = ?3 and transition_id = ?4;"
+#define SQL_INJECT_REMOVED_UPDATE_LOG "update health_log set last_transition_id = ?1 where alarm_id = ?2 and last_transition_id = ?3 and host_id = ?4;"
+void sql_inject_removed_status(RRDHOST *host, uint32_t alarm_id, uint32_t alarm_event_id, uint32_t unique_id, uint32_t max_unique_id, uuid_t *prev_transition_id)
 {
     int rc;
 
@@ -573,7 +570,7 @@ void sql_inject_removed_status(RRDHOST *host, uint32_t alarm_id, uint32_t alarm_
         goto failed;
     }
 
-    rc = sqlite3_bind_blob(res, 7, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, 7, prev_transition_id, sizeof(*prev_transition_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host_id parameter for SQL_INJECT_REMOVED.");
         goto failed;
@@ -588,40 +585,77 @@ void sql_inject_removed_status(RRDHOST *host, uint32_t alarm_id, uint32_t alarm_
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("HEALTH [N/A]: Failed to finalize the prepared statement for injecting removed event.");
 
-    //update the old entry
-    rc = sqlite3_prepare_v2(db_meta, SQL_INJECT_REMOVED_UPDATE, -1, &res, 0);
+    //update the old entry in health_log_detail
+    rc = sqlite3_prepare_v2(db_meta, SQL_INJECT_REMOVED_UPDATE_DETAIL, -1, &res, 0);
     if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement when trying to update during inject removed event");
+        error_report("Failed to prepare statement when trying to update health_log_detail during inject removed event");
         return;
     }
 
     rc = sqlite3_bind_int64(res, 1, (sqlite3_int64) HEALTH_ENTRY_FLAG_UPDATED);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind flags parameter for SQL_INJECT_REMOVED (update)");
+        error_report("Failed to bind flags parameter for SQL_INJECT_REMOVED_UPDATE_DETAIL");
         goto failed;
     }
 
     rc = sqlite3_bind_int64(res, 2, (sqlite3_int64) max_unique_id);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind max_unique_id parameter for SQL_INJECT_REMOVED (update)");
+        error_report("Failed to bind max_unique_id parameter for SQL_INJECT_REMOVED_UPDATE_DETAIL");
         goto failed;
     }
 
     rc = sqlite3_bind_int64(res, 3, (sqlite3_int64) unique_id);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind unique_id parameter for SQL_INJECT_REMOVED (update)");
+        error_report("Failed to bind unique_id parameter for SQL_INJECT_REMOVED_UPDATE_DETAIL");
         goto failed;
     }
 
-    rc = sqlite3_bind_blob(res, 4, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, 4, prev_transition_id, sizeof(*prev_transition_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id parameter for SQL_INJECT_REMOVED.");
+        error_report("Failed to bind host_id parameter for SQL_INJECT_REMOVED_UPDATE_DETAIL");
         goto failed;
     }
 
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
-        error_report("HEALTH [N/A]: Failed to execute SQL_INJECT_REMOVED_UPDATE, rc = %d", rc);
+        error_report("HEALTH [N/A]: Failed to execute SQL_INJECT_REMOVED_UPDATE_DETAIL, rc = %d", rc);
+        goto failed;
+    }
+
+    //update the health_log_table
+    rc = sqlite3_prepare_v2(db_meta, SQL_INJECT_REMOVED_UPDATE_LOG, -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement when trying to update health_log during inject removed event");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &transition_id, sizeof(transition_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter for SQL_INJECT_REMOVED_UPDATE_LOG");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int64(res, 2, (sqlite3_int64) alarm_id);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind unique_id parameter for SQL_INJECT_REMOVED_UPDATE_DETAIL");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_blob(res, 3, prev_transition_id, sizeof(*prev_transition_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter for SQL_INJECT_REMOVED_UPDATE_LOG");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_blob(res, 4, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter for SQL_INJECT_REMOVED_UPDATE_DETAIL");
+        goto failed;
+    }
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE)) {
+        error_report("HEALTH [N/A]: Failed to execute SQL_INJECT_REMOVED_UPDATE_DETAIL, rc = %d", rc);
         goto failed;
     }
 
@@ -630,7 +664,7 @@ failed:
         error_report("HEALTH [N/A]: Failed to finalize the prepared statement for injecting removed event.");
 }
 
-#define SQL_SELECT_MAX_UNIQUE_ID "SELECT MAX(unique_id) from health_log where host_id = @host_id;"
+#define SQL_SELECT_MAX_UNIQUE_ID "SELECT MAX(hld.unique_id) from health_log_detail hld, health_log hl where hl.host_id = @host_id; and hl.health_log_id = hld.health_log_id"
 uint32_t sql_get_max_unique_id (RRDHOST *host)
 {
     int rc;
@@ -662,12 +696,13 @@ uint32_t sql_get_max_unique_id (RRDHOST *host)
      return max_unique_id;
 }
 
-#define SQL_SELECT_LAST_STATUSES "SELECT hld.new_status, hld.unique_id, hld.alarm_id, hld.alarm_event_id from health_log hl, health_log_detail hld where hl.host_id = @host_id  and hl.last_transition_id = hld.transition_id;"
+#define SQL_SELECT_LAST_STATUSES "SELECT hld.new_status, hld.unique_id, hld.alarm_id, hld.alarm_event_id, hld.transition_id from health_log hl, health_log_detail hld where hl.host_id = @host_id and hl.last_transition_id = hld.transition_id;"
 void sql_check_removed_alerts_state(RRDHOST *host)
 {
     int rc;
     uint32_t max_unique_id = 0;
     sqlite3_stmt *res = NULL;
+    uuid_t transition_id;
 
     rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_LAST_STATUSES, -1, &res, 0);
     if (rc != SQLITE_OK) {
@@ -690,10 +725,11 @@ void sql_check_removed_alerts_state(RRDHOST *host)
         unique_id = (uint32_t) sqlite3_column_int64(res, 1);
         alarm_id = (uint32_t) sqlite3_column_int64(res, 2);
         alarm_event_id = (uint32_t) sqlite3_column_int64(res, 3);
+        uuid_copy(transition_id, *((uuid_t *) sqlite3_column_blob(res, 4)));
         if (unlikely(status != RRDCALC_STATUS_REMOVED)) {
             if (unlikely(!max_unique_id))
                 max_unique_id = sql_get_max_unique_id (host);
-            sql_inject_removed_status (host, alarm_id, alarm_event_id, unique_id, ++max_unique_id);
+            sql_inject_removed_status (host, alarm_id, alarm_event_id, unique_id, ++max_unique_id, &transition_id);
         }
     }
 
@@ -1412,6 +1448,7 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
     buffer_free(command);
 }
 
+//MUST MAKE SURE THERE IS A TRANSACTION_ID FOR ALL
 #define SQL_COPY_HEALTH_LOG(table) "INSERT INTO health_log (host_id, unique_id, alarm_id, alarm_event_id, " \
     "config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, " \
     "exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, " \
