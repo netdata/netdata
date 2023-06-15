@@ -4,7 +4,38 @@
 #include "ebpf_functions.h"
 
 /*****************************************************************
- *  EBPF ERROR FUNCTION
+ *  EBPF HELP FUNCTIONS
+ *****************************************************************/
+
+static void ebpf_function_enable_help(const char *transaction) {
+    pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600);
+    fprintf(stdout, "%s",
+            "ebpf.plugin / enable\n"
+            "\n"
+            "Function `enable` allows user to control eBPF threads.\n"
+            "\n"
+            "The following filters are supported:\n"
+            "\n"
+            "   thread:NAME\n"
+            "      Shows information for the thread NAME. Names are listed inside `ebpf.d.conf`.\n"
+            "\n"
+            "   enable:NAME\n"
+            "      Enable a specific thread to run a specific period of time `NAME`.\n"
+            "\n"
+            "   interval:SECONDS\n"
+            "      Sets thread to run for a specific period of time, default 600 seconds.\n"
+            "\n"
+            "   disable:NAME\n"
+            "      Disable a sp.\n"
+            "\n"
+            "Filters can be combined. Each filter can be given only one time.\n"
+            );
+    pluginsd_function_result_end_to_stdout();
+}
+
+
+/*****************************************************************
+ *  EBPF ERROR FUNCTIONS
  *****************************************************************/
 
 /**
@@ -46,6 +77,18 @@ static void ebpf_function_enable(const char *transaction,
                                  int line_max __maybe_unused,
                                  int timeout __maybe_unused)
 {
+    char *words[PLUGINSD_MAX_WORDS] = { NULL };
+    size_t num_words = pluginsd_split_words(function, words, PLUGINSD_MAX_WORDS);
+    for(int i = 1; i < PLUGINSD_MAX_WORDS ;i++) {
+        const char *keyword = get_word(words, num_words, i);
+        if (!keyword)
+            break;
+
+        if(strcmp(keyword, "help") == 0) {
+            ebpf_function_enable_help(transaction);
+            return;
+        }
+    }
 }
 
 
