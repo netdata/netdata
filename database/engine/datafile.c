@@ -27,9 +27,9 @@ static struct rrdengine_datafile *datafile_alloc_and_init(struct rrdengine_insta
 
     datafile->users.available = true;
 
-    netdata_spinlock_init(&datafile->users.spinlock);
-    netdata_spinlock_init(&datafile->writers.spinlock);
-    netdata_spinlock_init(&datafile->extent_queries.spinlock);
+    spinlock_init(&datafile->users.spinlock);
+    spinlock_init(&datafile->writers.spinlock);
+    spinlock_init(&datafile->extent_queries.spinlock);
 
     return datafile;
 }
@@ -37,7 +37,7 @@ static struct rrdengine_datafile *datafile_alloc_and_init(struct rrdengine_insta
 bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason) {
     bool ret;
 
-    netdata_spinlock_lock(&df->users.spinlock);
+    spinlock_lock(&df->users.spinlock);
 
     if(df->users.available) {
         ret = true;
@@ -47,25 +47,25 @@ bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS re
     else
         ret = false;
 
-    netdata_spinlock_unlock(&df->users.spinlock);
+    spinlock_unlock(&df->users.spinlock);
 
     return ret;
 }
 
 void datafile_release(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason) {
-    netdata_spinlock_lock(&df->users.spinlock);
+    spinlock_lock(&df->users.spinlock);
     if(!df->users.lockers)
         fatal("DBENGINE DATAFILE: cannot release a datafile that is not acquired");
 
     df->users.lockers--;
     df->users.lockers_by_reason[reason]--;
-    netdata_spinlock_unlock(&df->users.spinlock);
+    spinlock_unlock(&df->users.spinlock);
 }
 
 bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
     bool can_be_deleted = false;
 
-    netdata_spinlock_lock(&df->users.spinlock);
+    spinlock_lock(&df->users.spinlock);
     df->users.available = false;
 
     if(!df->users.lockers)
@@ -75,9 +75,9 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
         // there are lockers
 
         // evict any pages referencing this in the open cache
-        netdata_spinlock_unlock(&df->users.spinlock);
+        spinlock_unlock(&df->users.spinlock);
         pgc_open_evict_clean_pages_of_datafile(open_cache, df);
-        netdata_spinlock_lock(&df->users.spinlock);
+        spinlock_lock(&df->users.spinlock);
 
         if(!df->users.lockers)
             can_be_deleted = true;
@@ -86,12 +86,12 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
             // there are lockers still
 
             // count the number of pages referencing this in the open cache
-            netdata_spinlock_unlock(&df->users.spinlock);
+            spinlock_unlock(&df->users.spinlock);
             usec_t time_to_scan_ut = now_monotonic_usec();
             size_t clean_pages_in_open_cache = pgc_count_clean_pages_having_data_ptr(open_cache, (Word_t)df->ctx, df);
             size_t hot_pages_in_open_cache = pgc_count_hot_pages_having_data_ptr(open_cache, (Word_t)df->ctx, df);
             time_to_scan_ut = now_monotonic_usec() - time_to_scan_ut;
-            netdata_spinlock_lock(&df->users.spinlock);
+            spinlock_lock(&df->users.spinlock);
 
             if(!df->users.lockers)
                 can_be_deleted = true;
@@ -149,7 +149,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
                                time_to_scan_ut);
         }
     }
-    netdata_spinlock_unlock(&df->users.spinlock);
+    spinlock_unlock(&df->users.spinlock);
 
     return can_be_deleted;
 }
@@ -569,11 +569,11 @@ void finalize_data_files(struct rrdengine_instance *ctx)
         bool available = false;
         do {
             uv_rwlock_wrlock(&ctx->datafiles.rwlock);
-            netdata_spinlock_lock(&datafile->writers.spinlock);
+            spinlock_lock(&datafile->writers.spinlock);
             available = (datafile->writers.running || datafile->writers.flushed_to_open_running) ? false : true;
 
             if(!available) {
-                netdata_spinlock_unlock(&datafile->writers.spinlock);
+                spinlock_unlock(&datafile->writers.spinlock);
                 uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
                 if(!logged) {
                     info("Waiting for writers to data file %u of tier %d to finish...", datafile->fileno, ctx->config.tier);
@@ -586,7 +586,7 @@ void finalize_data_files(struct rrdengine_instance *ctx)
         journalfile_close(journalfile, datafile);
         close_data_file(datafile);
         datafile_list_delete_unsafe(ctx, datafile);
-        netdata_spinlock_unlock(&datafile->writers.spinlock);
+        spinlock_unlock(&datafile->writers.spinlock);
         uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
 
         freez(journalfile);

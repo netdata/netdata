@@ -278,11 +278,11 @@ int __netdata_rwlock_trywrlock(netdata_rwlock_t *rwlock) {
 // spinlock implementation
 // https://www.youtube.com/watch?v=rmGJc9PXpuE&t=41s
 
-void netdata_spinlock_init(SPINLOCK *spinlock) {
+void spinlock_init(SPINLOCK *spinlock) {
     memset(spinlock, 0, sizeof(SPINLOCK));
 }
 
-void netdata_spinlock_lock(SPINLOCK *spinlock) {
+void spinlock_lock(SPINLOCK *spinlock) {
     static const struct timespec ns = { .tv_sec = 0, .tv_nsec = 1 };
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -314,7 +314,7 @@ void netdata_spinlock_lock(SPINLOCK *spinlock) {
 #endif
 }
 
-void netdata_spinlock_unlock(SPINLOCK *spinlock) {
+void spinlock_unlock(SPINLOCK *spinlock) {
 #ifdef NETDATA_INTERNAL_CHECKS
     spinlock->locker_pid = 0;
 #endif
@@ -322,7 +322,7 @@ void netdata_spinlock_unlock(SPINLOCK *spinlock) {
     netdata_thread_enable_cancelability();
 }
 
-bool netdata_spinlock_trylock(SPINLOCK *spinlock) {
+bool spinlock_trylock(SPINLOCK *spinlock) {
     netdata_thread_disable_cancelability();
 
     if(!__atomic_load_n(&spinlock->locked, __ATOMIC_RELAXED) &&
@@ -332,6 +332,35 @@ bool netdata_spinlock_trylock(SPINLOCK *spinlock) {
 
     // we didn't get the lock
     return false;
+}
+
+void rw_spinlock_init(RW_SPINLOCK *rw_spinlock) {
+    rw_spinlock->readers = 0;
+    spinlock_init(&rw_spinlock->spinlock);
+}
+
+void rw_spinlock_read_lock(RW_SPINLOCK *rw_spinlock) {
+    spinlock_lock(&rw_spinlock->spinlock);
+    __atomic_add_fetch(&rw_spinlock->readers, 1, __ATOMIC_RELAXED);
+    spinlock_unlock(&rw_spinlock->spinlock);
+}
+
+void rw_spinlock_read_unlock(RW_SPINLOCK *rw_spinlock) {
+    __atomic_sub_fetch(&rw_spinlock->readers, 1, __ATOMIC_RELAXED);
+}
+
+void rw_spinlock_write_lock(RW_SPINLOCK *rw_spinlock) {
+    static const struct timespec ns = { .tv_sec = 0, .tv_nsec = 1 };
+
+    spinlock_lock(&rw_spinlock->spinlock);
+    while (__atomic_load_n(&rw_spinlock->readers, __ATOMIC_RELAXED) > 0) {
+        // Busy wait until all readers have released their locks.
+        nanosleep(&ns, NULL);
+    }
+}
+
+void rw_spinlock_write_unlock(RW_SPINLOCK *rw_spinlock) {
+    spinlock_unlock(&rw_spinlock->spinlock);
 }
 
 #ifdef NETDATA_TRACE_RWLOCKS

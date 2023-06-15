@@ -59,7 +59,7 @@ static struct {
 void julyl_cleanup1(void) {
     struct JulyL *item = NULL;
 
-    if(!netdata_spinlock_trylock(&julyl_globals.protected.spinlock))
+    if(!spinlock_trylock(&julyl_globals.protected.spinlock))
         return;
 
     if(julyl_globals.protected.available_items && julyl_globals.protected.available > 10) {
@@ -68,7 +68,7 @@ void julyl_cleanup1(void) {
         julyl_globals.protected.available--;
     }
 
-    netdata_spinlock_unlock(&julyl_globals.protected.spinlock);
+    spinlock_unlock(&julyl_globals.protected.spinlock);
 
     if(item) {
         size_t bytes = item->bytes;
@@ -81,7 +81,7 @@ void julyl_cleanup1(void) {
 struct JulyL *julyl_get(void) {
     struct JulyL *j;
 
-    netdata_spinlock_lock(&julyl_globals.protected.spinlock);
+    spinlock_lock(&julyl_globals.protected.spinlock);
 
     j = julyl_globals.protected.available_items;
     if(likely(j)) {
@@ -89,7 +89,7 @@ struct JulyL *julyl_get(void) {
         julyl_globals.protected.available--;
     }
 
-    netdata_spinlock_unlock(&julyl_globals.protected.spinlock);
+    spinlock_unlock(&julyl_globals.protected.spinlock);
 
     if(unlikely(!j)) {
         size_t bytes = sizeof(struct JulyL) + JULYL_MIN_ENTRIES * sizeof(struct JulyL_item);
@@ -113,10 +113,10 @@ static void julyl_release(struct JulyL *j) {
     __atomic_add_fetch(&julyl_globals.atomics.bytes_moved, j->bytes_moved, __ATOMIC_RELAXED);
     __atomic_add_fetch(&julyl_globals.atomics.reallocs, j->reallocs, __ATOMIC_RELAXED);
 
-    netdata_spinlock_lock(&julyl_globals.protected.spinlock);
+    spinlock_lock(&julyl_globals.protected.spinlock);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(julyl_globals.protected.available_items, j, cache.prev, cache.next);
     julyl_globals.protected.available++;
-    netdata_spinlock_unlock(&julyl_globals.protected.spinlock);
+    spinlock_unlock(&julyl_globals.protected.spinlock);
 }
 
 size_t julyl_cache_size(void) {

@@ -58,7 +58,7 @@ void web_client_cache_destroy(void) {
 
     struct web_client *w, *t;
 
-    netdata_spinlock_lock(&web_clients_cache.avail.spinlock);
+    spinlock_lock(&web_clients_cache.avail.spinlock);
     w = web_clients_cache.avail.head;
     while(w) {
         t = w;
@@ -67,10 +67,10 @@ void web_client_cache_destroy(void) {
     }
     web_clients_cache.avail.head = NULL;
     web_clients_cache.avail.count = 0;
-    netdata_spinlock_unlock(&web_clients_cache.avail.spinlock);
+    spinlock_unlock(&web_clients_cache.avail.spinlock);
 
 // DO NOT FREE THEM IF THEY ARE USED
-//    netdata_spinlock_lock(&web_clients_cache.used.spinlock);
+//    spinlock_lock(&web_clients_cache.used.spinlock);
 //    w = web_clients_cache.used.head;
 //    while(w) {
 //        t = w;
@@ -81,37 +81,37 @@ void web_client_cache_destroy(void) {
 //    web_clients_cache.used.count = 0;
 //    web_clients_cache.used.reused = 0;
 //    web_clients_cache.used.allocated = 0;
-//    netdata_spinlock_unlock(&web_clients_cache.used.spinlock);
+//    spinlock_unlock(&web_clients_cache.used.spinlock);
 }
 
 struct web_client *web_client_get_from_cache(void) {
-    netdata_spinlock_lock(&web_clients_cache.avail.spinlock);
+    spinlock_lock(&web_clients_cache.avail.spinlock);
     struct web_client *w = web_clients_cache.avail.head;
     if(w) {
         // get it from avail
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(web_clients_cache.avail.head, w, cache.prev, cache.next);
         web_clients_cache.avail.count--;
-        netdata_spinlock_unlock(&web_clients_cache.avail.spinlock);
+        spinlock_unlock(&web_clients_cache.avail.spinlock);
 
         web_client_zero(w);
 
-        netdata_spinlock_lock(&web_clients_cache.used.spinlock);
+        spinlock_lock(&web_clients_cache.used.spinlock);
         web_clients_cache.used.reused++;
     }
     else {
-        netdata_spinlock_unlock(&web_clients_cache.avail.spinlock);
+        spinlock_unlock(&web_clients_cache.avail.spinlock);
 
         // allocate it
         w = web_client_create(&netdata_buffers_statistics.buffers_web);
 
-        netdata_spinlock_lock(&web_clients_cache.used.spinlock);
+        spinlock_lock(&web_clients_cache.used.spinlock);
         web_clients_cache.used.allocated++;
     }
 
     // link it to used web clients
     DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(web_clients_cache.used.head, w, cache.prev, cache.next);
     web_clients_cache.used.count++;
-    netdata_spinlock_unlock(&web_clients_cache.used.spinlock);
+    spinlock_unlock(&web_clients_cache.used.spinlock);
 
     // initialize it
     w->use_count++;
@@ -128,14 +128,14 @@ void web_client_release_to_cache(struct web_client *w) {
 #endif
 
     // unlink it from the used
-    netdata_spinlock_lock(&web_clients_cache.used.spinlock);
+    spinlock_lock(&web_clients_cache.used.spinlock);
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(web_clients_cache.used.head, w, cache.prev, cache.next);
     ssize_t used_count = (ssize_t)--web_clients_cache.used.count;
-    netdata_spinlock_unlock(&web_clients_cache.used.spinlock);
+    spinlock_unlock(&web_clients_cache.used.spinlock);
 
-    netdata_spinlock_lock(&web_clients_cache.avail.spinlock);
+    spinlock_lock(&web_clients_cache.avail.spinlock);
     if(w->use_count > 100 || (used_count > 0 && web_clients_cache.avail.count >= 2 * (size_t)used_count) || (used_count <= 10 && web_clients_cache.avail.count >= 20)) {
-        netdata_spinlock_unlock(&web_clients_cache.avail.spinlock);
+        spinlock_unlock(&web_clients_cache.avail.spinlock);
 
         // we have too many of them - free it
         web_client_free(w);
@@ -144,6 +144,6 @@ void web_client_release_to_cache(struct web_client *w) {
         // link it to the avail
         DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(web_clients_cache.avail.head, w, cache.prev, cache.next);
         web_clients_cache.avail.count++;
-        netdata_spinlock_unlock(&web_clients_cache.avail.spinlock);
+        spinlock_unlock(&web_clients_cache.avail.spinlock);
     }
 }

@@ -822,7 +822,7 @@ void pg_cache_preload(struct rrdeng_query_handle *handle) {
     handle->pdc->optimal_end_time_s = handle->end_time_s;
     handle->pdc->ctx = handle->ctx;
     handle->pdc->refcount = 1;
-    netdata_spinlock_init(&handle->pdc->refcount_spinlock);
+    spinlock_init(&handle->pdc->refcount_spinlock);
     completion_init(&handle->pdc->prep_completion);
     completion_init(&handle->pdc->page_completion);
 

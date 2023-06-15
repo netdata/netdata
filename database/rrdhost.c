@@ -593,7 +593,7 @@ static void rrdhost_update(RRDHOST *host
 {
     UNUSED(guid);
 
-    netdata_spinlock_lock(&host->rrdhost_update_lock);
+    spinlock_lock(&host->rrdhost_update_lock);
 
     host->health.health_enabled = (mode == RRD_MEMORY_MODE_NONE) ? 0 : health_enabled;
 
@@ -687,7 +687,7 @@ static void rrdhost_update(RRDHOST *host
         info("Host %s is not in archived mode anymore", rrdhost_hostname(host));
     }
 
-    netdata_spinlock_unlock(&host->rrdhost_update_lock);
+    spinlock_unlock(&host->rrdhost_update_lock);
 }
 
 RRDHOST *rrdhost_find_or_create(

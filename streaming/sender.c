@@ -1299,10 +1299,10 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
 void rrdpush_initialize_ssl_ctx(RRDHOST *host) {
 #ifdef ENABLE_HTTPS
     static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
-    netdata_spinlock_lock(&sp);
+    spinlock_lock(&sp);
 
     if(netdata_ssl_streaming_sender_ctx || !host) {
-        netdata_spinlock_unlock(&sp);
+        spinlock_unlock(&sp);
         return;
     }
 
@@ -1318,7 +1318,7 @@ void rrdpush_initialize_ssl_ctx(RRDHOST *host) {
         }
     }
 
-    netdata_spinlock_unlock(&sp);
+    spinlock_unlock(&sp);
 #endif
 }
 

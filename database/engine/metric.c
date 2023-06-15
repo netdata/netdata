@@ -123,7 +123,7 @@ static inline REFCOUNT metric_acquire(MRG *mrg __maybe_unused, METRIC *metric, b
     REFCOUNT refcount;
 
     if(!having_spinlock)
-        netdata_spinlock_lock(&metric->spinlock);
+        spinlock_lock(&metric->spinlock);
 
     if(unlikely(metric->refcount < 0))
         fatal("METRIC: refcount is %d (negative) during acquire", metric->refcount);
@@ -134,7 +134,7 @@ static inline REFCOUNT metric_acquire(MRG *mrg __maybe_unused, METRIC *metric, b
     metric_has_retention_unsafe(mrg, metric);
 
     if(!having_spinlock)
-        netdata_spinlock_unlock(&metric->spinlock);
+        spinlock_unlock(&metric->spinlock);
 
     if(refcount == 1)
         __atomic_add_fetch(&mrg->stats.entries_referenced, 1, __ATOMIC_RELAXED);
@@ -148,7 +148,7 @@ static inline bool metric_release_and_can_be_deleted(MRG *mrg __maybe_unused, ME
     bool ret = true;
     REFCOUNT refcount;
 
-    netdata_spinlock_lock(&metric->spinlock);
+    spinlock_lock(&metric->spinlock);
 
     if(unlikely(metric->refcount <= 0))
         fatal("METRIC: refcount is %d (zero or negative) during release", metric->refcount);
@@ -158,7 +158,7 @@ static inline bool metric_release_and_can_be_deleted(MRG *mrg __maybe_unused, ME
     if(likely(metric_has_retention_unsafe(mrg, metric) || refcount != 0))
         ret = false;
 
-    netdata_spinlock_unlock(&metric->spinlock);
+    spinlock_unlock(&metric->spinlock);
 
     if(unlikely(!refcount))
         __atomic_sub_fetch(&mrg->stats.entries_referenced, 1, __ATOMIC_RELAXED);
@@ -217,7 +217,7 @@ static METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
     metric->writer = 0;
     metric->refcount = 0;
     metric->flags = 0;
-    netdata_spinlock_init(&metric->spinlock);
+    spinlock_init(&metric->spinlock);
     metric_acquire(mrg, metric, true); // no spinlock use required here
     *PValue = metric;
 
@@ -393,10 +393,10 @@ bool mrg_metric_set_first_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t
     if(unlikely(first_time_s < 0))
         return false;
 
-    netdata_spinlock_lock(&metric->spinlock);
+    spinlock_lock(&metric->spinlock);
     metric->first_time_s = first_time_s;
     metric_has_retention_unsafe(mrg, metric);
-    netdata_spinlock_unlock(&metric->spinlock);
+    spinlock_unlock(&metric->spinlock);
 
     return true;
 }
@@ -421,7 +421,7 @@ void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t
     if(unlikely(!first_time_s && !last_time_s && !update_every_s))
         return;
 
-    netdata_spinlock_lock(&metric->spinlock);
+    spinlock_lock(&metric->spinlock);
 
     if(unlikely(first_time_s && (!metric->first_time_s || first_time_s < metric->first_time_s)))
         metric->first_time_s = first_time_s;
@@ -436,7 +436,7 @@ void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t
         metric->latest_update_every_s = (uint32_t) update_every_s;
 
     metric_has_retention_unsafe(mrg, metric);
-    netdata_spinlock_unlock(&metric->spinlock);
+    spinlock_unlock(&metric->spinlock);
 }
 
 bool mrg_metric_set_first_time_s_if_bigger(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s) {
@@ -444,13 +444,13 @@ bool mrg_metric_set_first_time_s_if_bigger(MRG *mrg __maybe_unused, METRIC *metr
 
     bool ret = false;
 
-    netdata_spinlock_lock(&metric->spinlock);
+    spinlock_lock(&metric->spinlock);
     if(first_time_s > metric->first_time_s) {
         metric->first_time_s = first_time_s;
         ret = true;
     }
     metric_has_retention_unsafe(mrg, metric);
-    netdata_spinlock_unlock(&metric->spinlock);
+    spinlock_unlock(&metric->spinlock);
 
     return ret;
 }
@@ -458,7 +458,7 @@ bool mrg_metric_set_first_time_s_if_bigger(MRG *mrg __maybe_unused, METRIC *metr
 time_t mrg_metric_get_first_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
     time_t first_time_s;
 
-    netdata_spinlock_lock(&metric->spinlock);
+    spinlock_lock(&metric->spinlock);
 
     if(unlikely(!metric->first_time_s)) {
         if(metric->latest_time_s_clean)
@@ -470,13 +470,13 @@ time_t mrg_metric_get_first_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
 
     first_time_s = metric->first_time_s;
 
-    netdata_spinlock_unlock(&metric->spinlock);
+    spinlock_unlock(&metric->spinlock);
 
     return first_time_s;
 }
 
 void mrg_metric_get_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t *first_time_s, time_t *last_time_s, time_t *update_every_s) {
-    netdata_spinlock_lock(&metric->spinlock);
+    spinlock_lock(&metric->spinlock);
 
     if(unlikely(!metric->first_time_s)) {
         if(metric->latest_time_s_clean)
@@ -490,7 +490,7 @@ void mrg_metric_get_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t *f
     *last_time_s = MAX(metric->latest_time_s_clean, metric->latest_time_s_hot);
     *update_every_s = metric->latest_update_every_s;
 
-    netdata_spinlock_unlock(&metric->spinlock);
+    spinlock_unlock(&metric->spinlock);
 }
 
 bool mrg_metric_set_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s) {
@@ -499,7 +499,7 @@ bool mrg_metric_set_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric,
     if(unlikely(latest_time_s < 0))
         return false;
 
-    netdata_spinlock_lock(&metric->spinlock);
+    spinlock_lock(&metric->spinlock);
 
 //    internal_fatal(latest_time_s > max_acceptable_collected_time(),
 //                   "DBENGINE METRIC: metric latest time is in the future");
@@ -513,7 +513,7 @@ bool mrg_metric_set_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric,
         metric->first_time_s = latest_time_s;
 
     metric_has_retention_unsafe(mrg, metric);
-    netdata_spinlock_unlock(&metric->spinlock);
+    spinlock_unlock(&metric->spinlock);
     return true;
 }
 
@@ -551,7 +551,7 @@ bool mrg_metric_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric) {
         if (min_first_time_s == LONG_MAX)
             min_first_time_s = 0;
 
-        netdata_spinlock_lock(&metric->spinlock);
+        spinlock_lock(&metric->spinlock);
         if (--countdown && !min_first_time_s && metric->latest_time_s_hot)
             do_again = true;
         else {
@@ -563,7 +563,7 @@ bool mrg_metric_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric) {
 
             ret = metric_has_retention_unsafe(mrg, metric);
         }
-        netdata_spinlock_unlock(&metric->spinlock);
+        spinlock_unlock(&metric->spinlock);
     } while(do_again);
 
     return ret;
@@ -578,22 +578,22 @@ bool mrg_metric_set_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, t
     if(unlikely(latest_time_s < 0))
         return false;
 
-    netdata_spinlock_lock(&metric->spinlock);
+    spinlock_lock(&metric->spinlock);
     metric->latest_time_s_hot = latest_time_s;
 
     if(unlikely(!metric->first_time_s))
         metric->first_time_s = latest_time_s;
 
     metric_has_retention_unsafe(mrg, metric);
-    netdata_spinlock_unlock(&metric->spinlock);
+    spinlock_unlock(&metric->spinlock);
     return true;
 }
 
 time_t mrg_metric_get_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
     time_t max;
-    netdata_spinlock_lock(&metric->spinlock);
+    spinlock_lock(&metric->spinlock);
     max = MAX(metric->latest_time_s_clean, metric->latest_time_s_hot);
-    netdata_spinlock_unlock(&metric->spinlock);
+    spinlock_unlock(&metric->spinlock);
     return max;
 }
 
@@ -603,9 +603,9 @@ bool mrg_metric_set_update_every(MRG *mrg __maybe_unused, METRIC *metric, time_t
     if(update_every_s <= 0)
         return false;
 
-    netdata_spinlock_lock(&metric->spinlock);
+    spinlock_lock(&metric->spinlock);
     metric->latest_update_every_s = (uint32_t) update_every_s;
-    netdata_spinlock_unlock(&metric->spinlock);
+    spinlock_unlock(&metric->spinlock);
 
     return true;
 }
@@ -616,10 +616,10 @@ bool mrg_metric_set_update_every_s_if_zero(MRG *mrg __maybe_unused, METRIC *metr
     if(update_every_s <= 0)
         return false;
 
-    netdata_spinlock_lock(&metric->spinlock);
+    spinlock_lock(&metric->spinlock);
     if(!metric->latest_update_every_s)
         metric->latest_update_every_s = (uint32_t) update_every_s;
-    netdata_spinlock_unlock(&metric->spinlock);
+    spinlock_unlock(&metric->spinlock);
 
     return true;
 }
@@ -627,16 +627,16 @@ bool mrg_metric_set_update_every_s_if_zero(MRG *mrg __maybe_unused, METRIC *metr
 time_t mrg_metric_get_update_every_s(MRG *mrg __maybe_unused, METRIC *metric) {
     time_t update_every_s;
 
-    netdata_spinlock_lock(&metric->spinlock);
+    spinlock_lock(&metric->spinlock);
     update_every_s = metric->latest_update_every_s;
-    netdata_spinlock_unlock(&metric->spinlock);
+    spinlock_unlock(&metric->spinlock);
 
     return update_every_s;
 }
 
 bool mrg_metric_set_writer(MRG *mrg, METRIC *metric) {
     bool done = false;
-    netdata_spinlock_lock(&metric->spinlock);
+    spinlock_lock(&metric->spinlock);
     if(!metric->writer) {
         metric->writer = gettid();
         __atomic_add_fetch(&mrg->stats.writers, 1, __ATOMIC_RELAXED);
@@ -644,19 +644,19 @@ bool mrg_metric_set_writer(MRG *mrg, METRIC *metric) {
     }
     else
         __atomic_add_fetch(&mrg->stats.writers_conflicts, 1, __ATOMIC_RELAXED);
-    netdata_spinlock_unlock(&metric->spinlock);
+    spinlock_unlock(&metric->spinlock);
     return done;
 }
 
 bool mrg_metric_clear_writer(MRG *mrg, METRIC *metric) {
     bool done = false;
-    netdata_spinlock_lock(&metric->spinlock);
+    spinlock_lock(&metric->spinlock);
     if(metric->writer) {
         metric->writer = 0;
         __atomic_sub_fetch(&mrg->stats.writers, 1, __ATOMIC_RELAXED);
         done = true;
     }
-    netdata_spinlock_unlock(&metric->spinlock);
+    spinlock_unlock(&metric->spinlock);
     return done;
 }
 

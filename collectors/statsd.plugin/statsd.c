@@ -1072,9 +1072,9 @@ static int statsd_snd_callback(POLLINFO *pi, short int *events) {
 
 void statsd_collector_thread_cleanup(void *data) {
     struct statsd_udp *d = data;
-    netdata_spinlock_lock(&d->status->spinlock);
+    spinlock_lock(&d->status->spinlock);
     d->status->running = false;
-    netdata_spinlock_unlock(&d->status->spinlock);
+    spinlock_unlock(&d->status->spinlock);
 
     collector_info("cleaning up...");
 
@@ -1097,9 +1097,9 @@ static bool statsd_should_stop(void) {
 
 void *statsd_collector_thread(void *ptr) {
     struct collection_thread_status *status = ptr;
-    netdata_spinlock_lock(&status->spinlock);
+    spinlock_lock(&status->spinlock);
     status->running = true;
-    netdata_spinlock_unlock(&status->spinlock);
+    spinlock_unlock(&status->spinlock);
 
     worker_register("STATSD");
     worker_register_job_name(WORKER_JOB_TYPE_TCP_CONNECTED, "tcp connect");
@@ -2347,7 +2347,7 @@ static void statsd_main_cleanup(void *data) {
     if (statsd.collection_threads_status) {
         int i;
         for (i = 0; i < statsd.threads; i++) {
-            netdata_spinlock_lock(&statsd.collection_threads_status[i].spinlock);
+            spinlock_lock(&statsd.collection_threads_status[i].spinlock);
             if(statsd.collection_threads_status[i].running) {
                 collector_info("STATSD: stopping data collection thread %d...", i + 1);
                 netdata_thread_cancel(statsd.collection_threads_status[i].thread);
@@ -2355,7 +2355,7 @@ static void statsd_main_cleanup(void *data) {
             else {
                 collector_info("STATSD: data collection thread %d found stopped.", i + 1);
             }
-            netdata_spinlock_unlock(&statsd.collection_threads_status[i].spinlock);
+            spinlock_unlock(&statsd.collection_threads_status[i].spinlock);
         }
     }
 
@@ -2529,7 +2529,7 @@ void *statsd_main(void *ptr) {
         statsd.collection_threads_status[i].max_sockets = max_sockets / statsd.threads;
         char tag[NETDATA_THREAD_TAG_MAX + 1];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STATSD_IN[%d]", i + 1);
-        netdata_spinlock_init(&statsd.collection_threads_status[i].spinlock);
+        spinlock_init(&statsd.collection_threads_status[i].spinlock);
         netdata_thread_create(&statsd.collection_threads_status[i].thread, tag, NETDATA_THREAD_OPTION_DEFAULT, statsd_collector_thread, &statsd.collection_threads_status[i]);
     }
 

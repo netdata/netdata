@@ -238,27 +238,27 @@ static inline void pgc_index_write_unlock(PGC *cache, size_t partition) {
 }
 
 static inline bool pgc_ll_trylock(PGC *cache __maybe_unused, struct pgc_linked_list *ll) {
-    return netdata_spinlock_trylock(&ll->spinlock);
+    return spinlock_trylock(&ll->spinlock);
 }
 
 static inline void pgc_ll_lock(PGC *cache __maybe_unused, struct pgc_linked_list *ll) {
-    netdata_spinlock_lock(&ll->spinlock);
+    spinlock_lock(&ll->spinlock);
 }
 
 static inline void pgc_ll_unlock(PGC *cache __maybe_unused, struct pgc_linked_list *ll) {
-    netdata_spinlock_unlock(&ll->spinlock);
+    spinlock_unlock(&ll->spinlock);
 }
 
 static inline bool page_transition_trylock(PGC *cache __maybe_unused, PGC_PAGE *page) {
-    return netdata_spinlock_trylock(&page->transition_spinlock);
+    return spinlock_trylock(&page->transition_spinlock);
 }
 
 static inline void page_transition_lock(PGC *cache __maybe_unused, PGC_PAGE *page) {
-    netdata_spinlock_lock(&page->transition_spinlock);
+    spinlock_lock(&page->transition_spinlock);
 }
 
 static inline void page_transition_unlock(PGC *cache __maybe_unused, PGC_PAGE *page) {
-    netdata_spinlock_unlock(&page->transition_spinlock);
+    spinlock_unlock(&page->transition_spinlock);
 }
 
 // ----------------------------------------------------------------------------
@@ -267,9 +267,9 @@ static inline void page_transition_unlock(PGC *cache __maybe_unused, PGC_PAGE *p
 static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
 
     if(size_to_evict)
-        netdata_spinlock_lock(&cache->usage.spinlock);
+        spinlock_lock(&cache->usage.spinlock);
 
-    else if(!netdata_spinlock_trylock(&cache->usage.spinlock))
+    else if(!spinlock_trylock(&cache->usage.spinlock))
         return __atomic_load_n(&cache->usage.per1000, __ATOMIC_RELAXED);
 
     size_t current_cache_size;
@@ -319,7 +319,7 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
     __atomic_store_n(&cache->stats.wanted_cache_size, wanted_cache_size, __ATOMIC_RELAXED);
     __atomic_store_n(&cache->stats.current_cache_size, current_cache_size, __ATOMIC_RELAXED);
 
-    netdata_spinlock_unlock(&cache->usage.spinlock);
+    spinlock_unlock(&cache->usage.spinlock);
 
     if(size_to_evict) {
         size_t target = (size_t)((unsigned long long)wanted_cache_size * (unsigned long long)cache->config.evict_low_threshold_per1000 / 1000ULL);
@@ -422,7 +422,7 @@ static void pgc_section_pages_static_aral_init(void) {
     static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
 
     if(unlikely(!pgc_section_pages_aral)) {
-        netdata_spinlock_lock(&spinlock);
+        spinlock_lock(&spinlock);
 
         // we have to check again
         if(!pgc_section_pages_aral)
@@ -433,7 +433,7 @@ static void pgc_section_pages_static_aral_init(void) {
                     65536, NULL,
                     NULL, NULL, false, false);
 
-        netdata_spinlock_unlock(&spinlock);
+        spinlock_unlock(&spinlock);
     }
 }
 
@@ -1255,7 +1255,7 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
             page->update_every_s = entry->update_every_s,
             page->data = entry->data;
             page->assumed_size = page_assumed_size(cache, entry->size);
-            netdata_spinlock_init(&page->transition_spinlock);
+            spinlock_init(&page->transition_spinlock);
             page->link.prev = NULL;
             page->link.next = NULL;
 
@@ -1781,9 +1781,9 @@ PGC *pgc_create(const char *name,
     for(size_t part = 0; part < cache->config.partitions ; part++)
         netdata_rwlock_init(&cache->index[part].rwlock);
 
-    netdata_spinlock_init(&cache->hot.spinlock);
-    netdata_spinlock_init(&cache->dirty.spinlock);
-    netdata_spinlock_init(&cache->clean.spinlock);
+    spinlock_init(&cache->hot.spinlock);
+    spinlock_init(&cache->dirty.spinlock);
+    spinlock_init(&cache->clean.spinlock);
 
     cache->hot.flags = PGC_PAGE_HOT;
     cache->hot.linked_list_in_sections_judy = true;
@@ -2091,7 +2091,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
     }
 
     struct section_pages *sp = *section_pages_pptr;
-    if(!netdata_spinlock_trylock(&sp->migration_to_v2_spinlock)) {
+    if(!spinlock_trylock(&sp->migration_to_v2_spinlock)) {
         info("DBENGINE: migration to journal v2 for datafile %u is postponed, another jv2 indexer is already running for this section", datafile_fileno);
         pgc_ll_unlock(cache, &cache->hot);
         return;
@@ -2205,7 +2205,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
         pgc_ll_lock(cache, &cache->hot);
     }
 
-    netdata_spinlock_unlock(&sp->migration_to_v2_spinlock);
+    spinlock_unlock(&sp->migration_to_v2_spinlock);
     pgc_ll_unlock(cache, &cache->hot);
 
     // callback

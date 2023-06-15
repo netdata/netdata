@@ -387,9 +387,9 @@ static void myClosedCallback(int id, void *user_ptr) {
     __atomic_store_n(&chan->open, false, __ATOMIC_RELAXED);
     internal_error(true, "WEBRTC[%d],DC[%d]: data channel closed.", chan->conn->pc, chan->dc);
 
-    netdata_spinlock_lock(&chan->conn->channels.spinlock);
+    spinlock_lock(&chan->conn->channels.spinlock);
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(chan->conn->channels.head, chan, link.prev, link.next);
-    netdata_spinlock_unlock(&chan->conn->channels.spinlock);
+    spinlock_unlock(&chan->conn->channels.spinlock);
 
     log_access("WEBRTC[%d],DC[%d]: %d DATA CHANNEL '%s' CLOSED", chan->conn->pc, chan->dc, gettid(), chan->label);
 
@@ -451,9 +451,9 @@ static void myDataChannelCallback(int pc, int dc, void *user_ptr) {
     chan->dc = dc;
     chan->conn = conn;
 
-    netdata_spinlock_lock(&conn->channels.spinlock);
+    spinlock_lock(&conn->channels.spinlock);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(conn->channels.head, chan, link.prev, link.next);
-    netdata_spinlock_unlock(&conn->channels.spinlock);
+    spinlock_unlock(&conn->channels.spinlock);
 
     rtcSetUserPointer(dc, chan);
 
@@ -486,9 +486,9 @@ static void myDataChannelCallback(int pc, int dc, void *user_ptr) {
 
 static inline void webrtc_destroy_connection_unsafe(WEBRTC_CONN *conn) {
     if(conn->state == RTC_CLOSED) {
-        netdata_spinlock_lock(&conn->channels.spinlock);
+        spinlock_lock(&conn->channels.spinlock);
         WEBRTC_DC *chan = conn->channels.head;
-        netdata_spinlock_unlock(&conn->channels.spinlock);
+        spinlock_unlock(&conn->channels.spinlock);
 
         if(!chan) {
             internal_error(true, "WEBRTC[%d]: destroying connection", conn->pc);
@@ -502,25 +502,25 @@ static inline void webrtc_destroy_connection_unsafe(WEBRTC_CONN *conn) {
 }
 
 static void cleanupConnections() {
-    netdata_spinlock_lock(&webrtc_base.unsafe.spinlock);
+    spinlock_lock(&webrtc_base.unsafe.spinlock);
     WEBRTC_CONN *conn = webrtc_base.unsafe.head;
     while(conn) {
         WEBRTC_CONN *conn_next = conn->link.next;
         webrtc_destroy_connection_unsafe(conn);
         conn = conn_next;
     }
-    netdata_spinlock_unlock(&webrtc_base.unsafe.spinlock);
+    spinlock_unlock(&webrtc_base.unsafe.spinlock);
 }
 
 static WEBRTC_CONN *webrtc_create_connection(void) {
     WEBRTC_CONN *conn = callocz(1, sizeof(WEBRTC_CONN));
 
-    netdata_spinlock_init(&conn->response.spinlock);
-    netdata_spinlock_init(&conn->channels.spinlock);
+    spinlock_init(&conn->response.spinlock);
+    spinlock_init(&conn->channels.spinlock);
 
-    netdata_spinlock_lock(&webrtc_base.unsafe.spinlock);
+    spinlock_lock(&webrtc_base.unsafe.spinlock);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(webrtc_base.unsafe.head, conn, link.prev, link.next);
-    netdata_spinlock_unlock(&webrtc_base.unsafe.spinlock);
+    spinlock_unlock(&webrtc_base.unsafe.spinlock);
     return conn;
 }
 
@@ -531,13 +531,13 @@ static void myDescriptionCallback(int pc __maybe_unused, const char *sdp, const 
     internal_fatal(conn->pc != pc, "WEBRTC[%d]: pc mismatch, expected %d, got %d", conn->pc, conn->pc, pc);
 
     internal_error(true, "WEBRTC[%d]: local description type '%s': %s", conn->pc, type, sdp);
-    netdata_spinlock_lock(&conn->response.spinlock);
+    spinlock_lock(&conn->response.spinlock);
     if(!conn->response.candidates) {
         buffer_json_member_add_string(conn->response.wb, "sdp", sdp);
         buffer_json_member_add_string(conn->response.wb, "type", type);
         conn->response.sdp = true;
     }
-    netdata_spinlock_unlock(&conn->response.spinlock);
+    spinlock_unlock(&conn->response.spinlock);
 
     conn->local_max_message_size = find_max_message_size_in_sdp(sdp);
 }
@@ -548,7 +548,7 @@ static void myCandidateCallback(int pc __maybe_unused, const char *cand, const c
     WEBRTC_CONN *conn = user_ptr;
     internal_fatal(conn->pc != pc, "WEBRTC[%d]: pc mismatch, expected %d, got %d", conn->pc, conn->pc, pc);
 
-    netdata_spinlock_lock(&conn->response.spinlock);
+    spinlock_lock(&conn->response.spinlock);
     if(!conn->response.candidates) {
         buffer_json_member_add_array(conn->response.wb, "candidates");
         conn->response.candidates = true;
@@ -556,7 +556,7 @@ static void myCandidateCallback(int pc __maybe_unused, const char *cand, const c
 
     internal_error(true, "WEBRTC[%d]: local candidate '%s', mid '%s'", conn->pc, cand, mid);
     buffer_json_add_array_item_string(conn->response.wb, cand);
-    netdata_spinlock_unlock(&conn->response.spinlock);
+    spinlock_unlock(&conn->response.spinlock);
 }
 
 static void myStateChangeCallback(int pc __maybe_unused, rtcState state, void *user_ptr) {
@@ -595,9 +595,9 @@ static void myStateChangeCallback(int pc __maybe_unused, rtcState state, void *u
         case RTC_CLOSED:
             log_access("WEBRTC[%d]: %d CONNECTION CLOSED", conn->pc, gettid());
             internal_error(true, "WEBRTC[%d]: closed.", conn->pc);
-            netdata_spinlock_lock(&webrtc_base.unsafe.spinlock);
+            spinlock_lock(&webrtc_base.unsafe.spinlock);
             webrtc_destroy_connection_unsafe(conn);
-            netdata_spinlock_unlock(&webrtc_base.unsafe.spinlock);
+            spinlock_unlock(&webrtc_base.unsafe.spinlock);
             break;
     }
 }

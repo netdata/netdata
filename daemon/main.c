@@ -60,7 +60,7 @@ SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, request_quit_t
     SERVICE_THREAD *sth = NULL;
     pid_t tid = gettid();
 
-    netdata_spinlock_lock(&service_globals.lock);
+    spinlock_lock(&service_globals.lock);
     Pvoid_t *PValue = JudyLIns(&service_globals.pid_judy, tid, PJE0);
     if(!*PValue) {
         sth = callocz(1, sizeof(SERVICE_THREAD));
@@ -87,7 +87,7 @@ SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, request_quit_t
     else {
         sth = *PValue;
     }
-    netdata_spinlock_unlock(&service_globals.lock);
+    spinlock_unlock(&service_globals.lock);
 
     return sth;
 }
@@ -95,13 +95,13 @@ SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, request_quit_t
 void service_exits(void) {
     pid_t tid = gettid();
 
-    netdata_spinlock_lock(&service_globals.lock);
+    spinlock_lock(&service_globals.lock);
     Pvoid_t *PValue = JudyLGet(service_globals.pid_judy, tid, PJE0);
     if(PValue) {
         freez(*PValue);
         JudyLDel(&service_globals.pid_judy, tid, PJE0);
     }
-    netdata_spinlock_unlock(&service_globals.lock);
+    spinlock_unlock(&service_globals.lock);
 }
 
 bool service_running(SERVICE_TYPE service) {
@@ -124,7 +124,7 @@ bool service_running(SERVICE_TYPE service) {
 void service_signal_exit(SERVICE_TYPE service) {
     __atomic_and_fetch(&service_globals.running, ~(service), __ATOMIC_RELAXED);
 
-    netdata_spinlock_lock(&service_globals.lock);
+    spinlock_lock(&service_globals.lock);
 
     Pvoid_t *PValue;
     Word_t tid = 0;
@@ -133,14 +133,14 @@ void service_signal_exit(SERVICE_TYPE service) {
         SERVICE_THREAD *sth = *PValue;
 
         if((sth->services & service) && sth->request_quit_callback) {
-            netdata_spinlock_unlock(&service_globals.lock);
+            spinlock_unlock(&service_globals.lock);
             sth->request_quit_callback(sth->data);
-            netdata_spinlock_lock(&service_globals.lock);
+            spinlock_lock(&service_globals.lock);
             continue;
         }
     }
 
-    netdata_spinlock_unlock(&service_globals.lock);
+    spinlock_unlock(&service_globals.lock);
 }
 
 static void service_to_buffer(BUFFER *wb, SERVICE_TYPE service) {
@@ -187,7 +187,7 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
     {
         buffer_flush(thread_list);
 
-        netdata_spinlock_lock(&service_globals.lock);
+        spinlock_lock(&service_globals.lock);
 
         Pvoid_t *PValue;
         Word_t tid = 0;
@@ -217,15 +217,15 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
                 running_services |= sth->services & service;
 
                 if(sth->force_quit_callback) {
-                    netdata_spinlock_unlock(&service_globals.lock);
+                    spinlock_unlock(&service_globals.lock);
                     sth->force_quit_callback(sth->data);
-                    netdata_spinlock_lock(&service_globals.lock);
+                    spinlock_lock(&service_globals.lock);
                     continue;
                 }
             }
         }
 
-        netdata_spinlock_unlock(&service_globals.lock);
+        spinlock_unlock(&service_globals.lock);
     }
 
     service_signal_exit(service);
@@ -244,7 +244,7 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
         running_services = 0;
         buffer_flush(thread_list);
 
-        netdata_spinlock_lock(&service_globals.lock);
+        spinlock_lock(&service_globals.lock);
 
         Pvoid_t *PValue;
         Word_t tid = 0;
@@ -262,7 +262,7 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
             }
         }
 
-        netdata_spinlock_unlock(&service_globals.lock);
+        spinlock_unlock(&service_globals.lock);
 
         if(running) {
             log_countdown_ut -= (log_countdown_ut >= sleep_ut) ? sleep_ut : log_countdown_ut;

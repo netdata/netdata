@@ -78,7 +78,7 @@ static inline RRDSET *pluginsd_get_chart_from_parent(void *user) {
 static inline void pluginsd_lock_rrdset_data_collection(void *user) {
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
     if(u->st && !u->v2.locked_data_collection) {
-        netdata_spinlock_lock(&u->st->data_collection_lock);
+        spinlock_lock(&u->st->data_collection_lock);
         u->v2.locked_data_collection = true;
     }
 }
@@ -86,7 +86,7 @@ static inline void pluginsd_lock_rrdset_data_collection(void *user) {
 static inline bool pluginsd_unlock_rrdset_data_collection(void *user) {
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
     if(u->st && u->v2.locked_data_collection) {
-        netdata_spinlock_unlock(&u->st->data_collection_lock);
+        spinlock_unlock(&u->st->data_collection_lock);
         u->v2.locked_data_collection = false;
         return true;
     }

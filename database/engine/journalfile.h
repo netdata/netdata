@@ -51,9 +51,9 @@ struct rrdengine_journalfile {
 };
 
 static inline uint64_t journalfile_current_size(struct rrdengine_journalfile *journalfile) {
-    netdata_spinlock_lock(&journalfile->unsafe.spinlock);
+    spinlock_lock(&journalfile->unsafe.spinlock);
     uint64_t size = journalfile->unsafe.pos;
-    netdata_spinlock_unlock(&journalfile->unsafe.spinlock);
+    spinlock_unlock(&journalfile->unsafe.spinlock);
     return size;
 }
 

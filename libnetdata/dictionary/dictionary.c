@@ -147,12 +147,12 @@ struct dictionary {
 
     struct {                            // support for multiple indexing engines
         Pvoid_t JudyHSArray;            // the hash table
-        netdata_rwlock_t rwlock;        // protect the index
+        RW_SPINLOCK rw_spinlock;        // protect the index
     } index;
 
     struct {
         DICTIONARY_ITEM *list;          // the double linked list of all items in the dictionary
-        netdata_rwlock_t rwlock;        // protect the linked-list
+        RW_SPINLOCK rw_spinlock;        // protect the linked-list
         pid_t writer_pid;               // the gettid() of the writer
         uint32_t writer_depth;          // nesting of write locks
     } items;
@@ -632,19 +632,14 @@ static void dictionary_execute_delete_callback(DICTIONARY *dict, DICTIONARY_ITEM
 
 static inline size_t dictionary_locks_init(DICTIONARY *dict) {
     if(likely(!is_dictionary_single_threaded(dict))) {
-        netdata_rwlock_init(&dict->index.rwlock);
-        netdata_rwlock_init(&dict->items.rwlock);
+        rw_spinlock_init(&dict->index.rw_spinlock);
+        rw_spinlock_init(&dict->items.rw_spinlock);
     }
 
     return 0;
 }
 
-static inline size_t dictionary_locks_destroy(DICTIONARY *dict) {
-    if(likely(!is_dictionary_single_threaded(dict))) {
-        netdata_rwlock_destroy(&dict->index.rwlock);
-        netdata_rwlock_destroy(&dict->items.rwlock);
-    }
-
+static inline size_t dictionary_locks_destroy(DICTIONARY *dict __maybe_unused) {
     return 0;
 }
 
@@ -676,11 +671,11 @@ static inline void ll_recursive_lock(DICTIONARY *dict, char rw) {
 
     if(rw == DICTIONARY_LOCK_READ || rw == DICTIONARY_LOCK_REENTRANT || rw == 'R') {
         // read lock
-        netdata_rwlock_rdlock(&dict->items.rwlock);
+        rw_spinlock_read_lock(&dict->items.rw_spinlock);
     }
     else {
         // write lock
-        netdata_rwlock_wrlock(&dict->items.rwlock);
+        rw_spinlock_write_lock(&dict->items.rw_spinlock);
         ll_recursive_lock_set_thread_as_writer(dict);
     }
 }
@@ -697,14 +692,14 @@ static inline void ll_recursive_unlock(DICTIONARY *dict, char rw) {
     if(rw == DICTIONARY_LOCK_READ || rw == DICTIONARY_LOCK_REENTRANT || rw == 'R') {
         // read unlock
 
-        netdata_rwlock_unlock(&dict->items.rwlock);
+        rw_spinlock_read_unlock(&dict->items.rw_spinlock);
     }
     else {
         // write unlock
 
         ll_recursive_unlock_unset_thread_writer(dict);
 
-        netdata_rwlock_unlock(&dict->items.rwlock);
+        rw_spinlock_write_unlock(&dict->items.rw_spinlock);
     }
 }
 
@@ -719,27 +714,27 @@ static inline void dictionary_index_lock_rdlock(DICTIONARY *dict) {
     if(unlikely(is_dictionary_single_threaded(dict)))
         return;
 
-    netdata_rwlock_rdlock(&dict->index.rwlock);
+    rw_spinlock_read_lock(&dict->index.rw_spinlock);
 }
 
 static inline void dictionary_index_rdlock_unlock(DICTIONARY *dict) {
     if(unlikely(is_dictionary_single_threaded(dict)))
         return;
 
-    netdata_rwlock_unlock(&dict->index.rwlock);
+    rw_spinlock_read_unlock(&dict->index.rw_spinlock);
 }
 
 static inline void dictionary_index_lock_wrlock(DICTIONARY *dict) {
     if(unlikely(is_dictionary_single_threaded(dict)))
         return;
 
-    netdata_rwlock_wrlock(&dict->index.rwlock);
+    rw_spinlock_write_lock(&dict->index.rw_spinlock);
 }
 static inline void dictionary_index_wrlock_unlock(DICTIONARY *dict) {
     if(unlikely(is_dictionary_single_threaded(dict)))
         return;
 
-    netdata_rwlock_unlock(&dict->index.rwlock);
+    rw_spinlock_write_unlock(&dict->index.rw_spinlock);
 }
 
 // ----------------------------------------------------------------------------
@@ -1232,7 +1227,7 @@ void dictionary_static_items_aral_init(void) {
     static SPINLOCK spinlock;
 
     if(unlikely(!dict_items_aral || !dict_shared_items_aral)) {
-        netdata_spinlock_lock(&spinlock);
+        spinlock_lock(&spinlock);
 
         // we have to check again
         if(!dict_items_aral)
@@ -1254,7 +1249,7 @@ void dictionary_static_items_aral_init(void) {
                     aral_by_size_statistics(),
                     NULL, NULL, false, false);
 
-        netdata_spinlock_unlock(&spinlock);
+        spinlock_unlock(&spinlock);
     }
 }
 

@@ -1058,13 +1058,13 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         static time_t last_stream_accepted_t = 0;
 
         time_t now = now_realtime_sec();
-        netdata_spinlock_lock(&spinlock);
+        spinlock_lock(&spinlock);
 
         if(unlikely(last_stream_accepted_t == 0))
             last_stream_accepted_t = now;
 
         if(now - last_stream_accepted_t < web_client_streaming_rate_t) {
-            netdata_spinlock_unlock(&spinlock);
+            spinlock_unlock(&spinlock);
 
             char msg[100 + 1];
             snprintfz(msg, 100,
@@ -1081,7 +1081,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         }
 
         last_stream_accepted_t = now;
-        netdata_spinlock_unlock(&spinlock);
+        spinlock_unlock(&spinlock);
     }
 
     /*

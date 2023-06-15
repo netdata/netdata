@@ -135,7 +135,7 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     st->chart_type = ctr->chart_type;
     st->rrdhost = host;
 
-    netdata_spinlock_init(&st->data_collection_lock);
+    spinlock_init(&st->data_collection_lock);
 
     st->flags =   RRDSET_FLAG_SYNC_CLOCK
                 | RRDSET_FLAG_INDEXED_ID
@@ -1511,7 +1511,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
     if(unlikely(rrdhost_has_rrdpush_sender_enabled(st->rrdhost)))
         stream_buffer = rrdset_push_metric_initialize(st, now.tv_sec);
 
-    netdata_spinlock_lock(&st->data_collection_lock);
+    spinlock_lock(&st->data_collection_lock);
 
     if (pending_rrdset_next)
         rrdset_timed_next(st, now, 0ULL);
@@ -1533,7 +1533,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
 
     RRDSET_FLAGS rrdset_flags = rrdset_flag_check(st, ~0);
     if(unlikely(rrdset_flags & RRDSET_FLAG_COLLECTION_FINISHED)) {
-        netdata_spinlock_unlock(&st->data_collection_lock);
+        spinlock_unlock(&st->data_collection_lock);
         return;
     }
 
@@ -1963,7 +1963,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
         );
     }
 
-    netdata_spinlock_unlock(&st->data_collection_lock);
+    spinlock_unlock(&st->data_collection_lock);
     rrdset_push_metrics_finished(&stream_buffer, st);
 
     // ALL DONE ABOUT THE DATA UPDATE
