@@ -115,7 +115,7 @@ time_t cloud_next_connection_attempt(void) {
 
 size_t cloud_connection_id(void) {
 #ifdef ENABLE_ACLK
-    return aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0;
+    return aclk_connection_counter;
 #else
     return 0;
 #endif
