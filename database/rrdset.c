@@ -2179,7 +2179,7 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
         error("File '%s' does not have the desired granularity. Clearing it.", fullfilename);
         memset(st_on_file, 0, size);
     }
-    else if((now_s - st_on_file->last_updated.tv_sec) > st->update_every * st->db.entries) {
+    else if((now_s - st_on_file->last_updated.tv_sec) > (long)st->update_every * (long)st->db.entries) {
         info("File '%s' is too old. Clearing it.", fullfilename);
         memset(st_on_file, 0, size);
     }
