@@ -2,7 +2,6 @@
 
 #include "sqlite_functions.h"
 #include "sqlite_db_migration.h"
-#include "uuid.h"
 
 #define DB_METADATA_VERSION 9
 
@@ -458,7 +457,7 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to register internal now_usec function");
 
-    rc = sqlite3_create_function(db_meta, "uuid_random", 1, SQLITE_ANY, 0, sqlite_uuid_random, 0, 0);
+    rc = sqlite3_create_function(db_meta, "uuid_random", 0, SQLITE_ANY, 0, sqlite_uuid_random, 0, 0);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to register internal uuid_random function");
 
