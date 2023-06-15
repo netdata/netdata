@@ -26,7 +26,7 @@ void spinlock_unlock(SPINLOCK *spinlock);
 bool spinlock_trylock(SPINLOCK *spinlock);
 
 typedef struct netdata_rw_spinlock {
-    uint32_t readers;
+    int32_t readers;
     SPINLOCK spinlock;
 } RW_SPINLOCK;
 

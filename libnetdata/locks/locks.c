@@ -346,16 +346,24 @@ void rw_spinlock_read_lock(RW_SPINLOCK *rw_spinlock) {
 }
 
 void rw_spinlock_read_unlock(RW_SPINLOCK *rw_spinlock) {
+#ifndef NETDATA_INTERNAL_CHECKS
     __atomic_sub_fetch(&rw_spinlock->readers, 1, __ATOMIC_RELAXED);
+#else
+    int32_t x = __atomic_sub_fetch(&rw_spinlock->readers, 1, __ATOMIC_RELAXED);
+    if(x < 0)
+        fatal("RW_SPINLOCK: readers is negative %d", x);
+#endif
 }
 
 void rw_spinlock_write_lock(RW_SPINLOCK *rw_spinlock) {
     static const struct timespec ns = { .tv_sec = 0, .tv_nsec = 1 };
 
     spinlock_lock(&rw_spinlock->spinlock);
+    size_t count = 0;
     while (__atomic_load_n(&rw_spinlock->readers, __ATOMIC_RELAXED) > 0) {
         // Busy wait until all readers have released their locks.
-        nanosleep(&ns, NULL);
+        if(count++ > 10000)
+            nanosleep(&ns, NULL);
     }
 }
 
