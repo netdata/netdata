@@ -528,7 +528,7 @@ int is_legacy = 1;
                  ", program_version '%s'"
                  ", update every %d"
                  ", memory mode %s"
-                 ", history entries %ld"
+                 ", history entries %d"
                  ", streaming %s"
                  " (to '%s' with api key '%s')"
                  ", health %s"
@@ -632,13 +632,19 @@ static void rrdhost_update(RRDHOST *host
     }
 
     if(host->rrd_update_every != update_every)
-        error("Host '%s' has an update frequency of %d seconds, but the wanted one is %d seconds. Restart netdata here to apply the new settings.", rrdhost_hostname(host), host->rrd_update_every, update_every);
+        error("Host '%s' has an update frequency of %d seconds, but the wanted one is %d seconds. "
+              "Restart netdata here to apply the new settings.",
+              rrdhost_hostname(host), host->rrd_update_every, update_every);
 
     if(host->rrd_memory_mode != mode)
-        error("Host '%s' has memory mode '%s', but the wanted one is '%s'. Restart netdata here to apply the new settings.", rrdhost_hostname(host), rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
+        error("Host '%s' has memory mode '%s', but the wanted one is '%s'. "
+              "Restart netdata here to apply the new settings.",
+              rrdhost_hostname(host), rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
 
     else if(host->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && host->rrd_history_entries < history)
-        error("Host '%s' has history of %ld entries, but the wanted one is %ld entries. Restart netdata here to apply the new settings.", rrdhost_hostname(host), host->rrd_history_entries, history);
+        error("Host '%s' has history of %d entries, but the wanted one is %ld entries. "
+              "Restart netdata here to apply the new settings.",
+              rrdhost_hostname(host), host->rrd_history_entries, history);
 
     // update host tags
     rrdhost_init_tags(host, tags);

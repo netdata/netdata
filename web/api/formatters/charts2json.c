@@ -53,7 +53,7 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
                        ",\n\t\"os\": \"%s\""
                        ",\n\t\"timezone\": \"%s\""
                        ",\n\t\"update_every\": %d"
-                       ",\n\t\"history\": %ld"
+                       ",\n\t\"history\": %d"
                        ",\n\t\"memory_mode\": \"%s\""
                        ",\n\t\"custom_info\": \"%s\""
                        ",\n\t\"charts\": {"

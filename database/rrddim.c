@@ -59,7 +59,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     }
 
     if(ctr->memory_mode == RRD_MEMORY_MODE_RAM) {
-        size_t entries = st->entries;
+        size_t entries = st->db.entries;
         if(!entries) entries = 5;
 
         rd->db.data = netdata_mmap(NULL, entries * sizeof(storage_number), MAP_PRIVATE, 1, false, NULL);
@@ -74,7 +74,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     }
 
     if(ctr->memory_mode == RRD_MEMORY_MODE_ALLOC || ctr->memory_mode == RRD_MEMORY_MODE_NONE) {
-        size_t entries = st->entries;
+        size_t entries = st->db.entries;
         if(entries < 5) entries = 5;
 
         rd->db.data = rrddim_alloc_db(entries);
@@ -133,7 +133,9 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         if(td && (td->algorithm != rd->algorithm || ABS(td->multiplier) != ABS(rd->multiplier) || ABS(td->divisor) != ABS(rd->divisor))) {
             if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already present (algorithm is '%s' vs '%s', multiplier is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ", divisor is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ").",
+                info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already "
+                     "present (algorithm is '%s' vs '%s', multiplier is %d vs %d, "
+                     "divisor is %d vs %d).",
                      rrddim_name(rd),
                      rrdset_name(st),
                      rrdhost_hostname(host),
@@ -386,11 +388,12 @@ inline int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm)
     return 1;
 }
 
-inline int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multiplier) {
+inline int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, int32_t multiplier) {
     if(unlikely(rd->multiplier == multiplier))
         return 0;
 
-    debug(D_RRD_CALLS, "Updating multiplier of dimension '%s/%s' from " COLLECTED_NUMBER_FORMAT " to " COLLECTED_NUMBER_FORMAT, rrdset_id(st), rrddim_name(rd), rd->multiplier, multiplier);
+    debug(D_RRD_CALLS, "Updating multiplier of dimension '%s/%s' from %d to %d",
+          rrdset_id(st), rrddim_name(rd), rd->multiplier, multiplier);
     rd->multiplier = multiplier;
     rrddim_clear_exposed(rd);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
@@ -399,11 +402,12 @@ inline int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multip
     return 1;
 }
 
-inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) {
+inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, int32_t divisor) {
     if(unlikely(rd->divisor == divisor))
         return 0;
 
-    debug(D_RRD_CALLS, "Updating divisor of dimension '%s/%s' from " COLLECTED_NUMBER_FORMAT " to " COLLECTED_NUMBER_FORMAT, rrdset_id(st), rrddim_name(rd), rd->divisor, divisor);
+    debug(D_RRD_CALLS, "Updating divisor of dimension '%s/%s' from %d to %d",
+          rrdset_id(st), rrddim_name(rd), rd->divisor, divisor);
     rd->divisor = divisor;
     rrddim_clear_exposed(rd);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
@@ -684,7 +688,7 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
 
     struct rrddim_map_save_v019 *rd_on_file = NULL;
 
-    unsigned long size = sizeof(struct rrddim_map_save_v019) + (st->entries * sizeof(storage_number));
+    unsigned long size = sizeof(struct rrddim_map_save_v019) + (st->db.entries * sizeof(storage_number));
 
     char filename[FILENAME_MAX + 1];
     char fullfilename[FILENAME_MAX + 1];
@@ -730,10 +734,12 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
                  fullfilename, rd->algorithm, rrd_algorithm_name(rd->algorithm), rd_on_file->algorithm, rrd_algorithm_name(rd_on_file->algorithm));
 
         if(rd_on_file->multiplier != rd->multiplier)
-            info("File %s does not have the expected multiplier (expected " COLLECTED_NUMBER_FORMAT ", found " COLLECTED_NUMBER_FORMAT "). Previous values may be wrong.", fullfilename, rd->multiplier, rd_on_file->multiplier);
+            info("File %s does not have the expected multiplier (expected %d, found %ld). "
+                 "Previous values may be wrong.", fullfilename, rd->multiplier, (long)rd_on_file->multiplier);
 
         if(rd_on_file->divisor != rd->divisor)
-            info("File %s does not have the expected divisor (expected " COLLECTED_NUMBER_FORMAT ", found " COLLECTED_NUMBER_FORMAT "). Previous values may be wrong.", fullfilename, rd->divisor, rd_on_file->divisor);
+            info("File %s does not have the expected divisor (expected %d, found %ld). "
+                 "Previous values may be wrong.", fullfilename, rd->divisor, (long)rd_on_file->divisor);
     }
 
     // zero the entire header
@@ -744,7 +750,7 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
     rd_on_file->algorithm = rd->algorithm;
     rd_on_file->multiplier = rd->multiplier;
     rd_on_file->divisor = rd->divisor;
-    rd_on_file->entries = st->entries;
+    rd_on_file->entries = st->db.entries;
     rd_on_file->update_every = rd->rrdset->update_every;
     rd_on_file->memsize = size;
     rd_on_file->rrd_memory_mode = memory_mode;

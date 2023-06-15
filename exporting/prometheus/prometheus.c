@@ -497,7 +497,7 @@ static void generate_as_collected_prom_help(BUFFER *wb, struct gen_parameters *p
     if (prometheus_collector)
         buffer_sprintf(wb, "1 / 1");
     else
-        buffer_sprintf(wb, COLLECTED_NUMBER_FORMAT " / " COLLECTED_NUMBER_FORMAT, p->rd->multiplier, p->rd->divisor);
+        buffer_sprintf(wb, "%d / %d", p->rd->multiplier, p->rd->divisor);
 
     buffer_sprintf(wb, " %s %s (%s)\n", p->relation, rrdset_units(p->st), p->type);
 }

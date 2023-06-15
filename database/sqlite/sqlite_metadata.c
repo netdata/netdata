@@ -522,7 +522,7 @@ static int store_chart_metadata(RRDSET *st)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, ++param, (int) st->entries);
+    rc = sqlite3_bind_int(res, ++param, (int) st->db.entries);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 

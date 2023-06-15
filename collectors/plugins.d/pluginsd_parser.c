@@ -1216,9 +1216,9 @@ PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, void *user) {
             st->counter_done++;
 
             // these are only needed for db mode RAM, SAVE, MAP, ALLOC
-            st->current_entry++;
-            if(st->current_entry >= st->entries)
-                st->current_entry -= st->entries;
+            st->db.current_entry++;
+            if(st->db.current_entry >= st->db.entries)
+                st->db.current_entry -= st->db.entries;
 
             ((PARSER_USER_OBJECT *) user)->replay.start_time = start_time;
             ((PARSER_USER_OBJECT *) user)->replay.end_time = end_time;
@@ -1643,9 +1643,9 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
     st->counter_done++;
 
     // these are only needed for db mode RAM, SAVE, MAP, ALLOC
-    st->current_entry++;
-    if(st->current_entry >= st->entries)
-        st->current_entry -= st->entries;
+    st->db.current_entry++;
+    if(st->db.current_entry >= st->db.entries)
+        st->db.current_entry -= st->db.entries;
 
     timing_step(TIMING_STEP_BEGIN2_STORE);
 

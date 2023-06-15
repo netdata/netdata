@@ -35,15 +35,15 @@ struct mem_metric_handle {
 
 static void update_metric_handle_from_rrddim(struct mem_metric_handle *mh, RRDDIM *rd) {
     mh->counter        = rd->rrdset->counter;
-    mh->entries        = rd->rrdset->entries;
-    mh->current_entry  = rd->rrdset->current_entry;
+    mh->entries        = rd->rrdset->db.entries;
+    mh->current_entry  = rd->rrdset->db.current_entry;
     mh->last_updated_s = rd->rrdset->last_updated.tv_sec;
     mh->update_every_s = rd->rrdset->update_every;
 }
 
 static void check_metric_handle_from_rrddim(struct mem_metric_handle *mh) {
     RRDDIM *rd = mh->rd; (void)rd;
-    internal_fatal(mh->entries != (size_t)rd->rrdset->entries, "RRDDIM: entries do not match");
+    internal_fatal(mh->entries != (size_t)rd->rrdset->db.entries, "RRDDIM: entries do not match");
     internal_fatal(mh->update_every_s != rd->rrdset->update_every, "RRDDIM: update every does not match");
 }
 

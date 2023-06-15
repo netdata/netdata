@@ -247,7 +247,7 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
     // send the chart
     buffer_sprintf(
             wb
-            , "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d \"%s %s %s %s\" \"%s\" \"%s\"\n"
+            , "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %d %d \"%s %s %s %s\" \"%s\" \"%s\"\n"
             , rrdset_id(st)
             , name
             , rrdset_title(st)
@@ -274,7 +274,7 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
     rrddim_foreach_read(rd, st) {
         buffer_sprintf(
                 wb
-                , "DIMENSION \"%s\" \"%s\" \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " \"%s %s %s\"\n"
+                , "DIMENSION \"%s\" \"%s\" \"%s\" %d %d \"%s %s %s\"\n"
                 , rrddim_id(rd)
                 , rrddim_name(rd)
                 , rrd_algorithm_name(rd->algorithm)
