@@ -344,11 +344,11 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
 
 void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host)
 {
-    se->os_name = (host->system_info->host_os_name)?url_encode(host->system_info->host_os_name):"";
-    se->os_id = (host->system_info->host_os_id)?url_encode(host->system_info->host_os_id):"";
-    se->os_version = (host->system_info->host_os_version)?url_encode(host->system_info->host_os_version):"";
-    se->kernel_name = (host->system_info->kernel_name)?url_encode(host->system_info->kernel_name):"";
-    se->kernel_version = (host->system_info->kernel_version)?url_encode(host->system_info->kernel_version):"";
+    se->os_name = (host->system_info->host_os_name)?url_encode(host->system_info->host_os_name):strdupz("");
+    se->os_id = (host->system_info->host_os_id)?url_encode(host->system_info->host_os_id):strdupz("");
+    se->os_version = (host->system_info->host_os_version)?url_encode(host->system_info->host_os_version):strdupz("");
+    se->kernel_name = (host->system_info->kernel_name)?url_encode(host->system_info->kernel_name):strdupz("");
+    se->kernel_version = (host->system_info->kernel_version)?url_encode(host->system_info->kernel_version):strdupz("");
 }
 
 void rrdpush_clean_encoded(stream_encoded_t *se)
@@ -1101,7 +1101,7 @@ void rrdpush_signal_sender_to_wake_up(struct sender_state *s) {
 static NETDATA_DOUBLE rrdhost_sender_replication_completion(RRDHOST *host, time_t now, size_t *instances) {
     size_t charts = rrdhost_sender_replicating_charts(host);
     NETDATA_DOUBLE completion;
-    if(!charts || !host->sender->replication.oldest_request_after_t)
+    if(!charts || !host->sender || !host->sender->replication.oldest_request_after_t)
         completion = 100.0;
     else if(!host->sender->replication.latest_completed_before_t || host->sender->replication.latest_completed_before_t < host->sender->replication.oldest_request_after_t)
         completion = 0.0;
@@ -1159,8 +1159,7 @@ void rrdhost_sender_to_json(BUFFER *wb, RRDHOST *host, const char *key, time_t n
                 snprintfz(buf, 1024, "[%s]:%d%s", peers.peer.ip, peers.peer.port, ssl ? ":SSL" : "");
                 buffer_json_member_add_string(wb, "remote", buf);
 
-                stream_capabilities_to_json_array(wb, online ? host->sender->capabilities : 0,
-                                                  "capabilities");
+                stream_capabilities_to_json_array(wb, host->sender->capabilities, "capabilities");
 
                 buffer_json_member_add_object(wb, "traffic");
                 {

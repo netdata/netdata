@@ -324,6 +324,64 @@ static inline int access_to_file_is_not_permitted(struct web_client *w, const ch
 
 // Work around a bug in the CMocka library by removing this function during testing.
 #ifndef REMOVE_MYSENDFILE
+
+static bool find_filename_to_serve(const char *filename, char *dst, size_t dst_len, struct stat *statbuf) {
+    // copy the filename to our src buffer
+    char path[FILENAME_MAX + 1];
+    strncpyz(path, filename, FILENAME_MAX);
+
+    bool strip = false;
+    while(1) {
+        if(*path)
+            snprintfz(dst, dst_len, "%s/%s", netdata_configured_web_dir, path);
+        else
+            snprintfz(dst, dst_len, "%s", netdata_configured_web_dir);
+
+        // internal_error(true, "WEBFILE: trying '%s', path '%s'", dst, path);
+
+        strip = false;
+        if (lstat(dst, statbuf) != 0)
+            strip = true;
+
+        if (!strip && (statbuf->st_mode & S_IFMT) == S_IFDIR) {
+            // it is a directory
+            // let's see if it has index.html in it
+            if(*path)
+                snprintfz(dst, dst_len, "%s/%s/index.html", netdata_configured_web_dir, path);
+            else
+                snprintfz(dst, dst_len, "%s/index.html", netdata_configured_web_dir);
+
+            if (lstat(dst, statbuf) != 0 || (statbuf->st_mode & S_IFMT) == S_IFDIR)
+                strip = true;
+        }
+
+        if(!strip && (statbuf->st_mode & S_IFMT) != S_IFREG)
+            strip = true;
+
+        if(strip) {
+            char *s = path, *e = path;
+            while(*e) e++; // find the terminator
+            if(e > s) e--; // find the last character
+
+            while(e >= s && *e != '/') *e-- = '\0'; // find the previous slash
+            while(e >= s && *e == '/') *e-- = '\0'; // zero the slashes
+
+            if(!*s || e <= s) {
+                snprintfz(dst, dst_len, "%s/index.html", netdata_configured_web_dir);
+                if(lstat(dst, statbuf) != 0)
+                    return false;
+                else
+                    break;
+            }
+        }
+        else
+            break;
+    }
+
+    // internal_error(true, "WEBFILE: final '%s'", dst);
+    return true;
+}
+
 int mysendfile(struct web_client *w, char *filename) {
     debug(D_WEB_CLIENT, "%llu: Looking for file '%s/%s'", w->id, netdata_configured_web_dir, filename);
 
@@ -355,60 +413,41 @@ int mysendfile(struct web_client *w, char *filename) {
     }
 
     // find the physical file on disk
-    char webfilename[FILENAME_MAX + 1];
-    snprintfz(webfilename, FILENAME_MAX, "%s/%s", netdata_configured_web_dir, filename);
-
+    char web_filename[FILENAME_MAX + 1];
     struct stat statbuf;
-    int done = 0;
-    while(!done) {
-        // check if the file exists
-        if (lstat(webfilename, &statbuf) != 0) {
-            debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not found.", w->id, webfilename);
-            w->response.data->content_type = CT_TEXT_HTML;
-            buffer_strcat(w->response.data, "File does not exist, or is not accessible: ");
-            buffer_strcat_htmlescape(w->response.data, webfilename);
-            return HTTP_RESP_NOT_FOUND;
-        }
-
-        if ((statbuf.st_mode & S_IFMT) == S_IFDIR) {
-            snprintfz(webfilename, FILENAME_MAX, "%s/%s/index.html", netdata_configured_web_dir, filename);
-            continue;
-        }
-
-        if ((statbuf.st_mode & S_IFMT) != S_IFREG) {
-            error("%llu: File '%s' is not a regular file. Access Denied.", w->id, webfilename);
-            return access_to_file_is_not_permitted(w, webfilename);
-        }
-
-        done = 1;
+    if(!find_filename_to_serve(filename, web_filename, FILENAME_MAX, &statbuf)) {
+        w->response.data->content_type = CT_TEXT_HTML;
+        buffer_strcat(w->response.data, "File does not exist, or is not accessible: ");
+        buffer_strcat_htmlescape(w->response.data, web_filename);
+        return HTTP_RESP_NOT_FOUND;
     }
 
     // open the file
-    w->ifd = open(webfilename, O_NONBLOCK, O_RDONLY);
+    w->ifd = open(web_filename, O_NONBLOCK, O_RDONLY);
     if(w->ifd == -1) {
         w->ifd = w->ofd;
 
         if(errno == EBUSY || errno == EAGAIN) {
-            error("%llu: File '%s' is busy, sending 307 Moved Temporarily to force retry.", w->id, webfilename);
+            error("%llu: File '%s' is busy, sending 307 Moved Temporarily to force retry.", w->id, web_filename);
             w->response.data->content_type = CT_TEXT_HTML;
             buffer_sprintf(w->response.header, "Location: /%s\r\n", filename);
             buffer_strcat(w->response.data, "File is currently busy, please try again later: ");
-            buffer_strcat_htmlescape(w->response.data, webfilename);
+            buffer_strcat_htmlescape(w->response.data, web_filename);
             return HTTP_RESP_REDIR_TEMP;
         }
         else {
-            error("%llu: Cannot open file '%s'.", w->id, webfilename);
+            error("%llu: Cannot open file '%s'.", w->id, web_filename);
             w->response.data->content_type = CT_TEXT_HTML;
             buffer_strcat(w->response.data, "Cannot open file: ");
-            buffer_strcat_htmlescape(w->response.data, webfilename);
+            buffer_strcat_htmlescape(w->response.data, web_filename);
             return HTTP_RESP_NOT_FOUND;
         }
     }
 
     sock_setnonblock(w->ifd);
 
-    w->response.data->content_type = contenttype_for_filename(webfilename);
-    debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%"PRId64" bytes, ifd %d, ofd %d).", w->id, webfilename, (int64_t)statbuf.st_size, w->ifd, w->ofd);
+    w->response.data->content_type = contenttype_for_filename(web_filename);
+    debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%"PRId64" bytes, ifd %d, ofd %d).", w->id, web_filename, (int64_t)statbuf.st_size, w->ifd, w->ofd);
 
     w->mode = WEB_CLIENT_MODE_FILECOPY;
     web_client_enable_wait_receive(w);

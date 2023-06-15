@@ -3,7 +3,6 @@
 #include "sqlite_health.h"
 #include "sqlite_functions.h"
 #include "sqlite_db_migration.h"
-#include "uuid.h"
 
 #define MAX_HEALTH_SQL_SIZE 2048
 #define sqlite3_bind_string_or_null(res,key,param) ((key) ? sqlite3_bind_text(res, param, string2str(key), -1, SQLITE_STATIC) : sqlite3_bind_null(res, param))

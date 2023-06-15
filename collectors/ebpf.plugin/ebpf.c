@@ -6,6 +6,7 @@
 
 #include "ebpf.h"
 #include "ebpf_socket.h"
+#include "ebpf_unittest.h"
 #include "libnetdata/required_dummies.h"
 
 /*****************************************************************
@@ -578,7 +579,7 @@ static void ebpf_exit()
  * @param objects       objects loaded from eBPF programs
  * @param probe_links   links from loader
  */
-static void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe_links)
+void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe_links)
 {
     if (!probe_links || !objects)
         return;
@@ -2060,6 +2061,48 @@ static inline void ebpf_load_thread_config()
 }
 
 /**
+ * Check Conditions
+ *
+ * This function checks kernel that plugin is running and permissions.
+ *
+ * @return It returns 0 on success and -1 otherwise
+ */
+int ebpf_check_conditions()
+{
+    if (!has_condition_to_run(running_on_kernel)) {
+        error("The current collector cannot run on this kernel.");
+        return -1;
+    }
+
+    if (!am_i_running_as_root()) {
+        error(
+            "ebpf.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities..",
+            (unsigned int)getuid(), (unsigned int)geteuid());
+        return -1;
+    }
+
+    return 0;
+}
+
+/**
+ * Adjust memory
+ *
+ * Adjust memory values to load eBPF programs.
+ *
+ * @return It returns 0 on success and -1 otherwise
+ */
+int ebpf_adjust_memory_limit()
+{
+    struct rlimit r = { RLIM_INFINITY, RLIM_INFINITY };
+    if (setrlimit(RLIMIT_MEMLOCK, &r)) {
+        error("Setrlimit(RLIMIT_MEMLOCK)");
+        return -1;
+    }
+
+    return 0;
+}
+
+/**
  * Parse arguments given from user.
  *
  * @param argc the number of arguments
@@ -2097,6 +2140,7 @@ static void ebpf_parse_args(int argc, char **argv)
         {"return",         no_argument,    0,  0 },
         {"legacy",         no_argument,    0,  0 },
         {"core",           no_argument,    0,  0 },
+        {"unittest",       no_argument,    0,  0 },
         {0, 0, 0, 0}
     };
 
@@ -2286,6 +2330,33 @@ static void ebpf_parse_args(int argc, char **argv)
                 info("EBPF running with \"CO-RE\" code, because it was started with the option \"[-]-core\".");
 #endif
                 break;
+            }
+            case EBPF_OPTION_UNITTEST: {
+                // if we cannot run until the end, we will cancel the unittest
+                int exit_code = ECANCELED;
+                if (ebpf_check_conditions())
+                    goto unittest;
+
+                if (ebpf_adjust_memory_limit())
+                    goto unittest;
+
+                // Load binary in entry mode
+                ebpf_ut_initialize_structure(MODE_ENTRY);
+                if (ebpf_ut_load_real_binary())
+                    goto unittest;
+
+                ebpf_ut_cleanup_memory();
+
+                // Do not load a binary in entry mode
+                ebpf_ut_initialize_structure(MODE_ENTRY);
+                if (ebpf_ut_load_fake_binary())
+                    goto unittest;
+
+                ebpf_ut_cleanup_memory();
+
+                exit_code = 0;
+unittest:
+                exit(exit_code);
             }
             default: {
                 break;
@@ -2505,17 +2576,8 @@ int main(int argc, char **argv)
     ebpf_parse_args(argc, argv);
     ebpf_manage_pid(getpid());
 
-    if (!has_condition_to_run(running_on_kernel)) {
-        error("The current collector cannot run on this kernel.");
+    if (ebpf_check_conditions())
         return 2;
-    }
-
-    if (!am_i_running_as_root()) {
-        error(
-            "ebpf.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities..",
-            (unsigned int)getuid(), (unsigned int)geteuid());
-        return 3;
-    }
 
     // set name
     program_name = "ebpf.plugin";
@@ -2527,11 +2589,8 @@ int main(int argc, char **argv)
     error_log_errors_per_period = 100;
     error_log_throttle_period = 3600;
 
-    struct rlimit r = { RLIM_INFINITY, RLIM_INFINITY };
-    if (setrlimit(RLIMIT_MEMLOCK, &r)) {
-        error("Setrlimit(RLIMIT_MEMLOCK)");
-        return 4;
-    }
+    if (ebpf_adjust_memory_limit())
+        return 3;
 
     signal(SIGINT, ebpf_stop_threads);
     signal(SIGQUIT, ebpf_stop_threads);

@@ -360,6 +360,8 @@ EBPF_PLUGIN_FILES = \
     collectors/ebpf.plugin/ebpf_apps.h \
     collectors/ebpf.plugin/ebpf_cgroup.c \
     collectors/ebpf.plugin/ebpf_cgroup.h \
+    collectors/ebpf.plugin/ebpf_unittest.c \
+    collectors/ebpf.plugin/ebpf_unittest.h \
     $(LIBNETDATA_FILES) \
     $(NULL)
 

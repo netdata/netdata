@@ -2,14 +2,36 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.39.1...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.40.0...HEAD)
 
 **Merged pull requests:**
 
+- Redirect to index.html when a file is not found by web server [\#15143](https://github.com/netdata/netdata/pull/15143) ([MrZammler](https://github.com/MrZammler))
+
+## [v1.40.0](https://github.com/netdata/netdata/tree/v1.40.0) (2023-06-14)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.39.1...v1.40.0)
+
+**Merged pull requests:**
+
+- ebpf: disable sync by default [\#15190](https://github.com/netdata/netdata/pull/15190) ([ilyam8](https://github.com/ilyam8))
+- Add support for SUSE 15.5 [\#15189](https://github.com/netdata/netdata/pull/15189) ([tkatsoulas](https://github.com/tkatsoulas))
+- bump go.d.plugin to v0.53.2 [\#15184](https://github.com/netdata/netdata/pull/15184) ([ilyam8](https://github.com/ilyam8))
+- Do strdupz on empty string [\#15183](https://github.com/netdata/netdata/pull/15183) ([MrZammler](https://github.com/MrZammler))
+- set setuid for go.d.plugin in container [\#15180](https://github.com/netdata/netdata/pull/15180) ([ilyam8](https://github.com/ilyam8))
+- bump go.d.plugin to v0.53.1 [\#15179](https://github.com/netdata/netdata/pull/15179) ([ilyam8](https://github.com/ilyam8))
+- Update smartd\_log.conf [\#15171](https://github.com/netdata/netdata/pull/15171) ([TougeAI](https://github.com/TougeAI))
+- Change package conflicts policy on deb based packages [\#15170](https://github.com/netdata/netdata/pull/15170) ([tkatsoulas](https://github.com/tkatsoulas))
+- Fix coverity issues [\#15169](https://github.com/netdata/netdata/pull/15169) ([stelfrag](https://github.com/stelfrag))
+- Fix user and group handling in DEB packages. [\#15166](https://github.com/netdata/netdata/pull/15166) ([Ferroin](https://github.com/Ferroin))
+- change mandatory packages for RPMs [\#15165](https://github.com/netdata/netdata/pull/15165) ([tkatsoulas](https://github.com/tkatsoulas))
+- Fix CID 385073 -- Uninitialized scalar variable [\#15163](https://github.com/netdata/netdata/pull/15163) ([stelfrag](https://github.com/stelfrag))
+- api v2 nodes for streaming statuses [\#15162](https://github.com/netdata/netdata/pull/15162) ([ktsaou](https://github.com/ktsaou))
 - Restrict ebpf dep in DEB package to amd64 only. [\#15161](https://github.com/netdata/netdata/pull/15161) ([Ferroin](https://github.com/Ferroin))
 - Make plugin packages hard dependencies. [\#15160](https://github.com/netdata/netdata/pull/15160) ([Ferroin](https://github.com/Ferroin))
 - freeipmi: add availability status chart and alarm [\#15151](https://github.com/netdata/netdata/pull/15151) ([ilyam8](https://github.com/ilyam8))
 - Check null transition id and config hash [\#15147](https://github.com/netdata/netdata/pull/15147) ([stelfrag](https://github.com/stelfrag))
+- eBPF unittest + bug fix [\#15146](https://github.com/netdata/netdata/pull/15146) ([thiagoftsm](https://github.com/thiagoftsm))
 - Mattermost cloud integration docs [\#15141](https://github.com/netdata/netdata/pull/15141) ([car12o](https://github.com/car12o))
 - send EXIT before exiting in freeipmi and debugfs plugins [\#15140](https://github.com/netdata/netdata/pull/15140) ([ilyam8](https://github.com/ilyam8))
 - minor - fix syntax in config.ac [\#15139](https://github.com/netdata/netdata/pull/15139) ([underhood](https://github.com/underhood))
@@ -17,6 +39,7 @@
 - updated events docs and minor fix on silecing rules table [\#15134](https://github.com/netdata/netdata/pull/15134) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Provide necessary permission for the kickstart to run the netdata-updater script [\#15132](https://github.com/netdata/netdata/pull/15132) ([tkatsoulas](https://github.com/tkatsoulas))
 - fix: allow square brackets in label value [\#15131](https://github.com/netdata/netdata/pull/15131) ([ilyam8](https://github.com/ilyam8))
+- Add library to encode/decode Gorilla compressed buffers. [\#15128](https://github.com/netdata/netdata/pull/15128) ([vkalintiris](https://github.com/vkalintiris))
 - Fix bundling of eBPF legacy code for DEB packages. [\#15127](https://github.com/netdata/netdata/pull/15127) ([Ferroin](https://github.com/Ferroin))
 - Percentage of group aggregatable at cloud - fixed for backwards compatibility [\#15126](https://github.com/netdata/netdata/pull/15126) ([ktsaou](https://github.com/ktsaou))
 - Fix package versioning issues. [\#15125](https://github.com/netdata/netdata/pull/15125) ([Ferroin](https://github.com/Ferroin))
@@ -392,20 +415,6 @@
 - Reorganize learn documents under Integrations part 2 [\#14538](https://github.com/netdata/netdata/pull/14538) ([cakrit](https://github.com/cakrit))
 - Roles docs: Add Early Bird and Member role [\#14537](https://github.com/netdata/netdata/pull/14537) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Fix broken Alma Linux entries in build matrix generation. [\#14536](https://github.com/netdata/netdata/pull/14536) ([Ferroin](https://github.com/Ferroin))
-- Re-index when machine guid changes [\#14535](https://github.com/netdata/netdata/pull/14535) ([MrZammler](https://github.com/MrZammler))
-- Use BoxListItemRegexLink component in docs/quickstart/insfrastructure.md [\#14533](https://github.com/netdata/netdata/pull/14533) ([Ancairon](https://github.com/Ancairon))
-- Update main metric retention docs [\#14530](https://github.com/netdata/netdata/pull/14530) ([cakrit](https://github.com/cakrit))
-- Add Debian 12 to our CI and platform support document. [\#14529](https://github.com/netdata/netdata/pull/14529) ([Ferroin](https://github.com/Ferroin))
-- Update role-based-access.md [\#14528](https://github.com/netdata/netdata/pull/14528) ([cakrit](https://github.com/cakrit))
-- added section to explain impacts on member role [\#14527](https://github.com/netdata/netdata/pull/14527) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- fix setting go.d.plugin capabilities [\#14525](https://github.com/netdata/netdata/pull/14525) ([ilyam8](https://github.com/ilyam8))
-- Simplify parser README.md and add parser files to CMakeLists.txt [\#14523](https://github.com/netdata/netdata/pull/14523) ([stelfrag](https://github.com/stelfrag))
-- Link statically libnetfilter\_acct into our static builds [\#14516](https://github.com/netdata/netdata/pull/14516) ([tkatsoulas](https://github.com/tkatsoulas))
-- Fix broken links in markdown files [\#14513](https://github.com/netdata/netdata/pull/14513) ([Ancairon](https://github.com/Ancairon))
-- Make external plugins a category page in learn [\#14511](https://github.com/netdata/netdata/pull/14511) ([cakrit](https://github.com/cakrit))
-- Learn integrations category changes [\#14510](https://github.com/netdata/netdata/pull/14510) ([cakrit](https://github.com/cakrit))
-- Move collectors under Integrations/Monitoring [\#14509](https://github.com/netdata/netdata/pull/14509) ([cakrit](https://github.com/cakrit))
-- Guides and collectors reorg and cleanup part 1 [\#14507](https://github.com/netdata/netdata/pull/14507) ([cakrit](https://github.com/cakrit))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
