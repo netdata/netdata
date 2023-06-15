@@ -66,7 +66,7 @@ static void ebpf_function_thread_manipulation_help(const char *transaction) {
 
 
 /*****************************************************************
- *  EBPF ERROR FUNCTION
+ *  EBPF ERROR FUNCTIONS
  *****************************************************************/
 
 /**
