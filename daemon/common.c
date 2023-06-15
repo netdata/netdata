@@ -16,8 +16,14 @@ char *netdata_configured_host_prefix         = NULL;
 char *netdata_configured_timezone            = NULL;
 char *netdata_configured_abbrev_timezone     = NULL;
 int32_t netdata_configured_utc_offset        = 0;
-int netdata_ready;
-int netdata_cloud_setting;
+
+bool netdata_ready = false;
+
+#if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
+bool netdata_cloud_enabled = false;
+#else
+bool netdata_cloud_enabled = true;
+#endif
 
 long get_netdata_cpus(void) {
     static long processors = 0;
@@ -53,4 +59,32 @@ long get_netdata_cpus(void) {
     processors = cores_user_configured;
 
     return processors;
+}
+
+const char *cloud_status_to_string(CLOUD_STATUS status) {
+    switch(status) {
+        default:
+        case CLOUD_STATUS_DISABLED:
+            return "disabled";
+
+        case CLOUD_STATUS_OFFLINE:
+            return "offline";
+
+        case CLOUD_STATUS_ONLINE:
+            return "online";
+    }
+}
+
+CLOUD_STATUS cloud_status(void) {
+#ifdef ENABLE_ACLK
+    if(aclk_connected)
+        return CLOUD_STATUS_ONLINE;
+
+    if(netdata_cloud_enabled)
+        return CLOUD_STATUS_OFFLINE;
+    else
+        return CLOUD_STATUS_DISABLED;
+#else
+    return CLOUD_STATUS_DISABLED;
+#endif
 }

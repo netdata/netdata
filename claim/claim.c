@@ -49,7 +49,7 @@ extern struct registry registry;
 /* rrd_init() and post_conf_load() must have been called before this function */
 void claim_agent(char *claiming_arguments)
 {
-    if (!netdata_cloud_setting) {
+    if (!netdata_cloud_enabled) {
         error("Refusing to claim agent -> cloud functionality has been disabled");
         return;
     }
@@ -132,7 +132,7 @@ void load_claiming_state(void)
     // --------------------------------------------------------------------
     // Check if the cloud is enabled
 #if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
-    netdata_cloud_setting = 0;
+    netdata_cloud_enabled = false;
 #else
     uuid_t uuid;
 
@@ -181,7 +181,7 @@ void load_claiming_state(void)
     freez(claimed_id);
 
     info("File '%s' was found. Setting state to AGENT_CLAIMED.", filename);
-    netdata_cloud_setting = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1);
+    netdata_cloud_enabled = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1);
 #endif
 }
 

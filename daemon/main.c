@@ -1316,9 +1316,9 @@ void post_conf_load(char **user)
     // --------------------------------------------------------------------
     // Check if the cloud is enabled
 #if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
-    netdata_cloud_setting = 0;
+    netdata_cloud_enabled = false;
 #else
-    netdata_cloud_setting = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1);
+    netdata_cloud_enabled = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1);
 #endif
     // This must be set before any point in the code that accesses it. Do not move it from this function.
     appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", DEFAULT_CLOUD_BASE_URL);
@@ -1362,7 +1362,7 @@ int main(int argc, char **argv) {
 
     static_threads = static_threads_get();
 
-    netdata_ready=0;
+    netdata_ready = false;
     // set the name for logging
     program_name = "netdata";
 
@@ -2122,7 +2122,7 @@ int main(int argc, char **argv) {
 
     usec_t ready_ut = now_monotonic_usec();
     info("NETDATA STARTUP: completed in %llu ms. Enjoy real-time performance monitoring!", (ready_ut - started_ut) / USEC_PER_MS);
-    netdata_ready = 1;
+    netdata_ready = true;
 
     send_statistics("START", "-",  "-");
     if (crash_detected)

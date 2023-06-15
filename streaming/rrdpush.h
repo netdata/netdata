@@ -241,6 +241,31 @@ struct sender_state {
 #define rrdpush_sender_pending_replication_requests_minus_one(sender) __atomic_sub_fetch(&((sender)->replication.atomic.pending_requests), 1, __ATOMIC_RELAXED)
 #define rrdpush_sender_pending_replication_requests_zero(sender) __atomic_store_n(&((sender)->replication.atomic.pending_requests), 0, __ATOMIC_RELAXED)
 
+/*
+typedef enum {
+    STREAM_NODE_INSTANCE_FEATURE_CLOUD_ONLINE   = (1 << 0),
+    STREAM_NODE_INSTANCE_FEATURE_VIRTUAL_HOST   = (1 << 1),
+    STREAM_NODE_INSTANCE_FEATURE_HEALTH_ENABLED = (1 << 2),
+    STREAM_NODE_INSTANCE_FEATURE_ML_SELF        = (1 << 3),
+    STREAM_NODE_INSTANCE_FEATURE_ML_RECEIVED    = (1 << 4),
+    STREAM_NODE_INSTANCE_FEATURE_SSL            = (1 << 5),
+} STREAM_NODE_INSTANCE_FEATURES;
+
+typedef struct stream_node_instance {
+    uuid_t uuid;
+    STRING *agent;
+    STREAM_NODE_INSTANCE_FEATURES features;
+    uint32_t hops;
+
+    // receiver information on that agent
+    int32_t capabilities;
+    uint32_t local_port;
+    uint32_t remote_port;
+    STRING *local_ip;
+    STRING *remote_ip;
+} STREAM_NODE_INSTANCE;
+*/
+
 struct receiver_state {
     RRDHOST *host;
     pid_t tid;
@@ -297,6 +322,13 @@ struct receiver_state {
 #endif
 
     time_t replication_first_time_t;
+
+/*
+    struct {
+        uint32_t count;
+        STREAM_NODE_INSTANCE *array;
+    } instances;
+*/
 };
 
 struct rrdpush_destinations {

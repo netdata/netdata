@@ -42,6 +42,7 @@ bool is_storage_engine_shared(STORAGE_INSTANCE *engine __maybe_unused) {
 }
 
 RRDHOST *find_host_by_node_id(char *node_id) {
+
     uuid_t node_uuid;
     if (unlikely(!node_id || uuid_parse(node_id, node_uuid)))
         return NULL;
@@ -1394,7 +1395,7 @@ void rrdhost_set_is_parent_label(void) {
 
         //queue a node info
 #ifdef ENABLE_ACLK
-        if (netdata_cloud_setting) {
+        if (netdata_cloud_enabled) {
             aclk_queue_node_info(localhost, false);
         }
 #endif

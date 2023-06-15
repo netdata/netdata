@@ -155,7 +155,7 @@ biofailed:
 static int wait_till_cloud_enabled()
 {
     info("Waiting for Cloud to be enabled");
-    while (!netdata_cloud_setting) {
+    while (!netdata_cloud_enabled) {
         sleep_usec(USEC_PER_SEC * 1);
         if (!service_running(SERVICE_ACLK))
             return 1;

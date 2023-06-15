@@ -822,7 +822,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
 #ifdef ENABLE_ACLK
     // in case we have cloud connection we inform cloud
     // new child connected
-    if (netdata_cloud_setting)
+    if (netdata_cloud_enabled)
         aclk_host_state_update(rpt->host, 1);
 #endif
 
@@ -851,7 +851,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
 #ifdef ENABLE_ACLK
     // in case we have cloud connection we inform cloud
     // a child disconnected
-    if (netdata_cloud_setting)
+    if (netdata_cloud_enabled)
         aclk_host_state_update(rpt->host, 0);
 #endif
 
