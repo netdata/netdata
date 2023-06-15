@@ -52,6 +52,7 @@ dist_noinst_DATA = \
 
 dist_web_DATA = \
     dashboard.js \
+    $(srcdir)/switch.html \
     $(srcdir)/dashboard_info.js \
     $(srcdir)/dashboard_info_custom_example.js \
     $(srcdir)/main.css \
