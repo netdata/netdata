@@ -7,12 +7,19 @@
  *  EBPF HELP FUNCTIONS
  *****************************************************************/
 
-static void ebpf_function_enable_help(const char *transaction) {
+/**
+ * Thread Help
+ *
+ * Shows help with all options accepted by thread function.
+ *
+ * @param transaction  the transaction id that Netdata sent for this function execution
+*/
+static void ebpf_function_thread_manipulation_help(const char *transaction) {
     pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600);
     fprintf(stdout, "%s",
-            "ebpf.plugin / enable\n"
+            "ebpf.plugin / thread\n"
             "\n"
-            "Function `enable` allows user to control eBPF threads.\n"
+            "Function `thread` allows user to control eBPF threads.\n"
             "\n"
             "The following filters are supported:\n"
             "\n"
@@ -66,12 +73,12 @@ static void ebpf_function_error(const char *transaction, int code, const char *m
  * Enable a specific thread.
  *
  * @param transaction  the transaction id that Netdata sent for this function execution
- * @param function     function name and arguments given to enable threads.
+ * @param function     function name and arguments given to thread.
  * @param line_buffer  buffer used to parse args
  * @param line_max     Number of arguments given
  * @param timeout      The function timeout
  */
-static void ebpf_function_enable(const char *transaction,
+static void ebpf_function_thread_manipulation(const char *transaction,
                                  char *function __maybe_unused,
                                  char *line_buffer __maybe_unused,
                                  int line_max __maybe_unused,
@@ -85,7 +92,7 @@ static void ebpf_function_enable(const char *transaction,
             break;
 
         if(strcmp(keyword, "help") == 0) {
-            ebpf_function_enable_help(transaction);
+            ebpf_function_thread_manipulation_help(transaction);
             return;
         }
     }
@@ -129,7 +136,7 @@ void *ebpf_function_thread(void *ptr)
             else {
                 int timeout = str2i(timeout_s);
                 if (!strncmp(function, EBPF_FUNCTION_ENABLE, sizeof(EBPF_FUNCTION_ENABLE) - 1))
-                    ebpf_function_enable(transaction, function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
+                    ebpf_function_thread_manipulation(transaction, function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
                 else
                     ebpf_function_error(transaction,
                                         HTTP_RESP_NOT_FOUND,
