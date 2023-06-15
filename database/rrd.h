@@ -225,6 +225,8 @@ typedef enum __attribute__ ((__packed__)) rrddim_options {
     RRDDIM_OPTION_HIDDEN                            = (1 << 0), // this dimension will not be offered to callers
     RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS   = (1 << 1), // do not offer RESET or OVERFLOW info to callers
     RRDDIM_OPTION_BACKFILLED_HIGH_TIERS             = (1 << 2), // when set, we have backfilled higher tiers
+    RRDDIM_OPTION_UPDATED                           = (1 << 3), // single-threaded collector updated flag
+    RRDDIM_OPTION_EXPOSED                           = (1 << 4), // single-threaded collector exposed flag
 
     // this is 8-bit
 } RRDDIM_OPTIONS;
@@ -344,11 +346,10 @@ struct rrddim {
     RRD_MEMORY_MODE rrd_memory_mode;                // the memory mode for this dimension
     RRDDIM_FLAGS flags;                             // run time changing status flags
 
-    bool updated;                                   // 1 when the dimension has been updated since the last processing
-    bool exposed;                                   // 1 when set what have sent this dimension to the central netdata
-
     int32_t multiplier;                             // the multiplier of the collected values
     int32_t divisor;                                // the divider of the collected values
+
+    uint32_t collections_counter;                   // the number of times we added values to this rrddim
 
     // ------------------------------------------------------------------------
     // operational state members
@@ -359,19 +360,15 @@ struct rrddim {
     // linking to siblings and parents
 
     struct rrdset *rrdset;
-
     RRDMETRIC_ACQUIRED *rrdmetric;                  // the rrdmetric of this dimension
 
     // ------------------------------------------------------------------------
     // data collection members
 
-    struct rrddim_tier tiers[RRD_STORAGE_TIERS];   // our tiers of databases
-
     struct timeval last_collected_time;             // when was this dimension last updated
                                                     // this is actual date time we updated the last_collected_value
                                                     // THIS IS DIFFERENT FROM THE SAME MEMBER OF RRDSET
 
-    size_t collections_counter;                     // the number of times we added values to this rrddim
     collected_number collected_value_max;           // the absolute maximum of the collected value
 
     NETDATA_DOUBLE calculated_value;                // the current calculated value, after applying the algorithm - resets to zero after being used
@@ -395,10 +392,24 @@ struct rrddim {
     size_t memsize;                                 // the memory allocated for this dimension (without RRDDIM)
     void *rd_on_file;                               // pointer to the header written on disk
     storage_number *db;                             // the array of values
+
+    // ------------------------------------------------------------------------
+
+    struct rrddim_tier tiers[];                     // our tiers of databases
 };
+
+size_t rrddim_size(void);
 
 #define rrddim_id(rd) string2str((rd)->id)
 #define rrddim_name(rd) string2str((rd) ->name)
+
+#define rrddim_check_updated(rd) ((rd)->options & RRDDIM_OPTION_UPDATED)
+#define rrddim_set_updated(rd) (rd)->options |= RRDDIM_OPTION_UPDATED
+#define rrddim_clear_updated(rd) (rd)->options &= ~RRDDIM_OPTION_UPDATED
+
+#define rrddim_check_exposed(rd) ((rd)->options & RRDDIM_OPTION_EXPOSED)
+#define rrddim_set_exposed(rd) (rd)->options |= RRDDIM_OPTION_EXPOSED
+#define rrddim_clear_exposed(rd) (rd)->options &= ~RRDDIM_OPTION_EXPOSED
 
 // returns the RRDDIM cache filename, or NULL if it does not exist
 const char *rrddim_cache_filename(RRDDIM *rd);

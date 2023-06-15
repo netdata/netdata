@@ -258,7 +258,7 @@ static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
 
         RRDDIM *rd;
         rrddim_foreach_read(rd, st)
-            rd->exposed = 0;
+            rrddim_clear_exposed(rd);
         rrddim_foreach_done(rd);
     }
     rrdset_foreach_done(st);

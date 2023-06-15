@@ -284,7 +284,7 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
                 , rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN)?"hidden":""
                 , rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
         );
-        rd->exposed = 1;
+        rrddim_set_exposed(rd);
     }
     rrddim_foreach_done(rd);
 
@@ -338,10 +338,10 @@ static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_sta
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        if(unlikely(!rd->updated))
+        if(unlikely(!rrddim_check_updated(rd)))
             continue;
 
-        if(likely(rd->exposed)) {
+        if(likely(rrddim_check_exposed(rd))) {
             buffer_fast_strcat(wb, "SET \"", 5);
             buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
             buffer_fast_strcat(wb, "\" = ", 4);

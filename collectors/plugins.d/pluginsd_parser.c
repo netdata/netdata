@@ -1757,7 +1757,7 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
     rd->last_stored_value = value;
     rd->last_calculated_value = value;
     rd->collections_counter++;
-    rd->updated = true;
+    rrddim_set_updated(rd);
 
     timing_step(TIMING_STEP_SET2_STORE);
 
@@ -1814,7 +1814,7 @@ PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_
     rrddim_foreach_read(rd, st) {
                 rd->calculated_value = 0;
                 rd->collected_value = 0;
-                rd->updated = false;
+                rrddim_clear_updated(rd);
             }
     rrddim_foreach_done(rd);
 

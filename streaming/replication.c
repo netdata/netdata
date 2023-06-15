@@ -168,7 +168,7 @@ static struct replication_query *replication_query_prepare(
     size_t count = 0;
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        if (unlikely(!rd || !rd_dfe.item || !rd->exposed))
+        if (unlikely(!rd || !rd_dfe.item || !rrddim_check_exposed(rd)))
             continue;
 
         if (unlikely(rd_dfe.counter >= q->dimensions)) {
@@ -216,7 +216,7 @@ static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st, STRE
     NUMBER_ENCODING encoding = (capabilities & STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
     RRDDIM *rd;
     rrddim_foreach_read(rd, st){
-        if (!rd->exposed) continue;
+        if (!rrddim_check_exposed(rd)) continue;
 
         buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE " '",
                            sizeof(PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE) - 1 + 2);

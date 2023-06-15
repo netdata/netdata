@@ -1821,7 +1821,7 @@ static inline void rrddim_set_by_pointer_fake_time(RRDDIM *rd, collected_number 
     rd->last_collected_time.tv_sec = now;
     rd->last_collected_time.tv_usec = 0;
     rd->collected_value = value;
-    rd->updated = 1;
+    rrddim_set_updated(rd);
 
     rd->collections_counter++;
 

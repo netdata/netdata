@@ -1437,7 +1437,7 @@ static inline size_t rrdset_done_interpolate(
                 continue;
             }
 
-            if(likely(rd->updated && rd->collections_counter > 1 && iterations < gap_when_lost_iterations_above)) {
+            if(likely(rrddim_check_updated(rd) && rd->collections_counter > 1 && iterations < gap_when_lost_iterations_above)) {
                 uint32_t dim_storage_flags = storage_flags;
 
                 if (ml_dimension_is_anomalous(rd, current_time_s, new_value, true)) {
@@ -1659,7 +1659,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
         rda->rd = dictionary_acquired_item_value(rda->item);
 
         // calculate totals
-        if(likely(rd->updated)) {
+        if(likely(rrddim_check_updated(rd))) {
             // if the new is smaller than the old (an overflow, or reset), set the old equal to the new
             // to reset the calculation (it will give zero as the calculation for this second)
             if(unlikely(rd->algorithm == RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL && rd->last_collected_value > rd->collected_value)) {
@@ -1700,7 +1700,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
         rd = rda->rd;
         if(unlikely(!rd)) continue;
 
-        if(unlikely(!rd->updated)) {
+        if(unlikely(!rrddim_check_updated(rd))) {
             rd->calculated_value = 0;
             continue;
         }
@@ -1905,7 +1905,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
         rd = rda->rd;
         if(unlikely(!rd)) continue;
 
-        if(unlikely(!rd->updated))
+        if(unlikely(!rrddim_check_updated(rd)))
             continue;
 
         rrdset_debug(st, "%s: setting last_collected_value (old: " COLLECTED_NUMBER_FORMAT ") to last_collected_value (new: " COLLECTED_NUMBER_FORMAT ")", rrddim_name(rd), rd->last_collected_value, rd->collected_value);
@@ -1943,7 +1943,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
 
         rd->calculated_value = 0;
         rd->collected_value = 0;
-        rd->updated = 0;
+        rrddim_clear_updated(rd);
 
         rrdset_debug(st, "%s: END "
                     " last_collected_value = " COLLECTED_NUMBER_FORMAT
