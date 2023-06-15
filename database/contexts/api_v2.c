@@ -578,7 +578,11 @@ void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time
     buffer_json_member_add_time_t(wb, "now", now_s);
     buffer_json_member_add_uint64(wb, "ai", 0);
     buffer_json_member_add_string(wb, "v", string2str(localhost->program_version));
-    buffer_json_member_add_string(wb, "cloud", cloud_status_to_string(cloud_status()));
+
+    buffer_json_member_add_object(wb, "cloud");
+    buffer_json_member_add_string(wb, "status", cloud_status_to_string(cloud_status()));
+    buffer_json_object_close(wb);
+
     agent_capabilities_to_json(wb, localhost, "cp");
 
     if(timings)
