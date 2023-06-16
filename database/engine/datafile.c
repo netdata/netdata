@@ -410,11 +410,12 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         freez(datafiles);
         return 0;
     }
-    if (matched_files == MAX_DATAFILES) {
+
+    if (matched_files == MAX_DATAFILES)
         error("DBENGINE: warning: hit maximum database engine file limit of %d files", MAX_DATAFILES);
-    }
+
     qsort(datafiles, matched_files, sizeof(*datafiles), scan_data_files_cmp);
-    /* TODO: change this when tiering is implemented */
+
     ctx->atomic.last_fileno = datafiles[matched_files - 1]->fileno;
 
     for (failed_to_load = 0, i = 0 ; i < matched_files ; ++i) {
@@ -422,9 +423,9 @@ static int scan_data_files(struct rrdengine_instance *ctx)
 
         datafile = datafiles[i];
         ret = load_data_file(datafile);
-        if (0 != ret) {
+        if (0 != ret)
             must_delete_pair = 1;
-        }
+
         journalfile = journalfile_alloc_and_init(datafile);
         ret = journalfile_load(ctx, journalfile, datafile);
         if (0 != ret) {
@@ -432,6 +433,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
                 close_data_file(datafile);
             must_delete_pair = 1;
         }
+
         if (must_delete_pair) {
             char path[RRDENG_PATH_MAX];
 
@@ -455,6 +457,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->unsafe.pos);
         datafile_list_insert(ctx, datafile);
     }
+
     matched_files -= failed_to_load;
     freez(datafiles);
 

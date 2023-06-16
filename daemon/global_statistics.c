@@ -1718,7 +1718,7 @@ static void dbengine2_statistics_charts(void) {
     cache_efficiency_stats = rrdeng_get_cache_efficiency_stats();
 
     mrg_stats_old = mrg_stats;
-    mrg_stats = mrg_get_statistics(main_mrg);
+    mrg_get_statistics(main_mrg, &mrg_stats);
 
     struct rrdeng_buffer_sizes buffers = rrdeng_get_buffer_sizes();
     size_t buffers_total_size = buffers.handles + buffers.xt_buf + buffers.xt_io + buffers.pdc + buffers.descriptors +

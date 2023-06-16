@@ -112,8 +112,9 @@ struct pgc {
     PGC_CACHE_LINE_PADDING(0);
 
     struct pgc_index {
-        netdata_rwlock_t rwlock;
+        RW_SPINLOCK rw_spinlock;
         Pvoid_t sections_judy;
+        PGC_CACHE_LINE_PADDING(0);
     } *index;
 
     PGC_CACHE_LINE_PADDING(1);
@@ -222,19 +223,16 @@ static inline size_t pgc_indexing_partition(PGC *cache, Word_t metric_id) {
 }
 
 static inline void pgc_index_read_lock(PGC *cache, size_t partition) {
-    netdata_rwlock_rdlock(&cache->index[partition].rwlock);
+    rw_spinlock_read_lock(&cache->index[partition].rw_spinlock);
 }
 static inline void pgc_index_read_unlock(PGC *cache, size_t partition) {
-    netdata_rwlock_unlock(&cache->index[partition].rwlock);
+    rw_spinlock_read_unlock(&cache->index[partition].rw_spinlock);
 }
-//static inline bool pgc_index_write_trylock(PGC *cache, size_t partition) {
-//    return !netdata_rwlock_trywrlock(&cache->index[partition].rwlock);
-//}
 static inline void pgc_index_write_lock(PGC *cache, size_t partition) {
-    netdata_rwlock_wrlock(&cache->index[partition].rwlock);
+    rw_spinlock_write_lock(&cache->index[partition].rw_spinlock);
 }
 static inline void pgc_index_write_unlock(PGC *cache, size_t partition) {
-    netdata_rwlock_unlock(&cache->index[partition].rwlock);
+    rw_spinlock_write_unlock(&cache->index[partition].rw_spinlock);
 }
 
 static inline bool pgc_ll_trylock(PGC *cache __maybe_unused, struct pgc_linked_list *ll) {
@@ -1779,7 +1777,7 @@ PGC *pgc_create(const char *name,
     cache->index = callocz(cache->config.partitions, sizeof(struct pgc_index));
 
     for(size_t part = 0; part < cache->config.partitions ; part++)
-        netdata_rwlock_init(&cache->index[part].rwlock);
+        rw_spinlock_init(&cache->index[part].rw_spinlock);
 
     spinlock_init(&cache->hot.spinlock);
     spinlock_init(&cache->dirty.spinlock);
@@ -1853,8 +1851,8 @@ void pgc_destroy(PGC *cache) {
     else {
         pointer_destroy_index(cache);
 
-        for(size_t part = 0; part < cache->config.partitions ; part++)
-            netdata_rwlock_destroy(&cache->index[part].rwlock);
+//        for(size_t part = 0; part < cache->config.partitions ; part++)
+//            netdata_rwlock_destroy(&cache->index[part].rw_spinlock);
 
 #ifdef PGC_WITH_ARAL
         for(size_t part = 0; part < cache->config.partitions ; part++)

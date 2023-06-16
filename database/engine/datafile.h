@@ -21,7 +21,7 @@ struct rrdengine_instance;
 #endif
 
 #define MIN_DATAFILE_SIZE   (4LU * 1024LU * 1024LU)
-#define MAX_DATAFILES (65536) /* Supports up to 64TiB for now */
+#define MAX_DATAFILES (65536 * 4) /* Supports up to 64TiB for now */
 #define TARGET_DATAFILES (50)
 
 typedef enum __attribute__ ((__packed__)) {
