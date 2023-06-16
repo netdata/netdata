@@ -26,7 +26,7 @@ dist_web_DATA = \
     $(srcdir)/index.html \
     $(srcdir)/infographic.html \
     $(srcdir)/manifest.json \
-    $(srcdir)/precache-manifest.21dcd7c609bff6504512face054c360f.js \
+    $(srcdir)/precache-manifest.bd84a3c001b18550e33345eda81322f8.js \
     $(srcdir)/refresh-badges.js \
     $(srcdir)/robots.txt \
     $(srcdir)/service-worker.js \
@@ -147,9 +147,9 @@ webstaticjsdir=$(webdir)/static/js
 dist_webstaticjs_DATA = \
     $(srcdir)/static/js/10.a5cd7d0e.chunk.js \
     $(srcdir)/static/js/10.a5cd7d0e.chunk.js.map \
-    $(srcdir)/static/js/2.ae48988e.chunk.js \
-    $(srcdir)/static/js/2.ae48988e.chunk.js.LICENSE \
-    $(srcdir)/static/js/2.ae48988e.chunk.js.map \
+    $(srcdir)/static/js/2.fbe8638b.chunk.js \
+    $(srcdir)/static/js/2.fbe8638b.chunk.js.LICENSE \
+    $(srcdir)/static/js/2.fbe8638b.chunk.js.map \
     $(srcdir)/static/js/3.f137faca.chunk.js \
     $(srcdir)/static/js/3.f137faca.chunk.js.map \
     $(srcdir)/static/js/4.2dbcd906.chunk.js \
