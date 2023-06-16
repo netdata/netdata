@@ -18,10 +18,9 @@ static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unu
         // they are not null and not empty
 
         if(!strcmp(name, "scope_nodes")) req.scope_nodes = value;
-        else if((options & (CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODES_INSTANCES | CONTEXTS_V2_CONTEXTS))
-                && !strcmp(name, "nodes")) req.nodes = value;
-        else if((options & CONTEXTS_V2_CONTEXTS) && !strcmp(name, "scope_contexts")) req.scope_contexts = value;
-        else if((options & CONTEXTS_V2_CONTEXTS) && !strcmp(name, "contexts")) req.contexts = value;
+        else if(!strcmp(name, "nodes")) req.nodes = value;
+        else if((options & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH)) && !strcmp(name, "scope_contexts")) req.scope_contexts = value;
+        else if((options & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH)) && !strcmp(name, "contexts")) req.contexts = value;
         else if((options & CONTEXTS_V2_SEARCH) && !strcmp(name, "q")) req.q = value;
         else if(!strcmp(name, "options")) {
             if(strstr(value, "minify"))
