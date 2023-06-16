@@ -7,9 +7,9 @@
 #define NETDATA_DIRECTORY_FUNCTIONS_CONFIG_FILE "functions.conf"
 
 // function list
-#define EBPF_FUNCTION_THREAD "thread"
+#define EBPF_FUNCTION_THREAD "ebpf_thread"
 
-#define EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION "Detailed information on the currently running processes."
+#define EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION "Detailed information on the currently running threads."
 
 #define EBPF_PLUGIN_FUNCTIONS(NAME, DESC) do { \
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " \"" NAME "\" 10 \"%s\"\n", DESC); \
