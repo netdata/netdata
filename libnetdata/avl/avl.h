@@ -10,20 +10,11 @@
 #define AVL_MAX_HEIGHT 92
 #endif
 
-#ifndef AVL_WITHOUT_PTHREADS
-#include <pthread.h>
-
-// #define AVL_LOCK_WITH_MUTEX 1
-
-#ifdef AVL_LOCK_WITH_MUTEX
-#define AVL_LOCK_INITIALIZER NETDATA_MUTEX_INITIALIZER
-#else /* AVL_LOCK_WITH_MUTEX */
+#if defined(AVL_LOCK_WITH_RWLOCK)
 #define AVL_LOCK_INITIALIZER NETDATA_RWLOCK_INITIALIZER
-#endif /* AVL_LOCK_WITH_MUTEX */
-
-#else /* AVL_WITHOUT_PTHREADS */
-#define AVL_LOCK_INITIALIZER
-#endif /* AVL_WITHOUT_PTHREADS */
+#else
+#define AVL_LOCK_INITIALIZER NETDATA_RW_SPINLOCK_INITIALIZER
+#endif
 
 /* Data structures */
 
@@ -42,13 +33,11 @@ typedef struct avl_tree_type {
 typedef struct avl_tree_lock {
     avl_tree_type avl_tree;
 
-#ifndef AVL_WITHOUT_PTHREADS
-#ifdef AVL_LOCK_WITH_MUTEX
-    netdata_mutex_t mutex;
-#else /* AVL_LOCK_WITH_MUTEX */
+#if defined(AVL_LOCK_WITH_RWLOCK)
     netdata_rwlock_t rwlock;
-#endif /* AVL_LOCK_WITH_MUTEX */
-#endif /* AVL_WITHOUT_PTHREADS */
+#else
+    RW_SPINLOCK rwlock;
+#endif
 } avl_tree_lock;
 
 /* Public methods */
