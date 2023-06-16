@@ -64,7 +64,7 @@ static void ebpf_function_error(const char *transaction, int code, const char *m
 }
 
 /*****************************************************************
- *  EBPF ENABLE FUNCTION
+ *  EBPF THREAD FUNCTION
  *****************************************************************/
 
 /**
@@ -135,7 +135,7 @@ void *ebpf_function_thread(void *ptr)
             }
             else {
                 int timeout = str2i(timeout_s);
-                if (!strncmp(function, EBPF_FUNCTION_ENABLE, sizeof(EBPF_FUNCTION_ENABLE) - 1))
+                if (!strncmp(function, EBPF_FUNCTION_THREAD, sizeof(EBPF_FUNCTION_THREAD) - 1))
                     ebpf_function_thread_manipulation(transaction, function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
                 else
                     ebpf_function_error(transaction,

@@ -7,7 +7,7 @@
 #define NETDATA_DIRECTORY_FUNCTIONS_CONFIG_FILE "functions.conf"
 
 // function list
-#define EBPF_FUNCTION_ENABLE "enable"
+#define EBPF_FUNCTION_THREAD "thread"
 
 void *ebpf_function_thread(void *ptr);
 
