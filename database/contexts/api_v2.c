@@ -379,10 +379,10 @@ static void agent_capabilities_to_json(BUFFER *wb, RRDHOST *host, const char *ke
             continue;
         }
 
-        buffer_json_add_array_item_array(wb);
-        buffer_json_add_array_item_string(wb, capa->name);
-        buffer_json_add_array_item_uint64(wb, capa->version);
-        buffer_json_array_close(wb);
+        buffer_json_add_array_item_object(wb);
+        buffer_json_member_add_string(wb, "name", capa->name);
+        buffer_json_member_add_uint64(wb, "version", capa->version);
+        buffer_json_object_close(wb);
         capa++;
     }
     buffer_json_array_close(wb);
@@ -485,6 +485,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
             buffer_json_member_add_object(wb, "db");
             {
                 buffer_json_member_add_string(wb, "status", rrdhost_db_status_to_string(s.db.status));
+                buffer_json_member_add_string(wb, "liveness", rrdhost_db_liveness_to_string(s.db.liveness));
                 buffer_json_member_add_time_t(wb, "first_time", s.db.first_time_s);
                 buffer_json_member_add_time_t(wb, "last_time", s.db.last_time_s);
                 buffer_json_member_add_uint64(wb, "metrics", s.db.metrics);

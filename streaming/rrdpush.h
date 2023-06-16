@@ -442,6 +442,22 @@ static inline const char *rrdhost_db_status_to_string(RRDHOST_DB_STATUS status) 
 }
 
 typedef enum __attribute__((packed)) {
+    RRDHOST_DB_LIVENESS_STALE = 0,
+    RRDHOST_DB_LIVENESS_LIVE,
+} RRDHOST_DB_LIVENESS;
+
+static inline const char *rrdhost_db_liveness_to_string(RRDHOST_DB_LIVENESS status) {
+    switch(status) {
+        default:
+        case RRDHOST_DB_LIVENESS_STALE:
+            return "stale";
+
+        case RRDHOST_DB_LIVENESS_LIVE:
+            return "live";
+    }
+}
+
+typedef enum __attribute__((packed)) {
     RRDHOST_INGEST_STATUS_ARCHIVED = 0,
     RRDHOST_INGEST_STATUS_INITIALIZING,
     RRDHOST_INGEST_STATUS_REPLICATING,
@@ -583,6 +599,7 @@ typedef struct rrdhost_status {
 
     struct {
         RRDHOST_DB_STATUS status;
+        RRDHOST_DB_LIVENESS liveness;
         time_t first_time_s;
         time_t last_time_s;
         size_t metrics;

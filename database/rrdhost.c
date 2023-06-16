@@ -1803,6 +1803,10 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     if(!s->ingest.reason)
         s->ingest.reason = "";
 
+    if(s->ingest.status == RRDHOST_INGEST_STATUS_ONLINE)
+        s->db.liveness = RRDHOST_DB_LIVENESS_LIVE;
+    else
+        s->db.liveness = RRDHOST_DB_LIVENESS_STALE;
 
     // --- stream ---
 
