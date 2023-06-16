@@ -25,7 +25,7 @@
 #define EBPF_THREAD_STATUS_STOPPED "stopped"
 
 // function list
-#define EBPF_FUNCTION_ENABLE "enable"
+#define EBPF_FUNCTION_THREAD "thread"
 
 void *ebpf_function_thread(void *ptr);
 
