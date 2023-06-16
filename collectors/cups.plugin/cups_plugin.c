@@ -17,7 +17,7 @@
 static int debug = 0;
 
 static int netdata_update_every = 1;
-static int netdata_priority = 100004;
+static uint32_t netdata_priority = 100004;
 
 http_t *http; // connection to the cups daemon
 
@@ -25,7 +25,9 @@ http_t *http; // connection to the cups daemon
  * Used to aggregate job metrics for a destination (and all destinations).
  */
 struct job_metrics {
-    int is_collected; // flag if this was collected in the current cycle
+    uint32_t id;
+
+    bool is_collected; // flag if this was collected in the current cycle
 
     int num_pending;
     int num_processing;
@@ -140,7 +142,7 @@ getIntegerOption(
 static int reset_job_metrics(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data __maybe_unused) {
     struct job_metrics *jm = (struct job_metrics *)entry;
 
-    jm->is_collected = 0;
+    jm->is_collected = false;
     jm->num_held = 0;
     jm->num_pending = 0;
     jm->num_processing = 0;
@@ -151,28 +153,34 @@ static int reset_job_metrics(const DICTIONARY_ITEM *item __maybe_unused, void *e
     return 0;
 }
 
+void send_job_charts_definitions_to_netdata(const char *name, uint32_t job_id, bool obsolete) {
+    printf("CHART cups.job_num_%s '' 'Active jobs of %s' jobs '%s' cups.destination_job_num stacked %u %i %s\n",
+           name, name, name, netdata_priority + job_id, netdata_update_every, obsolete?"obsolete":"");
+    printf("DIMENSION pending '' absolute 1 1\n");
+    printf("DIMENSION held '' absolute 1 1\n");
+    printf("DIMENSION processing '' absolute 1 1\n");
+
+    printf("CHART cups.job_size_%s '' 'Active jobs size of %s' KB '%s' cups.destination_job_size stacked %u %i %s\n",
+           name, name, name, netdata_priority + 1 + job_id, netdata_update_every, obsolete?"obsolete":"");
+    printf("DIMENSION pending '' absolute 1 1\n");
+    printf("DIMENSION held '' absolute 1 1\n");
+    printf("DIMENSION processing '' absolute 1 1\n");
+}
+
 struct job_metrics *get_job_metrics(char *dest) {
     struct job_metrics *jm = dictionary_get(dict_dest_job_metrics, dest);
 
     if (unlikely(!jm)) {
-        struct job_metrics new_job_metrics;
-        reset_job_metrics(NULL, &new_job_metrics, NULL);
+        static uint32_t job_id = 0;
+        struct job_metrics new_job_metrics = { .id = ++job_id };
         jm = dictionary_set(dict_dest_job_metrics, dest, &new_job_metrics, sizeof(struct job_metrics));
-
-        printf("CHART cups.job_num_%s '' 'Active jobs of %s' jobs '%s' cups.destination_job_num stacked %i %i\n", dest, dest, dest, netdata_priority++, netdata_update_every);
-        printf("DIMENSION pending '' absolute 1 1\n");
-        printf("DIMENSION held '' absolute 1 1\n");
-        printf("DIMENSION processing '' absolute 1 1\n");
-
-        printf("CHART cups.job_size_%s '' 'Active jobs size of %s' KB '%s' cups.destination_job_size stacked %i %i\n", dest, dest, dest, netdata_priority++, netdata_update_every);
-        printf("DIMENSION pending '' absolute 1 1\n");
-        printf("DIMENSION held '' absolute 1 1\n");
-        printf("DIMENSION processing '' absolute 1 1\n");
+        send_job_charts_definitions_to_netdata(dest, jm->id, false);
     };
+
     return jm;
 }
 
-int collect_job_metrics(const DICTIONARY_ITEM *item, void *entry, void *data __maybe_unused) {
+int send_job_metrics_to_netdata(const DICTIONARY_ITEM *item, void *entry, void *data __maybe_unused) {
     const char *name = dictionary_acquired_item_name(item);
 
     struct job_metrics *jm = (struct job_metrics *)entry;
@@ -192,16 +200,12 @@ int collect_job_metrics(const DICTIONARY_ITEM *item, void *entry, void *data __m
             "SET processing = %d\n"
             "END\n",
             name, jm->size_pending, jm->size_held, jm->size_processing);
-    } else {
-        printf("CHART cups.job_num_%s '' 'Active jobs of %s' jobs '%s' cups.destination_job_num stacked 1 %i 'obsolete'\n", name, name, name, netdata_update_every);
-        printf("DIMENSION pending '' absolute 1 1\n");
-        printf("DIMENSION held '' absolute 1 1\n");
-        printf("DIMENSION processing '' absolute 1 1\n");
+    }
+    else {
+        // mark it obsolete
+        send_job_charts_definitions_to_netdata(name, jm->id, true);
 
-        printf("CHART cups.job_size_%s '' 'Active jobs size of %s' KB '%s' cups.destination_job_size stacked 1 %i 'obsolete'\n", name, name, name, netdata_update_every);
-        printf("DIMENSION pending '' absolute 1 1\n");
-        printf("DIMENSION held '' absolute 1 1\n");
-        printf("DIMENSION processing '' absolute 1 1\n");
+        // delete it
         dictionary_del(dict_dest_job_metrics, name);
     }
 
@@ -255,14 +259,11 @@ int main(int argc, char **argv) {
 
     heartbeat_t hb;
     heartbeat_init(&hb);
-    for (iteration = 0; 1; iteration++)
-    {
+    for (iteration = 0; 1; iteration++) {
         heartbeat_next(&hb, step);
 
         if (unlikely(netdata_exit))
-        {
             break;
-        }
 
         reset_metrics();
 
@@ -329,7 +330,7 @@ int main(int argc, char **argv) {
              * This is needed to report also destinations with zero active jobs.
              */
             struct job_metrics *jm = get_job_metrics(curr_dest->name);
-            jm->is_collected = 1;
+            jm->is_collected = true;
         }
         cupsFreeDests(num_dest_total, dests);
 
@@ -341,7 +342,7 @@ int main(int argc, char **argv) {
         int i;
         for (i = num_jobs, curr_job = jobs; i > 0; i--, curr_job++) {
             struct job_metrics *jm = get_job_metrics(curr_job->dest);
-            jm->is_collected = 1;
+            jm->is_collected = true;
 
             switch (curr_job->state) {
                 case IPP_JOB_PENDING:
@@ -369,7 +370,8 @@ int main(int argc, char **argv) {
         }
         cupsFreeJobs(num_jobs, jobs);
 
-        dictionary_walkthrough_write(dict_dest_job_metrics, collect_job_metrics, NULL);
+        dictionary_walkthrough_write(dict_dest_job_metrics, send_job_metrics_to_netdata, NULL);
+        dictionary_garbage_collect(dict_dest_job_metrics);
 
         static int cups_printer_by_option_created = 0;
         if (unlikely(!cups_printer_by_option_created))

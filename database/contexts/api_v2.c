@@ -194,7 +194,7 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
     }
 
     struct rrdcontext_to_json_v2_entry t = {
-            .count = 0,
+            .count = 1,
             .id = rc->id,
             .family = string_dup(rc->family),
             .priority = rc->priority,
@@ -202,30 +202,9 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
             .last_time_s = rc->last_time_s,
             .flags = rc->flags,
             .match = match,
-    }, *z = dictionary_set(ctl->ctx, string2str(rc->id), &t, sizeof(t));
+    };
 
-    if(!z->count) {
-        // we just added this
-        z->count = 1;
-    }
-    else {
-        // it is already in there
-        z->count++;
-        z->flags |= rc->flags;
-
-        if(z->priority > rc->priority)
-            z->priority = rc->priority;
-
-        if(z->first_time_s > rc->first_time_s)
-            z->first_time_s = rc->first_time_s;
-
-        if(z->last_time_s < rc->last_time_s)
-            z->last_time_s = rc->last_time_s;
-
-        if(z->family != rc->family) {
-            z->family = string_2way_merge(z->family, rc->family);
-        }
-    }
+    dictionary_set(ctl->ctx, string2str(rc->id), &t, sizeof(t));
 
     return 1;
 }
@@ -692,6 +671,48 @@ void buffer_json_cloud_timings(BUFFER *wb, const char *key, struct query_timings
     buffer_json_object_close(wb);
 }
 
+bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
+    struct rrdcontext_to_json_v2_entry *o = old_value;
+    struct rrdcontext_to_json_v2_entry *n = new_value;
+
+    o->count++;
+
+    if(o->family != n->family) {
+        STRING *m = string_2way_merge(o->family, n->family);
+        string_freez(o->family);
+        o->family = m;
+    }
+
+    if(o->priority != n->priority) {
+        if((o->flags & RRD_FLAG_COLLECTED) && !(n->flags & RRD_FLAG_COLLECTED))
+            // keep o
+            ;
+        else if(!(o->flags & RRD_FLAG_COLLECTED) && (n->flags & RRD_FLAG_COLLECTED))
+            // keep n
+            o->priority = n->priority;
+        else
+            // keep the min
+            o->priority = MIN(o->priority, n->priority);
+    }
+
+    if(o->first_time_s && n->first_time_s)
+        o->first_time_s = MIN(o->first_time_s, n->first_time_s);
+    else if(!o->first_time_s)
+        o->first_time_s = n->first_time_s;
+
+    if(o->last_time_s && n->last_time_s)
+        o->last_time_s = MAX(o->last_time_s, n->last_time_s);
+    else if(!o->last_time_s)
+        o->last_time_s = n->last_time_s;
+
+    o->flags |= n->flags;
+    o->match = MIN(o->match, n->match);
+
+    string_freez(n->family);
+
+    return true;
+}
+
 void contexts_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct rrdcontext_to_json_v2_entry *z = value;
     string_freez(z->family);
@@ -730,6 +751,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                 DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL,
                 sizeof(struct rrdcontext_to_json_v2_entry));
 
+        dictionary_register_conflict_callback(ctl.ctx, contexts_conflict_callback, NULL);
         dictionary_register_delete_callback(ctl.ctx, contexts_delete_callback, NULL);
     }
 
