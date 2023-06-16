@@ -595,14 +595,19 @@ static void ebpf_create_statistic_charts(ebpf_module_t *em)
         return;
 
     ebpf_create_statistic_thread_chart(em);
+    EBPF_PLUGIN_FUNCTIONS(EBPF_FUNCTION_THREAD, EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
 
     ebpf_create_statistic_load_chart(em);
+    EBPF_PLUGIN_FUNCTIONS(EBPF_FUNCTION_THREAD, EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
 
     ebpf_create_statistic_kernel_memory(em);
+    EBPF_PLUGIN_FUNCTIONS(EBPF_FUNCTION_THREAD, EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
 
     ebpf_create_statistic_hash_tables(em);
+    EBPF_PLUGIN_FUNCTIONS(EBPF_FUNCTION_THREAD, EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
 
     ebpf_create_statistic_hash_per_core(em);
+    EBPF_PLUGIN_FUNCTIONS(EBPF_FUNCTION_THREAD, EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
 }
 
 /**

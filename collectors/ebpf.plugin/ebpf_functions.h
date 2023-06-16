@@ -9,6 +9,13 @@
 // function list
 #define EBPF_FUNCTION_THREAD "thread"
 
+#define EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION "Detailed information on the currently running processes."
+
+#define EBPF_PLUGIN_FUNCTIONS(NAME, DESC) do { \
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " \"" NAME "\" 10 \"%s\"\n", DESC); \
+} while(0)
+
+
 void *ebpf_function_thread(void *ptr);
 
 #endif
