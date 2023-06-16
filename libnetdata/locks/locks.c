@@ -371,6 +371,32 @@ void rw_spinlock_write_unlock(RW_SPINLOCK *rw_spinlock) {
     spinlock_unlock(&rw_spinlock->spinlock);
 }
 
+bool rw_spinlock_tryread_lock(RW_SPINLOCK *rw_spinlock) {
+    if(spinlock_trylock(&rw_spinlock->spinlock)) {
+        __atomic_add_fetch(&rw_spinlock->readers, 1, __ATOMIC_RELAXED);
+        spinlock_unlock(&rw_spinlock->spinlock);
+        return true;
+    }
+
+    return false;
+}
+
+bool rw_spinlock_trywrite_lock(RW_SPINLOCK *rw_spinlock) {
+    if(spinlock_trylock(&rw_spinlock->spinlock)) {
+        if (__atomic_load_n(&rw_spinlock->readers, __ATOMIC_RELAXED) == 0) {
+            // No readers, we've successfully acquired the write lock
+            return true;
+        }
+        else {
+            // There are readers, unlock the spinlock and return false
+            spinlock_unlock(&rw_spinlock->spinlock);
+        }
+    }
+
+    return false;
+}
+
+
 #ifdef NETDATA_TRACE_RWLOCKS
 
 // ----------------------------------------------------------------------------

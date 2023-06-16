@@ -38,6 +38,8 @@ void rw_spinlock_read_lock(RW_SPINLOCK *rw_spinlock);
 void rw_spinlock_read_unlock(RW_SPINLOCK *rw_spinlock);
 void rw_spinlock_write_lock(RW_SPINLOCK *rw_spinlock);
 void rw_spinlock_write_unlock(RW_SPINLOCK *rw_spinlock);
+bool rw_spinlock_tryread_lock(RW_SPINLOCK *rw_spinlock);
+bool rw_spinlock_trywrite_lock(RW_SPINLOCK *rw_spinlock);
 
 #ifdef NETDATA_TRACE_RWLOCKS
 
