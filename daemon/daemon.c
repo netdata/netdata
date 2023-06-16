@@ -57,7 +57,9 @@ static void fix_directory_file_permissions(const char *dirname, uid_t uid, gid_t
         if (de->d_type == DT_DIR) {
             if (false == recursive || !strcmp(de->d_name,".") || !strcmp(de->d_name,".."))
                 continue;
-            fix_directory_file_permissions(de->d_name, uid, gid, false);
+
+            (void) snprintfz(filename, FILENAME_MAX, "%s/%s", dirname, de->d_name);
+            fix_directory_file_permissions(filename, uid, gid, false);
                 return;
         }
 
