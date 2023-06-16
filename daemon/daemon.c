@@ -93,6 +93,10 @@ void prepare_required_directories(uid_t uid, gid_t gid) {
     change_dir_ownership(netdata_configured_log_dir, uid, gid);
     change_dir_ownership(claimingdirectory, uid, gid);
 
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/registry", netdata_configured_varlib_dir);
+    change_dir_ownership(filename, uid, gid);
+
     clean_directory(netdata_configured_lock_dir);
 }
 
