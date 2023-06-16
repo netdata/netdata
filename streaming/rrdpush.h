@@ -664,5 +664,6 @@ typedef struct rrdhost_status {
 } RRDHOST_STATUS;
 
 void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s);
+bool rrdhost_state_cloud_emulation(RRDHOST *host);
 
 #endif //NETDATA_RRDPUSH_H

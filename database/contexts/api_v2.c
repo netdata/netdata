@@ -372,18 +372,14 @@ static void agent_capabilities_to_json(BUFFER *wb, RRDHOST *host, const char *ke
     buffer_json_member_add_array(wb, key);
 
     struct capability *capas = aclk_get_node_instance_capas(host);
-    struct capability *capa = capas;
-    while(capa->name != NULL) {
-        if(!capa->enabled) {
-            capa++;
-            continue;
-        }
-
+    for(struct capability *capa = capas; capa->name ;capa++) {
         buffer_json_add_array_item_object(wb);
-        buffer_json_member_add_string(wb, "name", capa->name);
-        buffer_json_member_add_uint64(wb, "version", capa->version);
+        {
+            buffer_json_member_add_string(wb, "name", capa->name);
+            buffer_json_member_add_uint64(wb, "version", capa->version);
+            buffer_json_member_add_boolean(wb, "enabled", capa->enabled);
+        }
         buffer_json_object_close(wb);
-        capa++;
     }
     buffer_json_array_close(wb);
     freez(capas);
@@ -444,16 +440,16 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
             host_matched = true;
     }
 
-    if(host_matched && (ctl->options & (CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED | CONTEXTS_V2_DEBUG))) {
+    if(host_matched && (ctl->options & (CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED | CONTEXTS_V2_NODES_INSTANCES | CONTEXTS_V2_DEBUG))) {
         buffer_json_add_array_item_object(wb);
         buffer_json_node_add_v2(wb, host, ctl->nodes.ni++, 0);
 
-        if(ctl->options & CONTEXTS_V2_NODES_DETAILED) {
+        if(ctl->options & (CONTEXTS_V2_NODES_DETAILED)) {
             buffer_json_member_add_string(wb, "v", rrdhost_program_version(host));
 
             host_labels2json(host, wb, "labels");
 
-            if(host->system_info) {
+            if (host->system_info) {
                 buffer_json_member_add_object(wb, "hw");
                 {
                     buffer_json_member_add_string_or_empty(wb, "architecture", host->system_info->architecture);
@@ -479,59 +475,79 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
                 buffer_json_object_close(wb);
             }
 
-            time_t now = now_realtime_sec();
-            RRDHOST_STATUS s;
-            rrdhost_status(host, now, &s);
-            buffer_json_member_add_object(wb, "db");
-            {
-                buffer_json_member_add_string(wb, "status", rrdhost_db_status_to_string(s.db.status));
-                buffer_json_member_add_string(wb, "liveness", rrdhost_db_liveness_to_string(s.db.liveness));
-                buffer_json_member_add_time_t(wb, "first_time", s.db.first_time_s);
-                buffer_json_member_add_time_t(wb, "last_time", s.db.last_time_s);
-                buffer_json_member_add_uint64(wb, "metrics", s.db.metrics);
-                buffer_json_member_add_uint64(wb, "instances", s.db.instances);
-                buffer_json_member_add_uint64(wb, "contexts", s.db.contexts);
-            }
-            buffer_json_object_close(wb);
+            // created      - the node is created but never connected to cloud
+            // unreachable  - not currently connected
+            // stale        - connected but not having live data
+            // reachable    - connected with live data
+            // pruned       - not connected for some time and has been removed
+            buffer_json_member_add_string(wb, "state", rrdhost_state_cloud_emulation(host)?"reachable":"stale");
 
-            rrdhost_receiver_to_json(wb, &s, "ingest");
-            rrdhost_sender_to_json(wb, &s, "stream");
-
-            buffer_json_member_add_object(wb, "ml");
-            buffer_json_member_add_string(wb, "status", rrdhost_ml_status_to_string(s.ml.status));
-            buffer_json_member_add_string(wb, "type", rrdhost_ml_type_to_string(s.ml.type));
-            if(s.ml.status == RRDHOST_ML_STATUS_RUNNING) {
-                buffer_json_member_add_object(wb, "metrics");
-                {
-                    buffer_json_member_add_uint64(wb, "anomalous", s.ml.metrics.anomalous);
-                    buffer_json_member_add_uint64(wb, "normal", s.ml.metrics.normal);
-                    buffer_json_member_add_uint64(wb, "trained", s.ml.metrics.trained);
-                    buffer_json_member_add_uint64(wb, "pending", s.ml.metrics.pending);
-                    buffer_json_member_add_uint64(wb, "silenced", s.ml.metrics.silenced);
-                }
-                buffer_json_object_close(wb); // metrics
-            }
-            buffer_json_object_close(wb); // ml
-
-            buffer_json_member_add_object(wb, "health");
-            {
-                buffer_json_member_add_string(wb, "status", rrdhost_health_status_to_string(s.health.status));
-                if(s.health.status == RRDHOST_HEALTH_STATUS_RUNNING) {
-                    buffer_json_member_add_object(wb, "alerts");
-                    {
-                        buffer_json_member_add_uint64(wb, "critical", s.health.alerts.critical);
-                        buffer_json_member_add_uint64(wb, "warning", s.health.alerts.warning);
-                        buffer_json_member_add_uint64(wb, "clear", s.health.alerts.clear);
-                        buffer_json_member_add_uint64(wb, "undefined", s.health.alerts.undefined);
-                        buffer_json_member_add_uint64(wb, "uninitialized", s.health.alerts.uninitialized);
-                    }
-                    buffer_json_object_close(wb); // alerts
-                }
-            }
-            buffer_json_object_close(wb); // health
-
+            agent_capabilities_to_json(wb, host, "capabilities");
         }
 
+        if(ctl->options & (CONTEXTS_V2_NODES_INSTANCES)) {
+            buffer_json_member_add_array(wb, "instances");
+            buffer_json_add_array_item_object(wb); // this instances
+            {
+                buffer_json_member_add_uint64(wb, "ai", 0);
+
+                time_t now = now_realtime_sec();
+                RRDHOST_STATUS s;
+                rrdhost_status(host, now, &s);
+                buffer_json_member_add_object(wb, "db");
+                {
+                    buffer_json_member_add_string(wb, "status", rrdhost_db_status_to_string(s.db.status));
+                    buffer_json_member_add_string(wb, "liveness", rrdhost_db_liveness_to_string(s.db.liveness));
+                    buffer_json_member_add_time_t(wb, "first_time", s.db.first_time_s);
+                    buffer_json_member_add_time_t(wb, "last_time", s.db.last_time_s);
+                    buffer_json_member_add_uint64(wb, "metrics", s.db.metrics);
+                    buffer_json_member_add_uint64(wb, "instances", s.db.instances);
+                    buffer_json_member_add_uint64(wb, "contexts", s.db.contexts);
+                }
+                buffer_json_object_close(wb);
+
+                rrdhost_receiver_to_json(wb, &s, "ingest");
+                rrdhost_sender_to_json(wb, &s, "stream");
+
+                buffer_json_member_add_object(wb, "ml");
+                buffer_json_member_add_string(wb, "status", rrdhost_ml_status_to_string(s.ml.status));
+                buffer_json_member_add_string(wb, "type", rrdhost_ml_type_to_string(s.ml.type));
+                if (s.ml.status == RRDHOST_ML_STATUS_RUNNING) {
+                    buffer_json_member_add_object(wb, "metrics");
+                    {
+                        buffer_json_member_add_uint64(wb, "anomalous", s.ml.metrics.anomalous);
+                        buffer_json_member_add_uint64(wb, "normal", s.ml.metrics.normal);
+                        buffer_json_member_add_uint64(wb, "trained", s.ml.metrics.trained);
+                        buffer_json_member_add_uint64(wb, "pending", s.ml.metrics.pending);
+                        buffer_json_member_add_uint64(wb, "silenced", s.ml.metrics.silenced);
+                    }
+                    buffer_json_object_close(wb); // metrics
+                }
+                buffer_json_object_close(wb); // ml
+
+                buffer_json_member_add_object(wb, "health");
+                {
+                    buffer_json_member_add_string(wb, "status", rrdhost_health_status_to_string(s.health.status));
+                    if (s.health.status == RRDHOST_HEALTH_STATUS_RUNNING) {
+                        buffer_json_member_add_object(wb, "alerts");
+                        {
+                            buffer_json_member_add_uint64(wb, "critical", s.health.alerts.critical);
+                            buffer_json_member_add_uint64(wb, "warning", s.health.alerts.warning);
+                            buffer_json_member_add_uint64(wb, "clear", s.health.alerts.clear);
+                            buffer_json_member_add_uint64(wb, "undefined", s.health.alerts.undefined);
+                            buffer_json_member_add_uint64(wb, "uninitialized", s.health.alerts.uninitialized);
+                        }
+                        buffer_json_object_close(wb); // alerts
+                    }
+                }
+                buffer_json_object_close(wb); // health
+
+                host_functions2json(host, wb); // functions
+                agent_capabilities_to_json(wb, host, "capabilities");
+            }
+            buffer_json_object_close(wb); // this instance
+            buffer_json_array_close(wb); // instances
+        }
         buffer_json_object_close(wb);
     }
 
@@ -567,7 +583,7 @@ void buffer_json_query_timings(BUFFER *wb, const char *key, struct query_timings
     buffer_json_object_close(wb);
 }
 
-void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time_t now_s) {
+void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time_t now_s, bool cloud) {
     if(!now_s)
         now_s = now_realtime_sec();
 
@@ -580,31 +596,31 @@ void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time
     buffer_json_member_add_uint64(wb, "ai", 0);
     buffer_json_member_add_string(wb, "v", string2str(localhost->program_version));
 
-    buffer_json_member_add_object(wb, "cloud");
-    {
-        size_t id = cloud_connection_id();
-        CLOUD_STATUS status = cloud_status();
-        time_t last_change = cloud_last_change();
-        time_t next_connect = cloud_next_connection_attempt();
-        buffer_json_member_add_uint64(wb, "id", id);
-        buffer_json_member_add_string(wb, "status", cloud_status_to_string(status));
-        buffer_json_member_add_time_t(wb, "since", last_change);
-        buffer_json_member_add_time_t(wb, "age", now_s - last_change);
+    if(cloud) {
+        buffer_json_member_add_object(wb, "cloud");
+        {
+            size_t id = cloud_connection_id();
+            CLOUD_STATUS status = cloud_status();
+            time_t last_change = cloud_last_change();
+            time_t next_connect = cloud_next_connection_attempt();
+            buffer_json_member_add_uint64(wb, "id", id);
+            buffer_json_member_add_string(wb, "status", cloud_status_to_string(status));
+            buffer_json_member_add_time_t(wb, "since", last_change);
+            buffer_json_member_add_time_t(wb, "age", now_s - last_change);
 
-        if(status != CLOUD_STATUS_ONLINE)
-            buffer_json_member_add_string(wb, "reason", cloud_offline_reason());
+            if (status != CLOUD_STATUS_ONLINE)
+                buffer_json_member_add_string(wb, "reason", cloud_offline_reason());
 
-        if (status == CLOUD_STATUS_OFFLINE && next_connect > now_s) {
-            buffer_json_member_add_time_t(wb, "next_check", next_connect);
-            buffer_json_member_add_time_t(wb, "next_in", next_connect - now_s);
+            if (status == CLOUD_STATUS_OFFLINE && next_connect > now_s) {
+                buffer_json_member_add_time_t(wb, "next_check", next_connect);
+                buffer_json_member_add_time_t(wb, "next_in", next_connect - now_s);
+            }
+
+            if (status != CLOUD_STATUS_DISABLED && cloud_base_url())
+                buffer_json_member_add_string(wb, "url", cloud_base_url());
         }
-
-        if(status != CLOUD_STATUS_DISABLED && cloud_base_url())
-            buffer_json_member_add_string(wb, "url", cloud_base_url());
-
-        agent_capabilities_to_json(wb, localhost, "capabilities");
+        buffer_json_object_close(wb); // cloud
     }
-    buffer_json_object_close(wb); // cloud
 
     if(timings)
         buffer_json_query_timings(wb, "timings", timings);
@@ -681,7 +697,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         buffer_json_object_close(wb);
     }
 
-    if(options & (CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED | CONTEXTS_V2_DEBUG))
+    if(options & (CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED | CONTEXTS_V2_NODES_INSTANCES | CONTEXTS_V2_DEBUG))
         buffer_json_member_add_array(wb, "nodes");
 
     ssize_t ret = query_scope_foreach_host(ctl.nodes.scope_pattern, ctl.nodes.pattern,
@@ -702,7 +718,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         goto cleanup;
     }
 
-    if(options & (CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED | CONTEXTS_V2_DEBUG))
+    if(options & (CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED | CONTEXTS_V2_NODES_INSTANCES | CONTEXTS_V2_DEBUG))
         buffer_json_array_close(wb);
 
     ctl.timings.executed_ut = now_monotonic_usec();
@@ -738,7 +754,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         buffer_json_object_close(wb);
     }
 
-    buffer_json_agents_array_v2(wb, &ctl.timings, now_s);
+    buffer_json_agents_array_v2(wb, &ctl.timings, now_s, options & (CONTEXTS_V2_NODES_DETAILED));
     buffer_json_cloud_timings(wb, "timings", &ctl.timings);
     buffer_json_finalize(wb);
 

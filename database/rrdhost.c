@@ -1715,6 +1715,12 @@ static NETDATA_DOUBLE rrdhost_sender_replication_completion_unsafe(RRDHOST *host
     return completion;
 }
 
+bool rrdhost_state_cloud_emulation(RRDHOST *host) {
+    return (host == localhost ||
+            !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED) ||
+            rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST)));
+}
+
 void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     memset(s, 0, sizeof(*s));
 
