@@ -43,10 +43,31 @@ static void chown_open_file(int fd, uid_t uid, gid_t gid) {
     }
 }
 
+static void fix_directory_file_permissions(const char *dirname, uid_t uid, gid_t gid)
+{
+    char filename[FILENAME_MAX + 1];
+
+    DIR *dir = opendir(dirname);
+    if (!dir)
+        return;
+
+    struct dirent *de = NULL;
+
+    while ((de = readdir(dir))) {
+        snprintfz(filename, FILENAME_MAX, "%s/%s", dirname, de->d_name);
+        if (chown(filename, uid, gid) == -1)
+            error("Cannot chown directory '%s' to %u:%u", filename, (unsigned int)uid, (unsigned int)gid);
+    }
+
+    closedir(dir);
+}
+
 void change_dir_ownership(const char *dir, uid_t uid, gid_t gid)
 {
     if (chown(dir, uid, gid) == -1)
         error("Cannot chown directory '%s' to %u:%u", dir, (unsigned int)uid, (unsigned int)gid);
+
+    fix_directory_file_permissions(dir, uid, gid);
 }
 
 void clean_directory(char *dirname)
