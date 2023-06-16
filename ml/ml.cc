@@ -1309,8 +1309,6 @@ void ml_chart_new(RRDSET *rs)
     chart->rs = rs;
     chart->mls = ml_machine_learning_stats_t();
 
-    netdata_mutex_init(&chart->mutex);
-
     rs->ml_chart = (rrd_ml_chart_t *) chart;
 }
 
@@ -1322,8 +1320,6 @@ void ml_chart_delete(RRDSET *rs)
 
     ml_chart_t *chart = (ml_chart_t *) rs->ml_chart;
 
-    netdata_mutex_destroy(&chart->mutex);
-
     delete chart;
     rs->ml_chart = NULL;
 }
@@ -1334,7 +1330,6 @@ bool ml_chart_update_begin(RRDSET *rs)
     if (!chart)
         return false;
 
-    netdata_mutex_lock(&chart->mutex);
     chart->mls = {};
     return true;
 }
@@ -1344,8 +1339,6 @@ void ml_chart_update_end(RRDSET *rs)
     ml_chart_t *chart = (ml_chart_t *) rs->ml_chart;
     if (!chart)
         return;
-
-    netdata_mutex_unlock(&chart->mutex);
 }
 
 void ml_dimension_new(RRDDIM *rd)
