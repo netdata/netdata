@@ -54,18 +54,15 @@ static void fix_directory_file_permissions(const char *dirname, uid_t uid, gid_t
     struct dirent *de = NULL;
 
     while ((de = readdir(dir))) {
-        if (de->d_type == DT_DIR) {
-            if (false == recursive || !strcmp(de->d_name,".") || !strcmp(de->d_name,".."))
+        if (de->d_type == DT_DIR && (!strcmp(de->d_name,".") || !strcmp(de->d_name,"..")))
                 continue;
-
-            (void) snprintfz(filename, FILENAME_MAX, "%s/%s", dirname, de->d_name);
-            fix_directory_file_permissions(filename, uid, gid, false);
-                return;
-        }
 
         (void) snprintfz(filename, FILENAME_MAX, "%s/%s", dirname, de->d_name);
         if (chown(filename, uid, gid) == -1)
             error("Cannot chown directory '%s' to %u:%u", filename, (unsigned int)uid, (unsigned int)gid);
+
+        if (de->d_type == DT_DIR && recursive)
+            fix_directory_file_permissions(filename, uid, gid, recursive);
     }
 
     closedir(dir);
