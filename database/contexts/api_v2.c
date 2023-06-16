@@ -230,6 +230,18 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
     return 1;
 }
 
+void buffer_json_agent_status_id(BUFFER *wb, size_t ai, usec_t duration_ut) {
+    buffer_json_member_add_object(wb, "st");
+    {
+        buffer_json_member_add_uint64(wb, "ai", ai);
+        buffer_json_member_add_uint64(wb, "code", 200);
+        buffer_json_member_add_string(wb, "msg", "");
+        if (duration_ut)
+            buffer_json_member_add_double(wb, "ms", (NETDATA_DOUBLE) duration_ut / 1000.0);
+    }
+    buffer_json_object_close(wb);
+}
+
 void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t duration_ut, bool status) {
     buffer_json_member_add_string(wb, "mg", host->machine_guid);
 
@@ -238,17 +250,8 @@ void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t durati
     buffer_json_member_add_string(wb, "nm", rrdhost_hostname(host));
     buffer_json_member_add_uint64(wb, "ni", ni);
 
-    if(status) {
-        buffer_json_member_add_object(wb, "st");
-        {
-            buffer_json_member_add_uint64(wb, "ai", 0);
-            buffer_json_member_add_uint64(wb, "code", 200);
-            buffer_json_member_add_string(wb, "msg", "");
-            if (duration_ut)
-                buffer_json_member_add_double(wb, "ms", (NETDATA_DOUBLE) duration_ut / 1000.0);
-        }
-        buffer_json_object_close(wb);
-    }
+    if(status)
+        buffer_json_agent_status_id(wb, 0, duration_ut);
 }
 
 static void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *key) {
@@ -448,7 +451,8 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
 
     if(host_matched && (ctl->options & CONTEXTS_V2_NODES)) {
         buffer_json_add_array_item_object(wb); // this node
-        buffer_json_node_add_v2(wb, host, ctl->nodes.ni++, 0, ctl->options & CONTEXTS_V2_AGENTS);
+        buffer_json_node_add_v2(wb, host, ctl->nodes.ni++, 0,
+                                (ctl->options & CONTEXTS_V2_AGENTS) && !(ctl->options & CONTEXTS_V2_NODES_INSTANCES));
 
         if(ctl->options & (CONTEXTS_V2_NODES_INFO)) {
             buffer_json_member_add_string(wb, "v", rrdhost_program_version(host));
@@ -495,7 +499,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
             buffer_json_member_add_array(wb, "instances");
             buffer_json_add_array_item_object(wb); // this instance
             {
-                buffer_json_member_add_uint64(wb, "ai", 0);
+                buffer_json_agent_status_id(wb, 0, 0);
 
                 time_t now = now_realtime_sec();
                 RRDHOST_STATUS s;
