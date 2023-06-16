@@ -42,7 +42,7 @@ To enable the webhook integrations on RocketChat you need:
 
 4. You will end up with a webhook endpoint that looks like so:
 ```
-https://your-mattermost-server.rocket.chat/hooks/YYYYYYYYYYYYYYYYYYYYYYYY/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+https://your-server.rocket.chat/hooks/YYYYYYYYYYYYYYYYYYYYYYYY/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ```
    - Treat this endpoint as a secret. Anyone who has it will be able to post messages to your RocketChat instance.
 
