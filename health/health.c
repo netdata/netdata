@@ -628,8 +628,9 @@ static inline void health_alarm_log_process(RRDHOST *host) {
     //delete those that are updated, no in progress execution, and is not repeating
     netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
 
-    ALARM_ENTRY *prev = host->health_log.alarms;
-    for(ae = host->health_log.alarms; ae ; ae = ae->next) {
+    ALARM_ENTRY *prev = NULL, *next = NULL;
+    for(ae = host->health_log.alarms; ae ; ae = next) {
+        next = ae->next; // set it here, for the next iteration
 
         if((likely(!(ae->flags & HEALTH_ENTRY_FLAG_IS_REPEATING)) &&
            (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) &&
@@ -641,15 +642,19 @@ static inline void health_alarm_log_process(RRDHOST *host) {
            (ae->when + 3600 < now_realtime_sec())))
             {
 
-            if (ae == host->health_log.alarms) {
-                host->health_log.alarms = ae->next;
-                prev = ae->next;
-            } else {
-                prev->next = ae->next;
+            if(host->health_log.alarms == ae) {
+                host->health_log.alarms = next;
+                // prev is also NULL here
             }
+            else {
+                prev->next = next;
+                // prev should not be touched here - we need it for the next iteration
+                // because we may have to also remove the next item
+            }
+
             health_alarm_log_free_one_nochecks_nounlink(ae);
-            ae = prev;
-        } else
+        }
+        else
             prev = ae;
     }
 
