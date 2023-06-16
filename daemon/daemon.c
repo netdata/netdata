@@ -43,7 +43,7 @@ static void chown_open_file(int fd, uid_t uid, gid_t gid) {
     }
 }
 
-static void fix_directory_file_permissions(const char *dirname, uid_t uid, gid_t gid)
+static void fix_directory_file_permissions(const char *dirname, uid_t uid, gid_t gid, bool recursive)
 {
     char filename[FILENAME_MAX + 1];
 
@@ -54,6 +54,11 @@ static void fix_directory_file_permissions(const char *dirname, uid_t uid, gid_t
     struct dirent *de = NULL;
 
     while ((de = readdir(dir))) {
+        if (de->d_type == DT_DIR) {
+            if (false == recursive || !strcmp(de->d_name,".") || !strcmp(de->d_name,".."))
+                continue;
+        }
+
         snprintfz(filename, FILENAME_MAX, "%s/%s", dirname, de->d_name);
         if (chown(filename, uid, gid) == -1)
             error("Cannot chown directory '%s' to %u:%u", filename, (unsigned int)uid, (unsigned int)gid);
@@ -62,12 +67,12 @@ static void fix_directory_file_permissions(const char *dirname, uid_t uid, gid_t
     closedir(dir);
 }
 
-void change_dir_ownership(const char *dir, uid_t uid, gid_t gid)
+void change_dir_ownership(const char *dir, uid_t uid, gid_t gid, bool recursive)
 {
     if (chown(dir, uid, gid) == -1)
         error("Cannot chown directory '%s' to %u:%u", dir, (unsigned int)uid, (unsigned int)gid);
 
-    fix_directory_file_permissions(dir, uid, gid);
+    fix_directory_file_permissions(dir, uid, gid, recursive);
 }
 
 void clean_directory(char *dirname)
@@ -87,15 +92,15 @@ void clean_directory(char *dirname)
 }
 
 void prepare_required_directories(uid_t uid, gid_t gid) {
-    change_dir_ownership(netdata_configured_cache_dir, uid, gid);
-    change_dir_ownership(netdata_configured_varlib_dir, uid, gid);
-    change_dir_ownership(netdata_configured_lock_dir, uid, gid);
-    change_dir_ownership(netdata_configured_log_dir, uid, gid);
-    change_dir_ownership(claimingdirectory, uid, gid);
+    change_dir_ownership(netdata_configured_cache_dir, uid, gid, true);
+    change_dir_ownership(netdata_configured_varlib_dir, uid, gid, false);
+    change_dir_ownership(netdata_configured_lock_dir, uid, gid, false);
+    change_dir_ownership(netdata_configured_log_dir, uid, gid, false);
+    change_dir_ownership(claimingdirectory, uid, gid, false);
 
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/registry", netdata_configured_varlib_dir);
-    change_dir_ownership(filename, uid, gid);
+    change_dir_ownership(filename, uid, gid, false);
 
     clean_directory(netdata_configured_lock_dir);
 }
