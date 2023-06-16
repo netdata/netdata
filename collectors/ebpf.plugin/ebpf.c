@@ -2072,7 +2072,7 @@ void set_global_variables()
 static inline void ebpf_load_thread_config()
 {
     int i;
-    for (i = 0; ebpf_modules[i].thread_name; i++) {
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
         ebpf_update_module(&ebpf_modules[i], default_btf, running_on_kernel, isrh);
     }
 }
