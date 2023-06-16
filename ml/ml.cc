@@ -568,9 +568,9 @@ int ml_dimension_load_models(RRDDIM *rd) {
     if (!dim)
         return 0;
 
-    netdata_mutex_lock(&dim->mutex);
+    netdata_spinlock_lock(&dim->slock);
     bool is_empty = dim->km_contexts.empty();
-    netdata_mutex_unlock(&dim->mutex);
+    netdata_spinlock_unlock(&dim->slock);
 
     if (!is_empty)
         return 0;
@@ -602,7 +602,7 @@ int ml_dimension_load_models(RRDDIM *rd) {
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    netdata_mutex_lock(&dim->mutex);
+    netdata_spinlock_lock(&dim->slock);
 
     dim->km_contexts.reserve(Cfg.num_models_to_use);
     while ((rc = sqlite3_step_monitored(res)) == SQLITE_ROW) {
@@ -639,7 +639,7 @@ int ml_dimension_load_models(RRDDIM *rd) {
         dim->ts = TRAINING_STATUS_TRAINED;
     }
 
-    netdata_mutex_unlock(&dim->mutex);
+    netdata_spinlock_unlock(&dim->slock);
 
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to load models, rc = %d", rc);
@@ -666,7 +666,7 @@ ml_dimension_train_model(ml_training_thread_t *training_thread, ml_dimension_t *
     ml_training_response_t training_response = P.second;
 
     if (training_response.result != TRAINING_RESULT_OK) {
-        netdata_mutex_lock(&dim->mutex);
+        netdata_spinlock_lock(&dim->slock);
 
         dim->mt = METRIC_TYPE_CONSTANT;
 
@@ -687,7 +687,8 @@ ml_dimension_train_model(ml_training_thread_t *training_thread, ml_dimension_t *
 
         dim->last_training_time = training_response.last_entry_on_response;
         enum ml_training_result result = training_response.result;
-        netdata_mutex_unlock(&dim->mutex);
+
+        netdata_spinlock_unlock(&dim->slock);
 
         return result;
     }
@@ -713,7 +714,7 @@ ml_dimension_train_model(ml_training_thread_t *training_thread, ml_dimension_t *
     // update models
     worker_is_busy(WORKER_TRAIN_UPDATE_MODELS);
     {
-        netdata_mutex_lock(&dim->mutex);
+        netdata_spinlock_lock(&dim->slock);
 
         if (dim->km_contexts.size() < Cfg.num_models_to_use) {
             dim->km_contexts.push_back(std::move(dim->kmeans));
@@ -752,7 +753,7 @@ ml_dimension_train_model(ml_training_thread_t *training_thread, ml_dimension_t *
         model_info.kmeans = dim->km_contexts.back();
         training_thread->pending_model_info.push_back(model_info);
 
-        netdata_mutex_unlock(&dim->mutex);
+        netdata_spinlock_unlock(&dim->slock);
     }
 
     return training_response.result;
@@ -851,7 +852,7 @@ ml_dimension_predict(ml_dimension_t *dim, time_t curr_time, calculated_number_t 
     /*
      * Lock to predict and possibly schedule the dimension for training
     */
-    if (netdata_mutex_trylock(&dim->mutex) != 0)
+    if (netdata_spinlock_trylock(&dim->slock) == 0)
         return false;
 
     // Mark the metric time as variable if we received different values
@@ -866,7 +867,7 @@ ml_dimension_predict(ml_dimension_t *dim, time_t curr_time, calculated_number_t 
         case TRAINING_STATUS_UNTRAINED:
         case TRAINING_STATUS_PENDING_WITHOUT_MODEL: {
         case TRAINING_STATUS_SILENCED:
-            netdata_mutex_unlock(&dim->mutex);
+            netdata_spinlock_unlock(&dim->slock);
             return false;
         }
         default:
@@ -891,7 +892,7 @@ ml_dimension_predict(ml_dimension_t *dim, time_t curr_time, calculated_number_t 
 
         if (anomaly_score < (100 * Cfg.dimension_anomaly_score_threshold)) {
             global_statistics_ml_models_consulted(models_consulted);
-            netdata_mutex_unlock(&dim->mutex);
+            netdata_spinlock_unlock(&dim->slock);
             return false;
         }
 
@@ -905,7 +906,7 @@ ml_dimension_predict(ml_dimension_t *dim, time_t curr_time, calculated_number_t 
         dim->ts = TRAINING_STATUS_SILENCED;
     }
 
-    netdata_mutex_unlock(&dim->mutex);
+    netdata_spinlock_unlock(&dim->slock);
 
     global_statistics_ml_models_consulted(models_consulted);
     return sum;
@@ -1276,7 +1277,7 @@ void ml_host_stop(RRDHOST *rh) {
             if (!dim)
                 continue;
 
-            netdata_mutex_lock(&dim->mutex);
+            netdata_spinlock_lock(&dim->slock);
 
             // reset dim
             // TODO: should we drop in-mem models, or mark them as stale? Is it
@@ -1291,7 +1292,7 @@ void ml_host_stop(RRDHOST *rh) {
 
             ml_kmeans_init(&dim->kmeans);
 
-            netdata_mutex_unlock(&dim->mutex);
+            netdata_spinlock_unlock(&dim->slock);
         }
         rrddim_foreach_done(rdp);
     }
@@ -1430,7 +1431,7 @@ void ml_dimension_new(RRDDIM *rd)
     else
         dim->mls = MACHINE_LEARNING_STATUS_ENABLED;
 
-    netdata_mutex_init(&dim->mutex);
+    netdata_spinlock_init(&dim->slock);
 
     dim->km_contexts.reserve(Cfg.num_models_to_use);
 
@@ -1444,8 +1445,6 @@ void ml_dimension_delete(RRDDIM *rd)
     ml_dimension_t *dim = (ml_dimension_t *) rd->ml_dimension;
     if (!dim)
         return;
-
-    netdata_mutex_destroy(&dim->mutex);
 
     delete dim;
     rd->ml_dimension = NULL;

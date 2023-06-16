@@ -195,7 +195,7 @@ typedef struct {
     std::vector<calculated_number_t> cns;
 
     std::vector<ml_kmeans_t> km_contexts;
-    netdata_mutex_t mutex;
+    SPINLOCK slock;
     ml_kmeans_t kmeans;
     std::vector<DSample> feature;
 
