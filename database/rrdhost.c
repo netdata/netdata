@@ -917,9 +917,12 @@ void dbengine_init(char *hostname) {
         strncpyz(tiers_init[tier].path, dbenginepath, FILENAME_MAX);
         tiers_init[tier].ret = 0;
 
-        if(parallel_initialization)
-            netdata_thread_create(&tiers_init[tier].thread, "DBENGINE_INIT", NETDATA_THREAD_OPTION_JOINABLE,
+        if(parallel_initialization) {
+            char tag[NETDATA_THREAD_TAG_MAX + 1];
+            snprintfz(tag, NETDATA_THREAD_TAG_MAX, "DBENGINIT[%zu]", tier);
+            netdata_thread_create(&tiers_init[tier].thread, tag, NETDATA_THREAD_OPTION_JOINABLE,
                                   dbengine_tier_init, &tiers_init[tier]);
+        }
         else
             dbengine_tier_init(&tiers_init[tier]);
     }
