@@ -467,6 +467,8 @@ struct api_v2_contexts_request {
     char *contexts;
     char *q;
 
+    time_t after;
+    time_t before;
     time_t timeout_ms;
 
     qt_interrupt_callback_t interrupt_callback;

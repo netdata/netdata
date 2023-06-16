@@ -1305,6 +1305,9 @@ extern RRDHOST *localhost;
 #define rrdhost_sender_replicating_charts_minus_one(host) (__atomic_sub_fetch(&((host)->rrdpush_sender_replicating_charts), 1, __ATOMIC_RELAXED))
 #define rrdhost_sender_replicating_charts_zero(host) (__atomic_store_n(&((host)->rrdpush_sender_replicating_charts), 0, __ATOMIC_RELAXED))
 
+#define rrdhost_is_online(host) ((host) == localhost || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED) || rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST)))
+bool rrdhost_matches_window(RRDHOST *host, time_t after, time_t before, time_t now);
+
 extern DICTIONARY *rrdhost_root_index;
 size_t rrdhost_hosts_available(void);
 

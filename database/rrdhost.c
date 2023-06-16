@@ -1715,10 +1715,14 @@ static NETDATA_DOUBLE rrdhost_sender_replication_completion_unsafe(RRDHOST *host
     return completion;
 }
 
+bool rrdhost_matches_window(RRDHOST *host, time_t after, time_t before, time_t now) {
+    time_t first_time_s, last_time_s;
+    rrdhost_retention(host, now, rrdhost_is_online(host), &first_time_s, &last_time_s);
+    return query_matches_retention(after, before, first_time_s, last_time_s, 0);
+}
+
 bool rrdhost_state_cloud_emulation(RRDHOST *host) {
-    return (host == localhost ||
-            !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED) ||
-            rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST)));
+    return rrdhost_is_online(host);
 }
 
 void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
@@ -1731,9 +1735,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
 
     // --- db ---
 
-    bool online = (host == localhost ||
-            !(flags & (RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED) ||
-            rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST)));
+    bool online = rrdhost_is_online(host);
 
     rrdhost_retention(host, now, online, &s->db.first_time_s, &s->db.last_time_s);
     s->db.metrics = host->rrdctx.metrics;

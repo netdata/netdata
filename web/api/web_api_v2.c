@@ -28,6 +28,8 @@ static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unu
             else if(strstr(value, "debug"))
                 options |= CONTEXTS_V2_DEBUG;
         }
+        else if(!strcmp(name, "after")) req.after = str2l(value);
+        else if(!strcmp(name, "before")) req.before = str2l(value);
         else if(!strcmp(name, "timeout")) req.timeout_ms = str2l(value);
     }
 

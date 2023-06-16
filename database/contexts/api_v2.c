@@ -88,6 +88,8 @@ static inline bool full_text_search_char(FTS_INDEX *fts, SIMPLE_PATTERN *q, char
 }
 
 struct rrdcontext_to_json_v2_data {
+    time_t now;
+
     BUFFER *wb;
     struct api_v2_contexts_request *request;
     DICTIONARY *ctx;
@@ -113,6 +115,13 @@ struct rrdcontext_to_json_v2_data {
         FTS_INDEX fts;
     } q;
 
+    struct {
+        bool enabled;
+        bool relative;
+        time_t after;
+        time_t before;
+    } window;
+
     struct query_timings timings;
 };
 
@@ -132,6 +141,9 @@ static FTS_MATCH rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_jso
     dfe_start_read(rc->rrdinstances, ri) {
         if(matched) break;
 
+        if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, ri->first_time_s, ri->last_time_s, 0))
+            continue;
+
         if(unlikely(full_text_search_string(&ctl->q.fts, q, ri->id)) ||
            (ri->name != ri->id && full_text_search_string(&ctl->q.fts, q, ri->name))) {
             matched = FTS_MATCHED_INSTANCE;
@@ -140,6 +152,9 @@ static FTS_MATCH rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_jso
 
         RRDMETRIC *rm;
         dfe_start_read(ri->rrdmetrics, rm) {
+            if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, rm->first_time_s, rm->last_time_s, 0))
+                continue;
+
             if(unlikely(full_text_search_string(&ctl->q.fts, q, rm->id)) ||
                (rm->name != rm->id && full_text_search_string(&ctl->q.fts, q, rm->name))) {
                 matched = FTS_MATCHED_DIMENSION;
@@ -185,12 +200,15 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
 
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
 
+    if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, rc->first_time_s, rc->last_time_s, 0))
+        return 0; // continue to next context
+
     FTS_MATCH match = ctl->q.host_match;
     if((ctl->options & CONTEXTS_V2_SEARCH) && ctl->q.pattern) {
         match = rrdcontext_to_json_v2_full_text_search(ctl, rc, ctl->q.pattern);
 
         if(match == FTS_MATCHED_NONE)
-            return 0;
+            return 0; // continue to next context
     }
 
     struct rrdcontext_to_json_v2_entry t = {
@@ -377,18 +395,22 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
     if(!queryable_host || !host->rrdctx.contexts)
         // the host matches the 'scope_host' but does not match the 'host' patterns
         // or the host does not have any contexts
-        return 0;
+        return 0; // continue to next host
 
     struct rrdcontext_to_json_v2_data *ctl = data;
     BUFFER *wb = ctl->wb;
 
+    if(ctl->window.enabled && !rrdhost_matches_window(host, ctl->window.after, ctl->window.before, ctl->now))
+        // the host does not have data in the requested window
+        return 0; // continue to next host
+
     if(ctl->request->timeout_ms && now_monotonic_usec() > ctl->timings.received_ut + ctl->request->timeout_ms * USEC_PER_MS)
         // timed out
-        return -2;
+        return -2; // stop the query
 
     if(ctl->request->interrupt_callback && ctl->request->interrupt_callback(ctl->request->interrupt_callback_data))
         // interrupted
-        return -1;
+        return -1; // stop the query
 
     bool host_matched = (ctl->options & CONTEXTS_V2_NODES);
     bool do_contexts = (ctl->options & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH));
@@ -421,14 +443,17 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
         // restore it
         ctl->q.pattern = old_q;
 
-        if(added == -1)
-            return -1;
+        if(unlikely(added < 0))
+            return -1; // stop the query
 
         if(added)
             host_matched = true;
     }
 
-    if(host_matched && (ctl->options & CONTEXTS_V2_NODES)) {
+    if(!host_matched)
+        return 0;
+
+    if(ctl->options & CONTEXTS_V2_NODES) {
         buffer_json_add_array_item_object(wb); // this node
         buffer_json_node_add_v2(wb, host, ctl->nodes.ni++, 0,
                                 (ctl->options & CONTEXTS_V2_AGENTS) && !(ctl->options & CONTEXTS_V2_NODES_INSTANCES));
@@ -541,7 +566,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
         buffer_json_object_close(wb); // this node
     }
 
-    return host_matched ? 1 : 0;
+    return 1;
 }
 
 static void buffer_json_contexts_v2_options_to_array(BUFFER *wb, CONTEXTS_V2_OPTIONS options) {
@@ -741,6 +766,12 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
             .contexts.pattern = string_to_simple_pattern(req->contexts),
             .contexts.scope_pattern = string_to_simple_pattern(req->scope_contexts),
             .q.pattern = string_to_simple_pattern_nocase(req->q),
+            .window = {
+                    .enabled = false,
+                    .relative = false,
+                    .after = req->after,
+                    .before = req->before,
+            },
             .timings = {
                     .received_ut = now_monotonic_usec(),
             }
@@ -755,7 +786,13 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         dictionary_register_delete_callback(ctl.ctx, contexts_delete_callback, NULL);
     }
 
-    time_t now_s = now_realtime_sec();
+    if(req->after || req->before) {
+        ctl.window.relative = rrdr_relative_window_to_absolute(&ctl.window.after, &ctl.window.before, &ctl.now);
+        ctl.window.enabled = true;
+    }
+    else
+        ctl.now = now_realtime_sec();
+
     buffer_json_initialize(wb, "\"", "\"", 0,
                            true, (options & CONTEXTS_V2_MINIFY) && !(options & CONTEXTS_V2_DEBUG));
 
@@ -774,7 +811,12 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         buffer_json_member_add_string(wb, "contexts", req->contexts);
         buffer_json_object_close(wb);
 
+        buffer_json_member_add_object(wb, "filters");
         buffer_json_member_add_string(wb, "q", req->q);
+        buffer_json_member_add_time_t(wb, "after", req->after);
+        buffer_json_member_add_time_t(wb, "before", req->before);
+        buffer_json_object_close(wb);
+
         buffer_json_member_add_array(wb, "options");
         buffer_json_contexts_v2_options_to_array(wb, options);
         buffer_json_array_close(wb);
@@ -819,7 +861,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                 buffer_json_member_add_string(wb, "family", string2str(z->family));
                 buffer_json_member_add_uint64(wb, "priority", z->priority);
                 buffer_json_member_add_time_t(wb, "first_entry", z->first_time_s);
-                buffer_json_member_add_time_t(wb, "last_entry", collected ? now_s : z->last_time_s);
+                buffer_json_member_add_time_t(wb, "last_entry", collected ? ctl.now : z->last_time_s);
                 buffer_json_member_add_boolean(wb, "live", collected);
                 if (options & CONTEXTS_V2_SEARCH)
                     buffer_json_member_add_string(wb, "match", fts_match_to_string(z->match));
@@ -842,7 +884,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         version_hashes_api_v2(wb, &ctl.versions);
 
     if(options & CONTEXTS_V2_AGENTS)
-        buffer_json_agents_array_v2(wb, &ctl.timings, now_s, options & (CONTEXTS_V2_AGENTS_INFO));
+        buffer_json_agents_array_v2(wb, &ctl.timings, ctl.now, options & (CONTEXTS_V2_AGENTS_INFO));
 
     buffer_json_cloud_timings(wb, "timings", &ctl.timings);
 
