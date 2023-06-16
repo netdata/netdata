@@ -1002,6 +1002,16 @@ bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *db_instance, uuid_t *dim_
     return true;
 }
 
+size_t rrdeng_disk_space_max(STORAGE_INSTANCE *db_instance) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+    return ctx->config.max_disk_space;
+}
+
+size_t rrdeng_disk_space_used(STORAGE_INSTANCE *db_instance) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+    return __atomic_load_n(&ctx->atomic.current_disk_space, __ATOMIC_RELAXED);
+}
+
 /*
  * Gathers Database Engine statistics.
  * Careful when modifying this function.

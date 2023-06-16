@@ -230,19 +230,25 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
     return 1;
 }
 
-void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t duration_ut) {
+void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t duration_ut, bool status) {
     buffer_json_member_add_string(wb, "mg", host->machine_guid);
+
     if(host->node_id)
         buffer_json_member_add_uuid(wb, "nd", host->node_id);
     buffer_json_member_add_string(wb, "nm", rrdhost_hostname(host));
     buffer_json_member_add_uint64(wb, "ni", ni);
-    buffer_json_member_add_object(wb, "st");
-    buffer_json_member_add_uint64(wb, "ai", 0);
-    buffer_json_member_add_uint64(wb, "code", 200);
-    buffer_json_member_add_string(wb, "msg", "");
-    if(duration_ut)
-        buffer_json_member_add_double(wb, "ms", (NETDATA_DOUBLE)duration_ut / 1000.0);
-    buffer_json_object_close(wb);
+
+    if(status) {
+        buffer_json_member_add_object(wb, "st");
+        {
+            buffer_json_member_add_uint64(wb, "ai", 0);
+            buffer_json_member_add_uint64(wb, "code", 200);
+            buffer_json_member_add_string(wb, "msg", "");
+            if (duration_ut)
+                buffer_json_member_add_double(wb, "ms", (NETDATA_DOUBLE) duration_ut / 1000.0);
+        }
+        buffer_json_object_close(wb);
+    }
 }
 
 static void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *key) {
@@ -440,11 +446,11 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
             host_matched = true;
     }
 
-    if(host_matched && (ctl->options & (CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED | CONTEXTS_V2_NODES_INSTANCES | CONTEXTS_V2_DEBUG))) {
-        buffer_json_add_array_item_object(wb);
-        buffer_json_node_add_v2(wb, host, ctl->nodes.ni++, 0);
+    if(host_matched && (ctl->options & CONTEXTS_V2_NODES)) {
+        buffer_json_add_array_item_object(wb); // this node
+        buffer_json_node_add_v2(wb, host, ctl->nodes.ni++, 0, ctl->options & CONTEXTS_V2_AGENTS);
 
-        if(ctl->options & (CONTEXTS_V2_NODES_DETAILED)) {
+        if(ctl->options & (CONTEXTS_V2_NODES_INFO)) {
             buffer_json_member_add_string(wb, "v", rrdhost_program_version(host));
 
             host_labels2json(host, wb, "labels");
@@ -487,7 +493,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
 
         if(ctl->options & (CONTEXTS_V2_NODES_INSTANCES)) {
             buffer_json_member_add_array(wb, "instances");
-            buffer_json_add_array_item_object(wb); // this instances
+            buffer_json_add_array_item_object(wb); // this instance
             {
                 buffer_json_member_add_uint64(wb, "ai", 0);
 
@@ -498,6 +504,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
                 {
                     buffer_json_member_add_string(wb, "status", rrdhost_db_status_to_string(s.db.status));
                     buffer_json_member_add_string(wb, "liveness", rrdhost_db_liveness_to_string(s.db.liveness));
+                    buffer_json_member_add_string(wb, "mode", rrd_memory_mode_name(s.db.mode));
                     buffer_json_member_add_time_t(wb, "first_time", s.db.first_time_s);
                     buffer_json_member_add_time_t(wb, "last_time", s.db.last_time_s);
                     buffer_json_member_add_uint64(wb, "metrics", s.db.metrics);
@@ -548,7 +555,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
             buffer_json_object_close(wb); // this instance
             buffer_json_array_close(wb); // instances
         }
-        buffer_json_object_close(wb);
+        buffer_json_object_close(wb); // this node
     }
 
     return host_matched ? 1 : 0;
@@ -558,8 +565,26 @@ static void buffer_json_contexts_v2_options_to_array(BUFFER *wb, CONTEXTS_V2_OPT
     if(options & CONTEXTS_V2_DEBUG)
         buffer_json_add_array_item_string(wb, "debug");
 
-    if(options & (CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED))
+    if(options & CONTEXTS_V2_MINIFY)
+        buffer_json_add_array_item_string(wb, "minify");
+
+    if(options & CONTEXTS_V2_VERSIONS)
+        buffer_json_add_array_item_string(wb, "versions");
+
+    if(options & CONTEXTS_V2_AGENTS)
+        buffer_json_add_array_item_string(wb, "agents");
+
+    if(options & CONTEXTS_V2_AGENTS_INFO)
+        buffer_json_add_array_item_string(wb, "agents-info");
+
+    if(options & CONTEXTS_V2_NODES)
         buffer_json_add_array_item_string(wb, "nodes");
+
+    if(options & CONTEXTS_V2_NODES_INFO)
+        buffer_json_add_array_item_string(wb, "nodes-info");
+
+    if(options & CONTEXTS_V2_NODES_INSTANCES)
+        buffer_json_add_array_item_string(wb, "nodes-instances");
 
     if(options & CONTEXTS_V2_CONTEXTS)
         buffer_json_add_array_item_string(wb, "contexts");
@@ -583,7 +608,7 @@ void buffer_json_query_timings(BUFFER *wb, const char *key, struct query_timings
     buffer_json_object_close(wb);
 }
 
-void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time_t now_s, bool cloud) {
+void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time_t now_s, bool info) {
     if(!now_s)
         now_s = now_realtime_sec();
 
@@ -594,9 +619,10 @@ void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time
     buffer_json_member_add_string(wb, "nm", rrdhost_hostname(localhost));
     buffer_json_member_add_time_t(wb, "now", now_s);
     buffer_json_member_add_uint64(wb, "ai", 0);
-    buffer_json_member_add_string(wb, "v", string2str(localhost->program_version));
 
-    if(cloud) {
+    if(info) {
+        buffer_json_member_add_string(wb, "v", string2str(localhost->program_version));
+
         buffer_json_member_add_object(wb, "cloud");
         {
             size_t id = cloud_connection_id();
@@ -620,6 +646,28 @@ void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time
                 buffer_json_member_add_string(wb, "url", cloud_base_url());
         }
         buffer_json_object_close(wb); // cloud
+
+        buffer_json_member_add_array(wb, "db_size");
+        for (size_t tier = 0; tier < storage_tiers; tier++) {
+            STORAGE_ENGINE *eng = localhost->db[tier].eng;
+            if (!eng) continue;
+
+            size_t max = storage_engine_disk_space_max(eng->backend, localhost->db[tier].instance);
+            size_t used = storage_engine_disk_space_used(eng->backend, localhost->db[tier].instance);
+            NETDATA_DOUBLE percent;
+            if (used && max)
+                percent = (NETDATA_DOUBLE) used * 100.0 / (NETDATA_DOUBLE) max;
+            else
+                percent = 0.0;
+
+            buffer_json_add_array_item_object(wb);
+            buffer_json_member_add_uint64(wb, "tier", tier);
+            buffer_json_member_add_uint64(wb, "disk_used", used);
+            buffer_json_member_add_uint64(wb, "disk_max", max);
+            buffer_json_member_add_double(wb, "disk_percent", percent);
+            buffer_json_object_close(wb);
+        }
+        buffer_json_array_close(wb); // db_size
     }
 
     if(timings)
@@ -630,6 +678,9 @@ void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time
 }
 
 void buffer_json_cloud_timings(BUFFER *wb, const char *key, struct query_timings *timings) {
+    if(!timings->finished_ut)
+        timings->finished_ut = now_monotonic_usec();
+
     buffer_json_member_add_object(wb, key);
     buffer_json_member_add_double(wb, "routing_ms", 0.0);
     buffer_json_member_add_double(wb, "node_max_ms", 0.0);
@@ -647,6 +698,12 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
     if(options & CONTEXTS_V2_SEARCH)
         options |= CONTEXTS_V2_CONTEXTS;
+
+    if(options & (CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODES_INSTANCES))
+        options |= CONTEXTS_V2_NODES;
+
+    if(options & (CONTEXTS_V2_AGENTS_INFO))
+        options |= CONTEXTS_V2_AGENTS;
 
     struct rrdcontext_to_json_v2_data ctl = {
             .wb = wb,
@@ -673,7 +730,9 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     }
 
     time_t now_s = now_realtime_sec();
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0,
+                           true, (options & CONTEXTS_V2_MINIFY) && !(options & CONTEXTS_V2_DEBUG));
+
     buffer_json_member_add_uint64(wb, "api", 2);
 
     if(options & CONTEXTS_V2_DEBUG) {
@@ -697,7 +756,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         buffer_json_object_close(wb);
     }
 
-    if(options & (CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED | CONTEXTS_V2_NODES_INSTANCES | CONTEXTS_V2_DEBUG))
+    if(options & CONTEXTS_V2_NODES)
         buffer_json_member_add_array(wb, "nodes");
 
     ssize_t ret = query_scope_foreach_host(ctl.nodes.scope_pattern, ctl.nodes.pattern,
@@ -718,11 +777,10 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         goto cleanup;
     }
 
-    if(options & (CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED | CONTEXTS_V2_NODES_INSTANCES | CONTEXTS_V2_DEBUG))
+    if(options & CONTEXTS_V2_NODES)
         buffer_json_array_close(wb);
 
     ctl.timings.executed_ut = now_monotonic_usec();
-    version_hashes_api_v2(wb, &ctl.versions);
 
     if(options & CONTEXTS_V2_CONTEXTS) {
         buffer_json_member_add_object(wb, "contexts");
@@ -754,8 +812,14 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         buffer_json_object_close(wb);
     }
 
-    buffer_json_agents_array_v2(wb, &ctl.timings, now_s, options & (CONTEXTS_V2_NODES_DETAILED));
+    if(options & (CONTEXTS_V2_VERSIONS))
+        version_hashes_api_v2(wb, &ctl.versions);
+
+    if(options & CONTEXTS_V2_AGENTS)
+        buffer_json_agents_array_v2(wb, &ctl.timings, now_s, options & (CONTEXTS_V2_AGENTS_INFO));
+
     buffer_json_cloud_timings(wb, "timings", &ctl.timings);
+
     buffer_json_finalize(wb);
 
 cleanup:

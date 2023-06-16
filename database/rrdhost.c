@@ -1745,6 +1745,8 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     else
         s->db.status = RRDHOST_DB_STATUS_QUERYABLE;
 
+    s->db.mode = host->rrd_memory_mode;
+
     // --- ingest ---
 
     s->ingest.since = MAX(host->child_connect_time, host->child_disconnected_time);

@@ -497,6 +497,27 @@ static inline void storage_engine_store_metric(
                                        count, anomaly_count, flags);
 }
 
+size_t rrdeng_disk_space_max(STORAGE_INSTANCE *db_instance);
+static inline size_t storage_engine_disk_space_max(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance) {
+#ifdef ENABLE_DBENGINE
+    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_disk_space_max(db_instance);
+#endif
+
+    return 0;
+}
+
+size_t rrdeng_disk_space_used(STORAGE_INSTANCE *db_instance);
+static inline size_t storage_engine_disk_space_used(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance) {
+#ifdef ENABLE_DBENGINE
+    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_disk_space_used(db_instance);
+#endif
+
+    // TODO - calculate the total host disk space for memory mode save and map
+    return 0;
+}
+
 void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_handle);
 void rrddim_store_metric_flush(STORAGE_COLLECT_HANDLE *collection_handle);
 static inline void storage_engine_store_flush(STORAGE_COLLECT_HANDLE *collection_handle) {

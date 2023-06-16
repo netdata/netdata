@@ -250,7 +250,7 @@ static void query_target_summary_nodes_v2(BUFFER *wb, QUERY_TARGET *qt, const ch
         QUERY_NODE *qn = query_node(qt, c);
         RRDHOST *host = qn->rrdhost;
         buffer_json_add_array_item_object(wb);
-        buffer_json_node_add_v2(wb, host, qn->slot, qn->duration_ut);
+        buffer_json_node_add_v2(wb, host, qn->slot, qn->duration_ut, true);
         query_target_instance_counts(wb, &qn->instances);
         query_target_metric_counts(wb, &qn->metrics);
         query_target_alerts_counts(wb, &qn->alerts, NULL, false);

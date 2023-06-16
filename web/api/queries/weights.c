@@ -874,7 +874,7 @@ static size_t registered_results_to_json_multinode_no_group_by(
                 continue;
 
             buffer_json_add_array_item_object(wb);
-            buffer_json_node_add_v2(wb, dun->host, dun->i, dun->duration_ut);
+            buffer_json_node_add_v2(wb, dun->host, dun->i, dun->duration_ut, true);
             buffer_json_object_close(wb);
         }
         dfe_done(dun);
