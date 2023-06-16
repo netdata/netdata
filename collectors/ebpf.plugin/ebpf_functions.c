@@ -77,12 +77,14 @@ static void ebpf_function_error(const char *transaction, int code, const char *m
  * @param line_buffer  buffer used to parse args
  * @param line_max     Number of arguments given
  * @param timeout      The function timeout
+ * @param em           The structure with thread information
  */
 static void ebpf_function_thread_manipulation(const char *transaction,
-                                 char *function __maybe_unused,
-                                 char *line_buffer __maybe_unused,
-                                 int line_max __maybe_unused,
-                                 int timeout __maybe_unused)
+                                              char *function __maybe_unused,
+                                              char *line_buffer __maybe_unused,
+                                              int line_max __maybe_unused,
+                                              int timeout __maybe_unused,
+                                              ebpf_module_t *em)
 {
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
     size_t num_words = pluginsd_split_words(function, words, PLUGINSD_MAX_WORDS);
@@ -96,6 +98,50 @@ static void ebpf_function_thread_manipulation(const char *transaction,
             return;
         }
     }
+
+    time_t expires = now_realtime_sec() + em->update_every;
+    pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires);
+
+    BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "table");
+    buffer_json_member_add_time_t(wb, "update_every", em->update_every);
+    buffer_json_member_add_string(wb, "help", EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
+
+    // Collect data
+    buffer_json_member_add_array(wb, "data");
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    int i;
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
+        ebpf_module_t *wem = &ebpf_modules[i];
+        buffer_json_add_array_item_array(wb);
+
+        // IMPORTANT!
+        // THE ORDER SHOULD BE THE SAME WITH THE FIELDS!
+
+        // thread name
+        buffer_json_add_array_item_string(wb, wem->thread_name);
+
+        // enabled
+        buffer_json_add_array_item_string(wb,
+                                          (wem->enabled != NETDATA_THREAD_EBPF_NOT_RUNNING) ?
+                                          "running":
+                                          "stopped");
+
+        buffer_json_array_close(wb);
+    }
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+    buffer_json_array_close(wb);
+
+    buffer_json_member_add_time_t(wb, "expires", expires);
+    buffer_json_finalize(wb);
+
+    fwrite(buffer_tostring(wb), buffer_strlen(wb), 1, stdout);
+    buffer_free(wb);
+
+    pluginsd_function_result_end_to_stdout();
 }
 
 
@@ -107,11 +153,12 @@ static void ebpf_function_thread_manipulation(const char *transaction,
  * FUNCTION thread.
  *
  * @param ptr a `ebpf_module_t *`.
+ *
  * @return always NULL.
  */
 void *ebpf_function_thread(void *ptr)
 {
-    (void)ptr;
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
     char buffer[PLUGINSD_LINE_MAX + 1];
 
     char *s = NULL;
@@ -136,7 +183,12 @@ void *ebpf_function_thread(void *ptr)
             else {
                 int timeout = str2i(timeout_s);
                 if (!strncmp(function, EBPF_FUNCTION_THREAD, sizeof(EBPF_FUNCTION_THREAD) - 1))
-                    ebpf_function_thread_manipulation(transaction, function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
+                    ebpf_function_thread_manipulation(transaction,
+                                                      function,
+                                                      buffer,
+                                                      PLUGINSD_LINE_MAX + 1,
+                                                      timeout,
+                                                      em);
                 else
                     ebpf_function_error(transaction,
                                         HTTP_RESP_NOT_FOUND,
