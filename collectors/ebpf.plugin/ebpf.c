@@ -365,6 +365,16 @@ struct netdata_static_thread ebpf_threads[] = {
         .start_routine = NULL
     },
     {
+        .name = "EBPF FUNCTIONS",
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+    },
+    {
         .name = NULL,
         .config_section = NULL,
         .config_name = NULL,
