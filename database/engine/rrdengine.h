@@ -362,6 +362,11 @@ struct rrdengine_instance {
     } datafiles;
 
     struct {
+        RW_SPINLOCK spinlock;
+        Pvoid_t JudyL;
+    } njfv2idx;
+
+    struct {
         unsigned last_fileno;                       // newest index of datafile and journalfile
         unsigned last_flush_fileno;                 // newest index of datafile received data
 

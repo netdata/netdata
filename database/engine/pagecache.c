@@ -505,6 +505,8 @@ static size_t list_has_time_gaps(
     return gaps;
 }
 
+// ----------------------------------------------------------------------------
+
 typedef void (*page_found_callback_t)(PGC_PAGE *page, void *data);
 static size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *metric, usec_t start_time_ut, usec_t end_time_ut, page_found_callback_t callback, void *callback_data) {
     uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
@@ -515,12 +517,19 @@ static size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METR
 
     size_t pages_found = 0;
 
-    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+    NJFV2IDX_FIND_STATE state = {
+            .init = false,
+            .last = 0,
+            .ctx = ctx,
+            .wanted_start_time_s = wanted_start_time_s,
+            .wanted_end_time_s = wanted_end_time_s,
+            .j2_header_acquired = NULL,
+    };
+
     struct rrdengine_datafile *datafile;
-    for(datafile = ctx->datafiles.first; datafile ; datafile = datafile->next) {
-        struct journal_v2_header *j2_header = journalfile_v2_data_acquire(datafile->journalfile, NULL,
-                                                                          wanted_start_time_s,
-                                                                          wanted_end_time_s);
+    while((datafile = njfv2idx_find_and_acquire_j2_header(&state))) {
+        struct journal_v2_header *j2_header = state.j2_header_acquired;
+
         if (unlikely(!j2_header))
             continue;
 
@@ -595,7 +604,6 @@ static size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METR
 
         journalfile_v2_data_release(datafile->journalfile);
     }
-    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
     return pages_found;
 }

@@ -122,6 +122,120 @@ void journalfile_v1_generate_path(struct rrdengine_datafile *datafile, char *str
                     datafile->ctx->config.dbfiles_path, datafile->tier, datafile->fileno);
 }
 
+// ----------------------------------------------------------------------------
+
+struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJFV2IDX_FIND_STATE *s) {
+    struct journal_v2_header *j2_header = NULL;
+    struct rrdengine_datafile *datafile = NULL;
+
+    rw_spinlock_read_lock(&s->ctx->njfv2idx.spinlock);
+
+    Pvoid_t *PValue = NULL;
+
+    if(unlikely(!s->init)) {
+        s->init = true;
+        s->last = s->wanted_start_time_s;
+
+        PValue = JudyLGet(s->ctx->njfv2idx.JudyL, s->last, PJE0);
+        if (unlikely(PValue == PJERR))
+            fatal("DBENGINE: NJFV2IDX corrupted judy array");
+
+        if(!PValue) {
+            s->last = s->wanted_start_time_s;
+            PValue = JudyLLast(s->ctx->njfv2idx.JudyL, &s->last, PJE0);
+            if (unlikely(PValue == PJERR))
+                fatal("DBENGINE: NJFV2IDX corrupted judy array");
+
+            if(!PValue)
+                s->last = s->wanted_start_time_s;
+        }
+    }
+
+    while(1) {
+        if (likely(!PValue)) {
+            PValue = JudyLNext(s->ctx->njfv2idx.JudyL, &s->last, PJE0);
+            if (unlikely(PValue == PJERR))
+                fatal("DBENGINE: NJFV2IDX corrupted judy array");
+
+            if(!PValue)
+                break;
+        }
+
+        datafile = *PValue;
+        TIME_RANGE_COMPARE rc = is_page_in_time_range(datafile->journalfile->v2.first_time_s, datafile->journalfile->v2.last_time_s,
+                                                      s->wanted_start_time_s, s->wanted_end_time_s);
+
+        if(rc == PAGE_IS_IN_RANGE) {
+            // this is good to return
+            break;
+        }
+        else if(rc == PAGE_IS_IN_THE_PAST) {
+            // continue to get the next
+            datafile = NULL;
+            PValue = NULL;
+            continue;
+        }
+        else /* PAGE_IS_IN_THE_FUTURE */ {
+            // we finished - no more datafiles
+            datafile = NULL;
+            PValue = NULL;
+            break;
+        }
+    }
+
+    if(datafile)
+        s->j2_header_acquired = journalfile_v2_data_acquire(datafile->journalfile, NULL,
+                                                            s->wanted_start_time_s, s->wanted_end_time_s);
+    else
+        s->j2_header_acquired = NULL;
+
+    rw_spinlock_read_unlock(&s->ctx->njfv2idx.spinlock);
+
+    return datafile;
+}
+
+static void njfv2idx_add(struct rrdengine_datafile *datafile) {
+    internal_fatal(datafile->journalfile->v2.first_time_s <= 0, "DBENGINE: NJFV2IDX trying to index a journal file with invalid first_time_s");
+
+    rw_spinlock_write_lock(&datafile->ctx->njfv2idx.spinlock);
+    datafile->journalfile->njfv2idx.indexed_as = datafile->journalfile->v2.first_time_s;
+
+    do {
+        internal_fatal(datafile->journalfile->njfv2idx.indexed_as <= 0, "DBENGINE: NJFV2IDX journalfile is already indexed");
+
+        Pvoid_t *PValue = JudyLIns(&datafile->ctx->njfv2idx.JudyL, datafile->journalfile->njfv2idx.indexed_as, PJE0);
+        if (!PValue || PValue == PJERR)
+            fatal("DBENGINE: NJFV2IDX corrupted judy array");
+
+        if (unlikely(*PValue)) {
+            // already there
+            datafile->journalfile->njfv2idx.indexed_as--;
+        }
+        else {
+            *PValue = datafile;
+            break;
+        }
+    } while(0);
+
+    rw_spinlock_write_unlock(&datafile->ctx->njfv2idx.spinlock);
+}
+
+static void njfv2idx_remove(struct rrdengine_datafile *datafile) {
+    internal_fatal(!datafile->journalfile->njfv2idx.indexed_as, "DBENGINE: NJFV2IDX journalfile to remove is not indexed");
+
+    rw_spinlock_write_lock(&datafile->ctx->njfv2idx.spinlock);
+
+    int rc = JudyLDel(&datafile->ctx->njfv2idx.JudyL, datafile->journalfile->njfv2idx.indexed_as, PJE0);
+    if (!rc)
+        fatal("DBENGINE: NJFV2IDX cannot remove entry");
+
+    datafile->journalfile->njfv2idx.indexed_as = 0;
+
+    rw_spinlock_write_unlock(&datafile->ctx->njfv2idx.spinlock);
+}
+
+// ----------------------------------------------------------------------------
+
 static struct journal_v2_header *journalfile_v2_mounted_data_get(struct rrdengine_journalfile *journalfile, size_t *data_size) {
     struct journal_v2_header *j2_header = NULL;
 
@@ -346,9 +460,13 @@ void journalfile_v2_data_set(struct rrdengine_journalfile *journalfile, int fd, 
 
     spinlock_unlock(&journalfile->v2.spinlock);
     spinlock_unlock(&journalfile->mmap.spinlock);
+
+    njfv2idx_add(journalfile->datafile);
 }
 
 static void journalfile_v2_data_unmap_permanently(struct rrdengine_journalfile *journalfile) {
+    njfv2idx_remove(journalfile->datafile);
+
     bool has_references = false;
 
     do {
