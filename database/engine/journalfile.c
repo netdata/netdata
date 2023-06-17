@@ -125,7 +125,6 @@ void journalfile_v1_generate_path(struct rrdengine_datafile *datafile, char *str
 // ----------------------------------------------------------------------------
 
 struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJFV2IDX_FIND_STATE *s) {
-    struct journal_v2_header *j2_header = NULL;
     struct rrdengine_datafile *datafile = NULL;
 
     rw_spinlock_read_lock(&s->ctx->njfv2idx.spinlock);
@@ -136,19 +135,12 @@ struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJFV2IDX_FIND_STA
         s->init = true;
         s->last = s->wanted_start_time_s;
 
-        PValue = JudyLGet(s->ctx->njfv2idx.JudyL, s->last, PJE0);
+        PValue = JudyLPrev(s->ctx->njfv2idx.JudyL, &s->last, PJE0);
         if (unlikely(PValue == PJERR))
             fatal("DBENGINE: NJFV2IDX corrupted judy array");
 
-        if(!PValue) {
+        if(!PValue)
             s->last = s->wanted_start_time_s;
-            PValue = JudyLLast(s->ctx->njfv2idx.JudyL, &s->last, PJE0);
-            if (unlikely(PValue == PJERR))
-                fatal("DBENGINE: NJFV2IDX corrupted judy array");
-
-            if(!PValue)
-                s->last = s->wanted_start_time_s;
-        }
     }
 
     while(1) {
@@ -157,13 +149,18 @@ struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJFV2IDX_FIND_STA
             if (unlikely(PValue == PJERR))
                 fatal("DBENGINE: NJFV2IDX corrupted judy array");
 
-            if(!PValue)
+            if(!PValue) {
+                // cannot find anything after that point
+                datafile = NULL;
                 break;
+            }
         }
 
         datafile = *PValue;
-        TIME_RANGE_COMPARE rc = is_page_in_time_range(datafile->journalfile->v2.first_time_s, datafile->journalfile->v2.last_time_s,
-                                                      s->wanted_start_time_s, s->wanted_end_time_s);
+        TIME_RANGE_COMPARE rc = is_page_in_time_range(datafile->journalfile->v2.first_time_s,
+                                                      datafile->journalfile->v2.last_time_s,
+                                                      s->wanted_start_time_s,
+                                                      s->wanted_end_time_s);
 
         if(rc == PAGE_IS_IN_RANGE) {
             // this is good to return
@@ -185,7 +182,8 @@ struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJFV2IDX_FIND_STA
 
     if(datafile)
         s->j2_header_acquired = journalfile_v2_data_acquire(datafile->journalfile, NULL,
-                                                            s->wanted_start_time_s, s->wanted_end_time_s);
+                                                            s->wanted_start_time_s,
+                                                            s->wanted_end_time_s);
     else
         s->j2_header_acquired = NULL;
 
@@ -195,10 +193,10 @@ struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJFV2IDX_FIND_STA
 }
 
 static void njfv2idx_add(struct rrdengine_datafile *datafile) {
-    internal_fatal(datafile->journalfile->v2.first_time_s <= 0, "DBENGINE: NJFV2IDX trying to index a journal file with invalid first_time_s");
+    internal_fatal(datafile->journalfile->v2.last_time_s <= 0, "DBENGINE: NJFV2IDX trying to index a journal file with invalid first_time_s");
 
     rw_spinlock_write_lock(&datafile->ctx->njfv2idx.spinlock);
-    datafile->journalfile->njfv2idx.indexed_as = datafile->journalfile->v2.first_time_s;
+    datafile->journalfile->njfv2idx.indexed_as = datafile->journalfile->v2.last_time_s;
 
     do {
         internal_fatal(datafile->journalfile->njfv2idx.indexed_as <= 0, "DBENGINE: NJFV2IDX journalfile is already indexed");
@@ -209,7 +207,7 @@ static void njfv2idx_add(struct rrdengine_datafile *datafile) {
 
         if (unlikely(*PValue)) {
             // already there
-            datafile->journalfile->njfv2idx.indexed_as--;
+            datafile->journalfile->njfv2idx.indexed_as++;
         }
         else {
             *PValue = datafile;

@@ -1376,7 +1376,7 @@ static PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric
                 Word_t time = start_time_s;
 
                 // find the previous page
-                page_ptr = JudyLLast(*pages_judy_pptr, &time, PJE0);
+                page_ptr = JudyLPrev(*pages_judy_pptr, &time, PJE0);
                 if(unlikely(page_ptr == PJERR))
                     fatal("DBENGINE CACHE: corrupted page in pages judy array #2");
 
