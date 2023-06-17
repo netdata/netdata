@@ -139,8 +139,15 @@ struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJFV2IDX_FIND_STA
         if (unlikely(PValue == PJERR))
             fatal("DBENGINE: NJFV2IDX corrupted judy array");
 
-        if(!PValue)
-            s->last = s->wanted_start_time_s;
+        if(!PValue) {
+            s->last = 0;
+            PValue = JudyLFirst(s->ctx->njfv2idx.JudyL, &s->last, PJE0);
+            if (unlikely(PValue == PJERR))
+                fatal("DBENGINE: NJFV2IDX corrupted judy array");
+
+            if(!PValue)
+                s->last = s->wanted_start_time_s;
+        }
     }
 
     while(1) {
