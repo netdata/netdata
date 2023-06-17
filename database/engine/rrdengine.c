@@ -791,7 +791,7 @@ static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_
         datafile = ctx->datafiles.first->prev;
         uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
-        if(datafile_is_full(ctx, datafile) && create_new_datafile_pair(ctx) == 0)
+        if(datafile_is_full(ctx, datafile) && create_new_datafile_pair(ctx, true) == 0)
             rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_INDEX, datafile, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL,
                            NULL);
 
