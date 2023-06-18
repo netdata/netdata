@@ -377,6 +377,23 @@ static void ebpf_function_thread_manipulation(const char *transaction,
     }
     buffer_json_object_close(wb); // charts
 
+    // Do we use only on fields that can be groupped?
+    buffer_json_member_add_object(wb, "group_by");
+    {
+        // group by Status
+        buffer_json_member_add_object(wb, "Status");
+        {
+            buffer_json_member_add_string(wb, "name", "Thread status");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Status");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // group_by
+
     buffer_json_member_add_time_t(wb, "expires", expires);
     buffer_json_finalize(wb);
 
