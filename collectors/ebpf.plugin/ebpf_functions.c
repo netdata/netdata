@@ -135,6 +135,17 @@ static void ebpf_function_thread_manipulation(const char *transaction,
 
     buffer_json_array_close(wb);
 
+    buffer_json_member_add_object(wb, "columns");
+    {
+        int fields_added = 0;
+
+        // IMPORTANT!
+        // THE ORDER SHOULD BE THE SAME WITH THE VALUES!
+        ebpf_add_table_field(wb, "Thread", "Thread Name", true, "string", "value", "none", 0, NULL, NAN, "ascending", true, true, false, NULL, "count_unique", false);
+        ebpf_add_table_field(wb, "Status", "Thread Status", true, "string", "value", "none", 0, NULL, NAN, "ascending", true, true, false, NULL, "count_unique", false);
+    }
+    buffer_json_object_close(wb);
+
     buffer_json_member_add_time_t(wb, "expires", expires);
     buffer_json_finalize(wb);
 
