@@ -144,7 +144,28 @@ static void ebpf_function_thread_manipulation(const char *transaction,
         ebpf_add_table_field(wb, "Thread", "Thread Name", true, "string", "value", "none", 0, NULL, NAN, "ascending", true, true, false, NULL, "count_unique", false);
         ebpf_add_table_field(wb, "Status", "Thread Status", true, "string", "value", "none", 0, NULL, NAN, "ascending", true, true, false, NULL, "count_unique", false);
     }
-    buffer_json_object_close(wb);
+    buffer_json_object_close(wb); // columns
+
+    buffer_json_member_add_string(wb, "default_sort_column", "Thread");
+
+    buffer_json_member_add_object(wb, "charts");
+    {
+        // Load Methods
+        buffer_json_member_add_object(wb, "ebpf_load_methods");
+        {
+            buffer_json_member_add_string(wb, "name", "Load Methods");
+            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                // Should I add both?
+                // Should I convert total in this chart for thread name?
+                buffer_json_add_array_item_string(wb, "Status");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // charts
 
     buffer_json_member_add_time_t(wb, "expires", expires);
     buffer_json_finalize(wb);
