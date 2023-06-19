@@ -286,43 +286,6 @@ void dcstat_update_publish(netdata_publish_dcstat_t *out, uint64_t cache_access,
  *****************************************************************/
 
 /**
- *  Clean names
- *
- *  Clean the optional names allocated during startup.
- */
-void ebpf_dcstat_clean_names()
-{
-    size_t i = 0;
-    while (dc_optional_name[i].program_name) {
-        freez(dc_optional_name[i].optional);
-        i++;
-    }
-}
-
-/**
- * DCstat Free
- *
- * Cleanup variables after child threads to stop
- *
- * @param ptr thread data.
- */
-static void ebpf_dcstat_free(ebpf_module_t *em )
-{
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPING;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-
-    freez(dcstat_vector);
-    freez(dcstat_values);
-
-    ebpf_dcstat_clean_names();
-
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-}
-
-/**
  * DCstat exit
  *
  * Cancel child and exit.
@@ -332,7 +295,18 @@ static void ebpf_dcstat_free(ebpf_module_t *em )
 static void ebpf_dcstat_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    ebpf_dcstat_free(em);
+
+#ifdef LIBBPF_MAJOR_VERSION
+    if (dc_bpf_obj)
+        dc_bpf__destroy(dc_bpf_obj);
+#endif
+
+    if (em->objects)
+        ebpf_unload_legacy_code(em->objects, em->probe_links);
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************

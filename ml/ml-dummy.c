@@ -33,6 +33,14 @@ void ml_host_delete(RRDHOST *rh) {
     UNUSED(rh);
 }
 
+void ml_host_start(RRDHOST *rh) {
+    UNUSED(rh);
+}
+
+void ml_host_stop(RRDHOST *rh) {
+    UNUSED(rh);
+}
+
 void ml_host_start_training_thread(RRDHOST *rh) {
     UNUSED(rh);
 }

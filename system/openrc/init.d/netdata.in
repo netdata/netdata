@@ -15,7 +15,6 @@ command_prefix="@sbindir_POST@"
 command="${command_prefix}/netdata"
 command_args="-P ${NETDATA_PIDFILE} ${NETDATA_EXTRA_ARGS}"
 command_args_foreground="-D"
-start_stop_daemon_args="-u ${NETDATA_OWNER}"
 
 depend() {
     use logger
@@ -24,7 +23,7 @@ depend() {
 }
 
 start_pre() {
-    checkpath -o ${NETDATA_OWNER} -d @localstatedir_POST@/cache/netdata @localstatedir_POST@/run/netdata
+    checkpath -o ${NETDATA_OWNER} -d @localstatedir_POST@/run/netdata
 
     if [ -z "${supervisor}" ]; then
         pidfile="${NETDATA_PIDFILE}"

@@ -52,6 +52,10 @@ static netdata_publish_syscall_t oomkill_publish_aggregated = {.name = "oomkill"
 static void oomkill_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    if (em->objects)
+        ebpf_unload_legacy_code(em->objects, em->probe_links);
+
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);

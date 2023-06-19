@@ -1,5 +1,19 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.40.0...HEAD)
+
+**Merged pull requests:**
+
+- Fix health crash [\#15209](https://github.com/netdata/netdata/pull/15209) ([stelfrag](https://github.com/stelfrag))
+- Fix file permissions under directory [\#15208](https://github.com/netdata/netdata/pull/15208) ([stelfrag](https://github.com/stelfrag))
+- RocketChat cloud integration docs [\#15205](https://github.com/netdata/netdata/pull/15205) ([car12o](https://github.com/car12o))
+- sqlite\_health.c: remove `uuid.h` include [\#15195](https://github.com/netdata/netdata/pull/15195) ([nandahkrishna](https://github.com/nandahkrishna))
+- RPM: Added elfutils-libelf-devel for build with eBPF \(again\) [\#15192](https://github.com/netdata/netdata/pull/15192) ([k0ste](https://github.com/k0ste))
+- Redirect to index.html when a file is not found by web server [\#15143](https://github.com/netdata/netdata/pull/15143) ([MrZammler](https://github.com/MrZammler))
+- Consistently start the agent as root and rely on it to drop privileges properly. [\#14890](https://github.com/netdata/netdata/pull/14890) ([Ferroin](https://github.com/Ferroin))
+
 ## [v1.40.0](https://github.com/netdata/netdata/tree/v1.40.0) (2023-06-14)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.39.1...v1.40.0)
@@ -396,18 +410,6 @@
 - RPM: Added elfutils-libelf-devel for build with eBPF [\#14552](https://github.com/netdata/netdata/pull/14552) ([k0ste](https://github.com/k0ste))
 - More reorg learn 021623 [\#14550](https://github.com/netdata/netdata/pull/14550) ([cakrit](https://github.com/cakrit))
 - Update learn path of python plugin readme [\#14549](https://github.com/netdata/netdata/pull/14549) ([cakrit](https://github.com/cakrit))
-- Hide netdata for IoT from learn. [\#14548](https://github.com/netdata/netdata/pull/14548) ([cakrit](https://github.com/cakrit))
-- Reorg markdown files for learn [\#14547](https://github.com/netdata/netdata/pull/14547) ([cakrit](https://github.com/cakrit))
-- Fix two issues with the edit-config script. [\#14545](https://github.com/netdata/netdata/pull/14545) ([Ferroin](https://github.com/Ferroin))
-- Reorganize system directory to better reflect what files are actually used for. [\#14544](https://github.com/netdata/netdata/pull/14544) ([Ferroin](https://github.com/Ferroin))
-- Fix coverity issues [\#14543](https://github.com/netdata/netdata/pull/14543) ([stelfrag](https://github.com/stelfrag))
-- Remove unused config options and functions [\#14542](https://github.com/netdata/netdata/pull/14542) ([stelfrag](https://github.com/stelfrag))
-- Add renamed markdown files [\#14540](https://github.com/netdata/netdata/pull/14540) ([cakrit](https://github.com/cakrit))
-- Fix broken svgs and improve database queries API doc [\#14539](https://github.com/netdata/netdata/pull/14539) ([cakrit](https://github.com/cakrit))
-- Reorganize learn documents under Integrations part 2 [\#14538](https://github.com/netdata/netdata/pull/14538) ([cakrit](https://github.com/cakrit))
-- Roles docs: Add Early Bird and Member role [\#14537](https://github.com/netdata/netdata/pull/14537) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- Fix broken Alma Linux entries in build matrix generation. [\#14536](https://github.com/netdata/netdata/pull/14536) ([Ferroin](https://github.com/Ferroin))
-- Re-index when machine guid changes [\#14535](https://github.com/netdata/netdata/pull/14535) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 

@@ -61,29 +61,6 @@ static softirq_val_t softirq_vals[] = {
 static softirq_ebpf_val_t *softirq_ebpf_vals = NULL;
 
 /**
- * Cachestat Free
- *
- * Cleanup variables after child threads to stop
- *
- * @param ptr thread data.
- */
-static void ebpf_softirq_free(ebpf_module_t *em)
-{
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPING;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-
-    for (int i = 0; softirq_tracepoints[i].class != NULL; i++) {
-        ebpf_disable_tracepoint(&softirq_tracepoints[i]);
-    }
-    freez(softirq_ebpf_vals);
-
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-}
-
-/**
  * Cleanup
  *
  * Clean up allocated memory.
@@ -93,7 +70,18 @@ static void ebpf_softirq_free(ebpf_module_t *em)
 static void softirq_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    ebpf_softirq_free(em);
+
+    if (em->objects)
+        ebpf_unload_legacy_code(em->objects, em->probe_links);
+
+    for (int i = 0; softirq_tracepoints[i].class != NULL; i++) {
+        ebpf_disable_tracepoint(&softirq_tracepoints[i]);
+    }
+    freez(softirq_ebpf_vals);
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************
