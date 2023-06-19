@@ -1537,7 +1537,7 @@ int health_migrate_old_health_log_table(char *table) {
         rc = sqlite3_finalize(res);
         if (unlikely(rc != SQLITE_OK))
             error_report("Failed to reset statement to copy health log table, rc = %d", rc);
-        //freez(uuid_from_table);
+        freez(uuid_from_table);
     }
 
     //detail
@@ -1545,7 +1545,6 @@ int health_migrate_old_health_log_table(char *table) {
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to copy health log detail, rc = %d", rc);
-        //freez(uuid_from_table);
         return 0;
     }
 
@@ -1555,14 +1554,12 @@ int health_migrate_old_health_log_table(char *table) {
         rc = sqlite3_finalize(res);
         if (unlikely(rc != SQLITE_OK))
             error_report("Failed to reset statement to copy health log detail table, rc = %d", rc);
-        //freez(uuid_from_table);
     }
 
     //update transition ids
     rc = sqlite3_prepare_v2(db_meta, SQL_UPDATE_HEALTH_LOG_DETAIL_TRANSITION_ID, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to update health log detail with transition ids, rc = %d", rc);
-        //freez(uuid_from_table);
         return 0;
     }
 
@@ -1572,14 +1569,12 @@ int health_migrate_old_health_log_table(char *table) {
         rc = sqlite3_finalize(res);
         if (unlikely(rc != SQLITE_OK))
             error_report("Failed to reset statement to update health log detail table with transition ids, rc = %d", rc);
-        //freez(uuid_from_table);
     }
 
     //update health_log_id
     rc = sqlite3_prepare_v2(db_meta, SQL_UPDATE_HEALTH_LOG_DETAIL_HEALTH_LOG_ID, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to update health log detail with health log ids, rc = %d", rc);
-        //freez(uuid_from_table);
         return 0;
     }
 
@@ -1588,7 +1583,6 @@ int health_migrate_old_health_log_table(char *table) {
         rc = sqlite3_finalize(res);
         if (unlikely(rc != SQLITE_OK))
             error_report("Failed to reset statement to update health log detail with health log ids, rc = %d", rc);
-        freez(uuid_from_table);
         return 0;
     }
 
@@ -1598,14 +1592,12 @@ int health_migrate_old_health_log_table(char *table) {
         rc = sqlite3_finalize(res);
         if (unlikely(rc != SQLITE_OK))
             error_report("Failed to reset statement to update health log detail table with health log ids, rc = %d", rc);
-        //freez(uuid_from_table);
     }
 
     //update last transition id
     rc = sqlite3_prepare_v2(db_meta, SQL_UPDATE_HEALTH_LOG_LAST_TRANSITION_ID, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to update health log  with last transition id, rc = %d", rc);
-        //freez(uuid_from_table);
         return 0;
     }
 
@@ -1614,7 +1606,6 @@ int health_migrate_old_health_log_table(char *table) {
         rc = sqlite3_finalize(res);
         if (unlikely(rc != SQLITE_OK))
             error_report("Failed to reset statement to update health log with last transition id, rc = %d", rc);
-        //freez(uuid_from_table);
         return 0;
     }
 
@@ -1624,8 +1615,51 @@ int health_migrate_old_health_log_table(char *table) {
         rc = sqlite3_finalize(res);
         if (unlikely(rc != SQLITE_OK))
             error_report("Failed to reset statement to update health log table with last transition id, rc = %d", rc);
-        //freez(uuid_from_table);
     }
 
     return 1;
+}
+
+#define SQL_GET_ALARM_ID "select alarm_id from health_log where host = @host_id and chart = @chart and name = @name"
+uint32_t sql_get_alarm_id(RRDHOST *host, STRING *chart, STRING *name)
+{
+    int rc = 0, alarm_id = 0;
+    sqlite3_stmt *res = NULL;
+
+    rc = sqlite3_prepare_v2(db_meta, SQL_GET_ALARM_ID, -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement when trying to get an alarm id");
+        return alarm_id;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter for SQL_GET_ALARM_ID.");
+        sqlite3_finalize(res);
+        return alarm_id;
+    }
+
+    rc = sqlite3_bind_string_or_null(res, chart, 2);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind char parameter for SQL_GET_ALARM_ID.");
+        sqlite3_finalize(res);
+        return alarm_id;
+    }
+
+    rc = sqlite3_bind_string_or_null(res, name, 3);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind name parameter for SQL_GET_ALARM_ID.");
+        sqlite3_finalize(res);
+        return alarm_id;
+    }
+
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+        alarm_id = (uint32_t) sqlite3_column_int64(res, 0);
+    }
+
+     rc = sqlite3_finalize(res);
+     if (unlikely(rc != SQLITE_OK))
+         error_report("Failed to finalize the statement while getting an alarm id.");
+
+     return alarm_id;
 }
