@@ -1620,7 +1620,7 @@ int health_migrate_old_health_log_table(char *table) {
     return 1;
 }
 
-#define SQL_GET_ALARM_ID "select alarm_id from health_log where host = @host_id and chart = @chart and name = @name"
+#define SQL_GET_ALARM_ID "select alarm_id from health_log where host_id = @host_id and chart = @chart and name = @name"
 uint32_t sql_get_alarm_id(RRDHOST *host, STRING *chart, STRING *name)
 {
     int rc = 0, alarm_id = 0;
