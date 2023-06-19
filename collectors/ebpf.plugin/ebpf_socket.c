@@ -2177,7 +2177,9 @@ void *ebpf_socket_read_hash(void *ptr)
     int fd_ipv6 = socket_maps[NETDATA_SOCKET_TABLE_IPV6].map_fd;
     int maps_per_core = em->maps_per_core;
     // This thread is cancelled from another thread
-    for (;;) {
+    int running_time;
+    int life_time = em->life_time;
+    for (running_time = 0;!ebpf_exit_plugin && running_time < life_time; running_time++) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_exit_plugin)
            break;
@@ -2918,7 +2920,9 @@ static void socket_collector(ebpf_module_t *em)
     int update_every = em->update_every;
     int maps_per_core = em->maps_per_core;
     int counter = update_every - 1;
-    while (!ebpf_exit_plugin) {
+    int running_time = 0;
+    int life_time = em->life_time;
+    while (!ebpf_exit_plugin && running_time < life_time) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_exit_plugin || ++counter != update_every)
             continue;
@@ -2973,6 +2977,11 @@ static void socket_collector(ebpf_module_t *em)
         }
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
+
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        running_time += update_every;
+        em->running_time = running_time;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 

@@ -309,7 +309,9 @@ static void oomkill_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
     int counter = update_every - 1;
-    while (!ebpf_exit_plugin) {
+    int running_time = 0;
+    int life_time = em->life_time;
+    while (!ebpf_exit_plugin && running_time < life_time) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_exit_plugin || ++counter != update_every)
             continue;
@@ -335,6 +337,11 @@ static void oomkill_collector(ebpf_module_t *em)
         }
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
+
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        running_time += update_every;
+        em->running_time = running_time;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 
