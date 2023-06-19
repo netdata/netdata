@@ -43,7 +43,11 @@
 #define EBPF_CFG_MAPS_PER_CORE "maps per core"
 
 #define EBPF_CFG_UPDATE_EVERY "update every"
+<<<<<<< HEAD
 #define EBPF_CFG_LIFETIME "lifetime"
+=======
+#define EBPF_CFG_LIFETIME "life time"
+>>>>>>> f0ff94fdb (ebpf_functions: Add new eBPF option to control period of time thread runs)
 #define EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT 10
 #define EBPF_CFG_PID_SIZE "pid table size"
 #define EBPF_CFG_APPLICATION "apps"
@@ -311,12 +315,19 @@ typedef struct ebpf_module {
     int maps_per_core;
 
     // period to run
+<<<<<<< HEAD
     uint32_t running_time; // internal usage, this is used to reset a value when a new request happens.
     uint32_t lifetime;
 } ebpf_module_t;
 
 #define EBPF_DEFAULT_LIFETIME 300
 // This will be present until all functions are merged
+=======
+    uint32_t life_time;
+} ebpf_module_t;
+
+#define EBPF_LIFE_TIME 600
+>>>>>>> f0ff94fdb (ebpf_functions: Add new eBPF option to control period of time thread runs)
 #define EBPF_NON_FUNCTION_LIFE_TIME 86400
 
 int ebpf_get_kernel_version();
