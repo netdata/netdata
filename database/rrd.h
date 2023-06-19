@@ -7,6 +7,8 @@
 extern "C" {
 #endif
 
+#include "libnetdata/libnetdata.h"
+
 // non-existing structs instead of voids
 // to enable type checking at compile time
 typedef struct storage_instance STORAGE_INSTANCE;
@@ -94,6 +96,14 @@ extern RRD_MEMORY_MODE default_rrd_memory_mode;
 
 const char *rrd_memory_mode_name(RRD_MEMORY_MODE id);
 RRD_MEMORY_MODE rrd_memory_mode_id(const char *name);
+
+struct ml_metrics_statistics {
+    size_t anomalous;
+    size_t normal;
+    size_t trained;
+    size_t pending;
+    size_t silenced;
+};
 
 #include "daemon/common.h"
 #include "web/api/queries/query.h"
@@ -301,7 +311,7 @@ void rrdlabels_copy(DICTIONARY *dst, DICTIONARY *src);
 void reload_host_labels(void);
 void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels);
 void rrdset_save_rrdlabels_to_sql(RRDSET *st);
-void rrdhost_set_is_parent_label(int count);
+void rrdhost_set_is_parent_label(void);
 int rrdlabels_unittest(void);
 
 // unfortunately this break when defined in exporting_engine.h
@@ -485,6 +495,27 @@ static inline void storage_engine_store_metric(
     return rrddim_collect_store_metric(collection_handle, point_in_time_ut,
                                        n, min_value, max_value,
                                        count, anomaly_count, flags);
+}
+
+size_t rrdeng_disk_space_max(STORAGE_INSTANCE *db_instance);
+static inline size_t storage_engine_disk_space_max(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance) {
+#ifdef ENABLE_DBENGINE
+    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_disk_space_max(db_instance);
+#endif
+
+    return 0;
+}
+
+size_t rrdeng_disk_space_used(STORAGE_INSTANCE *db_instance);
+static inline size_t storage_engine_disk_space_used(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance) {
+#ifdef ENABLE_DBENGINE
+    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_disk_space_used(db_instance);
+#endif
+
+    // TODO - calculate the total host disk space for memory mode save and map
+    return 0;
 }
 
 void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_handle);
@@ -924,6 +955,7 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
     // ACLK
     RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 21), // when set, we should send ACLK stream context updates
     RRDHOST_FLAG_ACLK_STREAM_ALERTS             = (1 << 22), // set when the receiver part is disconnected
+
     // Metadata
     RRDHOST_FLAG_METADATA_UPDATE                = (1 << 23), // metadata needs to be stored in the database
     RRDHOST_FLAG_METADATA_LABELS                = (1 << 24), // metadata needs to be stored in the database
@@ -959,6 +991,8 @@ typedef enum __attribute__ ((__packed__)) {
     RRDHOST_OPTION_DELETE_ORPHAN_HOST       = (1 << 4), // delete the entire host when orphan
 
     RRDHOST_OPTION_REPLICATION              = (1 << 5), // when set, we support replication for this host
+
+    RRDHOST_OPTION_VIRTUAL_HOST             = (1 << 6), // when set, this host is a virtual one
 } RRDHOST_OPTIONS;
 
 #define rrdhost_option_check(host, flag) ((host)->options & (flag))
@@ -1163,6 +1197,9 @@ struct rrdhost {
     size_t rrdpush_sender_replicating_charts;       // the number of charts currently being replicated to a parent
     void *aclk_sync_host_config;
 
+    uint32_t rrdpush_receiver_connection_counter;   // the number of times this receiver has connected
+    uint32_t rrdpush_sender_connection_counter;     // the number of times this sender has connected
+
     // ------------------------------------------------------------------------
     // streaming of data from remote hosts - rrdpush receiver
 
@@ -1225,7 +1262,15 @@ struct rrdhost {
         DICTIONARY *contexts;
         DICTIONARY *hub_queue;
         DICTIONARY *pp_queue;
+        uint32_t metrics;
+        uint32_t instances;
     } rrdctx;
+
+    struct {
+        SPINLOCK spinlock;
+        time_t first_time_s;
+        time_t last_time_s;
+    } retention;
 
     uuid_t  host_uuid;                              // Global GUID for this host
     uuid_t  *node_id;                               // Cloud node_id
@@ -1259,6 +1304,9 @@ extern RRDHOST *localhost;
 #define rrdhost_sender_replicating_charts_plus_one(host) (__atomic_add_fetch(&((host)->rrdpush_sender_replicating_charts), 1, __ATOMIC_RELAXED))
 #define rrdhost_sender_replicating_charts_minus_one(host) (__atomic_sub_fetch(&((host)->rrdpush_sender_replicating_charts), 1, __ATOMIC_RELAXED))
 #define rrdhost_sender_replicating_charts_zero(host) (__atomic_store_n(&((host)->rrdpush_sender_replicating_charts), 0, __ATOMIC_RELAXED))
+
+#define rrdhost_is_online(host) ((host) == localhost || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED) || rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST)))
+bool rrdhost_matches_window(RRDHOST *host, time_t after, time_t before, time_t now);
 
 extern DICTIONARY *rrdhost_root_index;
 size_t rrdhost_hosts_available(void);
@@ -1521,6 +1569,20 @@ void set_host_properties(
 
 size_t get_tier_grouping(size_t tier);
 void store_metric_collection_completed(void);
+
+static inline void rrdhost_retention(RRDHOST *host, time_t now, bool online, time_t *from, time_t *to) {
+    time_t first_time_s = 0, last_time_s = 0;
+    netdata_spinlock_lock(&host->retention.spinlock);
+    first_time_s = host->retention.first_time_s;
+    last_time_s = host->retention.last_time_s;
+    netdata_spinlock_unlock(&host->retention.spinlock);
+
+    if(from)
+        *from = first_time_s;
+
+    if(to)
+        *to = online ? now : last_time_s;
+}
 
 // ----------------------------------------------------------------------------
 // RRD DB engine declarations

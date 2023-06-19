@@ -155,7 +155,7 @@ biofailed:
 static int wait_till_cloud_enabled()
 {
     info("Waiting for Cloud to be enabled");
-    while (!netdata_cloud_setting) {
+    while (!netdata_cloud_enabled) {
         sleep_usec(USEC_PER_SEC * 1);
         if (!service_running(SERVICE_ACLK))
             return 1;
@@ -489,6 +489,74 @@ static int aclk_get_transport_idx(aclk_env_t *env) {
 }
 #endif
 
+ACLK_STATUS aclk_status = ACLK_STATUS_INITIALIZING;
+
+const char *aclk_status_to_string(void) {
+    switch(aclk_status) {
+        case ACLK_STATUS_CONNECTED:
+            return "connected";
+
+        case ACLK_STATUS_INITIALIZING:
+            return "initializing";
+
+        case ACLK_STATUS_DISABLED:
+            return "disabled";
+
+        case ACLK_STATUS_NO_CLOUD_URL:
+            return "no_cloud_url";
+
+        case ACLK_STATUS_INVALID_CLOUD_URL:
+            return "invalid_cloud_url";
+
+        case ACLK_STATUS_NOT_CLAIMED:
+            return "not_claimed";
+
+        case ACLK_STATUS_ENV_ENDPOINT_UNREACHABLE:
+            return "env_endpoint_unreachable";
+
+        case ACLK_STATUS_ENV_RESPONSE_NOT_200:
+            return "env_response_not_200";
+
+        case ACLK_STATUS_ENV_RESPONSE_EMPTY:
+            return "env_response_empty";
+
+        case ACLK_STATUS_ENV_RESPONSE_NOT_JSON:
+            return "env_response_not_json";
+
+        case ACLK_STATUS_ENV_FAILED:
+            return "env_failed";
+
+        case ACLK_STATUS_BLOCKED:
+            return "blocked";
+
+        case ACLK_STATUS_NO_OLD_PROTOCOL:
+            return "no_old_protocol";
+
+        case ACLK_STATUS_NO_PROTOCOL_CAPABILITY:
+            return "no_protocol_capability";
+
+        case ACLK_STATUS_INVALID_ENV_AUTH_URL:
+            return "invalid_env_auth_url";
+
+        case ACLK_STATUS_INVALID_ENV_TRANSPORT_IDX:
+            return "invalid_env_transport_idx";
+
+        case ACLK_STATUS_INVALID_ENV_TRANSPORT_URL:
+            return "invalid_env_transport_url";
+
+        case ACLK_STATUS_INVALID_OTP:
+            return "invalid_otp";
+
+        case ACLK_STATUS_NO_LWT_TOPIC:
+            return "no_lwt_topic";
+
+        default:
+            return "unknown";
+    }
+}
+
+const char *aclk_cloud_base_url = NULL;
+
 /* Attempts to make a connection to MQTT broker over WSS
  * @param client instance of mqtt_wss_client
  * @return  0 - Successful Connection,
@@ -513,18 +581,22 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
 #endif
 
     while (service_running(SERVICE_ACLK)) {
-        char *cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
-        if (cloud_base_url == NULL) {
+        aclk_cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
+        if (aclk_cloud_base_url == NULL) {
             error_report("Do not move the cloud base url out of post_conf_load!!");
+            aclk_status = ACLK_STATUS_NO_CLOUD_URL;
             return -1;
         }
 
-        if (aclk_block_till_recon_allowed())
+        if (aclk_block_till_recon_allowed()) {
+            aclk_status = ACLK_STATUS_BLOCKED;
             return 1;
+        }
 
         info("Attempting connection now");
         memset(&base_url, 0, sizeof(url_t));
-        if (url_parse(cloud_base_url, &base_url)) {
+        if (url_parse(aclk_cloud_base_url, &base_url)) {
+            aclk_status = ACLK_STATUS_INVALID_CLOUD_URL;
             error_report("ACLK base URL configuration key could not be parsed. Will retry in %d seconds.", CLOUD_BASE_URL_READ_RETRY);
             sleep(CLOUD_BASE_URL_READ_RETRY);
             url_t_destroy(&base_url);
@@ -554,21 +626,57 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
 
         ret = aclk_get_env(aclk_env, base_url.host, base_url.port);
         url_t_destroy(&base_url);
-        if (ret) {
-            error_report("Failed to Get ACLK environment");
-            // delay handled by aclk_block_till_recon_allowed
-            continue;
+        if(ret) switch(ret) {
+            case 1:
+                aclk_status = ACLK_STATUS_NOT_CLAIMED;
+                error_report("Failed to Get ACLK environment (agent is not claimed)");
+                // delay handled by aclk_block_till_recon_allowed
+                continue;
+
+            case 2:
+                aclk_status = ACLK_STATUS_ENV_ENDPOINT_UNREACHABLE;
+                error_report("Failed to Get ACLK environment (cannot contact ENV endpoint)");
+                // delay handled by aclk_block_till_recon_allowed
+                continue;
+
+            case 3:
+                aclk_status = ACLK_STATUS_ENV_RESPONSE_NOT_200;
+                error_report("Failed to Get ACLK environment (ENV response code is not 200)");
+                // delay handled by aclk_block_till_recon_allowed
+                continue;
+
+            case 4:
+                aclk_status = ACLK_STATUS_ENV_RESPONSE_EMPTY;
+                error_report("Failed to Get ACLK environment (ENV response is empty)");
+                // delay handled by aclk_block_till_recon_allowed
+                continue;
+
+            case 5:
+                aclk_status = ACLK_STATUS_ENV_RESPONSE_NOT_JSON;
+                error_report("Failed to Get ACLK environment (ENV response is not JSON)");
+                // delay handled by aclk_block_till_recon_allowed
+                continue;
+
+            default:
+                aclk_status = ACLK_STATUS_ENV_FAILED;
+                error_report("Failed to Get ACLK environment (unknown error)");
+                // delay handled by aclk_block_till_recon_allowed
+                continue;
         }
 
-        if (!service_running(SERVICE_ACLK))
+        if (!service_running(SERVICE_ACLK)) {
+            aclk_status = ACLK_STATUS_DISABLED;
             return 1;
+        }
 
         if (aclk_env->encoding != ACLK_ENC_PROTO) {
+            aclk_status = ACLK_STATUS_NO_OLD_PROTOCOL;
             error_report("This agent can only use the new cloud protocol but cloud requested old one.");
             continue;
         }
 
         if (!aclk_env_has_capa("proto")) {
+            aclk_status = ACLK_STATUS_NO_PROTOCOL_CAPABILITY;
             error_report("Can't use encoding=proto without at least \"proto\" capability.");
             continue;
         }
@@ -576,6 +684,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
 
         memset(&auth_url, 0, sizeof(url_t));
         if (url_parse(aclk_env->auth_endpoint, &auth_url)) {
+            aclk_status = ACLK_STATUS_INVALID_ENV_AUTH_URL;
             error_report("Parsing URL returned by env endpoint for authentication failed. \"%s\"", aclk_env->auth_endpoint);
             url_t_destroy(&auth_url);
             continue;
@@ -584,6 +693,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         ret = aclk_get_mqtt_otp(aclk_private_key, (char **)&mqtt_conn_params.clientid, (char **)&mqtt_conn_params.username, (char **)&mqtt_conn_params.password, &auth_url);
         url_t_destroy(&auth_url);
         if (ret) {
+            aclk_status = ACLK_STATUS_INVALID_OTP;
             error_report("Error passing Challenge/Response to get OTP");
             continue;
         }
@@ -593,6 +703,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         mqtt_conn_params.will_topic = aclk_get_topic(ACLK_TOPICID_AGENT_CONN);
 
         if (!mqtt_conn_params.will_topic) {
+            aclk_status = ACLK_STATUS_NO_LWT_TOPIC;
             error_report("Couldn't get LWT topic. Will not send LWT.");
             continue;
         }
@@ -600,12 +711,14 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         // Do the MQTT connection
         ret = aclk_get_transport_idx(aclk_env);
         if (ret < 0) {
+            aclk_status = ACLK_STATUS_INVALID_ENV_TRANSPORT_IDX;
             error_report("Cloud /env endpoint didn't return any transport usable by this Agent.");
             continue;
         }
 
         memset(&mqtt_url, 0, sizeof(url_t));
         if (url_parse(aclk_env->transports[ret]->endpoint, &mqtt_url)){
+            aclk_status = ACLK_STATUS_INVALID_ENV_TRANSPORT_URL;
             error_report("Failed to parse target URL for /env trp idx %d \"%s\"", ret, aclk_env->transports[ret]->endpoint);
             url_t_destroy(&mqtt_url);
             continue;
@@ -638,6 +751,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         if (!ret) {
             last_conn_time_mqtt = now_realtime_sec();
             info("ACLK connection successfully established");
+            aclk_status = ACLK_STATUS_CONNECTED;
             log_access("ACLK CONNECTED");
             mqtt_connected_actions(client);
             return 0;
@@ -646,6 +760,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         error_report("Connect failed");
     }
 
+    aclk_status = ACLK_STATUS_DISABLED;
     return 1;
 }
 

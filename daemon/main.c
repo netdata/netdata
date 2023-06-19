@@ -14,7 +14,7 @@ int netdata_anonymous_statistics_enabled;
 
 int libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
 bool ieee754_doubles = false;
-
+time_t netdata_start_time = 0;
 struct netdata_static_thread *static_threads;
 
 struct config netdata_config = {
@@ -446,8 +446,11 @@ void netdata_cleanup_and_exit(int ret) {
                 for (size_t tier = 0; tier < storage_tiers; tier++)
                     running += rrdeng_collectors_running(multidb_ctx[tier]);
 
-                if(running)
-                    sleep_usec(100 * USEC_PER_MS);
+                if(running) {
+                    error_limit_static_thread_var(erl, 1, 100 * USEC_PER_MS);
+                    error_limit(&erl, "waiting for %zu collectors to finish", running);
+                    // sleep_usec(100 * USEC_PER_MS);
+                }
             }
 
             delta_shutdown_time("wait for dbengine main cache to finish flushing");
@@ -1313,9 +1316,9 @@ void post_conf_load(char **user)
     // --------------------------------------------------------------------
     // Check if the cloud is enabled
 #if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
-    netdata_cloud_setting = 0;
+    netdata_cloud_enabled = false;
 #else
-    netdata_cloud_setting = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1);
+    netdata_cloud_enabled = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1);
 #endif
     // This must be set before any point in the code that accesses it. Do not move it from this function.
     appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", DEFAULT_CLOUD_BASE_URL);
@@ -1342,6 +1345,8 @@ void replication_initialize(void);
 int main(int argc, char **argv) {
     // initialize the system clocks
     clocks_init();
+    netdata_start_time = now_realtime_sec();
+
     usec_t started_ut = now_monotonic_usec();
     usec_t last_ut = started_ut;
     const char *prev_msg = NULL;
@@ -1357,7 +1362,7 @@ int main(int argc, char **argv) {
 
     static_threads = static_threads_get();
 
-    netdata_ready=0;
+    netdata_ready = false;
     // set the name for logging
     program_name = "netdata";
 
@@ -2117,7 +2122,7 @@ int main(int argc, char **argv) {
 
     usec_t ready_ut = now_monotonic_usec();
     info("NETDATA STARTUP: completed in %llu ms. Enjoy real-time performance monitoring!", (ready_ut - started_ut) / USEC_PER_MS);
-    netdata_ready = 1;
+    netdata_ready = true;
 
     send_statistics("START", "-",  "-");
     if (crash_detected)

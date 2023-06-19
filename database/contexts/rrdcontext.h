@@ -467,6 +467,8 @@ struct api_v2_contexts_request {
     char *contexts;
     char *q;
 
+    time_t after;
+    time_t before;
     time_t timeout_ms;
 
     qt_interrupt_callback_t interrupt_callback;
@@ -474,18 +476,23 @@ struct api_v2_contexts_request {
 };
 
 typedef enum __attribute__ ((__packed__)) {
-    CONTEXTS_V2_DEBUG          = (1 << 0),
-    CONTEXTS_V2_SEARCH         = (1 << 1),
-    CONTEXTS_V2_NODES          = (1 << 2),
-    CONTEXTS_V2_NODES_DETAILED = (1 << 3),
-    CONTEXTS_V2_CONTEXTS       = (1 << 4),
+    CONTEXTS_V2_DEBUG           = (1 << 0),
+    CONTEXTS_V2_MINIFY          = (1 << 1),
+    CONTEXTS_V2_SEARCH          = (1 << 2),
+    CONTEXTS_V2_NODES           = (1 << 3),
+    CONTEXTS_V2_NODES_INFO      = (1 << 4),
+    CONTEXTS_V2_NODES_INSTANCES = (1 << 5),
+    CONTEXTS_V2_CONTEXTS        = (1 << 6),
+    CONTEXTS_V2_AGENTS          = (1 << 7),
+    CONTEXTS_V2_AGENTS_INFO     = (1 << 8),
+    CONTEXTS_V2_VERSIONS        = (1 << 9),
 } CONTEXTS_V2_OPTIONS;
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_OPTIONS options);
 
 RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o);
-void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time_t now_s);
-void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t duration_ut);
+void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time_t now_s, bool info);
+void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t duration_ut, bool status);
 void buffer_json_query_timings(BUFFER *wb, const char *key, struct query_timings *timings);
 void buffer_json_cloud_timings(BUFFER *wb, const char *key, struct query_timings *timings);
 

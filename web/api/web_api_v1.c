@@ -233,7 +233,7 @@ void web_client_api_request_v1_data_options_to_string(char *buf, size_t size, RR
     *write = *end = '\0';
 }
 
-inline DATASOURCE_FORMAT web_client_api_request_v1_data_format(char *name) {
+inline uint32_t web_client_api_request_v1_data_format(char *name) {
     uint32_t hash = simple_hash(name);
     int i;
 
