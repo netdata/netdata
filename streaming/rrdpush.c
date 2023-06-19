@@ -264,7 +264,7 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
     // send the chart
     buffer_sprintf(
             wb
-            , "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d \"%s %s %s %s\" \"%s\" \"%s\"\n"
+            , "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %d %d \"%s %s %s %s\" \"%s\" \"%s\"\n"
             , rrdset_id(st)
             , name
             , rrdset_title(st)
@@ -291,7 +291,7 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
     rrddim_foreach_read(rd, st) {
         buffer_sprintf(
                 wb
-                , "DIMENSION \"%s\" \"%s\" \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " \"%s %s %s\"\n"
+                , "DIMENSION \"%s\" \"%s\" \"%s\" %d %d \"%s %s %s\"\n"
                 , rrddim_id(rd)
                 , rrddim_name(rd)
                 , rrd_algorithm_name(rd->algorithm)
@@ -301,7 +301,7 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
                 , rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN)?"hidden":""
                 , rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
         );
-        rd->exposed = 1;
+        rrddim_set_exposed(rd);
     }
     rrddim_foreach_done(rd);
 
@@ -355,10 +355,10 @@ static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_sta
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        if(unlikely(!rd->updated))
+        if(unlikely(!rrddim_check_updated(rd)))
             continue;
 
-        if(likely(rd->exposed)) {
+        if(likely(rrddim_check_exposed(rd))) {
             buffer_fast_strcat(wb, "SET \"", 5);
             buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
             buffer_fast_strcat(wb, "\" = ", 4);
@@ -598,6 +598,7 @@ int connect_to_one_of_destinations(
             *reconnects_counter += 1;
 
         d->last_attempt = now;
+        d->attempts++;
         sock = connect_to_this(string2str(d->destination), default_port, timeout);
 
         if (sock != -1) {
@@ -1091,13 +1092,13 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         static time_t last_stream_accepted_t = 0;
 
         time_t now = now_realtime_sec();
-        netdata_spinlock_lock(&spinlock);
+        spinlock_lock(&spinlock);
 
         if(unlikely(last_stream_accepted_t == 0))
             last_stream_accepted_t = now;
 
         if(now - last_stream_accepted_t < web_client_streaming_rate_t) {
-            netdata_spinlock_unlock(&spinlock);
+            spinlock_unlock(&spinlock);
 
             char msg[100 + 1];
             snprintfz(msg, 100,
@@ -1114,7 +1115,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         }
 
         last_stream_accepted_t = now;
-        netdata_spinlock_unlock(&spinlock);
+        spinlock_unlock(&spinlock);
     }
 
     /*
@@ -1220,11 +1221,10 @@ static struct {
     STREAM_HANDSHAKE err;
     const char *str;
 } handshake_errors[] = {
-    { STREAM_HANDSHAKE_OK_V5, "OK_V5" },
-    { STREAM_HANDSHAKE_OK_V4, "OK_V4" },
-    { STREAM_HANDSHAKE_OK_V3, "OK_V3" },
-    { STREAM_HANDSHAKE_OK_V2, "OK_V2" },
-    { STREAM_HANDSHAKE_OK_V1, "OK_V1" },
+    { STREAM_HANDSHAKE_OK_V3, "CONNECTED" },
+    { STREAM_HANDSHAKE_OK_V2, "CONNECTED" },
+    { STREAM_HANDSHAKE_OK_V1, "CONNECTED" },
+    { STREAM_HANDSHAKE_NEVER, "NOT_TRIED_YET" },
     { STREAM_HANDSHAKE_ERROR_BAD_HANDSHAKE, "BAD HANDSHAKE" },
     { STREAM_HANDSHAKE_ERROR_LOCALHOST, "LOCALHOST" },
     { STREAM_HANDSHAKE_ERROR_ALREADY_CONNECTED, "ALREADY CONNECTED" },
@@ -1241,12 +1241,16 @@ static struct {
 };
 
 const char *stream_handshake_error_to_string(STREAM_HANDSHAKE handshake_error) {
+    if(handshake_error >= STREAM_HANDSHAKE_OK_V1)
+        // handshake_error is the whole version / capabilities number
+        return "CONNECTED";
+
     for(size_t i = 0; handshake_errors[i].str ; i++) {
         if(handshake_error == handshake_errors[i].err)
             return handshake_errors[i].str;
     }
 
-    return "";
+    return "UNKNOWN";
 }
 
 static struct {

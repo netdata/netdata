@@ -78,11 +78,10 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender);
 #define START_STREAMING_ERROR_INITIALIZATION "The server is initializing. Try later."
 
 typedef enum {
-    STREAM_HANDSHAKE_OK_V5 = 5, // COMPRESSION
-    STREAM_HANDSHAKE_OK_V4 = 4, // CLABELS
-    STREAM_HANDSHAKE_OK_V3 = 3, // CLAIM
-    STREAM_HANDSHAKE_OK_V2 = 2, // HLABELS
-    STREAM_HANDSHAKE_OK_V1 = 1,
+    STREAM_HANDSHAKE_OK_V3 = 3, // v3+
+    STREAM_HANDSHAKE_OK_V2 = 2, // v2
+    STREAM_HANDSHAKE_OK_V1 = 1, // v1
+    STREAM_HANDSHAKE_NEVER = 0, // never tried to connect
     STREAM_HANDSHAKE_ERROR_BAD_HANDSHAKE = -1,
     STREAM_HANDSHAKE_ERROR_LOCALHOST = -2,
     STREAM_HANDSHAKE_ERROR_ALREADY_CONNECTED = -3,
@@ -334,6 +333,7 @@ struct receiver_state {
 struct rrdpush_destinations {
     STRING *destination;
     bool ssl;
+    uint32_t attempts;
 
     const char *last_error;
     time_t last_attempt;

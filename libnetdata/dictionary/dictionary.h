@@ -46,7 +46,7 @@
 typedef struct dictionary DICTIONARY;
 typedef struct dictionary_item DICTIONARY_ITEM;
 
-typedef enum dictionary_options {
+typedef enum __attribute__((packed)) dictionary_options {
     DICT_OPTION_NONE                    = 0,        // the default is the opposite of all below
     DICT_OPTION_SINGLE_THREADED         = (1 << 0), // don't use any locks (default: use locks)
     DICT_OPTION_VALUE_LINK_DONT_CLONE   = (1 << 1), // don't copy the value, just point to the one provided (default: copy)

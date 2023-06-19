@@ -28,37 +28,49 @@ static __thread size_t netdata_locks_acquired_rwlocks = 0;
 static __thread size_t netdata_locks_acquired_mutexes = 0;
 
 inline void netdata_thread_disable_cancelability(void) {
-    int old;
-    int ret = pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &old);
-    if(ret != 0)
-        error("THREAD_CANCELABILITY: pthread_setcancelstate() on thread %s returned error %d", netdata_thread_tag(), ret);
-    else {
-        if(!netdata_thread_nested_disables)
-            netdata_thread_first_cancelability = old;
+    if(!netdata_thread_nested_disables) {
+        int old;
+        int ret = pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &old);
 
-        netdata_thread_nested_disables++;
+        if(ret != 0)
+            error("THREAD_CANCELABILITY: pthread_setcancelstate() on thread %s returned error %d",
+                  netdata_thread_tag(), ret);
+
+        netdata_thread_first_cancelability = old;
     }
+
+    netdata_thread_nested_disables++;
 }
 
 inline void netdata_thread_enable_cancelability(void) {
-    if(netdata_thread_nested_disables < 1) {
-        error("THREAD_CANCELABILITY: netdata_thread_enable_cancelability(): invalid thread cancelability count %d on thread %s - results will be undefined - please report this!",
+    if(unlikely(netdata_thread_nested_disables < 1)) {
+        internal_fatal(true, "THREAD_CANCELABILITY: trying to enable cancelability, but it was not not disabled");
+
+        error("THREAD_CANCELABILITY: netdata_thread_enable_cancelability(): invalid thread cancelability count %d "
+              "on thread %s - results will be undefined - please report this!",
             netdata_thread_nested_disables, netdata_thread_tag());
+
+        netdata_thread_nested_disables = 1;
     }
-    else if(netdata_thread_nested_disables == 1) {
+
+    if(netdata_thread_nested_disables == 1) {
         int old = 1;
         int ret = pthread_setcancelstate(netdata_thread_first_cancelability, &old);
         if(ret != 0)
             error("THREAD_CANCELABILITY: pthread_setcancelstate() on thread %s returned error %d", netdata_thread_tag(), ret);
         else {
-            if(old != PTHREAD_CANCEL_DISABLE)
-                error("THREAD_CANCELABILITY: netdata_thread_enable_cancelability(): old thread cancelability on thread %s was changed, expected DISABLED (%d), found %s (%d) - please report this!", netdata_thread_tag(), PTHREAD_CANCEL_DISABLE, (old == PTHREAD_CANCEL_ENABLE)?"ENABLED":"UNKNOWN", old);
-        }
+            if(old != PTHREAD_CANCEL_DISABLE) {
+                internal_fatal(true, "THREAD_CANCELABILITY: invalid old state cancelability");
 
-        netdata_thread_nested_disables = 0;
+                error("THREAD_CANCELABILITY: netdata_thread_enable_cancelability(): old thread cancelability "
+                      "on thread %s was changed, expected DISABLED (%d), found %s (%d) - please report this!",
+                      netdata_thread_tag(), PTHREAD_CANCEL_DISABLE,
+                      (old == PTHREAD_CANCEL_ENABLE) ? "ENABLED" : "UNKNOWN", old);
+            }
+        }
     }
-    else
-        netdata_thread_nested_disables--;
+
+    netdata_thread_nested_disables--;
 }
 
 // ----------------------------------------------------------------------------
@@ -278,11 +290,11 @@ int __netdata_rwlock_trywrlock(netdata_rwlock_t *rwlock) {
 // spinlock implementation
 // https://www.youtube.com/watch?v=rmGJc9PXpuE&t=41s
 
-void netdata_spinlock_init(SPINLOCK *spinlock) {
+void spinlock_init(SPINLOCK *spinlock) {
     memset(spinlock, 0, sizeof(SPINLOCK));
 }
 
-void netdata_spinlock_lock(SPINLOCK *spinlock) {
+void spinlock_lock(SPINLOCK *spinlock) {
     static const struct timespec ns = { .tv_sec = 0, .tv_nsec = 1 };
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -314,7 +326,7 @@ void netdata_spinlock_lock(SPINLOCK *spinlock) {
 #endif
 }
 
-void netdata_spinlock_unlock(SPINLOCK *spinlock) {
+void spinlock_unlock(SPINLOCK *spinlock) {
 #ifdef NETDATA_INTERNAL_CHECKS
     spinlock->locker_pid = 0;
 #endif
@@ -322,7 +334,7 @@ void netdata_spinlock_unlock(SPINLOCK *spinlock) {
     netdata_thread_enable_cancelability();
 }
 
-bool netdata_spinlock_trylock(SPINLOCK *spinlock) {
+bool spinlock_trylock(SPINLOCK *spinlock) {
     netdata_thread_disable_cancelability();
 
     if(!__atomic_load_n(&spinlock->locked, __ATOMIC_RELAXED) &&
@@ -331,8 +343,80 @@ bool netdata_spinlock_trylock(SPINLOCK *spinlock) {
         return true;
 
     // we didn't get the lock
+    netdata_thread_enable_cancelability();
     return false;
 }
+
+// ----------------------------------------------------------------------------
+// rw_spinlock implementation
+
+void rw_spinlock_init(RW_SPINLOCK *rw_spinlock) {
+    rw_spinlock->readers = 0;
+    spinlock_init(&rw_spinlock->spinlock);
+}
+
+void rw_spinlock_read_lock(RW_SPINLOCK *rw_spinlock) {
+    netdata_thread_disable_cancelability();
+
+    spinlock_lock(&rw_spinlock->spinlock);
+    __atomic_add_fetch(&rw_spinlock->readers, 1, __ATOMIC_RELAXED);
+    spinlock_unlock(&rw_spinlock->spinlock);
+}
+
+void rw_spinlock_read_unlock(RW_SPINLOCK *rw_spinlock) {
+#ifndef NETDATA_INTERNAL_CHECKS
+    __atomic_sub_fetch(&rw_spinlock->readers, 1, __ATOMIC_RELAXED);
+#else
+    int32_t x = __atomic_sub_fetch(&rw_spinlock->readers, 1, __ATOMIC_RELAXED);
+    if(x < 0)
+        fatal("RW_SPINLOCK: readers is negative %d", x);
+#endif
+
+    netdata_thread_enable_cancelability();
+}
+
+void rw_spinlock_write_lock(RW_SPINLOCK *rw_spinlock) {
+    static const struct timespec ns = { .tv_sec = 0, .tv_nsec = 1 };
+
+    spinlock_lock(&rw_spinlock->spinlock);
+    size_t count = 0;
+    while (__atomic_load_n(&rw_spinlock->readers, __ATOMIC_RELAXED) > 0) {
+        // Busy wait until all readers have released their locks.
+        if(++count > 1000)
+            nanosleep(&ns, NULL);
+    }
+}
+
+void rw_spinlock_write_unlock(RW_SPINLOCK *rw_spinlock) {
+    spinlock_unlock(&rw_spinlock->spinlock);
+}
+
+bool rw_spinlock_tryread_lock(RW_SPINLOCK *rw_spinlock) {
+    if(spinlock_trylock(&rw_spinlock->spinlock)) {
+        __atomic_add_fetch(&rw_spinlock->readers, 1, __ATOMIC_RELAXED);
+        spinlock_unlock(&rw_spinlock->spinlock);
+        netdata_thread_disable_cancelability();
+        return true;
+    }
+
+    return false;
+}
+
+bool rw_spinlock_trywrite_lock(RW_SPINLOCK *rw_spinlock) {
+    if(spinlock_trylock(&rw_spinlock->spinlock)) {
+        if (__atomic_load_n(&rw_spinlock->readers, __ATOMIC_RELAXED) == 0) {
+            // No readers, we've successfully acquired the write lock
+            return true;
+        }
+        else {
+            // There are readers, unlock the spinlock and return false
+            spinlock_unlock(&rw_spinlock->spinlock);
+        }
+    }
+
+    return false;
+}
+
 
 #ifdef NETDATA_TRACE_RWLOCKS
 

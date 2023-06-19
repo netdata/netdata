@@ -529,7 +529,7 @@ int is_legacy = 1;
                  ", program_version '%s'"
                  ", update every %d"
                  ", memory mode %s"
-                 ", history entries %ld"
+                 ", history entries %d"
                  ", streaming %s"
                  " (to '%s' with api key '%s')"
                  ", health %s"
@@ -594,7 +594,7 @@ static void rrdhost_update(RRDHOST *host
 {
     UNUSED(guid);
 
-    netdata_spinlock_lock(&host->rrdhost_update_lock);
+    spinlock_lock(&host->rrdhost_update_lock);
 
     host->health.health_enabled = (mode == RRD_MEMORY_MODE_NONE) ? 0 : health_enabled;
 
@@ -633,13 +633,19 @@ static void rrdhost_update(RRDHOST *host
     }
 
     if(host->rrd_update_every != update_every)
-        error("Host '%s' has an update frequency of %d seconds, but the wanted one is %d seconds. Restart netdata here to apply the new settings.", rrdhost_hostname(host), host->rrd_update_every, update_every);
+        error("Host '%s' has an update frequency of %d seconds, but the wanted one is %d seconds. "
+              "Restart netdata here to apply the new settings.",
+              rrdhost_hostname(host), host->rrd_update_every, update_every);
 
     if(host->rrd_memory_mode != mode)
-        error("Host '%s' has memory mode '%s', but the wanted one is '%s'. Restart netdata here to apply the new settings.", rrdhost_hostname(host), rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
+        error("Host '%s' has memory mode '%s', but the wanted one is '%s'. "
+              "Restart netdata here to apply the new settings.",
+              rrdhost_hostname(host), rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
 
     else if(host->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && host->rrd_history_entries < history)
-        error("Host '%s' has history of %ld entries, but the wanted one is %ld entries. Restart netdata here to apply the new settings.", rrdhost_hostname(host), host->rrd_history_entries, history);
+        error("Host '%s' has history of %d entries, but the wanted one is %ld entries. "
+              "Restart netdata here to apply the new settings.",
+              rrdhost_hostname(host), host->rrd_history_entries, history);
 
     // update host tags
     rrdhost_init_tags(host, tags);
@@ -682,7 +688,7 @@ static void rrdhost_update(RRDHOST *host
         info("Host %s is not in archived mode anymore", rrdhost_hostname(host));
     }
 
-    netdata_spinlock_unlock(&host->rrdhost_update_lock);
+    spinlock_unlock(&host->rrdhost_update_lock);
 }
 
 RRDHOST *rrdhost_find_or_create(
@@ -912,9 +918,12 @@ void dbengine_init(char *hostname) {
         strncpyz(tiers_init[tier].path, dbenginepath, FILENAME_MAX);
         tiers_init[tier].ret = 0;
 
-        if(parallel_initialization)
-            netdata_thread_create(&tiers_init[tier].thread, "DBENGINE_INIT", NETDATA_THREAD_OPTION_JOINABLE,
+        if(parallel_initialization) {
+            char tag[NETDATA_THREAD_TAG_MAX + 1];
+            snprintfz(tag, NETDATA_THREAD_TAG_MAX, "DBENGINIT[%zu]", tier);
+            netdata_thread_create(&tiers_init[tier].thread, tag, NETDATA_THREAD_OPTION_JOINABLE,
                                   dbengine_tier_init, &tiers_init[tier]);
+        }
         else
             dbengine_tier_init(&tiers_init[tier]);
     }

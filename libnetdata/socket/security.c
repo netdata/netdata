@@ -571,7 +571,7 @@ static SSL_CTX * netdata_ssl_create_server_ctx(unsigned long mode) {
  */
 void netdata_ssl_initialize_ctx(int selector) {
     static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
-    netdata_spinlock_lock(&sp);
+    spinlock_lock(&sp);
 
     switch (selector) {
         case NETDATA_SSL_WEB_SERVER_CTX: {
@@ -621,7 +621,7 @@ void netdata_ssl_initialize_ctx(int selector) {
         }
     }
 
-    netdata_spinlock_unlock(&sp);
+    spinlock_unlock(&sp);
 }
 
 /**

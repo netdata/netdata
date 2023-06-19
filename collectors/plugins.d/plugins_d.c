@@ -22,28 +22,28 @@ inline size_t pluginsd_initialize_plugin_directories()
 }
 
 static inline void plugin_set_disabled(struct plugind *cd) {
-    netdata_spinlock_lock(&cd->unsafe.spinlock);
+    spinlock_lock(&cd->unsafe.spinlock);
     cd->unsafe.enabled = false;
-    netdata_spinlock_unlock(&cd->unsafe.spinlock);
+    spinlock_unlock(&cd->unsafe.spinlock);
 }
 
 bool plugin_is_enabled(struct plugind *cd) {
-    netdata_spinlock_lock(&cd->unsafe.spinlock);
+    spinlock_lock(&cd->unsafe.spinlock);
     bool ret = cd->unsafe.enabled;
-    netdata_spinlock_unlock(&cd->unsafe.spinlock);
+    spinlock_unlock(&cd->unsafe.spinlock);
     return ret;
 }
 
 static inline void plugin_set_running(struct plugind *cd) {
-    netdata_spinlock_lock(&cd->unsafe.spinlock);
+    spinlock_lock(&cd->unsafe.spinlock);
     cd->unsafe.running = true;
-    netdata_spinlock_unlock(&cd->unsafe.spinlock);
+    spinlock_unlock(&cd->unsafe.spinlock);
 }
 
 static inline bool plugin_is_running(struct plugind *cd) {
-    netdata_spinlock_lock(&cd->unsafe.spinlock);
+    spinlock_lock(&cd->unsafe.spinlock);
     bool ret = cd->unsafe.running;
-    netdata_spinlock_unlock(&cd->unsafe.spinlock);
+    spinlock_unlock(&cd->unsafe.spinlock);
     return ret;
 }
 
@@ -53,7 +53,7 @@ static void pluginsd_worker_thread_cleanup(void *arg)
 
     worker_unregister();
 
-    netdata_spinlock_lock(&cd->unsafe.spinlock);
+    spinlock_lock(&cd->unsafe.spinlock);
 
     cd->unsafe.running = false;
     cd->unsafe.thread = 0;
@@ -61,7 +61,7 @@ static void pluginsd_worker_thread_cleanup(void *arg)
     pid_t pid = cd->unsafe.pid;
     cd->unsafe.pid = 0;
 
-    netdata_spinlock_unlock(&cd->unsafe.spinlock);
+    spinlock_unlock(&cd->unsafe.spinlock);
 
     if (pid) {
         siginfo_t info;
@@ -190,14 +190,14 @@ static void pluginsd_main_cleanup(void *data) {
 
     struct plugind *cd;
     for (cd = pluginsd_root; cd; cd = cd->next) {
-        netdata_spinlock_lock(&cd->unsafe.spinlock);
+        spinlock_lock(&cd->unsafe.spinlock);
         if (cd->unsafe.enabled && cd->unsafe.running && cd->unsafe.thread != 0) {
             info("PLUGINSD: 'host:%s', stopping plugin thread: %s",
                  rrdhost_hostname(cd->host), cd->id);
 
             netdata_thread_cancel(cd->unsafe.thread);
         }
-        netdata_spinlock_unlock(&cd->unsafe.spinlock);
+        spinlock_unlock(&cd->unsafe.spinlock);
     }
 
     info("PLUGINSD: cleanup completed.");

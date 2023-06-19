@@ -299,19 +299,17 @@ static void rrdhost_sender_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *ke
         return;
 
     buffer_json_member_add_object(wb, key);
+    {
+        buffer_json_member_add_uint64(wb, "id", s->stream.id);
+        buffer_json_member_add_uint64(wb, "hops", s->stream.hops);
+        buffer_json_member_add_string(wb, "status", rrdhost_streaming_status_to_string(s->stream.status));
+        buffer_json_member_add_time_t(wb, "since", s->stream.since);
+        buffer_json_member_add_time_t(wb, "age", s->now - s->stream.since);
 
-    buffer_json_member_add_uint64(wb, "id", s->stream.id);
-    buffer_json_member_add_uint64(wb, "hops", s->stream.hops);
-    buffer_json_member_add_string(wb, "status", rrdhost_streaming_status_to_string(s->stream.status));
-    buffer_json_member_add_time_t(wb, "since", s->stream.since);
-    buffer_json_member_add_time_t(wb, "age", s->now - s->stream.since);
+        if (s->stream.status == RRDHOST_STREAM_STATUS_OFFLINE)
+            buffer_json_member_add_string(wb, "reason", s->stream.reason);
 
-    if(s->stream.status == RRDHOST_STREAM_STATUS_OFFLINE)
-        buffer_json_member_add_string(wb, "reason", s->stream.reason);
-
-    if(s->stream.status == RRDHOST_STREAM_STATUS_REPLICATING || s->stream.status == RRDHOST_STREAM_STATUS_ONLINE) {
-
-        if(s->stream.status == RRDHOST_STREAM_STATUS_REPLICATING) {
+        if (s->stream.status == RRDHOST_STREAM_STATUS_REPLICATING) {
             buffer_json_member_add_object(wb, "replication");
             {
                 buffer_json_member_add_boolean(wb, "in_progress", s->stream.replication.in_progress);
@@ -346,6 +344,7 @@ static void rrdhost_sender_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *ke
             struct rrdpush_destinations *d;
             for (d = s->host->destinations; d; d = d->next) {
                 buffer_json_add_array_item_object(wb);
+                buffer_json_member_add_uint64(wb, "attempts", d->attempts);
                 {
 
                     if (d->ssl) {
@@ -357,13 +356,12 @@ static void rrdhost_sender_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *ke
 
                     buffer_json_member_add_time_t(wb, "last_check", d->last_attempt);
                     buffer_json_member_add_time_t(wb, "age", s->now - d->last_attempt);
-                    buffer_json_member_add_string(wb, "last_error", d->last_error);
-                    buffer_json_member_add_string(wb, "last_handshake",
-                                                  stream_handshake_error_to_string(d->last_handshake));
-                    buffer_json_member_add_time_t(wb, "next_check", d->postpone_reconnection_until);
-                    buffer_json_member_add_time_t(wb, "next_in",
-                                                  (d->postpone_reconnection_until > s->now) ?
-                                                  d->postpone_reconnection_until - s->now : 0);
+                    buffer_json_member_add_string_or_omit(wb, "last_error", d->last_error);
+                    buffer_json_member_add_string(wb, "last_handshake", stream_handshake_error_to_string(d->last_handshake));
+                    if(d->postpone_reconnection_until > s->now) {
+                        buffer_json_member_add_time_t(wb, "next_check", d->postpone_reconnection_until);
+                        buffer_json_member_add_time_t(wb, "next_in", d->postpone_reconnection_until - s->now);
+                    }
                 }
                 buffer_json_object_close(wb); // each candidate
             }

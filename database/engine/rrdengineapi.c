@@ -703,14 +703,14 @@ static void register_query_handle(struct rrdeng_query_handle *handle) {
     handle->query_pid = gettid();
     handle->started_time_s = now_realtime_sec();
 
-    netdata_spinlock_lock(&global_query_handle_spinlock);
+    spinlock_lock(&global_query_handle_spinlock);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(global_query_handle_ll, handle, prev, next);
-    netdata_spinlock_unlock(&global_query_handle_spinlock);
+    spinlock_unlock(&global_query_handle_spinlock);
 }
 static void unregister_query_handle(struct rrdeng_query_handle *handle) {
-    netdata_spinlock_lock(&global_query_handle_spinlock);
+    spinlock_lock(&global_query_handle_spinlock);
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(global_query_handle_ll, handle, prev, next);
-    netdata_spinlock_unlock(&global_query_handle_spinlock);
+    spinlock_unlock(&global_query_handle_spinlock);
 }
 #else
 static void register_query_handle(struct rrdeng_query_handle *handle __maybe_unused) {
@@ -1076,14 +1076,14 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
     if(cpus > datafiles)
         cpus = datafiles;
 
-    if(cpus < 1)
-        cpus = 1;
-
     if(cpus > (size_t)libuv_worker_threads)
         cpus = (size_t)libuv_worker_threads;
 
-    if(cpus > MRG_PARTITIONS)
-        cpus = MRG_PARTITIONS;
+    if(cpus >= MRG_PARTITIONS / 2)
+        cpus = MRG_PARTITIONS / 2 - 1;
+
+    if(cpus < 1)
+        cpus = 1;
 
     info("DBENGINE: populating retention to MRG from %zu journal files of tier %d, using %zu threads...", datafiles, ctx->config.tier, cpus);
 

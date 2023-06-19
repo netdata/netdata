@@ -171,7 +171,7 @@ static void rrdhost_update_cached_retention(RRDHOST *host, time_t first_time_s, 
     if(unlikely(!host))
         return;
 
-    netdata_spinlock_lock(&host->retention.spinlock);
+    spinlock_lock(&host->retention.spinlock);
 
     if(global) {
         host->retention.first_time_s = first_time_s;
@@ -185,7 +185,7 @@ static void rrdhost_update_cached_retention(RRDHOST *host, time_t first_time_s, 
             host->retention.last_time_s = last_time_s;
     }
 
-    netdata_spinlock_unlock(&host->retention.spinlock);
+    spinlock_unlock(&host->retention.spinlock);
 }
 
 void rrdcontext_recalculate_context_retention(RRDCONTEXT *rc, RRD_FLAGS reason, bool worker_jobs) {
