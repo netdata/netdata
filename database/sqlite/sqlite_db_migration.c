@@ -245,27 +245,27 @@ static int do_migration_v8_v9(sqlite3 *database, const char *name)
     snprintfz(sql, 2047, "CREATE INDEX IF NOT EXISTS health_log_d_ind_3 ON health_log_detail (transition_id);");
     sqlite3_exec_monitored(database, sql, 0, 0, NULL);
 
-    snprintfz(sql, 255, "ALTER TABLE alert_hash ADD source text;");
+    snprintfz(sql, 2047, "ALTER TABLE alert_hash ADD source text;");
     sqlite3_exec_monitored(database, sql, 0, 0, NULL);
 
     snprintfz(sql, 2047, "CREATE INDEX IF NOT EXISTS alert_hash_index ON alert_hash (hash_id);");
     sqlite3_exec_monitored(database, sql, 0, 0, NULL);
 
-    DICTIONARY *dict_tables = dictionary_create(DICT_OPTION_NONE);
-
-    snprintfz(sql, 2047, "SELECT name FROM sqlite_schema WHERE type ='table' AND name LIKE 'health_log_%%';");
+    snprintfz(sql, 2047, "SELECT name FROM sqlite_schema WHERE type ='table' AND name LIKE 'health_log_%%' AND name <> 'health_log_detail';");
     rc = sqlite3_prepare_v2(database, sql, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement to alter health_log tables");
         return 1;
     }
 
+    DICTIONARY *dict_tables = dictionary_create(DICT_OPTION_NONE);
+
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-         char *table = strdupz((char *) sqlite3_column_text(res, 0));
-         if (health_migrate_old_health_log_table(table)) {
-             dictionary_set(dict_tables, table, NULL, 0);
-         }
-         freez(table);
+        char *table = strdupz((char *) sqlite3_column_text(res, 0));
+        if (health_migrate_old_health_log_table(table)) {
+            dictionary_set(dict_tables, table, NULL, 0);
+        }
+        freez(table);
     }
 
     rc = sqlite3_finalize(res);
@@ -279,7 +279,6 @@ static int do_migration_v8_v9(sqlite3 *database, const char *name)
     dfe_done(table);
     dictionary_destroy(dict_tables);
 
-    info("Completed database migration %s", name);
     return 0;
 }
 
