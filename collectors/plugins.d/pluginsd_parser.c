@@ -11,7 +11,7 @@ static ssize_t send_to_plugin(const char *txt, void *data) {
         return 0;
 
     errno = 0;
-    netdata_spinlock_lock(&parser->writer.spinlock);
+    spinlock_lock(&parser->writer.spinlock);
     ssize_t bytes = -1;
 
 #ifdef ENABLE_HTTPS
@@ -24,7 +24,7 @@ static ssize_t send_to_plugin(const char *txt, void *data) {
         else
             error("PLUGINSD: cannot send command (SSL)");
 
-        netdata_spinlock_unlock(&parser->writer.spinlock);
+        spinlock_unlock(&parser->writer.spinlock);
         return bytes;
     }
 #endif
@@ -39,7 +39,7 @@ static ssize_t send_to_plugin(const char *txt, void *data) {
         else
             fflush(parser->fp_output);
 
-        netdata_spinlock_unlock(&parser->writer.spinlock);
+        spinlock_unlock(&parser->writer.spinlock);
         return bytes;
     }
 
@@ -52,18 +52,18 @@ static ssize_t send_to_plugin(const char *txt, void *data) {
             sent = write(parser->fd, &txt[bytes], total - bytes);
             if(sent <= 0) {
                 error("PLUGINSD: cannot send command (fd)");
-                netdata_spinlock_unlock(&parser->writer.spinlock);
+                spinlock_unlock(&parser->writer.spinlock);
                 return -3;
             }
             bytes += sent;
         }
         while(bytes < total);
 
-        netdata_spinlock_unlock(&parser->writer.spinlock);
+        spinlock_unlock(&parser->writer.spinlock);
         return (int)bytes;
     }
 
-    netdata_spinlock_unlock(&parser->writer.spinlock);
+    spinlock_unlock(&parser->writer.spinlock);
     error("PLUGINSD: cannot send command (no output socket/pipe/file given to plugins.d parser)");
     return -4;
 }

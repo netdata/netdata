@@ -1576,10 +1576,10 @@ void store_metric_collection_completed(void);
 
 static inline void rrdhost_retention(RRDHOST *host, time_t now, bool online, time_t *from, time_t *to) {
     time_t first_time_s = 0, last_time_s = 0;
-    netdata_spinlock_lock(&host->retention.spinlock);
+    spinlock_lock(&host->retention.spinlock);
     first_time_s = host->retention.first_time_s;
     last_time_s = host->retention.last_time_s;
-    netdata_spinlock_unlock(&host->retention.spinlock);
+    spinlock_unlock(&host->retention.spinlock);
 
     if(from)
         *from = first_time_s;

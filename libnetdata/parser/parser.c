@@ -46,7 +46,7 @@ PARSER *parser_init(void *user, FILE *fp_input, FILE *fp_output, int fd,
     parser->flags = flags;
     parser->worker_job_next_id = WORKER_PARSER_FIRST_JOB;
 
-    netdata_spinlock_init(&parser->writer.spinlock);
+    spinlock_init(&parser->writer.spinlock);
     return parser;
 }
 
