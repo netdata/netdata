@@ -43,11 +43,7 @@
 #define EBPF_CFG_MAPS_PER_CORE "maps per core"
 
 #define EBPF_CFG_UPDATE_EVERY "update every"
-<<<<<<< HEAD
 #define EBPF_CFG_LIFETIME "lifetime"
-=======
-#define EBPF_CFG_LIFETIME "life time"
->>>>>>> f0ff94fdb (ebpf_functions: Add new eBPF option to control period of time thread runs)
 #define EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT 10
 #define EBPF_CFG_PID_SIZE "pid table size"
 #define EBPF_CFG_APPLICATION "apps"
