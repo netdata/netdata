@@ -289,23 +289,6 @@ static inline int ebpf_shm_load_and_attach(struct shm_bpf *obj, ebpf_module_t *e
  *****************************************************************/
 
 /**
- * SHM Free
- *
- * Cleanup variables after child threads to stop
- *
- * @param ptr thread data.
- */
-static void ebpf_shm_free(ebpf_module_t *em)
-{
-    freez(shm_vector);
-    freez(shm_values);
-
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-}
-
-/**
  * SHM Exit
  *
  * Cancel child thread.
@@ -315,7 +298,18 @@ static void ebpf_shm_free(ebpf_module_t *em)
 static void ebpf_shm_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    ebpf_shm_free(em);
+
+#ifdef LIBBPF_MAJOR_VERSION
+    if (shm_bpf_obj)
+        shm_bpf__destroy(shm_bpf_obj);
+#endif
+
+    if (em->objects)
+        ebpf_unload_legacy_code(em->objects, em->probe_links);
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************

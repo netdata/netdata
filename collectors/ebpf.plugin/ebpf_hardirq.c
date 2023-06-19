@@ -188,23 +188,6 @@ void ebpf_hardirq_release(hardirq_val_t *stat)
  *****************************************************************/
 
 /**
- * Hardirq Free
- *
- * Cleanup variables after child threads to stop
- *
- * @param ptr thread data.
- */
-static void ebpf_hardirq_free(ebpf_module_t *em)
-{
-    for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
-        ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
-    }
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-}
-
-/**
  * Hardirq Exit
  *
  * Cancel child and exit.
@@ -214,7 +197,17 @@ static void ebpf_hardirq_free(ebpf_module_t *em)
 static void hardirq_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    ebpf_hardirq_free(em);
+
+    if (em->objects)
+        ebpf_unload_legacy_code(em->objects, em->probe_links);
+
+    for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
+        ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
+    }
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************
