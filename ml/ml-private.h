@@ -195,7 +195,7 @@ typedef struct {
     std::vector<calculated_number_t> cns;
 
     std::vector<ml_kmeans_t> km_contexts;
-    netdata_mutex_t mutex;
+    SPINLOCK slock;
     ml_kmeans_t kmeans;
     std::vector<DSample> feature;
 
@@ -206,14 +206,14 @@ typedef struct {
 typedef struct {
     RRDSET *rs;
     ml_machine_learning_stats_t mls;
-
-    netdata_mutex_t mutex;
 } ml_chart_t;
 
 void ml_chart_update_dimension(ml_chart_t *chart, ml_dimension_t *dim, bool is_anomalous);
 
 typedef struct {
     RRDHOST *rh;
+
+    std::atomic<bool> ml_running;
 
     ml_machine_learning_stats_t mls;
 
@@ -226,6 +226,9 @@ typedef struct {
     /*
      * bookkeeping for anomaly detection charts
     */
+
+    RRDSET *ml_running_rs;
+    RRDDIM *ml_running_rd;
 
     RRDSET *machine_learning_status_rs;
     RRDDIM *machine_learning_status_enabled_rd;

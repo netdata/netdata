@@ -183,6 +183,41 @@ void ml_update_dimensions_chart(ml_host_t *host, const ml_machine_learning_stats
 
         rrdset_done(host->dimensions_rs);
     }
+
+    // ML running
+    {
+        if (!host->ml_running_rs) {
+            char id_buf[1024];
+            char name_buf[1024];
+
+            snprintfz(id_buf, 1024, "ml_running_on_%s", localhost->machine_guid);
+            snprintfz(name_buf, 1024, "ml_running_on_%s", rrdhost_hostname(localhost));
+
+            host->ml_running_rs = rrdset_create(
+                    host->rh,
+                    "anomaly_detection", // type
+                    id_buf, // id
+                    name_buf, // name
+                    "anomaly_detection", // family
+                    "anomaly_detection.ml_running", // ctx
+                    "ML running", // title
+                    "boolean", // units
+                    NETDATA_ML_PLUGIN, // plugin
+                    NETDATA_ML_MODULE_DETECTION, // module
+                    NETDATA_ML_CHART_RUNNING, // priority
+                    localhost->rrd_update_every, // update_every
+                    RRDSET_TYPE_LINE // chart_type
+            );
+            rrdset_flag_set(host->ml_running_rs, RRDSET_FLAG_ANOMALY_DETECTION);
+
+            host->ml_running_rd =
+                rrddim_add(host->ml_running_rs, "ml_running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        rrddim_set_by_pointer(host->ml_running_rs,
+                              host->ml_running_rd, host->ml_running);
+        rrdset_done(host->ml_running_rs);
+    }
 }
 
 void ml_update_host_and_detection_rate_charts(ml_host_t *host, collected_number AnomalyRate) {
@@ -260,47 +295,55 @@ void ml_update_host_and_detection_rate_charts(ml_host_t *host, collected_number 
         /*
          * Compute the values of the dimensions based on the host rate chart
         */
-        ONEWAYALLOC *OWA = onewayalloc_create(0);
-        time_t Now = now_realtime_sec();
-        time_t Before = Now - host->rh->rrd_update_every;
-        time_t After = Before - Cfg.anomaly_detection_query_duration;
-        RRDR_OPTIONS Options = static_cast<RRDR_OPTIONS>(0x00000000);
+        if (host->ml_running) {
+            ONEWAYALLOC *OWA = onewayalloc_create(0);
+            time_t Now = now_realtime_sec();
+            time_t Before = Now - host->rh->rrd_update_every;
+            time_t After = Before - Cfg.anomaly_detection_query_duration;
+            RRDR_OPTIONS Options = static_cast<RRDR_OPTIONS>(0x00000000);
 
-        RRDR *R = rrd2rrdr_legacy(
-                OWA,
-                host->anomaly_rate_rs,
-                1 /* points wanted */,
-                After,
-                Before,
-                Cfg.anomaly_detection_grouping_method,
-                0 /* resampling time */,
-                Options, "anomaly_rate",
-                NULL /* group options */,
-                0, /* timeout */
-                0, /* tier */
-                QUERY_SOURCE_ML,
-                STORAGE_PRIORITY_SYNCHRONOUS
-        );
+            RRDR *R = rrd2rrdr_legacy(
+                    OWA,
+                    host->anomaly_rate_rs,
+                    1 /* points wanted */,
+                    After,
+                    Before,
+                    Cfg.anomaly_detection_grouping_method,
+                    0 /* resampling time */,
+                    Options, "anomaly_rate",
+                    NULL /* group options */,
+                    0, /* timeout */
+                    0, /* tier */
+                    QUERY_SOURCE_ML,
+                    STORAGE_PRIORITY_SYNCHRONOUS
+            );
 
-        if (R) {
-            if (R->d == 1 && R->n == 1 && R->rows == 1) {
-                static thread_local bool prev_above_threshold = false;
-                bool above_threshold = R->v[0] >= Cfg.host_anomaly_rate_threshold;
-                bool new_anomaly_event = above_threshold && !prev_above_threshold;
-                prev_above_threshold = above_threshold;
+            if (R) {
+                if (R->d == 1 && R->n == 1 && R->rows == 1) {
+                    static thread_local bool prev_above_threshold = false;
+                    bool above_threshold = R->v[0] >= Cfg.host_anomaly_rate_threshold;
+                    bool new_anomaly_event = above_threshold && !prev_above_threshold;
+                    prev_above_threshold = above_threshold;
 
-                rrddim_set_by_pointer(host->detector_events_rs,
-                                      host->detector_events_above_threshold_rd, above_threshold);
-                rrddim_set_by_pointer(host->detector_events_rs,
-                                      host->detector_events_new_anomaly_event_rd, new_anomaly_event);
+                    rrddim_set_by_pointer(host->detector_events_rs,
+                                          host->detector_events_above_threshold_rd, above_threshold);
+                    rrddim_set_by_pointer(host->detector_events_rs,
+                                          host->detector_events_new_anomaly_event_rd, new_anomaly_event);
 
-                rrdset_done(host->detector_events_rs);
+                    rrdset_done(host->detector_events_rs);
+                }
+
+                rrdr_free(OWA, R);
             }
 
-            rrdr_free(OWA, R);
+            onewayalloc_destroy(OWA);
+        } else {
+            rrddim_set_by_pointer(host->detector_events_rs,
+                                  host->detector_events_above_threshold_rd, 0);
+            rrddim_set_by_pointer(host->detector_events_rs,
+                                  host->detector_events_new_anomaly_event_rd, 0);
+            rrdset_done(host->detector_events_rs);
         }
-
-        onewayalloc_destroy(OWA);
     }
 }
 
