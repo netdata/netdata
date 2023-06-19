@@ -223,20 +223,6 @@ static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_
  *****************************************************************/
 
 /**
- * Mount Free
- *
- * Cleanup variables after child threads to stop
- *
- * @param ptr thread data.
- */
-static void ebpf_mount_free(ebpf_module_t *em)
-{
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-}
-
-/**
  * Mount Exit
  *
  * Cancel child thread.
@@ -246,7 +232,17 @@ static void ebpf_mount_free(ebpf_module_t *em)
 static void ebpf_mount_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    ebpf_mount_free(em);
+
+#ifdef LIBBPF_MAJOR_VERSION
+    if (mount_bpf_obj)
+        mount_bpf__destroy(mount_bpf_obj);
+#endif
+    if (em->objects)
+        ebpf_unload_legacy_code(em->objects, em->probe_links);
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************

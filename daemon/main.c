@@ -344,11 +344,6 @@ void netdata_cleanup_and_exit(int ret) {
 
     webrtc_close_all_connections();
 
-    delta_shutdown_time("disable ML detection and training threads");
-
-    ml_stop_threads();
-    ml_fini();
-
     delta_shutdown_time("disable maintenance, new queries, new web requests, new streaming connections and aclk");
 
     service_signal_exit(
@@ -376,6 +371,11 @@ void netdata_cleanup_and_exit(int ret) {
             SERVICE_COLLECTORS
             | SERVICE_STREAMING
             , 3 * USEC_PER_SEC);
+
+    delta_shutdown_time("disable ML detection and training threads");
+
+    ml_stop_threads();
+    ml_fini();
 
     delta_shutdown_time("stop context thread");
 

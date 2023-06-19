@@ -43,10 +43,39 @@ static void chown_open_file(int fd, uid_t uid, gid_t gid) {
     }
 }
 
-void change_dir_ownership(const char *dir, uid_t uid, gid_t gid)
+static void fix_directory_file_permissions(const char *dirname, uid_t uid, gid_t gid, bool recursive)
+{
+    char filename[FILENAME_MAX + 1];
+
+    DIR *dir = opendir(dirname);
+    if (!dir)
+        return;
+
+    struct dirent *de = NULL;
+
+    while ((de = readdir(dir))) {
+        if (de->d_type == DT_DIR && (!strcmp(de->d_name, ".") || !strcmp(de->d_name, "..")))
+            continue;
+
+        (void) snprintfz(filename, FILENAME_MAX, "%s/%s", dirname, de->d_name);
+        if (de->d_type == DT_REG || recursive) {
+            if (chown(filename, uid, gid) == -1)
+                error("Cannot chown %s '%s' to %u:%u", de->d_type == DT_DIR ? "directory" : "file", filename, (unsigned int)uid, (unsigned int)gid);
+        }
+
+        if (de->d_type == DT_DIR && recursive)
+            fix_directory_file_permissions(filename, uid, gid, recursive);
+    }
+
+    closedir(dir);
+}
+
+void change_dir_ownership(const char *dir, uid_t uid, gid_t gid, bool recursive)
 {
     if (chown(dir, uid, gid) == -1)
         error("Cannot chown directory '%s' to %u:%u", dir, (unsigned int)uid, (unsigned int)gid);
+
+    fix_directory_file_permissions(dir, uid, gid, recursive);
 }
 
 void clean_directory(char *dirname)
@@ -66,11 +95,15 @@ void clean_directory(char *dirname)
 }
 
 void prepare_required_directories(uid_t uid, gid_t gid) {
-    change_dir_ownership(netdata_configured_cache_dir, uid, gid);
-    change_dir_ownership(netdata_configured_varlib_dir, uid, gid);
-    change_dir_ownership(netdata_configured_lock_dir, uid, gid);
-    change_dir_ownership(netdata_configured_log_dir, uid, gid);
-    change_dir_ownership(claimingdirectory, uid, gid);
+    change_dir_ownership(netdata_configured_cache_dir, uid, gid, true);
+    change_dir_ownership(netdata_configured_varlib_dir, uid, gid, false);
+    change_dir_ownership(netdata_configured_lock_dir, uid, gid, false);
+    change_dir_ownership(netdata_configured_log_dir, uid, gid, false);
+    change_dir_ownership(claimingdirectory, uid, gid, false);
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/registry", netdata_configured_varlib_dir);
+    change_dir_ownership(filename, uid, gid, false);
 
     clean_directory(netdata_configured_lock_dir);
 }
@@ -86,6 +119,9 @@ int become_user(const char *username, int pid_fd) {
 
     uid_t uid = pw->pw_uid;
     gid_t gid = pw->pw_gid;
+
+    if (am_i_root)
+        info("I am root, so checking permissions");
 
     prepare_required_directories(uid, gid);
 
