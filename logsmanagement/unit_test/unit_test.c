@@ -54,7 +54,7 @@ static int test_compression_decompression() {
         ++errors;
     }
 
-    fprintf(stderr, "%s", errors ? "" : "OK\n");
+    fprintf(stderr, "%s\n", errors ? "FAIL" : "OK");
     return errors;
 }
 
@@ -140,8 +140,78 @@ static int test_auto_detect_web_log_parser_config() {
         freez(wblp_conf);
     }
 
-    fprintf(stderr, "%s", errors ? "" : "OK\n");
+    fprintf(stderr, "%s\n", errors ? "FAIL" : "OK");
     return errors;
+}
+
+Log_line_parsed_t log_line_parsed_expected[] = {
+    /*  char vhost[VHOST_MAX_LEN];
+        int  port;
+        char req_scheme[REQ_SCHEME_MAX_LEN];
+        char req_client[REQ_CLIENT_MAX_LEN];
+        char req_method[REQ_METHOD_MAX_LEN];
+        char req_URL[REQ_URL_MAX_LEN];
+        char req_proto[REQ_PROTO_MAX_LEN];
+        int req_size;
+        int req_proc_time;
+        int resp_code;
+        int resp_size;
+        int ups_resp_time;
+        char ssl_proto[SSL_PROTO_MAX_LEN];
+        char ssl_cipher[SSL_CIPHER_SUITE_MAX_LEN];
+        int64_t timestamp;
+        int parsing_errors; */
+    {"", 0, "", "127.0.0.1", "GET", "/", "1.0", 0, 0, 200, 11228, 0, "", "", 1687200864000, 0}, 
+    
+};
+static int test_parse_web_log_line(){
+    int errors = 0;
+    fprintf(stderr, "%s():\n", __FUNCTION__);
+
+    Web_log_parser_config_t *wblp_conf = callocz(1, sizeof(Web_log_parser_config_t));
+   
+    wblp_conf->delimiter = parse_config_delim;
+    wblp_conf->verify_parsed_logs = 1;
+
+    for(int i = 0; i < (int) (sizeof(parse_configs_to_test) / sizeof(parse_configs_to_test[0])); i++){
+        parse_config_expected_num_fields = reallocz(parse_config_expected_num_fields, (i + 1) * sizeof(int));
+        parse_config_expected_num_fields[i] = 0;
+        for(int j = 0; (int) parse_config_expected[i][j] != -1; j++){
+            parse_config_expected_num_fields[i]++;
+        }
+    }
+
+    for(int i = 0; i < (int) (sizeof(parse_configs_to_test) / sizeof(parse_configs_to_test[0])); i++){
+        wblp_conf->num_fields = parse_config_expected_num_fields[i];
+        wblp_conf->fields = (web_log_line_field_t *) parse_config_expected[i];
+
+        Log_line_parsed_t log_line_parsed = (Log_line_parsed_t) {0};
+        parse_web_log_line( wblp_conf, 
+                            (char *) parse_configs_to_test[i], 
+                            strlen(parse_configs_to_test[i]), 
+                            log_line_parsed);
+        
+        errors += strcmp(log_line_parsed_expected[i].vhost, log_line_parsed.vhost) ? 1 : 0;
+        errors += log_line_parsed_expected[i].port != log_line_parsed.port ? 1 : 0;
+        errors += strcmp(log_line_parsed_expected[i].req_scheme, log_line_parsed.req_scheme) ? 1 : 0;
+        errors += strcmp(log_line_parsed_expected[i].req_client, log_line_parsed.req_client) ? 1 : 0;
+        errors += strcmp(log_line_parsed_expected[i].req_method, log_line_parsed.req_method) ? 1 : 0;
+        errors += strcmp(log_line_parsed_expected[i].req_URL, log_line_parsed.req_URL) ? 1 : 0;
+        errors += strcmp(log_line_parsed_expected[i].req_proto, log_line_parsed.req_proto) ? 1 : 0;
+        errors += log_line_parsed_expected[i].req_size != log_line_parsed.req_size ? 1 : 0;
+        errors += log_line_parsed_expected[i].req_proc_time != log_line_parsed.req_proc_time ? 1 : 0;
+        errors += log_line_parsed_expected[i].resp_code != log_line_parsed.resp_code ? 1 : 0;
+        errors += log_line_parsed_expected[i].resp_size != log_line_parsed.resp_size ? 1 : 0;
+        errors += log_line_parsed_expected[i].ups_resp_time != log_line_parsed.ups_resp_time ? 1 : 0;
+        errors += strcmp(log_line_parsed_expected[i].ssl_proto, log_line_parsed.ssl_proto) ? 1 : 0;
+        errors += strcmp(log_line_parsed_expected[i].ssl_cipher, log_line_parsed.ssl_cipher) ? 1 : 0;
+        errors += log_line_parsed_expected[i].timestamp != log_line_parsed.timestamp ? 1 : 0;
+    }
+
+    freez(wblp_conf);
+
+    fprintf(stderr, "%s\n", errors ? "FAIL" : "OK");
+    return errors ;
 }
 
 const char * const unsanitised_strings[] = { "[test]", "^test$", "{test}", 
@@ -161,7 +231,7 @@ static int test_sanitise_string(){
         freez(sanitised);
     }
 
-    fprintf(stderr, "%s", errors ? "" : "OK\n");
+    fprintf(stderr, "%s\n", errors ? "FAIL" : "OK");
     return errors;
 }
 
@@ -267,7 +337,7 @@ static int test_search_keyword(){
         freez(res);
     }
 
-    fprintf(stderr, "%s", errors ? "" : "OK\n");
+    fprintf(stderr, "%s\n", errors ? "FAIL" : "OK");
     return errors;
 }
 
@@ -283,6 +353,8 @@ int test_logs_management(int argc, char *argv[]){
     errors += test_compression_decompression();
     fprintf(stderr, "------------------------------------------------------\n");
     errors += test_auto_detect_web_log_parser_config();
+    fprintf(stderr, "------------------------------------------------------\n");
+    errors += test_parse_web_log_line();
     fprintf(stderr, "------------------------------------------------------\n");
     errors += test_sanitise_string();
     fprintf(stderr, "------------------------------------------------------\n");

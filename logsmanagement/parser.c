@@ -44,25 +44,6 @@ const char* const csv_auto_format_guess_matrix[] = {
     NULL}
 ;
 
-typedef struct log_line_parsed{
-    char vhost[VHOST_MAX_LEN];
-    int  port;
-    char req_scheme[REQ_SCHEME_MAX_LEN];
-    char req_client[REQ_CLIENT_MAX_LEN];
-    char req_method[REQ_METHOD_MAX_LEN];
-    char req_URL[REQ_URL_MAX_LEN];
-    char req_proto[REQ_PROTO_MAX_LEN];
-    int req_size;
-    int req_proc_time;
-    int resp_code;
-    int resp_size;
-    int ups_resp_time;
-    char ssl_proto[SSL_PROTO_MAX_LEN];
-    char ssl_cipher[SSL_CIPHER_SUITE_MAX_LEN];
-    int64_t timestamp;
-    int parsing_errors;
-} Log_line_parsed_t;
-
 static inline int count_fields(const char *line, const char delimiter){
     const char *ptr;
     int cnt, fQuote;
@@ -471,9 +452,9 @@ Web_log_parser_config_t *read_web_log_parser_config(const char *log_format, cons
  * @param[in] line Web log record to be parsed. '\n', '\r' or '\0' terminated.
  * @param[out] log_line_parsed Struct that stores the results of parsing.
  */
-static void parse_web_log_line( const Web_log_parser_config_t *wblp_config, 
-                                char *line, const size_t line_len, 
-                                Log_line_parsed_t *log_line_parsed){
+UNIT_STATIC void parse_web_log_line(const Web_log_parser_config_t *wblp_config, 
+                                    char *line, const size_t line_len, 
+                                    Log_line_parsed_t *log_line_parsed){
 
     /* Read parsing configuration */
     web_log_line_field_t *fields_format = wblp_config->fields;

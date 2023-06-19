@@ -89,7 +89,7 @@ typedef struct log_parser_config{
 #define WEB_LOG_INVALID_CLIENT_IP_STR "inv"
 
 /* Web log configuration */
-#define ENABLE_PARSE_WEB_LOG_LINE_DEBUG 0
+#define ENABLE_PARSE_WEB_LOG_LINE_DEBUG 1
 #define MEASURE_WEB_LOG_PARSE_EXTRACT_TIME 0
 #define SKIP_WEB_LOG_TIME_PARSING 0
 
@@ -111,7 +111,7 @@ typedef enum{
     REQ_SIZE,         // nginx: $request_length         apache: %I
     REQ_PROC_TIME,    // nginx: $request_time           apache: %D  
     RESP_CODE,        // nginx: $status                 apache: %s, %>s
-    RESP_SIZE,        // nginx: $bytes_sent, $body_bytes_sent apache: %b, %O, %B // Should separate %b from %O ?
+    RESP_SIZE,        // nginx: $bytes_sent, $body_bytes_sent apache: %b, %O, %B // TODO: Should separate %b from %O ?
     UPS_RESP_TIME,    // nginx: $upstream_response_time apache: -
     SSL_PROTO,        // nginx: $ssl_protocol           apache: -
     SSL_CIPHER_SUITE, // nginx: $ssl_cipher             apache: -
@@ -237,11 +237,36 @@ typedef struct web_log_metrics{
     int64_t timestamp;
 } Web_log_metrics_t;
 
+typedef struct log_line_parsed{
+    char vhost[VHOST_MAX_LEN];
+    int  port;
+    char req_scheme[REQ_SCHEME_MAX_LEN];
+    char req_client[REQ_CLIENT_MAX_LEN];
+    char req_method[REQ_METHOD_MAX_LEN];
+    char req_URL[REQ_URL_MAX_LEN];
+    char req_proto[REQ_PROTO_MAX_LEN];
+    int req_size;
+    int req_proc_time;
+    int resp_code;
+    int resp_size;
+    int ups_resp_time;
+    char ssl_proto[SSL_PROTO_MAX_LEN];
+    char ssl_cipher[SSL_CIPHER_SUITE_MAX_LEN];
+    int64_t timestamp;
+    int parsing_errors;
+} Log_line_parsed_t;
+
 Web_log_parser_config_t *read_web_log_parser_config(const char *log_format, const char delimiter);
-Web_log_parser_config_t *auto_detect_web_log_parser_config(char *line, const char delimiter);
+#ifdef ENABLE_LOGSMANAGEMENT_TESTS
+/* Used as public only for unit testing, normally defined as static */
+void parse_web_log_line(const Web_log_parser_config_t *wblp_config, 
+                        char *line, const size_t line_len, 
+                        Log_line_parsed_t *log_line_parsed);
+#endif // ENABLE_LOGSMANAGEMENT_TESTS
 int parse_web_log_buf(  char *text, size_t text_size, 
                         Log_parser_config_t *parser_config, 
                         Web_log_metrics_t *parser_metrics);
+Web_log_parser_config_t *auto_detect_web_log_parser_config(char *line, const char delimiter);
 
 /* -------------------------------------------------------------------------- */
 
