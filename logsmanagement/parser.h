@@ -234,13 +234,14 @@ typedef struct web_log_metrics{
         int size;									/**< Size of SSL ciphers array **/
         int size_max;
     } ssl_cipher_arr;
+    int64_t timestamp;
 } Web_log_metrics_t;
 
 Web_log_parser_config_t *read_web_log_parser_config(const char *log_format, const char delimiter);
 Web_log_parser_config_t *auto_detect_web_log_parser_config(char *line, const char delimiter);
 int parse_web_log_buf(  char *text, size_t text_size, 
                         Log_parser_config_t *parser_config, 
-                        Log_parser_metrics_t *parser_metrics);
+                        Web_log_metrics_t *parser_metrics);
 
 /* -------------------------------------------------------------------------- */
 

@@ -472,7 +472,8 @@ Web_log_parser_config_t *read_web_log_parser_config(const char *log_format, cons
  * @param[out] log_line_parsed Struct that stores the results of parsing.
  */
 static void parse_web_log_line( const Web_log_parser_config_t *wblp_config, 
-                                char *line, Log_line_parsed_t *log_line_parsed){
+                                char *line, const size_t line_len, 
+                                Log_line_parsed_t *log_line_parsed){
 
     /* Read parsing configuration */
     web_log_line_field_t *fields_format = wblp_config->fields;
@@ -490,9 +491,13 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
         if(unlikely(*field == '"')) { field++; offset++; }; // Remove any double quotes
         while(  *offset != '"' && 
                 *offset != delimiter && 
-                *offset != '\n' &&
-                *offset != '\0' &&
-                *offset != '\r') { offset++; };
+                ((size_t)(offset - line) < line_len - 1)
+                // *offset != '\n' &&
+                // *offset != '\0' &&
+                // *offset != '\r'
+                ) { offset++; };
+        
+        if((size_t) (offset - line) >= line_len) break;
 
         field_size = (size_t) (offset - field);
 
@@ -1265,12 +1270,14 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
         }
 
 next_item:
-        /* Consume double quotes */
+        /* Consume closing double quotes */
         if(unlikely(*offset == '"')) offset++;
 
-        /* Consume extra whitespace characters */
-        if(*offset != '\n' && *offset != '\0' && *offset != '\r') {while(*(offset + 1) == delimiter) {offset++;};} 
-        else break;
+        // /* Consume extra whitespace characters */
+        // if( *offset != '\n' && 
+        //     *offset != '\0' && 
+        //     *offset != '\r') {while(*(offset + 1) == delimiter) {offset++;};} 
+        // else break;
         field = ++offset;
     }
 }
@@ -1285,7 +1292,7 @@ next_item:
  */
 static inline void extract_web_log_metrics( Log_parser_config_t *parser_config, 
                                             Log_line_parsed_t *line_parsed, 
-                                            Log_parser_metrics_t *metrics){
+                                            Web_log_metrics_t *metrics){
 
     /* Extract number of parsed lines */
     /* NOTE: Commented out as it is done in flb_collect_logs_cb() now. */
@@ -1295,21 +1302,21 @@ static inline void extract_web_log_metrics( Log_parser_config_t *parser_config,
     // TODO: Reduce number of reallocs
     if((parser_config->chart_config & CHART_VHOST) && *line_parsed->vhost){
         int i;
-        for(i = 0; i < metrics->web_log->vhost_arr.size; i++){
-            if(!strcmp(metrics->web_log->vhost_arr.vhosts[i].name, line_parsed->vhost)){
-                metrics->web_log->vhost_arr.vhosts[i].count++;
+        for(i = 0; i < metrics->vhost_arr.size; i++){
+            if(!strcmp(metrics->vhost_arr.vhosts[i].name, line_parsed->vhost)){
+                metrics->vhost_arr.vhosts[i].count++;
                 break;
             }
         }
-        if(metrics->web_log->vhost_arr.size == i){ // Vhost not found in array - need to append
-            metrics->web_log->vhost_arr.size++;
-            if(metrics->web_log->vhost_arr.size >= metrics->web_log->vhost_arr.size_max){
-                metrics->web_log->vhost_arr.size_max = metrics->web_log->vhost_arr.size * LOG_PARSER_METRICS_VHOST_BUFFS_SCALE_FACTOR + 1;
-                metrics->web_log->vhost_arr.vhosts = reallocz( metrics->web_log->vhost_arr.vhosts, 
-                                                      metrics->web_log->vhost_arr.size_max * sizeof(struct log_parser_metrics_vhost));
+        if(metrics->vhost_arr.size == i){ // Vhost not found in array - need to append
+            metrics->vhost_arr.size++;
+            if(metrics->vhost_arr.size >= metrics->vhost_arr.size_max){
+                metrics->vhost_arr.size_max = metrics->vhost_arr.size * LOG_PARSER_METRICS_VHOST_BUFFS_SCALE_FACTOR + 1;
+                metrics->vhost_arr.vhosts = reallocz( metrics->vhost_arr.vhosts, 
+                                                      metrics->vhost_arr.size_max * sizeof(struct log_parser_metrics_vhost));
             }
-            snprintf(metrics->web_log->vhost_arr.vhosts[metrics->web_log->vhost_arr.size - 1].name, VHOST_MAX_LEN, "%s", line_parsed->vhost);
-            metrics->web_log->vhost_arr.vhosts[metrics->web_log->vhost_arr.size - 1].count = 1;
+            snprintf(metrics->vhost_arr.vhosts[metrics->vhost_arr.size - 1].name, VHOST_MAX_LEN, "%s", line_parsed->vhost);
+            metrics->vhost_arr.vhosts[metrics->vhost_arr.size - 1].count = 1;
         }
     }
 
@@ -1317,21 +1324,21 @@ static inline void extract_web_log_metrics( Log_parser_config_t *parser_config,
     // TODO: Reduce number of reallocs
     if((parser_config->chart_config & CHART_PORT) && line_parsed->port){
         int i;
-        for(i = 0; i < metrics->web_log->port_arr.size; i++){
-            if(metrics->web_log->port_arr.ports[i].port == line_parsed->port){
-                metrics->web_log->port_arr.ports[i].count++;
+        for(i = 0; i < metrics->port_arr.size; i++){
+            if(metrics->port_arr.ports[i].port == line_parsed->port){
+                metrics->port_arr.ports[i].count++;
                 break;
             }
         }
-        if(metrics->web_log->port_arr.size == i){ // Port not found in array - need to append
-            metrics->web_log->port_arr.size++;
-            if(metrics->web_log->port_arr.size >= metrics->web_log->port_arr.size_max){
-                metrics->web_log->port_arr.size_max = metrics->web_log->port_arr.size * LOG_PARSER_METRICS_PORT_BUFFS_SCALE_FACTOR + 1;
-                metrics->web_log->port_arr.ports = reallocz( metrics->web_log->port_arr.ports, 
-                                                    metrics->web_log->port_arr.size_max * sizeof(struct log_parser_metrics_port));
+        if(metrics->port_arr.size == i){ // Port not found in array - need to append
+            metrics->port_arr.size++;
+            if(metrics->port_arr.size >= metrics->port_arr.size_max){
+                metrics->port_arr.size_max = metrics->port_arr.size * LOG_PARSER_METRICS_PORT_BUFFS_SCALE_FACTOR + 1;
+                metrics->port_arr.ports = reallocz( metrics->port_arr.ports, 
+                                                    metrics->port_arr.size_max * sizeof(struct log_parser_metrics_port));
             }
-            metrics->web_log->port_arr.ports[metrics->web_log->port_arr.size - 1].port = line_parsed->port;
-            metrics->web_log->port_arr.ports[metrics->web_log->port_arr.size - 1].count = 1;
+            metrics->port_arr.ports[metrics->port_arr.size - 1].port = line_parsed->port;
+            metrics->port_arr.ports[metrics->port_arr.size - 1].count = 1;
         } 
     }
 
@@ -1340,24 +1347,24 @@ static inline void extract_web_log_metrics( Log_parser_config_t *parser_config,
         
         /* Invalid IP version */
         if(unlikely(!strcmp(line_parsed->req_client, WEB_LOG_INVALID_CLIENT_IP_STR))){
-            if(parser_config->chart_config & CHART_IP_VERSION) metrics->web_log->ip_ver.invalid++;
+            if(parser_config->chart_config & CHART_IP_VERSION) metrics->ip_ver.invalid++;
         }
 
         else if(strchr(line_parsed->req_client, ':')){
             /* IPv6 version */
-            if(parser_config->chart_config & CHART_IP_VERSION) metrics->web_log->ip_ver.v6++;
+            if(parser_config->chart_config & CHART_IP_VERSION) metrics->ip_ver.v6++;
 
             /* Unique Client IPv6 Address current poll */
             if(parser_config->chart_config & CHART_REQ_CLIENT_CURRENT){
                 int i;
-                for(i = 0; i < metrics->web_log->req_clients_current_arr.ipv6_size; i++){
-                    if(!strcmp(metrics->web_log->req_clients_current_arr.ipv6_req_clients[i], line_parsed->req_client)) break;
+                for(i = 0; i < metrics->req_clients_current_arr.ipv6_size; i++){
+                    if(!strcmp(metrics->req_clients_current_arr.ipv6_req_clients[i], line_parsed->req_client)) break;
                 }
-                if(metrics->web_log->req_clients_current_arr.ipv6_size == i){ // Req client not found in array - need to append
-                    metrics->web_log->req_clients_current_arr.ipv6_size++;
-                    metrics->web_log->req_clients_current_arr.ipv6_req_clients = reallocz(metrics->web_log->req_clients_current_arr.ipv6_req_clients, 
-                        metrics->web_log->req_clients_current_arr.ipv6_size * sizeof(*metrics->web_log->req_clients_current_arr.ipv6_req_clients));
-                    snprintf(metrics->web_log->req_clients_current_arr.ipv6_req_clients[metrics->web_log->req_clients_current_arr.ipv6_size - 1], 
+                if(metrics->req_clients_current_arr.ipv6_size == i){ // Req client not found in array - need to append
+                    metrics->req_clients_current_arr.ipv6_size++;
+                    metrics->req_clients_current_arr.ipv6_req_clients = reallocz(metrics->req_clients_current_arr.ipv6_req_clients, 
+                        metrics->req_clients_current_arr.ipv6_size * sizeof(*metrics->req_clients_current_arr.ipv6_req_clients));
+                    snprintf(metrics->req_clients_current_arr.ipv6_req_clients[metrics->req_clients_current_arr.ipv6_size - 1], 
                         REQ_CLIENT_MAX_LEN, "%s", line_parsed->req_client);
                 }
             }
@@ -1365,14 +1372,14 @@ static inline void extract_web_log_metrics( Log_parser_config_t *parser_config,
             /* Unique Client IPv6 Address all-time */
             if(parser_config->chart_config & CHART_REQ_CLIENT_ALL_TIME){
                 int i;
-                for(i = 0; i < metrics->web_log->req_clients_alltime_arr.ipv6_size; i++){
-                    if(!strcmp(metrics->web_log->req_clients_alltime_arr.ipv6_req_clients[i], line_parsed->req_client)) break;
+                for(i = 0; i < metrics->req_clients_alltime_arr.ipv6_size; i++){
+                    if(!strcmp(metrics->req_clients_alltime_arr.ipv6_req_clients[i], line_parsed->req_client)) break;
                 }
-                if(metrics->web_log->req_clients_alltime_arr.ipv6_size == i){ // Req client not found in array - need to append
-                    metrics->web_log->req_clients_alltime_arr.ipv6_size++;
-                    metrics->web_log->req_clients_alltime_arr.ipv6_req_clients = reallocz(metrics->web_log->req_clients_alltime_arr.ipv6_req_clients, 
-                        metrics->web_log->req_clients_alltime_arr.ipv6_size * sizeof(*metrics->web_log->req_clients_alltime_arr.ipv6_req_clients));
-                    snprintf(metrics->web_log->req_clients_alltime_arr.ipv6_req_clients[metrics->web_log->req_clients_alltime_arr.ipv6_size - 1], 
+                if(metrics->req_clients_alltime_arr.ipv6_size == i){ // Req client not found in array - need to append
+                    metrics->req_clients_alltime_arr.ipv6_size++;
+                    metrics->req_clients_alltime_arr.ipv6_req_clients = reallocz(metrics->req_clients_alltime_arr.ipv6_req_clients, 
+                        metrics->req_clients_alltime_arr.ipv6_size * sizeof(*metrics->req_clients_alltime_arr.ipv6_req_clients));
+                    snprintf(metrics->req_clients_alltime_arr.ipv6_req_clients[metrics->req_clients_alltime_arr.ipv6_size - 1], 
                         REQ_CLIENT_MAX_LEN, "%s", line_parsed->req_client);
                 }
             }
@@ -1381,19 +1388,19 @@ static inline void extract_web_log_metrics( Log_parser_config_t *parser_config,
         
         else{
             /* IPv4 version */
-            if(parser_config->chart_config & CHART_IP_VERSION) metrics->web_log->ip_ver.v4++;
+            if(parser_config->chart_config & CHART_IP_VERSION) metrics->ip_ver.v4++;
 
             /* Unique Client IPv4 Address current poll */
             if(parser_config->chart_config & CHART_REQ_CLIENT_CURRENT){
                 int i;
-                for(i = 0; i < metrics->web_log->req_clients_current_arr.ipv4_size; i++){
-                    if(!strcmp(metrics->web_log->req_clients_current_arr.ipv4_req_clients[i], line_parsed->req_client)) break;
+                for(i = 0; i < metrics->req_clients_current_arr.ipv4_size; i++){
+                    if(!strcmp(metrics->req_clients_current_arr.ipv4_req_clients[i], line_parsed->req_client)) break;
                 }
-                if(metrics->web_log->req_clients_current_arr.ipv4_size == i){ // Req client not found in array - need to append
-                    metrics->web_log->req_clients_current_arr.ipv4_size++;
-                    metrics->web_log->req_clients_current_arr.ipv4_req_clients = reallocz(metrics->web_log->req_clients_current_arr.ipv4_req_clients, 
-                        metrics->web_log->req_clients_current_arr.ipv4_size * sizeof(*metrics->web_log->req_clients_current_arr.ipv4_req_clients));
-                    snprintf(metrics->web_log->req_clients_current_arr.ipv4_req_clients[metrics->web_log->req_clients_current_arr.ipv4_size - 1], 
+                if(metrics->req_clients_current_arr.ipv4_size == i){ // Req client not found in array - need to append
+                    metrics->req_clients_current_arr.ipv4_size++;
+                    metrics->req_clients_current_arr.ipv4_req_clients = reallocz(metrics->req_clients_current_arr.ipv4_req_clients, 
+                        metrics->req_clients_current_arr.ipv4_size * sizeof(*metrics->req_clients_current_arr.ipv4_req_clients));
+                    snprintf(metrics->req_clients_current_arr.ipv4_req_clients[metrics->req_clients_current_arr.ipv4_size - 1], 
                         REQ_CLIENT_MAX_LEN, "%s", line_parsed->req_client);
                 }
             }
@@ -1401,14 +1408,14 @@ static inline void extract_web_log_metrics( Log_parser_config_t *parser_config,
             /* Unique Client IPv4 Address all-time */
             if(parser_config->chart_config & CHART_REQ_CLIENT_ALL_TIME){
                 int i;
-                for(i = 0; i < metrics->web_log->req_clients_alltime_arr.ipv4_size; i++){
-                    if(!strcmp(metrics->web_log->req_clients_alltime_arr.ipv4_req_clients[i], line_parsed->req_client)) break;
+                for(i = 0; i < metrics->req_clients_alltime_arr.ipv4_size; i++){
+                    if(!strcmp(metrics->req_clients_alltime_arr.ipv4_req_clients[i], line_parsed->req_client)) break;
                 }
-                if(metrics->web_log->req_clients_alltime_arr.ipv4_size == i){ // Req client not found in array - need to append
-                    metrics->web_log->req_clients_alltime_arr.ipv4_size++;
-                    metrics->web_log->req_clients_alltime_arr.ipv4_req_clients = reallocz(metrics->web_log->req_clients_alltime_arr.ipv4_req_clients, 
-                        metrics->web_log->req_clients_alltime_arr.ipv4_size * sizeof(*metrics->web_log->req_clients_alltime_arr.ipv4_req_clients));
-                    snprintf(metrics->web_log->req_clients_alltime_arr.ipv4_req_clients[metrics->web_log->req_clients_alltime_arr.ipv4_size - 1], 
+                if(metrics->req_clients_alltime_arr.ipv4_size == i){ // Req client not found in array - need to append
+                    metrics->req_clients_alltime_arr.ipv4_size++;
+                    metrics->req_clients_alltime_arr.ipv4_req_clients = reallocz(metrics->req_clients_alltime_arr.ipv4_req_clients, 
+                        metrics->req_clients_alltime_arr.ipv4_size * sizeof(*metrics->req_clients_alltime_arr.ipv4_req_clients));
+                    snprintf(metrics->req_clients_alltime_arr.ipv4_req_clients[metrics->req_clients_alltime_arr.ipv4_size - 1], 
                         REQ_CLIENT_MAX_LEN, "%s", line_parsed->req_client);
                 }
             }
@@ -1419,7 +1426,7 @@ static inline void extract_web_log_metrics( Log_parser_config_t *parser_config,
     if(parser_config->chart_config & CHART_REQ_METHODS){
         for(int i = 0; i < REQ_METHOD_ARR_SIZE; i++){
             if(!strcmp(line_parsed->req_method, req_method_str[i])){
-                metrics->web_log->req_method[i]++;
+                metrics->req_method[i]++;
                 break;
             }
         }
@@ -1427,28 +1434,28 @@ static inline void extract_web_log_metrics( Log_parser_config_t *parser_config,
 
     /* Extract request protocol */
     if(parser_config->chart_config & CHART_REQ_PROTO){
-        if(!strcmp(line_parsed->req_proto, "1") || !strcmp(line_parsed->req_proto, "1.0")) metrics->web_log->req_proto.http_1++;
-        else if(!strcmp(line_parsed->req_proto, "1.1")) metrics->web_log->req_proto.http_1_1++;
-        else if(!strcmp(line_parsed->req_proto, "2") || !strcmp(line_parsed->req_proto, "2.0")) metrics->web_log->req_proto.http_2++;
-        else metrics->web_log->req_proto.other++;
+        if(!strcmp(line_parsed->req_proto, "1") || !strcmp(line_parsed->req_proto, "1.0")) metrics->req_proto.http_1++;
+        else if(!strcmp(line_parsed->req_proto, "1.1")) metrics->req_proto.http_1_1++;
+        else if(!strcmp(line_parsed->req_proto, "2") || !strcmp(line_parsed->req_proto, "2.0")) metrics->req_proto.http_2++;
+        else metrics->req_proto.other++;
     }
 
     /* Extract bytes received and sent */
     if(parser_config->chart_config & CHART_BANDWIDTH){
-        metrics->web_log->bandwidth.req_size += line_parsed->req_size;
-        metrics->web_log->bandwidth.resp_size += line_parsed->resp_size;
+        metrics->bandwidth.req_size += line_parsed->req_size;
+        metrics->bandwidth.resp_size += line_parsed->resp_size;
     }
 
     /* Extract request processing time */
     if((parser_config->chart_config & CHART_REQ_PROC_TIME) && line_parsed->req_proc_time){
-        if(line_parsed->req_proc_time < metrics->web_log->req_proc_time.min || metrics->web_log->req_proc_time.min == 0){
-            metrics->web_log->req_proc_time.min = line_parsed->req_proc_time;
+        if(line_parsed->req_proc_time < metrics->req_proc_time.min || metrics->req_proc_time.min == 0){
+            metrics->req_proc_time.min = line_parsed->req_proc_time;
         }
-        if(line_parsed->req_proc_time > metrics->web_log->req_proc_time.max || metrics->web_log->req_proc_time.max == 0){
-            metrics->web_log->req_proc_time.max = line_parsed->req_proc_time;
+        if(line_parsed->req_proc_time > metrics->req_proc_time.max || metrics->req_proc_time.max == 0){
+            metrics->req_proc_time.max = line_parsed->req_proc_time;
         }
-        metrics->web_log->req_proc_time.sum += line_parsed->req_proc_time;
-        metrics->web_log->req_proc_time.count++;
+        metrics->req_proc_time.sum += line_parsed->req_proc_time;
+        metrics->req_proc_time.count++;
     }
 
     /* Extract response code family, response code & response code type */
@@ -1456,70 +1463,72 @@ static inline void extract_web_log_metrics( Log_parser_config_t *parser_config,
         switch(line_parsed->resp_code / 100){
             /* Note: 304 and 401 should be treated as resp_success */
             case 1:
-                metrics->web_log->resp_code_family.resp_1xx++;
-                metrics->web_log->resp_code[line_parsed->resp_code - 100]++;
-                metrics->web_log->resp_code_type.resp_success++;
+                metrics->resp_code_family.resp_1xx++;
+                metrics->resp_code[line_parsed->resp_code - 100]++;
+                metrics->resp_code_type.resp_success++;
                 break;
             case 2:
-                metrics->web_log->resp_code_family.resp_2xx++;
-                metrics->web_log->resp_code[line_parsed->resp_code - 100]++;
-                metrics->web_log->resp_code_type.resp_success++;
+                metrics->resp_code_family.resp_2xx++;
+                metrics->resp_code[line_parsed->resp_code - 100]++;
+                metrics->resp_code_type.resp_success++;
                 break;
             case 3:
-                metrics->web_log->resp_code_family.resp_3xx++;
-                metrics->web_log->resp_code[line_parsed->resp_code - 100]++;
-                if(line_parsed->resp_code == 304) metrics->web_log->resp_code_type.resp_success++;
-                else metrics->web_log->resp_code_type.resp_redirect++;
+                metrics->resp_code_family.resp_3xx++;
+                metrics->resp_code[line_parsed->resp_code - 100]++;
+                if(line_parsed->resp_code == 304) metrics->resp_code_type.resp_success++;
+                else metrics->resp_code_type.resp_redirect++;
                 break;
             case 4:
-                metrics->web_log->resp_code_family.resp_4xx++;
-                metrics->web_log->resp_code[line_parsed->resp_code - 100]++;
-                if(line_parsed->resp_code == 401) metrics->web_log->resp_code_type.resp_success++;
-                else metrics->web_log->resp_code_type.resp_bad++;
+                metrics->resp_code_family.resp_4xx++;
+                metrics->resp_code[line_parsed->resp_code - 100]++;
+                if(line_parsed->resp_code == 401) metrics->resp_code_type.resp_success++;
+                else metrics->resp_code_type.resp_bad++;
                 break;
             case 5:
-                metrics->web_log->resp_code_family.resp_5xx++;
-                metrics->web_log->resp_code[line_parsed->resp_code - 100]++;
-                metrics->web_log->resp_code_type.resp_error++;
+                metrics->resp_code_family.resp_5xx++;
+                metrics->resp_code[line_parsed->resp_code - 100]++;
+                metrics->resp_code_type.resp_error++;
                 break;
             default:
-                metrics->web_log->resp_code_family.other++;
-                metrics->web_log->resp_code[RESP_CODE_ARR_SIZE - 1]++;
-                metrics->web_log->resp_code_type.other++;
+                metrics->resp_code_family.other++;
+                metrics->resp_code[RESP_CODE_ARR_SIZE - 1]++;
+                metrics->resp_code_type.other++;
                 break;
         }
     }
 
     /* Extract SSL protocol */
     if(parser_config->chart_config & CHART_SSL_PROTO){
-        if(!strcmp(line_parsed->ssl_proto, "TLSv1")) metrics->web_log->ssl_proto.tlsv1++;
-        else if(!strcmp(line_parsed->ssl_proto, "TLSv1.1")) metrics->web_log->ssl_proto.tlsv1_1++;
-        else if(!strcmp(line_parsed->ssl_proto, "TLSv1.2")) metrics->web_log->ssl_proto.tlsv1_2++;
-        else if(!strcmp(line_parsed->ssl_proto, "TLSv1.3")) metrics->web_log->ssl_proto.tlsv1_3++;
-        else if(!strcmp(line_parsed->ssl_proto, "SSLv2")) metrics->web_log->ssl_proto.sslv2++;
-        else if(!strcmp(line_parsed->ssl_proto, "SSLv3")) metrics->web_log->ssl_proto.sslv3++;
-        else metrics->web_log->ssl_proto.other++;
+        if(!strcmp(line_parsed->ssl_proto, "TLSv1")) metrics->ssl_proto.tlsv1++;
+        else if(!strcmp(line_parsed->ssl_proto, "TLSv1.1")) metrics->ssl_proto.tlsv1_1++;
+        else if(!strcmp(line_parsed->ssl_proto, "TLSv1.2")) metrics->ssl_proto.tlsv1_2++;
+        else if(!strcmp(line_parsed->ssl_proto, "TLSv1.3")) metrics->ssl_proto.tlsv1_3++;
+        else if(!strcmp(line_parsed->ssl_proto, "SSLv2")) metrics->ssl_proto.sslv2++;
+        else if(!strcmp(line_parsed->ssl_proto, "SSLv3")) metrics->ssl_proto.sslv3++;
+        else metrics->ssl_proto.other++;
     }
 
     /* Extract SSL cipher suite */
     // TODO: Reduce number of reallocs
     if((parser_config->chart_config & CHART_SSL_CIPHER) && *line_parsed->ssl_cipher){
         int i;
-        for(i = 0; i < metrics->web_log->ssl_cipher_arr.size; i++){
-            if(!strcmp(metrics->web_log->ssl_cipher_arr.ssl_ciphers[i].string, line_parsed->ssl_cipher)){
-                metrics->web_log->ssl_cipher_arr.ssl_ciphers[i].count++;
+        for(i = 0; i < metrics->ssl_cipher_arr.size; i++){
+            if(!strcmp(metrics->ssl_cipher_arr.ssl_ciphers[i].string, line_parsed->ssl_cipher)){
+                metrics->ssl_cipher_arr.ssl_ciphers[i].count++;
                 break;
             }
         }
-        if(metrics->web_log->ssl_cipher_arr.size == i){ // SSL cipher suite not found in array - need to append
-            metrics->web_log->ssl_cipher_arr.size++;
-            metrics->web_log->ssl_cipher_arr.ssl_ciphers = reallocz(metrics->web_log->ssl_cipher_arr.ssl_ciphers, 
-                                        metrics->web_log->ssl_cipher_arr.size * sizeof(struct log_parser_metrics_ssl_cipher));
-            snprintf( metrics->web_log->ssl_cipher_arr.ssl_ciphers[metrics->web_log->ssl_cipher_arr.size - 1].string, 
+        if(metrics->ssl_cipher_arr.size == i){ // SSL cipher suite not found in array - need to append
+            metrics->ssl_cipher_arr.size++;
+            metrics->ssl_cipher_arr.ssl_ciphers = reallocz(metrics->ssl_cipher_arr.ssl_ciphers, 
+                                        metrics->ssl_cipher_arr.size * sizeof(struct log_parser_metrics_ssl_cipher));
+            snprintf( metrics->ssl_cipher_arr.ssl_ciphers[metrics->ssl_cipher_arr.size - 1].string, 
                       SSL_CIPHER_SUITE_MAX_LEN, "%s", line_parsed->ssl_cipher);
-            metrics->web_log->ssl_cipher_arr.ssl_ciphers[metrics->web_log->ssl_cipher_arr.size - 1].count = 1;
+            metrics->ssl_cipher_arr.ssl_ciphers[metrics->ssl_cipher_arr.size - 1].count = 1;
         }
     }
+
+    metrics->timestamp = line_parsed->timestamp;
 }
 
 /**
@@ -1533,7 +1542,7 @@ static inline void extract_web_log_metrics( Log_parser_config_t *parser_config,
  */
 int parse_web_log_buf( char *text, size_t text_size, 
                        Log_parser_config_t *parser_config, 
-                       Log_parser_metrics_t *parser_metrics){
+                       Web_log_metrics_t *parser_metrics){
 
     if(unlikely(!text_size || !text || !*text)){
         m_assert(0, "!text_size || !text || !*text");
@@ -1542,48 +1551,58 @@ int parse_web_log_buf( char *text, size_t text_size,
 
     Web_log_parser_config_t *wblp_config = (Web_log_parser_config_t *) parser_config->gen_config;
 
-    char *line_start = text, *line_end = text;
-    size_t consumed = 0;
-    do{
-        Log_line_parsed_t line_parsed = (Log_line_parsed_t) {0};
+    Log_line_parsed_t line_parsed = (Log_line_parsed_t) {0};
 
 #if MEASURE_WEB_LOG_PARSE_EXTRACT_TIME
-        struct timespec begin, end;
-        clock_gettime(CLOCK_THREAD_CPUTIME_ID, &begin);
-        struct rusage begin_rusage, end_rusage;
-        if(getrusage(1, &begin_rusage) !=0) exit(-1);
+    struct timespec begin, end;
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &begin);
+    struct rusage begin_rusage, end_rusage;
+    if(getrusage(1, &begin_rusage) !=0) exit(-1);
 #endif // MEASURE_WEB_LOG_PARSE_EXTRACT_TIME
-        
-        parse_web_log_line(wblp_config, line_start, &line_parsed);
-        
-        // TODO: Refactor the following, can be done inside parse_log_line() function to save a strcmp() call.
-        extract_web_log_metrics(parser_config, &line_parsed, parser_metrics);
+
+    parse_web_log_line(wblp_config, text, text_size, &line_parsed);
+
+    extract_web_log_metrics(parser_config, &line_parsed, parser_metrics);
 
 #if MEASURE_WEB_LOG_PARSE_EXTRACT_TIME
-        clock_gettime(CLOCK_THREAD_CPUTIME_ID, &end);
-        if(getrusage(1, &end_rusage) != 0) exit(-1);
-        fprintf (stderr, "Ru:%.9lfs T:%.9lfs\n", (
-            end_rusage.ru_stime.tv_usec 
-            + end_rusage.ru_utime.tv_usec 
-            - begin_rusage.ru_stime.tv_usec 
-            - begin_rusage.ru_utime.tv_usec) / 1000000.0 
-        + (double) (end_rusage.ru_stime.tv_sec 
-            + end_rusage.ru_utime.tv_sec  
-            - begin_rusage.ru_stime.tv_sec 
-            - begin_rusage.ru_utime.tv_sec), 
-        (end.tv_nsec - begin.tv_nsec) / 1000000000.0 + (end.tv_sec - begin.tv_sec));
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &end);
+    if(getrusage(1, &end_rusage) != 0) exit(-1);
+    fprintf (stderr, "Ru:%.9lfs T:%.9lfs\n", (
+        end_rusage.ru_stime.tv_usec 
+        + end_rusage.ru_utime.tv_usec 
+        - begin_rusage.ru_stime.tv_usec 
+        - begin_rusage.ru_utime.tv_usec) / 1000000.0 
+    + (double) (end_rusage.ru_stime.tv_sec 
+        + end_rusage.ru_utime.tv_sec  
+        - begin_rusage.ru_stime.tv_sec 
+        - begin_rusage.ru_utime.tv_sec), 
+    (end.tv_nsec - begin.tv_nsec) / 1000000000.0 + (end.tv_sec - begin.tv_sec));
 #endif // MEASURE_WEB_LOG_PARSE_EXTRACT_TIME
 
-        line_end = strchr(line_start, '\n');
-        if(line_end == NULL) line_end = strchr(line_start, '\0');
+//     char *line_start = text, *line_end = text;
+//     size_t consumed = 0;
+//     do{
+//         Log_line_parsed_t line_parsed = (Log_line_parsed_t) {0};
 
-        consumed += line_end - line_start + 1;
-        m_assert(consumed <= text_size, "consumed cannot be > text_size");
 
-        if(consumed == text_size) break;
-        else line_start = line_end + 1;
         
-    } while(1);
+//         parse_web_log_line(wblp_config, line_start, &line_parsed);
+        
+//         // TODO: Refactor the following, can be done inside parse_log_line() function to save a strcmp() call.
+//         extract_web_log_metrics(parser_config, &line_parsed, parser_metrics);
+
+
+
+//         line_end = strchr(line_start, '\n');
+//         if(line_end == NULL) line_end = strchr(line_start, '\0');
+
+//         consumed += line_end - line_start + 1;
+//         m_assert(consumed <= text_size, "consumed cannot be > text_size");
+
+//         if(consumed == text_size) break;
+//         else line_start = line_end + 1;
+        
+//     } while(1);
 
     return 0;
 }
@@ -1604,7 +1623,7 @@ Web_log_parser_config_t *auto_detect_web_log_parser_config(char *line, const cha
         if(count_fields(line, delimiter) == wblp_config->num_fields){
             wblp_config->verify_parsed_logs = 1; // Verification must be turned on to be able to pick up parsing_errors
             Log_line_parsed_t line_parsed = (Log_line_parsed_t) {0};
-            parse_web_log_line(wblp_config, line, &line_parsed);
+            parse_web_log_line(wblp_config, line, strlen(line), &line_parsed);
             if(line_parsed.parsing_errors == 0){
                 return wblp_config;
             }

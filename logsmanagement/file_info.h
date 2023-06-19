@@ -126,6 +126,7 @@ struct File_info {
     uv_mutex_t flb_tmp_buff_mut;
     uv_timer_t flb_tmp_buff_cpy_timer;
     // TODO: The following structs need to be converted to pointers, to reduce memory consumption when not used
+    Web_log_metrics_t flb_tmp_web_log_metrics;      /**< Temporarily store Web log metrics after each extraction in flb_collect_logs_cb(), until they are synced to parser_metrics->web_log **/
     Kernel_metrics_t flb_tmp_kernel_metrics;        /**< Temporarily store Kernel log metrics after each extraction in flb_collect_logs_cb(), until they are synced to parser_metrics->kernel **/
     Systemd_metrics_t flb_tmp_systemd_metrics;      /**< Temporarily store Systemd metrics after each extraction in flb_collect_logs_cb(), until they are synced to parser_metrics->systemd **/
     Docker_ev_metrics_t flb_tmp_docker_ev_metrics;  /**< Temporarily store Docker Events metrics after each extraction in flb_collect_logs_cb(), until they are synced to parser_metrics->docker_ev **/

@@ -213,6 +213,7 @@ static inline char *read_last_line(const char *filename, int max_line_width){
     uv_fs_req_cleanup(&read_req);
     if (unlikely(rc < 0)){ 
         error("uv_fs_read() error for %s (%d) %s\n", filename, rc, uv_strerror(rc));
+        freez(buff);
         return NULL;
     }
 

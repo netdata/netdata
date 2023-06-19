@@ -244,11 +244,11 @@ static void flb_complete_buff_item(struct File_info *p_file_info){
     /* Extract metrics */
     uv_mutex_lock(p_file_info->parser_metrics_mut);
     if(p_file_info->log_type == FLB_WEB_LOG){
-        if(unlikely(0 != parse_web_log_buf( buff->in->data, 
-                                            buff->in->text_size, 
-                                            p_file_info->parser_config, 
-                                            p_file_info->parser_metrics))) 
-            m_assert(0, "Parsed buffer did not contain any text or was of 0 size.");
+        // if(unlikely(0 != parse_web_log_buf( buff->in->data, 
+        //                                     buff->in->text_size, 
+        //                                     p_file_info->parser_config, 
+        //                                     p_file_info->parser_metrics))) 
+        //     m_assert(0, "Parsed buffer did not contain any text or was of 0 size.");
     }
     else if(p_file_info->log_type == FLB_KMSG){
         for(int i = 0; i < SYSLOG_SEVER_ARR_SIZE; i++){
@@ -458,6 +458,18 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
 
                         message = (char *) p->val.via.str.ptr;
                         message_size = p->val.via.str.size;
+
+                        if(p_file_info->log_type == FLB_WEB_LOG){
+                            debug(D_LOGS_MANAG, "LOG:[%.*s]", (int) message_size, message);
+                            if(unlikely(0 != parse_web_log_buf( message, message_size, 
+                                                                p_file_info->parser_config, 
+                                                                &p_file_info->flb_tmp_web_log_metrics))){
+                                collector_error("parse_web_log_buf() error");
+                                m_assert(0, "Parsed buffer did not contain any text or was of 0 size.");
+                            }
+
+                            timestamp = p_file_info->flb_tmp_web_log_metrics.timestamp * MSEC_PER_SEC; // convert to msec from sec
+                        }
 
                         new_tmp_text_size = message_size + 1; // +1 for '\n'
 
