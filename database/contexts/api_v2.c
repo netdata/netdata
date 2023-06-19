@@ -299,19 +299,17 @@ static void rrdhost_sender_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *ke
         return;
 
     buffer_json_member_add_object(wb, key);
+    {
+        buffer_json_member_add_uint64(wb, "id", s->stream.id);
+        buffer_json_member_add_uint64(wb, "hops", s->stream.hops);
+        buffer_json_member_add_string(wb, "status", rrdhost_streaming_status_to_string(s->stream.status));
+        buffer_json_member_add_time_t(wb, "since", s->stream.since);
+        buffer_json_member_add_time_t(wb, "age", s->now - s->stream.since);
 
-    buffer_json_member_add_uint64(wb, "id", s->stream.id);
-    buffer_json_member_add_uint64(wb, "hops", s->stream.hops);
-    buffer_json_member_add_string(wb, "status", rrdhost_streaming_status_to_string(s->stream.status));
-    buffer_json_member_add_time_t(wb, "since", s->stream.since);
-    buffer_json_member_add_time_t(wb, "age", s->now - s->stream.since);
+        if (s->stream.status == RRDHOST_STREAM_STATUS_OFFLINE)
+            buffer_json_member_add_string(wb, "reason", s->stream.reason);
 
-    if(s->stream.status == RRDHOST_STREAM_STATUS_OFFLINE)
-        buffer_json_member_add_string(wb, "reason", s->stream.reason);
-
-    if(s->stream.status == RRDHOST_STREAM_STATUS_REPLICATING || s->stream.status == RRDHOST_STREAM_STATUS_ONLINE) {
-
-        if(s->stream.status == RRDHOST_STREAM_STATUS_REPLICATING) {
+        if (s->stream.status == RRDHOST_STREAM_STATUS_REPLICATING) {
             buffer_json_member_add_object(wb, "replication");
             {
                 buffer_json_member_add_boolean(wb, "in_progress", s->stream.replication.in_progress);
