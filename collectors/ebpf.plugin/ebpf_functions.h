@@ -42,6 +42,8 @@
     fields_added++;                                                                                             \
 } while(0)
 
+#define EBPF_THREADS_ENABLE_CATEGORY "enable:"
+
 void *ebpf_function_thread(void *ptr);
 
 #endif

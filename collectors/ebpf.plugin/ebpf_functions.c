@@ -4,6 +4,28 @@
 #include "ebpf_functions.h"
 
 /*****************************************************************
+ *  EBPF SELECT MODULE
+ *****************************************************************/
+
+/**
+ * Select Module
+ *
+ * @param thread_name name of the thread we are looking for.
+ *
+ * @return it returns a pointer for the module that has thread_name on success or NULL otherwise.
+ */
+ebpf_module_t *ebpf_functions_select_module(const char *thread_name) {
+    int i;
+    for (i = 0; ebpf_modules[i].thread_name; i++) {
+        if (strcmp(ebpf_modules[i].thread_name, thread_name) == 0) {
+            return &ebpf_modules[i];
+        }
+    }
+
+    return NULL;
+}
+
+/*****************************************************************
  *  EBPF HELP FUNCTIONS
  *****************************************************************/
 
@@ -87,13 +109,45 @@ static void ebpf_function_thread_manipulation(const char *transaction,
                                               ebpf_module_t *em)
 {
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
+    char message[512];
     size_t num_words = pluginsd_split_words(function, words, PLUGINSD_MAX_WORDS);
     for(int i = 1; i < PLUGINSD_MAX_WORDS ;i++) {
         const char *keyword = get_word(words, num_words, i);
         if (!keyword)
             break;
 
-        if(strcmp(keyword, "help") == 0) {
+        if(strncmp(keyword, EBPF_THREADS_ENABLE_CATEGORY, sizeof(EBPF_THREADS_ENABLE_CATEGORY) -1) == 0) {
+            const char *name = &keyword[sizeof(EBPF_THREADS_ENABLE_CATEGORY)-1];
+            ebpf_module_t *em = ebpf_functions_select_module(name);
+            if (!em) {
+                snprintfz(message, 511, "%s%s", "ebpf.plugin does not have thread with name ", name);
+                ebpf_function_error(transaction,
+                                    HTTP_RESP_NOT_FOUND,
+                                    message);
+                return;
+            }
+
+            pthread_mutex_lock(&ebpf_exit_cleanup);
+            if (em->enabled != NETDATA_THREAD_EBPF_RUNNING && !em->thread->thread) {
+                struct netdata_static_thread *st = em->thread;
+                // Load configuration again
+                ebpf_update_module(em, default_btf, running_on_kernel, isrh);
+
+                st->thread = mallocz(sizeof(netdata_thread_t));
+                em->thread_id = i;
+                em->enabled = NETDATA_THREAD_EBPF_RUNNING;
+
+                netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, em);
+
+                if (em->apps_charts && em->apps_routine && em->maps && apps_groups_root_target) {
+                    /**
+                     * TODO: APPS CREATION NEEDS MORE CHANGES IN THE CODE, SO I AM POSTPONING FOR NEXT PR
+                     */
+                }
+
+            }
+            pthread_mutex_unlock(&ebpf_exit_cleanup);
+        } else if(strncmp(keyword, "help", 4) == 0) {
             ebpf_function_thread_manipulation_help(transaction);
             return;
         }
