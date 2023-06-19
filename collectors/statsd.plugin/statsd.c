@@ -247,17 +247,17 @@ static struct statsd {
     STATSD_INDEX sets;
     STATSD_INDEX dictionaries;
 
-    uint32_t unknown_types;
-    uint32_t socket_errors;
-    uint32_t tcp_socket_connects;
-    uint32_t tcp_socket_disconnects;
-    uint32_t tcp_socket_connected;
-    uint32_t tcp_socket_reads;
-    uint32_t tcp_packets_received;
-    uint32_t tcp_bytes_read;
-    uint32_t udp_socket_reads;
-    uint32_t udp_packets_received;
-    uint32_t udp_bytes_read;
+    size_t unknown_types;
+    size_t socket_errors;
+    size_t tcp_socket_connects;
+    size_t tcp_socket_disconnects;
+    size_t tcp_socket_connected;
+    size_t tcp_socket_reads;
+    size_t tcp_packets_received;
+    size_t tcp_bytes_read;
+    size_t udp_socket_reads;
+    size_t udp_packets_received;
+    size_t udp_bytes_read;
 
     int32_t update_every;
     bool enabled;
