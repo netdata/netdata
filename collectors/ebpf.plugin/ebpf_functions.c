@@ -117,13 +117,11 @@ static void ebpf_function_thread_manipulation(const char *transaction,
             break;
 
         if(strncmp(keyword, EBPF_THREADS_ENABLE_CATEGORY, sizeof(EBPF_THREADS_ENABLE_CATEGORY) -1) == 0) {
-            const char *name = &keyword[sizeof(EBPF_THREADS_ENABLE_CATEGORY)-1];
+            const char *name = &keyword[sizeof(EBPF_THREADS_ENABLE_CATEGORY) - 1];
             ebpf_module_t *em = ebpf_functions_select_module(name);
             if (!em) {
                 snprintfz(message, 511, "%s%s", "ebpf.plugin does not have thread with name ", name);
-                ebpf_function_error(transaction,
-                                    HTTP_RESP_NOT_FOUND,
-                                    message);
+                ebpf_function_error(transaction, HTTP_RESP_NOT_FOUND, message);
                 return;
             }
 
@@ -144,9 +142,12 @@ static void ebpf_function_thread_manipulation(const char *transaction,
                      * TODO: APPS CREATION NEEDS MORE CHANGES IN THE CODE, SO I AM POSTPONING FOR NEXT PR
                      */
                 }
-
             }
             pthread_mutex_unlock(&ebpf_exit_cleanup);
+        } else if(strncmp(keyword, EBPF_THREADS_DISABLE_CATEGORY, sizeof(EBPF_THREADS_DISABLE_CATEGORY) -1) == 0) {
+            /**
+             * TODO: TO DISABLE PROPERLY A THREAD WE MUST OBSOLETE CHARTS, SO I WILL BRING IN ANOTHER PR
+             */
         } else if(strncmp(keyword, "help", 4) == 0) {
             ebpf_function_thread_manipulation_help(transaction);
             return;
