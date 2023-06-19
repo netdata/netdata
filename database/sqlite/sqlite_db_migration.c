@@ -215,7 +215,6 @@ static int do_migration_v7_v8(sqlite3 *database, const char *name)
 
 static int do_migration_v8_v9(sqlite3 *database, const char *name)
 {
-    UNUSED(name);
     info("Running database migration %s", name);
 
     char sql[2048];
@@ -280,6 +279,7 @@ static int do_migration_v8_v9(sqlite3 *database, const char *name)
     dfe_done(table);
     dictionary_destroy(dict_tables);
 
+    info("Completed database migration %s", name);
     return 0;
 }
 
