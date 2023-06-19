@@ -386,9 +386,49 @@ void sql_health_alarm_log_count(RRDHOST *host) {
 }
 
 /* Health related SQL queries
-   Cleans up the health_log table on a non-claimed host
+   Cleans up the health_log table
 */
-#define SQL_CLEANUP_HEALTH_LOG_NOT_CLAIMED(limit) "DELETE FROM health_log where host_id = @host_id ORDER BY unique_id ASC LIMIT %lu;", limit
+#define SQL_CLEANUP_HEALTH_LOG(limit) "DELETE FROM health_log WHERE health_log_id not in (select health_log_id from health_log_detail) and host_id = @host_id ORDER BY alarm_id ASC LIMIT %lu;", limit
+void sql_health_alarm_log_cleanup_main_health_log(RRDHOST *host, size_t rotate_every)
+{
+    sqlite3_stmt *res = NULL;
+    int rc;
+    char command[MAX_HEALTH_SQL_SIZE + 1];
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            error_report("Database has not been initialized");
+        return;
+    }
+
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG((unsigned long int) (host->health.health_log_entries_written - rotate_every)));
+
+    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to cleanup health log table");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id for SQL_CLEANUP_HEALTH_LOG.");
+        sqlite3_finalize(res);
+        return;
+    }
+
+    rc = sqlite3_step_monitored(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to cleanup health log table, rc = %d", rc);
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement to cleanup health log table");
+}
+
+/* Health related SQL queries
+   Cleans up the health_log_detail table on a non-claimed host
+*/
+#define SQL_CLEANUP_HEALTH_LOG_DETAIL_NOT_CLAIMED(limit) "DELETE FROM health_log_detail where health_log_id in (select health_log_id from health_log where host_id = @host_id) ORDER BY unique_id ASC LIMIT %lu;", limit
 void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host, size_t rotate_every) {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -403,11 +443,11 @@ void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host, size_t rotate_every
     char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG_NOT_CLAIMED((unsigned long int) (host->health.health_log_entries_written - rotate_every)));
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG_DETAIL_NOT_CLAIMED((unsigned long int) (host->health.health_log_entries_written - rotate_every)));
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to cleanup health log table");
+        error_report("Failed to prepare statement to cleanup health log detail table (un-claimed)");
         return;
     }
 
@@ -424,7 +464,7 @@ void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host, size_t rotate_every
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement to cleanup health log table");
+        error_report("Failed to finalize the prepared statement to cleanup health log detail table (un-claimed)");
 
     host->health.health_log_entries_written = rotate_every;
 
@@ -435,9 +475,9 @@ void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host, size_t rotate_every
 }
 
 /* Health related SQL queries
-   Cleans up the health_log table on a claimed host
+   Cleans up the health_log_detail table on a claimed host
 */
-#define SQL_CLEANUP_HEALTH_LOG_CLAIMED(guid, limit) "DELETE from health_log WHERE host_id = ?1 AND unique_id NOT IN (SELECT filtered_alert_unique_id FROM aclk_alert_%s) AND unique_id IN (SELECT unique_id FROM health_log WHERE host_id = ?2 ORDER BY unique_id asc LIMIT %lu);", guid, limit
+#define SQL_CLEANUP_HEALTH_LOG_DETAIL_CLAIMED(guid, limit) "DELETE from health_log_detail WHERE unique_id NOT IN (SELECT filtered_alert_unique_id FROM aclk_alert_%s) AND unique_id IN (SELECT hld.unique_id FROM health_log hl, health_log_detail hld WHERE host_id = ?2 AND hl.health_log_id = hld.health_log_id) ORDER BY unique_id asc LIMIT %lu);", guid, limit
 void sql_health_alarm_log_cleanup_claimed(RRDHOST *host, size_t rotate_every) {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -458,11 +498,11 @@ void sql_health_alarm_log_cleanup_claimed(RRDHOST *host, size_t rotate_every) {
         return;
     }
 
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG_CLAIMED(uuid_str, (unsigned long int) (host->health.health_log_entries_written - rotate_every)));
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG_DETAIL_CLAIMED(uuid_str, (unsigned long int) (host->health.health_log_entries_written - rotate_every)));
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to cleanup health log table");
+        error_report("Failed to prepare statement to cleanup health log detail table (claimed)");
         return;
     }
 
@@ -486,7 +526,7 @@ void sql_health_alarm_log_cleanup_claimed(RRDHOST *host, size_t rotate_every) {
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement to cleanup health log table");
+        error_report("Failed to finalize the prepared statement to cleanup health log detail table (claimed)");
 
     sql_health_alarm_log_count(host);
 
@@ -512,6 +552,8 @@ void sql_health_alarm_log_cleanup(RRDHOST *host) {
         sql_health_alarm_log_cleanup_not_claimed(host, rotate_every);
     } else
         sql_health_alarm_log_cleanup_claimed(host, rotate_every);
+
+    sql_health_alarm_log_cleanup_main_health_log(host, rotate_every);
 }
 
 #define SQL_INJECT_REMOVED "insert into health_log_detail (health_log_id, unique_id, alarm_id, alarm_event_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, transition_id, global_id) select health_log_id, ?1, ?2, ?3, 0, ?4, unixepoch(), 0, 0, flags, exec_run_timestamp, unixepoch(), info, exec_code, -2, new_status, delay, NULL, new_value, 0, ?5, now_usec(0) from health_log_detail where unique_id = ?6 and transition_id = ?7;"
