@@ -598,6 +598,7 @@ int connect_to_one_of_destinations(
             *reconnects_counter += 1;
 
         d->last_attempt = now;
+        d->attempts++;
         sock = connect_to_this(string2str(d->destination), default_port, timeout);
 
         if (sock != -1) {
@@ -1220,11 +1221,10 @@ static struct {
     STREAM_HANDSHAKE err;
     const char *str;
 } handshake_errors[] = {
-    { STREAM_HANDSHAKE_OK_V5, "OK_V5" },
-    { STREAM_HANDSHAKE_OK_V4, "OK_V4" },
-    { STREAM_HANDSHAKE_OK_V3, "OK_V3" },
-    { STREAM_HANDSHAKE_OK_V2, "OK_V2" },
-    { STREAM_HANDSHAKE_OK_V1, "OK_V1" },
+    { STREAM_HANDSHAKE_OK_V3, "CONNECTED" },
+    { STREAM_HANDSHAKE_OK_V2, "CONNECTED" },
+    { STREAM_HANDSHAKE_OK_V1, "CONNECTED" },
+    { STREAM_HANDSHAKE_NEVER, "NOT_TRIED_YET" },
     { STREAM_HANDSHAKE_ERROR_BAD_HANDSHAKE, "BAD HANDSHAKE" },
     { STREAM_HANDSHAKE_ERROR_LOCALHOST, "LOCALHOST" },
     { STREAM_HANDSHAKE_ERROR_ALREADY_CONNECTED, "ALREADY CONNECTED" },
@@ -1241,12 +1241,16 @@ static struct {
 };
 
 const char *stream_handshake_error_to_string(STREAM_HANDSHAKE handshake_error) {
+    if(handshake_error >= STREAM_HANDSHAKE_OK_V1)
+        // handshake_error is the whole version / capabilities number
+        return "CONNECTED";
+
     for(size_t i = 0; handshake_errors[i].str ; i++) {
         if(handshake_error == handshake_errors[i].err)
             return handshake_errors[i].str;
     }
 
-    return "";
+    return "UNKNOWN";
 }
 
 static struct {
