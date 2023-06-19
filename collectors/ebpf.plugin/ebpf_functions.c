@@ -139,7 +139,8 @@ static void ebpf_function_thread_manipulation(const char *transaction,
                      * TODO: APPS CREATION NEEDS MORE CHANGES IN THE CODE, SO I AM POSTPONING FOR NEXT PR
                      */
                 }
-            }
+            } else
+                em->running_time = 0;
             pthread_mutex_unlock(&ebpf_exit_cleanup);
         } else if(strncmp(keyword, EBPF_THREADS_DISABLE_CATEGORY, sizeof(EBPF_THREADS_DISABLE_CATEGORY) -1) == 0) {
             /**

@@ -309,6 +309,7 @@ typedef struct ebpf_module {
     int maps_per_core;
 
     // period to run
+    uint32_t running_time; // internal usage, this is used to reset a value when a new request happens.
     uint32_t life_time;
 } ebpf_module_t;
 
