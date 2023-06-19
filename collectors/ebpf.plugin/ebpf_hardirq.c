@@ -542,7 +542,9 @@ static void hardirq_collector(ebpf_module_t *em)
     int update_every = em->update_every;
     int counter = update_every - 1;
     //This will be cancelled by its parent
-    while (!ebpf_exit_plugin) {
+    int running_time = 0;
+    int life_time = em->life_time;
+    while (!ebpf_exit_plugin && running_time < life_time) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
 
         if (ebpf_exit_plugin || ++counter != update_every)
@@ -561,6 +563,11 @@ static void hardirq_collector(ebpf_module_t *em)
         write_end_chart();
 
         pthread_mutex_unlock(&lock);
+
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        running_time += update_every;
+        em->running_time = running_time;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 

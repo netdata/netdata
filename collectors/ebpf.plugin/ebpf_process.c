@@ -1103,7 +1103,9 @@ static void process_collector(ebpf_module_t *em)
     int update_every = em->update_every;
     int counter = update_every - 1;
     int maps_per_core = em->maps_per_core;
-    while (!ebpf_exit_plugin) {
+    int running_time = 0;
+    int life_time = em->life_time;
+    while (!ebpf_exit_plugin && running_time < life_time) {
         usec_t dt = heartbeat_next(&hb, USEC_PER_SEC);
         (void)dt;
         if (ebpf_exit_plugin)
@@ -1149,6 +1151,10 @@ static void process_collector(ebpf_module_t *em)
         }
 
         fflush(stdout);
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        running_time += update_every;
+        em->running_time = running_time;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 
