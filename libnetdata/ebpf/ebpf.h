@@ -43,6 +43,7 @@
 #define EBPF_CFG_MAPS_PER_CORE "maps per core"
 
 #define EBPF_CFG_UPDATE_EVERY "update every"
+#define EBPF_CFG_LIFETIME "life time"
 #define EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT 10
 #define EBPF_CFG_PID_SIZE "pid table size"
 #define EBPF_CFG_APPLICATION "apps"
@@ -306,7 +307,13 @@ typedef struct ebpf_module {
     char memory_usage[NETDATA_EBPF_CHART_MEM_LENGTH];
     char memory_allocations[NETDATA_EBPF_CHART_MEM_LENGTH];
     int maps_per_core;
+
+    // period to run
+    uint32_t life_time;
 } ebpf_module_t;
+
+#define EBPF_LIFE_TIME 600
+#define EBPF_NON_FUNCTION_LIFE_TIME 86400
 
 int ebpf_get_kernel_version();
 int get_redhat_release();
