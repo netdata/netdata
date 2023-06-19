@@ -89,6 +89,7 @@
 #include "static_threads.h"
 #include "signals.h"
 #include "commands.h"
+#include "pipename.h"
 #include "analytics.h"
 
 // global netdata daemon variables
