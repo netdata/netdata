@@ -4,51 +4,66 @@
 
 #define LOG_FUNCTIONS false
 
-static int send_to_plugin(const char *txt, void *data) {
+static ssize_t send_to_plugin(const char *txt, void *data) {
     PARSER *parser = data;
 
     if(!txt || !*txt)
         return 0;
 
+    errno = 0;
+    netdata_spinlock_lock(&parser->writer.spinlock);
+    ssize_t bytes = -1;
+
 #ifdef ENABLE_HTTPS
     NETDATA_SSL *ssl = parser->ssl_output;
     if(ssl) {
-        if(SSL_connection(ssl))
-            return (int)netdata_ssl_write(ssl, (void *)txt, strlen(txt));
 
-        error("PLUGINSD: cannot send command (SSL)");
-        return -1;
+        if(SSL_connection(ssl))
+            bytes = netdata_ssl_write(ssl, (void *) txt, strlen(txt));
+
+        else
+            error("PLUGINSD: cannot send command (SSL)");
+
+        netdata_spinlock_unlock(&parser->writer.spinlock);
+        return bytes;
     }
 #endif
 
     if(parser->fp_output) {
-        int bytes = fprintf(parser->fp_output, "%s", txt);
+
+        bytes = fprintf(parser->fp_output, "%s", txt);
         if(bytes <= 0) {
             error("PLUGINSD: cannot send command (FILE)");
-            return -2;
+            bytes = -2;
         }
-        fflush(parser->fp_output);
+        else
+            fflush(parser->fp_output);
+
+        netdata_spinlock_unlock(&parser->writer.spinlock);
         return bytes;
     }
 
     if(parser->fd != -1) {
-        size_t bytes = 0;
-        size_t total = strlen(txt);
+        bytes = 0;
+        ssize_t total = (ssize_t)strlen(txt);
         ssize_t sent;
 
         do {
             sent = write(parser->fd, &txt[bytes], total - bytes);
             if(sent <= 0) {
                 error("PLUGINSD: cannot send command (fd)");
+                netdata_spinlock_unlock(&parser->writer.spinlock);
                 return -3;
             }
             bytes += sent;
         }
         while(bytes < total);
 
+        netdata_spinlock_unlock(&parser->writer.spinlock);
         return (int)bytes;
     }
 
+    netdata_spinlock_unlock(&parser->writer.spinlock);
     error("PLUGINSD: cannot send command (no output socket/pipe/file given to plugins.d parser)");
     return -4;
 }
@@ -401,6 +416,8 @@ static PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, size_t nu
             rrdhost_labels_to_system_info(u->host_define.rrdlabels),
             false
             );
+
+    rrdhost_option_set(host, RRDHOST_OPTION_VIRTUAL_HOST);
 
     if(host->rrdlabels) {
         rrdlabels_migrate_to_these(host->rrdlabels, u->host_define.rrdlabels);

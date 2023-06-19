@@ -1356,6 +1356,34 @@ void ml_host_get_detection_info(RRDHOST *rh, BUFFER *wb)
     netdata_mutex_unlock(&host->mutex);
 }
 
+bool ml_host_get_host_status(RRDHOST *rh, struct ml_metrics_statistics *mlm) {
+    ml_host_t *host = (ml_host_t *) rh->ml_host;
+    if (!host) {
+        memset(mlm, 0, sizeof(*mlm));
+        return false;
+    }
+
+    netdata_mutex_lock(&host->mutex);
+
+    mlm->anomalous = host->mls.num_anomalous_dimensions;
+    mlm->normal = host->mls.num_normal_dimensions;
+    mlm->trained = host->mls.num_training_status_trained + host->mls.num_training_status_pending_with_model;
+    mlm->pending = host->mls.num_training_status_untrained + host->mls.num_training_status_pending_without_model;
+    mlm->silenced = host->mls.num_training_status_silenced;
+
+    netdata_mutex_unlock(&host->mutex);
+
+    return true;
+}
+
+bool ml_host_running(RRDHOST *rh) {
+    ml_host_t *host = (ml_host_t *) rh->ml_host;
+    if(!host)
+        return false;
+
+    return true;
+}
+
 void ml_host_get_models(RRDHOST *rh, BUFFER *wb)
 {
     UNUSED(rh);

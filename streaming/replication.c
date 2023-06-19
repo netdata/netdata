@@ -797,9 +797,9 @@ static bool send_replay_chart_cmd(struct replication_request_details *r, const c
               rrdset_id(st), r->wanted.start_streaming ? "true" : "false",
               (unsigned long long)r->wanted.after, (unsigned long long)r->wanted.before);
 
-    int ret = r->caller.callback(buffer, r->caller.data);
+    ssize_t ret = r->caller.callback(buffer, r->caller.data);
     if (ret < 0) {
-        error("REPLAY ERROR: 'host:%s/chart:%s' failed to send replication request to child (error %d)",
+        error("REPLAY ERROR: 'host:%s/chart:%s' failed to send replication request to child (error %zd)",
               rrdhost_hostname(r->host), rrdset_id(r->st), ret);
         return false;
     }

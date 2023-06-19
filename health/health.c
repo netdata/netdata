@@ -349,7 +349,7 @@ static void health_reload_host(RRDHOST *host) {
     rrdset_foreach_done(st);
 
 #ifdef ENABLE_ACLK
-    if (netdata_cloud_setting) {
+    if (netdata_cloud_enabled) {
         struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *)host->aclk_sync_host_config;
         if (likely(wc)) {
             wc->alert_queue_removed = SEND_REMOVED_AFTER_HEALTH_LOOPS;
@@ -905,7 +905,7 @@ static int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
 
 static void sql_health_postpone_queue_removed(RRDHOST *host __maybe_unused) {
 #ifdef ENABLE_ACLK
-    if (netdata_cloud_setting) {
+    if (netdata_cloud_enabled) {
         struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *)host->aclk_sync_host_config;
         if (unlikely(!wc)) {
             return;
@@ -1131,7 +1131,7 @@ void *health_main(void *ptr) {
                             rc->value = NAN;
 
 #ifdef ENABLE_ACLK
-                            if (netdata_cloud_setting)
+                            if (netdata_cloud_enabled)
                                 sql_queue_alarm_to_aclk(host, ae, 1);
 #endif
                         }
@@ -1503,7 +1503,7 @@ void *health_main(void *ptr) {
                 break;
             }
 #ifdef ENABLE_ACLK
-            if (netdata_cloud_setting) {
+            if (netdata_cloud_enabled) {
                 struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *)host->aclk_sync_host_config;
                 if (unlikely(!wc)) {
                     continue;

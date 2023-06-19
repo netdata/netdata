@@ -93,7 +93,7 @@ PARSER_RC streaming_claimed_id(char **words, size_t num_words, void *user)
 
     rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_CLAIMID |RRDHOST_FLAG_METADATA_UPDATE);
 
-    rrdpush_claimed_id(host);
+    rrdpush_send_claimed_id(host);
 
     return PARSER_RC_OK;
 }
@@ -104,16 +104,22 @@ static int read_stream(struct receiver_state *r, char* buffer, size_t size) {
         return 0;
     }
 
+    int tries = 100;
     ssize_t bytes_read;
 
+    do {
+        errno = 0;
+
 #ifdef ENABLE_HTTPS
-    if (SSL_connection(&r->ssl))
-        bytes_read = netdata_ssl_read(&r->ssl, buffer, size);
-    else
-        bytes_read = read(r->fd, buffer, size);
+        if (SSL_connection(&r->ssl))
+            bytes_read = netdata_ssl_read(&r->ssl, buffer, size);
+        else
+            bytes_read = read(r->fd, buffer, size);
 #else
-    bytes_read = read(r->fd, buffer, size);
+        bytes_read = read(r->fd, buffer, size);
 #endif
+
+    } while(bytes_read < 0 && errno == EINTR && tries--);
 
     if((bytes_read == 0 || bytes_read == -1) && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINPROGRESS)) {
         error("STREAM: %s(): timeout while waiting for data on socket!", __FUNCTION__);
@@ -423,66 +429,17 @@ static void rrdpush_receiver_replication_reset(RRDHOST *host) {
     rrdhost_receiver_replicating_charts_zero(host);
 }
 
-void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST *host, const char *key, time_t now __maybe_unused) {
-    size_t receiver_hops = host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1;
-
-    netdata_mutex_lock(&host->receiver_lock);
-
-    buffer_json_member_add_object(wb, key);
-    buffer_json_member_add_uint64(wb, "hops", receiver_hops);
-
-    bool online = host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
-    buffer_json_member_add_boolean(wb, "online", online);
-
-    if(host->child_connect_time || host->child_disconnected_time) {
-        time_t since = MAX(host->child_connect_time, host->child_disconnected_time);
-        buffer_json_member_add_time_t(wb, "since", since);
-        buffer_json_member_add_time_t(wb, "age", now - since);
-    }
-
-    if(!online && host->rrdpush_last_receiver_exit_reason)
-        buffer_json_member_add_string(wb, "reason", host->rrdpush_last_receiver_exit_reason);
-
-    if(host != localhost && host->receiver) {
-        buffer_json_member_add_object(wb, "replication");
-        {
-            size_t instances = rrdhost_receiver_replicating_charts(host);
-            buffer_json_member_add_boolean(wb, "in_progress", instances);
-            buffer_json_member_add_double(wb, "completion", host->rrdpush_receiver_replication_percent);
-            buffer_json_member_add_uint64(wb, "instances", instances);
-        }
-        buffer_json_object_close(wb); // replication
-
-        buffer_json_member_add_object(wb, "source");
-        {
-
-            char buf[1024 + 1];
-            SOCKET_PEERS peers = socket_peers(host->receiver->fd);
-            bool ssl = SSL_connection(&host->receiver->ssl);
-
-            snprintfz(buf, 1024, "[%s]:%d%s", peers.local.ip, peers.local.port, ssl ? ":SSL" : "");
-            buffer_json_member_add_string(wb, "local", buf);
-
-            snprintfz(buf, 1024, "[%s]:%d%s", peers.peer.ip, peers.peer.port, ssl ? ":SSL" : "");
-            buffer_json_member_add_string(wb, "remote", buf);
-
-            stream_capabilities_to_json_array(wb, host->receiver->capabilities, "capabilities");
-        }
-        buffer_json_object_close(wb); // source
-    }
-    buffer_json_object_close(wb); // collection
-
-    netdata_mutex_unlock(&host->receiver_lock);
-}
-
 static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
     bool signal_rrdcontext = false;
     bool set_this = false;
 
     netdata_mutex_lock(&host->receiver_lock);
 
-    if (!host->receiver || host->receiver == rpt) {
+    if (!host->receiver) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
+
+        host->rrdpush_receiver_connection_counter++;
+        __atomic_add_fetch(&localhost->connected_children_count, 1, __ATOMIC_RELAXED);
 
         host->receiver = rpt;
         rpt->host = host;
@@ -534,6 +491,9 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
 
         // Make sure that we detach this thread and don't kill a freshly arriving receiver
         if(host->receiver == rpt) {
+            __atomic_sub_fetch(&localhost->connected_children_count, 1, __ATOMIC_RELAXED);
+            rrdhost_flag_set(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
+
             host->trigger_chart_obsoletion_check = 0;
             host->child_connect_time = 0;
             host->child_disconnected_time = now_realtime_sec();
@@ -631,11 +591,6 @@ void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, con
           , rpt->exit.reason?")":""
     );
 
-}
-
-static void rrdhost_reset_destinations(RRDHOST *host) {
-    for (struct rrdpush_destinations *d = host->destinations; d; d = d->next)
-        d->postpone_reconnection_until = 0;
 }
 
 static void rrdpush_receive(struct receiver_state *rpt)
@@ -867,14 +822,14 @@ static void rrdpush_receive(struct receiver_state *rpt)
 #ifdef ENABLE_ACLK
     // in case we have cloud connection we inform cloud
     // new child connected
-    if (netdata_cloud_setting)
+    if (netdata_cloud_enabled)
         aclk_host_state_update(rpt->host, 1);
 #endif
 
-    rrdhost_set_is_parent_label(++localhost->connected_children_count);
+    rrdhost_set_is_parent_label();
 
     // let it reconnect to parent immediately
-    rrdhost_reset_destinations(rpt->host);
+    rrdpush_reset_destinations_postpone_time(rpt->host);
 
     size_t count = streaming_parser(rpt, &cd, rpt->fd,
 #ifdef ENABLE_HTTPS
@@ -883,8 +838,6 @@ static void rrdpush_receive(struct receiver_state *rpt)
                                     NULL
 #endif
                                     );
-
-    rrdhost_flag_set(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
 
     if(!rpt->exit.reason)
         rpt->exit.reason = "PARSER EXIT";
@@ -898,11 +851,9 @@ static void rrdpush_receive(struct receiver_state *rpt)
 #ifdef ENABLE_ACLK
     // in case we have cloud connection we inform cloud
     // a child disconnected
-    if (netdata_cloud_setting)
+    if (netdata_cloud_enabled)
         aclk_host_state_update(rpt->host, 0);
 #endif
-
-    rrdhost_set_is_parent_label(--localhost->connected_children_count);
 
 cleanup:
     ;
@@ -921,6 +872,8 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
     , gettid());
 
     receiver_state_free(rpt);
+
+    rrdhost_set_is_parent_label();
 }
 
 void *rrdpush_receiver_thread(void *ptr) {

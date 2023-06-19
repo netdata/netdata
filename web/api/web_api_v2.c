@@ -18,14 +18,20 @@ static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unu
         // they are not null and not empty
 
         if(!strcmp(name, "scope_nodes")) req.scope_nodes = value;
-        else if((options & (CONTEXTS_V2_NODES | CONTEXTS_V2_CONTEXTS)) && !strcmp(name, "nodes")) req.nodes = value;
-        else if((options & CONTEXTS_V2_CONTEXTS) && !strcmp(name, "scope_contexts")) req.scope_contexts = value;
-        else if((options & CONTEXTS_V2_CONTEXTS) && !strcmp(name, "contexts")) req.contexts = value;
+        else if(!strcmp(name, "nodes")) req.nodes = value;
+        else if((options & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH)) && !strcmp(name, "scope_contexts")) req.scope_contexts = value;
+        else if((options & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH)) && !strcmp(name, "contexts")) req.contexts = value;
         else if((options & CONTEXTS_V2_SEARCH) && !strcmp(name, "q")) req.q = value;
+        else if(!strcmp(name, "options")) {
+            if(strstr(value, "minify"))
+                options |= CONTEXTS_V2_MINIFY;
+            else if(strstr(value, "debug"))
+                options |= CONTEXTS_V2_DEBUG;
+        }
+        else if(!strcmp(name, "after")) req.after = str2l(value);
+        else if(!strcmp(name, "before")) req.before = str2l(value);
         else if(!strcmp(name, "timeout")) req.timeout_ms = str2l(value);
     }
-
-    options |= CONTEXTS_V2_DEBUG;
 
     buffer_flush(w->response.data);
     buffer_no_cacheable(w->response.data);
@@ -33,15 +39,19 @@ static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unu
 }
 
 static int web_client_api_request_v2_q(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_SEARCH | CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_NODES);
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_SEARCH | CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_NODES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_VERSIONS);
 }
 
 static int web_client_api_request_v2_contexts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_CONTEXTS);
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_NODES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_VERSIONS);
 }
 
 static int web_client_api_request_v2_nodes(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED);
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_INFO);
+}
+
+static int web_client_api_request_v2_nodes_instances(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODES_INSTANCES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_AGENTS_INFO | CONTEXTS_V2_VERSIONS);
 }
 
 static int web_client_api_request_v2_weights(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
@@ -348,6 +358,7 @@ static int web_client_api_request_v2_webrtc(RRDHOST *host __maybe_unused, struct
 static struct web_api_command api_commands_v2[] = {
         {"data", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_data},
         {"nodes", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_nodes},
+        {"nodes_instances", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_nodes_instances},
         {"contexts", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_contexts},
         {"weights", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_weights},
         {"q", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_q},

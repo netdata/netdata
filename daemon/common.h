@@ -109,9 +109,26 @@ extern int32_t netdata_configured_utc_offset;
 extern int netdata_zero_metrics_enabled;
 extern int netdata_anonymous_statistics_enabled;
 
-extern int netdata_ready;
-extern int netdata_cloud_setting;
+extern bool netdata_ready;
+extern bool netdata_cloud_enabled;
+
+extern time_t netdata_start_time;
 
 long get_netdata_cpus(void);
+
+typedef enum __attribute__((packed)) {
+    CLOUD_STATUS_DISABLED = 0,
+    CLOUD_STATUS_BANNED,
+    CLOUD_STATUS_OFFLINE,
+    CLOUD_STATUS_ONLINE,
+} CLOUD_STATUS;
+
+const char *cloud_status_to_string(CLOUD_STATUS status);
+CLOUD_STATUS cloud_status(void);
+time_t cloud_last_change(void);
+time_t cloud_next_connection_attempt(void);
+size_t cloud_connection_id(void);
+const char *cloud_offline_reason(void);
+const char *cloud_base_url(void);
 
 #endif /* NETDATA_COMMON_H */
