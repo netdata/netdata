@@ -34,6 +34,7 @@ inline const char *rrdcalc_status2string(RRDCALC_STATUS status) {
     }
 }
 
+//TODO: add to get alarm_ids from sql
 uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id) {
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 

@@ -8,7 +8,6 @@
 #endif
 
 #define SQL_UPDATE_FILTERED_ALERT "UPDATE aclk_alert_%s SET filtered_alert_unique_id = %u where filtered_alert_unique_id = %u"
-
 void update_filtered(ALARM_ENTRY *ae, uint32_t unique_id, char *uuid_str) {
     char sql[ACLK_SYNC_QUERY_SIZE];
     snprintfz(sql, ACLK_SYNC_QUERY_SIZE-1, SQL_UPDATE_FILTERED_ALERT, uuid_str, ae->unique_id, unique_id);
@@ -16,17 +15,16 @@ void update_filtered(ALARM_ENTRY *ae, uint32_t unique_id, char *uuid_str) {
     ae->flags |= HEALTH_ENTRY_FLAG_ACLK_QUEUED;
 }
 
-#define SQL_SELECT_ALERT_BY_UNIQUE_ID "SELECT hl.unique_id FROM health_log hl, alert_hash ah WHERE hl.unique_id = %u " \
-                            "AND hl.config_hash_id = ah.hash_id AND host_id = @host_id " \
+#define SQL_SELECT_VARIABLE_ALERT_BY_UNIQUE_ID "SELECT hld.unique_id FROM health_log hl, alert_hash ah, health_log_detail hld WHERE hld.unique_id = %u " \
+                            "AND hl.config_hash_id = ah.hash_id AND hld.health_log_id = hl.health_log_id AND host_id = @host_id " \
                             "AND ah.warn IS NULL AND ah.crit IS NULL;"
-
 static inline bool is_event_from_alert_variable_config(uint32_t unique_id, uuid_t *host_id) {
     sqlite3_stmt *res = NULL;
     int rc = 0;
     bool ret = false;
 
     char sql[ACLK_SYNC_QUERY_SIZE];
-    snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1, SQL_SELECT_ALERT_BY_UNIQUE_ID, unique_id);
+    snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1, SQL_SELECT_VARIABLE_ALERT_BY_UNIQUE_ID, unique_id);
 
     rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
     if (rc != SQLITE_OK) {
@@ -54,13 +52,12 @@ static inline bool is_event_from_alert_variable_config(uint32_t unique_id, uuid_
 }
 
 #define MAX_REMOVED_PERIOD 604800 //a week
+
 //decide if some events should be sent or not
-
-#define SQL_SELECT_ALERT_BY_ID  "SELECT hl.new_status, hl.config_hash_id, hl.unique_id FROM health_log hl, aclk_alert_%s aa " \
-                                "WHERE hl.unique_id = aa.filtered_alert_unique_id " \
-                                "AND hl.alarm_id = %u AND host_id = @host_id " \
-                                "ORDER BY alarm_event_id DESC LIMIT 1;"
-
+#define SQL_SELECT_ALERT_BY_ID  "SELECT hld.new_status, hl.config_hash_id, hld.unique_id FROM health_log hl, aclk_alert_%s aa, health_log_detail hld " \
+                                "WHERE hld.unique_id = aa.filtered_alert_unique_id " \
+                                "AND hld.alarm_id = %u AND hl.host_id = @host_id AND hl.health_log_id = hld.health_log_id " \
+                                "ORDER BY hld.alarm_event_id DESC LIMIT 1;"
 int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
 {
     sqlite3_stmt *res = NULL;
@@ -272,12 +269,13 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
 
     sqlite3_stmt *res = NULL;
 
-    buffer_sprintf(sql, "select aa.sequence_id, hl.unique_id, hl.alarm_id, hl.config_hash_id, hl.updated_by_id, hl.when_key, " \
-        " hl.duration, hl.non_clear_duration, hl.flags, hl.exec_run_timestamp, hl.delay_up_to_timestamp, hl.name,  " \
-        " hl.chart, hl.family, hl.exec, hl.recipient, ha.source, hl.units, hl.info, hl.exec_code, hl.new_status,  " \
-        " hl.old_status, hl.delay, hl.new_value, hl.old_value, hl.last_repeat, hl.chart_context, hl.transition_id, hl.alarm_event_id  " \
-        " from health_log hl, aclk_alert_%s aa, alert_hash ha " \
-        " where hl.unique_id = aa.alert_unique_id and hl.config_hash_id = ha.hash_id and aa.date_submitted is null and host_id = @host_id " \
+    buffer_sprintf(sql, "select aa.sequence_id, hld.unique_id, hld.alarm_id, hl.config_hash_id, hld.updated_by_id, hld.when_key, " \
+        " hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, hld.delay_up_to_timestamp, hl.name,  " \
+        " hl.chart, hl.family, hl.exec, hl.recipient, ha.source, hl.units, hld.info, hld.exec_code, hld.new_status,  " \
+        " hld.old_status, hld.delay, hld.new_value, hld.old_value, hld.last_repeat, hl.chart_context, hld.transition_id, hld.alarm_event_id  " \
+        " from health_log hl, aclk_alert_%s aa, alert_hash ha, health_log_detail hld " \
+        " where hld.unique_id = aa.alert_unique_id and hl.config_hash_id = ha.hash_id and aa.date_submitted is null " \
+        " and hl.host_id = @host_id and hl.health_log_id = hld.health_log_id " \
         " order by aa.sequence_id asc limit %d;", wc->uuid_str, limit);
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
@@ -314,8 +312,8 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
         return;
     }
 
-    uint64_t  first_sequence_id = 0;
-    uint64_t  last_sequence_id = 0;
+    uint64_t first_sequence_id = 0;
+    uint64_t last_sequence_id = 0;
     static __thread uint64_t log_first_sequence_id = 0;
     static __thread uint64_t log_last_sequence_id = 0;
 
@@ -470,9 +468,9 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
 
     buffer_flush(sql);
     buffer_sprintf(sql, "insert into aclk_alert_%s (alert_unique_id, date_created, filtered_alert_unique_id) " \
-                   "select unique_id alert_unique_id, unixepoch(), unique_id alert_unique_id from health_log " \
-                   "where new_status <> 0 and new_status <> -2 and config_hash_id is not null and updated_by_id = 0 " \
-                   "and host_id = @host_id order by unique_id asc on conflict (alert_unique_id) do nothing;", uuid_str);
+                   "select hld.unique_id alert_unique_id, unixepoch(), hld.unique_id alert_unique_id from health_log_detail hld, health_log hl " \
+                   "where hld.new_status <> 0 and hld.new_status <> -2 and hl.health_log_id = hld.health_log_id and hl.config_hash_id is not null " \
+                   "and hld.updated_by_id = 0 and hl.host_id = @host_id order by hld.unique_id asc on conflict (alert_unique_id) do nothing;", uuid_str);
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (rc != SQLITE_OK) {
@@ -525,7 +523,6 @@ void aclk_send_alarm_configuration(char *config_hash)
     "module, charts, families, lookup, every, units, green, red, calc, warn, crit, to_key, exec, delay, repeat, info," \
     "options, host_labels, p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after," \
     "p_db_lookup_before, p_update_every FROM alert_hash WHERE hash_id = @hash_id;"
-
 int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash __maybe_unused)
 {
     int rc = 0;
@@ -687,13 +684,11 @@ void aclk_start_alert_streaming(char *node_id, bool resets)
 }
 
 #define SQL_QUEUE_REMOVE_ALERTS "INSERT INTO aclk_alert_%s (alert_unique_id, date_created, filtered_alert_unique_id) " \
-                                "SELECT unique_id alert_unique_id, UNIXEPOCH(), unique_id alert_unique_id FROM health_log " \
-                                "WHERE host_id = @host_id AND new_status = -2 AND updated_by_id = 0 AND unique_id NOT IN " \
-                                "(SELECT alert_unique_id FROM aclk_alert_%s) " \
-                                "AND config_hash_id NOT IN (select hash_id from alert_hash where warn is null and crit is null) " \
-                                "ORDER BY unique_id ASC " \
-                                "ON CONFLICT (alert_unique_id) DO NOTHING;"
-
+    "SELECT hld.unique_id alert_unique_id, UNIXEPOCH(), hld.unique_id alert_unique_id FROM health_log hl, health_log_detail hld " \
+    "WHERE hl.host_id = @host_id AND hl.health_log_id = hld.health_log_id AND hld.new_status = -2 AND hld.updated_by_id = 0 " \
+    "AND hld.unique_id NOT IN (SELECT alert_unique_id FROM aclk_alert_%s) " \
+    "AND hl.config_hash_id NOT IN (select hash_id from alert_hash where warn is null and crit is null) " \
+    "ORDER BY hld.unique_id ASC ON CONFLICT (alert_unique_id) DO NOTHING;"
 void sql_process_queue_removed_alerts_to_aclk(char *node_id)
 {
     struct aclk_sync_host_config *wc;
@@ -1006,7 +1001,6 @@ void sql_aclk_alert_clean_dead_entries(RRDHOST *host)
 #define SQL_GET_MIN_MAX_ALERT_SEQ "SELECT MIN(sequence_id), MAX(sequence_id), " \
                                   "(SELECT MAX(sequence_id) FROM aclk_alert_%s WHERE date_submitted IS NOT NULL) " \
                                   "FROM aclk_alert_%s WHERE date_submitted IS NULL;"
-
 int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert_status)
 {
     int rc;
