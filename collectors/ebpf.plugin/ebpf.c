@@ -540,6 +540,31 @@ ARAL *ebpf_allocate_pid_aral(char *name, size_t size)
  *****************************************************************/
 
 /**
+ * Wait to avoid possible coredumps while process is closing.
+ */
+static inline void ebpf_check_before2go()
+{
+    int i = EBPF_OPTION_ALL_CHARTS;
+    usec_t max = USEC_PER_SEC, step = 200000;
+    while (i && max) {
+        max -= step;
+        sleep_usec(step);
+        i = 0;
+        int j;
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        for (j = 0; ebpf_modules[j].thread_name != NULL; j++) {
+            if (ebpf_modules[j].enabled == NETDATA_THREAD_EBPF_RUNNING)
+                i++;
+        }
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
+    }
+
+    if (i) {
+        error("eBPF cannot unload all threads on time, but it will go away");
+    }
+}
+
+/**
  * Close the collector gracefully
  */
 static void ebpf_exit()
@@ -561,8 +586,10 @@ static void ebpf_exit()
 #ifdef NETDATA_INTERNAL_CHECKS
     error("Good bye world! I was PID %d", main_thread_id);
 #endif
-    printf("DISABLE\n");
+    fprintf(stdout, "EXIT\n");
+    fflush(stdout);
 
+    ebpf_check_before2go();
     pthread_mutex_lock(&mutex_cgroup_shm);
     if (shm_ebpf_cgroup.header) {
         ebpf_unmap_cgroup_shared_memory();
@@ -604,6 +631,10 @@ static void ebpf_unload_unique_maps()
 {
     int i;
     for (i = 0; ebpf_modules[i].thread_name; i++) {
+        // These threads are cleaned with other functions
+        if (i > EBPF_MODULE_SOCKET_IDX)
+            continue;
+
         if (ebpf_modules[i].enabled != NETDATA_THREAD_EBPF_STOPPED) {
             if (ebpf_modules[i].enabled != NETDATA_THREAD_EBPF_NOT_RUNNING)
                 error("Cannot unload maps for thread %s, because it is not stopped.", ebpf_modules[i].thread_name);
@@ -611,73 +642,18 @@ static void ebpf_unload_unique_maps()
             continue;
         }
 
-        ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
-        switch (i) {
-            case EBPF_MODULE_CACHESTAT_IDX: {
-#ifdef LIBBPF_MAJOR_VERSION
-                if (cachestat_bpf_obj)
-                    cachestat_bpf__destroy(cachestat_bpf_obj);
-#endif
-                break;
-            }
-            case EBPF_MODULE_DCSTAT_IDX: {
-#ifdef LIBBPF_MAJOR_VERSION
-                if (dc_bpf_obj)
-                    dc_bpf__destroy(dc_bpf_obj);
-#endif
-                break;
-            }
-            case EBPF_MODULE_FD_IDX: {
-#ifdef LIBBPF_MAJOR_VERSION
-                if (fd_bpf_obj)
-                    fd_bpf__destroy(fd_bpf_obj);
-#endif
-                break;
-            }
-            case EBPF_MODULE_MOUNT_IDX: {
-#ifdef LIBBPF_MAJOR_VERSION
-                if (mount_bpf_obj)
-                    mount_bpf__destroy(mount_bpf_obj);
-#endif
-                break;
-            }
-            case EBPF_MODULE_SHM_IDX: {
-#ifdef LIBBPF_MAJOR_VERSION
-                if (shm_bpf_obj)
-                    shm_bpf__destroy(shm_bpf_obj);
-#endif
-                break;
-            }
-            case EBPF_MODULE_SOCKET_IDX: {
-#ifdef LIBBPF_MAJOR_VERSION
-                if (socket_bpf_obj)
-                    socket_bpf__destroy(socket_bpf_obj);
-#endif
-                break;
-            }
-            case EBPF_MODULE_SWAP_IDX: {
-#ifdef LIBBPF_MAJOR_VERSION
-                if (bpf_obj)
-                    swap_bpf__destroy(bpf_obj);
-#endif
-                break;
-            }
-            case EBPF_MODULE_VFS_IDX: {
-#ifdef LIBBPF_MAJOR_VERSION
-                if (vfs_bpf_obj)
-                    vfs_bpf__destroy(vfs_bpf_obj);
-#endif
-                break;
-            }
-            case EBPF_MODULE_PROCESS_IDX:
-            case EBPF_MODULE_DISK_IDX:
-            case EBPF_MODULE_HARDIRQ_IDX:
-            case EBPF_MODULE_SOFTIRQ_IDX:
-            case EBPF_MODULE_OOMKILL_IDX:
-            case EBPF_MODULE_MDFLUSH_IDX:
-            default:
-                continue;
+        if (ebpf_modules[i].load == EBPF_LOAD_LEGACY) {
+            ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
+            continue;
         }
+
+        if (i == EBPF_MODULE_SOCKET_IDX) {
+#ifdef LIBBPF_MAJOR_VERSION
+            if (socket_bpf_obj)
+                socket_bpf__destroy(socket_bpf_obj);
+#endif
+        }
+
     }
 }
 
@@ -689,11 +665,15 @@ static void ebpf_unload_unique_maps()
 static void ebpf_unload_filesystems()
 {
     if (ebpf_modules[EBPF_MODULE_FILESYSTEM_IDX].enabled == NETDATA_THREAD_EBPF_NOT_RUNNING ||
-        ebpf_modules[EBPF_MODULE_SYNC_IDX].enabled == NETDATA_THREAD_EBPF_RUNNING)
+        ebpf_modules[EBPF_MODULE_FILESYSTEM_IDX].enabled == NETDATA_THREAD_EBPF_RUNNING ||
+        ebpf_modules[EBPF_MODULE_FILESYSTEM_IDX].load != EBPF_LOAD_LEGACY)
         return;
 
     int i;
     for (i = 0; localfs[i].filesystem != NULL; i++) {
+        if (!localfs[i].objects)
+            continue;
+
         ebpf_unload_legacy_code(localfs[i].objects, localfs[i].probe_links);
     }
 }
@@ -711,6 +691,15 @@ static void ebpf_unload_sync()
 
     int i;
     for (i = 0; local_syscalls[i].syscall != NULL; i++) {
+        if (!local_syscalls[i].enabled)
+            continue;
+
+#ifdef LIBBPF_MAJOR_VERSION
+        if (local_syscalls[i].sync_obj) {
+            sync_bpf__destroy(local_syscalls[i].sync_obj);
+            continue;
+        }
+#endif
         ebpf_unload_legacy_code(local_syscalls[i].objects, local_syscalls[i].probe_links);
     }
 }
@@ -753,19 +742,7 @@ static void ebpf_stop_threads(int sig)
 
     ebpf_exit_plugin = 1;
 
-    usec_t max = USEC_PER_SEC, step = 100000;
-    while (i && max) {
-        max -= step;
-        sleep_usec(step);
-        i = 0;
-        int j;
-        pthread_mutex_lock(&ebpf_exit_cleanup);
-        for (j = 0; ebpf_modules[j].thread_name != NULL; j++) {
-            if (ebpf_modules[j].enabled == NETDATA_THREAD_EBPF_RUNNING)
-                i++;
-        }
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
-    }
+    ebpf_check_before2go();
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     ebpf_unload_unique_maps();
@@ -2650,7 +2627,7 @@ int main(int argc, char **argv)
         (void)heartbeat_next(&hb, step);
 
         pthread_mutex_lock(&ebpf_exit_cleanup);
-        if (ebpf_modules[i].enabled == NETDATA_THREAD_EBPF_RUNNING && process_pid_fd != -1) {
+        if (process_pid_fd != -1) {
             pthread_mutex_lock(&collect_data_mutex);
             if (++update_apps_list == update_apps_every) {
                 update_apps_list = 0;
