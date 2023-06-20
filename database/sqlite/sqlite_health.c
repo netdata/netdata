@@ -1502,7 +1502,11 @@ int health_migrate_old_health_log_table(char *table) {
 
     //table should contain guid. We need to
     //keep it in the new table along with it's data
-    //health_log_UUID
+    //health_log_XXXXXXXX_XXXX_XXXX_XXXX_XXXXXXXXXXXX
+    if (strnlen(table, 46) != 46) {
+        return 0;
+    }
+
     char *uuid_from_table = strdupz(table + 11);
     uuid_t uuid;
     if (uuid_parse_fix(uuid_from_table, uuid)) {
@@ -1511,7 +1515,6 @@ int health_migrate_old_health_log_table(char *table) {
     }
 
     int rc;
-
     char command[MAX_HEALTH_SQL_SIZE + 1];
     sqlite3_stmt *res = NULL;
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_COPY_HEALTH_LOG(table));
