@@ -1049,13 +1049,11 @@ ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
             if(errno == EINTR || errno == EAGAIN)
                 continue;
 
-            internal_error(true, "%s(): failed -1", __FUNCTION__ );
             return -1;
         }
 
         if(!retval) {
             // timeout
-            internal_error(true, "%s(): timeout 0", __FUNCTION__ );
             return 0;
         }
 
@@ -1065,7 +1063,6 @@ ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
 
 #ifdef ENABLE_HTTPS
     if (SSL_connection(ssl)) {
-        internal_error(true, "%s(): calling SSL read", __FUNCTION__ );
         return netdata_ssl_read(ssl, buf, len);
     }
 #endif
