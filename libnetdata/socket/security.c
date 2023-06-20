@@ -231,6 +231,7 @@ ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num) {
 
     if(unlikely(bytes <= 0)) {
         int err = SSL_get_error(ssl->conn, bytes);
+        internal_error(true, "%s() returned %d, err is %d", __FUNCTION__, bytes, err);
         netdata_ssl_log_error_queue("SSL_read", ssl);
         if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
             ssl->ssl_errno = err;
