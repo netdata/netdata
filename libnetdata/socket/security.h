@@ -65,7 +65,6 @@ bool netdata_ssl_accept(NETDATA_SSL *ssl);
 
 bool netdata_ssl_open(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd);
 void netdata_ssl_close(NETDATA_SSL *ssl);
-void netdata_ssl_log_error_queue(const char *call, NETDATA_SSL *ssl);
 
 ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num);
 ssize_t netdata_ssl_write(NETDATA_SSL *ssl, const void *buf, size_t num);
