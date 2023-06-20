@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- RW\_SPINLOCK: recursive readers support [\#15217](https://github.com/netdata/netdata/pull/15217) ([ktsaou](https://github.com/ktsaou))
 - Fix health crash [\#15209](https://github.com/netdata/netdata/pull/15209) ([stelfrag](https://github.com/stelfrag))
 - Fix file permissions under directory [\#15208](https://github.com/netdata/netdata/pull/15208) ([stelfrag](https://github.com/stelfrag))
 - RocketChat cloud integration docs [\#15205](https://github.com/netdata/netdata/pull/15205) ([car12o](https://github.com/car12o))
@@ -406,8 +407,6 @@
 - pandas collector add `read_sql()` support [\#14563](https://github.com/netdata/netdata/pull/14563) ([andrewm4894](https://github.com/andrewm4894))
 - reviewed plans page to be according to latest updates [\#14560](https://github.com/netdata/netdata/pull/14560) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Fix kickstart link [\#14559](https://github.com/netdata/netdata/pull/14559) ([cakrit](https://github.com/cakrit))
-- Make secure nodes a category landing page [\#14558](https://github.com/netdata/netdata/pull/14558) ([cakrit](https://github.com/cakrit))
-- Add misc landing page and move proxy guides [\#14557](https://github.com/netdata/netdata/pull/14557) ([cakrit](https://github.com/cakrit))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 

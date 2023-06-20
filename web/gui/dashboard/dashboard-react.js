@@ -470,7 +470,7 @@ const fixHost = (host) => {
     host = host.substring(0, host.length - 1);
   }
 
-  return host;
+  return host.replace(/\/v1\/?$/, "");
 }
 
 NETDATA.chartRegistry = {
@@ -555,7 +555,7 @@ NETDATA.fixHost = function (host) {
     host = host.substring(0, host.length - 1);
   }
 
-  return host;
+  return host.replace(/\/v1\/?$/, "");
 };
 
 
