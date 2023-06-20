@@ -234,11 +234,12 @@ ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num) {
 
     if(unlikely(bytes <= 0)) {
         int err = SSL_get_error(ssl->conn, bytes);
-        netdata_ssl_log_error_queue("SSL_read", ssl, err);
         if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
             ssl->ssl_errno = err;
             errno = EWOULDBLOCK;
         }
+        else
+            netdata_ssl_log_error_queue("SSL_read", ssl, err);
 
         bytes = -1;  // according to read() or recv()
     }
@@ -270,11 +271,12 @@ ssize_t netdata_ssl_write(NETDATA_SSL *ssl, const void *buf, size_t num) {
 
     if(unlikely(bytes <= 0)) {
         int err = SSL_get_error(ssl->conn, bytes);
-        netdata_ssl_log_error_queue("SSL_write", ssl, err);
         if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
             ssl->ssl_errno = err;
             errno = EWOULDBLOCK;
         }
+        else
+            netdata_ssl_log_error_queue("SSL_write", ssl, err);
 
         bytes = -1; // according to write() or send()
     }
