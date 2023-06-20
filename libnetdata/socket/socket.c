@@ -1052,19 +1052,22 @@ ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
             return -1;
         }
 
-        if(!retval)
+        if(!retval) {
             // timeout
             return 0;
+        }
 
         if(fd.revents & POLLIN)
             break;
     }
 
 #ifdef ENABLE_HTTPS
-    if (SSL_connection(ssl))
+    if (SSL_connection(ssl)) {
         return netdata_ssl_read(ssl, buf, len);
+    }
 #endif
 
+    internal_error(true, "%s(): calling recv()", __FUNCTION__ );
     return recv(sockfd, buf, len, flags);
 }
 

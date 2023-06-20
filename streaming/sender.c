@@ -554,7 +554,7 @@ static bool rrdpush_sender_connect_ssl(struct sender_state *s) {
         return true;
     }
 
-    // failed to establish connection
+    error("SSL: failed to establish connection.");
     return false;
 
 #else
@@ -708,7 +708,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     if(!rrdpush_sender_connect_ssl(s))
         return false;
 
-    ssize_t bytes;
+    ssize_t bytes, len = strlen(http);
 
     bytes = send_timeout(
 #ifdef ENABLE_HTTPS
@@ -716,7 +716,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
 #endif
         s->rrdpush_sender_socket,
         http,
-        strlen(http),
+        len,
         0,
         timeout);
 
@@ -729,8 +729,6 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
         host->destination->postpone_reconnection_until = now_realtime_sec() + 1 * 60;
         return false;
     }
-
-    // info("STREAM %s [send to %s]: waiting response from remote netdata...", rrdhost_hostname(host), s->connected_to);
 
     bytes = recv_timeout(
 #ifdef ENABLE_HTTPS

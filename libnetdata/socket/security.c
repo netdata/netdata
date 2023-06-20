@@ -23,80 +23,19 @@ static SOCKET_PEERS netdata_ssl_peers(NETDATA_SSL *ssl) {
     return socket_peers(sock_fd);
 }
 
-bool netdata_ssl_open(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd) {
-    errno = 0;
-    ssl->ssl_errno = 0;
-
-    if(ssl->conn) {
-        if(!ctx || SSL_get_SSL_CTX(ssl->conn) != ctx) {
-            SSL_free(ssl->conn);
-            ssl->conn = NULL;
-        }
-        else if (SSL_clear(ssl->conn) == 0) {
-            netdata_ssl_log_error_queue("SSL_clear", ssl);
-            SSL_free(ssl->conn);
-            ssl->conn = NULL;
-        }
-    }
-
-    if(!ssl->conn) {
-        if(!ctx) {
-            internal_error(true, "SSL: not CTX given");
-            ssl->state = NETDATA_SSL_STATE_FAILED;
-            return false;
-        }
-
-        ssl->conn = SSL_new(ctx);
-        if (!ssl->conn) {
-            netdata_ssl_log_error_queue("SSL_new", ssl);
-            ssl->state = NETDATA_SSL_STATE_FAILED;
-            return false;
-        }
-    }
-
-    if(SSL_set_fd(ssl->conn, fd) != 1) {
-        netdata_ssl_log_error_queue("SSL_set_fd", ssl);
-        ssl->state = NETDATA_SSL_STATE_FAILED;
-        return false;
-    }
-
-    ssl->state = NETDATA_SSL_STATE_INIT;
-
-    ERR_clear_error();
-
-    return true;
-}
-
-void netdata_ssl_close(NETDATA_SSL *ssl) {
-    errno = 0;
-    ssl->ssl_errno = 0;
-
-    if(ssl->conn) {
-        if(SSL_connection(ssl)) {
-            int ret = SSL_shutdown(ssl->conn);
-            if(ret == 0)
-                SSL_shutdown(ssl->conn);
-        }
-
-        SSL_free(ssl->conn);
-
-        ERR_clear_error();
-    }
-
-    *ssl = NETDATA_SSL_UNSET_CONNECTION;
-}
-
-void netdata_ssl_log_error_queue(const char *call, NETDATA_SSL *ssl) {
+static void netdata_ssl_log_error_queue(const char *call, NETDATA_SSL *ssl, unsigned long err) {
     error_limit_static_thread_var(erl, 1, 0);
-    unsigned long err;
-    while((err = ERR_get_error())) {
+
+    if(err == SSL_ERROR_NONE)
+        err = ERR_get_error();
+
+    if(err == SSL_ERROR_NONE)
+        return;
+
+    do {
         char *code;
 
         switch (err) {
-            case SSL_ERROR_NONE:
-                code = "SSL_ERROR_NONE";
-                break;
-
             case SSL_ERROR_SSL:
                 code = "SSL_ERROR_SSL";
                 ssl->state = NETDATA_SSL_STATE_FAILED;
@@ -166,7 +105,71 @@ void netdata_ssl_log_error_queue(const char *call, NETDATA_SSL *ssl) {
         SOCKET_PEERS peers = netdata_ssl_peers(ssl);
         error_limit(&erl, "SSL: %s() on socket local [[%s]:%d] <-> remote [[%s]:%d], returned error %lu (%s): %s",
                     call, peers.local.ip, peers.local.port, peers.peer.ip, peers.peer.port, err, code, str);
+
+    } while((err = ERR_get_error()));
+}
+
+bool netdata_ssl_open(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd) {
+    errno = 0;
+    ssl->ssl_errno = 0;
+
+    if(ssl->conn) {
+        if(!ctx || SSL_get_SSL_CTX(ssl->conn) != ctx) {
+            SSL_free(ssl->conn);
+            ssl->conn = NULL;
+        }
+        else if (SSL_clear(ssl->conn) == 0) {
+            netdata_ssl_log_error_queue("SSL_clear", ssl, SSL_ERROR_NONE);
+            SSL_free(ssl->conn);
+            ssl->conn = NULL;
+        }
     }
+
+    if(!ssl->conn) {
+        if(!ctx) {
+            internal_error(true, "SSL: not CTX given");
+            ssl->state = NETDATA_SSL_STATE_FAILED;
+            return false;
+        }
+
+        ssl->conn = SSL_new(ctx);
+        if (!ssl->conn) {
+            netdata_ssl_log_error_queue("SSL_new", ssl, SSL_ERROR_NONE);
+            ssl->state = NETDATA_SSL_STATE_FAILED;
+            return false;
+        }
+    }
+
+    if(SSL_set_fd(ssl->conn, fd) != 1) {
+        netdata_ssl_log_error_queue("SSL_set_fd", ssl, SSL_ERROR_NONE);
+        ssl->state = NETDATA_SSL_STATE_FAILED;
+        return false;
+    }
+
+    ssl->state = NETDATA_SSL_STATE_INIT;
+
+    ERR_clear_error();
+
+    return true;
+}
+
+void netdata_ssl_close(NETDATA_SSL *ssl) {
+    errno = 0;
+    ssl->ssl_errno = 0;
+
+    if(ssl->conn) {
+        if(SSL_connection(ssl)) {
+            int ret = SSL_shutdown(ssl->conn);
+            if(ret == 0)
+                SSL_shutdown(ssl->conn);
+        }
+
+        SSL_free(ssl->conn);
+
+        ERR_clear_error();
+    }
+
+    *ssl = NETDATA_SSL_UNSET_CONNECTION;
 }
 
 static inline bool is_handshake_complete(NETDATA_SSL *ssl, const char *op) {
@@ -231,11 +234,12 @@ ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num) {
 
     if(unlikely(bytes <= 0)) {
         int err = SSL_get_error(ssl->conn, bytes);
-        netdata_ssl_log_error_queue("SSL_read", ssl);
         if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
             ssl->ssl_errno = err;
             errno = EWOULDBLOCK;
         }
+        else
+            netdata_ssl_log_error_queue("SSL_read", ssl, err);
 
         bytes = -1;  // according to read() or recv()
     }
@@ -267,11 +271,12 @@ ssize_t netdata_ssl_write(NETDATA_SSL *ssl, const void *buf, size_t num) {
 
     if(unlikely(bytes <= 0)) {
         int err = SSL_get_error(ssl->conn, bytes);
-        netdata_ssl_log_error_queue("SSL_write", ssl);
         if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
             ssl->ssl_errno = err;
             errno = EWOULDBLOCK;
         }
+        else
+            netdata_ssl_log_error_queue("SSL_write", ssl, err);
 
         bytes = -1; // according to write() or send()
     }
@@ -353,7 +358,8 @@ bool netdata_ssl_connect(NETDATA_SSL *ssl) {
     }
 
     if (err != 1) {
-        netdata_ssl_log_error_queue("SSL_connect", ssl);
+        err = SSL_get_error(ssl->conn, err);
+        netdata_ssl_log_error_queue("SSL_connect", ssl, err);
         ssl->state = NETDATA_SSL_STATE_FAILED;
         return false;
     }
@@ -378,7 +384,8 @@ bool netdata_ssl_accept(NETDATA_SSL *ssl) {
     }
 
     if (err != 1) {
-        netdata_ssl_log_error_queue("SSL_accept", ssl);
+        err = SSL_get_error(ssl->conn, err);
+        netdata_ssl_log_error_queue("SSL_accept", ssl, err);
         ssl->state = NETDATA_SSL_STATE_FAILED;
         return false;
     }
