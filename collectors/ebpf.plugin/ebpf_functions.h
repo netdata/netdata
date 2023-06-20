@@ -18,6 +18,9 @@
 #define EBPF_THREADS_ENABLE_CATEGORY "enable:"
 #define EBPF_THREADS_DISABLE_CATEGORY "disable:"
 
+#define EBPF_THREAD_STATUS_RUNNING "running"
+#define EBPF_THREAD_STATUS_STOPPED "stopped"
+
 void *ebpf_function_thread(void *ptr);
 
 #endif

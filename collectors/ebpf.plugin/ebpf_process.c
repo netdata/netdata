@@ -68,7 +68,6 @@ struct config process_config = { .first_section = NULL,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
 
-static char *threads_stat[NETDATA_EBPF_THREAD_STAT_END] = {"total", "running"};
 static char *load_event_stat[NETDATA_EBPF_LOAD_STAT_END] = {"legacy", "co-re"};
 static char *memlock_stat = {"memory_locked"};
 static char *hash_table_stat = {"hash_table"};
@@ -449,13 +448,12 @@ static inline void ebpf_create_statistic_thread_chart(ebpf_module_t *em)
                          em->update_every,
                          NETDATA_EBPF_MODULE_NAME_PROCESS);
 
-    ebpf_write_global_dimension(threads_stat[NETDATA_EBPF_THREAD_STAT_TOTAL],
-                                threads_stat[NETDATA_EBPF_THREAD_STAT_TOTAL],
-                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
-
-    ebpf_write_global_dimension(threads_stat[NETDATA_EBPF_THREAD_STAT_RUNNING],
-                                threads_stat[NETDATA_EBPF_THREAD_STAT_RUNNING],
-                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+    int i;
+    for (i = 0; ebpf_modules[i].thread_name; i++) {
+        ebpf_write_global_dimension((char *)ebpf_modules[i].thread_name,
+                                    (char *)ebpf_modules[i].thread_name,
+                                    ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+    }
 }
 
 /**
@@ -1058,8 +1056,11 @@ void ebpf_send_statistic_data()
         return;
 
     write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_THREADS);
-    write_chart_dimension(threads_stat[NETDATA_EBPF_THREAD_STAT_TOTAL], (long long)plugin_statistics.threads);
-    write_chart_dimension(threads_stat[NETDATA_EBPF_THREAD_STAT_RUNNING], (long long)plugin_statistics.running);
+    int i;
+    for (i = 0; ebpf_modules[i].thread_name; i++) {
+        ebpf_module_t *wem = &ebpf_modules[i];
+        write_chart_dimension((char *)wem->thread_name, (wem->enabled != NETDATA_THREAD_EBPF_NOT_RUNNING) ? 1 : 0);
+    }
     write_end_chart();
 
     write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_LOAD_METHOD);

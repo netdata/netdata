@@ -179,8 +179,8 @@ static void ebpf_function_thread_manipulation(const char *transaction,
         // enabled
         buffer_json_add_array_item_string(wb,
                                           (wem->enabled != NETDATA_THREAD_EBPF_NOT_RUNNING) ?
-                                          "running":
-                                          "stopped");
+                                          EBPF_THREAD_STATUS_RUNNING:
+                                          EBPF_THREAD_STATUS_STOPPED);
 
         buffer_json_array_close(wb);
     }

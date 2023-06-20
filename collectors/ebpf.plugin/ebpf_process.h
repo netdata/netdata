@@ -41,14 +41,6 @@
 
 #define NETDATA_EBPF_CGROUP_UPDATE 30
 
-// Statistical information
-enum netdata_ebpf_thread_stats{
-    NETDATA_EBPF_THREAD_STAT_TOTAL,
-    NETDATA_EBPF_THREAD_STAT_RUNNING,
-
-    NETDATA_EBPF_THREAD_STAT_END
-};
-
 enum netdata_ebpf_load_mode_stats{
     NETDATA_EBPF_LOAD_STAT_LEGACY,
     NETDATA_EBPF_LOAD_STAT_CORE,
