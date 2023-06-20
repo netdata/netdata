@@ -710,7 +710,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     if(!rrdpush_sender_connect_ssl(s))
         return false;
 
-    ssize_t bytes;
+    ssize_t bytes, len = strlen(http);
 
     bytes = send_timeout(
 #ifdef ENABLE_HTTPS
@@ -718,7 +718,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
 #endif
         s->rrdpush_sender_socket,
         http,
-        strlen(http),
+        len,
         0,
         timeout);
 
@@ -732,7 +732,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
         return false;
     }
 
-    internal_error(true, "STREAM: sent %zd bytes. Waiting %d secs for a response", bytes, timeout);
+    internal_error(true, "STREAM: sent %zd/%zd bytes. Waiting %d secs for a response", bytes, len, timeout);
     // info("STREAM %s [send to %s]: waiting response from remote netdata...", rrdhost_hostname(host), s->connected_to);
 
     bytes = recv_timeout(
