@@ -313,7 +313,7 @@ typedef struct ebpf_module {
     uint32_t life_time;
 } ebpf_module_t;
 
-#define EBPF_LIFE_TIME 600
+#define EBPF_LIFE_TIME 300
 #define EBPF_NON_FUNCTION_LIFE_TIME 86400
 
 int ebpf_get_kernel_version();
