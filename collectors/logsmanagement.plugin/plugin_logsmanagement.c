@@ -322,10 +322,10 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
                     "      \"error_code\": %d,\n"
                     "      \"error\": \"",
                     query_params.num_lines,
-                    end.ru_utime.tv_sec * 1000000ULL + end.ru_utime.tv_usec - 
-                    start.ru_utime.tv_sec * 1000000ULL - start.ru_utime.tv_usec,
-                    end.ru_stime.tv_sec * 1000000ULL + end.ru_stime.tv_usec - 
-                    start.ru_stime.tv_sec * 1000000ULL - start.ru_stime.tv_usec,
+                    end.ru_utime.tv_sec * USEC_PER_SEC + end.ru_utime.tv_usec - 
+                    start.ru_utime.tv_sec * USEC_PER_SEC - start.ru_utime.tv_usec,
+                    end.ru_stime.tv_sec * USEC_PER_SEC + end.ru_stime.tv_usec - 
+                    start.ru_stime.tv_sec * USEC_PER_SEC - start.ru_stime.tv_usec,
                     err_code
     );
     switch(err_code){

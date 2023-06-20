@@ -1604,13 +1604,13 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
     buffer_strcat(w->response.data, "\n\t],\n");
     buffer_sprintf(w->response.data, "\t\"num_lines\": %lu,\n", query_params.num_lines);
     getrusage(RUSAGE_THREAD, &end);
-    buffer_sprintf(w->response.data, "\t\"user_time\": %llu,\n", end.ru_utime.tv_sec * 1000000ULL + 
+    buffer_sprintf(w->response.data, "\t\"user_time\": %llu,\n", end.ru_utime.tv_sec * USEC_PER_SEC + 
                                                                  end.ru_utime.tv_usec - 
-                                                                 start.ru_utime.tv_sec * 1000000ULL -
+                                                                 start.ru_utime.tv_sec * USEC_PER_SEC -
                                                                  start.ru_utime.tv_usec);
-    buffer_sprintf(w->response.data, "\t\"system_time\": %llu,\n", end.ru_stime.tv_sec * 1000000ULL + 
+    buffer_sprintf(w->response.data, "\t\"system_time\": %llu,\n", end.ru_stime.tv_sec * USEC_PER_SEC + 
                                                                    end.ru_stime.tv_usec - 
-                                                                   start.ru_stime.tv_sec * 1000000ULL -
+                                                                   start.ru_stime.tv_sec * USEC_PER_SEC -
                                                                    start.ru_stime.tv_usec);
     buffer_sprintf(w->response.data, "\t\"error_code\": %d,\n", err_code);
     buffer_sprintf(w->response.data, "\t\"error\": \"");
