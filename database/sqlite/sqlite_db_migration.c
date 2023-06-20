@@ -235,7 +235,7 @@ static int do_migration_v8_v9(sqlite3 *database, const char *name)
               "updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, " \
               "flags int, exec_run_timestamp int, delay_up_to_timestamp int, " \
               "info text, exec_code int, new_status real, old_status real, delay int, " \
-              "new_value double, old_value double, last_repeat int, transition_id blob, global_id int);");
+              "new_value double, old_value double, last_repeat int, transition_id blob, global_id int, host_id blob);");
     sqlite3_exec_monitored(database, sql, 0, 0, NULL);
 
     snprintfz(sql, 2047, "CREATE INDEX IF NOT EXISTS health_log_d_ind_1 ON health_log_detail (unique_id);");
@@ -278,6 +278,9 @@ static int do_migration_v8_v9(sqlite3 *database, const char *name)
     }
     dfe_done(table);
     dictionary_destroy(dict_tables);
+
+    snprintfz(sql, 2047, "ALTER TABLE health_log_detail DROP COLUMN host_id;");
+    sqlite3_exec_monitored(database, sql, 0, 0, NULL);
 
     return 0;
 }

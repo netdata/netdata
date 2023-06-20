@@ -1490,11 +1490,10 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
     buffer_free(command);
 }
 
-//MUST MAKE SURE THERE IS A TRANSACTION_ID FOR ALL
 #define SQL_COPY_HEALTH_LOG(table) "INSERT OR IGNORE INTO health_log (host_id, alarm_id, config_hash_id, name, chart, family, exec, recipient, units, chart_context) SELECT ?1, alarm_id, config_hash_id, name, chart, family, exec, recipient, units, chart_context from %s;", table
-#define SQL_COPY_HEALTH_LOG_DETAIL(table) "INSERT INTO health_log_detail (unique_id, alarm_id, alarm_event_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, transition_id, global_id) SELECT unique_id, alarm_id, alarm_event_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, transition_id, now_usec(1) from %s;", table
+#define SQL_COPY_HEALTH_LOG_DETAIL(table) "INSERT INTO health_log_detail (unique_id, alarm_id, alarm_event_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, transition_id, global_id, host_id) SELECT unique_id, alarm_id, alarm_event_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, transition_id, now_usec(1), ?1 from %s;", table
 #define SQL_UPDATE_HEALTH_LOG_DETAIL_TRANSITION_ID "update health_log_detail set transition_id = uuid_random() where transition_id is null;"
-#define SQL_UPDATE_HEALTH_LOG_DETAIL_HEALTH_LOG_ID "update health_log_detail set health_log_id = (select health_log_id from health_log where host_id = ?1 and alarm_id = health_log_detail.alarm_id);"
+#define SQL_UPDATE_HEALTH_LOG_DETAIL_HEALTH_LOG_ID "update health_log_detail set health_log_id = (select health_log_id from health_log where host_id = ?1 and alarm_id = health_log_detail.alarm_id) where health_log_id is null and host_id = ?2;"
 #define SQL_UPDATE_HEALTH_LOG_LAST_TRANSITION_ID "update health_log set last_transition_id = (select transition_id from health_log_detail where health_log_id = health_log.health_log_id and alarm_id = health_log.alarm_id group by (alarm_id) having max(alarm_event_id)) where host_id = ?1;"
 int health_migrate_old_health_log_table(char *table) {
     if (!table)
@@ -1551,12 +1550,21 @@ int health_migrate_old_health_log_table(char *table) {
         return 0;
     }
 
+    rc = sqlite3_bind_blob(res, 1, &uuid, sizeof(uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        rc = sqlite3_finalize(res);
+        if (unlikely(rc != SQLITE_OK))
+            error_report("Failed to reset statement to copy health log detail, rc = %d", rc);
+        return 0;
+    }
+
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
         error_report("Failed to execute SQL_COPY_HEALTH_LOG_DETAIL, rc = %d", rc);
         rc = sqlite3_finalize(res);
         if (unlikely(rc != SQLITE_OK))
             error_report("Failed to reset statement to copy health log detail table, rc = %d", rc);
+        return 0;
     }
 
     //update transition ids
@@ -1572,6 +1580,7 @@ int health_migrate_old_health_log_table(char *table) {
         rc = sqlite3_finalize(res);
         if (unlikely(rc != SQLITE_OK))
             error_report("Failed to reset statement to update health log detail table with transition ids, rc = %d", rc);
+        return 0;
     }
 
     //update health_log_id
@@ -1582,6 +1591,14 @@ int health_migrate_old_health_log_table(char *table) {
     }
 
     rc = sqlite3_bind_blob(res, 1, &uuid, sizeof(uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        rc = sqlite3_finalize(res);
+        if (unlikely(rc != SQLITE_OK))
+            error_report("Failed to reset statement to update health log detail with health log ids, rc = %d", rc);
+        return 0;
+    }
+
+    rc = sqlite3_bind_blob(res, 2, &uuid, sizeof(uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         rc = sqlite3_finalize(res);
         if (unlikely(rc != SQLITE_OK))
