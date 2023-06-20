@@ -235,6 +235,7 @@ ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num) {
         if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
             ssl->ssl_errno = err;
             errno = EWOULDBLOCK;
+            internal_error(true, "%s() would block", __FUNCTION__);
         }
 
         bytes = -1;  // according to read() or recv()
