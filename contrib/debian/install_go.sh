@@ -36,30 +36,13 @@ download_go() {
 }
 
 install_go() {
-	ARCH_MAP=(
-		'i386::386'
-		'i686::386'
-		'x86_64::amd64'
-		'aarch64::arm64'
-		'armv64::arm64'
-		'armv6l::arm'
-		'armv7l::arm'
-		'armv5tel::arm'
-	)
-
 	if [ -z "${NETDATA_DISABLE_GO+x}" ]; then
-		echo >&2 "Install go.d.plugin"
-		ARCH="${DEB_TARGET_ARCH}"
-		OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+	  ARCH="${DEB_TARGET_ARCH}"
+	  ARCH=${ARCH#i} # i386 => 386
+	  OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 
-		for index in "${ARCH_MAP[@]}" ; do
-			KEY="${index%%::*}"
-			VALUE="${index##*::}"
-			if [ "$KEY" = "$ARCH" ]; then
-				ARCH="${VALUE}"
-				break
-			fi
-		done
+		echo >&2 "Install go.d.plugin (ARCH=${ARCH}, OS=${OS})"
+
 		tmp=$(mktemp -d /tmp/netdata-go-XXXXXX)
 		GO_PACKAGE_BASENAME="go.d.plugin-${GO_PACKAGE_VERSION}.${OS}-${ARCH}.tar.gz"
 		download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/${GO_PACKAGE_BASENAME}" "${tmp}/${GO_PACKAGE_BASENAME}"
