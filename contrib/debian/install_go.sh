@@ -36,9 +36,22 @@ download_go() {
 }
 
 install_go() {
+  ARCH_MAP=(
+    'i386::386'
+    'armhf::arm64'
+  )
   if [ -z "${NETDATA_DISABLE_GO+x}" ]; then
     ARCH="${DEB_TARGET_ARCH}"
-    ARCH=${ARCH#i} # i386 => 386
+
+    for index in "${ARCH_MAP[@]}" ; do
+      KEY="${index%%::*}"
+      VALUE="${index##*::}"
+      if [ "$KEY" = "$ARCH" ]; then
+        ARCH="${VALUE}"
+        break
+      fi
+    done
+
     OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 
     echo >&2 "Install go.d.plugin (ARCH=${ARCH}, OS=${OS})"
