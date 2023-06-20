@@ -2001,6 +2001,10 @@ ssize_t web_client_receive(struct web_client *w)
         debug(D_WEB_CLIENT, "%llu: Received %zd bytes.", w->id, bytes);
         debug(D_WEB_DATA, "%llu: Received data: '%s'.", w->id, &w->response.data->buffer[old]);
     }
+    else if(unlikely(bytes < 0 && errno == EWOULDBLOCK)) {
+        web_client_enable_wait_receive(w);
+        return 0;
+    }
     else if (bytes < 0) {
         debug(D_WEB_CLIENT, "%llu: receive data failed.", w->id);
         WEB_CLIENT_IS_DEAD(w);
