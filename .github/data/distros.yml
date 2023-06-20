@@ -184,6 +184,11 @@ include:
       <<: *opensuse_packages
       repo_distro: opensuse/15.5
 
+  - <<: *opensuse
+    version: "tumbleweed"
+    eol_check: false
+    base_image: opensuse/tumbleweed:latest
+
   - &oracle
     distro: oraclelinux
     version: "8"
