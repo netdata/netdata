@@ -555,7 +555,7 @@ static bool rrdpush_sender_connect_ssl(struct sender_state *s) {
         return true;
     }
 
-    // failed to establish connection
+    error("SSL: failed to establish connection.");
     return false;
 
 #else
