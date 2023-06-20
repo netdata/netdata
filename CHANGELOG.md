@@ -9,8 +9,13 @@
 - Fix health crash [\#15209](https://github.com/netdata/netdata/pull/15209) ([stelfrag](https://github.com/stelfrag))
 - Fix file permissions under directory [\#15208](https://github.com/netdata/netdata/pull/15208) ([stelfrag](https://github.com/stelfrag))
 - RocketChat cloud integration docs [\#15205](https://github.com/netdata/netdata/pull/15205) ([car12o](https://github.com/car12o))
+- Obvious memory reductions [\#15204](https://github.com/netdata/netdata/pull/15204) ([ktsaou](https://github.com/ktsaou))
 - sqlite\_health.c: remove `uuid.h` include [\#15195](https://github.com/netdata/netdata/pull/15195) ([nandahkrishna](https://github.com/nandahkrishna))
 - RPM: Added elfutils-libelf-devel for build with eBPF \(again\) [\#15192](https://github.com/netdata/netdata/pull/15192) ([k0ste](https://github.com/k0ste))
+- Speed up eBPF exit before to bring functions [\#15187](https://github.com/netdata/netdata/pull/15187) ([thiagoftsm](https://github.com/thiagoftsm))
+- Add two functions that allow someone to start/stop ML. [\#15185](https://github.com/netdata/netdata/pull/15185) ([vkalintiris](https://github.com/vkalintiris))
+- Fix issues in sync thread \(eBPF plugin\) [\#15174](https://github.com/netdata/netdata/pull/15174) ([thiagoftsm](https://github.com/thiagoftsm))
+- /api/v2/nodes and streaming function [\#15168](https://github.com/netdata/netdata/pull/15168) ([ktsaou](https://github.com/ktsaou))
 - Redirect to index.html when a file is not found by web server [\#15143](https://github.com/netdata/netdata/pull/15143) ([MrZammler](https://github.com/MrZammler))
 - Consistently start the agent as root and rely on it to drop privileges properly. [\#14890](https://github.com/netdata/netdata/pull/14890) ([Ferroin](https://github.com/Ferroin))
 
@@ -403,13 +408,6 @@
 - Fix kickstart link [\#14559](https://github.com/netdata/netdata/pull/14559) ([cakrit](https://github.com/cakrit))
 - Make secure nodes a category landing page [\#14558](https://github.com/netdata/netdata/pull/14558) ([cakrit](https://github.com/cakrit))
 - Add misc landing page and move proxy guides [\#14557](https://github.com/netdata/netdata/pull/14557) ([cakrit](https://github.com/cakrit))
-- Reorg learn 021723 [\#14556](https://github.com/netdata/netdata/pull/14556) ([cakrit](https://github.com/cakrit))
-- Update email notification docs with info about setup in Docker. [\#14555](https://github.com/netdata/netdata/pull/14555) ([Ferroin](https://github.com/Ferroin))
-- Fix broken links in integrations-overview [\#14554](https://github.com/netdata/netdata/pull/14554) ([Ancairon](https://github.com/Ancairon))
-- Add vnodes default configuration file. [\#14553](https://github.com/netdata/netdata/pull/14553) ([Ferroin](https://github.com/Ferroin))
-- RPM: Added elfutils-libelf-devel for build with eBPF [\#14552](https://github.com/netdata/netdata/pull/14552) ([k0ste](https://github.com/k0ste))
-- More reorg learn 021623 [\#14550](https://github.com/netdata/netdata/pull/14550) ([cakrit](https://github.com/cakrit))
-- Update learn path of python plugin readme [\#14549](https://github.com/netdata/netdata/pull/14549) ([cakrit](https://github.com/cakrit))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
