@@ -453,7 +453,7 @@ Web_log_parser_config_t *read_web_log_parser_config(const char *log_format, cons
  * @param[out] log_line_parsed Struct that stores the results of parsing.
  */
 UNIT_STATIC void parse_web_log_line(const Web_log_parser_config_t *wblp_config, 
-                                    char *line, const size_t line_len, 
+                                    char *line, size_t line_len, 
                                     Log_line_parsed_t *log_line_parsed){
 
     /* Read parsing configuration */
@@ -462,23 +462,22 @@ UNIT_STATIC void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
     const char delimiter = wblp_config->delimiter;
     const int verify = wblp_config->verify_parsed_logs;
 
+    /* Consume new lines and spaces at end of line */
+    for(; line[line_len-1] == '\n' || line[line_len-1] == '\r' || line[line_len-1] == ' '; line_len--);
+
     char *field = line;
     char *offset = line;
     size_t field_size = 0;
 
     for(int i = 0; i < num_fields_config; i++ ){
         
-        /* Find offset boundaries of next token in line */
-        if(unlikely(*field == '"')) { field++; offset++; }; // Remove any double quotes
-        while(  *offset != '"' && 
-                *offset != delimiter && 
-                ((size_t)(offset - line) < line_len - 1)
-                // *offset != '\n' &&
-                // *offset != '\0' &&
-                // *offset != '\r'
-                ) { offset++; };
+        /* Consume double quotes and extra delimiters at beginning of field */
+        while(*field == '"' || *field == delimiter) field++, offset++;
+
+        /* Find offset boundaries of next field in line */
+        while(*offset != delimiter && ((size_t)(offset - line) < line_len)) offset++;
         
-        if((size_t) (offset - line) >= line_len) break;
+        if(unlikely(*(offset - 1) == '"')) offset--;
 
         field_size = (size_t) (offset - field);
 
@@ -761,16 +760,9 @@ UNIT_STATIC void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
             }
             
             if(fields_format[i] == REQ) {
-                if(*offset == '"') offset++;
-                if(*offset != '\n' && *offset != '\r') {
-                    while(*(offset + 1) == delimiter) {offset++;}; // Consume extra whitespace characters
-                }
+                while(*(offset + 1) == delimiter) offset++; // Consume extra whitespace characters
                 field = ++offset; 
-                if(*field == '"') { field++; offset++; }; // Remove any double quotes
-                while(  *offset != '"' && 
-                        *offset != delimiter && 
-                        *offset != '\n' && 
-                        *offset != '\r') { offset++; };
+                while(*offset != delimiter && ((size_t)(offset - line) < line_len)) offset++;
                 field_size = (size_t) (offset - field);
             } 
             else goto next_item;
@@ -795,16 +787,9 @@ UNIT_STATIC void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
             #endif
 
             if(fields_format[i] == REQ) {
-                if(*offset == '"') offset++;
-                if(*offset != '\n' && *offset != '\r') {
-                    while(*(offset + 1) == delimiter) {offset++;}; // Consume extra whitespace characters
-                }
+                while(*(offset + 1) == delimiter) offset++; // Consume extra whitespace characters
                 field = ++offset; 
-                if(*field == '"') { field++; offset++; }; // Remove any double quotes
-                while(  *offset != '"' && 
-                        *offset != delimiter && 
-                        *offset != '\n' && 
-                        *offset != '\r') { offset++; };
+                while(*offset != delimiter && ((size_t)(offset - line) < line_len)) offset++;
                 field_size = (size_t) (offset - field);
             } 
             else goto next_item;
@@ -1251,14 +1236,9 @@ UNIT_STATIC void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
         }
 
 next_item:
-        /* Consume closing double quotes */
-        if(unlikely(*offset == '"')) offset++;
-
-        // /* Consume extra whitespace characters */
-        // if( *offset != '\n' && 
-        //     *offset != '\0' && 
-        //     *offset != '\r') {while(*(offset + 1) == delimiter) {offset++;};} 
-        // else break;
+        /* If offset is located beyond the end of the line, terminate parsing */
+        if(unlikely((size_t) (offset - line) >= line_len)) break;
+        
         field = ++offset;
     }
 }
