@@ -720,7 +720,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
 #ifdef NETDATA_INTERNAL_CHECKS
     info("STREAM '%s' [receive from [%s]:%s]: "
          "client willing to stream metrics for host '%s' with machine_guid '%s': "
-         "update every = %d, history = %ld, memory mode = %s, health %s,%s tags '%s'"
+         "update every = %d, history = %d, memory mode = %s, health %s,%s tags '%s'"
          , rpt->hostname
          , rpt->client_ip
          , rpt->client_port

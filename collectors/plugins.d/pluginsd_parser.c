@@ -11,7 +11,7 @@ static ssize_t send_to_plugin(const char *txt, void *data) {
         return 0;
 
     errno = 0;
-    netdata_spinlock_lock(&parser->writer.spinlock);
+    spinlock_lock(&parser->writer.spinlock);
     ssize_t bytes = -1;
 
 #ifdef ENABLE_HTTPS
@@ -24,7 +24,7 @@ static ssize_t send_to_plugin(const char *txt, void *data) {
         else
             error("PLUGINSD: cannot send command (SSL)");
 
-        netdata_spinlock_unlock(&parser->writer.spinlock);
+        spinlock_unlock(&parser->writer.spinlock);
         return bytes;
     }
 #endif
@@ -39,7 +39,7 @@ static ssize_t send_to_plugin(const char *txt, void *data) {
         else
             fflush(parser->fp_output);
 
-        netdata_spinlock_unlock(&parser->writer.spinlock);
+        spinlock_unlock(&parser->writer.spinlock);
         return bytes;
     }
 
@@ -52,18 +52,18 @@ static ssize_t send_to_plugin(const char *txt, void *data) {
             sent = write(parser->fd, &txt[bytes], total - bytes);
             if(sent <= 0) {
                 error("PLUGINSD: cannot send command (fd)");
-                netdata_spinlock_unlock(&parser->writer.spinlock);
+                spinlock_unlock(&parser->writer.spinlock);
                 return -3;
             }
             bytes += sent;
         }
         while(bytes < total);
 
-        netdata_spinlock_unlock(&parser->writer.spinlock);
+        spinlock_unlock(&parser->writer.spinlock);
         return (int)bytes;
     }
 
-    netdata_spinlock_unlock(&parser->writer.spinlock);
+    spinlock_unlock(&parser->writer.spinlock);
     error("PLUGINSD: cannot send command (no output socket/pipe/file given to plugins.d parser)");
     return -4;
 }
@@ -93,7 +93,7 @@ static inline RRDSET *pluginsd_get_chart_from_parent(void *user) {
 static inline void pluginsd_lock_rrdset_data_collection(void *user) {
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
     if(u->st && !u->v2.locked_data_collection) {
-        netdata_spinlock_lock(&u->st->data_collection_lock);
+        spinlock_lock(&u->st->data_collection_lock);
         u->v2.locked_data_collection = true;
     }
 }
@@ -101,7 +101,7 @@ static inline void pluginsd_lock_rrdset_data_collection(void *user) {
 static inline bool pluginsd_unlock_rrdset_data_collection(void *user) {
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
     if(u->st && u->v2.locked_data_collection) {
-        netdata_spinlock_unlock(&u->st->data_collection_lock);
+        spinlock_unlock(&u->st->data_collection_lock);
         u->v2.locked_data_collection = false;
         return true;
     }
@@ -1233,9 +1233,9 @@ PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, void *user) {
             st->counter_done++;
 
             // these are only needed for db mode RAM, SAVE, MAP, ALLOC
-            st->current_entry++;
-            if(st->current_entry >= st->entries)
-                st->current_entry -= st->entries;
+            st->db.current_entry++;
+            if(st->db.current_entry >= st->db.entries)
+                st->db.current_entry -= st->db.entries;
 
             ((PARSER_USER_OBJECT *) user)->replay.start_time = start_time;
             ((PARSER_USER_OBJECT *) user)->replay.end_time = end_time;
@@ -1660,9 +1660,9 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
     st->counter_done++;
 
     // these are only needed for db mode RAM, SAVE, MAP, ALLOC
-    st->current_entry++;
-    if(st->current_entry >= st->entries)
-        st->current_entry -= st->entries;
+    st->db.current_entry++;
+    if(st->db.current_entry >= st->db.entries)
+        st->db.current_entry -= st->db.entries;
 
     timing_step(TIMING_STEP_BEGIN2_STORE);
 
@@ -1774,7 +1774,7 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
     rd->last_stored_value = value;
     rd->last_calculated_value = value;
     rd->collections_counter++;
-    rd->updated = true;
+    rrddim_set_updated(rd);
 
     timing_step(TIMING_STEP_SET2_STORE);
 
@@ -1831,7 +1831,7 @@ PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_
     rrddim_foreach_read(rd, st) {
                 rd->calculated_value = 0;
                 rd->collected_value = 0;
-                rd->updated = false;
+                rrddim_clear_updated(rd);
             }
     rrddim_foreach_done(rd);
 

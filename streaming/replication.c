@@ -40,9 +40,9 @@ static struct replication_query_statistics replication_queries = {
 };
 
 struct replication_query_statistics replication_get_query_statistics(void) {
-    netdata_spinlock_lock(&replication_queries.spinlock);
+    spinlock_lock(&replication_queries.spinlock);
     struct replication_query_statistics ret = replication_queries;
-    netdata_spinlock_unlock(&replication_queries.spinlock);
+    spinlock_unlock(&replication_queries.spinlock);
     return ret;
 }
 
@@ -144,7 +144,7 @@ static struct replication_query *replication_query_prepare(
     }
 
     if(q->query.enable_streaming) {
-        netdata_spinlock_lock(&st->data_collection_lock);
+        spinlock_lock(&st->data_collection_lock);
         q->query.locked_data_collection = true;
 
         if (st->last_updated.tv_sec > q->query.before) {
@@ -168,7 +168,7 @@ static struct replication_query *replication_query_prepare(
     size_t count = 0;
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        if (unlikely(!rd || !rd_dfe.item || !rd->exposed))
+        if (unlikely(!rd || !rd_dfe.item || !rrddim_check_exposed(rd)))
             continue;
 
         if (unlikely(rd_dfe.counter >= q->dimensions)) {
@@ -198,7 +198,7 @@ static struct replication_query *replication_query_prepare(
         q->query.execute = false;
 
         if(q->query.locked_data_collection) {
-            netdata_spinlock_unlock(&st->data_collection_lock);
+            spinlock_unlock(&st->data_collection_lock);
             q->query.locked_data_collection = false;
         }
 
@@ -216,7 +216,7 @@ static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st, STRE
     NUMBER_ENCODING encoding = (capabilities & STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
     RRDDIM *rd;
     rrddim_foreach_read(rd, st){
-        if (!rd->exposed) continue;
+        if (!rrddim_check_exposed(rd)) continue;
 
         buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE " '",
                            sizeof(PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE) - 1 + 2);
@@ -248,7 +248,7 @@ static void replication_query_finalize(BUFFER *wb, struct replication_query *q, 
         replication_send_chart_collection_state(wb, q->st, q->query.capabilities);
 
     if(q->query.locked_data_collection) {
-        netdata_spinlock_unlock(&q->st->data_collection_lock);
+        spinlock_unlock(&q->st->data_collection_lock);
         q->query.locked_data_collection = false;
     }
 
@@ -269,7 +269,7 @@ static void replication_query_finalize(BUFFER *wb, struct replication_query *q, 
     }
 
     if(executed) {
-        netdata_spinlock_lock(&replication_queries.spinlock);
+        spinlock_lock(&replication_queries.spinlock);
         replication_queries.queries_started += queries;
         replication_queries.queries_finished += queries;
         replication_queries.points_read += q->points_read;
@@ -280,7 +280,7 @@ static void replication_query_finalize(BUFFER *wb, struct replication_query *q, 
             s->replication.latest_completed_before_t = q->query.before;
         }
 
-        netdata_spinlock_unlock(&replication_queries.spinlock);
+        spinlock_unlock(&replication_queries.spinlock);
     }
 
     __atomic_sub_fetch(&replication_buffers_allocated, sizeof(struct replication_query) + dimensions * sizeof(struct replication_dimension), __ATOMIC_RELAXED);
@@ -678,7 +678,7 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
     }
 
     if(locked_data_collection)
-        netdata_spinlock_unlock(&st->data_collection_lock);
+        spinlock_unlock(&st->data_collection_lock);
 
     return enable_streaming;
 }
@@ -1056,11 +1056,11 @@ static inline bool replication_recursive_lock_mode(char mode) {
 
     if(mode == 'L') { // (L)ock
         if(++recursions == 1)
-            netdata_spinlock_lock(&replication_globals.spinlock);
+            spinlock_lock(&replication_globals.spinlock);
     }
     else if(mode == 'U') { // (U)nlock
         if(--recursions == 0)
-            netdata_spinlock_unlock(&replication_globals.spinlock);
+            spinlock_unlock(&replication_globals.spinlock);
     }
     else if(mode == 'C') { // (C)heck
         if(recursions > 0)

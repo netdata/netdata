@@ -256,16 +256,17 @@ size_t judy_aral_structures(void);
 
 #define DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(head, item, prev, next)                          \
     do {                                                                                       \
+                                                                                               \
+        (item)->next = NULL;                                                                   \
+                                                                                               \
         if(likely(head)) {                                                                     \
             (item)->prev = (head)->prev;                                                       \
             (head)->prev->next = (item);                                                       \
             (head)->prev = (item);                                                             \
-            (item)->next = NULL;                                                               \
         }                                                                                      \
         else {                                                                                 \
+            (item)->prev = (item);                                                             \
             (head) = (item);                                                                   \
-            (head)->prev = (head);                                                             \
-            (head)->next = NULL;                                                               \
         }                                                                                      \
                                                                                                \
     } while (0)

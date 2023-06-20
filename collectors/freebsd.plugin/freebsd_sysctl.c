@@ -459,9 +459,9 @@ int do_dev_cpu_temperature(int update_every, usec_t dt) {
     static RRDDIM **rd_pcpu_temperature;
 
     if (unlikely(number_of_cpus != old_number_of_cpus)) {
-        rd_pcpu_temperature = reallocz(rd_pcpu_temperature, sizeof(RRDDIM) * number_of_cpus);
+        rd_pcpu_temperature = reallocz(rd_pcpu_temperature, sizeof(RRDDIM *) * number_of_cpus);
         if (unlikely(number_of_cpus > old_number_of_cpus))
-            memset(&rd_pcpu_temperature[old_number_of_cpus], 0, sizeof(RRDDIM) * (number_of_cpus - old_number_of_cpus));
+            memset(&rd_pcpu_temperature[old_number_of_cpus], 0, sizeof(RRDDIM *) * (number_of_cpus - old_number_of_cpus));
     }
 
     if (unlikely(!st)) {
