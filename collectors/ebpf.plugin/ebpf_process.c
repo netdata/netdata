@@ -439,7 +439,7 @@ static inline void ebpf_create_statistic_thread_chart(ebpf_module_t *em)
 {
     ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
                          NETDATA_EBPF_THREADS,
-                         "Threads info.",
+                         "Threads running.",
                          "threads",
                          NETDATA_EBPF_FAMILY,
                          NETDATA_EBPF_CHART_TYPE_LINE,
