@@ -945,6 +945,9 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
     if (journal_v1_file_size && j2_header->journal_v1_file_size != journal_v1_file_size)
         return 1;
 
+    if (!db_engine_journal_check)
+        return 0;
+
     journal_v2_trailer = (struct journal_v2_block_trailer *) ((uint8_t *) data_start + journal_v2_file_size - sizeof(*journal_v2_trailer));
 
     crc = crc32(0L, Z_NULL, 0);
@@ -955,9 +958,6 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
         error("DBENGINE: file CRC32 check: FAILED");
         return 1;
     }
-
-    if (!db_engine_journal_check)
-        return 0;
 
     rc = journalfile_check_v2_extent_list(data_start, journal_v2_file_size);
     if (rc) return 1;
