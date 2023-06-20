@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "sqlite_health.h"
-#include "libnetdata/string/string.h"
 #include "sqlite_functions.h"
 #include "sqlite_db_migration.h"
 
