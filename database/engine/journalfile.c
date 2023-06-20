@@ -956,14 +956,14 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
         return 1;
     }
 
+    if (!db_engine_journal_check)
+        return 0;
+
     rc = journalfile_check_v2_extent_list(data_start, journal_v2_file_size);
     if (rc) return 1;
 
     rc = journalfile_check_v2_metric_list(data_start, journal_v2_file_size);
     if (rc) return 1;
-
-    if (!db_engine_journal_check)
-        return 0;
 
     // Verify complete UUID chain
 
