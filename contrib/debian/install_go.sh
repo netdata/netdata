@@ -49,7 +49,7 @@ install_go() {
 
 	if [ -z "${NETDATA_DISABLE_GO+x}" ]; then
 		echo >&2 "Install go.d.plugin"
-		ARCH=$(uname -m)
+		ARCH="${DEB_TARGET_ARCH}"
 		OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 
 		for index in "${ARCH_MAP[@]}" ; do
