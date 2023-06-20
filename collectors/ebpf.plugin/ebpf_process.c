@@ -598,7 +598,6 @@ static void ebpf_create_statistic_charts(ebpf_module_t *em)
     EBPF_PLUGIN_FUNCTIONS(EBPF_FUNCTION_THREAD, EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
 
     ebpf_create_statistic_load_chart(em);
-    EBPF_PLUGIN_FUNCTIONS(EBPF_FUNCTION_THREAD, EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
 
     ebpf_create_statistic_kernel_memory(em);
 
