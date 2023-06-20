@@ -9,7 +9,7 @@ CLEANFILES = \
     $(NULL)
 
 SUBDIRS = \
-    dashboard \
+    v1 \
     $(NULL)
 
 DASHBOARD_JS_FILES = \

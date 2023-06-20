@@ -1921,7 +1921,7 @@ AC_CONFIG_FILES([
     web/api/queries/trimmed_mean/Makefile
     web/api/health/Makefile
     web/gui/Makefile
-    web/gui/dashboard/Makefile
+    web/gui/v1/Makefile
     web/rtc/Makefile
     web/server/Makefile
     web/server/static/Makefile
