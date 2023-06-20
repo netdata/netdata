@@ -378,13 +378,20 @@ void rw_spinlock_read_unlock(RW_SPINLOCK *rw_spinlock) {
 void rw_spinlock_write_lock(RW_SPINLOCK *rw_spinlock) {
     static const struct timespec ns = { .tv_sec = 0, .tv_nsec = 1 };
 
-    spinlock_lock(&rw_spinlock->spinlock);
-    size_t count = 0;
-    while (__atomic_load_n(&rw_spinlock->readers, __ATOMIC_RELAXED) > 0) {
+    size_t spins = 0;
+    while(1) {
+        spins++;
+        spinlock_lock(&rw_spinlock->spinlock);
+
+        if(__atomic_load_n(&rw_spinlock->readers, __ATOMIC_RELAXED) == 0)
+            break;
+
         // Busy wait until all readers have released their locks.
-        if(++count > 1000)
-            nanosleep(&ns, NULL);
+        spinlock_unlock(&rw_spinlock->spinlock);
+        nanosleep(&ns, NULL);
     }
+
+    (void)spins;
 }
 
 void rw_spinlock_write_unlock(RW_SPINLOCK *rw_spinlock) {
