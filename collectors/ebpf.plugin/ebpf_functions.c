@@ -115,8 +115,21 @@ static void ebpf_function_thread_manipulation(const char *transaction,
             break;
 
         if(strncmp(keyword, EBPF_THREADS_ENABLE_CATEGORY, sizeof(EBPF_THREADS_ENABLE_CATEGORY) -1) == 0) {
+            char thread_name[128];
+            int period;
             const char *name = &keyword[sizeof(EBPF_THREADS_ENABLE_CATEGORY) - 1];
-            ebpf_module_t *em = ebpf_functions_select_module(name);
+            char *separator = strchr(name, ':');
+            if (separator) {
+                strncpyz(thread_name, name, separator - name);
+                period = str2i(++separator);
+                if (period <= 0)
+                    period = EBPF_LIFE_TIME;
+            } else {
+                strncpyz(thread_name, name, strlen(name));
+                period = EBPF_LIFE_TIME;
+            }
+
+            ebpf_module_t *em = ebpf_functions_select_module(thread_name);
             if (!em) {
                 snprintfz(message, 511, "%s%s", "ebpf.plugin does not have thread with name ", name);
                 ebpf_function_error(transaction, HTTP_RESP_NOT_FOUND, message);
@@ -132,6 +145,11 @@ static void ebpf_function_thread_manipulation(const char *transaction,
                 st->thread = mallocz(sizeof(netdata_thread_t));
                 em->thread_id = i;
                 em->enabled = NETDATA_THREAD_EBPF_RUNNING;
+                em->life_time = period;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+                info("Starting thread %s with life time = %d", thread_name, period);
+#endif
 
                 netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, em);
 
