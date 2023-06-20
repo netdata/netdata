@@ -38,7 +38,7 @@ download_go() {
 install_go() {
   ARCH_MAP=(
     'i386::386'
-    'armhf::arm64'
+    'armhf::arm'
   )
   if [ -z "${NETDATA_DISABLE_GO+x}" ]; then
     ARCH="${DEB_TARGET_ARCH}"
