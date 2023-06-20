@@ -59,45 +59,45 @@ static int test_compression_decompression() {
 }
 
 const char * const parse_configs_to_test[] = {
-    /* Apache csvCombined 1 */
+    /* [1] Apache csvCombined 1 */
     "127.0.0.1 - - [30/Jun/2022:16:43:51 +0300] \"GET / HTTP/1.0\" 200 11228 \"-\" \"ApacheBench/2.3\"\n",
 
-    /* Apache csvCombined 2 */
+    /* [2] Apache csvCombined 2 */
     "::1 - - [01/Sep/2022:19:04:42 +0100] \"GET / HTTP/1.1\" 200 3477 \"-\" \"Mozilla/5.0 (Windows NT 10.0; \
 Win64; x64; rv:103.0) Gecko/20100101 Firefox/103.0\"\n",   
 
-    /* Apache csvVhostCombined */
+    /* [3] Apache csvVhostCombined */
     "XPS-wsl.localdomain:80 ::1 - - [30/Jun/2022:20:59:29 +0300] \"GET / HTTP/1.1\" 200 3477 \"-\" \"Mozilla\
 /5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.53 Safari/537.36\
  Edg/103.0.1264.37\"\n",
 
-    /* Apache csvCommon 1 */                                                                                        
+    /* [4] Apache csvCommon 1 */                                                                                        
     "127.0.0.1 - - [30/Jun/2022:16:43:51 +0300] \"GET / HTTP/1.0\" 200 11228\n",
 
-    /* Apache csvCommon 2 */                                                                                        
+    /* [5] Apache csvCommon 2 */                                                                                        
     "180.89.137.89 - barrows1527 [05/Jun/2023:17:46:08 +0000]\
  \"DELETE /b2c/viral/innovative/reintermediate HTTP/1.0\" 416 99\n",
 
-    /* Apache csvVhostCommon 1 */                  
+    /* [6] Apache csvVhostCommon 1 */                  
     "XPS-wsl.localdomain:80 127.0.0.1 - - [30/Jun/2022:16:43:51 +0300] \"GET / HTTP/1.0\" 200 11228\n",
 
-    /* Apache csvVhostCommon 2 */      
+    /* [7] Apache csvVhostCommon 2 */      
     "XPS-wsl.localdomain:80 2001:0db8:85a3:0000:0000:8a2e:0370:7334 - - [30/Jun/2022:16:43:51 +0300] \"GET /\
  HTTP/1.0\" 200 11228\n",
 
-    /* Nginx csvCombined */
+    /* [8] Nginx csvCombined */
     "47.29.201.179 - - [28/Feb/2019:13:17:10 +0000] \"GET /?p=1 HTTP/2.0\" 200 5316 \"https://dot.com/?p=1\"\
  \"Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.119 Safari/537.36\"\n", 
 };
 const web_log_line_field_t parse_config_expected[][15] = {
-    {REQ_CLIENT     , CUSTOM    , CUSTOM, TIME  , TIME, REQ , RESP_CODE, RESP_SIZE, CUSTOM   , CUSTOM ,     -1, -1, -1, -1, -1}, /* Apache csvCombined 1 */
-    {REQ_CLIENT     , CUSTOM    , CUSTOM, TIME  , TIME, REQ , RESP_CODE, RESP_SIZE, CUSTOM   , CUSTOM ,     -1, -1, -1, -1, -1}, /* Apache csvCombined 2 */
-    {VHOST_WITH_PORT, REQ_CLIENT, CUSTOM, CUSTOM, TIME, TIME, REQ      , RESP_CODE, RESP_SIZE, CUSTOM , CUSTOM, -1, -1, -1, -1}, /* Apache csvVhostCombined */
-    {REQ_CLIENT     , CUSTOM    , CUSTOM, TIME  , TIME, REQ , RESP_CODE, RESP_SIZE, -1       , -1     ,     -1, -1, -1, -1, -1}, /* Apache csvCommon 1 */
-    {REQ_CLIENT     , CUSTOM    , CUSTOM, TIME  , TIME, REQ , RESP_CODE, RESP_SIZE, -1       , -1     ,     -1, -1, -1, -1, -1}, /* Apache csvCommon 2 */
-    {VHOST_WITH_PORT, REQ_CLIENT, CUSTOM, CUSTOM, TIME, TIME, REQ      , RESP_CODE, RESP_SIZE, -1     ,     -1, -1, -1, -1, -1}, /* Apache csvVhostCommon 1 */
-    {VHOST_WITH_PORT, REQ_CLIENT, CUSTOM, CUSTOM, TIME, TIME, REQ      , RESP_CODE, RESP_SIZE, -1     ,     -1, -1, -1, -1, -1}, /* Apache csvVhostCommon 2 */
-    {REQ_CLIENT     , CUSTOM    , CUSTOM, TIME  , TIME, REQ,  RESP_CODE, RESP_SIZE, CUSTOM   , CUSTOM ,     -1, -1, -1, -1, -1}, /* Nginx csvCombined */
+    /* [1] */ {REQ_CLIENT     , CUSTOM    , CUSTOM, TIME  , TIME, REQ , RESP_CODE, RESP_SIZE, CUSTOM   , CUSTOM ,     -1, -1, -1, -1, -1}, /* Apache csvCombined 1 */
+    /* [2] */ {REQ_CLIENT     , CUSTOM    , CUSTOM, TIME  , TIME, REQ , RESP_CODE, RESP_SIZE, CUSTOM   , CUSTOM ,     -1, -1, -1, -1, -1}, /* Apache csvCombined 2 */
+    /* [3] */ {VHOST_WITH_PORT, REQ_CLIENT, CUSTOM, CUSTOM, TIME, TIME, REQ      , RESP_CODE, RESP_SIZE, CUSTOM , CUSTOM, -1, -1, -1, -1}, /* Apache csvVhostCombined */
+    /* [4] */ {REQ_CLIENT     , CUSTOM    , CUSTOM, TIME  , TIME, REQ , RESP_CODE, RESP_SIZE, -1       , -1     ,     -1, -1, -1, -1, -1}, /* Apache csvCommon 1 */
+    /* [5] */ {REQ_CLIENT     , CUSTOM    , CUSTOM, TIME  , TIME, REQ , RESP_CODE, RESP_SIZE, -1       , -1     ,     -1, -1, -1, -1, -1}, /* Apache csvCommon 2 */
+    /* [6] */ {VHOST_WITH_PORT, REQ_CLIENT, CUSTOM, CUSTOM, TIME, TIME, REQ      , RESP_CODE, RESP_SIZE, -1     ,     -1, -1, -1, -1, -1}, /* Apache csvVhostCommon 1 */
+    /* [7] */ {VHOST_WITH_PORT, REQ_CLIENT, CUSTOM, CUSTOM, TIME, TIME, REQ      , RESP_CODE, RESP_SIZE, -1     ,     -1, -1, -1, -1, -1}, /* Apache csvVhostCommon 2 */
+    /* [8] */ {REQ_CLIENT     , CUSTOM    , CUSTOM, TIME  , TIME, REQ,  RESP_CODE, RESP_SIZE, CUSTOM   , CUSTOM ,     -1, -1, -1, -1, -1}, /* Nginx csvCombined */
 }; 
 int *parse_config_expected_num_fields = NULL;
 const char parse_config_delim = ' ';
@@ -119,16 +119,16 @@ static int test_auto_detect_web_log_parser_config() {
         line[strlen(line) - 1] = 0;
         Web_log_parser_config_t *wblp_conf = auto_detect_web_log_parser_config(line, parse_config_delim);
         if(!wblp_conf){
-            fprintf(stderr, "- Error during auto_detect_web_log_parser_config() (NULL wblp_conf) for:\n%s log record \n", line);
+            fprintf(stderr, "- Error (NULL wblp_conf) for:\n%s", line);
             ++errors;
         } else if(wblp_conf->num_fields != parse_config_expected_num_fields[i]){
-            fprintf(stderr, "- Error during auto_detect_web_log_parser_config() (number of fields mismatch) for:\n%s log record \n", line);
+            fprintf(stderr, "- Error (number of fields mismatch) for:\n%s", line);
             fprintf(stderr, "Expected %d fields but auto-detected %d\n", parse_config_expected_num_fields[i], wblp_conf->num_fields);
             ++errors;
         } else {
             for(int j = 0; (int) parse_config_expected[i][j] != -1; j++){
                 if(wblp_conf->fields[j] != parse_config_expected[i][j]){
-                    fprintf(stderr, "- Error during auto_detect_web_log_parser_config() (field type mismatch) for:\n%s log record \n", line);
+                    fprintf(stderr, "- Error (field type mismatch) for:\n%s", line);
                     ++errors;
                     break;
                 }
@@ -161,8 +161,14 @@ Log_line_parsed_t log_line_parsed_expected[] = {
         char ssl_cipher[SSL_CIPHER_SUITE_MAX_LEN];
         int64_t timestamp;
         int parsing_errors; */
-    {"", 0, "", "127.0.0.1", "GET", "/", "1.0", 0, 0, 200, 11228, 0, "", "", 1687200864000, 0}, 
-    
+    {"",                    0,  "", "127.0.0.1",                                "GET",    "/",                                     "1.0", 0, 0, 200, 11228, 0, "", "", 1656618231, 0}, 
+    {"",                    0,  "", "::1",                                      "GET",    "/",                                     "1.1", 0, 0, 200, 3477 , 0, "", "", 1662062682, 0},
+    {"XPS-wsl.localdomain", 80, "", "::1",                                      "GET",    "/",                                     "1.1", 0, 0, 200, 3477 , 0, "", "", 1656633569, 0},
+    {"",                    0,  "", "127.0.0.1",                                "GET",    "/",                                     "1.0", 0, 0, 200, 11228, 0, "", "", 1656618231, 0},
+    {"",                    0,  "", "180.89.137.89",                            "DELETE", "/b2c/viral/innovative/reintermediate",  "1.0", 0, 0, 416, 99   , 0, "", "", 1685987168, 0},
+    {"XPS-wsl.localdomain", 80, "", "127.0.0.1",                                "GET",    "/",                                     "1.0", 0, 0, 200, 11228, 0, "", "", 1656618231, 0},
+    {"XPS-wsl.localdomain", 80, "", "2001:0db8:85a3:0000:0000:8a2e:0370:7334",  "GET",    "/",                                     "1.0", 0, 0, 200, 11228, 0, "", "", 1656618231, 0},
+    {"",                    0,  "", "47.29.201.179",                            "GET",    "/?p=1",                                 "2.0", 0, 0, 200, 5316 , 0, "", "", 1551359830, 0}
 };
 static int test_parse_web_log_line(){
     int errors = 0;
@@ -189,23 +195,38 @@ static int test_parse_web_log_line(){
         parse_web_log_line( wblp_conf, 
                             (char *) parse_configs_to_test[i], 
                             strlen(parse_configs_to_test[i]), 
-                            log_line_parsed);
+                            &log_line_parsed);
         
-        errors += strcmp(log_line_parsed_expected[i].vhost, log_line_parsed.vhost) ? 1 : 0;
-        errors += log_line_parsed_expected[i].port != log_line_parsed.port ? 1 : 0;
-        errors += strcmp(log_line_parsed_expected[i].req_scheme, log_line_parsed.req_scheme) ? 1 : 0;
-        errors += strcmp(log_line_parsed_expected[i].req_client, log_line_parsed.req_client) ? 1 : 0;
-        errors += strcmp(log_line_parsed_expected[i].req_method, log_line_parsed.req_method) ? 1 : 0;
-        errors += strcmp(log_line_parsed_expected[i].req_URL, log_line_parsed.req_URL) ? 1 : 0;
-        errors += strcmp(log_line_parsed_expected[i].req_proto, log_line_parsed.req_proto) ? 1 : 0;
-        errors += log_line_parsed_expected[i].req_size != log_line_parsed.req_size ? 1 : 0;
-        errors += log_line_parsed_expected[i].req_proc_time != log_line_parsed.req_proc_time ? 1 : 0;
-        errors += log_line_parsed_expected[i].resp_code != log_line_parsed.resp_code ? 1 : 0;
-        errors += log_line_parsed_expected[i].resp_size != log_line_parsed.resp_size ? 1 : 0;
-        errors += log_line_parsed_expected[i].ups_resp_time != log_line_parsed.ups_resp_time ? 1 : 0;
-        errors += strcmp(log_line_parsed_expected[i].ssl_proto, log_line_parsed.ssl_proto) ? 1 : 0;
-        errors += strcmp(log_line_parsed_expected[i].ssl_cipher, log_line_parsed.ssl_cipher) ? 1 : 0;
-        errors += log_line_parsed_expected[i].timestamp != log_line_parsed.timestamp ? 1 : 0;
+        if(strcmp(log_line_parsed_expected[i].vhost, log_line_parsed.vhost))
+            fprintf(stderr, "- Error (parsed vhost != expected vhost) for:\n%s", parse_configs_to_test[i]), ++errors;
+        if(log_line_parsed_expected[i].port != log_line_parsed.port)
+            fprintf(stderr, "- Error (parsed port != expected port) for:\n%s", parse_configs_to_test[i]), ++errors;
+        if(strcmp(log_line_parsed_expected[i].req_scheme, log_line_parsed.req_scheme))
+            fprintf(stderr, "- Error (parsed req_scheme != expected req_scheme) for:\n%s", parse_configs_to_test[i]), ++errors;
+        if(strcmp(log_line_parsed_expected[i].req_client, log_line_parsed.req_client))
+            fprintf(stderr, "- Error (parsed req_client != expected req_client) for:\n%s", parse_configs_to_test[i]), ++errors;
+        if(strcmp(log_line_parsed_expected[i].req_method, log_line_parsed.req_method))
+            fprintf(stderr, "- Error (parsed req_method != expected req_method) for:\n%s", parse_configs_to_test[i]), ++errors;
+        if(strcmp(log_line_parsed_expected[i].req_URL, log_line_parsed.req_URL))
+            fprintf(stderr, "- Error (parsed req_URL != expected req_URL) for:\n%s", parse_configs_to_test[i]), ++errors;
+        if(strcmp(log_line_parsed_expected[i].req_proto, log_line_parsed.req_proto))
+            fprintf(stderr, "- Error (parsed req_proto != expected req_proto) for:\n%s", parse_configs_to_test[i]), ++errors;
+        if(log_line_parsed_expected[i].req_size != log_line_parsed.req_size)
+            fprintf(stderr, "- Error (parsed req_size != expected req_size) for:\n%s", parse_configs_to_test[i]), ++errors;
+        if(log_line_parsed_expected[i].req_proc_time != log_line_parsed.req_proc_time)
+            fprintf(stderr, "- Error (parsed req_proc_time != expected req_proc_time) for:\n%s", parse_configs_to_test[i]), ++errors;
+        if(log_line_parsed_expected[i].resp_code != log_line_parsed.resp_code)
+            fprintf(stderr, "- Error (parsed resp_code != expected resp_code) for:\n%s", parse_configs_to_test[i]), ++errors;
+        if(log_line_parsed_expected[i].resp_size != log_line_parsed.resp_size)
+            fprintf(stderr, "- Error (parsed resp_size != expected resp_size) for:\n%s", parse_configs_to_test[i]), ++errors;
+        if(log_line_parsed_expected[i].ups_resp_time != log_line_parsed.ups_resp_time)
+            fprintf(stderr, "- Error (parsed ups_resp_time != expected ups_resp_time) for:\n%s", parse_configs_to_test[i]), ++errors;
+        if(strcmp(log_line_parsed_expected[i].ssl_proto, log_line_parsed.ssl_proto))
+            fprintf(stderr, "- Error (parsed ssl_proto != expected ssl_proto) for:\n%s", parse_configs_to_test[i]), ++errors;
+        if(strcmp(log_line_parsed_expected[i].ssl_cipher, log_line_parsed.ssl_cipher))
+            fprintf(stderr, "- Error (parsed ssl_cipher != expected ssl_cipher) for:\n%s", parse_configs_to_test[i]), ++errors;
+        if(log_line_parsed_expected[i].timestamp != log_line_parsed.timestamp)
+            fprintf(stderr, "- Error (parsed timestamp != expected timestamp) for:\n%s", parse_configs_to_test[i]), ++errors;
     }
 
     freez(wblp_conf);
