@@ -647,7 +647,7 @@ int db_init() {
                      * log source (in the form of a UUID) and bind it. */
                     uuid_t uuid;
                     uuid_generate(uuid);
-                    char uuid_str[GUID_LEN + 1];      // ex. "1b4e28ba-2fa1-11d2-883f-0016d3cca427" + "\0"
+                    char uuid_str[UUID_STR_LEN];      // ex. "1b4e28ba-2fa1-11d2-883f-0016d3cca427" + "\0"
                     uuid_unparse_lower(uuid, uuid_str);
                     
                     p_file_info->db_dir = mallocz(snprintf(NULL, 0, "%s/%s/", main_db_dir, uuid_str) + 1);
