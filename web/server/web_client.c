@@ -2003,7 +2003,7 @@ ssize_t web_client_receive(struct web_client *w)
         debug(D_WEB_CLIENT, "%llu: Received %zd bytes.", w->id, bytes);
         debug(D_WEB_DATA, "%llu: Received data: '%s'.", w->id, &w->response.data->buffer[old]);
     }
-    else if(unlikely(bytes < 0 && errno == EWOULDBLOCK)) {
+    else if(unlikely(bytes < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR))) {
         web_client_enable_wait_receive(w);
         return 0;
     }
