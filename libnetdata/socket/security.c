@@ -240,6 +240,8 @@ ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num) {
         bytes = -1;  // according to read() or recv()
     }
 
+    internal_error(true, "%s() return %d", __FUNCTION__, bytes);
+
     return bytes;
 }
 
