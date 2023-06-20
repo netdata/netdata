@@ -265,8 +265,9 @@ static struct journal_v2_header *journalfile_v2_mounted_data_get(struct rrdengin
 
             madvise_dontfork(journalfile->mmap.data, journalfile->mmap.size);
             madvise_dontdump(journalfile->mmap.data, journalfile->mmap.size);
-            madvise_random(journalfile->mmap.data, journalfile->mmap.size);
-            madvise_dontneed(journalfile->mmap.data, journalfile->mmap.size);
+//            madvise_willneed(journalfile->mmap.data, journalfile->v2.size_of_directory);
+//            madvise_random(journalfile->mmap.data, journalfile->mmap.size);
+//            madvise_dontneed(journalfile->mmap.data, journalfile->mmap.size);
 
             spinlock_lock(&journalfile->v2.spinlock);
             journalfile->v2.flags |= JOURNALFILE_FLAG_IS_AVAILABLE | JOURNALFILE_FLAG_IS_MOUNTED;
@@ -459,6 +460,7 @@ void journalfile_v2_data_set(struct rrdengine_journalfile *journalfile, int fd, 
     struct journal_v2_header *j2_header = journalfile->mmap.data;
     journalfile->v2.first_time_s = (time_t)(j2_header->start_time_ut / USEC_PER_SEC);
     journalfile->v2.last_time_s = (time_t)(j2_header->end_time_ut / USEC_PER_SEC);
+    // journalfile->v2.size_of_directory = j2_header->metric_offset + j2_header->metric_count * sizeof(struct journal_metric_list);
 
     journalfile_v2_mounted_data_unmount(journalfile, true, true);
 
