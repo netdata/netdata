@@ -87,6 +87,8 @@ struct aclk_sync_host_config {
     char uuid_str[UUID_STR_LEN];
     char node_id[UUID_STR_LEN];
     char *alerts_snapshot_uuid;        // will contain the snapshot_uuid value if snapshot was requested
+    uint64_t alerts_log_first_sequence_id;
+    uint64_t alerts_log_last_sequence_id;
 };
 
 extern sqlite3 *db_meta;

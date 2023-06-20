@@ -314,8 +314,6 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
 
     uint64_t first_sequence_id = 0;
     uint64_t last_sequence_id = 0;
-    static __thread uint64_t log_first_sequence_id = 0;
-    static __thread uint64_t log_last_sequence_id = 0;
 
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         struct alarm_log_entry alarm_log;
@@ -388,11 +386,11 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
         if (first_sequence_id == 0)
             first_sequence_id  = (uint64_t) sqlite3_column_int64(res, 0);
 
-        if (log_first_sequence_id == 0)
-            log_first_sequence_id  = (uint64_t) sqlite3_column_int64(res, 0);
+        if (wc->alerts_log_first_sequence_id == 0)
+            wc->alerts_log_first_sequence_id  = (uint64_t) sqlite3_column_int64(res, 0);
 
         last_sequence_id = (uint64_t) sqlite3_column_int64(res, 0);
-        log_last_sequence_id = (uint64_t) sqlite3_column_int64(res, 0);
+        wc->alerts_log_last_sequence_id = (uint64_t) sqlite3_column_int64(res, 0);
 
         destroy_alarm_log_entry(&alarm_log);
         freez(edit_command);
@@ -411,15 +409,15 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
         rrdhost_flag_set(wc->host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
 
     } else {
-        if (log_first_sequence_id)
+        if (wc->alerts_log_first_sequence_id)
             log_access(
                 "ACLK RES [%s (%s)]: ALERTS SENT from %" PRIu64 " to %" PRIu64 "",
                 wc->node_id,
                 wc->host ? rrdhost_hostname(wc->host) : "N/A",
-                log_first_sequence_id,
-                log_last_sequence_id);
-        log_first_sequence_id = 0;
-        log_last_sequence_id = 0;
+                wc->alerts_log_first_sequence_id,
+                wc->alerts_log_last_sequence_id);
+        wc->alerts_log_first_sequence_id = 0;
+        wc->alerts_log_last_sequence_id = 0;
     }
 
     rc = sqlite3_finalize(res);

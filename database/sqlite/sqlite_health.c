@@ -477,7 +477,7 @@ void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host, size_t rotate_every
 /* Health related SQL queries
    Cleans up the health_log_detail table on a claimed host
 */
-#define SQL_CLEANUP_HEALTH_LOG_DETAIL_CLAIMED(guid, limit) "DELETE from health_log_detail WHERE unique_id NOT IN (SELECT filtered_alert_unique_id FROM aclk_alert_%s) AND unique_id IN (SELECT hld.unique_id FROM health_log hl, health_log_detail hld WHERE host_id = ?2 AND hl.health_log_id = hld.health_log_id) ORDER BY unique_id asc LIMIT %lu);", guid, limit
+#define SQL_CLEANUP_HEALTH_LOG_DETAIL_CLAIMED(guid, limit) "DELETE from health_log_detail WHERE unique_id NOT IN (SELECT filtered_alert_unique_id FROM aclk_alert_%s) AND unique_id IN (SELECT hld.unique_id FROM health_log hl, health_log_detail hld WHERE host_id = ?2 AND hl.health_log_id = hld.health_log_id) ORDER BY unique_id asc LIMIT %lu;", guid, limit
 void sql_health_alarm_log_cleanup_claimed(RRDHOST *host, size_t rotate_every) {
     sqlite3_stmt *res = NULL;
     int rc;
