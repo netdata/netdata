@@ -2,7 +2,7 @@
 #
 # Copyright: © 2021 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
-'''Bundle the dashboard code into the agent repo.
+'''Bundle the v1 dashboard code into the agent repo.
 
    This is designed to be run as part of a GHA workflow, but will work fine outside of one.'''
 

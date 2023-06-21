@@ -10,6 +10,7 @@ CLEANFILES = \
 
 SUBDIRS = \
     v1 \
+    v2 \
     $(NULL)
 
 DASHBOARD_JS_FILES = \

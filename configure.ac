@@ -1922,6 +1922,7 @@ AC_CONFIG_FILES([
     web/api/health/Makefile
     web/gui/Makefile
     web/gui/v1/Makefile
+    web/gui/v2/Makefile
     web/rtc/Makefile
     web/server/Makefile
     web/server/static/Makefile
