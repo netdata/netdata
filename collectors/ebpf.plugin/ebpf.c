@@ -2995,6 +2995,15 @@ int main(int argc, char **argv)
         }
         pthread_mutex_unlock(&collect_data_mutex);
         pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+        if (global_iterations_counter < EBPF_DEFAULT_UPDATE_EVERY)
+            continue;
+
+        pthread_mutex_lock(&lock);
+        ebpf_create_statistic_charts(1);
+
+        ebpf_send_statistic_data();
+        pthread_mutex_unlock(&lock);
     }
 
     ebpf_stop_threads(0);
