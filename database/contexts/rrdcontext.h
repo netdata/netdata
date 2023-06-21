@@ -301,54 +301,6 @@ typedef struct query_target_request {
     void *interrupt_callback_data;
 } QUERY_TARGET_REQUEST;
 
-//typedef struct alert_target_request {
-//    size_t version;
-//
-//    const char *scope_nodes;
-//    const char *scope_contexts;
-//
-//    // selecting / filtering metrics to be queried
-//    RRDHOST *host;                      // the host to be queried (can be NULL, hosts will be used)
-//    RRDCONTEXT_ACQUIRED *rca;           // the context to be queried (can be NULL)
-//    RRDINSTANCE_ACQUIRED *ria;          // the instance to be queried (can be NULL)
-//    RRDMETRIC_ACQUIRED *rma;            // the metric to be queried (can be NULL)
-//    RRDSET *st;                         // the chart to be queried (NULL, for context queries)
-//    const char *nodes;                  // hosts simple pattern
-//    const char *contexts;               // contexts simple pattern (context queries)
-//    const char *instances;                 // charts simple pattern (for context queries)
-//    const char *dimensions;             // dimensions simple pattern
-//    const char *chart_label_key;        // select only the chart having this label key
-//    const char *labels;                 // select only the charts having this combo of label key:value
-//    const char *alerts;                 // select only the charts having this combo of alert name:status
-//
-//    time_t after;                       // the requested timeframe
-//    time_t before;                      // the requested timeframe
-//    size_t points;                      // the requested number of points to be returned
-//
-//    uint32_t format;                    // DATASOURCE_FORMAT
-//    RRDR_OPTIONS options;
-//    time_t timeout_ms;                     // the timeout of the query in milliseconds
-//
-//    size_t tier;
-//    QUERY_SOURCE query_source;
-//    STORAGE_PRIORITY priority;
-//
-//    // resampling metric values across time
-//    time_t resampling_time;
-//
-//    // grouping metric values across time
-//    RRDR_TIME_GROUPING time_group_method;
-//    const char *time_group_options;
-//
-//    // group by across multiple time-series
-//    struct group_by_pass group_by[MAX_QUERY_GROUP_BY_PASSES];
-//
-//    usec_t received_ut;
-//
-//    qt_interrupt_callback_t interrupt_callback;
-//    void *interrupt_callback_data;
-//} ALERT_TARGET_REQUEST;
-
 #define GROUP_BY_MAX_LABEL_KEYS 10
 
 struct query_tier_statistics {

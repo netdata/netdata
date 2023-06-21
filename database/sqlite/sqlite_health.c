@@ -923,10 +923,10 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         else
             ae->chart_context = NULL;
 
-         if (sqlite3_column_type(res, 31) != SQLITE_NULL)
-            uuid_copy(ae->transition_id, *((uuid_t *) sqlite3_column_blob(res, 31)));
+        if (sqlite3_column_type(res, 31) != SQLITE_NULL)
+            uuid_copy(ae->transition_id, *((uuid_t *)sqlite3_column_blob(res, 31)));
 
-         if (sqlite3_column_type(res, 32) != SQLITE_NULL)
+        if (sqlite3_column_type(res, 32) != SQLITE_NULL)
             ae->global_id = sqlite3_column_int64(res, 32);
 
         char value_string[100 + 1];
