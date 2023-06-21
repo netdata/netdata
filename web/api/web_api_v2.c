@@ -43,7 +43,7 @@ static int web_client_api_request_v2_functions(RRDHOST *host __maybe_unused, str
 }
 
 static int web_client_api_request_v2_versions(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_VERSIONS | CONTEXTS_V2_NODES | CONTEXTS_V2_AGENTS);
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_VERSIONS);
 }
 
 static int web_client_api_request_v2_q(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
