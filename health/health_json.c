@@ -193,11 +193,12 @@ static inline void health_alerts_rrdcalc2json_nolock(RRDHOST *host __maybe_unuse
             if (rc->ae) {
                 uuid_unparse_lower(rc->ae->transition_id, trans_uuid_str);
                 buffer_json_member_add_string(wb, "transition_id", trans_uuid_str);
+                buffer_json_member_add_uint64(wb, "gi", rc->ae->global_id);
             }
-            else
+            else {
                 buffer_json_member_add_quoted_string(wb, "transition_id", "NULL");
-
-            buffer_json_member_add_uint64(wb, "id", rc->id); // instance_id on query
+                buffer_json_member_add_quoted_string(wb, "gi", "NULL");
+            }
 
             buffer_json_member_add_string(wb, "status", rrdcalc_status2string(rc->status));
             buffer_json_member_add_uint64(wb, "last_status_change", (unsigned long)rc->last_status_change);
