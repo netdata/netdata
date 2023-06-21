@@ -1697,15 +1697,17 @@ void ebpf_start_pthread_variables()
  *
  * @return It returns 1 if at least one thread needs to collect the data, or zero otherwise.
  */
-static inline uint32_t ebpf_am_i_collect_pids()
+static inline uint32_t ebpf_am_i_collecting_pids()
 {
-    uint32_t ret = 0;
+    uint32_t ret;
     int i;
     for (i = 0; ebpf_modules[i].thread_name; i++) {
-        ret |= ebpf_modules[i].cgroup_charts | (ebpf_modules[i].apps_charts & NETDATA_EBPF_APPS_FLAG_YES);
+        ret = ebpf_modules[i].cgroup_charts | (ebpf_modules[i].apps_charts & NETDATA_EBPF_APPS_FLAG_YES);
+        if (ret)
+            return ret;
     }
 
-    return ret;
+    return 0;
 }
 
 /**
@@ -1713,7 +1715,7 @@ static inline uint32_t ebpf_am_i_collect_pids()
  */
 static void ebpf_allocate_common_vectors()
 {
-    if (unlikely(!ebpf_am_i_collect_pids())) {
+    if (unlikely(!ebpf_am_i_collecting_pids())) {
         return;
     }
 
@@ -2969,19 +2971,17 @@ int main(int argc, char **argv)
         (void)heartbeat_next(&hb, step);
 
         pthread_mutex_lock(&ebpf_exit_cleanup);
-        if (process_pid_fd != -1) {
-            pthread_mutex_lock(&collect_data_mutex);
-            if (++update_apps_list == update_apps_every) {
-                update_apps_list = 0;
-                cleanup_exited_pids();
-                collect_data_for_all_processes(process_pid_fd, process_maps_per_core);
+        pthread_mutex_lock(&collect_data_mutex);
+        if (++update_apps_list == update_apps_every) {
+            update_apps_list = 0;
+            cleanup_exited_pids();
+            collect_data_for_all_processes(process_pid_fd, process_maps_per_core);
 
-                pthread_mutex_lock(&lock);
-                ebpf_create_apps_charts(apps_groups_root_target);
-                pthread_mutex_unlock(&lock);
-            }
-            pthread_mutex_unlock(&collect_data_mutex);
+            pthread_mutex_lock(&lock);
+            ebpf_create_apps_charts(apps_groups_root_target);
+            pthread_mutex_unlock(&lock);
         }
+        pthread_mutex_unlock(&collect_data_mutex);
         pthread_mutex_unlock(&ebpf_exit_cleanup);
 
         if (global_iterations_counter < EBPF_DEFAULT_UPDATE_EVERY)
