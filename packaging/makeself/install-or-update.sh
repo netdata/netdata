@@ -164,11 +164,15 @@ run chmod g+rx,o+rx /opt
 run find /opt/netdata -type d -exec chmod go+rx '{}' \+
 run chown -R ${NETDATA_USER}:${NETDATA_GROUP} /opt/netdata/var
 
+if [ -d /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d ]; then
+  run chwon -R root:${NETDATA_GROUP} /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d
+fi
+
 # -----------------------------------------------------------------------------
 
 progress "changing plugins ownership and permissions"
 
-for x in apps.plugin perf.plugin slabinfo.plugin debugfs.plugin freeipmi.plugin ioping cgroup-network ebpf.plugin nfacct.plugin xenstat.plugin python.d.plugin charts.d.plugin go.d.plugin; do
+for x in apps.plugin perf.plugin slabinfo.plugin debugfs.plugin freeipmi.plugin ioping cgroup-network ebpf.plugin nfacct.plugin xenstat.plugin python.d.plugin charts.d.plugin go.d.plugin ioping.plugin cgroup-network-helper.sh; do
   f="usr/libexec/netdata/plugins.d/${x}"
   if [ -f "${f}" ]; then
     run chown root:${NETDATA_GROUP} "${f}"
