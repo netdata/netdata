@@ -1174,10 +1174,6 @@ static void process_collector(ebpf_module_t *em)
         }
 
         fflush(stdout);
-        pthread_mutex_lock(&ebpf_exit_cleanup);
-        running_time += update_every;
-        em->running_time = running_time;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 
