@@ -638,7 +638,7 @@ static inline void health_alarm_log_process(RRDHOST *host) {
             ||
            ((ae->new_status == RRDCALC_STATUS_REMOVED) &&
            (ae->flags & HEALTH_ENTRY_FLAG_SAVED) &&
-           (ae->when + 3600 < now_realtime_sec())))
+           (ae->when + 86400 < now_realtime_sec())))
             {
 
             if (ae == host->health_log.alarms) {

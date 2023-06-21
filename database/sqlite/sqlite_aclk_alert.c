@@ -337,7 +337,8 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
         alarm_log.timezone = strdupz(rrdhost_abbrev_timezone(wc->host));
         alarm_log.exec_path = sqlite3_column_bytes(res, 14) > 0 ? strdupz((char *)sqlite3_column_text(res, 14)) :
                                                                   strdupz((char *)string2str(wc->host->health.health_default_exec));
-        alarm_log.conf_source = strdupz((char *)sqlite3_column_text(res, 16));
+
+        alarm_log.conf_source = sqlite3_column_bytes(res, 16) > 0 ? strdupz((char *)sqlite3_column_text(res, 16)) : strdupz("");
 
         char *edit_command = sqlite3_column_bytes(res, 16) > 0 ?
                                  health_edit_command_from_source((char *)sqlite3_column_text(res, 16)) :
