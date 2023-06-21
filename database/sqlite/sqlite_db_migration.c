@@ -11,7 +11,6 @@ static int return_int_cb(void *data, int argc, char **argv, char **column)
     return 0;
 }
 
-
 int table_exists_in_database(const char *table)
 {
     char *err_msg = NULL;
@@ -214,6 +213,77 @@ static int do_migration_v7_v8(sqlite3 *database, const char *name)
     return 0;
 }
 
+static int do_migration_v8_v9(sqlite3 *database, const char *name)
+{
+    info("Running database migration %s", name);
+
+    char sql[2048];
+    int rc;
+    sqlite3_stmt *res = NULL;
+
+    //create the health_log table and it's index
+    snprintfz(sql, 2047, "CREATE TABLE IF NOT EXISTS health_log (health_log_id INTEGER PRIMARY KEY, host_id blob, alarm_id int, " \
+              "config_hash_id blob, name text, chart text, family text, recipient text, units text, exec text, " \
+              "chart_context text, last_transition_id blob, UNIQUE (host_id, alarm_id)) ;");
+    sqlite3_exec_monitored(database, sql, 0, 0, NULL);
+
+    //TODO indexes
+    snprintfz(sql, 2047, "CREATE INDEX IF NOT EXISTS health_log_ind_1 ON health_log (host_id);");
+    sqlite3_exec_monitored(database, sql, 0, 0, NULL);
+
+    snprintfz(sql, 2047, "CREATE TABLE IF NOT EXISTS health_log_detail (health_log_id int, unique_id int, alarm_id int, alarm_event_id int, " \
+              "updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, " \
+              "flags int, exec_run_timestamp int, delay_up_to_timestamp int, " \
+              "info text, exec_code int, new_status real, old_status real, delay int, " \
+              "new_value double, old_value double, last_repeat int, transition_id blob, global_id int, host_id blob);");
+    sqlite3_exec_monitored(database, sql, 0, 0, NULL);
+
+    snprintfz(sql, 2047, "CREATE INDEX IF NOT EXISTS health_log_d_ind_1 ON health_log_detail (unique_id);");
+    sqlite3_exec_monitored(database, sql, 0, 0, NULL);
+    snprintfz(sql, 2047, "CREATE INDEX IF NOT EXISTS health_log_d_ind_2 ON health_log_detail (global_id);");
+    sqlite3_exec_monitored(database, sql, 0, 0, NULL);
+    snprintfz(sql, 2047, "CREATE INDEX IF NOT EXISTS health_log_d_ind_3 ON health_log_detail (transition_id);");
+    sqlite3_exec_monitored(database, sql, 0, 0, NULL);
+
+    snprintfz(sql, 2047, "ALTER TABLE alert_hash ADD source text;");
+    sqlite3_exec_monitored(database, sql, 0, 0, NULL);
+
+    snprintfz(sql, 2047, "CREATE INDEX IF NOT EXISTS alert_hash_index ON alert_hash (hash_id);");
+    sqlite3_exec_monitored(database, sql, 0, 0, NULL);
+
+    snprintfz(sql, 2047, "SELECT name FROM sqlite_schema WHERE type ='table' AND name LIKE 'health_log_%%' AND name <> 'health_log_detail';");
+    rc = sqlite3_prepare_v2(database, sql, -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement to alter health_log tables");
+        return 1;
+    }
+
+    DICTIONARY *dict_tables = dictionary_create(DICT_OPTION_NONE);
+
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+        char *table = strdupz((char *) sqlite3_column_text(res, 0));
+        if (health_migrate_old_health_log_table(table)) {
+            dictionary_set(dict_tables, table, NULL, 0);
+        }
+        freez(table);
+    }
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement when copying health_log tables, rc = %d", rc);
+
+    char *table = NULL;
+    dfe_start_read(dict_tables, table) {
+        sql_drop_table(table_dfe.name);
+    }
+    dfe_done(table);
+    dictionary_destroy(dict_tables);
+
+    snprintfz(sql, 2047, "ALTER TABLE health_log_detail DROP COLUMN host_id;");
+    sqlite3_exec_monitored(database, sql, 0, 0, NULL);
+
+    return 0;
+}
 
 static int do_migration_noop(sqlite3 *database, const char *name)
 {
@@ -266,6 +336,7 @@ DATABASE_FUNC_MIGRATION_LIST migration_action[] = {
     {.name = "v5 to v6",  .func = do_migration_v5_v6},
     {.name = "v6 to v7",  .func = do_migration_v6_v7},
     {.name = "v7 to v8",  .func = do_migration_v7_v8},
+    {.name = "v8 to v9",  .func = do_migration_v8_v9},
     // the terminator of this array
     {.name = NULL, .func = NULL}
 };

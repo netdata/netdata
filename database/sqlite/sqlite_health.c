@@ -8,45 +8,12 @@
 #define sqlite3_bind_string_or_null(res,key,param) ((key) ? sqlite3_bind_text(res, param, string2str(key), -1, SQLITE_STATIC) : sqlite3_bind_null(res, param))
 
 /* Health related SQL queries
-   Creates a health log table in sqlite, one per host guid
-*/
-#define SQL_CREATE_HEALTH_LOG_TABLE(guid) "CREATE TABLE IF NOT EXISTS health_log_%s(hostname text, unique_id int, alarm_id int, alarm_event_id int, config_hash_id blob, updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, flags int, exec_run_timestamp int, delay_up_to_timestamp int, name text, chart text, family text, exec text, recipient text, source text, units text, info text, exec_code int, new_status real, old_status real, delay int, new_value double, old_value double, last_repeat int, class text, component text, type text, chart_context text, transition_id blob);", guid
-int sql_create_health_log_table(RRDHOST *host) {
-    int rc;
-    char command[MAX_HEALTH_SQL_SIZE + 1];
-
-    if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            error_report("HEALTH [%s]: Database has not been initialized", rrdhost_hostname(host));
-        return 1;
-    }
-
-    char uuid_str[UUID_STR_LEN];
-    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
-
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CREATE_HEALTH_LOG_TABLE(uuid_str));
-
-    rc = db_execute(db_meta, command);
-    if (unlikely(rc))
-        error_report("HEALTH [%s]: SQLite error during creation of health log table", rrdhost_hostname(host));
-    else {
-        snprintfz(command, MAX_HEALTH_SQL_SIZE, "CREATE INDEX IF NOT EXISTS health_log_index_%s ON health_log_%s (unique_id); ", uuid_str, uuid_str);
-        rc = db_execute(db_meta, command);
-        if (unlikely(unlikely(rc)))
-            error_report("HEALTH [%s]: SQLite error during creation of health log table index", rrdhost_hostname(host));
-    }
-
-    return rc;
-}
-
-/* Health related SQL queries
    Updates an entry in the table
 */
-#define SQL_UPDATE_HEALTH_LOG(guid) "UPDATE health_log_%s set updated_by_id = ?, flags = ?, exec_run_timestamp = ?, exec_code = ? where unique_id = ?;", guid
+#define SQL_UPDATE_HEALTH_LOG "UPDATE health_log_detail set updated_by_id = ?, flags = ?, exec_run_timestamp = ?, exec_code = ? where unique_id = ? AND alarm_id = ? and transition_id = ?;"
 void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
     sqlite3_stmt *res = NULL;
     int rc;
-    char command[MAX_HEALTH_SQL_SIZE + 1];
 
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
@@ -54,19 +21,10 @@ void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
         return;
     }
 
-    char uuid_str[UUID_STR_LEN];
-    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
-
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_UPDATE_HEALTH_LOG(uuid_str));
-
-    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_meta, SQL_UPDATE_HEALTH_LOG, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        sql_create_health_log_table(host);
-        rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
-        if (unlikely(rc != SQLITE_OK)) {
-            error_report("HEALTH [%s]: Failed to prepare statement for SQL_INSERT_HEALTH_LOG", rrdhost_hostname(host));
-            return;
-        }
+        error_report("HEALTH [%s]: Failed to prepare statement for SQL_UPDATE_HEALTH_LOG", rrdhost_hostname(host));
+        return;
     }
 
     rc = sqlite3_bind_int64(res, 1, (sqlite3_int64) ae->updated_by_id);
@@ -99,6 +57,18 @@ void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
         goto failed;
     }
 
+    rc = sqlite3_bind_int64(res, 6, (sqlite3_int64) ae->alarm_id);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind unique_id parameter for SQL_UPDATE_HEALTH_LOG");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_blob(res, 7, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id for SQL_UPDATE_HEALTH_LOG.");
+        goto failed;
+    }
+
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
         error_report("HEALTH [%s]: Failed to update health log, rc = %d", rrdhost_hostname(host), rc);
@@ -112,16 +82,19 @@ failed:
 /* Health related SQL queries
    Inserts an entry in the table
 */
-#define SQL_INSERT_HEALTH_LOG(guid) "INSERT INTO health_log_%s(hostname, unique_id, alarm_id, alarm_event_id, " \
-    "config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, " \
-    "exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, " \
-    "units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, " \
-    "class, component, type, chart_context, transition_id) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);", guid
+#define SQL_INSERT_HEALTH_LOG "INSERT INTO health_log (host_id, alarm_id, " \
+    "config_hash_id, name, chart, family, exec, recipient, units, chart_context, last_transition_id) " \
+    "VALUES (?,?,?,?,?,?,?,?,?,?,?) " \
+    "ON CONFLICT (host_id, alarm_id) DO UPDATE SET last_transition_id = excluded.last_transition_id RETURNING health_log_id; "
 
+#define SQL_INSERT_HEALTH_LOG_DETAIL "INSERT INTO health_log_detail (health_log_id, unique_id, alarm_id, alarm_event_id, " \
+    "updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, " \
+    "info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, transition_id, global_id) " \
+    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,now_usec(0)); "
 void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
     sqlite3_stmt *res = NULL;
     int rc;
-    char command[MAX_HEALTH_SQL_SIZE + 1];
+    uint64_t health_log_id = 0;
 
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
@@ -129,222 +102,225 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
         return;
     }
 
-    char uuid_str[UUID_STR_LEN];
-    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
-
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_INSERT_HEALTH_LOG(uuid_str));
-
-    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_meta, SQL_INSERT_HEALTH_LOG, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        sql_create_health_log_table(host);
-        rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
-        if (unlikely(rc != SQLITE_OK)) {
-            error_report("HEALTH [%s]: Failed to prepare statement for SQL_INSERT_HEALTH_LOG", rrdhost_hostname(host));
-            return;
-        }
+        error_report("HEALTH [%s]: Failed to prepare statement for SQL_INSERT_HEALTH_LOG", rrdhost_hostname(host));
+        return;
     }
 
-    rc = sqlite3_bind_text(res, 1, rrdhost_hostname(host), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind hostname parameter for SQL_INSERT_HEALTH_LOG");
+        error_report("Failed to bind host_id for SQL_INSERT_HEALTH_LOG.");
         goto failed;
     }
 
-    rc = sqlite3_bind_int64(res, 2, (sqlite3_int64) ae->unique_id);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind unique_id parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_int64(res, 3, (sqlite3_int64) ae->alarm_id);
+    rc = sqlite3_bind_int64(res, 2, (sqlite3_int64) ae->alarm_id);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind alarm_id parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_int64(res, 4, (sqlite3_int64) ae->alarm_event_id);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind alarm_event_id parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_blob(res, 5, &ae->config_hash_id, sizeof(ae->config_hash_id), SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, 3, &ae->config_hash_id, sizeof(ae->config_hash_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind config_hash_id parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_int64(res, 6, (sqlite3_int64) ae->updated_by_id);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind updated_by_id parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_int64(res, 7, (sqlite3_int64) ae->updates_id);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind updates_id parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_int64(res, 8, (sqlite3_int64) ae->when);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind when parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_int64(res, 9, (sqlite3_int64) ae->duration);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind duration parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_int64(res, 10, (sqlite3_int64) ae->non_clear_duration);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind non_clear_duration parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_int64(res, 11, (sqlite3_int64) ae->flags);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind flags parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_int64(res, 12, (sqlite3_int64) ae->exec_run_timestamp);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind exec_run_timestamp parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_int64(res, 13, (sqlite3_int64) ae->delay_up_to_timestamp);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind delay_up_to_timestamp parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_string_or_null(res, ae->name, 14);
+    rc = sqlite3_bind_string_or_null(res, ae->name, 4);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind name parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_string_or_null(res, ae->chart, 15);
+    rc = sqlite3_bind_string_or_null(res, ae->chart, 5);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind chart parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_string_or_null(res, ae->family, 16);
+    rc = sqlite3_bind_string_or_null(res, ae->family, 6);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind family parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_string_or_null(res, ae->exec, 17);
+    rc = sqlite3_bind_string_or_null(res, ae->exec, 7);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind exec parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_string_or_null(res, ae->recipient, 18);
+    rc = sqlite3_bind_string_or_null(res, ae->recipient, 8);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind recipient parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_string_or_null(res, ae->source, 19);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind source parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_string_or_null(res, ae->units, 20);
+    rc = sqlite3_bind_string_or_null(res, ae->units, 9);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host_id parameter to store node instance information");
         goto failed;
     }
 
-    rc = sqlite3_bind_string_or_null(res, ae->info, 21);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind info parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_int(res, 22, ae->exec_code);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind exec_code parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_int(res, 23, ae->new_status);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind new_status parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_int(res, 24, ae->old_status);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind old_status parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_int(res, 25, ae->delay);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind delay parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_double(res, 26, ae->new_value);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind new_value parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_double(res, 27, ae->old_value);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind old_value parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_int64(res, 28, (sqlite3_int64) ae->last_repeat);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind last_repeat parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_string_or_null(res, ae->classification, 29);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind classification parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_string_or_null(res, ae->component, 30);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind component parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_string_or_null(res, ae->type, 31);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind type parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_string_or_null(res, ae->chart_context, 32);
+    rc = sqlite3_bind_string_or_null(res, ae->chart_context, 10);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind chart_context parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_blob(res, 33, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, 11, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind transition_id parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
+    rc = sqlite3_step_monitored(res);
+    if (likely(rc == SQLITE_ROW))
+        health_log_id = (size_t) sqlite3_column_int64(res, 0);
+    else {
+        error_report("HEALTH [%s]: Failed to execute SQL_INSERT_HEALTH_LOG, rc = %d", rrdhost_hostname(host), rc);
+        goto failed;
+    }
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("HEALTH [%s]: Failed to finalize the prepared statement for inserting to health log.", rrdhost_hostname(host));
+
+    rc = sqlite3_prepare_v2(db_meta, SQL_INSERT_HEALTH_LOG_DETAIL, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("HEALTH [%s]: Failed to prepare statement for SQL_INSERT_HEALTH_LOG_DETAIL", rrdhost_hostname(host));
+        return;
+    }
+
+    rc = sqlite3_bind_int64(res, 1, (sqlite3_int64) health_log_id);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind unique_id parameter for SQL_INSERT_HEALTH_LOG_DETAIL");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int64(res, 2, (sqlite3_int64) ae->unique_id);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind unique_id parameter for SQL_INSERT_HEALTH_LOG_DETAIL");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int64(res, 3, (sqlite3_int64) ae->alarm_id);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind unique_id parameter for SQL_INSERT_HEALTH_LOG_DETAIL");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int64(res, 4, (sqlite3_int64) ae->alarm_event_id);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind alarm_event_id parameter for SQL_INSERT_HEALTH_LOG_DETAIL");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int64(res, 5, (sqlite3_int64) ae->updated_by_id);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind updated_by_id parameter for SQL_INSERT_HEALTH_LOG_DETAIL");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int64(res, 6, (sqlite3_int64) ae->updates_id);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind updates_id parameter for SQL_INSERT_HEALTH_LOG_DETAIL");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int64(res, 7, (sqlite3_int64) ae->when);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind when parameter for SQL_INSERT_HEALTH_LOG_DETAIL");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int64(res, 8, (sqlite3_int64) ae->duration);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind duration parameter for SQL_INSERT_HEALTH_LOG_DETAIL");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int64(res, 9, (sqlite3_int64) ae->non_clear_duration);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind non_clear_duration parameter for SQL_INSERT_HEALTH_LOG_DETAIL");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int64(res, 10, (sqlite3_int64) ae->flags);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind flags parameter for SQL_INSERT_HEALTH_LOG_DETAIL");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int64(res, 11, (sqlite3_int64) ae->exec_run_timestamp);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind exec_run_timestamp parameter for SQL_INSERT_HEALTH_LOG_DETAIL");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int64(res, 12, (sqlite3_int64) ae->delay_up_to_timestamp);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind delay_up_to_timestamp parameter for SQL_INSERT_HEALTH_LOG_DETAIL");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_string_or_null(res, ae->info, 13);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind info parameter for SQL_INSERT_HEALTH_LOG_DETAIL");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int(res, 14, ae->exec_code);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind exec_code parameter for SQL_INSERT_HEALTH_LOG_DETAIL");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int(res, 15, ae->new_status);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind new_status parameter for SQL_INSERT_HEALTH_LOG_DETAIL");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int(res, 16, ae->old_status);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind old_status parameter for SQL_INSERT_HEALTH_LOG_DETAIL");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int(res, 17, ae->delay);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind delay parameter for SQL_INSERT_HEALTH_LOG_DETAIL");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_double(res, 18, ae->new_value);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind new_value parameter for SQL_INSERT_HEALTH_LOG_DETAIL");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_double(res, 19, ae->old_value);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind old_value parameter for SQL_INSERT_HEALTH_LOG_DETAIL");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int64(res, 20, (sqlite3_int64) ae->last_repeat);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind last_repeat parameter for SQL_INSERT_HEALTH_LOG_DETAIL");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_blob(res, 21, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind transition_id parameter for SQL_INSERT_HEALTH_LOG_DETAIL");
+        goto failed;
+    }
+
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
-        error_report("HEALTH [%s]: Failed to execute SQL_INSERT_HEALTH_LOG, rc = %d", rrdhost_hostname(host), rc);
+        error_report("HEALTH [%s]: Failed to execute SQL_INSERT_HEALTH_LOG_DETAIL, rc = %d", rrdhost_hostname(host), rc);
         goto failed;
     }
 
@@ -373,11 +349,10 @@ void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
 /* Health related SQL queries
    Get a count of rows from health log table
 */
-#define SQL_COUNT_HEALTH_LOG(guid) "SELECT count(1) FROM health_log_%s;", guid
+#define SQL_COUNT_HEALTH_LOG_DETAIL "SELECT count(1) FROM health_log_detail hld, health_log hl where hl.host_id = @host_id and hl.health_log_id = hld.health_log_id;"
 void sql_health_alarm_log_count(RRDHOST *host) {
     sqlite3_stmt *res = NULL;
     int rc;
-    char command[MAX_HEALTH_SQL_SIZE + 1];
 
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
@@ -385,14 +360,16 @@ void sql_health_alarm_log_count(RRDHOST *host) {
         return;
     }
 
-    char uuid_str[UUID_STR_LEN];
-    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
-
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_COUNT_HEALTH_LOG(uuid_str));
-
-    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_meta, SQL_COUNT_HEALTH_LOG_DETAIL, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to count health log entries from db");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id for SQL_COUNT_HEALTH_LOG.");
+        sqlite3_finalize(res);
         return;
     }
 
@@ -404,13 +381,13 @@ void sql_health_alarm_log_count(RRDHOST *host) {
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize the prepared statement to count health log entries from db");
 
-    info("HEALTH [%s]: Table health_log_%s, contains %lu entries.", rrdhost_hostname(host), uuid_str, (unsigned long int) host->health.health_log_entries_written);
+    info("HEALTH [%s]: Table health_log_detail contains %lu entries.", rrdhost_hostname(host), (unsigned long int) host->health.health_log_entries_written);
 }
 
 /* Health related SQL queries
-   Cleans up the health_log table on a non-claimed host
+   Cleans up the health_log_detail table on a non-claimed host
 */
-#define SQL_CLEANUP_HEALTH_LOG_NOT_CLAIMED(guid,limit) "DELETE FROM health_log_%s ORDER BY unique_id ASC LIMIT %lu;", guid, limit
+#define SQL_CLEANUP_HEALTH_LOG_DETAIL_NOT_CLAIMED(limit) "DELETE FROM health_log_detail where health_log_id in (select health_log_id from health_log where host_id = @host_id) ORDER BY unique_id ASC LIMIT %lu;", limit
 void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host, size_t rotate_every) {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -425,11 +402,18 @@ void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host, size_t rotate_every
     char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG_NOT_CLAIMED(uuid_str, (unsigned long int) (host->health.health_log_entries_written - rotate_every)));
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG_DETAIL_NOT_CLAIMED((unsigned long int) (host->health.health_log_entries_written - rotate_every)));
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to cleanup health log table");
+        error_report("Failed to prepare statement to cleanup health log detail table (un-claimed)");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id for SQL_CLEANUP_HEALTH_LOG_NOT_CLAIMED.");
+        sqlite3_finalize(res);
         return;
     }
 
@@ -439,7 +423,7 @@ void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host, size_t rotate_every
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement to cleanup health log table");
+        error_report("Failed to finalize the prepared statement to cleanup health log detail table (un-claimed)");
 
     host->health.health_log_entries_written = rotate_every;
 
@@ -450,9 +434,9 @@ void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host, size_t rotate_every
 }
 
 /* Health related SQL queries
-   Cleans up the health_log table on a claimed host
+   Cleans up the health_log_detail table on a claimed host
 */
-#define SQL_CLEANUP_HEALTH_LOG_CLAIMED(guid, guid2, guid3, limit) "DELETE from health_log_%s WHERE unique_id NOT IN (SELECT filtered_alert_unique_id FROM aclk_alert_%s) AND unique_id IN (SELECT unique_id FROM health_log_%s ORDER BY unique_id asc LIMIT %lu);", guid, guid2, guid3, limit
+#define SQL_CLEANUP_HEALTH_LOG_DETAIL_CLAIMED(guid, limit) "DELETE from health_log_detail WHERE unique_id NOT IN (SELECT filtered_alert_unique_id FROM aclk_alert_%s) AND unique_id IN (SELECT hld.unique_id FROM health_log hl, health_log_detail hld WHERE hl.host_id = ?1 AND hl.health_log_id = hld.health_log_id) and health_log_id in (SELECT health_log_id FROM health_log WHERE host_id = ?2) ORDER BY unique_id asc LIMIT %lu;", guid, limit
 void sql_health_alarm_log_cleanup_claimed(RRDHOST *host, size_t rotate_every) {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -473,11 +457,25 @@ void sql_health_alarm_log_cleanup_claimed(RRDHOST *host, size_t rotate_every) {
         return;
     }
 
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG_CLAIMED(uuid_str, uuid_str, uuid_str, (unsigned long int) (host->health.health_log_entries_written - rotate_every)));
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG_DETAIL_CLAIMED(uuid_str, (unsigned long int) (host->health.health_log_entries_written - rotate_every)));
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to cleanup health log table");
+        error_report("Failed to prepare statement to cleanup health log detail table (claimed)");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind first host_id for SQL_CLEANUP_HEALTH_LOG_CLAIMED.");
+        sqlite3_finalize(res);
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 2, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind second host_id for SQL_CLEANUP_HEALTH_LOG_CLAIMED.");
+        sqlite3_finalize(res);
         return;
     }
 
@@ -487,7 +485,7 @@ void sql_health_alarm_log_cleanup_claimed(RRDHOST *host, size_t rotate_every) {
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement to cleanup health log table");
+        error_report("Failed to finalize the prepared statement to cleanup health log detail table (claimed)");
 
     sql_health_alarm_log_count(host);
 
@@ -515,24 +513,19 @@ void sql_health_alarm_log_cleanup(RRDHOST *host) {
         sql_health_alarm_log_cleanup_claimed(host, rotate_every);
 }
 
-#define SQL_INJECT_REMOVED(guid, guid2) "insert into health_log_%s (hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, " \
-"delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type, chart_context, transition_id) " \
-"select hostname, ?1, ?2, ?3, config_hash_id, 0, ?4, unixepoch(), 0, 0, flags, exec_run_timestamp, " \
-"unixepoch(), name, chart, family, exec, recipient, source, units, info, exec_code, -2, new_status, delay, NULL, new_value, 0, class, component, type, chart_context, ?5 " \
-"from health_log_%s where unique_id = ?6", guid, guid2
-#define SQL_INJECT_REMOVED_UPDATE(guid) "update health_log_%s set flags = flags | ?1, updated_by_id = ?2 where unique_id = ?3; ", guid
-void sql_inject_removed_status(char *uuid_str, uint32_t alarm_id, uint32_t alarm_event_id, uint32_t unique_id, uint32_t max_unique_id)
+#define SQL_INJECT_REMOVED "insert into health_log_detail (health_log_id, unique_id, alarm_id, alarm_event_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, transition_id, global_id) select health_log_id, ?1, ?2, ?3, 0, ?4, unixepoch(), 0, 0, flags, exec_run_timestamp, unixepoch(), info, exec_code, -2, new_status, delay, NULL, new_value, 0, ?5, now_usec(0) from health_log_detail where unique_id = ?6 and transition_id = ?7;"
+#define SQL_INJECT_REMOVED_UPDATE_DETAIL "update health_log_detail set flags = flags | ?1, updated_by_id = ?2 where unique_id = ?3 and transition_id = ?4;"
+#define SQL_INJECT_REMOVED_UPDATE_LOG "update health_log set last_transition_id = ?1 where alarm_id = ?2 and last_transition_id = ?3 and host_id = ?4;"
+void sql_inject_removed_status(RRDHOST *host, uint32_t alarm_id, uint32_t alarm_event_id, uint32_t unique_id, uint32_t max_unique_id, uuid_t *prev_transition_id)
 {
     int rc;
-    char command[MAX_HEALTH_SQL_SIZE + 1];
 
     if (!alarm_id || !alarm_event_id || !unique_id || !max_unique_id)
         return;
 
     sqlite3_stmt *res = NULL;
 
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_INJECT_REMOVED(uuid_str, uuid_str));
-    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_meta, SQL_INJECT_REMOVED, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement when trying to inject removed event");
         return;
@@ -566,13 +559,19 @@ void sql_inject_removed_status(char *uuid_str, uint32_t alarm_id, uint32_t alarm
     uuid_generate_random(transition_id);
     rc = sqlite3_bind_blob(res, 5, &transition_id, sizeof(transition_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind config_hash_id parameter for SQL_INSERT_HEALTH_LOG");
+        error_report("Failed to bind config_hash_id parameter for SQL_INJECT_REMOVED");
         goto failed;
     }
 
     rc = sqlite3_bind_int64(res, 6, (sqlite3_int64) unique_id);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind unique_id parameter for SQL_INJECT_REMOVED");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_blob(res, 7, prev_transition_id, sizeof(*prev_transition_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter for SQL_INJECT_REMOVED.");
         goto failed;
     }
 
@@ -585,35 +584,77 @@ void sql_inject_removed_status(char *uuid_str, uint32_t alarm_id, uint32_t alarm
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("HEALTH [N/A]: Failed to finalize the prepared statement for injecting removed event.");
 
-    //update the old entry
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_INJECT_REMOVED_UPDATE(uuid_str));
-    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    //update the old entry in health_log_detail
+    rc = sqlite3_prepare_v2(db_meta, SQL_INJECT_REMOVED_UPDATE_DETAIL, -1, &res, 0);
     if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement when trying to update during inject removed event");
+        error_report("Failed to prepare statement when trying to update health_log_detail during inject removed event");
         return;
     }
 
     rc = sqlite3_bind_int64(res, 1, (sqlite3_int64) HEALTH_ENTRY_FLAG_UPDATED);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind flags parameter for SQL_INJECT_REMOVED (update)");
+        error_report("Failed to bind flags parameter for SQL_INJECT_REMOVED_UPDATE_DETAIL");
         goto failed;
     }
 
     rc = sqlite3_bind_int64(res, 2, (sqlite3_int64) max_unique_id);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind max_unique_id parameter for SQL_INJECT_REMOVED (update)");
+        error_report("Failed to bind max_unique_id parameter for SQL_INJECT_REMOVED_UPDATE_DETAIL");
         goto failed;
     }
 
     rc = sqlite3_bind_int64(res, 3, (sqlite3_int64) unique_id);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind unique_id parameter for SQL_INJECT_REMOVED (update)");
+        error_report("Failed to bind unique_id parameter for SQL_INJECT_REMOVED_UPDATE_DETAIL");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_blob(res, 4, prev_transition_id, sizeof(*prev_transition_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter for SQL_INJECT_REMOVED_UPDATE_DETAIL");
         goto failed;
     }
 
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
-        error_report("HEALTH [N/A]: Failed to execute SQL_INJECT_REMOVED_UPDATE, rc = %d", rc);
+        error_report("HEALTH [N/A]: Failed to execute SQL_INJECT_REMOVED_UPDATE_DETAIL, rc = %d", rc);
+        goto failed;
+    }
+
+    //update the health_log_table
+    rc = sqlite3_prepare_v2(db_meta, SQL_INJECT_REMOVED_UPDATE_LOG, -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement when trying to update health_log during inject removed event");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &transition_id, sizeof(transition_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter for SQL_INJECT_REMOVED_UPDATE_LOG");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int64(res, 2, (sqlite3_int64) alarm_id);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind unique_id parameter for SQL_INJECT_REMOVED_UPDATE_DETAIL");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_blob(res, 3, prev_transition_id, sizeof(*prev_transition_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter for SQL_INJECT_REMOVED_UPDATE_LOG");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_blob(res, 4, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter for SQL_INJECT_REMOVED_UPDATE_DETAIL");
+        goto failed;
+    }
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE)) {
+        error_report("HEALTH [N/A]: Failed to execute SQL_INJECT_REMOVED_UPDATE_DETAIL, rc = %d", rc);
         goto failed;
     }
 
@@ -622,19 +663,24 @@ failed:
         error_report("HEALTH [N/A]: Failed to finalize the prepared statement for injecting removed event.");
 }
 
-#define SQL_SELECT_MAX_UNIQUE_ID(guid) "SELECT MAX(unique_id) from health_log_%s", guid
-uint32_t sql_get_max_unique_id (char *uuid_str)
+#define SQL_SELECT_MAX_UNIQUE_ID "SELECT MAX(hld.unique_id) from health_log_detail hld, health_log hl where hl.host_id = @host_id; and hl.health_log_id = hld.health_log_id"
+uint32_t sql_get_max_unique_id (RRDHOST *host)
 {
     int rc;
-    char command[MAX_HEALTH_SQL_SIZE + 1];
     uint32_t max_unique_id = 0;
 
     sqlite3_stmt *res = NULL;
 
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_SELECT_MAX_UNIQUE_ID(uuid_str));
-    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_MAX_UNIQUE_ID, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement when trying to get max unique id");
+        return 0;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter for SQL_SELECT_MAX_UNIQUE_ID.");
+        sqlite3_finalize(res);
         return 0;
     }
 
@@ -649,36 +695,42 @@ uint32_t sql_get_max_unique_id (char *uuid_str)
      return max_unique_id;
 }
 
-#define SQL_SELECT_LAST_STATUSES(guid) "SELECT new_status, unique_id, alarm_id, alarm_event_id from health_log_%s group by alarm_id having max(alarm_event_id)", guid
-void sql_check_removed_alerts_state(char *uuid_str)
+#define SQL_SELECT_LAST_STATUSES "SELECT hld.new_status, hld.unique_id, hld.alarm_id, hld.alarm_event_id, hld.transition_id from health_log hl, health_log_detail hld where hl.host_id = @host_id and hl.last_transition_id = hld.transition_id;"
+void sql_check_removed_alerts_state(RRDHOST *host)
 {
     int rc;
-    char command[MAX_HEALTH_SQL_SIZE + 1];
     uint32_t max_unique_id = 0;
-
     sqlite3_stmt *res = NULL;
+    uuid_t transition_id;
 
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_SELECT_LAST_STATUSES(uuid_str));
-    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_LAST_STATUSES, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement when trying to check removed statuses");
         return;
     }
 
-     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-         uint32_t alarm_id, alarm_event_id, unique_id;
-         RRDCALC_STATUS status;
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter for SQL_SELECT_LAST_STATUSES.");
+        sqlite3_finalize(res);
+        return;
+    }
 
-         status  = (RRDCALC_STATUS) sqlite3_column_int(res, 0);
-         unique_id = (uint32_t) sqlite3_column_int64(res, 1);
-         alarm_id = (uint32_t) sqlite3_column_int64(res, 2);
-         alarm_event_id = (uint32_t) sqlite3_column_int64(res, 3);
-         if (unlikely(status != RRDCALC_STATUS_REMOVED)) {
-             if (unlikely(!max_unique_id))
-                 max_unique_id = sql_get_max_unique_id (uuid_str);
-             sql_inject_removed_status (uuid_str, alarm_id, alarm_event_id, unique_id, ++max_unique_id);
-         }
-     }
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+        uint32_t alarm_id, alarm_event_id, unique_id;
+        RRDCALC_STATUS status;
+
+        status  = (RRDCALC_STATUS) sqlite3_column_int(res, 0);
+        unique_id = (uint32_t) sqlite3_column_int64(res, 1);
+        alarm_id = (uint32_t) sqlite3_column_int64(res, 2);
+        alarm_event_id = (uint32_t) sqlite3_column_int64(res, 3);
+        uuid_copy(transition_id, *((uuid_t *) sqlite3_column_blob(res, 4)));
+        if (unlikely(status != RRDCALC_STATUS_REMOVED)) {
+            if (unlikely(!max_unique_id))
+                max_unique_id = sql_get_max_unique_id (host);
+            sql_inject_removed_status (host, alarm_id, alarm_event_id, unique_id, ++max_unique_id, &transition_id);
+        }
+    }
 
      rc = sqlite3_finalize(res);
      if (unlikely(rc != SQLITE_OK))
@@ -688,12 +740,11 @@ void sql_check_removed_alerts_state(char *uuid_str)
 /* Health related SQL queries
    Load from the health log table
 */
-#define SQL_LOAD_HEALTH_LOG(guid) "SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type, chart_context, transition_id FROM health_log_%s group by alarm_id having max(alarm_event_id);", guid
+#define SQL_LOAD_HEALTH_LOG "SELECT hld.unique_id, hld.alarm_id, hld.alarm_event_id, hl.config_hash_id, hld.updated_by_id, hld.updates_id, hld.when_key, hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, hld.delay_up_to_timestamp, hl.name, hl.chart, hl.family, hl.exec, hl.recipient, ah.source, hl.units, hld.info, hld.exec_code, hld.new_status, hld.old_status, hld.delay, hld.new_value, hld.old_value, hld.last_repeat, ah.class, ah.component, ah.type, hl.chart_context, hld.transition_id FROM health_log hl, alert_hash ah, health_log_detail hld where hl.config_hash_id = ah.hash_id and hl.host_id = @host_id and hl.last_transition_id = hld.transition_id;"
 void sql_health_alarm_log_load(RRDHOST *host) {
     sqlite3_stmt *res = NULL;
     int ret;
     ssize_t errored = 0, loaded = 0;
-    char command[MAX_HEALTH_SQL_SIZE + 1];
 
     host->health.health_log_entries_written = 0;
 
@@ -703,16 +754,18 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         return;
     }
 
-    char uuid_str[UUID_STR_LEN];
-    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
+    sql_check_removed_alerts_state(host);
 
-    sql_check_removed_alerts_state(uuid_str);
-
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_LOAD_HEALTH_LOG(uuid_str));
-
-    ret = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    ret = sqlite3_prepare_v2(db_meta, SQL_LOAD_HEALTH_LOG, -1, &res, 0);
     if (unlikely(ret != SQLITE_OK)) {
         error_report("HEALTH [%s]: Failed to prepare sql statement to load health log.", rrdhost_hostname(host));
+        return;
+    }
+
+    ret = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(ret != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter for SQL_LOAD_HEALTH_LOG.");
+        sqlite3_finalize(res);
         return;
     }
 
@@ -730,14 +783,14 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         ALARM_ENTRY *ae = NULL;
 
         // check that we have valid ids
-        uint32_t unique_id = (uint32_t) sqlite3_column_int64(res, 1);
+        uint32_t unique_id = (uint32_t) sqlite3_column_int64(res, 0);
         if(!unique_id) {
             error_report("HEALTH [%s]: Got invalid unique id. Ignoring it.", rrdhost_hostname(host));
             errored++;
             continue;
         }
 
-        uint32_t alarm_id = (uint32_t) sqlite3_column_int64(res, 2);
+        uint32_t alarm_id = (uint32_t) sqlite3_column_int64(res, 1);
         if(!alarm_id) {
             error_report("HEALTH [%s]: Got invalid alarm id. Ignoring it.", rrdhost_hostname(host));
             errored++;
@@ -745,28 +798,28 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         }
 
         //need name, chart and family
-        if (sqlite3_column_type(res, 13) == SQLITE_NULL) {
+        if (sqlite3_column_type(res, 12) == SQLITE_NULL) {
             error_report("HEALTH [%s]: Got null name field. Ignoring it.", rrdhost_hostname(host));
             errored++;
             continue;
         }
 
-        if (sqlite3_column_type(res, 14) == SQLITE_NULL) {
+        if (sqlite3_column_type(res, 13) == SQLITE_NULL) {
             error_report("HEALTH [%s]: Got null chart field. Ignoring it.", rrdhost_hostname(host));
             errored++;
             continue;
         }
 
-        if (sqlite3_column_type(res, 15) == SQLITE_NULL) {
+        if (sqlite3_column_type(res, 14) == SQLITE_NULL) {
             error_report("HEALTH [%s]: Got null family field. Ignoring it.", rrdhost_hostname(host));
             errored++;
             continue;
         }
 
         // Check if we got last_repeat field
-        time_t last_repeat = (time_t)sqlite3_column_int64(res, 27);
+        time_t last_repeat = (time_t)sqlite3_column_int64(res, 26);
 
-        rc = dictionary_get(all_rrdcalcs, (char *) sqlite3_column_text(res, 14));
+        rc = dictionary_get(all_rrdcalcs, (char *) sqlite3_column_text(res, 13));
         if(unlikely(rc)) {
             if (rrdcalc_isrepeating(rc)) {
                 rc->last_repeat = last_repeat;
@@ -782,84 +835,84 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         ae->unique_id = unique_id;
         ae->alarm_id = alarm_id;
 
-        if (sqlite3_column_type(res, 4) != SQLITE_NULL)
-            uuid_copy(ae->config_hash_id, *((uuid_t *) sqlite3_column_blob(res, 4)));
+        if (sqlite3_column_type(res, 3) != SQLITE_NULL)
+            uuid_copy(ae->config_hash_id, *((uuid_t *) sqlite3_column_blob(res, 3)));
 
-        ae->alarm_event_id = (uint32_t) sqlite3_column_int64(res, 3);
-        ae->updated_by_id = (uint32_t) sqlite3_column_int64(res, 5);
-        ae->updates_id = (uint32_t) sqlite3_column_int64(res, 6);
+        ae->alarm_event_id = (uint32_t) sqlite3_column_int64(res, 2);
+        ae->updated_by_id = (uint32_t) sqlite3_column_int64(res, 4);
+        ae->updates_id = (uint32_t) sqlite3_column_int64(res, 5);
 
-        ae->when = (time_t) sqlite3_column_int64(res, 7);
-        ae->duration = (time_t) sqlite3_column_int64(res, 8);
-        ae->non_clear_duration = (time_t) sqlite3_column_int64(res, 9);
+        ae->when = (time_t) sqlite3_column_int64(res, 6);
+        ae->duration = (time_t) sqlite3_column_int64(res, 7);
+        ae->non_clear_duration = (time_t) sqlite3_column_int64(res, 8);
 
-        ae->flags = (uint32_t) sqlite3_column_int64(res, 10);
+        ae->flags = (uint32_t) sqlite3_column_int64(res, 9);
         ae->flags |= HEALTH_ENTRY_FLAG_SAVED;
 
-        ae->exec_run_timestamp = (time_t) sqlite3_column_int64(res, 11);
-        ae->delay_up_to_timestamp = (time_t) sqlite3_column_int64(res, 12);
+        ae->exec_run_timestamp = (time_t) sqlite3_column_int64(res, 10);
+        ae->delay_up_to_timestamp = (time_t) sqlite3_column_int64(res, 11);
 
-        ae->name   = string_strdupz((char *) sqlite3_column_text(res, 13));
-        ae->chart  = string_strdupz((char *) sqlite3_column_text(res, 14));
-        ae->family = string_strdupz((char *) sqlite3_column_text(res, 15));
+        ae->name   = string_strdupz((char *) sqlite3_column_text(res, 12));
+        ae->chart  = string_strdupz((char *) sqlite3_column_text(res, 13));
+        ae->family = string_strdupz((char *) sqlite3_column_text(res, 14));
 
-        if (sqlite3_column_type(res, 16) != SQLITE_NULL)
-            ae->exec = string_strdupz((char *) sqlite3_column_text(res, 16));
+        if (sqlite3_column_type(res, 15) != SQLITE_NULL)
+            ae->exec = string_strdupz((char *) sqlite3_column_text(res, 15));
         else
             ae->exec = NULL;
 
-        if (sqlite3_column_type(res, 17) != SQLITE_NULL)
-            ae->recipient = string_strdupz((char *) sqlite3_column_text(res, 17));
+        if (sqlite3_column_type(res, 16) != SQLITE_NULL)
+            ae->recipient = string_strdupz((char *) sqlite3_column_text(res, 16));
         else
             ae->recipient = NULL;
 
-        if (sqlite3_column_type(res, 18) != SQLITE_NULL)
-            ae->source = string_strdupz((char *) sqlite3_column_text(res, 18));
+        if (sqlite3_column_type(res, 17) != SQLITE_NULL)
+            ae->source = string_strdupz((char *) sqlite3_column_text(res, 17));
         else
             ae->source = NULL;
 
-        if (sqlite3_column_type(res, 19) != SQLITE_NULL)
-            ae->units = string_strdupz((char *) sqlite3_column_text(res, 19));
+        if (sqlite3_column_type(res, 18) != SQLITE_NULL)
+            ae->units = string_strdupz((char *) sqlite3_column_text(res, 18));
         else
             ae->units = NULL;
 
-        if (sqlite3_column_type(res, 20) != SQLITE_NULL)
-            ae->info = string_strdupz((char *) sqlite3_column_text(res, 20));
+        if (sqlite3_column_type(res, 19) != SQLITE_NULL)
+            ae->info = string_strdupz((char *) sqlite3_column_text(res, 19));
         else
             ae->info = NULL;
 
-        ae->exec_code   = (int) sqlite3_column_int(res, 21);
-        ae->new_status  = (RRDCALC_STATUS) sqlite3_column_int(res, 22);
-        ae->old_status  = (RRDCALC_STATUS)sqlite3_column_int(res, 23);
-        ae->delay       = (int) sqlite3_column_int(res, 24);
+        ae->exec_code   = (int) sqlite3_column_int(res, 20);
+        ae->new_status  = (RRDCALC_STATUS) sqlite3_column_int(res, 21);
+        ae->old_status  = (RRDCALC_STATUS)sqlite3_column_int(res, 22);
+        ae->delay       = (int) sqlite3_column_int(res, 23);
 
-        ae->new_value   = (NETDATA_DOUBLE) sqlite3_column_double(res, 25);
-        ae->old_value   = (NETDATA_DOUBLE) sqlite3_column_double(res, 26);
+        ae->new_value   = (NETDATA_DOUBLE) sqlite3_column_double(res, 24);
+        ae->old_value   = (NETDATA_DOUBLE) sqlite3_column_double(res, 25);
 
         ae->last_repeat = last_repeat;
 
-        if (sqlite3_column_type(res, 28) != SQLITE_NULL)
-            ae->classification = string_strdupz((char *) sqlite3_column_text(res, 28));
+        if (sqlite3_column_type(res, 27) != SQLITE_NULL)
+            ae->classification = string_strdupz((char *) sqlite3_column_text(res, 27));
         else
             ae->classification = NULL;
 
-        if (sqlite3_column_type(res, 29) != SQLITE_NULL)
-            ae->component = string_strdupz((char *) sqlite3_column_text(res, 29));
+        if (sqlite3_column_type(res, 28) != SQLITE_NULL)
+            ae->component = string_strdupz((char *) sqlite3_column_text(res, 28));
         else
             ae->component = NULL;
 
-        if (sqlite3_column_type(res, 30) != SQLITE_NULL)
-            ae->type = string_strdupz((char *) sqlite3_column_text(res, 30));
+        if (sqlite3_column_type(res, 29) != SQLITE_NULL)
+            ae->type = string_strdupz((char *) sqlite3_column_text(res, 29));
         else
             ae->type = NULL;
 
-        if (sqlite3_column_type(res, 31) != SQLITE_NULL)
-            ae->chart_context = string_strdupz((char *) sqlite3_column_text(res, 31));
+        if (sqlite3_column_type(res, 30) != SQLITE_NULL)
+            ae->chart_context = string_strdupz((char *) sqlite3_column_text(res, 30));
         else
             ae->chart_context = NULL;
 
-         if (sqlite3_column_type(res, 32) != SQLITE_NULL)
-            uuid_copy(ae->transition_id, *((uuid_t *) sqlite3_column_blob(res, 32)));
+         if (sqlite3_column_type(res, 31) != SQLITE_NULL)
+            uuid_copy(ae->transition_id, *((uuid_t *) sqlite3_column_blob(res, 31)));
 
         char value_string[100 + 1];
         string_freez(ae->old_value_string);
@@ -891,7 +944,7 @@ void sql_health_alarm_log_load(RRDHOST *host) {
     if (unlikely(!host->health_log.next_alarm_id || host->health_log.next_alarm_id <= host->health_max_alarm_id))
         host->health_log.next_alarm_id = host->health_max_alarm_id + 1;
 
-    log_health("[%s]: Table health_log_%s, loaded %zd alarm entries, errors in %zd entries.", rrdhost_hostname(host), uuid_str, loaded, errored);
+    log_health("[%s]: Table health_log, loaded %zd alarm entries, errors in %zd entries.", rrdhost_hostname(host), loaded, errored);
 
     ret = sqlite3_finalize(res);
     if (unlikely(ret != SQLITE_OK))
@@ -907,8 +960,8 @@ void sql_health_alarm_log_load(RRDHOST *host) {
     "on_key, class, component, type, os, hosts, lookup, every, units, calc, families, plugin, module, " \
     "charts, green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels, " \
     "p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after, " \
-    "p_db_lookup_before, p_update_every) values (?1,unixepoch(),?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12," \
-    "?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34);"
+    "p_db_lookup_before, p_update_every, source) values (?1,unixepoch(),?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12," \
+    "?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35);"
 
 int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
 {
@@ -1088,6 +1141,10 @@ int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
+    rc = sqlite3_bind_string_or_null(res, cfg->source, ++param);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to store alert config, rc = %d", rc);
@@ -1175,22 +1232,25 @@ int alert_hash_and_store_config(
     return 1;
 }
 
-#define SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT "SELECT new_status FROM health_log_%s WHERE alarm_id = %u AND unique_id != %u AND flags & %d ORDER BY unique_id DESC LIMIT 1"
+#define SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT "SELECT hld.new_status FROM health_log hl, health_log_detail hld WHERE hl.alarm_id = %u AND hld.unique_id != %u AND hld.flags & %d AND hl.host_id = @host_id and hl.health_log_id = hld.health_log_id ORDER BY hld.unique_id DESC LIMIT 1;"
 int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_STATUS *last_executed_status)
 {
     int rc = 0, ret = -1;
     char command[MAX_HEALTH_SQL_SIZE + 1];
-
-    char uuid_str[UUID_STR_LEN];
-    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
-
     sqlite3_stmt *res = NULL;
 
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT, uuid_str, ae->alarm_id, ae->unique_id, HEALTH_ENTRY_FLAG_EXEC_RUN);
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT, ae->alarm_id, ae->unique_id, HEALTH_ENTRY_FLAG_EXEC_RUN);
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement when trying to get last executed status");
+        return ret;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter for SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT.");
+        sqlite3_finalize(res);
         return ret;
     }
 
@@ -1207,7 +1267,7 @@ int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_S
      return ret;
 }
 
-#define SQL_SELECT_HEALTH_LOG(guid) "SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type, chart_context, transition_id FROM health_log_%s WHERE 1=1 ", guid
+#define SQL_SELECT_HEALTH_LOG "SELECT hld.unique_id, hld.alarm_id, hld.alarm_event_id, hl.config_hash_id, hld.updated_by_id, hld.updates_id, hld.when_key, hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, hld.delay_up_to_timestamp, hl.name, hl.chart, hl.family, hl.exec, hl.recipient, ah.source, hl.units, hld.info, hld.exec_code, hld.new_status, hld.old_status, hld.delay, hld.new_value, hld.old_value, hld.last_repeat, ah.class, ah.component, ah.type, hl.chart_context, hld.transition_id FROM health_log hl, alert_hash ah, health_log_detail hld WHERE hl.config_hash_id = ah.hash_id and hl.health_log_id = hld.health_log_id and hl.host_id = @host_id "
 void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *chart) {
 
     buffer_strcat(wb, "[");
@@ -1219,26 +1279,23 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
     int rc;
 
     BUFFER *command = buffer_create(MAX_HEALTH_SQL_SIZE, NULL);
-    char uuid_str[UUID_STR_LEN];
-    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
-
-    buffer_sprintf(command, SQL_SELECT_HEALTH_LOG(uuid_str));
+    buffer_sprintf(command, SQL_SELECT_HEALTH_LOG);
 
     if (chart) {
         char chart_sql[MAX_HEALTH_SQL_SIZE + 1];
-        snprintfz(chart_sql, MAX_HEALTH_SQL_SIZE, "AND chart = '%s' ", chart);
+        snprintfz(chart_sql, MAX_HEALTH_SQL_SIZE, "AND hl.chart = '%s' ", chart);
         buffer_strcat(command, chart_sql);
     }
 
     if (after) {
         char after_sql[MAX_HEALTH_SQL_SIZE + 1];
-        snprintfz(after_sql, MAX_HEALTH_SQL_SIZE, "AND unique_id > %u ", after);
+        snprintfz(after_sql, MAX_HEALTH_SQL_SIZE, "AND hld.unique_id > %u ", after);
         buffer_strcat(command, after_sql);
     }
 
     {
         char limit_sql[MAX_HEALTH_SQL_SIZE + 1];
-        snprintfz(limit_sql, MAX_HEALTH_SQL_SIZE, "ORDER BY unique_id DESC LIMIT %u ", max);
+        snprintfz(limit_sql, MAX_HEALTH_SQL_SIZE, "ORDER BY hld.unique_id DESC LIMIT %u ", max);
         buffer_strcat(command, limit_sql);
     }
 
@@ -1249,19 +1306,27 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
         return;
     }
 
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id for SQL_SELECT_HEALTH_LOG.");
+        sqlite3_finalize(res);
+        buffer_free(command);
+        return;
+    }
+
     while (sqlite3_step(res) == SQLITE_ROW) {
 
         char old_value_string[100 + 1];
         char new_value_string[100 + 1];
 
         char config_hash_id[UUID_STR_LEN];
-        uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 4)), config_hash_id);
+        uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 3)), config_hash_id);
 
         char transition_id[UUID_STR_LEN] = {0};
-        if (sqlite3_column_type(res, 32) != SQLITE_NULL)
-            uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 32)), transition_id);
+        if (sqlite3_column_type(res, 31) != SQLITE_NULL)
+            uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 31)), transition_id);
 
-        char *edit_command = health_edit_command_from_source((char *)sqlite3_column_text(res, 18));
+        char *edit_command = health_edit_command_from_source((char *)sqlite3_column_text(res, 17));
 
         if (count)
             buffer_sprintf(wb, ",");
@@ -1309,63 +1374,63 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
             "\t\t\"old_value_string\": \"%s\",\n"
             "\t\t\"last_repeat\": \"%lu\",\n"
             "\t\t\"silenced\": \"%s\",\n",
-            sqlite3_column_text(res, 0),
+            rrdhost_hostname(host),
             host->utc_offset,
             rrdhost_abbrev_timezone(host),
+            (unsigned int) sqlite3_column_int64(res, 0),
             (unsigned int) sqlite3_column_int64(res, 1),
             (unsigned int) sqlite3_column_int64(res, 2),
-            (unsigned int) sqlite3_column_int64(res, 3),
             config_hash_id,
             transition_id,
+            sqlite3_column_text(res, 12),
             sqlite3_column_text(res, 13),
+            sqlite3_column_text(res, 30),
             sqlite3_column_text(res, 14),
-            sqlite3_column_text(res, 31),
-            sqlite3_column_text(res, 15),
+            sqlite3_column_text(res, 27) ? (const char *) sqlite3_column_text(res, 27) : (char *) "Unknown",
             sqlite3_column_text(res, 28) ? (const char *) sqlite3_column_text(res, 28) : (char *) "Unknown",
             sqlite3_column_text(res, 29) ? (const char *) sqlite3_column_text(res, 29) : (char *) "Unknown",
-            sqlite3_column_text(res, 30) ? (const char *) sqlite3_column_text(res, 30) : (char *) "Unknown",
-            (sqlite3_column_int64(res, 10) & HEALTH_ENTRY_FLAG_PROCESSED)?"true":"false",
-            (sqlite3_column_int64(res, 10) & HEALTH_ENTRY_FLAG_UPDATED)?"true":"false",
-            (long unsigned int)sqlite3_column_int64(res, 11),
-            (sqlite3_column_int64(res, 10) & HEALTH_ENTRY_FLAG_EXEC_FAILED)?"true":"false",
-            sqlite3_column_text(res, 16) ? (const char *) sqlite3_column_text(res, 16) : string2str(host->health.health_default_exec),
-            sqlite3_column_text(res, 17) ? (const char *) sqlite3_column_text(res, 17) : string2str(host->health.health_default_recipient),
-            sqlite3_column_int(res, 21),
-            sqlite3_column_text(res, 18),
+            (sqlite3_column_int64(res, 9) & HEALTH_ENTRY_FLAG_PROCESSED)?"true":"false",
+            (sqlite3_column_int64(res, 9) & HEALTH_ENTRY_FLAG_UPDATED)?"true":"false",
+            (long unsigned int)sqlite3_column_int64(res, 10),
+            (sqlite3_column_int64(res, 9) & HEALTH_ENTRY_FLAG_EXEC_FAILED)?"true":"false",
+            sqlite3_column_text(res, 15) ? (const char *) sqlite3_column_text(res, 15) : string2str(host->health.health_default_exec),
+            sqlite3_column_text(res, 16) ? (const char *) sqlite3_column_text(res, 16) : string2str(host->health.health_default_recipient),
+            sqlite3_column_int(res, 20),
+            sqlite3_column_text(res, 17),
             edit_command,
-            sqlite3_column_text(res, 19),
+            sqlite3_column_text(res, 18),
+            (long unsigned int)sqlite3_column_int64(res, 6),
             (long unsigned int)sqlite3_column_int64(res, 7),
             (long unsigned int)sqlite3_column_int64(res, 8),
-            (long unsigned int)sqlite3_column_int64(res, 9),
+            rrdcalc_status2string(sqlite3_column_int(res, 21)),
             rrdcalc_status2string(sqlite3_column_int(res, 22)),
-            rrdcalc_status2string(sqlite3_column_int(res, 23)),
-            sqlite3_column_int(res, 24),
-            (long unsigned int)sqlite3_column_int64(res, 12),
+            sqlite3_column_int(res, 23),
+            (long unsigned int)sqlite3_column_int64(res, 11),
+            (unsigned int)sqlite3_column_int64(res, 4),
             (unsigned int)sqlite3_column_int64(res, 5),
-            (unsigned int)sqlite3_column_int64(res, 6),
-            sqlite3_column_type(res, 25) == SQLITE_NULL ? "-" : format_value_and_unit(new_value_string, 100, sqlite3_column_double(res, 25), (char *) sqlite3_column_text(res, 19), -1),
-            sqlite3_column_type(res, 26) == SQLITE_NULL ? "-" : format_value_and_unit(old_value_string, 100, sqlite3_column_double(res, 26), (char *) sqlite3_column_text(res, 19), -1),
-            (long unsigned int)sqlite3_column_int64(res, 27),
-            (sqlite3_column_int64(res, 10) & HEALTH_ENTRY_FLAG_SILENCED)?"true":"false");
+            sqlite3_column_type(res, 24) == SQLITE_NULL ? "-" : format_value_and_unit(new_value_string, 100, sqlite3_column_double(res, 24), (char *) sqlite3_column_text(res, 18), -1),
+            sqlite3_column_type(res, 25) == SQLITE_NULL ? "-" : format_value_and_unit(old_value_string, 100, sqlite3_column_double(res, 25), (char *) sqlite3_column_text(res, 18), -1),
+            (long unsigned int)sqlite3_column_int64(res, 26),
+            (sqlite3_column_int64(res, 9) & HEALTH_ENTRY_FLAG_SILENCED)?"true":"false");
 
-        health_string2json(wb, "\t\t", "info", (char *) sqlite3_column_text(res, 20), ",\n");
+        health_string2json(wb, "\t\t", "info", (char *) sqlite3_column_text(res, 19), ",\n");
 
-        if(unlikely(sqlite3_column_int64(res, 10) & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION)) {
+        if(unlikely(sqlite3_column_int64(res, 9) & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION)) {
             buffer_strcat(wb, "\t\t\"no_clear_notification\": true,\n");
         }
 
         buffer_strcat(wb, "\t\t\"value\":");
+        if (sqlite3_column_type(res, 24) == SQLITE_NULL)
+            buffer_strcat(wb, "null");
+        else
+            buffer_print_netdata_double(wb, sqlite3_column_double(res, 24));
+        buffer_strcat(wb, ",\n");
+
+        buffer_strcat(wb, "\t\t\"old_value\":");
         if (sqlite3_column_type(res, 25) == SQLITE_NULL)
             buffer_strcat(wb, "null");
         else
             buffer_print_netdata_double(wb, sqlite3_column_double(res, 25));
-        buffer_strcat(wb, ",\n");
-
-        buffer_strcat(wb, "\t\t\"old_value\":");
-        if (sqlite3_column_type(res, 26) == SQLITE_NULL)
-            buffer_strcat(wb, "null");
-        else
-            buffer_print_netdata_double(wb, sqlite3_column_double(res, 26));
         buffer_strcat(wb, "\n");
 
         buffer_strcat(wb, "\t}");
@@ -1380,4 +1445,232 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
         error_report("Failed to finalize statement for SQL_SELECT_HEALTH_LOG");
 
     buffer_free(command);
+}
+
+#define SQL_COPY_HEALTH_LOG(table) "INSERT OR IGNORE INTO health_log (host_id, alarm_id, config_hash_id, name, chart, family, exec, recipient, units, chart_context) SELECT ?1, alarm_id, config_hash_id, name, chart, family, exec, recipient, units, chart_context from %s;", table
+#define SQL_COPY_HEALTH_LOG_DETAIL(table) "INSERT INTO health_log_detail (unique_id, alarm_id, alarm_event_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, transition_id, global_id, host_id) SELECT unique_id, alarm_id, alarm_event_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, transition_id, now_usec(1), ?1 from %s;", table
+#define SQL_UPDATE_HEALTH_LOG_DETAIL_TRANSITION_ID "update health_log_detail set transition_id = uuid_random() where transition_id is null;"
+#define SQL_UPDATE_HEALTH_LOG_DETAIL_HEALTH_LOG_ID "update health_log_detail set health_log_id = (select health_log_id from health_log where host_id = ?1 and alarm_id = health_log_detail.alarm_id) where health_log_id is null and host_id = ?2;"
+#define SQL_UPDATE_HEALTH_LOG_LAST_TRANSITION_ID "update health_log set last_transition_id = (select transition_id from health_log_detail where health_log_id = health_log.health_log_id and alarm_id = health_log.alarm_id group by (alarm_id) having max(alarm_event_id)) where host_id = ?1;"
+int health_migrate_old_health_log_table(char *table) {
+    if (!table)
+        return 0;
+
+    //table should contain guid. We need to
+    //keep it in the new table along with it's data
+    //health_log_XXXXXXXX_XXXX_XXXX_XXXX_XXXXXXXXXXXX
+    if (strnlen(table, 46) != 46) {
+        return 0;
+    }
+
+    char *uuid_from_table = strdupz(table + 11);
+    uuid_t uuid;
+    if (uuid_parse_fix(uuid_from_table, uuid)) {
+        freez(uuid_from_table);
+        return 0;
+    }
+
+    int rc;
+    char command[MAX_HEALTH_SQL_SIZE + 1];
+    sqlite3_stmt *res = NULL;
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_COPY_HEALTH_LOG(table));
+    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to copy health log, rc = %d", rc);
+        freez(uuid_from_table);
+        return 0;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &uuid, sizeof(uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        rc = sqlite3_finalize(res);
+        if (unlikely(rc != SQLITE_OK))
+            error_report("Failed to reset statement to copy health log table, rc = %d", rc);
+        freez(uuid_from_table);
+        return 0;
+    }
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE)) {
+        error_report("Failed to execute SQL_COPY_HEALTH_LOG, rc = %d", rc);
+        rc = sqlite3_finalize(res);
+        if (unlikely(rc != SQLITE_OK))
+            error_report("Failed to reset statement to copy health log table, rc = %d", rc);
+        freez(uuid_from_table);
+    }
+
+    //detail
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_COPY_HEALTH_LOG_DETAIL(table));
+    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to copy health log detail, rc = %d", rc);
+        return 0;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &uuid, sizeof(uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        rc = sqlite3_finalize(res);
+        if (unlikely(rc != SQLITE_OK))
+            error_report("Failed to reset statement to copy health log detail, rc = %d", rc);
+        return 0;
+    }
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE)) {
+        error_report("Failed to execute SQL_COPY_HEALTH_LOG_DETAIL, rc = %d", rc);
+        rc = sqlite3_finalize(res);
+        if (unlikely(rc != SQLITE_OK))
+            error_report("Failed to reset statement to copy health log detail table, rc = %d", rc);
+        return 0;
+    }
+
+    //update transition ids
+    rc = sqlite3_prepare_v2(db_meta, SQL_UPDATE_HEALTH_LOG_DETAIL_TRANSITION_ID, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to update health log detail with transition ids, rc = %d", rc);
+        return 0;
+    }
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE)) {
+        error_report("Failed to execute SQL_UPDATE_HEALTH_LOG_DETAIL_TRANSITION_ID, rc = %d", rc);
+        rc = sqlite3_finalize(res);
+        if (unlikely(rc != SQLITE_OK))
+            error_report("Failed to reset statement to update health log detail table with transition ids, rc = %d", rc);
+        return 0;
+    }
+
+    //update health_log_id
+    rc = sqlite3_prepare_v2(db_meta, SQL_UPDATE_HEALTH_LOG_DETAIL_HEALTH_LOG_ID, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to update health log detail with health log ids, rc = %d", rc);
+        return 0;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &uuid, sizeof(uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        rc = sqlite3_finalize(res);
+        if (unlikely(rc != SQLITE_OK))
+            error_report("Failed to reset statement to update health log detail with health log ids, rc = %d", rc);
+        return 0;
+    }
+
+    rc = sqlite3_bind_blob(res, 2, &uuid, sizeof(uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        rc = sqlite3_finalize(res);
+        if (unlikely(rc != SQLITE_OK))
+            error_report("Failed to reset statement to update health log detail with health log ids, rc = %d", rc);
+        return 0;
+    }
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE)) {
+        error_report("Failed to execute SQL_UPDATE_HEALTH_LOG_DETAIL_HEALTH_LOG_ID, rc = %d", rc);
+        rc = sqlite3_finalize(res);
+        if (unlikely(rc != SQLITE_OK))
+            error_report("Failed to reset statement to update health log detail table with health log ids, rc = %d", rc);
+    }
+
+    //update last transition id
+    rc = sqlite3_prepare_v2(db_meta, SQL_UPDATE_HEALTH_LOG_LAST_TRANSITION_ID, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to update health log  with last transition id, rc = %d", rc);
+        return 0;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &uuid, sizeof(uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        rc = sqlite3_finalize(res);
+        if (unlikely(rc != SQLITE_OK))
+            error_report("Failed to reset statement to update health log with last transition id, rc = %d", rc);
+        return 0;
+    }
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE)) {
+        error_report("Failed to execute SQL_UPDATE_HEALTH_LOG_LAST_TRANSITION_ID, rc = %d", rc);
+        rc = sqlite3_finalize(res);
+        if (unlikely(rc != SQLITE_OK))
+            error_report("Failed to reset statement to update health log table with last transition id, rc = %d", rc);
+    }
+
+    return 1;
+}
+
+#define SQL_GET_ALARM_ID "select alarm_id, health_log_id from health_log where host_id = @host_id and chart = @chart and name = @name"
+#define SQL_GET_EVENT_ID "select max(alarm_event_id) + 1 from health_log_detail where health_log_id = @health_log_id and alarm_id = @alarm_id"
+uint32_t sql_get_alarm_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id)
+{
+    int rc = 0;
+    sqlite3_stmt *res = NULL;
+    uint32_t alarm_id = 0;
+    uint64_t health_log_id = 0;
+
+    rc = sqlite3_prepare_v2(db_meta, SQL_GET_ALARM_ID, -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement when trying to get an alarm id");
+        return alarm_id;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter for SQL_GET_ALARM_ID.");
+        sqlite3_finalize(res);
+        return alarm_id;
+    }
+
+    rc = sqlite3_bind_string_or_null(res, chart, 2);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind char parameter for SQL_GET_ALARM_ID.");
+        sqlite3_finalize(res);
+        return alarm_id;
+    }
+
+    rc = sqlite3_bind_string_or_null(res, name, 3);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind name parameter for SQL_GET_ALARM_ID.");
+        sqlite3_finalize(res);
+        return alarm_id;
+    }
+
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+        alarm_id = (uint32_t) sqlite3_column_int64(res, 0);
+        health_log_id = (uint64_t) sqlite3_column_int64(res, 1);
+    }
+
+     rc = sqlite3_finalize(res);
+     if (unlikely(rc != SQLITE_OK))
+         error_report("Failed to finalize the statement while getting an alarm id.");
+
+     if (alarm_id) {
+         rc = sqlite3_prepare_v2(db_meta, SQL_GET_EVENT_ID, -1, &res, 0);
+         if (rc != SQLITE_OK) {
+             error_report("Failed to prepare statement when trying to get an event id");
+             return alarm_id;
+         }
+
+         rc = sqlite3_bind_int64(res, 1, (sqlite3_int64) health_log_id);
+         if (unlikely(rc != SQLITE_OK)) {
+             error_report("Failed to bind host_id parameter for SQL_GET_EVENT_ID.");
+             sqlite3_finalize(res);
+             return alarm_id;
+         }
+
+         rc = sqlite3_bind_int64(res, 2, (sqlite3_int64) alarm_id);
+         if (unlikely(rc != SQLITE_OK)) {
+             error_report("Failed to bind char parameter for SQL_GET_EVENT_ID.");
+             sqlite3_finalize(res);
+             return alarm_id;
+         }
+
+         while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+             *next_event_id = (uint32_t) sqlite3_column_int64(res, 0);
+         }
+
+         rc = sqlite3_finalize(res);
+         if (unlikely(rc != SQLITE_OK))
+             error_report("Failed to finalize the statement while getting an alarm id.");
+     }
+
+     return alarm_id;
 }

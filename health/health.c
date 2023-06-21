@@ -639,7 +639,7 @@ static inline void health_alarm_log_process(RRDHOST *host) {
             ||
            ((ae->new_status == RRDCALC_STATUS_REMOVED) &&
            (ae->flags & HEALTH_ENTRY_FLAG_SAVED) &&
-           (ae->when + 3600 < now_realtime_sec())))
+           (ae->when + 86400 < now_realtime_sec())))
             {
 
             if(host->health_log.alarms == ae) {
@@ -794,7 +794,6 @@ static void initialize_health(RRDHOST *host)
 
     // TODO: This needs to go to the metadata thread
     // Health should wait before accessing the table (needs to be created by the metadata thread)
-    sql_create_health_log_table(host);
     sql_health_alarm_log_load(host);
 
     // ------------------------------------------------------------------------
