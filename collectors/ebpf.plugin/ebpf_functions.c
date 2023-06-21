@@ -368,16 +368,27 @@ static void ebpf_function_thread_manipulation(const char *transaction,
 
     buffer_json_member_add_object(wb, "charts");
     {
-        // Load Methods
-        buffer_json_member_add_object(wb, "ebpf_load_methods");
+        // Threads
+        buffer_json_member_add_object(wb, "eBPFThreads");
         {
-            buffer_json_member_add_string(wb, "name", "Load Methods");
+            buffer_json_member_add_string(wb, "name", "Threads");
             buffer_json_member_add_string(wb, "type", "line");
             buffer_json_member_add_array(wb, "columns");
             {
-                // Should I add both?
-                // Should I convert total in this chart for thread name?
-                buffer_json_add_array_item_string(wb, "Status");
+                buffer_json_add_array_item_string(wb, "Threads");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // Life Time
+        buffer_json_member_add_object(wb, "eBPFLifeTime");
+        {
+            buffer_json_member_add_string(wb, "name", "LifeTime");
+            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Threads");
             }
             buffer_json_array_close(wb);
         }
