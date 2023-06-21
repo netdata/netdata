@@ -6,7 +6,12 @@
 
 **Merged pull requests:**
 
+- Fix /api/v2/contexts,nodes,nodes\_instances,q before match [\#15223](https://github.com/netdata/netdata/pull/15223) ([ktsaou](https://github.com/ktsaou))
+- Fix SSL non-blocking retry handling in the web server [\#15222](https://github.com/netdata/netdata/pull/15222) ([ktsaou](https://github.com/ktsaou))
+- Update dashboard to version v3.0.0. [\#15219](https://github.com/netdata/netdata/pull/15219) ([netdatabot](https://github.com/netdatabot))
+- fix arch detection on i386 \(native packages\) [\#15218](https://github.com/netdata/netdata/pull/15218) ([ilyam8](https://github.com/ilyam8))
 - RW\_SPINLOCK: recursive readers support [\#15217](https://github.com/netdata/netdata/pull/15217) ([ktsaou](https://github.com/ktsaou))
+- cgroups: remove pod\_uid and container\_id labels in k8s [\#15216](https://github.com/netdata/netdata/pull/15216) ([ilyam8](https://github.com/ilyam8))
 - Fix health crash [\#15209](https://github.com/netdata/netdata/pull/15209) ([stelfrag](https://github.com/stelfrag))
 - Fix file permissions under directory [\#15208](https://github.com/netdata/netdata/pull/15208) ([stelfrag](https://github.com/stelfrag))
 - RocketChat cloud integration docs [\#15205](https://github.com/netdata/netdata/pull/15205) ([car12o](https://github.com/car12o))
@@ -401,12 +406,6 @@
 - Remove References category from learn [\#14571](https://github.com/netdata/netdata/pull/14571) ([cakrit](https://github.com/cakrit))
 - Fix doc capitalization and remove obsolete section [\#14569](https://github.com/netdata/netdata/pull/14569) ([cakrit](https://github.com/cakrit))
 - Remove obsolete instruction to lower memory usage [\#14568](https://github.com/netdata/netdata/pull/14568) ([cakrit](https://github.com/cakrit))
-- Port ML from C++ to C. [\#14567](https://github.com/netdata/netdata/pull/14567) ([vkalintiris](https://github.com/vkalintiris))
-- Fix broken links in our documentation [\#14565](https://github.com/netdata/netdata/pull/14565) ([Ancairon](https://github.com/Ancairon))
-- /api/v2/data - multi-host/context/instance/dimension/label queries [\#14564](https://github.com/netdata/netdata/pull/14564) ([ktsaou](https://github.com/ktsaou))
-- pandas collector add `read_sql()` support [\#14563](https://github.com/netdata/netdata/pull/14563) ([andrewm4894](https://github.com/andrewm4894))
-- reviewed plans page to be according to latest updates [\#14560](https://github.com/netdata/netdata/pull/14560) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- Fix kickstart link [\#14559](https://github.com/netdata/netdata/pull/14559) ([cakrit](https://github.com/cakrit))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
