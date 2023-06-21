@@ -3,8 +3,9 @@
 #ifndef NETDATA_EBPF_PROCESS_H
 #define NETDATA_EBPF_PROCESS_H 1
 
-// Module name
+// Module name & description
 #define NETDATA_EBPF_MODULE_NAME_PROCESS "process"
+#define NETDATA_EBPF_MODULE_PROCESS_DESC "Monitor information about process life. This thread is integrated with apps and cgroup."
 
 // Groups used on Dashboard
 #define NETDATA_PROCESS_GROUP "processes"

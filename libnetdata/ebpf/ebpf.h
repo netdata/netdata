@@ -280,6 +280,7 @@ enum ebpf_threads_status {
 typedef struct ebpf_module {
     const char *thread_name;
     const char *config_name;
+    const char *thread_description;
     enum ebpf_threads_status enabled;
     void *(*start_routine)(void *);
     int update_every;

@@ -3,8 +3,9 @@
 #ifndef NETDATA_EBPF_DCSTAT_H
 #define NETDATA_EBPF_DCSTAT_H 1
 
-// Module name
+// Module name & description
 #define NETDATA_EBPF_MODULE_NAME_DCSTAT "dcstat"
+#define NETDATA_EBPF_DC_MODULE_DESC "Monitor file access using directory cache. This thread is integrated with apps and cgroup."
 
 // charts
 #define NETDATA_DC_HIT_CHART "dc_hit_ratio"

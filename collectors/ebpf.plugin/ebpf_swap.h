@@ -3,8 +3,9 @@
 #ifndef NETDATA_EBPF_SWAP_H
 #define NETDATA_EBPF_SWAP_H 1
 
-// Module name
+// Module name & description
 #define NETDATA_EBPF_MODULE_NAME_SWAP "swap"
+#define NETDATA_EBPF_SWAP_MODULE_DESC "Monitor swap space usage. This thread is integrated with apps and cgroup."
 
 #define NETDATA_SWAP_SLEEP_MS 850000ULL
 
