@@ -244,6 +244,8 @@ static int do_migration_v8_v9(sqlite3 *database, const char *name)
     sqlite3_exec_monitored(database, sql, 0, 0, NULL);
     snprintfz(sql, 2047, "CREATE INDEX IF NOT EXISTS health_log_d_ind_3 ON health_log_detail (transition_id);");
     sqlite3_exec_monitored(database, sql, 0, 0, NULL);
+    snprintfz(sql, 2047, "CREATE INDEX IF NOT EXISTS health_log_d_ind_4 ON health_log_detail (health_log_id);");
+    sqlite3_exec_monitored(database, sql, 0, 0, NULL);
 
     snprintfz(sql, 2047, "ALTER TABLE alert_hash ADD source text;");
     sqlite3_exec_monitored(database, sql, 0, 0, NULL);
