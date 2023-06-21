@@ -58,6 +58,13 @@ static const char *fts_match_to_string(FTS_MATCH match) {
     }
 }
 
+struct rrdfunction_to_json_v2 {
+    size_t size;
+    size_t used;
+    size_t *node_ids;
+    STRING *help;
+};
+
 struct rrdcontext_to_json_v2_entry {
     size_t count;
     STRING *id;
@@ -114,6 +121,10 @@ struct rrdcontext_to_json_v2_data {
         SIMPLE_PATTERN *pattern;
         FTS_INDEX fts;
     } q;
+
+    struct {
+        DICTIONARY *dict;
+    } functions;
 
     struct {
         bool enabled;
@@ -470,6 +481,16 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
     if(!host_matched)
         return 0;
 
+    if(ctl->options & CONTEXTS_V2_FUNCTIONS) {
+        struct rrdfunction_to_json_v2 t = {
+                .used = 1,
+                .size = 1,
+                .node_ids = &ctl->nodes.ni,
+                .help = NULL,
+        };
+        host_functions_to_dict(host, ctl->functions.dict, &t, sizeof(t), &t.help);
+    }
+
     if(ctl->options & CONTEXTS_V2_NODES) {
         buffer_json_add_array_item_object(wb); // this node
         buffer_json_node_add_v2(wb, host, ctl->nodes.ni++, 0,
@@ -701,7 +722,37 @@ void buffer_json_cloud_timings(BUFFER *wb, const char *key, struct query_timings
     buffer_json_object_close(wb);
 }
 
-bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
+static void functions_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct rrdfunction_to_json_v2 *t = value;
+
+    // it is initialized with a static reference - we need to mallocz() the array
+    size_t *v = t->node_ids;
+    t->node_ids = mallocz(sizeof(size_t));
+    *t->node_ids = *v;
+    t->size = 1;
+    t->used = 1;
+}
+
+static bool functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
+    struct rrdfunction_to_json_v2 *t = old_value, *n = new_value;
+    size_t *v = n->node_ids;
+
+    if(t->used >= t->size) {
+        t->node_ids = reallocz(t->node_ids, t->size * 2 * sizeof(size_t));
+        t->size *= 2;
+    }
+
+    t->node_ids[t->used++] = *v;
+
+    return true;
+}
+
+static void functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct rrdfunction_to_json_v2 *t = value;
+    freez(t->node_ids);
+}
+
+static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
     struct rrdcontext_to_json_v2_entry *o = old_value;
     struct rrdcontext_to_json_v2_entry *n = new_value;
 
@@ -743,7 +794,7 @@ bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void
     return true;
 }
 
-void contexts_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+static void contexts_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct rrdcontext_to_json_v2_entry *z = value;
     string_freez(z->family);
 }
@@ -789,6 +840,16 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
         dictionary_register_conflict_callback(ctl.ctx, contexts_conflict_callback, NULL);
         dictionary_register_delete_callback(ctl.ctx, contexts_delete_callback, NULL);
+    }
+
+    if(options & CONTEXTS_V2_FUNCTIONS) {
+        ctl.functions.dict = dictionary_create_advanced(
+                DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL,
+                sizeof(struct rrdfunction_to_json_v2));
+
+        dictionary_register_insert_callback(ctl.functions.dict, functions_insert_callback, NULL);
+        dictionary_register_conflict_callback(ctl.functions.dict, functions_conflict_callback, NULL);
+        dictionary_register_delete_callback(ctl.functions.dict, functions_delete_callback, NULL);
     }
 
     if(req->after || req->before) {
@@ -855,33 +916,56 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
     ctl.timings.executed_ut = now_monotonic_usec();
 
+    if(options & CONTEXTS_V2_FUNCTIONS) {
+        buffer_json_member_add_array(wb, "functions");
+        {
+            struct rrdfunction_to_json_v2 *t;
+            dfe_start_read(ctl.functions.dict, t) {
+                buffer_json_add_array_item_object(wb);
+                buffer_json_member_add_string(wb, "name", t_dfe.name);
+                buffer_json_member_add_string(wb, "help", string2str(t->help));
+                buffer_json_member_add_array(wb, "ni");
+                for(size_t i = 0; i < t->used ;i++)
+                    buffer_json_add_array_item_uint64(wb, t->node_ids[i]);
+                buffer_json_array_close(wb);
+                buffer_json_object_close(wb);
+            }
+            dfe_done(t);
+        }
+        buffer_json_array_close(wb);
+    }
+
     if(options & CONTEXTS_V2_CONTEXTS) {
         buffer_json_member_add_object(wb, "contexts");
-        struct rrdcontext_to_json_v2_entry *z;
-        dfe_start_read(ctl.ctx, z){
-            bool collected = z->flags & RRD_FLAG_COLLECTED;
+        {
+            struct rrdcontext_to_json_v2_entry *z;
+            dfe_start_read(ctl.ctx, z) {
+                bool collected = z->flags & RRD_FLAG_COLLECTED;
 
-            buffer_json_member_add_object(wb, string2str(z->id));
-            {
-                buffer_json_member_add_string(wb, "family", string2str(z->family));
-                buffer_json_member_add_uint64(wb, "priority", z->priority);
-                buffer_json_member_add_time_t(wb, "first_entry", z->first_time_s);
-                buffer_json_member_add_time_t(wb, "last_entry", collected ? ctl.now : z->last_time_s);
-                buffer_json_member_add_boolean(wb, "live", collected);
-                if (options & CONTEXTS_V2_SEARCH)
-                    buffer_json_member_add_string(wb, "match", fts_match_to_string(z->match));
+                buffer_json_member_add_object(wb, string2str(z->id));
+                {
+                    buffer_json_member_add_string(wb, "family", string2str(z->family));
+                    buffer_json_member_add_uint64(wb, "priority", z->priority);
+                    buffer_json_member_add_time_t(wb, "first_entry", z->first_time_s);
+                    buffer_json_member_add_time_t(wb, "last_entry", collected ? ctl.now : z->last_time_s);
+                    buffer_json_member_add_boolean(wb, "live", collected);
+                    if (options & CONTEXTS_V2_SEARCH)
+                        buffer_json_member_add_string(wb, "match", fts_match_to_string(z->match));
+                }
+                buffer_json_object_close(wb);
             }
-            buffer_json_object_close(wb);
+            dfe_done(z);
         }
-        dfe_done(z);
         buffer_json_object_close(wb); // contexts
     }
 
     if(options & CONTEXTS_V2_SEARCH) {
         buffer_json_member_add_object(wb, "searches");
-        buffer_json_member_add_uint64(wb, "strings", ctl.q.fts.string_searches);
-        buffer_json_member_add_uint64(wb, "char", ctl.q.fts.char_searches);
-        buffer_json_member_add_uint64(wb, "total", ctl.q.fts.searches);
+        {
+            buffer_json_member_add_uint64(wb, "strings", ctl.q.fts.string_searches);
+            buffer_json_member_add_uint64(wb, "char", ctl.q.fts.char_searches);
+            buffer_json_member_add_uint64(wb, "total", ctl.q.fts.searches);
+        }
         buffer_json_object_close(wb);
     }
 
@@ -896,6 +980,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     buffer_json_finalize(wb);
 
 cleanup:
+    dictionary_destroy(ctl.functions.dict);
     dictionary_destroy(ctl.ctx);
     simple_pattern_free(ctl.nodes.scope_pattern);
     simple_pattern_free(ctl.nodes.pattern);
