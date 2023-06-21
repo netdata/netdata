@@ -8,6 +8,7 @@
 struct web_client;
 
 RRDR_OPTIONS web_client_api_request_v1_data_options(char *o);
+ALERT_OPTIONS web_client_api_request_v2_alert_options(char *o);
 void web_client_api_request_v1_data_options_to_buffer_json_array(BUFFER *wb, const char *key, RRDR_OPTIONS options);
 void web_client_api_request_v1_data_options_to_string(char *buf, size_t size, RRDR_OPTIONS options);
 

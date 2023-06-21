@@ -51,6 +51,14 @@ typedef enum rrdr_options {
     RRDR_OPTION_INTERNAL_AR          = (1 << 31), // internal use only, to let the formatters know we want to render the anomaly rate
 } RRDR_OPTIONS;
 
+typedef enum alert_options {
+    ALERT_OPTION_MINIFY          = (1 << 0), // remove JSON spaces and newlines from JSON output
+    ALERT_OPTION_ACTIVE          = (1 << 1), // Only active alerts
+    ALERT_OPTION_CONFIG          = (1 << 2), // Include config
+    ALERT_OPTION_TRANSITIONS     = (1 << 3), // Include transitions
+    ALERT_OPTION_INSTANCES       = (1 << 4), // Include alert instances
+} ALERT_OPTIONS;
+
 typedef enum __attribute__ ((__packed__)) rrdr_value_flag {
 
     // IMPORTANT:

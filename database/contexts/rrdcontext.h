@@ -475,6 +475,27 @@ struct api_v2_contexts_request {
     void *interrupt_callback_data;
 };
 
+struct api_v2_alerts_request {
+    char *scope_nodes;
+    char *scope_contexts;
+    char *nodes;
+    char *contexts;
+    char *config_hash;
+    char *state;
+    SIMPLE_PATTERN *config_hash_pattern;
+    char *transition_id;
+    time_t alert_id;
+    uint32_t last;
+    char *alert_name;
+    SIMPLE_PATTERN *alert_name_pattern;
+    ALERT_OPTIONS options;
+    time_t after;
+    time_t before;
+    char *q;
+};
+
+ssize_t get_alert_index(Pvoid_t JudyHS, uuid_t *uuid);
+
 typedef enum __attribute__ ((__packed__)) {
     CONTEXTS_V2_DEBUG           = (1 << 0),
     CONTEXTS_V2_MINIFY          = (1 << 1),
@@ -490,6 +511,7 @@ typedef enum __attribute__ ((__packed__)) {
 } CONTEXTS_V2_OPTIONS;
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_OPTIONS options);
+int alerts_to_json_v2(BUFFER *wb, struct api_v2_alerts_request *req, CONTEXTS_V2_OPTIONS options);
 
 RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o);
 void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time_t now_s, bool info);
