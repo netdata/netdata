@@ -1887,10 +1887,8 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups,
     // Read ebpf programs section
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION,
                                     ebpf_modules[EBPF_MODULE_PROCESS_IDX].config_name, CONFIG_BOOLEAN_YES);
-    int started = 0;
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_PROCESS_IDX, *disable_apps, *disable_cgroups);
-        started++;
     }
 
     // This is kept to keep compatibility
@@ -1902,7 +1900,6 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups,
                                         CONFIG_BOOLEAN_NO);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, *disable_apps, *disable_cgroups);
-        started++;
     }
 
     // This is kept to keep compatibility
@@ -1920,7 +1917,6 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups,
         // This is kept here to keep backward compatibility
         parse_network_viewer_section(&collector_config);
         parse_service_name_section(&collector_config);
-        started++;
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "cachestat",
@@ -1928,7 +1924,6 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups,
 
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_CACHESTAT_IDX, *disable_apps, *disable_cgroups);
-        started++;
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "sync",
@@ -1936,101 +1931,78 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups,
 
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_SYNC_IDX, *disable_apps, *disable_cgroups);
-        started++;
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "dcstat",
                                     CONFIG_BOOLEAN_NO);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_DCSTAT_IDX, *disable_apps, *disable_cgroups);
-        started++;
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "swap",
                                     CONFIG_BOOLEAN_NO);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_SWAP_IDX, *disable_apps, *disable_cgroups);
-        started++;
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "vfs",
                                     CONFIG_BOOLEAN_NO);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_VFS_IDX, *disable_apps, *disable_cgroups);
-        started++;
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "filesystem",
                                     CONFIG_BOOLEAN_NO);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_FILESYSTEM_IDX, *disable_apps, *disable_cgroups);
-        started++;
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "disk",
                                     CONFIG_BOOLEAN_NO);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_DISK_IDX, *disable_apps, *disable_cgroups);
-        started++;
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "mount",
                                     CONFIG_BOOLEAN_YES);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_MOUNT_IDX, *disable_apps, *disable_cgroups);
-        started++;
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "fd",
                                     CONFIG_BOOLEAN_YES);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_FD_IDX, *disable_apps, *disable_cgroups);
-        started++;
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "hardirq",
                                     CONFIG_BOOLEAN_YES);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_HARDIRQ_IDX, *disable_apps, *disable_cgroups);
-        started++;
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "softirq",
                                     CONFIG_BOOLEAN_YES);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_SOFTIRQ_IDX, *disable_apps, *disable_cgroups);
-        started++;
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "oomkill",
                                     CONFIG_BOOLEAN_YES);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_OOMKILL_IDX, *disable_apps, *disable_cgroups);
-        started++;
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "shm",
                                     CONFIG_BOOLEAN_YES);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_SHM_IDX, *disable_apps, *disable_cgroups);
-        started++;
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "mdflush",
                                     CONFIG_BOOLEAN_NO);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_MDFLUSH_IDX, *disable_apps, *disable_cgroups);
-        started++;
-    }
-
-    if (!started){
-        ebpf_enable_all_charts(*disable_apps, *disable_cgroups);
-        // Read network viewer section
-        // This is kept here to keep backward compatibility
-        if (network_viewer_opt.enabled) {
-            parse_network_viewer_section(&collector_config);
-            parse_service_name_section(&collector_config);
-        }
     }
 }
 
