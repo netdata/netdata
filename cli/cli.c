@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "cli.h"
+#include "daemon/pipename.h"
 
 void error_int(int is_collector __maybe_unused, const char *prefix __maybe_unused, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
     FILE *fp = stderr;
@@ -288,7 +289,9 @@ int main(int argc, char **argv)
     }
 
     req.data = buffer_create(128, NULL);
-    uv_pipe_connect(&req, &client_pipe, PIPENAME, connect_cb);
+
+    const char *pipename = daemon_pipename();
+    uv_pipe_connect(&req, &client_pipe, pipename, connect_cb);
 
     uv_run(loop, UV_RUN_DEFAULT);
 
