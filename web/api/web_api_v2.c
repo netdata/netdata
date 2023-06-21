@@ -38,6 +38,14 @@ static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unu
     return rrdcontext_to_json_v2(w->response.data, &req, options);
 }
 
+static int web_client_api_request_v2_functions(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_FUNCTIONS | CONTEXTS_V2_NODES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_VERSIONS);
+}
+
+static int web_client_api_request_v2_versions(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_VERSIONS);
+}
+
 static int web_client_api_request_v2_q(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_SEARCH | CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_NODES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_VERSIONS);
 }
@@ -51,12 +59,11 @@ static int web_client_api_request_v2_nodes(RRDHOST *host __maybe_unused, struct 
 }
 
 static int web_client_api_request_v2_nodes_instances(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODES_INSTANCES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_AGENTS_INFO | CONTEXTS_V2_VERSIONS);
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_INSTANCES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_AGENTS_INFO | CONTEXTS_V2_VERSIONS);
 }
 
 static int web_client_api_request_v2_weights(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_weights(host, w, url, WEIGHTS_METHOD_VALUE,
-                                          WEIGHTS_FORMAT_MULTINODE, 2);
+    return web_client_api_request_weights(host, w, url, WEIGHTS_METHOD_VALUE, WEIGHTS_FORMAT_MULTINODE, 2);
 }
 
 #define GROUP_BY_KEY_MAX_LENGTH 30
@@ -361,6 +368,8 @@ static struct web_api_command api_commands_v2[] = {
         {"nodes_instances", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_nodes_instances},
         {"contexts", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_contexts},
         {"weights", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_weights},
+        {"versions", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_versions},
+        {"functions", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_functions},
         {"q", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_q},
 
         {"rtc_offer", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_webrtc},

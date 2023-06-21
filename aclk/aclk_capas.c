@@ -4,17 +4,19 @@
 
 #include "ml/ml.h"
 
+#define HTTP_API_V2_VERSION 4
+
 const struct capability *aclk_get_agent_capas()
 {
     static struct capability agent_capabilities[] = {
         { .name = "json",        .version = 2, .enabled = 0 },
         { .name = "proto",       .version = 1, .enabled = 1 },
-        { .name = "ml",          .version = 0, .enabled = 0 },
-        { .name = "mc",          .version = 0, .enabled = 0 },
+        { .name = "ml",          .version = 0, .enabled = 0 }, // index 2, below
+        { .name = "mc",          .version = 0, .enabled = 0 }, // index 3, below
         { .name = "ctx",         .version = 1, .enabled = 1 },
         { .name = "funcs",       .version = 1, .enabled = 1 },
-        { .name = "http_api_v2", .version = 4, .enabled = 1 },
-        { .name = "health",      .version = 1, .enabled = 0 },
+        { .name = "http_api_v2", .version = HTTP_API_V2_VERSION, .enabled = 1 },
+        { .name = "health",      .version = 1, .enabled = 0 }, // index 7, below
         { .name = "req_cancel",  .version = 1, .enabled = 1 },
         { .name = NULL,          .version = 0, .enabled = 0 }
     };
@@ -41,7 +43,7 @@ struct capability *aclk_get_node_instance_capas(RRDHOST *host)
           .enabled = enable_metric_correlations },
         { .name = "ctx",         .version = 1,                     .enabled = 1 },
         { .name = "funcs",       .version = functions ? 1 : 0,     .enabled = functions ? 1 : 0 },
-        { .name = "http_api_v2", .version = 3,                     .enabled = 1 },
+        { .name = "http_api_v2", .version = HTTP_API_V2_VERSION,   .enabled = 1 },
         { .name = "health",      .version = 1,                     .enabled = host->health.health_enabled },
         { .name = "req_cancel",  .version = 1,                     .enabled = 1 },
         { .name = NULL,          .version = 0,                     .enabled = 0 }

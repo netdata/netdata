@@ -17,6 +17,8 @@ disabled_by_default = True
 
 NVIDIA_SMI = 'nvidia-smi'
 
+NOT_AVAILABLE = 'N/A'
+
 EMPTY_ROW = ''
 EMPTY_ROW_LIMIT = 500
 POLLER_BREAK_ROW = '</nvidia_smi_log>'
@@ -481,13 +483,14 @@ class GPU:
             'power_draw': self.power_draw(),
         }
 
-        pci_bw_max = self.pci_bw_max()
-        if not pci_bw_max:
-            data['rx_util_percent'] = 0
-            data['tx_util_percent'] = 0
-        else :
-            data['rx_util_percent'] = str(int(int(self.rx_util())*100/self.pci_bw_max()))
-            data['tx_util_percent'] = str(int(int(self.tx_util())*100/self.pci_bw_max()))
+        if self.rx_util() != NOT_AVAILABLE and self.tx_util() != NOT_AVAILABLE:
+            pci_bw_max = self.pci_bw_max()
+            if not pci_bw_max:
+                data['rx_util_percent'] = 0
+                data['tx_util_percent'] = 0
+            else:
+                data['rx_util_percent'] = str(int(int(self.rx_util()) * 100 / self.pci_bw_max()))
+                data['tx_util_percent'] = str(int(int(self.tx_util()) * 100 / self.pci_bw_max()))
 
 
         for v in POWER_STATES:

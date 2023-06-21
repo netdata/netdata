@@ -132,6 +132,22 @@ function add_lbl_prefix() {
   echo "${new_labels:0:-1}" # trim last ','
 }
 
+function remove_lbl() {
+  local orig_labels lbl_name
+  orig_labels="${1}"
+  lbl_name="${2}"
+
+  IFS=, read -ra labels <<< "$orig_labels"
+
+  local new_labels
+  for l in "${labels[@]}"; do
+    IFS="=" read -r lname lval <<< "$l"
+    [ "$lbl_name" != "$lname" ] && new_labels+="${l},"
+  done
+
+  echo "${new_labels:0:-1}" # trim last ','
+}
+
 function k8s_is_pause_container() {
   local cgroup_path="${1}"
 
@@ -385,6 +401,8 @@ function k8s_get_kubepod_name() {
       name+="_$(get_lbl_val "$labels" namespace)"
       name+="_$(get_lbl_val "$labels" pod_name)"
       name+="_$(get_lbl_val "$labels" container_name)"
+      labels=$(remove_lbl "$labels" "container_id")
+      labels=$(remove_lbl "$labels" "pod_uid")
       labels=$(add_lbl_prefix "$labels" "k8s_")
       name+=" $labels"
     else
@@ -400,6 +418,7 @@ function k8s_get_kubepod_name() {
       name="pod"
       name+="_$(get_lbl_val "$labels" namespace)"
       name+="_$(get_lbl_val "$labels" pod_name)"
+      labels=$(remove_lbl "$labels" "pod_uid")
       labels=$(add_lbl_prefix "$labels" "k8s_")
       name+=" $labels"
     else

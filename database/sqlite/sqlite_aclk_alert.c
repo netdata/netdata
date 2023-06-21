@@ -7,37 +7,7 @@
 #include "../../aclk/aclk_alarm_api.h"
 #endif
 
-#define SQL_GET_ALERT_REMOVE_TIME "SELECT when_key FROM health_log_%s WHERE alarm_id = %u " \
-                                  "AND unique_id > %u AND unique_id < %u " \
-                                  "AND new_status = -2;"
-
-time_t removed_when(uint32_t alarm_id, uint32_t before_unique_id, uint32_t after_unique_id, char *uuid_str) {
-    sqlite3_stmt *res = NULL;
-    time_t when = 0;
-    char sql[ACLK_SYNC_QUERY_SIZE];
-
-    snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1, SQL_GET_ALERT_REMOVE_TIME, uuid_str, alarm_id, after_unique_id, before_unique_id);
-
-    int rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement when trying to find removed gap.");
-        return 0;
-    }
-
-    rc = sqlite3_step_monitored(res);
-    if (likely(rc == SQLITE_ROW)) {
-        when = (time_t) sqlite3_column_int64(res, 0);
-    }
-
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize statement when trying to find removed gap, rc = %d", rc);
-
-    return when;
-}
-
 #define SQL_UPDATE_FILTERED_ALERT "UPDATE aclk_alert_%s SET filtered_alert_unique_id = %u where filtered_alert_unique_id = %u"
-
 void update_filtered(ALARM_ENTRY *ae, uint32_t unique_id, char *uuid_str) {
     char sql[ACLK_SYNC_QUERY_SIZE];
     snprintfz(sql, ACLK_SYNC_QUERY_SIZE-1, SQL_UPDATE_FILTERED_ALERT, uuid_str, ae->unique_id, unique_id);
@@ -45,21 +15,27 @@ void update_filtered(ALARM_ENTRY *ae, uint32_t unique_id, char *uuid_str) {
     ae->flags |= HEALTH_ENTRY_FLAG_ACLK_QUEUED;
 }
 
-#define SQL_SELECT_ALERT_BY_UNIQUE_ID "SELECT hl.unique_id FROM health_log_%s hl, alert_hash ah WHERE hl.unique_id = %u " \
-                            "AND hl.config_hash_id = ah.hash_id " \
+#define SQL_SELECT_VARIABLE_ALERT_BY_UNIQUE_ID "SELECT hld.unique_id FROM health_log hl, alert_hash ah, health_log_detail hld WHERE hld.unique_id = %u " \
+                            "AND hl.config_hash_id = ah.hash_id AND hld.health_log_id = hl.health_log_id AND host_id = @host_id " \
                             "AND ah.warn IS NULL AND ah.crit IS NULL;"
-
-static inline bool is_event_from_alert_variable_config(uint32_t unique_id, char *uuid_str) {
+static inline bool is_event_from_alert_variable_config(uint32_t unique_id, uuid_t *host_id) {
     sqlite3_stmt *res = NULL;
     int rc = 0;
     bool ret = false;
 
     char sql[ACLK_SYNC_QUERY_SIZE];
-    snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1, SQL_SELECT_ALERT_BY_UNIQUE_ID, uuid_str, unique_id);
+    snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1, SQL_SELECT_VARIABLE_ALERT_BY_UNIQUE_ID, unique_id);
 
     rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement when trying to check for alert variables.");
+        return false;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id for checking alert variable.");
+        sqlite3_finalize(res);
         return false;
     }
 
@@ -76,13 +52,12 @@ static inline bool is_event_from_alert_variable_config(uint32_t unique_id, char 
 }
 
 #define MAX_REMOVED_PERIOD 604800 //a week
+
 //decide if some events should be sent or not
-
-#define SQL_SELECT_ALERT_BY_ID  "SELECT hl.new_status, hl.config_hash_id, hl.unique_id FROM health_log_%s hl, aclk_alert_%s aa " \
-                                "WHERE hl.unique_id = aa.filtered_alert_unique_id " \
-                                "AND hl.alarm_id = %u " \
-                                "ORDER BY alarm_event_id DESC LIMIT 1;"
-
+#define SQL_SELECT_ALERT_BY_ID  "SELECT hld.new_status, hl.config_hash_id, hld.unique_id FROM health_log hl, aclk_alert_%s aa, health_log_detail hld " \
+                                "WHERE hld.unique_id = aa.filtered_alert_unique_id " \
+                                "AND hld.alarm_id = %u AND hl.host_id = @host_id AND hl.health_log_id = hld.health_log_id " \
+                                "ORDER BY hld.alarm_event_id DESC LIMIT 1;"
 int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
 {
     sqlite3_stmt *res = NULL;
@@ -104,13 +79,20 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
 
     //get the previous sent event of this alarm_id
     //base the search on the last filtered event
-    snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1, SQL_SELECT_ALERT_BY_ID, uuid_str, uuid_str, ae->alarm_id);
+    snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1, SQL_SELECT_ALERT_BY_ID, uuid_str, ae->alarm_id);
 
     int rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement when trying to filter alert events.");
         send = 1;
         return send;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id for checking alert variable.");
+        sqlite3_finalize(res);
+        return false;
     }
 
     rc = sqlite3_step_monitored(res);
@@ -142,20 +124,6 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
         goto done;
     }
 
-    //detect a long off period of the agent, TODO make global
-    if (ae->new_status == RRDCALC_STATUS_WARNING || ae->new_status == RRDCALC_STATUS_CRITICAL) {
-        time_t when = removed_when(ae->alarm_id, ae->unique_id, unique_id, uuid_str);
-
-        if (when && (when + (time_t)MAX_REMOVED_PERIOD) < ae->when) {
-            send = 1;
-            goto done;
-        } else {
-            send = 0;
-            update_filtered(ae, unique_id, uuid_str);
-            goto done;
-        }
-    }
-     
 done:
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
@@ -164,12 +132,8 @@ done:
     return send;
 }
 
-// will replace call to aclk_update_alarm in health/health_log.c
-// and handle both cases
-
 #define SQL_QUEUE_ALERT_TO_CLOUD "INSERT INTO aclk_alert_%s (alert_unique_id, date_created, filtered_alert_unique_id) " \
                             "VALUES (@alert_unique_id, unixepoch(), @alert_unique_id) ON CONFLICT (alert_unique_id) do nothing;"
-
 int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, int skip_filter)
 {
     if(!service_running(SERVICE_ACLK))
@@ -193,7 +157,7 @@ int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, int skip_filter)
     char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
-    if (is_event_from_alert_variable_config(ae->unique_id, uuid_str))
+    if (is_event_from_alert_variable_config(ae->unique_id, &host->host_uuid))
         return 0;
 
     sqlite3_stmt *res_alert = NULL;
@@ -305,20 +269,17 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
 
     sqlite3_stmt *res = NULL;
 
-    buffer_sprintf(sql, "select aa.sequence_id, hl.unique_id, hl.alarm_id, hl.config_hash_id, hl.updated_by_id, hl.when_key, " \
-        " hl.duration, hl.non_clear_duration, hl.flags, hl.exec_run_timestamp, hl.delay_up_to_timestamp, hl.name,  " \
-        " hl.chart, hl.family, hl.exec, hl.recipient, hl.source, hl.units, hl.info, hl.exec_code, hl.new_status,  " \
-        " hl.old_status, hl.delay, hl.new_value, hl.old_value, hl.last_repeat, hl.chart_context, hl.transition_id, hl.alarm_event_id  " \
-        " from health_log_%s hl, aclk_alert_%s aa " \
-        " where hl.unique_id = aa.alert_unique_id and aa.date_submitted is null " \
-        " order by aa.sequence_id asc limit %d;", wc->uuid_str, wc->uuid_str, limit);
+    buffer_sprintf(sql, "select aa.sequence_id, hld.unique_id, hld.alarm_id, hl.config_hash_id, hld.updated_by_id, hld.when_key, " \
+        " hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, hld.delay_up_to_timestamp, hl.name,  " \
+        " hl.chart, hl.family, hl.exec, hl.recipient, ha.source, hl.units, hld.info, hld.exec_code, hld.new_status,  " \
+        " hld.old_status, hld.delay, hld.new_value, hld.old_value, hld.last_repeat, hl.chart_context, hld.transition_id, hld.alarm_event_id  " \
+        " from health_log hl, aclk_alert_%s aa, alert_hash ha, health_log_detail hld " \
+        " where hld.unique_id = aa.alert_unique_id and hl.config_hash_id = ha.hash_id and aa.date_submitted is null " \
+        " and hl.host_id = @host_id and hl.health_log_id = hld.health_log_id " \
+        " order by aa.sequence_id asc limit %d;", wc->uuid_str, limit);
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (rc != SQLITE_OK) {
-
-        // Try to create tables
-        if (wc->host)
-            sql_create_health_log_table(wc->host);
 
         BUFFER *sql_fix = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
         buffer_sprintf(sql_fix, TABLE_ACLK_ALERT, wc->uuid_str);
@@ -344,10 +305,15 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
         }
     }
 
-    uint64_t  first_sequence_id = 0;
-    uint64_t  last_sequence_id = 0;
-    static __thread uint64_t log_first_sequence_id = 0;
-    static __thread uint64_t log_last_sequence_id = 0;
+    rc = sqlite3_bind_blob(res, 1, &wc->host->host_uuid, sizeof(wc->host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id for pushing alert event.");
+        sqlite3_finalize(res);
+        return;
+    }
+
+    uint64_t first_sequence_id = 0;
+    uint64_t last_sequence_id = 0;
 
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         struct alarm_log_entry alarm_log;
@@ -371,7 +337,8 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
         alarm_log.timezone = strdupz(rrdhost_abbrev_timezone(wc->host));
         alarm_log.exec_path = sqlite3_column_bytes(res, 14) > 0 ? strdupz((char *)sqlite3_column_text(res, 14)) :
                                                                   strdupz((char *)string2str(wc->host->health.health_default_exec));
-        alarm_log.conf_source = strdupz((char *)sqlite3_column_text(res, 16));
+
+        alarm_log.conf_source = sqlite3_column_bytes(res, 16) > 0 ? strdupz((char *)sqlite3_column_text(res, 16)) : strdupz("");
 
         char *edit_command = sqlite3_column_bytes(res, 16) > 0 ?
                                  health_edit_command_from_source((char *)sqlite3_column_text(res, 16)) :
@@ -420,11 +387,11 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
         if (first_sequence_id == 0)
             first_sequence_id  = (uint64_t) sqlite3_column_int64(res, 0);
 
-        if (log_first_sequence_id == 0)
-            log_first_sequence_id  = (uint64_t) sqlite3_column_int64(res, 0);
+        if (wc->alerts_log_first_sequence_id == 0)
+            wc->alerts_log_first_sequence_id  = (uint64_t) sqlite3_column_int64(res, 0);
 
         last_sequence_id = (uint64_t) sqlite3_column_int64(res, 0);
-        log_last_sequence_id = (uint64_t) sqlite3_column_int64(res, 0);
+        wc->alerts_log_last_sequence_id = (uint64_t) sqlite3_column_int64(res, 0);
 
         destroy_alarm_log_entry(&alarm_log);
         freez(edit_command);
@@ -443,15 +410,15 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
         rrdhost_flag_set(wc->host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
 
     } else {
-        if (log_first_sequence_id)
+        if (wc->alerts_log_first_sequence_id)
             log_access(
                 "ACLK RES [%s (%s)]: ALERTS SENT from %" PRIu64 " to %" PRIu64 "",
                 wc->node_id,
                 wc->host ? rrdhost_hostname(wc->host) : "N/A",
-                log_first_sequence_id,
-                log_last_sequence_id);
-        log_first_sequence_id = 0;
-        log_last_sequence_id = 0;
+                wc->alerts_log_first_sequence_id,
+                wc->alerts_log_last_sequence_id);
+        wc->alerts_log_first_sequence_id = 0;
+        wc->alerts_log_last_sequence_id = 0;
     }
 
     rc = sqlite3_finalize(res);
@@ -486,17 +453,49 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
     char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
     BUFFER *sql = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
+    sqlite3_stmt *res = NULL;
+    int rc;
 
-    buffer_sprintf(sql,"delete from aclk_alert_%s; " \
-                       "insert into aclk_alert_%s (alert_unique_id, date_created, filtered_alert_unique_id) " \
-                       "select unique_id alert_unique_id, unixepoch(), unique_id alert_unique_id from health_log_%s " \
-                       "where new_status <> 0 and new_status <> -2 and config_hash_id is not null and updated_by_id = 0 " \
-                       "order by unique_id asc on conflict (alert_unique_id) do nothing;", uuid_str, uuid_str, uuid_str);
+    netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
 
-    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
+    buffer_sprintf(sql, "delete from aclk_alert_%s; ", uuid_str);
+    if (unlikely(db_execute(db_meta, buffer_tostring(sql)))) {
+        netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+        buffer_free(sql);
+        return;
+    }
 
-    if (unlikely(db_execute(db_meta, buffer_tostring(sql))))
-        error_report("Failed to queue existing ACLK alert events for host %s", rrdhost_hostname(host));
+    buffer_flush(sql);
+    buffer_sprintf(sql, "insert into aclk_alert_%s (alert_unique_id, date_created, filtered_alert_unique_id) " \
+                   "select hld.unique_id alert_unique_id, unixepoch(), hld.unique_id alert_unique_id from health_log_detail hld, health_log hl " \
+                   "where hld.new_status <> 0 and hld.new_status <> -2 and hl.health_log_id = hld.health_log_id and hl.config_hash_id is not null " \
+                   "and hld.updated_by_id = 0 and hl.host_id = @host_id order by hld.unique_id asc on conflict (alert_unique_id) do nothing;", uuid_str);
+
+    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement when trying to queue existing alerts.");
+        netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+        buffer_free(sql);
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id for when trying to queue existing alerts.");
+        sqlite3_finalize(res);
+        netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+        buffer_free(sql);
+        return;
+    }
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE)) {
+        error_report("Failed to queue existing alerts, rc = %d", rc);
+    }
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement to queue existing alerts, rc = %d", rc);
 
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
@@ -523,7 +522,6 @@ void aclk_send_alarm_configuration(char *config_hash)
     "module, charts, families, lookup, every, units, green, red, calc, warn, crit, to_key, exec, delay, repeat, info," \
     "options, host_labels, p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after," \
     "p_db_lookup_before, p_update_every FROM alert_hash WHERE hash_id = @hash_id;"
-
 int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash __maybe_unused)
 {
     int rc = 0;
@@ -685,13 +683,11 @@ void aclk_start_alert_streaming(char *node_id, bool resets)
 }
 
 #define SQL_QUEUE_REMOVE_ALERTS "INSERT INTO aclk_alert_%s (alert_unique_id, date_created, filtered_alert_unique_id) " \
-                                "SELECT unique_id alert_unique_id, UNIXEPOCH(), unique_id alert_unique_id FROM health_log_%s " \
-                                "WHERE new_status = -2 AND updated_by_id = 0 AND unique_id NOT IN " \
-                                "(SELECT alert_unique_id FROM aclk_alert_%s) " \
-                                "AND config_hash_id NOT IN (select hash_id from alert_hash where warn is null and crit is null) " \
-                                "ORDER BY unique_id ASC " \
-                                "ON CONFLICT (alert_unique_id) DO NOTHING;"
-
+    "SELECT hld.unique_id alert_unique_id, UNIXEPOCH(), hld.unique_id alert_unique_id FROM health_log hl, health_log_detail hld " \
+    "WHERE hl.host_id = @host_id AND hl.health_log_id = hld.health_log_id AND hld.new_status = -2 AND hld.updated_by_id = 0 " \
+    "AND hld.unique_id NOT IN (SELECT alert_unique_id FROM aclk_alert_%s) " \
+    "AND hl.config_hash_id NOT IN (select hash_id from alert_hash where warn is null and crit is null) " \
+    "ORDER BY hld.unique_id ASC ON CONFLICT (alert_unique_id) DO NOTHING;"
 void sql_process_queue_removed_alerts_to_aclk(char *node_id)
 {
     struct aclk_sync_host_config *wc;
@@ -702,15 +698,35 @@ void sql_process_queue_removed_alerts_to_aclk(char *node_id)
         return;
 
     char sql[ACLK_SYNC_QUERY_SIZE * 2];
+    sqlite3_stmt *res = NULL;
 
-    snprintfz(sql,ACLK_SYNC_QUERY_SIZE * 2 - 1, SQL_QUEUE_REMOVE_ALERTS, wc->uuid_str, wc->uuid_str, wc->uuid_str);
+    snprintfz(sql, ACLK_SYNC_QUERY_SIZE * 2 - 1, SQL_QUEUE_REMOVE_ALERTS, wc->uuid_str, wc->uuid_str);
 
-    if (unlikely(db_execute(db_meta, sql))) {
-        log_access("ACLK STA [%s (%s)]: QUEUED REMOVED ALERTS FAILED", wc->node_id, rrdhost_hostname(wc->host));
-        error_report("Failed to queue ACLK alert removed entries for host %s", rrdhost_hostname(wc->host));
+    int rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement when trying to queue removed alerts.");
+        return;
     }
-    else
-        log_access("ACLK STA [%s (%s)]: QUEUED REMOVED ALERTS", wc->node_id, rrdhost_hostname(wc->host));
+
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id for when trying to queue remvoed alerts.");
+        sqlite3_finalize(res);
+        return;
+    }
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE)) {
+        sqlite3_finalize(res);
+        error_report("Failed to queue removed alerts, rc = %d", rc);
+        return;
+    }
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement to queue removed alerts, rc = %d", rc);
+
+    log_access("ACLK STA [%s (%s)]: QUEUED REMOVED ALERTS", wc->node_id, rrdhost_hostname(wc->host));
 
     rrdhost_flag_set(wc->host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
     wc->alert_queue_removed = 0;
@@ -886,7 +902,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
         if (have_recent_alarm(host, ae->alarm_id, ae->unique_id))
             continue;
 
-        if (is_event_from_alert_variable_config(ae->unique_id, uuid_str))
+        if (is_event_from_alert_variable_config(ae->unique_id, &host->host_uuid))
             continue;
 
         cnt++;
@@ -918,7 +934,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
             if (have_recent_alarm(host, ae->alarm_id, ae->unique_id))
                 continue;
 
-            if (is_event_from_alert_variable_config(ae->unique_id, uuid_str))
+            if (is_event_from_alert_variable_config(ae->unique_id, &host->host_uuid))
                 continue;
 
             cnt++;
@@ -984,7 +1000,6 @@ void sql_aclk_alert_clean_dead_entries(RRDHOST *host)
 #define SQL_GET_MIN_MAX_ALERT_SEQ "SELECT MIN(sequence_id), MAX(sequence_id), " \
                                   "(SELECT MAX(sequence_id) FROM aclk_alert_%s WHERE date_submitted IS NOT NULL) " \
                                   "FROM aclk_alert_%s WHERE date_submitted IS NULL;"
-
 int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert_status)
 {
     int rc;

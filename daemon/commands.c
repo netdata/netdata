@@ -644,14 +644,18 @@ static void command_thread(void *arg)
         command_thread_error = ret;
         goto error_after_pipe_init;
     }
-    (void)uv_fs_unlink(loop, &req, PIPENAME, NULL);
+
+    const char *pipename = daemon_pipename();
+
+    (void)uv_fs_unlink(loop, &req, pipename, NULL);
     uv_fs_req_cleanup(&req);
-    ret = uv_pipe_bind(&server_pipe, PIPENAME);
+    ret = uv_pipe_bind(&server_pipe, pipename);
     if (ret) {
         error("uv_pipe_bind(): %s", uv_strerror(ret));
         command_thread_error = ret;
         goto error_after_pipe_bind;
     }
+
     ret = uv_listen((uv_stream_t *)&server_pipe, SOMAXCONN, connection_cb);
     if (ret) {
         /* Fallback to backlog of 1 */

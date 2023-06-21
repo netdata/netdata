@@ -779,17 +779,33 @@ void host_functions2json(RRDHOST *host, BUFFER *wb) {
     buffer_json_object_close(wb);
 }
 
-void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst) {
+void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst, void *value, size_t value_size) {
     if(!rrdset_functions_view || !dst) return;
 
     struct rrd_collector_function *t;
     dfe_start_read(rrdset_functions_view, t) {
         if(!t->collector->running) continue;
 
-        dictionary_set(dst, t_dfe.name, NULL, 0);
+        dictionary_set(dst, t_dfe.name, value, value_size);
     }
     dfe_done(t);
 }
+
+void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t value_size, STRING **help) {
+    if(!host || !host->functions || !dictionary_entries(host->functions) || !dst) return;
+
+    struct rrd_collector_function *t;
+    dfe_start_read(host->functions, t) {
+        if(!t->collector->running) continue;
+
+        if(help)
+            *help = t->help;
+
+        dictionary_set(dst, t_dfe.name, value, value_size);
+    }
+    dfe_done(t);
+}
+
 
 int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const char *function __maybe_unused,
                                void *collector_data __maybe_unused,

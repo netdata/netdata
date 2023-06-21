@@ -936,6 +936,8 @@ DAEMON_FILES = \
     daemon/static_threads.c \
     daemon/commands.c \
     daemon/commands.h \
+    daemon/pipename.c \
+    daemon/pipename.h \
     daemon/unit_test.c \
     daemon/unit_test.h \
     $(NULL)
@@ -1140,6 +1142,8 @@ endif
 
 NETDATACLI_FILES = \
     daemon/commands.h \
+    daemon/pipename.c \
+    daemon/pipename.h \
     libnetdata/buffer/buffer.c \
     libnetdata/buffer/buffer.h \
     cli/cli.c \
