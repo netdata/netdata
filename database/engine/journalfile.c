@@ -945,9 +945,6 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
     if (journal_v1_file_size && j2_header->journal_v1_file_size != journal_v1_file_size)
         return 1;
 
-    if (!db_engine_journal_check)
-        return 0;
-
     journal_v2_trailer = (struct journal_v2_block_trailer *) ((uint8_t *) data_start + journal_v2_file_size - sizeof(*journal_v2_trailer));
 
     crc = crc32(0L, Z_NULL, 0);
@@ -961,6 +958,9 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
 
     rc = journalfile_check_v2_extent_list(data_start, journal_v2_file_size);
     if (rc) return 1;
+
+    if (!db_engine_journal_check)
+        return 0;
 
     rc = journalfile_check_v2_metric_list(data_start, journal_v2_file_size);
     if (rc) return 1;
@@ -1028,6 +1028,15 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
 
     uint8_t *data_start = (uint8_t *)j2_header;
     uint32_t entries = j2_header->metric_count;
+
+    if (journalfile->v2.flags & JOURNALFILE_FLAG_METRIC_CRC_CHECK) {
+        journalfile->v2.flags &= ~JOURNALFILE_FLAG_METRIC_CRC_CHECK;
+        if (journalfile_check_v2_metric_list(data_start, j2_header->journal_v2_file_size)) {
+            journalfile->v2.flags &= ~JOURNALFILE_FLAG_IS_AVAILABLE;
+            // needs rebuild
+            return;
+        }
+    }
 
     struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
     time_t header_start_time_s  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
@@ -1140,6 +1149,9 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
          );
 
     // Initialize the journal file to be able to access the data
+
+    if (!db_engine_journal_check)
+        journalfile->v2.flags |= JOURNALFILE_FLAG_METRIC_CRC_CHECK;
     journalfile_v2_data_set(journalfile, fd, data_start, journal_v2_file_size);
 
     ctx_current_disk_space_increase(ctx, journal_v2_file_size);
