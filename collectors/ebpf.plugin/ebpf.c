@@ -2974,6 +2974,7 @@ int main(int argc, char **argv)
         (void)heartbeat_next(&hb, step);
 
         if (global_iterations_counter % EBPF_DEFAULT_UPDATE_EVERY == 0) {
+            pthread_mutex_lock(&ebpf_exit_cleanup);
             pthread_mutex_lock(&lock);
             ebpf_create_statistic_charts(EBPF_DEFAULT_UPDATE_EVERY);
 
@@ -2995,7 +2996,6 @@ int main(int argc, char **argv)
         }
         pthread_mutex_unlock(&collect_data_mutex);
         pthread_mutex_unlock(&ebpf_exit_cleanup);
-
     }
 
     ebpf_stop_threads(0);
