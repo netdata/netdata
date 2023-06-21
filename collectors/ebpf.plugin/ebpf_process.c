@@ -60,18 +60,12 @@ static netdata_syscall_stat_t process_aggregated_data[NETDATA_KEY_PUBLISH_PROCES
 static netdata_publish_syscall_t process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_END];
 
 int process_enabled = 0;
-bool publish_internal_metrics = true;
 
 struct config process_config = { .first_section = NULL,
     .last_section = NULL,
     .mutex = NETDATA_MUTEX_INITIALIZER,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
-
-static char *load_event_stat[NETDATA_EBPF_LOAD_STAT_END] = {"legacy", "co-re"};
-static char *memlock_stat = {"memory_locked"};
-static char *hash_table_stat = {"hash_table"};
-static char *hash_table_core[NETDATA_EBPF_LOAD_STAT_END] = {"per_core", "unique"};
 
 /*****************************************************************
  *
@@ -426,213 +420,6 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK],
                           2, em->update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
     }
-}
-
-/**
- * Create chart for Statistic Thread
- *
- * Write to standard output current values for threads.
- *
- * @param em a pointer to the structure with the default values.
- */
-static inline void ebpf_create_statistic_thread_chart(ebpf_module_t *em)
-{
-    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
-                         NETDATA_EBPF_THREADS,
-                         "Threads running.",
-                         "boolean",
-                         NETDATA_EBPF_FAMILY,
-                         NETDATA_EBPF_CHART_TYPE_LINE,
-                         NULL,
-                         NETDATA_EBPF_ORDER_STAT_THREADS,
-                         em->update_every,
-                         NETDATA_EBPF_MODULE_NAME_PROCESS);
-
-    int i;
-    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
-        ebpf_write_global_dimension((char *)ebpf_modules[i].thread_name,
-                                    (char *)ebpf_modules[i].thread_name,
-                                    ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
-    }
-}
-
-/**
- * Create life time Thread Chart
- *
- * Write to standard output current values for threads life time.
- *
- * @param em a pointer to the structure with the default values.
- */
-static inline void ebpf_create_life_time_thread_chart(ebpf_module_t *em)
-{
-    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
-                         NETDATA_EBPF_LIFE_TIME,
-                         "Threads running.",
-                         "seconds",
-                         NETDATA_EBPF_FAMILY,
-                         NETDATA_EBPF_CHART_TYPE_LINE,
-                         NULL,
-                         NETDATA_EBPF_ORDER_STAT_LIFE_TIME,
-                         em->update_every,
-                         NETDATA_EBPF_MODULE_NAME_PROCESS);
-
-    int i;
-    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
-        ebpf_write_global_dimension((char *)ebpf_modules[i].thread_name,
-                                    (char *)ebpf_modules[i].thread_name,
-                                    ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
-    }
-}
-
-/**
- * Create chart for Load Thread
- *
- * Write to standard output current values for load mode.
- *
- * @param em a pointer to the structure with the default values.
- */
-static inline void ebpf_create_statistic_load_chart(ebpf_module_t *em)
-{
-    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
-                         NETDATA_EBPF_LOAD_METHOD,
-                         "Load info.",
-                         "methods",
-                         NETDATA_EBPF_FAMILY,
-                         NETDATA_EBPF_CHART_TYPE_LINE,
-                         NULL,
-                         NETDATA_EBPF_ORDER_STAT_LOAD_METHOD,
-                         em->update_every,
-                         NETDATA_EBPF_MODULE_NAME_PROCESS);
-
-    ebpf_write_global_dimension(load_event_stat[NETDATA_EBPF_LOAD_STAT_LEGACY],
-                                load_event_stat[NETDATA_EBPF_LOAD_STAT_LEGACY],
-                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
-
-    ebpf_write_global_dimension(load_event_stat[NETDATA_EBPF_LOAD_STAT_CORE],
-                                load_event_stat[NETDATA_EBPF_LOAD_STAT_CORE],
-                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
-}
-
-/**
- * Create chart for Kernel Memory
- *
- * Write to standard output current values for allocated memory.
- *
- * @param em a pointer to the structure with the default values.
- */
-static inline void ebpf_create_statistic_kernel_memory(ebpf_module_t *em)
-{
-    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
-                         NETDATA_EBPF_KERNEL_MEMORY,
-                         "Memory allocated for hash tables.",
-                         "bytes",
-                         NETDATA_EBPF_FAMILY,
-                         NETDATA_EBPF_CHART_TYPE_LINE,
-                         NULL,
-                         NETDATA_EBPF_ORDER_STAT_KERNEL_MEMORY,
-                         em->update_every,
-                         NETDATA_EBPF_MODULE_NAME_PROCESS);
-
-    ebpf_write_global_dimension(memlock_stat,
-                                memlock_stat,
-                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
-}
-
-/**
- * Create chart Hash Table
- *
- * Write to standard output number of hash tables used with this software.
- *
- * @param em a pointer to the structure with the default values.
- */
-static inline void ebpf_create_statistic_hash_tables(ebpf_module_t *em)
-{
-    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
-                         NETDATA_EBPF_HASH_TABLES_LOADED,
-                         "Number of hash tables loaded.",
-                         "hash tables",
-                         NETDATA_EBPF_FAMILY,
-                         NETDATA_EBPF_CHART_TYPE_LINE,
-                         NULL,
-                         NETDATA_EBPF_ORDER_STAT_HASH_TABLES,
-                         em->update_every,
-                         NETDATA_EBPF_MODULE_NAME_PROCESS);
-
-    ebpf_write_global_dimension(hash_table_stat,
-                                hash_table_stat,
-                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
-}
-
-/**
- * Create chart for percpu stats
- *
- * Write to standard output current values for threads.
- *
- * @param em a pointer to the structure with the default values.
- */
-static inline void ebpf_create_statistic_hash_per_core(ebpf_module_t *em)
-{
-    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
-                         NETDATA_EBPF_HASH_TABLES_PER_CORE,
-                         "How threads are loading hash/array tables.",
-                         "threads",
-                         NETDATA_EBPF_FAMILY,
-                         NETDATA_EBPF_CHART_TYPE_LINE,
-                         NULL,
-                         NETDATA_EBPF_ORDER_STAT_HASH_CORE,
-                         em->update_every,
-                         NETDATA_EBPF_MODULE_NAME_PROCESS);
-
-    ebpf_write_global_dimension(hash_table_core[NETDATA_EBPF_THREAD_PER_CORE],
-                                hash_table_core[NETDATA_EBPF_THREAD_PER_CORE],
-                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
-
-    ebpf_write_global_dimension(hash_table_core[NETDATA_EBPF_THREAD_UNIQUE],
-                                hash_table_core[NETDATA_EBPF_THREAD_UNIQUE],
-                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
-}
-
-/**
- * Update Internal Metric variable
- *
- * By default eBPF.plugin sends internal metrics for netdata, but user can
- * disable this.
- *
- * The function updates the variable used to send charts.
- */
-static void update_internal_metric_variable()
-{
-    const char *s = getenv("NETDATA_INTERNALS_MONITORING");
-    if (s && *s && strcmp(s, "NO") == 0)
-        publish_internal_metrics = false;
-}
-
-/**
- * Create Statistics Charts
- *
- * Create charts that will show statistics related to eBPF plugin.
- *
- * @param em a pointer to the structure with the default values.
- */
-static void ebpf_create_statistic_charts(ebpf_module_t *em)
-{
-    update_internal_metric_variable();
-    if (!publish_internal_metrics)
-        return;
-
-    ebpf_create_statistic_thread_chart(em);
-    EBPF_PLUGIN_FUNCTIONS(EBPF_FUNCTION_THREAD, EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
-
-    ebpf_create_life_time_thread_chart(em);
-    EBPF_PLUGIN_FUNCTIONS(EBPF_FUNCTION_THREAD, EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
-
-    ebpf_create_statistic_load_chart(em);
-
-    ebpf_create_statistic_kernel_memory(em);
-
-    ebpf_create_statistic_hash_tables(em);
-
-    ebpf_create_statistic_hash_per_core(em);
 }
 
 /**
@@ -1077,53 +864,6 @@ void ebpf_process_update_cgroup_algorithm()
 }
 
 /**
- * Send Statistic Data
- *
- * Send statistic information to netdata.
- */
-void ebpf_send_statistic_data()
-{
-    if (!publish_internal_metrics)
-        return;
-
-    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_THREADS);
-    int i;
-    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
-        ebpf_module_t *wem = &ebpf_modules[i];
-        write_chart_dimension((char *)wem->thread_name, (wem->enabled != NETDATA_THREAD_EBPF_NOT_RUNNING) ? 1 : 0);
-    }
-    write_end_chart();
-
-    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_LIFE_TIME);
-    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX ; i++) {
-        ebpf_module_t *wem = &ebpf_modules[i];
-        write_chart_dimension((char *)wem->thread_name,
-                              (wem->enabled != NETDATA_THREAD_EBPF_NOT_RUNNING) ?
-                              (long long) (wem->life_time - wem->running_time):
-                              0) ;
-    }
-    write_end_chart();
-
-    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_LOAD_METHOD);
-    write_chart_dimension(load_event_stat[NETDATA_EBPF_LOAD_STAT_LEGACY], (long long)plugin_statistics.legacy);
-    write_chart_dimension(load_event_stat[NETDATA_EBPF_LOAD_STAT_CORE], (long long)plugin_statistics.core);
-    write_end_chart();
-
-    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_KERNEL_MEMORY);
-    write_chart_dimension(memlock_stat, (long long)plugin_statistics.memlock_kern);
-    write_end_chart();
-
-    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_HASH_TABLES_LOADED);
-    write_chart_dimension(hash_table_stat, (long long)plugin_statistics.hash_tables);
-    write_end_chart();
-
-    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_HASH_TABLES_PER_CORE);
-    write_chart_dimension(hash_table_core[NETDATA_EBPF_THREAD_PER_CORE], (long long)plugin_statistics.hash_percpu);
-    write_chart_dimension(hash_table_core[NETDATA_EBPF_THREAD_UNIQUE], (long long)plugin_statistics.hash_unique);
-    write_end_chart();
-}
-
-/**
  * Main loop for this collector.
  *
  * @param em   the structure with thread information
@@ -1167,7 +907,6 @@ static void process_collector(ebpf_module_t *em)
             }
 
             pthread_mutex_lock(&lock);
-            ebpf_send_statistic_data();
 
             if (thread_enabled == NETDATA_THREAD_EBPF_RUNNING) {
                 if (publish_global) {
@@ -1337,8 +1076,6 @@ void *ebpf_process_thread(void *ptr)
     if (ebpf_aral_process_stat)
         ebpf_statistic_create_aral_chart(NETDATA_EBPF_PROC_ARAL_NAME, em);
 #endif
-
-    ebpf_create_statistic_charts(em);
 
     pthread_mutex_unlock(&lock);
 
