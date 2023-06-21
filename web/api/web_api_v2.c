@@ -426,7 +426,7 @@ static int web_client_api_request_v2_alerts(RRDHOST *host __maybe_unused, struct
     w->response.data->content_type = CT_APPLICATION_JSON;
     buffer_json_initialize( w->response.data, "\"", "\"", 0, true, alert_options & ALERT_OPTION_MINIFY);
 
-    if (alert_options & ALERT_OPTION_HISTORY && !req.last)
+    if (alert_options & ALERT_OPTION_INSTANCES && !req.last)
         req.last = 1;
 
     req.options = alert_options;

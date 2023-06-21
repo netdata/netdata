@@ -59,7 +59,7 @@ static struct {
      , {"active"           , 0    , ALERT_OPTION_ACTIVE}
      , {"config"           , 0    , ALERT_OPTION_CONFIG}
      , {"transitions"      , 0    , ALERT_OPTION_TRANSITIONS}
-     , {"history"          , 0    , ALERT_OPTION_HISTORY}
+     , {"instances"        , 0    , ALERT_OPTION_INSTANCES}
     , {NULL                , 0    , 0}
 };
 

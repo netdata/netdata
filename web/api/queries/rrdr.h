@@ -56,7 +56,7 @@ typedef enum alert_options {
     ALERT_OPTION_ACTIVE          = (1 << 1), // Only active alerts
     ALERT_OPTION_CONFIG          = (1 << 2), // Include config
     ALERT_OPTION_TRANSITIONS     = (1 << 3), // Include transitions
-    ALERT_OPTION_HISTORY         = (1 << 4), // Include alert history
+    ALERT_OPTION_INSTANCES       = (1 << 4), // Include alert instances
 } ALERT_OPTIONS;
 
 typedef enum __attribute__ ((__packed__)) rrdr_value_flag {
