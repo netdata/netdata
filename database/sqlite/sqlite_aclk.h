@@ -27,11 +27,19 @@ static inline void uuid_unparse_lower_fix(uuid_t *uuid, char *out)
     out[23] = '_';
 }
 
+static inline int uuid_parse_fix(char *in, uuid_t uuid)
+{
+    in[8] = '-';
+    in[13] = '-';
+    in[18] = '-';
+    in[23] = '-';
+    return uuid_parse(in, uuid);
+}
+
 static inline int claimed()
 {
     return localhost->aclk_state.claimed_id != NULL;
 }
-
 
 #define TABLE_ACLK_ALERT "CREATE TABLE IF NOT EXISTS aclk_alert_%s (sequence_id INTEGER PRIMARY KEY, " \
         "alert_unique_id, date_created, date_submitted, date_cloud_ack, filtered_alert_unique_id NOT NULL, " \
@@ -79,6 +87,8 @@ struct aclk_sync_host_config {
     char uuid_str[UUID_STR_LEN];
     char node_id[UUID_STR_LEN];
     char *alerts_snapshot_uuid;        // will contain the snapshot_uuid value if snapshot was requested
+    uint64_t alerts_log_first_sequence_id;
+    uint64_t alerts_log_last_sequence_id;
 };
 
 extern sqlite3 *db_meta;

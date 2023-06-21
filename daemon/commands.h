@@ -3,12 +3,6 @@
 #ifndef NETDATA_COMMANDS_H
 #define NETDATA_COMMANDS_H 1
 
-#ifdef _WIN32
-# define PIPENAME "\\\\?\\pipe\\netdata-cli"
-#else
-# define PIPENAME "/tmp/netdata-ipc"
-#endif
-
 #define MAX_COMMAND_LENGTH 4096
 #define MAX_EXIT_STATUS_LENGTH 23 /* Can't ever be bigger than "X-18446744073709551616" */
 
