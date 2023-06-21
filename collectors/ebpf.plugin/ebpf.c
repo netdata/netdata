@@ -2948,8 +2948,7 @@ int main(int argc, char **argv)
 
         ebpf_module_t *em = &ebpf_modules[i];
         em->thread = st;
-        // We always initialize process, because it is responsible to take care of apps integration
-        if (em->enabled || !i) {
+        if (em->enabled) {
             st->thread = mallocz(sizeof(netdata_thread_t));
             em->thread_id = i;
             em->enabled = NETDATA_THREAD_EBPF_RUNNING;
@@ -2970,6 +2969,14 @@ int main(int argc, char **argv)
     for ( ; !ebpf_exit_plugin ; global_iterations_counter++) {
         (void)heartbeat_next(&hb, step);
 
+        if (global_iterations_counter % EBPF_DEFAULT_UPDATE_EVERY == 0) {
+            pthread_mutex_lock(&lock);
+            ebpf_create_statistic_charts(EBPF_DEFAULT_UPDATE_EVERY);
+
+            ebpf_send_statistic_data();
+            pthread_mutex_unlock(&lock);
+        }
+
         pthread_mutex_lock(&ebpf_exit_cleanup);
         pthread_mutex_lock(&collect_data_mutex);
         if (++update_apps_list == update_apps_every) {
@@ -2984,14 +2991,6 @@ int main(int argc, char **argv)
         pthread_mutex_unlock(&collect_data_mutex);
         pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-        if (global_iterations_counter < EBPF_DEFAULT_UPDATE_EVERY)
-            continue;
-
-        pthread_mutex_lock(&lock);
-        ebpf_create_statistic_charts(1);
-
-        ebpf_send_statistic_data();
-        pthread_mutex_unlock(&lock);
     }
 
     ebpf_stop_threads(0);

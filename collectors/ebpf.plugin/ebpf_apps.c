@@ -1338,8 +1338,10 @@ void cleanup_exited_pids()
             p = p->next;
 
             // Clean process structure
-            ebpf_process_stat_release(global_process_stats[r]);
-            global_process_stats[r] = NULL;
+            if (global_process_stats) {
+                ebpf_process_stat_release(global_process_stats[r]);
+                global_process_stats[r] = NULL;
+            }
 
             cleanup_variables_from_other_threads(r);
 
