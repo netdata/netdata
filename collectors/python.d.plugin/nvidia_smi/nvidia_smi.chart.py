@@ -17,6 +17,8 @@ disabled_by_default = True
 
 NVIDIA_SMI = 'nvidia-smi'
 
+NOT_AVAILABLE = 'N/A'
+
 EMPTY_ROW = ''
 EMPTY_ROW_LIMIT = 500
 POLLER_BREAK_ROW = '</nvidia_smi_log>'
@@ -482,7 +484,7 @@ class GPU:
         }
 
         pci_bw_max = self.pci_bw_max()
-        if not pci_bw_max:
+        if not pci_bw_max or self.rx_util() == NOT_AVAILABLE or self.tx_util() == NOT_AVAILABLE:
             data['rx_util_percent'] = 0
             data['tx_util_percent'] = 0
         else :
