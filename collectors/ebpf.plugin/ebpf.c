@@ -30,6 +30,7 @@ int ebpf_nprocs;
 int isrh = 0;
 int main_thread_id = 0;
 int process_pid_fd = -1;
+static size_t global_iterations_counter = 1;
 
 pthread_mutex_t lock;
 pthread_mutex_t ebpf_exit_cleanup;
@@ -2691,7 +2692,7 @@ int main(int argc, char **argv)
     int update_apps_list = update_apps_every - 1;
     int process_maps_per_core = ebpf_modules[EBPF_MODULE_PROCESS_IDX].maps_per_core;
     //Plugin will be killed when it receives a signal
-    while (!ebpf_exit_plugin) {
+    for ( ; !ebpf_exit_plugin ; global_iterations_counter++) {
         (void)heartbeat_next(&hb, step);
 
         pthread_mutex_lock(&ebpf_exit_cleanup);
