@@ -483,13 +483,14 @@ class GPU:
             'power_draw': self.power_draw(),
         }
 
-        pci_bw_max = self.pci_bw_max()
-        if not pci_bw_max or self.rx_util() == NOT_AVAILABLE or self.tx_util() == NOT_AVAILABLE:
-            data['rx_util_percent'] = 0
-            data['tx_util_percent'] = 0
-        else :
-            data['rx_util_percent'] = str(int(int(self.rx_util())*100/self.pci_bw_max()))
-            data['tx_util_percent'] = str(int(int(self.tx_util())*100/self.pci_bw_max()))
+        if self.rx_util() != NOT_AVAILABLE and self.tx_util() != NOT_AVAILABLE:
+            pci_bw_max = self.pci_bw_max()
+            if not pci_bw_max:
+                data['rx_util_percent'] = 0
+                data['tx_util_percent'] = 0
+            else:
+                data['rx_util_percent'] = str(int(int(self.rx_util()) * 100 / self.pci_bw_max()))
+                data['tx_util_percent'] = str(int(int(self.tx_util()) * 100 / self.pci_bw_max()))
 
 
         for v in POWER_STATES:
