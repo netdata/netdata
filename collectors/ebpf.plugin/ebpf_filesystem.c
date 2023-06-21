@@ -459,6 +459,7 @@ static void ebpf_create_fs_charts(int update_every)
  */
 int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
 {
+    pthread_mutex_lock(&lock);
     int i;
     const char *saved_name = em->thread_name;
     uint64_t kernels = em->kernels;
@@ -476,6 +477,8 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
                 if (!efp->probe_links) {
                     em->thread_name = saved_name;
                     em->kernels = kernels;
+                    em->maps = NULL;
+                    pthread_mutex_unlock(&lock);
                     return -1;
                 }
             }
@@ -494,9 +497,7 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
             }
 #endif
             efp->flags |= NETDATA_FILESYSTEM_FLAG_HAS_PARTITION;
-            pthread_mutex_lock(&lock);
             ebpf_update_kernel_memory(&plugin_statistics, efp->fs_maps, EBPF_ACTION_STAT_ADD);
-            pthread_mutex_unlock(&lock);
 
             // Nedeed for filesystems like btrfs
             if ((efp->flags & NETDATA_FILESYSTEM_FILL_ADDRESS_TABLE) && (efp->addresses.function)) {
@@ -506,6 +507,7 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
         efp->flags &= ~NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM;
     }
     em->thread_name = saved_name;
+    pthread_mutex_unlock(&lock);
     em->kernels = kernels;
     em->maps = NULL;
 

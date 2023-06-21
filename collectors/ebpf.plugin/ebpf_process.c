@@ -449,7 +449,7 @@ static inline void ebpf_create_statistic_thread_chart(ebpf_module_t *em)
                          NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     int i;
-    for (i = 0; ebpf_modules[i].thread_name; i++) {
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
         ebpf_write_global_dimension((char *)ebpf_modules[i].thread_name,
                                     (char *)ebpf_modules[i].thread_name,
                                     ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
@@ -477,7 +477,7 @@ static inline void ebpf_create_life_time_thread_chart(ebpf_module_t *em)
                          NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     int i;
-    for (i = 0; ebpf_modules[i].thread_name; i++) {
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
         ebpf_write_global_dimension((char *)ebpf_modules[i].thread_name,
                                     (char *)ebpf_modules[i].thread_name,
                                     ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
@@ -1088,14 +1088,14 @@ void ebpf_send_statistic_data()
 
     write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_THREADS);
     int i;
-    for (i = 0; ebpf_modules[i].thread_name; i++) {
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
         ebpf_module_t *wem = &ebpf_modules[i];
         write_chart_dimension((char *)wem->thread_name, (wem->enabled != NETDATA_THREAD_EBPF_NOT_RUNNING) ? 1 : 0);
     }
     write_end_chart();
 
     write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_LIFE_TIME);
-    for (i = 0; ebpf_modules[i].thread_name; i++) {
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX ; i++) {
         ebpf_module_t *wem = &ebpf_modules[i];
         write_chart_dimension((char *)wem->thread_name,
                               (wem->enabled != NETDATA_THREAD_EBPF_NOT_RUNNING) ?
@@ -1189,13 +1189,14 @@ static void process_collector(ebpf_module_t *em)
             }
             pthread_mutex_unlock(&lock);
             pthread_mutex_unlock(&collect_data_mutex);
+
+            pthread_mutex_lock(&ebpf_exit_cleanup);
+            running_time += update_every;
+            em->running_time = running_time;
+            pthread_mutex_unlock(&ebpf_exit_cleanup);
         }
 
         fflush(stdout);
-        pthread_mutex_lock(&ebpf_exit_cleanup);
-        running_time += update_every;
-        em->running_time = running_time;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 

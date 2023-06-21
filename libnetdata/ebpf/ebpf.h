@@ -314,6 +314,7 @@ typedef struct ebpf_module {
 } ebpf_module_t;
 
 #define EBPF_LIFE_TIME 300
+// This will be present until all functions are merged
 #define EBPF_NON_FUNCTION_LIFE_TIME 86400
 
 int ebpf_get_kernel_version();
