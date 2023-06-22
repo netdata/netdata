@@ -197,9 +197,9 @@ static void ebpf_function_thread_manipulation(const char *transaction,
 
         // status
         buffer_json_add_array_item_string(wb,
-                                          (wem->enabled != NETDATA_THREAD_EBPF_NOT_RUNNING) ?
-                                          EBPF_THREAD_STATUS_RUNNING:
-                                          EBPF_THREAD_STATUS_STOPPED);
+                                          (wem->enabled != NETDATA_THREAD_EBPF_RUNNING) ?
+                                          EBPF_THREAD_STATUS_STOPPED:
+                                          EBPF_THREAD_STATUS_RUNNING);
 
         // description
         buffer_json_add_array_item_string(wb, wem->thread_description);
