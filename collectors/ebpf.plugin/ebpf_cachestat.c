@@ -383,15 +383,16 @@ static void ebpf_obsolete_services(ebpf_module_t *em)
  *
  * @param em a pointer to `struct ebpf_module`
  */
-static inline void ebpf_obsolete_cgroup_charts(ebpf_module_t *em) {
+static inline void ebpf_obsolete_cachestat_cgroup_charts(ebpf_module_t *em) {
     pthread_mutex_lock(&mutex_cgroup_shm);
+
+    ebpf_obsolete_services(em);
 
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (ect->systemd)
             continue;
 
-        ebpf_obsolete_services(em);
         ebpf_obsolete_specific_cachestat_charts(ect->name, em->update_every);
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
@@ -491,7 +492,7 @@ static void ebpf_cachestat_exit(void *ptr)
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
         if (em->cgroup_charts) {
-            ebpf_obsolete_cgroup_charts(em);
+            ebpf_obsolete_cachestat_cgroup_charts(em);
             fflush(stdout);
         }
 
@@ -1274,7 +1275,13 @@ static void cachestat_collector(ebpf_module_t *em)
         pthread_mutex_unlock(&collect_data_mutex);
 
         pthread_mutex_lock(&ebpf_exit_cleanup);
-        running_time += update_every;
+        // When a new request happen before the end of previous request, we reset em->running_time, so
+        // we need to reset running_time here
+        if (running_time && !em->running_time)
+            running_time = update_every;
+        else
+            running_time += update_every;
+
         em->running_time = running_time;
         pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
