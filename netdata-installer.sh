@@ -570,40 +570,9 @@ fi
 trap build_error EXIT
 
 # -----------------------------------------------------------------------------
+# Bundle sentry
 
-bundle_sentry() {
-  if [ -z "${ENABLE_SENTRY}" ]; then
-    echo "Skipping sentry"
-    return 0
-  fi
-
-  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling sentry."
-
-  tmp="$(mktemp -d -t netdata-sentry-XXXXXX)"
-
-  if [ -d "${PWD}/externaldeps/sentry-native" ]
-  then
-    echo >&2 "Found compiled sentry-native, not compiling it again. Remove path '${PWD}/externaldeps/sentry-native' to recompile."
-    return 0
-  fi
-
-  cmake -B "${tmp}" \
-    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-    -DCMAKE_INSTALL_LIBDIR="${PWD}/externaldeps/sentry-native/lib" \
-    -DCMAKE_INSTALL_PREFIX="${PWD}/externaldeps/sentry-native" \
-    -DBUILD_SHARED_LIBS=Off \
-    -DCMAKE_C_FLAGS='-DJSMN_STATIC' \
-    "${PWD}/libnetdata/sentry/sentry-native"
-
-  cmake --build "${tmp}" --parallel
-  cmake --install "${tmp}"
-
-  rm -rf "${tmp}"
-
-  run_ok "sentry built and prepared."
-}
-
-bundle_sentry
+. "${INSTALLER_DIR}/packaging/bundle-sentry.sh" "${PWD}" "${PWD}" || exit 1
 
 # -----------------------------------------------------------------------------
 build_protobuf() {

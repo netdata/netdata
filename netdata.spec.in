@@ -20,11 +20,13 @@ AutoReqProv: yes
 # hours to finish).
 %global _lto_cflags %nil
 
-# Disable eBPF for architectures other than x86
+# Disable eBPF & Sentry for architectures other than x86
 %ifarch x86_64 i386
 %global _have_ebpf 1
+%global _have_sentry 1
 %else
 %global _have_ebpf 0
+%global _have_sentry 0
 %endif
 
 # Mitigate the cross-distro mayhem by strictly defining the libexec destination
@@ -222,6 +224,9 @@ happened, on your systems and applications.
 
 %prep
 %setup -q -n %{name}-%{version}
+%if 0%{?_have_sentry}
+${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-sentry.sh ${RPM_BUILD_DIR}/%{name}-%{version} ${RPM_BUILD_DIR}/%{name}-%{version}
+%endif
 # Only bundle protobuf on CentOS 7 or earlier
 %if 0%{?centos_ver:1}
 %if %{centos_ver} < 8
@@ -242,6 +247,7 @@ export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging
 export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-ebpf-co-re.sh ${RPM_BUILD_DIR}/%{name}-%{version}
 %endif
 %endif
+
 
 %build
 # Conf step
@@ -269,7 +275,11 @@ autoreconf -ivf
 	--with-zlib \
 	--with-math \
 	--with-user=netdata \
-	--disable-dependency-tracking
+	%if 0%{?_have_sentry}
+	--enable-sentry \
+	%endif
+	--disable-dependency-trackin
+
 
 # Build step
 %{__make} %{?_smp_mflags}
