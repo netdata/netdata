@@ -2934,13 +2934,11 @@ int main(int argc, char **argv)
         (void)heartbeat_next(&hb, step);
 
         if (global_iterations_counter % EBPF_DEFAULT_UPDATE_EVERY == 0) {
-            pthread_mutex_lock(&ebpf_exit_cleanup);
             pthread_mutex_lock(&lock);
             ebpf_create_statistic_charts(EBPF_DEFAULT_UPDATE_EVERY);
 
             ebpf_send_statistic_data();
             pthread_mutex_unlock(&lock);
-            pthread_mutex_unlock(&ebpf_exit_cleanup);
         }
 
         pthread_mutex_lock(&ebpf_exit_cleanup);
