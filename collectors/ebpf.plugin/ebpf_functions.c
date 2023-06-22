@@ -255,6 +255,12 @@ static void ebpf_function_thread_manipulation(const char *transaction,
         // description
         buffer_json_add_array_item_string(wb, wem->thread_description);
 
+        // action
+        buffer_json_add_array_item_string(wb,
+                                          (wem->enabled != NETDATA_THREAD_EBPF_RUNNING)
+                                          ? "NULL" :
+                                          "Enabled/Disabled");
+
         buffer_json_array_close(wb);
     }
 
@@ -364,7 +370,14 @@ static void ebpf_function_thread_manipulation(const char *transaction,
                              RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                              RRDF_FIELD_FILTER_MULTISELECT,
                              RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
+
         buffer_rrdf_table_add_field(wb, fields_id++, "Description", "Thread Desc", RRDF_FIELD_TYPE_STRING,
+                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
+
+        buffer_rrdf_table_add_field(wb, fields_id++, "Action", "Thread Action", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
