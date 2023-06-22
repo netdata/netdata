@@ -152,6 +152,10 @@ static void ebpf_function_thread_manipulation(const char *transaction,
                 if (period <= 0)
                     period = EBPF_DEFAULT_LIFETIME;
 
+                // another request for thread that already ran, cleanup and restart
+                if (st->thread)
+                    freez(st->thread);
+
                 st->thread = mallocz(sizeof(netdata_thread_t));
                 lem->enabled = NETDATA_THREAD_EBPF_FUNCTION_RUNNING;
                 lem->lifetime = period;
