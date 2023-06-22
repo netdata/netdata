@@ -88,6 +88,7 @@ CURL="$(PATH="${PATH}:/opt/netdata/bin" command -v curl 2>/dev/null && true)"
 BADCACHE_MSG="Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour"
 BADNET_MSG="This is usually a result of a networking issue"
 ERROR_F0003="Could not find a usable HTTP client. Either curl or wget is required to proceed with installation."
+BADOPT_MSG="If you are following a third-party guide online, please see ${INSTALL_DOC_URL} for current instructions for using this script. If you are using a local copy of this script instead of fetching it from our servers, consider updating it. If you intended to pass this option to the installer code, please use either --local-build-options or --static-install-options to specify it instead."
 
 # ======================================================================
 # Core program logic
@@ -2218,7 +2219,8 @@ parse_args() {
           fatal "A source directory must be specified with the --offline-install-source option." F0501
         fi
         ;;
-      *) fatal "Unrecognized option '${1}'. If you are following a third-party guide online, please see ${INSTALL_DOC_URL} for current instructions for using this script. If you are using a local copy of this script instead of fetching it from our servers, consider updating it. If you intended to pass this option to the installer code, please use either --local-build-options or --static-install-options to specify it instead." F050E ;;
+      "--"|"all"|"--yes"|"-y"|"--force"|"--accept") warning "Option '${1}' is not recognized, ignoring it. ${BADOPT_MSG}" ;;
+      *) fatal "Unrecognized option '${1}'. ${BADOPT_MSG}" F050E ;;
     esac
     shift 1
   done
