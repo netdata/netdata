@@ -164,9 +164,20 @@ run chmod g+rx,o+rx /opt
 run find /opt/netdata -type d -exec chmod go+rx '{}' \+
 run chown -R ${NETDATA_USER}:${NETDATA_GROUP} /opt/netdata/var
 
+if [ -d /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d ]; then
+  run chown -R root:${NETDATA_GROUP} /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d
+fi
+
 # -----------------------------------------------------------------------------
 
 progress "changing plugins ownership and permissions"
+
+for x in apps.plugin perf.plugin slabinfo.plugin debugfs.plugin freeipmi.plugin ioping cgroup-network ebpf.plugin nfacct.plugin xenstat.plugin python.d.plugin charts.d.plugin go.d.plugin ioping.plugin cgroup-network-helper.sh; do
+  f="usr/libexec/netdata/plugins.d/${x}"
+  if [ -f "${f}" ]; then
+    run chown root:${NETDATA_GROUP} "${f}"
+  fi
+done
 
 if command -v setcap >/dev/null 2>&1; then
     run setcap "cap_dac_read_search,cap_sys_ptrace=ep" "usr/libexec/netdata/plugins.d/apps.plugin"
@@ -183,7 +194,6 @@ if command -v setcap >/dev/null 2>&1; then
 else
   for x in apps.plugin perf.plugin slabinfo.plugin debugfs.plugin; do
     f="usr/libexec/netdata/plugins.d/${x}"
-    run chown root:${NETDATA_GROUP} "${f}"
     run chmod 4750 "${f}"
   done
 fi
@@ -192,7 +202,6 @@ for x in freeipmi.plugin ioping cgroup-network ebpf.plugin nfacct.plugin xenstat
   f="usr/libexec/netdata/plugins.d/${x}"
 
   if [ -f "${f}" ]; then
-    run chown root:${NETDATA_GROUP} "${f}"
     run chmod 4750 "${f}"
   fi
 done
