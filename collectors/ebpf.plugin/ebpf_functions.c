@@ -140,8 +140,13 @@ static void ebpf_function_thread_manipulation(const char *transaction,
             }
 
             pthread_mutex_lock(&ebpf_exit_cleanup);
+<<<<<<< HEAD
             if (lem->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
                 struct netdata_static_thread *st = lem->thread;
+=======
+            if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !em->thread->thread) {
+                struct netdata_static_thread *st = em->thread;
+>>>>>>> 18c66d065 (ebpf_functions: Create new enum element to indicate origin of thread startup. Update code to use new element.)
                 // Load configuration again
                 ebpf_update_module(lem, default_btf, running_on_kernel, isrh);
 
@@ -153,8 +158,14 @@ static void ebpf_function_thread_manipulation(const char *transaction,
                     period = EBPF_DEFAULT_LIFETIME;
 
                 st->thread = mallocz(sizeof(netdata_thread_t));
+<<<<<<< HEAD
                 lem->enabled = NETDATA_THREAD_EBPF_FUNCTION_RUNNING;
                 lem->lifetime = period;
+=======
+                em->thread_id = i;
+                em->enabled = NETDATA_THREAD_EBPF_FUNCTION_RUNNING;
+                em->life_time = period;
+>>>>>>> 18c66d065 (ebpf_functions: Create new enum element to indicate origin of thread startup. Update code to use new element.)
 
 #ifdef NETDATA_INTERNAL_CHECKS
                 netdata_log_info("Starting thread %s with lifetime = %d", thread_name, period);
@@ -255,7 +266,7 @@ static void ebpf_function_thread_manipulation(const char *transaction,
         // description
         buffer_json_add_array_item_string(wb, wem->thread_description);
 
-        if (wem->enabled != NETDATA_THREAD_EBPF_RUNNING) {
+        if (wem->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
             // status
             buffer_json_add_array_item_string(wb, EBPF_THREAD_STATUS_STOPPED);
 
