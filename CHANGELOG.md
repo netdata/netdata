@@ -6,12 +6,18 @@
 
 **Merged pull requests:**
 
+- Create index for health log migration [\#15233](https://github.com/netdata/netdata/pull/15233) ([stelfrag](https://github.com/stelfrag))
+- New alerts endpoint [\#15232](https://github.com/netdata/netdata/pull/15232) ([stelfrag](https://github.com/stelfrag))
+- fix not handling N/A value in python.d/nvidia\_smi [\#15231](https://github.com/netdata/netdata/pull/15231) ([ilyam8](https://github.com/ilyam8))
+- /api/v2 improvements [\#15227](https://github.com/netdata/netdata/pull/15227) ([ktsaou](https://github.com/ktsaou))
+- Remove erroneous space for unit [\#15226](https://github.com/netdata/netdata/pull/15226) ([ralphm](https://github.com/ralphm))
 - Fix /api/v2/contexts,nodes,nodes\_instances,q before match [\#15223](https://github.com/netdata/netdata/pull/15223) ([ktsaou](https://github.com/ktsaou))
 - Fix SSL non-blocking retry handling in the web server [\#15222](https://github.com/netdata/netdata/pull/15222) ([ktsaou](https://github.com/ktsaou))
 - Update dashboard to version v3.0.0. [\#15219](https://github.com/netdata/netdata/pull/15219) ([netdatabot](https://github.com/netdatabot))
 - fix arch detection on i386 \(native packages\) [\#15218](https://github.com/netdata/netdata/pull/15218) ([ilyam8](https://github.com/ilyam8))
 - RW\_SPINLOCK: recursive readers support [\#15217](https://github.com/netdata/netdata/pull/15217) ([ktsaou](https://github.com/ktsaou))
 - cgroups: remove pod\_uid and container\_id labels in k8s [\#15216](https://github.com/netdata/netdata/pull/15216) ([ilyam8](https://github.com/ilyam8))
+- Allow overriding pipename from env [\#15215](https://github.com/netdata/netdata/pull/15215) ([vkalintiris](https://github.com/vkalintiris))
 - Fix health crash [\#15209](https://github.com/netdata/netdata/pull/15209) ([stelfrag](https://github.com/stelfrag))
 - Fix file permissions under directory [\#15208](https://github.com/netdata/netdata/pull/15208) ([stelfrag](https://github.com/stelfrag))
 - RocketChat cloud integration docs [\#15205](https://github.com/netdata/netdata/pull/15205) ([car12o](https://github.com/car12o))
@@ -22,6 +28,7 @@
 - Add two functions that allow someone to start/stop ML. [\#15185](https://github.com/netdata/netdata/pull/15185) ([vkalintiris](https://github.com/vkalintiris))
 - Fix issues in sync thread \(eBPF plugin\) [\#15174](https://github.com/netdata/netdata/pull/15174) ([thiagoftsm](https://github.com/thiagoftsm))
 - /api/v2/nodes and streaming function [\#15168](https://github.com/netdata/netdata/pull/15168) ([ktsaou](https://github.com/ktsaou))
+- Use a single health log table [\#15157](https://github.com/netdata/netdata/pull/15157) ([MrZammler](https://github.com/MrZammler))
 - Redirect to index.html when a file is not found by web server [\#15143](https://github.com/netdata/netdata/pull/15143) ([MrZammler](https://github.com/MrZammler))
 - Consistently start the agent as root and rely on it to drop privileges properly. [\#14890](https://github.com/netdata/netdata/pull/14890) ([Ferroin](https://github.com/Ferroin))
 
@@ -399,13 +406,6 @@
 - Add link to all installation options [\#14578](https://github.com/netdata/netdata/pull/14578) ([cakrit](https://github.com/cakrit))
 - Reorg learn 2102 1 [\#14577](https://github.com/netdata/netdata/pull/14577) ([cakrit](https://github.com/cakrit))
 - Update README.md [\#14576](https://github.com/netdata/netdata/pull/14576) ([cakrit](https://github.com/cakrit))
-- Reorg learn [\#14575](https://github.com/netdata/netdata/pull/14575) ([cakrit](https://github.com/cakrit))
-- Update static binary readme [\#14574](https://github.com/netdata/netdata/pull/14574) ([cakrit](https://github.com/cakrit))
-- Get update every from page [\#14573](https://github.com/netdata/netdata/pull/14573) ([stelfrag](https://github.com/stelfrag))
-- bump go.d to v0.51.0 [\#14572](https://github.com/netdata/netdata/pull/14572) ([ilyam8](https://github.com/ilyam8))
-- Remove References category from learn [\#14571](https://github.com/netdata/netdata/pull/14571) ([cakrit](https://github.com/cakrit))
-- Fix doc capitalization and remove obsolete section [\#14569](https://github.com/netdata/netdata/pull/14569) ([cakrit](https://github.com/cakrit))
-- Remove obsolete instruction to lower memory usage [\#14568](https://github.com/netdata/netdata/pull/14568) ([cakrit](https://github.com/cakrit))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
