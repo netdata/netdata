@@ -152,12 +152,6 @@ static void ebpf_function_thread_manipulation(const char *transaction,
 #endif
 
                 netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, em);
-
-                if (em->apps_charts && em->apps_routine && em->maps && apps_groups_root_target) {
-                    /**
-                     * TODO: APPS CREATION NEEDS MORE CHANGES IN THE CODE, SO I AM POSTPONING FOR NEXT PR
-                     */
-                }
             } else
                 em->running_time = 0;
             pthread_mutex_unlock(&ebpf_exit_cleanup);

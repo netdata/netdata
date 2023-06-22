@@ -829,6 +829,19 @@ static void ebpf_stop_threads(int sig)
  *****************************************************************/
 
 /**
+ * Create apps for module
+ *
+ * Create apps chart that will be used with specific module
+ *
+ * @param em     the module main structure.
+ * @param root   a pointer for the targets.
+ */
+static inline void ebpf_create_apps_for_module(ebpf_module_t *em, struct ebpf_target *root) {
+    if (em->enabled < NETDATA_THREAD_EBPF_STOPPING && em->apps_charts && em->apps_routine)
+        em->apps_routine(em, root);
+}
+
+/**
  * Create apps charts
  *
  * Call ebpf_create_chart to create the charts on apps submenu.
@@ -869,14 +882,21 @@ static void ebpf_create_apps_charts(struct ebpf_target *root)
         }
     }
 
-    if (!newly_added)
-        return;
+    int i;
+    if (!newly_added) {
+        for (i = 0; i < EBPF_MODULE_FUNCTION_IDX ; i++) {
+            ebpf_module_t *current = &ebpf_modules[i];
+            if (current->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
+                continue;
 
-    int counter;
-    for (counter = 0; ebpf_modules[counter].thread_name; counter++) {
-        ebpf_module_t *current = &ebpf_modules[counter];
-        if (current->enabled < NETDATA_THREAD_EBPF_STOPPING && current->apps_charts && current->apps_routine)
-            current->apps_routine(current, root);
+            ebpf_create_apps_for_module(current, root);
+        }
+        return;
+    }
+
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX ; i++) {
+        ebpf_module_t *current = &ebpf_modules[i];
+        ebpf_create_apps_for_module(current, root);
     }
 }
 
@@ -1316,7 +1336,7 @@ void ebpf_global_labels(netdata_syscall_stat_t *is, netdata_publish_syscall_t *p
 static inline void ebpf_set_thread_mode(netdata_run_mode_t lmode)
 {
     int i;
-    for (i = 0; ebpf_modules[i].thread_name; i++) {
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
         ebpf_modules[i].mode = lmode;
     }
 }
@@ -1325,16 +1345,15 @@ static inline void ebpf_set_thread_mode(netdata_run_mode_t lmode)
  * Enable specific charts selected by user.
  *
  * @param em             the structure that will be changed
- * @param disable_apps   the status about the apps charts.
  * @param disable_cgroup the status about the cgroups charts.
  */
-static inline void ebpf_enable_specific_chart(struct ebpf_module *em, int disable_apps, int disable_cgroup)
+static inline void ebpf_enable_specific_chart(struct ebpf_module *em, int disable_cgroup)
 {
     em->enabled = CONFIG_BOOLEAN_YES;
 
     // oomkill stores data inside apps submenu, so it always need to have apps_enabled for plugin to create
     // its chart, without this comparison eBPF.plugin will try to store invalid data when apps is disabled.
-    if (!disable_apps || !strcmp(em->thread_name, "oomkill")) {
+    if (!strcmp(em->thread_name, "oomkill")) {
         em->apps_charts = NETDATA_EBPF_APPS_FLAG_YES;
     }
 
@@ -1343,20 +1362,6 @@ static inline void ebpf_enable_specific_chart(struct ebpf_module *em, int disabl
     }
 
     em->global_charts = CONFIG_BOOLEAN_YES;
-}
-
-/**
- * Enable all charts
- *
- * @param apps    what is the current status of apps
- * @param cgroups what is the current status of cgroups
- */
-static inline void ebpf_enable_all_charts(int apps, int cgroups)
-{
-    int i;
-    for (i = 0; ebpf_modules[i].thread_name; i++) {
-        ebpf_enable_specific_chart(&ebpf_modules[i], apps, cgroups);
-    }
 }
 
 /**
@@ -1373,34 +1378,19 @@ static inline void disable_all_global_charts()
     }
 }
 
-
 /**
  * Enable the specified chart group
  *
  * @param idx            the index of ebpf_modules that I am enabling
- * @param disable_apps   should I keep apps charts?
  */
-static inline void ebpf_enable_chart(int idx, int disable_apps, int disable_cgroup)
+static inline void ebpf_enable_chart(int idx, int disable_cgroup)
 {
     int i;
     for (i = 0; ebpf_modules[i].thread_name; i++) {
         if (i == idx) {
-            ebpf_enable_specific_chart(&ebpf_modules[i], disable_apps, disable_cgroup);
+            ebpf_enable_specific_chart(&ebpf_modules[i], disable_cgroup);
             break;
         }
-    }
-}
-
-/**
- * Disable APPs
- *
- * Disable charts for apps loading only global charts.
- */
-static inline void ebpf_disable_apps()
-{
-    int i;
-    for (i = 0; ebpf_modules[i].thread_name; i++) {
-        ebpf_modules[i].apps_charts = NETDATA_EBPF_APPS_FLAG_NO;
     }
 }
 
@@ -1720,7 +1710,7 @@ static void ebpf_allocate_common_vectors()
  *
  * @param ptr the option given by users
  */
-static inline void how_to_load(char *ptr)
+static inline void ebpf_how_to_load(char *ptr)
 {
     if (!strcasecmp(ptr, EBPF_CFG_LOAD_MODE_RETURN))
         ebpf_set_thread_mode(MODE_RETURN);
@@ -1729,6 +1719,20 @@ static inline void how_to_load(char *ptr)
     else
         netdata_log_error("the option %s for \"ebpf load mode\" is not a valid option.", ptr);
 }
+
+/**
+ * Define whether we should have charts for apps
+ *
+ * @param lmode  the mode that will be used for them.
+ */
+static inline void ebpf_set_apps_mode(netdata_apps_integration_flags_t value)
+{
+    int i;
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
+        ebpf_modules[i].apps_charts = value;
+    }
+}
+
 
 /**
  * Update interval
@@ -1822,12 +1826,11 @@ static void ebpf_update_map_per_core()
 /**
  * Read collector values
  *
- * @param disable_apps    variable to store information related to apps.
  * @param disable_cgroups variable to store information related to cgroups.
  * @param update_every    value to overwrite the update frequency set by the server.
  * @param origin          specify the configuration file loaded
  */
-static void read_collector_values(int *disable_apps, int *disable_cgroups,
+static void read_collector_values(int *disable_cgroups,
                                   int update_every, netdata_ebpf_load_mode_t origin)
 {
     // Read global section
@@ -1839,7 +1842,7 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups,
         value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_LOAD_MODE,
                               EBPF_CFG_LOAD_MODE_DEFAULT);
 
-    how_to_load(value);
+    ebpf_how_to_load(value);
 
     btf_path = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_PROGRAM_PATH,
                              EBPF_DEFAULT_BTF_PATH);
@@ -1867,7 +1870,8 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups,
                                         CONFIG_BOOLEAN_YES);
         enabled =  (enabled == CONFIG_BOOLEAN_NO)?CONFIG_BOOLEAN_YES:CONFIG_BOOLEAN_NO;
     }
-    *disable_apps = (int)enabled;
+
+    ebpf_set_apps_mode(!enabled);
 
     // Cgroup is a positive sentence, so we need to invert the values to disable apps.
     // We are using the same pattern for cgroup and apps
@@ -1880,7 +1884,7 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups,
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION,
                                     ebpf_modules[EBPF_MODULE_PROCESS_IDX].config_name, CONFIG_BOOLEAN_YES);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_PROCESS_IDX, *disable_apps, *disable_cgroups);
+        ebpf_enable_chart(EBPF_MODULE_PROCESS_IDX, *disable_cgroups);
     }
 
     // This is kept to keep compatibility
@@ -1891,7 +1895,7 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups,
                                         ebpf_modules[EBPF_MODULE_SOCKET_IDX].config_name,
                                         CONFIG_BOOLEAN_NO);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, *disable_apps, *disable_cgroups);
+        ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, *disable_cgroups);
     }
 
     // This is kept to keep compatibility
@@ -1903,7 +1907,7 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups,
     network_viewer_opt.enabled = enabled;
     if (enabled) {
         if (!ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled)
-            ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, *disable_apps, *disable_cgroups);
+            ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, *disable_cgroups);
 
         // Read network viewer section if network viewer is enabled
         // This is kept here to keep backward compatibility
@@ -1915,86 +1919,86 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups,
                                     CONFIG_BOOLEAN_NO);
 
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_CACHESTAT_IDX, *disable_apps, *disable_cgroups);
+        ebpf_enable_chart(EBPF_MODULE_CACHESTAT_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "sync",
                                     CONFIG_BOOLEAN_YES);
 
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_SYNC_IDX, *disable_apps, *disable_cgroups);
+        ebpf_enable_chart(EBPF_MODULE_SYNC_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "dcstat",
                                     CONFIG_BOOLEAN_NO);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_DCSTAT_IDX, *disable_apps, *disable_cgroups);
+        ebpf_enable_chart(EBPF_MODULE_DCSTAT_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "swap",
                                     CONFIG_BOOLEAN_NO);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_SWAP_IDX, *disable_apps, *disable_cgroups);
+        ebpf_enable_chart(EBPF_MODULE_SWAP_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "vfs",
                                     CONFIG_BOOLEAN_NO);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_VFS_IDX, *disable_apps, *disable_cgroups);
+        ebpf_enable_chart(EBPF_MODULE_VFS_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "filesystem",
                                     CONFIG_BOOLEAN_NO);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_FILESYSTEM_IDX, *disable_apps, *disable_cgroups);
+        ebpf_enable_chart(EBPF_MODULE_FILESYSTEM_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "disk",
                                     CONFIG_BOOLEAN_NO);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_DISK_IDX, *disable_apps, *disable_cgroups);
+        ebpf_enable_chart(EBPF_MODULE_DISK_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "mount",
                                     CONFIG_BOOLEAN_YES);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_MOUNT_IDX, *disable_apps, *disable_cgroups);
+        ebpf_enable_chart(EBPF_MODULE_MOUNT_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "fd",
                                     CONFIG_BOOLEAN_YES);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_FD_IDX, *disable_apps, *disable_cgroups);
+        ebpf_enable_chart(EBPF_MODULE_FD_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "hardirq",
                                     CONFIG_BOOLEAN_YES);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_HARDIRQ_IDX, *disable_apps, *disable_cgroups);
+        ebpf_enable_chart(EBPF_MODULE_HARDIRQ_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "softirq",
                                     CONFIG_BOOLEAN_YES);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_SOFTIRQ_IDX, *disable_apps, *disable_cgroups);
+        ebpf_enable_chart(EBPF_MODULE_SOFTIRQ_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "oomkill",
                                     CONFIG_BOOLEAN_YES);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_OOMKILL_IDX, *disable_apps, *disable_cgroups);
+        ebpf_enable_chart(EBPF_MODULE_OOMKILL_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "shm",
                                     CONFIG_BOOLEAN_YES);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_SHM_IDX, *disable_apps, *disable_cgroups);
+        ebpf_enable_chart(EBPF_MODULE_SHM_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "mdflush",
                                     CONFIG_BOOLEAN_NO);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_MDFLUSH_IDX, *disable_apps, *disable_cgroups);
+        ebpf_enable_chart(EBPF_MODULE_MDFLUSH_IDX, *disable_cgroups);
     }
 }
 
@@ -2002,13 +2006,12 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups,
  * Load collector config
  *
  * @param path             the path where the file ebpf.conf is stored.
- * @param disable_apps     variable to store the information about apps plugin status.
  * @param disable_cgroups  variable to store the information about cgroups plugin status.
  * @param update_every value to overwrite the update frequency set by the server.
  *
  * @return 0 on success and -1 otherwise.
  */
-static int load_collector_config(char *path, int *disable_apps, int *disable_cgroups, int update_every)
+static int ebpf_load_collector_config(char *path, int *disable_cgroups, int update_every)
 {
     char lpath[4096];
     netdata_ebpf_load_mode_t origin;
@@ -2023,7 +2026,7 @@ static int load_collector_config(char *path, int *disable_apps, int *disable_cgr
     } else
         origin = EBPF_LOADED_FROM_USER;
 
-    read_collector_values(disable_apps, disable_cgroups, update_every, origin);
+    read_collector_values(disable_cgroups, update_every, origin);
 
     return 0;
 }
@@ -2122,7 +2125,6 @@ int ebpf_adjust_memory_limit()
  */
 static void ebpf_parse_args(int argc, char **argv)
 {
-    int disable_apps = 0;
     int disable_cgroups = 1;
     int freq = 0;
     int option_index = 0;
@@ -2299,7 +2301,7 @@ static void ebpf_parse_args(int argc, char **argv)
                 break;
             }
             case EBPF_OPTION_ALL_CHARTS: {
-                disable_apps = 0;
+                ebpf_set_apps_mode(NETDATA_EBPF_APPS_FLAG_YES);
                 disable_cgroups = 0;
 #ifdef NETDATA_INTERNAL_CHECKS
                 netdata_log_info("EBPF running with all chart groups, because it was started with the option \"[-]-all\".");
@@ -2315,7 +2317,6 @@ static void ebpf_parse_args(int argc, char **argv)
                 exit(0);
             }
             case EBPF_OPTION_GLOBAL_CHART: {
-                disable_apps = 1;
                 disable_cgroups = 1;
 #ifdef NETDATA_INTERNAL_CHECKS
                 netdata_log_info("EBPF running with global chart group, because it was started with the option  \"[-]-global\".");
@@ -2376,10 +2377,7 @@ unittest:
         }
     }
 
-    if (disable_apps || disable_cgroups) {
-        if (disable_apps)
-            ebpf_disable_apps();
-
+    if (disable_cgroups) {
         if (disable_cgroups)
             ebpf_disable_cgroups();
     }
@@ -2389,7 +2387,7 @@ unittest:
         uint64_t idx;
         for (idx = 0; idx < EBPF_OPTION_ALL_CHARTS; idx++) {
             if (select_threads & 1<<idx)
-                ebpf_enable_specific_chart(&ebpf_modules[idx], disable_apps, disable_cgroups);
+                ebpf_enable_specific_chart(&ebpf_modules[idx], disable_cgroups);
         }
     }
 
