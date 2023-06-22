@@ -336,6 +336,67 @@ static inline int ebpf_cachestat_load_and_attach(struct cachestat_bpf *obj, ebpf
  *
  *****************************************************************/
 
+static void ebpf_obsolete_specific_cachestat_charts(char *type, int update_every);
+
+/**
+ * Obsolete services
+ *
+ * Obsolete all service charts created
+ *
+ * @param em a pointer to `struct ebpf_module`
+ */
+static void ebpf_obsolete_services(ebpf_module_t *em)
+{
+    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY, NETDATA_CACHESTAT_HIT_RATIO_CHART,
+                              "Hit ratio",
+                              EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NETDATA_SYSTEMD_CACHESTAT_HIT_RATIO_CONTEXT, 21100,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY, NETDATA_CACHESTAT_DIRTY_CHART,
+                              "Number of dirty pages",
+                              EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NETDATA_SYSTEMD_CACHESTAT_MODIFIED_CACHE_CONTEXT, 21101,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY, NETDATA_CACHESTAT_HIT_CHART,
+                              "Number of accessed files",
+                              EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NETDATA_SYSTEMD_CACHESTAT_HIT_FILE_CONTEXT, 21102,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY, NETDATA_CACHESTAT_MISSES_CHART,
+                              "Files out of page cache",
+                              EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NETDATA_SYSTEMD_CACHESTAT_MISS_FILES_CONTEXT, 21103,
+                              em->update_every);
+}
+
+/**
+ * Obsolete cgroup chart
+ *
+ * Send obsolete for all charts created before to close.
+ *
+ * @param em a pointer to `struct ebpf_module`
+ */
+static inline void ebpf_obsolete_cgroup_charts(ebpf_module_t *em) {
+    pthread_mutex_lock(&mutex_cgroup_shm);
+
+    ebpf_cgroup_target_t *ect;
+    for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
+        if (ect->systemd)
+            continue;
+
+        ebpf_obsolete_services(em);
+        ebpf_obsolete_specific_cachestat_charts(ect->name, em->update_every);
+    }
+    pthread_mutex_unlock(&mutex_cgroup_shm);
+}
+
 /**
  * Cachestat exit.
  *
@@ -346,6 +407,12 @@ static inline int ebpf_cachestat_load_and_attach(struct cachestat_bpf *obj, ebpf
 static void ebpf_cachestat_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        if (em->cgroup_charts) {
+            ebpf_obsolete_cgroup_charts(em);
+        }
+    }
 
 #ifdef LIBBPF_MAJOR_VERSION
     if (cachestat_bpf_obj)
