@@ -1,6 +1,6 @@
   - metrics:
       module:
-        name: apps.plugin
+        name: system
       folding:
         title: Metrics
         enabled: false
@@ -19,6 +19,18 @@
                 - name: sleeping_uninterruptible
                 - name: zombie
                 - name: stopped
+  - metrics:
+      module:
+        name: apps
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
             - name: apps.cpu
               description: Apps CPU Time (100% = 1 core)
               unit: percentage
@@ -144,6 +156,18 @@
               unit: open pipes
               dimensions:
                 - name: a dimension per app group
+  - metrics:
+      module:
+        name: groups
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
             - name: groups.cpu
               description: User Groups CPU Time (100% = 1 core)
               unit: percentage
@@ -269,6 +293,18 @@
               unit: open pipes
               dimensions:
                 - name: a dimension per user group
+  - metrics:
+      module:
+        name: users
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
             - name: users.cpu
               description: Users CPU Time (100% = 1 core)
               unit: percentage
@@ -394,6 +430,18 @@
               unit: open pipes
               dimensions:
                 - name: a dimension per user
+  - metrics:
+      module:
+        name: netdata
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
             - name: netdata.apps_cpu
               description: Apps Plugin CPU
               unit: milliseconds/s
