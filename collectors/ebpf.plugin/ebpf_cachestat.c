@@ -489,6 +489,7 @@ static void ebpf_cachestat_exit(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        pthread_mutex_lock(&lock);
         if (em->cgroup_charts) {
             ebpf_obsolete_cgroup_charts(em);
             fflush(stdout);
@@ -501,6 +502,7 @@ static void ebpf_cachestat_exit(void *ptr)
         ebpf_obsolete_cachestat_global(em);
 
         fflush(stdout);
+        pthread_mutex_unlock(&lock);
     }
 
 #ifdef LIBBPF_MAJOR_VERSION
