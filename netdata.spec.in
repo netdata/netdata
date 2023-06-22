@@ -278,7 +278,7 @@ autoreconf -ivf
 	%if 0%{?_have_sentry}
 	--enable-sentry \
 	%endif
-	--disable-dependency-trackin
+	--disable-dependency-tracking
 
 
 # Build step
