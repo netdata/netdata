@@ -398,6 +398,86 @@ static inline void ebpf_obsolete_cgroup_charts(ebpf_module_t *em) {
 }
 
 /**
+ * Obsolete global
+ *
+ * Obsolete global charts created by thread.
+ *
+ * @param em a pointer to `struct ebpf_module`
+ */
+static void ebpf_obsolete_cachestat_global(ebpf_module_t *em)
+{
+    ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_RATIO_CHART,
+                              "Hit ratio",
+                              EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NULL, 21100,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_DIRTY_CHART,
+                              "Number of dirty pages",
+                              EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NULL, 21101,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_CHART,
+                              "Number of accessed files",
+                              EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NULL, 21102,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_MISSES_CHART,
+                              "Files out of page cache",
+                              EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NULL, 21103,
+                              em->update_every);
+}
+
+/**
+ * Obsolette apps charts
+ *
+ * Obsolete apps charts.
+ *
+ * @param em a pointer to the structure with the default values.
+ */
+void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
+{
+    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY, NETDATA_CACHESTAT_HIT_RATIO_CHART,
+                               "Hit ratio",
+                               EBPF_COMMON_DIMENSION_PERCENTAGE,
+                               NETDATA_CACHESTAT_SUBMENU,
+                               NETDATA_EBPF_CHART_TYPE_LINE,
+                              NULL,  20090,
+                               em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY, NETDATA_CACHESTAT_DIRTY_CHART,
+                               "Number of dirty pages",
+                               EBPF_CACHESTAT_DIMENSION_PAGE,
+                               NETDATA_CACHESTAT_SUBMENU,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               NULL, 20091,
+                               em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY, NETDATA_CACHESTAT_HIT_CHART,
+                               "Number of accessed files",
+                               EBPF_CACHESTAT_DIMENSION_HITS,
+                               NETDATA_CACHESTAT_SUBMENU,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               NULL, 20092,
+                               em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY, NETDATA_CACHESTAT_MISSES_CHART,
+                               "Files out of page cache",
+                               EBPF_CACHESTAT_DIMENSION_MISSES,
+                               NETDATA_CACHESTAT_SUBMENU,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               NULL, 20093,
+                               em->update_every);
+}
+
+/**
  * Cachestat exit.
  *
  * Cancel child and exit.
@@ -411,7 +491,16 @@ static void ebpf_cachestat_exit(void *ptr)
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         if (em->cgroup_charts) {
             ebpf_obsolete_cgroup_charts(em);
+            fflush(stdout);
         }
+
+        if (em->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
+            ebpf_obsolete_cachestat_apps_charts(em);
+        }
+
+        ebpf_obsolete_cachestat_global(em);
+
+        fflush(stdout);
     }
 
 #ifdef LIBBPF_MAJOR_VERSION
