@@ -98,7 +98,11 @@ struct rrdcontext_to_json_v2_data {
     time_t now;
 
     BUFFER *wb;
-    struct api_v2_contexts_request *request;
+    union {
+        struct api_v2_contexts_request *request;
+        struct api_v2_alerts_request *alerts_request;
+    };
+
     DICTIONARY *ctx;
 
     CONTEXTS_V2_OPTIONS options;
@@ -109,6 +113,16 @@ struct rrdcontext_to_json_v2_data {
         SIMPLE_PATTERN *pattern;
         size_t ni;
     } nodes;
+
+    struct {
+        Pvoid_t JudyHS;
+//        ALERT_OPTIONS alert_options;
+        SIMPLE_PATTERN *scope_pattern;
+        SIMPLE_PATTERN *pattern;
+//        time_t after;
+//        time_t before;
+        size_t li;
+    } alerts;
 
     struct {
         SIMPLE_PATTERN *scope_pattern;
@@ -135,6 +149,22 @@ struct rrdcontext_to_json_v2_data {
 
     struct query_timings timings;
 };
+
+static void add_alert_index(Pvoid_t *JudyHS, uuid_t *uuid, ssize_t idx)
+{
+    Pvoid_t *PValue = JudyHSIns(JudyHS, uuid, sizeof(*uuid), PJE0);
+    if (!PValue)
+        return;
+    *((Word_t *) PValue) = (Word_t) idx;
+}
+
+ssize_t get_alert_index(Pvoid_t JudyHS, uuid_t *uuid)
+{
+    Pvoid_t *PValue = JudyHSGet(JudyHS, uuid, sizeof(*uuid));
+    if (!PValue)
+        return -1;
+    return (ssize_t) *((Word_t *) PValue);
+}
 
 static FTS_MATCH rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_json_v2_data *ctl, RRDCONTEXT *rc, SIMPLE_PATTERN *q) {
     if(unlikely(full_text_search_string(&ctl->q.fts, q, rc->id) ||
@@ -248,6 +278,11 @@ void buffer_json_agent_status_id(BUFFER *wb, size_t ai, usec_t duration_ut) {
             buffer_json_member_add_double(wb, "ms", (NETDATA_DOUBLE) duration_ut / 1000.0);
     }
     buffer_json_object_close(wb);
+}
+
+static ssize_t alert_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context __maybe_unused)
+{
+    return rrdcontext_to_json_v2_add_context(data, rca, queryable_context);
 }
 
 void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t duration_ut, bool status) {
@@ -593,6 +628,229 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
     }
 
     return 1;
+}
+
+static ssize_t alert_to_json_v2_add_host(void *data, RRDHOST *host, bool queryable_host) {
+    if(!queryable_host || !host->rrdctx.contexts)
+        // the host matches the 'scope_host' but does not match the 'host' patterns
+        // or the host does not have any contexts
+        return 0;
+
+    struct rrdcontext_to_json_v2_data *ctl = data;
+    BUFFER *wb = ctl->wb;
+
+    bool host_matched = (ctl->options & CONTEXTS_V2_NODES);
+    bool do_contexts = (ctl->options & (CONTEXTS_V2_CONTEXTS));
+
+    ctl->q.host_match = FTS_MATCHED_NONE;
+    if((ctl->options & CONTEXTS_V2_SEARCH)) {
+        // check if we match the host itself
+        if(ctl->q.pattern && (
+                                  full_text_search_string(&ctl->q.fts, ctl->q.pattern, host->hostname) ||
+                                  full_text_search_char(&ctl->q.fts, ctl->q.pattern, host->machine_guid) ||
+                                  (ctl->q.pattern && full_text_search_char(&ctl->q.fts, ctl->q.pattern, ctl->q.host_node_id_str)))) {
+            ctl->q.host_match = FTS_MATCHED_HOST;
+            do_contexts = true;
+        }
+    }
+
+    if(do_contexts) {
+        // save it
+        SIMPLE_PATTERN *old_q = ctl->q.pattern;
+
+        if(ctl->q.host_match == FTS_MATCHED_HOST)
+            // do not do pattern matching on contexts - we matched the host itself
+            ctl->q.pattern = NULL;
+
+        ssize_t added = query_scope_foreach_context(
+            host, ctl->alerts_request->scope_contexts,
+            ctl->contexts.scope_pattern, ctl->contexts.pattern,
+            alert_to_json_v2_add_context, queryable_host, ctl);
+
+        // restore it
+        ctl->q.pattern = old_q;
+
+        if(added == -1)
+            return -1;
+
+        if(added)
+            host_matched = true;
+    }
+
+    if(host_matched && (ctl->options & (CONTEXTS_V2_NODES))) {
+        buffer_json_add_array_item_object(wb);
+        buffer_json_node_add_v2(wb, host, ctl->nodes.ni++, 0, false);
+
+        if (ctl->alerts_request->options & ALERT_OPTION_TRANSITIONS) {
+            if (rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)) {
+                buffer_json_member_add_array(wb, "instances");
+                health_alert2json(host, wb, ctl->alerts_request->options, ctl->alerts.JudyHS, ctl->alerts_request->after, ctl->alerts_request->before, ctl->alerts_request->last);
+                buffer_json_array_close(wb);
+            }
+        }
+
+        buffer_json_object_close(wb);
+    }
+
+    return host_matched ? 1 : 0;
+}
+
+static inline bool alert_is_matched( struct api_v2_alerts_request *alerts_request, RRDCALC *rc)
+{
+    char hash_id[UUID_STR_LEN];
+    uuid_unparse_lower(rc->config_hash_id, hash_id);
+
+    if (alerts_request->alert_id)
+        return (rc->id == alerts_request->alert_id);
+
+    SIMPLE_PATTERN_RESULT match = SP_MATCHED_POSITIVE;
+    SIMPLE_PATTERN *match_pattern = alerts_request->config_hash_pattern;
+    if(match_pattern) {
+        match = simple_pattern_matches_extract(match_pattern, hash_id, NULL, 0);
+        if(match == SP_NOT_MATCHED)
+            return false;;
+    }
+
+    match = SP_MATCHED_POSITIVE;
+    match_pattern = alerts_request->alert_name_pattern;
+    if(match_pattern) {
+        match = simple_pattern_matches_string_extract(match_pattern, rc->name, NULL, 0);
+        if(match == SP_NOT_MATCHED)
+            return false;
+    }
+
+    return true;
+}
+
+static ssize_t alert_to_json_v2_add_alert(void *data, RRDHOST *host, bool queryable_host) {
+    if(!queryable_host || !host->rrdctx.contexts)
+        // the host matches the 'scope_host' but does not match the 'host' patterns
+        // or the host does not have any contexts
+        return 0;
+
+    struct rrdcontext_to_json_v2_data *ctl = data;
+    BUFFER *wb = ctl->wb;
+
+    bool host_matched = (ctl->options & CONTEXTS_V2_NODES);
+    bool do_contexts = (ctl->options & (CONTEXTS_V2_CONTEXTS));
+
+    if(do_contexts) {
+        ssize_t added = query_scope_foreach_context(
+            host, ctl->request->scope_contexts,
+            ctl->contexts.scope_pattern, ctl->contexts.pattern,
+            alert_to_json_v2_add_context, queryable_host, ctl);
+
+        if(added == -1)
+            return -1;
+
+        if(added)
+            host_matched = true;
+    }
+
+    if(host_matched && (ctl->options & (CONTEXTS_V2_NODES))) {
+        if (rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)) {
+
+            RRDCALC *rc;
+            foreach_rrdcalc_in_rrdhost_read(host, rc) {
+                if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+                    continue;
+
+                if (unlikely(!rrdset_is_available_for_exporting_and_alarms(rc->rrdset)))
+                    continue;
+
+                if ((ctl->alerts_request->options & ALERT_OPTION_ACTIVE) &&
+                    !(rc->status == RRDCALC_STATUS_WARNING || rc->status == RRDCALC_STATUS_CRITICAL))
+                    continue;
+
+                char hash_id[GUID_LEN + 1];
+                uuid_unparse_lower(rc->config_hash_id, hash_id);
+
+                if (!alert_is_matched(ctl->alerts_request, rc))
+                    continue;
+
+                ssize_t idx = get_alert_index(ctl->alerts.JudyHS, &rc->config_hash_id);
+                if (idx >= 0)
+                    continue;
+
+                buffer_json_add_array_item_object(wb);
+                add_alert_index(&ctl->alerts.JudyHS, &rc->config_hash_id, (ssize_t)ctl->alerts.li++);
+
+                buffer_json_member_add_string(wb, "config_hash_id", hash_id);
+                buffer_json_member_add_string(wb, "name", rrdcalc_name(rc));
+                buffer_json_member_add_string(wb, "chart", rrdcalc_chart_name(rc));
+                buffer_json_member_add_string(wb, "family", (rc->rrdset) ? rrdset_family(rc->rrdset) : "");
+                buffer_json_member_add_string(wb, "class", rc->classification ? rrdcalc_classification(rc) : "Unknown");
+                buffer_json_member_add_string(wb, "component", rc->component ? rrdcalc_component(rc) : "Unknown");
+                buffer_json_member_add_string(wb, "type", rc->type ? rrdcalc_type(rc) : "Unknown");
+                buffer_json_member_add_string(wb, "units", rrdcalc_units(rc));
+                buffer_json_member_add_boolean(wb, "enabled", host->health.health_enabled);
+
+                if (ctl->alerts_request->options & ALERT_OPTION_CONFIG) {
+                    buffer_json_member_add_object(wb, "config");
+                    {
+                        buffer_json_member_add_boolean(wb, "active", (rc->rrdset));
+                        buffer_json_member_add_boolean(wb, "disabled", (rc->run_flags & RRDCALC_FLAG_DISABLED));
+                        buffer_json_member_add_boolean(wb, "silenced", (rc->run_flags & RRDCALC_FLAG_SILENCED));
+                        buffer_json_member_add_string(
+                            wb, "exec", rc->exec ? rrdcalc_exec(rc) : string2str(host->health.health_default_exec));
+                        buffer_json_member_add_string(
+                            wb,
+                            "recipient",
+                            rc->recipient ? rrdcalc_recipient(rc) : string2str(host->health.health_default_recipient));
+                        buffer_json_member_add_string(wb, "info", rrdcalc_info(rc));
+                        buffer_json_member_add_string(wb, "source", rrdcalc_source(rc));
+                        buffer_json_member_add_time_t(wb, "update_every", rc->update_every);
+                        buffer_json_member_add_time_t(wb, "delay_up_duration", rc->delay_up_duration);
+                        buffer_json_member_add_time_t(wb, "delay_down_duration", rc->delay_down_duration);
+                        buffer_json_member_add_time_t(wb, "delay_max_duration", rc->delay_max_duration);
+                        buffer_json_member_add_double(wb, "delay_multiplier", rc->delay_multiplier);
+                        buffer_json_member_add_time_t(wb, "delay", rc->delay_last);
+                        buffer_json_member_add_time_t(wb, "warn_repeat_every", rc->warn_repeat_every);
+                        buffer_json_member_add_time_t(wb, "crit_repeat_every", rc->crit_repeat_every);
+                        if (unlikely(rc->options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)) {
+                            buffer_json_member_add_boolean(wb, "no_clear_notification", true);
+                        }
+
+                        if (rc->calculation) {
+                            buffer_json_member_add_string(wb, "calc", rc->calculation->source);
+                            buffer_json_member_add_string(wb, "calc_parsed", rc->calculation->parsed_as);
+                        }
+
+                        if (rc->warning) {
+                            buffer_json_member_add_string(wb, "warn", rc->warning->source);
+                            buffer_json_member_add_string(wb, "warn_parsed", rc->warning->parsed_as);
+                        }
+
+                        if (rc->critical) {
+                            buffer_json_member_add_string(wb, "crit", rc->critical->source);
+                            buffer_json_member_add_string(wb, "crit_parsed", rc->critical->parsed_as);
+                        }
+
+                        if (RRDCALC_HAS_DB_LOOKUP(rc)) {
+                            if (rc->dimensions)
+                                buffer_json_member_add_string(wb, "lookup_dimensions", rrdcalc_dimensions(rc));
+
+                            buffer_json_member_add_string(wb, "lookup_method", time_grouping_method2string(rc->group));
+                            buffer_json_member_add_time_t(wb, "lookup_after", rc->after);
+                            buffer_json_member_add_time_t(wb, "lookup_before", rc->before);
+
+                            BUFFER *temp_id = buffer_create(1, NULL);
+                            buffer_data_options2string(temp_id, rc->options);
+
+                            buffer_json_member_add_string(wb, "lookup_options", buffer_tostring(temp_id));
+
+                            buffer_free(temp_id);
+                        }
+                    }
+                    buffer_json_object_close(wb); // config
+                }
+                buffer_json_object_close(wb);   // Alert
+            }
+            foreach_rrdcalc_in_rrdhost_done(rc);
+        }
+    }
+
+    return host_matched ? 1 : 0;
 }
 
 static void buffer_json_contexts_v2_options_to_array(BUFFER *wb, CONTEXTS_V2_OPTIONS options) {
@@ -991,3 +1249,119 @@ cleanup:
     return resp;
 }
 
+int alerts_to_json_v2(BUFFER *wb, struct api_v2_alerts_request *req, CONTEXTS_V2_OPTIONS options)
+{
+    int resp = HTTP_RESP_OK;
+
+//    ALERT_OPTIONS alert_options = req->options;
+    struct rrdcontext_to_json_v2_data ctl = {
+        .wb = wb,
+        .alerts_request = req,
+        .ctx = NULL,
+        .options = options,
+        .versions = { 0 },
+        .nodes.scope_pattern = string_to_simple_pattern(req->scope_nodes),
+        .nodes.pattern = string_to_simple_pattern(req->nodes),
+        .contexts.pattern = string_to_simple_pattern(req->contexts),
+        .contexts.scope_pattern = string_to_simple_pattern(req->scope_contexts),
+        .timings = {
+            .received_ut = now_monotonic_usec(),
+        }
+    };
+
+    if(options & CONTEXTS_V2_CONTEXTS)
+    {
+        ctl.ctx = dictionary_create_advanced(
+            DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL,
+            sizeof(struct rrdcontext_to_json_v2_entry));
+
+        dictionary_register_delete_callback(ctl.ctx, contexts_delete_callback, NULL);
+    }
+
+    time_t now_s = now_realtime_sec();
+    buffer_json_member_add_uint64(wb, "api", 2);
+
+    {
+        buffer_json_member_add_object(wb, "request");
+
+        buffer_json_member_add_object(wb, "scope");
+        buffer_json_member_add_string(wb, "scope_nodes", req->scope_nodes);
+        buffer_json_member_add_string(wb, "scope_contexts", req->scope_contexts);
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "selectors");
+        buffer_json_member_add_string(wb, "nodes", req->nodes);
+        buffer_json_member_add_string(wb, "contexts", req->contexts);
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_array(wb, "options");
+        buffer_json_contexts_v2_options_to_array(wb, options);
+        buffer_json_array_close(wb);
+
+        buffer_json_object_close(wb);
+    }
+
+    // Alert configuration
+    buffer_json_member_add_array(wb, "alerts");
+
+    ssize_t ret = query_scope_foreach_host(ctl.nodes.scope_pattern, ctl.nodes.pattern,
+            alert_to_json_v2_add_alert, &ctl, &ctl.versions, NULL);
+
+    if(unlikely(ret < 0)) {
+        buffer_flush(wb);
+
+        if(ret == -2) {
+            buffer_strcat(wb, "query timeout");
+            resp = HTTP_RESP_GATEWAY_TIMEOUT;
+        }
+        else {
+            buffer_strcat(wb, "query interrupted");
+            resp = HTTP_RESP_BACKEND_FETCH_FAILED;
+        }
+        goto cleanup;
+    }
+
+    buffer_json_array_close(wb); // alerts
+
+    buffer_json_member_add_array(wb, "nodes");
+
+    ret = query_scope_foreach_host(ctl.nodes.scope_pattern, ctl.nodes.pattern,
+                                           alert_to_json_v2_add_host, &ctl,
+                                           &ctl.versions, NULL);
+
+    if(unlikely(ret < 0)) {
+        buffer_flush(wb);
+
+        if(ret == -2) {
+            buffer_strcat(wb, "query timeout");
+            resp = HTTP_RESP_GATEWAY_TIMEOUT;
+        }
+        else {
+            buffer_strcat(wb, "query interrupted");
+            resp = HTTP_RESP_BACKEND_FETCH_FAILED;
+        }
+        goto cleanup;
+    }
+
+    buffer_json_array_close(wb);        // Nodes
+
+    ctl.timings.executed_ut = now_monotonic_usec();
+    version_hashes_api_v2(wb, &ctl.versions);
+
+    buffer_json_agents_array_v2(wb, &ctl.timings, now_s, false);
+    buffer_json_cloud_timings(wb, "timings", &ctl.timings);
+    buffer_json_finalize(wb);
+
+    JudyHSFreeArray(&ctl.alerts.JudyHS, PJE0);
+
+cleanup:
+//    dictionary_destroy(ctl.ctx);
+    simple_pattern_free(ctl.nodes.scope_pattern);
+    simple_pattern_free(ctl.nodes.pattern);
+    simple_pattern_free(ctl.contexts.pattern);
+    simple_pattern_free(ctl.contexts.scope_pattern);
+    simple_pattern_free(req->config_hash_pattern);
+    simple_pattern_free(req->alert_name_pattern);
+
+    return resp;
+}

@@ -53,6 +53,19 @@ static struct {
 static struct {
     const char *name;
     uint32_t hash;
+    ALERT_OPTIONS value;
+} api_v2_alert_options[] = {
+      {"minify"            , 0    , ALERT_OPTION_MINIFY}
+     , {"active"           , 0    , ALERT_OPTION_ACTIVE}
+     , {"config"           , 0    , ALERT_OPTION_CONFIG}
+     , {"transitions"      , 0    , ALERT_OPTION_TRANSITIONS}
+     , {"instances"        , 0    , ALERT_OPTION_INSTANCES}
+    , {NULL                , 0    , 0}
+};
+
+static struct {
+    const char *name;
+    uint32_t hash;
     DATASOURCE_FORMAT value;
 } api_v1_data_formats[] = {
         {  DATASOURCE_FORMAT_DATATABLE_JSON , 0 , DATASOURCE_DATATABLE_JSON}
@@ -93,6 +106,9 @@ void web_client_api_v1_init(void) {
 
     for(i = 0; api_v1_data_options[i].name ; i++)
         api_v1_data_options[i].hash = simple_hash(api_v1_data_options[i].name);
+
+    for(i = 0; api_v2_alert_options[i].name ; i++)
+        api_v2_alert_options[i].hash = simple_hash(api_v2_alert_options[i].name);
 
     for(i = 0; api_v1_data_formats[i].name ; i++)
         api_v1_data_formats[i].hash = simple_hash(api_v1_data_formats[i].name);
@@ -186,6 +202,26 @@ inline RRDR_OPTIONS web_client_api_request_v1_data_options(char *o) {
         for(i = 0; api_v1_data_options[i].name ; i++) {
             if (unlikely(hash == api_v1_data_options[i].hash && !strcmp(tok, api_v1_data_options[i].name))) {
                 ret |= api_v1_data_options[i].value;
+                break;
+            }
+        }
+    }
+
+    return ret;
+}
+
+inline ALERT_OPTIONS web_client_api_request_v2_alert_options(char *o) {
+    ALERT_OPTIONS ret = 0x00000000;
+    char *tok;
+
+    while(o && *o && (tok = strsep_skip_consecutive_separators(&o, ", |"))) {
+        if(!*tok) continue;
+
+        uint32_t hash = simple_hash(tok);
+        int i;
+        for(i = 0; api_v2_alert_options[i].name ; i++) {
+            if (unlikely(hash == api_v2_alert_options[i].hash && !strcmp(tok, api_v2_alert_options[i].name))) {
+                ret |= api_v2_alert_options[i].value;
                 break;
             }
         }

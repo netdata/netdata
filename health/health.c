@@ -1128,6 +1128,7 @@ void *health_main(void *ptr) {
                             rc->last_status_change = now;
                             rc->last_updated = now;
                             rc->value = NAN;
+                            rc->ae = ae;
 
 #ifdef ENABLE_ACLK
                             if (netdata_cloud_enabled)
@@ -1396,6 +1397,7 @@ void *health_main(void *ptr) {
                         rc->last_status_change = now;
                         rc->old_status = rc->status;
                         rc->status = status;
+                        rc->ae = ae;
                     }
 
                     rc->last_updated = now;
@@ -1473,6 +1475,7 @@ void *health_main(void *ptr) {
                             ae->flags |= HEALTH_ENTRY_RUN_ONCE;
                         }
                         rc->run_flags |= RRDCALC_FLAG_RUN_ONCE;
+                        rc->ae = ae;
                         health_process_notifications(host, ae);
                         debug(D_HEALTH, "Notification sent for the repeating alarm %u.", ae->alarm_id);
                         health_alarm_wait_for_execution(ae);

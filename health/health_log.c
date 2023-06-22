@@ -47,6 +47,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     uuid_copy(ae->config_hash_id, *((uuid_t *) config_hash_id));
 
     uuid_generate_random(ae->transition_id);
+    ae->global_id = now_realtime_usec();
 
     ae->family = string_dup(family);
     ae->classification = string_dup(class);

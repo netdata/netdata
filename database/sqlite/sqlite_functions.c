@@ -61,6 +61,7 @@ const char *database_config[] = {
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_1 ON health_log_detail (unique_id);",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_2 ON health_log_detail (global_id);",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_3 ON health_log_detail (transition_id);",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_4 ON health_log_detail (health_log_id);",
     //TODO more indexes
 
     NULL

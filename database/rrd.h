@@ -1014,6 +1014,7 @@ struct alarm_entry {
     uint32_t unique_id;
     uint32_t alarm_id;
     uint32_t alarm_event_id;
+    usec_t global_id;
     uuid_t config_hash_id;
     uuid_t transition_id;
 
