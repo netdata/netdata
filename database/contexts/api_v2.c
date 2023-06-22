@@ -681,7 +681,7 @@ static ssize_t alert_to_json_v2_add_host(void *data, RRDHOST *host, bool queryab
         buffer_json_add_array_item_object(wb);
         buffer_json_node_add_v2(wb, host, ctl->nodes.ni++, 0, false);
 
-        if (ctl->alerts_request->options & ALERT_OPTION_TRANSITIONS) {
+        if (ctl->alerts_request->options & ALERT_OPTION_INSTANCES) {
             if (rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)) {
                 buffer_json_member_add_array(wb, "instances");
                 health_alert2json(host, wb, ctl->alerts_request->options, ctl->alerts.JudyHS, ctl->alerts_request->after, ctl->alerts_request->before, ctl->alerts_request->last);

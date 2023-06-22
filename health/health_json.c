@@ -216,7 +216,7 @@ static inline void health_alerts_rrdcalc2json_nolock(RRDHOST *host __maybe_unuse
             buffer_json_member_add_double(wb, "red", rc->red);
             buffer_json_member_add_double(wb, "value", rc->value);
 
-            if (options & ALERT_OPTION_INSTANCES) {
+            if (options & ALERT_OPTION_TRANSITIONS) {
                 buffer_json_member_add_array(wb, "transitions");
                 sql_health_alarm_log2json_v2(host, wb, rc->id, NULL, after, before, top);
                 buffer_json_array_close(wb);
