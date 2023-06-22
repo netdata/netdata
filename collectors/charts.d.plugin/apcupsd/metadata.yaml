@@ -1,0 +1,66 @@
+  - metrics:
+      module:
+        name: apcupsd
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        ups:
+          name: ups
+          description: TBD
+          labels: []
+          metrics:
+            - name: apcupsd.charge
+              description: UPS Charge
+              unit: percentage
+              dimensions:
+                - name: charge
+            - name: apcupsd.battery.voltage
+              description: UPS Battery Voltage
+              unit: Volts
+              dimensions:
+                - name: voltage
+                - name: nominal
+            - name: apcupsd.input.voltage
+              description: UPS Input Voltage
+              unit: Volts
+              dimensions:
+                - name: voltage
+                - name: min
+                - name: max
+            - name: apcupsd.output.voltage
+              description: UPS Output Voltage
+              unit: Volts
+              dimensions:
+                - name: absolute
+                - name: nominal
+            - name: apcupsd.input.frequency
+              description: UPS Input Voltage
+              unit: Hz
+              dimensions:
+                - name: frequency
+            - name: apcupsd.load
+              description: UPS Load
+              unit: percentage
+              dimensions:
+                - name: load
+            - name: apcupsd.load_usage
+              description: UPS Load Usage
+              unit: Watts
+              dimensions:
+                - name: load
+            - name: apcupsd.temperature
+              description: UPS Temperature
+              unit: Celsius
+              dimensions:
+                - name: temp
+            - name: apcupsd.time
+              description: UPS Time Remaining
+              unit: Minutes
+              dimensions:
+                - name: time
+            - name: apcupsd.online
+              description: UPS ONLINE flag
+              unit: boolean
+              dimensions:
+                - name: online

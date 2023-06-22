@@ -1,0 +1,22 @@
+  - metrics:
+      module:
+        name: anomalies
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: anomalies.probability
+              description: Anomaly Probability
+              unit: probability
+              dimensions:
+                - name: a dimension per probability
+            - name: anomalies.anomaly
+              description: Anomaly
+              unit: count
+              dimensions:
+                - name: a dimension per anomaly

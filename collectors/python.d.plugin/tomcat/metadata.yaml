@@ -1,0 +1,67 @@
+  - metrics:
+      module:
+        name: tomcat
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: tomcat.accesses
+              description: Requests
+              unit: requests/s
+              dimensions:
+                - name: accesses
+                - name: errors
+            - name: tomcat.bandwidth
+              description: Bandwidth
+              unit: KiB/s
+              dimensions:
+                - name: sent
+                - name: received
+            - name: tomcat.processing_time
+              description: processing time
+              unit: seconds
+              dimensions:
+                - name: processing time
+            - name: tomcat.threads
+              description: Threads
+              unit: current threads
+              dimensions:
+                - name: current
+                - name: busy
+            - name: tomcat.jvm
+              description: JVM Memory Pool Usage
+              unit: MiB
+              dimensions:
+                - name: free
+                - name: eden
+                - name: survivor
+                - name: tenured
+                - name: code cache
+                - name: compressed
+                - name: metaspace
+            - name: tomcat.jvm_eden
+              description: Eden Memory Usage
+              unit: MiB
+              dimensions:
+                - name: used
+                - name: committed
+                - name: max
+            - name: tomcat.jvm_survivor
+              description: Survivor Memory Usage
+              unit: MiB
+              dimensions:
+                - name: used
+                - name: committed
+                - name: max
+            - name: tomcat.jvm_tenured
+              description: Tenured Memory Usage
+              unit: MiB
+              dimensions:
+                - name: used
+                - name: committed
+                - name: max

@@ -1,0 +1,73 @@
+  - metrics:
+      module:
+        name: nut
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        ups:
+          name: ups
+          description: TBD
+          labels: []
+          metrics:
+            - name: nut.charge
+              description: UPS Charge
+              unit: percentage
+              dimensions:
+                - name: charge
+            - name: nut.runtime
+              description: UPS Runtime
+              unit: seconds
+              dimensions:
+                - name: runtime
+            - name: nut.battery.voltage
+              description: UPS Battery Voltage
+              unit: Volts
+              dimensions:
+                - name: voltage
+                - name: high
+                - name: low
+                - name: nominal
+            - name: nut.input.voltage
+              description: UPS Input Voltage
+              unit: Volts
+              dimensions:
+                - name: voltage
+                - name: fault
+                - name: nominal
+            - name: nut.input.current
+              description: UPS Input Current
+              unit: Ampere
+              dimensions:
+                - name: nominal
+            - name: nut.input.frequency
+              description: UPS Input Frequency
+              unit: Hz
+              dimensions:
+                - name: frequency
+                - name: nominal
+            - name: nut.output.voltage
+              description: UPS Output Voltage
+              unit: Volts
+              dimensions:
+                - name: voltage
+            - name: nut.load
+              description: UPS Load
+              unit: percentage
+              dimensions:
+                - name: load
+            - name: nut.load_usage
+              description: UPS Load Usage
+              unit: Watts
+              dimensions:
+                - name: load_usage
+            - name: nut.temperature
+              description: UPS Temperature
+              unit: temperature
+              dimensions:
+                - name: temp
+            - name: nut.clients
+              description: UPS Connected Clients
+              unit: clients
+              dimensions:
+                - name: clients

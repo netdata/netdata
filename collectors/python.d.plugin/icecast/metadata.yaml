@@ -1,0 +1,17 @@
+  - metrics:
+      module:
+        name: icecast
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: icecast.listeners
+              description: Number Of Listeners
+              unit: listeners
+              dimensions:
+                - name: a dimension for each active source

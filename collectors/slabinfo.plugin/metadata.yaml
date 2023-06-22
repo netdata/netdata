@@ -1,0 +1,27 @@
+  - metrics:
+      module:
+        name: slabinfo.plugin
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: mem.slabmemory
+              description: Memory Usage
+              unit: B
+              dimensions:
+                - name: a dimension per cache
+            - name: mem.slabfilling
+              description: Object Filling
+              unit: '%'
+              dimensions:
+                - name: a dimension per cache
+            - name: mem.slabwaste
+              description: Memory waste
+              unit: B
+              dimensions:
+                - name: a dimension per cache

@@ -1,0 +1,61 @@
+  - metrics:
+      module:
+        name: litespeed
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: litespeed.net_throughput
+              description: Network Throughput HTTP
+              unit: kilobits/s
+              dimensions:
+                - name: in
+                - name: out
+            - name: litespeed.net_throughput
+              description: Network Throughput HTTPS
+              unit: kilobits/s
+              dimensions:
+                - name: in
+                - name: out
+            - name: litespeed.connections
+              description: Connections HTTP
+              unit: conns
+              dimensions:
+                - name: free
+                - name: used
+            - name: litespeed.connections
+              description: Connections HTTPS
+              unit: conns
+              dimensions:
+                - name: free
+                - name: used
+            - name: litespeed.requests
+              description: Requests
+              unit: requests/s
+              dimensions:
+                - name: requests
+            - name: litespeed.requests_processing
+              description: Requests In Processing
+              unit: requests
+              dimensions:
+                - name: processing
+            - name: litespeed.cache
+              description: Public Cache Hits
+              unit: hits/s
+              dimensions:
+                - name: hits
+            - name: litespeed.cache
+              description: Private Cache Hits
+              unit: hits/s
+              dimensions:
+                - name: hits
+            - name: litespeed.static
+              description: Static Hits
+              unit: hits/s
+              dimensions:
+                - name: hits

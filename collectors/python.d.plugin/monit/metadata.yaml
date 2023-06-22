@@ -1,0 +1,72 @@
+  - metrics:
+      module:
+        name: monit
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: monit.filesystems
+              description: Filesystems
+              unit: filesystems
+              dimensions:
+                - name: a dimension per target
+            - name: monit.directories
+              description: Directories
+              unit: directories
+              dimensions:
+                - name: a dimension per target
+            - name: monit.files
+              description: Files
+              unit: files
+              dimensions:
+                - name: a dimension per target
+            - name: monit.fifos
+              description: Pipes (fifo)
+              unit: pipes
+              dimensions:
+                - name: a dimension per target
+            - name: monit.programs
+              description: Programs statuses
+              unit: programs
+              dimensions:
+                - name: a dimension per target
+            - name: monit.services
+              description: Processes statuses
+              unit: processes
+              dimensions:
+                - name: a dimension per target
+            - name: monit.process_uptime
+              description: Processes uptime
+              unit: seconds
+              dimensions:
+                - name: a dimension per target
+            - name: monit.process_threads
+              description: Processes threads
+              unit: threads
+              dimensions:
+                - name: a dimension per target
+            - name: monit.process_childrens
+              description: Child processes
+              unit: children
+              dimensions:
+                - name: a dimension per target
+            - name: monit.hosts
+              description: Hosts
+              unit: hosts
+              dimensions:
+                - name: a dimension per target
+            - name: monit.host_latency
+              description: Hosts latency
+              unit: milliseconds
+              dimensions:
+                - name: a dimension per target
+            - name: monit.networks
+              description: Network interfaces and addresses
+              unit: interfaces
+              dimensions:
+                - name: a dimension per target

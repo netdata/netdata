@@ -1,0 +1,32 @@
+  - metrics:
+      module:
+        name: diskspace.plugin
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        mount point:
+          name: mount point
+          description: TBD
+          labels:
+            - name: mount_point
+              description: TBD
+            - name: filesystem
+              description: TBD
+            - name: mount_root
+              description: TBD
+          metrics:
+            - name: disk.space
+              description: Disk Space Usage
+              unit: GiB
+              dimensions:
+                - name: avail
+                - name: used
+                - name: reserved_for_root
+            - name: disk.inodes
+              description: Disk Files (inodes) Usage
+              unit: inodes
+              dimensions:
+                - name: avail
+                - name: used
+                - name: reserved_for_root

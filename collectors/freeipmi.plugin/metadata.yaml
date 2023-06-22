@@ -1,0 +1,59 @@
+  - metrics:
+      module:
+        name: freeipmi.plugin
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: ipmi.sel
+              description: IPMI Events
+              unit: events
+              dimensions:
+                - name: events
+            - name: ipmi.sensors_states
+              description: IPMI Sensors State
+              unit: sensors
+              dimensions:
+                - name: nominal
+                - name: critical
+                - name: warning
+            - name: ipmi.temperatures_c
+              description: System Celsius Temperatures read by IPMI
+              unit: Celsius
+              dimensions:
+                - name: a dimension per sensor
+            - name: ipmi.temperatures_f
+              description: System Celsius Temperatures read by IPMI
+              unit: Fahrenheit
+              dimensions:
+                - name: a dimension per sensor
+            - name: ipmi.voltages
+              description: System Voltages read by IPMI
+              unit: Volts
+              dimensions:
+                - name: a dimension per sensor
+            - name: ipmi.amps
+              description: System Current read by IPMI
+              unit: Amps
+              dimensions:
+                - name: a dimension per sensor
+            - name: ipmi.rpm
+              description: System Fans read by IPMI
+              unit: RPM
+              dimensions:
+                - name: a dimension per sensor
+            - name: ipmi.watts
+              description: System Power read by IPMI
+              unit: Watts
+              dimensions:
+                - name: a dimension per sensor
+            - name: ipmi.percent
+              description: System Metrics read by IPMI
+              unit: '%'
+              dimensions:
+                - name: a dimension per sensor

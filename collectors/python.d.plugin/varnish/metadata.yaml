@@ -1,0 +1,123 @@
+  - metrics:
+      module:
+        name: varnish
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: varnish.session_connection
+              description: Connections Statistics
+              unit: connections/s
+              dimensions:
+                - name: accepted
+                - name: dropped
+            - name: varnish.client_requests
+              description: Client Requests
+              unit: requests/s
+              dimensions:
+                - name: received
+            - name: varnish.all_time_hit_rate
+              description: All History Hit Rate Ratio
+              unit: percentage
+              dimensions:
+                - name: hit
+                - name: miss
+                - name: hitpass
+            - name: varnish.current_poll_hit_rate
+              description: Current Poll Hit Rate Ratio
+              unit: percentage
+              dimensions:
+                - name: hit
+                - name: miss
+                - name: hitpass
+            - name: varnish.cached_objects_expired
+              description: Expired Objects
+              unit: expired/s
+              dimensions:
+                - name: objects
+            - name: varnish.cached_objects_nuked
+              description: Least Recently Used Nuked Objects
+              unit: nuked/s
+              dimensions:
+                - name: objects
+            - name: varnish.threads_total
+              description: Number Of Threads In All Pools
+              unit: number
+              dimensions:
+                - name: None
+            - name: varnish.threads_statistics
+              description: Threads Statistics
+              unit: threads/s
+              dimensions:
+                - name: created
+                - name: failed
+                - name: limited
+            - name: varnish.threads_queue_len
+              description: Current Queue Length
+              unit: requests
+              dimensions:
+                - name: in queue
+            - name: varnish.backend_connections
+              description: Backend Connections Statistics
+              unit: connections/s
+              dimensions:
+                - name: successful
+                - name: unhealthy
+                - name: reused
+                - name: closed
+                - name: recycled
+                - name: failed
+            - name: varnish.backend_requests
+              description: Requests To The Backend
+              unit: requests/s
+              dimensions:
+                - name: sent
+            - name: varnish.esi_statistics
+              description: ESI Statistics
+              unit: problems/s
+              dimensions:
+                - name: errors
+                - name: warnings
+            - name: varnish.memory_usage
+              description: Memory Usage
+              unit: MiB
+              dimensions:
+                - name: free
+                - name: allocated
+            - name: varnish.uptime
+              description: Uptime
+              unit: seconds
+              dimensions:
+                - name: uptime
+        Backend:
+          name: Backend
+          description: TBD
+          labels: []
+          metrics:
+            - name: varnish.backend
+              description: Backend {backend_name}
+              unit: kilobits/s
+              dimensions:
+                - name: header
+                - name: body
+        Storage:
+          name: Storage
+          description: TBD
+          labels: []
+          metrics:
+            - name: varnish.storage_usage
+              description: Storage {storage_name} Usage
+              unit: KiB
+              dimensions:
+                - name: free
+                - name: allocated
+            - name: varnish.storage_alloc_objs
+              description: Storage {storage_name} Allocated Objects
+              unit: objects
+              dimensions:
+                - name: allocated

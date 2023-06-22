@@ -1,0 +1,734 @@
+  - metrics:
+      module:
+        name: /sys/fs/cgroup
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        cgroup:
+          name: cgroup
+          description: TBD
+          labels:
+            - name: container_name
+              description: TBD
+            - name: image
+              description: TBD
+          metrics:
+            - name: cgroup.cpu_limit
+              description: CPU Usage within the limits
+              unit: percentage
+              dimensions:
+                - name: used
+            - name: cgroup.cpu
+              description: CPU Usage (100% = 1 core)
+              unit: percentage
+              dimensions:
+                - name: user
+                - name: system
+            - name: cgroup.cpu_per_core
+              description: CPU Usage (100% = 1 core) Per Core
+              unit: percentage
+              dimensions:
+                - name: a dimension per core
+            - name: cgroup.throttled
+              description: CPU Throttled Runnable Periods
+              unit: percentage
+              dimensions:
+                - name: throttled
+            - name: cgroup.throttled_duration
+              description: CPU Throttled Time Duration
+              unit: ms
+              dimensions:
+                - name: duration
+            - name: cgroup.cpu_shares
+              description: CPU Time Relative Share
+              unit: shares
+              dimensions:
+                - name: shares
+            - name: cgroup.mem
+              description: Memory Usage
+              unit: MiB
+              dimensions:
+                - name: cache
+                - name: rss
+                - name: swap
+                - name: rss_huge
+                - name: mapped_file
+            - name: cgroup.writeback
+              description: Writeback Memory
+              unit: MiB
+              dimensions:
+                - name: dirty
+                - name: writeback
+            - name: cgroup.mem_activity
+              description: Memory Activity
+              unit: MiB/s
+              dimensions:
+                - name: in
+                - name: out
+            - name: cgroup.pgfaults
+              description: Memory Page Faults
+              unit: MiB/s
+              dimensions:
+                - name: pgfault
+                - name: swap
+            - name: cgroup.mem_usage
+              description: Used Memory
+              unit: MiB
+              dimensions:
+                - name: ram
+                - name: swap
+            - name: cgroup.mem_usage_limit
+              description: Used RAM within the limits
+              unit: MiB
+              dimensions:
+                - name: available
+                - name: used
+            - name: cgroup.mem_utilization
+              description: Memory Utilization
+              unit: percentage
+              dimensions:
+                - name: utilization
+            - name: cgroup.mem_failcnt
+              description: Memory Limit Failures
+              unit: count
+              dimensions:
+                - name: failures
+            - name: cgroup.io
+              description: I/O Bandwidth (all disks)
+              unit: KiB/s
+              dimensions:
+                - name: read
+                - name: write
+            - name: cgroup.serviced_ops
+              description: Serviced I/O Operations (all disks)
+              unit: operations/s
+              dimensions:
+                - name: read
+                - name: write
+            - name: cgroup.throttle_io
+              description: Throttle I/O Bandwidth (all disks)
+              unit: KiB/s
+              dimensions:
+                - name: read
+                - name: write
+            - name: cgroup.throttle_serviced_ops
+              description: Throttle Serviced I/O Operations (all disks)
+              unit: operations/s
+              dimensions:
+                - name: read
+                - name: write
+            - name: cgroup.queued_ops
+              description: Queued I/O Operations (all disks)
+              unit: operations
+              dimensions:
+                - name: read
+                - name: write
+            - name: cgroup.merged_ops
+              description: Merged I/O Operations (all disks)
+              unit: operations/s
+              dimensions:
+                - name: read
+                - name: write
+            - name: cgroup.cpu_some_pressure
+              description: CPU some pressure
+              unit: percentage
+              dimensions:
+                - name: some10
+                - name: some60
+                - name: some300
+            - name: cgroup.cpu_some_pressure_stall_time
+              description: CPU some pressure stall time
+              unit: ms
+              dimensions:
+                - name: time
+            - name: cgroup.cpu_full_pressure
+              description: CPU full pressure
+              unit: percentage
+              dimensions:
+                - name: some10
+                - name: some60
+                - name: some300
+            - name: cgroup.cpu_full_pressure_stall_time
+              description: CPU full pressure stall time
+              unit: ms
+              dimensions:
+                - name: time
+            - name: cgroup.memory_some_pressure
+              description: Memory some pressure
+              unit: percentage
+              dimensions:
+                - name: some10
+                - name: some60
+                - name: some300
+            - name: cgroup.memory_some_pressure_stall_time
+              description: Memory some pressure stall time
+              unit: ms
+              dimensions:
+                - name: time
+            - name: cgroup.memory_full_pressure
+              description: Memory full pressure
+              unit: percentage
+              dimensions:
+                - name: some10
+                - name: some60
+                - name: some300
+            - name: cgroup.memory_full_pressure_stall_time
+              description: Memory full pressure stall time
+              unit: ms
+              dimensions:
+                - name: time
+            - name: cgroup.io_some_pressure
+              description: I/O some pressure
+              unit: percentage
+              dimensions:
+                - name: some10
+                - name: some60
+                - name: some300
+            - name: cgroup.io_some_pressure_stall_time
+              description: I/O some pressure stall time
+              unit: ms
+              dimensions:
+                - name: time
+            - name: cgroup.io_full_pressure
+              description: I/O some pressure
+              unit: percentage
+              dimensions:
+                - name: some10
+                - name: some60
+                - name: some300
+            - name: cgroup.io_full_pressure_stall_time
+              description: I/O some pressure stall time
+              unit: ms
+              dimensions:
+                - name: time
+        k8s cgroup:
+          name: k8s cgroup
+          description: TBD
+          labels:
+            - name: k8s_namespace
+              description: TBD
+            - name: k8s_pod_name
+              description: TBD
+            - name: k8s_pod_uid
+              description: TBD
+            - name: k8s_controller_kind
+              description: TBD
+            - name: k8s_controller_name
+              description: TBD
+            - name: k8s_node_name
+              description: TBD
+            - name: k8s_container_name
+              description: TBD
+            - name: k8s_container_id
+              description: TBD
+            - name: k8s_kind
+              description: TBD
+            - name: k8s_qos_class
+              description: TBD
+            - name: k8s_cluster_id
+              description: TBD
+          metrics:
+            - name: k8s.cgroup.cpu_limit
+              description: CPU Usage within the limits
+              unit: percentage
+              dimensions:
+                - name: used
+            - name: k8s.cgroup.cpu
+              description: CPU Usage (100% = 1000 mCPU)
+              unit: percentage
+              dimensions:
+                - name: user
+                - name: system
+            - name: k8s.cgroup.cpu_per_core
+              description: CPU Usage (100% = 1000 mCPU) Per Core
+              unit: percentage
+              dimensions:
+                - name: a dimension per core
+            - name: k8s.cgroup.throttled
+              description: CPU Throttled Runnable Periods
+              unit: percentage
+              dimensions:
+                - name: throttled
+            - name: k8s.cgroup.throttled_duration
+              description: CPU Throttled Time Duration
+              unit: ms
+              dimensions:
+                - name: duration
+            - name: k8s.cgroup.cpu_shares
+              description: CPU Time Relative Share
+              unit: shares
+              dimensions:
+                - name: shares
+            - name: k8s.cgroup.mem
+              description: Memory Usage
+              unit: MiB
+              dimensions:
+                - name: cache
+                - name: rss
+                - name: swap
+                - name: rss_huge
+                - name: mapped_file
+            - name: k8s.cgroup.writeback
+              description: Writeback Memory
+              unit: MiB
+              dimensions:
+                - name: dirty
+                - name: writeback
+            - name: k8s.cgroup.mem_activity
+              description: Memory Activity
+              unit: MiB/s
+              dimensions:
+                - name: in
+                - name: out
+            - name: k8s.cgroup.pgfaults
+              description: Memory Page Faults
+              unit: MiB/s
+              dimensions:
+                - name: pgfault
+                - name: swap
+            - name: k8s.cgroup.mem_usage
+              description: Used Memory
+              unit: MiB
+              dimensions:
+                - name: ram
+                - name: swap
+            - name: k8s.cgroup.mem_usage_limit
+              description: Used RAM within the limits
+              unit: MiB
+              dimensions:
+                - name: available
+                - name: used
+            - name: k8s.cgroup.mem_utilization
+              description: Memory Utilization
+              unit: percentage
+              dimensions:
+                - name: utilization
+            - name: k8s.cgroup.mem_failcnt
+              description: Memory Limit Failures
+              unit: count
+              dimensions:
+                - name: failures
+            - name: k8s.cgroup.io
+              description: I/O Bandwidth (all disks)
+              unit: KiB/s
+              dimensions:
+                - name: read
+                - name: write
+            - name: k8s.cgroup.serviced_ops
+              description: Serviced I/O Operations (all disks)
+              unit: operations/s
+              dimensions:
+                - name: read
+                - name: write
+            - name: k8s.cgroup.throttle_io
+              description: Throttle I/O Bandwidth (all disks)
+              unit: KiB/s
+              dimensions:
+                - name: read
+                - name: write
+            - name: k8s.cgroup.throttle_serviced_ops
+              description: Throttle Serviced I/O Operations (all disks)
+              unit: operations/s
+              dimensions:
+                - name: read
+                - name: write
+            - name: k8s.cgroup.queued_ops
+              description: Queued I/O Operations (all disks)
+              unit: operations
+              dimensions:
+                - name: read
+                - name: write
+            - name: k8s.cgroup.merged_ops
+              description: Merged I/O Operations (all disks)
+              unit: operations/s
+              dimensions:
+                - name: read
+                - name: write
+            - name: k8s.cgroup.cpu_some_pressure
+              description: CPU some pressure
+              unit: percentage
+              dimensions:
+                - name: some10
+                - name: some60
+                - name: some300
+            - name: k8s.cgroup.cpu_some_pressure_stall_time
+              description: CPU some pressure stall time
+              unit: ms
+              dimensions:
+                - name: time
+            - name: k8s.cgroup.cpu_full_pressure
+              description: CPU full pressure
+              unit: percentage
+              dimensions:
+                - name: some10
+                - name: some60
+                - name: some300
+            - name: k8s.cgroup.cpu_full_pressure_stall_time
+              description: CPU full pressure stall time
+              unit: ms
+              dimensions:
+                - name: time
+            - name: k8s.cgroup.memory_some_pressure
+              description: Memory some pressure
+              unit: percentage
+              dimensions:
+                - name: some10
+                - name: some60
+                - name: some300
+            - name: k8s.cgroup.memory_some_pressure_stall_time
+              description: Memory some pressure stall time
+              unit: ms
+              dimensions:
+                - name: time
+            - name: k8s.cgroup.memory_full_pressure
+              description: Memory full pressure
+              unit: percentage
+              dimensions:
+                - name: some10
+                - name: some60
+                - name: some300
+            - name: k8s.cgroup.memory_full_pressure_stall_time
+              description: Memory full pressure stall time
+              unit: ms
+              dimensions:
+                - name: time
+            - name: k8s.cgroup.io_some_pressure
+              description: I/O some pressure
+              unit: percentage
+              dimensions:
+                - name: some10
+                - name: some60
+                - name: some300
+            - name: k8s.cgroup.io_some_pressure_stall_time
+              description: I/O some pressure stall time
+              unit: ms
+              dimensions:
+                - name: time
+            - name: k8s.cgroup.io_full_pressure
+              description: I/O some pressure
+              unit: percentage
+              dimensions:
+                - name: some10
+                - name: some60
+                - name: some300
+            - name: k8s.cgroup.io_full_pressure_stall_time
+              description: I/O some pressure stall time
+              unit: ms
+              dimensions:
+                - name: time
+  - metrics:
+      module:
+        name: /proc/net/dev
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        cgroup, network device:
+          name: cgroup, network device
+          description: TBD
+          labels:
+            - name: container_name
+              description: TBD
+            - name: image
+              description: TBD
+            - name: device
+              description: TBD
+            - name: interface_type
+              description: TBD
+          metrics:
+            - name: cgroup.net_net
+              description: Bandwidth
+              unit: kilobits/s
+              dimensions:
+                - name: received
+                - name: sent
+            - name: cgroup.net_packets
+              description: Packets
+              unit: pps
+              dimensions:
+                - name: received
+                - name: sent
+                - name: multicast
+            - name: cgroup.net_errors
+              description: Interface Errors
+              unit: errors/s
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: cgroup.net_drops
+              description: Interface Drops
+              unit: errors/s
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: cgroup.net_fifo
+              description: Interface FIFO Buffer Errors
+              unit: errors/s
+              dimensions:
+                - name: receive
+                - name: transmit
+            - name: cgroup.net_compressed
+              description: Interface FIFO Buffer Errors
+              unit: pps
+              dimensions:
+                - name: receive
+                - name: sent
+            - name: cgroup.net_events
+              description: Network Interface Events
+              unit: events/s
+              dimensions:
+                - name: frames
+                - name: collisions
+                - name: carrier
+            - name: cgroup.net_operstate
+              description: Interface Operational State
+              unit: state
+              dimensions:
+                - name: up
+                - name: down
+                - name: notpresent
+                - name: lowerlayerdown
+                - name: testing
+                - name: dormant
+                - name: unknown
+            - name: cgroup.net_carrier
+              description: Interface Physical Link State
+              unit: state
+              dimensions:
+                - name: up
+                - name: down
+            - name: cgroup.net_mtu
+              description: Interface MTU
+              unit: octets
+              dimensions:
+                - name: mtu
+        k8s cgroup, network device:
+          name: k8s cgroup, network device
+          description: TBD
+          labels:
+            - name: device
+              description: TBD
+            - name: interface_type
+              description: TBD
+            - name: k8s_namespace
+              description: TBD
+            - name: k8s_pod_name
+              description: TBD
+            - name: k8s_pod_uid
+              description: TBD
+            - name: k8s_controller_kind
+              description: TBD
+            - name: k8s_controller_name
+              description: TBD
+            - name: k8s_node_name
+              description: TBD
+            - name: k8s_container_name
+              description: TBD
+            - name: k8s_container_id
+              description: TBD
+            - name: k8s_kind
+              description: TBD
+            - name: k8s_qos_class
+              description: TBD
+            - name: k8s_cluster_id
+              description: TBD
+          metrics:
+            - name: k8s.cgroup.net_net
+              description: Bandwidth
+              unit: kilobits/s
+              dimensions:
+                - name: received
+                - name: sent
+            - name: k8s.cgroup.net_packets
+              description: Packets
+              unit: pps
+              dimensions:
+                - name: received
+                - name: sent
+                - name: multicast
+            - name: k8s.cgroup.net_errors
+              description: Interface Errors
+              unit: errors/s
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: k8s.cgroup.net_drops
+              description: Interface Drops
+              unit: errors/s
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: k8s.cgroup.net_fifo
+              description: Interface FIFO Buffer Errors
+              unit: errors/s
+              dimensions:
+                - name: receive
+                - name: transmit
+            - name: k8s.cgroup.net_compressed
+              description: Interface FIFO Buffer Errors
+              unit: pps
+              dimensions:
+                - name: receive
+                - name: sent
+            - name: k8s.cgroup.net_events
+              description: Network Interface Events
+              unit: events/s
+              dimensions:
+                - name: frames
+                - name: collisions
+                - name: carrier
+            - name: k8s.cgroup.net_operstate
+              description: Interface Operational State
+              unit: state
+              dimensions:
+                - name: up
+                - name: down
+                - name: notpresent
+                - name: lowerlayerdown
+                - name: testing
+                - name: dormant
+                - name: unknown
+            - name: k8s.cgroup.net_carrier
+              description: Interface Physical Link State
+              unit: state
+              dimensions:
+                - name: up
+                - name: down
+            - name: k8s.cgroup.net_mtu
+              description: Interface MTU
+              unit: octets
+              dimensions:
+                - name: mtu
+  - metrics:
+      module:
+        name: systemd
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: services.cpu
+              description: Systemd Services CPU utilization (100% = 1 core)
+              unit: percentage
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.mem_usage
+              description: Systemd Services Used Memory
+              unit: MiB
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.mem_rss
+              description: Systemd Services RSS Memory
+              unit: MiB
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.mem_mapped
+              description: Systemd Services Mapped Memory
+              unit: MiB
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.mem_cache
+              description: Systemd Services Cache Memory
+              unit: MiB
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.mem_writeback
+              description: Systemd Services Writeback Memory
+              unit: MiB
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.mem_pgfault
+              description: Systemd Services Memory Minor Page Faults
+              unit: MiB/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.mem_pgmajfault
+              description: Systemd Services Memory Major Page Faults
+              unit: MiB/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.mem_pgpgin
+              description: Systemd Services Memory Charging Activity
+              unit: MiB/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.mem_pgpgout
+              description: Systemd Services Memory Uncharging Activity
+              unit: MiB/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.mem_failcnt
+              description: Systemd Services Memory Limit Failures
+              unit: failures
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.swap_usage
+              description: Systemd Services Swap Memory Used
+              unit: MiB
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.io_read
+              description: Systemd Services Disk Read Bandwidth
+              unit: KiB/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.io_write
+              description: Systemd Services Disk Write Bandwidth
+              unit: KiB/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.io_ops_read
+              description: Systemd Services Disk Read Operations
+              unit: operations/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.io_ops_write
+              description: Systemd Services Disk Write Operations
+              unit: operations/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.throttle_io_read
+              description: Systemd Services Throttle Disk Read Bandwidth
+              unit: KiB/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.services.throttle_io_write
+              description: Systemd Services Throttle Disk Write Bandwidth
+              unit: KiB/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.throttle_io_ops_read
+              description: Systemd Services Throttle Disk Read Operations
+              unit: operations/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: throttle_io_ops_write
+              description: Systemd Services Throttle Disk Write Operations
+              unit: operations/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.queued_io_ops_read
+              description: Systemd Services Queued Disk Read Operations
+              unit: operations/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.queued_io_ops_write
+              description: Systemd Services Queued Disk Write Operations
+              unit: operations/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.merged_io_ops_read
+              description: Systemd Services Merged Disk Read Operations
+              unit: operations/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.merged_io_ops_write
+              description: Systemd Services Merged Disk Write Operations
+              unit: operations/s
+              dimensions:
+                - name: a dimension per systemd service

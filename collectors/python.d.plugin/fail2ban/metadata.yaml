@@ -1,0 +1,27 @@
+  - metrics:
+      module:
+        name: fail2ban
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: fail2ban.faile_attempts
+              description: Failed attempts
+              unit: attempts/s
+              dimensions:
+                - name: a dimension per jail
+            - name: fail2ban.bans
+              description: Bans
+              unit: bans/s
+              dimensions:
+                - name: a dimension per jail
+            - name: fail2ban.banned_ips
+              description: Banned IP addresses (since the last restart of netdata)
+              unit: ips
+              dimensions:
+                - name: a dimension per jail

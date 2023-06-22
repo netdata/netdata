@@ -1,0 +1,203 @@
+  - metrics:
+      module:
+        name: riakkv
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: riak.kv.throughput
+              description: Reads & writes coordinated by this node
+              unit: operations/s
+              dimensions:
+                - name: gets
+                - name: puts
+            - name: riak.dt.vnode_updates
+              description: Update operations coordinated by local vnodes by data type
+              unit: operations/s
+              dimensions:
+                - name: counters
+                - name: sets
+                - name: maps
+            - name: riak.search
+              description: Search queries on the node
+              unit: queries/s
+              dimensions:
+                - name: queries
+            - name: riak.search.documents
+              description: Documents indexed by search
+              unit: documents/s
+              dimensions:
+                - name: indexed
+            - name: riak.consistent.operations
+              description: Consistent node operations
+              unit: operations/s
+              dimensions:
+                - name: gets
+                - name: puts
+            - name: riak.kv.latency.get
+              description: Time between reception of a client GET request and subsequent
+                response to client
+              unit: ms
+              dimensions:
+                - name: mean
+                - name: median
+                - name: '95'
+                - name: '99'
+                - name: '100'
+            - name: riak.kv.latency.put
+              description: Time between reception of a client PUT request and subsequent
+                response to client
+              unit: ms
+              dimensions:
+                - name: mean
+                - name: median
+                - name: '95'
+                - name: '99'
+                - name: '100'
+            - name: riak.dt.latency.counter_merge
+              description: Time it takes to perform an Update Counter operation
+              unit: ms
+              dimensions:
+                - name: mean
+                - name: median
+                - name: '95'
+                - name: '99'
+                - name: '100'
+            - name: riak.dt.latency.set_merge
+              description: Time it takes to perform an Update Set operation
+              unit: ms
+              dimensions:
+                - name: mean
+                - name: median
+                - name: '95'
+                - name: '99'
+                - name: '100'
+            - name: riak.dt.latency.map_merge
+              description: Time it takes to perform an Update Map operation
+              unit: ms
+              dimensions:
+                - name: mean
+                - name: median
+                - name: '95'
+                - name: '99'
+                - name: '100'
+            - name: riak.search.latency.query
+              description: Search query latency
+              unit: ms
+              dimensions:
+                - name: median
+                - name: min
+                - name: '95'
+                - name: '99'
+                - name: '999'
+                - name: max
+            - name: riak.search.latency.index
+              description: Time it takes Search to index a new document
+              unit: ms
+              dimensions:
+                - name: median
+                - name: min
+                - name: '95'
+                - name: '99'
+                - name: '999'
+                - name: max
+            - name: riak.consistent.latency.get
+              description: Strongly consistent read latency
+              unit: ms
+              dimensions:
+                - name: mean
+                - name: median
+                - name: '95'
+                - name: '99'
+                - name: '100'
+            - name: riak.consistent.latency.put
+              description: Strongly consistent write latency
+              unit: ms
+              dimensions:
+                - name: mean
+                - name: median
+                - name: '95'
+                - name: '99'
+                - name: '100'
+            - name: riak.vm
+              description: Total processes running in the Erlang VM
+              unit: total
+              dimensions:
+                - name: processes
+            - name: riak.vm.memory.processes
+              description: Memory allocated & used by Erlang processes
+              unit: MB
+              dimensions:
+                - name: allocated
+                - name: used
+            - name: riak.kv.siblings_encountered.get
+              description: Number of siblings encountered during GET operations by
+                this node during the past minute
+              unit: siblings
+              dimensions:
+                - name: mean
+                - name: median
+                - name: '95'
+                - name: '99'
+                - name: '100'
+            - name: riak.kv.objsize.get
+              description: Object size encountered by this node during the past minute
+              unit: KB
+              dimensions:
+                - name: mean
+                - name: median
+                - name: '95'
+                - name: '99'
+                - name: '100'
+            - name: riak.search.vnodeq_size
+              description: Number of unprocessed messages in the vnode message queues
+                of Search on this node in the past minute
+              unit: messages
+              dimensions:
+                - name: mean
+                - name: median
+                - name: '95'
+                - name: '99'
+                - name: '100'
+            - name: riak.search.index
+              description: Number of document index errors encountered by Search
+              unit: errors
+              dimensions:
+                - name: errors
+            - name: riak.core.protobuf_connections
+              description: Protocol buffer connections by status
+              unit: connections
+              dimensions:
+                - name: active
+            - name: riak.core.repairs
+              description: Number of repair operations this node has coordinated
+              unit: repairs
+              dimensions:
+                - name: read
+            - name: riak.core.fsm_active
+              description: Active finite state machines by kind
+              unit: fsms
+              dimensions:
+                - name: get
+                - name: put
+                - name: secondary index
+                - name: list keys
+            - name: riak.core.fsm_rejected
+              description: Finite state machines being rejected by Sidejobs overload
+                protection
+              unit: fsms
+              dimensions:
+                - name: get
+                - name: put
+            - name: riak.search.index
+              description: Number of writes to Search failed due to bad data format
+                by reason
+              unit: writes
+              dimensions:
+                - name: bad_entry
+                - name: extract_fail

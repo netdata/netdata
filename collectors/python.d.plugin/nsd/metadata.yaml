@@ -1,0 +1,64 @@
+  - metrics:
+      module:
+        name: nsd
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: nsd.queries
+              description: queries
+              unit: queries/s
+              dimensions:
+                - name: queries
+            - name: nsd.zones
+              description: zones
+              unit: zones
+              dimensions:
+                - name: master
+                - name: slave
+            - name: nsd.protocols
+              description: protocol
+              unit: queries/s
+              dimensions:
+                - name: udp
+                - name: udp6
+                - name: tcp
+                - name: tcp6
+            - name: nsd.type
+              description: query type
+              unit: queries/s
+              dimensions:
+                - name: A
+                - name: NS
+                - name: CNAME
+                - name: SOA
+                - name: PTR
+                - name: HINFO
+                - name: MX
+                - name: NAPTR
+                - name: TXT
+                - name: AAAA
+                - name: SRV
+                - name: ANY
+            - name: nsd.transfer
+              description: transfer
+              unit: queries/s
+              dimensions:
+                - name: NOTIFY
+                - name: AXFR
+            - name: nsd.rcode
+              description: return code
+              unit: queries/s
+              dimensions:
+                - name: NOERROR
+                - name: FORMERR
+                - name: SERVFAIL
+                - name: NXDOMAIN
+                - name: NOTIMP
+                - name: REFUSED
+                - name: YXDOMAIN

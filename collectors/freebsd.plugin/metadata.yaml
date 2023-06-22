@@ -1,0 +1,1114 @@
+  - metrics:
+      module:
+        name: vm.loadavg
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: system.load
+              description: System Load Average
+              unit: load
+              dimensions:
+                - name: load1
+                - name: load5
+                - name: load15
+  - metrics:
+      module:
+        name: vm.vmtotal
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: system.active_processes
+              description: System Active Processes
+              unit: processes
+              dimensions:
+                - name: active
+            - name: system.processes
+              description: System Processes
+              unit: processes
+              dimensions:
+                - name: running
+                - name: blocked
+            - name: mem.real
+              description: Total Real Memory In Use
+              unit: MiB
+              dimensions:
+                - name: used
+  - metrics:
+      module:
+        name: kern.cp_time
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: system.cpu
+              description: Total CPU utilization
+              unit: percentage
+              dimensions:
+                - name: nice
+                - name: system
+                - name: user
+                - name: interrupt
+                - name: idle
+        core:
+          name: core
+          description: TBD
+          labels: []
+          metrics:
+            - name: cpu.cpu
+              description: Core utilization
+              unit: percentage
+              dimensions:
+                - name: nice
+                - name: system
+                - name: user
+                - name: interrupt
+                - name: idle
+  - metrics:
+      module:
+        name: dev.cpu.temperature
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: cpu.temperature
+              description: Core temperature
+              unit: Celsius
+              dimensions:
+                - name: a dimension per core
+  - metrics:
+      module:
+        name: dev.cpu.0.freq
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: cpu.scaling_cur_freq
+              description: Current CPU Scaling Frequency
+              unit: MHz
+              dimensions:
+                - name: frequency
+  - metrics:
+      module:
+        name: hw.intrcnt
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: system.intr
+              description: Total Hardware Interrupts
+              unit: interrupts/s
+              dimensions:
+                - name: interrupts
+            - name: system.interrupts
+              description: System interrupts
+              unit: interrupts/s
+              dimensions:
+                - name: a dimension per interrupt
+  - metrics:
+      module:
+        name: vm.stats.sys.v_intr
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: system.dev_intr
+              description: Device Interrupts
+              unit: interrupts/s
+              dimensions:
+                - name: interrupts
+  - metrics:
+      module:
+        name: vm.stats.sys.v_soft
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: system.soft_intr
+              description: Software Interrupts
+              unit: interrupts/s
+              dimensions:
+                - name: interrupts
+  - metrics:
+      module:
+        name: vm.stats.sys.v_swtch
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: system.ctxt
+              description: CPU Context Switches
+              unit: context switches/s
+              dimensions:
+                - name: switches
+            - name: system.forks
+              description: Started Processes
+              unit: processes/s
+              dimensions:
+                - name: started
+  - metrics:
+      module:
+        name: vm.swap_info
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: system.swap
+              description: System Swap
+              unit: MiB
+              dimensions:
+                - name: free
+                - name: used
+  - metrics:
+      module:
+        name: system.ram
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: system.ram
+              description: System RAM
+              unit: MiB
+              dimensions:
+                - name: free
+                - name: active
+                - name: inactive
+                - name: wired
+                - name: cache
+                - name: laundry
+                - name: buffers
+            - name: mem.available
+              description: Available RAM for applications
+              unit: MiB
+              dimensions:
+                - name: avail
+  - metrics:
+      module:
+        name: vm.stats.vm.v_swappgs
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: system.swapio
+              description: Swap I/O
+              unit: KiB/s
+              dimensions:
+                - name: io
+                - name: out
+  - metrics:
+      module:
+        name: vm.stats.vm.v_pgfaults
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: mem.pgfaults
+              description: Memory Page Faults
+              unit: page faults/s
+              dimensions:
+                - name: memory
+                - name: io_requiring
+                - name: cow
+                - name: cow_optimized
+                - name: in_transit
+  - metrics:
+      module:
+        name: kern.ipc.sem
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: system.ipc_semaphores
+              description: IPC Semaphores
+              unit: semaphores
+              dimensions:
+                - name: semaphores
+            - name: system.ipc_semaphore_arrays
+              description: IPC Semaphore Arrays
+              unit: arrays
+              dimensions:
+                - name: arrays
+  - metrics:
+      module:
+        name: kern.ipc.shm
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: system.ipc_shared_mem_segs
+              description: IPC Shared Memory Segments
+              unit: segments
+              dimensions:
+                - name: segments
+            - name: system.ipc_shared_mem_size
+              description: IPC Shared Memory Segments Size
+              unit: KiB
+              dimensions:
+                - name: allocated
+  - metrics:
+      module:
+        name: kern.ipc.msq
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: system.ipc_msq_queues
+              description: Number of IPC Message Queues
+              unit: queues
+              dimensions:
+                - name: queues
+            - name: system.ipc_msq_messages
+              description: Number of Messages in IPC Message Queues
+              unit: messages
+              dimensions:
+                - name: messages
+            - name: system.ipc_msq_size
+              description: Size of IPC Message Queues
+              unit: bytes
+              dimensions:
+                - name: allocated
+                - name: used
+  - metrics:
+      module:
+        name: uptime
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: system.uptime
+              description: System Uptime
+              unit: seconds
+              dimensions:
+                - name: uptime
+  - metrics:
+      module:
+        name: net.isr
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: system.softnet_stat
+              description: System softnet_stat
+              unit: events/s
+              dimensions:
+                - name: dispatched
+                - name: hybrid_dispatched
+                - name: qdrops
+                - name: queued
+        core:
+          name: core
+          description: TBD
+          labels: []
+          metrics:
+            - name: cpu.softnet_stat
+              description: Per CPU netisr statistics
+              unit: events/s
+              dimensions:
+                - name: dispatched
+                - name: hybrid_dispatched
+                - name: qdrops
+                - name: queued
+  - metrics:
+      module:
+        name: devstat
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: system.io
+              description: Disk I/O
+              unit: KiB/s
+              dimensions:
+                - name: io
+                - name: out
+        disk:
+          name: disk
+          description: TBD
+          labels: []
+          metrics:
+            - name: disk.io
+              description: Disk I/O Bandwidth
+              unit: KiB/s
+              dimensions:
+                - name: reads
+                - name: writes
+                - name: frees
+            - name: disk.ops
+              description: Disk Completed I/O Operations
+              unit: operations/s
+              dimensions:
+                - name: reads
+                - name: writes
+                - name: other
+                - name: frees
+            - name: disk.qops
+              description: Disk Current I/O Operations
+              unit: operations
+              dimensions:
+                - name: operations
+            - name: disk.util
+              description: Disk Utilization Time
+              unit: '% of time working'
+              dimensions:
+                - name: utilization
+            - name: disk.iotime
+              description: Disk Total I/O Time
+              unit: milliseconds/s
+              dimensions:
+                - name: reads
+                - name: writes
+                - name: other
+                - name: frees
+            - name: disk.await
+              description: Average Completed I/O Operation Time
+              unit: milliseconds/operation
+              dimensions:
+                - name: reads
+                - name: writes
+                - name: other
+                - name: frees
+            - name: disk.avgsz
+              description: Average Completed I/O Operation Bandwidth
+              unit: KiB/operation
+              dimensions:
+                - name: reads
+                - name: writes
+                - name: frees
+            - name: disk.svctm
+              description: Average Service Time
+              unit: milliseconds/operation
+              dimensions:
+                - name: svctm
+  - metrics:
+      module:
+        name: net.inet.tcp.states
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: ipv4.tcpsock
+              description: IPv4 TCP Connections
+              unit: active connections
+              dimensions:
+                - name: connections
+  - metrics:
+      module:
+        name: net.inet.tcp.stats
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: ipv4.tcppackets
+              description: IPv4 TCP Packets
+              unit: packets/s
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.tcperrors
+              description: IPv4 TCP Errors
+              unit: packets/s
+              dimensions:
+                - name: InErrs
+                - name: InCsumErrors
+                - name: RetransSegs
+            - name: ipv4.tcphandshake
+              description: IPv4 TCP Handshake Issues
+              unit: events/s
+              dimensions:
+                - name: EstabResets
+                - name: ActiveOpens
+                - name: PassiveOpens
+                - name: AttemptFails
+            - name: ipv4.tcpconnaborts
+              description: TCP Connection Aborts
+              unit: connections/s
+              dimensions:
+                - name: baddata
+                - name: userclosed
+                - name: nomemory
+                - name: timeout
+                - name: linger
+            - name: ipv4.tcpofo
+              description: TCP Out-Of-Order Queue
+              unit: packets/s
+              dimensions:
+                - name: inqueue
+            - name: ipv4.tcpsyncookies
+              description: TCP SYN Cookies
+              unit: packets/s
+              dimensions:
+                - name: received
+                - name: sent
+                - name: failed
+            - name: ipv4.tcplistenissues
+              description: TCP Listen Socket Issues
+              unit: packets/s
+              dimensions:
+                - name: overflows
+            - name: ipv4.ecnpkts
+              description: IPv4 ECN Statistics
+              unit: packets/s
+              dimensions:
+                - name: InCEPkts
+                - name: InECT0Pkts
+                - name: InECT1Pkts
+                - name: OutECT0Pkts
+                - name: OutECT1Pkts
+  - metrics:
+      module:
+        name: net.inet.udp.stats
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: ipv4.udppackets
+              description: IPv4 UDP Packets
+              unit: packets/s
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.udperrors
+              description: IPv4 UDP Errors
+              unit: events/s
+              dimensions:
+                - name: InErrors
+                - name: NoPorts
+                - name: RcvbufErrors
+                - name: InCsumErrors
+                - name: IgnoredMulti
+  - metrics:
+      module:
+        name: net.inet.icmp.stats
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: ipv4.icmp
+              description: IPv4 ICMP Packets
+              unit: packets/s
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.icmp_errors
+              description: IPv4 ICMP Errors
+              unit: packets/s
+              dimensions:
+                - name: InErrors
+                - name: OutErrors
+                - name: InCsumErrors
+            - name: ipv4.icmpmsg
+              description: IPv4 ICMP Messages
+              unit: packets/s
+              dimensions:
+                - name: InEchoReps
+                - name: OutEchoReps
+                - name: InEchos
+                - name: OutEchos
+  - metrics:
+      module:
+        name: net.inet.ip.stats
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: ipv4.packets
+              description: IPv4 Packets
+              unit: packets/s
+              dimensions:
+                - name: received
+                - name: sent
+                - name: forwarded
+                - name: delivered
+            - name: ipv4.fragsout
+              description: IPv4 Fragments Sent
+              unit: packets/s
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: created
+            - name: ipv4.fragsin
+              description: IPv4 Fragments Reassembly
+              unit: packets/s
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: all
+            - name: ipv4.errors
+              description: IPv4 Errors
+              unit: packets/s
+              dimensions:
+                - name: InDiscards
+                - name: OutDiscards
+                - name: InHdrErrors
+                - name: OutNoRoutes
+                - name: InAddrErrors
+                - name: InUnknownProtos
+  - metrics:
+      module:
+        name: net.inet6.ip6.stats
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: ipv6.packets
+              description: IPv6 Packets
+              unit: packets/s
+              dimensions:
+                - name: received
+                - name: sent
+                - name: forwarded
+                - name: delivers
+            - name: ipv6.fragsout
+              description: IPv6 Fragments Sent
+              unit: packets/s
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: all
+            - name: ipv6.fragsin
+              description: IPv6 Fragments Reassembly
+              unit: packets/s
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: timeout
+                - name: all
+            - name: ipv6.errors
+              description: IPv6 Errors
+              unit: packets/s
+              dimensions:
+                - name: InDiscards
+                - name: OutDiscards
+                - name: InHdrErrors
+                - name: InAddrErrors
+                - name: InTruncatedPkts
+                - name: InNoRoutes
+                - name: OutNoRoutes
+  - metrics:
+      module:
+        name: net.inet6.icmp6.stats
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: ipv6.icmp
+              description: IPv6 ICMP Messages
+              unit: messages/s
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.icmpredir
+              description: IPv6 ICMP Redirects
+              unit: redirects/s
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.icmperrors
+              description: IPv6 ICMP Errors
+              unit: errors/s
+              dimensions:
+                - name: InErrors
+                - name: OutErrors
+                - name: InCsumErrors
+                - name: InDestUnreachs
+                - name: InPktTooBigs
+                - name: InTimeExcds
+                - name: InParmProblems
+                - name: OutDestUnreachs
+                - name: OutTimeExcds
+                - name: OutParmProblems
+            - name: ipv6.icmpechos
+              description: IPv6 ICMP Echo
+              unit: messages/s
+              dimensions:
+                - name: InEchos
+                - name: OutEchos
+                - name: InEchoReplies
+                - name: OutEchoReplies
+            - name: ipv6.icmprouter
+              description: IPv6 Router Messages
+              unit: messages/s
+              dimensions:
+                - name: InSolicits
+                - name: OutSolicits
+                - name: InAdvertisements
+                - name: OutAdvertisements
+            - name: ipv6.icmpneighbor
+              description: IPv6 Neighbor Messages
+              unit: messages/s
+              dimensions:
+                - name: InSolicits
+                - name: OutSolicits
+                - name: InAdvertisements
+                - name: OutAdvertisements
+            - name: ipv6.icmptypes
+              description: IPv6 ICMP Types
+              unit: messages/s
+              dimensions:
+                - name: InType1
+                - name: InType128
+                - name: InType129
+                - name: InType136
+                - name: OutType1
+                - name: OutType128
+                - name: OutType129
+                - name: OutType133
+                - name: OutType135
+                - name: OutType143
+  - metrics:
+      module:
+        name: ipfw
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: ipfw.mem
+              description: Memory allocated by rules
+              unit: bytes
+              dimensions:
+                - name: dynamic
+                - name: static
+            - name: ipfw.packets
+              description: Packets
+              unit: packets/s
+              dimensions:
+                - name: a dimension per static rule
+            - name: ipfw.bytes
+              description: Bytes
+              unit: bytes/s
+              dimensions:
+                - name: a dimension per static rule
+            - name: ipfw.active
+              description: Active rules
+              unit: rules
+              dimensions:
+                - name: a dimension per dynamic rule
+            - name: ipfw.expired
+              description: Expired rules
+              unit: rules
+              dimensions:
+                - name: a dimension per dynamic rule
+  - metrics:
+      module:
+        name: getifaddrs
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: system.net
+              description: Network Traffic
+              unit: kilobits/s
+              dimensions:
+                - name: received
+                - name: sent
+            - name: system.packets
+              description: Network Packets
+              unit: packets/s
+              dimensions:
+                - name: received
+                - name: sent
+                - name: multicast_received
+                - name: multicast_sent
+            - name: system.ipv4
+              description: IPv4 Bandwidth
+              unit: kilobits/s
+              dimensions:
+                - name: received
+                - name: sent
+            - name: system.ipv6
+              description: IPv6 Bandwidth
+              unit: kilobits/s
+              dimensions:
+                - name: received
+                - name: sent
+        network device:
+          name: network device
+          description: TBD
+          labels: []
+          metrics:
+            - name: net.net
+              description: Bandwidth
+              unit: kilobits/s
+              dimensions:
+                - name: received
+                - name: sent
+            - name: net.packets
+              description: Packets
+              unit: packets/s
+              dimensions:
+                - name: received
+                - name: sent
+                - name: multicast_received
+                - name: multicast_sent
+            - name: net.errors
+              description: Interface Errors
+              unit: errors/s
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: net.drops
+              description: Interface Drops
+              unit: drops/s
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: net.events
+              description: Network Interface Events
+              unit: events/s
+              dimensions:
+                - name: collisions
+  - metrics:
+      module:
+        name: getmntinfo
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        mount point:
+          name: mount point
+          description: TBD
+          labels: []
+          metrics:
+            - name: disk.space
+              description: Disk Space Usage for {mounted dir} [{mounted filesystem}]
+              unit: GiB
+              dimensions:
+                - name: avail
+                - name: used
+                - name: reserved_for_root
+            - name: disk.inodes
+              description: Disk Files (inodes) Usage for {mounted dir} [{mounted filesystem}]
+              unit: inodes
+              dimensions:
+                - name: avail
+                - name: used
+                - name: reserved_for_root
+  - metrics:
+      module:
+        name: zfs
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: zfs.arc_size
+              description: ZFS ARC Size
+              unit: MiB
+              dimensions:
+                - name: arcsz
+                - name: target
+                - name: min
+                - name: max
+            - name: zfs.l2_size
+              description: ZFS L2 ARC Size
+              unit: MiB
+              dimensions:
+                - name: actual
+                - name: size
+            - name: zfs.reads
+              description: ZFS Reads
+              unit: reads/s
+              dimensions:
+                - name: arc
+                - name: demand
+                - name: prefetch
+                - name: metadata
+                - name: l2
+            - name: zfs.bytes
+              description: ZFS ARC L2 Read/Write Rate
+              unit: KiB/s
+              dimensions:
+                - name: read
+                - name: write
+            - name: zfs.hits
+              description: ZFS ARC Hits
+              unit: percentage
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.hits_rate
+              description: ZFS ARC Hits Rate
+              unit: events/s
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.dhits
+              description: ZFS Demand Hits
+              unit: percentage
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.dhits_rate
+              description: ZFS Demand Hits Rate
+              unit: events/s
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.phits
+              description: ZFS Prefetch Hits
+              unit: percentage
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.phits_rate
+              description: ZFS Prefetch Hits Rate
+              unit: events/s
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.mhits
+              description: ZFS Metadata Hits
+              unit: percentage
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.mhits_rate
+              description: ZFS Metadata Hits Rate
+              unit: events/s
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.l2hits
+              description: ZFS L2 Hits
+              unit: percentage
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.l2hits_rate
+              description: ZFS L2 Hits Rate
+              unit: events/s
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.list_hits
+              description: ZFS List Hits
+              unit: hits/s
+              dimensions:
+                - name: mfu
+                - name: mfu_ghost
+                - name: mru
+                - name: mru_ghost
+            - name: zfs.arc_size_breakdown
+              description: ZFS ARC Size Breakdown
+              unit: percentage
+              dimensions:
+                - name: recent
+                - name: frequent
+            - name: zfs.memory_ops
+              description: ZFS Memory Operations
+              unit: operations/s
+              dimensions:
+                - name: throttled
+            - name: zfs.important_ops
+              description: ZFS Important Operations
+              unit: operations/s
+              dimensions:
+                - name: evict_skip
+                - name: deleted
+                - name: mutex_miss
+                - name: hash_collisions
+            - name: zfs.actual_hits
+              description: ZFS Actual Cache Hits
+              unit: percentage
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.actual_hits_rate
+              description: ZFS Actual Cache Hits Rate
+              unit: events/s
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.demand_data_hits
+              description: ZFS Data Demand Efficiency
+              unit: percentage
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.demand_data_hits_rate
+              description: ZFS Data Demand Efficiency Rate
+              unit: events/s
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.prefetch_data_hits
+              description: ZFS Data Prefetch Efficiency
+              unit: percentage
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.prefetch_data_hits_rate
+              description: ZFS Data Prefetch Efficiency Rate
+              unit: events/s
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.hash_elements
+              description: ZFS ARC Hash Elements
+              unit: elements
+              dimensions:
+                - name: current
+                - name: max
+            - name: zfs.hash_chains
+              description: ZFS ARC Hash Chains
+              unit: chains
+              dimensions:
+                - name: current
+                - name: max
+            - name: zfs.trim_bytes
+              description: Successfully TRIMmed bytes
+              unit: bytes
+              dimensions:
+                - name: TRIMmed
+            - name: zfs.trim_requests
+              description: TRIM requests
+              unit: requests
+              dimensions:
+                - name: successful
+                - name: failed
+                - name: unsupported

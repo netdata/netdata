@@ -1,0 +1,142 @@
+  - metrics:
+      module:
+        name: opensips
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: opensips.dialogs_active
+              description: OpenSIPS Active Dialogs
+              unit: dialogs
+              dimensions:
+                - name: active
+                - name: early
+            - name: opensips.users
+              description: OpenSIPS Users
+              unit: users
+              dimensions:
+                - name: registered
+                - name: location
+                - name: contacts
+                - name: expires
+            - name: opensips.registrar
+              description: OpenSIPS Registrar
+              unit: registrations/s
+              dimensions:
+                - name: accepted
+                - name: rejected
+            - name: opensips.transactions
+              description: OpenSIPS Transactions
+              unit: transactions/s
+              dimensions:
+                - name: UAS
+                - name: UAC
+            - name: opensips.core_rcv
+              description: OpenSIPS Core Receives
+              unit: queries/s
+              dimensions:
+                - name: requests
+                - name: replies
+            - name: opensips.core_fwd
+              description: OpenSIPS Core Forwards
+              unit: queries/s
+              dimensions:
+                - name: requests
+                - name: replies
+            - name: opensips.core_drop
+              description: OpenSIPS Core Drops
+              unit: queries/s
+              dimensions:
+                - name: requests
+                - name: replies
+            - name: opensips.core_err
+              description: OpenSIPS Core Errors
+              unit: queries/s
+              dimensions:
+                - name: requests
+                - name: replies
+            - name: opensips.core_bad
+              description: OpenSIPS Core Bad
+              unit: queries/s
+              dimensions:
+                - name: bad_URIs_rcvd
+                - name: unsupported_methods
+                - name: bad_msg_hdr
+            - name: opensips.tm_replies
+              description: OpenSIPS TM Replies
+              unit: replies/s
+              dimensions:
+                - name: received
+                - name: relayed
+                - name: local
+            - name: opensips.transactions_status
+              description: OpenSIPS Transactions Status
+              unit: transactions/s
+              dimensions:
+                - name: 2xx
+                - name: 3xx
+                - name: 4xx
+                - name: 5xx
+                - name: 6xx
+            - name: opensips.transactions_inuse
+              description: OpenSIPS InUse Transactions
+              unit: transactions
+              dimensions:
+                - name: inuse
+            - name: opensips.sl_replies
+              description: OpenSIPS SL Replies
+              unit: replies/s
+              dimensions:
+                - name: 1xx
+                - name: 2xx
+                - name: 3xx
+                - name: 4xx
+                - name: 5xx
+                - name: 6xx
+                - name: sent
+                - name: error
+                - name: ACKed
+            - name: opensips.dialogs
+              description: OpenSIPS Dialogs
+              unit: dialogs/s
+              dimensions:
+                - name: processed
+                - name: expire
+                - name: failed
+            - name: opensips.net_waiting
+              description: OpenSIPS Network Waiting
+              unit: kilobytes
+              dimensions:
+                - name: UDP
+                - name: TCP
+            - name: opensips.uri_checks
+              description: OpenSIPS URI Checks
+              unit: checks / sec
+              dimensions:
+                - name: positive
+                - name: negative
+            - name: opensips.traces
+              description: OpenSIPS Traces
+              unit: traces / sec
+              dimensions:
+                - name: requests
+                - name: replies
+            - name: opensips.shmem
+              description: OpenSIPS Shared Memory
+              unit: kilobytes
+              dimensions:
+                - name: total
+                - name: used
+                - name: real_used
+                - name: max_used
+                - name: free
+            - name: opensips.shmem_fragment
+              description: OpenSIPS Shared Memory Fragmentation
+              unit: fragments
+              dimensions:
+                - name: fragments

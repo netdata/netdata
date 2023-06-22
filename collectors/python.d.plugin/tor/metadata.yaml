@@ -1,0 +1,18 @@
+  - metrics:
+      module:
+        name: tor
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: tor.traffic
+              description: Tor Traffic
+              unit: KiB/s
+              dimensions:
+                - name: read
+                - name: write

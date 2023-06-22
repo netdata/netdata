@@ -1,0 +1,115 @@
+  - metrics:
+      module:
+        name: /sys/kernel/debug/extfrag
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        node:
+          name: node
+          description: TBD
+          labels:
+            - name: numa_node
+              description: TBD
+          metrics:
+            - name: mem.fragmentation_index_dma
+              description: Memory fragmentation index for each order
+              unit: index
+              dimensions:
+                - name: order0
+                - name: order1
+                - name: order2
+                - name: order3
+                - name: order4
+                - name: order5
+                - name: order6
+                - name: order7
+                - name: order8
+                - name: order9
+                - name: order10
+            - name: mem.fragmentation_index_dma32
+              description: Memory fragmentation index for each order
+              unit: index
+              dimensions:
+                - name: order0
+                - name: order1
+                - name: order2
+                - name: order3
+                - name: order4
+                - name: order5
+                - name: order6
+                - name: order7
+                - name: order8
+                - name: order9
+                - name: order10
+            - name: mem.fragmentation_index_normal
+              description: Memory fragmentation index for each order
+              unit: index
+              dimensions:
+                - name: order0
+                - name: order1
+                - name: order2
+                - name: order3
+                - name: order4
+                - name: order5
+                - name: order6
+                - name: order7
+                - name: order8
+                - name: order9
+                - name: order10
+  - metrics:
+      module:
+        name: /sys/kernel/debug/zswap
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: system.zswap_pool_compression_ratio
+              description: Zswap compression ratio
+              unit: ratio
+              dimensions:
+                - name: compression_ratio
+            - name: system.zswap_pool_compressed_size
+              description: Zswap compressed bytes currently stored
+              unit: bytes
+              dimensions:
+                - name: compressed_size
+            - name: system.zswap_pool_raw_size
+              description: Zswap uncompressed bytes currently stored
+              unit: bytes
+              dimensions:
+                - name: uncompressed_size
+            - name: system.zswap_rejections
+              description: Zswap rejections
+              unit: rejections/s
+              dimensions:
+                - name: compress_poor
+                - name: kmemcache_fail
+                - name: alloc_fail
+                - name: reclaim_fail
+            - name: system.zswap_pool_limit_hit
+              description: Zswap pool limit was reached
+              unit: events/s
+              dimensions:
+                - name: limit
+            - name: system.zswap_written_back_raw_bytes
+              description: Zswap uncomressed bytes written back when pool limit was
+                reached
+              unit: bytes/s
+              dimensions:
+                - name: written_back
+            - name: system.zswap_same_filled_raw_size
+              description: Zswap same-value filled uncompressed bytes currently stored
+              unit: bytes
+              dimensions:
+                - name: same_filled
+            - name: system.zswap_duplicate_entry
+              description: Zswap duplicate store was encountered
+              unit: entries/s
+              dimensions:
+                - name: duplicate

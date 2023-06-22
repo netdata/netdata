@@ -1,0 +1,22 @@
+  - metrics:
+      module:
+        name: zscores
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: zscores.z
+              description: Z Score
+              unit: z
+              dimensions:
+                - name: a dimension per chart or dimension
+            - name: zscores.3stddev
+              description: Z Score >3
+              unit: count
+              dimensions:
+                - name: a dimension per chart or dimension

@@ -1,0 +1,17 @@
+  - metrics:
+      module:
+        name: ioping.plugin
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        disk:
+          name: disk
+          description: TBD
+          labels: []
+          metrics:
+            - name: ioping.latency
+              description: Read Latency
+              unit: microseconds
+              dimensions:
+                - name: latency

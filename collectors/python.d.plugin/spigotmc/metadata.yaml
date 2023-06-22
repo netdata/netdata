@@ -1,0 +1,31 @@
+  - metrics:
+      module:
+        name: spigotmc
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: spigotmc.tps
+              description: Spigot Ticks Per Second
+              unit: ticks
+              dimensions:
+                - name: 1 Minute Average
+                - name: 5 Minute Average
+                - name: 15 Minute Average
+            - name: spigotmc.users
+              description: Minecraft Users
+              unit: users
+              dimensions:
+                - name: Users
+            - name: spigotmc.mem
+              description: Minecraft Memory Usage
+              unit: MiB
+              dimensions:
+                - name: used
+                - name: allocated
+                - name: max

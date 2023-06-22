@@ -1,0 +1,52 @@
+  - metrics:
+      module:
+        name: uwsgi
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: uwsgi.requests
+              description: Requests
+              unit: requests/s
+              dimensions:
+                - name: a dimension per worker
+            - name: uwsgi.tx
+              description: Transmitted data
+              unit: KiB/s
+              dimensions:
+                - name: a dimension per worker
+            - name: uwsgi.avg_rt
+              description: Average request time
+              unit: milliseconds
+              dimensions:
+                - name: a dimension per worker
+            - name: uwsgi.memory_rss
+              description: RSS (Resident Set Size)
+              unit: MiB
+              dimensions:
+                - name: a dimension per worker
+            - name: uwsgi.memory_vsz
+              description: VSZ (Virtual Memory Size)
+              unit: MiB
+              dimensions:
+                - name: a dimension per worker
+            - name: uwsgi.exceptions
+              description: Exceptions
+              unit: exceptions
+              dimensions:
+                - name: exceptions
+            - name: uwsgi.harakiris
+              description: Harakiris
+              unit: harakiris
+              dimensions:
+                - name: harakiris
+            - name: uwsgi.respawns
+              description: Respawns
+              unit: respawns
+              dimensions:
+                - name: respawns

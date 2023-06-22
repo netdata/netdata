@@ -1,0 +1,47 @@
+  - metrics:
+      module:
+        name: ap
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        wireless device:
+          name: wireless device
+          description: TBD
+          labels: []
+          metrics:
+            - name: ap.clients
+              description: Connected clients to ${ssid} on ${dev}
+              unit: clients
+              dimensions:
+                - name: clients
+            - name: ap.net
+              description: Bandwidth for ${ssid} on ${dev}
+              unit: kilobits/s
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ap.packets
+              description: Packets for ${ssid} on ${dev}
+              unit: packets/s
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ap.issues
+              description: Transmit Issues for ${ssid} on ${dev}
+              unit: issues/s
+              dimensions:
+                - name: retries
+                - name: failures
+            - name: ap.signal
+              description: Average Signal for ${ssid} on ${dev}
+              unit: dBm
+              dimensions:
+                - name: average signal
+            - name: ap.bitrate
+              description: Bitrate for ${ssid} on ${dev}
+              unit: Mbps
+              dimensions:
+                - name: receive
+                - name: transmit
+                - name: expected

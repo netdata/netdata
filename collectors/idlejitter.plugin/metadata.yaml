@@ -1,0 +1,19 @@
+  - metrics:
+      module:
+        name: idlejitter.plugin
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: system.idlejitter
+              description: CPU Idle Jitter
+              unit: microseconds lost/s
+              dimensions:
+                - name: min
+                - name: max
+                - name: average

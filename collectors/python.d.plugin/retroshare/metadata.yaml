@@ -1,0 +1,30 @@
+  - metrics:
+      module:
+        name: retroshare
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: retroshare.bandwidth
+              description: RetroShare Bandwidth
+              unit: kilobits/s
+              dimensions:
+                - name: Upload
+                - name: Download
+            - name: retroshare.peers
+              description: RetroShare Peers
+              unit: peers
+              dimensions:
+                - name: All friends
+                - name: Connected friends
+            - name: retroshare.dht
+              description: Retroshare DHT
+              unit: peers
+              dimensions:
+                - name: DHT nodes estimated
+                - name: RS nodes estimated

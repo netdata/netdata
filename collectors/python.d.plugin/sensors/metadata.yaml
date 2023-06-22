@@ -1,0 +1,47 @@
+  - metrics:
+      module:
+        name: sensors
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        chip:
+          name: chip
+          description: TBD
+          labels: []
+          metrics:
+            - name: sensors.temperature
+              description: Temperature
+              unit: Celsius
+              dimensions:
+                - name: a dimension per sensor
+            - name: sensors.voltage
+              description: Voltage
+              unit: Volts
+              dimensions:
+                - name: a dimension per sensor
+            - name: sensors.current
+              description: Current
+              unit: Ampere
+              dimensions:
+                - name: a dimension per sensor
+            - name: sensors.power
+              description: Power
+              unit: Watt
+              dimensions:
+                - name: a dimension per sensor
+            - name: sensors.fan
+              description: Fans speed
+              unit: Rotations/min
+              dimensions:
+                - name: a dimension per sensor
+            - name: sensors.energy
+              description: Energy
+              unit: Joule
+              dimensions:
+                - name: a dimension per sensor
+            - name: sensors.humidity
+              description: Humidity
+              unit: Percent
+              dimensions:
+                - name: a dimension per sensor

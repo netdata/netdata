@@ -1,0 +1,22 @@
+  - metrics:
+      module:
+        name: am2320
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: am2320.temperature
+              description: Temperature
+              unit: celsius
+              dimensions:
+                - name: temperature
+            - name: am2320.humidity
+              description: Relative Humidity
+              unit: percentage
+              dimensions:
+                - name: humidity

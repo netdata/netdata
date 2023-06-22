@@ -1,0 +1,419 @@
+  - metrics:
+      module:
+        name: mach_smi
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: system.cpu
+              description: Total CPU utilization
+              unit: percentage
+              dimensions:
+                - name: user
+                - name: nice
+                - name: system
+                - name: idle
+            - name: system.ram
+              description: System RAM
+              unit: MiB
+              dimensions:
+                - name: active
+                - name: wired
+                - name: throttled
+                - name: compressor
+                - name: inactive
+                - name: purgeable
+                - name: speculative
+                - name: free
+            - name: system.swapio
+              description: Swap I/O
+              unit: KiB/s
+              dimensions:
+                - name: io
+                - name: out
+            - name: mem.pgfaults
+              description: Memory Page Faults
+              unit: faults/s
+              dimensions:
+                - name: memory
+                - name: cow
+                - name: pagein
+                - name: pageout
+                - name: compress
+                - name: decompress
+                - name: zero_fill
+                - name: reactivate
+                - name: purge
+  - metrics:
+      module:
+        name: sysctl
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: system.load
+              description: System Load Average
+              unit: load
+              dimensions:
+                - name: load1
+                - name: load5
+                - name: load15
+            - name: system.swap
+              description: System Swap
+              unit: MiB
+              dimensions:
+                - name: free
+                - name: used
+            - name: system.ipv4
+              description: IPv4 Bandwidth
+              unit: kilobits/s
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.tcppackets
+              description: IPv4 TCP Packets
+              unit: packets/s
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.tcperrors
+              description: IPv4 TCP Errors
+              unit: packets/s
+              dimensions:
+                - name: InErrs
+                - name: InCsumErrors
+                - name: RetransSegs
+            - name: ipv4.tcphandshake
+              description: IPv4 TCP Handshake Issues
+              unit: events/s
+              dimensions:
+                - name: EstabResets
+                - name: ActiveOpens
+                - name: PassiveOpens
+                - name: AttemptFails
+            - name: ipv4.tcpconnaborts
+              description: TCP Connection Aborts
+              unit: connections/s
+              dimensions:
+                - name: baddata
+                - name: userclosed
+                - name: nomemory
+                - name: timeout
+            - name: ipv4.tcpofo
+              description: TCP Out-Of-Order Queue
+              unit: packets/s
+              dimensions:
+                - name: inqueue
+            - name: ipv4.tcpsyncookies
+              description: TCP SYN Cookies
+              unit: packets/s
+              dimensions:
+                - name: received
+                - name: sent
+                - name: failed
+            - name: ipv4.ecnpkts
+              description: IPv4 ECN Statistics
+              unit: packets/s
+              dimensions:
+                - name: CEP
+                - name: NoECTP
+            - name: ipv4.udppackets
+              description: IPv4 UDP Packets
+              unit: packets/s
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.udperrors
+              description: IPv4 UDP Errors
+              unit: events/s
+              dimensions:
+                - name: RcvbufErrors
+                - name: InErrors
+                - name: NoPorts
+                - name: InCsumErrors
+                - name: IgnoredMulti
+            - name: ipv4.icmp
+              description: IPv4 ICMP Packets
+              unit: packets/s
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.icmp_errors
+              description: IPv4 ICMP Errors
+              unit: packets/s
+              dimensions:
+                - name: InErrors
+                - name: OutErrors
+                - name: InCsumErrors
+            - name: ipv4.icmpmsg
+              description: IPv4 ICMP Messages
+              unit: packets/s
+              dimensions:
+                - name: InEchoReps
+                - name: OutEchoReps
+                - name: InEchos
+                - name: OutEchos
+            - name: ipv4.packets
+              description: IPv4 Packets
+              unit: packets/s
+              dimensions:
+                - name: received
+                - name: sent
+                - name: forwarded
+                - name: delivered
+            - name: ipv4.fragsout
+              description: IPv4 Fragments Sent
+              unit: packets/s
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: created
+            - name: ipv4.fragsin
+              description: IPv4 Fragments Reassembly
+              unit: packets/s
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: all
+            - name: ipv4.errors
+              description: IPv4 Errors
+              unit: packets/s
+              dimensions:
+                - name: InDiscards
+                - name: OutDiscards
+                - name: InHdrErrors
+                - name: OutNoRoutes
+                - name: InAddrErrors
+                - name: InUnknownProtos
+            - name: ipv6.packets
+              description: IPv6 Packets
+              unit: packets/s
+              dimensions:
+                - name: received
+                - name: sent
+                - name: forwarded
+                - name: delivers
+            - name: ipv6.fragsout
+              description: IPv6 Fragments Sent
+              unit: packets/s
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: all
+            - name: ipv6.fragsin
+              description: IPv6 Fragments Reassembly
+              unit: packets/s
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: timeout
+                - name: all
+            - name: ipv6.errors
+              description: IPv6 Errors
+              unit: packets/s
+              dimensions:
+                - name: InDiscards
+                - name: OutDiscards
+                - name: InHdrErrors
+                - name: InAddrErrors
+                - name: InTruncatedPkts
+                - name: InNoRoutes
+                - name: OutNoRoutes
+            - name: ipv6.icmp
+              description: IPv6 ICMP Messages
+              unit: messages/s
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.icmpredir
+              description: IPv6 ICMP Redirects
+              unit: redirects/s
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.icmperrors
+              description: IPv6 ICMP Errors
+              unit: errors/s
+              dimensions:
+                - name: InErrors
+                - name: OutErrors
+                - name: InCsumErrors
+                - name: InDestUnreachs
+                - name: InPktTooBigs
+                - name: InTimeExcds
+                - name: InParmProblems
+                - name: OutDestUnreachs
+                - name: OutTimeExcds
+                - name: OutParmProblems
+            - name: ipv6.icmpechos
+              description: IPv6 ICMP Echo
+              unit: messages/s
+              dimensions:
+                - name: InEchos
+                - name: OutEchos
+                - name: InEchoReplies
+                - name: OutEchoReplies
+            - name: ipv6.icmprouter
+              description: IPv6 Router Messages
+              unit: messages/s
+              dimensions:
+                - name: InSolicits
+                - name: OutSolicits
+                - name: InAdvertisements
+                - name: OutAdvertisements
+            - name: ipv6.icmpneighbor
+              description: IPv6 Neighbor Messages
+              unit: messages/s
+              dimensions:
+                - name: InSolicits
+                - name: OutSolicits
+                - name: InAdvertisements
+                - name: OutAdvertisements
+            - name: ipv6.icmptypes
+              description: IPv6 ICMP Types
+              unit: messages/s
+              dimensions:
+                - name: InType1
+                - name: InType128
+                - name: InType129
+                - name: InType136
+                - name: OutType1
+                - name: OutType128
+                - name: OutType129
+                - name: OutType133
+                - name: OutType135
+                - name: OutType143
+            - name: system.uptime
+              description: System Uptime
+              unit: seconds
+              dimensions:
+                - name: uptime
+  - metrics:
+      module:
+        name: iokit
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        disk:
+          name: disk
+          description: TBD
+          labels: []
+          metrics:
+            - name: disk.io
+              description: Disk I/O Bandwidth
+              unit: KiB/s
+              dimensions:
+                - name: read
+                - name: writes
+            - name: disk.ops
+              description: Disk Completed I/O Operations
+              unit: operations/s
+              dimensions:
+                - name: read
+                - name: writes
+            - name: disk.util
+              description: Disk Utilization Time
+              unit: '% of time working'
+              dimensions:
+                - name: utilization
+            - name: disk.iotime
+              description: Disk Total I/O Time
+              unit: milliseconds/s
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.await
+              description: Average Completed I/O Operation Time
+              unit: milliseconds/operation
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.avgsz
+              description: Average Completed I/O Operation Bandwidth
+              unit: KiB/operation
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.svctm
+              description: Average Service Time
+              unit: milliseconds/operation
+              dimensions:
+                - name: svctm
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: system.io
+              description: Disk I/O
+              unit: KiB/s
+              dimensions:
+                - name: in
+                - name: out
+        mount point:
+          name: mount point
+          description: TBD
+          labels: []
+          metrics:
+            - name: disk.space
+              description: Disk Space Usage for {mounted dir} [{mounted filesystem}]
+              unit: GiB
+              dimensions:
+                - name: avail
+                - name: used
+                - name: reserved_for_root
+            - name: disk.inodes
+              description: Disk Files (inodes) Usage for {mounted dir} [{mounted filesystem}]
+              unit: inodes
+              dimensions:
+                - name: avail
+                - name: used
+                - name: reserved_for_root
+        network device:
+          name: network device
+          description: TBD
+          labels: []
+          metrics:
+            - name: net.net
+              description: Bandwidth
+              unit: kilobits/s
+              dimensions:
+                - name: received
+                - name: sent
+            - name: net.packets
+              description: Packets
+              unit: packets/s
+              dimensions:
+                - name: received
+                - name: sent
+                - name: multicast_received
+                - name: multicast_sent
+            - name: net.errors
+              description: Interface Errors
+              unit: errors/s
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: net.drops
+              description: Interface Drops
+              unit: drops/s
+              dimensions:
+                - name: inbound
+            - name: net.events
+              description: Network Interface Events
+              unit: events/s
+              dimensions:
+                - name: frames
+                - name: collisions
+                - name: carrier

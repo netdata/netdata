@@ -1,0 +1,42 @@
+  - metrics:
+      module:
+        name: megacli
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: megacli.adapter_degraded
+              description: Adapter State
+              unit: is degraded
+              dimensions:
+                - name: a dimension per adapter
+            - name: megacli.pd_media_error
+              description: Physical Drives Media Errors
+              unit: errors/s
+              dimensions:
+                - name: a dimension per physical drive
+            - name: megacli.pd_predictive_failure
+              description: Physical Drives Predictive Failures
+              unit: failures/s
+              dimensions:
+                - name: a dimension per physical drive
+        battery:
+          name: battery
+          description: TBD
+          labels: []
+          metrics:
+            - name: megacli.bbu_relative_charge
+              description: Relative State of Charge
+              unit: percentage
+              dimensions:
+                - name: adapter {battery id}
+            - name: megacli.bbu_cycle_count
+              description: Cycle Count
+              unit: cycle count
+              dimensions:
+                - name: adapter {battery id}

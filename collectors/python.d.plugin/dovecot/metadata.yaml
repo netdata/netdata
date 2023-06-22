@@ -1,0 +1,80 @@
+  - metrics:
+      module:
+        name: dovecot
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: dovecot.sessions
+              description: Dovecot Active Sessions
+              unit: number
+              dimensions:
+                - name: active sessions
+            - name: dovecot.logins
+              description: Dovecot Logins
+              unit: number
+              dimensions:
+                - name: logins
+            - name: dovecot.commands
+              description: Dovecot Commands
+              unit: commands
+              dimensions:
+                - name: commands
+            - name: dovecot.faults
+              description: Dovecot Page Faults
+              unit: faults
+              dimensions:
+                - name: minor
+                - name: major
+            - name: dovecot.context_switches
+              description: Dovecot Context Switches
+              unit: switches
+              dimensions:
+                - name: voluntary
+                - name: involuntary
+            - name: dovecot.io
+              description: Dovecot Disk I/O
+              unit: KiB/s
+              dimensions:
+                - name: read
+                - name: write
+            - name: dovecot.net
+              description: Dovecot Network Bandwidth
+              unit: kilobits/s
+              dimensions:
+                - name: read
+                - name: write
+            - name: dovecot.syscalls
+              description: Dovecot Number of SysCalls
+              unit: syscalls/s
+              dimensions:
+                - name: read
+                - name: write
+            - name: dovecot.lookup
+              description: Dovecot Lookups
+              unit: number/s
+              dimensions:
+                - name: path
+                - name: attr
+            - name: dovecot.cache
+              description: Dovecot Cache Hits
+              unit: hits/s
+              dimensions:
+                - name: hits
+            - name: dovecot.auth
+              description: Dovecot Authentications
+              unit: attempts
+              dimensions:
+                - name: ok
+                - name: failed
+            - name: dovecot.auth_cache
+              description: Dovecot Authentication Cache
+              unit: number
+              dimensions:
+                - name: hit
+                - name: miss

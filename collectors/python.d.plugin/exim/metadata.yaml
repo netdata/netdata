@@ -1,0 +1,17 @@
+  - metrics:
+      module:
+        name: exim
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: exim.qemails
+              description: Exim Queue Emails
+              unit: emails
+              dimensions:
+                - name: emails

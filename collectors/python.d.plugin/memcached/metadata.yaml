@@ -1,0 +1,95 @@
+  - metrics:
+      module:
+        name: memcached
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: memcached.cache
+              description: Cache Size
+              unit: MiB
+              dimensions:
+                - name: available
+                - name: used
+            - name: memcached.net
+              description: Network
+              unit: kilobits/s
+              dimensions:
+                - name: in
+                - name: out
+            - name: memcached.connections
+              description: Connections
+              unit: connections/s
+              dimensions:
+                - name: current
+                - name: rejected
+                - name: total
+            - name: memcached.items
+              description: Items
+              unit: items
+              dimensions:
+                - name: current
+                - name: total
+            - name: memcached.evicted_reclaimed
+              description: Evicted and Reclaimed Items
+              unit: items
+              dimensions:
+                - name: reclaimed
+                - name: evicted
+            - name: memcached.get
+              description: Get Requests
+              unit: requests
+              dimensions:
+                - name: hints
+                - name: misses
+            - name: memcached.get_rate
+              description: Get Request Rate
+              unit: requests/s
+              dimensions:
+                - name: rate
+            - name: memcached.set_rate
+              description: Set Request Rate
+              unit: requests/s
+              dimensions:
+                - name: rate
+            - name: memcached.delete
+              description: Delete Requests
+              unit: requests
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: memcached.cas
+              description: Check and Set Requests
+              unit: requests
+              dimensions:
+                - name: hits
+                - name: misses
+                - name: bad value
+            - name: memcached.increment
+              description: Increment Requests
+              unit: requests
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: memcached.decrement
+              description: Decrement Requests
+              unit: requests
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: memcached.touch
+              description: Touch Requests
+              unit: requests
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: memcached.touch_rate
+              description: Touch Request Rate
+              unit: requests/s
+              dimensions:
+                - name: rate

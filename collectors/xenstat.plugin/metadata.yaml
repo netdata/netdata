@@ -1,0 +1,115 @@
+  - metrics:
+      module:
+        name: xenstat.plugin
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: xenstat.mem
+              description: Memory Usage
+              unit: MiB
+              dimensions:
+                - name: free
+                - name: used
+            - name: xenstat.domains
+              description: Number of Domains
+              unit: domains
+              dimensions:
+                - name: domains
+            - name: xenstat.cpus
+              description: Number of CPUs
+              unit: cpus
+              dimensions:
+                - name: cpus
+            - name: xenstat.cpu_freq
+              description: CPU Frequency
+              unit: MHz
+              dimensions:
+                - name: frequency
+        xendomain:
+          name: xendomain
+          description: TBD
+          labels: []
+          metrics:
+            - name: xendomain.states
+              description: Domain States
+              unit: boolean
+              dimensions:
+                - name: running
+                - name: blocked
+                - name: paused
+                - name: shutdown
+                - name: crashed
+                - name: dying
+            - name: xendomain.cpu
+              description: CPU Usage (100% = 1 core)
+              unit: percentage
+              dimensions:
+                - name: used
+            - name: xendomain.mem
+              description: Memory Reservation
+              unit: MiB
+              dimensions:
+                - name: maximum
+                - name: current
+            - name: xendomain.vcpu
+              description: CPU Usage per VCPU
+              unit: percentage
+              dimensions:
+                - name: a dimension per vcpu
+        xendomain, vbd:
+          name: xendomain, vbd
+          description: TBD
+          labels: []
+          metrics:
+            - name: xendomain.oo_req_vbd
+              description: VBD{%u} Out Of Requests
+              unit: requests/s
+              dimensions:
+                - name: requests
+            - name: xendomain.requests_vbd
+              description: VBD{%u} Requests
+              unit: requests/s
+              dimensions:
+                - name: read
+                - name: write
+            - name: xendomain.sectors_vbd
+              description: VBD{%u} Read/Written Sectors
+              unit: sectors/s
+              dimensions:
+                - name: read
+                - name: write
+        xendomain, network:
+          name: xendomain, network
+          description: TBD
+          labels: []
+          metrics:
+            - name: xendomain.bytes_network
+              description: Network{%u} Received/Sent Bytes
+              unit: kilobits/s
+              dimensions:
+                - name: received
+                - name: sent
+            - name: xendomain.packets_network
+              description: Network{%u} Received/Sent Packets
+              unit: packets/s
+              dimensions:
+                - name: received
+                - name: sent
+            - name: xendomain.errors_network
+              description: Network{%u} Receive/Transmit Errors
+              unit: errors/s
+              dimensions:
+                - name: received
+                - name: sent
+            - name: xendomain.drops_network
+              description: Network{%u} Receive/Transmit Drops
+              unit: drops/s
+              dimensions:
+                - name: received
+                - name: sent

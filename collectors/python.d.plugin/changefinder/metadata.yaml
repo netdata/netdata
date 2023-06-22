@@ -1,0 +1,22 @@
+  - metrics:
+      module:
+        name: changefinder
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: changefinder.scores
+              description: ChangeFinder
+              unit: score
+              dimensions:
+                - name: a dimension per chart
+            - name: changefinder.flags
+              description: ChangeFinder
+              unit: flag
+              dimensions:
+                - name: a dimension per chart

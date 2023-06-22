@@ -1,0 +1,23 @@
+  - metrics:
+      module:
+        name: libreswan
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        IPSEC tunnel:
+          name: IPSEC tunnel
+          description: TBD
+          labels: []
+          metrics:
+            - name: libreswan.net
+              description: LibreSWAN Tunnel ${name} Traffic
+              unit: kilobits/s
+              dimensions:
+                - name: in
+                - name: out
+            - name: libreswan.uptime
+              description: LibreSWAN Tunnel ${name} Uptime
+              unit: seconds
+              dimensions:
+                - name: uptime

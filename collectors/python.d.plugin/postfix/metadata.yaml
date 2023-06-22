@@ -1,0 +1,22 @@
+  - metrics:
+      module:
+        name: postfix
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: postfix.qemails
+              description: Postfix Queue Emails
+              unit: emails
+              dimensions:
+                - name: emails
+            - name: postfix.qsize
+              description: Postfix Queue Emails Size
+              unit: KiB
+              dimensions:
+                - name: size

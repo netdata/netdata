@@ -1,0 +1,22 @@
+  - metrics:
+      module:
+        name: alarms
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: alarms.status
+              description: Alarms ({status mapping})
+              unit: status
+              dimensions:
+                - name: a dimension per alarm
+            - name: alarms.status
+              description: Alarm Values
+              unit: value
+              dimensions:
+                - name: a dimension per alarm

@@ -1,0 +1,17 @@
+  - metrics:
+      module:
+        name: w1sensor
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: w1sensor.temp
+              description: 1-Wire Temperature Sensor
+              unit: Celsius
+              dimensions:
+                - name: a dimension per sensor

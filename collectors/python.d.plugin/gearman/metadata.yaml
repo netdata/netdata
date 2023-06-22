@@ -1,0 +1,30 @@
+  - metrics:
+      module:
+        name: gearman
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: gearman.total_jobs
+              description: Total Jobs
+              unit: Jobs
+              dimensions:
+                - name: Pending
+                - name: Running
+        gearman job:
+          name: gearman job
+          description: TBD
+          labels: []
+          metrics:
+            - name: gearman.single_job
+              description: '{job_name}'
+              unit: Jobs
+              dimensions:
+                - name: Pending
+                - name: Idle
+                - name: Runnning
