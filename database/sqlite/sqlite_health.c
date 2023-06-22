@@ -1805,3 +1805,38 @@ void sql_health_alarm_log2json_v2(RRDHOST *host, BUFFER *wb, uint32_t alert_id, 
 
     buffer_free(command);
 }
+
+#define SQL_GET_ALARM_ID_FROM_TRANSITION_ID "select alarm_id from health_log_detail where transition_id = @transition_id"
+uint32_t sql_get_alarm_id_from_transition_id(char *transition_id)
+{
+    int rc = 0;
+    sqlite3_stmt *res = NULL;
+    uint32_t alarm_id = 0;
+
+    uuid_t transition_uuid;
+    if (uuid_parse(transition_id, transition_uuid))
+        return alarm_id;
+
+    rc = sqlite3_prepare_v2(db_meta, SQL_GET_ALARM_ID_FROM_TRANSITION_ID, -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement when trying to get an alarm id from a transition_id");
+        return alarm_id;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &transition_uuid, sizeof(transition_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind transition_uuid parameter for SQL_GET_ALARM_ID_FROM_TRANSITION_ID.");
+        sqlite3_finalize(res);
+        return alarm_id;
+    }
+
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+        alarm_id = (uint32_t) sqlite3_column_int64(res, 0);
+    }
+
+     rc = sqlite3_finalize(res);
+     if (unlikely(rc != SQLITE_OK))
+         error_report("Failed to finalize the statement while getting an alarm id from a transition_id.");
+
+     return alarm_id;
+}

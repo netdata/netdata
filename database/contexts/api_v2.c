@@ -747,6 +747,9 @@ static ssize_t alert_to_json_v2_add_alert(void *data, RRDHOST *host, bool querya
             host_matched = true;
     }
 
+    if (ctl->alerts_request->transition_id)
+        ctl->alerts_request->alert_id = sql_get_alarm_id_from_transition_id(ctl->alerts_request->transition_id);
+
     if(host_matched && (ctl->options & (CONTEXTS_V2_NODES))) {
         if (rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)) {
 
