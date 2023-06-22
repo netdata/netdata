@@ -57,6 +57,8 @@ static struct netdev {
     int configured;
     int enabled;
     int updated;
+
+    time_t discover_time;
     
     int carrier_file_exists;
     time_t carrier_file_lost_time;
@@ -529,6 +531,7 @@ static inline void netdev_rename(struct netdev *d) {
     if(unlikely(r && !r->processed)) {
         netdev_rename_cgroup(d, r);
         r->processed = 1;
+        d->discover_time = 0;
         netdev_pending_renames--;
     }
 }
@@ -671,6 +674,8 @@ static struct netdev *get_netdev(const char *name) {
     return d;
 }
 
+#define NETDEV_VIRTUAL_COLLECT_DELAY 15 // 1 full run of the cgroups discovery thread (10 secs by default)
+
 int do_proc_net_dev(int update_every, usec_t dt) {
     (void)dt;
     static SIMPLE_PATTERN *disabled_list = NULL;
@@ -747,6 +752,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     kernel_uint_t system_rbytes = 0;
     kernel_uint_t system_tbytes = 0;
 
+    time_t now = now_realtime_sec();
+
     size_t lines = procfile_lines(ff), l;
     for(l = 2; l < lines ;l++) {
         // require 17 words on each line
@@ -765,6 +772,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
             // remember we configured it
             d->configured = 1;
+            d->discover_time = now;
 
             d->enabled = enable_new_interfaces;
 
@@ -825,6 +833,14 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         if(unlikely(!d->enabled))
             continue;
+
+        // See https://github.com/netdata/netdata/issues/15206
+        // This is necessary to prevent the creation of charts for virtual interfaces that will later be 
+        // recreated as container interfaces (create container) or
+        // rediscovered and recreated only to be deleted almost immediately (stop/remove container)
+        if (d->virtual && (now - d->discover_time < NETDEV_VIRTUAL_COLLECT_DELAY)) {
+            continue;
+        }
 
         if(likely(d->do_bandwidth != CONFIG_BOOLEAN_NO || !d->virtual)) {
             d->rbytes      = str2kernel_uint_t(procfile_lineword(ff, l, 1));
