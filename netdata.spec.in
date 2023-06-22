@@ -342,8 +342,13 @@ install -m 750 -p packaging/installer/netdata-uninstaller.sh \
 
 # ###########################################################
 # Install netdata service
+
 install -m 755 -d "${RPM_BUILD_ROOT}%{_unitdir}"
+%if 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
 install -m 644 -p system/systemd/netdata.service "${RPM_BUILD_ROOT}%{_unitdir}/netdata.service"
+%else
+install -m 644 -p system/systemd/netdata.service.v235 "${RPM_BUILD_ROOT}%{_unitdir}/netdata.service"
+%endif
 install -m 755 -d "${RPM_BUILD_ROOT}%{_presetdir}"
 install -m 644 -p system/systemd/50-netdata.preset "${RPM_BUILD_ROOT}%{_presetdir}/50-netdata.preset"
 
