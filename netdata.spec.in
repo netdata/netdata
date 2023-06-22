@@ -80,6 +80,9 @@ BuildRequires: gcc-c++
 BuildRequires: make
 BuildRequires: git-core
 BuildRequires: autoconf
+%if 0%{?_have_sentry}
+BuildRequires: libcurl-devel
+%endif
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
 BuildRequires: autoconf-archive
 %if 0%{?rhel} <= 8 && 0%{?amzn} < 2023
