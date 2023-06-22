@@ -165,7 +165,7 @@ run find /opt/netdata -type d -exec chmod go+rx '{}' \+
 run chown -R ${NETDATA_USER}:${NETDATA_GROUP} /opt/netdata/var
 
 if [ -d /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d ]; then
-  run chwon -R root:${NETDATA_GROUP} /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d
+  run chown -R root:${NETDATA_GROUP} /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d
 fi
 
 # -----------------------------------------------------------------------------
