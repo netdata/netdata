@@ -271,10 +271,11 @@ typedef enum netdata_apps_integration_flags {
 #define NETDATA_EBPF_STAT_DIMENSION_ARAL "aral"
 
 enum ebpf_threads_status {
-    NETDATA_THREAD_EBPF_RUNNING,
-    NETDATA_THREAD_EBPF_STOPPING,
-    NETDATA_THREAD_EBPF_STOPPED,
-    NETDATA_THREAD_EBPF_NOT_RUNNING
+    NETDATA_THREAD_EBPF_RUNNING,            // started by plugin
+    NETDATA_THREAD_EBPF_FUNCTION_RUNNING,   // started by function
+    NETDATA_THREAD_EBPF_STOPPING,           // stopping thread
+    NETDATA_THREAD_EBPF_STOPPED,            // thread stopped
+    NETDATA_THREAD_EBPF_NOT_RUNNING         // thread was never started
 };
 
 typedef struct ebpf_module {

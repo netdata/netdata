@@ -875,7 +875,6 @@ static void process_collector(ebpf_module_t *em)
     int publish_global = em->global_charts;
     int cgroups = em->cgroup_charts;
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    int thread_enabled = em->enabled;
     process_pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
     if (cgroups)
@@ -908,24 +907,23 @@ static void process_collector(ebpf_module_t *em)
 
             pthread_mutex_lock(&lock);
 
-            if (thread_enabled == NETDATA_THREAD_EBPF_RUNNING) {
-                if (publish_global) {
-                    ebpf_process_send_data(em);
-                }
+            if (publish_global) {
+                ebpf_process_send_data(em);
+            }
 
-                if (apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
-                    ebpf_process_send_apps_data(apps_groups_root_target, em);
-                }
+            if (apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
+                ebpf_process_send_apps_data(apps_groups_root_target, em);
+            }
 
 #ifdef NETDATA_DEV_MODE
-                if (ebpf_aral_process_stat)
-                    ebpf_send_data_aral_chart(ebpf_aral_process_stat, em);
+            if (ebpf_aral_process_stat)
+                ebpf_send_data_aral_chart(ebpf_aral_process_stat, em);
 #endif
 
-                if (cgroups && shm_ebpf_cgroup.header) {
-                    ebpf_process_send_cgroup_data(em);
-                }
+            if (cgroups && shm_ebpf_cgroup.header) {
+                ebpf_process_send_cgroup_data(em);
             }
+
             pthread_mutex_unlock(&lock);
             pthread_mutex_unlock(&collect_data_mutex);
 
@@ -1065,9 +1063,7 @@ void *ebpf_process_thread(void *ptr)
         process_aggregated_data, process_publish_aggregated, process_dimension_names, process_id_names,
         algorithms, NETDATA_KEY_PUBLISH_PROCESS_END);
 
-    if (process_enabled == NETDATA_THREAD_EBPF_RUNNING) {
-        ebpf_create_global_charts(em);
-    }
+    ebpf_create_global_charts(em);
 
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
@@ -1082,8 +1078,7 @@ void *ebpf_process_thread(void *ptr)
     process_collector(em);
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    if (em->enabled == NETDATA_THREAD_EBPF_RUNNING)
-        ebpf_update_disabled_plugin_stats(em);
+    ebpf_update_disabled_plugin_stats(em);
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     netdata_thread_cleanup_pop(1);

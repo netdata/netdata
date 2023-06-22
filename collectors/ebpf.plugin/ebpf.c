@@ -622,7 +622,7 @@ static inline void ebpf_check_before2go()
         int j;
         pthread_mutex_lock(&ebpf_exit_cleanup);
         for (j = 0; ebpf_modules[j].thread_name != NULL; j++) {
-            if (ebpf_modules[j].enabled == NETDATA_THREAD_EBPF_RUNNING)
+            if (ebpf_modules[j].enabled < NETDATA_THREAD_EBPF_STOPPING)
                 i++;
         }
         pthread_mutex_unlock(&ebpf_exit_cleanup);
@@ -734,7 +734,7 @@ static void ebpf_unload_unique_maps()
 static void ebpf_unload_filesystems()
 {
     if (ebpf_modules[EBPF_MODULE_FILESYSTEM_IDX].enabled == NETDATA_THREAD_EBPF_NOT_RUNNING ||
-        ebpf_modules[EBPF_MODULE_FILESYSTEM_IDX].enabled == NETDATA_THREAD_EBPF_RUNNING ||
+        ebpf_modules[EBPF_MODULE_FILESYSTEM_IDX].enabled < NETDATA_THREAD_EBPF_STOPPING ||
         ebpf_modules[EBPF_MODULE_FILESYSTEM_IDX].load != EBPF_LOAD_LEGACY)
         return;
 
@@ -755,7 +755,7 @@ static void ebpf_unload_filesystems()
 static void ebpf_unload_sync()
 {
     if (ebpf_modules[EBPF_MODULE_SYNC_IDX].enabled == NETDATA_THREAD_EBPF_NOT_RUNNING ||
-        ebpf_modules[EBPF_MODULE_SYNC_IDX].enabled == NETDATA_THREAD_EBPF_RUNNING)
+    ebpf_modules[EBPF_MODULE_SYNC_IDX].enabled < NETDATA_THREAD_EBPF_STOPPING)
         return;
 
     int i;
@@ -793,7 +793,7 @@ static void ebpf_stop_threads(int sig)
     only_one = 1;
     int i;
     for (i = 0; ebpf_modules[i].thread_name != NULL; i++) {
-        if (ebpf_modules[i].enabled == NETDATA_THREAD_EBPF_RUNNING) {
+        if (ebpf_modules[i].enabled < NETDATA_THREAD_EBPF_STOPPING) {
             netdata_thread_cancel(*ebpf_modules[i].thread->thread);
 #ifdef NETDATA_DEV_MODE
             netdata_log_info("Sending cancel for thread %s", ebpf_modules[i].thread_name);
@@ -875,7 +875,7 @@ static void ebpf_create_apps_charts(struct ebpf_target *root)
     int counter;
     for (counter = 0; ebpf_modules[counter].thread_name; counter++) {
         ebpf_module_t *current = &ebpf_modules[counter];
-        if (current->enabled == NETDATA_THREAD_EBPF_RUNNING && current->apps_charts && current->apps_routine)
+        if (current->enabled < NETDATA_THREAD_EBPF_STOPPING && current->apps_charts && current->apps_routine)
             current->apps_routine(current, root);
     }
 }

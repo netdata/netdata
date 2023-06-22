@@ -137,14 +137,14 @@ static void ebpf_function_thread_manipulation(const char *transaction,
             }
 
             pthread_mutex_lock(&ebpf_exit_cleanup);
-            if (em->enabled != NETDATA_THREAD_EBPF_RUNNING && !em->thread->thread) {
+            if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !em->thread->thread) {
                 struct netdata_static_thread *st = em->thread;
                 // Load configuration again
                 ebpf_update_module(em, default_btf, running_on_kernel, isrh);
 
                 st->thread = mallocz(sizeof(netdata_thread_t));
                 em->thread_id = i;
-                em->enabled = NETDATA_THREAD_EBPF_RUNNING;
+                em->enabled = NETDATA_THREAD_EBPF_FUNCTION_RUNNING;
                 em->life_time = period;
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -197,7 +197,7 @@ static void ebpf_function_thread_manipulation(const char *transaction,
         // description
         buffer_json_add_array_item_string(wb, wem->thread_description);
 
-        if (wem->enabled != NETDATA_THREAD_EBPF_RUNNING) {
+        if (wem->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
             // status
             buffer_json_add_array_item_string(wb, EBPF_THREAD_STATUS_STOPPED);
 
