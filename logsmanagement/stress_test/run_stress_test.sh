@@ -12,8 +12,8 @@ DEFAULT_DELAY_OPEN_TO_WRITE_SEC=6
 DEFAULT_RUN_LOGS_MANAGEMENT_TESTS_ONLY=0
 
 if [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
-  echo "Usage: $(basename $0) [ARGS]..."
-  echo "Example: $(basename $0) 0 1 2 1000 1000000 10 6 6 0"
+  echo "Usage: $(basename "$0") [ARGS]..."
+  echo "Example: $(basename "$0") 0 1 2 1000 1000000 10 6 6 0"
   echo "Build, install and run netdata with logs management "
   echo "functionality enabled and (optional) stress tests."
   echo ""
@@ -104,7 +104,7 @@ else
 	sudo chown -R netdata:netdata "$INSTALL_PATH/netdata/usr/share/netdata/web"
 fi
 
-cd logsmanagement/stress_test
+cd logsmanagement/stress_test || exit
 
 if [ "$run_logs_management_tests_only" -eq 0 ]
 then
