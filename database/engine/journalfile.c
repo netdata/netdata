@@ -1,57 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
 
-
-// DBENGINE2: Helper
-
-static void update_metric_retention_and_granularity_by_uuid(
-        struct rrdengine_instance *ctx, uuid_t *uuid,
-        time_t first_time_s, time_t last_time_s,
-        time_t update_every_s, time_t now_s)
-{
-    if(unlikely(last_time_s > now_s)) {
-        error_limit_static_global_var(erl, 1, 0);
-        error_limit(&erl, "DBENGINE JV2: wrong last time on-disk (%ld - %ld, now %ld), "
-                          "fixing last time to now",
-                    first_time_s, last_time_s, now_s);
-        last_time_s = now_s;
-    }
-
-    if (unlikely(first_time_s > last_time_s)) {
-        error_limit_static_global_var(erl, 1, 0);
-        error_limit(&erl, "DBENGINE JV2: wrong first time on-disk (%ld - %ld, now %ld), "
-                          "fixing first time to last time",
-                    first_time_s, last_time_s, now_s);
-
-        first_time_s = last_time_s;
-    }
-
-    if (unlikely(first_time_s == 0 || last_time_s == 0)) {
-        error_limit_static_global_var(erl, 1, 0);
-        error_limit(&erl, "DBENGINE JV2: zero on-disk timestamps (%ld - %ld, now %ld), "
-                          "using them as-is",
-                    first_time_s, last_time_s, now_s);
-    }
-
-    bool added = false;
-    METRIC *metric = mrg_metric_get_and_acquire(main_mrg, uuid, (Word_t) ctx);
-    if (!metric) {
-        MRG_ENTRY entry = {
-                .section = (Word_t) ctx,
-                .first_time_s = first_time_s,
-                .last_time_s = last_time_s,
-                .latest_update_every_s = (uint32_t) update_every_s
-        };
-        uuid_copy(entry.uuid, *uuid);
-        metric = mrg_metric_add_and_acquire(main_mrg, entry, &added);
-    }
-
-    if (likely(!added))
-        mrg_metric_expand_retention(main_mrg, metric, first_time_s, last_time_s, update_every_s);
-
-    mrg_metric_release(main_mrg, metric);
-}
-
 static void after_extent_write_journalfile_v1_io(uv_fs_t* req)
 {
     worker_is_busy(RRDENG_FLUSH_TRANSACTION_BUFFER_CB);
@@ -1045,8 +994,8 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
         time_t start_time_s = header_start_time_s + metric->delta_start_s;
         time_t end_time_s = header_start_time_s + metric->delta_end_s;
 
-        update_metric_retention_and_granularity_by_uuid(
-                ctx, &metric->uuid, start_time_s, end_time_s, (time_t) metric->update_every_s, now_s);
+        mrg_update_metric_retention_and_granularity_by_uuid(
+                main_mrg, (Word_t)ctx, &metric->uuid, start_time_s, end_time_s, (time_t) metric->update_every_s, now_s);
 
         metric++;
     }
