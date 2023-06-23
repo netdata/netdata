@@ -325,6 +325,57 @@ static inline uint8_t contenttype_for_filename(const char *filename) {
     return CT_APPLICATION_OCTET_STREAM;
 }
 
+static int append_slash_to_url_and_redirect(struct web_client *w) {
+    // this function returns a relative redirect
+    // it finds the last path component on the URL and just appends / to it
+    //
+    // So, if the URL is:
+    //
+    //        /path/to/file?query_string
+    //
+    // It adds a Location header like this:
+    //
+    //       Location: file/?query_string\r\n
+    //
+    // The web browser already knows that it is inside /path/to/
+    // so it converts the path to /path/to/file/ and executes the
+    // request again.
+
+    buffer_strcat(w->response.header, "Location: ");
+    const char *b = buffer_tostring(w->url_as_received);
+    const char *q = strchr(b, '?');
+    if(q && q > b) {
+        const char *e = q - 1;
+        while(e > b && *e != '/') e--;
+        if(*e == '/') e++;
+
+        size_t len = q - e;
+        buffer_strncat(w->response.header, e, len);
+        buffer_strncat(w->response.header, "/", 1);
+        buffer_strcat(w->response.header, q);
+    }
+    else {
+        const char *e = &b[buffer_strlen(w->url_as_received) - 1];
+        while(e > b && *e != '/') e--;
+        if(*e == '/') e++;
+
+        buffer_strcat(w->response.header, e);
+        buffer_strncat(w->response.header, "/", 1);
+    }
+
+    buffer_strncat(w->response.header, "\r\n", 2);
+
+    w->response.data->content_type = CT_TEXT_HTML;
+    buffer_flush(w->response.data);
+    buffer_strcat(w->response.data,
+                  "<!DOCTYPE html><html>"
+                  "<body onload=\"window.location.href = window.location.origin + window.location.pathname + '/' + window.location.search + window.location.hash\">"
+                  "Redirecting. In case your browser does not support redirection, please click "
+                  "<a onclick=\"window.location.href = window.location.origin + window.location.pathname + '/' + window.location.search + window.location.hash\">here</a>."
+                  "</body></html>");
+    return HTTP_RESP_MOVED_PERM;
+}
+
 // Work around a bug in the CMocka library by removing this function during testing.
 #ifndef REMOVE_MYSENDFILE
 
@@ -460,41 +511,8 @@ static int mysendfile(struct web_client *w, char *filename) {
         return HTTP_RESP_NOT_FOUND;
     }
 
-    if(is_dir && !web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH)) {
-        buffer_strcat(w->response.header, "Location: ");
-        const char *b = buffer_tostring(w->url_as_received);
-        const char *q = strchr(b, '?');
-        if(q && q > b) {
-            const char *e = q - 1;
-            while(e > b && *e != '/') e--;
-            if(*e == '/') e++;
-
-            size_t len = q - e;
-            buffer_strncat(w->response.header, e, len);
-            buffer_strncat(w->response.header, "/", 1);
-            buffer_strcat(w->response.header, q);
-        }
-        else {
-            const char *e = &b[buffer_strlen(w->url_as_received) - 1];
-            while(e > b && *e != '/') e--;
-            if(*e == '/') e++;
-
-            buffer_strcat(w->response.header, e);
-            buffer_strncat(w->response.header, "/", 1);
-        }
-
-        buffer_strncat(w->response.header, "\r\n", 2);
-
-        w->response.data->content_type = CT_TEXT_HTML;
-        buffer_flush(w->response.data);
-        buffer_strcat(w->response.data,
-                      "<!DOCTYPE html><html>"
-                      "<body onload=\"window.location.href = window.location.origin + window.location.pathname + '/' + window.location.search + window.location.hash\">"
-                      "Redirecting. In case your browser does not support redirection, please click "
-                      "<a onclick=\"window.location.href = window.location.origin + window.location.pathname + '/' + window.location.search + window.location.hash\">here</a>."
-                      "</body></html>");
-        return HTTP_RESP_MOVED_PERM;
-    }
+    if(is_dir && !web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH))
+        return append_slash_to_url_and_redirect(w);
 
     // open the file
     w->ifd = open(web_filename, O_NONBLOCK, O_RDONLY);
@@ -1358,36 +1376,9 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
         }
 
         if (host) {
-            if(!url) { //no delim found
-                debug(D_WEB_CLIENT, "%llu: URL doesn't end with / generating redirect.", w->id);
-                char *protocol, *url_host;
-                protocol = (
-#ifdef ENABLE_HTTPS
-                        SSL_connection(&w->ssl) ||
-#endif
-                        (w->flags & WEB_CLIENT_FLAG_PROXY_HTTPS)) ? "https" : "http";
-
-                url_host = w->forwarded_host;
-                if(!url_host) {
-                    url_host = w->server_host;
-                    if(!url_host) url_host = "";
-                }
-
-                buffer_sprintf(w->response.header, "Location: %s://%s/%s/%s/%s",
-                               protocol, url_host, nodeid?"node":"host", tok, buffer_tostring(w->url_path_decoded));
-
-                if(buffer_strlen(w->url_query_string_decoded)) {
-                    const char *query_string = buffer_tostring(w->url_query_string_decoded);
-                    if(*query_string) {
-                        if(*query_string != '?')
-                            buffer_fast_strcat(w->response.header, "?", 1);
-                        buffer_strcat(w->response.header, query_string);
-                    }
-                }
-                buffer_fast_strcat(w->response.header, "\r\n", 2);
-                buffer_strcat(w->response.data, "Permanent redirect");
-                return HTTP_RESP_REDIR_PERM;
-            }
+            if(!url)
+                //no delim found
+                return append_slash_to_url_and_redirect(w);
 
             size_t len = strlen(url) + 2;
             char buf[len];
