@@ -604,17 +604,11 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                         syslog_identifier = (char *) p->val.via.str.ptr;
                         syslog_identifier_size = p->val.via.str.size;
 
-                        m_assert(syslog_identifier, "syslog_identifier is NULL");
-                        m_assert(syslog_identifier_size, "syslog_identifier_size is 0");
-
                         new_tmp_text_size += syslog_identifier_size;
                     }
                     else if(!strncmp(p->key.via.str.ptr, "PID", (size_t) p->key.via.str.size)){
                         pid = (char *) p->val.via.str.ptr;
                         pid_size = p->val.via.str.size;
-
-                        m_assert(pid, "pid is NULL");
-                        m_assert(pid_size, "pid_size is 0");
 
                         new_tmp_text_size += pid_size;
                     }
