@@ -18,7 +18,8 @@ learn_rel_path: "Installation/Install on specific environments"
 
 ## Install prerequisites/dependencies
 
-To install Netdata on pfSense, first run the following command (within a shell or under the **Diagnostics/Command**
+To install Netdata on pfSense, first enable the [FreeBSD package repo](https://docs.netgate.com/pfsense/en/latest/recipes/freebsd-pkg-repo.html)
+Then run the following command (within a shell or under the **Diagnostics/Command**
 prompt within the pfSense web interface).
 
 ```bash
@@ -28,22 +29,22 @@ pkg install -y pkgconf bash e2fsprogs-libuuid libuv nano
 Then run the following commands to download various dependencies from the FreeBSD repository.
 
 ```sh
-pkg add http://pkg.freebsd.org/FreeBSD:12:amd64/latest/All/json-c-0.15_1.txz
-pkg add http://pkg.freebsd.org/FreeBSD:12:amd64/latest/All/py38-certifi-2021.10.8.txz
-pkg add http://pkg.freebsd.org/FreeBSD:12:amd64/latest/All/py38-asn1crypto-1.4.0.txz
-pkg add http://pkg.freebsd.org/FreeBSD:12:amd64/latest/All/py38-pycparser-2.20.txz
-pkg add http://pkg.freebsd.org/FreeBSD:12:amd64/latest/All/py38-cffi-1.14.6.txz
-pkg add http://pkg.freebsd.org/FreeBSD:12:amd64/latest/All/py38-six-1.16.0.txz
-pkg add http://pkg.freebsd.org/FreeBSD:12:amd64/latest/All/py38-cryptography-3.3.2.txz
-pkg add http://pkg.freebsd.org/FreeBSD:12:amd64/latest/All/py38-idna-2.10.txz
-pkg add http://pkg.freebsd.org/FreeBSD:12:amd64/latest/All/py38-openssl-20.0.1.txz
-pkg add http://pkg.freebsd.org/FreeBSD:12:amd64/latest/All/py38-pysocks-1.7.1.txz
-pkg add http://pkg.freebsd.org/FreeBSD:12:amd64/latest/All/py38-urllib3-1.26.7,1.txz
-pkg add http://pkg.freebsd.org/FreeBSD:12:amd64/latest/All/py38-yaml-5.4.1.txz
+pkg install json-c-0.15_1
+pkg install py39-certifi-2023.5.7
+pkg install py39-asn1crypto
+pkg install py39-pycparser
+pkg install py39-cffi
+pkg install py39-six
+pkg install py39-cryptography
+pkg install py39-idna
+pkg install py39-openssl
+pkg install py39-pysocks
+pkg install py39-urllib3
+pkg install py39-yaml
 ```
 
 > ⚠️ If any of the above commands return a `Not Found` error, you need to manually search for the latest package in the
-> [FreeBSD repository](https://www.freebsd.org/ports/). Search for the package's name, such as `py37-cffi`, find the
+> [FreeBSD repository](https://www.freebsd.org/ports/) or by running `pkg search`. Search for the package's name, such as `py37-cffi`, find the
 > latest version number, and update the command accordingly.
 
 > ⚠️ On pfSense 2.4.5, Python version 3.7 may be installed by the system, in which case you should should not install
@@ -58,7 +59,7 @@ pkg add http://pkg.freebsd.org/FreeBSD:12:amd64/latest/All/py38-yaml-5.4.1.txz
 You can now install Netdata from the FreeBSD repository.
 
 ```bash
-pkg add http://pkg.freebsd.org/FreeBSD:12:amd64/latest/All/netdata-1.31.0_1.txz
+pkg install netdata
 ```
 
 > ⚠️ If the above command returns a `Not Found` error, you need to manually search for the latest version of Netdata in
