@@ -5,11 +5,10 @@
  */
 
 #if SKIP_WEB_LOG_TIME_PARSING == 0
-#if !defined(_XOPEN_SOURCE) && !defined(__DARWIN__) && !defined(__APPLE__)
+#if !defined(_XOPEN_SOURCE) && !defined(__DARWIN__) && !defined(__APPLE__) && !defined(__FreeBSD__)
 /* _XOPEN_SOURCE 700 required by strptime (POSIX 2004) and strndup (POSIX 2008)
  * Will need to find a cleaner way of doing this, as currently defining
- * _XOPEN_SOURCE 700 causes issues on Centos 7 and most probably MacOS and 
- * FreeBSD as well. */
+ * _XOPEN_SOURCE 700 can cause issues on Centos 7, MacOS and FreeBSD too. */
 #define _XOPEN_SOURCE 700 
 /* _BSD_SOURCE (glibc <= 2.19) and _DEFAULT_SOURCE (glibc >= 2.20) are required 
  * to silence "warning: implicit declaration of function ‘strsep’;" that is 
