@@ -225,7 +225,7 @@ void web_client_decode_path_and_query_string(struct web_client *w, const char *p
 int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_fragment);
 const char *web_content_type_to_string(HTTP_CONTENT_TYPE content_type);
 void web_client_enable_deflate(struct web_client *w, int gzip);
-int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client *w, char *decoded_url_path, int version, bool has_extension);
+int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client *w, char *decoded_url_path, int dashboard_version, bool has_extension);
 
 void web_client_timeout_checkpoint_init(struct web_client *w);
 void web_client_timeout_checkpoint_set(struct web_client *w, int timeout_ms);

@@ -18,6 +18,12 @@ inline int web_client_permission_denied(struct web_client *w) {
     return HTTP_RESP_FORBIDDEN;
 }
 
+static inline int bad_request_multiple_dashboard_versions(struct web_client *w) {
+    w->response.data->content_type = CT_TEXT_HTML;
+    buffer_strcat(w->response.data, "Multiple dashboard versions given at the URL.");
+    return HTTP_RESP_BAD_REQUEST;
+}
+
 static inline int web_client_crock_socket(struct web_client *w __maybe_unused) {
 #ifdef TCP_CORK
     if(likely(web_client_is_corkable(w) && !w->tcp_cork && w->ofd != -1)) {
@@ -315,29 +321,22 @@ static inline uint8_t contenttype_for_filename(const char *filename) {
     return CT_APPLICATION_OCTET_STREAM;
 }
 
-static inline int access_to_file_is_not_permitted(struct web_client *w, const char *filename) {
-    w->response.data->content_type = CT_TEXT_HTML;
-    buffer_strcat(w->response.data, "Access to file is not permitted: ");
-    buffer_strcat_htmlescape(w->response.data, filename);
-    return HTTP_RESP_FORBIDDEN;
-}
-
 // Work around a bug in the CMocka library by removing this function during testing.
 #ifndef REMOVE_MYSENDFILE
 
-static bool find_filename_to_serve(const char *filename, char *dst, size_t dst_len, struct stat *statbuf, int version, bool has_extension) {
+static bool find_filename_to_serve(const char *filename, char *dst, size_t dst_len, struct stat *statbuf, int dashboard_version, bool has_extension) {
     int fallback = 0;
 
     if(has_extension) {
-        if(version == -1)
+        if(dashboard_version == -1)
             snprintfz(dst, dst_len, "%s/%s", netdata_configured_web_dir, filename);
         else {
-            snprintfz(dst, dst_len, "%s/v%d/%s", netdata_configured_web_dir, version, filename);
+            snprintfz(dst, dst_len, "%s/v%d/%s", netdata_configured_web_dir, dashboard_version, filename);
             fallback = 1;
         }
     }
-    else if(version != -1)
-        snprintfz(dst, dst_len, "%s/v%d", netdata_configured_web_dir, version);
+    else if(dashboard_version != -1)
+        snprintfz(dst, dst_len, "%s/v%d", netdata_configured_web_dir, dashboard_version);
     else
         snprintfz(dst, dst_len, "%s/%s", netdata_configured_web_dir, filename);
 
@@ -365,7 +364,7 @@ static bool find_filename_to_serve(const char *filename, char *dst, size_t dst_l
     return true;
 }
 
-static int mysendfile(struct web_client *w, char *filename, int version, bool has_extension) {
+static int mysendfile(struct web_client *w, char *filename, int dashboard_version, bool has_extension) {
     debug(D_WEB_CLIENT, "%llu: Looking for file '%s/%s'", w->id, netdata_configured_web_dir, filename);
 
     if(!web_client_can_access_dashboard(w))
@@ -398,7 +397,7 @@ static int mysendfile(struct web_client *w, char *filename, int version, bool ha
     // find the physical file on disk
     char web_filename[FILENAME_MAX + 1];
     struct stat statbuf;
-    if(!find_filename_to_serve(filename, web_filename, FILENAME_MAX, &statbuf, version, has_extension)) {
+    if(!find_filename_to_serve(filename, web_filename, FILENAME_MAX, &statbuf, dashboard_version, has_extension)) {
         w->response.data->content_type = CT_TEXT_HTML;
         buffer_strcat(w->response.data, "File does not exist, or is not accessible: ");
         buffer_strcat_htmlescape(w->response.data, web_filename);
@@ -1219,7 +1218,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
         w->statistics.sent_bytes += bytes;
 }
 
-static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, char *url, bool nodeid, int (*func)(RRDHOST *, struct web_client *, char *, int, bool), int version, bool has_extension) {
+static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, char *url, bool nodeid, int (*func)(RRDHOST *, struct web_client *, char *, int, bool), int dashboard_version, bool has_extension) {
     static uint32_t hash_localhost = 0;
 
     if(unlikely(!hash_localhost)) {
@@ -1304,7 +1303,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
 
             buffer_flush(w->url_path_decoded);
             buffer_strcat(w->url_path_decoded, buf);
-            return func(host, w, buf, version, has_extension);
+            return func(host, w, buf, dashboard_version, has_extension);
         }
     }
 
@@ -1315,7 +1314,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
     return HTTP_RESP_NOT_FOUND;
 }
 
-int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client *w, char *decoded_url_path, int version, bool has_extension) {
+int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client *w, char *decoded_url_path, int dashboard_version, bool has_extension) {
     static uint32_t
             hash_api = 0,
             hash_host = 0,
@@ -1339,7 +1338,7 @@ int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client 
         else if(unlikely((hash == hash_host && strcmp(tok, "host") == 0) || (hash == hash_node && strcmp(tok, "node") == 0))) {
             // host switching
             debug(D_WEB_CLIENT_ACCESS, "%llu: host switch request ...", w->id);
-            return web_client_switch_host(host, w, decoded_url_path, hash == hash_node, web_client_api_request_with_node_selection, version, has_extension);
+            return web_client_switch_host(host, w, decoded_url_path, hash == hash_node, web_client_api_request_with_node_selection, dashboard_version, has_extension);
         }
     }
 
@@ -1349,7 +1348,7 @@ int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client 
     return HTTP_RESP_NOT_FOUND;
 }
 
-static inline int web_client_process_url(RRDHOST *host, struct web_client *w, char *decoded_url_path, int version, bool has_extension) {
+static inline int web_client_process_url(RRDHOST *host, struct web_client *w, char *decoded_url_path, int dashboard_version, bool has_extension) {
     if(unlikely(!service_running(ABILITY_WEB_REQUESTS)))
         return web_client_permission_denied(w);
 
@@ -1396,21 +1395,21 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         }
         else if(unlikely((hash == hash_host && strcmp(tok, "host") == 0) || (hash == hash_node && strcmp(tok, "node") == 0))) { // host switching
             debug(D_WEB_CLIENT_ACCESS, "%llu: host switch request ...", w->id);
-            return web_client_switch_host(host, w, decoded_url_path, hash == hash_node, web_client_process_url, version, has_extension);
+            return web_client_switch_host(host, w, decoded_url_path, hash == hash_node, web_client_process_url, dashboard_version, has_extension);
         }
         else if(unlikely(hash == hash_v2 && strcmp(tok, "v2") == 0)) {
-            if(version != -1)
-                return web_client_permission_denied(w);
+            if(dashboard_version != -1 && dashboard_version != 2)
+                bad_request_multiple_dashboard_versions(w);
             return web_client_process_url(host, w, decoded_url_path, 2, has_extension);
         }
         else if(unlikely(hash == hash_v1 && strcmp(tok, "v1") == 0)) {
-            if(version != -1)
-                return web_client_permission_denied(w);
+            if(dashboard_version != -1 && dashboard_version != 1)
+                bad_request_multiple_dashboard_versions(w);
             return web_client_process_url(host, w, decoded_url_path, 1, has_extension);
         }
         else if(unlikely(hash == hash_v0 && strcmp(tok, "v0") == 0)) {
-            if(version != -1)
-                return web_client_permission_denied(w);
+            if(dashboard_version != -1 && dashboard_version != 0)
+                bad_request_multiple_dashboard_versions(w);
             return web_client_process_url(host, w, decoded_url_path, 0, has_extension);
         }
         else if(unlikely(hash == hash_netdata_conf && strcmp(tok, "netdata.conf") == 0)) {    // netdata.conf
@@ -1498,7 +1497,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
     }
 
     buffer_flush(w->response.data);
-    return mysendfile(w, filename, version, has_extension);
+    return mysendfile(w, filename, dashboard_version, has_extension);
 }
 
 void web_client_process_request(struct web_client *w) {
