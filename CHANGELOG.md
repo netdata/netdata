@@ -6,9 +6,12 @@
 
 **Merged pull requests:**
 
+- Install the correct systemd unit file on older RPM systems. [\#15240](https://github.com/netdata/netdata/pull/15240) ([Ferroin](https://github.com/Ferroin))
+- Add module column to apps.plugin csv [\#15235](https://github.com/netdata/netdata/pull/15235) ([Ancairon](https://github.com/Ancairon))
 - Create index for health log migration [\#15233](https://github.com/netdata/netdata/pull/15233) ([stelfrag](https://github.com/stelfrag))
 - New alerts endpoint [\#15232](https://github.com/netdata/netdata/pull/15232) ([stelfrag](https://github.com/stelfrag))
 - fix not handling N/A value in python.d/nvidia\_smi [\#15231](https://github.com/netdata/netdata/pull/15231) ([ilyam8](https://github.com/ilyam8))
+- Fix handling of plugin ownership in static builds. [\#15230](https://github.com/netdata/netdata/pull/15230) ([Ferroin](https://github.com/Ferroin))
 - /api/v2 improvements [\#15227](https://github.com/netdata/netdata/pull/15227) ([ktsaou](https://github.com/ktsaou))
 - Remove erroneous space for unit [\#15226](https://github.com/netdata/netdata/pull/15226) ([ralphm](https://github.com/ralphm))
 - Fix /api/v2/contexts,nodes,nodes\_instances,q before match [\#15223](https://github.com/netdata/netdata/pull/15223) ([ktsaou](https://github.com/ktsaou))
@@ -401,11 +404,6 @@
 - Prevent core dump when the agent is performing a quick shutdown [\#14587](https://github.com/netdata/netdata/pull/14587) ([stelfrag](https://github.com/stelfrag))
 - Clean host structure [\#14584](https://github.com/netdata/netdata/pull/14584) ([stelfrag](https://github.com/stelfrag))
 - Correct the sidebar position label metdata for learn [\#14583](https://github.com/netdata/netdata/pull/14583) ([cakrit](https://github.com/cakrit))
-- final install reorg for learn [\#14580](https://github.com/netdata/netdata/pull/14580) ([cakrit](https://github.com/cakrit))
-- Learn installation reorg part 2 [\#14579](https://github.com/netdata/netdata/pull/14579) ([cakrit](https://github.com/cakrit))
-- Add link to all installation options [\#14578](https://github.com/netdata/netdata/pull/14578) ([cakrit](https://github.com/cakrit))
-- Reorg learn 2102 1 [\#14577](https://github.com/netdata/netdata/pull/14577) ([cakrit](https://github.com/cakrit))
-- Update README.md [\#14576](https://github.com/netdata/netdata/pull/14576) ([cakrit](https://github.com/cakrit))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
