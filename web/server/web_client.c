@@ -325,64 +325,47 @@ static inline int access_to_file_is_not_permitted(struct web_client *w, const ch
 // Work around a bug in the CMocka library by removing this function during testing.
 #ifndef REMOVE_MYSENDFILE
 
-static bool find_filename_to_serve(const char *filename, char *dst, size_t dst_len, struct stat *statbuf) {
-    // copy the filename to our src buffer
-    char path[FILENAME_MAX + 1];
-    strncpyz(path, filename, FILENAME_MAX);
+static bool find_filename_to_serve(const char *filename, char *dst, size_t dst_len, struct stat *statbuf, int version, bool has_extension) {
+    int fallback = 0;
 
-    bool strip = false;
-    while(1) {
-        if(*path)
-            snprintfz(dst, dst_len, "%s/%s", netdata_configured_web_dir, path);
-        else
-            snprintfz(dst, dst_len, "%s", netdata_configured_web_dir);
-
-        // internal_error(true, "WEBFILE: trying '%s', path '%s'", dst, path);
-
-        strip = false;
-        if (lstat(dst, statbuf) != 0)
-            strip = true;
-
-        if (!strip && (statbuf->st_mode & S_IFMT) == S_IFDIR) {
-            // it is a directory
-            // let's see if it has index.html in it
-            if(*path)
-                snprintfz(dst, dst_len, "%s/%s/index.html", netdata_configured_web_dir, path);
-            else
-                snprintfz(dst, dst_len, "%s/index.html", netdata_configured_web_dir);
-
-            if (lstat(dst, statbuf) != 0 || (statbuf->st_mode & S_IFMT) == S_IFDIR)
-                strip = true;
+    if(has_extension) {
+        if(version == -1)
+            snprintfz(dst, dst_len, "%s/%s", netdata_configured_web_dir, filename);
+        else {
+            snprintfz(dst, dst_len, "%s/v%d/%s", netdata_configured_web_dir, version, filename);
+            fallback = 1;
         }
+    }
+    else if(version != -1)
+        snprintfz(dst, dst_len, "%s/v%d", netdata_configured_web_dir, version);
+    else
+        snprintfz(dst, dst_len, "%s/%s", netdata_configured_web_dir, filename);
 
-        if(!strip && (statbuf->st_mode & S_IFMT) != S_IFREG)
-            strip = true;
-
-        if(strip) {
-            char *s = path, *e = path;
-            while(*e) e++; // find the terminator
-            if(e > s) e--; // find the last character
-
-            while(e >= s && *e != '/') *e-- = '\0'; // find the previous slash
-            while(e >= s && *e == '/') *e-- = '\0'; // zero the slashes
-
-            if(!*s || e <= s) {
-                snprintfz(dst, dst_len, "%s/index.html", netdata_configured_web_dir);
-                if(lstat(dst, statbuf) != 0)
-                    return false;
-                else
-                    break;
-            }
+    if (lstat(dst, statbuf) != 0) {
+        if(fallback == 1) {
+            snprintfz(dst, dst_len, "%s/%s", netdata_configured_web_dir, filename);
+            if (lstat(dst, statbuf) != 0)
+                return false;
         }
         else
-            break;
+            return false;
     }
 
-    // internal_error(true, "WEBFILE: final '%s'", dst);
+    if((statbuf->st_mode & S_IFMT) == S_IFDIR) {
+        size_t len = strlen(dst);
+        if(len > dst_len - 11)
+            return false;
+
+        strncpyz(&dst[len], "/index.html", dst_len - len);
+
+        if (lstat(dst, statbuf) != 0)
+            return false;
+    }
+
     return true;
 }
 
-int mysendfile(struct web_client *w, char *filename) {
+static int mysendfile(struct web_client *w, char *filename, int version, bool has_extension) {
     debug(D_WEB_CLIENT, "%llu: Looking for file '%s/%s'", w->id, netdata_configured_web_dir, filename);
 
     if(!web_client_can_access_dashboard(w))
@@ -415,7 +398,7 @@ int mysendfile(struct web_client *w, char *filename) {
     // find the physical file on disk
     char web_filename[FILENAME_MAX + 1];
     struct stat statbuf;
-    if(!find_filename_to_serve(filename, web_filename, FILENAME_MAX, &statbuf)) {
+    if(!find_filename_to_serve(filename, web_filename, FILENAME_MAX, &statbuf, version, has_extension)) {
         w->response.data->content_type = CT_TEXT_HTML;
         buffer_strcat(w->response.data, "File does not exist, or is not accessible: ");
         buffer_strcat_htmlescape(w->response.data, web_filename);
@@ -1236,7 +1219,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
         w->statistics.sent_bytes += bytes;
 }
 
-static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, char *url, bool nodeid, int (*func)(RRDHOST *, struct web_client *, char *)) {
+static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, char *url, bool nodeid, int (*func)(RRDHOST *, struct web_client *, char *, int, bool), int version, bool has_extension) {
     static uint32_t hash_localhost = 0;
 
     if(unlikely(!hash_localhost)) {
@@ -1321,7 +1304,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
 
             buffer_flush(w->url_path_decoded);
             buffer_strcat(w->url_path_decoded, buf);
-            return func(host, w, buf);
+            return func(host, w, buf, version, has_extension);
         }
     }
 
@@ -1332,7 +1315,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
     return HTTP_RESP_NOT_FOUND;
 }
 
-int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client *w, char *decoded_url_path) {
+int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client *w, char *decoded_url_path, int version, bool has_extension) {
     static uint32_t
             hash_api = 0,
             hash_host = 0,
@@ -1356,7 +1339,7 @@ int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client 
         else if(unlikely((hash == hash_host && strcmp(tok, "host") == 0) || (hash == hash_node && strcmp(tok, "node") == 0))) {
             // host switching
             debug(D_WEB_CLIENT_ACCESS, "%llu: host switch request ...", w->id);
-            return web_client_switch_host(host, w, decoded_url_path, hash == hash_node, web_client_api_request_with_node_selection);
+            return web_client_switch_host(host, w, decoded_url_path, hash == hash_node, web_client_api_request_with_node_selection, version, has_extension);
         }
     }
 
@@ -1366,7 +1349,7 @@ int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client 
     return HTTP_RESP_NOT_FOUND;
 }
 
-static inline int web_client_process_url(RRDHOST *host, struct web_client *w, char *decoded_url_path) {
+static inline int web_client_process_url(RRDHOST *host, struct web_client *w, char *decoded_url_path, int version, bool has_extension) {
     if(unlikely(!service_running(ABILITY_WEB_REQUESTS)))
         return web_client_permission_denied(w);
 
@@ -1374,7 +1357,10 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             hash_api = 0,
             hash_netdata_conf = 0,
             hash_host = 0,
-            hash_node = 0;
+            hash_node = 0,
+            hash_v0 = 0,
+            hash_v1 = 0,
+            hash_v2 = 0;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     static uint32_t hash_exit = 0, hash_debug = 0, hash_mirror = 0;
@@ -1385,6 +1371,9 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         hash_netdata_conf = simple_hash("netdata.conf");
         hash_host = simple_hash("host");
         hash_node = simple_hash("node");
+        hash_v0 = simple_hash("v0");
+        hash_v1 = simple_hash("v1");
+        hash_v2 = simple_hash("v2");
 #ifdef NETDATA_INTERNAL_CHECKS
         hash_exit = simple_hash("exit");
         hash_debug = simple_hash("debug");
@@ -1394,20 +1383,35 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
 
     // keep a copy of the decoded path, in case we need to serve it as a filename
     char filename[FILENAME_MAX + 1];
-    strncpyz(filename, buffer_tostring(w->url_path_decoded), FILENAME_MAX);
+    strncpyz(filename, decoded_url_path ? decoded_url_path : "", FILENAME_MAX);
 
     char *tok = strsep_skip_consecutive_separators(&decoded_url_path, "/?");
     if(likely(tok && *tok)) {
         uint32_t hash = simple_hash(tok);
         debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);
 
-        if(unlikely(hash == hash_api && strcmp(tok, "api") == 0)) {                           // current API
+        if(likely(hash == hash_api && strcmp(tok, "api") == 0)) {                           // current API
             debug(D_WEB_CLIENT_ACCESS, "%llu: API request ...", w->id);
             return check_host_and_call(host, w, decoded_url_path, web_client_api_request);
         }
         else if(unlikely((hash == hash_host && strcmp(tok, "host") == 0) || (hash == hash_node && strcmp(tok, "node") == 0))) { // host switching
             debug(D_WEB_CLIENT_ACCESS, "%llu: host switch request ...", w->id);
-            return web_client_switch_host(host, w, decoded_url_path, hash == hash_node, web_client_process_url);
+            return web_client_switch_host(host, w, decoded_url_path, hash == hash_node, web_client_process_url, version, has_extension);
+        }
+        else if(unlikely(hash == hash_v2 && strcmp(tok, "v2") == 0)) {
+            if(version != -1)
+                return web_client_permission_denied(w);
+            return web_client_process_url(host, w, decoded_url_path, 2, has_extension);
+        }
+        else if(unlikely(hash == hash_v1 && strcmp(tok, "v1") == 0)) {
+            if(version != -1)
+                return web_client_permission_denied(w);
+            return web_client_process_url(host, w, decoded_url_path, 1, has_extension);
+        }
+        else if(unlikely(hash == hash_v0 && strcmp(tok, "v0") == 0)) {
+            if(version != -1)
+                return web_client_permission_denied(w);
+            return web_client_process_url(host, w, decoded_url_path, 0, has_extension);
         }
         else if(unlikely(hash == hash_netdata_conf && strcmp(tok, "netdata.conf") == 0)) {    // netdata.conf
             if(unlikely(!web_client_can_access_netdataconf(w)))
@@ -1494,7 +1498,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
     }
 
     buffer_flush(w->response.data);
-    return mysendfile(w, filename);
+    return mysendfile(w, filename, version, has_extension);
 }
 
 void web_client_process_request(struct web_client *w) {
@@ -1546,7 +1550,28 @@ void web_client_process_request(struct web_client *w) {
                         break;
                     }
 
-                    w->response.code = web_client_process_url(localhost, w, (char *)buffer_tostring(w->url_path_decoded));
+                    // find if the URL path has a filename extension
+                    bool has_extension = false;
+                    const char *path = buffer_tostring(w->url_path_decoded);
+                    ssize_t e;
+
+                    // remove the query string
+                    for (e = 0; path[e]; e++) {
+                        if (path[e] == '?')
+                            break;
+                    }
+
+                    // check if there is a filename extension
+                    while (--e > 0) {
+                        if (path[e] == '/')
+                            break;
+                        if(path[e] == '.') {
+                            has_extension = true;
+                            break;
+                        }
+                    }
+
+                    w->response.code = (short)web_client_process_url(localhost, w, (char *)path, -1, has_extension);
                     break;
             }
             break;
