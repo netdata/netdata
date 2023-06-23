@@ -19,8 +19,10 @@ inline int web_client_permission_denied(struct web_client *w) {
 }
 
 static inline int bad_request_multiple_dashboard_versions(struct web_client *w) {
-    w->response.data->content_type = CT_TEXT_HTML;
+    w->response.data->content_type = CT_TEXT_PLAIN;
+    buffer_flush(w->response.data);
     buffer_strcat(w->response.data, "Multiple dashboard versions given at the URL.");
+    w->response.code = HTTP_RESP_BAD_REQUEST;
     return HTTP_RESP_BAD_REQUEST;
 }
 
@@ -1398,18 +1400,18 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             return web_client_switch_host(host, w, decoded_url_path, hash == hash_node, web_client_process_url, dashboard_version, has_extension);
         }
         else if(unlikely(hash == hash_v2 && strcmp(tok, "v2") == 0)) {
-            if(dashboard_version != -1 && dashboard_version != 2)
-                bad_request_multiple_dashboard_versions(w);
+            if(dashboard_version != -1)
+                return bad_request_multiple_dashboard_versions(w);
             return web_client_process_url(host, w, decoded_url_path, 2, has_extension);
         }
         else if(unlikely(hash == hash_v1 && strcmp(tok, "v1") == 0)) {
-            if(dashboard_version != -1 && dashboard_version != 1)
-                bad_request_multiple_dashboard_versions(w);
+            if(dashboard_version != -1)
+                return bad_request_multiple_dashboard_versions(w);
             return web_client_process_url(host, w, decoded_url_path, 1, has_extension);
         }
         else if(unlikely(hash == hash_v0 && strcmp(tok, "v0") == 0)) {
-            if(dashboard_version != -1 && dashboard_version != 0)
-                bad_request_multiple_dashboard_versions(w);
+            if(dashboard_version != -1)
+                return bad_request_multiple_dashboard_versions(w);
             return web_client_process_url(host, w, decoded_url_path, 0, has_extension);
         }
         else if(unlikely(hash == hash_netdata_conf && strcmp(tok, "netdata.conf") == 0)) {    // netdata.conf
