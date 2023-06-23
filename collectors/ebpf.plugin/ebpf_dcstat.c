@@ -472,8 +472,11 @@ static void ebpf_dcstat_exit(void *ptr)
         dc_bpf__destroy(dc_bpf_obj);
 #endif
 
-    if (em->objects)
+    if (em->objects){
         ebpf_unload_legacy_code(em->objects, em->probe_links);
+        em->objects = NULL;
+        em->probe_links = NULL;
+    }
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;

@@ -448,6 +448,7 @@ static void ebpf_cleanup_plot_disks()
 
         move = next;
     }
+    plot_disks = NULL;
 }
 
 /**
@@ -465,6 +466,36 @@ static void ebpf_cleanup_disk_list()
 
         move = next;
     }
+    disk_list = NULL;
+}
+
+/**
+ * Obsolete global
+ *
+ * Obsolete global charts created by thread.
+ *
+ * @param em a pointer to `struct ebpf_module`
+ */
+static void ebpf_obsolete_disck_global(ebpf_module_t *em)
+{
+    ebpf_publish_disk_t *move = plot_disks;
+    while (move) {
+        netdata_ebpf_disks_t *ned = move->plot;
+        uint32_t flags = ned->flags;
+        if (flags & NETDATA_DISK_CHART_CREATED) {
+            ebpf_write_chart_obsolete(ned->histogram.name,
+                                      ned->family,
+                                      "Disk latency",
+                                      EBPF_COMMON_DIMENSION_CALL,
+                                      ned->family,
+                                      NETDATA_EBPF_CHART_TYPE_STACKED,
+                                      NULL,
+                                      ned->histogram.order,
+                                      em->update_every);
+        }
+
+        move = move->next;
+    }
 }
 
 /**
@@ -478,15 +509,28 @@ static void ebpf_disk_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        pthread_mutex_lock(&lock);
+
+        ebpf_obsolete_disck_global(em);
+
+        fflush(stdout);
+        pthread_mutex_unlock(&lock);
+
+        ebpf_unload_legacy_code(em->objects, em->probe_links);
+        em->objects = NULL;
+        em->probe_links = NULL;
+    }
+    ebpf_disk_disable_tracepoints();
+
     if (em->objects)
         ebpf_unload_legacy_code(em->objects, em->probe_links);
-
-    ebpf_disk_disable_tracepoints();
 
     if (dimensions)
         ebpf_histogram_dimension_cleanup(dimensions, NETDATA_EBPF_HIST_MAX_BINS);
 
     freez(disk_hash_values);
+    disk_hash_values = NULL;
     pthread_mutex_destroy(&plot_mutex);
 
     ebpf_cleanup_plot_disks();
@@ -868,6 +912,7 @@ void *ebpf_disk_thread(void *ptr)
         goto enddisk;
     }
 
+    error("KILLME 4");
     int algorithms[NETDATA_EBPF_HIST_MAX_BINS];
     ebpf_fill_algorithms(algorithms, NETDATA_EBPF_HIST_MAX_BINS, NETDATA_EBPF_INCREMENTAL_IDX);
     dimensions = ebpf_fill_histogram_dimension(NETDATA_EBPF_HIST_MAX_BINS);
