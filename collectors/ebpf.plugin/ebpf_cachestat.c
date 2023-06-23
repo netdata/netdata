@@ -347,32 +347,44 @@ static void ebpf_obsolete_specific_cachestat_charts(char *type, int update_every
  */
 static void ebpf_obsolete_services(ebpf_module_t *em)
 {
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY, NETDATA_CACHESTAT_HIT_RATIO_CHART,
+    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              NETDATA_CACHESTAT_HIT_RATIO_CHART,
                               "Hit ratio",
-                              EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
+                              EBPF_COMMON_DIMENSION_PERCENTAGE,
+                              NETDATA_CACHESTAT_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NETDATA_SYSTEMD_CACHESTAT_HIT_RATIO_CONTEXT, 21100,
+                              NETDATA_SYSTEMD_CACHESTAT_HIT_RATIO_CONTEXT,
+                              21100,
                               em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY, NETDATA_CACHESTAT_DIRTY_CHART,
+    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              NETDATA_CACHESTAT_DIRTY_CHART,
                               "Number of dirty pages",
-                              EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_SUBMENU,
+                              EBPF_CACHESTAT_DIMENSION_PAGE,
+                              NETDATA_CACHESTAT_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NETDATA_SYSTEMD_CACHESTAT_MODIFIED_CACHE_CONTEXT, 21101,
+                              NETDATA_SYSTEMD_CACHESTAT_MODIFIED_CACHE_CONTEXT,
+                              21101,
                               em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY, NETDATA_CACHESTAT_HIT_CHART,
+    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              NETDATA_CACHESTAT_HIT_CHART,
                               "Number of accessed files",
-                              EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
+                              EBPF_CACHESTAT_DIMENSION_HITS,
+                              NETDATA_CACHESTAT_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NETDATA_SYSTEMD_CACHESTAT_HIT_FILE_CONTEXT, 21102,
+                              NETDATA_SYSTEMD_CACHESTAT_HIT_FILE_CONTEXT,
+                              21102,
                               em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY, NETDATA_CACHESTAT_MISSES_CHART,
+    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              NETDATA_CACHESTAT_MISSES_CHART,
                               "Files out of page cache",
-                              EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_SUBMENU,
+                              EBPF_CACHESTAT_DIMENSION_MISSES,
+                              NETDATA_CACHESTAT_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NETDATA_SYSTEMD_CACHESTAT_MISS_FILES_CONTEXT, 21103,
+                              NETDATA_SYSTEMD_CACHESTAT_MISS_FILES_CONTEXT,
+                              21103,
                               em->update_every);
 }
 
@@ -407,32 +419,44 @@ static inline void ebpf_obsolete_cachestat_cgroup_charts(ebpf_module_t *em) {
  */
 static void ebpf_obsolete_cachestat_global(ebpf_module_t *em)
 {
-    ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_RATIO_CHART,
+    ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP,
+                              NETDATA_CACHESTAT_HIT_RATIO_CHART,
                               "Hit ratio",
-                              EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
+                              EBPF_COMMON_DIMENSION_PERCENTAGE,
+                              NETDATA_CACHESTAT_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL, 21100,
+                              NULL,
+                              21100,
                               em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_DIRTY_CHART,
+    ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP,
+                              NETDATA_CACHESTAT_DIRTY_CHART,
                               "Number of dirty pages",
-                              EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_SUBMENU,
+                              EBPF_CACHESTAT_DIMENSION_PAGE,
+                              NETDATA_CACHESTAT_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL, 21101,
+                              NULL,
+                              21101,
                               em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_CHART,
+    ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP,
+                              NETDATA_CACHESTAT_HIT_CHART,
                               "Number of accessed files",
-                              EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
+                              EBPF_CACHESTAT_DIMENSION_HITS,
+                              NETDATA_CACHESTAT_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL, 21102,
+                              NULL,
+                              21102,
                               em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_MISSES_CHART,
+    ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP,
+                              NETDATA_CACHESTAT_MISSES_CHART,
                               "Files out of page cache",
-                              EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_SUBMENU,
+                              EBPF_CACHESTAT_DIMENSION_MISSES,
+                              NETDATA_CACHESTAT_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL, 21103,
+                              NULL,
+                              21103,
                               em->update_every);
 }
 
@@ -445,37 +469,44 @@ static void ebpf_obsolete_cachestat_global(ebpf_module_t *em)
  */
 void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
 {
-    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY, NETDATA_CACHESTAT_HIT_RATIO_CHART,
-                               "Hit ratio",
-                               EBPF_COMMON_DIMENSION_PERCENTAGE,
-                               NETDATA_CACHESTAT_SUBMENU,
-                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,  20090,
-                               em->update_every);
+    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
+                              NETDATA_CACHESTAT_HIT_RATIO_CHART,
+                              "Hit ratio",
+                              EBPF_COMMON_DIMENSION_PERCENTAGE,
+                              NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NULL,
+                              20090,
+                              em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY, NETDATA_CACHESTAT_DIRTY_CHART,
-                               "Number of dirty pages",
-                               EBPF_CACHESTAT_DIMENSION_PAGE,
-                               NETDATA_CACHESTAT_SUBMENU,
-                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                               NULL, 20091,
-                               em->update_every);
+    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
+                              NETDATA_CACHESTAT_DIRTY_CHART,
+                              "Number of dirty pages",
+                              EBPF_CACHESTAT_DIMENSION_PAGE,
+                              NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                              NULL,
+                              20091,
+                              em->update_every);
 
     ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY, NETDATA_CACHESTAT_HIT_CHART,
-                               "Number of accessed files",
-                               EBPF_CACHESTAT_DIMENSION_HITS,
-                               NETDATA_CACHESTAT_SUBMENU,
-                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                               NULL, 20092,
-                               em->update_every);
+                              "Number of accessed files",
+                              EBPF_CACHESTAT_DIMENSION_HITS,
+                              NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                               NULL,
+                              20092,
+                              em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY, NETDATA_CACHESTAT_MISSES_CHART,
-                               "Files out of page cache",
-                               EBPF_CACHESTAT_DIMENSION_MISSES,
-                               NETDATA_CACHESTAT_SUBMENU,
-                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                               NULL, 20093,
-                               em->update_every);
+    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
+                              NETDATA_CACHESTAT_MISSES_CHART,
+                              "Files out of page cache",
+                              EBPF_CACHESTAT_DIMENSION_MISSES,
+                              NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                               NULL,
+                              20093,
+                              em->update_every);
 }
 
 /**
