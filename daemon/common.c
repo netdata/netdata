@@ -16,8 +16,14 @@ char *netdata_configured_host_prefix         = NULL;
 char *netdata_configured_timezone            = NULL;
 char *netdata_configured_abbrev_timezone     = NULL;
 int32_t netdata_configured_utc_offset        = 0;
-int netdata_ready;
-int netdata_cloud_setting;
+
+bool netdata_ready = false;
+
+#if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
+bool netdata_cloud_enabled = false;
+#else
+bool netdata_cloud_enabled = true;
+#endif
 
 long get_netdata_cpus(void) {
     static long processors = 0;
@@ -53,4 +59,86 @@ long get_netdata_cpus(void) {
     processors = cores_user_configured;
 
     return processors;
+}
+
+const char *cloud_status_to_string(CLOUD_STATUS status) {
+    switch(status) {
+        default:
+        case CLOUD_STATUS_DISABLED:
+            return "disabled";
+
+        case CLOUD_STATUS_BANNED:
+            return "banned";
+
+        case CLOUD_STATUS_OFFLINE:
+            return "offline";
+
+        case CLOUD_STATUS_ONLINE:
+            return "online";
+    }
+}
+
+CLOUD_STATUS cloud_status(void) {
+#ifdef ENABLE_ACLK
+    if(aclk_disable_runtime)
+        return CLOUD_STATUS_BANNED;
+
+    if(aclk_connected)
+        return CLOUD_STATUS_ONLINE;
+
+    if(netdata_cloud_enabled)
+        return CLOUD_STATUS_OFFLINE;
+
+    return CLOUD_STATUS_DISABLED;
+#else
+    return CLOUD_STATUS_DISABLED;
+#endif
+}
+
+time_t cloud_last_change(void) {
+#ifdef ENABLE_ACLK
+    time_t ret = MAX(last_conn_time_mqtt, last_disconnect_time);
+    if(!ret) ret = netdata_start_time;
+    return ret;
+#else
+    return netdata_start_time;
+#endif
+}
+
+time_t cloud_next_connection_attempt(void) {
+#ifdef ENABLE_ACLK
+    return next_connection_attempt;
+#else
+    return 0;
+#endif
+}
+
+size_t cloud_connection_id(void) {
+#ifdef ENABLE_ACLK
+    return aclk_connection_counter;
+#else
+    return 0;
+#endif
+}
+
+const char *cloud_offline_reason() {
+#ifdef ENABLE_ACLK
+    if(!netdata_cloud_enabled)
+        return "disabled";
+
+    if(aclk_disable_runtime)
+        return "banned";
+
+    return aclk_status_to_string();
+#else
+    return "disabled";
+#endif
+}
+
+const char *cloud_base_url() {
+#ifdef ENABLE_ACLK
+    return aclk_cloud_base_url;
+#else
+    return NULL;
+#endif
 }

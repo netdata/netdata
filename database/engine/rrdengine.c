@@ -351,7 +351,7 @@ static struct {
 static void wal_cleanup1(void) {
     WAL *wal = NULL;
 
-    if(!netdata_spinlock_trylock(&wal_globals.protected.spinlock))
+    if(!spinlock_trylock(&wal_globals.protected.spinlock))
         return;
 
     if(wal_globals.protected.available_items && wal_globals.protected.available > storage_tiers) {
@@ -360,7 +360,7 @@ static void wal_cleanup1(void) {
         wal_globals.protected.available--;
     }
 
-    netdata_spinlock_unlock(&wal_globals.protected.spinlock);
+    spinlock_unlock(&wal_globals.protected.spinlock);
 
     if(wal) {
         posix_memfree(wal->buf);
@@ -375,7 +375,7 @@ WAL *wal_get(struct rrdengine_instance *ctx, unsigned size) {
 
     WAL *wal = NULL;
 
-    netdata_spinlock_lock(&wal_globals.protected.spinlock);
+    spinlock_lock(&wal_globals.protected.spinlock);
 
     if(likely(wal_globals.protected.available_items)) {
         wal = wal_globals.protected.available_items;
@@ -384,7 +384,7 @@ WAL *wal_get(struct rrdengine_instance *ctx, unsigned size) {
     }
 
     uint64_t transaction_id = __atomic_fetch_add(&ctx->atomic.transaction_id, 1, __ATOMIC_RELAXED);
-    netdata_spinlock_unlock(&wal_globals.protected.spinlock);
+    spinlock_unlock(&wal_globals.protected.spinlock);
 
     if(unlikely(!wal)) {
         wal = mallocz(sizeof(WAL));
@@ -416,10 +416,10 @@ WAL *wal_get(struct rrdengine_instance *ctx, unsigned size) {
 void wal_release(WAL *wal) {
     if(unlikely(!wal)) return;
 
-    netdata_spinlock_lock(&wal_globals.protected.spinlock);
+    spinlock_lock(&wal_globals.protected.spinlock);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
     wal_globals.protected.available++;
-    netdata_spinlock_unlock(&wal_globals.protected.spinlock);
+    spinlock_unlock(&wal_globals.protected.spinlock);
 }
 
 // ----------------------------------------------------------------------------
@@ -459,7 +459,7 @@ void rrdeng_dequeue_epdl_cmd(struct rrdeng_cmd *cmd) {
 }
 
 void rrdeng_req_cmd(requeue_callback_t get_cmd_cb, void *data, STORAGE_PRIORITY priority) {
-    netdata_spinlock_lock(&rrdeng_main.cmd_queue.unsafe.spinlock);
+    spinlock_lock(&rrdeng_main.cmd_queue.unsafe.spinlock);
 
     struct rrdeng_cmd *cmd = get_cmd_cb(data);
     if(cmd) {
@@ -472,7 +472,7 @@ void rrdeng_req_cmd(requeue_callback_t get_cmd_cb, void *data, STORAGE_PRIORITY 
         }
     }
 
-    netdata_spinlock_unlock(&rrdeng_main.cmd_queue.unsafe.spinlock);
+    spinlock_unlock(&rrdeng_main.cmd_queue.unsafe.spinlock);
 }
 
 void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, void *data, struct completion *completion,
@@ -489,12 +489,12 @@ void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, v
     cmd->priority = priority;
     cmd->dequeue_cb = dequeue_cb;
 
-    netdata_spinlock_lock(&rrdeng_main.cmd_queue.unsafe.spinlock);
+    spinlock_lock(&rrdeng_main.cmd_queue.unsafe.spinlock);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(rrdeng_main.cmd_queue.unsafe.waiting_items_by_priority[priority], cmd, queue.prev, queue.next);
     rrdeng_main.cmd_queue.unsafe.waiting++;
     if(enqueue_cb)
         enqueue_cb(cmd);
-    netdata_spinlock_unlock(&rrdeng_main.cmd_queue.unsafe.spinlock);
+    spinlock_unlock(&rrdeng_main.cmd_queue.unsafe.spinlock);
 
     fatal_assert(0 == uv_async_send(&rrdeng_main.async));
 }
@@ -532,7 +532,7 @@ static inline struct rrdeng_cmd rrdeng_deq_cmd(bool from_worker) {
     }
 
     // find an opcode to execute from the queue
-    netdata_spinlock_lock(&rrdeng_main.cmd_queue.unsafe.spinlock);
+    spinlock_lock(&rrdeng_main.cmd_queue.unsafe.spinlock);
     for(STORAGE_PRIORITY priority = min_priority; priority <= max_priority ; priority++) {
         cmd = rrdeng_main.cmd_queue.unsafe.waiting_items_by_priority[priority];
         if(cmd) {
@@ -559,7 +559,7 @@ static inline struct rrdeng_cmd rrdeng_deq_cmd(bool from_worker) {
         cmd->dequeue_cb = NULL;
     }
 
-    netdata_spinlock_unlock(&rrdeng_main.cmd_queue.unsafe.spinlock);
+    spinlock_unlock(&rrdeng_main.cmd_queue.unsafe.spinlock);
 
     struct rrdeng_cmd ret;
     if(cmd) {
@@ -712,9 +712,9 @@ static void *extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx __m
     posix_memfree(xt_io_descr->buf);
     extent_io_descriptor_release(xt_io_descr);
 
-    netdata_spinlock_lock(&datafile->writers.spinlock);
+    spinlock_lock(&datafile->writers.spinlock);
     datafile->writers.flushed_to_open_running--;
-    netdata_spinlock_unlock(&datafile->writers.spinlock);
+    spinlock_unlock(&datafile->writers.spinlock);
 
     if(datafile->fileno != ctx_last_fileno_get(ctx) && still_running)
         // we just finished a flushing on a datafile that is not the active one
@@ -738,10 +738,10 @@ static void after_extent_write_datafile_io(uv_fs_t *uv_fs_request) {
 
     journalfile_v1_extent_write(ctx, xt_io_descr->datafile, xt_io_descr->wal, &rrdeng_main.loop);
 
-    netdata_spinlock_lock(&datafile->writers.spinlock);
+    spinlock_lock(&datafile->writers.spinlock);
     datafile->writers.running--;
     datafile->writers.flushed_to_open_running++;
-    netdata_spinlock_unlock(&datafile->writers.spinlock);
+    spinlock_unlock(&datafile->writers.spinlock);
 
     rrdeng_enq_cmd(xt_io_descr->ctx,
                    RRDENG_OPCODE_FLUSHED_TO_OPEN,
@@ -756,12 +756,12 @@ static void after_extent_write_datafile_io(uv_fs_t *uv_fs_request) {
 
 static bool datafile_is_full(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile) {
     bool ret = false;
-    netdata_spinlock_lock(&datafile->writers.spinlock);
+    spinlock_lock(&datafile->writers.spinlock);
 
     if(ctx_is_available_for_queries(ctx) && datafile->pos > rrdeng_target_data_file_size(ctx))
         ret = true;
 
-    netdata_spinlock_unlock(&datafile->writers.spinlock);
+    spinlock_unlock(&datafile->writers.spinlock);
 
     return ret;
 }
@@ -773,9 +773,9 @@ static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
     datafile = ctx->datafiles.first->prev;
     // become a writer on this datafile, to prevent it from vanishing
-    netdata_spinlock_lock(&datafile->writers.spinlock);
+    spinlock_lock(&datafile->writers.spinlock);
     datafile->writers.running++;
-    netdata_spinlock_unlock(&datafile->writers.spinlock);
+    spinlock_unlock(&datafile->writers.spinlock);
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
     if(datafile_is_full(ctx, datafile)) {
@@ -791,7 +791,7 @@ static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_
         datafile = ctx->datafiles.first->prev;
         uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
-        if(datafile_is_full(ctx, datafile) && create_new_datafile_pair(ctx) == 0)
+        if(datafile_is_full(ctx, datafile) && create_new_datafile_pair(ctx, true) == 0)
             rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_INDEX, datafile, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL,
                            NULL);
 
@@ -801,15 +801,15 @@ static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_
         uv_rwlock_rdlock(&ctx->datafiles.rwlock);
         datafile = ctx->datafiles.first->prev;
         // become a writer on this datafile, to prevent it from vanishing
-        netdata_spinlock_lock(&datafile->writers.spinlock);
+        spinlock_lock(&datafile->writers.spinlock);
         datafile->writers.running++;
-        netdata_spinlock_unlock(&datafile->writers.spinlock);
+        spinlock_unlock(&datafile->writers.spinlock);
         uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
         // release the writers on the old datafile
-        netdata_spinlock_lock(&old_datafile->writers.spinlock);
+        spinlock_lock(&old_datafile->writers.spinlock);
         old_datafile->writers.running--;
-        netdata_spinlock_unlock(&old_datafile->writers.spinlock);
+        spinlock_unlock(&old_datafile->writers.spinlock);
     }
 
     return datafile;
@@ -921,11 +921,11 @@ static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_insta
     real_io_size = ALIGN_BYTES_CEILING(size_bytes);
 
     datafile = get_datafile_to_write_extent(ctx);
-    netdata_spinlock_lock(&datafile->writers.spinlock);
+    spinlock_lock(&datafile->writers.spinlock);
     xt_io_descr->datafile = datafile;
     xt_io_descr->pos = datafile->pos;
     datafile->pos += real_io_size;
-    netdata_spinlock_unlock(&datafile->writers.spinlock);
+    spinlock_unlock(&datafile->writers.spinlock);
 
     xt_io_descr->bytes = size_bytes;
     xt_io_descr->uv_fs_request.data = xt_io_descr;
@@ -1334,11 +1334,11 @@ static void *populate_mrg_tp_worker(struct rrdengine_instance *ctx __maybe_unuse
         // find a datafile to work
         uv_rwlock_rdlock(&ctx->datafiles.rwlock);
         for(datafile = ctx->datafiles.first; datafile ; datafile = datafile->next) {
-            if(!netdata_spinlock_trylock(&datafile->populate_mrg.spinlock))
+            if(!spinlock_trylock(&datafile->populate_mrg.spinlock))
                 continue;
 
             if(datafile->populate_mrg.populated) {
-                netdata_spinlock_unlock(&datafile->populate_mrg.spinlock);
+                spinlock_unlock(&datafile->populate_mrg.spinlock);
                 continue;
             }
 
@@ -1352,7 +1352,7 @@ static void *populate_mrg_tp_worker(struct rrdengine_instance *ctx __maybe_unuse
 
         journalfile_v2_populate_retention_to_mrg(ctx, datafile->journalfile);
         datafile->populate_mrg.populated = true;
-        netdata_spinlock_unlock(&datafile->populate_mrg.spinlock);
+        spinlock_unlock(&datafile->populate_mrg.spinlock);
 
     } while(1);
 
@@ -1496,9 +1496,9 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __mayb
             continue;
         }
 
-        netdata_spinlock_lock(&datafile->writers.spinlock);
+        spinlock_lock(&datafile->writers.spinlock);
         bool available = (datafile->writers.running || datafile->writers.flushed_to_open_running) ? false : true;
-        netdata_spinlock_unlock(&datafile->writers.spinlock);
+        spinlock_unlock(&datafile->writers.spinlock);
 
         if(!available) {
             info("DBENGINE: journal file %u needs to be indexed, but it has writers working on it - skipping it for now", datafile->fileno);
@@ -1623,7 +1623,7 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
     static bool spawned = false;
     static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
 
-    netdata_spinlock_lock(&spinlock);
+    spinlock_lock(&spinlock);
 
     if(!spawned) {
         int ret;
@@ -1658,7 +1658,7 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
         spawned = true;
     }
 
-    netdata_spinlock_unlock(&spinlock);
+    spinlock_unlock(&spinlock);
     return true;
 }
 

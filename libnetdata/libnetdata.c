@@ -249,7 +249,7 @@ static avl_tree_lock malloc_trace_index = {
     .avl_tree = {
         .root = NULL,
         .compar = malloc_trace_compare},
-    .rwlock = NETDATA_RWLOCK_INITIALIZER
+    .rwlock = AVL_LOCK_INITIALIZER
 };
 
 int malloc_trace_walkthrough(int (*callback)(void *item, void *data), void *data) {

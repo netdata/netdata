@@ -231,10 +231,10 @@ static void global_statistics_charts(void) {
     static collected_number compression_ratio = -1,
                             average_response_time = -1;
 
-    static time_t netdata_start_time = 0;
-    if (!netdata_start_time)
-        netdata_start_time = now_boottime_sec();
-    time_t netdata_uptime = now_boottime_sec() - netdata_start_time;
+    static time_t netdata_boottime_time = 0;
+    if (!netdata_boottime_time)
+        netdata_boottime_time = now_boottime_sec();
+    time_t netdata_uptime = now_boottime_sec() - netdata_boottime_time;
 
     struct global_statistics gs;
     struct rusage me;
@@ -1718,7 +1718,7 @@ static void dbengine2_statistics_charts(void) {
     cache_efficiency_stats = rrdeng_get_cache_efficiency_stats();
 
     mrg_stats_old = mrg_stats;
-    mrg_stats = mrg_get_statistics(main_mrg);
+    mrg_get_statistics(main_mrg, &mrg_stats);
 
     struct rrdeng_buffer_sizes buffers = rrdeng_get_buffer_sizes();
     size_t buffers_total_size = buffers.handles + buffers.xt_buf + buffers.xt_io + buffers.pdc + buffers.descriptors +

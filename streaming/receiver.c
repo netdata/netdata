@@ -31,9 +31,13 @@ void receiver_state_free(struct receiver_state *rpt) {
     freez(rpt->program_version);
 
 #ifdef ENABLE_HTTPS
-    if(rpt->ssl.conn)
-        SSL_free(rpt->ssl.conn);
+    netdata_ssl_close(&rpt->ssl);
 #endif
+
+    if(rpt->fd != -1) {
+        internal_error(true, "closing socket...");
+        close(rpt->fd);
+    }
 
 #ifdef ENABLE_COMPRESSION
     if (rpt->decompressor)
@@ -89,7 +93,7 @@ PARSER_RC streaming_claimed_id(char **words, size_t num_words, void *user)
 
     rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_CLAIMID |RRDHOST_FLAG_METADATA_UPDATE);
 
-    rrdpush_claimed_id(host);
+    rrdpush_send_claimed_id(host);
 
     return PARSER_RC_OK;
 }
@@ -100,13 +104,24 @@ static int read_stream(struct receiver_state *r, char* buffer, size_t size) {
         return 0;
     }
 
+    int tries = 100;
+    ssize_t bytes_read;
+
+    do {
+        errno = 0;
+
 #ifdef ENABLE_HTTPS
-    if (r->ssl.conn && r->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE)
-        return (int)netdata_ssl_read(r->ssl.conn, buffer, size);
+        if (SSL_connection(&r->ssl))
+            bytes_read = netdata_ssl_read(&r->ssl, buffer, size);
+        else
+            bytes_read = read(r->fd, buffer, size);
+#else
+        bytes_read = read(r->fd, buffer, size);
 #endif
 
-    ssize_t bytes_read = read(r->fd, buffer, size);
-    if(bytes_read == 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINPROGRESS)) {
+    } while(bytes_read < 0 && errno == EINTR && tries--);
+
+    if((bytes_read == 0 || bytes_read == -1) && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINPROGRESS)) {
         error("STREAM: %s(): timeout while waiting for data on socket!", __FUNCTION__);
         bytes_read = -3;
     }
@@ -118,23 +133,6 @@ static int read_stream(struct receiver_state *r, char* buffer, size_t size) {
         error("STREAM: %s() failed to read from socket!", __FUNCTION__);
         bytes_read = -2;
     }
-
-//    do {
-//        bytes_read = (int) fread(buffer, 1, size, fp);
-//        if (unlikely(bytes_read <= 0)) {
-//            if(feof(fp)) {
-//                internal_error(true, "%s(): fread() failed with EOF", __FUNCTION__);
-//                bytes_read = -2;
-//            }
-//            else if(ferror(fp)) {
-//                internal_error(true, "%s(): fread() failed with ERROR", __FUNCTION__);
-//                bytes_read = -3;
-//            }
-//            else bytes_read = 0;
-//        }
-//        else
-//            worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, bytes_read);
-//    } while(bytes_read == 0);
 
     return (int)bytes_read;
 }
@@ -323,12 +321,6 @@ static char *receiver_next_line(struct receiver_state *r, char *buffer, size_t b
     return NULL;
 }
 
-static void streaming_parser_thread_cleanup(void *ptr) {
-    PARSER *parser = (PARSER *)ptr;
-    rrd_collector_finished();
-    parser_destroy(parser);
-}
-
 bool plugin_is_enabled(struct plugind *cd);
 
 static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, int fd, void *ssl) {
@@ -352,7 +344,7 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
 
     // this keeps the parser with its current value
     // so, parser needs to be allocated before pushing it
-    netdata_thread_cleanup_push(streaming_parser_thread_cleanup, parser);
+    netdata_thread_cleanup_push(pluginsd_process_thread_cleanup, parser);
 
     parser_add_keyword(parser, "CLAIMED_ID", streaming_claimed_id);
 
@@ -443,8 +435,11 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
 
     netdata_mutex_lock(&host->receiver_lock);
 
-    if (!host->receiver || host->receiver == rpt) {
+    if (!host->receiver) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
+
+        host->rrdpush_receiver_connection_counter++;
+        __atomic_add_fetch(&localhost->connected_children_count, 1, __ATOMIC_RELAXED);
 
         host->receiver = rpt;
         rpt->host = host;
@@ -474,6 +469,8 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
         aclk_queue_node_info(rpt->host, true);
 
+        rrdpush_reset_destinations_postpone_time(host);
+
         set_this = true;
     }
 
@@ -494,6 +491,9 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
 
         // Make sure that we detach this thread and don't kill a freshly arriving receiver
         if(host->receiver == rpt) {
+            __atomic_sub_fetch(&localhost->connected_children_count, 1, __ATOMIC_RELAXED);
+            rrdhost_flag_set(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
+
             host->trigger_chart_obsoletion_check = 0;
             host->child_connect_time = 0;
             host->child_disconnected_time = now_realtime_sec();
@@ -506,16 +506,17 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
             signal_rrdcontext = true;
             rrdpush_receiver_replication_reset(host);
 
-            if (host->receiver == rpt)
-                host->receiver = NULL;
-
             rrdhost_flag_set(host, RRDHOST_FLAG_ORPHAN);
+            host->receiver = NULL;
+            host->rrdpush_last_receiver_exit_reason = rpt->exit.reason;
         }
 
         netdata_mutex_unlock(&host->receiver_lock);
 
         if(signal_rrdcontext)
             rrdcontext_host_child_disconnected(host);
+
+        rrdpush_reset_destinations_postpone_time(host);
     }
 }
 
@@ -549,13 +550,25 @@ bool stop_streaming_receiver(RRDHOST *host, const char *reason) {
               "thread %d takes too long to stop, giving up..."
         , rrdhost_hostname(host)
         , host->receiver->client_ip, host->receiver->client_port
-        , gettid());
+        , host->receiver->tid);
     else
         ret = true;
 
     netdata_mutex_unlock(&host->receiver_lock);
 
     return ret;
+}
+
+static void rrdpush_send_error_on_taken_over_connection(struct receiver_state *rpt, const char *msg) {
+    (void) send_timeout(
+#ifdef ENABLE_HTTPS
+            &rpt->ssl,
+#endif
+            rpt->fd,
+            (char *)msg,
+            strlen(msg),
+            0,
+            5);
 }
 
 void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, const char *status) {
@@ -580,12 +593,7 @@ void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, con
 
 }
 
-static void rrdhost_reset_destinations(RRDHOST *host) {
-    for (struct rrdpush_destinations *d = host->destinations; d; d = d->next)
-        d->postpone_reconnection_until = 0;
-}
-
-static int rrdpush_receive(struct receiver_state *rpt)
+static void rrdpush_receive(struct receiver_state *rpt)
 {
     rpt->config.mode = default_rrd_memory_mode;
     rpt->config.history = default_rrd_history_entries;
@@ -689,14 +697,14 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
         if(!host) {
             rrdpush_receive_log_status(rpt, "failed to find/create host structure", "INTERNAL ERROR DROPPING CONNECTION");
-            close(rpt->fd);
-            return 1;
+            rrdpush_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_INTERNAL_ERROR);
+            goto cleanup;
         }
 
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
             rrdpush_receive_log_status(rpt, "host is initializing", "INITIALIZATION IN PROGRESS RETRY LATER");
-            close(rpt->fd);
-            return 1;
+            rrdpush_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_INITIALIZATION);
+            goto cleanup;
         }
 
         // system_info has been consumed by the host structure
@@ -704,15 +712,15 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
         if(!rrdhost_set_receiver(host, rpt)) {
             rrdpush_receive_log_status(rpt, "host is already served by another receiver", "DUPLICATE RECEIVER DROPPING CONNECTION");
-            close(rpt->fd);
-            return 1;
+            rrdpush_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_ALREADY_STREAMING);
+            goto cleanup;
         }
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
     info("STREAM '%s' [receive from [%s]:%s]: "
          "client willing to stream metrics for host '%s' with machine_guid '%s': "
-         "update every = %d, history = %ld, memory mode = %s, health %s,%s tags '%s'"
+         "update every = %d, history = %d, memory mode = %s, health %s,%s tags '%s'"
          , rpt->hostname
          , rpt->client_ip
          , rpt->client_port
@@ -776,15 +784,16 @@ static int rrdpush_receive(struct receiver_state *rpt)
         }
 
         debug(D_STREAM, "Initial response to %s: %s", rpt->client_ip, initial_response);
-        if(send_timeout(
+        ssize_t bytes_sent = send_timeout(
 #ifdef ENABLE_HTTPS
                 &rpt->ssl,
 #endif
-                rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
+                rpt->fd, initial_response, strlen(initial_response), 0, 60);
 
+        if(bytes_sent != (ssize_t)strlen(initial_response)) {
+            internal_error(true, "Cannot send response, got %zd bytes, expecting %zu bytes", bytes_sent, strlen(initial_response));
             rrdpush_receive_log_status(rpt, "cannot reply back", "CANT REPLY DROPPING CONNECTION");
-            close(rpt->fd);
-            return 0;
+            goto cleanup;
         }
     }
 
@@ -813,14 +822,14 @@ static int rrdpush_receive(struct receiver_state *rpt)
 #ifdef ENABLE_ACLK
     // in case we have cloud connection we inform cloud
     // new child connected
-    if (netdata_cloud_setting)
+    if (netdata_cloud_enabled)
         aclk_host_state_update(rpt->host, 1);
 #endif
 
-    rrdhost_set_is_parent_label(++localhost->connected_children_count);
+    rrdhost_set_is_parent_label();
 
     // let it reconnect to parent immediately
-    rrdhost_reset_destinations(rpt->host);
+    rrdpush_reset_destinations_postpone_time(rpt->host);
 
     size_t count = streaming_parser(rpt, &cd, rpt->fd,
 #ifdef ENABLE_HTTPS
@@ -829,8 +838,6 @@ static int rrdpush_receive(struct receiver_state *rpt)
                                     NULL
 #endif
                                     );
-
-    rrdhost_flag_set(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
 
     if(!rpt->exit.reason)
         rpt->exit.reason = "PARSER EXIT";
@@ -844,15 +851,12 @@ static int rrdpush_receive(struct receiver_state *rpt)
 #ifdef ENABLE_ACLK
     // in case we have cloud connection we inform cloud
     // a child disconnected
-    if (netdata_cloud_setting)
+    if (netdata_cloud_enabled)
         aclk_host_state_update(rpt->host, 0);
 #endif
 
-    rrdhost_set_is_parent_label(--localhost->connected_children_count);
-
-    // cleanup
-    close(rpt->fd);
-    return (int)count;
+cleanup:
+    ;
 }
 
 static void rrdpush_receiver_thread_cleanup(void *ptr) {
@@ -868,6 +872,8 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
     , gettid());
 
     receiver_state_free(rpt);
+
+    rrdhost_set_is_parent_label();
 }
 
 void *rrdpush_receiver_thread(void *ptr) {
@@ -879,7 +885,8 @@ void *rrdpush_receiver_thread(void *ptr) {
     worker_register_job_custom_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION, "replication completion", "%", WORKER_METRIC_ABSOLUTE);
 
     struct receiver_state *rpt = (struct receiver_state *)ptr;
-    info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
+    rpt->tid = gettid();
+    info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, rpt->tid);
 
     rrdpush_receive(rpt);
 

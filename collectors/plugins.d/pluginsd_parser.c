@@ -4,51 +4,66 @@
 
 #define LOG_FUNCTIONS false
 
-static int send_to_plugin(const char *txt, void *data) {
+static ssize_t send_to_plugin(const char *txt, void *data) {
     PARSER *parser = data;
 
     if(!txt || !*txt)
         return 0;
 
-#ifdef ENABLE_HTTPS
-    struct netdata_ssl *ssl = parser->ssl_output;
-    if(ssl) {
-        if(ssl->conn && ssl->flags == NETDATA_SSL_HANDSHAKE_COMPLETE)
-            return (int)netdata_ssl_write(ssl->conn, (void *)txt, strlen(txt));
+    errno = 0;
+    spinlock_lock(&parser->writer.spinlock);
+    ssize_t bytes = -1;
 
-        error("PLUGINSD: cannot send command (SSL)");
-        return -1;
+#ifdef ENABLE_HTTPS
+    NETDATA_SSL *ssl = parser->ssl_output;
+    if(ssl) {
+
+        if(SSL_connection(ssl))
+            bytes = netdata_ssl_write(ssl, (void *) txt, strlen(txt));
+
+        else
+            error("PLUGINSD: cannot send command (SSL)");
+
+        spinlock_unlock(&parser->writer.spinlock);
+        return bytes;
     }
 #endif
 
     if(parser->fp_output) {
-        int bytes = fprintf(parser->fp_output, "%s", txt);
+
+        bytes = fprintf(parser->fp_output, "%s", txt);
         if(bytes <= 0) {
             error("PLUGINSD: cannot send command (FILE)");
-            return -2;
+            bytes = -2;
         }
-        fflush(parser->fp_output);
+        else
+            fflush(parser->fp_output);
+
+        spinlock_unlock(&parser->writer.spinlock);
         return bytes;
     }
 
     if(parser->fd != -1) {
-        size_t bytes = 0;
-        size_t total = strlen(txt);
+        bytes = 0;
+        ssize_t total = (ssize_t)strlen(txt);
         ssize_t sent;
 
         do {
             sent = write(parser->fd, &txt[bytes], total - bytes);
             if(sent <= 0) {
                 error("PLUGINSD: cannot send command (fd)");
+                spinlock_unlock(&parser->writer.spinlock);
                 return -3;
             }
             bytes += sent;
         }
         while(bytes < total);
 
+        spinlock_unlock(&parser->writer.spinlock);
         return (int)bytes;
     }
 
+    spinlock_unlock(&parser->writer.spinlock);
     error("PLUGINSD: cannot send command (no output socket/pipe/file given to plugins.d parser)");
     return -4;
 }
@@ -78,7 +93,7 @@ static inline RRDSET *pluginsd_get_chart_from_parent(void *user) {
 static inline void pluginsd_lock_rrdset_data_collection(void *user) {
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
     if(u->st && !u->v2.locked_data_collection) {
-        netdata_spinlock_lock(&u->st->data_collection_lock);
+        spinlock_lock(&u->st->data_collection_lock);
         u->v2.locked_data_collection = true;
     }
 }
@@ -86,7 +101,7 @@ static inline void pluginsd_lock_rrdset_data_collection(void *user) {
 static inline bool pluginsd_unlock_rrdset_data_collection(void *user) {
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
     if(u->st && u->v2.locked_data_collection) {
-        netdata_spinlock_unlock(&u->st->data_collection_lock);
+        spinlock_unlock(&u->st->data_collection_lock);
         u->v2.locked_data_collection = false;
         return true;
     }
@@ -108,11 +123,12 @@ void pluginsd_rrdset_cleanup(RRDSET *st) {
     st->pluginsd.pos = 0;
 }
 
-static inline void pluginsd_set_chart_from_parent(void *user, RRDSET *st, const char *keyword) {
+static inline void pluginsd_unlock_previous_chart(void *user, const char *keyword, bool stale) {
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
 
     if(unlikely(pluginsd_unlock_rrdset_data_collection(user))) {
-        error("PLUGINSD: 'host:%s/chart:%s/' stale data collection lock found during %s; it has been unlocked",
+        if(stale)
+            error("PLUGINSD: 'host:%s/chart:%s/' stale data collection lock found during %s; it has been unlocked",
               rrdhost_hostname(u->st->rrdhost), rrdset_id(u->st), keyword);
     }
 
@@ -120,9 +136,16 @@ static inline void pluginsd_set_chart_from_parent(void *user, RRDSET *st, const 
         ml_chart_update_end(u->st);
         u->v2.ml_locked = false;
 
-        error("PLUGINSD: 'host:%s/chart:%s/' stale ML lock found during %s, it has been unlocked",
+        if(stale)
+            error("PLUGINSD: 'host:%s/chart:%s/' stale ML lock found during %s, it has been unlocked",
               rrdhost_hostname(u->st->rrdhost), rrdset_id(u->st), keyword);
     }
+}
+
+static inline void pluginsd_set_chart_from_parent(void *user, RRDSET *st, const char *keyword) {
+    PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
+
+    pluginsd_unlock_previous_chart(user, keyword, true);
 
     if(st) {
         size_t dims = dictionary_entries(st->rrddim_root_index);
@@ -393,6 +416,8 @@ static PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, size_t nu
             rrdhost_labels_to_system_info(u->host_define.rrdlabels),
             false
             );
+
+    rrdhost_option_set(host, RRDHOST_OPTION_VIRTUAL_HOST);
 
     if(host->rrdlabels) {
         rrdlabels_migrate_to_these(host->rrdlabels, u->host_define.rrdlabels);
@@ -1208,9 +1233,9 @@ PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, void *user) {
             st->counter_done++;
 
             // these are only needed for db mode RAM, SAVE, MAP, ALLOC
-            st->current_entry++;
-            if(st->current_entry >= st->entries)
-                st->current_entry -= st->entries;
+            st->db.current_entry++;
+            if(st->db.current_entry >= st->db.entries)
+                st->db.current_entry -= st->db.entries;
 
             ((PARSER_USER_OBJECT *) user)->replay.start_time = start_time;
             ((PARSER_USER_OBJECT *) user)->replay.end_time = end_time;
@@ -1459,9 +1484,11 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
         time_t started = st->rrdhost->receiver->replication_first_time_t;
         time_t current = ((PARSER_USER_OBJECT *) user)->replay.end_time;
 
-        if(started && current > started)
+        if(started && current > started) {
+            host->rrdpush_receiver_replication_percent = (NETDATA_DOUBLE) (current - started) * 100.0 / (NETDATA_DOUBLE) (now - started);
             worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION,
-                          (NETDATA_DOUBLE)(current - started) * 100.0 / (NETDATA_DOUBLE)(now - started));
+                              host->rrdpush_receiver_replication_percent);
+        }
     }
 
     ((PARSER_USER_OBJECT *) user)->replay.start_time = 0;
@@ -1501,7 +1528,8 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
 
         pluginsd_set_chart_from_parent(user, NULL, PLUGINSD_KEYWORD_REPLAY_END);
 
-        worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION, 100.0);
+        host->rrdpush_receiver_replication_percent = 100.0;
+        worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION, host->rrdpush_receiver_replication_percent);
 
         return PARSER_RC_OK;
     }
@@ -1632,9 +1660,9 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
     st->counter_done++;
 
     // these are only needed for db mode RAM, SAVE, MAP, ALLOC
-    st->current_entry++;
-    if(st->current_entry >= st->entries)
-        st->current_entry -= st->entries;
+    st->db.current_entry++;
+    if(st->db.current_entry >= st->db.entries)
+        st->db.current_entry -= st->db.entries;
 
     timing_step(TIMING_STEP_BEGIN2_STORE);
 
@@ -1746,7 +1774,7 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
     rd->last_stored_value = value;
     rd->last_calculated_value = value;
     rd->collections_counter++;
-    rd->updated = true;
+    rrddim_set_updated(rd);
 
     timing_step(TIMING_STEP_SET2_STORE);
 
@@ -1783,12 +1811,7 @@ PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_
     // ------------------------------------------------------------------------
     // unblock data collection
 
-    ml_chart_update_end(st);
-    u->v2.ml_locked = false;
-
-    timing_step(TIMING_STEP_END2_ML);
-
-    pluginsd_unlock_rrdset_data_collection(user);
+    pluginsd_unlock_previous_chart(user, PLUGINSD_KEYWORD_END_V2, false);
     rrdcontext_collected_rrdset(st);
     store_metric_collection_completed();
 
@@ -1808,7 +1831,7 @@ PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_
     rrddim_foreach_read(rd, st) {
                 rd->calculated_value = 0;
                 rd->collected_value = 0;
-                rd->updated = false;
+                rrddim_clear_updated(rd);
             }
     rrddim_foreach_done(rd);
 
@@ -1823,13 +1846,14 @@ PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_
     return PARSER_RC_OK;
 }
 
-static void pluginsd_process_thread_cleanup(void *ptr) {
+void pluginsd_process_thread_cleanup(void *ptr) {
     PARSER *parser = (PARSER *)ptr;
 
     pluginsd_cleanup_v2(parser->user);
     pluginsd_host_define_cleanup(parser->user);
 
     rrd_collector_finished();
+
     parser_destroy(parser);
 }
 

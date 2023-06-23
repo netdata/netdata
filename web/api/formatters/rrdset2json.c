@@ -37,7 +37,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
         "\t\t\t\"family\": \"%s\",\n"
         "\t\t\t\"context\": \"%s\",\n"
         "\t\t\t\"title\": \"%s (%s)\",\n"
-        "\t\t\t\"priority\": %ld,\n"
+        "\t\t\t\"priority\": %d,\n"
         "\t\t\t\"plugin\": \"%s\",\n"
         "\t\t\t\"module\": \"%s\",\n"
         "\t\t\t\"units\": \"%s\",\n"
@@ -90,7 +90,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
     rrddim_foreach_read(rd, st) {
         if(rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) continue;
 
-        memory += sizeof(RRDDIM) + rd->memsize;
+        memory += rrddim_size() + rd->db.memsize;
 
         if (dimensions)
             buffer_strcat(wb, ",\n\t\t\t\t\"");

@@ -1751,6 +1751,7 @@ install_zypper() {
   fi
 
   local opts="--ignore-unknown"
+  local install_opts="--allow-downgrade"
   if [ "${NON_INTERACTIVE}" -eq 1 ]; then
     echo >&2 "Running in non-interactive mode"
     # http://unix.stackexchange.com/questions/82016/how-to-use-zypper-in-bash-scripts-for-someone-coming-from-apt-get
@@ -1758,9 +1759,8 @@ install_zypper() {
   fi
 
   read -r -a zypper_opts <<< "$opts"
-
   # install the required packages
-  run ${sudo} zypper "${zypper_opts[@]}" install "${@}"
+  run ${sudo} zypper "${zypper_opts[@]}" install "${install_opts}" "${@}"
 }
 
 # -----------------------------------------------------------------------------

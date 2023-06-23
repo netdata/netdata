@@ -1952,7 +1952,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s
     if(unlikely(!t)) return;
 
     time_t latest_time_s = storage_engine_latest_time_s(t->backend, t->db_metric_handle);
-    time_t granularity = (time_t)t->tier_grouping * (time_t)rd->update_every;
+    time_t granularity = (time_t)t->tier_grouping * (time_t)rd->rrdset->update_every;
     time_t time_diff   = now_s - latest_time_s;
 
     // if the user wants only NEW backfilling, and we don't have any data
@@ -3291,7 +3291,6 @@ static void rrd2rrdr_convert_values_to_percentage_of_total(RRDR *r) {
 
 static RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
     QUERY_TARGET *qt = r_tmp->internal.qt;
-    RRDR_OPTIONS options = qt->window.options;
 
     if(!r_tmp->group_by.r) {
         // v1 query

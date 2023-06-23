@@ -1334,13 +1334,14 @@ int run_test(struct test *test)
     int errors = 0;
 
     if(st->counter != test->result_entries) {
-        fprintf(stderr, "    %s stored %zu entries, but we were expecting %lu, ### E R R O R ###\n", test->name, st->counter, test->result_entries);
+        fprintf(stderr, "    %s stored %u entries, but we were expecting %lu, ### E R R O R ###\n",
+                test->name, st->counter, test->result_entries);
         errors++;
     }
 
     unsigned long max = (st->counter < test->result_entries)?st->counter:test->result_entries;
     for(c = 0 ; c < max ; c++) {
-        NETDATA_DOUBLE v = unpack_storage_number(rd->db[c]);
+        NETDATA_DOUBLE v = unpack_storage_number(rd->db.data[c]);
         NETDATA_DOUBLE n = unpack_storage_number(pack_storage_number(test->results[c], SN_DEFAULT_FLAGS));
         int same = (roundndd(v * 10000000.0) == roundndd(n * 10000000.0))?1:0;
         fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " NETDATA_DOUBLE_FORMAT
@@ -1352,7 +1353,7 @@ int run_test(struct test *test)
         if(!same) errors++;
 
         if(rd2) {
-            v = unpack_storage_number(rd2->db[c]);
+            v = unpack_storage_number(rd2->db.data[c]);
             n = test->results2[c];
             same = (roundndd(v * 10000000.0) == roundndd(n * 10000000.0))?1:0;
             fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " NETDATA_DOUBLE_FORMAT
@@ -1602,7 +1603,7 @@ int unit_test(long delay, long shift)
         fprintf(stderr, "\nPOSITION: c = %lu, EXPECTED VALUE %lu\n", c, (oincrement + c * increment + increment * (1000000 - shift) / 1000000 )* 10);
 
         rrddim_foreach_read(rd, st) {
-            sn = rd->db[c];
+            sn = rd->db.data[c];
             cn = unpack_storage_number(sn);
             fprintf(stderr, "\t %s " NETDATA_DOUBLE_FORMAT " (PACKED AS " STORAGE_NUMBER_FORMAT ")   ->   ", rrddim_id(rd), cn, sn);
 
@@ -1658,6 +1659,18 @@ int test_sqlite(void) {
     rc = sqlite3_exec_monitored(db_meta, "UPDATE MINE SET id1=1 LIMIT 1;", 0, 0, NULL);
     if (rc != SQLITE_OK) {
         fprintf(stderr,"Failed to test SQLite: Update with LIMIT failed\n");
+        return 1;
+    }
+
+    rc = sqlite3_create_function(db_meta, "now_usec", 1, SQLITE_ANY, 0, sqlite_now_usec, 0, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        fprintf(stderr, "Failed to register internal now_usec function");
+        return 1;
+    }
+
+    rc = sqlite3_exec_monitored(db_meta, "UPDATE MINE SET id1=now_usec(0);", 0, 0, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr,"Failed to test SQLite: Update with now_usec() failed\n");
         return 1;
     }
 
@@ -1821,7 +1834,7 @@ static inline void rrddim_set_by_pointer_fake_time(RRDDIM *rd, collected_number 
     rd->last_collected_time.tv_sec = now;
     rd->last_collected_time.tv_usec = 0;
     rd->collected_value = value;
-    rd->updated = 1;
+    rrddim_set_updated(rd);
 
     rd->collections_counter++;
 

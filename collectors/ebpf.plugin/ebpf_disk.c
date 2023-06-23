@@ -435,17 +435,18 @@ static void ebpf_cleanup_disk_list()
 }
 
 /**
- * DISK Free
+ * Disk exit.
  *
- * Cleanup variables after child threads to stop
+ * Cancel child and exit.
  *
  * @param ptr thread data.
  */
-static void ebpf_disk_free(ebpf_module_t *em)
+static void ebpf_disk_exit(void *ptr)
 {
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPING;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    if (em->objects)
+        ebpf_unload_legacy_code(em->objects, em->probe_links);
 
     ebpf_disk_disable_tracepoints();
 
@@ -461,19 +462,6 @@ static void ebpf_disk_free(ebpf_module_t *em)
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
-}
-
-/**
- * Disk exit.
- *
- * Cancel child and exit.
- *
- * @param ptr thread data.
- */
-static void ebpf_disk_exit(void *ptr)
-{
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    ebpf_disk_free(em);
 }
 
 /*****************************************************************

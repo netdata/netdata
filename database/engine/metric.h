@@ -5,6 +5,8 @@
 
 #define MRG_PARTITIONS 10
 
+#define MRG_CACHE_LINE_PADDING(x) uint8_t padding##x[64]
+
 typedef struct metric METRIC;
 typedef struct mrg MRG;
 
@@ -17,13 +19,9 @@ typedef struct mrg_entry {
 } MRG_ENTRY;
 
 struct mrg_statistics {
+    // non-atomic - under a write lock
     size_t entries;
-    size_t entries_referenced;
-    size_t entries_with_retention;
-
     size_t size;                // total memory used, with indexing
-
-    size_t current_references;
 
     size_t additions;
     size_t additions_duplicate;
@@ -32,9 +30,22 @@ struct mrg_statistics {
     size_t delete_having_retention_or_referenced;
     size_t delete_misses;
 
+    // atomic - multiple readers / writers
+
+    MRG_CACHE_LINE_PADDING(0);
+    size_t entries_referenced;
+
+    MRG_CACHE_LINE_PADDING(1);
+    size_t entries_with_retention;
+
+    MRG_CACHE_LINE_PADDING(2);
+    size_t current_references;
+
+    MRG_CACHE_LINE_PADDING(3);
     size_t search_hits;
     size_t search_misses;
 
+    MRG_CACHE_LINE_PADDING(4);
     size_t writers;
     size_t writers_conflicts;
 };
@@ -72,7 +83,7 @@ bool mrg_metric_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric);
 bool mrg_metric_set_writer(MRG *mrg, METRIC *metric);
 bool mrg_metric_clear_writer(MRG *mrg, METRIC *metric);
 
-struct mrg_statistics mrg_get_statistics(MRG *mrg);
+void mrg_get_statistics(MRG *mrg, struct mrg_statistics *s);
 size_t mrg_aral_structures(void);
 size_t mrg_aral_overhead(void);
 

@@ -7,8 +7,7 @@ After=network.target httpd.service squid.service nfs-server.service mysqld.servi
 
 [Service]
 Type=simple
-User=@netdata_user_POST@
-Group=netdata
+User=root
 RuntimeDirectory=netdata
 RuntimeDirectoryMode=0775
 PIDFile=/run/netdata/netdata.pid
@@ -60,6 +59,8 @@ CapabilityBoundingSet=CAP_SYS_CHROOT
 CapabilityBoundingSet=CAP_NET_ADMIN
 # is required for plugins that use sudo
 CapabilityBoundingSet=CAP_SETGID CAP_SETUID
+# is required to change file ownership
+CapabilityBoundingSet=CAP_CHOWN
 
 # Sandboxing
 ProtectSystem=full

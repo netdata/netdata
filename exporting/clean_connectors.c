@@ -68,8 +68,7 @@ void simple_connector_cleanup(struct instance *instance)
     }
 
 #ifdef ENABLE_HTTPS
-    if (simple_connector_data->conn)
-        SSL_free(simple_connector_data->conn);
+    netdata_ssl_close(&simple_connector_data->ssl);
 #endif
 
     freez(simple_connector_data);
@@ -80,6 +79,4 @@ void simple_connector_cleanup(struct instance *instance)
 
     info("EXPORTING: instance %s exited", instance->config.name);
     instance->exited = 1;
-
-    return;
 }

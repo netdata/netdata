@@ -34,7 +34,7 @@ typedef struct statsd_metric_gauge {
 } STATSD_METRIC_GAUGE;
 
 typedef struct statsd_metric_counter { // counter and meter
-    long long value;
+    collected_number value;
 } STATSD_METRIC_COUNTER;
 
 typedef struct statsd_histogram_extensions {
@@ -57,8 +57,8 @@ typedef struct statsd_histogram_extensions {
     RRDDIM *rd_stddev;
     //RRDDIM *rd_sum;
 
-    size_t size;
-    size_t used;
+    uint32_t size;
+    uint32_t used;
     NETDATA_DOUBLE *values;   // dynamic array of values collected
 } STATSD_METRIC_HISTOGRAM_EXTENSIONS;
 
@@ -68,24 +68,22 @@ typedef struct statsd_metric_histogram { // histogram and timer
 
 typedef struct statsd_metric_set {
     DICTIONARY *dict;
-    size_t unique;
 } STATSD_METRIC_SET;
 
 typedef struct statsd_metric_dictionary_item {
-    size_t count;
+    uint32_t count;
     RRDDIM *rd;
 } STATSD_METRIC_DICTIONARY_ITEM;
 
 typedef struct statsd_metric_dictionary {
     DICTIONARY *dict;
-    size_t unique;
 } STATSD_METRIC_DICTIONARY;
 
 
 // --------------------------------------------------------------------------------------------------------------------
 // this is a metric - for all types of metrics
 
-typedef enum statsd_metric_options {
+typedef enum __attribute__((packed)) statsd_metric_options {
     STATSD_METRIC_OPTION_NONE                         = 0x00000000, // no options set
     STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED = 0x00000001, // do not update the chart dimension, when this metric is not collected
     STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED        = 0x00000002, // render a private chart for this metric
@@ -99,7 +97,7 @@ typedef enum statsd_metric_options {
     STATSD_METRIC_OPTION_UPDATED_CHART_METADATA       = 0x00000200, // set when the private chart metadata have been updated via tags
 } STATS_METRIC_OPTIONS;
 
-typedef enum statsd_metric_type {
+typedef enum __attribute__((packed)) statsd_metric_type {
     STATSD_METRIC_TYPE_GAUGE,
     STATSD_METRIC_TYPE_COUNTER,
     STATSD_METRIC_TYPE_METER,
@@ -118,7 +116,7 @@ typedef struct statsd_metric {
 
     // metadata about data collection
     collected_number events;        // the number of times this metric has been collected (never resets)
-    size_t count;                   // the number of times this metric has been collected since the last flush
+    uint32_t count;                 // the number of times this metric has been collected since the last flush
 
     // the actual collected data
     union {
@@ -151,22 +149,21 @@ typedef struct statsd_metric {
 
 typedef struct statsd_index {
     char *name;                     // the name of the index of metrics
-    size_t events;                  // the number of events processed for this index
-    size_t metrics;                 // the number of metrics in this index
-    size_t useful;                  // the number of useful metrics in this index
+    uint32_t events;                // the number of events processed for this index
+    uint32_t metrics;               // the number of metrics in this index
+    uint32_t useful;                // the number of useful metrics in this index
 
+    STATS_METRIC_OPTIONS default_options;  // default options for all metrics in this index
     STATSD_METRIC_TYPE type;        // the type of index
     DICTIONARY *dict;
 
     STATSD_METRIC *first_useful;    // the linked list of useful metrics (new metrics are added in front)
-
-    STATS_METRIC_OPTIONS default_options;  // default options for all metrics in this index
 } STATSD_INDEX;
 
 // --------------------------------------------------------------------------------------------------------------------
 // synthetic charts
 
-typedef enum statsd_app_chart_dimension_value_type {
+typedef enum __attribute__((packed)) statsd_app_chart_dimension_value_type {
     STATSD_APP_CHART_DIM_VALUE_TYPE_EVENTS,
     STATSD_APP_CHART_DIM_VALUE_TYPE_LAST,
     STATSD_APP_CHART_DIM_VALUE_TYPE_AVERAGE,
@@ -183,18 +180,18 @@ typedef struct statsd_app_chart_dimension {
     const char *metric;             // the source metric name of this dimension
     uint32_t metric_hash;           // hash for fast string comparisons
 
-    SIMPLE_PATTERN *metric_pattern; // set when the 'metric' is a simple pattern
-
-    collected_number multiplier;    // the multiplier of the dimension
-    collected_number divisor;       // the divisor of the dimension
+    int32_t multiplier;             // the multiplier of the dimension
+    int32_t divisor;                // the divisor of the dimension
     RRDDIM_FLAGS flags;             // the RRDDIM flags for this dimension
     RRDDIM_OPTIONS options;         // the RRDDIM options for this dimension
+    RRD_ALGORITHM algorithm;        // the algorithm of this dimension
 
     STATSD_APP_CHART_DIM_VALUE_TYPE value_type; // which value to use of the source metric
 
+    SIMPLE_PATTERN *metric_pattern; // set when the 'metric' is a simple pattern
+
     RRDDIM *rd;                     // a pointer to the RRDDIM that has been created for this dimension
     collected_number *value_ptr;    // a pointer to the source metric value
-    RRD_ALGORITHM algorithm;        // the algorithm of this dimension
 
     struct statsd_app_chart_dimension *next; // the next dimension for this chart
 } STATSD_APP_CHART_DIM;
@@ -207,11 +204,11 @@ typedef struct statsd_app_chart {
     const char *context;
     const char *units;
     const char *module;
-    long priority;
+    int32_t priority;
     RRDSET_TYPE chart_type;
     STATSD_APP_CHART_DIM *dimensions;
-    size_t dimensions_count;
-    size_t dimensions_linked_count;
+    uint32_t dimensions_count;
+    uint32_t dimensions_linked_count;
 
     RRDSET *st;
     struct statsd_app_chart *next;
@@ -222,8 +219,8 @@ typedef struct statsd_app {
     SIMPLE_PATTERN *metrics;
     STATS_METRIC_OPTIONS default_options;
     RRD_MEMORY_MODE rrd_memory_mode;
+    int32_t rrd_history_entries;
     DICTIONARY *dict;
-    long rrd_history_entries;
 
     const char *source;
     STATSD_APP_CHART *charts;
@@ -236,7 +233,7 @@ typedef struct statsd_app {
 struct collection_thread_status {
     SPINLOCK spinlock;
     bool running;
-    size_t max_sockets;
+    uint32_t max_sockets;
 
     netdata_thread_t thread;
 };
@@ -262,23 +259,22 @@ static struct statsd {
     size_t udp_packets_received;
     size_t udp_bytes_read;
 
-    int enabled;
-    int update_every;
+    int32_t update_every;
+    bool enabled;
+    bool private_charts_hidden;
     SIMPLE_PATTERN *charts_for;
 
-    size_t tcp_idle_timeout;
+    uint32_t tcp_idle_timeout;
     collected_number decimal_detail;
-    size_t private_charts;
-    size_t max_private_charts_hard;
-    long private_charts_rrd_history_entries;
-    unsigned int private_charts_hidden:1;
+    uint32_t private_charts;
+    uint32_t max_private_charts_hard;
 
     STATSD_APP *apps;
-    size_t recvmmsg_size;
-    size_t histogram_increase_step;
+    uint32_t recvmmsg_size;
+    uint32_t histogram_increase_step;
+    uint32_t dictionary_max_unique;
     double histogram_percentile;
     char *histogram_percentile_str;
-    size_t dictionary_max_unique;
 
     int threads;
     struct collection_thread_status *collection_threads_status;
@@ -287,7 +283,7 @@ static struct statsd {
 } statsd = {
         .enabled = 1,
         .max_private_charts_hard = 1000,
-        .private_charts_hidden = 0,
+        .private_charts_hidden = false,
         .recvmmsg_size = 10,
         .decimal_detail = STATSD_DECIMAL_DETAIL,
 
@@ -571,13 +567,6 @@ static inline void statsd_process_histogram_or_timer(STATSD_METRIC *m, const cha
 #define statsd_process_timer(m, value, sampling) statsd_process_histogram_or_timer(m, value, sampling, "timer")
 #define statsd_process_histogram(m, value, sampling) statsd_process_histogram_or_timer(m, value, sampling, "histogram")
 
-static void dictionary_metric_set_value_insert_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
-    (void)item;
-    (void)value;
-    STATSD_METRIC *m = (STATSD_METRIC *)data;
-    m->set.unique++;
-}
-
 static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
     if(!is_metric_useful_for_collection(m)) return;
 
@@ -594,11 +583,8 @@ static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
         statsd_reset_metric(m);
     }
 
-    if (unlikely(!m->set.dict)) {
-        m->set.dict   = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
-        dictionary_register_insert_callback(m->set.dict, dictionary_metric_set_value_insert_callback, m);
-        m->set.unique = 0;
-    }
+    if (unlikely(!m->set.dict))
+        m->set.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
 
     if(unlikely(value_is_zinit(value))) {
         // magic loading of metric, without affecting anything
@@ -616,13 +602,6 @@ static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
     }
 }
 
-static void dictionary_metric_dict_value_insert_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
-    (void)item;
-    (void)value;
-    STATSD_METRIC *m = (STATSD_METRIC *)data;
-    m->dictionary.unique++;
-}
-
 static inline void statsd_process_dictionary(STATSD_METRIC *m, const char *value) {
     if(!is_metric_useful_for_collection(m)) return;
 
@@ -634,11 +613,8 @@ static inline void statsd_process_dictionary(STATSD_METRIC *m, const char *value
     if(unlikely(m->reset))
         statsd_reset_metric(m);
 
-    if (unlikely(!m->dictionary.dict)) {
-        m->dictionary.dict   = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
-        dictionary_register_insert_callback(m->dictionary.dict, dictionary_metric_dict_value_insert_callback, m);
-        m->dictionary.unique = 0;
-    }
+    if (unlikely(!m->dictionary.dict))
+        m->dictionary.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
 
     if(unlikely(value_is_zinit(value))) {
         // magic loading of metric, without affecting anything
@@ -647,7 +623,7 @@ static inline void statsd_process_dictionary(STATSD_METRIC *m, const char *value
         STATSD_METRIC_DICTIONARY_ITEM *t = (STATSD_METRIC_DICTIONARY_ITEM *)dictionary_get(m->dictionary.dict, value);
 
         if (unlikely(!t)) {
-            if(!t && m->dictionary.unique >= statsd.dictionary_max_unique)
+            if(!t && dictionary_entries(m->dictionary.dict) >= statsd.dictionary_max_unique)
                 value = "other";
 
             t = (STATSD_METRIC_DICTIONARY_ITEM *)dictionary_set(m->dictionary.dict, value, NULL, sizeof(STATSD_METRIC_DICTIONARY_ITEM));
@@ -1096,9 +1072,9 @@ static int statsd_snd_callback(POLLINFO *pi, short int *events) {
 
 void statsd_collector_thread_cleanup(void *data) {
     struct statsd_udp *d = data;
-    netdata_spinlock_lock(&d->status->spinlock);
+    spinlock_lock(&d->status->spinlock);
     d->status->running = false;
-    netdata_spinlock_unlock(&d->status->spinlock);
+    spinlock_unlock(&d->status->spinlock);
 
     collector_info("cleaning up...");
 
@@ -1121,9 +1097,9 @@ static bool statsd_should_stop(void) {
 
 void *statsd_collector_thread(void *ptr) {
     struct collection_thread_status *status = ptr;
-    netdata_spinlock_lock(&status->spinlock);
+    spinlock_lock(&status->spinlock);
     status->running = true;
-    netdata_spinlock_unlock(&status->spinlock);
+    spinlock_unlock(&status->spinlock);
 
     worker_register("STATSD");
     worker_register_job_name(WORKER_JOB_TYPE_TCP_CONNECTED, "tcp connect");
@@ -1255,7 +1231,7 @@ static STATSD_APP_CHART_DIM *add_dimension_to_app_chart(
     }
     chart->dimensions_count++;
 
-    debug(D_STATSD, "Added dimension '%s' to chart '%s' of app '%s', for metric '%s', with type %u, multiplier " COLLECTED_NUMBER_FORMAT ", divisor " COLLECTED_NUMBER_FORMAT,
+    debug(D_STATSD, "Added dimension '%s' to chart '%s' of app '%s', for metric '%s', with type %u, multiplier %d, divisor %d",
             dim->name, chart->id, app->name, dim->metric, dim->value_type, dim->multiplier, dim->divisor);
 
     return dim;
@@ -1909,7 +1885,7 @@ static inline void statsd_flush_set(STATSD_METRIC *m) {
 
     int updated = 0;
     if(unlikely(!m->reset && m->count)) {
-        m->last = (collected_number)m->set.unique;
+        m->last = (collected_number)dictionary_entries(m->set.dict);
 
         m->reset = 1;
         updated = 1;
@@ -1927,7 +1903,7 @@ static inline void statsd_flush_dictionary(STATSD_METRIC *m) {
 
     int updated = 0;
     if(unlikely(!m->reset && m->count)) {
-        m->last = (collected_number)m->dictionary.unique;
+        m->last = (collected_number)dictionary_entries(m->dictionary.dict);
 
         m->reset = 1;
         updated = 1;
@@ -1939,13 +1915,13 @@ static inline void statsd_flush_dictionary(STATSD_METRIC *m) {
     if(unlikely(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && (updated || !(m->options & STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED))))
         statsd_private_chart_dictionary(m);
 
-    if(m->dictionary.unique >= statsd.dictionary_max_unique) {
+    if(dictionary_entries(m->dictionary.dict) >= statsd.dictionary_max_unique) {
         if(!(m->options & STATSD_METRIC_OPTION_COLLECTION_FULL_LOGGED)) {
             m->options |= STATSD_METRIC_OPTION_COLLECTION_FULL_LOGGED;
             collector_info(
                 "STATSD dictionary '%s' reach max of %zu items - try increasing 'dictionaries max unique dimensions' in netdata.conf",
                 m->name,
-                m->dictionary.unique);
+                dictionary_entries(m->dictionary.dict));
         }
     }
 }
@@ -2314,8 +2290,13 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
 
         if(unlikely(!(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_CHECKED))) {
             if(unlikely(statsd.private_charts >= statsd.max_private_charts_hard)) {
-                debug(D_STATSD, "STATSD: metric '%s' will not be charted, because the hard limit of the maximum number of charts has been reached.", m->name);
-                collector_info("STATSD: metric '%s' will not be charted, because the hard limit of the maximum number of charts (%zu) has been reached. Increase the number of charts by editing netdata.conf, [statsd] section.", m->name, statsd.max_private_charts_hard);
+                debug(D_STATSD, "STATSD: metric '%s' will not be charted, because the hard limit of the maximum number "
+                                "of charts has been reached.", m->name);
+
+                collector_info("STATSD: metric '%s' will not be charted, because the hard limit of the maximum number "
+                               "of charts (%u) has been reached. Increase the number of charts by editing netdata.conf, "
+                               "[statsd] section.", m->name, statsd.max_private_charts_hard);
+
                 m->options &= ~STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED;
             }
             else {
@@ -2366,7 +2347,7 @@ static void statsd_main_cleanup(void *data) {
     if (statsd.collection_threads_status) {
         int i;
         for (i = 0; i < statsd.threads; i++) {
-            netdata_spinlock_lock(&statsd.collection_threads_status[i].spinlock);
+            spinlock_lock(&statsd.collection_threads_status[i].spinlock);
             if(statsd.collection_threads_status[i].running) {
                 collector_info("STATSD: stopping data collection thread %d...", i + 1);
                 netdata_thread_cancel(statsd.collection_threads_status[i].thread);
@@ -2374,7 +2355,7 @@ static void statsd_main_cleanup(void *data) {
             else {
                 collector_info("STATSD: data collection thread %d found stopped.", i + 1);
             }
-            netdata_spinlock_unlock(&statsd.collection_threads_status[i].spinlock);
+            spinlock_unlock(&statsd.collection_threads_status[i].spinlock);
         }
     }
 
@@ -2466,7 +2447,6 @@ void *statsd_main(void *ptr) {
             config_get(CONFIG_SECTION_STATSD, "create private charts for metrics matching", "*"), NULL,
             SIMPLE_PATTERN_EXACT, true);
     statsd.max_private_charts_hard = (size_t)config_get_number(CONFIG_SECTION_STATSD, "max private charts hard limit", (long long)statsd.max_private_charts_hard);
-    statsd.private_charts_rrd_history_entries = (int)config_get_number(CONFIG_SECTION_STATSD, "private charts history", default_rrd_history_entries);
     statsd.decimal_detail = (collected_number)config_get_number(CONFIG_SECTION_STATSD, "decimal detail", (long long int)statsd.decimal_detail);
     statsd.tcp_idle_timeout = (size_t) config_get_number(CONFIG_SECTION_STATSD, "disconnect idle tcp clients after seconds", (long long int)statsd.tcp_idle_timeout);
     statsd.private_charts_hidden = (unsigned int)config_get_boolean(CONFIG_SECTION_STATSD, "private charts hidden", statsd.private_charts_hidden);
@@ -2549,7 +2529,7 @@ void *statsd_main(void *ptr) {
         statsd.collection_threads_status[i].max_sockets = max_sockets / statsd.threads;
         char tag[NETDATA_THREAD_TAG_MAX + 1];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STATSD_IN[%d]", i + 1);
-        netdata_spinlock_init(&statsd.collection_threads_status[i].spinlock);
+        spinlock_init(&statsd.collection_threads_status[i].spinlock);
         netdata_thread_create(&statsd.collection_threads_status[i].thread, tag, NETDATA_THREAD_OPTION_DEFAULT, statsd_collector_thread, &statsd.collection_threads_status[i]);
     }
 

@@ -864,7 +864,7 @@ static void tc_main_cleanup(void *ptr) {
             siginfo_t info;
 
             collector_info("TC: waiting for tc plugin child process pid %d to exit...", tc_child_pid);
-            waitid(P_PID, (id_t) tc_child_pid, &info, WEXITED);
+            netdata_waitid(P_PID, (id_t) tc_child_pid, &info, WEXITED);
         }
 
         tc_child_pid = 0;

@@ -446,6 +446,8 @@ set(LIBNETDATA_FILES
         libnetdata/dictionary/dictionary.h
         libnetdata/eval/eval.c
         libnetdata/eval/eval.h
+        libnetdata/gorilla/gorilla.cc
+        libnetdata/gorilla/gorilla.h
         libnetdata/health/health.c
         libnetdata/health/health.h
         libnetdata/july/july.c
@@ -618,6 +620,8 @@ set(EBPF_PROCESS_PLUGIN_FILES
         collectors/ebpf.plugin/ebpf_apps.h
         collectors/ebpf.plugin/ebpf_cgroup.c
         collectors/ebpf.plugin/ebpf_cgroup.h
+        collectors/ebpf.plugin/ebpf_unittest.c
+        collectors/ebpf.plugin/ebpf_unittest.h
         )
 
 set(PROC_PLUGIN_FILES

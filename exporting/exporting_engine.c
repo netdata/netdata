@@ -10,7 +10,7 @@ void analytics_exporting_connectors_ssl(BUFFER *b)
     if (netdata_ssl_exporting_ctx) {
         for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
             struct simple_connector_data *connector_specific_data = instance->connector_specific_data;
-            if (connector_specific_data->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
+            if (SSL_connection(&connector_specific_data->ssl)) {
                 buffer_strcat(b, "exporting");
                 break;
             }

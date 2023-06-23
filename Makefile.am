@@ -76,8 +76,10 @@ dist_noinst_DATA = \
     packaging/jsonc.version \
     packaging/yaml.checksums \
     packaging/yaml.version \
-    packaging/libbpf.checksums \
-    packaging/libbpf.version \
+    packaging/current_libbpf.checksums \
+    packaging/current_libbpf.version \
+    packaging/libbpf_0_0_9.checksums \
+    packaging/libbpf_0_0_9.version \
     packaging/protobuf.checksums \
     packaging/protobuf.version \
     packaging/version \
@@ -153,6 +155,8 @@ LIBNETDATA_FILES = \
     libnetdata/dictionary/dictionary.h \
     libnetdata/eval/eval.c \
     libnetdata/eval/eval.h \
+    libnetdata/gorilla/gorilla.h \
+    libnetdata/gorilla/gorilla.cc \
     libnetdata/inlined.h \
     libnetdata/july/july.c \
     libnetdata/july/july.h \
@@ -374,6 +378,8 @@ EBPF_PLUGIN_FILES = \
     collectors/ebpf.plugin/ebpf_apps.h \
     collectors/ebpf.plugin/ebpf_cgroup.c \
     collectors/ebpf.plugin/ebpf_cgroup.h \
+    collectors/ebpf.plugin/ebpf_unittest.c \
+    collectors/ebpf.plugin/ebpf_unittest.h \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
@@ -978,6 +984,8 @@ DAEMON_FILES = \
     daemon/static_threads.c \
     daemon/commands.c \
     daemon/commands.h \
+    daemon/pipename.c \
+    daemon/pipename.h \
     daemon/unit_test.c \
     daemon/unit_test.h \
     $(NULL)
@@ -1185,6 +1193,8 @@ endif
 
 NETDATACLI_FILES = \
     daemon/commands.h \
+    daemon/pipename.c \
+    daemon/pipename.h \
     libnetdata/buffer/buffer.c \
     libnetdata/buffer/buffer.h \
     cli/cli.c \

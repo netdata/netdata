@@ -69,6 +69,7 @@ dist_healthconfig_DATA = \
     health.d/nvme.conf \
     health.d/nut.conf \
     health.d/pihole.conf \
+    health.d/plugin.conf \
     health.d/ping.conf \
     health.d/postgres.conf \
     health.d/portcheck.conf \

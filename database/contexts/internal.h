@@ -275,6 +275,10 @@ typedef struct rrdcontext {
         size_t dispatches;              // the number of times this has been dispatched to hub
     } queue;
 
+    struct {
+        uint32_t metrics;               // the number of metrics in this context
+    } stats;
+
     netdata_mutex_t mutex;
 } RRDCONTEXT;
 

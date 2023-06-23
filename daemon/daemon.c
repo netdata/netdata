@@ -43,19 +43,39 @@ static void chown_open_file(int fd, uid_t uid, gid_t gid) {
     }
 }
 
-void create_needed_dir(const char *dir, uid_t uid, gid_t gid)
+static void fix_directory_file_permissions(const char *dirname, uid_t uid, gid_t gid, bool recursive)
 {
-    // attempt to create the directory
-    if(mkdir(dir, 0755) == 0) {
-        // we created it
+    char filename[FILENAME_MAX + 1];
 
-        // chown it to match the required user
-        if(chown(dir, uid, gid) == -1)
-            error("Cannot chown directory '%s' to %u:%u", dir, (unsigned int)uid, (unsigned int)gid);
+    DIR *dir = opendir(dirname);
+    if (!dir)
+        return;
+
+    struct dirent *de = NULL;
+
+    while ((de = readdir(dir))) {
+        if (de->d_type == DT_DIR && (!strcmp(de->d_name, ".") || !strcmp(de->d_name, "..")))
+            continue;
+
+        (void) snprintfz(filename, FILENAME_MAX, "%s/%s", dirname, de->d_name);
+        if (de->d_type == DT_REG || recursive) {
+            if (chown(filename, uid, gid) == -1)
+                error("Cannot chown %s '%s' to %u:%u", de->d_type == DT_DIR ? "directory" : "file", filename, (unsigned int)uid, (unsigned int)gid);
+        }
+
+        if (de->d_type == DT_DIR && recursive)
+            fix_directory_file_permissions(filename, uid, gid, recursive);
     }
-    else if(errno != EEXIST)
-        // log an error only if the directory does not exist
-        error("Cannot create directory '%s'", dir);
+
+    closedir(dir);
+}
+
+void change_dir_ownership(const char *dir, uid_t uid, gid_t gid, bool recursive)
+{
+    if (chown(dir, uid, gid) == -1)
+        error("Cannot chown directory '%s' to %u:%u", dir, (unsigned int)uid, (unsigned int)gid);
+
+    fix_directory_file_permissions(dir, uid, gid, recursive);
 }
 
 void clean_directory(char *dirname)
@@ -74,6 +94,20 @@ void clean_directory(char *dirname)
     closedir(dir);
 }
 
+void prepare_required_directories(uid_t uid, gid_t gid) {
+    change_dir_ownership(netdata_configured_cache_dir, uid, gid, true);
+    change_dir_ownership(netdata_configured_varlib_dir, uid, gid, false);
+    change_dir_ownership(netdata_configured_lock_dir, uid, gid, false);
+    change_dir_ownership(netdata_configured_log_dir, uid, gid, false);
+    change_dir_ownership(claimingdirectory, uid, gid, false);
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/registry", netdata_configured_varlib_dir);
+    change_dir_ownership(filename, uid, gid, false);
+
+    clean_directory(netdata_configured_lock_dir);
+}
+
 int become_user(const char *username, int pid_fd) {
     int am_i_root = (getuid() == 0)?1:0;
 
@@ -86,12 +120,10 @@ int become_user(const char *username, int pid_fd) {
     uid_t uid = pw->pw_uid;
     gid_t gid = pw->pw_gid;
 
-    create_needed_dir(netdata_configured_cache_dir, uid, gid);
-    create_needed_dir(netdata_configured_varlib_dir, uid, gid);
-    create_needed_dir(netdata_configured_lock_dir, uid, gid);
-    create_needed_dir(claimingdirectory, uid, gid);
+    if (am_i_root)
+        info("I am root, so checking permissions");
 
-    clean_directory(netdata_configured_lock_dir);
+    prepare_required_directories(uid, gid);
 
     if(pidfile[0]) {
         if(chown(pidfile, uid, gid) == -1)
@@ -487,12 +519,7 @@ int become_daemon(int dont_fork, const char *user)
         else debug(D_SYSTEM, "Successfully became user '%s'.", user);
     }
     else {
-        create_needed_dir(netdata_configured_cache_dir, getuid(), getgid());
-        create_needed_dir(netdata_configured_varlib_dir, getuid(), getgid());
-        create_needed_dir(netdata_configured_lock_dir, getuid(), getgid());
-        create_needed_dir(claimingdirectory, getuid(), getgid());
-
-        clean_directory(netdata_configured_lock_dir);
+        prepare_required_directories(getuid(), getgid());
     }
 
     if(pidfd != -1)

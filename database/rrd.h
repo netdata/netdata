@@ -7,6 +7,8 @@
 extern "C" {
 #endif
 
+#include "libnetdata/libnetdata.h"
+
 // non-existing structs instead of voids
 // to enable type checking at compile time
 typedef struct storage_instance STORAGE_INSTANCE;
@@ -94,6 +96,14 @@ extern RRD_MEMORY_MODE default_rrd_memory_mode;
 
 const char *rrd_memory_mode_name(RRD_MEMORY_MODE id);
 RRD_MEMORY_MODE rrd_memory_mode_id(const char *name);
+
+struct ml_metrics_statistics {
+    size_t anomalous;
+    size_t normal;
+    size_t trained;
+    size_t pending;
+    size_t silenced;
+};
 
 #include "daemon/common.h"
 #include "web/api/queries/query.h"
@@ -225,6 +235,8 @@ typedef enum __attribute__ ((__packed__)) rrddim_options {
     RRDDIM_OPTION_HIDDEN                            = (1 << 0), // this dimension will not be offered to callers
     RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS   = (1 << 1), // do not offer RESET or OVERFLOW info to callers
     RRDDIM_OPTION_BACKFILLED_HIGH_TIERS             = (1 << 2), // when set, we have backfilled higher tiers
+    RRDDIM_OPTION_UPDATED                           = (1 << 3), // single-threaded collector updated flag
+    RRDDIM_OPTION_EXPOSED                           = (1 << 4), // single-threaded collector exposed flag
 
     // this is 8-bit
 } RRDDIM_OPTIONS;
@@ -301,7 +313,7 @@ void rrdlabels_copy(DICTIONARY *dst, DICTIONARY *src);
 void reload_host_labels(void);
 void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels);
 void rrdset_save_rrdlabels_to_sql(RRDSET *st);
-void rrdhost_set_is_parent_label(int count);
+void rrdhost_set_is_parent_label(void);
 int rrdlabels_unittest(void);
 
 // unfortunately this break when defined in exporting_engine.h
@@ -344,15 +356,10 @@ struct rrddim {
     RRD_MEMORY_MODE rrd_memory_mode;                // the memory mode for this dimension
     RRDDIM_FLAGS flags;                             // run time changing status flags
 
-    bool updated;                                   // 1 when the dimension has been updated since the last processing
-    bool exposed;                                   // 1 when set what have sent this dimension to the central netdata
+    int32_t multiplier;                             // the multiplier of the collected values
+    int32_t divisor;                                // the divider of the collected values
 
-    collected_number multiplier;                    // the multiplier of the collected values
-    collected_number divisor;                       // the divider of the collected values
-
-    int update_every;                               // every how many seconds is this updated
-                                                    // TODO - remove update_every from rrddim
-                                                    //        it is always the same in rrdset
+    uint32_t collections_counter;                   // the number of times we added values to this rrddim
 
     // ------------------------------------------------------------------------
     // operational state members
@@ -363,19 +370,15 @@ struct rrddim {
     // linking to siblings and parents
 
     struct rrdset *rrdset;
-
     RRDMETRIC_ACQUIRED *rrdmetric;                  // the rrdmetric of this dimension
 
     // ------------------------------------------------------------------------
     // data collection members
 
-    struct rrddim_tier tiers[RRD_STORAGE_TIERS];   // our tiers of databases
-
     struct timeval last_collected_time;             // when was this dimension last updated
                                                     // this is actual date time we updated the last_collected_value
                                                     // THIS IS DIFFERENT FROM THE SAME MEMBER OF RRDSET
 
-    size_t collections_counter;                     // the number of times we added values to this rrddim
     collected_number collected_value_max;           // the absolute maximum of the collected value
 
     NETDATA_DOUBLE calculated_value;                // the current calculated value, after applying the algorithm - resets to zero after being used
@@ -396,13 +399,29 @@ struct rrddim {
     // TODO - they should be managed by storage engine
     //        (RRDDIM_DB_STATE ptr to an undefined structure, and a call to clean this up during destruction)
 
-    size_t memsize;                                 // the memory allocated for this dimension (without RRDDIM)
-    void *rd_on_file;                               // pointer to the header written on disk
-    storage_number *db;                             // the array of values
+    struct {
+        size_t memsize;                             // the memory allocated for this dimension (without RRDDIM)
+        void *rd_on_file;                           // pointer to the header written on disk
+        storage_number *data;                       // the array of values
+    } db;
+
+    // ------------------------------------------------------------------------
+
+    struct rrddim_tier tiers[];                     // our tiers of databases
 };
+
+size_t rrddim_size(void);
 
 #define rrddim_id(rd) string2str((rd)->id)
 #define rrddim_name(rd) string2str((rd) ->name)
+
+#define rrddim_check_updated(rd) ((rd)->options & RRDDIM_OPTION_UPDATED)
+#define rrddim_set_updated(rd) (rd)->options |= RRDDIM_OPTION_UPDATED
+#define rrddim_clear_updated(rd) (rd)->options &= ~RRDDIM_OPTION_UPDATED
+
+#define rrddim_check_exposed(rd) ((rd)->options & RRDDIM_OPTION_EXPOSED)
+#define rrddim_set_exposed(rd) (rd)->options |= RRDDIM_OPTION_EXPOSED
+#define rrddim_clear_exposed(rd) (rd)->options &= ~RRDDIM_OPTION_EXPOSED
 
 // returns the RRDDIM cache filename, or NULL if it does not exist
 const char *rrddim_cache_filename(RRDDIM *rd);
@@ -485,6 +504,27 @@ static inline void storage_engine_store_metric(
     return rrddim_collect_store_metric(collection_handle, point_in_time_ut,
                                        n, min_value, max_value,
                                        count, anomaly_count, flags);
+}
+
+size_t rrdeng_disk_space_max(STORAGE_INSTANCE *db_instance);
+static inline size_t storage_engine_disk_space_max(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance) {
+#ifdef ENABLE_DBENGINE
+    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_disk_space_max(db_instance);
+#endif
+
+    return 0;
+}
+
+size_t rrdeng_disk_space_used(STORAGE_INSTANCE *db_instance);
+static inline size_t storage_engine_disk_space_used(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance) {
+#ifdef ENABLE_DBENGINE
+    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_disk_space_used(db_instance);
+#endif
+
+    // TODO - calculate the total host disk space for memory mode save and map
+    return 0;
 }
 
 void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_handle);
@@ -739,18 +779,15 @@ struct rrdset {
     STRING *plugin_name;                            // the name of the plugin that generated this
     STRING *module_name;                            // the name of the plugin module that generated this
 
-    RRDSET_TYPE chart_type;                         // line, area, stacked
-
-    long priority;                                  // the sorting priority of this chart
-
-    int update_every;                               // data collection frequency
+    int32_t priority;                               // the sorting priority of this chart
+    int32_t update_every;                           // data collection frequency
 
     DICTIONARY *rrdlabels;                          // chart labels
     DICTIONARY *rrdsetvar_root_index;               // chart variables
     DICTIONARY *rrddimvar_root_index;               // dimension variables
                                                     // we use this dictionary to manage their allocation
 
-    rrd_ml_chart_t *ml_chart;
+    RRDSET_TYPE chart_type;                         // line, area, stacked
 
     // ------------------------------------------------------------------------
     // operational state members
@@ -759,6 +796,8 @@ struct rrdset {
     RRD_MEMORY_MODE rrd_memory_mode;                // the db mode of this rrdset
 
     DICTIONARY *rrddim_root_index;                  // dimensions index
+
+    rrd_ml_chart_t *ml_chart;
 
     STORAGE_METRICS_GROUP *storage_metrics_groups[RRD_STORAGE_TIERS];
 
@@ -775,11 +814,10 @@ struct rrdset {
 
     SPINLOCK data_collection_lock;
 
-    size_t counter;                                 // the number of times we added values to this database
-    size_t counter_done;                            // the number of times rrdset_done() has been called
+    uint32_t counter;                               // the number of times we added values to this database
+    uint32_t counter_done;                          // the number of times rrdset_done() has been called
 
     time_t last_accessed_time_s;                    // the last time this RRDSET has been accessed
-
     usec_t usec_since_last_update;                  // the time in microseconds since the last collection of data
 
     struct timeval last_updated;                    // when this data set was last updated (updated every time the rrd_stats_done() function)
@@ -799,18 +837,15 @@ struct rrdset {
     // TODO - they should be managed by storage engine
     //        (RRDSET_DB_STATE ptr to an undefined structure, and a call to clean this up during destruction)
 
-    char *cache_dir;                                // the directory to store dimensions
-    void *st_on_file;                               // compatibility with V019 RRDSET files
+    struct {
+        char *cache_dir;                                // the directory to store dimensions
+        void *st_on_file;                               // compatibility with V019 RRDSET files
 
-    // ------------------------------------------------------------------------
-    // db mode RAM, SAVE, MAP, ALLOC, NONE specifics
-    // TODO - they should be managed by storage engine
-    //        (RRDSET_DB_STATE ptr to an undefined structure, and a call to clean this up during destruction)
+        int32_t entries;                                // total number of entries in the data set
 
-    long entries;                                   // total number of entries in the data set
-
-    long current_entry;                             // the entry that is currently being updated
-                                                    // it goes around in a round-robin fashion
+        int32_t current_entry;                          // the entry that is currently being updated
+        // it goes around in a round-robin fashion
+    } db;
 
     // ------------------------------------------------------------------------
     // exporting to 3rd party time-series members
@@ -836,9 +871,9 @@ struct rrdset {
     } alerts;
 
     struct {
-        size_t pos;
-        size_t size;
-        size_t used;
+        uint32_t pos;
+        uint32_t size;
+        uint32_t used;
         RRDDIM_ACQUIRED **rda;
     } pluginsd;
 
@@ -924,6 +959,7 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
     // ACLK
     RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 21), // when set, we should send ACLK stream context updates
     RRDHOST_FLAG_ACLK_STREAM_ALERTS             = (1 << 22), // set when the receiver part is disconnected
+
     // Metadata
     RRDHOST_FLAG_METADATA_UPDATE                = (1 << 23), // metadata needs to be stored in the database
     RRDHOST_FLAG_METADATA_LABELS                = (1 << 24), // metadata needs to be stored in the database
@@ -959,6 +995,8 @@ typedef enum __attribute__ ((__packed__)) {
     RRDHOST_OPTION_DELETE_ORPHAN_HOST       = (1 << 4), // delete the entire host when orphan
 
     RRDHOST_OPTION_REPLICATION              = (1 << 5), // when set, we support replication for this host
+
+    RRDHOST_OPTION_VIRTUAL_HOST             = (1 << 6), // when set, this host is a virtual one
 } RRDHOST_OPTIONS;
 
 #define rrdhost_option_check(host, flag) ((host)->options & (flag))
@@ -976,6 +1014,7 @@ struct alarm_entry {
     uint32_t unique_id;
     uint32_t alarm_id;
     uint32_t alarm_event_id;
+    usec_t global_id;
     uuid_t config_hash_id;
     uuid_t transition_id;
 
@@ -1124,8 +1163,8 @@ struct rrdhost {
     RRDHOST_FLAGS flags;                            // runtime flags about this RRDHOST (atomics on this)
     RRDHOST_FLAGS *exporting_flags;                 // array of flags for exporting connector instances
 
-    int rrd_update_every;                           // the update frequency of the host
-    long rrd_history_entries;                       // the number of history entries for the host's charts
+    int32_t rrd_update_every;                       // the update frequency of the host
+    int32_t rrd_history_entries;                    // the number of history entries for the host's charts
 
     RRD_MEMORY_MODE rrd_memory_mode;                // the configured memory more for the charts of this host
                                                     // the actual per tier is at .db[tier].mode
@@ -1150,9 +1189,11 @@ struct rrdhost {
     struct rrdpush_destinations *destination;       // the current destination from the above list
     SIMPLE_PATTERN *rrdpush_send_charts_matching;   // pattern to match the charts to be sent
 
+    const char *rrdpush_last_receiver_exit_reason;
     time_t rrdpush_seconds_to_replicate;            // max time we want to replicate from the child
     time_t rrdpush_replication_step;                // seconds per replication step
     size_t rrdpush_receiver_replicating_charts;     // the number of charts currently being replicated from a child
+    NETDATA_DOUBLE rrdpush_receiver_replication_percent; // the % of replication completion
 
     // the following are state information for the threading
     // streaming metrics from this netdata to an upstream netdata
@@ -1160,6 +1201,9 @@ struct rrdhost {
     netdata_thread_t rrdpush_sender_thread;         // the sender thread
     size_t rrdpush_sender_replicating_charts;       // the number of charts currently being replicated to a parent
     void *aclk_sync_host_config;
+
+    uint32_t rrdpush_receiver_connection_counter;   // the number of times this receiver has connected
+    uint32_t rrdpush_sender_connection_counter;     // the number of times this sender has connected
 
     // ------------------------------------------------------------------------
     // streaming of data from remote hosts - rrdpush receiver
@@ -1223,7 +1267,15 @@ struct rrdhost {
         DICTIONARY *contexts;
         DICTIONARY *hub_queue;
         DICTIONARY *pp_queue;
+        uint32_t metrics;
+        uint32_t instances;
     } rrdctx;
+
+    struct {
+        SPINLOCK spinlock;
+        time_t first_time_s;
+        time_t last_time_s;
+    } retention;
 
     uuid_t  host_uuid;                              // Global GUID for this host
     uuid_t  *node_id;                               // Cloud node_id
@@ -1257,6 +1309,9 @@ extern RRDHOST *localhost;
 #define rrdhost_sender_replicating_charts_plus_one(host) (__atomic_add_fetch(&((host)->rrdpush_sender_replicating_charts), 1, __ATOMIC_RELAXED))
 #define rrdhost_sender_replicating_charts_minus_one(host) (__atomic_sub_fetch(&((host)->rrdpush_sender_replicating_charts), 1, __ATOMIC_RELAXED))
 #define rrdhost_sender_replicating_charts_zero(host) (__atomic_store_n(&((host)->rrdpush_sender_replicating_charts), 0, __ATOMIC_RELAXED))
+
+#define rrdhost_is_online(host) ((host) == localhost || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED) || rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST)))
+bool rrdhost_matches_window(RRDHOST *host, time_t after, time_t before, time_t now);
 
 extern DICTIONARY *rrdhost_root_index;
 size_t rrdhost_hosts_available(void);
@@ -1455,8 +1510,8 @@ RRDDIM *rrddim_add_custom(RRDSET *st
 
 int rrddim_reset_name(RRDSET *st, RRDDIM *rd, const char *name);
 int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm);
-int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multiplier);
-int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor);
+int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, int32_t multiplier);
+int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, int32_t divisor);
 
 RRDDIM *rrddim_find(RRDSET *st, const char *id);
 RRDDIM_ACQUIRED *rrddim_find_and_acquire(RRDSET *st, const char *id);
@@ -1519,6 +1574,20 @@ void set_host_properties(
 
 size_t get_tier_grouping(size_t tier);
 void store_metric_collection_completed(void);
+
+static inline void rrdhost_retention(RRDHOST *host, time_t now, bool online, time_t *from, time_t *to) {
+    time_t first_time_s = 0, last_time_s = 0;
+    spinlock_lock(&host->retention.spinlock);
+    first_time_s = host->retention.first_time_s;
+    last_time_s = host->retention.last_time_s;
+    spinlock_unlock(&host->retention.spinlock);
+
+    if(from)
+        *from = first_time_s;
+
+    if(to)
+        *to = online ? now : last_time_s;
+}
 
 // ----------------------------------------------------------------------------
 // RRD DB engine declarations

@@ -846,7 +846,7 @@ int aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int aclk_port) {
         error("Error trying to contact env endpoint");
         https_req_response_free(&resp);
         buffer_free(buf);
-        return 1;
+        return 2;
     }
     if (resp.http_code != 200) {
         error("The HTTP code not 200 OK (Got %d)", resp.http_code);
@@ -854,21 +854,21 @@ int aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int aclk_port) {
             aclk_parse_otp_error(resp.payload);
         https_req_response_free(&resp);
         buffer_free(buf);
-        return 1;
+        return 3;
     }
 
     if (!resp.payload || !resp.payload_size) {
         error("Unexpected empty payload as response to /env call");
         https_req_response_free(&resp);
         buffer_free(buf);
-        return 1;
+        return 4;
     }
 
     if (parse_json_env(resp.payload, env)) {
         error ("error parsing /env message");
         https_req_response_free(&resp);
         buffer_free(buf);
-        return 1;
+        return 5;
     }
 
     info("Getting Cloud /env successful");

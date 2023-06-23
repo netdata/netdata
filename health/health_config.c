@@ -202,6 +202,7 @@ static inline char *health_config_add_key_to_values(char *value) {
     char *s = value;
     size_t i = 0;
 
+    key[0] = '\0';
     while(*s) {
         if (*s == '=') {
             //hold the key
@@ -498,6 +499,7 @@ static inline void alert_config_free(struct alert_config *cfg)
     string_freez(cfg->p_db_lookup_dimensions);
     string_freez(cfg->p_db_lookup_method);
     string_freez(cfg->chart_labels);
+    string_freez(cfg->source);
     freez(cfg);
 }
 
@@ -672,6 +674,7 @@ static int health_readfile(const char *filename, void *data) {
                 alert_cfg = callocz(1, sizeof(struct alert_config));
 
                 alert_cfg->alarm = string_dup(rc->name);
+                alert_cfg->source = health_source_file(line, filename);
                 ignore_this = 0;
             } else {
                 rc = NULL;
@@ -718,6 +721,7 @@ static int health_readfile(const char *filename, void *data) {
                 alert_cfg = callocz(1, sizeof(struct alert_config));
 
                 alert_cfg->template_key = string_dup(rt->name);
+                alert_cfg->source = health_source_file(line, filename);
                 ignore_this = 0;
             } else {
                 rt = NULL;
