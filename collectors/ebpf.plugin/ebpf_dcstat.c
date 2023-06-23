@@ -285,6 +285,160 @@ void dcstat_update_publish(netdata_publish_dcstat_t *out, uint64_t cache_access,
  *
  *****************************************************************/
 
+static void ebpf_obsolete_specific_dc_charts(char *type, int update_every);
+
+/**
+ * Obsolete services
+ *
+ * Obsolete all service charts created
+ *
+ * @param em a pointer to `struct ebpf_module`
+ */
+static void ebpf_obsolete_dc_services(ebpf_module_t *em)
+{
+    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              NETDATA_DC_HIT_CHART,
+                              "Percentage of files inside directory cache",
+                              EBPF_COMMON_DIMENSION_PERCENTAGE,
+                              NETDATA_DIRECTORY_CACHE_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NETDATA_SYSTEMD_DC_HIT_RATIO_CONTEXT,
+                              21200,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              NETDATA_DC_REFERENCE_CHART,
+                              "Count file access",
+                              EBPF_COMMON_DIMENSION_FILES,
+                              NETDATA_DIRECTORY_CACHE_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NETDATA_SYSTEMD_DC_REFERENCE_CONTEXT,
+                              21201,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              NETDATA_DC_REQUEST_NOT_CACHE_CHART,
+                              "Files not present inside directory cache",
+                              EBPF_COMMON_DIMENSION_FILES,
+                              NETDATA_DIRECTORY_CACHE_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NETDATA_SYSTEMD_DC_NOT_CACHE_CONTEXT,
+                              21202,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              NETDATA_DC_REQUEST_NOT_FOUND_CHART,
+                              "Files not found",
+                              EBPF_COMMON_DIMENSION_FILES,
+                              NETDATA_DIRECTORY_CACHE_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NETDATA_SYSTEMD_DC_NOT_FOUND_CONTEXT,
+                              21202,
+                              em->update_every);
+}
+
+/**
+ * Obsolete cgroup chart
+ *
+ * Send obsolete for all charts created before to close.
+ *
+ * @param em a pointer to `struct ebpf_module`
+ */
+static inline void ebpf_obsolete_dc_cgroup_charts(ebpf_module_t *em) {
+    pthread_mutex_lock(&mutex_cgroup_shm);
+
+    ebpf_obsolete_dc_services(em);
+
+    ebpf_cgroup_target_t *ect;
+    for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
+        if (ect->systemd)
+            continue;
+
+        ebpf_obsolete_specific_dc_charts(ect->name, em->update_every);
+    }
+    pthread_mutex_unlock(&mutex_cgroup_shm);
+}
+
+/**
+ * Obsolette apps charts
+ *
+ * Obsolete apps charts.
+ *
+ * @param em a pointer to the structure with the default values.
+ */
+void ebpf_obsolete_dc_apps_charts(struct ebpf_module *em)
+{
+    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
+                              NETDATA_DC_HIT_CHART,
+                              "Percentage of files inside directory cache",
+                              EBPF_COMMON_DIMENSION_PERCENTAGE,
+                              NETDATA_DIRECTORY_CACHE_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NULL,
+                              20100,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
+                              NETDATA_DC_REFERENCE_CHART,
+                              "Count file access",
+                              EBPF_COMMON_DIMENSION_FILES,
+                              NETDATA_DIRECTORY_CACHE_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                              NULL,
+                               20101,
+                               em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
+                              NETDATA_DC_REQUEST_NOT_CACHE_CHART,
+                              "Files not present inside directory cache",
+                              EBPF_COMMON_DIMENSION_FILES,
+                              NETDATA_DIRECTORY_CACHE_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                              NULL,
+                              20102,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
+                              NETDATA_DC_REQUEST_NOT_FOUND_CHART,
+                              "Files not found",
+                              EBPF_COMMON_DIMENSION_FILES,
+                              NETDATA_DIRECTORY_CACHE_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                              NULL,
+                              20103,
+                               em->update_every);
+}
+
+/**
+ * Obsolete global
+ *
+ * Obsolete global charts created by thread.
+ *
+ * @param em a pointer to `struct ebpf_module`
+ */
+static void ebpf_obsolete_dc_global(ebpf_module_t *em)
+{
+    ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
+                              NETDATA_DC_HIT_CHART,
+                              "Percentage of files inside directory cache",
+                              EBPF_COMMON_DIMENSION_PERCENTAGE,
+                              NETDATA_DIRECTORY_CACHE_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NULL,
+                              21200,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
+                              NETDATA_DC_REFERENCE_CHART,
+                              "Variables used to calculate hit ratio.",
+                              EBPF_COMMON_DIMENSION_FILES,
+                              NETDATA_DIRECTORY_CACHE_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NULL,
+                              21201,
+                              em->update_every);
+}
+
 /**
  * DCstat exit
  *
@@ -295,6 +449,23 @@ void dcstat_update_publish(netdata_publish_dcstat_t *out, uint64_t cache_access,
 static void ebpf_dcstat_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        pthread_mutex_lock(&lock);
+        if (em->cgroup_charts) {
+            ebpf_obsolete_dc_cgroup_charts(em);
+            fflush(stdout);
+        }
+
+        if (em->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
+            ebpf_obsolete_dc_apps_charts(em);
+        }
+
+        ebpf_obsolete_dc_global(em);
+
+        fflush(stdout);
+        pthread_mutex_unlock(&lock);
+    }
 
 #ifdef LIBBPF_MAJOR_VERSION
     if (dc_bpf_obj)
@@ -1039,7 +1210,7 @@ static void dcstat_collector(ebpf_module_t *em)
  *
  * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_create_filesystem_charts(int update_every)
+static void ebpf_create_dc_global_charts(int update_every)
 {
     ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, NETDATA_DC_HIT_CHART,
                       "Percentage of files inside directory cache",
@@ -1167,7 +1338,7 @@ void *ebpf_dcstat_thread(void *ptr)
                        algorithms, NETDATA_DCSTAT_IDX_END);
 
     pthread_mutex_lock(&lock);
-    ebpf_create_filesystem_charts(em->update_every);
+    ebpf_create_dc_global_charts(em->update_every);
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
 #ifdef NETDATA_DEV_MODE
