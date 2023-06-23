@@ -338,9 +338,9 @@ static bool find_filename_to_serve(const char *filename, char *dst, size_t dst_l
         }
     }
     else if(dashboard_version != -1)
-        snprintfz(dst, dst_len, "%s/v%d", netdata_configured_web_dir, dashboard_version);
+        snprintfz(dst, dst_len, "%s/v%d/index.html", netdata_configured_web_dir, dashboard_version);
     else
-        snprintfz(dst, dst_len, "%s/%s", netdata_configured_web_dir, filename);
+        snprintfz(dst, dst_len, "%s/index.html", netdata_configured_web_dir);
 
     if (lstat(dst, statbuf) != 0) {
         if(fallback == 1) {
