@@ -914,10 +914,6 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
             //  web_client_enable_deflate(w, 0);
         }
     }
-    else if(hash == hash_forwarded_proto && !strcasecmp(s, "X-Forwarded-Proto")) {
-        if(strcasestr(v, "https"))
-            w->flags |= WEB_CLIENT_FLAG_PROXY_HTTPS;
-    }
     else if(hash == hash_forwarded_host && !strcasecmp(s, "X-Forwarded-Host")) {
         char buffer[NI_MAXHOST];
         strncpyz(buffer, v, ((size_t)(ve - v) < sizeof(buffer) - 1 ? (size_t)(ve - v) : sizeof(buffer) - 1));
