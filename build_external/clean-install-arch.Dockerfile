@@ -47,9 +47,9 @@ RUN find . -type f >/opt/netdata/manifest
 RUN CFLAGS="-O1 -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -DNETDATA_INTERNAL_CHECKS=1\
     -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1 ${EXTRA_CFLAGS}" ./netdata-installer.sh --disable-lto
 
-RUN ln -sf /dev/stdout /var/log/netdata/access.log
-RUN ln -sf /dev/stdout /var/log/netdata/debug.log
-RUN ln -sf /dev/stderr /var/log/netdata/error.log
-RUN ln -sf /dev/stdout /var/log/netdata/fluentbit.log
+RUN ln -sf /dev/stdout /var/log/netdata/access.log && \
+    ln -sf /dev/stdout /var/log/netdata/debug.log && \
+    ln -sf /dev/stderr /var/log/netdata/error.log && \
+    ln -sf /dev/stdout /var/log/netdata/fluentbit.log
 
 CMD ["/usr/sbin/netdata", "-D"]
