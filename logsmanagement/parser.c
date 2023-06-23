@@ -126,16 +126,16 @@ static inline char **parse_csv( const char *line, const char delimiter, int num_
 
     buf = mallocz( sizeof(char*) * (num_fields+1) );
 
-    if ( !buf ) {
-        return NULL;
-    }
+    // if ( !buf ) {
+    //     return NULL;
+    // }
 
     tmp = mallocz( strlen(line) + 1 );
 
-    if ( !tmp ) {
-        freez( buf );
-        return NULL;
-    }
+    // if ( !tmp ) {
+    //     freez( buf );
+    //     return NULL;
+    // }
 
     bptr = buf;
 
