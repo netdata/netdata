@@ -79,14 +79,17 @@ However, there may be some exceptions to this rule as more collectors are added 
 
 If systemd development libraries are missing at build time, the systemd log collector will not be available. This can be fixed by installing the missing libraries prior to building the agent:
 
-Debian / Ubuntu:
-
+Debian and derivatives:
 ```
 apt install libsystemd-dev
 ```
-Centos / Fedora:
+Red Hat Enterprise Linux and derivatives:
 ```
 yum install systemd-devel
+```
+openSUSE:
+```
+zypper install systemd-devel
 ```
 
 <a name="general-configuration"/>
