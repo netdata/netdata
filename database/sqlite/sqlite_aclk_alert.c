@@ -309,6 +309,8 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host_id for pushing alert event.");
         sqlite3_finalize(res);
+        buffer_free(sql);
+        freez(claim_id);
         return;
     }
 
