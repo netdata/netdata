@@ -467,19 +467,9 @@ static void ebpf_dcstat_exit(void *ptr)
 
         ebpf_obsolete_dc_global(em);
 
-<<<<<<< HEAD
 #ifdef NETDATA_DEV_MODE
         if (ebpf_aral_dcstat_pid)
             ebpf_statistic_obsolete_aral_chart(em, dcstat_disable_priority);
-=======
-        fflush(stdout);
-        pthread_mutex_unlock(&lock);
-    }
-
-#ifdef LIBBPF_MAJOR_VERSION
-    if (dc_bpf_obj)
-        dc_bpf__destroy(dc_bpf_obj);
->>>>>>> 4606f88c9 (ebpf_functions: Add final obsolete code for dc chart)
 #endif
 
         fflush(stdout);
