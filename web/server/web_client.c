@@ -482,9 +482,9 @@ static int mysendfile(struct web_client *w, char *filename) {
         buffer_flush(w->response.data);
         buffer_strcat(w->response.data,
                       "<!DOCTYPE html><html>"
-                      "<body onload=\"window.location.href = window.location.origin + window.location.pathname + '/' + window.location.search\">"
+                      "<body onload=\"window.location.href = window.location.origin + window.location.pathname + '/' + window.location.search + window.location.hash\">"
                       "Redirecting. In case your browser does not support redirection, please click "
-                      "<a onclick=\"window.location.href = window.location.origin + window.location.pathname + '/' + window.location.search\">here</a>."
+                      "<a onclick=\"window.location.href = window.location.origin + window.location.pathname + '/' + window.location.search + window.location.hash\">here</a>."
                       "</body></html>");
         return HTTP_RESP_MOVED_PERM;
     }
