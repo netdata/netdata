@@ -965,7 +965,7 @@ bundle_ebpf_co_re
 
 # -----------------------------------------------------------------------------
 build_fluentbit() {
-  local env_cmd=''
+  env_cmd=''
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
     env_cmd="env CFLAGS='-fPIC -pipe' CXXFLAGS='-fPIC -pipe' LDFLAGS="
@@ -1014,7 +1014,7 @@ bundle_fluentbit() {
   fi
 
   # If musl is used, we need to patch chunkio, providing fts has been previously installed.
-  local libc=$(detect_libc)
+  libc="$(detect_libc)"
   if [ "${libc}" = "musl" ]; then
     patch -N -p1 fluent-bit/lib/chunkio/src/CMakeLists.txt -i logsmanagement/fluent_bit_build/chunkio-static-lib-fts.patch
   fi
