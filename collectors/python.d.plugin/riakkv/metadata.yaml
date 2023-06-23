@@ -1,203 +1,321 @@
-  - metrics:
-      module:
-        name: riakkv
+name: riakkv
+title: COLLECTORNAME Monitoring
+duplicate_for_virtual_integrations:
+  list:
+    - title: Ubuntu
+      description: dummy description that will replace the original "overview" section,
+        leave the whole list empty if none
+    - title: Redhat
+      description: dummy description that will replace the original "overview" section,
+        leave the whole list empty if none
+overview:
+  operation:
+    description: This collector periodically does http requests to one or more [Apache](link
+      to collector) web servers to collect the metrics mod_status plugin that apache
+      exposes
+  platforms:
+    description: If this collector can't run on some platforms specify them here,
+      otherwise set this to true and this text will not be rendered, instead a templated
+      message will appear
+    boolean: true
+  multi-instance:
+    boolean: true
+  permissions:
+    description: if there are any notable permission requirements, eg running as root
+      and so on, specify them here and set it to false, otherwise set it to true and
+      a templated message will appear
+    boolean: true
+  related:
+    description: give a simple description if there are any other collectors related
+      to this collector. Example -> To get the most out of your apache servers, you
+      can monitor its processes for resources utilization and their log files to turn
+      them into real-time metrics. Check our related resources for more information.
+      (if not, leave empty)
+setup:
+  prerequisites:
+    list:
+      - title: Prerequisite title for heading
+        text: List like with dashes, TBD, use | and newline for multiline
+  behavior:
+    auto_detection:
+      description: The collector auto-detects apache web servers running on localhost
+        ports 80, 443, and 8080.
+    limits:
+      description: The collector is limited to x amount of tables or any other limitation,
+        leave empty if none
+    impact:
+      description: Is there any impact on the application when using the default configuration?
+        Maybe on a db collector having to many tables might slow down the db if collection
+        happens per second, leave empty if none
+  configuration:
+    file:
+      description: 'which file the user has to edit. Example: go.d/apache.conf'
+    options:
+      description: TBD, use | and newline for multiline
       folding:
-        title: Metrics
+        title: Config options
+        enabled: true
+      list:
+        - name: option name
+          description: option description
+          default: a number or a string
+          required: true or false
+    examples:
+      folding:
+        title: Config
         enabled: false
-      scope:
-        global:
-          name: global
-          description: TBD
-          labels: []
-          metrics:
-            - name: riak.kv.throughput
-              description: Reads & writes coordinated by this node
-              unit: operations/s
-              dimensions:
-                - name: gets
-                - name: puts
-            - name: riak.dt.vnode_updates
-              description: Update operations coordinated by local vnodes by data type
-              unit: operations/s
-              dimensions:
-                - name: counters
-                - name: sets
-                - name: maps
-            - name: riak.search
-              description: Search queries on the node
-              unit: queries/s
-              dimensions:
-                - name: queries
-            - name: riak.search.documents
-              description: Documents indexed by search
-              unit: documents/s
-              dimensions:
-                - name: indexed
-            - name: riak.consistent.operations
-              description: Consistent node operations
-              unit: operations/s
-              dimensions:
-                - name: gets
-                - name: puts
-            - name: riak.kv.latency.get
-              description: Time between reception of a client GET request and subsequent
-                response to client
-              unit: ms
-              dimensions:
-                - name: mean
-                - name: median
-                - name: '95'
-                - name: '99'
-                - name: '100'
-            - name: riak.kv.latency.put
-              description: Time between reception of a client PUT request and subsequent
-                response to client
-              unit: ms
-              dimensions:
-                - name: mean
-                - name: median
-                - name: '95'
-                - name: '99'
-                - name: '100'
-            - name: riak.dt.latency.counter_merge
-              description: Time it takes to perform an Update Counter operation
-              unit: ms
-              dimensions:
-                - name: mean
-                - name: median
-                - name: '95'
-                - name: '99'
-                - name: '100'
-            - name: riak.dt.latency.set_merge
-              description: Time it takes to perform an Update Set operation
-              unit: ms
-              dimensions:
-                - name: mean
-                - name: median
-                - name: '95'
-                - name: '99'
-                - name: '100'
-            - name: riak.dt.latency.map_merge
-              description: Time it takes to perform an Update Map operation
-              unit: ms
-              dimensions:
-                - name: mean
-                - name: median
-                - name: '95'
-                - name: '99'
-                - name: '100'
-            - name: riak.search.latency.query
-              description: Search query latency
-              unit: ms
-              dimensions:
-                - name: median
-                - name: min
-                - name: '95'
-                - name: '99'
-                - name: '999'
-                - name: max
-            - name: riak.search.latency.index
-              description: Time it takes Search to index a new document
-              unit: ms
-              dimensions:
-                - name: median
-                - name: min
-                - name: '95'
-                - name: '99'
-                - name: '999'
-                - name: max
-            - name: riak.consistent.latency.get
-              description: Strongly consistent read latency
-              unit: ms
-              dimensions:
-                - name: mean
-                - name: median
-                - name: '95'
-                - name: '99'
-                - name: '100'
-            - name: riak.consistent.latency.put
-              description: Strongly consistent write latency
-              unit: ms
-              dimensions:
-                - name: mean
-                - name: median
-                - name: '95'
-                - name: '99'
-                - name: '100'
-            - name: riak.vm
-              description: Total processes running in the Erlang VM
-              unit: total
-              dimensions:
-                - name: processes
-            - name: riak.vm.memory.processes
-              description: Memory allocated & used by Erlang processes
-              unit: MB
-              dimensions:
-                - name: allocated
-                - name: used
-            - name: riak.kv.siblings_encountered.get
-              description: Number of siblings encountered during GET operations by
-                this node during the past minute
-              unit: siblings
-              dimensions:
-                - name: mean
-                - name: median
-                - name: '95'
-                - name: '99'
-                - name: '100'
-            - name: riak.kv.objsize.get
-              description: Object size encountered by this node during the past minute
-              unit: KB
-              dimensions:
-                - name: mean
-                - name: median
-                - name: '95'
-                - name: '99'
-                - name: '100'
-            - name: riak.search.vnodeq_size
-              description: Number of unprocessed messages in the vnode message queues
-                of Search on this node in the past minute
-              unit: messages
-              dimensions:
-                - name: mean
-                - name: median
-                - name: '95'
-                - name: '99'
-                - name: '100'
-            - name: riak.search.index
-              description: Number of document index errors encountered by Search
-              unit: errors
-              dimensions:
-                - name: errors
-            - name: riak.core.protobuf_connections
-              description: Protocol buffer connections by status
-              unit: connections
-              dimensions:
-                - name: active
-            - name: riak.core.repairs
-              description: Number of repair operations this node has coordinated
-              unit: repairs
-              dimensions:
-                - name: read
-            - name: riak.core.fsm_active
-              description: Active finite state machines by kind
-              unit: fsms
-              dimensions:
-                - name: get
-                - name: put
-                - name: secondary index
-                - name: list keys
-            - name: riak.core.fsm_rejected
-              description: Finite state machines being rejected by Sidejobs overload
-                protection
-              unit: fsms
-              dimensions:
-                - name: get
-                - name: put
-            - name: riak.search.index
-              description: Number of writes to Search failed due to bad data format
-                by reason
-              unit: writes
-              dimensions:
-                - name: bad_entry
-                - name: extract_fail
+      list:
+        - name: Basic / else describe what this example is about
+          description: A basic example configuration / describe your example
+          data: input the example data in yaml format
+troubleshooting:
+  problems:
+    list:
+      - name: possible troubleshooting title
+        text: describe
+  debugging:
+    description: How to run this in debug mode? Use | and newline with indent, to
+      write in markdown
+  logs:
+    description: How can I monitor logs for this plugin?
+related_resources:
+  integrations:
+    list:
+      - apache
+      - weblog
+      - httpcheck
+      - etc
+    provide:
+      description: What info I can provide for other plugins that reference me? this
+        will only be visible in their end, they will scrape this text. Example ->
+        apps.plugin allows monitoring individual processes CPU, Memory, Disk I/O and
+        many more resources utilization.
+alerts:
+  - name: '[riakkv_1h_kv_get_mean_latency](https://gihtub.com/netdata/netdata/blob/master/health/health.d/riakkv.conf)'
+    metric: riak.kv.latency.get
+    info: average time between reception of client GET request and \
+  - name: '[riakkv_kv_get_slow](https://gihtub.com/netdata/netdata/blob/master/health/health.d/riakkv.conf)'
+    metric: riak.kv.latency.get
+    info: average time between reception of client GET request and \
+  - name: '[riakkv_1h_kv_put_mean_latency](https://gihtub.com/netdata/netdata/blob/master/health/health.d/riakkv.conf)'
+    metric: riak.kv.latency.put
+    info: average time between reception of client PUT request and \
+  - name: '[riakkv_kv_put_slow](https://gihtub.com/netdata/netdata/blob/master/health/health.d/riakkv.conf)'
+    metric: riak.kv.latency.put
+    info: average time between reception of client PUT request and \
+  - name: '[riakkv_kv_put_slow](https://gihtub.com/netdata/netdata/blob/master/health/health.d/riakkv.conf)'
+    metric: riak.kv.latency.put
+    info: average time between reception of client PUT request and \
+  - name: '[riakkv_kv_put_slow](https://gihtub.com/netdata/netdata/blob/master/health/health.d/riakkv.conf)'
+    metric: riak.kv.latency.put
+    info: average time between reception of client PUT request and \
+  - name: '[riakkv_vm_high_process_count](https://gihtub.com/netdata/netdata/blob/master/health/health.d/riakkv.conf)'
+    metric: riak.vm
+    info: number of processes running in the Erlang VM
+  - name: '[riakkv_list_keys_active](https://gihtub.com/netdata/netdata/blob/master/health/health.d/riakkv.conf)'
+    metric: riak.core.fsm_active
+    info: number of currently running list keys finite state machines
+  - name: '[riakkv_list_keys_active](https://gihtub.com/netdata/netdata/blob/master/health/health.d/riakkv.conf)'
+    metric: riak.core.fsm_active
+    info: number of currently running list keys finite state machines
+metrics:
+  description: some description for this section, or leave empty
+  folding:
+    title: Metrics
+    enabled: false
+  scope:
+    global:
+      name: global
+      description: TBD
+      labels: []
+      metrics:
+        - name: riak.kv.throughput
+          description: Reads & writes coordinated by this node
+          unit: operations/s
+          dimensions:
+            - name: gets
+            - name: puts
+        - name: riak.dt.vnode_updates
+          description: Update operations coordinated by local vnodes by data type
+          unit: operations/s
+          dimensions:
+            - name: counters
+            - name: sets
+            - name: maps
+        - name: riak.search
+          description: Search queries on the node
+          unit: queries/s
+          dimensions:
+            - name: queries
+        - name: riak.search.documents
+          description: Documents indexed by search
+          unit: documents/s
+          dimensions:
+            - name: indexed
+        - name: riak.consistent.operations
+          description: Consistent node operations
+          unit: operations/s
+          dimensions:
+            - name: gets
+            - name: puts
+        - name: riak.kv.latency.get
+          description: Time between reception of a client GET request and subsequent
+            response to client
+          unit: ms
+          dimensions:
+            - name: mean
+            - name: median
+            - name: '95'
+            - name: '99'
+            - name: '100'
+        - name: riak.kv.latency.put
+          description: Time between reception of a client PUT request and subsequent
+            response to client
+          unit: ms
+          dimensions:
+            - name: mean
+            - name: median
+            - name: '95'
+            - name: '99'
+            - name: '100'
+        - name: riak.dt.latency.counter_merge
+          description: Time it takes to perform an Update Counter operation
+          unit: ms
+          dimensions:
+            - name: mean
+            - name: median
+            - name: '95'
+            - name: '99'
+            - name: '100'
+        - name: riak.dt.latency.set_merge
+          description: Time it takes to perform an Update Set operation
+          unit: ms
+          dimensions:
+            - name: mean
+            - name: median
+            - name: '95'
+            - name: '99'
+            - name: '100'
+        - name: riak.dt.latency.map_merge
+          description: Time it takes to perform an Update Map operation
+          unit: ms
+          dimensions:
+            - name: mean
+            - name: median
+            - name: '95'
+            - name: '99'
+            - name: '100'
+        - name: riak.search.latency.query
+          description: Search query latency
+          unit: ms
+          dimensions:
+            - name: median
+            - name: min
+            - name: '95'
+            - name: '99'
+            - name: '999'
+            - name: max
+        - name: riak.search.latency.index
+          description: Time it takes Search to index a new document
+          unit: ms
+          dimensions:
+            - name: median
+            - name: min
+            - name: '95'
+            - name: '99'
+            - name: '999'
+            - name: max
+        - name: riak.consistent.latency.get
+          description: Strongly consistent read latency
+          unit: ms
+          dimensions:
+            - name: mean
+            - name: median
+            - name: '95'
+            - name: '99'
+            - name: '100'
+        - name: riak.consistent.latency.put
+          description: Strongly consistent write latency
+          unit: ms
+          dimensions:
+            - name: mean
+            - name: median
+            - name: '95'
+            - name: '99'
+            - name: '100'
+        - name: riak.vm
+          description: Total processes running in the Erlang VM
+          unit: total
+          dimensions:
+            - name: processes
+        - name: riak.vm.memory.processes
+          description: Memory allocated & used by Erlang processes
+          unit: MB
+          dimensions:
+            - name: allocated
+            - name: used
+        - name: riak.kv.siblings_encountered.get
+          description: Number of siblings encountered during GET operations by this
+            node during the past minute
+          unit: siblings
+          dimensions:
+            - name: mean
+            - name: median
+            - name: '95'
+            - name: '99'
+            - name: '100'
+        - name: riak.kv.objsize.get
+          description: Object size encountered by this node during the past minute
+          unit: KB
+          dimensions:
+            - name: mean
+            - name: median
+            - name: '95'
+            - name: '99'
+            - name: '100'
+        - name: riak.search.vnodeq_size
+          description: Number of unprocessed messages in the vnode message queues
+            of Search on this node in the past minute
+          unit: messages
+          dimensions:
+            - name: mean
+            - name: median
+            - name: '95'
+            - name: '99'
+            - name: '100'
+        - name: riak.search.index
+          description: Number of document index errors encountered by Search
+          unit: errors
+          dimensions:
+            - name: errors
+        - name: riak.core.protobuf_connections
+          description: Protocol buffer connections by status
+          unit: connections
+          dimensions:
+            - name: active
+        - name: riak.core.repairs
+          description: Number of repair operations this node has coordinated
+          unit: repairs
+          dimensions:
+            - name: read
+        - name: riak.core.fsm_active
+          description: Active finite state machines by kind
+          unit: fsms
+          dimensions:
+            - name: get
+            - name: put
+            - name: secondary index
+            - name: list keys
+        - name: riak.core.fsm_rejected
+          description: Finite state machines being rejected by Sidejobs overload protection
+          unit: fsms
+          dimensions:
+            - name: get
+            - name: put
+        - name: riak.search.index
+          description: Number of writes to Search failed due to bad data format by
+            reason
+          unit: writes
+          dimensions:
+            - name: bad_entry
+            - name: extract_fail

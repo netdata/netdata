@@ -1,306 +1,952 @@
-  - metrics:
-      module:
-        name: mach_smi
+name: macos.plugin
+title: TBD
+modules:
+  - name: iokit
+    title: COLLECTORNAME Monitoring
+    duplicate_for_virtual_integrations:
+      list:
+        - title: Ubuntu
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+        - title: Redhat
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+    overview:
+      operation:
+        description: This collector periodically does http requests to one or more
+          [Apache](link to collector) web servers to collect the metrics mod_status
+          plugin that apache exposes
+      platforms:
+        description: If this collector can't run on some platforms specify them here,
+          otherwise set this to true and this text will not be rendered, instead a
+          templated message will appear
+        boolean: true
+      multi-instance:
+        boolean: true
+      permissions:
+        description: if there are any notable permission requirements, eg running
+          as root and so on, specify them here and set it to false, otherwise set
+          it to true and a templated message will appear
+        boolean: true
+      related:
+        description: give a simple description if there are any other collectors related
+          to this collector. Example -> To get the most out of your apache servers,
+          you can monitor its processes for resources utilization and their log files
+          to turn them into real-time metrics. Check our related resources for more
+          information. (if not, leave empty)
+    setup:
+      prerequisites:
+        list:
+          - title: Prerequisite title for heading
+            text: List like with dashes, TBD, use | and newline for multiline
+      behavior:
+        auto_detection:
+          description: The collector auto-detects apache web servers running on localhost
+            ports 80, 443, and 8080.
+        limits:
+          description: The collector is limited to x amount of tables or any other
+            limitation, leave empty if none
+        impact:
+          description: Is there any impact on the application when using the default
+            configuration? Maybe on a db collector having to many tables might slow
+            down the db if collection happens per second, leave empty if none
+      configuration:
+        file:
+          description: 'which file the user has to edit. Example: go.d/apache.conf'
+        options:
+          description: TBD, use | and newline for multiline
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: option name
+              description: option description
+              default: a number or a string
+              required: true or false
+        examples:
+          folding:
+            title: Config
+            enabled: false
+          list:
+            - name: Basic / else describe what this example is about
+              description: A basic example configuration / describe your example
+              data: input the example data in yaml format
+    troubleshooting:
+      problems:
+        list:
+          - name: possible troubleshooting title
+            text: describe
+      debugging:
+        description: How to run this in debug mode? Use | and newline with indent,
+          to write in markdown
+      logs:
+        description: How can I monitor logs for this plugin?
+    related_resources:
+      integrations:
+        list:
+          - apache
+          - weblog
+          - httpcheck
+          - etc
+        provide:
+          description: What info I can provide for other plugins that reference me?
+            this will only be visible in their end, they will scrape this text. Example
+            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
+            I/O and many more resources utilization.
+    alerts:
+      - name: '[10min_disk_utilization](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.util
+        info: average percentage of time ${label:device} disk was busy over the last
+          10 minutes
+      - name: '[10min_disk_utilization](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.util
+        info: average percentage of time ${label:device} disk was busy over the last
+          10 minutes
+      - name: '[10min_disk_utilization](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.util
+        info: average percentage of time ${label:device} disk was busy over the last
+          10 minutes
+      - name: '[disk_space_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.space
+        info: disk ${label:mount_point} space utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[interface_speed](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.net
+        info: network interface ${label:device} current speed
+      - name: '[1m_received_traffic_overflow](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.net
+        info: average inbound utilization for the network interface ${label:device}
+          over the last minute
+      - name: '[1m_sent_traffic_overflow](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.net
+        info: average outbound utilization for the network interface ${label:device}
+          over the last minute
+      - name: '[1m_sent_traffic_overflow](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.net
+        info: average outbound utilization for the network interface ${label:device}
+          over the last minute
+      - name: '[1m_sent_traffic_overflow](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.net
+        info: average outbound utilization for the network interface ${label:device}
+          over the last minute
+      - name: '[inbound_packets_dropped_ratio](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.packets
+        info: ratio of inbound dropped packets for the network interface ${label:device}
+          over the last 10 minutes
+      - name: '[outbound_packets_dropped_ratio](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.packets
+        info: ratio of outbound dropped packets for the network interface ${label:device}
+          over the last 10 minutes
+      - name: '[wifi_inbound_packets_dropped_ratio](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.packets
+        info: ratio of inbound dropped packets for the network interface ${label:device}
+          over the last 10 minutes
+      - name: '[wifi_outbound_packets_dropped_ratio](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.packets
+        info: ratio of outbound dropped packets for the network interface ${label:device}
+          over the last 10 minutes
+      - name: '[wifi_outbound_packets_dropped_ratio](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.packets
+        info: ratio of outbound dropped packets for the network interface ${label:device}
+          over the last 10 minutes
+      - name: '[1m_received_packets_rate](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.packets
+        info: average number of packets received by the network interface ${label:device}
+          over the last minute
+      - name: '[10s_received_packets_storm](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.packets
+        info: ratio of average number of received packets for the network interface
+          ${label:device} over the last 10 seconds, \
+      - name: '[interface_inbound_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.errors
+        info: number of inbound errors for the network interface ${label:device} in
+          the last 10 minutes
+      - name: '[interface_outbound_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.errors
+        info: number of outbound errors for the network interface ${label:device}
+          in the last 10 minutes
+      - name: '[interface_outbound_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.errors
+        info: number of outbound errors for the network interface ${label:device}
+          in the last 10 minutes
+      - name: '[interface_outbound_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.errors
+        info: number of outbound errors for the network interface ${label:device}
+          in the last 10 minutes
+      - name: '[inbound_packets_dropped](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.drops
+        info: number of inbound dropped packets for the network interface ${label:device}
+          in the last 10 minutes
+      - name: '[outbound_packets_dropped](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.drops
+        info: number of outbound dropped packets for the network interface ${label:device}
+          in the last 10 minutes
+    metrics:
+      description: some description for this section, or leave empty
       folding:
         title: Metrics
         enabled: false
       scope:
-        global:
-          name: global
+        disk:
+          name: disk
           description: TBD
           labels: []
           metrics:
-            - name: system.cpu
-              description: Total CPU utilization
-              unit: percentage
-              dimensions:
-                - name: user
-                - name: nice
-                - name: system
-                - name: idle
-            - name: system.ram
-              description: System RAM
-              unit: MiB
-              dimensions:
-                - name: active
-                - name: wired
-                - name: throttled
-                - name: compressor
-                - name: inactive
-                - name: purgeable
-                - name: speculative
-                - name: free
-            - name: system.swapio
-              description: Swap I/O
+            - name: disk.io
+              description: Disk I/O Bandwidth
               unit: KiB/s
               dimensions:
-                - name: io
-                - name: out
-            - name: mem.pgfaults
-              description: Memory Page Faults
-              unit: faults/s
+                - name: read
+                - name: writes
+            - name: disk.ops
+              description: Disk Completed I/O Operations
+              unit: operations/s
               dimensions:
-                - name: memory
-                - name: cow
-                - name: pagein
-                - name: pageout
-                - name: compress
-                - name: decompress
-                - name: zero_fill
-                - name: reactivate
-                - name: purge
-  - metrics:
-      module:
-        name: sysctl
-      folding:
-        title: Metrics
-        enabled: false
-      scope:
+                - name: read
+                - name: writes
+            - name: disk.util
+              description: Disk Utilization Time
+              unit: '% of time working'
+              dimensions:
+                - name: utilization
+            - name: disk.iotime
+              description: Disk Total I/O Time
+              unit: milliseconds/s
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.await
+              description: Average Completed I/O Operation Time
+              unit: milliseconds/operation
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.avgsz
+              description: Average Completed I/O Operation Bandwidth
+              unit: KiB/operation
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.svctm
+              description: Average Service Time
+              unit: milliseconds/operation
+              dimensions:
+                - name: svctm
         global:
           name: global
           description: TBD
           labels: []
           metrics:
-            - name: system.load
-              description: System Load Average
-              unit: load
+            - name: system.io
+              description: Disk I/O
+              unit: KiB/s
               dimensions:
-                - name: load1
-                - name: load5
-                - name: load15
-            - name: system.swap
-              description: System Swap
-              unit: MiB
+                - name: in
+                - name: out
+        mount point:
+          name: mount point
+          description: TBD
+          labels: []
+          metrics:
+            - name: disk.space
+              description: Disk Space Usage for {mounted dir} [{mounted filesystem}]
+              unit: GiB
               dimensions:
-                - name: free
+                - name: avail
                 - name: used
-            - name: system.ipv4
-              description: IPv4 Bandwidth
+                - name: reserved_for_root
+            - name: disk.inodes
+              description: Disk Files (inodes) Usage for {mounted dir} [{mounted filesystem}]
+              unit: inodes
+              dimensions:
+                - name: avail
+                - name: used
+                - name: reserved_for_root
+        network device:
+          name: network device
+          description: TBD
+          labels: []
+          metrics:
+            - name: net.net
+              description: Bandwidth
               unit: kilobits/s
               dimensions:
                 - name: received
                 - name: sent
-            - name: ipv4.tcppackets
-              description: IPv4 TCP Packets
+            - name: net.packets
+              description: Packets
               unit: packets/s
               dimensions:
                 - name: received
                 - name: sent
-            - name: ipv4.tcperrors
-              description: IPv4 TCP Errors
-              unit: packets/s
-              dimensions:
-                - name: InErrs
-                - name: InCsumErrors
-                - name: RetransSegs
-            - name: ipv4.tcphandshake
-              description: IPv4 TCP Handshake Issues
-              unit: events/s
-              dimensions:
-                - name: EstabResets
-                - name: ActiveOpens
-                - name: PassiveOpens
-                - name: AttemptFails
-            - name: ipv4.tcpconnaborts
-              description: TCP Connection Aborts
-              unit: connections/s
-              dimensions:
-                - name: baddata
-                - name: userclosed
-                - name: nomemory
-                - name: timeout
-            - name: ipv4.tcpofo
-              description: TCP Out-Of-Order Queue
-              unit: packets/s
-              dimensions:
-                - name: inqueue
-            - name: ipv4.tcpsyncookies
-              description: TCP SYN Cookies
-              unit: packets/s
-              dimensions:
-                - name: received
-                - name: sent
-                - name: failed
-            - name: ipv4.ecnpkts
-              description: IPv4 ECN Statistics
-              unit: packets/s
-              dimensions:
-                - name: CEP
-                - name: NoECTP
-            - name: ipv4.udppackets
-              description: IPv4 UDP Packets
-              unit: packets/s
-              dimensions:
-                - name: received
-                - name: sent
-            - name: ipv4.udperrors
-              description: IPv4 UDP Errors
-              unit: events/s
-              dimensions:
-                - name: RcvbufErrors
-                - name: InErrors
-                - name: NoPorts
-                - name: InCsumErrors
-                - name: IgnoredMulti
-            - name: ipv4.icmp
-              description: IPv4 ICMP Packets
-              unit: packets/s
-              dimensions:
-                - name: received
-                - name: sent
-            - name: ipv4.icmp_errors
-              description: IPv4 ICMP Errors
-              unit: packets/s
-              dimensions:
-                - name: InErrors
-                - name: OutErrors
-                - name: InCsumErrors
-            - name: ipv4.icmpmsg
-              description: IPv4 ICMP Messages
-              unit: packets/s
-              dimensions:
-                - name: InEchoReps
-                - name: OutEchoReps
-                - name: InEchos
-                - name: OutEchos
-            - name: ipv4.packets
-              description: IPv4 Packets
-              unit: packets/s
-              dimensions:
-                - name: received
-                - name: sent
-                - name: forwarded
-                - name: delivered
-            - name: ipv4.fragsout
-              description: IPv4 Fragments Sent
-              unit: packets/s
-              dimensions:
-                - name: ok
-                - name: failed
-                - name: created
-            - name: ipv4.fragsin
-              description: IPv4 Fragments Reassembly
-              unit: packets/s
-              dimensions:
-                - name: ok
-                - name: failed
-                - name: all
-            - name: ipv4.errors
-              description: IPv4 Errors
-              unit: packets/s
-              dimensions:
-                - name: InDiscards
-                - name: OutDiscards
-                - name: InHdrErrors
-                - name: OutNoRoutes
-                - name: InAddrErrors
-                - name: InUnknownProtos
-            - name: ipv6.packets
-              description: IPv6 Packets
-              unit: packets/s
-              dimensions:
-                - name: received
-                - name: sent
-                - name: forwarded
-                - name: delivers
-            - name: ipv6.fragsout
-              description: IPv6 Fragments Sent
-              unit: packets/s
-              dimensions:
-                - name: ok
-                - name: failed
-                - name: all
-            - name: ipv6.fragsin
-              description: IPv6 Fragments Reassembly
-              unit: packets/s
-              dimensions:
-                - name: ok
-                - name: failed
-                - name: timeout
-                - name: all
-            - name: ipv6.errors
-              description: IPv6 Errors
-              unit: packets/s
-              dimensions:
-                - name: InDiscards
-                - name: OutDiscards
-                - name: InHdrErrors
-                - name: InAddrErrors
-                - name: InTruncatedPkts
-                - name: InNoRoutes
-                - name: OutNoRoutes
-            - name: ipv6.icmp
-              description: IPv6 ICMP Messages
-              unit: messages/s
-              dimensions:
-                - name: received
-                - name: sent
-            - name: ipv6.icmpredir
-              description: IPv6 ICMP Redirects
-              unit: redirects/s
-              dimensions:
-                - name: received
-                - name: sent
-            - name: ipv6.icmperrors
-              description: IPv6 ICMP Errors
+                - name: multicast_received
+                - name: multicast_sent
+            - name: net.errors
+              description: Interface Errors
               unit: errors/s
               dimensions:
-                - name: InErrors
-                - name: OutErrors
-                - name: InCsumErrors
-                - name: InDestUnreachs
-                - name: InPktTooBigs
-                - name: InTimeExcds
-                - name: InParmProblems
-                - name: OutDestUnreachs
-                - name: OutTimeExcds
-                - name: OutParmProblems
-            - name: ipv6.icmpechos
-              description: IPv6 ICMP Echo
-              unit: messages/s
+                - name: inbound
+                - name: outbound
+            - name: net.drops
+              description: Interface Drops
+              unit: drops/s
               dimensions:
-                - name: InEchos
-                - name: OutEchos
-                - name: InEchoReplies
-                - name: OutEchoReplies
-            - name: ipv6.icmprouter
-              description: IPv6 Router Messages
-              unit: messages/s
+                - name: inbound
+            - name: net.events
+              description: Network Interface Events
+              unit: events/s
               dimensions:
-                - name: InSolicits
-                - name: OutSolicits
-                - name: InAdvertisements
-                - name: OutAdvertisements
-            - name: ipv6.icmpneighbor
-              description: IPv6 Neighbor Messages
-              unit: messages/s
+                - name: frames
+                - name: collisions
+                - name: carrier
+  - name: iokit
+    title: COLLECTORNAME Monitoring
+    duplicate_for_virtual_integrations:
+      list:
+        - title: Ubuntu
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+        - title: Redhat
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+    overview:
+      operation:
+        description: This collector periodically does http requests to one or more
+          [Apache](link to collector) web servers to collect the metrics mod_status
+          plugin that apache exposes
+      platforms:
+        description: If this collector can't run on some platforms specify them here,
+          otherwise set this to true and this text will not be rendered, instead a
+          templated message will appear
+        boolean: true
+      multi-instance:
+        boolean: true
+      permissions:
+        description: if there are any notable permission requirements, eg running
+          as root and so on, specify them here and set it to false, otherwise set
+          it to true and a templated message will appear
+        boolean: true
+      related:
+        description: give a simple description if there are any other collectors related
+          to this collector. Example -> To get the most out of your apache servers,
+          you can monitor its processes for resources utilization and their log files
+          to turn them into real-time metrics. Check our related resources for more
+          information. (if not, leave empty)
+    setup:
+      prerequisites:
+        list:
+          - title: Prerequisite title for heading
+            text: List like with dashes, TBD, use | and newline for multiline
+      behavior:
+        auto_detection:
+          description: The collector auto-detects apache web servers running on localhost
+            ports 80, 443, and 8080.
+        limits:
+          description: The collector is limited to x amount of tables or any other
+            limitation, leave empty if none
+        impact:
+          description: Is there any impact on the application when using the default
+            configuration? Maybe on a db collector having to many tables might slow
+            down the db if collection happens per second, leave empty if none
+      configuration:
+        file:
+          description: 'which file the user has to edit. Example: go.d/apache.conf'
+        options:
+          description: TBD, use | and newline for multiline
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: option name
+              description: option description
+              default: a number or a string
+              required: true or false
+        examples:
+          folding:
+            title: Config
+            enabled: false
+          list:
+            - name: Basic / else describe what this example is about
+              description: A basic example configuration / describe your example
+              data: input the example data in yaml format
+    troubleshooting:
+      problems:
+        list:
+          - name: possible troubleshooting title
+            text: describe
+      debugging:
+        description: How to run this in debug mode? Use | and newline with indent,
+          to write in markdown
+      logs:
+        description: How can I monitor logs for this plugin?
+    related_resources:
+      integrations:
+        list:
+          - apache
+          - weblog
+          - httpcheck
+          - etc
+        provide:
+          description: What info I can provide for other plugins that reference me?
+            this will only be visible in their end, they will scrape this text. Example
+            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
+            I/O and many more resources utilization.
+    alerts:
+      - name: '[10min_disk_utilization](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.util
+        info: average percentage of time ${label:device} disk was busy over the last
+          10 minutes
+      - name: '[10min_disk_utilization](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.util
+        info: average percentage of time ${label:device} disk was busy over the last
+          10 minutes
+      - name: '[10min_disk_utilization](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.util
+        info: average percentage of time ${label:device} disk was busy over the last
+          10 minutes
+      - name: '[disk_space_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.space
+        info: disk ${label:mount_point} space utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[interface_speed](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.net
+        info: network interface ${label:device} current speed
+      - name: '[1m_received_traffic_overflow](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.net
+        info: average inbound utilization for the network interface ${label:device}
+          over the last minute
+      - name: '[1m_sent_traffic_overflow](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.net
+        info: average outbound utilization for the network interface ${label:device}
+          over the last minute
+      - name: '[1m_sent_traffic_overflow](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.net
+        info: average outbound utilization for the network interface ${label:device}
+          over the last minute
+      - name: '[1m_sent_traffic_overflow](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.net
+        info: average outbound utilization for the network interface ${label:device}
+          over the last minute
+      - name: '[inbound_packets_dropped_ratio](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.packets
+        info: ratio of inbound dropped packets for the network interface ${label:device}
+          over the last 10 minutes
+      - name: '[outbound_packets_dropped_ratio](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.packets
+        info: ratio of outbound dropped packets for the network interface ${label:device}
+          over the last 10 minutes
+      - name: '[wifi_inbound_packets_dropped_ratio](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.packets
+        info: ratio of inbound dropped packets for the network interface ${label:device}
+          over the last 10 minutes
+      - name: '[wifi_outbound_packets_dropped_ratio](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.packets
+        info: ratio of outbound dropped packets for the network interface ${label:device}
+          over the last 10 minutes
+      - name: '[wifi_outbound_packets_dropped_ratio](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.packets
+        info: ratio of outbound dropped packets for the network interface ${label:device}
+          over the last 10 minutes
+      - name: '[1m_received_packets_rate](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.packets
+        info: average number of packets received by the network interface ${label:device}
+          over the last minute
+      - name: '[10s_received_packets_storm](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.packets
+        info: ratio of average number of received packets for the network interface
+          ${label:device} over the last 10 seconds, \
+      - name: '[interface_inbound_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.errors
+        info: number of inbound errors for the network interface ${label:device} in
+          the last 10 minutes
+      - name: '[interface_outbound_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.errors
+        info: number of outbound errors for the network interface ${label:device}
+          in the last 10 minutes
+      - name: '[interface_outbound_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.errors
+        info: number of outbound errors for the network interface ${label:device}
+          in the last 10 minutes
+      - name: '[interface_outbound_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.errors
+        info: number of outbound errors for the network interface ${label:device}
+          in the last 10 minutes
+      - name: '[inbound_packets_dropped](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.drops
+        info: number of inbound dropped packets for the network interface ${label:device}
+          in the last 10 minutes
+      - name: '[outbound_packets_dropped](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.drops
+        info: number of outbound dropped packets for the network interface ${label:device}
+          in the last 10 minutes
+    metrics:
+      description: some description for this section, or leave empty
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        disk:
+          name: disk
+          description: TBD
+          labels: []
+          metrics:
+            - name: disk.io
+              description: Disk I/O Bandwidth
+              unit: KiB/s
               dimensions:
-                - name: InSolicits
-                - name: OutSolicits
-                - name: InAdvertisements
-                - name: OutAdvertisements
-            - name: ipv6.icmptypes
-              description: IPv6 ICMP Types
-              unit: messages/s
+                - name: read
+                - name: writes
+            - name: disk.ops
+              description: Disk Completed I/O Operations
+              unit: operations/s
               dimensions:
-                - name: InType1
-                - name: InType128
-                - name: InType129
-                - name: InType136
-                - name: OutType1
-                - name: OutType128
-                - name: OutType129
-                - name: OutType133
-                - name: OutType135
-                - name: OutType143
-            - name: system.uptime
-              description: System Uptime
-              unit: seconds
+                - name: read
+                - name: writes
+            - name: disk.util
+              description: Disk Utilization Time
+              unit: '% of time working'
               dimensions:
-                - name: uptime
-  - metrics:
-      module:
-        name: iokit
+                - name: utilization
+            - name: disk.iotime
+              description: Disk Total I/O Time
+              unit: milliseconds/s
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.await
+              description: Average Completed I/O Operation Time
+              unit: milliseconds/operation
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.avgsz
+              description: Average Completed I/O Operation Bandwidth
+              unit: KiB/operation
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.svctm
+              description: Average Service Time
+              unit: milliseconds/operation
+              dimensions:
+                - name: svctm
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: system.io
+              description: Disk I/O
+              unit: KiB/s
+              dimensions:
+                - name: in
+                - name: out
+        mount point:
+          name: mount point
+          description: TBD
+          labels: []
+          metrics:
+            - name: disk.space
+              description: Disk Space Usage for {mounted dir} [{mounted filesystem}]
+              unit: GiB
+              dimensions:
+                - name: avail
+                - name: used
+                - name: reserved_for_root
+            - name: disk.inodes
+              description: Disk Files (inodes) Usage for {mounted dir} [{mounted filesystem}]
+              unit: inodes
+              dimensions:
+                - name: avail
+                - name: used
+                - name: reserved_for_root
+        network device:
+          name: network device
+          description: TBD
+          labels: []
+          metrics:
+            - name: net.net
+              description: Bandwidth
+              unit: kilobits/s
+              dimensions:
+                - name: received
+                - name: sent
+            - name: net.packets
+              description: Packets
+              unit: packets/s
+              dimensions:
+                - name: received
+                - name: sent
+                - name: multicast_received
+                - name: multicast_sent
+            - name: net.errors
+              description: Interface Errors
+              unit: errors/s
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: net.drops
+              description: Interface Drops
+              unit: drops/s
+              dimensions:
+                - name: inbound
+            - name: net.events
+              description: Network Interface Events
+              unit: events/s
+              dimensions:
+                - name: frames
+                - name: collisions
+                - name: carrier
+  - name: iokit
+    title: COLLECTORNAME Monitoring
+    duplicate_for_virtual_integrations:
+      list:
+        - title: Ubuntu
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+        - title: Redhat
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+    overview:
+      operation:
+        description: This collector periodically does http requests to one or more
+          [Apache](link to collector) web servers to collect the metrics mod_status
+          plugin that apache exposes
+      platforms:
+        description: If this collector can't run on some platforms specify them here,
+          otherwise set this to true and this text will not be rendered, instead a
+          templated message will appear
+        boolean: true
+      multi-instance:
+        boolean: true
+      permissions:
+        description: if there are any notable permission requirements, eg running
+          as root and so on, specify them here and set it to false, otherwise set
+          it to true and a templated message will appear
+        boolean: true
+      related:
+        description: give a simple description if there are any other collectors related
+          to this collector. Example -> To get the most out of your apache servers,
+          you can monitor its processes for resources utilization and their log files
+          to turn them into real-time metrics. Check our related resources for more
+          information. (if not, leave empty)
+    setup:
+      prerequisites:
+        list:
+          - title: Prerequisite title for heading
+            text: List like with dashes, TBD, use | and newline for multiline
+      behavior:
+        auto_detection:
+          description: The collector auto-detects apache web servers running on localhost
+            ports 80, 443, and 8080.
+        limits:
+          description: The collector is limited to x amount of tables or any other
+            limitation, leave empty if none
+        impact:
+          description: Is there any impact on the application when using the default
+            configuration? Maybe on a db collector having to many tables might slow
+            down the db if collection happens per second, leave empty if none
+      configuration:
+        file:
+          description: 'which file the user has to edit. Example: go.d/apache.conf'
+        options:
+          description: TBD, use | and newline for multiline
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: option name
+              description: option description
+              default: a number or a string
+              required: true or false
+        examples:
+          folding:
+            title: Config
+            enabled: false
+          list:
+            - name: Basic / else describe what this example is about
+              description: A basic example configuration / describe your example
+              data: input the example data in yaml format
+    troubleshooting:
+      problems:
+        list:
+          - name: possible troubleshooting title
+            text: describe
+      debugging:
+        description: How to run this in debug mode? Use | and newline with indent,
+          to write in markdown
+      logs:
+        description: How can I monitor logs for this plugin?
+    related_resources:
+      integrations:
+        list:
+          - apache
+          - weblog
+          - httpcheck
+          - etc
+        provide:
+          description: What info I can provide for other plugins that reference me?
+            this will only be visible in their end, they will scrape this text. Example
+            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
+            I/O and many more resources utilization.
+    alerts:
+      - name: '[10min_disk_utilization](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.util
+        info: average percentage of time ${label:device} disk was busy over the last
+          10 minutes
+      - name: '[10min_disk_utilization](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.util
+        info: average percentage of time ${label:device} disk was busy over the last
+          10 minutes
+      - name: '[10min_disk_utilization](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.util
+        info: average percentage of time ${label:device} disk was busy over the last
+          10 minutes
+      - name: '[disk_space_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.space
+        info: disk ${label:mount_point} space utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+      - name: '[interface_speed](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.net
+        info: network interface ${label:device} current speed
+      - name: '[1m_received_traffic_overflow](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.net
+        info: average inbound utilization for the network interface ${label:device}
+          over the last minute
+      - name: '[1m_sent_traffic_overflow](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.net
+        info: average outbound utilization for the network interface ${label:device}
+          over the last minute
+      - name: '[1m_sent_traffic_overflow](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.net
+        info: average outbound utilization for the network interface ${label:device}
+          over the last minute
+      - name: '[1m_sent_traffic_overflow](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.net
+        info: average outbound utilization for the network interface ${label:device}
+          over the last minute
+      - name: '[inbound_packets_dropped_ratio](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.packets
+        info: ratio of inbound dropped packets for the network interface ${label:device}
+          over the last 10 minutes
+      - name: '[outbound_packets_dropped_ratio](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.packets
+        info: ratio of outbound dropped packets for the network interface ${label:device}
+          over the last 10 minutes
+      - name: '[wifi_inbound_packets_dropped_ratio](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.packets
+        info: ratio of inbound dropped packets for the network interface ${label:device}
+          over the last 10 minutes
+      - name: '[wifi_outbound_packets_dropped_ratio](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.packets
+        info: ratio of outbound dropped packets for the network interface ${label:device}
+          over the last 10 minutes
+      - name: '[wifi_outbound_packets_dropped_ratio](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.packets
+        info: ratio of outbound dropped packets for the network interface ${label:device}
+          over the last 10 minutes
+      - name: '[1m_received_packets_rate](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.packets
+        info: average number of packets received by the network interface ${label:device}
+          over the last minute
+      - name: '[10s_received_packets_storm](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.packets
+        info: ratio of average number of received packets for the network interface
+          ${label:device} over the last 10 seconds, \
+      - name: '[interface_inbound_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.errors
+        info: number of inbound errors for the network interface ${label:device} in
+          the last 10 minutes
+      - name: '[interface_outbound_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.errors
+        info: number of outbound errors for the network interface ${label:device}
+          in the last 10 minutes
+      - name: '[interface_outbound_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.errors
+        info: number of outbound errors for the network interface ${label:device}
+          in the last 10 minutes
+      - name: '[interface_outbound_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.errors
+        info: number of outbound errors for the network interface ${label:device}
+          in the last 10 minutes
+      - name: '[inbound_packets_dropped](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.drops
+        info: number of inbound dropped packets for the network interface ${label:device}
+          in the last 10 minutes
+      - name: '[outbound_packets_dropped](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
+        metric: net.drops
+        info: number of outbound dropped packets for the network interface ${label:device}
+          in the last 10 minutes
+    metrics:
+      description: some description for this section, or leave empty
       folding:
         title: Metrics
         enabled: false

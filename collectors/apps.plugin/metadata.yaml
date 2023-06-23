@@ -1,6 +1,101 @@
-  - metrics:
-      module:
-        name: system
+name: apps.plugin
+title: TBD
+modules:
+  - name: netdata
+    title: COLLECTORNAME Monitoring
+    duplicate_for_virtual_integrations:
+      list:
+        - title: Ubuntu
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+        - title: Redhat
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+    overview:
+      operation:
+        description: This collector periodically does http requests to one or more
+          [Apache](link to collector) web servers to collect the metrics mod_status
+          plugin that apache exposes
+      platforms:
+        description: If this collector can't run on some platforms specify them here,
+          otherwise set this to true and this text will not be rendered, instead a
+          templated message will appear
+        boolean: true
+      multi-instance:
+        boolean: true
+      permissions:
+        description: if there are any notable permission requirements, eg running
+          as root and so on, specify them here and set it to false, otherwise set
+          it to true and a templated message will appear
+        boolean: true
+      related:
+        description: give a simple description if there are any other collectors related
+          to this collector. Example -> To get the most out of your apache servers,
+          you can monitor its processes for resources utilization and their log files
+          to turn them into real-time metrics. Check our related resources for more
+          information. (if not, leave empty)
+    setup:
+      prerequisites:
+        list:
+          - title: Prerequisite title for heading
+            text: List like with dashes, TBD, use | and newline for multiline
+      behavior:
+        auto_detection:
+          description: The collector auto-detects apache web servers running on localhost
+            ports 80, 443, and 8080.
+        limits:
+          description: The collector is limited to x amount of tables or any other
+            limitation, leave empty if none
+        impact:
+          description: Is there any impact on the application when using the default
+            configuration? Maybe on a db collector having to many tables might slow
+            down the db if collection happens per second, leave empty if none
+      configuration:
+        file:
+          description: 'which file the user has to edit. Example: go.d/apache.conf'
+        options:
+          description: TBD, use | and newline for multiline
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: option name
+              description: option description
+              default: a number or a string
+              required: true or false
+        examples:
+          folding:
+            title: Config
+            enabled: false
+          list:
+            - name: Basic / else describe what this example is about
+              description: A basic example configuration / describe your example
+              data: input the example data in yaml format
+    troubleshooting:
+      problems:
+        list:
+          - name: possible troubleshooting title
+            text: describe
+      debugging:
+        description: How to run this in debug mode? Use | and newline with indent,
+          to write in markdown
+      logs:
+        description: How can I monitor logs for this plugin?
+    related_resources:
+      integrations:
+        list:
+          - apache
+          - weblog
+          - httpcheck
+          - etc
+        provide:
+          description: What info I can provide for other plugins that reference me?
+            this will only be visible in their end, they will scrape this text. Example
+            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
+            I/O and many more resources utilization.
+    alerts: []
+    metrics:
+      description: some description for this section, or leave empty
       folding:
         title: Metrics
         enabled: false
@@ -10,18 +105,138 @@
           description: TBD
           labels: []
           metrics:
-            - name: system.processes_state
-              description: System Processes State
-              unit: processes
+            - name: netdata.apps_cpu
+              description: Apps Plugin CPU
+              unit: milliseconds/s
               dimensions:
-                - name: running
-                - name: sleeping_interruptible
-                - name: sleeping_uninterruptible
-                - name: zombie
-                - name: stopped
-  - metrics:
-      module:
-        name: apps
+                - name: user
+                - name: system
+            - name: netdata.apps_sizes
+              description: Apps Plugin Files
+              unit: files/s
+              dimensions:
+                - name: calls
+                - name: files
+                - name: filenames
+                - name: inode_changes
+                - name: link_changes
+                - name: pids
+                - name: fds
+                - name: targets
+                - name: new_pids
+            - name: netdata.apps_fix
+              description: Apps Plugin Normalization Ratios
+              unit: percentage
+              dimensions:
+                - name: utime
+                - name: stime
+                - name: gtime
+                - name: minflt
+                - name: majflt
+            - name: netdata.apps_children_fix
+              description: Apps Plugin Exited Children Normalization Ratios
+              unit: percentage
+              dimensions:
+                - name: utime
+                - name: stime
+                - name: gtime
+                - name: minflt
+                - name: majflt
+  - name: netdata
+    title: COLLECTORNAME Monitoring
+    duplicate_for_virtual_integrations:
+      list:
+        - title: Ubuntu
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+        - title: Redhat
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+    overview:
+      operation:
+        description: This collector periodically does http requests to one or more
+          [Apache](link to collector) web servers to collect the metrics mod_status
+          plugin that apache exposes
+      platforms:
+        description: If this collector can't run on some platforms specify them here,
+          otherwise set this to true and this text will not be rendered, instead a
+          templated message will appear
+        boolean: true
+      multi-instance:
+        boolean: true
+      permissions:
+        description: if there are any notable permission requirements, eg running
+          as root and so on, specify them here and set it to false, otherwise set
+          it to true and a templated message will appear
+        boolean: true
+      related:
+        description: give a simple description if there are any other collectors related
+          to this collector. Example -> To get the most out of your apache servers,
+          you can monitor its processes for resources utilization and their log files
+          to turn them into real-time metrics. Check our related resources for more
+          information. (if not, leave empty)
+    setup:
+      prerequisites:
+        list:
+          - title: Prerequisite title for heading
+            text: List like with dashes, TBD, use | and newline for multiline
+      behavior:
+        auto_detection:
+          description: The collector auto-detects apache web servers running on localhost
+            ports 80, 443, and 8080.
+        limits:
+          description: The collector is limited to x amount of tables or any other
+            limitation, leave empty if none
+        impact:
+          description: Is there any impact on the application when using the default
+            configuration? Maybe on a db collector having to many tables might slow
+            down the db if collection happens per second, leave empty if none
+      configuration:
+        file:
+          description: 'which file the user has to edit. Example: go.d/apache.conf'
+        options:
+          description: TBD, use | and newline for multiline
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: option name
+              description: option description
+              default: a number or a string
+              required: true or false
+        examples:
+          folding:
+            title: Config
+            enabled: false
+          list:
+            - name: Basic / else describe what this example is about
+              description: A basic example configuration / describe your example
+              data: input the example data in yaml format
+    troubleshooting:
+      problems:
+        list:
+          - name: possible troubleshooting title
+            text: describe
+      debugging:
+        description: How to run this in debug mode? Use | and newline with indent,
+          to write in markdown
+      logs:
+        description: How can I monitor logs for this plugin?
+    related_resources:
+      integrations:
+        list:
+          - apache
+          - weblog
+          - httpcheck
+          - etc
+        provide:
+          description: What info I can provide for other plugins that reference me?
+            this will only be visible in their end, they will scrape this text. Example
+            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
+            I/O and many more resources utilization.
+    alerts: []
+    metrics:
+      description: some description for this section, or leave empty
       folding:
         title: Metrics
         enabled: false
@@ -31,134 +246,138 @@
           description: TBD
           labels: []
           metrics:
-            - name: apps.cpu
-              description: Apps CPU Time (100% = 1 core)
+            - name: netdata.apps_cpu
+              description: Apps Plugin CPU
+              unit: milliseconds/s
+              dimensions:
+                - name: user
+                - name: system
+            - name: netdata.apps_sizes
+              description: Apps Plugin Files
+              unit: files/s
+              dimensions:
+                - name: calls
+                - name: files
+                - name: filenames
+                - name: inode_changes
+                - name: link_changes
+                - name: pids
+                - name: fds
+                - name: targets
+                - name: new_pids
+            - name: netdata.apps_fix
+              description: Apps Plugin Normalization Ratios
               unit: percentage
               dimensions:
-                - name: a dimension per app group
-            - name: apps.cpu_user
-              description: Apps CPU User Time (100% = 1 core)
+                - name: utime
+                - name: stime
+                - name: gtime
+                - name: minflt
+                - name: majflt
+            - name: netdata.apps_children_fix
+              description: Apps Plugin Exited Children Normalization Ratios
               unit: percentage
               dimensions:
-                - name: a dimension per app group
-            - name: apps.cpu_system
-              description: Apps CPU System Time (100% = 1 core)
-              unit: percentage
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.cpu_guest
-              description: Apps CPU Guest Time (100% = 1 core)
-              unit: percentage
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.mem
-              description: Apps Real Memory (w/o shared)
-              unit: MiB
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.rss
-              description: Apps Resident Set Size (w/shared)
-              unit: MiB
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.vmem
-              description: Apps Virtual Memory Size
-              unit: MiB
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.swap
-              description: Apps Swap Memory
-              unit: MiB
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.major_faults
-              description: Apps Major Page Faults (swap read)
-              unit: page faults/s
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.minor_faults
-              description: Apps Minor Page Faults (swap read)
-              unit: page faults/s
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.preads
-              description: Apps Disk Reads
-              unit: KiB/s
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.pwrites
-              description: Apps Disk Writes
-              unit: KiB/s
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.lreads
-              description: Apps Disk Logical Reads
-              unit: KiB/s
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.lwrites
-              description: Apps I/O Logical Writes
-              unit: KiB/s
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.threads
-              description: Apps Threads
-              unit: threads
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.processes
-              description: Apps Processes
-              unit: processes
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.voluntary_ctxt_switches
-              description: Apps Voluntary Context Switches
-              unit: processes
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.involuntary_ctxt_switches
-              description: Apps Involuntary Context Switches
-              unit: processes
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.uptime
-              description: Apps Carried Over Uptime
-              unit: seconds
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.uptime_min
-              description: Apps Minimum Uptime
-              unit: seconds
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.uptime_avg
-              description: Apps Average Uptime
-              unit: seconds
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.uptime_max
-              description: Apps Maximum Uptime
-              unit: seconds
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.files
-              description: Apps Open Files
-              unit: open files
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.sockets
-              description: Apps Open Sockets
-              unit: open sockets
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.pipes
-              description: Apps Open Pipes
-              unit: open pipes
-              dimensions:
-                - name: a dimension per app group
-  - metrics:
-      module:
-        name: groups
+                - name: utime
+                - name: stime
+                - name: gtime
+                - name: minflt
+                - name: majflt
+  - name: netdata
+    title: COLLECTORNAME Monitoring
+    duplicate_for_virtual_integrations:
+      list:
+        - title: Ubuntu
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+        - title: Redhat
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+    overview:
+      operation:
+        description: This collector periodically does http requests to one or more
+          [Apache](link to collector) web servers to collect the metrics mod_status
+          plugin that apache exposes
+      platforms:
+        description: If this collector can't run on some platforms specify them here,
+          otherwise set this to true and this text will not be rendered, instead a
+          templated message will appear
+        boolean: true
+      multi-instance:
+        boolean: true
+      permissions:
+        description: if there are any notable permission requirements, eg running
+          as root and so on, specify them here and set it to false, otherwise set
+          it to true and a templated message will appear
+        boolean: true
+      related:
+        description: give a simple description if there are any other collectors related
+          to this collector. Example -> To get the most out of your apache servers,
+          you can monitor its processes for resources utilization and their log files
+          to turn them into real-time metrics. Check our related resources for more
+          information. (if not, leave empty)
+    setup:
+      prerequisites:
+        list:
+          - title: Prerequisite title for heading
+            text: List like with dashes, TBD, use | and newline for multiline
+      behavior:
+        auto_detection:
+          description: The collector auto-detects apache web servers running on localhost
+            ports 80, 443, and 8080.
+        limits:
+          description: The collector is limited to x amount of tables or any other
+            limitation, leave empty if none
+        impact:
+          description: Is there any impact on the application when using the default
+            configuration? Maybe on a db collector having to many tables might slow
+            down the db if collection happens per second, leave empty if none
+      configuration:
+        file:
+          description: 'which file the user has to edit. Example: go.d/apache.conf'
+        options:
+          description: TBD, use | and newline for multiline
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: option name
+              description: option description
+              default: a number or a string
+              required: true or false
+        examples:
+          folding:
+            title: Config
+            enabled: false
+          list:
+            - name: Basic / else describe what this example is about
+              description: A basic example configuration / describe your example
+              data: input the example data in yaml format
+    troubleshooting:
+      problems:
+        list:
+          - name: possible troubleshooting title
+            text: describe
+      debugging:
+        description: How to run this in debug mode? Use | and newline with indent,
+          to write in markdown
+      logs:
+        description: How can I monitor logs for this plugin?
+    related_resources:
+      integrations:
+        list:
+          - apache
+          - weblog
+          - httpcheck
+          - etc
+        provide:
+          description: What info I can provide for other plugins that reference me?
+            this will only be visible in their end, they will scrape this text. Example
+            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
+            I/O and many more resources utilization.
+    alerts: []
+    metrics:
+      description: some description for this section, or leave empty
       folding:
         title: Metrics
         enabled: false
@@ -168,134 +387,138 @@
           description: TBD
           labels: []
           metrics:
-            - name: groups.cpu
-              description: User Groups CPU Time (100% = 1 core)
+            - name: netdata.apps_cpu
+              description: Apps Plugin CPU
+              unit: milliseconds/s
+              dimensions:
+                - name: user
+                - name: system
+            - name: netdata.apps_sizes
+              description: Apps Plugin Files
+              unit: files/s
+              dimensions:
+                - name: calls
+                - name: files
+                - name: filenames
+                - name: inode_changes
+                - name: link_changes
+                - name: pids
+                - name: fds
+                - name: targets
+                - name: new_pids
+            - name: netdata.apps_fix
+              description: Apps Plugin Normalization Ratios
               unit: percentage
               dimensions:
-                - name: a dimension per user group
-            - name: groups.cpu_user
-              description: User Groups CPU User Time (100% = 1 core)
+                - name: utime
+                - name: stime
+                - name: gtime
+                - name: minflt
+                - name: majflt
+            - name: netdata.apps_children_fix
+              description: Apps Plugin Exited Children Normalization Ratios
               unit: percentage
               dimensions:
-                - name: a dimension per user group
-            - name: groups.cpu_system
-              description: User Groups CPU System Time (100% = 1 core)
-              unit: percentage
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.cpu_guest
-              description: User Groups CPU Guest Time (100% = 1 core)
-              unit: percentage
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.mem
-              description: User Groups Real Memory (w/o shared)
-              unit: MiB
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.rss
-              description: User Groups Resident Set Size (w/shared)
-              unit: MiB
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.vmem
-              description: User Groups Virtual Memory Size
-              unit: MiB
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.swap
-              description: User Groups Swap Memory
-              unit: MiB
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.major_faults
-              description: User Groups Major Page Faults (swap read)
-              unit: page faults/s
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.minor_faults
-              description: User Groups Page Faults (swap read)
-              unit: page faults/s
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.preads
-              description: User Groups Disk Reads
-              unit: KiB/s
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.pwrites
-              description: User Groups Disk Writes
-              unit: KiB/s
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.lreads
-              description: User Groups Disk Logical Reads
-              unit: KiB/s
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.lwrites
-              description: User Groups I/O Logical Writes
-              unit: KiB/s
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.threads
-              description: User Groups Threads
-              unit: threads
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.processes
-              description: User Groups Processes
-              unit: processes
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.voluntary_ctxt_switches
-              description: User Groups Voluntary Context Switches
-              unit: processes
-              dimensions:
-                - name: a dimension per app group
-            - name: groups.involuntary_ctxt_switches
-              description: User Groups Involuntary Context Switches
-              unit: processes
-              dimensions:
-                - name: a dimension per app group
-            - name: groups.uptime
-              description: User Groups Carried Over Uptime
-              unit: seconds
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.uptime_min
-              description: User Groups Minimum Uptime
-              unit: seconds
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.uptime_avg
-              description: User Groups Average Uptime
-              unit: seconds
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.uptime_max
-              description: User Groups Maximum Uptime
-              unit: seconds
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.files
-              description: User Groups Open Files
-              unit: open files
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.sockets
-              description: User Groups Open Sockets
-              unit: open sockets
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.pipes
-              description: User Groups Open Pipes
-              unit: open pipes
-              dimensions:
-                - name: a dimension per user group
-  - metrics:
-      module:
-        name: users
+                - name: utime
+                - name: stime
+                - name: gtime
+                - name: minflt
+                - name: majflt
+  - name: netdata
+    title: COLLECTORNAME Monitoring
+    duplicate_for_virtual_integrations:
+      list:
+        - title: Ubuntu
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+        - title: Redhat
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+    overview:
+      operation:
+        description: This collector periodically does http requests to one or more
+          [Apache](link to collector) web servers to collect the metrics mod_status
+          plugin that apache exposes
+      platforms:
+        description: If this collector can't run on some platforms specify them here,
+          otherwise set this to true and this text will not be rendered, instead a
+          templated message will appear
+        boolean: true
+      multi-instance:
+        boolean: true
+      permissions:
+        description: if there are any notable permission requirements, eg running
+          as root and so on, specify them here and set it to false, otherwise set
+          it to true and a templated message will appear
+        boolean: true
+      related:
+        description: give a simple description if there are any other collectors related
+          to this collector. Example -> To get the most out of your apache servers,
+          you can monitor its processes for resources utilization and their log files
+          to turn them into real-time metrics. Check our related resources for more
+          information. (if not, leave empty)
+    setup:
+      prerequisites:
+        list:
+          - title: Prerequisite title for heading
+            text: List like with dashes, TBD, use | and newline for multiline
+      behavior:
+        auto_detection:
+          description: The collector auto-detects apache web servers running on localhost
+            ports 80, 443, and 8080.
+        limits:
+          description: The collector is limited to x amount of tables or any other
+            limitation, leave empty if none
+        impact:
+          description: Is there any impact on the application when using the default
+            configuration? Maybe on a db collector having to many tables might slow
+            down the db if collection happens per second, leave empty if none
+      configuration:
+        file:
+          description: 'which file the user has to edit. Example: go.d/apache.conf'
+        options:
+          description: TBD, use | and newline for multiline
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: option name
+              description: option description
+              default: a number or a string
+              required: true or false
+        examples:
+          folding:
+            title: Config
+            enabled: false
+          list:
+            - name: Basic / else describe what this example is about
+              description: A basic example configuration / describe your example
+              data: input the example data in yaml format
+    troubleshooting:
+      problems:
+        list:
+          - name: possible troubleshooting title
+            text: describe
+      debugging:
+        description: How to run this in debug mode? Use | and newline with indent,
+          to write in markdown
+      logs:
+        description: How can I monitor logs for this plugin?
+    related_resources:
+      integrations:
+        list:
+          - apache
+          - weblog
+          - httpcheck
+          - etc
+        provide:
+          description: What info I can provide for other plugins that reference me?
+            this will only be visible in their end, they will scrape this text. Example
+            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
+            I/O and many more resources utilization.
+    alerts: []
+    metrics:
+      description: some description for this section, or leave empty
       folding:
         title: Metrics
         enabled: false
@@ -305,134 +528,138 @@
           description: TBD
           labels: []
           metrics:
-            - name: users.cpu
-              description: Users CPU Time (100% = 1 core)
+            - name: netdata.apps_cpu
+              description: Apps Plugin CPU
+              unit: milliseconds/s
+              dimensions:
+                - name: user
+                - name: system
+            - name: netdata.apps_sizes
+              description: Apps Plugin Files
+              unit: files/s
+              dimensions:
+                - name: calls
+                - name: files
+                - name: filenames
+                - name: inode_changes
+                - name: link_changes
+                - name: pids
+                - name: fds
+                - name: targets
+                - name: new_pids
+            - name: netdata.apps_fix
+              description: Apps Plugin Normalization Ratios
               unit: percentage
               dimensions:
-                - name: a dimension per user
-            - name: users.cpu_user
-              description: Users CPU User Time (100% = 1 core)
+                - name: utime
+                - name: stime
+                - name: gtime
+                - name: minflt
+                - name: majflt
+            - name: netdata.apps_children_fix
+              description: Apps Plugin Exited Children Normalization Ratios
               unit: percentage
               dimensions:
-                - name: a dimension per user
-            - name: users.cpu_system
-              description: Users CPU System Time (100% = 1 core)
-              unit: percentage
-              dimensions:
-                - name: a dimension per user
-            - name: users.cpu_guest
-              description: Users CPU Guest Time (100% = 1 core)
-              unit: percentage
-              dimensions:
-                - name: a dimension per user
-            - name: users.mem
-              description: Users Real Memory (w/o shared)
-              unit: MiB
-              dimensions:
-                - name: a dimension per user
-            - name: users.rss
-              description: Users Resident Set Size (w/shared)
-              unit: MiB
-              dimensions:
-                - name: a dimension per user
-            - name: users.vmem
-              description: Users Virtual Memory Size
-              unit: MiB
-              dimensions:
-                - name: a dimension per user
-            - name: users.swap
-              description: Users Swap Memory
-              unit: MiB
-              dimensions:
-                - name: a dimension per user
-            - name: users.major_faults
-              description: Users Major Page Faults (swap read)
-              unit: page faults/s
-              dimensions:
-                - name: a dimension per user
-            - name: users.minor_faults
-              description: Users Page Faults (swap read)
-              unit: page faults/s
-              dimensions:
-                - name: a dimension per user
-            - name: users.preads
-              description: Users Disk Reads
-              unit: KiB/s
-              dimensions:
-                - name: a dimension per user
-            - name: users.pwrites
-              description: Users Disk Writes
-              unit: KiB/s
-              dimensions:
-                - name: a dimension per user
-            - name: users.lreads
-              description: Users Disk Logical Reads
-              unit: KiB/s
-              dimensions:
-                - name: a dimension per user
-            - name: users.lwrites
-              description: Users I/O Logical Writes
-              unit: KiB/s
-              dimensions:
-                - name: a dimension per user
-            - name: users.threads
-              description: Users Threads
-              unit: threads
-              dimensions:
-                - name: a dimension per user
-            - name: users.processes
-              description: Users Processes
-              unit: processes
-              dimensions:
-                - name: a dimension per user
-            - name: users.voluntary_ctxt_switches
-              description: Users Voluntary Context Switches
-              unit: processes
-              dimensions:
-                - name: a dimension per app group
-            - name: users.involuntary_ctxt_switches
-              description: Users Involuntary Context Switches
-              unit: processes
-              dimensions:
-                - name: a dimension per app group
-            - name: users.uptime
-              description: Users Carried Over Uptime
-              unit: seconds
-              dimensions:
-                - name: a dimension per user
-            - name: users.uptime_min
-              description: Users Minimum Uptime
-              unit: seconds
-              dimensions:
-                - name: a dimension per user
-            - name: users.uptime_avg
-              description: Users Average Uptime
-              unit: seconds
-              dimensions:
-                - name: a dimension per user
-            - name: users.uptime_max
-              description: Users Maximum Uptime
-              unit: seconds
-              dimensions:
-                - name: a dimension per user
-            - name: users.files
-              description: Users Open Files
-              unit: open files
-              dimensions:
-                - name: a dimension per user
-            - name: users.sockets
-              description: Users Open Sockets
-              unit: open sockets
-              dimensions:
-                - name: a dimension per user
-            - name: users.pipes
-              description: Users Open Pipes
-              unit: open pipes
-              dimensions:
-                - name: a dimension per user
-  - metrics:
-      module:
-        name: netdata
+                - name: utime
+                - name: stime
+                - name: gtime
+                - name: minflt
+                - name: majflt
+  - name: netdata
+    title: COLLECTORNAME Monitoring
+    duplicate_for_virtual_integrations:
+      list:
+        - title: Ubuntu
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+        - title: Redhat
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+    overview:
+      operation:
+        description: This collector periodically does http requests to one or more
+          [Apache](link to collector) web servers to collect the metrics mod_status
+          plugin that apache exposes
+      platforms:
+        description: If this collector can't run on some platforms specify them here,
+          otherwise set this to true and this text will not be rendered, instead a
+          templated message will appear
+        boolean: true
+      multi-instance:
+        boolean: true
+      permissions:
+        description: if there are any notable permission requirements, eg running
+          as root and so on, specify them here and set it to false, otherwise set
+          it to true and a templated message will appear
+        boolean: true
+      related:
+        description: give a simple description if there are any other collectors related
+          to this collector. Example -> To get the most out of your apache servers,
+          you can monitor its processes for resources utilization and their log files
+          to turn them into real-time metrics. Check our related resources for more
+          information. (if not, leave empty)
+    setup:
+      prerequisites:
+        list:
+          - title: Prerequisite title for heading
+            text: List like with dashes, TBD, use | and newline for multiline
+      behavior:
+        auto_detection:
+          description: The collector auto-detects apache web servers running on localhost
+            ports 80, 443, and 8080.
+        limits:
+          description: The collector is limited to x amount of tables or any other
+            limitation, leave empty if none
+        impact:
+          description: Is there any impact on the application when using the default
+            configuration? Maybe on a db collector having to many tables might slow
+            down the db if collection happens per second, leave empty if none
+      configuration:
+        file:
+          description: 'which file the user has to edit. Example: go.d/apache.conf'
+        options:
+          description: TBD, use | and newline for multiline
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: option name
+              description: option description
+              default: a number or a string
+              required: true or false
+        examples:
+          folding:
+            title: Config
+            enabled: false
+          list:
+            - name: Basic / else describe what this example is about
+              description: A basic example configuration / describe your example
+              data: input the example data in yaml format
+    troubleshooting:
+      problems:
+        list:
+          - name: possible troubleshooting title
+            text: describe
+      debugging:
+        description: How to run this in debug mode? Use | and newline with indent,
+          to write in markdown
+      logs:
+        description: How can I monitor logs for this plugin?
+    related_resources:
+      integrations:
+        list:
+          - apache
+          - weblog
+          - httpcheck
+          - etc
+        provide:
+          description: What info I can provide for other plugins that reference me?
+            this will only be visible in their end, they will scrape this text. Example
+            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
+            I/O and many more resources utilization.
+    alerts: []
+    metrics:
+      description: some description for this section, or leave empty
       folding:
         title: Metrics
         enabled: false

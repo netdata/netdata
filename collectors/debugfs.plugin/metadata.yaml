@@ -1,65 +1,249 @@
-  - metrics:
-      module:
-        name: /sys/kernel/debug/extfrag
+name: debugfs.plugin
+title: TBD
+modules:
+  - name: /sys/kernel/debug/zswap
+    title: COLLECTORNAME Monitoring
+    duplicate_for_virtual_integrations:
+      list:
+        - title: Ubuntu
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+        - title: Redhat
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+    overview:
+      operation:
+        description: This collector periodically does http requests to one or more
+          [Apache](link to collector) web servers to collect the metrics mod_status
+          plugin that apache exposes
+      platforms:
+        description: If this collector can't run on some platforms specify them here,
+          otherwise set this to true and this text will not be rendered, instead a
+          templated message will appear
+        boolean: true
+      multi-instance:
+        boolean: true
+      permissions:
+        description: if there are any notable permission requirements, eg running
+          as root and so on, specify them here and set it to false, otherwise set
+          it to true and a templated message will appear
+        boolean: true
+      related:
+        description: give a simple description if there are any other collectors related
+          to this collector. Example -> To get the most out of your apache servers,
+          you can monitor its processes for resources utilization and their log files
+          to turn them into real-time metrics. Check our related resources for more
+          information. (if not, leave empty)
+    setup:
+      prerequisites:
+        list:
+          - title: Prerequisite title for heading
+            text: List like with dashes, TBD, use | and newline for multiline
+      behavior:
+        auto_detection:
+          description: The collector auto-detects apache web servers running on localhost
+            ports 80, 443, and 8080.
+        limits:
+          description: The collector is limited to x amount of tables or any other
+            limitation, leave empty if none
+        impact:
+          description: Is there any impact on the application when using the default
+            configuration? Maybe on a db collector having to many tables might slow
+            down the db if collection happens per second, leave empty if none
+      configuration:
+        file:
+          description: 'which file the user has to edit. Example: go.d/apache.conf'
+        options:
+          description: TBD, use | and newline for multiline
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: option name
+              description: option description
+              default: a number or a string
+              required: true or false
+        examples:
+          folding:
+            title: Config
+            enabled: false
+          list:
+            - name: Basic / else describe what this example is about
+              description: A basic example configuration / describe your example
+              data: input the example data in yaml format
+    troubleshooting:
+      problems:
+        list:
+          - name: possible troubleshooting title
+            text: describe
+      debugging:
+        description: How to run this in debug mode? Use | and newline with indent,
+          to write in markdown
+      logs:
+        description: How can I monitor logs for this plugin?
+    related_resources:
+      integrations:
+        list:
+          - apache
+          - weblog
+          - httpcheck
+          - etc
+        provide:
+          description: What info I can provide for other plugins that reference me?
+            this will only be visible in their end, they will scrape this text. Example
+            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
+            I/O and many more resources utilization.
+    alerts: []
+    metrics:
+      description: some description for this section, or leave empty
       folding:
         title: Metrics
         enabled: false
       scope:
-        node:
-          name: node
+        global:
+          name: global
           description: TBD
-          labels:
-            - name: numa_node
-              description: TBD
+          labels: []
           metrics:
-            - name: mem.fragmentation_index_dma
-              description: Memory fragmentation index for each order
-              unit: index
+            - name: system.zswap_pool_compression_ratio
+              description: Zswap compression ratio
+              unit: ratio
               dimensions:
-                - name: order0
-                - name: order1
-                - name: order2
-                - name: order3
-                - name: order4
-                - name: order5
-                - name: order6
-                - name: order7
-                - name: order8
-                - name: order9
-                - name: order10
-            - name: mem.fragmentation_index_dma32
-              description: Memory fragmentation index for each order
-              unit: index
+                - name: compression_ratio
+            - name: system.zswap_pool_compressed_size
+              description: Zswap compressed bytes currently stored
+              unit: bytes
               dimensions:
-                - name: order0
-                - name: order1
-                - name: order2
-                - name: order3
-                - name: order4
-                - name: order5
-                - name: order6
-                - name: order7
-                - name: order8
-                - name: order9
-                - name: order10
-            - name: mem.fragmentation_index_normal
-              description: Memory fragmentation index for each order
-              unit: index
+                - name: compressed_size
+            - name: system.zswap_pool_raw_size
+              description: Zswap uncompressed bytes currently stored
+              unit: bytes
               dimensions:
-                - name: order0
-                - name: order1
-                - name: order2
-                - name: order3
-                - name: order4
-                - name: order5
-                - name: order6
-                - name: order7
-                - name: order8
-                - name: order9
-                - name: order10
-  - metrics:
-      module:
-        name: /sys/kernel/debug/zswap
+                - name: uncompressed_size
+            - name: system.zswap_rejections
+              description: Zswap rejections
+              unit: rejections/s
+              dimensions:
+                - name: compress_poor
+                - name: kmemcache_fail
+                - name: alloc_fail
+                - name: reclaim_fail
+            - name: system.zswap_pool_limit_hit
+              description: Zswap pool limit was reached
+              unit: events/s
+              dimensions:
+                - name: limit
+            - name: system.zswap_written_back_raw_bytes
+              description: Zswap uncomressed bytes written back when pool limit was
+                reached
+              unit: bytes/s
+              dimensions:
+                - name: written_back
+            - name: system.zswap_same_filled_raw_size
+              description: Zswap same-value filled uncompressed bytes currently stored
+              unit: bytes
+              dimensions:
+                - name: same_filled
+            - name: system.zswap_duplicate_entry
+              description: Zswap duplicate store was encountered
+              unit: entries/s
+              dimensions:
+                - name: duplicate
+  - name: /sys/kernel/debug/zswap
+    title: COLLECTORNAME Monitoring
+    duplicate_for_virtual_integrations:
+      list:
+        - title: Ubuntu
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+        - title: Redhat
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+    overview:
+      operation:
+        description: This collector periodically does http requests to one or more
+          [Apache](link to collector) web servers to collect the metrics mod_status
+          plugin that apache exposes
+      platforms:
+        description: If this collector can't run on some platforms specify them here,
+          otherwise set this to true and this text will not be rendered, instead a
+          templated message will appear
+        boolean: true
+      multi-instance:
+        boolean: true
+      permissions:
+        description: if there are any notable permission requirements, eg running
+          as root and so on, specify them here and set it to false, otherwise set
+          it to true and a templated message will appear
+        boolean: true
+      related:
+        description: give a simple description if there are any other collectors related
+          to this collector. Example -> To get the most out of your apache servers,
+          you can monitor its processes for resources utilization and their log files
+          to turn them into real-time metrics. Check our related resources for more
+          information. (if not, leave empty)
+    setup:
+      prerequisites:
+        list:
+          - title: Prerequisite title for heading
+            text: List like with dashes, TBD, use | and newline for multiline
+      behavior:
+        auto_detection:
+          description: The collector auto-detects apache web servers running on localhost
+            ports 80, 443, and 8080.
+        limits:
+          description: The collector is limited to x amount of tables or any other
+            limitation, leave empty if none
+        impact:
+          description: Is there any impact on the application when using the default
+            configuration? Maybe on a db collector having to many tables might slow
+            down the db if collection happens per second, leave empty if none
+      configuration:
+        file:
+          description: 'which file the user has to edit. Example: go.d/apache.conf'
+        options:
+          description: TBD, use | and newline for multiline
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: option name
+              description: option description
+              default: a number or a string
+              required: true or false
+        examples:
+          folding:
+            title: Config
+            enabled: false
+          list:
+            - name: Basic / else describe what this example is about
+              description: A basic example configuration / describe your example
+              data: input the example data in yaml format
+    troubleshooting:
+      problems:
+        list:
+          - name: possible troubleshooting title
+            text: describe
+      debugging:
+        description: How to run this in debug mode? Use | and newline with indent,
+          to write in markdown
+      logs:
+        description: How can I monitor logs for this plugin?
+    related_resources:
+      integrations:
+        list:
+          - apache
+          - weblog
+          - httpcheck
+          - etc
+        provide:
+          description: What info I can provide for other plugins that reference me?
+            this will only be visible in their end, they will scrape this text. Example
+            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
+            I/O and many more resources utilization.
+    alerts: []
+    metrics:
+      description: some description for this section, or leave empty
       folding:
         title: Metrics
         enabled: false

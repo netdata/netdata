@@ -1,27 +1,119 @@
-  - metrics:
-      module:
-        name: fail2ban
+name: fail2ban
+title: COLLECTORNAME Monitoring
+duplicate_for_virtual_integrations:
+  list:
+    - title: Ubuntu
+      description: dummy description that will replace the original "overview" section,
+        leave the whole list empty if none
+    - title: Redhat
+      description: dummy description that will replace the original "overview" section,
+        leave the whole list empty if none
+overview:
+  operation:
+    description: This collector periodically does http requests to one or more [Apache](link
+      to collector) web servers to collect the metrics mod_status plugin that apache
+      exposes
+  platforms:
+    description: If this collector can't run on some platforms specify them here,
+      otherwise set this to true and this text will not be rendered, instead a templated
+      message will appear
+    boolean: true
+  multi-instance:
+    boolean: true
+  permissions:
+    description: if there are any notable permission requirements, eg running as root
+      and so on, specify them here and set it to false, otherwise set it to true and
+      a templated message will appear
+    boolean: true
+  related:
+    description: give a simple description if there are any other collectors related
+      to this collector. Example -> To get the most out of your apache servers, you
+      can monitor its processes for resources utilization and their log files to turn
+      them into real-time metrics. Check our related resources for more information.
+      (if not, leave empty)
+setup:
+  prerequisites:
+    list:
+      - title: Prerequisite title for heading
+        text: List like with dashes, TBD, use | and newline for multiline
+  behavior:
+    auto_detection:
+      description: The collector auto-detects apache web servers running on localhost
+        ports 80, 443, and 8080.
+    limits:
+      description: The collector is limited to x amount of tables or any other limitation,
+        leave empty if none
+    impact:
+      description: Is there any impact on the application when using the default configuration?
+        Maybe on a db collector having to many tables might slow down the db if collection
+        happens per second, leave empty if none
+  configuration:
+    file:
+      description: 'which file the user has to edit. Example: go.d/apache.conf'
+    options:
+      description: TBD, use | and newline for multiline
       folding:
-        title: Metrics
+        title: Config options
+        enabled: true
+      list:
+        - name: option name
+          description: option description
+          default: a number or a string
+          required: true or false
+    examples:
+      folding:
+        title: Config
         enabled: false
-      scope:
-        global:
-          name: global
-          description: TBD
-          labels: []
-          metrics:
-            - name: fail2ban.faile_attempts
-              description: Failed attempts
-              unit: attempts/s
-              dimensions:
-                - name: a dimension per jail
-            - name: fail2ban.bans
-              description: Bans
-              unit: bans/s
-              dimensions:
-                - name: a dimension per jail
-            - name: fail2ban.banned_ips
-              description: Banned IP addresses (since the last restart of netdata)
-              unit: ips
-              dimensions:
-                - name: a dimension per jail
+      list:
+        - name: Basic / else describe what this example is about
+          description: A basic example configuration / describe your example
+          data: input the example data in yaml format
+troubleshooting:
+  problems:
+    list:
+      - name: possible troubleshooting title
+        text: describe
+  debugging:
+    description: How to run this in debug mode? Use | and newline with indent, to
+      write in markdown
+  logs:
+    description: How can I monitor logs for this plugin?
+related_resources:
+  integrations:
+    list:
+      - apache
+      - weblog
+      - httpcheck
+      - etc
+    provide:
+      description: What info I can provide for other plugins that reference me? this
+        will only be visible in their end, they will scrape this text. Example ->
+        apps.plugin allows monitoring individual processes CPU, Memory, Disk I/O and
+        many more resources utilization.
+alerts: []
+metrics:
+  description: some description for this section, or leave empty
+  folding:
+    title: Metrics
+    enabled: false
+  scope:
+    global:
+      name: global
+      description: TBD
+      labels: []
+      metrics:
+        - name: fail2ban.faile_attempts
+          description: Failed attempts
+          unit: attempts/s
+          dimensions:
+            - name: a dimension per jail
+        - name: fail2ban.bans
+          description: Bans
+          unit: bans/s
+          dimensions:
+            - name: a dimension per jail
+        - name: fail2ban.banned_ips
+          description: Banned IP addresses (since the last restart of netdata)
+          unit: ips
+          dimensions:
+            - name: a dimension per jail
