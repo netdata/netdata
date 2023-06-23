@@ -328,28 +328,48 @@ static inline uint8_t contenttype_for_filename(const char *filename) {
 // Work around a bug in the CMocka library by removing this function during testing.
 #ifndef REMOVE_MYSENDFILE
 
-static bool find_filename_to_serve(const char *filename, char *dst, size_t dst_len, struct stat *statbuf, int dashboard_version, bool has_extension, bool *is_dir) {
+static inline int dashboard_version(struct web_client *w) {
+    if(!web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_WITH_VERSION))
+        return -1;
+
+    if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_IS_V0))
+        return 0;
+    if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_IS_V1))
+        return 1;
+    if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_IS_V2))
+        return 2;
+
+    return -1;
+}
+
+static bool find_filename_to_serve(const char *filename, char *dst, size_t dst_len, struct stat *statbuf, struct web_client *w, bool *is_dir) {
+    int d_version = dashboard_version(w);
+    bool has_extension = web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_HAS_FILE_EXTENSION);
+
     int fallback = 0;
 
     if(has_extension) {
-        if(dashboard_version == -1)
+        if(d_version == -1)
             snprintfz(dst, dst_len, "%s/%s", netdata_configured_web_dir, filename);
         else {
             // check if the filename or directory exists
             // fallback to the same path without the dashboard version otherwise
-            snprintfz(dst, dst_len, "%s/v%d/%s", netdata_configured_web_dir, dashboard_version, filename);
+            snprintfz(dst, dst_len, "%s/v%d/%s", netdata_configured_web_dir, d_version, filename);
             fallback = 1;
         }
     }
-    else if(dashboard_version != -1) {
+    else if(d_version != -1) {
         if(filename && *filename) {
             // check if the filename exists
             // fallback to /vN/index.html otherwise
             snprintfz(dst, dst_len, "%s/%s", netdata_configured_web_dir, filename);
             fallback = 2;
         }
-        else
-            snprintfz(dst, dst_len, "%s/v%d", netdata_configured_web_dir, dashboard_version);
+        else {
+            if(filename && *filename)
+                web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH);
+            snprintfz(dst, dst_len, "%s/v%d", netdata_configured_web_dir, d_version);
+        }
     }
     else {
         // check if filename exists
@@ -366,11 +386,15 @@ static bool find_filename_to_serve(const char *filename, char *dst, size_t dst_l
                 return false;
         }
         else if(fallback == 2) {
-            snprintfz(dst, dst_len, "%s/v%d", netdata_configured_web_dir, dashboard_version);
+            if(filename && *filename)
+                web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH);
+            snprintfz(dst, dst_len, "%s/v%d", netdata_configured_web_dir, d_version);
             if (lstat(dst, statbuf) != 0)
                 return false;
         }
         else if(fallback == 3) {
+            if(filename && *filename)
+                web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH);
             snprintfz(dst, dst_len, "%s", netdata_configured_web_dir);
             if (lstat(dst, statbuf) != 0)
                 return false;
@@ -393,20 +417,6 @@ static bool find_filename_to_serve(const char *filename, char *dst, size_t dst_l
     }
 
     return true;
-}
-
-static inline int dashboard_version(struct web_client *w) {
-    if(!web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_WITH_VERSION))
-        return -1;
-
-    if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_IS_V0))
-        return 0;
-    if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_IS_V1))
-        return 1;
-    if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_IS_V2))
-        return 2;
-
-    return -1;
 }
 
 static int mysendfile(struct web_client *w, char *filename) {
@@ -443,10 +453,7 @@ static int mysendfile(struct web_client *w, char *filename) {
     bool is_dir = false;
     char web_filename[FILENAME_MAX + 1];
     struct stat statbuf;
-    if(!find_filename_to_serve(filename, web_filename, FILENAME_MAX, &statbuf,
-                               dashboard_version(w),
-                               web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_HAS_FILE_EXTENSION),
-                               &is_dir)) {
+    if(!find_filename_to_serve(filename, web_filename, FILENAME_MAX, &statbuf, w, &is_dir)) {
         w->response.data->content_type = CT_TEXT_HTML;
         buffer_strcat(w->response.data, "File does not exist, or is not accessible: ");
         buffer_strcat_htmlescape(w->response.data, web_filename);
