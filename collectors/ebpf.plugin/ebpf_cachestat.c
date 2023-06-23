@@ -1275,8 +1275,6 @@ static void cachestat_collector(ebpf_module_t *em)
         pthread_mutex_unlock(&collect_data_mutex);
 
         pthread_mutex_lock(&ebpf_exit_cleanup);
-        // When a new request happen before the end of previous request, we reset em->running_time, so
-        // we need to reset running_time here
         if (running_time && !em->running_time)
             running_time = update_every;
         else

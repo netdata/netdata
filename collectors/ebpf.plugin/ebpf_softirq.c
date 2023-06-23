@@ -199,7 +199,11 @@ static void softirq_collector(ebpf_module_t *em)
         pthread_mutex_unlock(&lock);
 
         pthread_mutex_lock(&ebpf_exit_cleanup);
-        running_time += update_every;
+        if (running_time && !em->running_time)
+            running_time = update_every;
+        else
+            running_time += update_every;
+
         em->running_time = running_time;
         pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
