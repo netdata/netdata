@@ -130,6 +130,26 @@ static inline int ebpf_mdflush_load_and_attach(struct mdflush_bpf *obj, ebpf_mod
 #endif
 
 /**
+ * Obsolete global
+ *
+ * Obsolete global charts created by thread.
+ *
+ * @param em a pointer to `struct ebpf_module`
+ */
+static void ebpf_obsolete_mdflush_global(ebpf_module_t *em)
+{
+    ebpf_write_chart_obsolete("mdstat",
+                              "mdstat_flush",
+                              "MD flushes",
+                              "flushes",
+                              "flush (eBPF)",
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                              NULL,
+                              NETDATA_CHART_PRIO_MDSTAT_FLUSH,
+                              em->update_every);
+}
+
+/**
  * MDflush exit
  *
  * Cancel thread and exit.
@@ -140,8 +160,20 @@ static void mdflush_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    if (em->objects)
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        pthread_mutex_lock(&lock);
+
+        ebpf_obsolete_mdflush_global(em);
+
+        pthread_mutex_unlock(&lock);
+        fflush(stdout);
+    }
+
+    if (em->objects) {
         ebpf_unload_legacy_code(em->objects, em->probe_links);
+        em->objects = NULL;
+        em->probe_links = NULL;
+    }
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
