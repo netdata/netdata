@@ -118,11 +118,11 @@ struct compressor_state {
     char *compression_result_buffer;
     size_t compression_result_buffer_size;
     struct {
-        void *stream;
+        void *lz4_stream;
         char *input_ring_buffer;
         size_t input_ring_buffer_size;
         size_t input_ring_buffer_pos;
-    } data;
+    } stream;
     size_t (*compress)(struct compressor_state *state, const char *data, size_t size, char **buffer);
     void (*destroy)(struct compressor_state **state);
 };
@@ -241,7 +241,7 @@ struct sender_state {
     netdata_mutex_t mutex;
     struct circular_buffer *buffer;
     char read_buffer[PLUGINSD_LINE_MAX + 1];
-    int read_len;
+    ssize_t read_len;
     STREAM_CAPABILITIES capabilities;
 
     size_t sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_MAX];

@@ -12,28 +12,28 @@ void rrdpush_compressor_reset(struct compressor_state *state) {
     if(!state->initialized) {
         state->initialized = true;
 
-        state->data.stream = LZ4_createStream();
-        state->data.input_ring_buffer_size = LZ4_DECODER_RING_BUFFER_SIZE(COMPRESSION_MAX_MSG_SIZE * 2);
-        state->data.input_ring_buffer = callocz(1, state->data.input_ring_buffer_size);
+        state->stream.lz4_stream = LZ4_createStream();
+        state->stream.input_ring_buffer_size = LZ4_DECODER_RING_BUFFER_SIZE(COMPRESSION_MAX_MSG_SIZE * 2);
+        state->stream.input_ring_buffer = callocz(1, state->stream.input_ring_buffer_size);
         state->compression_result_buffer_size = 0;
     }
 
-    LZ4_resetStream_fast(state->data.stream);
+    LZ4_resetStream_fast(state->stream.lz4_stream);
 
-    state->data.input_ring_buffer_pos = 0;
+    state->stream.input_ring_buffer_pos = 0;
 }
 
 /*
  * Destroy compressor state and all related data
  */
 void rrdpush_compressor_destroy(struct compressor_state *state) {
-    if (state->data.stream) {
-        LZ4_freeStream(state->data.stream);
-        state->data.stream = NULL;
+    if (state->stream.lz4_stream) {
+        LZ4_freeStream(state->stream.lz4_stream);
+        state->stream.lz4_stream = NULL;
     }
 
-    freez(state->data.input_ring_buffer);
-    state->data.input_ring_buffer = NULL;
+    freez(state->stream.input_ring_buffer);
+    state->stream.input_ring_buffer = NULL;
 
     freez(state->compression_result_buffer);
     state->compression_result_buffer = NULL;
@@ -70,16 +70,16 @@ size_t rrdpush_compress(struct compressor_state *state, const char *data, size_t
     }
 
     // the ring buffer always has space for LZ4_MAX_MSG_SIZE
-    memcpy(state->data.input_ring_buffer + state->data.input_ring_buffer_pos, data, size);
+    memcpy(state->stream.input_ring_buffer + state->stream.input_ring_buffer_pos, data, size);
 
     // this call needs the last 64K of our previous data
     // they are available in the ring buffer
     long int compressed_data_size = LZ4_compress_fast_continue(
-        state->data.stream,
-        state->data.input_ring_buffer + state->data.input_ring_buffer_pos,
+        state->stream.lz4_stream,
+        state->stream.input_ring_buffer + state->stream.input_ring_buffer_pos,
         state->compression_result_buffer + RRDPUSH_COMPRESSION_SIGNATURE_SIZE,
-        size,
-        max_dst_size,
+        (int)size,
+        (int)max_dst_size,
         1);
 
     if (compressed_data_size < 0) {
@@ -88,9 +88,9 @@ size_t rrdpush_compress(struct compressor_state *state, const char *data, size_t
     }
 
     // update the next writing position of the ring buffer
-    state->data.input_ring_buffer_pos += size;
-    if(unlikely(state->data.input_ring_buffer_pos >= state->data.input_ring_buffer_size - COMPRESSION_MAX_MSG_SIZE))
-        state->data.input_ring_buffer_pos = 0;
+    state->stream.input_ring_buffer_pos += size;
+    if(unlikely(state->stream.input_ring_buffer_pos >= state->stream.input_ring_buffer_size - COMPRESSION_MAX_MSG_SIZE))
+        state->stream.input_ring_buffer_pos = 0;
 
     // update the signature header
     uint32_t len = ((compressed_data_size & 0x7f) | 0x80 | (((compressed_data_size & (0x7f << 7)) << 1) | 0x8000)) << 8;

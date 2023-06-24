@@ -11,7 +11,7 @@
 #define WORKER_SENDER_JOB_DISCONNECT_OVERFLOW        6
 #define WORKER_SENDER_JOB_DISCONNECT_TIMEOUT         7
 #define WORKER_SENDER_JOB_DISCONNECT_POLL_ERROR      8
-#define WORKER_SENDER_JOB_DISCONNECT_SOCKER_ERROR    9
+#define WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR    9
 #define WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR      10
 #define WORKER_SENDER_JOB_DISCONNECT_PARENT_CLOSED  11
 #define WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR  12
@@ -709,7 +709,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     if(!rrdpush_sender_connect_ssl(s))
         return false;
 
-    ssize_t bytes, len = strlen(http);
+    ssize_t bytes, len = (ssize_t)strlen(http);
 
     bytes = send_timeout(
 #ifdef ENABLE_HTTPS
@@ -819,9 +819,9 @@ static bool attempt_to_connect(struct sender_state *state)
     return false;
 }
 
-// TCP window is open and we have data to transmit.
+// TCP window is open, and we have data to transmit.
 static ssize_t attempt_to_send(struct sender_state *s) {
-    ssize_t ret = 0;
+    ssize_t ret;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     struct circular_buffer *cb = s->buffer;
@@ -1218,7 +1218,7 @@ void *rrdpush_sender_thread(void *ptr) {
     // disconnection reasons
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT, "disconnect timeout");
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_POLL_ERROR, "disconnect poll error");
-    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_SOCKER_ERROR, "disconnect socket error");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR, "disconnect socket error");
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_OVERFLOW, "disconnect overflow");
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR, "disconnect ssl error");
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_PARENT_CLOSED, "disconnect parent closed");
@@ -1479,7 +1479,7 @@ void *rrdpush_sender_thread(void *ptr) {
                 error = "connection is invalid (POLLNVAL)";
 
             if(unlikely(error)) {
-                worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SOCKER_ERROR);
+                worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR);
                 error("STREAM %s [send to %s]: restarting connection: %s - %zu bytes transmitted.",
                       rrdhost_hostname(s->host), s->connected_to, error, s->sent_bytes_on_this_connection);
                 rrdpush_sender_thread_close_socket(s->host);
