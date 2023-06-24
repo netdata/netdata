@@ -2012,7 +2012,8 @@ PARSER *parser_init(struct parser_user_object *user, FILE *fp_input, FILE *fp_ou
     PARSER *parser;
 
     parser = callocz(1, sizeof(*parser));
-    parser->user = *user;
+    if(user)
+        parser->user = *user;
     parser->fd = fd;
     parser->fp_input = fp_input;
     parser->fp_output = fp_output;
@@ -2048,5 +2049,38 @@ int pluginsd_parser_unittest(void) {
     PARSER *p = parser_init(NULL, NULL, NULL, -1, PARSER_INPUT_SPLIT, NULL);
     pluginsd_keywords_init(p, PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING);
     parser_destroy(p);
+
+    char *lines[] = {
+            "BEGIN2 abcdefghijklmnopqr 123",
+            "SET2 abcdefg 0x12345678 0 0",
+            "SET2 hijklmnoqr 0x12345678 0 0",
+            "SET2 stuvwxyz 0x12345678 0 0",
+            "END2",
+            NULL,
+    };
+
+    char *words[PLUGINSD_MAX_WORDS];
+    size_t iterations = 1000000;
+    size_t count = 0;
+
+    usec_t started = now_realtime_usec();
+    while(--iterations) {
+        char input[PLUGINSD_LINE_MAX + 1];
+        for(size_t line = 0; lines[line] ;line++) {
+            strncpyz(input, lines[line], PLUGINSD_LINE_MAX);
+            size_t num_words = quoted_strings_splitter_pluginsd(input, words, PLUGINSD_MAX_WORDS);
+            const char *command = get_word(words, num_words, 0);
+            PARSER_KEYWORD *keyword = gperf_lookup_keyword(command, strlen(command));
+            if(unlikely(!keyword))
+                fatal("Cannot parse the line '%s'", lines[line]);
+            count++;
+        }
+    }
+    usec_t ended = now_realtime_usec();
+
+    info("Parsed %zu lines in %0.2f secs, %0.2f klines/sec", count,
+         (double)(ended - started) / (double)USEC_PER_SEC,
+         (double)count / ((double)(ended - started) / (double)USEC_PER_SEC) / 1000.0);
+
     return 0;
 }

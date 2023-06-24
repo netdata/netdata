@@ -1555,6 +1555,10 @@ int main(int argc, char **argv) {
                             unittest_running = true;
                             return julytest();
                         }
+                        else if(strcmp(optarg, "parsertest") == 0) {
+                            unittest_running = true;
+                            return pluginsd_parser_unittest();
+                        }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
                             unsigned history_seconds = strtoul(optarg, NULL, 0);
