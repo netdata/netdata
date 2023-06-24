@@ -113,13 +113,13 @@ typedef struct parser {
 
 } PARSER;
 
-static inline int find_first_keyword(const char *src, char *dst, int dst_size, int (*custom_isspace)(char)) {
+static inline int find_first_keyword(const char *src, char *dst, int dst_size, bool *isspace_map) {
     const char *s = src, *keyword_start;
 
-    while (unlikely(custom_isspace(*s))) s++;
+    while (unlikely(isspace_map[(uint8_t)*s])) s++;
     keyword_start = s;
 
-    while (likely(*s && !custom_isspace(*s)) && dst_size > 1) {
+    while (likely(*s && !isspace_map[(uint8_t)*s]) && dst_size > 1) {
         *dst++ = *s++;
         dst_size--;
     }
@@ -142,7 +142,7 @@ static inline int parser_action(PARSER *parser, char *input) {
 
     if(unlikely(parser->flags & PARSER_DEFER_UNTIL_KEYWORD)) {
         char command[PLUGINSD_LINE_MAX + 1];
-        bool has_keyword = find_first_keyword(input, command, PLUGINSD_LINE_MAX, pluginsd_space);
+        bool has_keyword = find_first_keyword(input, command, PLUGINSD_LINE_MAX, isspace_map_pluginsd);
 
         if(!has_keyword || strcmp(command, parser->defer.end_keyword) != 0) {
             if(parser->defer.response) {
@@ -171,7 +171,7 @@ static inline int parser_action(PARSER *parser, char *input) {
     }
 
     char *words[PLUGINSD_MAX_WORDS];
-    size_t num_words = pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS);
+    size_t num_words = quoted_strings_splitter_pluginsd(input, words, PLUGINSD_MAX_WORDS);
     const char *command = get_word(words, num_words, 0);
 
     if(unlikely(!command))

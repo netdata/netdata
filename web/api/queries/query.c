@@ -2516,13 +2516,6 @@ void rrdr_json_group_by_labels(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTION
     buffer_json_object_close(wb); // key
 }
 
-static int group_by_label_is_space(char c) {
-    if(c == ',' || c == '|')
-        return 1;
-
-    return 0;
-}
-
 static void rrd2rrdr_set_timestamps(RRDR *r) {
     QUERY_TARGET *qt = r->internal.qt;
 
@@ -2755,9 +2748,9 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
         if (qt->request.group_by[g].group_by & RRDR_GROUP_BY_LABEL &&
             qt->request.group_by[g].group_by_label && *qt->request.group_by[g].group_by_label)
-            qt->group_by[g].used = quoted_strings_splitter(
+            qt->group_by[g].used = quoted_strings_splitter_query_group_by_label(
                     qt->request.group_by[g].group_by_label, qt->group_by[g].label_keys,
-                    GROUP_BY_MAX_LABEL_KEYS, group_by_label_is_space);
+                    GROUP_BY_MAX_LABEL_KEYS);
 
         if (!qt->group_by[g].used)
             qt->request.group_by[g].group_by &= ~RRDR_GROUP_BY_LABEL;

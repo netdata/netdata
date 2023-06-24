@@ -600,11 +600,96 @@ void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value);
 
 #define COMPRESSION_MAX_MSG_SIZE 0x4000
 #define PLUGINSD_LINE_MAX (COMPRESSION_MAX_MSG_SIZE - 1024)
+int pluginsd_isspace(char c);
 int config_isspace(char c);
-int pluginsd_space(char c);
+int group_by_label_isspace(char c);
 
-size_t quoted_strings_splitter(char *str, char **words, size_t max_words, int (*custom_isspace)(char));
-size_t pluginsd_split_words(char *str, char **words, size_t max_words);
+extern bool isspace_map_pluginsd[256];
+extern bool isspace_map_config[256];
+extern bool isspace_map_group_by_label[256];
+
+static inline size_t quoted_strings_splitter(char *str, char **words, size_t max_words, bool *isspace_map) {
+    char *s = str, quote = 0;
+    size_t i = 0;
+
+    // skip all white space
+    while (unlikely(isspace_map[(uint8_t)*s]))
+        s++;
+
+    if(unlikely(!*s)) {
+        words[i] = NULL;
+        return 0;
+    }
+
+    // check for quote
+    if (unlikely(*s == '\'' || *s == '"')) {
+        quote = *s; // remember the quote
+        s++;        // skip the quote
+    }
+
+    // store the first word
+    words[i++] = s;
+
+    // while we have something
+    while (likely(*s)) {
+        // if it is an escape
+        if (unlikely(*s == '\\' && s[1])) {
+            s += 2;
+            continue;
+        }
+
+            // if it is a quote
+        else if (unlikely(*s == quote)) {
+            quote = 0;
+            *s = ' ';
+            continue;
+        }
+
+            // if it is a space
+        else if (unlikely(quote == 0 && isspace_map[(uint8_t)*s])) {
+            // terminate the word
+            *s++ = '\0';
+
+            // skip all white space
+            while (likely(isspace_map[(uint8_t)*s]))
+                s++;
+
+            // check for a quote
+            if (unlikely(*s == '\'' || *s == '"')) {
+                quote = *s; // remember the quote
+                s++;        // skip the quote
+            }
+
+            // if we reached the end, stop
+            if (unlikely(!*s))
+                break;
+
+            // store the next word
+            if (likely(i < max_words))
+                words[i++] = s;
+            else
+                break;
+        }
+
+            // anything else
+        else
+            s++;
+    }
+
+    if (i < max_words)
+        words[i] = NULL;
+
+    return i;
+}
+
+#define quoted_strings_splitter_query_group_by_label(str, words, max_words) \
+        quoted_strings_splitter(str, words, max_words, isspace_map_group_by_label)
+
+#define quoted_strings_splitter_config(str, words, max_words) \
+        quoted_strings_splitter(str, words, max_words, isspace_map_config)
+
+#define quoted_strings_splitter_pluginsd(str, words, max_words) \
+        quoted_strings_splitter(str, words, max_words, isspace_map_pluginsd)
 
 static inline char *get_word(char **words, size_t num_words, size_t index) {
     if (index >= num_words)
