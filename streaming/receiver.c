@@ -2,17 +2,6 @@
 
 #include "rrdpush.h"
 
-// IMPORTANT: to add workers, you have to edit WORKER_PARSER_FIRST_JOB accordingly
-#define WORKER_RECEIVER_JOB_BYTES_READ (WORKER_PARSER_FIRST_JOB - 1)
-#define WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED (WORKER_PARSER_FIRST_JOB - 2)
-
-// this has to be the same at parser.h
-#define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION (WORKER_PARSER_FIRST_JOB - 3)
-
-#if WORKER_PARSER_FIRST_JOB < 1
-#error The define WORKER_PARSER_FIRST_JOB needs to be at least 1
-#endif
-
 extern struct config stream_config;
 
 void receiver_state_free(struct receiver_state *rpt) {
@@ -54,49 +43,16 @@ void receiver_state_free(struct receiver_state *rpt) {
 
 #include "collectors/plugins.d/pluginsd_parser.h"
 
-PARSER_RC streaming_claimed_id(char **words, size_t num_words, void *user)
-{
-    const char *host_uuid_str = get_word(words, num_words, 1);
-    const char *claim_id_str = get_word(words, num_words, 2);
+// IMPORTANT: to add workers, you have to edit WORKER_PARSER_FIRST_JOB accordingly
+#define WORKER_RECEIVER_JOB_BYTES_READ (WORKER_PARSER_FIRST_JOB - 1)
+#define WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED (WORKER_PARSER_FIRST_JOB - 2)
 
-    if (!host_uuid_str || !claim_id_str) {
-        error("Command CLAIMED_ID came malformed, uuid = '%s', claim_id = '%s'",
-              host_uuid_str ? host_uuid_str : "[unset]",
-              claim_id_str ? claim_id_str : "[unset]");
-        return PARSER_RC_ERROR;
-    }
+// this has to be the same at parser.h
+#define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION (WORKER_PARSER_FIRST_JOB - 3)
 
-    uuid_t uuid;
-    RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
-
-    // We don't need the parsed UUID
-    // just do it to check the format
-    if(uuid_parse(host_uuid_str, uuid)) {
-        error("1st parameter (host GUID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", host_uuid_str);
-        return PARSER_RC_ERROR;
-    }
-    if(uuid_parse(claim_id_str, uuid) && strcmp(claim_id_str, "NULL")) {
-        error("2nd parameter (Claim ID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", claim_id_str);
-        return PARSER_RC_ERROR;
-    }
-
-    if(strcmp(host_uuid_str, host->machine_guid)) {
-        error("Claim ID is for host \"%s\" but it came over connection for \"%s\"", host_uuid_str, host->machine_guid);
-        return PARSER_RC_OK; //the message is OK problem must be somewhere else
-    }
-
-    rrdhost_aclk_state_lock(host);
-    if (host->aclk_state.claimed_id)
-        freez(host->aclk_state.claimed_id);
-    host->aclk_state.claimed_id = strcmp(claim_id_str, "NULL") ? strdupz(claim_id_str) : NULL;
-    rrdhost_aclk_state_unlock(host);
-
-    rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_CLAIMID |RRDHOST_FLAG_METADATA_UPDATE);
-
-    rrdpush_send_claimed_id(host);
-
-    return PARSER_RC_OK;
-}
+#if WORKER_PARSER_FIRST_JOB < 1
+#error The define WORKER_PARSER_FIRST_JOB needs to be at least 1
+#endif
 
 static int read_stream(struct receiver_state *r, char* buffer, size_t size) {
     if(unlikely(!size)) {
@@ -345,8 +301,6 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
     // this keeps the parser with its current value
     // so, parser needs to be allocated before pushing it
     netdata_thread_cleanup_push(pluginsd_process_thread_cleanup, parser);
-
-    parser_add_keyword(parser, "CLAIMED_ID", streaming_claimed_id);
 
     user.parser = parser;
 

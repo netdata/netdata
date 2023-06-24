@@ -491,8 +491,6 @@ set(LIBNETDATA_FILES
         libnetdata/string/utf8.h
         libnetdata/worker_utilization/worker_utilization.c
         libnetdata/worker_utilization/worker_utilization.h
-		libnetdata/parser/parser.h
-		libnetdata/parser/parser.c
         libnetdata/http/http_defs.h
         )
 

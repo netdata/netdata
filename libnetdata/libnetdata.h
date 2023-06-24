@@ -664,7 +664,6 @@ extern char *netdata_configured_host_prefix;
 #include "libnetdata/aral/aral.h"
 #include "onewayalloc/onewayalloc.h"
 #include "worker_utilization/worker_utilization.h"
-#include "parser/parser.h"
 #include "yaml.h"
 #include "http/http_defs.h"
 #include "gorilla/gorilla.h"

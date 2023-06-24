@@ -168,8 +168,6 @@ LIBNETDATA_FILES = \
     libnetdata/log/log.h \
     libnetdata/onewayalloc/onewayalloc.c \
     libnetdata/onewayalloc/onewayalloc.h \
-    libnetdata/parser/parser.c \
-    libnetdata/parser/parser.h \
     libnetdata/popen/popen.c \
     libnetdata/popen/popen.h \
     libnetdata/procfile/procfile.c \
@@ -425,6 +423,7 @@ PLUGINSD_PLUGIN_FILES = \
     collectors/plugins.d/plugins_d.h \
     collectors/plugins.d/pluginsd_parser.c \
     collectors/plugins.d/pluginsd_parser.h \
+    collectors/plugins.d/gperf-hashtable.h \
     $(NULL)
 
 RRD_PLUGIN_FILES = \

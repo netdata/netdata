@@ -1846,6 +1846,130 @@ PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_
     return PARSER_RC_OK;
 }
 
+PARSER_RC pluginsd_exit(char **words __maybe_unused, size_t num_words __maybe_unused, void *user __maybe_unused)
+{
+    info("PLUGINSD: plugin called EXIT.");
+    return PARSER_RC_STOP;
+}
+
+PARSER_RC streaming_claimed_id(char **words, size_t num_words, void *user)
+{
+    const char *host_uuid_str = get_word(words, num_words, 1);
+    const char *claim_id_str = get_word(words, num_words, 2);
+
+    if (!host_uuid_str || !claim_id_str) {
+        error("Command CLAIMED_ID came malformed, uuid = '%s', claim_id = '%s'",
+              host_uuid_str ? host_uuid_str : "[unset]",
+              claim_id_str ? claim_id_str : "[unset]");
+        return PARSER_RC_ERROR;
+    }
+
+    uuid_t uuid;
+    RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
+
+    // We don't need the parsed UUID
+    // just do it to check the format
+    if(uuid_parse(host_uuid_str, uuid)) {
+        error("1st parameter (host GUID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", host_uuid_str);
+        return PARSER_RC_ERROR;
+    }
+    if(uuid_parse(claim_id_str, uuid) && strcmp(claim_id_str, "NULL")) {
+        error("2nd parameter (Claim ID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", claim_id_str);
+        return PARSER_RC_ERROR;
+    }
+
+    if(strcmp(host_uuid_str, host->machine_guid)) {
+        error("Claim ID is for host \"%s\" but it came over connection for \"%s\"", host_uuid_str, host->machine_guid);
+        return PARSER_RC_OK; //the message is OK problem must be somewhere else
+    }
+
+    rrdhost_aclk_state_lock(host);
+    if (host->aclk_state.claimed_id)
+        freez(host->aclk_state.claimed_id);
+    host->aclk_state.claimed_id = strcmp(claim_id_str, "NULL") ? strdupz(claim_id_str) : NULL;
+    rrdhost_aclk_state_unlock(host);
+
+    rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_CLAIMID |RRDHOST_FLAG_METADATA_UPDATE);
+
+    rrdpush_send_claimed_id(host);
+
+    return PARSER_RC_OK;
+}
+
+// ----------------------------------------------------------------------------
+
+typedef enum {
+    PARSER_FGETS_RESULT_OK,
+    PARSER_FGETS_RESULT_TIMEOUT,
+    PARSER_FGETS_RESULT_ERROR,
+    PARSER_FGETS_RESULT_EOF,
+} PARSER_FGETS_RESULT;
+
+static inline PARSER_FGETS_RESULT parser_fgets(char *s, int size, FILE *stream) {
+    errno = 0;
+
+    struct pollfd fds[1];
+    int timeout_msecs = 2 * 60 * MSEC_PER_SEC;
+
+    fds[0].fd = fileno(stream);
+    fds[0].events = POLLIN;
+
+    int ret = poll(fds, 1, timeout_msecs);
+
+    if (ret > 0) {
+        /* There is data to read */
+        if (fds[0].revents & POLLIN) {
+            char *tmp = fgets(s, size, stream);
+
+            if(unlikely(!tmp)) {
+                if (feof(stream)) {
+                    error("PARSER: read failed: end of file.");
+                    return PARSER_FGETS_RESULT_EOF;
+                }
+
+                else if (ferror(stream)) {
+                    error("PARSER: read failed: input error.");
+                    return PARSER_FGETS_RESULT_ERROR;
+                }
+
+                error("PARSER: read failed: unknown error.");
+                return PARSER_FGETS_RESULT_ERROR;
+            }
+
+            return PARSER_FGETS_RESULT_OK;
+        }
+        else if(fds[0].revents & POLLERR) {
+            error("PARSER: read failed: POLLERR.");
+            return PARSER_FGETS_RESULT_ERROR;
+        }
+        else if(fds[0].revents & POLLHUP) {
+            error("PARSER: read failed: POLLHUP.");
+            return PARSER_FGETS_RESULT_ERROR;
+        }
+        else if(fds[0].revents & POLLNVAL) {
+            error("PARSER: read failed: POLLNVAL.");
+            return PARSER_FGETS_RESULT_ERROR;
+        }
+
+        error("PARSER: poll() returned positive number, but POLLIN|POLLERR|POLLHUP|POLLNVAL are not set.");
+        return PARSER_FGETS_RESULT_ERROR;
+    }
+    else if (ret == 0) {
+        error("PARSER: timeout while waiting for data.");
+        return PARSER_FGETS_RESULT_TIMEOUT;
+    }
+
+    error("PARSER: poll() failed with code %d.", ret);
+    return PARSER_FGETS_RESULT_ERROR;
+}
+
+static int parser_next(PARSER *parser, char *buffer, size_t buffer_size) {
+    if(likely(parser_fgets(buffer, (int)buffer_size, (FILE *)parser->fp_input) == PARSER_FGETS_RESULT_OK))
+        return 0;
+
+    return 1;
+}
+
 void pluginsd_process_thread_cleanup(void *ptr) {
     PARSER *parser = (PARSER *)ptr;
 
@@ -1856,8 +1980,6 @@ void pluginsd_process_thread_cleanup(void *ptr) {
 
     parser_destroy(parser);
 }
-
-// New plugins.d parser
 
 inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugin_input, FILE *fp_plugin_output, int trust_durations)
 {
@@ -1926,139 +2048,52 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     return count;
 }
 
-PARSER_RC pluginsd_exit(char **words __maybe_unused, size_t num_words __maybe_unused, void *user __maybe_unused)
-{
-    info("PLUGINSD: plugin called EXIT.");
-    return PARSER_RC_STOP;
-}
+void pluginsd_keywords_init(PARSER *parser, PARSER_REPERTOIRE repertoire) {
+    parser_init_repertoire(parser, repertoire);
 
-static void pluginsd_keywords_init_internal(PARSER *parser, PLUGINSD_KEYWORDS types, void (*add_func)(PARSER *parser, char *keyword, keyword_function func)) {
-
-    if (types & PARSER_INIT_PLUGINSD) {
-        add_func(parser, PLUGINSD_KEYWORD_FLUSH, pluginsd_flush);
-        add_func(parser, PLUGINSD_KEYWORD_DISABLE, pluginsd_disable);
-
-        add_func(parser, PLUGINSD_KEYWORD_HOST_DEFINE, pluginsd_host_define);
-        add_func(parser, PLUGINSD_KEYWORD_HOST_DEFINE_END, pluginsd_host_define_end);
-        add_func(parser, PLUGINSD_KEYWORD_HOST_LABEL, pluginsd_host_labels);
-        add_func(parser, PLUGINSD_KEYWORD_HOST, pluginsd_host);
-
-        add_func(parser, PLUGINSD_KEYWORD_EXIT, pluginsd_exit);
-    }
-
-    if (types & (PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING)) {
-        // plugins.d plugins and streaming
-        add_func(parser, PLUGINSD_KEYWORD_CHART, pluginsd_chart);
-        add_func(parser, PLUGINSD_KEYWORD_DIMENSION, pluginsd_dimension);
-        add_func(parser, PLUGINSD_KEYWORD_VARIABLE, pluginsd_variable);
-        add_func(parser, PLUGINSD_KEYWORD_LABEL, pluginsd_label);
-        add_func(parser, PLUGINSD_KEYWORD_OVERWRITE, pluginsd_overwrite);
-        add_func(parser, PLUGINSD_KEYWORD_CLABEL_COMMIT, pluginsd_clabel_commit);
-        add_func(parser, PLUGINSD_KEYWORD_CLABEL, pluginsd_clabel);
-        add_func(parser, PLUGINSD_KEYWORD_FUNCTION, pluginsd_function);
-        add_func(parser, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN, pluginsd_function_result_begin);
-
-        add_func(parser, PLUGINSD_KEYWORD_BEGIN, pluginsd_begin);
-        add_func(parser, PLUGINSD_KEYWORD_SET, pluginsd_set);
-        add_func(parser, PLUGINSD_KEYWORD_END, pluginsd_end);
-
+    if (repertoire & (PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING))
         inflight_functions_init(parser);
+}
+
+PARSER *parser_init(struct parser_user_object *user, FILE *fp_input, FILE *fp_output, int fd,
+                    PARSER_INPUT_TYPE flags, void *ssl __maybe_unused) {
+    PARSER *parser;
+
+    parser = callocz(1, sizeof(*parser));
+    parser->user = user;
+    parser->fd = fd;
+    parser->fp_input = fp_input;
+    parser->fp_output = fp_output;
+#ifdef ENABLE_HTTPS
+    parser->ssl_output = ssl;
+#endif
+    parser->flags = flags;
+
+    spinlock_init(&parser->writer.spinlock);
+    return parser;
+}
+
+#include "gperf-hashtable.h"
+
+void parser_init_repertoire(PARSER *parser, PARSER_REPERTOIRE repertoire) {
+    parser->repertoire = repertoire;
+
+    for(size_t i = GPERF_PARSER_MIN_HASH_VALUE ; i <= GPERF_PARSER_MAX_HASH_VALUE ;i++) {
+        if(gperf_keywords[i].keyword && *gperf_keywords[i].keyword)
+            worker_register_job_name(gperf_keywords[i].worker_job_id, gperf_keywords[i].keyword);
     }
-
-    if (types & PARSER_INIT_STREAMING) {
-        add_func(parser, PLUGINSD_KEYWORD_CHART_DEFINITION_END, pluginsd_chart_definition_end);
-
-        // replication
-        add_func(parser, PLUGINSD_KEYWORD_REPLAY_BEGIN, pluginsd_replay_begin);
-        add_func(parser, PLUGINSD_KEYWORD_REPLAY_SET, pluginsd_replay_set);
-        add_func(parser, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE, pluginsd_replay_rrddim_collection_state);
-        add_func(parser, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE, pluginsd_replay_rrdset_collection_state);
-        add_func(parser, PLUGINSD_KEYWORD_REPLAY_END, pluginsd_replay_end);
-
-        // streaming metrics v2
-        add_func(parser, PLUGINSD_KEYWORD_BEGIN_V2, pluginsd_begin_v2);
-        add_func(parser, PLUGINSD_KEYWORD_SET_V2, pluginsd_set_v2);
-        add_func(parser, PLUGINSD_KEYWORD_END_V2, pluginsd_end_v2);
-    }
 }
 
-void pluginsd_keywords_init(PARSER *parser, PLUGINSD_KEYWORDS types) {
-    pluginsd_keywords_init_internal(parser, types, parser_add_keyword);
+void parser_destroy(PARSER *parser) {
+    if (unlikely(!parser))
+        return;
+
+    dictionary_destroy(parser->inflight.functions);
+    freez(parser);
 }
-
-struct pluginsd_user_unittest {
-    size_t size;
-    const char **hashtable;
-    uint32_t (*hash)(const char *s);
-    size_t collisions;
-};
-
-void pluginsd_keyword_collision_check(PARSER *parser, char *keyword, keyword_function func __maybe_unused) {
-    struct pluginsd_user_unittest *u = parser->user;
-
-    uint32_t hash = u->hash(keyword);
-    uint32_t slot = hash % u->size;
-
-    if(u->hashtable[slot])
-        u->collisions++;
-
-    u->hashtable[slot] = keyword;
-}
-
-static struct {
-    const char *name;
-    uint32_t (*hash)(const char *s);
-    size_t slots_needed;
-} hashers[] = {
-    { .name = "djb2_hash32(s)",            djb2_hash32, .slots_needed = 0, },
-    { .name = "fnv1_hash32(s)",            fnv1_hash32, .slots_needed = 0, },
-    { .name = "fnv1a_hash32(s)",           fnv1a_hash32, .slots_needed = 0, },
-    { .name = "larson_hash32(s)",          larson_hash32, .slots_needed = 0, },
-    { .name = "pluginsd_parser_hash32(s)", pluginsd_parser_hash32, .slots_needed = 0, },
-
-    // terminator
-    { .name = NULL, NULL, .slots_needed = 0, },
-};
 
 int pluginsd_parser_unittest(void) {
-    PARSER *p;
-    size_t slots_to_check = 1000;
-    size_t i, h;
-
-    // check for hashtable collisions
-    for(h = 0; hashers[h].name ;h++) {
-        hashers[h].slots_needed = slots_to_check * 1000000;
-
-        for (i = 10; i < slots_to_check; i++) {
-            struct pluginsd_user_unittest user = {
-                    .hash = hashers[h].hash,
-                    .size = i,
-                    .hashtable = callocz(i, sizeof(const char *)),
-                    .collisions = 0,
-            };
-
-            p = parser_init(&user, NULL, NULL, -1, PARSER_INPUT_SPLIT, NULL);
-            pluginsd_keywords_init_internal(p, PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING,
-                                            pluginsd_keyword_collision_check);
-            parser_destroy(p);
-
-            freez(user.hashtable);
-
-            if (!user.collisions) {
-                hashers[h].slots_needed = i;
-                break;
-            }
-        }
-    }
-
-    for(h = 0; hashers[h].name ;h++) {
-        if(hashers[h].slots_needed > 1000)
-            info("PARSER: hash function '%s' cannot be used without collisions under %zu slots", hashers[h].name, slots_to_check);
-        else
-            info("PARSER: hash function '%s' needs PARSER_KEYWORDS_HASHTABLE_SIZE (in parser.h) set to %zu", hashers[h].name, hashers[h].slots_needed);
-    }
-
-    p = parser_init(NULL, NULL, NULL, -1, PARSER_INPUT_SPLIT, NULL);
+    PARSER *p = parser_init(NULL, NULL, NULL, -1, PARSER_INPUT_SPLIT, NULL);
     pluginsd_keywords_init(p, PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING);
     parser_destroy(p);
     return 0;
