@@ -591,12 +591,33 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 // Taken from linux kernel
 #define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
 
+#ifdef ENV32BIT
+typedef struct bitmap256 {
+    uint32_t data[8];
+} BITMAP256;
+
+#define bitmap256_get_bit(ptr, idx) (((ptr)->data[(idx) >> 5] & (1ULL << ((idx) & 31))) != 0)
+static inline void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value) {
+    uint32_t mask = 1U << (idx & 31);
+    if (value)
+        ptr->data[idx >> 5] |= mask;
+    else
+        ptr->data[idx >> 5] &= ~mask;
+}
+#else // 64bit
 typedef struct bitmap256 {
     uint64_t data[4];
 } BITMAP256;
 
-bool bitmap256_get_bit(BITMAP256 *ptr, uint8_t idx);
-void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value);
+#define bitmap256_get_bit(ptr, idx) ((ptr)->data[(idx) >> 6] & (1ULL << ((idx) & 63)))
+static inline void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value) {
+    uint64_t mask = 1ULL << (idx & 63);
+    if (value)
+        ptr->data[idx >> 6] |= mask;
+    else
+        ptr->data[idx >> 6] &= ~mask;
+}
+#endif // 64bit
 
 #define COMPRESSION_MAX_MSG_SIZE 0x4000
 #define PLUGINSD_LINE_MAX (COMPRESSION_MAX_MSG_SIZE - 1024)
@@ -638,14 +659,14 @@ static inline size_t quoted_strings_splitter(char *str, char **words, size_t max
             continue;
         }
 
-            // if it is a quote
+        // if it is a quote
         else if (unlikely(*s == quote)) {
             quote = 0;
             *s = ' ';
             continue;
         }
 
-            // if it is a space
+        // if it is a space
         else if (unlikely(quote == 0 && isspace_map[(uint8_t)*s])) {
             // terminate the word
             *s++ = '\0';
@@ -671,12 +692,12 @@ static inline size_t quoted_strings_splitter(char *str, char **words, size_t max
                 break;
         }
 
-            // anything else
+        // anything else
         else
             s++;
     }
 
-    if (i < max_words)
+    if (likely(i < max_words))
         words[i] = NULL;
 
     return i;
@@ -692,7 +713,7 @@ static inline size_t quoted_strings_splitter(char *str, char **words, size_t max
         quoted_strings_splitter(str, words, max_words, isspace_map_pluginsd)
 
 static inline char *get_word(char **words, size_t num_words, size_t index) {
-    if (index >= num_words)
+    if (unlikely(index >= num_words))
         return NULL;
 
     return words[index];

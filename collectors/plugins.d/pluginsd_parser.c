@@ -2062,10 +2062,10 @@ int pluginsd_parser_unittest(void) {
     char *words[PLUGINSD_MAX_WORDS];
     size_t iterations = 1000000;
     size_t count = 0;
+    char input[PLUGINSD_LINE_MAX + 1];
 
     usec_t started = now_realtime_usec();
     while(--iterations) {
-        char input[PLUGINSD_LINE_MAX + 1];
         for(size_t line = 0; lines[line] ;line++) {
             strncpyz(input, lines[line], PLUGINSD_LINE_MAX);
             size_t num_words = quoted_strings_splitter_pluginsd(input, words, PLUGINSD_MAX_WORDS);

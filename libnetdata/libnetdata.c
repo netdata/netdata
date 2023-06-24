@@ -1731,21 +1731,6 @@ __attribute__((constructor)) void initialize_is_space_arrays(void) {
     }
 }
 
-bool bitmap256_get_bit(BITMAP256 *ptr, uint8_t idx) {
-    if (unlikely(!ptr))
-        return false;
-    return (ptr->data[idx / 64] & (1ULL << (idx % 64)));
-}
-
-void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value) {
-    if (unlikely(!ptr))
-        return;
-    if (likely(value))
-        ptr->data[idx / 64] |= (1ULL << (idx % 64));
-    else
-        ptr->data[idx / 64] &= ~(1ULL << (idx % 64));
-}
-
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length) {
     pid_t pid;
     FILE *fp = netdata_popen(command, &pid, NULL);
