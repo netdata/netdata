@@ -516,15 +516,14 @@ static void ebpf_disk_exit(void *ptr)
 
         pthread_mutex_unlock(&lock);
         fflush(stdout);
+    }
+    ebpf_disk_disable_tracepoints();
 
+    if (em->objects) {
         ebpf_unload_legacy_code(em->objects, em->probe_links);
         em->objects = NULL;
         em->probe_links = NULL;
     }
-    ebpf_disk_disable_tracepoints();
-
-    if (em->objects)
-        ebpf_unload_legacy_code(em->objects, em->probe_links);
 
     if (dimensions)
         ebpf_histogram_dimension_cleanup(dimensions, NETDATA_EBPF_HIST_MAX_BINS);
