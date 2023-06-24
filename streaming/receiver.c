@@ -290,7 +290,7 @@ static inline bool receiver_should_continue(struct receiver_state *rpt) {
     // check every 1000 lines read
     if((counter++ % 1000) != 0) return true;
 
-    if(!unlikely(!service_running(SERVICE_STREAMING))) {
+    if(unlikely(!service_running(SERVICE_STREAMING))) {
         if(!rpt->exit.reason)
             rpt->exit.reason = "NETDATA EXIT";
 
