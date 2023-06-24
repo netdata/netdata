@@ -110,10 +110,10 @@ bool service_running(SERVICE_TYPE service) {
     if(unlikely(!sth))
         sth = service_register(SERVICE_THREAD_TYPE_NETDATA, NULL, NULL, NULL, false);
 
-    if(netdata_exit)
+    if(unlikely(netdata_exit))
         __atomic_store_n(&service_globals.running, 0, __ATOMIC_RELAXED);
 
-    if(service == 0)
+    if(unlikely(service == 0))
         service = sth->services;
 
     sth->services |= service;

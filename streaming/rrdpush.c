@@ -784,7 +784,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         return rrdpush_receiver_too_busy_now(w);
 
     struct receiver_state *rpt = callocz(1, sizeof(*rpt));
-    rpt->last_msg_t = now_realtime_sec();
+    rpt->last_msg_t = now_monotonic_sec();
     rpt->capabilities = STREAM_CAP_INVALID;
     rpt->hops = 1;
 
@@ -1140,7 +1140,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         if (host) {
             netdata_mutex_lock(&host->receiver_lock);
             if (host->receiver) {
-                age = now_realtime_sec() - host->receiver->last_msg_t;
+                age = now_monotonic_sec() - host->receiver->last_msg_t;
 
                 if (age < 30)
                     receiver_working = true;
