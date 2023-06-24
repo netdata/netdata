@@ -1118,10 +1118,8 @@ static void rrdhost_streaming_sender_structures_init(RRDHOST *host)
     host->sender->rrdpush_sender_socket  = -1;
 
 #ifdef ENABLE_COMPRESSION
-    if(default_compression_enabled) {
+    if(default_compression_enabled)
         host->sender->flags |= SENDER_FLAG_COMPRESSION;
-        host->sender->compressor = create_compressor();
-    }
     else
         host->sender->flags &= ~SENDER_FLAG_COMPRESSION;
 #endif
@@ -1140,8 +1138,7 @@ static void rrdhost_streaming_sender_structures_free(RRDHOST *host)
     rrdpush_sender_thread_stop(host, "HOST CLEANUP", true); // stop a possibly running thread
     cbuffer_free(host->sender->buffer);
 #ifdef ENABLE_COMPRESSION
-    if (host->sender->compressor)
-        host->sender->compressor->destroy(&host->sender->compressor);
+    rrdpush_compressor_destroy(&host->sender->compressor);
 #endif
     replication_cleanup_sender(host->sender);
 
@@ -1859,7 +1856,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
                 s->stream.status = RRDHOST_STREAM_STATUS_ONLINE;
 
 #ifdef ENABLE_COMPRESSION
-            s->stream.compression = (stream_has_capability(host->sender, STREAM_CAP_COMPRESSION) && host->sender->compressor);
+            s->stream.compression = (stream_has_capability(host->sender, STREAM_CAP_COMPRESSION) && host->sender->compressor.initialized);
 #endif
         }
         else {

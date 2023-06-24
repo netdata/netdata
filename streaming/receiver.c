@@ -280,15 +280,15 @@ bool plugin_is_enabled(struct plugind *cd);
 static inline bool receiver_should_continue(struct receiver_state *rpt) {
     static __thread size_t counter = 0;
 
-    // check every 100 lines read
-    if((++counter % 100) != 0) return true;
-
     if(unlikely(rpt->exit.shutdown)) {
         if(!rpt->exit.reason)
             rpt->exit.reason = "SHUTDOWN REQUESTED";
 
         return false;
     }
+
+    // check every 1000 lines read
+    if((counter++ % 1000) != 0) return true;
 
     if(!unlikely(!service_running(SERVICE_STREAMING))) {
         if(!rpt->exit.reason)

@@ -118,7 +118,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
     }
 
 #ifdef ENABLE_COMPRESSION
-    if (stream_has_capability(s, STREAM_CAP_COMPRESSION) && s->compressor) {
+    if (stream_has_capability(s, STREAM_CAP_COMPRESSION) && s->compressor.initialized) {
         while(src_len) {
             size_t size_to_compress = src_len;
 
@@ -144,13 +144,13 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
             }
 
             char *dst;
-            size_t dst_len = s->compressor->compress(s->compressor, src, size_to_compress, &dst);
+            size_t dst_len = rrdpush_compress(&s->compressor, src, size_to_compress, &dst);
             if (!dst_len) {
                 error("STREAM %s [send to %s]: COMPRESSION failed. Resetting compressor and re-trying",
                       rrdhost_hostname(s->host), s->connected_to);
 
-                s->compressor->reset(s->compressor);
-                dst_len = s->compressor->compress(s->compressor, src, size_to_compress, &dst);
+                rrdpush_compressor_reset(&s->compressor);
+                dst_len = rrdpush_compress(&s->compressor, src, size_to_compress, &dst);
                 if(!dst_len) {
                     error("STREAM %s [send to %s]: COMPRESSION failed again. Deactivating compression",
                           rrdhost_hostname(s->host), s->connected_to);
@@ -763,12 +763,10 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
         return false;
 
 #ifdef ENABLE_COMPRESSION
-    if(stream_has_capability(s, STREAM_CAP_COMPRESSION)) {
-        if(!s->compressor)
-            s->compressor = create_compressor();
-        else
-            s->compressor->reset(s->compressor);
-    }
+    if(stream_has_capability(s, STREAM_CAP_COMPRESSION))
+        rrdpush_compressor_reset(&s->compressor);
+    else
+        rrdpush_compressor_destroy(&s->compressor);
 #endif  //ENABLE_COMPRESSION
 
     log_sender_capabilities(s);

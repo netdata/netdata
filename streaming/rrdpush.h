@@ -114,13 +114,22 @@ typedef struct {
 #define RRDPUSH_COMPRESSION_SIGNATURE_SIZE 4
 
 struct compressor_state {
+    bool initialized;
     char *compression_result_buffer;
     size_t compression_result_buffer_size;
-    struct compressor_data *data; // Compression API specific data
-    void (*reset)(struct compressor_state *state);
+    struct {
+        void *stream;
+        char *input_ring_buffer;
+        size_t input_ring_buffer_size;
+        size_t input_ring_buffer_pos;
+    } data;
     size_t (*compress)(struct compressor_state *state, const char *data, size_t size, char **buffer);
     void (*destroy)(struct compressor_state **state);
 };
+
+void rrdpush_compressor_reset(struct compressor_state *state);
+void rrdpush_compressor_destroy(struct compressor_state *state);
+size_t rrdpush_compress(struct compressor_state *state, const char *data, size_t size, char **out);
 
 struct decompressor_state {
     bool initialized;
@@ -158,14 +167,14 @@ static inline size_t rrdpush_decompress_decode_header(const char *data, size_t d
 
 static inline size_t rrdpush_decompressor_start(struct decompressor_state *state, const char *header, size_t header_size) {
     if(unlikely(state->stream.read_at != state->stream.write_at))
-        fatal("RRDPUSH DECOMPRESSION: asked to decompress new data, while there are unread data in the decompression buffer!");
+        fatal("RRDPUSH DECOMPRESS: asked to decompress new data, while there are unread data in the decompression buffer!");
 
     return rrdpush_decompress_decode_header(header, header_size);
 }
 
 static inline size_t rrdpush_decompressed_bytes_in_buffer(struct decompressor_state *state) {
     if(unlikely(state->stream.read_at > state->stream.write_at))
-        fatal("RRDPUSH DECOMPRESSION: invalid read/write stream positions");
+        fatal("RRDPUSH DECOMPRESS: invalid read/write stream positions");
 
     return state->stream.write_at - state->stream.read_at;
 }
@@ -187,7 +196,7 @@ static inline size_t rrdpush_decompressor_get(struct decompressor_state *state, 
     state->stream.read_at += bytes_to_return;
 
     if(unlikely(state->stream.read_at > state->stream.write_at))
-        fatal("RRDPUSH DECOMPRESSION: invalid read/write stream positions");
+        fatal("RRDPUSH DECOMPRESS: invalid read/write stream positions");
 
     return bytes_to_return;
 }
@@ -243,8 +252,9 @@ struct sender_state {
     uint16_t hops;
 
 #ifdef ENABLE_COMPRESSION
-    struct compressor_state *compressor;
+    struct compressor_state compressor;
 #endif
+
 #ifdef ENABLE_HTTPS
     NETDATA_SSL ssl;                     // structure used to encrypt the connection
 #endif
