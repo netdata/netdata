@@ -282,17 +282,19 @@ bool plugin_is_enabled(struct plugind *cd);
 static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, int fd, void *ssl) {
     size_t result;
 
-    PARSER_USER_OBJECT user = {
-        .enabled = plugin_is_enabled(cd),
-        .host = rpt->host,
-        .opaque = rpt,
-        .cd = cd,
-        .trust_durations = 1,
-        .capabilities = rpt->capabilities,
-    };
+    PARSER *parser = NULL;
+    {
+        PARSER_USER_OBJECT user = {
+                .enabled = plugin_is_enabled(cd),
+                .host = rpt->host,
+                .opaque = rpt,
+                .cd = cd,
+                .trust_durations = 1,
+                .capabilities = rpt->capabilities,
+        };
 
-    PARSER *parser = parser_init(&user, NULL, NULL, fd,
-                                 PARSER_INPUT_SPLIT, ssl);
+        parser = parser_init(&user, NULL, NULL, fd, PARSER_INPUT_SPLIT, ssl);
+    }
 
     pluginsd_keywords_init(parser, PARSER_INIT_STREAMING);
 
@@ -301,8 +303,6 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
     // this keeps the parser with its current value
     // so, parser needs to be allocated before pushing it
     netdata_thread_cleanup_push(pluginsd_process_thread_cleanup, parser);
-
-    user.parser = parser;
 
     bool compressed_connection = false;
 #ifdef ENABLE_COMPRESSION
@@ -365,7 +365,7 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
     }
 
 done:
-    result = user.data_collections_count;
+    result = parser ? parser->user.data_collections_count : 0;
 
     // free parser with the pop function
     netdata_thread_cleanup_pop(1);

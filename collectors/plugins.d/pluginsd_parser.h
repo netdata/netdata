@@ -27,7 +27,8 @@ typedef enum __attribute__ ((__packed__)) {
     PARSER_INIT_STREAMING       = (1 << 2),
 } PARSER_REPERTOIRE;
 
-typedef PARSER_RC (*keyword_function)(char **words, size_t num_words, void *user_data);
+struct parser;
+typedef PARSER_RC (*keyword_function)(char **words, size_t num_words, struct parser *parser);
 
 typedef struct parser_keyword {
     char *keyword;
@@ -36,38 +37,7 @@ typedef struct parser_keyword {
     size_t worker_job_id;
 } PARSER_KEYWORD;
 
-typedef struct parser {
-    uint8_t version;                // Parser version
-    PARSER_REPERTOIRE repertoire;
-    int fd;                         // Socket
-    FILE *fp_input;                 // Input source e.g. stream
-    FILE *fp_output;                // Stream to send commands to plugin
-#ifdef ENABLE_HTTPS
-    NETDATA_SSL *ssl_output;
-#endif
-    struct parser_user_object *user; // User defined structure to hold extra state between calls
-    uint32_t flags;
-    size_t line;
-
-    struct {
-        const char *end_keyword;
-        BUFFER *response;
-        void (*action)(struct parser *parser, void *action_data);
-        void *action_data;
-    } defer;
-
-    struct {
-        DICTIONARY *functions;
-        usec_t smaller_timeout;
-    } inflight;
-
-    struct {
-        SPINLOCK spinlock;
-    } writer;
-} PARSER;
-
 typedef struct parser_user_object {
-    PARSER  *parser;
     RRDSET *st;
     RRDHOST *host;
     void    *opaque;
@@ -109,6 +79,39 @@ typedef struct parser_user_object {
         bool ml_locked;
     } v2;
 } PARSER_USER_OBJECT;
+
+typedef struct parser {
+    uint8_t version;                // Parser version
+    PARSER_REPERTOIRE repertoire;
+    uint32_t flags;
+    int fd;                         // Socket
+    size_t line;
+    FILE *fp_input;                 // Input source e.g. stream
+    FILE *fp_output;                // Stream to send commands to plugin
+
+#ifdef ENABLE_HTTPS
+    NETDATA_SSL *ssl_output;
+#endif
+
+    PARSER_USER_OBJECT user;        // User defined structure to hold extra state between calls
+
+    struct {
+        const char *end_keyword;
+        BUFFER *response;
+        void (*action)(struct parser *parser, void *action_data);
+        void *action_data;
+    } defer;
+
+    struct {
+        DICTIONARY *functions;
+        usec_t smaller_timeout;
+    } inflight;
+
+    struct {
+        SPINLOCK spinlock;
+    } writer;
+
+} PARSER;
 
 static inline int find_first_keyword(const char *src, char *dst, int dst_size, int (*custom_isspace)(char)) {
     const char *s = src, *keyword_start;
@@ -178,7 +181,7 @@ static inline int parser_action(PARSER *parser, char *input) {
     PARSER_KEYWORD *t = parser_find_keyword(parser, command);
     if(likely(t)) {
         worker_is_busy(t->worker_job_id);
-        rc = (*t->func)(words, num_words, parser->user);
+        rc = (*t->func)(words, num_words, parser);
         worker_is_idle();
     }
     else
@@ -207,7 +210,7 @@ static inline int parser_action(PARSER *parser, char *input) {
 PARSER *parser_init(struct parser_user_object *user, FILE *fp_input, FILE *fp_output, int fd, PARSER_INPUT_TYPE flags, void *ssl);
 void parser_init_repertoire(PARSER *parser, PARSER_REPERTOIRE repertoire);
 void parser_destroy(PARSER *working_parser);
-void pluginsd_cleanup_v2(void *user);
+void pluginsd_cleanup_v2(PARSER *parser);
 void inflight_functions_init(PARSER *parser);
 void pluginsd_keywords_init(PARSER *parser, PARSER_REPERTOIRE repertoire);
 
