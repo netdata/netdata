@@ -476,7 +476,7 @@ static void ebpf_cleanup_disk_list()
  *
  * @param em a pointer to `struct ebpf_module`
  */
-static void ebpf_obsolete_disck_global(ebpf_module_t *em)
+static void ebpf_obsolete_disk_global(ebpf_module_t *em)
 {
     ebpf_publish_disk_t *move = plot_disks;
     while (move) {
@@ -512,10 +512,10 @@ static void ebpf_disk_exit(void *ptr)
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
 
-        ebpf_obsolete_disck_global(em);
+        ebpf_obsolete_disk_global(em);
 
-        fflush(stdout);
         pthread_mutex_unlock(&lock);
+        fflush(stdout);
 
         ebpf_unload_legacy_code(em->objects, em->probe_links);
         em->objects = NULL;

@@ -468,8 +468,10 @@ static void ebpf_dcstat_exit(void *ptr)
     }
 
 #ifdef LIBBPF_MAJOR_VERSION
-    if (dc_bpf_obj)
+    if (dc_bpf_obj) {
         dc_bpf__destroy(dc_bpf_obj);
+        dc_bpf_obj = NULL;
+    }
 #endif
 
     if (em->objects){

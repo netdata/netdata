@@ -538,8 +538,10 @@ static void ebpf_cachestat_exit(void *ptr)
     }
 
 #ifdef LIBBPF_MAJOR_VERSION
-    if (cachestat_bpf_obj)
+    if (cachestat_bpf_obj) {
         cachestat_bpf__destroy(cachestat_bpf_obj);
+        cachestat_bpf_obj = NULL;
+    }
 #endif
 
     if (em->objects) {

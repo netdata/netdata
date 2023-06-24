@@ -347,6 +347,7 @@ void ebpf_update_map_size(struct bpf_map *map, ebpf_local_maps_t *lmap, ebpf_mod
 typedef struct netdata_ebpf_histogram {
     char *name;
     char *title;
+    char *ctx;
     int order;
     uint64_t histogram[NETDATA_EBPF_HIST_MAX_BINS];
 } netdata_ebpf_histogram_t;
