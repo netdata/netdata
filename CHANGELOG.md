@@ -8,6 +8,7 @@
 
 - Install the correct systemd unit file on older RPM systems. [\#15240](https://github.com/netdata/netdata/pull/15240) ([Ferroin](https://github.com/Ferroin))
 - Add module column to apps.plugin csv [\#15235](https://github.com/netdata/netdata/pull/15235) ([Ancairon](https://github.com/Ancairon))
+- Fix coverity 393183 & 393182 [\#15234](https://github.com/netdata/netdata/pull/15234) ([MrZammler](https://github.com/MrZammler))
 - Create index for health log migration [\#15233](https://github.com/netdata/netdata/pull/15233) ([stelfrag](https://github.com/stelfrag))
 - New alerts endpoint [\#15232](https://github.com/netdata/netdata/pull/15232) ([stelfrag](https://github.com/stelfrag))
 - fix not handling N/A value in python.d/nvidia\_smi [\#15231](https://github.com/netdata/netdata/pull/15231) ([ilyam8](https://github.com/ilyam8))
