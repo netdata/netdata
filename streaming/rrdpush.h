@@ -94,6 +94,17 @@ typedef enum {
     STREAM_HANDSHAKE_BUSY_TRY_LATER = -10,
     STREAM_HANDSHAKE_INTERNAL_ERROR = -11,
     STREAM_HANDSHAKE_INITIALIZATION = -12,
+    STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP = -13,
+    STREAM_HANDSHAKE_DISCONNECT_STALE_RECEIVER = -14,
+    STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN = -15,
+    STREAM_HANDSHAKE_DISCONNECT_NETDATA_EXIT = -16,
+    STREAM_HANDSHAKE_DISCONNECT_PARSER_EXIT = -17,
+    STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_ERROR = -18,
+    STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED = -19,
+    STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT = -20,
+    STREAM_HANDSHAKE_DISCONNECT_ORPHAN_HOST = -21,
+    STREAM_HANDSHAKE_NON_STREAMABLE_HOST = -22,
+
 } STREAM_HANDSHAKE;
 
 
@@ -261,7 +272,7 @@ struct sender_state {
 
     struct {
         bool shutdown;
-        const char *reason;
+        STREAM_HANDSHAKE reason;
     } exit;
 
     struct {
@@ -364,7 +375,7 @@ struct receiver_state {
 
     struct {
         bool shutdown;      // signal the streaming parser to exit
-        const char *reason; // the reason of disconnection to log
+        STREAM_HANDSHAKE reason;
     } exit;
 
     struct {
@@ -404,11 +415,9 @@ struct rrdpush_destinations {
     STRING *destination;
     bool ssl;
     uint32_t attempts;
-
-    const char *last_error;
-    time_t last_attempt;
+    time_t since;
     time_t postpone_reconnection_until;
-    STREAM_HANDSHAKE last_handshake;
+    STREAM_HANDSHAKE reason;
 
     struct rrdpush_destinations *prev;
     struct rrdpush_destinations *next;
@@ -460,7 +469,7 @@ void rrdpush_send_global_functions(RRDHOST *host);
 #define THREAD_TAG_STREAM_SENDER "SNDR" // "[host]" is appended
 
 int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_string);
-void rrdpush_sender_thread_stop(RRDHOST *host, const char *reason, bool wait);
+void rrdpush_sender_thread_stop(RRDHOST *host, STREAM_HANDSHAKE reason, bool wait);
 
 void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQUIRED *rva);
 void log_stream_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
@@ -489,7 +498,7 @@ STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version, RRDH
 int32_t stream_capabilities_to_vn(uint32_t caps);
 
 void receiver_state_free(struct receiver_state *rpt);
-bool stop_streaming_receiver(RRDHOST *host, const char *reason);
+bool stop_streaming_receiver(RRDHOST *host, STREAM_HANDSHAKE reason);
 
 void sender_thread_buffer_free(void);
 
@@ -693,7 +702,7 @@ typedef struct rrdhost_status {
         STREAM_CAPABILITIES capabilities;
         uint32_t id;
         time_t since;
-        const char *reason;
+        STREAM_HANDSHAKE reason;
 
         struct {
             bool in_progress;
@@ -711,7 +720,7 @@ typedef struct rrdhost_status {
         STREAM_CAPABILITIES capabilities;
         uint32_t id;
         time_t since;
-        const char *reason;
+        STREAM_HANDSHAKE reason;
 
         struct {
             bool in_progress;

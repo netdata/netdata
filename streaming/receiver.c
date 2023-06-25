@@ -277,13 +277,16 @@ static inline char *receiver_next_line(struct receiver_state *r, char *buffer, s
 
 bool plugin_is_enabled(struct plugind *cd);
 
+static void receiver_set_exit_reason(struct receiver_state *rpt, STREAM_HANDSHAKE reason, bool force) {
+    if(force || !rpt->exit.reason)
+        rpt->exit.reason = reason;
+}
+
 static inline bool receiver_should_continue(struct receiver_state *rpt) {
     static __thread size_t counter = 0;
 
     if(unlikely(rpt->exit.shutdown)) {
-        if(!rpt->exit.reason)
-            rpt->exit.reason = "SHUTDOWN REQUESTED";
-
+        receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN, false);
         return false;
     }
 
@@ -291,9 +294,7 @@ static inline bool receiver_should_continue(struct receiver_state *rpt) {
     if((counter++ % 1000) != 0) return true;
 
     if(unlikely(!service_running(SERVICE_STREAMING))) {
-        if(!rpt->exit.reason)
-            rpt->exit.reason = "NETDATA EXIT";
-
+        receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_NETDATA_EXIT, false);
         return false;
     }
 
@@ -351,9 +352,7 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
             bool have_new_data = compressed_connection ? receiver_read_compressed(rpt) : receiver_read_uncompressed(rpt);
 
             if(unlikely(!have_new_data)) {
-                if(!rpt->exit.reason)
-                    rpt->exit.reason = "SOCKET READ ERROR";
-
+                receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_ERROR, false);
                 break;
             }
 
@@ -362,10 +361,7 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
 
         if (unlikely(parser_action(parser,  buffer))) {
             internal_error(true, "parser_action() failed on keyword '%s'.", buffer);
-
-            if(!rpt->exit.reason)
-                rpt->exit.reason = "PARSER FAILED";
-
+            receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
             break;
         }
     }
@@ -460,7 +456,7 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
             if (rpt->config.health_enabled == CONFIG_BOOLEAN_AUTO)
                 host->health.health_enabled = 0;
 
-            rrdpush_sender_thread_stop(host, "RECEIVER LEFT", false);
+            rrdpush_sender_thread_stop(host, STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT, false);
 
             signal_rrdcontext = true;
             rrdpush_receiver_replication_reset(host);
@@ -479,7 +475,7 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
     }
 }
 
-bool stop_streaming_receiver(RRDHOST *host, const char *reason) {
+bool stop_streaming_receiver(RRDHOST *host, STREAM_HANDSHAKE reason) {
     bool ret = false;
 
     netdata_mutex_lock(&host->receiver_lock);
@@ -487,7 +483,7 @@ bool stop_streaming_receiver(RRDHOST *host, const char *reason) {
     if(host->receiver) {
         if(!host->receiver->exit.shutdown) {
             host->receiver->exit.shutdown = true;
-            host->receiver->exit.reason = reason;
+            receiver_set_exit_reason(host->receiver, reason, true);
             shutdown(host->receiver->fd, SHUT_RDWR);
         }
 
@@ -545,9 +541,9 @@ void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, con
           , rpt->client_ip, rpt->client_port
           , msg
           , status
-          , rpt->exit.reason?" (":""
-          , rpt->exit.reason?rpt->exit.reason:""
-          , rpt->exit.reason?")":""
+          , rpt->exit.reason != STREAM_HANDSHAKE_NEVER?" (":""
+          , stream_handshake_error_to_string(rpt->exit.reason)
+          , rpt->exit.reason != STREAM_HANDSHAKE_NEVER?")":""
     );
 
 }
@@ -797,8 +793,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
 #endif
                                     );
 
-    if(!rpt->exit.reason)
-        rpt->exit.reason = "PARSER EXIT";
+    receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_EXIT, false);
 
     {
         char msg[100 + 1];

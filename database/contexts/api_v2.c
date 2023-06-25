@@ -309,7 +309,7 @@ static void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *
 
         if(s->ingest.type == RRDHOST_INGEST_TYPE_CHILD) {
             if(s->ingest.status == RRDHOST_INGEST_STATUS_OFFLINE)
-                buffer_json_member_add_string(wb, "reason", s->ingest.reason);
+                buffer_json_member_add_string(wb, "reason", stream_handshake_error_to_string(s->ingest.reason));
 
             if(s->ingest.status == RRDHOST_INGEST_STATUS_REPLICATING) {
                 buffer_json_member_add_object(wb, "replication");
@@ -353,7 +353,7 @@ static void rrdhost_sender_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *ke
         buffer_json_member_add_time_t(wb, "age", s->now - s->stream.since);
 
         if (s->stream.status == RRDHOST_STREAM_STATUS_OFFLINE)
-            buffer_json_member_add_string(wb, "reason", s->stream.reason);
+            buffer_json_member_add_string(wb, "reason", stream_handshake_error_to_string(s->stream.reason));
 
         if (s->stream.status == RRDHOST_STREAM_STATUS_REPLICATING) {
             buffer_json_member_add_object(wb, "replication");
@@ -400,10 +400,9 @@ static void rrdhost_sender_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *ke
                     else
                         buffer_json_member_add_string(wb, "destination", string2str(d->destination));
 
-                    buffer_json_member_add_time_t(wb, "last_check", d->last_attempt);
-                    buffer_json_member_add_time_t(wb, "age", s->now - d->last_attempt);
-                    buffer_json_member_add_string_or_omit(wb, "last_error", d->last_error);
-                    buffer_json_member_add_string(wb, "last_handshake", stream_handshake_error_to_string(d->last_handshake));
+                    buffer_json_member_add_time_t(wb, "since", d->since);
+                    buffer_json_member_add_time_t(wb, "age", s->now - d->since);
+                    buffer_json_member_add_string(wb, "last_handshake", stream_handshake_error_to_string(d->reason));
                     if(d->postpone_reconnection_until > s->now) {
                         buffer_json_member_add_time_t(wb, "next_check", d->postpone_reconnection_until);
                         buffer_json_member_add_time_t(wb, "next_in", d->postpone_reconnection_until - s->now);

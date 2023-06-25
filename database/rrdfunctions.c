@@ -884,7 +884,7 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
                         buffer_json_add_array_item_string(wb, NULL); // InSince
                         buffer_json_add_array_item_string(wb, NULL); // InAge
                     }
-                    buffer_json_add_array_item_string(wb, s.ingest.reason); // InReason
+                    buffer_json_add_array_item_string(wb, stream_handshake_error_to_string(s.ingest.reason)); // InReason
                     buffer_json_add_array_item_uint64(wb, s.ingest.hops); // InHops
                     buffer_json_add_array_item_double(wb, s.ingest.replication.completion); // InReplCompletion
                     buffer_json_add_array_item_uint64(wb, s.ingest.replication.instances); // InReplInstances
@@ -904,7 +904,7 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
                         buffer_json_add_array_item_string(wb, NULL); // OutSince
                         buffer_json_add_array_item_string(wb, NULL); // OutAge
                     }
-                    buffer_json_add_array_item_string(wb, s.stream.reason); // OutReason
+                    buffer_json_add_array_item_string(wb, stream_handshake_error_to_string(s.stream.reason)); // OutReason
                     buffer_json_add_array_item_uint64(wb, s.stream.hops); // OutHops
                     buffer_json_add_array_item_double(wb, s.stream.replication.completion); // OutReplCompletion
                     buffer_json_add_array_item_uint64(wb, s.stream.replication.instances); // OutReplInstances
@@ -923,10 +923,10 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
                     buffer_json_add_array_item_array(wb); // OutAttemptHandshake
                     time_t last_attempt = 0;
                     for(struct rrdpush_destinations *d = host->destinations; d ; d = d->next) {
-                        if(d->last_attempt > last_attempt)
-                            last_attempt = d->last_attempt;
+                        if(d->since > last_attempt)
+                            last_attempt = d->since;
 
-                        buffer_json_add_array_item_string(wb, stream_handshake_error_to_string(d->last_handshake));
+                        buffer_json_add_array_item_string(wb, stream_handshake_error_to_string(d->reason));
                     }
                     buffer_json_array_close(wb); // // OutAttemptHandshake
 
