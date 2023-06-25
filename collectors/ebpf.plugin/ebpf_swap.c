@@ -229,6 +229,109 @@ static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t 
  *
  *****************************************************************/
 
+static void ebpf_obsolete_specific_swap_charts(char *type, int update_every);
+
+/**
+ * Obsolete services
+ *
+ * Obsolete all service charts created
+ *
+ * @param em a pointer to `struct ebpf_module`
+ */
+static void ebpf_obsolete_swap_services(ebpf_module_t *em)
+{
+    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              NETDATA_MEM_SWAP_READ_CHART,
+                              "Calls to function <code>swap_readpage</code>.",
+                              EBPF_COMMON_DIMENSION_CALL,
+                              NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NETDATA_CGROUP_SWAP_READ_CONTEXT,
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5100,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              NETDATA_MEM_SWAP_WRITE_CHART,
+                              "Calls to function <code>swap_writepage</code>.",
+                              EBPF_COMMON_DIMENSION_CALL,
+                              NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NETDATA_CGROUP_SWAP_WRITE_CONTEXT,
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5101,
+                              em->update_every);
+}
+
+/**
+ * Obsolete cgroup chart
+ *
+ * Send obsolete for all charts created before to close.
+ *
+ * @param em a pointer to `struct ebpf_module`
+ */
+static inline void ebpf_obsolete_swap_cgroup_charts(ebpf_module_t *em) {
+    pthread_mutex_lock(&mutex_cgroup_shm);
+
+    ebpf_obsolete_swap_services(em);
+
+    ebpf_cgroup_target_t *ect;
+    for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
+        if (ect->systemd)
+            continue;
+
+        ebpf_obsolete_specific_swap_charts(ect->name, em->update_every);
+    }
+    pthread_mutex_unlock(&mutex_cgroup_shm);
+}
+
+/**
+ * Obsolette apps charts
+ *
+ * Obsolete apps charts.
+ *
+ * @param em a pointer to the structure with the default values.
+ */
+void ebpf_obsolete_swap_apps_charts(struct ebpf_module *em)
+{
+    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
+                              NETDATA_MEM_SWAP_READ_CHART,
+                              "Calls to function <code>swap_readpage</code>.",
+                              EBPF_COMMON_DIMENSION_CALL,
+                              NETDATA_SWAP_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                              NULL,
+                               20191,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
+                              NETDATA_MEM_SWAP_WRITE_CHART,
+                              "Calls to function <code>swap_writepage</code>.",
+                              EBPF_COMMON_DIMENSION_CALL,
+                              NETDATA_SWAP_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                              NULL,
+                              20192,
+                              em->update_every);
+}
+
+/**
+ * Obsolete global
+ *
+ * Obsolete global charts created by thread.
+ *
+ * @param em a pointer to `struct ebpf_module`
+ */
+static void ebpf_obsolete_swap_global(ebpf_module_t *em)
+{
+    ebpf_write_chart_obsolete(NETDATA_EBPF_SYSTEM_GROUP,
+                              NETDATA_MEM_SWAP_CHART,
+                              "Calls to access swap memory",
+                              EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NULL,
+                              NETDATA_CHART_PRIO_SYSTEM_SWAP_CALLS,
+                              em->update_every);
+}
+
 /**
  * Swap exit
  *
@@ -240,12 +343,34 @@ static void ebpf_swap_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        pthread_mutex_lock(&lock);
+        if (em->cgroup_charts) {
+            ebpf_obsolete_swap_cgroup_charts(em);
+            fflush(stdout);
+        }
+
+        if (em->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
+            ebpf_obsolete_swap_apps_charts(em);
+        }
+
+        ebpf_obsolete_swap_global(em);
+
+        fflush(stdout);
+        pthread_mutex_unlock(&lock);
+    }
+
 #ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
+    if (bpf_obj) {
         swap_bpf__destroy(bpf_obj);
+        bpf_obj = NULL;
+    }
 #endif
-    if (em->objects)
+    if (em->objects) {
         ebpf_unload_legacy_code(em->objects, em->probe_links);
+        em->objects = NULL;
+        em->probe_links = NULL;
+    }
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
