@@ -59,24 +59,16 @@ ebpf_process_stat_t *process_stat_vector = NULL;
 static netdata_syscall_stat_t process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_END];
 static netdata_publish_syscall_t process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_END];
 
-<<<<<<< HEAD
-=======
-int process_enabled = 0;
-
->>>>>>> ec13693f5 (ebpf_functions: Move content from process thread to main thread reducing dependency from process.)
 struct config process_config = { .first_section = NULL,
     .last_section = NULL,
     .mutex = NETDATA_MUTEX_INITIALIZER,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
 
-<<<<<<< HEAD
 #ifdef NETDATA_DEV_MODE
 int process_disable_priority;
 #endif
 
-=======
->>>>>>> ec13693f5 (ebpf_functions: Move content from process thread to main thread reducing dependency from process.)
 /*****************************************************************
  *
  *  PROCESS DATA AND SEND TO NETDATA
@@ -431,12 +423,9 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           2, em->update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
     }
 
-<<<<<<< HEAD
     fflush(stdout);
 }
 
-=======
->>>>>>> ec13693f5 (ebpf_functions: Move content from process thread to main thread reducing dependency from process.)
 /**
  * Create process apps charts
  *
@@ -757,7 +746,6 @@ static void ebpf_process_exit(void *ptr)
     if (ebpf_aral_process_stat)
         ebpf_statistic_obsolete_aral_chart(em, process_disable_priority);
 #endif
-
 
         fflush(stdout);
         pthread_mutex_unlock(&lock);
