@@ -44,6 +44,71 @@ static netdata_publish_syscall_t oomkill_publish_aggregated = {.name = "oomkill"
                                                                .algorithm = "absolute",
                                                                .next = NULL};
 
+static void ebpf_create_specific_oomkill_charts(char *type, int update_every);
+
+/**
+ * Obsolete services
+ *
+ * Obsolete all service charts created
+ *
+ * @param em a pointer to `struct ebpf_module`
+ */
+static void ebpf_obsolete_oomkill_services(ebpf_module_t *em)
+{
+    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              NETDATA_OOMKILL_CHART,
+                              "OOM kills. This chart is provided by eBPF plugin.",
+                              EBPF_COMMON_DIMENSION_KILLS,
+                              NETDATA_EBPF_MEMORY_GROUP,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NULL,
+                              20191,
+                              em->update_every);
+}
+
+/**
+ * Obsolete cgroup chart
+ *
+ * Send obsolete for all charts created before to close.
+ *
+ * @param em a pointer to `struct ebpf_module`
+ */
+static inline void ebpf_obsolete_oomkill_cgroup_charts(ebpf_module_t *em)
+{
+    pthread_mutex_lock(&mutex_cgroup_shm);
+
+    ebpf_obsolete_oomkill_services(em);
+
+    ebpf_cgroup_target_t *ect;
+    for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
+        if (ect->systemd)
+            continue;
+
+        ebpf_create_specific_oomkill_charts(ect->name, em->update_every);
+    }
+    pthread_mutex_unlock(&mutex_cgroup_shm);
+}
+
+/**
+ * Obsolete global
+ *
+ * Obsolete global charts created by thread.
+ *
+ * @param em a pointer to `struct ebpf_module`
+ */
+static void ebpf_obsolete_oomkill_apps(ebpf_module_t *em)
+{
+    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
+                              NETDATA_OOMKILL_CHART,
+                             "OOM kills",
+                              EBPF_COMMON_DIMENSION_KILLS,
+                              "mem",
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                              NULL,
+                               20020,
+                               em->update_every);
+}
+
 /**
  * Clean up the main thread.
  *
@@ -53,8 +118,24 @@ static void oomkill_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    if (em->objects)
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        pthread_mutex_lock(&lock);
+
+        if (em->cgroup_charts) {
+            ebpf_obsolete_oomkill_cgroup_charts(em);
+        }
+
+        ebpf_obsolete_oomkill_apps(em);
+
+        fflush(stdout);
+        pthread_mutex_unlock(&lock);
+    }
+
+    if (em->objects) {
         ebpf_unload_legacy_code(em->objects, em->probe_links);
+        em->objects = NULL;
+        em->probe_links = NULL;
+    }
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
@@ -294,6 +375,30 @@ static void ebpf_update_oomkill_cgroup(int32_t *keys, uint32_t total)
 }
 
 /**
+ * Update OOMkill period
+ *
+ * Update oomkill period according function arguments.
+ *
+ * @param running_time  current value of running_value.
+ * @param em            the thread main structure.
+ *
+ * @return It returns new running_time value.
+ */
+static int ebpf_update_oomkill_period(int running_time, ebpf_module_t *em)
+{
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    if (running_time && !em->running_time)
+        running_time = em->update_every;
+    else
+        running_time += em->update_every;
+
+    em->running_time = running_time;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+    return running_time;
+}
+
+/**
 * Main loop for this collector.
  *
  * @param em the thread main structure.
@@ -319,8 +424,10 @@ static void oomkill_collector(ebpf_module_t *em)
         counter = 0;
 
         uint32_t count = oomkill_read_data(keys);
-        if (!count)
+        if (!count) {
+            running_time = ebpf_update_oomkill_period(running_time, em);
             continue;
+        }
 
         pthread_mutex_lock(&collect_data_mutex);
         pthread_mutex_lock(&lock);
@@ -338,14 +445,7 @@ static void oomkill_collector(ebpf_module_t *em)
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
 
-        pthread_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time && !em->running_time)
-            running_time = update_every;
-        else
-            running_time += update_every;
-
-        em->running_time = running_time;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        running_time = ebpf_update_oomkill_period(running_time, em);
     }
 }
 
