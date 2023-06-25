@@ -61,6 +61,26 @@ static softirq_val_t softirq_vals[] = {
 static softirq_ebpf_val_t *softirq_ebpf_vals = NULL;
 
 /**
+ * Obsolete global
+ *
+ * Obsolete global charts created by thread.
+ *
+ * @param em a pointer to `struct ebpf_module`
+ */
+static void ebpf_obsolete_softirq_global(ebpf_module_t *em)
+{
+    ebpf_write_chart_obsolete(NETDATA_EBPF_SYSTEM_GROUP,
+                              "softirq_latency",
+                              "Software IRQ latency",
+                              EBPF_COMMON_DIMENSION_MILLISECONDS,
+                              "softirqs",
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                              NULL,
+                              NETDATA_CHART_PRIO_SYSTEM_SOFTIRQS+1,
+                              em->update_every);
+}
+
+/**
  * Cleanup
  *
  * Clean up allocated memory.
@@ -71,13 +91,26 @@ static void softirq_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    if (em->objects)
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        pthread_mutex_lock(&lock);
+
+        ebpf_obsolete_softirq_global(em);
+
+        pthread_mutex_unlock(&lock);
+        fflush(stdout);
+    }
+
+    if (em->objects) {
         ebpf_unload_legacy_code(em->objects, em->probe_links);
+        em->objects = NULL;
+        em->probe_links = NULL;
+    }
 
     for (int i = 0; softirq_tracepoints[i].class != NULL; i++) {
         ebpf_disable_tracepoint(&softirq_tracepoints[i]);
     }
     freez(softirq_ebpf_vals);
+    softirq_ebpf_vals = NULL;
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
