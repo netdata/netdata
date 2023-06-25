@@ -222,6 +222,13 @@ static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_
  *
  *****************************************************************/
 
+/**
+ * Obsolete global
+ *
+ * Obsolete global charts created by thread.
+ *
+ * @param em a pointer to `struct ebpf_module`
+ */
 static void ebpf_obsolete_mount_global(ebpf_module_t *em)
 {
     ebpf_write_chart_obsolete(NETDATA_EBPF_MOUNT_GLOBAL_FAMILY,
