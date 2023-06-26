@@ -716,13 +716,10 @@ static void ebpf_unload_unique_maps()
             continue;
         }
 
-        if (i == EBPF_MODULE_SOCKET_IDX) {
 #ifdef LIBBPF_MAJOR_VERSION
-            if (socket_bpf_obj)
-                socket_bpf__destroy(socket_bpf_obj);
+        if (socket_bpf_obj)
+            socket_bpf__destroy(socket_bpf_obj);
 #endif
-        }
-
     }
 }
 
