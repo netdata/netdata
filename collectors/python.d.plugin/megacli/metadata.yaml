@@ -2,29 +2,25 @@ name: megacli
 title: COLLECTORNAME Monitoring
 duplicate_for_virtual_integrations:
   list:
-    - title: Ubuntu
-      description: dummy description that will replace the original "overview" section,
-        leave the whole list empty if none
-    - title: Redhat
-      description: dummy description that will replace the original "overview" section,
-        leave the whole list empty if none
+    - '[Ubuntu](link to ubuntu)'
+    - '[Redhat](link to redhat)'
 overview:
   operation:
     description: This collector periodically does http requests to one or more [Apache](link
       to collector) web servers to collect the metrics mod_status plugin that apache
       exposes
   platforms:
-    description: If this collector can't run on some platforms specify them here,
-      otherwise set this to true and this text will not be rendered, instead a templated
-      message will appear
-    boolean: true
+    description: If this collector can't run on some platforms specify them here and
+      set it to false, otherwise set this to true and this text will not be rendered,
+      instead a templated message will appear
+    use_templated_text: true
   multi-instance:
     boolean: true
   permissions:
     description: if there are any notable permission requirements, eg running as root
       and so on, specify them here and set it to false, otherwise set it to true and
       a templated message will appear
-    boolean: true
+    use_templated_text: true
   related:
     description: give a simple description if there are any other collectors related
       to this collector. Example -> To get the most out of your apache servers, you
@@ -93,7 +89,7 @@ related_resources:
 alerts:
   - name: '[megacli_adapter_state](https://gihtub.com/netdata/netdata/blob/master/health/health.d/megacli.conf)'
     metric: megacli.adapter_degraded
-    info: adapter is in the degraded state (0
+    info: 'adapter is in the degraded state (0: false, 1: true)'
   - name: '[megacli_pd_media_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/megacli.conf)'
     metric: megacli.pd_media_error
     info: number of physical drive media errors
@@ -104,9 +100,6 @@ alerts:
     metric: megacli.bbu_relative_charge
     info: average battery backup unit (BBU) relative state of charge over the last
       10 seconds
-  - name: '[megacli_bbu_cycle_count](https://gihtub.com/netdata/netdata/blob/master/health/health.d/megacli.conf)'
-    metric: megacli.bbu_cycle_count
-    info: average battery backup unit (BBU) charge cycles count over the last 10 seconds
 metrics:
   description: some description for this section, or leave empty
   folding:

@@ -5,29 +5,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -104,9 +100,6 @@ modules:
       - name: '[20min_steal_cpu](https://gihtub.com/netdata/netdata/blob/master/health/health.d/cpu.conf)'
         metric: system.cpu
         info: average CPU steal time over the last 20 minutes
-      - name: '[10min_cpu_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/cpu.conf)'
-        metric: system.cpu
-        info: average CPU utilization over the last 10 minutes (excluding nice)
       - name: '[ram_in_use](https://gihtub.com/netdata/netdata/blob/master/health/health.d/ram.conf)'
         metric: system.ram
         info: system memory utilization
@@ -170,29 +163,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -268,30 +257,20 @@ modules:
       - name: '[load_average_5](https://gihtub.com/netdata/netdata/blob/master/health/health.d/load.conf)'
         metric: system.load
         info: system five-minute load average
-      - name: '[load_average_1](https://gihtub.com/netdata/netdata/blob/master/health/health.d/load.conf)'
-        metric: system.load
-        info: system one-minute load average
-      - name: '[used_swap](https://gihtub.com/netdata/netdata/blob/master/health/health.d/swap.conf)'
-        metric: system.swap
-        info: swap memory utilization
       - name: '[1m_ipv4_tcp_resets_sent](https://gihtub.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf)'
         metric: ipv4.tcphandshake
         info: average number of sent TCP RESETS over the last minute
       - name: '[10s_ipv4_tcp_resets_sent](https://gihtub.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf)'
         metric: ipv4.tcphandshake
-        info: average number of sent TCP RESETS over the last 10 seconds. \
+        info: average number of sent TCP RESETS over the last 10 seconds. This can
+          indicate a port scan, or that a service running on this host has crashed.
+          Netdata will not send a clear notification for this alarm.
       - name: '[1m_ipv4_tcp_resets_received](https://gihtub.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf)'
         metric: ipv4.tcphandshake
         info: average number of received TCP RESETS over the last minute
-      - name: '[10s_ipv4_tcp_resets_received](https://gihtub.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf)'
-        metric: ipv4.tcphandshake
-        info: average number of received TCP RESETS over the last 10 seconds. \
       - name: '[1m_ipv4_udp_receive_buffer_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/udp_errors.conf)'
         metric: ipv4.udperrors
         info: average number of UDP receive buffer errors over the last minute
-      - name: '[1m_ipv4_udp_send_buffer_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/udp_errors.conf)'
-        metric: ipv4.udperrors
-        info: average number of UDP send buffer errors over the last minute
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -544,29 +523,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -674,10 +649,6 @@ modules:
         metric: net.packets
         info: average number of packets received by the network interface ${label:device}
           over the last minute
-      - name: '[10s_received_packets_storm](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
-        metric: net.packets
-        info: ratio of average number of received packets for the network interface
-          ${label:device} over the last 10 seconds, \
       - name: '[interface_inbound_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
         metric: net.errors
         info: number of inbound errors for the network interface ${label:device} in

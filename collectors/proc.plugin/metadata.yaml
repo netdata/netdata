@@ -5,29 +5,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -104,9 +100,6 @@ modules:
       - name: '[20min_steal_cpu](https://gihtub.com/netdata/netdata/blob/master/health/health.d/cpu.conf)'
         metric: system.cpu
         info: average CPU steal time over the last 20 minutes
-      - name: '[10min_cpu_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/cpu.conf)'
-        metric: system.cpu
-        info: average CPU utilization over the last 10 minutes (excluding nice)
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -198,29 +191,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -286,10 +275,7 @@ modules:
             this will only be visible in their end, they will scrape this text. Example
             -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
             I/O and many more resources utilization.
-    alerts:
-      - name: '[lowest_entropy](https://gihtub.com/netdata/netdata/blob/master/health/health.d/entropy.conf)'
-        metric: system.entropy
-        info: minimum number of entries in the random numbers pool in the last 5 minutes
+    alerts: []
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -310,29 +296,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -419,29 +401,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -632,29 +610,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -753,29 +727,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -851,12 +821,6 @@ modules:
       - name: '[load_average_5](https://gihtub.com/netdata/netdata/blob/master/health/health.d/load.conf)'
         metric: system.load
         info: system five-minute load average
-      - name: '[load_average_1](https://gihtub.com/netdata/netdata/blob/master/health/health.d/load.conf)'
-        metric: system.load
-        info: system one-minute load average
-      - name: '[active_processes](https://gihtub.com/netdata/netdata/blob/master/health/health.d/processes.conf)'
-        metric: system.active_processes
-        info: system process IDs (PID) space utilization
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -884,29 +848,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -1060,29 +1020,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -1181,29 +1137,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -1272,14 +1224,13 @@ modules:
     alerts:
       - name: '[1min_netdev_backlog_exceeded](https://gihtub.com/netdata/netdata/blob/master/health/health.d/softnet.conf)'
         metric: system.softnet_stat
-        info: average number of dropped packets in the last minute \
+        info: average number of dropped packets in the last minute due to exceeded
+          net.core.netdev_max_backlog
       - name: '[1min_netdev_budget_ran_outs](https://gihtub.com/netdata/netdata/blob/master/health/health.d/softnet.conf)'
         metric: system.softnet_stat
         info: average number of times ksoftirq ran out of sysctl net.core.netdev_budget
-          or \
-      - name: '[10min_netisr_backlog_exceeded](https://gihtub.com/netdata/netdata/blob/master/health/health.d/softnet.conf)'
-        metric: system.softnet_stat
-        info: average number of drops in the last minute \
+          or net.core.netdev_budget_usecs with work remaining over the last minute
+          (this can be a cause for dropped packets)
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -1318,29 +1269,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -1417,16 +1364,6 @@ modules:
         metric: mem.available
         info: percentage of estimated amount of RAM available for userspace processes,
           without causing swapping
-      - name: '[ram_available](https://gihtub.com/netdata/netdata/blob/master/health/health.d/ram.conf)'
-        metric: mem.available
-        info: percentage of estimated amount of RAM available for userspace processes,
-          without causing swapping
-      - name: '[used_swap](https://gihtub.com/netdata/netdata/blob/master/health/health.d/swap.conf)'
-        metric: system.swap
-        info: swap memory utilization
-      - name: '[1hour_memory_hw_corrupted](https://gihtub.com/netdata/netdata/blob/master/health/health.d/memory.conf)'
-        metric: mem.hwcorrupt
-        info: amount of memory corrupted due to a hardware failure
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -1509,29 +1446,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -1634,29 +1567,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -1754,29 +1683,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -1870,29 +1795,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -1993,29 +1914,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -2121,29 +2038,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -2213,9 +2126,6 @@ modules:
       - name: '[semaphores_used](https://gihtub.com/netdata/netdata/blob/master/health/health.d/ipc.conf)'
         metric: system.ipc_semaphores
         info: IPC semaphore utilization
-      - name: '[semaphore_arrays_used](https://gihtub.com/netdata/netdata/blob/master/health/health.d/ipc.conf)'
-        metric: system.ipc_semaphore_arrays
-        info: IPC semaphore arrays utilization
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -2261,29 +2171,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -2350,19 +2256,15 @@ modules:
             -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
             I/O and many more resources utilization.
     alerts:
-      - name: '[10min_disk_backlog](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
-        metric: disk.backlog
-        info: average backlog size of the ${label:device} disk over the last 10 minutes
       - name: '[10min_disk_utilization](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
         metric: disk.util
         info: average percentage of time ${label:device} disk was busy over the last
           10 minutes
-      - name: '[bcache_cache_dirty](https://gihtub.com/netdata/netdata/blob/master/health/health.d/bcache.conf)'
-        metric: disk.bcache_cache_alloc
-        info: percentage of cache space used for dirty data and metadata \
       - name: '[bcache_cache_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/bcache.conf)'
         metric: disk.bcache_cache_read_races
-        info: number of times data was read from the cache, \
+        info: number of times data was read from the cache, the bucket was reused
+          and invalidated in the last 10 minutes (when this occurs the data is reread
+          from the backing device)
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -2542,29 +2444,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -2637,14 +2535,11 @@ modules:
       - name: '[mdstat_disks](https://gihtub.com/netdata/netdata/blob/master/health/health.d/mdstat.conf)'
         metric: md.disks
         info: number of devices in the down state for the ${label:device} ${label:raid_level}
-          array. \
+          array. Any number > 0 indicates that the array is degraded.
       - name: '[mdstat_mismatch_cnt](https://gihtub.com/netdata/netdata/blob/master/health/health.d/mdstat.conf)'
         metric: md.mismatch_cnt
         info: number of unsynchronized blocks for the ${label:device} ${label:raid_level}
           array
-      - name: '[mdstat_nonredundant_last_collected](https://gihtub.com/netdata/netdata/blob/master/health/health.d/mdstat.conf)'
-        metric: md.nonredundant
-        info: number of seconds since the last successful data collection
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -2708,29 +2603,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -2828,10 +2719,6 @@ modules:
         metric: net.packets
         info: average number of packets received by the network interface ${label:device}
           over the last minute
-      - name: '[10s_received_packets_storm](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
-        metric: net.packets
-        info: ratio of average number of received packets for the network interface
-          ${label:device} over the last 10 seconds, \
       - name: '[interface_inbound_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
         metric: net.errors
         info: number of inbound errors for the network interface ${label:device} in
@@ -2960,29 +2847,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -3104,29 +2987,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -3278,29 +3157,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -3370,7 +3245,7 @@ modules:
       - name: '[1m_tcp_syn_queue_drops](https://gihtub.com/netdata/netdata/blob/master/health/health.d/tcp_listen.conf)'
         metric: ip.tcp_syn_queue
         info: average number of SYN requests was dropped due to the full TCP SYN queue
-          over the last minute \
+          over the last minute (SYN cookies were not enabled)
       - name: '[1m_tcp_syn_queue_cookies](https://gihtub.com/netdata/netdata/blob/master/health/health.d/tcp_listen.conf)'
         metric: ip.tcp_syn_queue
         info: average number of sent SYN cookies due to the full TCP SYN queue over
@@ -3382,27 +3257,20 @@ modules:
         metric: ip.tcp_accept_queue
         info: average number of dropped packets in the TCP accept queue over the last
           minute
-      - name: '[tcp_connections](https://gihtub.com/netdata/netdata/blob/master/health/health.d/tcp_conn.conf)'
-        metric: ipv4.tcpsock
-        info: IPv4 TCP connections utilization
       - name: '[1m_ipv4_tcp_resets_sent](https://gihtub.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf)'
         metric: ipv4.tcphandshake
         info: average number of sent TCP RESETS over the last minute
       - name: '[10s_ipv4_tcp_resets_sent](https://gihtub.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf)'
         metric: ipv4.tcphandshake
-        info: average number of sent TCP RESETS over the last 10 seconds. \
+        info: average number of sent TCP RESETS over the last 10 seconds. This can
+          indicate a port scan, or that a service running on this host has crashed.
+          Netdata will not send a clear notification for this alarm.
       - name: '[1m_ipv4_tcp_resets_received](https://gihtub.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf)'
         metric: ipv4.tcphandshake
         info: average number of received TCP RESETS over the last minute
-      - name: '[10s_ipv4_tcp_resets_received](https://gihtub.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf)'
-        metric: ipv4.tcphandshake
-        info: average number of received TCP RESETS over the last 10 seconds. \
       - name: '[1m_ipv4_udp_receive_buffer_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/udp_errors.conf)'
         metric: ipv4.udperrors
         info: average number of UDP receive buffer errors over the last minute
-      - name: '[1m_ipv4_udp_send_buffer_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/udp_errors.conf)'
-        metric: ipv4.udperrors
-        info: average number of UDP send buffer errors over the last minute
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -3834,29 +3702,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -3922,13 +3786,7 @@ modules:
             this will only be visible in their end, they will scrape this text. Example
             -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
             I/O and many more resources utilization.
-    alerts:
-      - name: '[tcp_orphans](https://gihtub.com/netdata/netdata/blob/master/health/health.d/tcp_orphans.conf)'
-        metric: ipv4.sockstat_tcp_sockets
-        info: orphan IPv4 TCP sockets utilization
-      - name: '[tcp_memory](https://gihtub.com/netdata/netdata/blob/master/health/health.d/tcp_mem.conf)'
-        metric: ipv4.sockstat_tcp_mem
-        info: TCP memory utilization
+    alerts: []
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -3992,29 +3850,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -4121,29 +3975,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -4242,29 +4092,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -4374,29 +4220,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -4534,29 +4376,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -4669,29 +4507,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -4757,10 +4591,7 @@ modules:
             this will only be visible in their end, they will scrape this text. Example
             -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
             I/O and many more resources utilization.
-    alerts:
-      - name: '[netfilter_conntrack_full](https://gihtub.com/netdata/netdata/blob/master/health/health.d/netfilter.conf)'
-        metric: netfilter.conntrack_sockets
-        info: netfilter connection tracker table size utilization
+    alerts: []
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -4817,29 +4648,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -4938,29 +4765,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -5030,9 +4853,6 @@ modules:
       - name: '[zfs_pool_state_warn](https://gihtub.com/netdata/netdata/blob/master/health/health.d/zfs.conf)'
         metric: zfspool.state
         info: ZFS pool ${label:pool} state is degraded
-      - name: '[zfs_pool_state_crit](https://gihtub.com/netdata/netdata/blob/master/health/health.d/zfs.conf)'
-        metric: zfspool.state
-        info: ZFS pool ${label:pool} state is faulted or unavail
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -5061,29 +4881,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -5334,29 +5150,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -5447,9 +5259,6 @@ modules:
       - name: '[btrfs_device_corruption_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/btrfs.conf)'
         metric: btrfs.device_errors
         info: number of encountered BTRFS corruption errors
-      - name: '[btrfs_device_generation_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/btrfs.conf)'
-        metric: btrfs.device_errors
-        info: number of encountered BTRFS generation errors
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -5535,29 +5344,25 @@ modules:
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
+        - '[Ubuntu](link to ubuntu)'
+        - '[Redhat](link to redhat)'
     overview:
       operation:
         description: This collector periodically does http requests to one or more
           [Apache](link to collector) web servers to collect the metrics mod_status
           plugin that apache exposes
       platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
+        description: If this collector can't run on some platforms specify them here
+          and set it to false, otherwise set this to true and this text will not be
+          rendered, instead a templated message will appear
+        use_templated_text: true
       multi-instance:
         boolean: true
       permissions:
         description: if there are any notable permission requirements, eg running
           as root and so on, specify them here and set it to false, otherwise set
           it to true and a templated message will appear
-        boolean: true
+        use_templated_text: true
       related:
         description: give a simple description if there are any other collectors related
           to this collector. Example -> To get the most out of your apache servers,
@@ -5623,10 +5428,7 @@ modules:
             this will only be visible in their end, they will scrape this text. Example
             -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
             I/O and many more resources utilization.
-    alerts:
-      - name: '[linux_power_supply_capacity](https://gihtub.com/netdata/netdata/blob/master/health/health.d/linux_power_supply.conf)'
-        metric: powersupply.capacity
-        info: percentage of remaining power supply capacity
+    alerts: []
     metrics:
       description: some description for this section, or leave empty
       folding:
