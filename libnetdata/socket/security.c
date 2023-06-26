@@ -119,7 +119,7 @@ bool netdata_ssl_open_ext(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd, const unsigned
             ssl->conn = NULL;
         }
         else if (SSL_clear(ssl->conn) == 0) {
-            netdata_ssl_log_error_queue("SSL_clear", ssl);
+            netdata_ssl_log_error_queue("SSL_clear", ssl, SSL_ERROR_NONE);
             SSL_free(ssl->conn);
             ssl->conn = NULL;
         }
@@ -134,7 +134,7 @@ bool netdata_ssl_open_ext(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd, const unsigned
 
         ssl->conn = SSL_new(ctx);
         if (!ssl->conn) {
-            netdata_ssl_log_error_queue("SSL_new", ssl);
+            netdata_ssl_log_error_queue("SSL_new", ssl, SSL_ERROR_NONE);
             ssl->state = NETDATA_SSL_STATE_FAILED;
             return false;
         }
@@ -143,7 +143,7 @@ bool netdata_ssl_open_ext(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd, const unsigned
     }
 
     if(SSL_set_fd(ssl->conn, fd) != 1) {
-        netdata_ssl_log_error_queue("SSL_set_fd", ssl);
+        netdata_ssl_log_error_queue("SSL_set_fd", ssl, SSL_ERROR_NONE);
         ssl->state = NETDATA_SSL_STATE_FAILED;
         return false;
     }
