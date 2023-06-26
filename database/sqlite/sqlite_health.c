@@ -1696,7 +1696,15 @@ uint32_t sql_get_alarm_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *
     "old_value, last_repeat, transition_id, units, d.global_id FROM health_log_detail d, health_log h " \
     "WHERE h.host_id = @host_id AND h.health_log_id = d.health_log_id "
 
-void sql_health_alarm_log2json_v2(RRDHOST *host, BUFFER *wb, uint32_t alert_id, const char *chart, time_t after, time_t before, uint32_t max)
+void sql_health_alarm_log2json_v2(
+    RRDHOST *host,
+    BUFFER *wb,
+    uint32_t alert_id,
+    const char *chart,
+    time_t after,
+    time_t before,
+    const char *transition,
+    uint32_t max)
 {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -1717,6 +1725,9 @@ void sql_health_alarm_log2json_v2(RRDHOST *host, BUFFER *wb, uint32_t alert_id, 
     if (before)
         buffer_sprintf(command, "AND d.when_key < %ld ", before);
 
+    if (transition)
+        buffer_sprintf(command, "AND transition_id = @transition_id ");
+
     buffer_sprintf(command, " ORDER BY d.alarm_event_id DESC LIMIT %u", max);
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(command), -1, &res, 0);
@@ -1729,6 +1740,19 @@ void sql_health_alarm_log2json_v2(RRDHOST *host, BUFFER *wb, uint32_t alert_id, 
     rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to bind host_id parameter for SQL_GET_ALARM_ID.");
+
+    if (transition) {
+        uuid_t transition_uuid;
+        if (uuid_parse(transition, transition_uuid)) {
+             error_report("Failed to parse transition");
+             goto fail;
+        }
+        rc = sqlite3_bind_blob(res, 2, &transition_uuid, sizeof(transition_uuid), SQLITE_STATIC);
+        if (unlikely(rc != SQLITE_OK)) {
+             error_report("Failed to bind transition parameter");
+             goto fail;
+        }
+    }
 
     while (sqlite3_step(res) == SQLITE_ROW) {
 
@@ -1799,6 +1823,7 @@ void sql_health_alarm_log2json_v2(RRDHOST *host, BUFFER *wb, uint32_t alert_id, 
         buffer_json_object_close(wb);
     }
 
+fail:
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement for SQL_SELECT_HEALTH_LOG");

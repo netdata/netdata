@@ -1387,9 +1387,15 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
                         if(req->options & CONTEXT_V2_OPTION_ALERTS_TRANSITIONS) {
                             buffer_json_member_add_array(wb, "transitions");
-                            sql_health_alarm_log2json_v2(t->host, wb, t->alarm_id, string2str(t->chart_name),
-                                                         ctl.request->after, ctl.request->before,
-                                                         ctl.request->alerts.last ? ctl.request->alerts.last : 10);
+                            sql_health_alarm_log2json_v2(
+                                t->host,
+                                wb,
+                                t->alarm_id,
+                                string2str(t->chart_name),
+                                ctl.request->after,
+                                ctl.request->before,
+                                NULL,
+                                ctl.request->alerts.last ? ctl.request->alerts.last : 10);
                             buffer_json_array_close(wb);
                         }
                     }
