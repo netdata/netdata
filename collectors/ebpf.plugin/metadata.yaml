@@ -1,7 +1,188 @@
 name: ebpf.plugin
 title: TBD
 modules:
-  - name: process
+  - name: filedescriptor
+    title: COLLECTORNAME Monitoring
+    duplicate_for_virtual_integrations:
+      list:
+        - title: Ubuntu
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+        - title: Redhat
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+    overview:
+      operation:
+        description: This collector periodically does http requests to one or more
+          [Apache](link to collector) web servers to collect the metrics mod_status
+          plugin that apache exposes
+      platforms:
+        description: If this collector can't run on some platforms specify them here,
+          otherwise set this to true and this text will not be rendered, instead a
+          templated message will appear
+        boolean: true
+      multi-instance:
+        boolean: true
+      permissions:
+        description: if there are any notable permission requirements, eg running
+          as root and so on, specify them here and set it to false, otherwise set
+          it to true and a templated message will appear
+        boolean: true
+      related:
+        description: give a simple description if there are any other collectors related
+          to this collector. Example -> To get the most out of your apache servers,
+          you can monitor its processes for resources utilization and their log files
+          to turn them into real-time metrics. Check our related resources for more
+          information. (if not, leave empty)
+    setup:
+      prerequisites:
+        list:
+          - title: Prerequisite title for heading
+            text: List like with dashes, TBD, use | and newline for multiline
+      behavior:
+        auto_detection:
+          description: The collector auto-detects apache web servers running on localhost
+            ports 80, 443, and 8080.
+        limits:
+          description: The collector is limited to x amount of tables or any other
+            limitation, leave empty if none
+        impact:
+          description: Is there any impact on the application when using the default
+            configuration? Maybe on a db collector having to many tables might slow
+            down the db if collection happens per second, leave empty if none
+      configuration:
+        file:
+          description: 'which file the user has to edit. Example: go.d/apache.conf'
+        options:
+          description: TBD, use | and newline for multiline
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: option name
+              description: option description
+              default: a number or a string
+              required: true or false
+        examples:
+          folding:
+            title: Config
+            enabled: false
+          list:
+            - name: Basic / else describe what this example is about
+              description: A basic example configuration / describe your example
+              data: input the example data in yaml format
+    troubleshooting:
+      problems:
+        list:
+          - name: possible troubleshooting title
+            text: describe
+      debugging:
+        description: How to run this in debug mode? Use | and newline with indent,
+          to write in markdown
+      logs:
+        description: How can I monitor logs for this plugin?
+    related_resources:
+      integrations:
+        list:
+          - apache
+          - weblog
+          - httpcheck
+          - etc
+        provide:
+          description: What info I can provide for other plugins that reference me?
+            this will only be visible in their end, they will scrape this text. Example
+            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
+            I/O and many more resources utilization.
+    alerts: []
+    metrics:
+      description: some description for this section, or leave empty
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        cgroup:
+          name: cgroup
+          description: TBD
+          labels: []
+          metrics:
+            - name: cgroup.fd_open
+              description: Number of open files
+              unit: calls/s
+              dimensions:
+                - name: open
+            - name: cgroup.fd_open_error
+              description: Fails to open files
+              unit: calls/s
+              dimensions:
+                - name: open
+            - name: cgroup.fd_closed
+              description: Files closed
+              unit: calls/s
+              dimensions:
+                - name: close
+            - name: cgroup.fd_close_error
+              description: Fails to close files
+              unit: calls/s
+              dimensions:
+                - name: close
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: services.file_open
+              description: Number of open files
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.file_open_error
+              description: Fails to open files
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.file_closed
+              description: Files closed
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.file_close_error
+              description: Fails to close files
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: apps.file_open
+              description: Number of open files
+              unit: calls/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.file_open_error
+              description: Fails to open files
+              unit: calls/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.file_closed
+              description: Files closed
+              unit: calls/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.file_close_error
+              description: Fails to close files
+              unit: calls/s
+              dimensions:
+                - name: a dimension per app group
+            - name: filesystem.file_descriptor
+              description: Open and close calls
+              unit: calls/s
+              dimensions:
+                - name: open
+                - name: close
+            - name: filesystem.file_error
+              description: Open fails
+              unit: calls/s
+              dimensions:
+                - name: open
+                - name: close
+  - name: processes
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
@@ -105,59 +286,217 @@ modules:
           description: TBD
           labels: []
           metrics:
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
+            - name: system.process_thread
+              description: Start process
+              unit: calls/s
               dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory.
-              unit: calls
+                - name: process
+            - name: system.process_status
+              description: Process not closed
+              unit: difference
               dimensions:
-                - name: aral
-            - name: netdata.ebpf_threads
-              description: Threads info
-              unit: threads
+                - name: process
+                - name: zombie
+            - name: system.exit
+              description: Exit process
+              unit: calls/s
               dimensions:
-                - name: total
-                - name: running
-            - name: netdata.ebpf_load_methods
-              description: Load info
-              unit: methods
+                - name: process
+            - name: system.task_error
+              description: Fails to create process
+              unit: calls/s
               dimensions:
-                - name: legacy
-                - name: co-re
-            - name: netdata.ebpf_kernel_memory
-              description: Memory allocated for hash tables.
-              unit: bytes
+                - name: task
+            - name: apps.process_create
+              description: Process started
+              unit: calls/s
               dimensions:
-                - name: memory_locked
-            - name: netdata.ebpf_hash_tables_count
-              description: Number of hash tables loaded
-              unit: hash tables
+                - name: a dimension per app group
+            - name: apps.thread_create
+              description: Threads started
+              unit: calls/s
               dimensions:
-                - name: hash_table
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL
-              unit: bytes
+                - name: a dimension per app group
+            - name: apps.task_exit
+              description: Tasks starts exit process
+              unit: calls/s
               dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
+                - name: a dimension per app group
+            - name: apps.task_close
+              description: Tasks closed
+              unit: calls/s
               dimensions:
-                - name: aral
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
+                - name: a dimension per app group
+            - name: apps.task_error
+              description: Errors to create process or threads
+              unit: calls/s
               dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
+                - name: a dimension per app group
+        cgroup:
+          name: cgroup
+          description: TBD
+          labels: []
+          metrics:
+            - name: cgroup.process_create
+              description: Process started
+              unit: calls/s
               dimensions:
-                - name: aral
-  - name: process
+                - name: process
+            - name: cgroup.thread_create
+              description: Threads started
+              unit: calls/s
+              dimensions:
+                - name: thread
+            - name: cgroup.task_exit
+              description: Tasks starts exit process
+              unit: calls/s
+              dimensions:
+                - name: exit
+            - name: cgroup.task_close
+              description: Tasks closed
+              unit: calls/s
+              dimensions:
+                - name: process
+            - name: cgroup.task_error
+              description: Errors to create process or threads
+              unit: calls/s
+              dimensions:
+                - name: process
+            - name: services.process_create
+              description: Process started
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.thread_create
+              description: Threads started
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.task_close
+              description: Tasks starts exit process
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.task_exit
+              description: Tasks closed
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.task_error
+              description: Errors to create process or threads
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+  - name: disk
+    title: COLLECTORNAME Monitoring
+    duplicate_for_virtual_integrations:
+      list:
+        - title: Ubuntu
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+        - title: Redhat
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+    overview:
+      operation:
+        description: This collector periodically does http requests to one or more
+          [Apache](link to collector) web servers to collect the metrics mod_status
+          plugin that apache exposes
+      platforms:
+        description: If this collector can't run on some platforms specify them here,
+          otherwise set this to true and this text will not be rendered, instead a
+          templated message will appear
+        boolean: true
+      multi-instance:
+        boolean: true
+      permissions:
+        description: if there are any notable permission requirements, eg running
+          as root and so on, specify them here and set it to false, otherwise set
+          it to true and a templated message will appear
+        boolean: true
+      related:
+        description: give a simple description if there are any other collectors related
+          to this collector. Example -> To get the most out of your apache servers,
+          you can monitor its processes for resources utilization and their log files
+          to turn them into real-time metrics. Check our related resources for more
+          information. (if not, leave empty)
+    setup:
+      prerequisites:
+        list:
+          - title: Prerequisite title for heading
+            text: List like with dashes, TBD, use | and newline for multiline
+      behavior:
+        auto_detection:
+          description: The collector auto-detects apache web servers running on localhost
+            ports 80, 443, and 8080.
+        limits:
+          description: The collector is limited to x amount of tables or any other
+            limitation, leave empty if none
+        impact:
+          description: Is there any impact on the application when using the default
+            configuration? Maybe on a db collector having to many tables might slow
+            down the db if collection happens per second, leave empty if none
+      configuration:
+        file:
+          description: 'which file the user has to edit. Example: go.d/apache.conf'
+        options:
+          description: TBD, use | and newline for multiline
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: option name
+              description: option description
+              default: a number or a string
+              required: true or false
+        examples:
+          folding:
+            title: Config
+            enabled: false
+          list:
+            - name: Basic / else describe what this example is about
+              description: A basic example configuration / describe your example
+              data: input the example data in yaml format
+    troubleshooting:
+      problems:
+        list:
+          - name: possible troubleshooting title
+            text: describe
+      debugging:
+        description: How to run this in debug mode? Use | and newline with indent,
+          to write in markdown
+      logs:
+        description: How can I monitor logs for this plugin?
+    related_resources:
+      integrations:
+        list:
+          - apache
+          - weblog
+          - httpcheck
+          - etc
+        provide:
+          description: What info I can provide for other plugins that reference me?
+            this will only be visible in their end, they will scrape this text. Example
+            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
+            I/O and many more resources utilization.
+    alerts: []
+    metrics:
+      description: some description for this section, or leave empty
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        disk:
+          name: disk
+          description: TBD
+          labels: []
+          metrics:
+            - name: disk.latency_io
+              description: Disk latency
+              unit: calls/s
+              dimensions:
+                - name: latency
+  - name: hardirq
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
@@ -261,59 +600,12 @@ modules:
           description: TBD
           labels: []
           metrics:
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
+            - name: system.hardirq_latency
+              description: Hardware IRQ latency
+              unit: milisecondds
               dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory.
-              unit: calls
-              dimensions:
-                - name: aral
-            - name: netdata.ebpf_threads
-              description: Threads info
-              unit: threads
-              dimensions:
-                - name: total
-                - name: running
-            - name: netdata.ebpf_load_methods
-              description: Load info
-              unit: methods
-              dimensions:
-                - name: legacy
-                - name: co-re
-            - name: netdata.ebpf_kernel_memory
-              description: Memory allocated for hash tables.
-              unit: bytes
-              dimensions:
-                - name: memory_locked
-            - name: netdata.ebpf_hash_tables_count
-              description: Number of hash tables loaded
-              unit: hash tables
-              dimensions:
-                - name: hash_table
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
-              dimensions:
-                - name: aral
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
-              dimensions:
-                - name: aral
-  - name: process
+                - name: hardirq names
+  - name: cachestat
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
@@ -417,59 +709,221 @@ modules:
           description: TBD
           labels: []
           metrics:
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
+            - name: apps.cachestat_ratio
+              description: Hit ratio
+              unit: '%'
               dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory.
-              unit: calls
+                - name: a dimension per app group
+            - name: apps.cachestat_dirties
+              description: Number of dirty pages
+              unit: page/s
               dimensions:
-                - name: aral
-            - name: netdata.ebpf_threads
-              description: Threads info
-              unit: threads
+                - name: a dimension per app group
+            - name: apps.cachestat_hits
+              description: Number of accessed files
+              unit: hits/s
               dimensions:
-                - name: total
-                - name: running
-            - name: netdata.ebpf_load_methods
-              description: Load info
-              unit: methods
+                - name: a dimension per app group
+            - name: apps.cachestat_misses
+              description: Files out of page cache
+              unit: misses/s
               dimensions:
-                - name: legacy
-                - name: co-re
-            - name: netdata.ebpf_kernel_memory
-              description: Memory allocated for hash tables.
-              unit: bytes
+                - name: a dimension per app group
+            - name: services.cachestat_ratio
+              description: Hit ratio
+              unit: '%'
               dimensions:
-                - name: memory_locked
-            - name: netdata.ebpf_hash_tables_count
-              description: Number of hash tables loaded
-              unit: hash tables
+                - name: a dimension per systemd service
+            - name: services.cachestat_dirties
+              description: Number of dirty pages
+              unit: page/s
               dimensions:
-                - name: hash_table
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL
-              unit: bytes
+                - name: a dimension per systemd service
+            - name: services.cachestat_hits
+              description: Number of accessed files
+              unit: hits/s
               dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
+                - name: a dimension per systemd service
+            - name: services.cachestat_misses
+              description: Files out of page cache
+              unit: misses/s
               dimensions:
-                - name: aral
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
+                - name: a dimension per systemd service
+            - name: mem.cachestat_ratio
+              description: Hit ratio
+              unit: '%'
               dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
+                - name: ratio
+            - name: mem.cachestat_dirties
+              description: Number of dirty pages
+              unit: page/s
               dimensions:
-                - name: aral
-  - name: process
+                - name: dirty
+            - name: mem.cachestat_hits
+              description: Number of accessed files
+              unit: hits/s
+              dimensions:
+                - name: hit
+            - name: mem.cachestat_misses
+              description: Files out of page cache
+              unit: misses/s
+              dimensions:
+                - name: miss
+        cgroup:
+          name: cgroup
+          description: TBD
+          labels: []
+          metrics:
+            - name: cgroup.cachestat_ratio
+              description: Hit ratio
+              unit: '%'
+              dimensions:
+                - name: ratio
+            - name: cgroup.cachestat_dirties
+              description: Number of dirty pages
+              unit: page/s
+              dimensions:
+                - name: dirty
+            - name: cgroup.cachestat_hits
+              description: Number of accessed files
+              unit: hits/s
+              dimensions:
+                - name: hit
+            - name: cgroup.cachestat_misses
+              description: Files out of page cache
+              unit: misses/s
+              dimensions:
+                - name: miss
+  - name: sync
+    title: COLLECTORNAME Monitoring
+    duplicate_for_virtual_integrations:
+      list:
+        - title: Ubuntu
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+        - title: Redhat
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+    overview:
+      operation:
+        description: This collector periodically does http requests to one or more
+          [Apache](link to collector) web servers to collect the metrics mod_status
+          plugin that apache exposes
+      platforms:
+        description: If this collector can't run on some platforms specify them here,
+          otherwise set this to true and this text will not be rendered, instead a
+          templated message will appear
+        boolean: true
+      multi-instance:
+        boolean: true
+      permissions:
+        description: if there are any notable permission requirements, eg running
+          as root and so on, specify them here and set it to false, otherwise set
+          it to true and a templated message will appear
+        boolean: true
+      related:
+        description: give a simple description if there are any other collectors related
+          to this collector. Example -> To get the most out of your apache servers,
+          you can monitor its processes for resources utilization and their log files
+          to turn them into real-time metrics. Check our related resources for more
+          information. (if not, leave empty)
+    setup:
+      prerequisites:
+        list:
+          - title: Prerequisite title for heading
+            text: List like with dashes, TBD, use | and newline for multiline
+      behavior:
+        auto_detection:
+          description: The collector auto-detects apache web servers running on localhost
+            ports 80, 443, and 8080.
+        limits:
+          description: The collector is limited to x amount of tables or any other
+            limitation, leave empty if none
+        impact:
+          description: Is there any impact on the application when using the default
+            configuration? Maybe on a db collector having to many tables might slow
+            down the db if collection happens per second, leave empty if none
+      configuration:
+        file:
+          description: 'which file the user has to edit. Example: go.d/apache.conf'
+        options:
+          description: TBD, use | and newline for multiline
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: option name
+              description: option description
+              default: a number or a string
+              required: true or false
+        examples:
+          folding:
+            title: Config
+            enabled: false
+          list:
+            - name: Basic / else describe what this example is about
+              description: A basic example configuration / describe your example
+              data: input the example data in yaml format
+    troubleshooting:
+      problems:
+        list:
+          - name: possible troubleshooting title
+            text: describe
+      debugging:
+        description: How to run this in debug mode? Use | and newline with indent,
+          to write in markdown
+      logs:
+        description: How can I monitor logs for this plugin?
+    related_resources:
+      integrations:
+        list:
+          - apache
+          - weblog
+          - httpcheck
+          - etc
+        provide:
+          description: What info I can provide for other plugins that reference me?
+            this will only be visible in their end, they will scrape this text. Example
+            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
+            I/O and many more resources utilization.
+    alerts:
+      - name: '[sync_freq](https://gihtub.com/netdata/netdata/blob/master/health/health.d/synchronization.conf)'
+        metric: mem.sync
+        info: number of sync() system calls. \
+    metrics:
+      description: some description for this section, or leave empty
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: mem.file_sync
+              description: Monitor calls for <code>fsync(2)</code> and <code>fdatasync(2)</code>.
+              unit: calls/s
+              dimensions:
+                - name: fsync
+                - name: fdatasync
+            - name: mem.meory_map
+              description: Monitor calls for <code>msync(2)</code>.
+              unit: calls/s
+              dimensions:
+                - name: msync
+            - name: mem.sync
+              description: Monitor calls for <code>sync(2)</code> and <code>syncfs(2)</code>.
+              unit: calls/s
+              dimensions:
+                - name: sync
+                - name: syncfs
+            - name: mem.file_segment
+              description: Monitor calls for <code>sync_file_range(2)</code>.
+              unit: calls/s
+              dimensions:
+                - name: sync_file_range
+  - name: mdflush
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
@@ -573,59 +1027,281 @@ modules:
           description: TBD
           labels: []
           metrics:
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
+            - name: mdstat.mdstat_flush
+              description: MD flushes
+              unit: flushes
               dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory.
-              unit: calls
+                - name: disk
+  - name: swap
+    title: COLLECTORNAME Monitoring
+    duplicate_for_virtual_integrations:
+      list:
+        - title: Ubuntu
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+        - title: Redhat
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+    overview:
+      operation:
+        description: This collector periodically does http requests to one or more
+          [Apache](link to collector) web servers to collect the metrics mod_status
+          plugin that apache exposes
+      platforms:
+        description: If this collector can't run on some platforms specify them here,
+          otherwise set this to true and this text will not be rendered, instead a
+          templated message will appear
+        boolean: true
+      multi-instance:
+        boolean: true
+      permissions:
+        description: if there are any notable permission requirements, eg running
+          as root and so on, specify them here and set it to false, otherwise set
+          it to true and a templated message will appear
+        boolean: true
+      related:
+        description: give a simple description if there are any other collectors related
+          to this collector. Example -> To get the most out of your apache servers,
+          you can monitor its processes for resources utilization and their log files
+          to turn them into real-time metrics. Check our related resources for more
+          information. (if not, leave empty)
+    setup:
+      prerequisites:
+        list:
+          - title: Prerequisite title for heading
+            text: List like with dashes, TBD, use | and newline for multiline
+      behavior:
+        auto_detection:
+          description: The collector auto-detects apache web servers running on localhost
+            ports 80, 443, and 8080.
+        limits:
+          description: The collector is limited to x amount of tables or any other
+            limitation, leave empty if none
+        impact:
+          description: Is there any impact on the application when using the default
+            configuration? Maybe on a db collector having to many tables might slow
+            down the db if collection happens per second, leave empty if none
+      configuration:
+        file:
+          description: 'which file the user has to edit. Example: go.d/apache.conf'
+        options:
+          description: TBD, use | and newline for multiline
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: option name
+              description: option description
+              default: a number or a string
+              required: true or false
+        examples:
+          folding:
+            title: Config
+            enabled: false
+          list:
+            - name: Basic / else describe what this example is about
+              description: A basic example configuration / describe your example
+              data: input the example data in yaml format
+    troubleshooting:
+      problems:
+        list:
+          - name: possible troubleshooting title
+            text: describe
+      debugging:
+        description: How to run this in debug mode? Use | and newline with indent,
+          to write in markdown
+      logs:
+        description: How can I monitor logs for this plugin?
+    related_resources:
+      integrations:
+        list:
+          - apache
+          - weblog
+          - httpcheck
+          - etc
+        provide:
+          description: What info I can provide for other plugins that reference me?
+            this will only be visible in their end, they will scrape this text. Example
+            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
+            I/O and many more resources utilization.
+    alerts: []
+    metrics:
+      description: some description for this section, or leave empty
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        cgroup:
+          name: cgroup
+          description: TBD
+          labels: []
+          metrics:
+            - name: cgroup.swap_read
+              description: Calls to function <code>swap_readpage</code>.
+              unit: calls/s
               dimensions:
-                - name: aral
-            - name: netdata.ebpf_threads
-              description: Threads info
-              unit: threads
+                - name: read
+            - name: cgroup.swap_write
+              description: Calls to function <code>swap_writepage</code>.
+              unit: calls/s
               dimensions:
-                - name: total
-                - name: running
-            - name: netdata.ebpf_load_methods
-              description: Load info
-              unit: methods
+                - name: write
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: services.swap_read
+              description: Calls to <code>swap_readpage</code>.
+              unit: calls/s
               dimensions:
-                - name: legacy
-                - name: co-re
-            - name: netdata.ebpf_kernel_memory
-              description: Memory allocated for hash tables.
-              unit: bytes
+                - name: a dimension per systemd service
+            - name: services.swap_write
+              description: Calls to function <code>swap_writepage</code>.
+              unit: calls/s
               dimensions:
-                - name: memory_locked
-            - name: netdata.ebpf_hash_tables_count
-              description: Number of hash tables loaded
-              unit: hash tables
+                - name: a dimension per systemd service
+            - name: apps.swap_read_call
+              description: Calls to function <code>swap_readpage</code>.
+              unit: calls/s
               dimensions:
-                - name: hash_table
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL
-              unit: bytes
+                - name: a dimension per app group
+            - name: apps.swap_write_call
+              description: Calls to function <code>swap_writepage</code>.
+              unit: calls/s
               dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
+                - name: a dimension per app group
+            - name: system.swapcalls
+              description: Calls to access swap memory
+              unit: calls/s
               dimensions:
-                - name: aral
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
+                - name: write
+                - name: read
+  - name: oomkill
+    title: COLLECTORNAME Monitoring
+    duplicate_for_virtual_integrations:
+      list:
+        - title: Ubuntu
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+        - title: Redhat
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+    overview:
+      operation:
+        description: This collector periodically does http requests to one or more
+          [Apache](link to collector) web servers to collect the metrics mod_status
+          plugin that apache exposes
+      platforms:
+        description: If this collector can't run on some platforms specify them here,
+          otherwise set this to true and this text will not be rendered, instead a
+          templated message will appear
+        boolean: true
+      multi-instance:
+        boolean: true
+      permissions:
+        description: if there are any notable permission requirements, eg running
+          as root and so on, specify them here and set it to false, otherwise set
+          it to true and a templated message will appear
+        boolean: true
+      related:
+        description: give a simple description if there are any other collectors related
+          to this collector. Example -> To get the most out of your apache servers,
+          you can monitor its processes for resources utilization and their log files
+          to turn them into real-time metrics. Check our related resources for more
+          information. (if not, leave empty)
+    setup:
+      prerequisites:
+        list:
+          - title: Prerequisite title for heading
+            text: List like with dashes, TBD, use | and newline for multiline
+      behavior:
+        auto_detection:
+          description: The collector auto-detects apache web servers running on localhost
+            ports 80, 443, and 8080.
+        limits:
+          description: The collector is limited to x amount of tables or any other
+            limitation, leave empty if none
+        impact:
+          description: Is there any impact on the application when using the default
+            configuration? Maybe on a db collector having to many tables might slow
+            down the db if collection happens per second, leave empty if none
+      configuration:
+        file:
+          description: 'which file the user has to edit. Example: go.d/apache.conf'
+        options:
+          description: TBD, use | and newline for multiline
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: option name
+              description: option description
+              default: a number or a string
+              required: true or false
+        examples:
+          folding:
+            title: Config
+            enabled: false
+          list:
+            - name: Basic / else describe what this example is about
+              description: A basic example configuration / describe your example
+              data: input the example data in yaml format
+    troubleshooting:
+      problems:
+        list:
+          - name: possible troubleshooting title
+            text: describe
+      debugging:
+        description: How to run this in debug mode? Use | and newline with indent,
+          to write in markdown
+      logs:
+        description: How can I monitor logs for this plugin?
+    related_resources:
+      integrations:
+        list:
+          - apache
+          - weblog
+          - httpcheck
+          - etc
+        provide:
+          description: What info I can provide for other plugins that reference me?
+            this will only be visible in their end, they will scrape this text. Example
+            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
+            I/O and many more resources utilization.
+    alerts: []
+    metrics:
+      description: some description for this section, or leave empty
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        cgroup:
+          name: cgroup
+          description: TBD
+          labels: []
+          metrics:
+            - name: cgroup.oomkills
+              description: OOM kills. This chart is provided by eBPF plugin.
+              unit: kills
               dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
+                - name: cgroup name
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: services.oomkills
+              description: OOM kills. This chart is provided by eBPF plugin.
+              unit: kills
               dimensions:
-                - name: aral
-  - name: process
+                - name: a dimension per systemd service
+            - name: apps.oomkills
+              description: OOM kills
+              unit: kills
+              dimensions:
+                - name: a dimension per app group
+  - name: socket
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
@@ -729,59 +1405,199 @@ modules:
           description: TBD
           labels: []
           metrics:
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
+            - name: ip.inbound_conn
+              description: Inbound connections.
+              unit: connections/s
               dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory.
-              unit: calls
+                - name: connection_tcp
+            - name: ip.tcp_outbound_conn
+              description: TCP outbound connections.
+              unit: connections/s
               dimensions:
-                - name: aral
-            - name: netdata.ebpf_threads
-              description: Threads info
-              unit: threads
+                - name: received
+            - name: ip.tcp_functions
+              description: Calls to internal functions
+              unit: calls/s
               dimensions:
-                - name: total
-                - name: running
-            - name: netdata.ebpf_load_methods
-              description: Load info
-              unit: methods
+                - name: received
+                - name: send
+                - name: closed
+            - name: ip.total_tcp_bandwidth
+              description: TCP bandwidth
+              unit: kilobits/s
               dimensions:
-                - name: legacy
-                - name: co-re
-            - name: netdata.ebpf_kernel_memory
-              description: Memory allocated for hash tables.
-              unit: bytes
+                - name: received
+                - name: send
+            - name: ip.tcp_error
+              description: TCP errors
+              unit: calls/s
               dimensions:
-                - name: memory_locked
-            - name: netdata.ebpf_hash_tables_count
-              description: Number of hash tables loaded
-              unit: hash tables
+                - name: received
+                - name: send
+            - name: ip.tcp_retransmit
+              description: Packages retransmitted
+              unit: calls/s
               dimensions:
-                - name: hash_table
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL
-              unit: bytes
+                - name: retransmited
+            - name: ip.udp_functions
+              description: UDP calls
+              unit: calls/s
               dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
+                - name: received
+                - name: send
+            - name: ip.total_udp_bandwidth
+              description: UDP bandwidth
+              unit: kilobits/s
               dimensions:
-                - name: aral
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
+                - name: received
+                - name: send
+            - name: ip.udp_error
+              description: UDP errors
+              unit: calls/s
               dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
+                - name: received
+                - name: send
+            - name: apps.outbound_conn_v4
+              description: Calls to tcp_v4_connection
+              unit: connections/s
               dimensions:
-                - name: aral
-  - name: process
+                - name: a dimension per app group
+            - name: apps.outbound_conn_v6
+              description: Calls to tcp_v6_connection
+              unit: connections/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.total_bandwidth_sent
+              description: Bytes sent
+              unit: kilobits/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.total_bandwidth_recv
+              description: bytes received
+              unit: kilobits/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.bandwidth_tcp_send
+              description: Calls for tcp_sendmsg
+              unit: calls/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.bandwidth_tcp_recv
+              description: Calls for tcp_cleanup_rbuf
+              unit: calls/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.bandwidth_tcp_retransmit
+              description: Calls for tcp_retransmit
+              unit: calls/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.bandwidth_udp_send
+              description: Calls for udp_sendmsg
+              unit: calls/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.bandwidth_udp_recv
+              description: Calls for udp_recvmsg
+              unit: calls/s
+              dimensions:
+                - name: a dimension per app group
+            - name: services.net_conn_ipv4
+              description: Calls to tcp_v4_connection
+              unit: connections/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.net_conn_ipv6
+              description: Calls to tcp_v6_connection
+              unit: connections/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.net_bytes_recv
+              description: Bytes received
+              unit: kilobits/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.net_bytes_sent
+              description: Bytes sent
+              unit: kilobits/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.net_tcp_recv
+              description: Calls to tcp_cleanup_rbuf.
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.net_tcp_send
+              description: Calls to tcp_sendmsg.
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.net_tcp_retransmit
+              description: Calls to tcp_retransmit
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.net_udp_send
+              description: Calls to udp_sendmsg
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.net_udp_recv
+              description: Calls to udp_recvmsg
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+        cgroup:
+          name: cgroup
+          description: TBD
+          labels: []
+          metrics:
+            - name: cgroup.net_conn_ipv4
+              description: Calls to tcp_v4_connection
+              unit: connections/s
+              dimensions:
+                - name: connected_v4
+            - name: cgroup.net_conn_ipv6
+              description: Calls to tcp_v6_connection
+              unit: connections/s
+              dimensions:
+                - name: connected_v6
+            - name: cgroup.net_bytes_recv
+              description: Bytes received
+              unit: calls/s
+              dimensions:
+                - name: received
+            - name: cgroup.net_bytes_sent
+              description: Bytes sent
+              unit: calls/s
+              dimensions:
+                - name: sent
+            - name: cgroup.net_tcp_recv
+              description: Calls to tcp_cleanup_rbuf.
+              unit: calls/s
+              dimensions:
+                - name: received
+            - name: cgroup.net_tcp_send
+              description: Calls to tcp_sendmsg.
+              unit: calls/s
+              dimensions:
+                - name: sent
+            - name: cgroup.net_retransmit
+              description: Calls to tcp_retransmit.
+              unit: calls/s
+              dimensions:
+                - name: retransmitted
+            - name: cgroup.net_udp_send
+              description: Calls to udp_sendmsg
+              unit: calls/s
+              dimensions:
+                - name: sent
+            - name: cgroup.net_udp_recv
+              description: Calls to udp_recvmsg
+              unit: calls/s
+              dimensions:
+                - name: received
+  - name: dcstat
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
@@ -885,59 +1701,405 @@ modules:
           description: TBD
           labels: []
           metrics:
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
+            - name: apps.dc_ratio
+              description: Percentage of files inside directory cache
+              unit: '%'
               dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory.
-              unit: calls
+                - name: a dimension per app group
+            - name: apps.dc_reference
+              description: Count file access
+              unit: files
               dimensions:
-                - name: aral
-            - name: netdata.ebpf_threads
-              description: Threads info
-              unit: threads
+                - name: a dimension per app group
+            - name: apps.dc_not_cache
+              description: Files not present inside directory cache
+              unit: files
               dimensions:
-                - name: total
-                - name: running
-            - name: netdata.ebpf_load_methods
-              description: Load info
-              unit: methods
+                - name: a dimension per app group
+            - name: apps.dc_not_found
+              description: Files not found
+              unit: files
               dimensions:
-                - name: legacy
-                - name: co-re
-            - name: netdata.ebpf_kernel_memory
-              description: Memory allocated for hash tables.
-              unit: bytes
+                - name: a dimension per app group
+            - name: services.dc_ratio
+              description: Percentage of files inside directory cache
+              unit: '%'
               dimensions:
-                - name: memory_locked
-            - name: netdata.ebpf_hash_tables_count
-              description: Number of hash tables loaded
-              unit: hash tables
+                - name: a dimension per systemd service
+            - name: services.dc_reference
+              description: Count file access
+              unit: files
               dimensions:
-                - name: hash_table
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL
-              unit: bytes
+                - name: a dimension per systemd service
+            - name: services.dc_not_cache
+              description: Files not present inside directory cache
+              unit: files
               dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
+                - name: a dimension per systemd service
+            - name: services.dc_not_found
+              description: Files not found
+              unit: files
               dimensions:
-                - name: aral
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
+                - name: a dimension per systemd service
+            - name: filesystem.dc_hit_ratio
+              description: Percentage of files inside directory cache
+              unit: '%'
               dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
+                - name: ratio
+        cgroup:
+          name: cgroup
+          description: TBD
+          labels: []
+          metrics:
+            - name: cgroup.dc_ratio
+              description: Percentage of files inside directory cache
+              unit: '%'
               dimensions:
-                - name: aral
-  - name: process
+                - name: ratio
+            - name: cgroup.dc_reference
+              description: Count file access
+              unit: files
+              dimensions:
+                - name: reference
+            - name: cgroup.dc_not_cache
+              description: Files not present inside directory cache
+              unit: files
+              dimensions:
+                - name: slow
+            - name: cgroup.dc_not_found
+              description: Files not found
+              unit: files
+              dimensions:
+                - name: miss
+        filesystem:
+          name: filesystem
+          description: TBD
+          labels: []
+          metrics:
+            - name: filesystem.dc_reference
+              description: Variables used to calculate hit ratio.
+              unit: files
+              dimensions:
+                - name: reference
+                - name: slow
+                - name: miss
+  - name: filesystem
+    title: COLLECTORNAME Monitoring
+    duplicate_for_virtual_integrations:
+      list:
+        - title: Ubuntu
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+        - title: Redhat
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+    overview:
+      operation:
+        description: This collector periodically does http requests to one or more
+          [Apache](link to collector) web servers to collect the metrics mod_status
+          plugin that apache exposes
+      platforms:
+        description: If this collector can't run on some platforms specify them here,
+          otherwise set this to true and this text will not be rendered, instead a
+          templated message will appear
+        boolean: true
+      multi-instance:
+        boolean: true
+      permissions:
+        description: if there are any notable permission requirements, eg running
+          as root and so on, specify them here and set it to false, otherwise set
+          it to true and a templated message will appear
+        boolean: true
+      related:
+        description: give a simple description if there are any other collectors related
+          to this collector. Example -> To get the most out of your apache servers,
+          you can monitor its processes for resources utilization and their log files
+          to turn them into real-time metrics. Check our related resources for more
+          information. (if not, leave empty)
+    setup:
+      prerequisites:
+        list:
+          - title: Prerequisite title for heading
+            text: List like with dashes, TBD, use | and newline for multiline
+      behavior:
+        auto_detection:
+          description: The collector auto-detects apache web servers running on localhost
+            ports 80, 443, and 8080.
+        limits:
+          description: The collector is limited to x amount of tables or any other
+            limitation, leave empty if none
+        impact:
+          description: Is there any impact on the application when using the default
+            configuration? Maybe on a db collector having to many tables might slow
+            down the db if collection happens per second, leave empty if none
+      configuration:
+        file:
+          description: 'which file the user has to edit. Example: go.d/apache.conf'
+        options:
+          description: TBD, use | and newline for multiline
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: option name
+              description: option description
+              default: a number or a string
+              required: true or false
+        examples:
+          folding:
+            title: Config
+            enabled: false
+          list:
+            - name: Basic / else describe what this example is about
+              description: A basic example configuration / describe your example
+              data: input the example data in yaml format
+    troubleshooting:
+      problems:
+        list:
+          - name: possible troubleshooting title
+            text: describe
+      debugging:
+        description: How to run this in debug mode? Use | and newline with indent,
+          to write in markdown
+      logs:
+        description: How can I monitor logs for this plugin?
+    related_resources:
+      integrations:
+        list:
+          - apache
+          - weblog
+          - httpcheck
+          - etc
+        provide:
+          description: What info I can provide for other plugins that reference me?
+            this will only be visible in their end, they will scrape this text. Example
+            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
+            I/O and many more resources utilization.
+    alerts: []
+    metrics:
+      description: some description for this section, or leave empty
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        filesystem:
+          name: filesystem
+          description: TBD
+          labels: []
+          metrics:
+            - name: filesystem.read_latency
+              description: ext4 latency for each read request.
+              unit: calls/s
+              dimensions:
+                - name: latency period
+            - name: filesystem.open_latency
+              description: ext4 latency for each open request.
+              unit: calls/s
+              dimensions:
+                - name: latency period
+            - name: filesystem.sync_latency
+              description: ext4 latency for each sync request.
+              unit: calls/s
+              dimensions:
+                - name: latency period
+        iilesystem:
+          name: iilesystem
+          description: TBD
+          labels: []
+          metrics:
+            - name: filesystem.write_latency
+              description: ext4 latency for each write request.
+              unit: calls/s
+              dimensions:
+                - name: latency period
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: filesystem.attributte_latency
+              description: nfs latency for each attribute request.
+              unit: calls/s
+              dimensions:
+                - name: latency period
+  - name: shm
+    title: COLLECTORNAME Monitoring
+    duplicate_for_virtual_integrations:
+      list:
+        - title: Ubuntu
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+        - title: Redhat
+          description: dummy description that will replace the original "overview"
+            section, leave the whole list empty if none
+    overview:
+      operation:
+        description: This collector periodically does http requests to one or more
+          [Apache](link to collector) web servers to collect the metrics mod_status
+          plugin that apache exposes
+      platforms:
+        description: If this collector can't run on some platforms specify them here,
+          otherwise set this to true and this text will not be rendered, instead a
+          templated message will appear
+        boolean: true
+      multi-instance:
+        boolean: true
+      permissions:
+        description: if there are any notable permission requirements, eg running
+          as root and so on, specify them here and set it to false, otherwise set
+          it to true and a templated message will appear
+        boolean: true
+      related:
+        description: give a simple description if there are any other collectors related
+          to this collector. Example -> To get the most out of your apache servers,
+          you can monitor its processes for resources utilization and their log files
+          to turn them into real-time metrics. Check our related resources for more
+          information. (if not, leave empty)
+    setup:
+      prerequisites:
+        list:
+          - title: Prerequisite title for heading
+            text: List like with dashes, TBD, use | and newline for multiline
+      behavior:
+        auto_detection:
+          description: The collector auto-detects apache web servers running on localhost
+            ports 80, 443, and 8080.
+        limits:
+          description: The collector is limited to x amount of tables or any other
+            limitation, leave empty if none
+        impact:
+          description: Is there any impact on the application when using the default
+            configuration? Maybe on a db collector having to many tables might slow
+            down the db if collection happens per second, leave empty if none
+      configuration:
+        file:
+          description: 'which file the user has to edit. Example: go.d/apache.conf'
+        options:
+          description: TBD, use | and newline for multiline
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: option name
+              description: option description
+              default: a number or a string
+              required: true or false
+        examples:
+          folding:
+            title: Config
+            enabled: false
+          list:
+            - name: Basic / else describe what this example is about
+              description: A basic example configuration / describe your example
+              data: input the example data in yaml format
+    troubleshooting:
+      problems:
+        list:
+          - name: possible troubleshooting title
+            text: describe
+      debugging:
+        description: How to run this in debug mode? Use | and newline with indent,
+          to write in markdown
+      logs:
+        description: How can I monitor logs for this plugin?
+    related_resources:
+      integrations:
+        list:
+          - apache
+          - weblog
+          - httpcheck
+          - etc
+        provide:
+          description: What info I can provide for other plugins that reference me?
+            this will only be visible in their end, they will scrape this text. Example
+            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
+            I/O and many more resources utilization.
+    alerts: []
+    metrics:
+      description: some description for this section, or leave empty
+      folding:
+        title: Metrics
+        enabled: false
+      scope:
+        cgroup:
+          name: cgroup
+          description: TBD
+          labels: []
+          metrics:
+            - name: cgroup.shmget
+              description: Calls to syscall <code>shmget(2)</code>.
+              unit: calls/s
+              dimensions:
+                - name: get
+            - name: cgroup.shmat
+              description: Calls to syscall <code>shmat(2)</code>.
+              unit: calls/s
+              dimensions:
+                - name: at
+            - name: cgroup.shmdt
+              description: Calls to syscall <code>shmdt(2)</code>.
+              unit: calls/s
+              dimensions:
+                - name: dt
+            - name: cgroup.shmctl
+              description: Calls to syscall <code>shmctl(2)</code>.
+              unit: calls/s
+              dimensions:
+                - name: ctl
+        global:
+          name: global
+          description: TBD
+          labels: []
+          metrics:
+            - name: services.shmget
+              description: Calls to syscall <code>shmget(2)</code>.
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.shmat
+              description: Calls to syscall <code>shmat(2)</code>.
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.shmdt
+              description: Calls to syscall <code>shmdt(2)</code>.
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.shmctl
+              description: Calls to syscall <code>shmctl(2)</code>.
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: apps.shmget_call
+              description: Calls to syscall <code>shmget(2)</code>.
+              unit: calls/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.shmat_call
+              description: Calls to syscall <code>shmat(2)</code>.
+              unit: calls/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.shmdt_call
+              description: Calls to syscall <code>shmdt(2)</code>.
+              unit: calls/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.shmctl_call
+              description: Calls to syscall <code>shmctl(2)</code>.
+              unit: calls/s
+              dimensions:
+                - name: a dimension per app group
+            - name: system.shared_memory_calls
+              description: Calls to shared memory system calls
+              unit: calls/s
+              dimensions:
+                - name: get
+                - name: at
+                - name: dt
+                - name: ctl
+  - name: softirq
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
@@ -1041,59 +2203,12 @@ modules:
           description: TBD
           labels: []
           metrics:
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
+            - name: system.softirq_latency
+              description: Software IRQ latency
+              unit: miliseconds
               dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory.
-              unit: calls
-              dimensions:
-                - name: aral
-            - name: netdata.ebpf_threads
-              description: Threads info
-              unit: threads
-              dimensions:
-                - name: total
-                - name: running
-            - name: netdata.ebpf_load_methods
-              description: Load info
-              unit: methods
-              dimensions:
-                - name: legacy
-                - name: co-re
-            - name: netdata.ebpf_kernel_memory
-              description: Memory allocated for hash tables.
-              unit: bytes
-              dimensions:
-                - name: memory_locked
-            - name: netdata.ebpf_hash_tables_count
-              description: Number of hash tables loaded
-              unit: hash tables
-              dimensions:
-                - name: hash_table
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
-              dimensions:
-                - name: aral
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
-              dimensions:
-                - name: aral
-  - name: process
+                - name: soft IRQs
+  - name: mount
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
@@ -1197,59 +2312,19 @@ modules:
           description: TBD
           labels: []
           metrics:
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
+            - name: mount_points.call
+              description: Calls to mount and umount syscalls
+              unit: calls/s
               dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory.
-              unit: calls
+                - name: mount
+                - name: umount
+            - name: mount_points.error
+              description: Errors to mount and umount file systems
+              unit: calls/s
               dimensions:
-                - name: aral
-            - name: netdata.ebpf_threads
-              description: Threads info
-              unit: threads
-              dimensions:
-                - name: total
-                - name: running
-            - name: netdata.ebpf_load_methods
-              description: Load info
-              unit: methods
-              dimensions:
-                - name: legacy
-                - name: co-re
-            - name: netdata.ebpf_kernel_memory
-              description: Memory allocated for hash tables.
-              unit: bytes
-              dimensions:
-                - name: memory_locked
-            - name: netdata.ebpf_hash_tables_count
-              description: Number of hash tables loaded
-              unit: hash tables
-              dimensions:
-                - name: hash_table
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
-              dimensions:
-                - name: aral
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
-              dimensions:
-                - name: aral
-  - name: process
+                - name: mount
+                - name: umount
+  - name: vfs
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:
       list:
@@ -1348,1155 +2423,264 @@ modules:
         title: Metrics
         enabled: false
       scope:
+        cgroup:
+          name: cgroup
+          description: TBD
+          labels: []
+          metrics:
+            - name: cgroup.vfs_unlink
+              description: Files deleted
+              unit: calls/s
+              dimensions:
+                - name: delete
+            - name: cgroup.vfs_write
+              description: Write to disk
+              unit: calls/s
+              dimensions:
+                - name: write
+            - name: cgroup.vfs_write_error
+              description: Fails to write
+              unit: calls/s
+              dimensions:
+                - name: write
+            - name: cgroup.vfs_read
+              description: Read from disk
+              unit: calls/s
+              dimensions:
+                - name: read
+            - name: cgroup.vfs_read_error
+              description: Fails to read
+              unit: calls/s
+              dimensions:
+                - name: read
+            - name: cgroup.vfs_write_bytes
+              description: Bytes written on disk
+              unit: bytes/s
+              dimensions:
+                - name: write
+            - name: cgroup.vfs_read_bytes
+              description: Bytes read from disk
+              unit: bytes/s
+              dimensions:
+                - name: read
+            - name: cgroup.vfs_fsync
+              description: Calls for <code>vfs_fsync</code>
+              unit: calls/s
+              dimensions:
+                - name: fsync
+            - name: cgroup.vfs_fsync_error
+              description: Sync error
+              unit: calls/s
+              dimensions:
+                - name: fsync
+            - name: cgroup.vfs_open
+              description: Calls for <code>vfs_open</code>
+              unit: calls/s
+              dimensions:
+                - name: open
+            - name: cgroup.vfs_open_error
+              description: Open error
+              unit: calls/s
+              dimensions:
+                - name: open
+            - name: cgroup.vfs_create
+              description: Calls for <code>vfs_create</code>
+              unit: calls/s
+              dimensions:
+                - name: create
+            - name: cgroup.vfs_create_error
+              description: Create error
+              unit: calls/s
+              dimensions:
+                - name: create
         global:
           name: global
           description: TBD
           labels: []
           metrics:
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory.
-              unit: calls
-              dimensions:
-                - name: aral
-            - name: netdata.ebpf_threads
-              description: Threads info
-              unit: threads
-              dimensions:
-                - name: total
-                - name: running
-            - name: netdata.ebpf_load_methods
-              description: Load info
-              unit: methods
-              dimensions:
-                - name: legacy
-                - name: co-re
-            - name: netdata.ebpf_kernel_memory
-              description: Memory allocated for hash tables.
-              unit: bytes
-              dimensions:
-                - name: memory_locked
-            - name: netdata.ebpf_hash_tables_count
-              description: Number of hash tables loaded
-              unit: hash tables
-              dimensions:
-                - name: hash_table
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
-              dimensions:
-                - name: aral
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
-              dimensions:
-                - name: aral
-  - name: process
-    title: COLLECTORNAME Monitoring
-    duplicate_for_virtual_integrations:
-      list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-    overview:
-      operation:
-        description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
-      platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
-      multi-instance:
-        boolean: true
-      permissions:
-        description: if there are any notable permission requirements, eg running
-          as root and so on, specify them here and set it to false, otherwise set
-          it to true and a templated message will appear
-        boolean: true
-      related:
-        description: give a simple description if there are any other collectors related
-          to this collector. Example -> To get the most out of your apache servers,
-          you can monitor its processes for resources utilization and their log files
-          to turn them into real-time metrics. Check our related resources for more
-          information. (if not, leave empty)
-    setup:
-      prerequisites:
-        list:
-          - title: Prerequisite title for heading
-            text: List like with dashes, TBD, use | and newline for multiline
-      behavior:
-        auto_detection:
-          description: The collector auto-detects apache web servers running on localhost
-            ports 80, 443, and 8080.
-        limits:
-          description: The collector is limited to x amount of tables or any other
-            limitation, leave empty if none
-        impact:
-          description: Is there any impact on the application when using the default
-            configuration? Maybe on a db collector having to many tables might slow
-            down the db if collection happens per second, leave empty if none
-      configuration:
-        file:
-          description: 'which file the user has to edit. Example: go.d/apache.conf'
-        options:
-          description: TBD, use | and newline for multiline
-          folding:
-            title: Config options
-            enabled: true
-          list:
-            - name: option name
-              description: option description
-              default: a number or a string
-              required: true or false
-        examples:
-          folding:
-            title: Config
-            enabled: false
-          list:
-            - name: Basic / else describe what this example is about
-              description: A basic example configuration / describe your example
-              data: input the example data in yaml format
-    troubleshooting:
-      problems:
-        list:
-          - name: possible troubleshooting title
-            text: describe
-      debugging:
-        description: How to run this in debug mode? Use | and newline with indent,
-          to write in markdown
-      logs:
-        description: How can I monitor logs for this plugin?
-    related_resources:
-      integrations:
-        list:
-          - apache
-          - weblog
-          - httpcheck
-          - etc
-        provide:
-          description: What info I can provide for other plugins that reference me?
-            this will only be visible in their end, they will scrape this text. Example
-            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
-            I/O and many more resources utilization.
-    alerts: []
-    metrics:
-      description: some description for this section, or leave empty
-      folding:
-        title: Metrics
-        enabled: false
-      scope:
-        global:
-          name: global
-          description: TBD
-          labels: []
-          metrics:
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory.
-              unit: calls
-              dimensions:
-                - name: aral
-            - name: netdata.ebpf_threads
-              description: Threads info
-              unit: threads
-              dimensions:
-                - name: total
-                - name: running
-            - name: netdata.ebpf_load_methods
-              description: Load info
-              unit: methods
-              dimensions:
-                - name: legacy
-                - name: co-re
-            - name: netdata.ebpf_kernel_memory
-              description: Memory allocated for hash tables.
-              unit: bytes
-              dimensions:
-                - name: memory_locked
-            - name: netdata.ebpf_hash_tables_count
-              description: Number of hash tables loaded
-              unit: hash tables
-              dimensions:
-                - name: hash_table
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
-              dimensions:
-                - name: aral
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
-              dimensions:
-                - name: aral
-  - name: process
-    title: COLLECTORNAME Monitoring
-    duplicate_for_virtual_integrations:
-      list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-    overview:
-      operation:
-        description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
-      platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
-      multi-instance:
-        boolean: true
-      permissions:
-        description: if there are any notable permission requirements, eg running
-          as root and so on, specify them here and set it to false, otherwise set
-          it to true and a templated message will appear
-        boolean: true
-      related:
-        description: give a simple description if there are any other collectors related
-          to this collector. Example -> To get the most out of your apache servers,
-          you can monitor its processes for resources utilization and their log files
-          to turn them into real-time metrics. Check our related resources for more
-          information. (if not, leave empty)
-    setup:
-      prerequisites:
-        list:
-          - title: Prerequisite title for heading
-            text: List like with dashes, TBD, use | and newline for multiline
-      behavior:
-        auto_detection:
-          description: The collector auto-detects apache web servers running on localhost
-            ports 80, 443, and 8080.
-        limits:
-          description: The collector is limited to x amount of tables or any other
-            limitation, leave empty if none
-        impact:
-          description: Is there any impact on the application when using the default
-            configuration? Maybe on a db collector having to many tables might slow
-            down the db if collection happens per second, leave empty if none
-      configuration:
-        file:
-          description: 'which file the user has to edit. Example: go.d/apache.conf'
-        options:
-          description: TBD, use | and newline for multiline
-          folding:
-            title: Config options
-            enabled: true
-          list:
-            - name: option name
-              description: option description
-              default: a number or a string
-              required: true or false
-        examples:
-          folding:
-            title: Config
-            enabled: false
-          list:
-            - name: Basic / else describe what this example is about
-              description: A basic example configuration / describe your example
-              data: input the example data in yaml format
-    troubleshooting:
-      problems:
-        list:
-          - name: possible troubleshooting title
-            text: describe
-      debugging:
-        description: How to run this in debug mode? Use | and newline with indent,
-          to write in markdown
-      logs:
-        description: How can I monitor logs for this plugin?
-    related_resources:
-      integrations:
-        list:
-          - apache
-          - weblog
-          - httpcheck
-          - etc
-        provide:
-          description: What info I can provide for other plugins that reference me?
-            this will only be visible in their end, they will scrape this text. Example
-            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
-            I/O and many more resources utilization.
-    alerts: []
-    metrics:
-      description: some description for this section, or leave empty
-      folding:
-        title: Metrics
-        enabled: false
-      scope:
-        global:
-          name: global
-          description: TBD
-          labels: []
-          metrics:
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory.
-              unit: calls
-              dimensions:
-                - name: aral
-            - name: netdata.ebpf_threads
-              description: Threads info
-              unit: threads
-              dimensions:
-                - name: total
-                - name: running
-            - name: netdata.ebpf_load_methods
-              description: Load info
-              unit: methods
-              dimensions:
-                - name: legacy
-                - name: co-re
-            - name: netdata.ebpf_kernel_memory
-              description: Memory allocated for hash tables.
-              unit: bytes
-              dimensions:
-                - name: memory_locked
-            - name: netdata.ebpf_hash_tables_count
-              description: Number of hash tables loaded
-              unit: hash tables
-              dimensions:
-                - name: hash_table
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
-              dimensions:
-                - name: aral
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
-              dimensions:
-                - name: aral
-  - name: process
-    title: COLLECTORNAME Monitoring
-    duplicate_for_virtual_integrations:
-      list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-    overview:
-      operation:
-        description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
-      platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
-      multi-instance:
-        boolean: true
-      permissions:
-        description: if there are any notable permission requirements, eg running
-          as root and so on, specify them here and set it to false, otherwise set
-          it to true and a templated message will appear
-        boolean: true
-      related:
-        description: give a simple description if there are any other collectors related
-          to this collector. Example -> To get the most out of your apache servers,
-          you can monitor its processes for resources utilization and their log files
-          to turn them into real-time metrics. Check our related resources for more
-          information. (if not, leave empty)
-    setup:
-      prerequisites:
-        list:
-          - title: Prerequisite title for heading
-            text: List like with dashes, TBD, use | and newline for multiline
-      behavior:
-        auto_detection:
-          description: The collector auto-detects apache web servers running on localhost
-            ports 80, 443, and 8080.
-        limits:
-          description: The collector is limited to x amount of tables or any other
-            limitation, leave empty if none
-        impact:
-          description: Is there any impact on the application when using the default
-            configuration? Maybe on a db collector having to many tables might slow
-            down the db if collection happens per second, leave empty if none
-      configuration:
-        file:
-          description: 'which file the user has to edit. Example: go.d/apache.conf'
-        options:
-          description: TBD, use | and newline for multiline
-          folding:
-            title: Config options
-            enabled: true
-          list:
-            - name: option name
-              description: option description
-              default: a number or a string
-              required: true or false
-        examples:
-          folding:
-            title: Config
-            enabled: false
-          list:
-            - name: Basic / else describe what this example is about
-              description: A basic example configuration / describe your example
-              data: input the example data in yaml format
-    troubleshooting:
-      problems:
-        list:
-          - name: possible troubleshooting title
-            text: describe
-      debugging:
-        description: How to run this in debug mode? Use | and newline with indent,
-          to write in markdown
-      logs:
-        description: How can I monitor logs for this plugin?
-    related_resources:
-      integrations:
-        list:
-          - apache
-          - weblog
-          - httpcheck
-          - etc
-        provide:
-          description: What info I can provide for other plugins that reference me?
-            this will only be visible in their end, they will scrape this text. Example
-            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
-            I/O and many more resources utilization.
-    alerts: []
-    metrics:
-      description: some description for this section, or leave empty
-      folding:
-        title: Metrics
-        enabled: false
-      scope:
-        global:
-          name: global
-          description: TBD
-          labels: []
-          metrics:
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory.
-              unit: calls
-              dimensions:
-                - name: aral
-            - name: netdata.ebpf_threads
-              description: Threads info
-              unit: threads
-              dimensions:
-                - name: total
-                - name: running
-            - name: netdata.ebpf_load_methods
-              description: Load info
-              unit: methods
-              dimensions:
-                - name: legacy
-                - name: co-re
-            - name: netdata.ebpf_kernel_memory
-              description: Memory allocated for hash tables.
-              unit: bytes
-              dimensions:
-                - name: memory_locked
-            - name: netdata.ebpf_hash_tables_count
-              description: Number of hash tables loaded
-              unit: hash tables
-              dimensions:
-                - name: hash_table
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
-              dimensions:
-                - name: aral
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
-              dimensions:
-                - name: aral
-  - name: process
-    title: COLLECTORNAME Monitoring
-    duplicate_for_virtual_integrations:
-      list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-    overview:
-      operation:
-        description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
-      platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
-      multi-instance:
-        boolean: true
-      permissions:
-        description: if there are any notable permission requirements, eg running
-          as root and so on, specify them here and set it to false, otherwise set
-          it to true and a templated message will appear
-        boolean: true
-      related:
-        description: give a simple description if there are any other collectors related
-          to this collector. Example -> To get the most out of your apache servers,
-          you can monitor its processes for resources utilization and their log files
-          to turn them into real-time metrics. Check our related resources for more
-          information. (if not, leave empty)
-    setup:
-      prerequisites:
-        list:
-          - title: Prerequisite title for heading
-            text: List like with dashes, TBD, use | and newline for multiline
-      behavior:
-        auto_detection:
-          description: The collector auto-detects apache web servers running on localhost
-            ports 80, 443, and 8080.
-        limits:
-          description: The collector is limited to x amount of tables or any other
-            limitation, leave empty if none
-        impact:
-          description: Is there any impact on the application when using the default
-            configuration? Maybe on a db collector having to many tables might slow
-            down the db if collection happens per second, leave empty if none
-      configuration:
-        file:
-          description: 'which file the user has to edit. Example: go.d/apache.conf'
-        options:
-          description: TBD, use | and newline for multiline
-          folding:
-            title: Config options
-            enabled: true
-          list:
-            - name: option name
-              description: option description
-              default: a number or a string
-              required: true or false
-        examples:
-          folding:
-            title: Config
-            enabled: false
-          list:
-            - name: Basic / else describe what this example is about
-              description: A basic example configuration / describe your example
-              data: input the example data in yaml format
-    troubleshooting:
-      problems:
-        list:
-          - name: possible troubleshooting title
-            text: describe
-      debugging:
-        description: How to run this in debug mode? Use | and newline with indent,
-          to write in markdown
-      logs:
-        description: How can I monitor logs for this plugin?
-    related_resources:
-      integrations:
-        list:
-          - apache
-          - weblog
-          - httpcheck
-          - etc
-        provide:
-          description: What info I can provide for other plugins that reference me?
-            this will only be visible in their end, they will scrape this text. Example
-            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
-            I/O and many more resources utilization.
-    alerts: []
-    metrics:
-      description: some description for this section, or leave empty
-      folding:
-        title: Metrics
-        enabled: false
-      scope:
-        global:
-          name: global
-          description: TBD
-          labels: []
-          metrics:
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory.
-              unit: calls
-              dimensions:
-                - name: aral
-            - name: netdata.ebpf_threads
-              description: Threads info
-              unit: threads
-              dimensions:
-                - name: total
-                - name: running
-            - name: netdata.ebpf_load_methods
-              description: Load info
-              unit: methods
-              dimensions:
-                - name: legacy
-                - name: co-re
-            - name: netdata.ebpf_kernel_memory
-              description: Memory allocated for hash tables.
-              unit: bytes
-              dimensions:
-                - name: memory_locked
-            - name: netdata.ebpf_hash_tables_count
-              description: Number of hash tables loaded
-              unit: hash tables
-              dimensions:
-                - name: hash_table
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
-              dimensions:
-                - name: aral
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
-              dimensions:
-                - name: aral
-  - name: process
-    title: COLLECTORNAME Monitoring
-    duplicate_for_virtual_integrations:
-      list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-    overview:
-      operation:
-        description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
-      platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
-      multi-instance:
-        boolean: true
-      permissions:
-        description: if there are any notable permission requirements, eg running
-          as root and so on, specify them here and set it to false, otherwise set
-          it to true and a templated message will appear
-        boolean: true
-      related:
-        description: give a simple description if there are any other collectors related
-          to this collector. Example -> To get the most out of your apache servers,
-          you can monitor its processes for resources utilization and their log files
-          to turn them into real-time metrics. Check our related resources for more
-          information. (if not, leave empty)
-    setup:
-      prerequisites:
-        list:
-          - title: Prerequisite title for heading
-            text: List like with dashes, TBD, use | and newline for multiline
-      behavior:
-        auto_detection:
-          description: The collector auto-detects apache web servers running on localhost
-            ports 80, 443, and 8080.
-        limits:
-          description: The collector is limited to x amount of tables or any other
-            limitation, leave empty if none
-        impact:
-          description: Is there any impact on the application when using the default
-            configuration? Maybe on a db collector having to many tables might slow
-            down the db if collection happens per second, leave empty if none
-      configuration:
-        file:
-          description: 'which file the user has to edit. Example: go.d/apache.conf'
-        options:
-          description: TBD, use | and newline for multiline
-          folding:
-            title: Config options
-            enabled: true
-          list:
-            - name: option name
-              description: option description
-              default: a number or a string
-              required: true or false
-        examples:
-          folding:
-            title: Config
-            enabled: false
-          list:
-            - name: Basic / else describe what this example is about
-              description: A basic example configuration / describe your example
-              data: input the example data in yaml format
-    troubleshooting:
-      problems:
-        list:
-          - name: possible troubleshooting title
-            text: describe
-      debugging:
-        description: How to run this in debug mode? Use | and newline with indent,
-          to write in markdown
-      logs:
-        description: How can I monitor logs for this plugin?
-    related_resources:
-      integrations:
-        list:
-          - apache
-          - weblog
-          - httpcheck
-          - etc
-        provide:
-          description: What info I can provide for other plugins that reference me?
-            this will only be visible in their end, they will scrape this text. Example
-            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
-            I/O and many more resources utilization.
-    alerts: []
-    metrics:
-      description: some description for this section, or leave empty
-      folding:
-        title: Metrics
-        enabled: false
-      scope:
-        global:
-          name: global
-          description: TBD
-          labels: []
-          metrics:
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory.
-              unit: calls
-              dimensions:
-                - name: aral
-            - name: netdata.ebpf_threads
-              description: Threads info
-              unit: threads
-              dimensions:
-                - name: total
-                - name: running
-            - name: netdata.ebpf_load_methods
-              description: Load info
-              unit: methods
-              dimensions:
-                - name: legacy
-                - name: co-re
-            - name: netdata.ebpf_kernel_memory
-              description: Memory allocated for hash tables.
-              unit: bytes
-              dimensions:
-                - name: memory_locked
-            - name: netdata.ebpf_hash_tables_count
-              description: Number of hash tables loaded
-              unit: hash tables
-              dimensions:
-                - name: hash_table
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
-              dimensions:
-                - name: aral
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
-              dimensions:
-                - name: aral
-  - name: process
-    title: COLLECTORNAME Monitoring
-    duplicate_for_virtual_integrations:
-      list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-    overview:
-      operation:
-        description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
-      platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
-      multi-instance:
-        boolean: true
-      permissions:
-        description: if there are any notable permission requirements, eg running
-          as root and so on, specify them here and set it to false, otherwise set
-          it to true and a templated message will appear
-        boolean: true
-      related:
-        description: give a simple description if there are any other collectors related
-          to this collector. Example -> To get the most out of your apache servers,
-          you can monitor its processes for resources utilization and their log files
-          to turn them into real-time metrics. Check our related resources for more
-          information. (if not, leave empty)
-    setup:
-      prerequisites:
-        list:
-          - title: Prerequisite title for heading
-            text: List like with dashes, TBD, use | and newline for multiline
-      behavior:
-        auto_detection:
-          description: The collector auto-detects apache web servers running on localhost
-            ports 80, 443, and 8080.
-        limits:
-          description: The collector is limited to x amount of tables or any other
-            limitation, leave empty if none
-        impact:
-          description: Is there any impact on the application when using the default
-            configuration? Maybe on a db collector having to many tables might slow
-            down the db if collection happens per second, leave empty if none
-      configuration:
-        file:
-          description: 'which file the user has to edit. Example: go.d/apache.conf'
-        options:
-          description: TBD, use | and newline for multiline
-          folding:
-            title: Config options
-            enabled: true
-          list:
-            - name: option name
-              description: option description
-              default: a number or a string
-              required: true or false
-        examples:
-          folding:
-            title: Config
-            enabled: false
-          list:
-            - name: Basic / else describe what this example is about
-              description: A basic example configuration / describe your example
-              data: input the example data in yaml format
-    troubleshooting:
-      problems:
-        list:
-          - name: possible troubleshooting title
-            text: describe
-      debugging:
-        description: How to run this in debug mode? Use | and newline with indent,
-          to write in markdown
-      logs:
-        description: How can I monitor logs for this plugin?
-    related_resources:
-      integrations:
-        list:
-          - apache
-          - weblog
-          - httpcheck
-          - etc
-        provide:
-          description: What info I can provide for other plugins that reference me?
-            this will only be visible in their end, they will scrape this text. Example
-            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
-            I/O and many more resources utilization.
-    alerts: []
-    metrics:
-      description: some description for this section, or leave empty
-      folding:
-        title: Metrics
-        enabled: false
-      scope:
-        global:
-          name: global
-          description: TBD
-          labels: []
-          metrics:
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory.
-              unit: calls
-              dimensions:
-                - name: aral
-            - name: netdata.ebpf_threads
-              description: Threads info
-              unit: threads
-              dimensions:
-                - name: total
-                - name: running
-            - name: netdata.ebpf_load_methods
-              description: Load info
-              unit: methods
-              dimensions:
-                - name: legacy
-                - name: co-re
-            - name: netdata.ebpf_kernel_memory
-              description: Memory allocated for hash tables.
-              unit: bytes
-              dimensions:
-                - name: memory_locked
-            - name: netdata.ebpf_hash_tables_count
-              description: Number of hash tables loaded
-              unit: hash tables
-              dimensions:
-                - name: hash_table
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
-              dimensions:
-                - name: aral
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
-              dimensions:
-                - name: aral
-  - name: process
-    title: COLLECTORNAME Monitoring
-    duplicate_for_virtual_integrations:
-      list:
-        - title: Ubuntu
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-        - title: Redhat
-          description: dummy description that will replace the original "overview"
-            section, leave the whole list empty if none
-    overview:
-      operation:
-        description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
-      platforms:
-        description: If this collector can't run on some platforms specify them here,
-          otherwise set this to true and this text will not be rendered, instead a
-          templated message will appear
-        boolean: true
-      multi-instance:
-        boolean: true
-      permissions:
-        description: if there are any notable permission requirements, eg running
-          as root and so on, specify them here and set it to false, otherwise set
-          it to true and a templated message will appear
-        boolean: true
-      related:
-        description: give a simple description if there are any other collectors related
-          to this collector. Example -> To get the most out of your apache servers,
-          you can monitor its processes for resources utilization and their log files
-          to turn them into real-time metrics. Check our related resources for more
-          information. (if not, leave empty)
-    setup:
-      prerequisites:
-        list:
-          - title: Prerequisite title for heading
-            text: List like with dashes, TBD, use | and newline for multiline
-      behavior:
-        auto_detection:
-          description: The collector auto-detects apache web servers running on localhost
-            ports 80, 443, and 8080.
-        limits:
-          description: The collector is limited to x amount of tables or any other
-            limitation, leave empty if none
-        impact:
-          description: Is there any impact on the application when using the default
-            configuration? Maybe on a db collector having to many tables might slow
-            down the db if collection happens per second, leave empty if none
-      configuration:
-        file:
-          description: 'which file the user has to edit. Example: go.d/apache.conf'
-        options:
-          description: TBD, use | and newline for multiline
-          folding:
-            title: Config options
-            enabled: true
-          list:
-            - name: option name
-              description: option description
-              default: a number or a string
-              required: true or false
-        examples:
-          folding:
-            title: Config
-            enabled: false
-          list:
-            - name: Basic / else describe what this example is about
-              description: A basic example configuration / describe your example
-              data: input the example data in yaml format
-    troubleshooting:
-      problems:
-        list:
-          - name: possible troubleshooting title
-            text: describe
-      debugging:
-        description: How to run this in debug mode? Use | and newline with indent,
-          to write in markdown
-      logs:
-        description: How can I monitor logs for this plugin?
-    related_resources:
-      integrations:
-        list:
-          - apache
-          - weblog
-          - httpcheck
-          - etc
-        provide:
-          description: What info I can provide for other plugins that reference me?
-            this will only be visible in their end, they will scrape this text. Example
-            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
-            I/O and many more resources utilization.
-    alerts: []
-    metrics:
-      description: some description for this section, or leave empty
-      folding:
-        title: Metrics
-        enabled: false
-      scope:
-        global:
-          name: global
-          description: TBD
-          labels: []
-          metrics:
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory.
-              unit: calls
-              dimensions:
-                - name: aral
-            - name: netdata.ebpf_threads
-              description: Threads info
-              unit: threads
-              dimensions:
-                - name: total
-                - name: running
-            - name: netdata.ebpf_load_methods
-              description: Load info
-              unit: methods
-              dimensions:
-                - name: legacy
-                - name: co-re
-            - name: netdata.ebpf_kernel_memory
-              description: Memory allocated for hash tables.
-              unit: bytes
-              dimensions:
-                - name: memory_locked
-            - name: netdata.ebpf_hash_tables_count
-              description: Number of hash tables loaded
-              unit: hash tables
-              dimensions:
-                - name: hash_table
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
-              dimensions:
-                - name: aral
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: bytes
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: calls
-              dimensions:
-                - name: aral
+            - name: services.vfs_unlink
+              description: Files deleted
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.vfs_write
+              description: Write to disk
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.vfs_write_error
+              description: Fails to write
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.vfs_read
+              description: Read from disk
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.vfs_read_error
+              description: Fails to read
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.vfs_write_bytes
+              description: Bytes written on disk
+              unit: bytes/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.vfs_read_bytes
+              description: Bytes read from disk
+              unit: bytes/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.vfs_fsync
+              description: Calls to <code>vfs_fsync</code>
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.vfs_fsync_error
+              description: Sync error
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.vfs_open
+              description: Calls to <code>vfs_open</code>
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.vfs_open_error
+              description: Open error
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.vfs_create
+              description: Calls to <code>vfs_create</code>
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.vfs_create_error
+              description: Create error
+              unit: calls/s
+              dimensions:
+                - name: a dimension per systemd service
+            - name: filesystem.vfs_deleted_objects
+              description: Remove files
+              unit: calls/s
+              dimensions:
+                - name: delete
+            - name: filesystem.vfs_io
+              description: Calls to IO
+              unit: calls/s
+              dimensions:
+                - name: read
+                - name: write
+            - name: filesystem.vfs_io_bytes
+              description: Bytes written and read
+              unit: bytes/s
+              dimensions:
+                - name: read
+                - name: write
+            - name: filesystem.vfs_io_error
+              description: Fails to write or read
+              unit: calls/s
+              dimensions:
+                - name: read
+                - name: write
+            - name: filesystem.vfs_fsync
+              description: Calls for <code>vfs_fsync</code>
+              unit: calls/s
+              dimensions:
+                - name: fsync
+            - name: filesystem.vfs_fsync_error
+              description: Fails to synchronize
+              unit: calls/s
+              dimensions:
+                - name: fsync
+            - name: filesystem.vfs_open
+              description: Calls for <code>vfs_open</code>
+              unit: calls/s
+              dimensions:
+                - name: open
+            - name: filesystem.vfs_open_error
+              description: Fails to open a file
+              unit: calls/s
+              dimensions:
+                - name: open
+            - name: filesystem.vfs_create
+              description: Calls for <code>vfs_create</code>
+              unit: calls/s
+              dimensions:
+                - name: create
+            - name: filesystem.vfs_create_error
+              description: Fails to create a file.
+              unit: calls/s
+              dimensions:
+                - name: create
+            - name: apps.file_deleted
+              description: Files deleted
+              unit: calls/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.vfs_write_call
+              description: Write to disk
+              unit: calls/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.vfs_write_error
+              description: Fails to write
+              unit: calls/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.vfs_read_call
+              description: Read from disk
+              unit: calls/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.vfs_read_error
+              description: Fails to read
+              unit: calls/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.vfs_write_bytes
+              description: Bytes written on disk
+              unit: bytes/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.vfs_read_bytes
+              description: Bytes read on disk
+              unit: bytes/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.vfs_fsync
+              description: Calls for <code>vfs_fsync</code>
+              unit: calls/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.vfs_fsync_error
+              description: Sync error
+              unit: calls/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.vfs_open
+              description: Calls for <code>vfs_open</code>
+              unit: calls/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.vfs_open_error
+              description: Open error
+              unit: calls/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.vfs_create
+              description: Calls for <code>vfs_create</code>
+              unit: calls/s
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.vfs_create_error
+              description: Create error
+              unit: calls/s
+              dimensions:
+                - name: a dimension per app group
   - name: process
     title: COLLECTORNAME Monitoring
     duplicate_for_virtual_integrations:

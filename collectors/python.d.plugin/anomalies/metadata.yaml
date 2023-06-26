@@ -94,9 +94,6 @@ alerts:
   - name: '[anomalies_anomaly_probabilities](https://gihtub.com/netdata/netdata/blob/master/health/health.d/anomalies.conf)'
     metric: anomalies.probability
     info: average anomaly probability over the last 2 minutes
-  - name: '[anomalies_anomaly_probabilities](https://gihtub.com/netdata/netdata/blob/master/health/health.d/anomalies.conf)'
-    metric: anomalies.probability
-    info: average anomaly probability over the last 2 minutes
   - name: '[anomalies_anomaly_flags](https://gihtub.com/netdata/netdata/blob/master/health/health.d/anomalies.conf)'
     metric: anomalies.anomaly
     info: average anomaly probability over the last 2 minutes

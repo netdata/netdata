@@ -94,20 +94,6 @@ alerts:
   - name: '[memcached_cache_memory_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/memcached.conf)'
     metric: memcached.cache
     info: cache memory utilization
-  - name: '[memcached_cache_memory_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/memcached.conf)'
-    metric: memcached.cache
-    info: cache memory utilization
-  - name: '[memcached_cache_memory_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/memcached.conf)'
-    metric: memcached.cache
-    info: cache memory utilization
-  - name: '[memcached_cache_fill_rate](https://gihtub.com/netdata/netdata/blob/master/health/health.d/memcached.conf)'
-    metric: memcached.cache
-    info: average rate the cache fills up (positive), or frees up (negative) space
-      over the last hour
-  - name: '[memcached_cache_fill_rate](https://gihtub.com/netdata/netdata/blob/master/health/health.d/memcached.conf)'
-    metric: memcached.cache
-    info: average rate the cache fills up (positive), or frees up (negative) space
-      over the last hour
   - name: '[memcached_cache_fill_rate](https://gihtub.com/netdata/netdata/blob/master/health/health.d/memcached.conf)'
     metric: memcached.cache
     info: average rate the cache fills up (positive), or frees up (negative) space

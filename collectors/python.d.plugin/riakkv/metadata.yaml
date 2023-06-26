@@ -103,18 +103,9 @@ alerts:
   - name: '[riakkv_kv_put_slow](https://gihtub.com/netdata/netdata/blob/master/health/health.d/riakkv.conf)'
     metric: riak.kv.latency.put
     info: average time between reception of client PUT request and \
-  - name: '[riakkv_kv_put_slow](https://gihtub.com/netdata/netdata/blob/master/health/health.d/riakkv.conf)'
-    metric: riak.kv.latency.put
-    info: average time between reception of client PUT request and \
-  - name: '[riakkv_kv_put_slow](https://gihtub.com/netdata/netdata/blob/master/health/health.d/riakkv.conf)'
-    metric: riak.kv.latency.put
-    info: average time between reception of client PUT request and \
   - name: '[riakkv_vm_high_process_count](https://gihtub.com/netdata/netdata/blob/master/health/health.d/riakkv.conf)'
     metric: riak.vm
     info: number of processes running in the Erlang VM
-  - name: '[riakkv_list_keys_active](https://gihtub.com/netdata/netdata/blob/master/health/health.d/riakkv.conf)'
-    metric: riak.core.fsm_active
-    info: number of currently running list keys finite state machines
   - name: '[riakkv_list_keys_active](https://gihtub.com/netdata/netdata/blob/master/health/health.d/riakkv.conf)'
     metric: riak.core.fsm_active
     info: number of currently running list keys finite state machines
