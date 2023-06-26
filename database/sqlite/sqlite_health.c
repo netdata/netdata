@@ -1805,3 +1805,45 @@ void sql_health_alarm_log2json_v2(RRDHOST *host, BUFFER *wb, uint32_t alert_id, 
 
     buffer_free(command);
 }
+
+#define SQL_GET_ALARM_ID_FROM_TRANSITION_ID "SELECT hld.alarm_id, hl.host_id, hl.chart_context FROM " \
+        "health_log_detail hld, health_log hl WHERE hld.transition_id = @transition_id " \
+        "and hld.health_log_id = hl.health_log_id"
+
+bool sql_find_alert_transition(const char *transition, void (*cb)(const char *machine_guid, const char *context, time_t alert_id, void *data), void *data)
+{
+    char machine_guid[UUID_STR_LEN];
+
+    int rc;
+    uuid_t transition_uuid;
+    if (uuid_parse(transition, transition_uuid))
+        return false;
+
+    sqlite3_stmt *res = NULL;
+
+    rc = sqlite3_prepare_v2(db_meta, SQL_GET_ALARM_ID_FROM_TRANSITION_ID, -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement when trying to get transition id");
+        return false;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &transition_uuid, sizeof(transition_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind transition");
+        sqlite3_finalize(res);
+        return false;
+    }
+
+    bool ok = false;
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+        ok = true;
+        uuid_unparse_lower(*(uuid_t *) sqlite3_column_blob(res, 2), machine_guid);
+        cb(machine_guid, (const char *) sqlite3_column_text(res, 3), sqlite3_column_int(res, 1), data);
+    }
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize the statement");
+
+    return ok;
+}
