@@ -51,13 +51,23 @@ typedef enum rrdr_options {
     RRDR_OPTION_INTERNAL_AR          = (1 << 31), // internal use only, to let the formatters know we want to render the anomaly rate
 } RRDR_OPTIONS;
 
-typedef enum alert_options {
-    ALERT_OPTION_MINIFY          = (1 << 0), // remove JSON spaces and newlines from JSON output
-    ALERT_OPTION_ACTIVE          = (1 << 1), // Only active alerts
-    ALERT_OPTION_CONFIG          = (1 << 2), // Include config
-    ALERT_OPTION_TRANSITIONS     = (1 << 3), // Include transitions
-    ALERT_OPTION_INSTANCES       = (1 << 4), // Include alert instances
-} ALERT_OPTIONS;
+typedef enum context_v2_options {
+    CONTEXT_V2_OPTION_MINIFY                = (1 << 0), // remove JSON spaces and newlines from JSON output
+    CONTEXT_V2_OPTION_DEBUG                 = (1 << 1), // remove JSON spaces and newlines from JSON output
+    CONTEXT_V2_OPTION_ALERTS_STATE          = (1 << 2), // Only active alerts
+    CONTEXT_V2_OPTION_ALERTS_CONFIG         = (1 << 3), // Include config
+    CONTEXT_V2_OPTION_ALERTS_TRANSITIONS    = (1 << 4), // Include transitions
+    CONTEXT_V2_OPTION_ALERTS_INSTANCES      = (1 << 5), // Include alert instances
+    CONTEXT_V2_OPTION_ALERTS_UNINITIALIZED  = (1 << 6), // Only active alerts
+    CONTEXT_V2_OPTION_ALERTS_UNDEFINED      = (1 << 7), // Only active alerts
+    CONTEXT_V2_OPTION_ALERTS_CLEAR          = (1 << 8), // Only active alerts
+    CONTEXT_V2_OPTION_ALERTS_RAISED         = (1 << 9), // Only active alerts
+    CONTEXT_V2_OPTION_ALERTS_WARNING        = (1 << 10), // Only active alerts
+    CONTEXT_V2_OPTION_ALERTS_CRITICAL       = (1 << 11), // Only active alerts
+
+} CONTEXTS_V2_OPTIONS;
+
+#define CONTEXTS_V2_OPTIONS_ALERTS_STATES (CONTEXT_V2_OPTION_ALERTS_UNINITIALIZED|CONTEXT_V2_OPTION_ALERTS_UNDEFINED|CONTEXT_V2_OPTION_ALERTS_CLEAR|CONTEXT_V2_OPTION_ALERTS_RAISED|CONTEXT_V2_OPTION_ALERTS_WARNING|CONTEXT_V2_OPTION_ALERTS_CRITICAL)
 
 typedef enum __attribute__ ((__packed__)) rrdr_value_flag {
 

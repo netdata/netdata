@@ -120,6 +120,7 @@ struct rrdcalc {
 
     NETDATA_DOUBLE value;           // the current value of the alarm
     NETDATA_DOUBLE old_value;       // the previous value of the alarm
+    NETDATA_DOUBLE last_status_change_value; // the value at the last status change
 
     RRDCALC_FLAGS run_flags;        // check RRDCALC_FLAG_*
 

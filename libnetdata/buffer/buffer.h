@@ -757,7 +757,7 @@ static inline void buffer_json_member_add_uuid(BUFFER *wb, const char *key, uuid
     buffer_print_json_key(wb, key);
     buffer_fast_strcat(wb, ":", 1);
 
-    if(value) {
+    if(value && !uuid_is_null(*value)) {
         char uuid[GUID_LEN + 1];
         uuid_unparse_lower(*value, uuid);
         buffer_json_add_string_value(wb, uuid);

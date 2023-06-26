@@ -167,68 +167,6 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
     buffer_strcat(wb, "\t\t}");
 }
 
-
-static inline void health_alerts_rrdcalc2json_nolock(RRDHOST *host __maybe_unused, BUFFER *wb,
-                                                     RRDCALC *rc, ALERT_OPTIONS options __maybe_unused,
-                                                     Pvoid_t JudyHS, time_t after, time_t before, uint32_t top)
-{
-    ssize_t idx= get_alert_index(JudyHS, &rc->config_hash_id);
-    // If not in index then skip it
-    if (idx < 0)
-        return;
-
-    char value_string[100 + 1];
-    format_value_and_unit(value_string, 100, rc->value, rrdcalc_units(rc), -1);
-
-
-    char hash_id[UUID_STR_LEN];
-    uuid_unparse_lower(rc->config_hash_id, hash_id);
-
-    buffer_json_add_array_item_object(wb);
-    if ((!after || after <= rc->last_updated) && (!before || before >= rc->last_updated)) {
-
-            buffer_json_member_add_uint64(wb, "li", (size_t) idx);
-
-            char trans_uuid_str[UUID_STR_LEN];
-            if (rc->ae) {
-                uuid_unparse_lower(rc->ae->transition_id, trans_uuid_str);
-                buffer_json_member_add_string(wb, "transition_id", trans_uuid_str);
-                buffer_json_member_add_uint64(wb, "gi", rc->ae->global_id);
-            }
-            else {
-                buffer_json_member_add_quoted_string(wb, "transition_id", "NULL");
-                buffer_json_member_add_quoted_string(wb, "gi", "NULL");
-            }
-
-            buffer_json_member_add_string(wb, "status", rrdcalc_status2string(rc->status));
-            buffer_json_member_add_uint64(wb, "last_status_change", (unsigned long)rc->last_status_change);
-            buffer_json_member_add_uint64(wb, "last_updated", (unsigned long)rc->last_updated);
-            buffer_json_member_add_uint64(wb, "next_update", (unsigned long)rc->next_update);
-            buffer_json_member_add_uint64(wb, "delay_up_to_timestamp", (unsigned long)rc->delay_up_to_timestamp);
-
-            buffer_json_member_add_string(wb, "value_string", value_string);
-            buffer_json_member_add_uint64(wb, "last_repeat", (unsigned long)rc->last_repeat);
-            buffer_json_member_add_uint64(wb, "times_repeat", (unsigned long)rc->times_repeat);
-            buffer_json_member_add_uint64(wb, "db_after", (unsigned long)rc->db_after);
-            buffer_json_member_add_uint64(wb, "db_before", (unsigned long)rc->db_before);
-
-            buffer_json_member_add_double(wb, "green", rc->green);
-            buffer_json_member_add_double(wb, "red", rc->red);
-            buffer_json_member_add_double(wb, "value", rc->value);
-
-            if (options & ALERT_OPTION_INSTANCES) {
-                buffer_json_member_add_array(wb, "transitions");
-                sql_health_alarm_log2json_v2(host, wb, rc->id, NULL, after, before, top);
-                buffer_json_array_close(wb);
-            }
-    }
-    buffer_json_object_close(wb); // array entry
-}
-
-//void health_rrdcalctemplate2json_nolock(BUFFER *wb, RRDCALCTEMPLATE *rt) {
-//
-//}
-
 void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCALC_STATUS status) {
     RRDCALC *rc;
     int numberOfAlarms = 0;
@@ -290,37 +228,6 @@ static void health_alarms2json_fill_alarms(RRDHOST *host, BUFFER *wb, int all, v
         i++;
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
-}
-
-static void health_alerts2json_fill_alarms(
-    RRDHOST *host,
-    BUFFER *wb,
-    ALERT_OPTIONS all,
-    Pvoid_t JudyHS,
-    time_t after,
-    time_t before,
-    uint32_t top,
-    void (*fp)(RRDHOST *, BUFFER *, RRDCALC *, ALERT_OPTIONS, Pvoid_t , time_t, time_t, uint32_t))
-{
-    RRDCALC *rc;
-    foreach_rrdcalc_in_rrdhost_read(host, rc) {
-        if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
-            continue;
-
-        if (unlikely(!rrdset_is_available_for_exporting_and_alarms(rc->rrdset)))
-            continue;
-
-        if(likely((all & ALERT_OPTION_ACTIVE) && !(rc->status == RRDCALC_STATUS_WARNING || rc->status == RRDCALC_STATUS_CRITICAL)))
-            continue;
-
-        fp(host, wb, rc, all, JudyHS, after, before, top);
-    }
-    foreach_rrdcalc_in_rrdhost_done(rc);
-}
-
-void health_alert2json(RRDHOST *host, BUFFER *wb, ALERT_OPTIONS options, Pvoid_t JudyHS, time_t after, time_t before, uint32_t top)
-{
-    health_alerts2json_fill_alarms(host, wb, options, JudyHS, after, before, top, health_alerts_rrdcalc2json_nolock);
 }
 
 void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {

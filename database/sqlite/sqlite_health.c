@@ -1696,7 +1696,7 @@ uint32_t sql_get_alarm_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *
     "old_value, last_repeat, transition_id, units, d.global_id FROM health_log_detail d, health_log h " \
     "WHERE h.host_id = @host_id AND h.health_log_id = d.health_log_id "
 
-void sql_health_alarm_log2json_v2(RRDHOST *host, BUFFER *wb, uint32_t alert_id, char *chart, time_t after, time_t before, uint32_t max)
+void sql_health_alarm_log2json_v2(RRDHOST *host, BUFFER *wb, uint32_t alert_id, const char *chart, time_t after, time_t before, uint32_t max)
 {
     sqlite3_stmt *res = NULL;
     int rc;

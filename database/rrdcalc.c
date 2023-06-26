@@ -181,6 +181,7 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
 
     debug(D_HEALTH, "Health linking alarm '%s.%s' to chart '%s' of host '%s'", rrdcalc_chart_name(rc), rrdcalc_name(rc), rrdset_id(st), rrdhost_hostname(host));
 
+    rc->last_status_change_value = rc->value;
     rc->last_status_change = now_realtime_sec();
     rc->rrdset = st;
 

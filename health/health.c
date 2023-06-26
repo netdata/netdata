@@ -1126,6 +1126,7 @@ void *health_main(void *ptr) {
                             rc->old_status = rc->status;
                             rc->status = RRDCALC_STATUS_REMOVED;
                             rc->last_status_change = now;
+                            rc->last_status_change_value = rc->value;
                             rc->last_updated = now;
                             rc->value = NAN;
                             rc->ae = ae;
@@ -1297,36 +1298,37 @@ void *health_main(void *ptr) {
                     RRDCALC_STATUS status = RRDCALC_STATUS_UNDEFINED;
 
                     switch (warning_status) {
-                    case RRDCALC_STATUS_CLEAR:
-                        status = RRDCALC_STATUS_CLEAR;
-                        break;
+                        case RRDCALC_STATUS_CLEAR:
+                            status = RRDCALC_STATUS_CLEAR;
+                            break;
 
-                    case RRDCALC_STATUS_RAISED:
-                        status = RRDCALC_STATUS_WARNING;
-                        break;
+                        case RRDCALC_STATUS_RAISED:
+                            status = RRDCALC_STATUS_WARNING;
+                            break;
 
-                    default:
-                        break;
+                        default:
+                            break;
                     }
 
                     switch (critical_status) {
-                    case RRDCALC_STATUS_CLEAR:
-                        if (status == RRDCALC_STATUS_UNDEFINED)
-                            status = RRDCALC_STATUS_CLEAR;
-                        break;
+                        case RRDCALC_STATUS_CLEAR:
+                            if (status == RRDCALC_STATUS_UNDEFINED)
+                                status = RRDCALC_STATUS_CLEAR;
+                            break;
 
-                    case RRDCALC_STATUS_RAISED:
-                        status = RRDCALC_STATUS_CRITICAL;
-                        break;
+                        case RRDCALC_STATUS_RAISED:
+                            status = RRDCALC_STATUS_CRITICAL;
+                            break;
 
-                    default:
-                        break;
+                        default:
+                            break;
                     }
 
                     // --------------------------------------------------------
                     // check if the new status and the old differ
 
                     if (status != rc->status) {
+
                         worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY);
                         int delay = 0;
 
@@ -1394,6 +1396,7 @@ void *health_main(void *ptr) {
 
                         log_health("[%s]: Alert event for [%s.%s], value [%s], status [%s].", rrdhost_hostname(host), ae_chart_name(ae), ae_name(ae), ae_new_value_string(ae), rrdcalc_status2string(ae->new_status));
 
+                        rc->last_status_change_value = rc->value;
                         rc->last_status_change = now;
                         rc->old_status = rc->status;
                         rc->status = status;
