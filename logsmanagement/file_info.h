@@ -127,7 +127,7 @@ struct File_info {
     int flb_lib_output;                             /**< Fluent-bit "lib" output interface property for this log source **/
     void *flb_config;                               /**< Any other Fluent-Bit configuration specific to this log source only **/
     uv_mutex_t flb_tmp_buff_mut;
-    uv_timer_t flb_tmp_buff_cpy_timer;
+    uv_timer_t *flb_tmp_buff_cpy_timer;
     // TODO: The following structs need to be converted to pointers, to reduce memory consumption when not used
     Web_log_metrics_t flb_tmp_web_log_metrics;      /**< Temporarily store Web log metrics after each extraction in flb_collect_logs_cb(), until they are synced to parser_metrics->web_log **/
     Kernel_metrics_t flb_tmp_kernel_metrics;        /**< Temporarily store Kernel log metrics after each extraction in flb_collect_logs_cb(), until they are synced to parser_metrics->kernel **/

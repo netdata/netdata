@@ -115,6 +115,13 @@ static void p_file_info_destroy(struct File_info *p_file_info){
         m_assert(0, "db_writer_thread joined");
     }   
 
+    if(p_file_info->flb_tmp_buff_cpy_timer){
+        uv_timer_stop(p_file_info->flb_tmp_buff_cpy_timer);
+        uv_close((uv_handle_t *) p_file_info->flb_tmp_buff_cpy_timer, NULL);
+        freez(p_file_info->flb_tmp_buff_cpy_timer);
+        p_file_info->flb_tmp_buff_cpy_timer = NULL;
+    }
+
     freez((void *) p_file_info->chart_name);
     freez(p_file_info->filename);
     freez((void *) p_file_info->file_basename);
@@ -159,6 +166,7 @@ static void p_file_info_destroy(struct File_info *p_file_info){
             freez(p_file_info->parser_cus_config[i]->chart_name);
             freez(p_file_info->parser_cus_config[i]->regex_str);
             freez(p_file_info->parser_cus_config[i]->regex_name);
+            regfree(&p_file_info->parser_cus_config[i]->regex);
             freez(p_file_info->parser_cus_config[i]);
             freez(p_file_info->parser_metrics->parser_cus[i]);
         }    
@@ -950,8 +958,10 @@ static void logs_management_init(uv_loop_t *main_loop,
             size_t regcomp_err_str_size = regerror(rc, &regex, 0, 0);
             char *regcomp_err_str = mallocz(regcomp_err_str_size);
             regerror(rc, &regex, regcomp_err_str, regcomp_err_str_size);
-            collector_error("[%s]: could not compile regex for custom %d chart: %s, custom charts for this log source will be disabled.", 
-                            p_file_info->chart_name, cus_off, cus_chart_v);
+            collector_error("[%s]: could not compile regex for custom %d chart: %s due to error: %s. "
+                            "Custom charts for this log source will be disabled.", 
+                            p_file_info->chart_name, cus_off, cus_chart_v, regcomp_err_str);
+            freez(regcomp_err_str);
             freez(cus_chart_v);
             freez(cus_regex_v);
             freez(cus_regex_name_v);
@@ -1071,12 +1081,13 @@ static void logs_management_init(uv_loop_t *main_loop,
 
             /* flb_complete_item_timer_timeout_cb() is needed for 
              * both local and non-local sources. */
-            p_file_info->flb_tmp_buff_cpy_timer.data = p_file_info;
+            p_file_info->flb_tmp_buff_cpy_timer = mallocz(sizeof(uv_timer_t));
+            p_file_info->flb_tmp_buff_cpy_timer->data = p_file_info;
             if(unlikely(0 != uv_mutex_init(&p_file_info->flb_tmp_buff_mut))){
                 fatal("uv_mutex_init(&p_file_info->flb_tmp_buff_mut) failed");
             }
-            uv_timer_init(main_loop, &p_file_info->flb_tmp_buff_cpy_timer);
-            uv_timer_start( &p_file_info->flb_tmp_buff_cpy_timer, 
+            uv_timer_init(main_loop, p_file_info->flb_tmp_buff_cpy_timer);
+            uv_timer_start( p_file_info->flb_tmp_buff_cpy_timer, 
                             (uv_timer_cb)flb_complete_item_timer_timeout_cb, 
                             0, p_file_info->update_timeout * MSEC_PER_SEC);            
             break;
