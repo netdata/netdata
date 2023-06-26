@@ -6,9 +6,10 @@ duplicate_for_virtual_integrations:
     - '[Redhat](link to redhat)'
 overview:
   operation:
-    description: This collector periodically does http requests to one or more [Apache](link
-      to collector) web servers to collect the metrics mod_status plugin that apache
-      exposes
+    description: This collector periodically does http requests to one or more {[Apache](link
+      to collector)} (<- CI will remove the curly brackets, they are for replacing
+      with the virtual integrations, to replace the link each time) web servers to
+      collect the metrics mod_status plugin that apache exposes
   platforms:
     description: If this collector can't run on some platforms specify them here and
       set it to false, otherwise set this to true and this text will not be rendered,
@@ -90,9 +91,11 @@ alerts:
   - name: '[apcupsd_ups_charge](https://gihtub.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf)'
     metric: apcupsd.charge
     info: average UPS charge over the last minute
+    os: '*'
   - name: '[apcupsd_10min_ups_load](https://gihtub.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf)'
     metric: apcupsd.load
     info: average UPS load over the last 10 minutes
+    os: '*'
 metrics:
   description: some description for this section, or leave empty
   folding:

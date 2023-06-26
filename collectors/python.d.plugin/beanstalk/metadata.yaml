@@ -6,9 +6,10 @@ duplicate_for_virtual_integrations:
     - '[Redhat](link to redhat)'
 overview:
   operation:
-    description: This collector periodically does http requests to one or more [Apache](link
-      to collector) web servers to collect the metrics mod_status plugin that apache
-      exposes
+    description: This collector periodically does http requests to one or more {[Apache](link
+      to collector)} (<- CI will remove the curly brackets, they are for replacing
+      with the virtual integrations, to replace the link each time) web servers to
+      collect the metrics mod_status plugin that apache exposes
   platforms:
     description: If this collector can't run on some platforms specify them here and
       set it to false, otherwise set this to true and this text will not be rendered,
@@ -92,6 +93,7 @@ alerts:
     info: number of buried jobs across all tubes. You need to manually kick them so
       they can be processed. Presence of buried jobs in a tube does not affect new
       jobs.
+    os: freebsd
 metrics:
   description: some description for this section, or leave empty
   folding:

@@ -10,8 +10,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -93,12 +94,15 @@ modules:
       - name: '[load_cpu_number](https://gihtub.com/netdata/netdata/blob/master/health/health.d/load.conf)'
         metric: system.load
         info: number of active CPU cores in the system
+        os: linux
       - name: '[load_average_15](https://gihtub.com/netdata/netdata/blob/master/health/health.d/load.conf)'
         metric: system.load
         info: system fifteen-minute load average
+        os: linux
       - name: '[load_average_5](https://gihtub.com/netdata/netdata/blob/master/health/health.d/load.conf)'
         metric: system.load
         info: system five-minute load average
+        os: linux
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -126,8 +130,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -242,8 +247,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -326,12 +332,15 @@ modules:
         metric: system.cpu
         info: average CPU utilization over the last 10 minutes (excluding iowait,
           nice and steal)
+        os: linux
       - name: '[10min_cpu_iowait](https://gihtub.com/netdata/netdata/blob/master/health/health.d/cpu.conf)'
         metric: system.cpu
         info: average CPU iowait time over the last 10 minutes
+        os: linux
       - name: '[20min_steal_cpu](https://gihtub.com/netdata/netdata/blob/master/health/health.d/cpu.conf)'
         metric: system.cpu
         info: average CPU steal time over the last 20 minutes
+        os: linux
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -375,8 +384,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -480,8 +490,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -585,8 +596,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -695,8 +707,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -800,8 +813,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -905,8 +919,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -1015,8 +1030,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -1121,8 +1137,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -1204,13 +1221,16 @@ modules:
       - name: '[ram_in_use](https://gihtub.com/netdata/netdata/blob/master/health/health.d/ram.conf)'
         metric: system.ram
         info: system memory utilization
+        os: linux
       - name: '[ram_in_use](https://gihtub.com/netdata/netdata/blob/master/health/health.d/ram.conf)'
         metric: system.ram
         info: system memory utilization
+        os: freebsd
       - name: '[ram_available](https://gihtub.com/netdata/netdata/blob/master/health/health.d/ram.conf)'
         metric: mem.available
         info: percentage of estimated amount of RAM available for userspace processes,
           without causing swapping
+        os: linux
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -1247,8 +1267,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -1330,6 +1351,7 @@ modules:
       - name: '[30min_ram_swapped_out](https://gihtub.com/netdata/netdata/blob/master/health/health.d/swap.conf)'
         metric: system.swapio
         info: percentage of the system RAM swapped in the last 30 minutes
+        os: linux freebsd
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -1356,8 +1378,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -1465,8 +1488,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -1548,6 +1572,7 @@ modules:
       - name: '[semaphores_used](https://gihtub.com/netdata/netdata/blob/master/health/health.d/ipc.conf)'
         metric: system.ipc_semaphores
         info: IPC semaphore utilization
+        os: linux
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -1578,8 +1603,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -1688,8 +1714,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -1804,8 +1831,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -1909,8 +1937,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -1993,11 +2022,13 @@ modules:
         metric: system.softnet_stat
         info: average number of dropped packets in the last minute due to exceeded
           net.core.netdev_max_backlog
+        os: linux
       - name: '[1min_netdev_budget_ran_outs](https://gihtub.com/netdata/netdata/blob/master/health/health.d/softnet.conf)'
         metric: system.softnet_stat
         info: average number of times ksoftirq ran out of sysctl net.core.netdev_budget
           or net.core.netdev_budget_usecs with work remaining over the last minute
           (this can be a cause for dropped packets)
+        os: linux
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -2039,8 +2070,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -2123,6 +2155,7 @@ modules:
         metric: disk.util
         info: average percentage of time ${label:device} disk was busy over the last
           10 minutes
+        os: linux freebsd
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -2207,8 +2240,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -2312,8 +2346,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -2395,14 +2430,17 @@ modules:
       - name: '[1m_ipv4_tcp_resets_sent](https://gihtub.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf)'
         metric: ipv4.tcphandshake
         info: average number of sent TCP RESETS over the last minute
+        os: linux
       - name: '[10s_ipv4_tcp_resets_sent](https://gihtub.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf)'
         metric: ipv4.tcphandshake
         info: average number of sent TCP RESETS over the last 10 seconds. This can
           indicate a port scan, or that a service running on this host has crashed.
           Netdata will not send a clear notification for this alarm.
+        os: linux
       - name: '[1m_ipv4_tcp_resets_received](https://gihtub.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf)'
         metric: ipv4.tcphandshake
         info: average number of received TCP RESETS over the last minute
+        os: linux freebsd
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -2479,8 +2517,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -2562,6 +2601,7 @@ modules:
       - name: '[1m_ipv4_udp_receive_buffer_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/udp_errors.conf)'
         metric: ipv4.udperrors
         info: average number of UDP receive buffer errors over the last minute
+        os: linux freebsd
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -2597,8 +2637,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -2718,8 +2759,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -2850,8 +2892,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -2984,8 +3027,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -3148,8 +3192,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -3274,8 +3319,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -3357,50 +3403,62 @@ modules:
       - name: '[interface_speed](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
         metric: net.net
         info: network interface ${label:device} current speed
+        os: '*'
       - name: '[1m_received_traffic_overflow](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
         metric: net.net
         info: average inbound utilization for the network interface ${label:device}
           over the last minute
+        os: linux
       - name: '[1m_sent_traffic_overflow](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
         metric: net.net
         info: average outbound utilization for the network interface ${label:device}
           over the last minute
+        os: linux
       - name: '[inbound_packets_dropped_ratio](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
         metric: net.packets
         info: ratio of inbound dropped packets for the network interface ${label:device}
           over the last 10 minutes
+        os: linux
       - name: '[outbound_packets_dropped_ratio](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
         metric: net.packets
         info: ratio of outbound dropped packets for the network interface ${label:device}
           over the last 10 minutes
+        os: linux
       - name: '[wifi_inbound_packets_dropped_ratio](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
         metric: net.packets
         info: ratio of inbound dropped packets for the network interface ${label:device}
           over the last 10 minutes
+        os: linux
       - name: '[wifi_outbound_packets_dropped_ratio](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
         metric: net.packets
         info: ratio of outbound dropped packets for the network interface ${label:device}
           over the last 10 minutes
+        os: linux
       - name: '[1m_received_packets_rate](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
         metric: net.packets
         info: average number of packets received by the network interface ${label:device}
           over the last minute
+        os: linux freebsd
       - name: '[interface_inbound_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
         metric: net.errors
         info: number of inbound errors for the network interface ${label:device} in
           the last 10 minutes
+        os: freebsd
       - name: '[interface_outbound_errors](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
         metric: net.errors
         info: number of outbound errors for the network interface ${label:device}
           in the last 10 minutes
+        os: freebsd
       - name: '[inbound_packets_dropped](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
         metric: net.drops
         info: number of inbound dropped packets for the network interface ${label:device}
           in the last 10 minutes
+        os: linux
       - name: '[outbound_packets_dropped](https://gihtub.com/netdata/netdata/blob/master/health/health.d/net.conf)'
         metric: net.drops
         info: number of outbound dropped packets for the network interface ${label:device}
           in the last 10 minutes
+        os: linux
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -3483,8 +3541,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -3566,9 +3625,11 @@ modules:
       - name: '[disk_space_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
         metric: disk.space
         info: disk ${label:mount_point} space utilization
+        os: linux freebsd
       - name: '[disk_inode_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/disks.conf)'
         metric: disk.inodes
         info: disk ${label:mount_point} inode utilization
+        os: linux freebsd
     metrics:
       description: some description for this section, or leave empty
       folding:
@@ -3603,8 +3664,9 @@ modules:
     overview:
       operation:
         description: This collector periodically does http requests to one or more
-          [Apache](link to collector) web servers to collect the metrics mod_status
-          plugin that apache exposes
+          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
+          are for replacing with the virtual integrations, to replace the link each
+          time) web servers to collect the metrics mod_status plugin that apache exposes
       platforms:
         description: If this collector can't run on some platforms specify them here
           and set it to false, otherwise set this to true and this text will not be
@@ -3686,6 +3748,7 @@ modules:
       - name: '[zfs_memory_throttle](https://gihtub.com/netdata/netdata/blob/master/health/health.d/zfs.conf)'
         metric: zfs.memory_ops
         info: number of times ZFS had to limit the ARC growth in the last 10 minutes
+        os: '*'
     metrics:
       description: some description for this section, or leave empty
       folding:
