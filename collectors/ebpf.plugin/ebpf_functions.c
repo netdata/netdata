@@ -108,7 +108,7 @@ static void ebpf_function_thread_manipulation(const char *transaction,
 {
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
     char message[512];
-    size_t num_words = pluginsd_split_words(function, words, PLUGINSD_MAX_WORDS);
+    size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
     for(int i = 1; i < PLUGINSD_MAX_WORDS ;i++) {
         const char *keyword = get_word(words, num_words, i);
         if (!keyword)
@@ -337,7 +337,7 @@ void *ebpf_function_thread(void *ptr)
     char *s = NULL;
     while(!ebpf_exit_plugin && (s = fgets(buffer, PLUGINSD_LINE_MAX, stdin))) {
         char *words[PLUGINSD_MAX_WORDS] = { NULL };
-        size_t num_words = pluginsd_split_words(buffer, words, PLUGINSD_MAX_WORDS);
+        size_t num_words = quoted_strings_splitter_pluginsd(buffer, words, PLUGINSD_MAX_WORDS);
 
         const char *keyword = get_word(words, num_words, 0);
 
