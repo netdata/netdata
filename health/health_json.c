@@ -170,7 +170,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
 
 static inline void health_alerts_rrdcalc2json_nolock(RRDHOST *host __maybe_unused, BUFFER *wb,
                                                      RRDCALC *rc, ALERT_OPTIONS options __maybe_unused,
-                                                     Pvoid_t JudyHS, time_t after, time_t before, uint32_t top)
+                                                     Pvoid_t JudyHS, time_t after, time_t before, uint32_t top, char *transition_id)
 {
     ssize_t idx= get_alert_index(JudyHS, &rc->config_hash_id);
     // If not in index then skip it
@@ -218,7 +218,7 @@ static inline void health_alerts_rrdcalc2json_nolock(RRDHOST *host __maybe_unuse
 
             if (options & ALERT_OPTION_TRANSITIONS) {
                 buffer_json_member_add_array(wb, "transitions");
-                sql_health_alarm_log2json_v2(host, wb, rc->id, NULL, after, before, top);
+                sql_health_alarm_log2json_v2(host, wb, rc->id, NULL, after, before, top, transition_id);
                 buffer_json_array_close(wb);
             }
     }
@@ -300,7 +300,8 @@ static void health_alerts2json_fill_alarms(
     time_t after,
     time_t before,
     uint32_t top,
-    void (*fp)(RRDHOST *, BUFFER *, RRDCALC *, ALERT_OPTIONS, Pvoid_t , time_t, time_t, uint32_t))
+    char *transition_id,
+    void (*fp)(RRDHOST *, BUFFER *, RRDCALC *, ALERT_OPTIONS, Pvoid_t , time_t, time_t, uint32_t, char *))
 {
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
@@ -313,14 +314,14 @@ static void health_alerts2json_fill_alarms(
         if(likely((all & ALERT_OPTION_ACTIVE) && !(rc->status == RRDCALC_STATUS_WARNING || rc->status == RRDCALC_STATUS_CRITICAL)))
             continue;
 
-        fp(host, wb, rc, all, JudyHS, after, before, top);
+        fp(host, wb, rc, all, JudyHS, after, before, top, transition_id);
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
 }
 
-void health_alert2json(RRDHOST *host, BUFFER *wb, ALERT_OPTIONS options, Pvoid_t JudyHS, time_t after, time_t before, uint32_t top)
+void health_alert2json(RRDHOST *host, BUFFER *wb, ALERT_OPTIONS options, Pvoid_t JudyHS, time_t after, time_t before, uint32_t top, char *transition_id)
 {
-    health_alerts2json_fill_alarms(host, wb, options, JudyHS, after, before, top, health_alerts_rrdcalc2json_nolock);
+    health_alerts2json_fill_alarms(host, wb, options, JudyHS, after, before, top, transition_id, health_alerts_rrdcalc2json_nolock);
 }
 
 void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {

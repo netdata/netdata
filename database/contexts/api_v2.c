@@ -684,7 +684,7 @@ static ssize_t alert_to_json_v2_add_host(void *data, RRDHOST *host, bool queryab
         if (ctl->alerts_request->options & ALERT_OPTION_INSTANCES) {
             if (rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)) {
                 buffer_json_member_add_array(wb, "instances");
-                health_alert2json(host, wb, ctl->alerts_request->options, ctl->alerts.JudyHS, ctl->alerts_request->after, ctl->alerts_request->before, ctl->alerts_request->last);
+                health_alert2json(host, wb, ctl->alerts_request->options, ctl->alerts.JudyHS, ctl->alerts_request->after, ctl->alerts_request->before, ctl->alerts_request->last, ctl->alerts_request->transition_id);
                 buffer_json_array_close(wb);
             }
         }
@@ -746,9 +746,6 @@ static ssize_t alert_to_json_v2_add_alert(void *data, RRDHOST *host, bool querya
         if(added)
             host_matched = true;
     }
-
-    if (ctl->alerts_request->transition_id)
-        ctl->alerts_request->alert_id = sql_get_alarm_id_from_transition_id(ctl->alerts_request->transition_id);
 
     if(host_matched && (ctl->options & (CONTEXTS_V2_NODES))) {
         if (rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)) {
@@ -1302,6 +1299,10 @@ int alerts_to_json_v2(BUFFER *wb, struct api_v2_alerts_request *req, CONTEXTS_V2
         buffer_json_array_close(wb);
 
         buffer_json_object_close(wb);
+    }
+
+    if (req->transition_id) {
+        sql_limit_scope_with_transition_id(req->transition_id, &req->alert_id, ctl.nodes.pattern);
     }
 
     // Alert configuration

@@ -40,7 +40,7 @@ void health_reload(void);
 
 void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* context, RRDCALC_STATUS status);
 void health_alarms2json(RRDHOST *host, BUFFER *wb, int all);
-void health_alert2json(RRDHOST *host, BUFFER *wb, ALERT_OPTIONS all, Pvoid_t JudyHS, time_t after, time_t before, uint32_t top);
+void health_alert2json(RRDHOST *host, BUFFER *wb, ALERT_OPTIONS all, Pvoid_t JudyHS, time_t after, time_t before, uint32_t top, char *transition_id);
 void health_alert2json_conf(RRDHOST *host, BUFFER *wb, ALERT_OPTIONS all);
 void health_alarms_values2json(RRDHOST *host, BUFFER *wb, int all);
 

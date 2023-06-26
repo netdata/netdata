@@ -1696,7 +1696,7 @@ uint32_t sql_get_alarm_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *
     "old_value, last_repeat, transition_id, units, d.global_id FROM health_log_detail d, health_log h " \
     "WHERE h.host_id = @host_id AND h.health_log_id = d.health_log_id "
 
-void sql_health_alarm_log2json_v2(RRDHOST *host, BUFFER *wb, uint32_t alert_id, char *chart, time_t after, time_t before, uint32_t max)
+void sql_health_alarm_log2json_v2(RRDHOST *host, BUFFER *wb, uint32_t alert_id, char *chart, time_t after, time_t before, uint32_t max, char *transition_id)
 {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -1717,18 +1717,29 @@ void sql_health_alarm_log2json_v2(RRDHOST *host, BUFFER *wb, uint32_t alert_id, 
     if (before)
         buffer_sprintf(command, "AND d.when_key < %ld ", before);
 
+    if (transition_id)
+        buffer_sprintf(command, "AND d.transition_id = @transition_id ");
+
     buffer_sprintf(command, " ORDER BY d.alarm_event_id DESC LIMIT %u", max);
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(command), -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement SQL_SELECT_HEALTH_LOG");
+        error_report("Failed to prepare statement SQL_SELECT_HEALTH_LOG_V2");
         buffer_free(command);
         return;
     }
 
     rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to bind host_id parameter for SQL_GET_ALARM_ID.");
+        error_report("Failed to bind host_id parameter for SQL_SELECT_HEALTH_LOG_V2.");
+
+    if (transition_id) {
+        uuid_t transition_uuid;
+        uuid_parse(transition_id, transition_uuid);
+        rc = sqlite3_bind_blob(res, 2, &transition_uuid, sizeof(transition_uuid), SQLITE_STATIC);
+        if (unlikely(rc != SQLITE_OK))
+            error_report("Failed to bind host_id parameter for SQL_SELECT_HEALTH_LOG_V2.");
+    }
 
     while (sqlite3_step(res) == SQLITE_ROW) {
 
@@ -1806,37 +1817,67 @@ void sql_health_alarm_log2json_v2(RRDHOST *host, BUFFER *wb, uint32_t alert_id, 
     buffer_free(command);
 }
 
-#define SQL_GET_ALARM_ID_FROM_TRANSITION_ID "select alarm_id from health_log_detail where transition_id = @transition_id"
-uint32_t sql_get_alarm_id_from_transition_id(char *transition_id)
+#define SQL_GET_ALARM_ID_FROM_TRANSITION_ID "select hld.alarm_id, hl.host_id, h.hostname from health_log_detail hld, health_log hl, host h where hld.transition_id = @transition_id and hld.health_log_id = hl.health_log_id and hl.host_id = h.host_id"
+void sql_limit_scope_with_transition_id(char *transition_id, time_t *alarm_id, SIMPLE_PATTERN *nodes)
 {
     int rc = 0;
     sqlite3_stmt *res = NULL;
-    uint32_t alarm_id = 0;
+    *alarm_id = -1;
+    uuid_t host_uuid;
+    char *hostname = NULL;
 
     uuid_t transition_uuid;
     if (uuid_parse(transition_id, transition_uuid))
-        return alarm_id;
+        return;
 
     rc = sqlite3_prepare_v2(db_meta, SQL_GET_ALARM_ID_FROM_TRANSITION_ID, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement when trying to get an alarm id from a transition_id");
-        return alarm_id;
+        return;
     }
 
     rc = sqlite3_bind_blob(res, 1, &transition_uuid, sizeof(transition_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind transition_uuid parameter for SQL_GET_ALARM_ID_FROM_TRANSITION_ID.");
         sqlite3_finalize(res);
-        return alarm_id;
+        return;
     }
 
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-        alarm_id = (uint32_t) sqlite3_column_int64(res, 0);
+        *alarm_id = (uint32_t) sqlite3_column_int64(res, 0);
+        uuid_copy(host_uuid, *((uuid_t *) sqlite3_column_blob(res, 1)));
+        hostname = strdupz((char *) sqlite3_column_text(res, 2));
     }
 
      rc = sqlite3_finalize(res);
      if (unlikely(rc != SQLITE_OK))
          error_report("Failed to finalize the statement while getting an alarm id from a transition_id.");
 
-     return alarm_id;
+     if (*alarm_id) {
+         char host_id[UUID_STR_LEN];
+         uuid_unparse_lower(host_uuid, host_id);
+
+         //if nodes is populated without our query host, do the alarm id -1 so no match from anywhere
+         //if not, populate with this hostname to limit search
+         if (nodes) {
+             SIMPLE_PATTERN_RESULT match = simple_pattern_matches_extract(nodes, hostname, NULL, 0);
+             if(match == SP_NOT_MATCHED) {
+                 match = simple_pattern_matches_extract(nodes, host_id, NULL, 0);
+                 if(match == SP_NOT_MATCHED) {
+                     *alarm_id = -1;
+                     freez(hostname);
+                     return;
+                 }
+             }
+             if (match == SP_MATCHED_POSITIVE) {
+                 nodes = string_to_simple_pattern(hostname);
+                 freez(hostname);
+                 return;
+             }
+         } else {
+             nodes = string_to_simple_pattern(hostname);
+             freez(hostname);
+             return;
+         }
+     }
 }
