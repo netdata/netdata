@@ -1837,8 +1837,8 @@ bool sql_find_alert_transition(const char *transition, void (*cb)(const char *ma
     bool ok = false;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         ok = true;
-        uuid_unparse_lower(*(uuid_t *) sqlite3_column_blob(res, 2), machine_guid);
-        cb(machine_guid, (const char *) sqlite3_column_text(res, 3), sqlite3_column_int(res, 1), data);
+        uuid_unparse_lower(*(uuid_t *) sqlite3_column_blob(res, 1), machine_guid);
+        cb(machine_guid, (const char *) sqlite3_column_text(res, 2), sqlite3_column_int(res, 0), data);
     }
 
     rc = sqlite3_finalize(res);
