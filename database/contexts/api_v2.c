@@ -396,68 +396,73 @@ static bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRD
             RRDSET *st = ri->rrdset;
             netdata_rwlock_rdlock(&st->alerts.rwlock);
             for (RRDCALC *rcl = st->alerts.base; rcl; rcl = rcl->next) {
-                if(!ctl->alerts.alert_name_pattern || simple_pattern_matches_string(ctl->alerts.alert_name_pattern, rcl->name)) {
+                if(ctl->alerts.alert_name_pattern && !simple_pattern_matches_string(ctl->alerts.alert_name_pattern, rcl->name))
+                    continue;
 
-                    size_t m = ctl->request->options & CONTEXTS_V2_OPTIONS_ALERTS_STATES ? 0 : 1;
+                if(ctl->alerts.alarm_id_filter && ctl->alerts.alarm_id_filter != rcl->id)
+                    continue;
 
-                    if(!m) {
-                        if ((ctl->request->options & CONTEXT_V2_OPTION_ALERTS_UNINITIALIZED) &&
-                            rcl->status == RRDCALC_STATUS_UNINITIALIZED)
-                            m++;
+                size_t m = ctl->request->options & CONTEXTS_V2_OPTIONS_ALERTS_STATES ? 0 : 1;
 
-                        if ((ctl->request->options & CONTEXT_V2_OPTION_ALERTS_UNDEFINED) &&
-                            rcl->status == RRDCALC_STATUS_UNDEFINED)
-                            m++;
+                if (!m) {
+                    if ((ctl->request->options & CONTEXT_V2_OPTION_ALERTS_UNINITIALIZED) &&
+                        rcl->status == RRDCALC_STATUS_UNINITIALIZED)
+                        m++;
 
-                        if ((ctl->request->options & CONTEXT_V2_OPTION_ALERTS_CLEAR) &&
-                            rcl->status == RRDCALC_STATUS_CLEAR)
-                            m++;
+                    if ((ctl->request->options & CONTEXT_V2_OPTION_ALERTS_UNDEFINED) &&
+                        rcl->status == RRDCALC_STATUS_UNDEFINED)
+                        m++;
 
-                        if ((ctl->request->options & CONTEXT_V2_OPTION_ALERTS_RAISED) &&
-                            rcl->status >= RRDCALC_STATUS_RAISED)
-                            m++;
+                    if ((ctl->request->options & CONTEXT_V2_OPTION_ALERTS_CLEAR) &&
+                        rcl->status == RRDCALC_STATUS_CLEAR)
+                        m++;
 
-                        if ((ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WARNING) &&
-                            rcl->status == RRDCALC_STATUS_WARNING)
-                            m++;
+                    if ((ctl->request->options & CONTEXT_V2_OPTION_ALERTS_RAISED) &&
+                        rcl->status >= RRDCALC_STATUS_RAISED)
+                        m++;
 
-                        if ((ctl->request->options & CONTEXT_V2_OPTION_ALERTS_CRITICAL) &&
-                            rcl->status == RRDCALC_STATUS_CRITICAL)
-                            m++;
-                    }
+                    if ((ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WARNING) &&
+                        rcl->status == RRDCALC_STATUS_WARNING)
+                        m++;
 
-                    if(m) {
+                    if ((ctl->request->options & CONTEXT_V2_OPTION_ALERTS_CRITICAL) &&
+                        rcl->status == RRDCALC_STATUS_CRITICAL)
+                        m++;
 
-                        struct alert_v2_entry t = {
-                                .tmp = rcl,
-                        };
-                        struct alert_v2_entry *a2e = dictionary_set(ctl->alerts.alerts, string2str(rcl->name), &t, sizeof(struct alert_v2_entry));
-                        size_t ati = a2e->ati;
-                        size_t aci = 0;
-                        matches++;
+                    if(!m)
+                        continue;
+                }
 
-                        if(ctl->options & CONTEXT_V2_OPTION_ALERTS_CONFIG) {
-                            char key[UUID_STR_LEN + 1];
-                            uuid_unparse_lower(rcl->config_hash_id, key);
-                            struct alert_config_v2_entry t2 = {
-                                    .tmp = rcl,
-                            };
-                            struct alert_config_v2_entry *a2c = dictionary_set(ctl->alerts.alert_configs, key, &t2, sizeof(struct alert_config_v2_entry));
-                            aci = a2c->aci;
-                        }
+                struct alert_v2_entry t = {
+                        .tmp = rcl,
+                };
+                struct alert_v2_entry *a2e = dictionary_set(ctl->alerts.alerts, string2str(rcl->name), &t,
+                                                            sizeof(struct alert_v2_entry));
+                size_t ati = a2e->ati;
+                size_t aci = 0;
+                matches++;
 
-                        if(ctl->options & CONTEXT_V2_OPTION_ALERTS_INSTANCES) {
-                            char key[20+1];
-                            snprintfz(key, 20, "%p", rcl);
+                if (ctl->options & CONTEXT_V2_OPTION_ALERTS_CONFIG) {
+                    char key[UUID_STR_LEN + 1];
+                    uuid_unparse_lower(rcl->config_hash_id, key);
+                    struct alert_config_v2_entry t2 = {
+                            .tmp = rcl,
+                    };
+                    struct alert_config_v2_entry *a2c = dictionary_set(ctl->alerts.alert_configs, key, &t2,
+                                                                       sizeof(struct alert_config_v2_entry));
+                    aci = a2c->aci;
+                }
 
-                            struct alert_instance_v2_entry z = {
-                                    .ati = ati,
-                                    .aci = aci,
-                                    .tmp = rcl,
-                            };
-                            dictionary_set(ctl->alerts.alert_instances, key, &z, sizeof(z));
-                        }
-                    }
+                if (ctl->options & CONTEXT_V2_OPTION_ALERTS_INSTANCES) {
+                    char key[20 + 1];
+                    snprintfz(key, 20, "%p", rcl);
+
+                    struct alert_instance_v2_entry z = {
+                            .ati = ati,
+                            .aci = aci,
+                            .tmp = rcl,
+                    };
+                    dictionary_set(ctl->alerts.alert_instances, key, &z, sizeof(z));
                 }
             }
             netdata_rwlock_unlock(&st->alerts.rwlock);
@@ -1107,6 +1112,7 @@ static void rrdcontext_v2_set_transition_filter(const char *machine_guid, const 
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_MODE mode) {
     int resp = HTTP_RESP_OK;
+    bool run = true;
 
     if(mode & CONTEXTS_V2_SEARCH)
         mode |= CONTEXTS_V2_CONTEXTS;
@@ -1191,7 +1197,11 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         }
 
 //        if(req->alerts.transition) {
-//            sql_find_alert_transition(req->alerts.transition, rrdcontext_v2_set_transition_filter, &ctl);
+//            run = sql_find_alert_transition(req->alerts.transition, rrdcontext_v2_set_transition_filter, &ctl);
+//            if(!run) {
+//                resp = HTTP_RESP_NOT_FOUND;
+//                goto cleanup;
+//            }
 //        }
     }
 
@@ -1251,7 +1261,9 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         buffer_json_object_close(wb);
     }
 
-    ssize_t ret = query_scope_foreach_host(ctl.nodes.scope_pattern, ctl.nodes.pattern,
+    ssize_t ret = 0;
+    if(run)
+        ret = query_scope_foreach_host(ctl.nodes.scope_pattern, ctl.nodes.pattern,
                              rrdcontext_to_json_v2_add_host, &ctl,
                              &ctl.versions, ctl.q.host_node_id_str);
 
