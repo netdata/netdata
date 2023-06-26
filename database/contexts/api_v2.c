@@ -442,7 +442,7 @@ static bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRD
                 size_t aci = 0;
                 matches++;
 
-                if (ctl->options & CONTEXT_V2_OPTION_ALERTS_CONFIG) {
+                if (ctl->options & CONTEXT_V2_OPTION_ALERT_CONFIGURATIONS) {
                     char key[UUID_STR_LEN + 1];
                     uuid_unparse_lower(rcl->config_hash_id, key);
                     struct alert_config_v2_entry t2 = {
@@ -453,7 +453,7 @@ static bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRD
                     aci = a2c->aci;
                 }
 
-                if (ctl->options & CONTEXT_V2_OPTION_ALERTS_INSTANCES) {
+                if (ctl->options & CONTEXT_V2_OPTION_ALERT_INSTANCES) {
                     char key[20 + 1];
                     snprintfz(key, 20, "%p", rcl);
 
@@ -1171,6 +1171,15 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     }
 
     if(mode & CONTEXTS_V2_ALERTS) {
+        if(req->alerts.transition) {
+            ctl.options |= CONTEXT_V2_OPTION_ALERT_INSTANCES | CONTEXT_V2_OPTION_ALERT_CONFIGURATIONS | CONTEXT_V2_OPTION_ALERT_TRANSITIONS;
+            run = sql_find_alert_transition(req->alerts.transition, rrdcontext_v2_set_transition_filter, &ctl);
+            if(!run) {
+                resp = HTTP_RESP_NOT_FOUND;
+                goto cleanup;
+            }
+        }
+
         ctl.alerts.alerts = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
                                                        NULL, sizeof(struct alert_v2_entry));
 
@@ -1178,7 +1187,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         dictionary_register_conflict_callback(ctl.alerts.alerts, alerts_v2_conflict_callback, &ctl);
         dictionary_register_delete_callback(ctl.alerts.alerts, alerts_v2_delete_callback, &ctl);
 
-        if(ctl.options & CONTEXT_V2_OPTION_ALERTS_INSTANCES) {
+        if(ctl.options & CONTEXT_V2_OPTION_ALERT_INSTANCES) {
             ctl.alerts.alert_instances = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
                                                                     NULL, sizeof(struct alert_instance_v2_entry));
 
@@ -1187,21 +1196,13 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
             dictionary_register_delete_callback(ctl.alerts.alert_instances, alert_instances_delete_callback, &ctl);
         }
 
-        if(ctl.options & CONTEXT_V2_OPTION_ALERTS_CONFIG) {
+        if(ctl.options & CONTEXT_V2_OPTION_ALERT_CONFIGURATIONS) {
             ctl.alerts.alert_configs = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
                                                                   NULL, sizeof(struct alert_config_v2_entry));
 
             dictionary_register_insert_callback(ctl.alerts.alert_configs, alert_configs_v2_insert_callback, &ctl);
             dictionary_register_conflict_callback(ctl.alerts.alert_configs, alert_configs_v2_conflict_callback, &ctl);
             dictionary_register_delete_callback(ctl.alerts.alert_configs, alert_configs_delete_callback, &ctl);
-        }
-
-        if(req->alerts.transition) {
-            run = sql_find_alert_transition(req->alerts.transition, rrdcontext_v2_set_transition_filter, &ctl);
-            if(!run) {
-                resp = HTTP_RESP_NOT_FOUND;
-                goto cleanup;
-            }
         }
     }
 
@@ -1360,7 +1361,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         }
         buffer_json_array_close(wb); // alerts
 
-        if(req->options & CONTEXT_V2_OPTION_ALERTS_INSTANCES) {
+        if(req->options & CONTEXT_V2_OPTION_ALERT_INSTANCES) {
             buffer_json_member_add_array(wb, "alert_instances");
             {
                 struct alert_instance_v2_entry *t;
@@ -1370,7 +1371,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                         buffer_json_member_add_string(wb, "alert", string2str(t->name));
                         buffer_json_member_add_uint64(wb, "ati", t->ati);
                         buffer_json_member_add_uint64(wb, "aii", t->aii);
-                        if(req->options & CONTEXT_V2_OPTION_ALERTS_CONFIG) {
+                        if(req->options & CONTEXT_V2_OPTION_ALERT_CONFIGURATIONS) {
                             buffer_json_member_add_uint64(wb, "aci", t->aci);
                         }
                         buffer_json_member_add_uint64(wb, "ni", t->ni);
@@ -1385,7 +1386,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                         buffer_json_member_add_uuid(wb, "last_transition_id", &t->last_transition_id);
                         buffer_json_member_add_uuid(wb, "config_hash_id", &t->config_hash_id);
 
-                        if(req->options & CONTEXT_V2_OPTION_ALERTS_TRANSITIONS) {
+                        if(req->options & CONTEXT_V2_OPTION_ALERT_TRANSITIONS) {
                             buffer_json_member_add_array(wb, "transitions");
                             sql_health_alarm_log2json_v2(
                                 t->host,
@@ -1394,7 +1395,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                                 string2str(t->chart_name),
                                 ctl.request->after,
                                 ctl.request->before,
-                                NULL,
+                                ctl.request->alerts.transition,
                                 ctl.request->alerts.last ? ctl.request->alerts.last : 10);
                             buffer_json_array_close(wb);
                         }
@@ -1406,7 +1407,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
             buffer_json_array_close(wb); // alerts_instances
         }
 
-        if(req->options & CONTEXT_V2_OPTION_ALERTS_CONFIG) {
+        if(req->options & CONTEXT_V2_OPTION_ALERT_CONFIGURATIONS) {
             buffer_json_member_add_array(wb, "alert_configurations");
             {
                 struct alert_config_v2_entry *t;

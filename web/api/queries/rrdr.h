@@ -53,17 +53,16 @@ typedef enum rrdr_options {
 
 typedef enum context_v2_options {
     CONTEXT_V2_OPTION_MINIFY                = (1 << 0), // remove JSON spaces and newlines from JSON output
-    CONTEXT_V2_OPTION_DEBUG                 = (1 << 1), // remove JSON spaces and newlines from JSON output
-    CONTEXT_V2_OPTION_ALERTS_STATE          = (1 << 2), // Only active alerts
-    CONTEXT_V2_OPTION_ALERTS_CONFIG         = (1 << 3), // Include config
-    CONTEXT_V2_OPTION_ALERTS_TRANSITIONS    = (1 << 4), // Include transitions
-    CONTEXT_V2_OPTION_ALERTS_INSTANCES      = (1 << 5), // Include alert instances
-    CONTEXT_V2_OPTION_ALERTS_UNINITIALIZED  = (1 << 6), // Only active alerts
-    CONTEXT_V2_OPTION_ALERTS_UNDEFINED      = (1 << 7), // Only active alerts
-    CONTEXT_V2_OPTION_ALERTS_CLEAR          = (1 << 8), // Only active alerts
-    CONTEXT_V2_OPTION_ALERTS_RAISED         = (1 << 9), // Only active alerts
-    CONTEXT_V2_OPTION_ALERTS_WARNING        = (1 << 10), // Only active alerts
-    CONTEXT_V2_OPTION_ALERTS_CRITICAL       = (1 << 11), // Only active alerts
+    CONTEXT_V2_OPTION_DEBUG                 = (1 << 1), // show the request
+    CONTEXT_V2_OPTION_ALERT_CONFIGURATIONS  = (1 << 2), // include alert configurations
+    CONTEXT_V2_OPTION_ALERT_TRANSITIONS     = (1 << 3), // include alert transitions
+    CONTEXT_V2_OPTION_ALERT_INSTANCES       = (1 << 4), // include alert instances
+    CONTEXT_V2_OPTION_ALERTS_UNINITIALIZED  = (1 << 5), // include UNINITIALIZED alerts
+    CONTEXT_V2_OPTION_ALERTS_UNDEFINED      = (1 << 6), // include UNDEFINED alerts
+    CONTEXT_V2_OPTION_ALERTS_CLEAR          = (1 << 7), // include CLEAR alerts
+    CONTEXT_V2_OPTION_ALERTS_RAISED         = (1 << 8), // include WARNING & CRITICAL alerts
+    CONTEXT_V2_OPTION_ALERTS_WARNING        = (1 << 9), // include WARNING alerts
+    CONTEXT_V2_OPTION_ALERTS_CRITICAL       = (1 << 10), // include CRITICAL alerts
 
 } CONTEXTS_V2_OPTIONS;
 
