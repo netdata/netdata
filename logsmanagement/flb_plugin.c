@@ -113,6 +113,8 @@ static void (*dl_msgpack_zone_free)(msgpack_zone* zone);
 static flb_ctx_t *ctx = NULL;
 static void *flb_lib_handle = NULL;
 
+static struct flb_lib_out_cb *fwd_input_out_cb = NULL;
+
 int flb_init(flb_srvc_config_t flb_srvc_config){
     int rc = 0;
     char *dl_error;
@@ -1284,7 +1286,6 @@ int flb_add_input(struct File_info *const p_file_info){
  * @return 0 on success, -1 on error.
  */
 int flb_add_fwd_input(Flb_socket_config_t *forward_in_config){
-    struct flb_lib_out_cb *callback = NULL;
     int input, output;
 
     if(forward_in_config == NULL){
@@ -1314,12 +1315,12 @@ int flb_add_fwd_input(Flb_socket_config_t *forward_in_config){
                 NULL) != 0) break;
         } else break; // should never reach this line
 
-        callback = mallocz(sizeof(struct flb_lib_out_cb));
+        fwd_input_out_cb = mallocz(sizeof(struct flb_lib_out_cb));
 
         /* Set up output */
-        callback->cb = flb_collect_logs_cb;
-        callback->data = NULL;
-        if((output = flb_output(ctx, "lib", callback)) < 0) break;
+        fwd_input_out_cb->cb = flb_collect_logs_cb;
+        fwd_input_out_cb->data = NULL;
+        if((output = flb_output(ctx, "lib", fwd_input_out_cb)) < 0) break;
         if(flb_output_set(ctx, output, 
             "Match", "fwd*",
             NULL) != 0) break; 
@@ -1329,6 +1330,10 @@ int flb_add_fwd_input(Flb_socket_config_t *forward_in_config){
     } while(0);
 
     /* Error */
-    if(callback) freez(callback);
+    if(fwd_input_out_cb) freez(fwd_input_out_cb);
     return -1;
+}
+
+void flb_free_fwd_input_out_cb(void){
+    freez(fwd_input_out_cb);
 }

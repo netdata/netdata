@@ -26,5 +26,6 @@ void flb_terminate(void);
 void flb_complete_item_timer_timeout_cb(uv_timer_t *handle);
 int flb_add_input(struct File_info *const p_file_info);
 int flb_add_fwd_input(Flb_socket_config_t *const forward_in_config);
+void flb_free_fwd_input_out_cb(void);
 
 #endif // FLB_PLUGIN_H_

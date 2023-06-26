@@ -117,7 +117,8 @@ static void p_file_info_destroy(struct File_info *p_file_info){
 
     if(p_file_info->flb_tmp_buff_cpy_timer){
         uv_timer_stop(p_file_info->flb_tmp_buff_cpy_timer);
-        uv_close((uv_handle_t *) p_file_info->flb_tmp_buff_cpy_timer, NULL);
+        if (!uv_is_closing((uv_handle_t *) p_file_info->flb_tmp_buff_cpy_timer))
+            uv_close((uv_handle_t *) p_file_info->flb_tmp_buff_cpy_timer, NULL);
         freez(p_file_info->flb_tmp_buff_cpy_timer);
         p_file_info->flb_tmp_buff_cpy_timer = NULL;
     }
@@ -1121,13 +1122,15 @@ static void logsmanagement_main_cleanup(void *ptr) {
 
     collector_info("cleaning up...");
 
-    uv_stop(thread_data->main_loop);
+    flb_terminate();
 
     // TODO: Clean up stats charts memory
 
     flb_socket_config_destroy(thread_data->forward_in_config);
+    flb_free_fwd_input_out_cb();
 
-    flb_terminate();
+    uv_stop(thread_data->main_loop);
+    m_assert(UV_EBUSY != uv_loop_close(thread_data->main_loop), "uv_loop_close() == UV_EBUSY");
 
     if(p_file_infos_arr){
         for(int i = 0; i < p_file_infos_arr->count; i++){
@@ -1137,10 +1140,7 @@ static void logsmanagement_main_cleanup(void *ptr) {
         p_file_infos_arr = NULL;
     }
 
-    uv_loop_close(thread_data->main_loop);
     freez(thread_data->main_loop);
-
-    // TODO: Additional work to do here on exit? Maybe flush buffers to DB?
 
     thread_data->logsmanagement_main_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
