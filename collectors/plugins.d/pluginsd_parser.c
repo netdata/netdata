@@ -2032,7 +2032,7 @@ void parser_init_repertoire(PARSER *parser, PARSER_REPERTOIRE repertoire) {
     parser->repertoire = repertoire;
 
     for(size_t i = GPERF_PARSER_MIN_HASH_VALUE ; i <= GPERF_PARSER_MAX_HASH_VALUE ;i++) {
-        if(gperf_keywords[i].keyword && *gperf_keywords[i].keyword)
+        if(gperf_keywords[i].keyword && *gperf_keywords[i].keyword && (parser->repertoire & gperf_keywords[i].repertoire))
             worker_register_job_name(gperf_keywords[i].worker_job_id, gperf_keywords[i].keyword);
     }
 }
