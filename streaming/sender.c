@@ -827,7 +827,8 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
 
     if (s->parent_using_h2o && rrdpush_http_upgrade_prelude(host, s)) {
         rrdpush_sender_thread_close_socket(host);
-        host->destination->last_error = "failure to negotiate HTTP upgrade to streaming protocol";
+        host->destination->reason = STREAM_HANDSHAKE_ERROR_HTTP_UPGRADE;
+        host->destination->postpone_reconnection_until = now_realtime_sec() + 1 * 60;
         return false;
     }
     
