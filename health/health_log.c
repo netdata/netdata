@@ -35,7 +35,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     STRING *units,
     STRING *info,
     int delay,
-    uint32_t flags
+    HEALTH_ENTRY_FLAGS flags
 ) {
     debug(D_HEALTH, "Health adding alarm log entry with id: %u", host->health_log.next_log_id);
 

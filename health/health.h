@@ -7,18 +7,21 @@
 
 extern unsigned int default_health_enabled;
 
-#define HEALTH_ENTRY_FLAG_PROCESSED             0x00000001
-#define HEALTH_ENTRY_FLAG_UPDATED               0x00000002
-#define HEALTH_ENTRY_FLAG_EXEC_RUN              0x00000004
-#define HEALTH_ENTRY_FLAG_EXEC_FAILED           0x00000008
-#define HEALTH_ENTRY_FLAG_SILENCED              0x00000010
-#define HEALTH_ENTRY_RUN_ONCE                   0x00000020
-#define HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS      0x00000040
-#define HEALTH_ENTRY_FLAG_IS_REPEATING          0x00000080
+typedef enum __attribute__((packed)) {
+    HEALTH_ENTRY_FLAG_PROCESSED             = 0x00000001,
+    HEALTH_ENTRY_FLAG_UPDATED               = 0x00000002,
+    HEALTH_ENTRY_FLAG_EXEC_RUN              = 0x00000004,
+    HEALTH_ENTRY_FLAG_EXEC_FAILED           = 0x00000008,
+    HEALTH_ENTRY_FLAG_SILENCED              = 0x00000010,
+    HEALTH_ENTRY_RUN_ONCE                   = 0x00000020,
+    HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS      = 0x00000040,
+    HEALTH_ENTRY_FLAG_IS_REPEATING          = 0x00000080,
+    HEALTH_ENTRY_FLAG_SAVED                 = 0x10000000,
+    HEALTH_ENTRY_FLAG_ACLK_QUEUED           = 0x20000000,
+    HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION = 0x80000000,
+} HEALTH_ENTRY_FLAGS;
 
-#define HEALTH_ENTRY_FLAG_SAVED                 0x10000000
-#define HEALTH_ENTRY_FLAG_ACLK_QUEUED           0x20000000
-#define HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION 0x80000000
+void health_entry_flags_to_json_array(BUFFER *wb, const char *key, HEALTH_ENTRY_FLAGS flags);
 
 #ifndef HEALTH_LISTEN_PORT
 #define HEALTH_LISTEN_PORT 19998
@@ -74,7 +77,7 @@ ALARM_ENTRY* health_create_alarm_entry(
     STRING *units,
     STRING *info,
     int delay,
-    uint32_t flags);
+    HEALTH_ENTRY_FLAGS flags);
 
 void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae);
 

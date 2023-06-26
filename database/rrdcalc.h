@@ -28,6 +28,8 @@ typedef enum {
     RRDCALC_FLAG_FROM_TEMPLATE              = (1 << 10), // the rrdcalc has been created from a template
 } RRDCALC_FLAGS;
 
+void rrdcalc_flags_to_json_array(BUFFER *wb, const char *key, RRDCALC_FLAGS flags);
+
 typedef enum {
     // This list uses several other options from RRDR_OPTIONS for db lookups.
     // To add an item here, you need to reserve a bit in RRDR_OPTIONS.

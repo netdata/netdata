@@ -5,6 +5,33 @@
 // ----------------------------------------------------------------------------
 // RRDCALC helpers
 
+void rrdcalc_flags_to_json_array(BUFFER *wb, const char *key, RRDCALC_FLAGS flags) {
+    buffer_json_member_add_array(wb, key);
+
+    if(flags & RRDCALC_FLAG_DB_ERROR)
+        buffer_json_add_array_item_string(wb, "DB_ERROR");
+    if(flags & RRDCALC_FLAG_DB_NAN)
+        buffer_json_add_array_item_string(wb, "DB_NAN");
+    if(flags & RRDCALC_FLAG_CALC_ERROR)
+        buffer_json_add_array_item_string(wb, "CALC_ERROR");
+    if(flags & RRDCALC_FLAG_WARN_ERROR)
+        buffer_json_add_array_item_string(wb, "WARN_ERROR");
+    if(flags & RRDCALC_FLAG_CRIT_ERROR)
+        buffer_json_add_array_item_string(wb, "CRIT_ERROR");
+    if(flags & RRDCALC_FLAG_RUNNABLE)
+        buffer_json_add_array_item_string(wb, "RUNNABLE");
+    if(flags & RRDCALC_FLAG_DISABLED)
+        buffer_json_add_array_item_string(wb, "DISABLED");
+    if(flags & RRDCALC_FLAG_SILENCED)
+        buffer_json_add_array_item_string(wb, "SILENCED");
+    if(flags & RRDCALC_FLAG_RUN_ONCE)
+        buffer_json_add_array_item_string(wb, "RUN_ONCE");
+    if(flags & RRDCALC_FLAG_FROM_TEMPLATE)
+        buffer_json_add_array_item_string(wb, "FROM_TEMPLATE");
+
+    buffer_json_array_close(wb);
+}
+
 inline const char *rrdcalc_status2string(RRDCALC_STATUS status) {
     switch(status) {
         case RRDCALC_STATUS_REMOVED:

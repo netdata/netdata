@@ -22,6 +22,36 @@ char *silencers_filename;
 SIMPLE_PATTERN *conf_enabled_alarms = NULL;
 DICTIONARY *health_rrdvars;
 
+
+void health_entry_flags_to_json_array(BUFFER *wb, const char *key, HEALTH_ENTRY_FLAGS flags) {
+    buffer_json_member_add_array(wb, key);
+
+    if(flags & HEALTH_ENTRY_FLAG_PROCESSED)
+        buffer_json_add_array_item_string(wb, "PROCESSED");
+    if(flags & HEALTH_ENTRY_FLAG_UPDATED)
+        buffer_json_add_array_item_string(wb, "UPDATED");
+    if(flags & HEALTH_ENTRY_FLAG_EXEC_RUN)
+        buffer_json_add_array_item_string(wb, "EXEC_RUN");
+    if(flags & HEALTH_ENTRY_FLAG_EXEC_FAILED)
+        buffer_json_add_array_item_string(wb, "FAILED");
+    if(flags & HEALTH_ENTRY_FLAG_SILENCED)
+        buffer_json_add_array_item_string(wb, "SILENCED");
+    if(flags & HEALTH_ENTRY_RUN_ONCE)
+        buffer_json_add_array_item_string(wb, "ONCE");
+    if(flags & HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS)
+        buffer_json_add_array_item_string(wb, "IN_PROGRESS");
+    if(flags & HEALTH_ENTRY_FLAG_IS_REPEATING)
+        buffer_json_add_array_item_string(wb, "RECURRING");
+    if(flags & HEALTH_ENTRY_FLAG_SAVED)
+        buffer_json_add_array_item_string(wb, "SAVED");
+    if(flags & HEALTH_ENTRY_FLAG_ACLK_QUEUED)
+        buffer_json_add_array_item_string(wb, "ACLK_QUEUED");
+    if(flags & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION)
+        buffer_json_add_array_item_string(wb, "NO_CLEAR_NOTIFICATION");
+
+    buffer_json_array_close(wb);
+}
+
 static bool prepare_command(BUFFER *wb,
                             const char *exec,
                             const char *recipient,

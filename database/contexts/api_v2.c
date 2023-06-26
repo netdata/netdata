@@ -111,6 +111,7 @@ struct alert_instance_v2_entry {
     STRING *chart_name;
     STRING *name;
     RRDCALC_STATUS status;
+    RRDCALC_FLAGS flags;
     STRING *info;
     NETDATA_DOUBLE value;
     time_t last_updated;
@@ -292,6 +293,7 @@ static void alert_instances_v2_insert_callback(const DICTIONARY_ITEM *item __may
     t->chart_name = rc->rrdset->name;
     t->name = rc->name;
     t->status = rc->status;
+    t->flags = rc->run_flags;
     t->info = rc->info;
     t->value = rc->value;
     t->last_updated = rc->last_updated;
@@ -1377,6 +1379,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                         buffer_json_member_add_uint64(wb, "ni", t->ni);
                         buffer_json_member_add_string(wb, "instance", string2str(t->chart_name));
                         buffer_json_member_add_string(wb, "status", rrdcalc_status2string(t->status));
+                        rrdcalc_flags_to_json_array(wb, "flags", t->flags);
                         buffer_json_member_add_string(wb, "info", string2str(t->info));
                         buffer_json_member_add_double(wb, "value", t->value);
                         buffer_json_member_add_time_t(wb, "last_updated", t->last_updated);
