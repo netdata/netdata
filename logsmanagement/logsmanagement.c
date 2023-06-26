@@ -1106,14 +1106,26 @@ static void logs_management_init(uv_loop_t *main_loop,
     collector_info("[%s]: initialization completed", p_file_info->chart_name);
 }
 
-static void logsmanagement_main_cleanup(void *ptr) {
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+typedef struct {
+    struct netdata_static_thread *logsmanagement_main_thread;
+    uv_loop_t *main_loop;
+    Flb_socket_config_t *forward_in_config;
+} logsmanagement_main_thread_data_t;
 
+static void logsmanagement_main_cleanup(void *ptr) {
     rrd_collector_finished();
 
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+    logsmanagement_main_thread_data_t *thread_data = (logsmanagement_main_thread_data_t *) ptr;
+
+    thread_data->logsmanagement_main_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     collector_info("cleaning up...");
+
+    uv_stop(thread_data->main_loop);
+
+    // TODO: Clean up stats charts memory
+
+    flb_socket_config_destroy(thread_data->forward_in_config);
 
     flb_terminate();
 
@@ -1125,30 +1137,34 @@ static void logsmanagement_main_cleanup(void *ptr) {
         p_file_infos_arr = NULL;
     }
 
-    // TODO: Clean up stats charts memory
+    uv_loop_close(thread_data->main_loop);
+    freez(thread_data->main_loop);
 
     // TODO: Additional work to do here on exit? Maybe flush buffers to DB?
 
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+    thread_data->logsmanagement_main_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /**
  * @brief The main function of the program.
  * @details Any static asserts are most likely going to be inluded here. After 
  * any initialisation routines, the default uv_loop_t is executed indefinitely. 
- * @todo Any cleanup required on program exit? 
  */
 void *logsmanagement_main(void *ptr) {
     rrd_collector_started();
 
-    netdata_thread_cleanup_push(logsmanagement_main_cleanup, ptr);
+    logsmanagement_main_thread_data_t thread_data = {
+        .logsmanagement_main_thread = ptr,
+        .main_loop = mallocz(sizeof(uv_loop_t)),
+        .forward_in_config = NULL
+    };
 
-    Flb_socket_config_t *forward_in_config = NULL;
+    netdata_thread_cleanup_push(logsmanagement_main_cleanup, (void *) &thread_data);
 
-    uv_loop_t *main_loop = mallocz(sizeof(uv_loop_t));
-    fatal_assert(uv_loop_init(main_loop) == 0);
+    thread_data.main_loop = mallocz(sizeof(uv_loop_t));
+    fatal_assert(uv_loop_init(thread_data.main_loop) == 0);
 
-    if(logs_manag_config_load(&forward_in_config)) goto cleanup;
+    if(logs_manag_config_load(&thread_data.forward_in_config)) goto cleanup;
 
     /* Static asserts */
     #pragma GCC diagnostic push
@@ -1168,15 +1184,15 @@ void *logsmanagement_main(void *ptr) {
         goto cleanup;
     }
 
-    if(flb_add_fwd_input(forward_in_config)){
+    if(flb_add_fwd_input(thread_data.forward_in_config)){
         collector_error("flb_add_fwd_input() failed - logs management forward input will be disabled");
-        flb_socket_config_destroy(forward_in_config);
+        flb_socket_config_destroy(thread_data.forward_in_config);
     }
 
     /* Initialize logs management for each configuration section  */
     struct section *config_section = log_management_config.first_section;
     do {
-        logs_management_init(main_loop, config_section, forward_in_config);
+        logs_management_init(thread_data.main_loop, config_section, thread_data.forward_in_config);
         config_section = config_section->next;
     } while(config_section);
     if(p_file_infos_arr->count == 0){
@@ -1233,16 +1249,12 @@ void *logsmanagement_main(void *ptr) {
     collector_info("logsmanagement_main() setup completed successfully");
 
     /* Run uvlib loop. */
-    uv_run(main_loop, UV_RUN_DEFAULT);
+    uv_run(thread_data.main_loop, UV_RUN_DEFAULT);
 
     /* If there are valid log sources, there should always be valid handles */
     collector_error("uv_run(main_loop, ...); - no handles or requests - exiting");
 
 cleanup:
-    flb_socket_config_destroy(forward_in_config);
-    uv_stop(main_loop);
-    uv_loop_close(main_loop);
-    freez(main_loop);
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
