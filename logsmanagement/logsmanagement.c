@@ -110,18 +110,16 @@ static void p_file_info_destroy(struct File_info *p_file_info){
 
     collector_info("[%s]: p_file_info_destroy() cleanup", p_file_info->chart_name ? p_file_info->chart_name : "Unknown");
 
+    if(uv_is_active((uv_handle_t *) &p_file_info->flb_tmp_buff_cpy_timer)){
+        uv_timer_stop(&p_file_info->flb_tmp_buff_cpy_timer);
+        if (!uv_is_closing((uv_handle_t *) &p_file_info->flb_tmp_buff_cpy_timer))
+            uv_close((uv_handle_t *) &p_file_info->flb_tmp_buff_cpy_timer, NULL);
+    }
+
     if(p_file_info->db_writer_thread){
         uv_thread_join(p_file_info->db_writer_thread);
         m_assert(0, "db_writer_thread joined");
     }   
-
-    if(p_file_info->flb_tmp_buff_cpy_timer){
-        uv_timer_stop(p_file_info->flb_tmp_buff_cpy_timer);
-        if (!uv_is_closing((uv_handle_t *) p_file_info->flb_tmp_buff_cpy_timer))
-            uv_close((uv_handle_t *) p_file_info->flb_tmp_buff_cpy_timer, NULL);
-        freez(p_file_info->flb_tmp_buff_cpy_timer);
-        p_file_info->flb_tmp_buff_cpy_timer = NULL;
-    }
 
     freez((void *) p_file_info->chart_name);
     freez(p_file_info->filename);
@@ -1082,15 +1080,14 @@ static void logs_management_init(uv_loop_t *main_loop,
 
             /* flb_complete_item_timer_timeout_cb() is needed for 
              * both local and non-local sources. */
-            p_file_info->flb_tmp_buff_cpy_timer = mallocz(sizeof(uv_timer_t));
-            p_file_info->flb_tmp_buff_cpy_timer->data = p_file_info;
+            p_file_info->flb_tmp_buff_cpy_timer.data = p_file_info;
             if(unlikely(0 != uv_mutex_init(&p_file_info->flb_tmp_buff_mut))){
                 fatal("uv_mutex_init(&p_file_info->flb_tmp_buff_mut) failed");
             }
-            uv_timer_init(main_loop, p_file_info->flb_tmp_buff_cpy_timer);
-            uv_timer_start( p_file_info->flb_tmp_buff_cpy_timer, 
-                            (uv_timer_cb)flb_complete_item_timer_timeout_cb, 
-                            0, p_file_info->update_timeout * MSEC_PER_SEC);            
+            fatal_assert(0 == uv_timer_init(main_loop, &p_file_info->flb_tmp_buff_cpy_timer));
+            fatal_assert(0 == uv_timer_start( &p_file_info->flb_tmp_buff_cpy_timer, 
+                                              flb_complete_item_timer_timeout_cb, 0, 
+                                              p_file_info->update_timeout * MSEC_PER_SEC));
             break;
         }
         default: 
@@ -1105,6 +1102,11 @@ static void logs_management_init(uv_loop_t *main_loop,
     p_file_infos_arr->data[p_file_infos_arr->count - 1] = p_file_info;
 
     collector_info("[%s]: initialization completed", p_file_info->chart_name);
+}
+
+static void on_walk_cleanup(uv_handle_t* handle, void* data){
+    UNUSED(data);
+    if (!uv_is_closing(handle)) uv_close(handle, NULL);
 }
 
 typedef struct {
@@ -1130,7 +1132,6 @@ static void logsmanagement_main_cleanup(void *ptr) {
     flb_free_fwd_input_out_cb();
 
     uv_stop(thread_data->main_loop);
-    m_assert(UV_EBUSY != uv_loop_close(thread_data->main_loop), "uv_loop_close() == UV_EBUSY");
 
     if(p_file_infos_arr){
         for(int i = 0; i < p_file_infos_arr->count; i++){
@@ -1140,6 +1141,10 @@ static void logsmanagement_main_cleanup(void *ptr) {
         p_file_infos_arr = NULL;
     }
 
+    uv_run(thread_data->main_loop, UV_RUN_DEFAULT);
+    uv_walk(thread_data->main_loop, on_walk_cleanup, NULL);
+    uv_run(thread_data->main_loop, UV_RUN_DEFAULT);
+    m_assert(0 == uv_loop_close(thread_data->main_loop), "uv_loop_close() result not 0");
     freez(thread_data->main_loop);
 
     thread_data->logsmanagement_main_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
