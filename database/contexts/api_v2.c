@@ -1196,13 +1196,13 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
             dictionary_register_delete_callback(ctl.alerts.alert_configs, alert_configs_delete_callback, &ctl);
         }
 
-//        if(req->alerts.transition) {
-//            run = sql_find_alert_transition(req->alerts.transition, rrdcontext_v2_set_transition_filter, &ctl);
-//            if(!run) {
-//                resp = HTTP_RESP_NOT_FOUND;
-//                goto cleanup;
-//            }
-//        }
+        if(req->alerts.transition) {
+            run = sql_find_alert_transition(req->alerts.transition, rrdcontext_v2_set_transition_filter, &ctl);
+            if(!run) {
+                resp = HTTP_RESP_NOT_FOUND;
+                goto cleanup;
+            }
+        }
     }
 
     if(req->after || req->before) {
