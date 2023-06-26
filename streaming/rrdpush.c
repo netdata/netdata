@@ -597,7 +597,7 @@ int connect_to_one_of_destinations(
         if (reconnects_counter)
             *reconnects_counter += 1;
 
-        d->last_attempt = now;
+        d->since = now;
         d->attempts++;
         sock = connect_to_this(string2str(d->destination), default_port, timeout);
 
@@ -683,7 +683,7 @@ void rrdpush_destinations_free(RRDHOST *host) {
 
 // Either the receiver lost the connection or the host is being destroyed.
 // The sender mutex guards thread creation, any spurious data is wiped on reconnection.
-void rrdpush_sender_thread_stop(RRDHOST *host, const char *reason, bool wait) {
+void rrdpush_sender_thread_stop(RRDHOST *host, STREAM_HANDSHAKE reason, bool wait) {
     if (!host->sender)
         return;
 
@@ -784,7 +784,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         return rrdpush_receiver_too_busy_now(w);
 
     struct receiver_state *rpt = callocz(1, sizeof(*rpt));
-    rpt->last_msg_t = now_realtime_sec();
+    rpt->last_msg_t = now_monotonic_sec();
     rpt->capabilities = STREAM_CAP_INVALID;
     rpt->hops = 1;
 
@@ -1140,7 +1140,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         if (host) {
             netdata_mutex_lock(&host->receiver_lock);
             if (host->receiver) {
-                age = now_realtime_sec() - host->receiver->last_msg_t;
+                age = now_monotonic_sec() - host->receiver->last_msg_t;
 
                 if (age < 30)
                     receiver_working = true;
@@ -1151,7 +1151,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         }
         rrd_unlock();
 
-        if (receiver_stale && stop_streaming_receiver(host, "STALE RECEIVER")) {
+        if (receiver_stale && stop_streaming_receiver(host, STREAM_HANDSHAKE_DISCONNECT_STALE_RECEIVER)) {
             // we stopped the receiver
             // we can proceed with this connection
             receiver_stale = false;
@@ -1224,7 +1224,7 @@ static struct {
     { STREAM_HANDSHAKE_OK_V3, "CONNECTED" },
     { STREAM_HANDSHAKE_OK_V2, "CONNECTED" },
     { STREAM_HANDSHAKE_OK_V1, "CONNECTED" },
-    { STREAM_HANDSHAKE_NEVER, "NOT_TRIED_YET" },
+    { STREAM_HANDSHAKE_NEVER, "" },
     { STREAM_HANDSHAKE_ERROR_BAD_HANDSHAKE, "BAD HANDSHAKE" },
     { STREAM_HANDSHAKE_ERROR_LOCALHOST, "LOCALHOST" },
     { STREAM_HANDSHAKE_ERROR_ALREADY_CONNECTED, "ALREADY CONNECTED" },
@@ -1236,7 +1236,17 @@ static struct {
     { STREAM_HANDSHAKE_ERROR_CANT_CONNECT, "CANT CONNECT" },
     { STREAM_HANDSHAKE_BUSY_TRY_LATER, "BUSY TRY LATER" },
     { STREAM_HANDSHAKE_INTERNAL_ERROR, "INTERNAL ERROR" },
-    { STREAM_HANDSHAKE_INITIALIZATION, "INITIALIZING" },
+    { STREAM_HANDSHAKE_INITIALIZATION, "REMOTE IS INITIALIZING" },
+    { STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, "DISCONNECTED HOST CLEANUP" },
+    { STREAM_HANDSHAKE_DISCONNECT_STALE_RECEIVER, "DISCONNECTED STALE RECEIVER" },
+    { STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN, "DISCONNECTED SHUTDOWN REQUESTED" },
+    { STREAM_HANDSHAKE_DISCONNECT_NETDATA_EXIT, "DISCONNECTED NETDATA EXIT" },
+    { STREAM_HANDSHAKE_DISCONNECT_PARSER_EXIT, "DISCONNECTED PARSE ENDED" },
+    { STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_ERROR, "DISCONNECTED SOCKET READ ERROR" },
+    { STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, "DISCONNECTED PARSE ERROR" },
+    { STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT, "DISCONNECTED RECEIVER LEFT" },
+    { STREAM_HANDSHAKE_DISCONNECT_ORPHAN_HOST, "DISCONNECTED ORPHAN HOST" },
+    { STREAM_HANDSHAKE_NON_STREAMABLE_HOST, "NON STREAMABLE HOST" },
     { 0, NULL },
 };
 

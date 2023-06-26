@@ -1684,7 +1684,7 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
     return value;
 }
 
-inline int pluginsd_space(char c) {
+inline int pluginsd_isspace(char c) {
     switch(c) {
         case ' ':
         case '\t':
@@ -1698,8 +1698,7 @@ inline int pluginsd_space(char c) {
     }
 }
 
-inline int config_isspace(char c)
-{
+inline int config_isspace(char c) {
     switch (c) {
         case ' ':
         case '\t':
@@ -1713,100 +1712,23 @@ inline int config_isspace(char c)
     }
 }
 
-// split a text into words, respecting quotes
-inline size_t quoted_strings_splitter(char *str, char **words, size_t max_words, int (*custom_isspace)(char))
-{
-    char *s = str, quote = 0;
-    size_t i = 0;
+inline int group_by_label_isspace(char c) {
+    if(c == ',' || c == '|')
+        return 1;
 
-    // skip all white space
-    while (unlikely(custom_isspace(*s)))
-        s++;
-
-    if(unlikely(!*s)) {
-        words[i] = NULL;
-        return 0;
-    }
-
-    // check for quote
-    if (unlikely(*s == '\'' || *s == '"')) {
-        quote = *s; // remember the quote
-        s++;        // skip the quote
-    }
-
-    // store the first word
-    words[i++] = s;
-
-    // while we have something
-    while (likely(*s)) {
-        // if it is an escape
-        if (unlikely(*s == '\\' && s[1])) {
-            s += 2;
-            continue;
-        }
-
-        // if it is a quote
-        else if (unlikely(*s == quote)) {
-            quote = 0;
-            *s = ' ';
-            continue;
-        }
-
-        // if it is a space
-        else if (unlikely(quote == 0 && custom_isspace(*s))) {
-            // terminate the word
-            *s++ = '\0';
-
-            // skip all white space
-            while (likely(custom_isspace(*s)))
-                s++;
-
-            // check for a quote
-            if (unlikely(*s == '\'' || *s == '"')) {
-                quote = *s; // remember the quote
-                s++;        // skip the quote
-            }
-
-            // if we reached the end, stop
-            if (unlikely(!*s))
-                break;
-
-            // store the next word
-            if (likely(i < max_words))
-                words[i++] = s;
-            else
-                break;
-        }
-
-        // anything else
-        else
-            s++;
-    }
-
-    if (i < max_words)
-        words[i] = NULL;
-
-    return i;
+    return 0;
 }
 
-inline size_t pluginsd_split_words(char *str, char **words, size_t max_words)
-{
-    return quoted_strings_splitter(str, words, max_words, pluginsd_space);
-}
+bool isspace_map_pluginsd[256] = {};
+bool isspace_map_config[256] = {};
+bool isspace_map_group_by_label[256] = {};
 
-bool bitmap256_get_bit(BITMAP256 *ptr, uint8_t idx) {
-    if (unlikely(!ptr))
-        return false;
-    return (ptr->data[idx / 64] & (1ULL << (idx % 64)));
-}
-
-void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value) {
-    if (unlikely(!ptr))
-        return;
-    if (likely(value))
-        ptr->data[idx / 64] |= (1ULL << (idx % 64));
-    else
-        ptr->data[idx / 64] &= ~(1ULL << (idx % 64));
+__attribute__((constructor)) void initialize_is_space_arrays(void) {
+    for(int c = 0; c < 256 ; c++) {
+        isspace_map_pluginsd[c] = pluginsd_isspace((char) c);
+        isspace_map_config[c] = config_isspace((char) c);
+        isspace_map_group_by_label[c] = group_by_label_isspace((char) c);
+    }
 }
 
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length) {

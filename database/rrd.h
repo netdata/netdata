@@ -1189,7 +1189,7 @@ struct rrdhost {
     struct rrdpush_destinations *destination;       // the current destination from the above list
     SIMPLE_PATTERN *rrdpush_send_charts_matching;   // pattern to match the charts to be sent
 
-    const char *rrdpush_last_receiver_exit_reason;
+    int32_t rrdpush_last_receiver_exit_reason;
     time_t rrdpush_seconds_to_replicate;            // max time we want to replicate from the child
     time_t rrdpush_replication_step;                // seconds per replication step
     size_t rrdpush_receiver_replicating_charts;     // the number of charts currently being replicated from a child

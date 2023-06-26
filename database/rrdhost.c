@@ -1118,10 +1118,8 @@ static void rrdhost_streaming_sender_structures_init(RRDHOST *host)
     host->sender->rrdpush_sender_socket  = -1;
 
 #ifdef ENABLE_COMPRESSION
-    if(default_compression_enabled) {
+    if(default_compression_enabled)
         host->sender->flags |= SENDER_FLAG_COMPRESSION;
-        host->sender->compressor = create_compressor();
-    }
     else
         host->sender->flags &= ~SENDER_FLAG_COMPRESSION;
 #endif
@@ -1137,11 +1135,10 @@ static void rrdhost_streaming_sender_structures_free(RRDHOST *host)
     if (unlikely(!host->sender))
         return;
 
-    rrdpush_sender_thread_stop(host, "HOST CLEANUP", true); // stop a possibly running thread
+    rrdpush_sender_thread_stop(host, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, true); // stop a possibly running thread
     cbuffer_free(host->sender->buffer);
 #ifdef ENABLE_COMPRESSION
-    if (host->sender->compressor)
-        host->sender->compressor->destroy(&host->sender->compressor);
+    rrdpush_compressor_destroy(&host->sender->compressor);
 #endif
     replication_cleanup_sender(host->sender);
 
@@ -1174,7 +1171,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     rrdhost_streaming_sender_structures_free(host);
 
     if (netdata_exit || force)
-        stop_streaming_receiver(host, "HOST CLEANUP");
+        stop_streaming_receiver(host, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP);
 
 
     // ------------------------------------------------------------------------
@@ -1761,7 +1758,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     // --- ingest ---
 
     s->ingest.since = MAX(host->child_connect_time, host->child_disconnected_time);
-    s->ingest.reason = (online) ? "" : host->rrdpush_last_receiver_exit_reason;
+    s->ingest.reason = (online) ? STREAM_HANDSHAKE_NEVER : host->rrdpush_last_receiver_exit_reason;
 
     netdata_mutex_lock(&host->receiver_lock);
     s->ingest.hops = (host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
@@ -1819,9 +1816,6 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     if(!s->ingest.since)
         s->ingest.since = netdata_start_time;
 
-    if(!s->ingest.reason)
-        s->ingest.reason = "";
-
     if(s->ingest.status == RRDHOST_INGEST_STATUS_ONLINE)
         s->db.liveness = RRDHOST_DB_LIVENESS_LIVE;
     else
@@ -1847,7 +1841,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
 
         if (rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED)) {
             s->stream.hops = host->sender->hops;
-            s->stream.reason = "";
+            s->stream.reason = STREAM_HANDSHAKE_NEVER;
             s->stream.capabilities = host->sender->capabilities;
 
             s->stream.replication.completion = rrdhost_sender_replication_completion_unsafe(host, now, &s->stream.replication.instances);
@@ -1859,7 +1853,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
                 s->stream.status = RRDHOST_STREAM_STATUS_ONLINE;
 
 #ifdef ENABLE_COMPRESSION
-            s->stream.compression = (stream_has_capability(host->sender, STREAM_CAP_COMPRESSION) && host->sender->compressor);
+            s->stream.compression = (stream_has_capability(host->sender, STREAM_CAP_COMPRESSION) && host->sender->compressor.initialized);
 #endif
         }
         else {
@@ -1875,9 +1869,6 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
 
     if(!s->stream.since)
         s->stream.since = netdata_start_time;
-
-    if(!s->stream.reason)
-        s->stream.reason = "";
 
     // --- ml ---
 

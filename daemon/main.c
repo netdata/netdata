@@ -110,10 +110,10 @@ bool service_running(SERVICE_TYPE service) {
     if(unlikely(!sth))
         sth = service_register(SERVICE_THREAD_TYPE_NETDATA, NULL, NULL, NULL, false);
 
-    if(netdata_exit)
+    if(unlikely(netdata_exit))
         __atomic_store_n(&service_globals.running, 0, __ATOMIC_RELAXED);
 
-    if(service == 0)
+    if(unlikely(service == 0))
         service = sth->services;
 
     sth->services |= service;
@@ -1554,6 +1554,10 @@ int main(int argc, char **argv) {
                         else if(strcmp(optarg, "julytest") == 0) {
                             unittest_running = true;
                             return julytest();
+                        }
+                        else if(strcmp(optarg, "parsertest") == 0) {
+                            unittest_running = true;
+                            return pluginsd_parser_unittest();
                         }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
