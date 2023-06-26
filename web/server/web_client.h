@@ -33,28 +33,27 @@ typedef enum {
 } HTTP_VALIDATION;
 
 typedef enum web_client_flags {
-    WEB_CLIENT_FLAG_DEAD = 1 << 1, // if set, this client is dead
-
-    WEB_CLIENT_FLAG_KEEPALIVE = 1 << 2, // if set, the web client will be re-used
-
-    WEB_CLIENT_FLAG_WAIT_RECEIVE = 1 << 3, // if set, we are waiting more input data
-    WEB_CLIENT_FLAG_WAIT_SEND = 1 << 4,    // if set, we have data to send to the client
-
-    WEB_CLIENT_FLAG_DO_NOT_TRACK = 1 << 5,      // if set, we should not set cookies on this client
-    WEB_CLIENT_FLAG_TRACKING_REQUIRED = 1 << 6, // if set, we need to send cookies
-
-    WEB_CLIENT_FLAG_TCP_CLIENT = 1 << 7,  // if set, the client is using a TCP socket
-    WEB_CLIENT_FLAG_UNIX_CLIENT = 1 << 8, // if set, the client is using a UNIX socket
-
-    WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET = 1 << 9, // don't close the socket when cleaning up (static-threaded web server)
-
-    WEB_CLIENT_CHUNKED_TRANSFER = 1 << 10, // chunked transfer (used with zlib compression)
-
-    WEB_CLIENT_FLAG_SSL_WAIT_RECEIVE = 1 << 11, // if set, we are waiting more input data from an ssl conn
-    WEB_CLIENT_FLAG_SSL_WAIT_SEND = 1 << 12,    // if set, we have data to send to the client from an ssl conn
-
-    WEB_CLIENT_FLAG_PROXY_HTTPS = 1 << 13, // if set, the client reaches us via an https proxy
+    WEB_CLIENT_FLAG_DEAD                    = (1 << 1), // if set, this client is dead
+    WEB_CLIENT_FLAG_KEEPALIVE               = (1 << 2), // if set, the web client will be re-used
+    WEB_CLIENT_FLAG_WAIT_RECEIVE            = (1 << 3), // if set, we are waiting more input data
+    WEB_CLIENT_FLAG_WAIT_SEND               = (1 << 4), // if set, we have data to send to the client
+    WEB_CLIENT_FLAG_DO_NOT_TRACK            = (1 << 5), // if set, we should not set cookies on this client
+    WEB_CLIENT_FLAG_TRACKING_REQUIRED       = (1 << 6), // if set, we need to send cookies
+    WEB_CLIENT_FLAG_TCP_CLIENT              = (1 << 7), // if set, the client is using a TCP socket
+    WEB_CLIENT_FLAG_UNIX_CLIENT             = (1 << 8), // if set, the client is using a UNIX socket
+    WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET       = (1 << 9), // don't close the socket when cleaning up (static-threaded web server)
+    WEB_CLIENT_CHUNKED_TRANSFER             = (1 << 10), // chunked transfer (used with zlib compression)
+    WEB_CLIENT_FLAG_SSL_WAIT_RECEIVE        = (1 << 11), // if set, we are waiting more input data from an ssl conn
+    WEB_CLIENT_FLAG_SSL_WAIT_SEND           = (1 << 12), // if set, we have data to send to the client from an ssl conn
+    WEB_CLIENT_FLAG_PATH_IS_V0              = (1 << 13), // v0 dashboard found on the path
+    WEB_CLIENT_FLAG_PATH_IS_V1              = (1 << 14), // v1 dashboard found on the path
+    WEB_CLIENT_FLAG_PATH_IS_V2              = (1 << 15), // v2 dashboard found on the path
+    WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH = (1 << 16), // the path has a trailing hash
+    WEB_CLIENT_FLAG_PATH_HAS_FILE_EXTENSION = (1 << 17), // the path ends with a filename extension
 } WEB_CLIENT_FLAGS;
+
+#define WEB_CLIENT_FLAG_PATH_WITH_VERSION (WEB_CLIENT_FLAG_PATH_IS_V0|WEB_CLIENT_FLAG_PATH_IS_V1|WEB_CLIENT_FLAG_PATH_IS_V2)
+#define web_client_reset_path_flags(w) (w)->flags &= ~(WEB_CLIENT_FLAG_PATH_WITH_VERSION|WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH|WEB_CLIENT_FLAG_PATH_HAS_FILE_EXTENSION)
 
 #define web_client_flag_check(w, flag) ((w)->flags & (flag))
 #define web_client_flag_set(w, flag) (w)->flags |= flag
@@ -210,12 +209,10 @@ void web_client_request_done(struct web_client *w);
 
 void buffer_data_options2string(BUFFER *wb, uint32_t options);
 
-int mysendfile(struct web_client *w, char *filename);
-
 void web_client_build_http_header(struct web_client *w);
 char *strip_control_characters(char *url);
 
-void web_client_zero(struct web_client *w);
+void web_client_reuse_from_cache(struct web_client *w);
 struct web_client *web_client_create(size_t *statistics_memory_accounting);
 void web_client_free(struct web_client *w);
 

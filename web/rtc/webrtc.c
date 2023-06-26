@@ -304,7 +304,7 @@ static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, siz
     web_client_timeout_checkpoint_set(w, 0);
     web_client_decode_path_and_query_string(w, path);
     path = (char *)buffer_tostring(w->url_path_decoded);
-    w->response.code = web_client_api_request_with_node_selection(localhost, w, path);
+    w->response.code = (short)web_client_api_request_with_node_selection(localhost, w, path);
     web_client_timeout_checkpoint_response_ready(w, NULL);
 
     size_t sent_bytes = 0;

@@ -128,7 +128,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) 
         ACLK_STATS_UNLOCK;
     }
 
-    w->response.code = web_client_api_request_with_node_selection(localhost, w, path);
+    w->response.code = (short)web_client_api_request_with_node_selection(localhost, w, path);
     web_client_timeout_checkpoint_response_ready(w, &t);
 
     if(buffer_strlen(w->response.data) > ACLK_MAX_WEB_RESPONSE_SIZE) {

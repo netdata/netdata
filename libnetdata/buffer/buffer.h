@@ -242,19 +242,16 @@ static inline void buffer_strncat(BUFFER *wb, const char *txt, size_t len) {
     if(unlikely(!txt || !*txt)) return;
 
     const char *t = txt;
-    while(*t) {
-        buffer_need_bytes(wb, len);
-        char *s = &wb->buffer[wb->len];
-        char *d = s;
-        const char *e = &wb->buffer[wb->len + len];
+    buffer_need_bytes(wb, len + 1);
+    char *s = &wb->buffer[wb->len];
+    char *d = s;
+    const char *e = &wb->buffer[wb->len + len];
 
-        while(*t && d < e)
-            *d++ = *t++;
+    while(*t && d < e)
+        *d++ = *t++;
 
-        wb->len += d - s;
-    }
+    wb->len += d - s;
 
-    buffer_need_bytes(wb, 1);
     wb->buffer[wb->len] = '\0';
 
     buffer_overflow_check(wb);
