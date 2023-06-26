@@ -701,7 +701,7 @@ static void ebpf_unload_unique_maps()
     int i;
     for (i = 0; ebpf_modules[i].thread_name; i++) {
         // These threads are cleaned with other functions
-        if (i > EBPF_MODULE_SOCKET_IDX)
+        if (i != EBPF_MODULE_SOCKET_IDX)
             continue;
 
         if (ebpf_modules[i].enabled != NETDATA_THREAD_EBPF_STOPPED) {
@@ -2958,4 +2958,3 @@ int main(int argc, char **argv)
 
     return 0;
 }
-
