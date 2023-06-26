@@ -21,6 +21,7 @@ typedef enum __attribute__ ((__packed__)) {
     JOURNALFILE_FLAG_IS_AVAILABLE          = (1 << 0),
     JOURNALFILE_FLAG_IS_MOUNTED            = (1 << 1),
     JOURNALFILE_FLAG_MOUNTED_FOR_RETENTION = (1 << 2),
+    JOURNALFILE_FLAG_METRIC_CRC_CHECK      = (1 << 3),
 } JOURNALFILE_FLAGS;
 
 /* only one event loop is supported for now */
@@ -39,6 +40,7 @@ struct rrdengine_journalfile {
         time_t first_time_s;
         time_t last_time_s;
         time_t not_needed_since_s;
+        // uint32_t size_of_directory;
     } v2;
 
     struct {
