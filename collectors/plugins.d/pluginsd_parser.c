@@ -2048,7 +2048,6 @@ void parser_destroy(PARSER *parser) {
 int pluginsd_parser_unittest(void) {
     PARSER *p = parser_init(NULL, NULL, NULL, -1, PARSER_INPUT_SPLIT, NULL);
     pluginsd_keywords_init(p, PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING);
-    parser_destroy(p);
 
     char *lines[] = {
             "BEGIN2 abcdefghijklmnopqr 123",
@@ -2070,7 +2069,7 @@ int pluginsd_parser_unittest(void) {
             strncpyz(input, lines[line], PLUGINSD_LINE_MAX);
             size_t num_words = quoted_strings_splitter_pluginsd(input, words, PLUGINSD_MAX_WORDS);
             const char *command = get_word(words, num_words, 0);
-            PARSER_KEYWORD *keyword = gperf_lookup_keyword(command, strlen(command));
+            PARSER_KEYWORD *keyword = parser_find_keyword(p, command);
             if(unlikely(!keyword))
                 fatal("Cannot parse the line '%s'", lines[line]);
             count++;
@@ -2082,5 +2081,6 @@ int pluginsd_parser_unittest(void) {
          (double)(ended - started) / (double)USEC_PER_SEC,
          (double)count / ((double)(ended - started) / (double)USEC_PER_SEC) / 1000.0);
 
+    parser_destroy(p);
     return 0;
 }
