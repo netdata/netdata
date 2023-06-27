@@ -1817,7 +1817,7 @@ void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_
     if (before)
         buffer_sprintf(command, "AND d.when_key < %ld ", before);
 
-    buffer_sprintf(command, " ORDER BY d.when_key DESC LIMIT %u", max);
+    buffer_sprintf(command, " ORDER BY d.global_id DESC LIMIT %u", max);
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(command), -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
