@@ -1713,21 +1713,22 @@ void sql_health_alarm_log2json_v2(
 
     buffer_sprintf(command, SQL_SELECT_HEALTH_LOG_V2);
 
-    if (alert_id)
-        buffer_sprintf(command, "AND d.alarm_id = %u ", alert_id);
-
-    if (chart)
-        buffer_sprintf(command, "AND h.chart = '%s' ", chart);
-
-    if (after)
-        buffer_sprintf(command, "AND d.when_key >= %ld ", after);
-
-    if (before)
-        buffer_sprintf(command, "AND d.when_key < %ld ", before);
-
     if (transition)
-        buffer_sprintf(command, "AND transition_id = @transition_id ");
+         buffer_sprintf(command, "AND transition_id = @transition_id ");
+    else {
+         if (alert_id)
+             buffer_sprintf(command, "AND d.alarm_id = %u ", alert_id);
 
+         if (chart)
+             buffer_sprintf(command, "AND h.chart = '%s' ", chart);
+
+         if (after)
+             buffer_sprintf(command, "AND d.when_key >= %ld ", after);
+
+         if (before)
+             buffer_sprintf(command, "AND d.when_key < %ld ", before);
+
+    }
     buffer_sprintf(command, " ORDER BY d.alarm_event_id DESC LIMIT %u", max);
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(command), -1, &res, 0);
