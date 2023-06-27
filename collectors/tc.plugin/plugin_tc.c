@@ -418,18 +418,18 @@ static inline void tc_device_commit(struct tc_device *d) {
                 d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED);
 
             rrdlabels_add(d->st_bytes->rrdlabels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
-            rrdlabels_add(d->st_bytes->rrdlabels, "name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
-            rrdlabels_add(d->st_bytes->rrdlabels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->rrdlabels, "device_name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->rrdlabels, "device_group", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
             if(unlikely(d->name_updated))
                 rrdset_reset_name(d->st_bytes, string2str(d->name));
 
             if(d->name && d->name_updated)
-                rrdlabels_add(d->st_bytes->rrdlabels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
+                rrdlabels_add(d->st_bytes->rrdlabels, "device_name", string2str(d->name), RRDLABEL_SRC_AUTO);
 
             if(d->family && d->family_updated)
-                rrdlabels_add(d->st_bytes->rrdlabels, "family", string2str(d->family), RRDLABEL_SRC_AUTO);
+                rrdlabels_add(d->st_bytes->rrdlabels, "device_group", string2str(d->family), RRDLABEL_SRC_AUTO);
 
             // TODO
             // update the family
@@ -479,8 +479,8 @@ static inline void tc_device_commit(struct tc_device *d) {
                 d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED);
 
             rrdlabels_add(d->st_packets->rrdlabels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
-            rrdlabels_add(d->st_packets->rrdlabels, "name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
-            rrdlabels_add(d->st_packets->rrdlabels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_packets->rrdlabels, "device_name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_packets->rrdlabels, "device_group", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
             if(unlikely(d->name_updated)) {
@@ -490,10 +490,10 @@ static inline void tc_device_commit(struct tc_device *d) {
             }
 
             if(d->name && d->name_updated)
-                rrdlabels_add(d->st_packets->rrdlabels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
+                rrdlabels_add(d->st_packets->rrdlabels, "device_name", string2str(d->name), RRDLABEL_SRC_AUTO);
 
             if(d->family && d->family_updated)
-                rrdlabels_add(d->st_packets->rrdlabels, "family", string2str(d->family), RRDLABEL_SRC_AUTO);
+                rrdlabels_add(d->st_packets->rrdlabels, "device_group", string2str(d->family), RRDLABEL_SRC_AUTO);
 
             // TODO
             // update the family
@@ -543,8 +543,8 @@ static inline void tc_device_commit(struct tc_device *d) {
                 d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED);
 
             rrdlabels_add(d->st_dropped->rrdlabels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
-            rrdlabels_add(d->st_dropped->rrdlabels, "name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
-            rrdlabels_add(d->st_dropped->rrdlabels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_dropped->rrdlabels, "device_name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_dropped->rrdlabels, "device_group", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
             if(unlikely(d->name_updated)) {
@@ -554,10 +554,10 @@ static inline void tc_device_commit(struct tc_device *d) {
             }
 
             if(d->name && d->name_updated)
-                rrdlabels_add(d->st_dropped->rrdlabels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
+                rrdlabels_add(d->st_dropped->rrdlabels, "device_name", string2str(d->name), RRDLABEL_SRC_AUTO);
 
             if(d->family && d->family_updated)
-                rrdlabels_add(d->st_dropped->rrdlabels, "family", string2str(d->family), RRDLABEL_SRC_AUTO);
+                rrdlabels_add(d->st_dropped->rrdlabels, "device_group", string2str(d->family), RRDLABEL_SRC_AUTO);
 
             // TODO
             // update the family
@@ -607,8 +607,8 @@ static inline void tc_device_commit(struct tc_device *d) {
                 RRDSET_TYPE_LINE);
 
             rrdlabels_add(d->st_tokens->rrdlabels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
-            rrdlabels_add(d->st_tokens->rrdlabels, "name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
-            rrdlabels_add(d->st_tokens->rrdlabels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_tokens->rrdlabels, "device_name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_tokens->rrdlabels, "device_group", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
             if(unlikely(d->name_updated)) {
@@ -618,10 +618,10 @@ static inline void tc_device_commit(struct tc_device *d) {
             }
 
             if(d->name && d->name_updated)
-                rrdlabels_add(d->st_tokens->rrdlabels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
+                rrdlabels_add(d->st_tokens->rrdlabels, "device_name", string2str(d->name), RRDLABEL_SRC_AUTO);
 
             if(d->family && d->family_updated)
-                rrdlabels_add(d->st_tokens->rrdlabels, "family", string2str(d->family), RRDLABEL_SRC_AUTO);
+                rrdlabels_add(d->st_tokens->rrdlabels, "device_group", string2str(d->family), RRDLABEL_SRC_AUTO);
 
             // TODO
             // update the family
@@ -672,8 +672,8 @@ static inline void tc_device_commit(struct tc_device *d) {
                 RRDSET_TYPE_LINE);
 
             rrdlabels_add(d->st_ctokens->rrdlabels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
-            rrdlabels_add(d->st_ctokens->rrdlabels, "name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
-            rrdlabels_add(d->st_ctokens->rrdlabels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_ctokens->rrdlabels, "device_name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_ctokens->rrdlabels, "device_group", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
             debug(D_TC_LOOP, "TC: Updating _ctokens chart for device '%s'", string2str(d->name?d->name:d->id));
@@ -685,10 +685,10 @@ static inline void tc_device_commit(struct tc_device *d) {
             }
 
             if(d->name && d->name_updated)
-                rrdlabels_add(d->st_ctokens->rrdlabels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
+                rrdlabels_add(d->st_ctokens->rrdlabels, "device_name", string2str(d->name), RRDLABEL_SRC_AUTO);
 
             if(d->family && d->family_updated)
-                rrdlabels_add(d->st_ctokens->rrdlabels, "family", string2str(d->family), RRDLABEL_SRC_AUTO);
+                rrdlabels_add(d->st_ctokens->rrdlabels, "device_group", string2str(d->family), RRDLABEL_SRC_AUTO);
 
             // TODO
             // update the family
