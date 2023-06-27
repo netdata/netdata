@@ -2,7 +2,7 @@
 
 This plugin allows someone to backfill an agent with random data.
 
-A use can specify:
+A user can specify:
 
  - The number charts they want,
  - the number of dimensions per chart,
