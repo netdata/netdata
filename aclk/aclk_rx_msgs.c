@@ -399,10 +399,10 @@ int handle_disconnect_req(const char *msg, size_t msg_len)
         error("Cloud Banned This Agent!");
         aclk_disable_runtime = 1;
     }
-    info("Cloud requested disconnect (EC=%u, \"%s\")", (unsigned int)cmd->error_code, cmd->error_description);
+    netdata_log_info("Cloud requested disconnect (EC=%u, \"%s\")", (unsigned int)cmd->error_code, cmd->error_description);
     if (cmd->reconnect_after_s > 0) {
         aclk_block_until = now_monotonic_sec() + cmd->reconnect_after_s;
-        info(
+        netdata_log_info(
             "Cloud asks not to reconnect for %u seconds. We shall honor that request",
             (unsigned int)cmd->reconnect_after_s);
     }

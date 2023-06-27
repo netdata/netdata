@@ -4,7 +4,7 @@
 #include "csv.h"
 
 void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const char *startline, const char *separator, const char *endline, const char *betweenlines) {
-    //info("RRD2CSV(): %s: BEGIN", r->st->id);
+    //netdata_log_info("RRD2CSV(): %s: BEGIN", r->st->id);
     long c, i;
     const long used = (long)r->d;
 
@@ -104,5 +104,5 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
 
         buffer_strcat(wb, endline);
     }
-    //info("RRD2CSV(): %s: END", r->st->id);
+    //netdata_log_info("RRD2CSV(): %s: END", r->st->id);
 }

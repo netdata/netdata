@@ -1174,7 +1174,7 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
         added++;
     }
 
-    info("DBENGINE: recalculating tier %d retention for %zu metrics starting with datafile %u",
+    netdata_log_info("DBENGINE: recalculating tier %d retention for %zu metrics starting with datafile %u",
          ctx->config.tier, count, first_datafile_remaining->fileno);
 
     journalfile_v2_data_release(journalfile);
@@ -1189,7 +1189,7 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_POPULATE_MRG);
 
-    info("DBENGINE: updating tier %d metrics registry retention for %zu metrics",
+    netdata_log_info("DBENGINE: updating tier %d metrics registry retention for %zu metrics",
          ctx->config.tier, added);
 
     size_t deleted_metrics = 0, zero_retention_referenced = 0, zero_disk_retention = 0, zero_disk_but_live = 0;
@@ -1243,7 +1243,7 @@ void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *
         datafile_got_for_deletion = datafile_acquire_for_deletion(datafile);
 
         if (!datafile_got_for_deletion) {
-            info("DBENGINE: waiting for data file '%s/"
+            netdata_log_info("DBENGINE: waiting for data file '%s/"
                          DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION
                          "' to be available for deletion, "
                          "it is in use currently by %u users.",
@@ -1255,7 +1255,7 @@ void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *
     }
 
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.datafile_deletion_started, 1, __ATOMIC_RELAXED);
-    info("DBENGINE: deleting data file '%s/"
+    netdata_log_info("DBENGINE: deleting data file '%s/"
          DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION
          "'.",
          ctx->config.dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
@@ -1277,26 +1277,26 @@ void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *
     journal_file_bytes = journalfile_current_size(journal_file);
     deleted_bytes = journalfile_v2_data_size_get(journal_file);
 
-    info("DBENGINE: deleting data and journal files to maintain disk quota");
+    netdata_log_info("DBENGINE: deleting data and journal files to maintain disk quota");
     ret = journalfile_destroy_unsafe(journal_file, datafile);
     if (!ret) {
         journalfile_v1_generate_path(datafile, path, sizeof(path));
-        info("DBENGINE: deleted journal file \"%s\".", path);
+        netdata_log_info("DBENGINE: deleted journal file \"%s\".", path);
         journalfile_v2_generate_path(datafile, path, sizeof(path));
-        info("DBENGINE: deleted journal file \"%s\".", path);
+        netdata_log_info("DBENGINE: deleted journal file \"%s\".", path);
         deleted_bytes += journal_file_bytes;
     }
     ret = destroy_data_file_unsafe(datafile);
     if (!ret) {
         generate_datafilepath(datafile, path, sizeof(path));
-        info("DBENGINE: deleted data file \"%s\".", path);
+        netdata_log_info("DBENGINE: deleted data file \"%s\".", path);
         deleted_bytes += datafile_bytes;
     }
     freez(journal_file);
     freez(datafile);
 
     ctx_current_disk_space_decrease(ctx, deleted_bytes);
-    info("DBENGINE: reclaimed %u bytes of disk space.", deleted_bytes);
+    netdata_log_info("DBENGINE: reclaimed %u bytes of disk space.", deleted_bytes);
 }
 
 static void *database_rotate_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
@@ -1376,7 +1376,7 @@ static void *ctx_shutdown_tp_worker(struct rrdengine_instance *ctx __maybe_unuse
             __atomic_load_n(&ctx->atomic.inflight_queries, __ATOMIC_RELAXED)) {
         if(!logged) {
             logged = true;
-            info("DBENGINE: waiting for %zu inflight queries to finish to shutdown tier %d...",
+            netdata_log_info("DBENGINE: waiting for %zu inflight queries to finish to shutdown tier %d...",
                  __atomic_load_n(&ctx->atomic.inflight_queries, __ATOMIC_RELAXED),
                  (ctx->config.legacy) ? -1 : ctx->config.tier);
         }
@@ -1501,12 +1501,12 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __mayb
         spinlock_unlock(&datafile->writers.spinlock);
 
         if(!available) {
-            info("DBENGINE: journal file %u needs to be indexed, but it has writers working on it - skipping it for now", datafile->fileno);
+            netdata_log_info("DBENGINE: journal file %u needs to be indexed, but it has writers working on it - skipping it for now", datafile->fileno);
             datafile = datafile->next;
             continue;
         }
 
-        info("DBENGINE: journal file %u is ready to be indexed", datafile->fileno);
+        netdata_log_info("DBENGINE: journal file %u is ready to be indexed", datafile->fileno);
         pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->config.page_type,
                                      journalfile_migrate_to_v2_callback, (void *) datafile->journalfile);
 
@@ -1860,7 +1860,7 @@ void dbengine_event_loop(void* arg) {
     }
 
     /* cleanup operations of the event loop */
-    info("DBENGINE: shutting down dbengine thread");
+    netdata_log_info("DBENGINE: shutting down dbengine thread");
 
     /*
      * uv_async_send after uv_close does not seem to crash in linux at the moment,

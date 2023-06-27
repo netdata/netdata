@@ -285,7 +285,7 @@ static struct {
 };
 
 static inline uint8_t contenttype_for_filename(const char *filename) {
-    // info("checking filename '%s'", filename);
+    // netdata_log_info("checking filename '%s'", filename);
 
     static int initialized = 0;
     int i;
@@ -306,22 +306,22 @@ static inline uint8_t contenttype_for_filename(const char *filename) {
     }
 
     if(unlikely(!last_dot || !*last_dot || !last_dot[1])) {
-        // info("no extension for filename '%s'", filename);
+        // netdata_log_info("no extension for filename '%s'", filename);
         return CT_APPLICATION_OCTET_STREAM;
     }
     last_dot++;
 
-    // info("extension for filename '%s' is '%s'", filename, last_dot);
+    // netdata_log_info("extension for filename '%s' is '%s'", filename, last_dot);
 
     uint32_t hash = simple_hash(last_dot);
     for(i = 0; mime_types[i].extension ; i++) {
         if(unlikely(hash == mime_types[i].hash && !strcmp(last_dot, mime_types[i].extension))) {
-            // info("matched extension for filename '%s': '%s'", filename, last_dot);
+            // netdata_log_info("matched extension for filename '%s': '%s'", filename, last_dot);
             return mime_types[i].contenttype;
         }
     }
 
-    // info("not matched extension for filename '%s': '%s'", filename, last_dot);
+    // netdata_log_info("not matched extension for filename '%s': '%s'", filename, last_dot);
     return CT_APPLICATION_OCTET_STREAM;
 }
 
@@ -1017,7 +1017,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
         is_it_valid = url_is_request_complete(s, &s[last_pos], w->header_parse_last_size, &w->post_payload, &w->post_payload_size);
         if(!is_it_valid) {
             if(w->header_parse_tries > HTTP_REQ_MAX_HEADER_FETCH_TRIES) {
-                info("Disabling slow client after %zu attempts to read the request (%zu bytes received)", w->header_parse_tries, buffer_strlen(w->response.data));
+                netdata_log_info("Disabling slow client after %zu attempts to read the request (%zu bytes received)", w->header_parse_tries, buffer_strlen(w->response.data));
                 w->header_parse_tries = 0;
                 w->header_parse_last_size = 0;
                 web_client_disable_wait_receive(w);

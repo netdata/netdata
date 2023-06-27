@@ -124,7 +124,7 @@ static void exporting_main_cleanup(void *ptr)
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    info("cleaning up...");
+    netdata_log_info("cleaning up...");
 
     if (!engine) {
         static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
@@ -139,17 +139,17 @@ static void exporting_main_cleanup(void *ptr)
     for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
         if (!instance->exited) {
             found++;
-            info("stopping worker for instance %s", instance->config.name);
+            netdata_log_info("stopping worker for instance %s", instance->config.name);
             uv_mutex_unlock(&instance->mutex);
             instance->data_is_ready = 1;
             uv_cond_signal(&instance->cond_var);
         } else
-            info("found stopped worker for instance %s", instance->config.name);
+            netdata_log_info("found stopped worker for instance %s", instance->config.name);
     }
 
     while (found && max > 0) {
         max -= step;
-        info("Waiting %d exporting connectors to finish...", found);
+        netdata_log_info("Waiting %d exporting connectors to finish...", found);
         sleep_usec(step);
         found = 0;
 
@@ -178,7 +178,7 @@ void *exporting_main(void *ptr)
 
     engine = read_exporting_config();
     if (!engine) {
-        info("EXPORTING: no exporting connectors configured");
+        netdata_log_info("EXPORTING: no exporting connectors configured");
         goto cleanup;
     }
 

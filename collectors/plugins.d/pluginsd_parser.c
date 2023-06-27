@@ -1017,7 +1017,7 @@ static inline PARSER_RC pluginsd_flush(char **words __maybe_unused, size_t num_w
 }
 
 static inline PARSER_RC pluginsd_disable(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser) {
-    info("PLUGINSD: plugin called DISABLE. Disabling it.");
+    netdata_log_info("PLUGINSD: plugin called DISABLE. Disabling it.");
     parser->user.enabled = 0;
     return PARSER_RC_STOP;
 }
@@ -1796,7 +1796,7 @@ static inline PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_
 }
 
 static inline PARSER_RC pluginsd_exit(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser __maybe_unused) {
-    info("PLUGINSD: plugin called EXIT.");
+    netdata_log_info("PLUGINSD: plugin called EXIT.");
     return PARSER_RC_STOP;
 }
 
@@ -2173,7 +2173,7 @@ int pluginsd_parser_unittest(void) {
     }
     usec_t ended = now_realtime_usec();
 
-    info("Parsed %zu lines in %0.2f secs, %0.2f klines/sec", count,
+    netdata_log_info("Parsed %zu lines in %0.2f secs, %0.2f klines/sec", count,
          (double)(ended - started) / (double)USEC_PER_SEC,
          (double)count / ((double)(ended - started) / (double)USEC_PER_SEC) / 1000.0);
 

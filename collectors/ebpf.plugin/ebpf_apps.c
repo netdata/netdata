@@ -44,7 +44,7 @@ void ebpf_aral_init(void)
     ebpf_aral_process_stat = ebpf_allocate_pid_aral(NETDATA_EBPF_PROC_ARAL_NAME, sizeof(ebpf_process_stat_t));
 
 #ifdef NETDATA_DEV_MODE
-    info("Plugin is using ARAL with values %d", NETDATA_EBPF_ALLOC_MAX_PID);
+    netdata_log_info("Plugin is using ARAL with values %d", NETDATA_EBPF_ALLOC_MAX_PID);
 #endif
 }
 

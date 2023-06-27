@@ -588,7 +588,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
                 struct sockaddr_in *sin = (struct sockaddr_in *) rp->ai_addr;
                 inet_ntop(AF_INET, &sin->sin_addr, rip, INET_ADDRSTRLEN);
                 rport = ntohs(sin->sin_port);
-                // info("Attempting to listen on IPv4 '%s' ('%s'), port %d ('%s'), socktype %d", rip, ip, rport, port, socktype);
+                // netdata_log_info("Attempting to listen on IPv4 '%s' ('%s'), port %d ('%s'), socktype %d", rip, ip, rport, port, socktype);
                 fd = create_listen_socket4(socktype, rip, rport, listen_backlog);
                 break;
             }
@@ -597,7 +597,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
                 struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) rp->ai_addr;
                 inet_ntop(AF_INET6, &sin6->sin6_addr, rip, INET6_ADDRSTRLEN);
                 rport = ntohs(sin6->sin6_port);
-                // info("Attempting to listen on IPv6 '%s' ('%s'), port %d ('%s'), socktype %d", rip, ip, rport, port, socktype);
+                // netdata_log_info("Attempting to listen on IPv6 '%s' ('%s'), port %d ('%s'), socktype %d", rip, ip, rport, port, socktype);
                 fd = create_listen_socket6(socktype, scope_id, rip, rport, listen_backlog);
                 break;
             }
@@ -660,7 +660,7 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
     if(sockets->failed) {
         size_t i;
         for(i = 0; i < sockets->opened ;i++)
-            info("LISTENER: Listen socket %s opened successfully.", sockets->fds_names[i]);
+            netdata_log_info("LISTENER: Listen socket %s opened successfully.", sockets->fds_names[i]);
     }
 
     return (int)sockets->opened;
@@ -810,7 +810,7 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
             errno = 0;
             if(connect(fd, ai->ai_addr, ai->ai_addrlen) < 0) {
                 if(errno == EALREADY || errno == EINPROGRESS) {
-                    info("Waiting for connection to ip %s port %s to be established", hostBfr, servBfr);
+                    netdata_log_info("Waiting for connection to ip %s port %s to be established", hostBfr, servBfr);
 
                     // Convert 'struct timeval' to milliseconds for poll():
                     int timeout_milliseconds = timeout->tv_sec * 1000 + timeout->tv_usec / 1000;
@@ -824,7 +824,7 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
                         // poll() completed normally. We can check the revents to see what happened
                         if (fds[0].revents & POLLOUT) {
                             // connect() completed successfully, socket is writable.
-                            info("connect() to ip %s port %s completed successfully", hostBfr, servBfr);
+                            netdata_log_info("connect() to ip %s port %s completed successfully", hostBfr, servBfr);
                         }
                         else {
                             // This means that the socket is in error. We will close it and set fd to -1
@@ -1349,7 +1349,7 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
     if(unlikely(fd < 0)) return NULL;
 
     //if(p->limit && p->used >= p->limit) {
-    //    info("Max sockets limit reached (%zu sockets), dropping connection", p->used);
+    //    netdata_log_info("Max sockets limit reached (%zu sockets), dropping connection", p->used);
     //    close(fd);
     //    return NULL;
     //}
@@ -1533,7 +1533,7 @@ int poll_default_rcv_callback(POLLINFO *pi, short int *events) {
             }
         } else if (rc) {
             // data received
-            info("POLLFD: internal error: poll_default_rcv_callback() is discarding %zd bytes received on socket %d", rc, pi->fd);
+            netdata_log_info("POLLFD: internal error: poll_default_rcv_callback() is discarding %zd bytes received on socket %d", rc, pi->fd);
         }
     } while (rc != -1);
 
@@ -1543,7 +1543,7 @@ int poll_default_rcv_callback(POLLINFO *pi, short int *events) {
 int poll_default_snd_callback(POLLINFO *pi, short int *events) {
     *events &= ~POLLOUT;
 
-    info("POLLFD: internal error: poll_default_snd_callback(): nothing to send on socket %d", pi->fd);
+    netdata_log_info("POLLFD: internal error: poll_default_snd_callback(): nothing to send on socket %d", pi->fd);
     return 0;
 }
 
@@ -1773,7 +1773,7 @@ void poll_events(LISTEN_SOCKETS *sockets
         );
 
         pi->data = data;
-        info("POLLFD: LISTENER: listening on '%s'", (sockets->fds_names[i])?sockets->fds_names[i]:"UNKNOWN");
+        netdata_log_info("POLLFD: LISTENER: listening on '%s'", (sockets->fds_names[i])?sockets->fds_names[i]:"UNKNOWN");
     }
 
     int listen_sockets_active = 1;
@@ -1814,7 +1814,7 @@ void poll_events(LISTEN_SOCKETS *sockets
         // enable or disable the TCP listening sockets, based on the current number of sockets used and the limit set
         if((listen_sockets_active && (p.limit && p.used >= p.limit)) || (!listen_sockets_active && (!p.limit || p.used < p.limit))) {
             listen_sockets_active = !listen_sockets_active;
-            info("%s listening sockets (used TCP sockets %zu, max allowed for this worker %zu)", (listen_sockets_active)?"ENABLING":"DISABLING", p.used, p.limit);
+            netdata_log_info("%s listening sockets (used TCP sockets %zu, max allowed for this worker %zu)", (listen_sockets_active)?"ENABLING":"DISABLING", p.used, p.limit);
             for (i = 0; i <= p.max; i++) {
                 if(p.inf[i].flags & POLLINFO_FLAG_SERVER_SOCKET && p.inf[i].socktype == SOCK_STREAM) {
                     p.fds[i].events = (short int) ((listen_sockets_active) ? POLLIN : 0);
@@ -1962,7 +1962,7 @@ void poll_events(LISTEN_SOCKETS *sockets
 
                 if(likely(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET)) {
                     if (unlikely(pi->send_count == 0 && p.complete_request_timeout > 0 && (now - pi->connected_t) >= p.complete_request_timeout)) {
-                        info("POLLFD: LISTENER: client slot %zu (fd %d) from %s port %s has not sent a complete request in %zu seconds - closing it. "
+                        netdata_log_info("POLLFD: LISTENER: client slot %zu (fd %d) from %s port %s has not sent a complete request in %zu seconds - closing it. "
                               , i
                               , pi->fd
                               , pi->client_ip ? pi->client_ip : "<undefined-ip>"
@@ -1972,7 +1972,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                         poll_close_fd(pi);
                     }
                     else if(unlikely(pi->recv_count && p.idle_timeout > 0 && now - ((pi->last_received_t > pi->last_sent_t) ? pi->last_received_t : pi->last_sent_t) >= p.idle_timeout )) {
-                        info("POLLFD: LISTENER: client slot %zu (fd %d) from %s port %s is idle for more than %zu seconds - closing it. "
+                        netdata_log_info("POLLFD: LISTENER: client slot %zu (fd %d) from %s port %s is idle for more than %zu seconds - closing it. "
                               , i
                               , pi->fd
                               , pi->client_ip ? pi->client_ip : "<undefined-ip>"

@@ -303,7 +303,7 @@ void simple_connector_worker(void *instance_p)
 
                     if(netdata_ssl_open(&connector_specific_data->ssl, netdata_ssl_exporting_ctx, sock)) {
                         if(netdata_ssl_connect(&connector_specific_data->ssl)) {
-                            info("Exporting established a SSL connection.");
+                            netdata_log_info("Exporting established a SSL connection.");
 
                             struct timeval tv;
                             tv.tv_sec = timeout.tv_sec / 4;

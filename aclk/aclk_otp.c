@@ -335,7 +335,7 @@ int aclk_get_otp_challenge(url_t *target, const char *agent_id, unsigned char **
     }
     buffer_free(url);
 
-    info ("ACLK_OTP Got Challenge from Cloud");
+    netdata_log_info("ACLK_OTP Got Challenge from Cloud");
 
     json_object *json = json_tokener_parse(resp.payload);
     if (!json) {
@@ -414,7 +414,7 @@ int aclk_send_otp_response(const char *agent_id, const unsigned char *response, 
             aclk_parse_otp_error(resp.payload);
         goto cleanup_response;
     }
-    info ("ACLK_OTP Got Password from Cloud");
+    netdata_log_info("ACLK_OTP Got Password from Cloud");
 
     if (parse_passwd_response(resp.payload, mqtt_auth)){
         error("Error parsing response of password endpoint");
@@ -871,7 +871,7 @@ int aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int aclk_port) {
         return 5;
     }
 
-    info("Getting Cloud /env successful");
+    netdata_log_info("Getting Cloud /env successful");
 
     https_req_response_free(&resp);
     buffer_free(buf);

@@ -52,7 +52,7 @@ bool is_system_ieee754_double(void) {
 
         if(*ptr != tests[i].i && (tests[i].original == tests[i].d || (isnan(tests[i].original) && isnan(tests[i].d)))) {
             if(!logged)
-                info("IEEE754: test #%zu, value " NETDATA_DOUBLE_FORMAT_G " is represented in this system as %lX, but it was expected as %lX",
+                netdata_log_info("IEEE754: test #%zu, value " NETDATA_DOUBLE_FORMAT_G " is represented in this system as %lX, but it was expected as %lX",
                      i+1, tests[i].original, *ptr, tests[i].i);
             errors++;
         }
@@ -60,14 +60,14 @@ bool is_system_ieee754_double(void) {
 
     if(!errors && sizeof(NETDATA_DOUBLE) == sizeof(uint64_t)) {
         if(!logged)
-            info("IEEE754: system is using IEEE754 DOUBLE PRECISION values");
+            netdata_log_info("IEEE754: system is using IEEE754 DOUBLE PRECISION values");
 
         logged = true;
         return true;
     }
     else {
         if(!logged)
-            info("IEEE754: system is NOT compatible with IEEE754 DOUBLE PRECISION values");
+            netdata_log_info("IEEE754: system is NOT compatible with IEEE754 DOUBLE PRECISION values");
 
         logged = true;
         return false;

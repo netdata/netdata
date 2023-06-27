@@ -111,7 +111,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
 //    fclose(fp);
 
     if(unlikely(s->buffer->max_size < (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE)) {
-        info("STREAM %s [send to %s]: max buffer size of %zu is too small for a data message of size %zu. Increasing the max buffer size to %d times the max data message size.",
+        netdata_log_info("STREAM %s [send to %s]: max buffer size of %zu is too small for a data message of size %zu. Increasing the max buffer size to %d times the max data message size.",
               rrdhost_hostname(s->host), s->connected_to, s->buffer->max_size, buffer_strlen(wb) + 1, SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE);
 
         s->buffer->max_size = (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE;
@@ -585,7 +585,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
         return false;
     }
 
-    // info("STREAM %s [send to %s]: initializing communication...", rrdhost_hostname(host), s->connected_to);
+    // netdata_log_info("STREAM %s [send to %s]: initializing communication...", rrdhost_hostname(host), s->connected_to);
 
     // reset our capabilities to default
     s->capabilities = stream_our_capabilities(host, true);
@@ -1165,7 +1165,7 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     RRDHOST *host = s->host;
 
     sender_lock(host->sender);
-    info("STREAM %s [send]: sending thread exits %s",
+    netdata_log_info("STREAM %s [send]: sending thread exits %s",
          rrdhost_hostname(host),
          host->sender->exit.reason != STREAM_HANDSHAKE_NEVER ? stream_handshake_error_to_string(host->sender->exit.reason) : "");
 
@@ -1251,7 +1251,7 @@ void *rrdpush_sender_thread(void *ptr) {
 
     rrdpush_initialize_ssl_ctx(s->host);
 
-    info("STREAM %s [send]: thread created (task id %d)", rrdhost_hostname(s->host), gettid());
+    netdata_log_info("STREAM %s [send]: thread created (task id %d)", rrdhost_hostname(s->host), gettid());
 
     s->timeout = (int)appconfig_get_number(
         &stream_config, CONFIG_SECTION_STREAM, "timeout seconds", 600);
@@ -1324,7 +1324,7 @@ void *rrdpush_sender_thread(void *ptr) {
             s->replication.oldest_request_after_t = 0;
 
             rrdhost_flag_set(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
-            info("STREAM %s [send to %s]: enabling metrics streaming...", rrdhost_hostname(s->host), s->connected_to);
+            netdata_log_info("STREAM %s [send to %s]: enabling metrics streaming...", rrdhost_hostname(s->host), s->connected_to);
 
             continue;
         }

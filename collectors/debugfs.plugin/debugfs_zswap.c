@@ -383,7 +383,7 @@ int do_debugfs_zswap(int update_every, const char *name)
     static int check_if_enabled = 1;
 
     if (likely(check_if_enabled && debugfs_is_zswap_enabled())) {
-        info("Zswap is disabled");
+        netdata_log_info("Zswap is disabled");
         return 1;
     }
 

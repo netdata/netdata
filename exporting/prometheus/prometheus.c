@@ -244,7 +244,7 @@ inline char *prometheus_units_copy(char *d, const char *s, size_t usable, int sh
         uint32_t hash = simple_hash(s);
         for (i = 0; units[i].newunit; i++) {
             if (unlikely(hash == units[i].hash && !strcmp(s, units[i].newunit))) {
-                // info("matched extension for filename '%s': '%s'", filename, last_dot);
+                // netdata_log_info("matched extension for filename '%s': '%s'", filename, last_dot);
                 s = units[i].oldunit;
                 sorig = s;
                 break;

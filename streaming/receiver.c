@@ -533,7 +533,7 @@ void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, con
                           (rpt->hostname && *rpt->hostname) ? rpt->hostname : "-",
                           status);
 
-    info("STREAM '%s' [receive from [%s]:%s]: "
+    netdata_log_info("STREAM '%s' [receive from [%s]:%s]: "
           "%s. "
           "STATUS: %s%s%s%s"
           , rpt->hostname
@@ -671,7 +671,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    info("STREAM '%s' [receive from [%s]:%s]: "
+    netdata_log_info("STREAM '%s' [receive from [%s]:%s]: "
          "client willing to stream metrics for host '%s' with machine_guid '%s': "
          "update every = %d, history = %d, memory mode = %s, health %s,%s tags '%s'"
          , rpt->hostname
@@ -717,7 +717,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
 #endif
 
     {
-        // info("STREAM %s [receive from [%s]:%s]: initializing communication...", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
+        // netdata_log_info("STREAM %s [receive from [%s]:%s]: initializing communication...", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
         char initial_response[HTTP_HEADER_SIZE];
         if (stream_has_capability(rpt, STREAM_CAP_VCAPS)) {
             log_receiver_capabilities(rpt);
@@ -817,7 +817,7 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
 
     rrdhost_clear_receiver(rpt);
 
-    info("STREAM '%s' [receive from [%s]:%s]: "
+    netdata_log_info("STREAM '%s' [receive from [%s]:%s]: "
          "receive thread ended (task id %d)"
     , rpt->hostname ? rpt->hostname : "-"
     , rpt->client_ip ? rpt->client_ip : "-", rpt->client_port ? rpt->client_port : "-"
@@ -838,7 +838,7 @@ void *rrdpush_receiver_thread(void *ptr) {
 
     struct receiver_state *rpt = (struct receiver_state *)ptr;
     rpt->tid = gettid();
-    info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, rpt->tid);
+    netdata_log_info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, rpt->tid);
 
     rrdpush_receive(rpt);
 

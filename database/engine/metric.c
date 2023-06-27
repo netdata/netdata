@@ -867,7 +867,7 @@ int mrg_unittest(void) {
     size_t threads = mrg->partitions / 3 + 1;
     size_t tiers = 3;
     size_t run_for_secs = 5;
-    info("preparing stress test of %zu entries...", entries);
+    netdata_log_info("preparing stress test of %zu entries...", entries);
     struct mrg_stress t = {
             .mrg = mrg,
             .entries = entries,
@@ -880,7 +880,7 @@ int mrg_unittest(void) {
         t.array[i].after = now / 3;
         t.array[i].before = now / 2;
     }
-    info("stress test is populating MRG with 3 tiers...");
+    netdata_log_info("stress test is populating MRG with 3 tiers...");
     for(size_t i = 0; i < entries ;i++) {
         struct mrg_stress_entry *e = &t.array[i];
         for(size_t tier = 1; tier <= tiers ;tier++) {
@@ -893,7 +893,7 @@ int mrg_unittest(void) {
                     e->before);
         }
     }
-    info("stress test ready to run...");
+    netdata_log_info("stress test ready to run...");
 
     usec_t started_ut = now_monotonic_usec();
 
@@ -920,7 +920,7 @@ int mrg_unittest(void) {
     struct mrg_statistics stats;
     mrg_get_statistics(mrg, &stats);
 
-    info("DBENGINE METRIC: did %zu additions, %zu duplicate additions, "
+    netdata_log_info("DBENGINE METRIC: did %zu additions, %zu duplicate additions, "
          "%zu deletions, %zu wrong deletions, "
          "%zu successful searches, %zu wrong searches, "
          "in %llu usecs",
@@ -929,13 +929,13 @@ int mrg_unittest(void) {
         stats.search_hits, stats.search_misses,
         ended_ut - started_ut);
 
-    info("DBENGINE METRIC: updates performance: %0.2fk/sec total, %0.2fk/sec/thread",
+    netdata_log_info("DBENGINE METRIC: updates performance: %0.2fk/sec total, %0.2fk/sec/thread",
          (double)t.updates / (double)((ended_ut - started_ut) / USEC_PER_SEC) / 1000.0,
          (double)t.updates / (double)((ended_ut - started_ut) / USEC_PER_SEC) / 1000.0 / threads);
 
     mrg_destroy(mrg);
 
-    info("DBENGINE METRIC: all tests passed!");
+    netdata_log_info("DBENGINE METRIC: all tests passed!");
 
     return 0;
 }

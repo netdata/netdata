@@ -29,10 +29,10 @@ int rrdhost_is_exportable(struct instance *instance, RRDHOST *host)
 
         if (!instance->config.hosts_pattern || simple_pattern_matches(instance->config.hosts_pattern, host_name)) {
             *flags |= RRDHOST_FLAG_EXPORTING_SEND;
-            info("enabled exporting of host '%s' for instance '%s'", host_name, instance->config.name);
+            netdata_log_info("enabled exporting of host '%s' for instance '%s'", host_name, instance->config.name);
         } else {
             *flags |= RRDHOST_FLAG_EXPORTING_DONT_SEND;
-            info("disabled exporting of host '%s' for instance '%s'", host_name, instance->config.name);
+            netdata_log_info("disabled exporting of host '%s' for instance '%s'", host_name, instance->config.name);
         }
     }
 

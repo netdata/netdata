@@ -152,7 +152,7 @@ void netdata_threads_init_after_fork(size_t stacksize) {
         if(i != 0)
             error("pthread_attr_setstacksize() to %zu bytes, failed with code %d.", stacksize, i);
         else
-            info("Set threads stack size to %zu bytes", stacksize);
+            netdata_log_info("Set threads stack size to %zu bytes", stacksize);
     }
     else
         error("Invalid pthread stacksize %zu", stacksize);
@@ -173,7 +173,7 @@ static void thread_cleanup(void *ptr) {
     }
 
     if(!(netdata_thread->options & NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP))
-        info("thread with task id %d finished", gettid());
+        netdata_log_info("thread with task id %d finished", gettid());
 
     sender_thread_buffer_free();
     rrdset_thread_rda_free();
@@ -207,7 +207,7 @@ static void thread_set_name_np(NETDATA_THREAD *nt) {
         if (ret != 0)
             error("cannot set pthread name of %d to %s. ErrCode: %d", gettid(), threadname, ret);
         else
-            info("set name of thread %d to %s", gettid(), threadname);
+            netdata_log_info("set name of thread %d to %s", gettid(), threadname);
 
     }
 }
@@ -230,7 +230,7 @@ void uv_thread_set_name_np(uv_thread_t ut, const char* name) {
     thread_name_get(true);
 
     if (ret)
-        info("cannot set libuv thread name to %s. Err: %d", threadname, ret);
+        netdata_log_info("cannot set libuv thread name to %s. Err: %d", threadname, ret);
 }
 
 void os_thread_get_current_name_np(char threadname[NETDATA_THREAD_NAME_MAX + 1])
@@ -247,7 +247,7 @@ static void *netdata_thread_init(void *ptr) {
     netdata_thread = (NETDATA_THREAD *)ptr;
 
     if(!(netdata_thread->options & NETDATA_THREAD_OPTION_DONT_LOG_STARTUP))
-        info("thread created with task id %d", gettid());
+        netdata_log_info("thread created with task id %d", gettid());
 
     if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
         error("cannot set pthread cancel type to DEFERRED.");

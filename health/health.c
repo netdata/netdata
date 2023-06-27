@@ -287,7 +287,7 @@ static void health_silencers_init(void) {
                 if (copied == (length* sizeof(char))) {
                     str[length] = 0x00;
                     json_parse(str, NULL, health_silencers_json_read_callback);
-                    info("Parsed health silencers file %s", silencers_filename);
+                    netdata_log_info("Parsed health silencers file %s", silencers_filename);
                 } else {
                     error("Cannot read the data from health silencers file %s", silencers_filename);
                 }
@@ -302,7 +302,7 @@ static void health_silencers_init(void) {
         }
         fclose(fd);
     } else {
-        info("Cannot open the file %s, so Netdata will work with the default health configuration.",silencers_filename);
+        netdata_log_info("Cannot open the file %s, so Netdata will work with the default health configuration.",silencers_filename);
     }
 }
 
@@ -775,7 +775,7 @@ static void health_main_cleanup(void *ptr) {
 
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
-    info("cleaning up...");
+    netdata_log_info("cleaning up...");
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 
     log_health("Health thread ended.");
@@ -915,7 +915,7 @@ static int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
     }
 
     if (rrdcalc_flags_old != rc->run_flags) {
-        info("Alarm silencing changed for host '%s' alarm '%s': Disabled %s->%s Silenced %s->%s",
+        netdata_log_info("Alarm silencing changed for host '%s' alarm '%s': Disabled %s->%s Silenced %s->%s",
              rrdhost_hostname(host),
              rrdcalc_name(rc),
              (rrdcalc_flags_old & RRDCALC_FLAG_DISABLED)?"true":"false",

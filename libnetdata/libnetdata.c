@@ -1043,7 +1043,7 @@ void netdata_fix_chart_id(char *s) {
 }
 
 static int memory_file_open(const char *filename, size_t size) {
-    // info("memory_file_open('%s', %zu", filename, size);
+    // netdata_log_info("memory_file_open('%s', %zu", filename, size);
 
     int fd = open(filename, O_RDWR | O_CREAT | O_NOATIME, 0664);
     if (fd != -1) {
@@ -1127,7 +1127,7 @@ inline int madvise_mergeable(void *mem __maybe_unused, size_t len __maybe_unused
 
 void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool read_only, int *open_fd)
 {
-    // info("netdata_mmap('%s', %zu", filename, size);
+    // netdata_log_info("netdata_mmap('%s', %zu", filename, size);
 
     // MAP_SHARED is used in memory mode map
     // MAP_PRIVATE is used in memory mode ram and save
@@ -1177,9 +1177,9 @@ void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool r
         if(fd != -1 && fd_for_mmap == -1) {
             if (lseek(fd, 0, SEEK_SET) == 0) {
                 if (read(fd, mem, size) != (ssize_t) size)
-                    info("Cannot read from file '%s'", filename);
+                    netdata_log_info("Cannot read from file '%s'", filename);
             }
-            else info("Cannot seek to beginning of file '%s'.", filename);
+            else netdata_log_info("Cannot seek to beginning of file '%s'.", filename);
         }
 
         // madvise_sequential(mem, size);
@@ -1321,14 +1321,14 @@ int recursively_delete_dir(const char *path, const char *reason) {
             continue;
         }
 
-        info("Deleting %s file '%s'", reason?reason:"", fullpath);
+        netdata_log_info("Deleting %s file '%s'", reason?reason:"", fullpath);
         if(unlikely(unlink(fullpath) == -1))
             error("Cannot delete %s file '%s'", reason?reason:"", fullpath);
         else
             ret++;
     }
 
-    info("Deleting empty directory '%s'", path);
+    netdata_log_info("Deleting empty directory '%s'", path);
     if(unlikely(rmdir(path) == -1))
         error("Cannot delete empty directory '%s'", path);
     else
@@ -1399,7 +1399,7 @@ int verify_netdata_host_prefix() {
         goto failed;
 
     if(netdata_configured_host_prefix && *netdata_configured_host_prefix)
-        info("Using host prefix directory '%s'", netdata_configured_host_prefix);
+        netdata_log_info("Using host prefix directory '%s'", netdata_configured_host_prefix);
 
     return 0;
 
@@ -1921,7 +1921,7 @@ void timing_action(TIMING_ACTION action, TIMING_STEP step) {
                 );
             }
 
-            info("TIMINGS REPORT:\n%sTIMINGS REPORT:                        total # %10zu, t %11.2f ms",
+            netdata_log_info("TIMINGS REPORT:\n%sTIMINGS REPORT:                        total # %10zu, t %11.2f ms",
                  buffer_tostring(wb), total_reqs, (double)total_usec / USEC_PER_MS);
 
             memcpy(timings2, timings3, sizeof(timings2));

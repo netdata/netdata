@@ -25,7 +25,7 @@ static void webrtc_log(rtcLogLevel level, const char *message) {
             break;
 
         case RTC_LOG_INFO:
-            info("WEBRTC: %s", message);
+            netdata_log_info("WEBRTC: %s", message);
             break;
 
         default:

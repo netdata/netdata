@@ -22,7 +22,7 @@ int table_exists_in_database(const char *table)
 
     int rc = sqlite3_exec_monitored(db_meta, sql, return_int_cb, (void *) &exists, &err_msg);
     if (rc != SQLITE_OK) {
-        info("Error checking table existence; %s", err_msg);
+        netdata_log_info("Error checking table existence; %s", err_msg);
         sqlite3_free(err_msg);
     }
 
@@ -40,7 +40,7 @@ static int column_exists_in_table(const char *table, const char *column)
 
     int rc = sqlite3_exec_monitored(db_meta, sql, return_int_cb, (void *) &exists, &err_msg);
     if (rc != SQLITE_OK) {
-        info("Error checking column existence; %s", err_msg);
+        netdata_log_info("Error checking column existence; %s", err_msg);
         sqlite3_free(err_msg);
     }
 
@@ -82,7 +82,7 @@ const char *database_migrate_v5_v6[] = {
 static int do_migration_v1_v2(sqlite3 *database, const char *name)
 {
     UNUSED(name);
-    info("Running \"%s\" database migration", name);
+    netdata_log_info("Running \"%s\" database migration", name);
 
     if (table_exists_in_database("host") && !column_exists_in_table("host", "hops"))
         return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v1_v2[0]);
@@ -92,7 +92,7 @@ static int do_migration_v1_v2(sqlite3 *database, const char *name)
 static int do_migration_v2_v3(sqlite3 *database, const char *name)
 {
     UNUSED(name);
-    info("Running \"%s\" database migration", name);
+    netdata_log_info("Running \"%s\" database migration", name);
 
     if (table_exists_in_database("host") && !column_exists_in_table("host", "memory_mode"))
         return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v2_v3[0]);
@@ -102,7 +102,7 @@ static int do_migration_v2_v3(sqlite3 *database, const char *name)
 static int do_migration_v3_v4(sqlite3 *database, const char *name)
 {
     UNUSED(name);
-    info("Running database migration %s", name);
+    netdata_log_info("Running database migration %s", name);
 
     char sql[256];
 
@@ -134,7 +134,7 @@ static int do_migration_v3_v4(sqlite3 *database, const char *name)
 static int do_migration_v4_v5(sqlite3 *database, const char *name)
 {
     UNUSED(name);
-    info("Running \"%s\" database migration", name);
+    netdata_log_info("Running \"%s\" database migration", name);
 
     return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v4_v5[0]);
 }
@@ -142,7 +142,7 @@ static int do_migration_v4_v5(sqlite3 *database, const char *name)
 static int do_migration_v5_v6(sqlite3 *database, const char *name)
 {
     UNUSED(name);
-    info("Running \"%s\" database migration", name);
+    netdata_log_info("Running \"%s\" database migration", name);
 
     return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v5_v6[0]);
 }
@@ -150,7 +150,7 @@ static int do_migration_v5_v6(sqlite3 *database, const char *name)
 static int do_migration_v6_v7(sqlite3 *database, const char *name)
 {
     UNUSED(name);
-    info("Running \"%s\" database migration", name);
+    netdata_log_info("Running \"%s\" database migration", name);
 
     char sql[256];
 
@@ -184,7 +184,7 @@ static int do_migration_v6_v7(sqlite3 *database, const char *name)
 static int do_migration_v7_v8(sqlite3 *database, const char *name)
 {
     UNUSED(name);
-    info("Running database migration %s", name);
+    netdata_log_info("Running database migration %s", name);
 
     char sql[256];
 
@@ -215,7 +215,7 @@ static int do_migration_v7_v8(sqlite3 *database, const char *name)
 
 static int do_migration_v8_v9(sqlite3 *database, const char *name)
 {
-    info("Running database migration %s", name);
+    netdata_log_info("Running database migration %s", name);
 
     char sql[2048];
     int rc;
@@ -291,7 +291,7 @@ static int do_migration_noop(sqlite3 *database, const char *name)
 {
     UNUSED(database);
     UNUSED(name);
-    info("Running database migration %s", name);
+    netdata_log_info("Running database migration %s", name);
     return 0;
 }
 
@@ -308,16 +308,16 @@ static int migrate_database(sqlite3 *database, int target_version, char *db_name
 
     int rc = sqlite3_exec_monitored(database, "PRAGMA user_version;", return_int_cb, (void *) &user_version, &err_msg);
     if (rc != SQLITE_OK) {
-        info("Error checking the %s database version; %s", db_name, err_msg);
+        netdata_log_info("Error checking the %s database version; %s", db_name, err_msg);
         sqlite3_free(err_msg);
     }
 
     if (likely(user_version == target_version)) {
-        info("%s database version is %d (no migration needed)", db_name, target_version);
+        netdata_log_info("%s database version is %d (no migration needed)", db_name, target_version);
         return target_version;
     }
 
-    info("Database version is %d, current version is %d. Running migration for %s ...", user_version, target_version, db_name);
+    netdata_log_info("Database version is %d, current version is %d. Running migration for %s ...", user_version, target_version, db_name);
     for (int i = user_version; i < target_version && migration_list[i].func; i++) {
         rc = (migration_list[i].func)(database, migration_list[i].name);
         if (unlikely(rc)) {

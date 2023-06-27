@@ -394,7 +394,7 @@ cleanup:
 static void socket_listen_main_static_threaded_worker_cleanup(void *ptr) {
     worker_private = (struct web_server_static_threaded_worker *)ptr;
 
-    info("stopped after %zu connects, %zu disconnects (max concurrent %zu), %zu receptions and %zu sends",
+    netdata_log_info("stopped after %zu connects, %zu disconnects (max concurrent %zu), %zu receptions and %zu sends",
             worker_private->connected,
             worker_private->disconnected,
             worker_private->max_concurrent,
@@ -462,16 +462,16 @@ static void socket_listen_main_static_threaded_cleanup(void *ptr) {
 //    for(i = 1; i < static_threaded_workers_count; i++) {
 //        if(static_workers_private_data[i].running) {
 //            found++;
-//            info("stopping worker %d", i + 1);
+//            netdata_log_info("stopping worker %d", i + 1);
 //            netdata_thread_cancel(static_workers_private_data[i].thread);
 //        }
 //        else
-//            info("found stopped worker %d", i + 1);
+//            netdata_log_info("found stopped worker %d", i + 1);
 //    }
 //
 //    while(found && max > 0) {
 //        max -= step;
-//        info("Waiting %d static web threads to finish...", found);
+//        netdata_log_info("Waiting %d static web threads to finish...", found);
 //        sleep_usec(step);
 //        found = 0;
 //
@@ -485,10 +485,10 @@ static void socket_listen_main_static_threaded_cleanup(void *ptr) {
 //    if(found)
 //        error("%d static web threads are taking too long to finish. Giving up.", found);
 
-    info("closing all web server sockets...");
+    netdata_log_info("closing all web server sockets...");
     listen_sockets_close(&api_sockets);
 
-    info("all static web threads stopped.");
+    netdata_log_info("all static web threads stopped.");
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
@@ -502,7 +502,7 @@ void *socket_listen_main_static_threaded(void *ptr) {
     netdata_ssl_validate_certificate = !config_get_boolean(CONFIG_SECTION_WEB, "ssl skip certificate verification", !netdata_ssl_validate_certificate);
 
     if(!netdata_ssl_validate_certificate_sender)
-        info("SSL: web server will skip SSL certificates verification.");
+        netdata_log_info("SSL: web server will skip SSL certificates verification.");
 
 #ifdef ENABLE_HTTPS
     netdata_ssl_initialize_ctx(NETDATA_SSL_WEB_SERVER_CTX);
@@ -514,7 +514,7 @@ void *socket_listen_main_static_threaded(void *ptr) {
     int def_thread_count = MIN(get_netdata_cpus(), 6);
 
     if (!strcmp(config_get(CONFIG_SECTION_WEB, "mode", ""),"single-threaded")) {
-                info("Running web server with one thread, because mode is single-threaded");
+                netdata_log_info("Running web server with one thread, because mode is single-threaded");
                 config_set(CONFIG_SECTION_WEB, "mode", "static-threaded");
                 def_thread_count = 1;
     }
@@ -526,7 +526,7 @@ void *socket_listen_main_static_threaded(void *ptr) {
     // See https://github.com/netdata/netdata/issues/11081#issuecomment-831998240 for more details
     if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110) {
         static_threaded_workers_count = 1;
-        info("You are running an OpenSSL older than 1.1.0, web server will not enable multithreading.");
+        netdata_log_info("You are running an OpenSSL older than 1.1.0, web server will not enable multithreading.");
     }
 #endif
 
@@ -546,7 +546,7 @@ void *socket_listen_main_static_threaded(void *ptr) {
         char tag[50 + 1];
         snprintfz(tag, 50, "WEB[%d]", i+1);
 
-        info("starting worker %d", i+1);
+        netdata_log_info("starting worker %d", i+1);
         netdata_thread_create(&static_workers_private_data[i].thread, tag, NETDATA_THREAD_OPTION_DEFAULT,
                               socket_listen_main_static_threaded_worker, (void *)&static_workers_private_data[i]);
     }

@@ -200,7 +200,7 @@ char *get_mgmt_api_key(void) {
     return guid;
 
 temp_key:
-    info("You can still continue to use the alarm management API using the authorization token %s during this Netdata session only.", guid);
+    netdata_log_info("You can still continue to use the alarm management API using the authorization token %s during this Netdata session only.", guid);
     return guid;
 }
 

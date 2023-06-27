@@ -385,7 +385,7 @@ static void aclk_synchronization(void *arg __maybe_unused)
     config->timer_req.data = config;
     fatal_assert(0 == uv_timer_start(&config->timer_req, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
 
-    info("Starting ACLK synchronization thread");
+    netdata_log_info("Starting ACLK synchronization thread");
 
     config->cleanup_after = now_realtime_sec() + ACLK_DATABASE_CLEANUP_FIRST;
     config->initialized = true;
@@ -462,7 +462,7 @@ static void aclk_synchronization(void *arg __maybe_unused)
 
     worker_unregister();
     service_exits();
-    info("ACLK SYNC: Shutting down ACLK synchronization event loop");
+    netdata_log_info("ACLK SYNC: Shutting down ACLK synchronization event loop");
 }
 
 static void aclk_synchronization_init(void)
@@ -543,7 +543,7 @@ void sql_aclk_sync_init(void)
         return;
     }
 
-    info("Creating archived hosts");
+    netdata_log_info("Creating archived hosts");
     int number_of_children = 0;
     rc = sqlite3_exec_monitored(db_meta, SQL_FETCH_ALL_HOSTS, create_host_callback, &number_of_children, &err_msg);
 
@@ -552,7 +552,7 @@ void sql_aclk_sync_init(void)
         sqlite3_free(err_msg);
     }
 
-    info("Created %d archived hosts", number_of_children);
+    netdata_log_info("Created %d archived hosts", number_of_children);
     // Trigger host context load for hosts that have been created
     metadata_queue_load_host_context(NULL);
 
@@ -568,7 +568,7 @@ void sql_aclk_sync_init(void)
     }
     aclk_synchronization_init();
 
-    info("ACLK sync initialization completed");
+    netdata_log_info("ACLK sync initialization completed");
 #endif
 }
 

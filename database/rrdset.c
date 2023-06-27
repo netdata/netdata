@@ -64,7 +64,7 @@ static STRING *rrdset_fix_name(RRDHOST *host, const char *chart_full_id, const c
                 i++;
             } while (rrdset_index_find_name(host, new_name));
 
-            info("RRDSET: using name '%s' for chart '%s' on host '%s'.", new_name, full_name, rrdhost_hostname(host));
+            netdata_log_info("RRDSET: using name '%s' for chart '%s' on host '%s'.", new_name, full_name, rrdhost_hostname(host));
         }
         else
             return NULL;
@@ -147,7 +147,7 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || st->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
         if(!rrdset_memory_load_or_create_map_save(st, st->rrd_memory_mode)) {
-            info("Failed to use db mode %s for chart '%s', falling back to ram mode.", (st->rrd_memory_mode == RRD_MEMORY_MODE_MAP)?"map":"save", rrdset_name(st));
+            netdata_log_info("Failed to use db mode %s for chart '%s', falling back to ram mode.", (st->rrd_memory_mode == RRD_MEMORY_MODE_MAP)?"map":"save", rrdset_name(st));
             st->rrd_memory_mode = RRD_MEMORY_MODE_RAM;
         }
     }
@@ -660,7 +660,7 @@ void rrdset_get_retention_of_tier_for_collected_chart(RRDSET *st, time_t *first_
 
 inline void rrdset_is_obsolete(RRDSET *st) {
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))) {
-        info("Cannot obsolete already archived chart %s", rrdset_name(st));
+        netdata_log_info("Cannot obsolete already archived chart %s", rrdset_name(st));
         return;
     }
 
@@ -717,7 +717,7 @@ inline void rrdset_update_heterogeneous_flag(RRDSET *st) {
         if(algorithm != rd->algorithm || multiplier != ABS(rd->multiplier) || divisor != ABS(rd->divisor)) {
             if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
                 #ifdef NETDATA_INTERNAL_CHECKS
-                info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already present "
+                netdata_log_info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already present "
                      "(algorithm is '%s' vs '%s', multiplier is %d vs %d, "
                      "divisor is %d vs %d).",
                      rrddim_name(rd),
@@ -835,12 +835,12 @@ void rrdset_save(RRDSET *st) {
 void rrdset_delete_files(RRDSET *st) {
     RRDDIM *rd;
 
-    info("Deleting chart '%s' ('%s') from disk...", rrdset_id(st), rrdset_name(st));
+    netdata_log_info("Deleting chart '%s' ('%s') from disk...", rrdset_id(st), rrdset_name(st));
 
     if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || st->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
         const char *cache_filename = rrdset_cache_filename(st);
         if(cache_filename) {
-            info("Deleting chart header file '%s'.", cache_filename);
+            netdata_log_info("Deleting chart header file '%s'.", cache_filename);
             if (unlikely(unlink(cache_filename) == -1))
                 error("Cannot delete chart header file '%s'", cache_filename);
         }
@@ -852,7 +852,7 @@ void rrdset_delete_files(RRDSET *st) {
         const char *cache_filename = rrddim_cache_filename(rd);
         if(!cache_filename) continue;
 
-        info("Deleting dimension file '%s'.", cache_filename);
+        netdata_log_info("Deleting dimension file '%s'.", cache_filename);
         if(unlikely(unlink(cache_filename) == -1))
             error("Cannot delete dimension file '%s'", cache_filename);
     }
@@ -865,13 +865,13 @@ void rrdset_delete_files(RRDSET *st) {
 void rrdset_delete_obsolete_dimensions(RRDSET *st) {
     RRDDIM *rd;
 
-    info("Deleting dimensions of chart '%s' ('%s') from disk...", rrdset_id(st), rrdset_name(st));
+    netdata_log_info("Deleting dimensions of chart '%s' ('%s') from disk...", rrdset_id(st), rrdset_name(st));
 
     rrddim_foreach_read(rd, st) {
         if(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
             const char *cache_filename = rrddim_cache_filename(rd);
             if(!cache_filename) continue;
-            info("Deleting dimension file '%s'.", cache_filename);
+            netdata_log_info("Deleting dimension file '%s'.", cache_filename);
             if(unlikely(unlink(cache_filename) == -1))
                 error("Cannot delete dimension file '%s'", cache_filename);
         }
@@ -1001,7 +1001,7 @@ void rrdset_timed_next(RRDSET *st, struct timeval now, usec_t duration_since_las
         if(unlikely(since_last_usec < 0)) {
             // oops! the database is in the future
             #ifdef NETDATA_INTERNAL_CHECKS
-            info("RRD database for chart '%s' on host '%s' is %0.5" NETDATA_DOUBLE_MODIFIER
+            netdata_log_info("RRD database for chart '%s' on host '%s' is %0.5" NETDATA_DOUBLE_MODIFIER
                 " secs in the future (counter #%u, update #%u). Adjusting it to current time."
                 , rrdset_id(st)
                 , rrdhost_hostname(st->rrdhost)
@@ -1020,7 +1020,7 @@ void rrdset_timed_next(RRDSET *st, struct timeval now, usec_t duration_since_las
         else if(unlikely((usec_t)since_last_usec > (usec_t)(st->update_every * 5 * USEC_PER_SEC))) {
             // oops! the database is too far behind
             #ifdef NETDATA_INTERNAL_CHECKS
-            info("RRD database for chart '%s' on host '%s' is %0.5" NETDATA_DOUBLE_MODIFIER
+            netdata_log_info("RRD database for chart '%s' on host '%s' is %0.5" NETDATA_DOUBLE_MODIFIER
                 " secs in the past (counter #%u, update #%u). Adjusting it to current time.",
                 rrdset_id(st), rrdhost_hostname(st->rrdhost), (NETDATA_DOUBLE)since_last_usec / USEC_PER_SEC,
                 st->counter, st->counter_done);
@@ -1048,7 +1048,7 @@ void rrdset_timed_next(RRDSET *st, struct timeval now, usec_t duration_since_las
                 last_time_s = now.tv_sec;
 
                 if(min_delta > permanent_min_delta) {
-                    info("MINIMUM MICROSECONDS DELTA of thread %d increased from %lld to %lld (+%lld)", gettid(), permanent_min_delta, min_delta, min_delta - permanent_min_delta);
+                    netdata_log_info("MINIMUM MICROSECONDS DELTA of thread %d increased from %lld to %lld (+%lld)", gettid(), permanent_min_delta, min_delta, min_delta - permanent_min_delta);
                     permanent_min_delta = min_delta;
                 }
 
@@ -1544,7 +1544,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
 
     // check if the chart has a long time to be updated
     if(unlikely(st->usec_since_last_update > MAX(st->db.entries, 60) * update_every_ut)) {
-        info("host '%s', chart '%s': took too long to be updated (counter #%u, update #%u, %0.3" NETDATA_DOUBLE_MODIFIER
+        netdata_log_info("host '%s', chart '%s': took too long to be updated (counter #%u, update #%u, %0.3" NETDATA_DOUBLE_MODIFIER
             " secs). Resetting it.", rrdhost_hostname(st->rrdhost), rrdset_id(st), st->counter, st->counter_done,
             (NETDATA_DOUBLE)st->usec_since_last_update / USEC_PER_SEC);
         rrdset_reset(st);
@@ -1586,7 +1586,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
     // check if we will re-write the entire data set
     if(unlikely(dt_usec(&st->last_collected_time, &st->last_updated) > st->db.entries * update_every_ut &&
                 st->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)) {
-        info(
+        netdata_log_info(
             "'%s': too old data (last updated at %"PRId64".%"PRId64", last collected at %"PRId64".%"PRId64"). "
             "Resetting it. Will not store the next entry.",
             rrdset_id(st),
@@ -1888,7 +1888,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
 //     if(unlikely(now_collect_ut < next_store_ut && st->counter_done > 1)) {
 //         // this is collected in the same interpolation point
 //         rrdset_debug(st, "THIS IS IN THE SAME INTERPOLATION POINT");
-//         info("INTERNAL CHECK: host '%s', chart '%s' collection %zu is in the same interpolation point: short by %llu microseconds", st->rrdhost->hostname, rrdset_name(st), st->counter_done, next_store_ut - now_collect_ut);
+//         netdata_log_info("INTERNAL CHECK: host '%s', chart '%s' collection %zu is in the same interpolation point: short by %llu microseconds", st->rrdhost->hostname, rrdset_name(st), st->counter_done, next_store_ut - now_collect_ut);
 //     }
 // #endif
 
@@ -2162,7 +2162,7 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
 
     st_on_file->magic[sizeof(RRDSET_MAGIC_V019)] = '\0';
     if(strcmp(st_on_file->magic, RRDSET_MAGIC_V019) != 0) {
-        info("Initializing file '%s'.", fullfilename);
+        netdata_log_info("Initializing file '%s'.", fullfilename);
         memset(st_on_file, 0, size);
     }
     else if(strncmp(st_on_file->id, rrdset_id(st), RRD_ID_LENGTH_MAX_V019) != 0) {
@@ -2178,7 +2178,7 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
         memset(st_on_file, 0, size);
     }
     else if((now_s - st_on_file->last_updated.tv_sec) > (long)st->update_every * (long)st->db.entries) {
-        info("File '%s' is too old. Clearing it.", fullfilename);
+        netdata_log_info("File '%s' is too old. Clearing it.", fullfilename);
         memset(st_on_file, 0, size);
     }
     else if(st_on_file->last_updated.tv_sec > now_s + st->update_every) {

@@ -43,7 +43,7 @@ int sql_init_context_database(int memory)
         return 1;
     }
 
-    info("SQLite database %s initialization", sqlite_database);
+    netdata_log_info("SQLite database %s initialization", sqlite_database);
 
     char buf[1024 + 1] = "";
     const char *list[2] = { buf, NULL };
@@ -112,7 +112,7 @@ void sql_close_context_database(void)
     if (unlikely(!db_context_meta))
         return;
 
-    info("Closing context SQLite database");
+    netdata_log_info("Closing context SQLite database");
 
     rc = sqlite3_close_v2(db_context_meta);
     if (unlikely(rc != SQLITE_OK))
@@ -431,7 +431,7 @@ int ctx_delete_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
     else {
         char host_uuid_str[UUID_STR_LEN];
         uuid_unparse_lower(*host_uuid, host_uuid_str);
-        info("%s: Deleted context %s under host %s", __FUNCTION__, context_data->id, host_uuid_str);
+        netdata_log_info("%s: Deleted context %s under host %s", __FUNCTION__, context_data->id, host_uuid_str);
     }
 #endif
 
@@ -463,7 +463,7 @@ int sql_context_cache_stats(int op)
 static void dict_ctx_get_context_list_cb(VERSIONED_CONTEXT_DATA *context_data, void *data)
 {
     (void)data;
-    info("   Context id = %s "
+    netdata_log_info("   Context id = %s "
          "version = %"PRIu64" "
          "title = %s "
          "chart_type = %s "
@@ -512,48 +512,48 @@ int ctx_unittest(void)
     context_data.version  = now_realtime_usec();
 
     if (likely(!ctx_store_context(&host_uuid, &context_data)))
-        info("Entry %s inserted", context_data.id);
+        netdata_log_info("Entry %s inserted", context_data.id);
     else
-        info("Entry %s not inserted", context_data.id);
+        netdata_log_info("Entry %s not inserted", context_data.id);
 
     if (likely(!ctx_store_context(&host_uuid, &context_data)))
-        info("Entry %s inserted", context_data.id);
+        netdata_log_info("Entry %s inserted", context_data.id);
     else
-        info("Entry %s not inserted", context_data.id);
+        netdata_log_info("Entry %s not inserted", context_data.id);
 
     // This will change end time
     context_data.first_time_s = 1657781000;
     context_data.last_time_s  = 1657782001;
     if (likely(!ctx_update_context(&host_uuid, &context_data)))
-        info("Entry %s updated", context_data.id);
+        netdata_log_info("Entry %s updated", context_data.id);
     else
-        info("Entry %s not updated", context_data.id);
-    info("List context start after insert");
+        netdata_log_info("Entry %s not updated", context_data.id);
+    netdata_log_info("List context start after insert");
     ctx_get_context_list(&host_uuid, dict_ctx_get_context_list_cb, NULL);
-    info("List context end after insert");
+    netdata_log_info("List context end after insert");
 
     // This will change start time
     context_data.first_time_s = 1657782000;
     context_data.last_time_s  = 1657782001;
     if (likely(!ctx_update_context(&host_uuid, &context_data)))
-        info("Entry %s updated", context_data.id);
+        netdata_log_info("Entry %s updated", context_data.id);
     else
-        info("Entry %s not updated", context_data.id);
+        netdata_log_info("Entry %s not updated", context_data.id);
 
     // This will list one entry
-    info("List context start after insert");
+    netdata_log_info("List context start after insert");
     ctx_get_context_list(&host_uuid, dict_ctx_get_context_list_cb, NULL);
-    info("List context end after insert");
+    netdata_log_info("List context end after insert");
 
-    info("List context start after insert");
+    netdata_log_info("List context start after insert");
     ctx_get_context_list(&host_uuid, dict_ctx_get_context_list_cb, NULL);
-    info("List context end after insert");
+    netdata_log_info("List context end after insert");
 
     // This will delete the entry
     if (likely(!ctx_delete_context(&host_uuid, &context_data)))
-        info("Entry %s deleted", context_data.id);
+        netdata_log_info("Entry %s deleted", context_data.id);
     else
-        info("Entry %s not deleted", context_data.id);
+        netdata_log_info("Entry %s not deleted", context_data.id);
 
     freez((void *)context_data.id);
     freez((void *)context_data.title);
@@ -562,9 +562,9 @@ int ctx_unittest(void)
     freez((void *)context_data.units);
 
     // The list should be empty
-    info("List context start after delete");
+    netdata_log_info("List context start after delete");
     ctx_get_context_list(&host_uuid, dict_ctx_get_context_list_cb, NULL);
-    info("List context end after delete");
+    netdata_log_info("List context end after delete");
 
     sql_close_context_database();
 

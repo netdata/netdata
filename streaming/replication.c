@@ -1606,7 +1606,7 @@ static void verify_all_hosts_charts_are_streaming_now(void) {
     dfe_done(host);
 
     size_t executed = __atomic_load_n(&replication_globals.atomic.executed, __ATOMIC_RELAXED);
-    info("REPLICATION SUMMARY: finished, executed %zu replication requests, %zu charts pending replication",
+    netdata_log_info("REPLICATION SUMMARY: finished, executed %zu replication requests, %zu charts pending replication",
          executed - replication_globals.main_thread.last_executed, errors);
     replication_globals.main_thread.last_executed = executed;
 }
