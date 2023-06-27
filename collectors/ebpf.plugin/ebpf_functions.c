@@ -139,30 +139,31 @@ static void ebpf_function_thread_manipulation(const char *transaction,
             }
 
             pthread_mutex_lock(&ebpf_exit_cleanup);
-            if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
-                struct netdata_static_thread *st = em->thread;
+            if (lem->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+                struct netdata_static_thread *st = lem->thread;
                 // Load configuration again
-                ebpf_update_module(em, default_btf, running_on_kernel, isrh);
+                ebpf_update_module(lem, default_btf, running_on_kernel, isrh);
 
                 // another request for thread that already ran, cleanup and restart
                 if (st->thread)
                     freez(st->thread);
 
                 st->thread = mallocz(sizeof(netdata_thread_t));
-                em->thread_id = i;
-                em->enabled = NETDATA_THREAD_EBPF_FUNCTION_RUNNING;
-                em->life_time = period;
+                lem->thread_id = i;
+                lem->enabled = NETDATA_THREAD_EBPF_FUNCTION_RUNNING;
+                lem->life_time = period;
 
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("Starting thread %s with life time = %d", thread_name, period);
 #endif
 
-                netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, em);
+                netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT,
+                                      st->start_routine, lem);
             } else
-                em->running_time = 0;
+                lem->running_time = 0;
             pthread_mutex_unlock(&ebpf_exit_cleanup);
         } else if(strncmp(keyword, EBPF_THREADS_DISABLE_CATEGORY, sizeof(EBPF_THREADS_DISABLE_CATEGORY) -1) == 0) {
-            const char *name = &keyword[sizeof(EBPF_THREADS_ENABLE_CATEGORY)];
+            const char *name = &keyword[sizeof(EBPF_THREADS_DISABLE_CATEGORY) - 1];
             lem = ebpf_functions_select_module(name);
             if (!lem) {
                 snprintfz(message, 511, "%s%s", EBPF_PLUGIN_THREAD_FUNCTION_ERROR_THREAD_NOT_FOUND, name);
@@ -170,13 +171,13 @@ static void ebpf_function_thread_manipulation(const char *transaction,
                 return;
             }
 
-            if (ebpf_modules->enabled < NETDATA_THREAD_EBPF_STOPPING && ebpf_modules->thread->thread) {
-                pthread_mutex_lock(&ebpf_exit_cleanup);
-                em->life_time = 0;
-                em->running_time = em->update_every;
-                netdata_thread_cancel(*em->thread->thread);
-                pthread_mutex_unlock(&ebpf_exit_cleanup);
+            pthread_mutex_lock(&ebpf_exit_cleanup);
+            if (lem->enabled < NETDATA_THREAD_EBPF_STOPPING && lem->thread->thread) {
+                lem->life_time = 0;
+                lem->running_time = lem->update_every;
+                netdata_thread_cancel(*lem->thread->thread);
             }
+            pthread_mutex_unlock(&ebpf_exit_cleanup);
         } else if(strncmp(keyword, EBPF_THREADS_SELECT_THREAD, sizeof(EBPF_THREADS_SELECT_THREAD) -1) == 0) {
             const char *name = &keyword[sizeof(EBPF_THREADS_SELECT_THREAD) - 1];
             lem = ebpf_functions_select_module(name);
