@@ -1809,7 +1809,7 @@ void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_
          "AND h.health_log_id = d.health_log_id ", alert_instances);
 
     if (transition)
-        buffer_sprintf(command, "AND transition_id = @transition ");
+        buffer_sprintf(command, " AND d.global_id <= (SELECT global_id FROM health_log_detail WHERE transition_id = @transition) ");
 
     if (after)
         buffer_sprintf(command, "AND d.when_key >= %ld ", after);
