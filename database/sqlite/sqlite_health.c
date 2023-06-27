@@ -1853,22 +1853,24 @@ void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_
             if (sqlite3_column_type(res, 20) != SQLITE_NULL) {
                 char transition_id[UUID_STR_LEN];
                 uuid_unparse_lower(*((uuid_t *)sqlite3_column_blob(res, 20)), transition_id);
-                buffer_json_member_add_string(wb, "id", transition_id);
+                buffer_json_member_add_string(wb, "tr_i", transition_id);
             } else
-                buffer_json_member_add_quoted_string(wb, "id", "null");
+                buffer_json_member_add_quoted_string(wb, "tr_i", "null");
 
             buffer_json_member_add_uint64(wb, "gi", (uint64_t)sqlite3_column_int64(res, 22));
 
             uint64_t flags = sqlite3_column_int64(res, 8);
+            buffer_json_member_add_uint64(wb, "t", (long unsigned int)sqlite3_column_int64(res, 4));
+
+            buffer_json_member_add_object(wb, "st");
+            buffer_json_member_add_string(wb, "new", rrdcalc_status2string(sqlite3_column_int(res, 14)));
+            buffer_json_member_add_string(wb, "old", rrdcalc_status2string(sqlite3_column_int(res, 15)));
+            buffer_json_member_add_uint64(wb, "dur", (long unsigned int)sqlite3_column_int64(res, 5)); // old duration
+            buffer_json_object_close(wb); //st
+
             // buffer_json_member_add_uint64 (wb, "unique_id", (unsigned int) sqlite3_column_int64(res, 0));
             // buffer_json_member_add_uint64 (wb, "alarm_event_id", (unsigned int) sqlite3_column_int64(res, 1));
-
-            buffer_json_member_add_uint64(wb, "when", (long unsigned int)sqlite3_column_int64(res, 4));
-            buffer_json_member_add_uint64(wb, "duration", (long unsigned int)sqlite3_column_int64(res, 5));
             //buffer_json_member_add_uint64 (wb, "non_clear_duration", (long unsigned int)sqlite3_column_int64(res, 6));
-
-            buffer_json_member_add_string(wb, "status", rrdcalc_status2string(sqlite3_column_int(res, 14)));
-            buffer_json_member_add_string(wb, "old_status", rrdcalc_status2string(sqlite3_column_int(res, 15)));
             //buffer_json_member_add_uint64 (wb, "delay", sqlite3_column_int(res, 16));
             //buffer_json_member_add_uint64 (wb, "delay_up_to_timestamp", (long unsigned int)sqlite3_column_int64(res, 10));
             //buffer_json_member_add_uint64 (wb, "updated_by_id", (unsigned int)sqlite3_column_int64(res, 3));
@@ -1876,32 +1878,36 @@ void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_
             //buffer_json_member_add_uint64(wb, "last_repeat", (long unsigned int)sqlite3_column_int64(res, 19));
             //buffer_json_member_add_string (wb, "info", (const char *)sqlite3_column_text(res, 12));
 
-            if (sqlite3_column_type(res, 17) == SQLITE_NULL) {
-                buffer_json_member_add_quoted_string(wb, "value", "null");
-            } else {
-                buffer_json_member_add_double(wb, "value", sqlite3_column_double(res, 17));
+            buffer_json_member_add_object(wb, "v");
+            {
+                if (sqlite3_column_type(res, 17) == SQLITE_NULL) {
+                    buffer_json_member_add_quoted_string(wb, "new", "null");
+                } else {
+                    buffer_json_member_add_double(wb, "new", sqlite3_column_double(res, 17));
+                }
+
+                if (sqlite3_column_type(res, 18) == SQLITE_NULL) {
+                    buffer_json_member_add_quoted_string(wb, "old", "null");
+                } else
+                    buffer_json_member_add_double(wb, "old", sqlite3_column_double(res, 18));
             }
+            buffer_json_object_close(wb); // v
 
-            if (sqlite3_column_type(res, 18) == SQLITE_NULL) {
-                buffer_json_member_add_quoted_string(wb, "old_value", "null");
-            } else
-                buffer_json_member_add_double(wb, "old_value", sqlite3_column_double(res, 18));
-
-            buffer_json_member_add_object(wb, "notification");
+            buffer_json_member_add_object(wb, "nf");
             {
                 const char *exec = (const char *)sqlite3_column_text(res, 10);
                 const char *recipient = (const char *)sqlite3_column_text(res, 11);
 
                 buffer_json_member_add_string(wb, "type", "agent");
                 health_entry_flags_to_json_array(wb, "flags", flags);
-                buffer_json_member_add_uint64(wb, "when", (long unsigned int)sqlite3_column_int64(res, 9));
+                buffer_json_member_add_uint64(wb, "t", (long unsigned int)sqlite3_column_int64(res, 9));
                 buffer_json_member_add_string(
                     wb, "method", exec ? (const char *)exec : string2str(localhost->health.health_default_exec));
                 buffer_json_member_add_string(
                     wb,
-                    "recipient",
+                    "to",
                     recipient ? recipient : string2str(localhost->health.health_default_recipient));
-                buffer_json_member_add_uint64(wb, "result", sqlite3_column_int(res, 13));
+                buffer_json_member_add_uint64(wb, "code", sqlite3_column_int(res, 13));
             }
             buffer_json_object_close(wb); // notification
         }

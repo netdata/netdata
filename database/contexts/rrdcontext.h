@@ -425,6 +425,7 @@ struct alert_instance_v2_entry {
     STRING *chart_id;
     STRING *chart_name;
     STRING *name;
+    STRING *family;
     RRDCALC_STATUS status;
     RRDCALC_FLAGS flags;
     STRING *info;
