@@ -131,7 +131,7 @@ static void ebpf_function_thread_manipulation(const char *transaction,
 
             ebpf_module_t *em = ebpf_functions_select_module(thread_name);
             if (!em) {
-                snprintfz(message, 511, "%s%s", "ebpf.plugin does not have thread with name ", name);
+                snprintfz(message, 511, "%s%s", EBPF_PLUGIN_THREAD_FUNCTION_ERROR_THREAD_NOT_FOUND, name);
                 ebpf_function_error(transaction, HTTP_RESP_NOT_FOUND, message);
                 return;
             }
@@ -160,9 +160,21 @@ static void ebpf_function_thread_manipulation(const char *transaction,
                 em->running_time = 0;
             pthread_mutex_unlock(&ebpf_exit_cleanup);
         } else if(strncmp(keyword, EBPF_THREADS_DISABLE_CATEGORY, sizeof(EBPF_THREADS_DISABLE_CATEGORY) -1) == 0) {
-            /**
-             * TODO: TO DISABLE PROPERLY A THREAD WE MUST OBSOLETE CHARTS, SO I WILL BRING IN ANOTHER PR
-             */
+            const char *name = &keyword[sizeof(EBPF_THREADS_ENABLE_CATEGORY)];
+            ebpf_module_t *em = ebpf_functions_select_module(name);
+            if (!em) {
+                snprintfz(message, 511, "%s%s", EBPF_PLUGIN_THREAD_FUNCTION_ERROR_THREAD_NOT_FOUND, name);
+                ebpf_function_error(transaction, HTTP_RESP_NOT_FOUND, message);
+                return;
+            }
+
+            if (ebpf_modules->enabled < NETDATA_THREAD_EBPF_STOPPING && ebpf_modules->thread->thread) {
+                pthread_mutex_lock(&ebpf_exit_cleanup);
+                em->life_time = 0;
+                em->running_time = em->update_every;
+                netdata_thread_cancel(*em->thread->thread);
+                pthread_mutex_unlock(&ebpf_exit_cleanup);
+            }
         } else if(strncmp(keyword, "help", 4) == 0) {
             ebpf_function_thread_manipulation_help(transaction);
             return;
@@ -195,7 +207,9 @@ static void ebpf_function_thread_manipulation(const char *transaction,
         // description
         buffer_json_add_array_item_string(wb, wem->thread_description);
 
-        if (wem->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        // Either it is not running or received a disabled signal and it is stopping.
+        if (wem->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING ||
+            (!wem->life_time && wem->running_time == wem->update_every)) {
             // status
             buffer_json_add_array_item_string(wb, EBPF_THREAD_STATUS_STOPPED);
 
