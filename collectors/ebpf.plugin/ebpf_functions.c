@@ -108,12 +108,14 @@ static void ebpf_function_thread_manipulation(const char *transaction,
 {
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
     char message[512];
+    uint32_t show_specific_thread = 0;
     size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
     for(int i = 1; i < PLUGINSD_MAX_WORDS ;i++) {
         const char *keyword = get_word(words, num_words, i);
         if (!keyword)
             break;
 
+        ebpf_module_t *lem;
         if(strncmp(keyword, EBPF_THREADS_ENABLE_CATEGORY, sizeof(EBPF_THREADS_ENABLE_CATEGORY) -1) == 0) {
             char thread_name[128];
             int period;
@@ -129,8 +131,8 @@ static void ebpf_function_thread_manipulation(const char *transaction,
                 period = EBPF_LIFE_TIME;
             }
 
-            ebpf_module_t *em = ebpf_functions_select_module(thread_name);
-            if (!em) {
+            lem = ebpf_functions_select_module(thread_name);
+            if (!lem) {
                 snprintfz(message, 511, "%s%s", EBPF_PLUGIN_THREAD_FUNCTION_ERROR_THREAD_NOT_FOUND, name);
                 ebpf_function_error(transaction, HTTP_RESP_NOT_FOUND, message);
                 return;
@@ -161,8 +163,8 @@ static void ebpf_function_thread_manipulation(const char *transaction,
             pthread_mutex_unlock(&ebpf_exit_cleanup);
         } else if(strncmp(keyword, EBPF_THREADS_DISABLE_CATEGORY, sizeof(EBPF_THREADS_DISABLE_CATEGORY) -1) == 0) {
             const char *name = &keyword[sizeof(EBPF_THREADS_ENABLE_CATEGORY)];
-            ebpf_module_t *em = ebpf_functions_select_module(name);
-            if (!em) {
+            lem = ebpf_functions_select_module(name);
+            if (!lem) {
                 snprintfz(message, 511, "%s%s", EBPF_PLUGIN_THREAD_FUNCTION_ERROR_THREAD_NOT_FOUND, name);
                 ebpf_function_error(transaction, HTTP_RESP_NOT_FOUND, message);
                 return;
@@ -175,6 +177,16 @@ static void ebpf_function_thread_manipulation(const char *transaction,
                 netdata_thread_cancel(*em->thread->thread);
                 pthread_mutex_unlock(&ebpf_exit_cleanup);
             }
+        } else if(strncmp(keyword, EBPF_THREADS_SELECT_THREAD, sizeof(EBPF_THREADS_SELECT_THREAD) -1) == 0) {
+            const char *name = &keyword[sizeof(EBPF_THREADS_SELECT_THREAD) - 1];
+            lem = ebpf_functions_select_module(name);
+            if (!lem) {
+                snprintfz(message, 511, "%s%s", EBPF_PLUGIN_THREAD_FUNCTION_ERROR_THREAD_NOT_FOUND, name);
+                ebpf_function_error(transaction, HTTP_RESP_NOT_FOUND, message);
+                return;
+            }
+
+            show_specific_thread |= 1<<lem->thread_id;
         } else if(strncmp(keyword, "help", 4) == 0) {
             ebpf_function_thread_manipulation_help(transaction);
             return;
@@ -196,6 +208,9 @@ static void ebpf_function_thread_manipulation(const char *transaction,
     int i;
     for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
         ebpf_module_t *wem = &ebpf_modules[i];
+        if (show_specific_thread && !(show_specific_thread & 1<<i))
+            continue;
+
         buffer_json_add_array_item_array(wb);
 
         // IMPORTANT!
