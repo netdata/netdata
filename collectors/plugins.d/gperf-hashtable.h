@@ -1,6 +1,5 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
 /* ANSI-C code produced by gperf version 3.1 */
-/* Command-line: gperf --multiple-iterations=1000 --hash-function-name=gperf_keyword_hash_function --lookup-function-name=gperf_lookup_keyword --word-array-name=gperf_keywords --constants-prefix=GPERF_PARSER_ --struct-type --slot-name=keyword --global-table --null-strings --omit-struct-type --output-file=gperf-hashtable.h gperf-config.txt  */
+/* Command-line: gperf --multiple-iterations=1000 --output-file=gperf-hashtable.h gperf-config.txt  */
 /* Computed positions: -k'1-2' */
 
 #if !((' ' == 32) && ('!' == 33) && ('"' == 34) && ('#' == 35) \
@@ -83,66 +82,66 @@ gperf_keyword_hash_function (register const char *str, register size_t len)
 static PARSER_KEYWORD gperf_keywords[] =
   {
     {(char*)0}, {(char*)0}, {(char*)0}, {(char*)0},
-#line 9 "gperf-config.txt"
-    {"HOST",                   pluginsd_host,                              PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 4},
-#line 42 "gperf-config.txt"
-    {"RSET",                   pluginsd_replay_set,                        PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 28},
-#line 17 "gperf-config.txt"
-    {"CHART",                  pluginsd_chart,                             PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 9},
-    {(char*)0},
-#line 43 "gperf-config.txt"
-    {"RSSTATE",                pluginsd_replay_rrdset_collection_state,    PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 29},
-#line 40 "gperf-config.txt"
-    {"RDSTATE",                pluginsd_replay_rrddim_collection_state,    PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 26},
-#line 12 "gperf-config.txt"
-    {"HOST_LABEL",             pluginsd_host_labels,                       PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 7},
-#line 10 "gperf-config.txt"
-    {"HOST_DEFINE",            pluginsd_host_define,                       PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 5},
-#line 26 "gperf-config.txt"
-    {"SET",                    pluginsd_set,                               PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 18},
-#line 33 "gperf-config.txt"
-    {"SET2",                   pluginsd_set_v2,                            PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 22},
-#line 41 "gperf-config.txt"
-    {"REND",                   pluginsd_replay_end,                        PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 27},
-#line 11 "gperf-config.txt"
-    {"HOST_DEFINE_END",        pluginsd_host_define_end,                   PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 6},
 #line 18 "gperf-config.txt"
-    {"CLABEL",                 pluginsd_clabel,                            PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 10},
-#line 39 "gperf-config.txt"
-    {"RBEGIN",                 pluginsd_replay_begin,                      PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 25},
-#line 6 "gperf-config.txt"
-    {"FLUSH",                  pluginsd_flush,                             PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 1},
-#line 22 "gperf-config.txt"
-    {"FUNCTION",               pluginsd_function,                          PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 14},
-#line 31 "gperf-config.txt"
-    {"CLAIMED_ID",             streaming_claimed_id,                       PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 20},
-#line 38 "gperf-config.txt"
-    {"CHART_DEFINITION_END",   pluginsd_chart_definition_end,              PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 24},
-#line 25 "gperf-config.txt"
-    {"OVERWRITE",              pluginsd_overwrite,                         PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 17},
-#line 19 "gperf-config.txt"
-    {"CLABEL_COMMIT",          pluginsd_clabel_commit,                     PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 11},
-#line 16 "gperf-config.txt"
-    {"BEGIN",                  pluginsd_begin,                             PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 8},
-#line 32 "gperf-config.txt"
-    {"BEGIN2",                 pluginsd_begin_v2,                          PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 21},
+    {"HOST",                   71, PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 4},
+#line 51 "gperf-config.txt"
+    {"RSET",                   21, PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 28},
+#line 26 "gperf-config.txt"
+    {"CHART",                  32, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 9},
+    {(char*)0},
+#line 52 "gperf-config.txt"
+    {"RSSTATE",                24, PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 29},
+#line 49 "gperf-config.txt"
+    {"RDSTATE",                23, PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 26},
 #line 21 "gperf-config.txt"
-    {"END",                    pluginsd_end,                               PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 13},
-#line 34 "gperf-config.txt"
-    {"END2",                   pluginsd_end_v2,                            PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 23},
-#line 7 "gperf-config.txt"
-    {"DISABLE",                pluginsd_disable,                           PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 2},
-#line 24 "gperf-config.txt"
-    {"LABEL",                  pluginsd_label,                             PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 16},
+    {"HOST_LABEL",             74, PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 7},
+#line 19 "gperf-config.txt"
+    {"HOST_DEFINE",            72, PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 5},
+#line 35 "gperf-config.txt"
+    {"SET",                    11, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 18},
+#line 42 "gperf-config.txt"
+    {"SET2",                    1, PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 22},
+#line 50 "gperf-config.txt"
+    {"REND",                   25, PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 27},
 #line 20 "gperf-config.txt"
-    {"DIMENSION",              pluginsd_dimension,                         PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 12},
-#line 8 "gperf-config.txt"
-    {"EXIT",                   pluginsd_exit,                              PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 3},
-#line 23 "gperf-config.txt"
-    {"FUNCTION_RESULT_BEGIN",  pluginsd_function_result_begin,             PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 15},
-    {(char*)0}, {(char*)0}, {(char*)0},
+    {"HOST_DEFINE_END",        73, PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 6},
 #line 27 "gperf-config.txt"
-    {"VARIABLE",               pluginsd_variable,                          PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 19}
+    {"CLABEL",                 34, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 10},
+#line 48 "gperf-config.txt"
+    {"RBEGIN",                 22, PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 25},
+#line 15 "gperf-config.txt"
+    {"FLUSH",                  97, PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 1},
+#line 31 "gperf-config.txt"
+    {"FUNCTION",               41, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 14},
+#line 40 "gperf-config.txt"
+    {"CLAIMED_ID",             61, PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 20},
+#line 47 "gperf-config.txt"
+    {"CHART_DEFINITION_END",   33, PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 24},
+#line 34 "gperf-config.txt"
+    {"OVERWRITE",              52, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 17},
+#line 28 "gperf-config.txt"
+    {"CLABEL_COMMIT",          35, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 11},
+#line 25 "gperf-config.txt"
+    {"BEGIN",                  12, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 8},
+#line 41 "gperf-config.txt"
+    {"BEGIN2",                  2, PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 21},
+#line 30 "gperf-config.txt"
+    {"END",                    13, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 13},
+#line 43 "gperf-config.txt"
+    {"END2",                    3, PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 23},
+#line 16 "gperf-config.txt"
+    {"DISABLE",                98, PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 2},
+#line 33 "gperf-config.txt"
+    {"LABEL",                  51, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 16},
+#line 29 "gperf-config.txt"
+    {"DIMENSION",              31, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 12},
+#line 17 "gperf-config.txt"
+    {"EXIT",                   99, PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 3},
+#line 32 "gperf-config.txt"
+    {"FUNCTION_RESULT_BEGIN",  42, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 15},
+    {(char*)0}, {(char*)0}, {(char*)0},
+#line 36 "gperf-config.txt"
+    {"VARIABLE",               53, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 19}
   };
 
 PARSER_KEYWORD *
