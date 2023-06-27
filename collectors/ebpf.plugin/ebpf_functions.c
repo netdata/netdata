@@ -224,6 +224,9 @@ static void ebpf_function_thread_manipulation(const char *transaction,
             continue;
 
         ebpf_module_t *wem = &ebpf_modules[i];
+        if (show_specific_thread && !(show_specific_thread & 1<<i))
+            continue;
+
         buffer_json_add_array_item_array(wb);
 
         // IMPORTANT!

@@ -34,6 +34,7 @@
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " \"" NAME "\" 10 \"%s\"\n", DESC); \
 } while(0)
 
+#define EBPF_THREADS_SELECT_THREAD "thread:"
 #define EBPF_THREADS_ENABLE_CATEGORY "enable:"
 #define EBPF_THREADS_DISABLE_CATEGORY "disable:"
 
