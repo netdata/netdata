@@ -726,7 +726,7 @@ inline void mrg_get_statistics(MRG *mrg, struct mrg_statistics *s) {
         s->writers_conflicts += __atomic_load_n(&mrg->index[i].stats.writers_conflicts, __ATOMIC_RELAXED);
     }
 
-    s->size += sizeof(MRG);
+    s->size += sizeof(MRG) + sizeof(struct mrg_partition) * mrg->partitions;
 }
 
 // ----------------------------------------------------------------------------
