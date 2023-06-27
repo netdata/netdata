@@ -415,6 +415,31 @@ typedef struct query_target {
     } internal;
 } QUERY_TARGET;
 
+struct alert_instance_v2_entry {
+    RRDCALC *tmp;
+
+    size_t ati;
+    size_t aci;
+    size_t aii;
+
+    STRING *chart_id;
+    STRING *chart_name;
+    STRING *name;
+    RRDCALC_STATUS status;
+    RRDCALC_FLAGS flags;
+    STRING *info;
+    NETDATA_DOUBLE value;
+    time_t last_updated;
+    time_t last_status_change;
+    NETDATA_DOUBLE last_status_change_value;
+    uuid_t config_hash_id;
+    usec_t global_id;
+    uuid_t last_transition_id;
+    uint32_t alarm_id;
+    RRDHOST *host;
+    size_t ni;
+};
+
 static inline NEVERNULL QUERY_NODE *query_node(QUERY_TARGET *qt, size_t id) {
     internal_fatal(id >= qt->nodes.used, "QUERY: invalid query host id");
     return &qt->nodes.array[id];
