@@ -340,6 +340,8 @@ typedef struct {
     size_t suppression_threshold;
 
     bool enable_statistics_charts;
+
+    size_t crash_detection_thread_after;
 } ml_config_t;
 
 void ml_config_load(ml_config_t *cfg);

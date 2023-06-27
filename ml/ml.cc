@@ -1129,9 +1129,17 @@ ml_detect_main(void *arg)
     heartbeat_t hb;
     heartbeat_init(&hb);
 
+    size_t loop_counter = 0;
+
     while (!Cfg.detection_stop) {
         worker_is_idle();
         heartbeat_next(&hb, USEC_PER_SEC);
+
+        loop_counter += 1;
+        if (loop_counter == Cfg.crash_detection_thread_after) {
+            error("GVD: aborting detection thread");
+            abort();
+        }
 
         RRDHOST *rh;
         rrd_rdlock();

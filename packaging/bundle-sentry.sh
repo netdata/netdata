@@ -1,7 +1,12 @@
 #!/bin/bash
 
-SENTRY_SOURCE="${1}/libnetdata/sentry/sentry-native"
-SENTRY_BUILD_PATH="${2}/externaldeps/sentry-native"
+if [ "$#" -eq 0 ]; then
+    SENTRY_SOURCE="${PWD}/libnetdata/sentry/sentry-native"
+    SENTRY_BUILD_PATH="${PWD}/externaldeps/sentry-native"
+else
+    SENTRY_SOURCE="${1}/libnetdata/sentry/sentry-native"
+    SENTRY_BUILD_PATH="${2}/externaldeps/sentry-native"
+fi
 
 if [ -z "${ENABLE_SENTRY}" ]; then
     echo "Skipping sentry"

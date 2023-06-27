@@ -51,6 +51,8 @@ void ml_config_load(ml_config_t *cfg) {
 
     bool enable_statistics_charts = config_get_boolean(config_section_ml, "enable statistics charts", true);
 
+    size_t crash_detection_thread_after = config_get_number(config_section_ml, "crash detection thread after", 60);
+
     /*
      * Clamp
      */
@@ -131,4 +133,6 @@ void ml_config_load(ml_config_t *cfg) {
     cfg->suppression_threshold = suppression_threshold;
 
     cfg->enable_statistics_charts = enable_statistics_charts;
+
+    cfg->crash_detection_thread_after = crash_detection_thread_after;
 }
