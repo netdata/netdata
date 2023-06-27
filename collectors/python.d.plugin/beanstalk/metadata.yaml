@@ -1,0 +1,207 @@
+name: beanstalk
+title: TBD Monitoring
+duplicate_for_virtual_integrations:
+  list:
+    - '[TBD](link to TBD)'
+    - '[TBD](link to TBD)'
+overview:
+  how_the_collector_works:
+        # The CI will remove the curly brackets in the link, they are for replacing with the virtual integrations, to replace the link each time
+    description: |
+      This collector works by... {[TBD](link to TBD)} ...
+  supported_platforms:
+    description: |
+      If this collector can't run on some platforms specify them here. Leave empty otherwise.
+  multi-instance: true
+  permissions:
+    description: |
+      if there are any notable permission requirements, eg running as root and so on, specify them here. Leave empty otherwise.
+setup:
+  prerequisites:
+    list:
+      - title: Prerequisite title for heading
+        text: |
+          - TBD
+          - TBD
+  behavior:
+    auto_detection:
+      description: |
+        TBD
+    limits:
+      description: |
+        TBD
+    performance_impact:
+      description: |
+        TBD
+  configuration:
+    file:
+      description: |
+        which file the user has to edit. Example: go.d/apache.conf
+    options:
+      description: |
+        TBD, use | and newline for multiline
+      folding:
+        title: Config options
+        enabled: true
+      list:
+        - name: option name
+          description: option description
+          default: a number or a string
+          required: true or false
+    examples:
+      folding:
+        title: Config
+        enabled: false
+      list:
+        - name: Basic / else describe what this example is about
+          description: |
+            A basic example configuration / describe your example
+          data:
+            jobs:
+              - name: example
+                TBD: TBD
+troubleshooting:
+  problems:
+    list:
+      - name: possible troubleshooting title
+        text: |
+          describe the issue and the troubleshooting process
+related_resources:
+  integrations:
+    list: [apache, weblog, httpcheck, etc]
+        # This text will be added in the overview section
+    overview_text: |
+      give a simple description if there are any other collectors related to this collector. Example -> To get the most out of TBD, you can do XYZ with collectors X Y and Z. Check our related resources for more information.
+    provide:
+      description: |
+        What info I can provide for other plugins that reference me? this will only be visible in their end, they will scrape this text. Example -> XYZ allows monitoring X Y Z metrics...
+alerts:
+  - name: beanstalk_server_buried_jobs
+    link: https://gihtub.com/netdata/netdata/blob/master/health/health.d/beanstalkd.conf
+    metric: beanstalk.current_jobs
+    info: number of buried jobs across all tubes. You need to manually kick them so
+      they can be processed. Presence of buried jobs in a tube does not affect new
+      jobs.
+    os: freebsd
+metrics:
+  description: some description for this section, or leave empty
+  folding:
+    title: Metrics
+    enabled: false
+  scope:
+    global:
+      name: global
+      description: TBD
+      labels: []
+      metrics:
+        - name: beanstalk.cpu_usage
+          description: Cpu Usage
+          unit: cpu time
+          dimensions:
+            - name: user
+            - name: system
+        - name: beanstalk.jobs_rate
+          description: Jobs Rate
+          unit: jobs/s
+          dimensions:
+            - name: total
+            - name: timeouts
+        - name: beanstalk.connections_rate
+          description: Connections Rate
+          unit: connections/s
+          dimensions:
+            - name: connections
+        - name: beanstalk.commands_rate
+          description: Commands Rate
+          unit: commands/s
+          dimensions:
+            - name: put
+            - name: peek
+            - name: peek-ready
+            - name: peek-delayed
+            - name: peek-buried
+            - name: reserve
+            - name: use
+            - name: watch
+            - name: ignore
+            - name: delete
+            - name: bury
+            - name: kick
+            - name: stats
+            - name: stats-job
+            - name: stats-tube
+            - name: list-tubes
+            - name: list-tube-used
+            - name: list-tubes-watched
+            - name: pause-tube
+        - name: beanstalk.connections_rate
+          description: Current Tubes
+          unit: tubes
+          dimensions:
+            - name: tubes
+        - name: beanstalk.current_jobs
+          description: Current Jobs
+          unit: jobs
+          dimensions:
+            - name: urgent
+            - name: ready
+            - name: reserved
+            - name: delayed
+            - name: buried
+        - name: beanstalk.current_connections
+          description: Current Connections
+          unit: connections
+          dimensions:
+            - name: written
+            - name: producers
+            - name: workers
+            - name: waiting
+        - name: beanstalk.binlog
+          description: Binlog
+          unit: records/s
+          dimensions:
+            - name: written
+            - name: migrated
+        - name: beanstalk.uptime
+          description: seconds
+          unit: seconds
+          dimensions:
+            - name: uptime
+    tube:
+      name: tube
+      description: TBD
+      labels: []
+      metrics:
+        - name: beanstalk.jobs_rate
+          description: Jobs Rate
+          unit: jobs/s
+          dimensions:
+            - name: jobs
+        - name: beanstalk.jobs
+          description: Jobs
+          unit: jobs
+          dimensions:
+            - name: urgent
+            - name: ready
+            - name: reserved
+            - name: delayed
+            - name: buried
+        - name: beanstalk.connections
+          description: Connections
+          unit: connections
+          dimensions:
+            - name: using
+            - name: waiting
+            - name: watching
+        - name: beanstalk.commands
+          description: Commands
+          unit: commands/s
+          dimensions:
+            - name: deletes
+            - name: pauses
+        - name: beanstalk.pause
+          description: Pause
+          unit: seconds
+          dimensions:
+            - name: since
+            - name: left
