@@ -1,52 +1,43 @@
-%struct-type
-%omit-struct-type
-%define hash-function-name gperf_keyword_hash_function
-%define lookup-function-name gperf_lookup_keyword
-%define word-array-name gperf_keywords
-%define constants-prefix GPERF_PARSER_
-%define slot-name keyword
-%global-table
-%null-strings
 PARSER_KEYWORD;
 %%
 #
 # Plugins Only Keywords
 #
-FLUSH,                  97, PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 1
-DISABLE,                98, PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 2
-EXIT,                   99, PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 3
-HOST,                   71, PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 4
-HOST_DEFINE,            72, PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 5
-HOST_DEFINE_END,        73, PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 6
-HOST_LABEL,             74, PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 7
+FLUSH,                  pluginsd_flush,                             PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 1
+DISABLE,                pluginsd_disable,                           PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 2
+EXIT,                   pluginsd_exit,                              PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 3
+HOST,                   pluginsd_host,                              PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 4
+HOST_DEFINE,            pluginsd_host_define,                       PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 5
+HOST_DEFINE_END,        pluginsd_host_define_end,                   PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 6
+HOST_LABEL,             pluginsd_host_labels,                       PARSER_INIT_PLUGINSD,                       WORKER_PARSER_FIRST_JOB + 7
 #
 # Common keywords
 #
-BEGIN,                  12, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 8
-CHART,                  32, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 9
-CLABEL,                 34, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 10
-CLABEL_COMMIT,          35, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 11
-DIMENSION,              31, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 12
-END,                    13, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 13
-FUNCTION,               41, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 14
-FUNCTION_RESULT_BEGIN,  42, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 15
-LABEL,                  51, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 16
-OVERWRITE,              52, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 17
-SET,                    11, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 18
-VARIABLE,               53, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 19
+BEGIN,                  pluginsd_begin,                             PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 8
+CHART,                  pluginsd_chart,                             PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 9
+CLABEL,                 pluginsd_clabel,                            PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 10
+CLABEL_COMMIT,          pluginsd_clabel_commit,                     PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 11
+DIMENSION,              pluginsd_dimension,                         PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 12
+END,                    pluginsd_end,                               PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 13
+FUNCTION,               pluginsd_function,                          PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 14
+FUNCTION_RESULT_BEGIN,  pluginsd_function_result_begin,             PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 15
+LABEL,                  pluginsd_label,                             PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 16
+OVERWRITE,              pluginsd_overwrite,                         PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 17
+SET,                    pluginsd_set,                               PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 18
+VARIABLE,               pluginsd_variable,                          PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 19
 #
 # Streaming only keywords
 #
-CLAIMED_ID,             61, PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 20
-BEGIN2,                  2, PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 21
-SET2,                    1, PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 22
-END2,                    3, PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 23
+CLAIMED_ID,             streaming_claimed_id,                       PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 20
+BEGIN2,                 pluginsd_begin_v2,                          PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 21
+SET2,                   pluginsd_set_v2,                            PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 22
+END2,                   pluginsd_end_v2,                            PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 23
 #
 # Streaming Replication keywords
 #
-CHART_DEFINITION_END,   33, PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 24
-RBEGIN,                 22, PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 25
-RDSTATE,                23, PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 26
-REND,                   25, PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 27
-RSET,                   21, PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 28
-RSSTATE,                24, PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 29
+CHART_DEFINITION_END,   pluginsd_chart_definition_end,              PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 24
+RBEGIN,                 pluginsd_replay_begin,                      PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 25
+RDSTATE,                pluginsd_replay_rrddim_collection_state,    PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 26
+REND,                   pluginsd_replay_end,                        PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 27
+RSET,                   pluginsd_replay_set,                        PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 28
+RSSTATE,                pluginsd_replay_rrdset_collection_state,    PARSER_INIT_STREAMING,                       WORKER_PARSER_FIRST_JOB + 29
