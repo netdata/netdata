@@ -2908,7 +2908,7 @@ int main(int argc, char **argv)
         ebpf_module_t *em = &ebpf_modules[i];
         em->thread = st;
         em->thread_id = i;
-        if (em->enabled) {
+        if (em->enabled || !i) {
             st->thread = mallocz(sizeof(netdata_thread_t));
             em->enabled = NETDATA_THREAD_EBPF_RUNNING;
             em->life_time = EBPF_NON_FUNCTION_LIFE_TIME;
