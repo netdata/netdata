@@ -4538,10 +4538,8 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         // cmd
         buffer_json_add_array_item_string(wb, p->comm);
 
-#ifdef NETDATA_DEV_MODE
         // cmdline
         buffer_json_add_array_item_string(wb, (p->cmdline && *p->cmdline) ? p->cmdline : p->comm);
-#endif
 
         // ppid
         buffer_json_add_array_item_uint64(wb, p->ppid);
@@ -4648,13 +4646,12 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
 
-#ifdef NETDATA_DEV_MODE
-        buffer_rrdf_table_add_field(wb, field_id++, "CmdLine", "Command Line", RRDF_FIELD_TYPE_DETAIL_STRING,
+        buffer_rrdf_table_add_field(wb, field_id++, "CmdLine", "Command Line", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0,
                                     NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
-#endif
+
         buffer_rrdf_table_add_field(wb, field_id++, "PPID", "Parent Process ID", RRDF_FIELD_TYPE_INTEGER,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL,
                                     NAN, RRDF_FIELD_SORT_ASCENDING, "PID", RRDF_FIELD_SUMMARY_COUNT,
