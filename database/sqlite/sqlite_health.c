@@ -1735,7 +1735,7 @@ fail:
     return ok;
 }
 
-void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_t after, time_t before, const char *transition, uint32_t max)
+void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_t after, time_t before, const char *transition, uint32_t max, bool debug __maybe_unused)
 {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -1850,12 +1850,8 @@ void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_
             buffer_json_member_add_uint64(wb, "ati", ati);
             buffer_json_member_add_uint64(wb, "aci", aci);
 
-            if (sqlite3_column_type(res, 20) != SQLITE_NULL) {
-                char transition_id[UUID_STR_LEN];
-                uuid_unparse_lower(*((uuid_t *)sqlite3_column_blob(res, 20)), transition_id);
-                buffer_json_member_add_string(wb, "tr_i", transition_id);
-            } else
-                buffer_json_member_add_quoted_string(wb, "tr_i", "null");
+            uuid_t *transition_id = (sqlite3_column_type(res, 20) != SQLITE_NULL) ? ((uuid_t *)sqlite3_column_blob(res, 20)) : NULL;
+            buffer_json_member_add_uuid(wb, "tr_i", transition_id);
 
             buffer_json_member_add_uint64(wb, "gi", (uint64_t)sqlite3_column_int64(res, 22));
 
@@ -1880,16 +1876,11 @@ void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_
 
             buffer_json_member_add_object(wb, "v");
             {
-                if (sqlite3_column_type(res, 17) == SQLITE_NULL) {
-                    buffer_json_member_add_quoted_string(wb, "new", "null");
-                } else {
-                    buffer_json_member_add_double(wb, "new", sqlite3_column_double(res, 17));
-                }
+                NETDATA_DOUBLE n = (sqlite3_column_type(res, 17) == SQLITE_NULL) ? NAN : sqlite3_column_double(res, 17);
+                buffer_json_member_add_double(wb, "new", n);
 
-                if (sqlite3_column_type(res, 18) == SQLITE_NULL) {
-                    buffer_json_member_add_quoted_string(wb, "old", "null");
-                } else
-                    buffer_json_member_add_double(wb, "old", sqlite3_column_double(res, 18));
+                NETDATA_DOUBLE o = (sqlite3_column_type(res, 18) == SQLITE_NULL) ? NAN : sqlite3_column_double(res, 18);
+                buffer_json_member_add_double(wb, "old", o);
             }
             buffer_json_object_close(wb); // v
 

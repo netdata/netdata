@@ -34,6 +34,6 @@ void sql_health_alarm_log2json_v3(
     time_t after,
     time_t before,
     const char *transition,
-    uint32_t max);
+    uint32_t max, bool debug);
 bool sql_find_alert_transition(const char *transition, void (*cb)(const char *machine_guid, const char *context, time_t alert_id, void *data), void *data);
 #endif //NETDATA_SQLITE_HEALTH_H
