@@ -3,8 +3,6 @@
 
 #include "../rrd.h"
 
-#define MRG_PARTITIONS 10
-
 #define MRG_CACHE_LINE_PADDING(x) uint8_t padding##x[64]
 
 typedef struct metric METRIC;
@@ -19,9 +17,10 @@ typedef struct mrg_entry {
 } MRG_ENTRY;
 
 struct mrg_statistics {
-    // non-atomic - under a write lock
+    // --- non-atomic --- under a write lock
+
     size_t entries;
-    size_t size;                // total memory used, with indexing
+    size_t size;    // total memory used, with indexing
 
     size_t additions;
     size_t additions_duplicate;
@@ -30,9 +29,10 @@ struct mrg_statistics {
     size_t delete_having_retention_or_referenced;
     size_t delete_misses;
 
-    // atomic - multiple readers / writers
-
     MRG_CACHE_LINE_PADDING(0);
+
+    // --- atomic --- multiple readers / writers
+
     size_t entries_referenced;
 
     MRG_CACHE_LINE_PADDING(1);
@@ -50,7 +50,7 @@ struct mrg_statistics {
     size_t writers_conflicts;
 };
 
-MRG *mrg_create(void);
+MRG *mrg_create(size_t partitions);
 void mrg_destroy(MRG *mrg);
 
 METRIC *mrg_metric_dup(MRG *mrg, METRIC *metric);
