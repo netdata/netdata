@@ -9,7 +9,8 @@ CLEANFILES = \
     $(NULL)
 
 SUBDIRS = \
-    dashboard \
+    v1 \
+    v2 \
     $(NULL)
 
 DASHBOARD_JS_FILES = \
@@ -52,6 +53,7 @@ dist_noinst_DATA = \
 
 dist_web_DATA = \
     dashboard.js \
+    $(srcdir)/switch.html \
     $(srcdir)/dashboard_info.js \
     $(srcdir)/dashboard_info_custom_example.js \
     $(srcdir)/main.css \
@@ -61,6 +63,11 @@ dist_web_DATA = \
 
 webolddir=$(webdir)/old
 dist_webold_DATA = \
+    $(srcdir)/old/index.html \
+    $(NULL)
+
+webv0dir=$(webdir)/v0
+dist_webv0_DATA = \
     $(srcdir)/old/index.html \
     $(NULL)
 
