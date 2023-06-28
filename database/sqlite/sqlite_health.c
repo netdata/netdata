@@ -1777,7 +1777,6 @@ void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_
         goto fail_only_drop;
     }
 
-    // We dont need it
     struct alert_instance_v2_entry *t;
     dfe_start_read(alert_instances, t) {
             rc = sqlite3_bind_blob(res, 1, &t->host->host_uuid, sizeof(t->host->host_uuid), SQLITE_STATIC);
@@ -1818,6 +1817,12 @@ void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_
     }
     dfe_done(t);
 
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK)) {
+        // log error but continue
+        error_report("Failed to finalize statement for sql_health_alarm_log2json_v3 temp table population");
+    }
+
     BUFFER *command = buffer_create(MAX_HEALTH_SQL_SIZE, NULL);
 
     buffer_sprintf(command, SQL_SEARCH_ALERT_LOG, alert_instances);
@@ -1847,9 +1852,7 @@ void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_
         }
     }
 
-    // Run multiple queries
     while (sqlite3_step(res) == SQLITE_ROW) {
-        // One alarm
         buffer_json_add_array_item_object(wb);
         {
             size_t aii = sqlite3_column_int64(res, 13);
