@@ -2,10 +2,12 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.40.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.40.1...HEAD)
 
 **Merged pull requests:**
 
+- fix tc.plugin charts labels [\#15262](https://github.com/netdata/netdata/pull/15262) ([ilyam8](https://github.com/ilyam8))
+- Update libbpf version [\#15258](https://github.com/netdata/netdata/pull/15258) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix $\(libh2o\_dir\) not expanded properly sometimes. [\#15253](https://github.com/netdata/netdata/pull/15253) ([Dim-P](https://github.com/Dim-P))
 - use gperf for the pluginsd/streaming parser hashtable [\#15251](https://github.com/netdata/netdata/pull/15251) ([ktsaou](https://github.com/ktsaou))
 - Update pfsense.md package install instructions [\#15250](https://github.com/netdata/netdata/pull/15250) ([MYanello](https://github.com/MYanello))
@@ -41,6 +43,10 @@
 - Use a single health log table [\#15157](https://github.com/netdata/netdata/pull/15157) ([MrZammler](https://github.com/MrZammler))
 - Redirect to index.html when a file is not found by web server [\#15143](https://github.com/netdata/netdata/pull/15143) ([MrZammler](https://github.com/MrZammler))
 - Consistently start the agent as root and rely on it to drop privileges properly. [\#14890](https://github.com/netdata/netdata/pull/14890) ([Ferroin](https://github.com/Ferroin))
+
+## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.40.0...v1.40.1)
 
 ## [v1.40.0](https://github.com/netdata/netdata/tree/v1.40.0) (2023-06-14)
 
@@ -397,14 +403,6 @@
 - Misc SSL improvements 3 [\#14602](https://github.com/netdata/netdata/pull/14602) ([MrZammler](https://github.com/MrZammler))
 - Update deployment-strategies.md [\#14601](https://github.com/netdata/netdata/pull/14601) ([cakrit](https://github.com/cakrit))
 - Add deployment strategies [\#14600](https://github.com/netdata/netdata/pull/14600) ([cakrit](https://github.com/cakrit))
-- Add Amazon Linux 2 to CI and platform support. [\#14599](https://github.com/netdata/netdata/pull/14599) ([Ferroin](https://github.com/Ferroin))
-- Replace web server readme with its improved replica [\#14598](https://github.com/netdata/netdata/pull/14598) ([cakrit](https://github.com/cakrit))
-- Update interact-new-charts.md [\#14596](https://github.com/netdata/netdata/pull/14596) ([cakrit](https://github.com/cakrit))
-- Fix context unittest coredump [\#14595](https://github.com/netdata/netdata/pull/14595) ([stelfrag](https://github.com/stelfrag))
-- Delete interact-dashboard-charts [\#14594](https://github.com/netdata/netdata/pull/14594) ([cakrit](https://github.com/cakrit))
-- /api/v2/contexts [\#14592](https://github.com/netdata/netdata/pull/14592) ([ktsaou](https://github.com/ktsaou))
-- Use vector allocation whenever is possible \(eBPF\) [\#14591](https://github.com/netdata/netdata/pull/14591) ([thiagoftsm](https://github.com/thiagoftsm))
-- Change link text to collectors.md [\#14590](https://github.com/netdata/netdata/pull/14590) ([cakrit](https://github.com/cakrit))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
