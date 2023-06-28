@@ -58,9 +58,6 @@ long get_netdata_cpus(void) {
 
     processors = cores_user_configured;
 
-    if(processors < 1)
-        processors = 1;
-
     return processors;
 }
 

@@ -1079,8 +1079,8 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
     if(cpus > (size_t)libuv_worker_threads)
         cpus = (size_t)libuv_worker_threads;
 
-    if(cpus >= (size_t)get_netdata_cpus() / 2)
-        cpus = get_netdata_cpus()/ 2 - 1;
+    if(cpus >= MRG_PARTITIONS / 2)
+        cpus = MRG_PARTITIONS / 2 - 1;
 
     if(cpus < 1)
         cpus = 1;

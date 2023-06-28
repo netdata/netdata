@@ -32,7 +32,7 @@ typedef PARSER_RC (*keyword_function)(char **words, size_t num_words, struct par
 
 typedef struct parser_keyword {
     char *keyword;
-    size_t id;
+    keyword_function func;
     PARSER_REPERTOIRE repertoire;
     size_t worker_job_id;
 } PARSER_KEYWORD;
@@ -113,14 +113,6 @@ typedef struct parser {
 
 } PARSER;
 
-PARSER *parser_init(struct parser_user_object *user, FILE *fp_input, FILE *fp_output, int fd, PARSER_INPUT_TYPE flags, void *ssl);
-void parser_init_repertoire(PARSER *parser, PARSER_REPERTOIRE repertoire);
-void parser_destroy(PARSER *working_parser);
-void pluginsd_cleanup_v2(PARSER *parser);
-void inflight_functions_init(PARSER *parser);
-void pluginsd_keywords_init(PARSER *parser, PARSER_REPERTOIRE repertoire);
-PARSER_RC parser_execute(PARSER *parser, PARSER_KEYWORD *keyword, char **words, size_t num_words);
-
 static inline int find_first_keyword(const char *src, char *dst, int dst_size, bool *isspace_map) {
     const char *s = src, *keyword_start;
 
@@ -189,8 +181,7 @@ static inline int parser_action(PARSER *parser, char *input) {
     PARSER_KEYWORD *t = parser_find_keyword(parser, command);
     if(likely(t)) {
         worker_is_busy(t->worker_job_id);
-        rc = parser_execute(parser, t, words, num_words);
-        // rc = (*t->func)(words, num_words, parser);
+        rc = (*t->func)(words, num_words, parser);
         worker_is_idle();
     }
     else
@@ -215,5 +206,12 @@ static inline int parser_action(PARSER *parser, char *input) {
 
     return (rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP);
 }
+
+PARSER *parser_init(struct parser_user_object *user, FILE *fp_input, FILE *fp_output, int fd, PARSER_INPUT_TYPE flags, void *ssl);
+void parser_init_repertoire(PARSER *parser, PARSER_REPERTOIRE repertoire);
+void parser_destroy(PARSER *working_parser);
+void pluginsd_cleanup_v2(PARSER *parser);
+void inflight_functions_init(PARSER *parser);
+void pluginsd_keywords_init(PARSER *parser, PARSER_REPERTOIRE repertoire);
 
 #endif //NETDATA_PLUGINSD_PARSER_H
