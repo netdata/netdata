@@ -133,7 +133,7 @@ static void ebpf_function_thread_manipulation(const char *transaction,
             }
 
             lem = ebpf_functions_select_module(thread_name);
-            if (!lem || lem == &ebpf_modules[0]) {
+            if (!lem) {
                 snprintfz(message, 511, "%s%s", EBPF_PLUGIN_THREAD_FUNCTION_ERROR_THREAD_NOT_FOUND, name);
                 ebpf_function_error(transaction, HTTP_RESP_NOT_FOUND, message);
                 return;
@@ -166,7 +166,7 @@ static void ebpf_function_thread_manipulation(const char *transaction,
         } else if(strncmp(keyword, EBPF_THREADS_DISABLE_CATEGORY, sizeof(EBPF_THREADS_DISABLE_CATEGORY) -1) == 0) {
             const char *name = &keyword[sizeof(EBPF_THREADS_DISABLE_CATEGORY) - 1];
             lem = ebpf_functions_select_module(name);
-            if (!lem || lem == &ebpf_modules[0]) {
+            if (!lem) {
                 snprintfz(message, 511, "%s%s", EBPF_PLUGIN_THREAD_FUNCTION_ERROR_THREAD_NOT_FOUND, name);
                 ebpf_function_error(transaction, HTTP_RESP_NOT_FOUND, message);
                 return;
@@ -182,7 +182,7 @@ static void ebpf_function_thread_manipulation(const char *transaction,
         } else if(strncmp(keyword, EBPF_THREADS_SELECT_THREAD, sizeof(EBPF_THREADS_SELECT_THREAD) -1) == 0) {
             const char *name = &keyword[sizeof(EBPF_THREADS_SELECT_THREAD) - 1];
             lem = ebpf_functions_select_module(name);
-            if (!lem || lem == &ebpf_modules[0]) {
+            if (!lem) {
                 snprintfz(message, 511, "%s%s", EBPF_PLUGIN_THREAD_FUNCTION_ERROR_THREAD_NOT_FOUND, name);
                 ebpf_function_error(transaction, HTTP_RESP_NOT_FOUND, message);
                 return;
