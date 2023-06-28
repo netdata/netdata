@@ -378,6 +378,82 @@ AM_CONDITIONAL([LINUX], [test "${build_target}" = "linux"])
 AC_MSG_RESULT([Host OS: ${build_target}])
 
 # -----------------------------------------------------------------------------
+# hardening
+
+HARDENING_CFLAGS=""
+
+if ! echo "${originalCFLAGS}" | grep -q '-fstack-protector'; then
+    AX_CHECK_COMPILE_FLAG(
+        [-fstack-protector-strong],
+        [HARDENING_CFLAGS="${HARDENING_CFLAGS} -fstack-protector-strong"],
+        [AX_CHECK_COMPILE_FLAG(
+            [-fstack-protector],
+            [HARDENING_CFLAGS="${HARDENING_CFLAGS} -fstack-protector"],
+            ,
+            [-Werror],
+        )],
+        [-Werror],
+    )
+fi
+
+if ! echo "${originalCFLAGS}" | grep -q '-fno-stack-clash-protection'; then
+    AX_CHECK_COMPILE_FLAG(
+        [-fstack-clash-protection],
+        [HARDENING_CFLAGS="${HARDENING_CFLAGS} -fstack-clash-protection"],
+        ,
+        [-Werror],
+    )
+fi
+
+if ! echo "${originalCFLAGS}" | grep -q '-fcf-protection'; then
+    AX_CHECK_COMPILE_FLAG(
+        [-fcf-protection=full],
+        [HARDENING_CFLAGS="${HARDENING_CFLAGS} -fcf-protection=full"],
+        ,
+        [-Werror],
+    )
+fi
+
+if ! echo "${originalCFLAGS}" | grep -q '-mbranch-protection'; then
+    AX_CHECK_COMPILE_FLAG(
+        [-mbranch-protection=standard],
+        [HARDENING_CFLAGS="${HARDENING_CFLAGS} -mbranch-protection=standard"],
+        ,
+        [-Werror],
+    )
+fi
+
+if ! echo "${originalCFLAGS}" | grep -q '-D_FORTIFY_SOURCE'; then
+    # This complex set of checks is needed because there is no clean
+    # way to verify _FORTIFY_SOURCE support without having to check for
+    # the required compiler builtins.
+    AC_CHECK_DECLS(
+        [__builtin_constant_p, __builtin_object_size, __builtin___memcpy_chk, __builtin___memmove_chk, __builtin___mempcpy_chk,
+         __builtin___memset_chk, __builtin___snprintf_chk, __builtin___sprintf_chk, __builtin___stpcpy_chk, __builtin___strcat_chk,
+         __builtin___strcpy_chk, __builtin___strncat_chk, __builtin___strncpy_chk, __builtin___vsnprintf_chk, __builtin___vsprintf_chk],
+        [HAVE_FORTIFY_SOURCE=2]
+    )
+
+    if test "x${HAVE_FORTIFY_SOURCE}" = "x2"; then
+        AC_CHECK_DECL(
+            __builtin_dynamic_object_size,
+            [AX_CHECK_COMPILE_FLAG(
+                [-D_FORTIFY_SOURCE=3],
+                [HARDENING_CFLAGS="${HARDENING_CFLAGS} -D_FORTIFY_SOURCE=3"],
+                ,
+                [-Werror],
+            )],
+            [AX_CHECK_COMPILE_FLAG(
+                [-D_FORTIFY_SOURCE=2],
+                [HARDENING_CFLAGS="${HARDENING_CFLAGS} -D_FORTIFY_SOURCE=2"],
+                ,
+                [-Werror],
+            )],
+        )
+    fi
+fi
+
+# -----------------------------------------------------------------------------
 # backtrace
 
 AC_SEARCH_LIBS([backtrace], [execinfo], [AC_DEFINE([HAVE_BACKTRACE], [1], [backtrace availability])])
@@ -1724,7 +1800,7 @@ CFLAGS="${originalCFLAGS} ${OPTIONAL_LTO_CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${O
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
     ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PUBSUB_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} \
     ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_YAML_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${JUDY_CFLAGS} \
-    ${OPTIONAL_ACLK_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_OS_DEP_CFLAGS} ${HTTPD_CFLAGS}"
+    ${OPTIONAL_ACLK_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_OS_DEP_CFLAGS} ${HTTPD_CFLAGS} ${HARDENING_CFLAGS}"
 
 CXXFLAGS="${CFLAGS} ${OPTIONAL_KINESIS_CXXFLAGS} ${CPP_STD_FLAG}"
 
