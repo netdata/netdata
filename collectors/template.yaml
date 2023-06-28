@@ -72,7 +72,7 @@ related_resources:
       [apache, weblog, httpcheck, etc]
       # This text will be added in the overview section
     overview_text: |
-      give a simple description if there are any other collectors related to this collector. 
+      give a simple description if there are any other collectors related to this collector.
       Example -> To get the most out of TBD, you can do XYZ with collectors X Y and Z. Check our related resources for more information.
     provide:
       description: |
