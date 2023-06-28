@@ -46,6 +46,8 @@ Netdata](https://user-images.githubusercontent.com/1153921/96495792-2e881380-11f
 
 - [Features](#features)
 - [Get Netdata](#get-netdata)
+  - [Infrastructure view](#infrastructure-view)
+  - [Single node view](#single-node-view)
   - [Docker](#docker)
   - [Other operating systems](#other-operating-systems)
   - [Post-installation](#post-installation)
