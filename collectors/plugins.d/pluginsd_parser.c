@@ -1973,6 +1973,8 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
 
     rrd_collector_started();
 
+    size_t count = 0;
+
     // this keeps the parser with its current value
     // so, parser needs to be allocated before pushing it
     netdata_thread_cleanup_push(pluginsd_process_thread_cleanup, parser);
@@ -1984,11 +1986,8 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
             break;
     }
 
-    // free parser with the pop function
-    netdata_thread_cleanup_pop(1);
-
     cd->unsafe.enabled = parser->user.enabled;
-    size_t count = parser->user.data_collections_count;
+    count = parser->user.data_collections_count;
 
     if (likely(count)) {
         cd->successful_collections += count;
@@ -1996,6 +1995,9 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     }
     else
         cd->serial_failures++;
+
+    // free parser with the pop function
+    netdata_thread_cleanup_pop(1);
 
     return count;
 }

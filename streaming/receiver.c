@@ -306,7 +306,7 @@ static inline bool receiver_should_continue(struct receiver_state *rpt) {
 }
 
 static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, int fd, void *ssl) {
-    size_t result;
+    size_t result = 0;
 
     PARSER *parser = NULL;
     {
