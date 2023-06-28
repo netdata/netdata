@@ -28,6 +28,8 @@ typedef enum {
     RRDCALC_FLAG_FROM_TEMPLATE              = (1 << 10), // the rrdcalc has been created from a template
 } RRDCALC_FLAGS;
 
+void rrdcalc_flags_to_json_array(BUFFER *wb, const char *key, RRDCALC_FLAGS flags);
+
 typedef enum {
     // This list uses several other options from RRDR_OPTIONS for db lookups.
     // To add an item here, you need to reserve a bit in RRDR_OPTIONS.
@@ -120,6 +122,7 @@ struct rrdcalc {
 
     NETDATA_DOUBLE value;           // the current value of the alarm
     NETDATA_DOUBLE old_value;       // the previous value of the alarm
+    NETDATA_DOUBLE last_status_change_value; // the value at the last status change
 
     RRDCALC_FLAGS run_flags;        // check RRDCALC_FLAG_*
 

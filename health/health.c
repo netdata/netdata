@@ -22,6 +22,36 @@ char *silencers_filename;
 SIMPLE_PATTERN *conf_enabled_alarms = NULL;
 DICTIONARY *health_rrdvars;
 
+
+void health_entry_flags_to_json_array(BUFFER *wb, const char *key, HEALTH_ENTRY_FLAGS flags) {
+    buffer_json_member_add_array(wb, key);
+
+    if(flags & HEALTH_ENTRY_FLAG_PROCESSED)
+        buffer_json_add_array_item_string(wb, "PROCESSED");
+    if(flags & HEALTH_ENTRY_FLAG_UPDATED)
+        buffer_json_add_array_item_string(wb, "UPDATED");
+    if(flags & HEALTH_ENTRY_FLAG_EXEC_RUN)
+        buffer_json_add_array_item_string(wb, "EXEC_RUN");
+    if(flags & HEALTH_ENTRY_FLAG_EXEC_FAILED)
+        buffer_json_add_array_item_string(wb, "FAILED");
+    if(flags & HEALTH_ENTRY_FLAG_SILENCED)
+        buffer_json_add_array_item_string(wb, "SILENCED");
+    if(flags & HEALTH_ENTRY_RUN_ONCE)
+        buffer_json_add_array_item_string(wb, "ONCE");
+    if(flags & HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS)
+        buffer_json_add_array_item_string(wb, "IN_PROGRESS");
+    if(flags & HEALTH_ENTRY_FLAG_IS_REPEATING)
+        buffer_json_add_array_item_string(wb, "RECURRING");
+    if(flags & HEALTH_ENTRY_FLAG_SAVED)
+        buffer_json_add_array_item_string(wb, "SAVED");
+    if(flags & HEALTH_ENTRY_FLAG_ACLK_QUEUED)
+        buffer_json_add_array_item_string(wb, "ACLK_QUEUED");
+    if(flags & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION)
+        buffer_json_add_array_item_string(wb, "NO_CLEAR_NOTIFICATION");
+
+    buffer_json_array_close(wb);
+}
+
 static bool prepare_command(BUFFER *wb,
                             const char *exec,
                             const char *recipient,
@@ -1126,6 +1156,7 @@ void *health_main(void *ptr) {
                             rc->old_status = rc->status;
                             rc->status = RRDCALC_STATUS_REMOVED;
                             rc->last_status_change = now;
+                            rc->last_status_change_value = rc->value;
                             rc->last_updated = now;
                             rc->value = NAN;
                             rc->ae = ae;
@@ -1297,36 +1328,37 @@ void *health_main(void *ptr) {
                     RRDCALC_STATUS status = RRDCALC_STATUS_UNDEFINED;
 
                     switch (warning_status) {
-                    case RRDCALC_STATUS_CLEAR:
-                        status = RRDCALC_STATUS_CLEAR;
-                        break;
+                        case RRDCALC_STATUS_CLEAR:
+                            status = RRDCALC_STATUS_CLEAR;
+                            break;
 
-                    case RRDCALC_STATUS_RAISED:
-                        status = RRDCALC_STATUS_WARNING;
-                        break;
+                        case RRDCALC_STATUS_RAISED:
+                            status = RRDCALC_STATUS_WARNING;
+                            break;
 
-                    default:
-                        break;
+                        default:
+                            break;
                     }
 
                     switch (critical_status) {
-                    case RRDCALC_STATUS_CLEAR:
-                        if (status == RRDCALC_STATUS_UNDEFINED)
-                            status = RRDCALC_STATUS_CLEAR;
-                        break;
+                        case RRDCALC_STATUS_CLEAR:
+                            if (status == RRDCALC_STATUS_UNDEFINED)
+                                status = RRDCALC_STATUS_CLEAR;
+                            break;
 
-                    case RRDCALC_STATUS_RAISED:
-                        status = RRDCALC_STATUS_CRITICAL;
-                        break;
+                        case RRDCALC_STATUS_RAISED:
+                            status = RRDCALC_STATUS_CRITICAL;
+                            break;
 
-                    default:
-                        break;
+                        default:
+                            break;
                     }
 
                     // --------------------------------------------------------
                     // check if the new status and the old differ
 
                     if (status != rc->status) {
+
                         worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY);
                         int delay = 0;
 
@@ -1394,6 +1426,7 @@ void *health_main(void *ptr) {
 
                         log_health("[%s]: Alert event for [%s.%s], value [%s], status [%s].", rrdhost_hostname(host), ae_chart_name(ae), ae_name(ae), ae_new_value_string(ae), rrdcalc_status2string(ae->new_status));
 
+                        rc->last_status_change_value = rc->value;
                         rc->last_status_change = now;
                         rc->old_status = rc->status;
                         rc->status = status;

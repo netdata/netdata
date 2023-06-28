@@ -415,6 +415,32 @@ typedef struct query_target {
     } internal;
 } QUERY_TARGET;
 
+struct alert_instance_v2_entry {
+    RRDCALC *tmp;
+
+    size_t ati;
+    size_t aci;
+    size_t aii;
+
+    STRING *chart_id;
+    STRING *chart_name;
+    STRING *name;
+    STRING *family;
+    RRDCALC_STATUS status;
+    RRDCALC_FLAGS flags;
+    STRING *info;
+    NETDATA_DOUBLE value;
+    time_t last_updated;
+    time_t last_status_change;
+    NETDATA_DOUBLE last_status_change_value;
+    uuid_t config_hash_id;
+    usec_t global_id;
+    uuid_t last_transition_id;
+    uint32_t alarm_id;
+    RRDHOST *host;
+    size_t ni;
+};
+
 static inline NEVERNULL QUERY_NODE *query_node(QUERY_TARGET *qt, size_t id) {
     internal_fatal(id >= qt->nodes.used, "QUERY: invalid query host id");
     return &qt->nodes.array[id];
@@ -467,6 +493,15 @@ struct api_v2_contexts_request {
     char *contexts;
     char *q;
 
+    CONTEXTS_V2_OPTIONS options;
+
+    struct {
+        CONTEXTS_V2_ALERT_STATUS status;
+        char *alert;
+        char *transition;
+        uint32_t last;
+    } alerts;
+
     time_t after;
     time_t before;
     time_t timeout_ms;
@@ -475,43 +510,20 @@ struct api_v2_contexts_request {
     void *interrupt_callback_data;
 };
 
-struct api_v2_alerts_request {
-    char *scope_nodes;
-    char *scope_contexts;
-    char *nodes;
-    char *contexts;
-    char *config_hash;
-    char *state;
-    SIMPLE_PATTERN *config_hash_pattern;
-    char *transition_id;
-    time_t alert_id;
-    uint32_t last;
-    char *alert_name;
-    SIMPLE_PATTERN *alert_name_pattern;
-    ALERT_OPTIONS options;
-    time_t after;
-    time_t before;
-    char *q;
-};
-
-ssize_t get_alert_index(Pvoid_t JudyHS, uuid_t *uuid);
-
 typedef enum __attribute__ ((__packed__)) {
-    CONTEXTS_V2_DEBUG           = (1 << 0),
-    CONTEXTS_V2_MINIFY          = (1 << 1),
-    CONTEXTS_V2_SEARCH          = (1 << 2),
-    CONTEXTS_V2_NODES           = (1 << 3),
-    CONTEXTS_V2_NODES_INFO      = (1 << 4),
-    CONTEXTS_V2_NODES_INSTANCES = (1 << 5),
-    CONTEXTS_V2_CONTEXTS        = (1 << 6),
-    CONTEXTS_V2_AGENTS          = (1 << 7),
-    CONTEXTS_V2_AGENTS_INFO     = (1 << 8),
-    CONTEXTS_V2_VERSIONS        = (1 << 9),
-    CONTEXTS_V2_FUNCTIONS       = (1 << 10),
-} CONTEXTS_V2_OPTIONS;
+    CONTEXTS_V2_SEARCH          = (1 << 1),
+    CONTEXTS_V2_NODES           = (1 << 2),
+    CONTEXTS_V2_NODES_INFO      = (1 << 3),
+    CONTEXTS_V2_NODES_INSTANCES = (1 << 4),
+    CONTEXTS_V2_CONTEXTS        = (1 << 5),
+    CONTEXTS_V2_AGENTS          = (1 << 6),
+    CONTEXTS_V2_AGENTS_INFO     = (1 << 7),
+    CONTEXTS_V2_VERSIONS        = (1 << 8),
+    CONTEXTS_V2_FUNCTIONS       = (1 << 9),
+    CONTEXTS_V2_ALERTS          = (1 << 10),
+} CONTEXTS_V2_MODE;
 
-int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_OPTIONS options);
-int alerts_to_json_v2(BUFFER *wb, struct api_v2_alerts_request *req, CONTEXTS_V2_OPTIONS options);
+int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_MODE mode);
 
 RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o);
 void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time_t now_s, bool info);

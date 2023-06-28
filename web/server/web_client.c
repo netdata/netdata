@@ -839,7 +839,7 @@ const char *web_response_code_to_string(int code) {
 
 static inline char *http_header_parse(struct web_client *w, char *s, int parse_useragent) {
     static uint32_t hash_origin = 0, hash_connection = 0, hash_donottrack = 0, hash_useragent = 0,
-                    hash_authorization = 0, hash_host = 0, hash_forwarded_proto = 0, hash_forwarded_host = 0;
+                    hash_authorization = 0, hash_host = 0, hash_forwarded_host = 0;
     static uint32_t hash_accept_encoding = 0;
 
     if(unlikely(!hash_origin)) {
@@ -850,7 +850,6 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
         hash_useragent = simple_uhash("User-Agent");
         hash_authorization = simple_uhash("X-Auth-Token");
         hash_host = simple_uhash("Host");
-        hash_forwarded_proto = simple_uhash("X-Forwarded-Proto");
         hash_forwarded_host = simple_uhash("X-Forwarded-Host");
     }
 
