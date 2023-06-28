@@ -26,7 +26,7 @@ KICKSTART_SOURCE="$(
     echo "$(pwd -P)/${self##*/}"
 )"
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
-DEFAULT_PLUGIN_PACKAGES="netdata-plugin-go netdata-plugin-python netdata-plugin-apps netdata-plugin-ebpf"
+DEFAULT_PLUGIN_PACKAGES=""
 PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 PUBLIC_CLOUD_URL="https://app.netdata.cloud"
 REPOCONFIG_DEB_URL_PREFIX="https://repo.netdata.cloud/repos/repoconfig"
@@ -745,7 +745,7 @@ confirm() {
 update() {
   updater="${ndprefix}/usr/libexec/netdata/netdata-updater.sh"
 
-  if [ -x "${updater}" ]; then
+  if run_as_root test -x "${updater}"; then
     if [ "${DRY_RUN}" -eq 1 ]; then
       progress "Would attempt to update existing installation by running the updater script located at: ${updater}"
       return 0
@@ -1204,9 +1204,9 @@ claim() {
 # ======================================================================
 # Auto-update handling code.
 set_auto_updates() {
-  if [ -x "${INSTALL_PREFIX}/usr/libexec/netdata/netdata-updater.sh" ]; then
+  if run_as_root test -x "${INSTALL_PREFIX}/usr/libexec/netdata/netdata-updater.sh"; then
     updater="${INSTALL_PREFIX}/usr/libexec/netdata/netdata-updater.sh"
-  elif [ -x "${INSTALL_PREFIX}/netdata/usr/libexec/netdata/netdata-updater.sh" ]; then
+  elif run_as_root test -x "${INSTALL_PREFIX}/netdata/usr/libexec/netdata/netdata-updater.sh"; then
     updater="${INSTALL_PREFIX}/netdata/usr/libexec/netdata/netdata-updater.sh"
   else
     warning "Could not find netdata-updater.sh. This means that auto-updates cannot (currently) be enabled on this system. See https://learn.netdata.cloud/docs/agent/packaging/installer/update for more information about updating Netdata."
@@ -1217,7 +1217,7 @@ set_auto_updates() {
     if [ "${DRY_RUN}" -eq 1 ]; then
       progress "Would have attempted to enable automatic updates."
     # This first case is for catching using a new kickstart script with an old build. It can be safely removed after v1.34.0 is released.
-    elif ! grep -q '\-\-enable-auto-updates' "${updater}"; then
+    elif ! run_as_root grep -q '\-\-enable-auto-updates' "${updater}"; then
       echo
     elif ! run_as_root "${updater}" --enable-auto-updates "${NETDATA_AUTO_UPDATE_TYPE}"; then
       warning "Failed to enable auto updates. Netdata will still work, but you will need to update manually."
@@ -1399,9 +1399,9 @@ try_package_install() {
       common_rpm_opts
       common_dnf_opts
       repo_prefix="el/${SYSVERSION}"
-      if [ "${SYSVERSION}" -lt 8 ]; then
-        explicitly_install_native_plugins=1
-      fi
+      # if [ "${SYSVERSION}" -lt 8 ]; then
+      #   explicitly_install_native_plugins=1
+      # fi
       ;;
     fedora|ol)
       common_rpm_opts

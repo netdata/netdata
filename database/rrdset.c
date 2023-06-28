@@ -128,14 +128,14 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     st->module_name = rrd_string_strdupz(ctr->module);
     st->priority = ctr->priority;
 
-    st->entries = (ctr->memory_mode != RRD_MEMORY_MODE_DBENGINE) ? align_entries_to_pagesize(ctr->memory_mode, ctr->history_entries) : 5;
+    st->db.entries = (ctr->memory_mode != RRD_MEMORY_MODE_DBENGINE) ? align_entries_to_pagesize(ctr->memory_mode, ctr->history_entries) : 5;
     st->update_every = ctr->update_every;
     st->rrd_memory_mode = ctr->memory_mode;
 
     st->chart_type = ctr->chart_type;
     st->rrdhost = host;
 
-    netdata_spinlock_init(&st->data_collection_lock);
+    spinlock_init(&st->data_collection_lock);
 
     st->flags =   RRDSET_FLAG_SYNC_CLOCK
                 | RRDSET_FLAG_INDEXED_ID
@@ -278,7 +278,7 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     string_freez(st->module_name);
 
     freez(st->exporting_flags);
-    freez(st->cache_dir);
+    freez(st->db.cache_dir);
 }
 
 // the item to be inserted, is already in the dictionary
@@ -702,8 +702,8 @@ inline void rrdset_update_heterogeneous_flag(RRDSET *st) {
 
     bool init = false, is_heterogeneous = false;
     RRD_ALGORITHM algorithm;
-    collected_number multiplier;
-    collected_number divisor;
+    int32_t multiplier;
+    int32_t divisor;
 
     rrddim_foreach_read(rd, st) {
         if(!init) {
@@ -717,7 +717,9 @@ inline void rrdset_update_heterogeneous_flag(RRDSET *st) {
         if(algorithm != rd->algorithm || multiplier != ABS(rd->multiplier) || divisor != ABS(rd->divisor)) {
             if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
                 #ifdef NETDATA_INTERNAL_CHECKS
-                info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already present (algorithm is '%s' vs '%s', multiplier is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ", divisor is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ").",
+                info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already present "
+                     "(algorithm is '%s' vs '%s', multiplier is %d vs %d, "
+                     "divisor is %d vs %d).",
                      rrddim_name(rd),
                      rrdset_name(st),
                      rrdhost_hostname(host),
@@ -751,7 +753,7 @@ void rrdset_reset(RRDSET *st) {
     st->last_collected_time.tv_usec = 0;
     st->last_updated.tv_sec = 0;
     st->last_updated.tv_usec = 0;
-    st->current_entry = 0;
+    st->db.current_entry = 0;
     st->counter = 0;
     st->counter_done = 0;
 
@@ -856,8 +858,8 @@ void rrdset_delete_files(RRDSET *st) {
     }
     rrddim_foreach_done(rd);
 
-    if(st->cache_dir)
-        recursively_delete_dir(st->cache_dir, "left-over chart");
+    if(st->db.cache_dir)
+        recursively_delete_dir(st->db.cache_dir, "left-over chart");
 }
 
 void rrdset_delete_obsolete_dimensions(RRDSET *st) {
@@ -1000,7 +1002,7 @@ void rrdset_timed_next(RRDSET *st, struct timeval now, usec_t duration_since_las
             // oops! the database is in the future
             #ifdef NETDATA_INTERNAL_CHECKS
             info("RRD database for chart '%s' on host '%s' is %0.5" NETDATA_DOUBLE_MODIFIER
-                " secs in the future (counter #%zu, update #%zu). Adjusting it to current time."
+                " secs in the future (counter #%u, update #%u). Adjusting it to current time."
                 , rrdset_id(st)
                 , rrdhost_hostname(st->rrdhost)
                 , (NETDATA_DOUBLE)-since_last_usec / USEC_PER_SEC
@@ -1019,7 +1021,9 @@ void rrdset_timed_next(RRDSET *st, struct timeval now, usec_t duration_since_las
             // oops! the database is too far behind
             #ifdef NETDATA_INTERNAL_CHECKS
             info("RRD database for chart '%s' on host '%s' is %0.5" NETDATA_DOUBLE_MODIFIER
-                " secs in the past (counter #%zu, update #%zu). Adjusting it to current time.", rrdset_id(st), rrdhost_hostname(st->rrdhost), (NETDATA_DOUBLE)since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
+                " secs in the past (counter #%u, update #%u). Adjusting it to current time.",
+                rrdset_id(st), rrdhost_hostname(st->rrdhost), (NETDATA_DOUBLE)since_last_usec / USEC_PER_SEC,
+                st->counter, st->counter_done);
             #endif
 
             duration_since_last_update = (usec_t)since_last_usec;
@@ -1126,7 +1130,7 @@ static inline void rrdset_init_last_updated_time(RRDSET *st) {
 static __thread size_t rrdset_done_statistics_points_stored_per_tier[RRD_STORAGE_TIERS];
 
 static inline time_t tier_next_point_time_s(RRDDIM *rd, struct rrddim_tier *t, time_t now_s) {
-    time_t loop = (time_t)rd->update_every * (time_t)t->tier_grouping;
+    time_t loop = (time_t)rd->rrdset->update_every * (time_t)t->tier_grouping;
     return now_s + loop - ((now_s + loop) % loop);
 }
 
@@ -1231,7 +1235,7 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
     time_t now_s = (time_t)(point_end_time_ut / USEC_PER_SEC);
 
     STORAGE_POINT sp = {
-        .start_time_s = now_s - rd->update_every,
+        .start_time_s = now_s - rd->rrdset->update_every,
         .end_time_s = now_s,
         .min = n,
         .max = n,
@@ -1320,7 +1324,7 @@ static inline size_t rrdset_done_interpolate(
     if((now_collect_ut % (update_every_ut)) == 0) iterations++;
 
     size_t counter = st->counter;
-    long current_entry = st->current_entry;
+    long current_entry = st->db.current_entry;
 
     SN_FLAGS storage_flags = SN_DEFAULT_FLAGS;
 
@@ -1437,7 +1441,7 @@ static inline size_t rrdset_done_interpolate(
                 continue;
             }
 
-            if(likely(rd->updated && rd->collections_counter > 1 && iterations < gap_when_lost_iterations_above)) {
+            if(likely(rrddim_check_updated(rd) && rd->collections_counter > 1 && iterations < gap_when_lost_iterations_above)) {
                 uint32_t dim_storage_flags = storage_flags;
 
                 if (ml_dimension_is_anomalous(rd, current_time_s, new_value, true)) {
@@ -1472,7 +1476,7 @@ static inline size_t rrdset_done_interpolate(
         storage_flags = SN_DEFAULT_FLAGS;
 
         st->counter = ++counter;
-        st->current_entry = current_entry = ((current_entry + 1) >= st->entries) ? 0 : current_entry + 1;
+        st->db.current_entry = current_entry = ((current_entry + 1) >= st->db.entries) ? 0 : current_entry + 1;
 
         st->last_updated.tv_sec = (time_t) (last_ut / USEC_PER_SEC);
         st->last_updated.tv_usec = 0;
@@ -1507,7 +1511,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
     if(unlikely(rrdhost_has_rrdpush_sender_enabled(st->rrdhost)))
         stream_buffer = rrdset_push_metric_initialize(st, now.tv_sec);
 
-    netdata_spinlock_lock(&st->data_collection_lock);
+    spinlock_lock(&st->data_collection_lock);
 
     if (pending_rrdset_next)
         rrdset_timed_next(st, now, 0ULL);
@@ -1529,7 +1533,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
 
     RRDSET_FLAGS rrdset_flags = rrdset_flag_check(st, ~0);
     if(unlikely(rrdset_flags & RRDSET_FLAG_COLLECTION_FINISHED)) {
-        netdata_spinlock_unlock(&st->data_collection_lock);
+        spinlock_unlock(&st->data_collection_lock);
         return;
     }
 
@@ -1539,9 +1543,10 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
     }
 
     // check if the chart has a long time to be updated
-    if(unlikely(st->usec_since_last_update > MAX(st->entries, 60) * update_every_ut)) {
-        info("host '%s', chart '%s': took too long to be updated (counter #%zu, update #%zu, %0.3" NETDATA_DOUBLE_MODIFIER
-            " secs). Resetting it.", rrdhost_hostname(st->rrdhost), rrdset_id(st), st->counter, st->counter_done, (NETDATA_DOUBLE)st->usec_since_last_update / USEC_PER_SEC);
+    if(unlikely(st->usec_since_last_update > MAX(st->db.entries, 60) * update_every_ut)) {
+        info("host '%s', chart '%s': took too long to be updated (counter #%u, update #%u, %0.3" NETDATA_DOUBLE_MODIFIER
+            " secs). Resetting it.", rrdhost_hostname(st->rrdhost), rrdset_id(st), st->counter, st->counter_done,
+            (NETDATA_DOUBLE)st->usec_since_last_update / USEC_PER_SEC);
         rrdset_reset(st);
         st->usec_since_last_update = update_every_ut;
         store_this_entry = 0;
@@ -1579,7 +1584,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
     }
 
     // check if we will re-write the entire data set
-    if(unlikely(dt_usec(&st->last_collected_time, &st->last_updated) > st->entries * update_every_ut &&
+    if(unlikely(dt_usec(&st->last_collected_time, &st->last_updated) > st->db.entries * update_every_ut &&
                 st->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)) {
         info(
             "'%s': too old data (last updated at %"PRId64".%"PRId64", last collected at %"PRId64".%"PRId64"). "
@@ -1659,7 +1664,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
         rda->rd = dictionary_acquired_item_value(rda->item);
 
         // calculate totals
-        if(likely(rd->updated)) {
+        if(likely(rrddim_check_updated(rd))) {
             // if the new is smaller than the old (an overflow, or reset), set the old equal to the new
             // to reset the calculation (it will give zero as the calculation for this second)
             if(unlikely(rd->algorithm == RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL && rd->last_collected_value > rd->collected_value)) {
@@ -1700,7 +1705,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
         rd = rda->rd;
         if(unlikely(!rd)) continue;
 
-        if(unlikely(!rd->updated)) {
+        if(unlikely(!rrddim_check_updated(rd))) {
             rd->calculated_value = 0;
             continue;
         }
@@ -1905,7 +1910,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
         rd = rda->rd;
         if(unlikely(!rd)) continue;
 
-        if(unlikely(!rd->updated))
+        if(unlikely(!rrddim_check_updated(rd)))
             continue;
 
         rrdset_debug(st, "%s: setting last_collected_value (old: " COLLECTED_NUMBER_FORMAT ") to last_collected_value (new: " COLLECTED_NUMBER_FORMAT ")", rrddim_name(rd), rd->last_collected_value, rd->collected_value);
@@ -1943,7 +1948,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
 
         rd->calculated_value = 0;
         rd->collected_value = 0;
-        rd->updated = 0;
+        rrddim_clear_updated(rd);
 
         rrdset_debug(st, "%s: END "
                     " last_collected_value = " COLLECTED_NUMBER_FORMAT
@@ -1958,7 +1963,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
         );
     }
 
-    netdata_spinlock_unlock(&st->data_collection_lock);
+    spinlock_unlock(&st->data_collection_lock);
     rrdset_push_metrics_finished(&stream_buffer, st);
 
     // ALL DONE ABOUT THE DATA UPDATE
@@ -1991,6 +1996,8 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
 }
 
 time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
+    if(unlikely(update_every_s == st->update_every))
+        return st->update_every;
 
     internal_error(true, "RRDSET '%s' switching update every from %d to %d",
                    rrdset_id(st), (int)st->update_every, (int)update_every_s);
@@ -2007,10 +2014,6 @@ time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
                         rd->tiers[tier].db_collection_handle,
                         (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
         }
-
-        assert(rd->update_every == (int) prev_update_every_s &&
-               "chart's update every differs from the update every of its dimensions");
-        rd->update_every = st->update_every;
     }
     rrddim_foreach_done(rd);
 
@@ -2094,10 +2097,10 @@ struct rrdset_map_save_v019 {
 };
 
 void rrdset_memory_file_update(RRDSET *st) {
-    if(!st->st_on_file) return;
-    struct rrdset_map_save_v019 *st_on_file = st->st_on_file;
+    if(!st->db.st_on_file) return;
+    struct rrdset_map_save_v019 *st_on_file = st->db.st_on_file;
 
-    st_on_file->current_entry = st->current_entry;
+    st_on_file->current_entry = st->db.current_entry;
     st_on_file->counter = st->counter;
     st_on_file->usec_since_last_update = st->usec_since_last_update;
     st_on_file->last_updated.tv_sec = st->last_updated.tv_sec;
@@ -2105,41 +2108,41 @@ void rrdset_memory_file_update(RRDSET *st) {
 }
 
 const char *rrdset_cache_filename(RRDSET *st) {
-    if(!st->st_on_file) return NULL;
-    struct rrdset_map_save_v019 *st_on_file = st->st_on_file;
+    if(!st->db.st_on_file) return NULL;
+    struct rrdset_map_save_v019 *st_on_file = st->db.st_on_file;
     return st_on_file->cache_filename;
 }
 
 const char *rrdset_cache_dir(RRDSET *st) {
-    if(!st->cache_dir)
-        st->cache_dir = rrdhost_cache_dir_for_rrdset_alloc(st->rrdhost, rrdset_id(st));
+    if(!st->db.cache_dir)
+        st->db.cache_dir = rrdhost_cache_dir_for_rrdset_alloc(st->rrdhost, rrdset_id(st));
 
-    return st->cache_dir;
+    return st->db.cache_dir;
 }
 
 void rrdset_memory_file_free(RRDSET *st) {
-    if(!st->st_on_file) return;
+    if(!st->db.st_on_file) return;
 
     // needed for memory mode map, to save the latest state
     rrdset_memory_file_update(st);
 
-    struct rrdset_map_save_v019 *st_on_file = st->st_on_file;
+    struct rrdset_map_save_v019 *st_on_file = st->db.st_on_file;
     __atomic_sub_fetch(&rrddim_db_memory_size, st_on_file->memsize, __ATOMIC_RELAXED);
     netdata_munmap(st_on_file, st_on_file->memsize);
 
     // remove the pointers from the RRDDIM
-    st->st_on_file = NULL;
+    st->db.st_on_file = NULL;
 }
 
 void rrdset_memory_file_save(RRDSET *st) {
-    if(!st->st_on_file) return;
+    if(!st->db.st_on_file) return;
 
     rrdset_memory_file_update(st);
 
-    struct rrdset_map_save_v019 *st_on_file = st->st_on_file;
+    struct rrdset_map_save_v019 *st_on_file = st->db.st_on_file;
     if(st_on_file->rrd_memory_mode != RRD_MEMORY_MODE_SAVE) return;
 
-    memory_file_save(st_on_file->cache_filename, st->st_on_file, st_on_file->memsize);
+    memory_file_save(st_on_file->cache_filename, st->db.st_on_file, st_on_file->memsize);
 }
 
 bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mode) {
@@ -2166,7 +2169,7 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
         error("File '%s' contents are not for chart '%s'. Clearing it.", fullfilename, rrdset_id(st));
         memset(st_on_file, 0, size);
     }
-    else if(st_on_file->memsize != size || st_on_file->entries != st->entries) {
+    else if(st_on_file->memsize != size || st_on_file->entries != st->db.entries) {
         error("File '%s' does not have the desired size. Clearing it.", fullfilename);
         memset(st_on_file, 0, size);
     }
@@ -2174,7 +2177,7 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
         error("File '%s' does not have the desired granularity. Clearing it.", fullfilename);
         memset(st_on_file, 0, size);
     }
-    else if((now_s - st_on_file->last_updated.tv_sec) > st->update_every * st->entries) {
+    else if((now_s - st_on_file->last_updated.tv_sec) > (long)st->update_every * (long)st->db.entries) {
         info("File '%s' is too old. Clearing it.", fullfilename);
         memset(st_on_file, 0, size);
     }
@@ -2194,14 +2197,14 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
     }
 
     // copy the useful values to st
-    st->current_entry = st_on_file->current_entry;
+    st->db.current_entry = st_on_file->current_entry;
     st->counter = st_on_file->counter;
     st->usec_since_last_update = st_on_file->usec_since_last_update;
     st->last_updated.tv_sec = st_on_file->last_updated.tv_sec;
     st->last_updated.tv_usec = st_on_file->last_updated.tv_usec;
 
     // link it to st
-    st->st_on_file = st_on_file;
+    st->db.st_on_file = st_on_file;
 
     // clear everything
     memset(st_on_file, 0, size);
@@ -2211,7 +2214,7 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
     strcpy(st_on_file->cache_filename, fullfilename);
     strcpy(st_on_file->magic, RRDSET_MAGIC_V019);
     st_on_file->memsize = size;
-    st_on_file->entries = st->entries;
+    st_on_file->entries = st->db.entries;
     st_on_file->update_every = st->update_every;
     st_on_file->rrd_memory_mode = memory_mode;
 

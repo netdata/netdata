@@ -522,7 +522,7 @@ static int store_chart_metadata(RRDSET *st)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, ++param, (int) st->entries);
+    rc = sqlite3_bind_int(res, ++param, (int) st->db.entries);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -1485,7 +1485,6 @@ static inline void queue_metadata_cmd(enum metadata_opcode opcode, const void *p
     cmd.param[1] = param1;
     cmd.completion = NULL;
     metadata_enq_cmd(&metasync_worker, &cmd);
-
 }
 
 // Public

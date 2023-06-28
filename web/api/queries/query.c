@@ -1952,7 +1952,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s
     if(unlikely(!t)) return;
 
     time_t latest_time_s = storage_engine_latest_time_s(t->backend, t->db_metric_handle);
-    time_t granularity = (time_t)t->tier_grouping * (time_t)rd->update_every;
+    time_t granularity = (time_t)t->tier_grouping * (time_t)rd->rrdset->update_every;
     time_t time_diff   = now_s - latest_time_s;
 
     // if the user wants only NEW backfilling, and we don't have any data
@@ -2516,13 +2516,6 @@ void rrdr_json_group_by_labels(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTION
     buffer_json_object_close(wb); // key
 }
 
-static int group_by_label_is_space(char c) {
-    if(c == ',' || c == '|')
-        return 1;
-
-    return 0;
-}
-
 static void rrd2rrdr_set_timestamps(RRDR *r) {
     QUERY_TARGET *qt = r->internal.qt;
 
@@ -2755,9 +2748,9 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
         if (qt->request.group_by[g].group_by & RRDR_GROUP_BY_LABEL &&
             qt->request.group_by[g].group_by_label && *qt->request.group_by[g].group_by_label)
-            qt->group_by[g].used = quoted_strings_splitter(
+            qt->group_by[g].used = quoted_strings_splitter_query_group_by_label(
                     qt->request.group_by[g].group_by_label, qt->group_by[g].label_keys,
-                    GROUP_BY_MAX_LABEL_KEYS, group_by_label_is_space);
+                    GROUP_BY_MAX_LABEL_KEYS);
 
         if (!qt->group_by[g].used)
             qt->request.group_by[g].group_by &= ~RRDR_GROUP_BY_LABEL;
@@ -3168,7 +3161,10 @@ static void rrdr2rrdr_group_by_partial_trimming(RRDR *r) {
 }
 
 static void rrdr2rrdr_group_by_calculate_percentage_of_group(RRDR *r) {
-    if(!r->vh || query_target_aggregatable(r->internal.qt))
+    if(!r->vh)
+        return;
+
+    if(query_target_aggregatable(r->internal.qt) && query_has_group_by_aggregation_percentage(r->internal.qt))
         return;
 
     for(size_t i = 0; i < r->n ;i++) {
@@ -3288,7 +3284,6 @@ static void rrd2rrdr_convert_values_to_percentage_of_total(RRDR *r) {
 
 static RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
     QUERY_TARGET *qt = r_tmp->internal.qt;
-    RRDR_OPTIONS options = qt->window.options;
 
     if(!r_tmp->group_by.r) {
         // v1 query

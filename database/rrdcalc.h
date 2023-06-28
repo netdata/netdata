@@ -136,6 +136,7 @@ struct rrdcalc {
     int delay_up_current;           // the current up notification delay duration
     int delay_down_current;         // the current down notification delay duration
     int delay_last;                 // the last delay we used
+    ALARM_ENTRY *ae;                // last alarm entry
 
     // ------------------------------------------------------------------------
     // variables this alarm exposes to the rest of the alarms
@@ -211,6 +212,7 @@ struct alert_config {
     STRING *repeat;
     STRING *host_labels;
     STRING *chart_labels;
+    STRING *source;
 
     STRING *p_db_lookup_dimensions;
     STRING *p_db_lookup_method;

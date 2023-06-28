@@ -13,17 +13,50 @@
 #define ACLK_PUBACKS_CONN_STABLE 3
 #endif /* ENABLE_ACLK */
 
+typedef enum __attribute__((packed)) {
+    ACLK_STATUS_CONNECTED = 0,
+    ACLK_STATUS_INITIALIZING,
+    ACLK_STATUS_DISABLED,
+    ACLK_STATUS_NO_CLOUD_URL,
+    ACLK_STATUS_INVALID_CLOUD_URL,
+    ACLK_STATUS_NOT_CLAIMED,
+    ACLK_STATUS_ENV_ENDPOINT_UNREACHABLE,
+    ACLK_STATUS_ENV_RESPONSE_NOT_200,
+    ACLK_STATUS_ENV_RESPONSE_EMPTY,
+    ACLK_STATUS_ENV_RESPONSE_NOT_JSON,
+    ACLK_STATUS_ENV_FAILED,
+    ACLK_STATUS_BLOCKED,
+    ACLK_STATUS_NO_OLD_PROTOCOL,
+    ACLK_STATUS_NO_PROTOCOL_CAPABILITY,
+    ACLK_STATUS_INVALID_ENV_AUTH_URL,
+    ACLK_STATUS_INVALID_ENV_TRANSPORT_IDX,
+    ACLK_STATUS_INVALID_ENV_TRANSPORT_URL,
+    ACLK_STATUS_INVALID_OTP,
+    ACLK_STATUS_NO_LWT_TOPIC,
+} ACLK_STATUS;
+
+extern ACLK_STATUS aclk_status;
+extern const char *aclk_cloud_base_url;
+const char *aclk_status_to_string(void);
+
 extern int aclk_connected;
 extern int aclk_ctx_based;
 extern int aclk_disable_runtime;
 extern int aclk_stats_enabled;
 extern int aclk_kill_link;
 
+extern time_t last_conn_time_mqtt;
+extern time_t last_conn_time_appl;
+extern time_t last_disconnect_time;
+extern time_t next_connection_attempt;
+extern float last_backoff_value;
+
 extern usec_t aclk_session_us;
 extern time_t aclk_session_sec;
 
 extern time_t aclk_block_until;
 
+extern int aclk_connection_counter;
 extern int disconnect_req;
 
 #ifdef ENABLE_ACLK

@@ -2,17 +2,6 @@
 
 #include "rrdpush.h"
 
-// IMPORTANT: to add workers, you have to edit WORKER_PARSER_FIRST_JOB accordingly
-#define WORKER_RECEIVER_JOB_BYTES_READ (WORKER_PARSER_FIRST_JOB - 1)
-#define WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED (WORKER_PARSER_FIRST_JOB - 2)
-
-// this has to be the same at parser.h
-#define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION (WORKER_PARSER_FIRST_JOB - 3)
-
-#if WORKER_PARSER_FIRST_JOB < 1
-#error The define WORKER_PARSER_FIRST_JOB needs to be at least 1
-#endif
-
 extern struct config stream_config;
 
 void receiver_state_free(struct receiver_state *rpt) {
@@ -31,17 +20,20 @@ void receiver_state_free(struct receiver_state *rpt) {
     freez(rpt->program_version);
 
 #ifdef ENABLE_HTTPS
-    if(rpt->ssl.conn)
-        SSL_free(rpt->ssl.conn);
+    netdata_ssl_close(&rpt->ssl);
 #endif
 
+    if(rpt->fd != -1) {
+        internal_error(true, "closing socket...");
+        close(rpt->fd);
+    }
+
 #ifdef ENABLE_COMPRESSION
-    if (rpt->decompressor)
-        rpt->decompressor->destroy(&rpt->decompressor);
+    rrdpush_decompressor_destroy(&rpt->decompressor);
 #endif
 
     if(rpt->system_info)
-        rrdhost_system_info_free(rpt->system_info);
+         rrdhost_system_info_free(rpt->system_info);
 
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_receivers, sizeof(*rpt), __ATOMIC_RELAXED);
 
@@ -50,63 +42,41 @@ void receiver_state_free(struct receiver_state *rpt) {
 
 #include "collectors/plugins.d/pluginsd_parser.h"
 
-PARSER_RC streaming_claimed_id(char **words, size_t num_words, void *user)
-{
-    const char *host_uuid_str = get_word(words, num_words, 1);
-    const char *claim_id_str = get_word(words, num_words, 2);
+// IMPORTANT: to add workers, you have to edit WORKER_PARSER_FIRST_JOB accordingly
+#define WORKER_RECEIVER_JOB_BYTES_READ (WORKER_PARSER_FIRST_JOB - 1)
+#define WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED (WORKER_PARSER_FIRST_JOB - 2)
 
-    if (!host_uuid_str || !claim_id_str) {
-        error("Command CLAIMED_ID came malformed, uuid = '%s', claim_id = '%s'",
-              host_uuid_str ? host_uuid_str : "[unset]",
-              claim_id_str ? claim_id_str : "[unset]");
-        return PARSER_RC_ERROR;
-    }
+// this has to be the same at parser.h
+#define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION (WORKER_PARSER_FIRST_JOB - 3)
 
-    uuid_t uuid;
-    RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
+#if WORKER_PARSER_FIRST_JOB < 1
+#error The define WORKER_PARSER_FIRST_JOB needs to be at least 1
+#endif
 
-    // We don't need the parsed UUID
-    // just do it to check the format
-    if(uuid_parse(host_uuid_str, uuid)) {
-        error("1st parameter (host GUID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", host_uuid_str);
-        return PARSER_RC_ERROR;
-    }
-    if(uuid_parse(claim_id_str, uuid) && strcmp(claim_id_str, "NULL")) {
-        error("2nd parameter (Claim ID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", claim_id_str);
-        return PARSER_RC_ERROR;
-    }
-
-    if(strcmp(host_uuid_str, host->machine_guid)) {
-        error("Claim ID is for host \"%s\" but it came over connection for \"%s\"", host_uuid_str, host->machine_guid);
-        return PARSER_RC_OK; //the message is OK problem must be somewhere else
-    }
-
-    rrdhost_aclk_state_lock(host);
-    if (host->aclk_state.claimed_id)
-        freez(host->aclk_state.claimed_id);
-    host->aclk_state.claimed_id = strcmp(claim_id_str, "NULL") ? strdupz(claim_id_str) : NULL;
-    rrdhost_aclk_state_unlock(host);
-
-    rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_CLAIMID |RRDHOST_FLAG_METADATA_UPDATE);
-
-    rrdpush_claimed_id(host);
-
-    return PARSER_RC_OK;
-}
-
-static int read_stream(struct receiver_state *r, char* buffer, size_t size) {
+static inline int read_stream(struct receiver_state *r, char* buffer, size_t size) {
     if(unlikely(!size)) {
         internal_error(true, "%s() asked to read zero bytes", __FUNCTION__);
         return 0;
     }
 
+    int tries = 100;
+    ssize_t bytes_read;
+
+    do {
+        errno = 0;
+
 #ifdef ENABLE_HTTPS
-    if (r->ssl.conn && r->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE)
-        return (int)netdata_ssl_read(r->ssl.conn, buffer, size);
+        if (SSL_connection(&r->ssl))
+            bytes_read = netdata_ssl_read(&r->ssl, buffer, size);
+        else
+            bytes_read = read(r->fd, buffer, size);
+#else
+        bytes_read = read(r->fd, buffer, size);
 #endif
 
-    ssize_t bytes_read = read(r->fd, buffer, size);
-    if(bytes_read == 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINPROGRESS)) {
+    } while(bytes_read < 0 && errno == EINTR && tries--);
+
+    if((bytes_read == 0 || bytes_read == -1) && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINPROGRESS)) {
         error("STREAM: %s(): timeout while waiting for data on socket!", __FUNCTION__);
         bytes_read = -3;
     }
@@ -119,27 +89,10 @@ static int read_stream(struct receiver_state *r, char* buffer, size_t size) {
         bytes_read = -2;
     }
 
-//    do {
-//        bytes_read = (int) fread(buffer, 1, size, fp);
-//        if (unlikely(bytes_read <= 0)) {
-//            if(feof(fp)) {
-//                internal_error(true, "%s(): fread() failed with EOF", __FUNCTION__);
-//                bytes_read = -2;
-//            }
-//            else if(ferror(fp)) {
-//                internal_error(true, "%s(): fread() failed with ERROR", __FUNCTION__);
-//                bytes_read = -3;
-//            }
-//            else bytes_read = 0;
-//        }
-//        else
-//            worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, bytes_read);
-//    } while(bytes_read == 0);
-
     return (int)bytes_read;
 }
 
-static bool receiver_read_uncompressed(struct receiver_state *r) {
+static inline bool receiver_read_uncompressed(struct receiver_state *r) {
 #ifdef NETDATA_INTERNAL_CHECKS
     if(r->read_buffer[r->read_len] != '\0')
         fatal("%s(): read_buffer does not start with zero", __FUNCTION__ );
@@ -159,19 +112,17 @@ static bool receiver_read_uncompressed(struct receiver_state *r) {
 }
 
 #ifdef ENABLE_COMPRESSION
-static bool receiver_read_compressed(struct receiver_state *r) {
+static inline bool receiver_read_compressed(struct receiver_state *r) {
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(r->read_buffer[r->read_len] != '\0')
-        fatal("%s: read_buffer does not start with zero #2", __FUNCTION__ );
-#endif
+    internal_fatal(r->read_buffer[r->read_len] != '\0',
+                   "%s: read_buffer does not start with zero #2", __FUNCTION__ );
 
     // first use any available uncompressed data
-    if (r->decompressor->decompressed_bytes_in_buffer(r->decompressor)) {
+    if (likely(rrdpush_decompressed_bytes_in_buffer(&r->decompressor))) {
         size_t available = sizeof(r->read_buffer) - r->read_len - 1;
-        if (available) {
-            size_t len = r->decompressor->get(r->decompressor, r->read_buffer + r->read_len, available);
-            if (!len) {
+        if (likely(available)) {
+            size_t len = rrdpush_decompressor_get(&r->decompressor, r->read_buffer + r->read_len, available);
+            if (unlikely(!len)) {
                 internal_error(true, "decompressor returned zero length #1");
                 return false;
             }
@@ -180,7 +131,7 @@ static bool receiver_read_compressed(struct receiver_state *r) {
             r->read_buffer[r->read_len] = '\0';
         }
         else
-            internal_error(true, "The line to read is too big! Already have %d bytes in read_buffer.", r->read_len);
+            internal_fatal(true, "The line to read is too big! Already have %d bytes in read_buffer.", r->read_len);
 
         return true;
     }
@@ -188,8 +139,9 @@ static bool receiver_read_compressed(struct receiver_state *r) {
     // no decompressed data available
     // read the compression signature of the next block
 
-    if(unlikely(r->read_len + r->decompressor->signature_size > sizeof(r->read_buffer) - 1)) {
-        internal_error(true, "The last incomplete line does not leave enough room for the next compression header! Already have %d bytes in read_buffer.", r->read_len);
+    if(unlikely(r->read_len + r->decompressor.signature_size > sizeof(r->read_buffer) - 1)) {
+        internal_error(true, "The last incomplete line does not leave enough room for the next compression header! "
+                             "Already have %d bytes in read_buffer.", r->read_len);
         return false;
     }
 
@@ -197,19 +149,19 @@ static bool receiver_read_compressed(struct receiver_state *r) {
     // we have to do a loop here, because read_stream() may return less than the data we need
     int bytes_read = 0;
     do {
-        int ret = read_stream(r, r->read_buffer + r->read_len + bytes_read, r->decompressor->signature_size - bytes_read);
+        int ret = read_stream(r, r->read_buffer + r->read_len + bytes_read, r->decompressor.signature_size - bytes_read);
         if (unlikely(ret <= 0))
             return false;
 
         bytes_read += ret;
-    } while(unlikely(bytes_read < (int)r->decompressor->signature_size));
+    } while(unlikely(bytes_read < (int)r->decompressor.signature_size));
 
     worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, (NETDATA_DOUBLE)bytes_read);
 
-    if(unlikely(bytes_read != (int)r->decompressor->signature_size))
-        fatal("read %d bytes, but expected compression signature of size %zu", bytes_read, r->decompressor->signature_size);
+    if(unlikely(bytes_read != (int)r->decompressor.signature_size))
+        fatal("read %d bytes, but expected compression signature of size %zu", bytes_read, r->decompressor.signature_size);
 
-    size_t compressed_message_size = r->decompressor->start(r->decompressor, r->read_buffer + r->read_len, bytes_read);
+    size_t compressed_message_size = rrdpush_decompressor_start(&r->decompressor, r->read_buffer + r->read_len, bytes_read);
     if (unlikely(!compressed_message_size)) {
         internal_error(true, "multiplexed uncompressed data in compressed stream!");
         r->read_len += bytes_read;
@@ -246,8 +198,8 @@ static bool receiver_read_compressed(struct receiver_state *r) {
     worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, (NETDATA_DOUBLE)compressed_bytes_read);
 
     // decompress the compressed block
-    size_t bytes_to_parse = r->decompressor->decompress(r->decompressor, compressed, compressed_bytes_read);
-    if (!bytes_to_parse) {
+    size_t bytes_to_parse = rrdpush_decompress(&r->decompressor, compressed, compressed_bytes_read);
+    if (unlikely(!bytes_to_parse)) {
         internal_error(true, "no bytes to parse.");
         return false;
     }
@@ -255,8 +207,8 @@ static bool receiver_read_compressed(struct receiver_state *r) {
     worker_set_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_to_parse);
 
     // fill read buffer with decompressed data
-    size_t len = (int)r->decompressor->get(r->decompressor, r->read_buffer + r->read_len, sizeof(r->read_buffer) - r->read_len - 1);
-    if (!len) {
+    size_t len = (int) rrdpush_decompressor_get(&r->decompressor, r->read_buffer + r->read_len, sizeof(r->read_buffer) - r->read_len - 1);
+    if (unlikely(!len)) {
         internal_error(true, "decompressor returned zero length #2");
         return false;
     }
@@ -266,7 +218,7 @@ static bool receiver_read_compressed(struct receiver_state *r) {
     return true;
 }
 #else // !ENABLE_COMPRESSION
-static bool receiver_read_compressed(struct receiver_state *r) {
+static inline bool receiver_read_compressed(struct receiver_state *r) {
     return receiver_read_uncompressed(r);
 }
 #endif // ENABLE_COMPRESSION
@@ -274,7 +226,7 @@ static bool receiver_read_compressed(struct receiver_state *r) {
 /* Produce a full line if one exists, statefully return where we start next time.
  * When we hit the end of the buffer with a partial line move it to the beginning for the next fill.
  */
-static char *receiver_next_line(struct receiver_state *r, char *buffer, size_t buffer_length, size_t *pos) {
+static inline char *receiver_next_line(struct receiver_state *r, char *buffer, size_t buffer_length, size_t *pos) {
     size_t start = *pos;
 
     char *ss = &r->read_buffer[start];
@@ -323,28 +275,52 @@ static char *receiver_next_line(struct receiver_state *r, char *buffer, size_t b
     return NULL;
 }
 
-static void streaming_parser_thread_cleanup(void *ptr) {
-    PARSER *parser = (PARSER *)ptr;
-    rrd_collector_finished();
-    parser_destroy(parser);
+bool plugin_is_enabled(struct plugind *cd);
+
+static void receiver_set_exit_reason(struct receiver_state *rpt, STREAM_HANDSHAKE reason, bool force) {
+    if(force || !rpt->exit.reason)
+        rpt->exit.reason = reason;
 }
 
-bool plugin_is_enabled(struct plugind *cd);
+static inline bool receiver_should_continue(struct receiver_state *rpt) {
+    static __thread size_t counter = 0;
+
+    if(unlikely(rpt->exit.shutdown)) {
+        receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN, false);
+        return false;
+    }
+
+    // check every 1000 lines read
+    if((counter++ % 1000) != 0) return true;
+
+    if(unlikely(!service_running(SERVICE_STREAMING))) {
+        receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_NETDATA_EXIT, false);
+        return false;
+    }
+
+    netdata_thread_testcancel();
+
+    rpt->last_msg_t = now_monotonic_sec();
+
+    return true;
+}
 
 static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, int fd, void *ssl) {
     size_t result;
 
-    PARSER_USER_OBJECT user = {
-        .enabled = plugin_is_enabled(cd),
-        .host = rpt->host,
-        .opaque = rpt,
-        .cd = cd,
-        .trust_durations = 1,
-        .capabilities = rpt->capabilities,
-    };
+    PARSER *parser = NULL;
+    {
+        PARSER_USER_OBJECT user = {
+                .enabled = plugin_is_enabled(cd),
+                .host = rpt->host,
+                .opaque = rpt,
+                .cd = cd,
+                .trust_durations = 1,
+                .capabilities = rpt->capabilities,
+        };
 
-    PARSER *parser = parser_init(&user, NULL, NULL, fd,
-                                 PARSER_INPUT_SPLIT, ssl);
+        parser = parser_init(&user, NULL, NULL, fd, PARSER_INPUT_SPLIT, ssl);
+    }
 
     pluginsd_keywords_init(parser, PARSER_INIT_STREAMING);
 
@@ -352,22 +328,17 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
 
     // this keeps the parser with its current value
     // so, parser needs to be allocated before pushing it
-    netdata_thread_cleanup_push(streaming_parser_thread_cleanup, parser);
-
-    parser_add_keyword(parser, "CLAIMED_ID", streaming_claimed_id);
-
-    user.parser = parser;
+    netdata_thread_cleanup_push(pluginsd_process_thread_cleanup, parser);
 
     bool compressed_connection = false;
+
 #ifdef ENABLE_COMPRESSION
     if(stream_has_capability(rpt, STREAM_CAP_COMPRESSION)) {
         compressed_connection = true;
-
-        if (!rpt->decompressor)
-            rpt->decompressor = create_decompressor();
-        else
-            rpt->decompressor->reset(rpt->decompressor);
+        rrdpush_decompressor_reset(&rpt->decompressor);
     }
+    else
+        rrdpush_decompressor_destroy(&rpt->decompressor);
 #endif
 
     rpt->read_buffer[0] = '\0';
@@ -375,51 +346,27 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
 
     size_t read_buffer_start = 0;
     char buffer[PLUGINSD_LINE_MAX + 2] = "";
-    while(service_running(SERVICE_STREAMING)) {
-        netdata_thread_testcancel();
+    while(receiver_should_continue(rpt)) {
 
         if(!receiver_next_line(rpt, buffer, PLUGINSD_LINE_MAX + 2, &read_buffer_start)) {
-            bool have_new_data;
-            if(likely(compressed_connection))
-                have_new_data = receiver_read_compressed(rpt);
-            else
-                have_new_data = receiver_read_uncompressed(rpt);
+            bool have_new_data = compressed_connection ? receiver_read_compressed(rpt) : receiver_read_uncompressed(rpt);
 
             if(unlikely(!have_new_data)) {
-                if(!rpt->exit.reason)
-                    rpt->exit.reason = "SOCKET READ ERROR";
-
+                receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_ERROR, false);
                 break;
             }
 
-            rpt->last_msg_t = now_realtime_sec();
             continue;
-        }
-
-        if(unlikely(!service_running(SERVICE_STREAMING))) {
-            if(!rpt->exit.reason)
-                rpt->exit.reason = "NETDATA EXIT";
-            goto done;
-        }
-        if(unlikely(rpt->exit.shutdown)) {
-            if(!rpt->exit.reason)
-                rpt->exit.reason = "SHUTDOWN REQUESTED";
-
-            goto done;
         }
 
         if (unlikely(parser_action(parser,  buffer))) {
             internal_error(true, "parser_action() failed on keyword '%s'.", buffer);
-
-            if(!rpt->exit.reason)
-                rpt->exit.reason = "PARSER FAILED";
-
+            receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
             break;
         }
     }
 
-done:
-    result = user.data_collections_count;
+    result = parser ? parser->user.data_collections_count : 0;
 
     // free parser with the pop function
     netdata_thread_cleanup_pop(1);
@@ -443,8 +390,11 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
 
     netdata_mutex_lock(&host->receiver_lock);
 
-    if (!host->receiver || host->receiver == rpt) {
+    if (!host->receiver) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
+
+        host->rrdpush_receiver_connection_counter++;
+        __atomic_add_fetch(&localhost->connected_children_count, 1, __ATOMIC_RELAXED);
 
         host->receiver = rpt;
         rpt->host = host;
@@ -474,6 +424,8 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
         aclk_queue_node_info(rpt->host, true);
 
+        rrdpush_reset_destinations_postpone_time(host);
+
         set_this = true;
     }
 
@@ -494,6 +446,9 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
 
         // Make sure that we detach this thread and don't kill a freshly arriving receiver
         if(host->receiver == rpt) {
+            __atomic_sub_fetch(&localhost->connected_children_count, 1, __ATOMIC_RELAXED);
+            rrdhost_flag_set(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
+
             host->trigger_chart_obsoletion_check = 0;
             host->child_connect_time = 0;
             host->child_disconnected_time = now_realtime_sec();
@@ -501,25 +456,26 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
             if (rpt->config.health_enabled == CONFIG_BOOLEAN_AUTO)
                 host->health.health_enabled = 0;
 
-            rrdpush_sender_thread_stop(host, "RECEIVER LEFT", false);
+            rrdpush_sender_thread_stop(host, STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT, false);
 
             signal_rrdcontext = true;
             rrdpush_receiver_replication_reset(host);
 
-            if (host->receiver == rpt)
-                host->receiver = NULL;
-
             rrdhost_flag_set(host, RRDHOST_FLAG_ORPHAN);
+            host->receiver = NULL;
+            host->rrdpush_last_receiver_exit_reason = rpt->exit.reason;
         }
 
         netdata_mutex_unlock(&host->receiver_lock);
 
         if(signal_rrdcontext)
             rrdcontext_host_child_disconnected(host);
+
+        rrdpush_reset_destinations_postpone_time(host);
     }
 }
 
-bool stop_streaming_receiver(RRDHOST *host, const char *reason) {
+bool stop_streaming_receiver(RRDHOST *host, STREAM_HANDSHAKE reason) {
     bool ret = false;
 
     netdata_mutex_lock(&host->receiver_lock);
@@ -527,7 +483,7 @@ bool stop_streaming_receiver(RRDHOST *host, const char *reason) {
     if(host->receiver) {
         if(!host->receiver->exit.shutdown) {
             host->receiver->exit.shutdown = true;
-            host->receiver->exit.reason = reason;
+            receiver_set_exit_reason(host->receiver, reason, true);
             shutdown(host->receiver->fd, SHUT_RDWR);
         }
 
@@ -549,13 +505,25 @@ bool stop_streaming_receiver(RRDHOST *host, const char *reason) {
               "thread %d takes too long to stop, giving up..."
         , rrdhost_hostname(host)
         , host->receiver->client_ip, host->receiver->client_port
-        , gettid());
+        , host->receiver->tid);
     else
         ret = true;
 
     netdata_mutex_unlock(&host->receiver_lock);
 
     return ret;
+}
+
+static void rrdpush_send_error_on_taken_over_connection(struct receiver_state *rpt, const char *msg) {
+    (void) send_timeout(
+#ifdef ENABLE_HTTPS
+            &rpt->ssl,
+#endif
+            rpt->fd,
+            (char *)msg,
+            strlen(msg),
+            0,
+            5);
 }
 
 void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, const char *status) {
@@ -573,19 +541,14 @@ void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, con
           , rpt->client_ip, rpt->client_port
           , msg
           , status
-          , rpt->exit.reason?" (":""
-          , rpt->exit.reason?rpt->exit.reason:""
-          , rpt->exit.reason?")":""
+          , rpt->exit.reason != STREAM_HANDSHAKE_NEVER?" (":""
+          , stream_handshake_error_to_string(rpt->exit.reason)
+          , rpt->exit.reason != STREAM_HANDSHAKE_NEVER?")":""
     );
 
 }
 
-static void rrdhost_reset_destinations(RRDHOST *host) {
-    for (struct rrdpush_destinations *d = host->destinations; d; d = d->next)
-        d->postpone_reconnection_until = 0;
-}
-
-static int rrdpush_receive(struct receiver_state *rpt)
+static void rrdpush_receive(struct receiver_state *rpt)
 {
     rpt->config.mode = default_rrd_memory_mode;
     rpt->config.history = default_rrd_history_entries;
@@ -653,7 +616,6 @@ static int rrdpush_receive(struct receiver_state *rpt)
     rpt->config.rrdpush_compression = default_compression_enabled;
     rpt->config.rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->key, "enable compression", rpt->config.rrdpush_compression);
     rpt->config.rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->machine_guid, "enable compression", rpt->config.rrdpush_compression);
-    rpt->rrdpush_compression = (rpt->config.rrdpush_compression && default_compression_enabled);
 #endif  //ENABLE_COMPRESSION
 
     (void)appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");
@@ -689,14 +651,14 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
         if(!host) {
             rrdpush_receive_log_status(rpt, "failed to find/create host structure", "INTERNAL ERROR DROPPING CONNECTION");
-            close(rpt->fd);
-            return 1;
+            rrdpush_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_INTERNAL_ERROR);
+            goto cleanup;
         }
 
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
             rrdpush_receive_log_status(rpt, "host is initializing", "INITIALIZATION IN PROGRESS RETRY LATER");
-            close(rpt->fd);
-            return 1;
+            rrdpush_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_INITIALIZATION);
+            goto cleanup;
         }
 
         // system_info has been consumed by the host structure
@@ -704,15 +666,15 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
         if(!rrdhost_set_receiver(host, rpt)) {
             rrdpush_receive_log_status(rpt, "host is already served by another receiver", "DUPLICATE RECEIVER DROPPING CONNECTION");
-            close(rpt->fd);
-            return 1;
+            rrdpush_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_ALREADY_STREAMING);
+            goto cleanup;
         }
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
     info("STREAM '%s' [receive from [%s]:%s]: "
          "client willing to stream metrics for host '%s' with machine_guid '%s': "
-         "update every = %d, history = %ld, memory mode = %s, health %s,%s tags '%s'"
+         "update every = %d, history = %d, memory mode = %s, health %s,%s tags '%s'"
          , rpt->hostname
          , rpt->client_ip
          , rpt->client_port
@@ -750,7 +712,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
 #ifdef ENABLE_COMPRESSION
     if (stream_has_capability(rpt, STREAM_CAP_COMPRESSION)) {
-        if (!rpt->rrdpush_compression)
+        if (!rpt->config.rrdpush_compression)
             rpt->capabilities &= ~STREAM_CAP_COMPRESSION;
     }
 #endif
@@ -776,15 +738,16 @@ static int rrdpush_receive(struct receiver_state *rpt)
         }
 
         debug(D_STREAM, "Initial response to %s: %s", rpt->client_ip, initial_response);
-        if(send_timeout(
+        ssize_t bytes_sent = send_timeout(
 #ifdef ENABLE_HTTPS
                 &rpt->ssl,
 #endif
-                rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
+                rpt->fd, initial_response, strlen(initial_response), 0, 60);
 
+        if(bytes_sent != (ssize_t)strlen(initial_response)) {
+            internal_error(true, "Cannot send response, got %zd bytes, expecting %zu bytes", bytes_sent, strlen(initial_response));
             rrdpush_receive_log_status(rpt, "cannot reply back", "CANT REPLY DROPPING CONNECTION");
-            close(rpt->fd);
-            return 0;
+            goto cleanup;
         }
     }
 
@@ -813,14 +776,14 @@ static int rrdpush_receive(struct receiver_state *rpt)
 #ifdef ENABLE_ACLK
     // in case we have cloud connection we inform cloud
     // new child connected
-    if (netdata_cloud_setting)
+    if (netdata_cloud_enabled)
         aclk_host_state_update(rpt->host, 1);
 #endif
 
-    rrdhost_set_is_parent_label(++localhost->connected_children_count);
+    rrdhost_set_is_parent_label();
 
     // let it reconnect to parent immediately
-    rrdhost_reset_destinations(rpt->host);
+    rrdpush_reset_destinations_postpone_time(rpt->host);
 
     size_t count = streaming_parser(rpt, &cd, rpt->fd,
 #ifdef ENABLE_HTTPS
@@ -830,10 +793,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
 #endif
                                     );
 
-    rrdhost_flag_set(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
-
-    if(!rpt->exit.reason)
-        rpt->exit.reason = "PARSER EXIT";
+    receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_EXIT, false);
 
     {
         char msg[100 + 1];
@@ -844,15 +804,12 @@ static int rrdpush_receive(struct receiver_state *rpt)
 #ifdef ENABLE_ACLK
     // in case we have cloud connection we inform cloud
     // a child disconnected
-    if (netdata_cloud_setting)
+    if (netdata_cloud_enabled)
         aclk_host_state_update(rpt->host, 0);
 #endif
 
-    rrdhost_set_is_parent_label(--localhost->connected_children_count);
-
-    // cleanup
-    close(rpt->fd);
-    return (int)count;
+cleanup:
+    ;
 }
 
 static void rrdpush_receiver_thread_cleanup(void *ptr) {
@@ -868,6 +825,8 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
     , gettid());
 
     receiver_state_free(rpt);
+
+    rrdhost_set_is_parent_label();
 }
 
 void *rrdpush_receiver_thread(void *ptr) {
@@ -879,7 +838,8 @@ void *rrdpush_receiver_thread(void *ptr) {
     worker_register_job_custom_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION, "replication completion", "%", WORKER_METRIC_ABSOLUTE);
 
     struct receiver_state *rpt = (struct receiver_state *)ptr;
-    info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
+    rpt->tid = gettid();
+    info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, rpt->tid);
 
     rrdpush_receive(rpt);
 

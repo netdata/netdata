@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
 
-void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
+void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, bool having_lock)
 {
-    uv_rwlock_wrlock(&ctx->datafiles.rwlock);
+    if(!having_lock)
+        uv_rwlock_wrlock(&ctx->datafiles.rwlock);
+
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ctx->datafiles.first, datafile, prev, next);
-    uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
+
+    if(!having_lock)
+        uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
 }
 
 void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
@@ -27,9 +31,9 @@ static struct rrdengine_datafile *datafile_alloc_and_init(struct rrdengine_insta
 
     datafile->users.available = true;
 
-    netdata_spinlock_init(&datafile->users.spinlock);
-    netdata_spinlock_init(&datafile->writers.spinlock);
-    netdata_spinlock_init(&datafile->extent_queries.spinlock);
+    spinlock_init(&datafile->users.spinlock);
+    spinlock_init(&datafile->writers.spinlock);
+    spinlock_init(&datafile->extent_queries.spinlock);
 
     return datafile;
 }
@@ -37,7 +41,7 @@ static struct rrdengine_datafile *datafile_alloc_and_init(struct rrdengine_insta
 bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason) {
     bool ret;
 
-    netdata_spinlock_lock(&df->users.spinlock);
+    spinlock_lock(&df->users.spinlock);
 
     if(df->users.available) {
         ret = true;
@@ -47,25 +51,25 @@ bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS re
     else
         ret = false;
 
-    netdata_spinlock_unlock(&df->users.spinlock);
+    spinlock_unlock(&df->users.spinlock);
 
     return ret;
 }
 
 void datafile_release(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason) {
-    netdata_spinlock_lock(&df->users.spinlock);
+    spinlock_lock(&df->users.spinlock);
     if(!df->users.lockers)
         fatal("DBENGINE DATAFILE: cannot release a datafile that is not acquired");
 
     df->users.lockers--;
     df->users.lockers_by_reason[reason]--;
-    netdata_spinlock_unlock(&df->users.spinlock);
+    spinlock_unlock(&df->users.spinlock);
 }
 
 bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
     bool can_be_deleted = false;
 
-    netdata_spinlock_lock(&df->users.spinlock);
+    spinlock_lock(&df->users.spinlock);
     df->users.available = false;
 
     if(!df->users.lockers)
@@ -75,9 +79,9 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
         // there are lockers
 
         // evict any pages referencing this in the open cache
-        netdata_spinlock_unlock(&df->users.spinlock);
+        spinlock_unlock(&df->users.spinlock);
         pgc_open_evict_clean_pages_of_datafile(open_cache, df);
-        netdata_spinlock_lock(&df->users.spinlock);
+        spinlock_lock(&df->users.spinlock);
 
         if(!df->users.lockers)
             can_be_deleted = true;
@@ -86,12 +90,12 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
             // there are lockers still
 
             // count the number of pages referencing this in the open cache
-            netdata_spinlock_unlock(&df->users.spinlock);
+            spinlock_unlock(&df->users.spinlock);
             usec_t time_to_scan_ut = now_monotonic_usec();
             size_t clean_pages_in_open_cache = pgc_count_clean_pages_having_data_ptr(open_cache, (Word_t)df->ctx, df);
             size_t hot_pages_in_open_cache = pgc_count_hot_pages_having_data_ptr(open_cache, (Word_t)df->ctx, df);
             time_to_scan_ut = now_monotonic_usec() - time_to_scan_ut;
-            netdata_spinlock_lock(&df->users.spinlock);
+            spinlock_lock(&df->users.spinlock);
 
             if(!df->users.lockers)
                 can_be_deleted = true;
@@ -149,7 +153,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
                                time_to_scan_ut);
         }
     }
-    netdata_spinlock_unlock(&df->users.spinlock);
+    spinlock_unlock(&df->users.spinlock);
 
     return can_be_deleted;
 }
@@ -410,11 +414,12 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         freez(datafiles);
         return 0;
     }
-    if (matched_files == MAX_DATAFILES) {
+
+    if (matched_files == MAX_DATAFILES)
         error("DBENGINE: warning: hit maximum database engine file limit of %d files", MAX_DATAFILES);
-    }
+
     qsort(datafiles, matched_files, sizeof(*datafiles), scan_data_files_cmp);
-    /* TODO: change this when tiering is implemented */
+
     ctx->atomic.last_fileno = datafiles[matched_files - 1]->fileno;
 
     for (failed_to_load = 0, i = 0 ; i < matched_files ; ++i) {
@@ -422,9 +427,9 @@ static int scan_data_files(struct rrdengine_instance *ctx)
 
         datafile = datafiles[i];
         ret = load_data_file(datafile);
-        if (0 != ret) {
+        if (0 != ret)
             must_delete_pair = 1;
-        }
+
         journalfile = journalfile_alloc_and_init(datafile);
         ret = journalfile_load(ctx, journalfile, datafile);
         if (0 != ret) {
@@ -432,6 +437,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
                 close_data_file(datafile);
             must_delete_pair = 1;
         }
+
         if (must_delete_pair) {
             char path[RRDENG_PATH_MAX];
 
@@ -453,8 +459,9 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         }
 
         ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->unsafe.pos);
-        datafile_list_insert(ctx, datafile);
+        datafile_list_insert(ctx, datafile, false);
     }
+
     matched_files -= failed_to_load;
     freez(datafiles);
 
@@ -462,7 +469,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
 }
 
 /* Creates a datafile and a journalfile pair */
-int create_new_datafile_pair(struct rrdengine_instance *ctx)
+int create_new_datafile_pair(struct rrdengine_instance *ctx, bool having_lock)
 {
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.datafile_creation_started, 1, __ATOMIC_RELAXED);
 
@@ -490,7 +497,7 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx)
     info("DBENGINE: created journal file \"%s\".", path);
 
     ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->unsafe.pos);
-    datafile_list_insert(ctx, datafile);
+    datafile_list_insert(ctx, datafile, having_lock);
     ctx_last_fileno_increment(ctx);
 
     return 0;
@@ -519,7 +526,7 @@ int init_data_files(struct rrdengine_instance *ctx)
     } else if (0 == ret) {
         info("DBENGINE: data files not found, creating in path \"%s\".", ctx->config.dbfiles_path);
         ctx->atomic.last_fileno = 0;
-        ret = create_new_datafile_pair(ctx);
+        ret = create_new_datafile_pair(ctx, false);
         if (ret) {
             error("DBENGINE: failed to create data and journal files in path \"%s\".", ctx->config.dbfiles_path);
             return ret;
@@ -527,7 +534,7 @@ int init_data_files(struct rrdengine_instance *ctx)
     }
     else {
         if (ctx->loading.create_new_datafile_pair)
-            create_new_datafile_pair(ctx);
+            create_new_datafile_pair(ctx, false);
 
         while(rrdeng_ctx_exceeded_disk_quota(ctx))
             datafile_delete(ctx, ctx->datafiles.first, false, false);
@@ -569,11 +576,11 @@ void finalize_data_files(struct rrdengine_instance *ctx)
         bool available = false;
         do {
             uv_rwlock_wrlock(&ctx->datafiles.rwlock);
-            netdata_spinlock_lock(&datafile->writers.spinlock);
+            spinlock_lock(&datafile->writers.spinlock);
             available = (datafile->writers.running || datafile->writers.flushed_to_open_running) ? false : true;
 
             if(!available) {
-                netdata_spinlock_unlock(&datafile->writers.spinlock);
+                spinlock_unlock(&datafile->writers.spinlock);
                 uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
                 if(!logged) {
                     info("Waiting for writers to data file %u of tier %d to finish...", datafile->fileno, ctx->config.tier);
@@ -586,7 +593,7 @@ void finalize_data_files(struct rrdengine_instance *ctx)
         journalfile_close(journalfile, datafile);
         close_data_file(datafile);
         datafile_list_delete_unsafe(ctx, datafile);
-        netdata_spinlock_unlock(&datafile->writers.spinlock);
+        spinlock_unlock(&datafile->writers.spinlock);
         uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
 
         freez(journalfile);

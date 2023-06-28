@@ -119,7 +119,8 @@ enum ebpf_main_index {
     EBPF_OPTION_GLOBAL_CHART,
     EBPF_OPTION_RETURN_MODE,
     EBPF_OPTION_LEGACY,
-    EBPF_OPTION_CORE
+    EBPF_OPTION_CORE,
+    EBPF_OPTION_UNITTEST
 };
 
 typedef struct ebpf_tracepoint {
@@ -308,6 +309,8 @@ void ebpf_write_chart_obsolete(char *type, char *id, char *title, char *units, c
 void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, char **dimensions, uint32_t end);
 void ebpf_update_disabled_plugin_stats(ebpf_module_t *em);
 ARAL *ebpf_allocate_pid_aral(char *name, size_t size);
+void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe_links);
+
 extern ebpf_filesystem_partitions_t localfs[];
 extern ebpf_sync_syscalls_t local_syscalls[];
 extern int ebpf_exit_plugin;

@@ -198,7 +198,7 @@ void extent_buffer_init(void) {
 void extent_buffer_cleanup1(void) {
     struct extent_buffer *item = NULL;
 
-    if(!netdata_spinlock_trylock(&extent_buffer_globals.protected.spinlock))
+    if(!spinlock_trylock(&extent_buffer_globals.protected.spinlock))
         return;
 
     if(extent_buffer_globals.protected.available_items && extent_buffer_globals.protected.available > 1) {
@@ -207,7 +207,7 @@ void extent_buffer_cleanup1(void) {
         extent_buffer_globals.protected.available--;
     }
 
-    netdata_spinlock_unlock(&extent_buffer_globals.protected.spinlock);
+    spinlock_unlock(&extent_buffer_globals.protected.spinlock);
 
     if(item) {
         size_t bytes = sizeof(struct extent_buffer) + item->bytes;
@@ -225,13 +225,13 @@ struct extent_buffer *extent_buffer_get(size_t size) {
     if(size < extent_buffer_globals.max_size)
         size = extent_buffer_globals.max_size;
 
-    netdata_spinlock_lock(&extent_buffer_globals.protected.spinlock);
+    spinlock_lock(&extent_buffer_globals.protected.spinlock);
     if(likely(extent_buffer_globals.protected.available_items)) {
         eb = extent_buffer_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(extent_buffer_globals.protected.available_items, eb, cache.prev, cache.next);
         extent_buffer_globals.protected.available--;
     }
-    netdata_spinlock_unlock(&extent_buffer_globals.protected.spinlock);
+    spinlock_unlock(&extent_buffer_globals.protected.spinlock);
 
     if(unlikely(eb && eb->bytes < size)) {
         size_t bytes = sizeof(struct extent_buffer) + eb->bytes;
@@ -255,10 +255,10 @@ struct extent_buffer *extent_buffer_get(size_t size) {
 void extent_buffer_release(struct extent_buffer *eb) {
     if(unlikely(!eb)) return;
 
-    netdata_spinlock_lock(&extent_buffer_globals.protected.spinlock);
+    spinlock_lock(&extent_buffer_globals.protected.spinlock);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(extent_buffer_globals.protected.available_items, eb, cache.prev, cache.next);
     extent_buffer_globals.protected.available++;
-    netdata_spinlock_unlock(&extent_buffer_globals.protected.spinlock);
+    spinlock_unlock(&extent_buffer_globals.protected.spinlock);
 }
 
 size_t extent_buffer_cache_size(void) {
@@ -400,20 +400,20 @@ static void pdc_destroy(PDC *pdc) {
 }
 
 void pdc_acquire(PDC *pdc) {
-    netdata_spinlock_lock(&pdc->refcount_spinlock);
+    spinlock_lock(&pdc->refcount_spinlock);
 
     if(pdc->refcount < 1)
         fatal("DBENGINE: pdc is not referenced and cannot be acquired");
 
     pdc->refcount++;
-    netdata_spinlock_unlock(&pdc->refcount_spinlock);
+    spinlock_unlock(&pdc->refcount_spinlock);
 }
 
 bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router __maybe_unused) {
     if(unlikely(!pdc))
         return true;
 
-    netdata_spinlock_lock(&pdc->refcount_spinlock);
+    spinlock_lock(&pdc->refcount_spinlock);
 
     if(pdc->refcount <= 0)
         fatal("DBENGINE: pdc is not referenced and cannot be released");
@@ -429,12 +429,12 @@ bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router 
     }
 
     if (pdc->refcount == 0) {
-        netdata_spinlock_unlock(&pdc->refcount_spinlock);
+        spinlock_unlock(&pdc->refcount_spinlock);
         pdc_destroy(pdc);
         return true;
     }
 
-    netdata_spinlock_unlock(&pdc->refcount_spinlock);
+    spinlock_unlock(&pdc->refcount_spinlock);
     return false;
 }
 
@@ -456,7 +456,7 @@ static struct rrdeng_cmd *epdl_get_cmd(void *epdl_ptr) {
 static bool epdl_pending_add(EPDL *epdl) {
     bool added_new;
 
-    netdata_spinlock_lock(&epdl->datafile->extent_queries.spinlock);
+    spinlock_lock(&epdl->datafile->extent_queries.spinlock);
     Pvoid_t *PValue = JudyLIns(&epdl->datafile->extent_queries.pending_epdl_by_extent_offset_judyL, epdl->extent_offset, PJE0);
     internal_fatal(!PValue || PValue == PJERR, "DBENGINE: corrupted pending extent judy");
 
@@ -478,20 +478,20 @@ static bool epdl_pending_add(EPDL *epdl) {
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(base, epdl, query.prev, query.next);
     *PValue = base;
 
-    netdata_spinlock_unlock(&epdl->datafile->extent_queries.spinlock);
+    spinlock_unlock(&epdl->datafile->extent_queries.spinlock);
 
     return added_new;
 }
 
 static void epdl_pending_del(EPDL *epdl) {
-    netdata_spinlock_lock(&epdl->datafile->extent_queries.spinlock);
+    spinlock_lock(&epdl->datafile->extent_queries.spinlock);
     if(epdl->head_to_datafile_extent_queries_pending_for_extent) {
         epdl->head_to_datafile_extent_queries_pending_for_extent = false;
         int rc = JudyLDel(&epdl->datafile->extent_queries.pending_epdl_by_extent_offset_judyL, epdl->extent_offset, PJE0);
         (void) rc;
         internal_fatal(!rc, "DBENGINE: epdl not found in pending list");
     }
-    netdata_spinlock_unlock(&epdl->datafile->extent_queries.spinlock);
+    spinlock_unlock(&epdl->datafile->extent_queries.spinlock);
 }
 
 void pdc_to_epdl_router(struct rrdengine_instance *ctx, PDC *pdc, execute_extent_page_details_list_t exec_first_extent_list, execute_extent_page_details_list_t exec_rest_extent_list)

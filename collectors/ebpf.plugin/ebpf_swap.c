@@ -230,23 +230,6 @@ static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t 
  *****************************************************************/
 
 /**
- * Cachestat Free
- *
- * Cleanup variables after child threads to stop
- *
- * @param ptr thread data.
- */
-static void ebpf_swap_free(ebpf_module_t *em)
-{
-    freez(swap_vector);
-    freez(swap_values);
-
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-}
-
-/**
  * Swap exit
  *
  * Cancel thread and exit.
@@ -256,7 +239,17 @@ static void ebpf_swap_free(ebpf_module_t *em)
 static void ebpf_swap_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    ebpf_swap_free(em);
+
+#ifdef LIBBPF_MAJOR_VERSION
+    if (bpf_obj)
+        swap_bpf__destroy(bpf_obj);
+#endif
+    if (em->objects)
+        ebpf_unload_legacy_code(em->objects, em->probe_links);
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************

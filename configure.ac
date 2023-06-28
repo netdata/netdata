@@ -1257,7 +1257,7 @@ fi
 
 # Check if uuid is available. Fail if ML was explicitly requested.
 if test "${enable_ml}" = "yes" -a "${have_uuid}" != "yes"; then
-    AC_MSG_ERROR([You have explicitly requested --enable-ml functionality but libuuid can not be found."])
+    AC_MSG_ERROR([You have explicitly requested --enable-ml functionality but libuuid can not be found.])
 fi
 
 # Check if submodules have not been fetched. Fail if ML was explicitly requested.
@@ -1877,7 +1877,6 @@ AC_CONFIG_FILES([
     libnetdata/locks/Makefile
     libnetdata/log/Makefile
     libnetdata/onewayalloc/Makefile
-    libnetdata/parser/Makefile
     libnetdata/popen/Makefile
     libnetdata/procfile/Makefile
     libnetdata/simple_pattern/Makefile

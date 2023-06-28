@@ -34,31 +34,6 @@ struct rrdeng_cmd;
 #define RRDENG_FILE_NUMBER_SCAN_TMPL "%1u-%10u"
 #define RRDENG_FILE_NUMBER_PRINT_TMPL "%1.1u-%10.10u"
 
-typedef struct page_details_control {
-    struct rrdengine_instance *ctx;
-    struct metric *metric;
-
-    struct completion prep_completion;
-    struct completion page_completion;   // sync between the query thread and the workers
-
-    Pvoid_t page_list_JudyL;        // the list of page details
-    unsigned completed_jobs;        // the number of jobs completed last time the query thread checked
-    bool workers_should_stop;       // true when the query thread left and the workers should stop
-    bool prep_done;
-
-    SPINLOCK refcount_spinlock;     // spinlock to protect refcount
-    int32_t refcount;               // the number of workers currently working on this request + 1 for the query thread
-    size_t executed_with_gaps;
-
-    time_t start_time_s;
-    time_t end_time_s;
-    STORAGE_PRIORITY priority;
-
-    time_t optimal_end_time_s;
-} PDC;
-
-PDC *pdc_get(void);
-
 typedef enum __attribute__ ((__packed__)) {
     // final status for all pages
     // if a page does not have one of these, it is considered unroutable
@@ -98,6 +73,34 @@ typedef enum __attribute__ ((__packed__)) {
 } PDC_PAGE_STATUS;
 
 #define PDC_PAGE_QUERY_GLOBAL_SKIP_LIST (PDC_PAGE_FAILED | PDC_PAGE_SKIP | PDC_PAGE_INVALID | PDC_PAGE_RELEASED)
+
+typedef struct page_details_control {
+    struct rrdengine_instance *ctx;
+    struct metric *metric;
+
+    struct completion prep_completion;
+    struct completion page_completion;   // sync between the query thread and the workers
+
+    Pvoid_t page_list_JudyL;        // the list of page details
+    unsigned completed_jobs;        // the number of jobs completed last time the query thread checked
+    bool workers_should_stop;       // true when the query thread left and the workers should stop
+    bool prep_done;
+
+    PDC_PAGE_STATUS common_status;
+    size_t pages_to_load_from_disk;
+
+    SPINLOCK refcount_spinlock;     // spinlock to protect refcount
+    int32_t refcount;               // the number of workers currently working on this request + 1 for the query thread
+    size_t executed_with_gaps;
+
+    time_t start_time_s;
+    time_t end_time_s;
+    STORAGE_PRIORITY priority;
+
+    time_t optimal_end_time_s;
+} PDC;
+
+PDC *pdc_get(void);
 
 struct page_details {
     struct {
@@ -360,6 +363,11 @@ struct rrdengine_instance {
         uv_rwlock_t rwlock;                         // the linked list of datafiles is protected by this lock
         struct rrdengine_datafile *first;           // oldest - the newest with ->first->prev
     } datafiles;
+
+    struct {
+        RW_SPINLOCK spinlock;
+        Pvoid_t JudyL;
+    } njfv2idx;
 
     struct {
         unsigned last_fileno;                       // newest index of datafile and journalfile

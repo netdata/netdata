@@ -33,6 +33,14 @@ void ml_host_delete(RRDHOST *rh) {
     UNUSED(rh);
 }
 
+void ml_host_start(RRDHOST *rh) {
+    UNUSED(rh);
+}
+
+void ml_host_stop(RRDHOST *rh) {
+    UNUSED(rh);
+}
+
 void ml_host_start_training_thread(RRDHOST *rh) {
     UNUSED(rh);
 }
@@ -99,6 +107,15 @@ int ml_dimension_load_models(RRDDIM *rd) {
 
 void ml_update_global_statistics_charts(uint64_t models_consulted) {
     UNUSED(models_consulted);
+}
+
+bool ml_host_get_host_status(RRDHOST *rh, struct ml_metrics_statistics *mlm) {
+    memset(mlm, 0, sizeof(*mlm));
+    return false;
+}
+
+bool ml_host_running(RRDHOST *rh) {
+    return false;
 }
 
 #endif

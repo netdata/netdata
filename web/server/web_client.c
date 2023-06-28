@@ -18,6 +18,14 @@ inline int web_client_permission_denied(struct web_client *w) {
     return HTTP_RESP_FORBIDDEN;
 }
 
+static inline int bad_request_multiple_dashboard_versions(struct web_client *w) {
+    w->response.data->content_type = CT_TEXT_PLAIN;
+    buffer_flush(w->response.data);
+    buffer_strcat(w->response.data, "Multiple dashboard versions given at the URL.");
+    w->response.code = HTTP_RESP_BAD_REQUEST;
+    return HTTP_RESP_BAD_REQUEST;
+}
+
 static inline int web_client_crock_socket(struct web_client *w __maybe_unused) {
 #ifdef TCP_CORK
     if(likely(web_client_is_corkable(w) && !w->tcp_cork && w->ofd != -1)) {
@@ -34,11 +42,10 @@ static inline int web_client_crock_socket(struct web_client *w __maybe_unused) {
     return 0;
 }
 
-static inline void web_client_enable_wait_from_ssl(struct web_client *w, int bytes) {
-    int ssl_err = SSL_get_error(w->ssl.conn, bytes);
-    if (ssl_err == SSL_ERROR_WANT_READ)
+static inline void web_client_enable_wait_from_ssl(struct web_client *w) {
+    if (w->ssl.ssl_errno == SSL_ERROR_WANT_READ)
         web_client_enable_ssl_wait_receive(w);
-    else if (ssl_err == SSL_ERROR_WANT_WRITE)
+    else if (w->ssl.ssl_errno == SSL_ERROR_WANT_WRITE)
         web_client_enable_ssl_wait_send(w);
     else {
         web_client_disable_ssl_wait_receive(w);
@@ -99,15 +106,6 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
         freez(w->post_payload);
         w->post_payload = NULL;
         w->post_payload_size = 0;
-
-#ifdef ENABLE_HTTPS
-        if ((!web_client_check_unix(w)) && (netdata_ssl_srv_ctx)) {
-            if (w->ssl.conn) {
-                SSL_free(w->ssl.conn);
-                w->ssl.conn = NULL;
-            }
-        }
-#endif
     }
     else {
         // the web client is to be re-used
@@ -121,7 +119,6 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
         buffer_reset(w->response.data);
 
         // leave w->post_payload
-        // leave w->ssl
     }
 
     freez(w->server_host);
@@ -151,6 +148,8 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
         w->response.zinitialized = false;
         w->flags &= ~WEB_CLIENT_CHUNKED_TRANSFER;
     }
+
+    web_client_reset_path_flags(w);
 }
 
 void web_client_request_done(struct web_client *w) {
@@ -326,16 +325,152 @@ static inline uint8_t contenttype_for_filename(const char *filename) {
     return CT_APPLICATION_OCTET_STREAM;
 }
 
-static inline int access_to_file_is_not_permitted(struct web_client *w, const char *filename) {
+static int append_slash_to_url_and_redirect(struct web_client *w) {
+    // this function returns a relative redirect
+    // it finds the last path component on the URL and just appends / to it
+    //
+    // So, if the URL is:
+    //
+    //        /path/to/file?query_string
+    //
+    // It adds a Location header like this:
+    //
+    //       Location: file/?query_string\r\n
+    //
+    // The web browser already knows that it is inside /path/to/
+    // so it converts the path to /path/to/file/ and executes the
+    // request again.
+
+    buffer_strcat(w->response.header, "Location: ");
+    const char *b = buffer_tostring(w->url_as_received);
+    const char *q = strchr(b, '?');
+    if(q && q > b) {
+        const char *e = q - 1;
+        while(e > b && *e != '/') e--;
+        if(*e == '/') e++;
+
+        size_t len = q - e;
+        buffer_strncat(w->response.header, e, len);
+        buffer_strncat(w->response.header, "/", 1);
+        buffer_strcat(w->response.header, q);
+    }
+    else {
+        const char *e = &b[buffer_strlen(w->url_as_received) - 1];
+        while(e > b && *e != '/') e--;
+        if(*e == '/') e++;
+
+        buffer_strcat(w->response.header, e);
+        buffer_strncat(w->response.header, "/", 1);
+    }
+
+    buffer_strncat(w->response.header, "\r\n", 2);
+
     w->response.data->content_type = CT_TEXT_HTML;
-    buffer_strcat(w->response.data, "Access to file is not permitted: ");
-    buffer_strcat_htmlescape(w->response.data, filename);
-    return HTTP_RESP_FORBIDDEN;
+    buffer_flush(w->response.data);
+    buffer_strcat(w->response.data,
+                  "<!DOCTYPE html><html>"
+                  "<body onload=\"window.location.href = window.location.origin + window.location.pathname + '/' + window.location.search + window.location.hash\">"
+                  "Redirecting. In case your browser does not support redirection, please click "
+                  "<a onclick=\"window.location.href = window.location.origin + window.location.pathname + '/' + window.location.search + window.location.hash\">here</a>."
+                  "</body></html>");
+    return HTTP_RESP_MOVED_PERM;
 }
 
 // Work around a bug in the CMocka library by removing this function during testing.
 #ifndef REMOVE_MYSENDFILE
-int mysendfile(struct web_client *w, char *filename) {
+
+static inline int dashboard_version(struct web_client *w) {
+    if(!web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_WITH_VERSION))
+        return -1;
+
+    if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_IS_V0))
+        return 0;
+    if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_IS_V1))
+        return 1;
+    if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_IS_V2))
+        return 2;
+
+    return -1;
+}
+
+static bool find_filename_to_serve(const char *filename, char *dst, size_t dst_len, struct stat *statbuf, struct web_client *w, bool *is_dir) {
+    int d_version = dashboard_version(w);
+    bool has_extension = web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_HAS_FILE_EXTENSION);
+
+    int fallback = 0;
+
+    if(has_extension) {
+        if(d_version == -1)
+            snprintfz(dst, dst_len, "%s/%s", netdata_configured_web_dir, filename);
+        else {
+            // check if the filename or directory exists
+            // fallback to the same path without the dashboard version otherwise
+            snprintfz(dst, dst_len, "%s/v%d/%s", netdata_configured_web_dir, d_version, filename);
+            fallback = 1;
+        }
+    }
+    else if(d_version != -1) {
+        if(filename && *filename) {
+            // check if the filename exists
+            // fallback to /vN/index.html otherwise
+            snprintfz(dst, dst_len, "%s/%s", netdata_configured_web_dir, filename);
+            fallback = 2;
+        }
+        else {
+            if(filename && *filename)
+                web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH);
+            snprintfz(dst, dst_len, "%s/v%d", netdata_configured_web_dir, d_version);
+        }
+    }
+    else {
+        // check if filename exists
+        // this is needed to serve {filename}/index.html, in case a user puts a html file into a directory
+        // fallback to /index.html otherwise
+        snprintfz(dst, dst_len, "%s/%s", netdata_configured_web_dir, filename);
+        fallback = 3;
+    }
+
+    if (lstat(dst, statbuf) != 0) {
+        if(fallback == 1) {
+            snprintfz(dst, dst_len, "%s/%s", netdata_configured_web_dir, filename);
+            if (lstat(dst, statbuf) != 0)
+                return false;
+        }
+        else if(fallback == 2) {
+            if(filename && *filename)
+                web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH);
+            snprintfz(dst, dst_len, "%s/v%d", netdata_configured_web_dir, d_version);
+            if (lstat(dst, statbuf) != 0)
+                return false;
+        }
+        else if(fallback == 3) {
+            if(filename && *filename)
+                web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH);
+            snprintfz(dst, dst_len, "%s", netdata_configured_web_dir);
+            if (lstat(dst, statbuf) != 0)
+                return false;
+        }
+        else
+            return false;
+    }
+
+    if((statbuf->st_mode & S_IFMT) == S_IFDIR) {
+        size_t len = strlen(dst);
+        if(len > dst_len - 11)
+            return false;
+
+        strncpyz(&dst[len], "/index.html", dst_len - len);
+
+        if (lstat(dst, statbuf) != 0)
+            return false;
+
+        *is_dir = true;
+    }
+
+    return true;
+}
+
+static int mysendfile(struct web_client *w, char *filename) {
     debug(D_WEB_CLIENT, "%llu: Looking for file '%s/%s'", w->id, netdata_configured_web_dir, filename);
 
     if(!web_client_can_access_dashboard(w))
@@ -366,60 +501,45 @@ int mysendfile(struct web_client *w, char *filename) {
     }
 
     // find the physical file on disk
-    char webfilename[FILENAME_MAX + 1];
-    snprintfz(webfilename, FILENAME_MAX, "%s/%s", netdata_configured_web_dir, filename);
-
+    bool is_dir = false;
+    char web_filename[FILENAME_MAX + 1];
     struct stat statbuf;
-    int done = 0;
-    while(!done) {
-        // check if the file exists
-        if (lstat(webfilename, &statbuf) != 0) {
-            debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not found.", w->id, webfilename);
-            w->response.data->content_type = CT_TEXT_HTML;
-            buffer_strcat(w->response.data, "File does not exist, or is not accessible: ");
-            buffer_strcat_htmlescape(w->response.data, webfilename);
-            return HTTP_RESP_NOT_FOUND;
-        }
-
-        if ((statbuf.st_mode & S_IFMT) == S_IFDIR) {
-            snprintfz(webfilename, FILENAME_MAX, "%s/%s/index.html", netdata_configured_web_dir, filename);
-            continue;
-        }
-
-        if ((statbuf.st_mode & S_IFMT) != S_IFREG) {
-            error("%llu: File '%s' is not a regular file. Access Denied.", w->id, webfilename);
-            return access_to_file_is_not_permitted(w, webfilename);
-        }
-
-        done = 1;
+    if(!find_filename_to_serve(filename, web_filename, FILENAME_MAX, &statbuf, w, &is_dir)) {
+        w->response.data->content_type = CT_TEXT_HTML;
+        buffer_strcat(w->response.data, "File does not exist, or is not accessible: ");
+        buffer_strcat_htmlescape(w->response.data, web_filename);
+        return HTTP_RESP_NOT_FOUND;
     }
 
+    if(is_dir && !web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH))
+        return append_slash_to_url_and_redirect(w);
+
     // open the file
-    w->ifd = open(webfilename, O_NONBLOCK, O_RDONLY);
+    w->ifd = open(web_filename, O_NONBLOCK, O_RDONLY);
     if(w->ifd == -1) {
         w->ifd = w->ofd;
 
         if(errno == EBUSY || errno == EAGAIN) {
-            error("%llu: File '%s' is busy, sending 307 Moved Temporarily to force retry.", w->id, webfilename);
+            error("%llu: File '%s' is busy, sending 307 Moved Temporarily to force retry.", w->id, web_filename);
             w->response.data->content_type = CT_TEXT_HTML;
             buffer_sprintf(w->response.header, "Location: /%s\r\n", filename);
             buffer_strcat(w->response.data, "File is currently busy, please try again later: ");
-            buffer_strcat_htmlescape(w->response.data, webfilename);
+            buffer_strcat_htmlescape(w->response.data, web_filename);
             return HTTP_RESP_REDIR_TEMP;
         }
         else {
-            error("%llu: Cannot open file '%s'.", w->id, webfilename);
+            error("%llu: Cannot open file '%s'.", w->id, web_filename);
             w->response.data->content_type = CT_TEXT_HTML;
             buffer_strcat(w->response.data, "Cannot open file: ");
-            buffer_strcat_htmlescape(w->response.data, webfilename);
+            buffer_strcat_htmlescape(w->response.data, web_filename);
             return HTTP_RESP_NOT_FOUND;
         }
     }
 
     sock_setnonblock(w->ifd);
 
-    w->response.data->content_type = contenttype_for_filename(webfilename);
-    debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%"PRId64" bytes, ifd %d, ofd %d).", w->id, webfilename, (int64_t)statbuf.st_size, w->ifd, w->ofd);
+    w->response.data->content_type = contenttype_for_filename(web_filename);
+    debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%"PRId64" bytes, ifd %d, ofd %d).", w->id, web_filename, (int64_t)statbuf.st_size, w->ifd, w->ofd);
 
     w->mode = WEB_CLIENT_MODE_FILECOPY;
     web_client_enable_wait_receive(w);
@@ -794,12 +914,6 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
             //  web_client_enable_deflate(w, 0);
         }
     }
-#ifdef ENABLE_HTTPS
-    else if(hash == hash_forwarded_proto && !strcasecmp(s, "X-Forwarded-Proto")) {
-        if(strcasestr(v, "https"))
-            w->ssl.flags |= NETDATA_SSL_PROXY_HTTPS;
-    }
-#endif
     else if(hash == hash_forwarded_host && !strcasecmp(s, "X-Forwarded-Host")) {
         char buffer[NI_MAXHOST];
         strncpyz(buffer, v, ((size_t)(ve - v) < sizeof(buffer) - 1 ? (size_t)(ve - v) : sizeof(buffer) - 1));
@@ -839,7 +953,7 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
         s = &s[7];
 
 #ifdef ENABLE_HTTPS
-        if (w->ssl.flags && web_client_is_using_ssl_force(w)){
+        if (!SSL_connection(&w->ssl) && web_client_is_using_ssl_force(w)) {
             w->header_parse_tries = 0;
             w->header_parse_last_size = 0;
             web_client_disable_wait_receive(w);
@@ -980,8 +1094,8 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 *ue = c;
 
 #ifdef ENABLE_HTTPS
-                if ( (!web_client_check_unix(w)) && (netdata_ssl_srv_ctx) ) {
-                    if ((w->ssl.conn) && ((w->ssl.flags & NETDATA_SSL_NO_HANDSHAKE) && (web_client_is_using_ssl_force(w) || web_client_is_using_ssl_default(w)) && (w->mode != WEB_CLIENT_MODE_STREAM))  ) {
+                if ( (!web_client_check_unix(w)) && (netdata_ssl_web_server_ctx) ) {
+                    if (!w->ssl.conn && (web_client_is_using_ssl_force(w) || web_client_is_using_ssl_default(w)) && (w->mode != WEB_CLIENT_MODE_STREAM)) {
                         w->header_parse_tries = 0;
                         w->header_parse_last_size = 0;
                         web_client_disable_wait_receive(w);
@@ -1010,16 +1124,15 @@ static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,
 {
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
-    if ( (!web_client_check_unix(w)) && (netdata_ssl_srv_ctx) ) {
-        if ( ( w->ssl.conn ) && ( !w->ssl.flags ) ){
-            bytes = netdata_ssl_write(w->ssl.conn, buf, len) ;
-            web_client_enable_wait_from_ssl(w, bytes);
-        } else {
-            bytes = send(w->ofd,buf, len , flags);
+    if ((!web_client_check_unix(w)) && (netdata_ssl_web_server_ctx)) {
+        if (SSL_connection(&w->ssl)) {
+            bytes = netdata_ssl_write(&w->ssl, buf, len) ;
+            web_client_enable_wait_from_ssl(w);
         }
-    } else {
+        else
+            bytes = send(w->ofd,buf, len , flags);
+    } else
         bytes = send(w->ofd,buf, len , flags);
-    }
 #else
     bytes = send(w->ofd, buf, len, flags);
 #endif
@@ -1057,14 +1170,16 @@ void web_client_build_http_header(struct web_client *w) {
         strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", tm);
     }
 
-    if (w->response.code == HTTP_RESP_MOVED_PERM) {
+    if (w->response.code == HTTP_RESP_HTTPS_UPGRADE) {
         buffer_sprintf(w->response.header_output,
                        "HTTP/1.1 %d %s\r\n"
                        "Location: https://%s%s\r\n",
                        w->response.code, code_msg,
                        w->server_host ? w->server_host : "",
                        buffer_tostring(w->url_as_received));
-    }else {
+        w->response.code = HTTP_RESP_MOVED_PERM;
+    }
+    else {
         buffer_sprintf(w->response.header_output,
                        "HTTP/1.1 %d %s\r\n"
                        "Connection: %s\r\n"
@@ -1156,10 +1271,10 @@ static inline void web_client_send_http_header(struct web_client *w) {
     size_t count = 0;
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
-    if ( (!web_client_check_unix(w)) && (netdata_ssl_srv_ctx) ) {
-        if ( ( w->ssl.conn ) && ( w->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE ) ) {
-            bytes = netdata_ssl_write(w->ssl.conn, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output));
-            web_client_enable_wait_from_ssl(w, bytes);
+    if ( (!web_client_check_unix(w)) && (netdata_ssl_web_server_ctx) ) {
+        if (SSL_connection(&w->ssl)) {
+            bytes = netdata_ssl_write(&w->ssl, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output));
+            web_client_enable_wait_from_ssl(w);
         }
         else {
             while((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
@@ -1257,36 +1372,9 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
         }
 
         if (host) {
-            if(!url) { //no delim found
-                debug(D_WEB_CLIENT, "%llu: URL doesn't end with / generating redirect.", w->id);
-                char *protocol, *url_host;
-#ifdef ENABLE_HTTPS
-                protocol = ((w->ssl.conn && !w->ssl.flags) || w->ssl.flags & NETDATA_SSL_PROXY_HTTPS) ? "https" : "http";
-#else
-                protocol = "http";
-#endif
-
-                url_host = w->forwarded_host;
-                if(!url_host) {
-                    url_host = w->server_host;
-                    if(!url_host) url_host = "";
-                }
-
-                buffer_sprintf(w->response.header, "Location: %s://%s/%s/%s/%s",
-                               protocol, url_host, nodeid?"node":"host", tok, buffer_tostring(w->url_path_decoded));
-
-                if(buffer_strlen(w->url_query_string_decoded)) {
-                    const char *query_string = buffer_tostring(w->url_query_string_decoded);
-                    if(*query_string) {
-                        if(*query_string != '?')
-                            buffer_fast_strcat(w->response.header, "?", 1);
-                        buffer_strcat(w->response.header, query_string);
-                    }
-                }
-                buffer_fast_strcat(w->response.header, "\r\n", 2);
-                buffer_strcat(w->response.data, "Permanent redirect");
-                return HTTP_RESP_REDIR_PERM;
-            }
+            if(!url)
+                //no delim found
+                return append_slash_to_url_and_redirect(w);
 
             size_t len = strlen(url) + 2;
             char buf[len];
@@ -1349,7 +1437,10 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             hash_api = 0,
             hash_netdata_conf = 0,
             hash_host = 0,
-            hash_node = 0;
+            hash_node = 0,
+            hash_v0 = 0,
+            hash_v1 = 0,
+            hash_v2 = 0;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     static uint32_t hash_exit = 0, hash_debug = 0, hash_mirror = 0;
@@ -1360,6 +1451,9 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         hash_netdata_conf = simple_hash("netdata.conf");
         hash_host = simple_hash("host");
         hash_node = simple_hash("node");
+        hash_v0 = simple_hash("v0");
+        hash_v1 = simple_hash("v1");
+        hash_v2 = simple_hash("v2");
 #ifdef NETDATA_INTERNAL_CHECKS
         hash_exit = simple_hash("exit");
         hash_debug = simple_hash("debug");
@@ -1369,20 +1463,38 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
 
     // keep a copy of the decoded path, in case we need to serve it as a filename
     char filename[FILENAME_MAX + 1];
-    strncpyz(filename, buffer_tostring(w->url_path_decoded), FILENAME_MAX);
+    strncpyz(filename, decoded_url_path ? decoded_url_path : "", FILENAME_MAX);
 
     char *tok = strsep_skip_consecutive_separators(&decoded_url_path, "/?");
     if(likely(tok && *tok)) {
         uint32_t hash = simple_hash(tok);
         debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);
 
-        if(unlikely(hash == hash_api && strcmp(tok, "api") == 0)) {                           // current API
+        if(likely(hash == hash_api && strcmp(tok, "api") == 0)) {                           // current API
             debug(D_WEB_CLIENT_ACCESS, "%llu: API request ...", w->id);
             return check_host_and_call(host, w, decoded_url_path, web_client_api_request);
         }
         else if(unlikely((hash == hash_host && strcmp(tok, "host") == 0) || (hash == hash_node && strcmp(tok, "node") == 0))) { // host switching
             debug(D_WEB_CLIENT_ACCESS, "%llu: host switch request ...", w->id);
             return web_client_switch_host(host, w, decoded_url_path, hash == hash_node, web_client_process_url);
+        }
+        else if(unlikely(hash == hash_v2 && strcmp(tok, "v2") == 0)) {
+            if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_WITH_VERSION))
+                return bad_request_multiple_dashboard_versions(w);
+            web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_IS_V2);
+            return web_client_process_url(host, w, decoded_url_path);
+        }
+        else if(unlikely(hash == hash_v1 && strcmp(tok, "v1") == 0)) {
+            if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_WITH_VERSION))
+                return bad_request_multiple_dashboard_versions(w);
+            web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_IS_V1);
+            return web_client_process_url(host, w, decoded_url_path);
+        }
+        else if(unlikely(hash == hash_v0 && strcmp(tok, "v0") == 0)) {
+            if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_WITH_VERSION))
+                return bad_request_multiple_dashboard_versions(w);
+            web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_IS_V0);
+            return web_client_process_url(host, w, decoded_url_path);
         }
         else if(unlikely(hash == hash_netdata_conf && strcmp(tok, "netdata.conf") == 0)) {    // netdata.conf
             if(unlikely(!web_client_can_access_netdataconf(w)))
@@ -1521,7 +1633,33 @@ void web_client_process_request(struct web_client *w) {
                         break;
                     }
 
-                    w->response.code = web_client_process_url(localhost, w, (char *)buffer_tostring(w->url_path_decoded));
+                    web_client_reset_path_flags(w);
+
+                    // find if the URL path has a filename extension
+                    char path[FILENAME_MAX + 1];
+                    strncpyz(path, buffer_tostring(w->url_path_decoded), FILENAME_MAX);
+                    char *s = path, *e = path;
+
+                    // remove the query string and find the last char
+                    for (; *e ; e++) {
+                        if (*e == '?')
+                            break;
+                    }
+
+                    if(e == s || (*(e - 1) == '/'))
+                        web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH);
+
+                    // check if there is a filename extension
+                    while (--e > s) {
+                        if (*e == '/')
+                            break;
+                        if(*e == '.') {
+                            web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_HAS_FILE_EXTENSION);
+                            break;
+                        }
+                    }
+
+                    w->response.code = (short)web_client_process_url(localhost, w, path);
                     break;
             }
             break;
@@ -1560,7 +1698,7 @@ void web_client_process_request(struct web_client *w) {
                           " click <a onclick=\"window.location.href ='https://'+ window.location.hostname + ':' "
                           " + window.location.port + window.location.pathname + window.location.search\">here</a>."
                           "</body></html>");
-            w->response.code = HTTP_RESP_MOVED_PERM;
+            w->response.code = HTTP_RESP_HTTPS_UPGRADE;
             break;
         }
 #endif
@@ -1947,12 +2085,15 @@ ssize_t web_client_receive(struct web_client *w)
     // do we have any space for more data?
     buffer_need_bytes(w->response.data, NETDATA_WEB_REQUEST_INITIAL_SIZE);
 
+    errno = 0;
+
 #ifdef ENABLE_HTTPS
-    if ( (!web_client_check_unix(w)) && (netdata_ssl_srv_ctx) ) {
-        if ( ( w->ssl.conn ) && (!w->ssl.flags)) {
-            bytes = netdata_ssl_read(w->ssl.conn, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
-            web_client_enable_wait_from_ssl(w, bytes);
-        }else {
+    if ( (!web_client_check_unix(w)) && (netdata_ssl_web_server_ctx) ) {
+        if (SSL_connection(&w->ssl)) {
+            bytes = netdata_ssl_read(&w->ssl, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
+            web_client_enable_wait_from_ssl(w);
+        }
+        else {
             bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
         }
     }
@@ -1975,6 +2116,10 @@ ssize_t web_client_receive(struct web_client *w)
         debug(D_WEB_CLIENT, "%llu: Received %zd bytes.", w->id, bytes);
         debug(D_WEB_DATA, "%llu: Received data: '%s'.", w->id, &w->response.data->buffer[old]);
     }
+    else if(unlikely(bytes < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR))) {
+        web_client_enable_wait_receive(w);
+        return 0;
+    }
     else if (bytes < 0) {
         debug(D_WEB_CLIENT, "%llu: receive data failed.", w->id);
         WEB_CLIENT_IS_DEAD(w);
@@ -1984,26 +2129,6 @@ ssize_t web_client_receive(struct web_client *w)
     return(bytes);
 }
 
-
-int web_client_socket_is_now_used_for_streaming(struct web_client *w) {
-    // prevent the web_client from closing the streaming socket
-
-    WEB_CLIENT_IS_DEAD(w);
-
-    if(web_server_mode == WEB_SERVER_MODE_STATIC_THREADED) {
-        web_client_flag_set(w, WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET);
-    }
-    else {
-        if(w->ifd == w->ofd)
-            w->ifd = w->ofd = -1;
-        else
-            w->ifd = -1;
-    }
-
-    buffer_flush(w->response.data);
-
-    return HTTP_RESP_OK;
-}
 
 void web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string) {
     char buffer[NETDATA_WEB_REQUEST_URL_SIZE + 2];
@@ -2052,26 +2177,7 @@ void web_client_decode_path_and_query_string(struct web_client *w, const char *p
     }
 }
 
-#ifdef ENABLE_HTTPS
-void web_client_reuse_ssl(struct web_client *w) {
-    if (netdata_ssl_srv_ctx) {
-        if (w->ssl.conn) {
-            SSL_SESSION *session = SSL_get_session(w->ssl.conn);
-            SSL *old = w->ssl.conn;
-            w->ssl.conn = SSL_new(netdata_ssl_srv_ctx);
-            if (session) {
-#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_111
-                if (SSL_SESSION_is_resumable(session))
-#endif
-                    SSL_set_session(w->ssl.conn, session);
-            }
-            SSL_free(old);
-        }
-    }
-}
-#endif
-
-void web_client_zero(struct web_client *w) {
+void web_client_reuse_from_cache(struct web_client *w) {
     // zero everything about it - but keep the buffers
 
     web_client_reset_allocations(w, false);
@@ -2085,8 +2191,7 @@ void web_client_zero(struct web_client *w) {
     BUFFER *b6 = w->url_query_string_decoded;
 
 #ifdef ENABLE_HTTPS
-    web_client_reuse_ssl(w);
-    SSL *ssl = w->ssl.conn;
+    NETDATA_SSL ssl = w->ssl;
 #endif
 
     size_t use_count = w->use_count;
@@ -2100,9 +2205,7 @@ void web_client_zero(struct web_client *w) {
     w->use_count = use_count;
 
 #ifdef ENABLE_HTTPS
-    w->ssl.conn = ssl;
-    w->ssl.flags = NETDATA_SSL_START;
-    debug(D_WEB_CLIENT_ACCESS,"Reusing SSL structure with (w->ssl = NULL, w->accepted = %u)", w->ssl.flags);
+    w->ssl = ssl;
 #endif
 
     // restore the pointers of the buffers
@@ -2116,6 +2219,11 @@ void web_client_zero(struct web_client *w) {
 
 struct web_client *web_client_create(size_t *statistics_memory_accounting) {
     struct web_client *w = (struct web_client *)callocz(1, sizeof(struct web_client));
+
+#ifdef ENABLE_HTTPS
+    w->ssl = NETDATA_SSL_UNSET_CONNECTION;
+#endif
+
     w->use_count = 1;
     w->statistics.memory_accounting = statistics_memory_accounting;
 
@@ -2132,6 +2240,10 @@ struct web_client *web_client_create(size_t *statistics_memory_accounting) {
 }
 
 void web_client_free(struct web_client *w) {
+#ifdef ENABLE_HTTPS
+    netdata_ssl_close(&w->ssl);
+#endif
+
     web_client_reset_allocations(w, true);
 
     __atomic_sub_fetch(w->statistics.memory_accounting, sizeof(struct web_client), __ATOMIC_RELAXED);

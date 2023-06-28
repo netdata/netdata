@@ -14,7 +14,7 @@ int netdata_anonymous_statistics_enabled;
 
 int libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
 bool ieee754_doubles = false;
-
+time_t netdata_start_time = 0;
 struct netdata_static_thread *static_threads;
 
 struct config netdata_config = {
@@ -60,7 +60,7 @@ SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, request_quit_t
     SERVICE_THREAD *sth = NULL;
     pid_t tid = gettid();
 
-    netdata_spinlock_lock(&service_globals.lock);
+    spinlock_lock(&service_globals.lock);
     Pvoid_t *PValue = JudyLIns(&service_globals.pid_judy, tid, PJE0);
     if(!*PValue) {
         sth = callocz(1, sizeof(SERVICE_THREAD));
@@ -87,7 +87,7 @@ SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, request_quit_t
     else {
         sth = *PValue;
     }
-    netdata_spinlock_unlock(&service_globals.lock);
+    spinlock_unlock(&service_globals.lock);
 
     return sth;
 }
@@ -95,13 +95,13 @@ SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, request_quit_t
 void service_exits(void) {
     pid_t tid = gettid();
 
-    netdata_spinlock_lock(&service_globals.lock);
+    spinlock_lock(&service_globals.lock);
     Pvoid_t *PValue = JudyLGet(service_globals.pid_judy, tid, PJE0);
     if(PValue) {
         freez(*PValue);
         JudyLDel(&service_globals.pid_judy, tid, PJE0);
     }
-    netdata_spinlock_unlock(&service_globals.lock);
+    spinlock_unlock(&service_globals.lock);
 }
 
 bool service_running(SERVICE_TYPE service) {
@@ -110,10 +110,10 @@ bool service_running(SERVICE_TYPE service) {
     if(unlikely(!sth))
         sth = service_register(SERVICE_THREAD_TYPE_NETDATA, NULL, NULL, NULL, false);
 
-    if(netdata_exit)
+    if(unlikely(netdata_exit))
         __atomic_store_n(&service_globals.running, 0, __ATOMIC_RELAXED);
 
-    if(service == 0)
+    if(unlikely(service == 0))
         service = sth->services;
 
     sth->services |= service;
@@ -124,7 +124,7 @@ bool service_running(SERVICE_TYPE service) {
 void service_signal_exit(SERVICE_TYPE service) {
     __atomic_and_fetch(&service_globals.running, ~(service), __ATOMIC_RELAXED);
 
-    netdata_spinlock_lock(&service_globals.lock);
+    spinlock_lock(&service_globals.lock);
 
     Pvoid_t *PValue;
     Word_t tid = 0;
@@ -133,14 +133,14 @@ void service_signal_exit(SERVICE_TYPE service) {
         SERVICE_THREAD *sth = *PValue;
 
         if((sth->services & service) && sth->request_quit_callback) {
-            netdata_spinlock_unlock(&service_globals.lock);
+            spinlock_unlock(&service_globals.lock);
             sth->request_quit_callback(sth->data);
-            netdata_spinlock_lock(&service_globals.lock);
+            spinlock_lock(&service_globals.lock);
             continue;
         }
     }
 
-    netdata_spinlock_unlock(&service_globals.lock);
+    spinlock_unlock(&service_globals.lock);
 }
 
 static void service_to_buffer(BUFFER *wb, SERVICE_TYPE service) {
@@ -187,7 +187,7 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
     {
         buffer_flush(thread_list);
 
-        netdata_spinlock_lock(&service_globals.lock);
+        spinlock_lock(&service_globals.lock);
 
         Pvoid_t *PValue;
         Word_t tid = 0;
@@ -217,15 +217,15 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
                 running_services |= sth->services & service;
 
                 if(sth->force_quit_callback) {
-                    netdata_spinlock_unlock(&service_globals.lock);
+                    spinlock_unlock(&service_globals.lock);
                     sth->force_quit_callback(sth->data);
-                    netdata_spinlock_lock(&service_globals.lock);
+                    spinlock_lock(&service_globals.lock);
                     continue;
                 }
             }
         }
 
-        netdata_spinlock_unlock(&service_globals.lock);
+        spinlock_unlock(&service_globals.lock);
     }
 
     service_signal_exit(service);
@@ -244,7 +244,7 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
         running_services = 0;
         buffer_flush(thread_list);
 
-        netdata_spinlock_lock(&service_globals.lock);
+        spinlock_lock(&service_globals.lock);
 
         Pvoid_t *PValue;
         Word_t tid = 0;
@@ -262,7 +262,7 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
             }
         }
 
-        netdata_spinlock_unlock(&service_globals.lock);
+        spinlock_unlock(&service_globals.lock);
 
         if(running) {
             log_countdown_ut -= (log_countdown_ut >= sleep_ut) ? sleep_ut : log_countdown_ut;
@@ -344,11 +344,6 @@ void netdata_cleanup_and_exit(int ret) {
 
     webrtc_close_all_connections();
 
-    delta_shutdown_time("disable ML detection and training threads");
-
-    ml_stop_threads();
-    ml_fini();
-
     delta_shutdown_time("disable maintenance, new queries, new web requests, new streaming connections and aclk");
 
     service_signal_exit(
@@ -376,6 +371,11 @@ void netdata_cleanup_and_exit(int ret) {
             SERVICE_COLLECTORS
             | SERVICE_STREAMING
             , 3 * USEC_PER_SEC);
+
+    delta_shutdown_time("disable ML detection and training threads");
+
+    ml_stop_threads();
+    ml_fini();
 
     delta_shutdown_time("stop context thread");
 
@@ -446,8 +446,11 @@ void netdata_cleanup_and_exit(int ret) {
                 for (size_t tier = 0; tier < storage_tiers; tier++)
                     running += rrdeng_collectors_running(multidb_ctx[tier]);
 
-                if(running)
-                    sleep_usec(100 * USEC_PER_MS);
+                if(running) {
+                    error_limit_static_thread_var(erl, 1, 100 * USEC_PER_MS);
+                    error_limit(&erl, "waiting for %zu collectors to finish", running);
+                    // sleep_usec(100 * USEC_PER_MS);
+                }
             }
 
             delta_shutdown_time("wait for dbengine main cache to finish flushing");
@@ -482,7 +485,7 @@ void netdata_cleanup_and_exit(int ret) {
 
 #ifdef ENABLE_HTTPS
     delta_shutdown_time("free openssl structures");
-    security_clean_openssl();
+    netdata_ssl_cleanup();
 #endif
 
     delta_shutdown_time("remove incomplete shutdown file");
@@ -834,7 +837,7 @@ static void security_init(){
     tls_version    = config_get(CONFIG_SECTION_WEB, "tls version",  "1.3");
     tls_ciphers    = config_get(CONFIG_SECTION_WEB, "tls ciphers",  "none");
 
-    security_openssl_library();
+    netdata_ssl_initialize_openssl();
 }
 #endif
 
@@ -1313,9 +1316,9 @@ void post_conf_load(char **user)
     // --------------------------------------------------------------------
     // Check if the cloud is enabled
 #if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
-    netdata_cloud_setting = 0;
+    netdata_cloud_enabled = false;
 #else
-    netdata_cloud_setting = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1);
+    netdata_cloud_enabled = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1);
 #endif
     // This must be set before any point in the code that accesses it. Do not move it from this function.
     appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", DEFAULT_CLOUD_BASE_URL);
@@ -1342,6 +1345,8 @@ void replication_initialize(void);
 int main(int argc, char **argv) {
     // initialize the system clocks
     clocks_init();
+    netdata_start_time = now_realtime_sec();
+
     usec_t started_ut = now_monotonic_usec();
     usec_t last_ut = started_ut;
     const char *prev_msg = NULL;
@@ -1357,7 +1362,7 @@ int main(int argc, char **argv) {
 
     static_threads = static_threads_get();
 
-    netdata_ready=0;
+    netdata_ready = false;
     // set the name for logging
     program_name = "netdata";
 
@@ -1549,6 +1554,10 @@ int main(int argc, char **argv) {
                         else if(strcmp(optarg, "julytest") == 0) {
                             unittest_running = true;
                             return julytest();
+                        }
+                        else if(strcmp(optarg, "parsertest") == 0) {
+                            unittest_running = true;
+                            return pluginsd_parser_unittest();
                         }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
@@ -2117,7 +2126,7 @@ int main(int argc, char **argv) {
 
     usec_t ready_ut = now_monotonic_usec();
     info("NETDATA STARTUP: completed in %llu ms. Enjoy real-time performance monitoring!", (ready_ut - started_ut) / USEC_PER_MS);
-    netdata_ready = 1;
+    netdata_ready = true;
 
     send_statistics("START", "-",  "-");
     if (crash_detected)

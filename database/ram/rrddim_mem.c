@@ -35,15 +35,15 @@ struct mem_metric_handle {
 
 static void update_metric_handle_from_rrddim(struct mem_metric_handle *mh, RRDDIM *rd) {
     mh->counter        = rd->rrdset->counter;
-    mh->entries        = rd->rrdset->entries;
-    mh->current_entry  = rd->rrdset->current_entry;
+    mh->entries        = rd->rrdset->db.entries;
+    mh->current_entry  = rd->rrdset->db.current_entry;
     mh->last_updated_s = rd->rrdset->last_updated.tv_sec;
     mh->update_every_s = rd->rrdset->update_every;
 }
 
 static void check_metric_handle_from_rrddim(struct mem_metric_handle *mh) {
     RRDDIM *rd = mh->rd; (void)rd;
-    internal_fatal(mh->entries != (size_t)rd->rrdset->entries, "RRDDIM: entries do not match");
+    internal_fatal(mh->entries != (size_t)rd->rrdset->db.entries, "RRDDIM: entries do not match");
     internal_fatal(mh->update_every_s != rd->rrdset->update_every, "RRDDIM: update every does not match");
 }
 
@@ -161,7 +161,7 @@ void rrddim_store_metric_flush(STORAGE_COLLECT_HANDLE *collection_handle) {
     storage_number empty = pack_storage_number(NAN, SN_FLAG_NONE);
 
     for(size_t i = 0; i < entries ;i++)
-        rd->db[i] = empty;
+        rd->db.data[i] = empty;
 
     mh->counter = 0;
     mh->last_updated_s = 0;
@@ -192,7 +192,7 @@ static inline void rrddim_fill_the_gap(STORAGE_COLLECT_HANDLE *collection_handle
         // fill the dimension
         size_t c;
         for(c = 0; c < entries && now_store_s <= now_collect_s ; now_store_s += update_every_s, c++) {
-            rd->db[current_entry++] = empty;
+            rd->db.data[current_entry++] = empty;
 
             if(unlikely(current_entry >= entries))
                 current_entry = 0;
@@ -227,7 +227,7 @@ void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *collection_handle,
     if(unlikely(mh->last_updated_s && point_in_time_s - mh->update_every_s > mh->last_updated_s))
         rrddim_fill_the_gap(collection_handle, point_in_time_s);
 
-    rd->db[mh->current_entry] = pack_storage_number(n, flags);
+    rd->db.data[mh->current_entry] = pack_storage_number(n, flags);
     mh->counter++;
     mh->current_entry = (mh->current_entry + 1) >= mh->entries ? 0 : mh->current_entry + 1;
     mh->last_updated_s = point_in_time_s;
@@ -390,7 +390,7 @@ STORAGE_POINT rrddim_query_next_metric(struct storage_engine_query_handle *handl
         return sp;
     }
 
-    storage_number n = rd->db[slot++];
+    storage_number n = rd->db.data[slot++];
     if(unlikely(slot >= entries)) slot = 0;
 
     h->slot = slot;

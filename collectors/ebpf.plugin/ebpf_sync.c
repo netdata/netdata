@@ -349,6 +349,7 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
     for (i = 0; local_syscalls[i].syscall; i++) {
         ebpf_sync_syscalls_t *w = &local_syscalls[i];
         w->sync_maps = local_syscalls[i].sync_maps;
+        em->maps = local_syscalls[i].sync_maps;
         if (w->enabled) {
             if (em->load & EBPF_LOAD_LEGACY) {
                 if (ebpf_sync_load_legacy(w, em))
@@ -360,20 +361,23 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
             else {
                 char syscall[NETDATA_EBPF_MAX_SYSCALL_LENGTH];
                 ebpf_select_host_prefix(syscall, NETDATA_EBPF_MAX_SYSCALL_LENGTH, w->syscall, running_on_kernel);
-                w->sync_obj = sync_bpf__open();
-                if (!w->sync_obj) {
-                    errors++;
-                } else {
-                    if (ebpf_is_function_inside_btf(default_btf, syscall)) {
+                if (ebpf_is_function_inside_btf(default_btf, syscall)) {
+                    w->sync_obj = sync_bpf__open();
+                    if (!w->sync_obj) {
+                        w->enabled = false;
+                        errors++;
+                    } else {
                         if (ebpf_sync_load_and_attach(w->sync_obj, em, syscall, i)) {
+                            w->enabled = false;
                             errors++;
                         }
-                    } else {
-                        if (ebpf_sync_load_legacy(w, em))
-                            errors++;
                     }
-                    em->thread_name = saved_name;
+                } else {
+                    info("Cannot find syscall %s we are not going to monitor it.", syscall);
+                    w->enabled = false;
                 }
+
+                em->thread_name = saved_name;
             }
 #endif
         }
@@ -402,7 +406,7 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
  */
 static void ebpf_sync_read_global_table(int maps_per_core)
 {
-    netdata_idx_t stored[ebpf_nprocs];
+    netdata_idx_t stored[NETDATA_MAX_PROCESSOR];
     uint32_t idx = NETDATA_SYNC_CALL;
     int i;
     for (i = 0; local_syscalls[i].syscall; i++) {
@@ -456,7 +460,7 @@ static void ebpf_send_sync_chart(char *id,
  */
 static void sync_send_data()
 {
-    if (local_syscalls[NETDATA_SYNC_FSYNC_IDX].enabled || local_syscalls[NETDATA_SYNC_FDATASYNC_IDX].enabled) {
+    if (local_syscalls[NETDATA_SYNC_FSYNC_IDX].enabled && local_syscalls[NETDATA_SYNC_FDATASYNC_IDX].enabled) {
         ebpf_send_sync_chart(NETDATA_EBPF_FILE_SYNC_CHART, NETDATA_SYNC_FSYNC_IDX, NETDATA_SYNC_FDATASYNC_IDX);
     }
 
@@ -465,7 +469,7 @@ static void sync_send_data()
                                         sync_counter_publish_aggregated[NETDATA_SYNC_MSYNC_IDX].dimension,
                                         sync_hash_values[NETDATA_SYNC_MSYNC_IDX]);
 
-    if (local_syscalls[NETDATA_SYNC_SYNC_IDX].enabled || local_syscalls[NETDATA_SYNC_SYNCFS_IDX].enabled) {
+    if (local_syscalls[NETDATA_SYNC_SYNC_IDX].enabled && local_syscalls[NETDATA_SYNC_SYNCFS_IDX].enabled) {
         ebpf_send_sync_chart(NETDATA_EBPF_SYNC_CHART, NETDATA_SYNC_SYNC_IDX, NETDATA_SYNC_SYNCFS_IDX);
     }
 
@@ -551,7 +555,7 @@ static void ebpf_create_sync_chart(char *id,
  */
 static void ebpf_create_sync_charts(int update_every)
 {
-    if (local_syscalls[NETDATA_SYNC_FSYNC_IDX].enabled || local_syscalls[NETDATA_SYNC_FDATASYNC_IDX].enabled)
+    if (local_syscalls[NETDATA_SYNC_FSYNC_IDX].enabled && local_syscalls[NETDATA_SYNC_FDATASYNC_IDX].enabled)
         ebpf_create_sync_chart(NETDATA_EBPF_FILE_SYNC_CHART,
                                "Monitor calls for <code>fsync(2)</code> and <code>fdatasync(2)</code>.", 21300,
                                NETDATA_SYNC_FSYNC_IDX, NETDATA_SYNC_FDATASYNC_IDX, update_every);
@@ -561,7 +565,7 @@ static void ebpf_create_sync_charts(int update_every)
                                "Monitor calls for <code>msync(2)</code>.", 21301,
                                NETDATA_SYNC_MSYNC_IDX, NETDATA_SYNC_MSYNC_IDX, update_every);
 
-    if (local_syscalls[NETDATA_SYNC_SYNC_IDX].enabled || local_syscalls[NETDATA_SYNC_SYNCFS_IDX].enabled)
+    if (local_syscalls[NETDATA_SYNC_SYNC_IDX].enabled && local_syscalls[NETDATA_SYNC_SYNCFS_IDX].enabled)
         ebpf_create_sync_chart(NETDATA_EBPF_SYNC_CHART,
                                "Monitor calls for <code>sync(2)</code> and <code>syncfs(2)</code>.", 21302,
                                NETDATA_SYNC_SYNC_IDX, NETDATA_SYNC_SYNCFS_IDX, update_every);
@@ -616,7 +620,6 @@ void *ebpf_sync_thread(void *ptr)
     netdata_thread_cleanup_push(ebpf_sync_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    em->maps = sync_maps;
 
     ebpf_set_sync_maps();
     ebpf_sync_parse_syscalls();

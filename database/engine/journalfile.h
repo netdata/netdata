@@ -21,6 +21,7 @@ typedef enum __attribute__ ((__packed__)) {
     JOURNALFILE_FLAG_IS_AVAILABLE          = (1 << 0),
     JOURNALFILE_FLAG_IS_MOUNTED            = (1 << 1),
     JOURNALFILE_FLAG_MOUNTED_FOR_RETENTION = (1 << 2),
+    JOURNALFILE_FLAG_METRIC_CRC_CHECK      = (1 << 3),
 } JOURNALFILE_FLAGS;
 
 /* only one event loop is supported for now */
@@ -39,7 +40,12 @@ struct rrdengine_journalfile {
         time_t first_time_s;
         time_t last_time_s;
         time_t not_needed_since_s;
+        // uint32_t size_of_directory;
     } v2;
+
+    struct {
+        Word_t indexed_as;
+    } njfv2idx;
 
     struct {
         SPINLOCK spinlock;
@@ -51,9 +57,9 @@ struct rrdengine_journalfile {
 };
 
 static inline uint64_t journalfile_current_size(struct rrdengine_journalfile *journalfile) {
-    netdata_spinlock_lock(&journalfile->unsafe.spinlock);
+    spinlock_lock(&journalfile->unsafe.spinlock);
     uint64_t size = journalfile->unsafe.pos;
-    netdata_spinlock_unlock(&journalfile->unsafe.spinlock);
+    spinlock_unlock(&journalfile->unsafe.spinlock);
     return size;
 }
 
@@ -156,5 +162,16 @@ void journalfile_v2_data_set(struct rrdengine_journalfile *journalfile, int fd, 
 struct journal_v2_header *journalfile_v2_data_acquire(struct rrdengine_journalfile *journalfile, size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s);
 void journalfile_v2_data_release(struct rrdengine_journalfile *journalfile);
 void journalfile_v2_data_unmount_cleanup(time_t now_s);
+
+typedef struct {
+    bool init;
+    Word_t last;
+    time_t wanted_start_time_s;
+    time_t wanted_end_time_s;
+    struct rrdengine_instance *ctx;
+    struct journal_v2_header *j2_header_acquired;
+} NJFV2IDX_FIND_STATE;
+
+struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJFV2IDX_FIND_STATE *s);
 
 #endif /* NETDATA_JOURNALFILE_H */

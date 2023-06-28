@@ -39,21 +39,6 @@ static avl_tree_lock mdflush_pub;
 static mdflush_ebpf_val_t *mdflush_ebpf_vals = NULL;
 
 /**
- * MDflush Free
- *
- * Cleanup variables after child threads to stop
- *
- * @param ptr thread data.
- */
-static void ebpf_mdflush_free(ebpf_module_t *em)
-{
-    freez(mdflush_ebpf_vals);
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-}
-
-/**
  * MDflush exit
  *
  * Cancel thread and exit.
@@ -63,7 +48,13 @@ static void ebpf_mdflush_free(ebpf_module_t *em)
 static void mdflush_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    ebpf_mdflush_free(em);
+
+    if (em->objects)
+        ebpf_unload_legacy_code(em->objects, em->probe_links);
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /**

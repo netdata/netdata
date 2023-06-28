@@ -387,15 +387,17 @@ static size_t list_has_time_gaps(
         time_t wanted_end_time_s,
         size_t *pages_total,
         size_t *pages_found_pass4,
-        size_t *pages_pending,
+        size_t *pages_to_load_from_disk,
         size_t *pages_overlapping,
         time_t *optimal_end_time_s,
-        bool populate_gaps
+        bool populate_gaps,
+        PDC_PAGE_STATUS *common_status
 ) {
     // we will recalculate these, so zero them
-    *pages_pending = 0;
+    *pages_to_load_from_disk = 0;
     *pages_overlapping = 0;
     *optimal_end_time_s = 0;
+    *common_status = 0;
 
     bool first;
     Pvoid_t *PValue;
@@ -461,6 +463,7 @@ static size_t list_has_time_gaps(
             (*pages_overlapping)++;
             pd->status |= PDC_PAGE_SKIP;
             pd->status &= ~(PDC_PAGE_READY | PDC_PAGE_DISK_PENDING);
+            *common_status |= pd->status;
             continue;
         }
 
@@ -480,7 +483,7 @@ static size_t list_has_time_gaps(
 
             }
             else if(!(pd->status & PDC_PAGE_FAILED) && (pd->status & PDC_PAGE_DATAFILE_ACQUIRED)) {
-                (*pages_pending)++;
+                (*pages_to_load_from_disk)++;
 
                 pd->status |= PDC_PAGE_DISK_PENDING;
 
@@ -495,6 +498,8 @@ static size_t list_has_time_gaps(
             pd->status &= ~PDC_PAGE_DISK_PENDING;
             pd->status |= (PDC_PAGE_READY | PDC_PAGE_PRELOADED);
         }
+
+        *common_status |= pd->status;
     }
 
     internal_fatal(pages_pass2 != pages_pass3,
@@ -504,6 +509,8 @@ static size_t list_has_time_gaps(
 
     return gaps;
 }
+
+// ----------------------------------------------------------------------------
 
 typedef void (*page_found_callback_t)(PGC_PAGE *page, void *data);
 static size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *metric, usec_t start_time_ut, usec_t end_time_ut, page_found_callback_t callback, void *callback_data) {
@@ -515,12 +522,19 @@ static size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METR
 
     size_t pages_found = 0;
 
-    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+    NJFV2IDX_FIND_STATE state = {
+            .init = false,
+            .last = 0,
+            .ctx = ctx,
+            .wanted_start_time_s = wanted_start_time_s,
+            .wanted_end_time_s = wanted_end_time_s,
+            .j2_header_acquired = NULL,
+    };
+
     struct rrdengine_datafile *datafile;
-    for(datafile = ctx->datafiles.first; datafile ; datafile = datafile->next) {
-        struct journal_v2_header *j2_header = journalfile_v2_data_acquire(datafile->journalfile, NULL,
-                                                                          wanted_start_time_s,
-                                                                          wanted_end_time_s);
+    while((datafile = njfv2idx_find_and_acquire_j2_header(&state))) {
+        struct journal_v2_header *j2_header = state.j2_header_acquired;
+
         if (unlikely(!j2_header))
             continue;
 
@@ -595,7 +609,6 @@ static size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METR
 
         journalfile_v2_data_release(datafile->journalfile);
     }
-    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
     return pages_found;
 }
@@ -644,10 +657,13 @@ static Pvoid_t get_page_list(
         METRIC *metric,
         usec_t start_time_ut,
         usec_t end_time_ut,
-        size_t *pages_to_load,
-        time_t *optimal_end_time_s
+        time_t *optimal_end_time_s,
+        size_t *pages_to_load_from_disk,
+        PDC_PAGE_STATUS *common_status
 ) {
     *optimal_end_time_s = 0;
+    *pages_to_load_from_disk = 0;
+    *common_status = 0;
 
     Pvoid_t JudyL_page_array = (Pvoid_t) NULL;
 
@@ -658,14 +674,13 @@ static Pvoid_t get_page_list(
             pages_found_in_open_cache = 0,
             pages_found_in_journals_v2 = 0,
             pages_found_pass4 = 0,
-            pages_pending = 0,
             pages_overlapping = 0,
             pages_total = 0;
 
     size_t cache_gaps = 0, query_gaps = 0;
     bool done_v2 = false, done_open = false;
 
-    usec_t pass1_ut = 0, pass2_ut = 0, pass3_ut = 0, pass4_ut = 0;
+    usec_t pass1_ut = 0, pass2_ut = 0, pass3_ut = 0, pass4_ut = 0, finish_ut = 0;
 
     // --------------------------------------------------------------
     // PASS 1: Check what the main page cache has available
@@ -680,8 +695,8 @@ static Pvoid_t get_page_list(
 
     if(pages_found_in_main_cache && !cache_gaps) {
         query_gaps = list_has_time_gaps(ctx, metric, JudyL_page_array, wanted_start_time_s, wanted_end_time_s,
-                                        &pages_total, &pages_found_pass4, &pages_pending, &pages_overlapping,
-                                        optimal_end_time_s, false);
+                                        &pages_total, &pages_found_pass4, pages_to_load_from_disk, &pages_overlapping,
+                                        optimal_end_time_s, false, common_status);
 
         if (pages_total && !query_gaps)
             goto we_are_done;
@@ -702,8 +717,8 @@ static Pvoid_t get_page_list(
 
     if(pages_found_in_open_cache) {
         query_gaps = list_has_time_gaps(ctx, metric, JudyL_page_array, wanted_start_time_s, wanted_end_time_s,
-                                        &pages_total, &pages_found_pass4, &pages_pending, &pages_overlapping,
-                                        optimal_end_time_s, false);
+                                        &pages_total, &pages_found_pass4, pages_to_load_from_disk, &pages_overlapping,
+                                        optimal_end_time_s, false, common_status);
 
         if (pages_total && !query_gaps)
             goto we_are_done;
@@ -726,15 +741,11 @@ static Pvoid_t get_page_list(
 
     pass4_ut = now_monotonic_usec();
     query_gaps = list_has_time_gaps(ctx, metric, JudyL_page_array, wanted_start_time_s, wanted_end_time_s,
-                                    &pages_total, &pages_found_pass4, &pages_pending, &pages_overlapping,
-                                    optimal_end_time_s, true);
+                                    &pages_total, &pages_found_pass4, pages_to_load_from_disk, &pages_overlapping,
+                                    optimal_end_time_s, true, common_status);
 
 we_are_done:
-
-    if(pages_to_load)
-        *pages_to_load = pages_pending;
-
-    usec_t finish_ut = now_monotonic_usec();
+    finish_ut = now_monotonic_usec();
     time_delta(finish_ut, pass4_ut);
     time_delta(finish_ut, pass3_ut);
     time_delta(finish_ut, pass2_ut);
@@ -754,7 +765,7 @@ we_are_done:
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_meta_source_journal_v2, pages_found_in_journals_v2, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_data_source_main_cache, pages_found_in_main_cache, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_data_source_main_cache_at_pass4, pages_found_pass4, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_to_load_from_disk, pages_pending, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_to_load_from_disk, *pages_to_load_from_disk, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_overlapping_skipped, pages_overlapping, __ATOMIC_RELAXED);
 
     return JudyL_page_array;
@@ -773,14 +784,23 @@ void rrdeng_prep_query(struct page_details_control *pdc, bool worker) {
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_QUERY);
 
-    size_t pages_to_load = 0;
     pdc->page_list_JudyL = get_page_list(pdc->ctx, pdc->metric,
                                                  pdc->start_time_s * USEC_PER_SEC,
                                                  pdc->end_time_s * USEC_PER_SEC,
-                                                 &pages_to_load,
-                                                 &pdc->optimal_end_time_s);
+                                                 &pdc->optimal_end_time_s,
+                                                 &pdc->pages_to_load_from_disk,
+                                                 &pdc->common_status);
 
-    if (pages_to_load && pdc->page_list_JudyL) {
+    internal_fatal(pdc->pages_to_load_from_disk && !(pdc->common_status & PDC_PAGE_DISK_PENDING),
+                   "DBENGINE: PDC reports there are %zu pages to load from disk, "
+                   "but none of the pages has the PDC_PAGE_DISK_PENDING flag",
+                   pdc->pages_to_load_from_disk);
+
+    internal_fatal(!pdc->pages_to_load_from_disk && (pdc->common_status & PDC_PAGE_DISK_PENDING),
+                   "DBENGINE: PDC reports there are no pages to load from disk, "
+                   "but one or more pages have the PDC_PAGE_DISK_PENDING flag");
+
+    if (pdc->pages_to_load_from_disk && pdc->page_list_JudyL) {
         pdc_acquire(pdc); // we get 1 for the 1st worker in the chain: do_read_page_list_work()
         usec_t start_ut = now_monotonic_usec();
         if(likely(pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS))
@@ -822,7 +842,7 @@ void pg_cache_preload(struct rrdeng_query_handle *handle) {
     handle->pdc->optimal_end_time_s = handle->end_time_s;
     handle->pdc->ctx = handle->ctx;
     handle->pdc->refcount = 1;
-    netdata_spinlock_init(&handle->pdc->refcount_spinlock);
+    spinlock_init(&handle->pdc->refcount_spinlock);
     completion_init(&handle->pdc->prep_completion);
     completion_init(&handle->pdc->page_completion);
 

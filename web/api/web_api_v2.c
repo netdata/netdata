@@ -18,35 +18,52 @@ static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unu
         // they are not null and not empty
 
         if(!strcmp(name, "scope_nodes")) req.scope_nodes = value;
-        else if((options & (CONTEXTS_V2_NODES | CONTEXTS_V2_CONTEXTS)) && !strcmp(name, "nodes")) req.nodes = value;
-        else if((options & CONTEXTS_V2_CONTEXTS) && !strcmp(name, "scope_contexts")) req.scope_contexts = value;
-        else if((options & CONTEXTS_V2_CONTEXTS) && !strcmp(name, "contexts")) req.contexts = value;
+        else if(!strcmp(name, "nodes")) req.nodes = value;
+        else if((options & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH)) && !strcmp(name, "scope_contexts")) req.scope_contexts = value;
+        else if((options & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH)) && !strcmp(name, "contexts")) req.contexts = value;
         else if((options & CONTEXTS_V2_SEARCH) && !strcmp(name, "q")) req.q = value;
+        else if(!strcmp(name, "options")) {
+            if(strstr(value, "minify"))
+                options |= CONTEXTS_V2_MINIFY;
+            else if(strstr(value, "debug"))
+                options |= CONTEXTS_V2_DEBUG;
+        }
+        else if(!strcmp(name, "after")) req.after = str2l(value);
+        else if(!strcmp(name, "before")) req.before = str2l(value);
         else if(!strcmp(name, "timeout")) req.timeout_ms = str2l(value);
     }
-
-    options |= CONTEXTS_V2_DEBUG;
 
     buffer_flush(w->response.data);
     buffer_no_cacheable(w->response.data);
     return rrdcontext_to_json_v2(w->response.data, &req, options);
 }
 
+static int web_client_api_request_v2_functions(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_FUNCTIONS | CONTEXTS_V2_NODES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_VERSIONS);
+}
+
+static int web_client_api_request_v2_versions(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_VERSIONS);
+}
+
 static int web_client_api_request_v2_q(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_SEARCH | CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_NODES);
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_SEARCH | CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_NODES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_VERSIONS);
 }
 
 static int web_client_api_request_v2_contexts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_CONTEXTS);
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_NODES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_VERSIONS);
 }
 
 static int web_client_api_request_v2_nodes(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_DETAILED);
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_INFO);
+}
+
+static int web_client_api_request_v2_nodes_instances(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_INSTANCES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_AGENTS_INFO | CONTEXTS_V2_VERSIONS);
 }
 
 static int web_client_api_request_v2_weights(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_weights(host, w, url, WEIGHTS_METHOD_VALUE,
-                                          WEIGHTS_FORMAT_MULTINODE, 2);
+    return web_client_api_request_weights(host, w, url, WEIGHTS_METHOD_VALUE, WEIGHTS_FORMAT_MULTINODE, 2);
 }
 
 #define GROUP_BY_KEY_MAX_LENGTH 30
@@ -341,6 +358,84 @@ cleanup:
     return ret;
 }
 
+static int web_client_api_request_v2_alerts(RRDHOST *host __maybe_unused, struct web_client *w, char *url)
+{
+    time_t after = 0;
+    time_t before = 0;
+    struct api_v2_alerts_request req = { 0 };
+
+    CONTEXTS_V2_OPTIONS options =  CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_NODES;
+    ALERT_OPTIONS alert_options = 0;
+
+    while(url) {
+        char *value = strsep_skip_consecutive_separators(&url, "&");
+        if(!value || !*value) continue;
+
+        char *name = strsep_skip_consecutive_separators(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        // name and value are now the parameters
+        // they are not null and not empty
+
+        if (!strcmp(name, "scope_nodes")) {
+            req.scope_nodes = value;
+            options |= CONTEXTS_V2_NODES;
+        }
+        else if (!strcmp(name, "nodes")) {
+            req.nodes = value;
+            options |= CONTEXTS_V2_NODES;
+        }
+        else if (!strcmp(name, "scope_contexts")) {
+            req.scope_contexts = value;
+            options |= CONTEXTS_V2_CONTEXTS;
+        }
+        else if (!strcmp(name, "instance_id"))
+            req.alert_id = (time_t)strtoul(value, NULL, 0);
+        else if (!strcmp(name, "last"))
+            req.last = strtoul(value, NULL, 0);
+        else if (!strcmp(name, "transition_id")) {
+            req.transition_id = value;
+        } else if (!strcmp(name, "alert_name")) {
+            req.alert_name = value;
+            req.alert_name_pattern = string_to_simple_pattern(value);
+        } else if (!strcmp(name, "config_hash")) {
+            req.config_hash = value;
+            req.config_hash_pattern = string_to_simple_pattern(value);
+        } else if (!strcmp(name, "contexts")) {
+            req.contexts = value;
+            options |= CONTEXTS_V2_CONTEXTS;
+        } else if (!strcmp(name, "state")) {
+            req.state = value;  // all | warning | critical, clear, undefined, uninitialiazed
+        } else if (!strcmp(name, "q"))
+            req.q = value;
+        else if (!strcmp(name, "after"))
+            after = (time_t)strtoul(value, NULL, 0);
+        else if (!strcmp(name, "before"))
+            before = (time_t)strtoul(value, NULL, 0);
+        else if (!strcmp(name, "output")) {
+            // config, instances, transitions
+            alert_options |= web_client_api_request_v2_alert_options(value);
+        }
+
+        // TODO: All states and special "ACTIVE"
+    }
+
+    buffer_flush(w->response.data);
+    buffer_no_cacheable(w->response.data);
+    w->response.data->content_type = CT_APPLICATION_JSON;
+    buffer_json_initialize( w->response.data, "\"", "\"", 0, true, alert_options & ALERT_OPTION_MINIFY);
+
+    if (alert_options & ALERT_OPTION_INSTANCES && !req.last)
+        req.last = 1;
+
+    req.options = alert_options;
+    req.after = after;
+    req.before = before;
+
+    return alerts_to_json_v2(w->response.data, &req, options);
+}
+
 static int web_client_api_request_v2_webrtc(RRDHOST *host __maybe_unused, struct web_client *w, char *url __maybe_unused) {
     return webrtc_new_connection(w->post_payload, w->response.data);
 }
@@ -348,11 +443,15 @@ static int web_client_api_request_v2_webrtc(RRDHOST *host __maybe_unused, struct
 static struct web_api_command api_commands_v2[] = {
         {"data", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_data},
         {"nodes", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_nodes},
+        {"nodes_instances", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_nodes_instances},
         {"contexts", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_contexts},
         {"weights", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_weights},
+        {"versions", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_versions},
+        {"functions", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_functions},
         {"q", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_q},
 
         {"rtc_offer", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_webrtc},
+        {"alerts", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_alerts},
 
         // terminator
         {NULL, 0, WEB_CLIENT_ACL_NONE, NULL},

@@ -375,8 +375,12 @@ void analytics_https(void)
     BUFFER *b = buffer_create(30, NULL);
 #ifdef ENABLE_HTTPS
     analytics_exporting_connectors_ssl(b);
-    buffer_strcat(b, netdata_ssl_client_ctx && rrdhost_flag_check(localhost, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED) && localhost->sender->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE ? "streaming|" : "|");
-    buffer_strcat(b, netdata_ssl_srv_ctx ? "web" : "");
+
+    buffer_strcat(b, netdata_ssl_streaming_sender_ctx &&
+                     rrdhost_flag_check(localhost, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED) &&
+                     SSL_connection(&localhost->sender->ssl) ? "streaming|" : "|");
+
+    buffer_strcat(b, netdata_ssl_web_server_ctx ? "web" : "");
 #else
     buffer_strcat(b, "||");
 #endif
@@ -628,6 +632,17 @@ static const char *verify_required_directory(const char *dir)
     return dir;
 }
 
+static const char *verify_or_create_required_directory(const char *dir) {
+    int result;
+
+    result = mkdir(dir, 0755);
+
+    if (result != 0 && errno != EEXIST)
+        fatal("Cannot create required directory '%s'", dir);
+
+    return verify_required_directory(dir);
+}
+
 /*
  * This is called after the rrdinit
  * These values will be sent on the START event
@@ -823,11 +838,11 @@ void set_global_environment()
     setenv("NETDATA_STOCK_CONFIG_DIR", verify_required_directory(netdata_configured_stock_config_dir), 1);
     setenv("NETDATA_PLUGINS_DIR", verify_required_directory(netdata_configured_primary_plugins_dir), 1);
     setenv("NETDATA_WEB_DIR", verify_required_directory(netdata_configured_web_dir), 1);
-    setenv("NETDATA_CACHE_DIR", verify_required_directory(netdata_configured_cache_dir), 1);
-    setenv("NETDATA_LIB_DIR", verify_required_directory(netdata_configured_varlib_dir), 1);
-    setenv("NETDATA_LOCK_DIR", netdata_configured_lock_dir, 1);
-    setenv("NETDATA_LOG_DIR", verify_required_directory(netdata_configured_log_dir), 1);
-    setenv("HOME", verify_required_directory(netdata_configured_home_dir), 1);
+    setenv("NETDATA_CACHE_DIR", verify_or_create_required_directory(netdata_configured_cache_dir), 1);
+    setenv("NETDATA_LIB_DIR", verify_or_create_required_directory(netdata_configured_varlib_dir), 1);
+    setenv("NETDATA_LOCK_DIR", verify_or_create_required_directory(netdata_configured_lock_dir), 1);
+    setenv("NETDATA_LOG_DIR", verify_or_create_required_directory(netdata_configured_log_dir), 1);
+    setenv("HOME", verify_or_create_required_directory(netdata_configured_home_dir), 1);
     setenv("NETDATA_HOST_PREFIX", netdata_configured_host_prefix, 1);
 
     {

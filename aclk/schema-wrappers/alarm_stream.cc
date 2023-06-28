@@ -86,6 +86,7 @@ void destroy_alarm_log_entry(struct alarm_log_entry *entry)
 
     freez(entry->rendered_info);
     freez(entry->chart_context);
+    freez(entry->transition_id);
 }
 
 static void fill_alarm_log_entry(struct alarm_log_entry *data, AlarmLogEntry *proto)
@@ -134,6 +135,9 @@ static void fill_alarm_log_entry(struct alarm_log_entry *data, AlarmLogEntry *pr
     proto->set_rendered_info(data->rendered_info);
 
     proto->set_chart_context(data->chart_context);
+
+    proto->set_event_id(data->event_id);
+    proto->set_transition_id(data->transition_id);
 }
 
 char *generate_alarm_log_entry(size_t *len, struct alarm_log_entry *data)

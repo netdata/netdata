@@ -337,27 +337,6 @@ static inline int ebpf_cachestat_load_and_attach(struct cachestat_bpf *obj, ebpf
  *****************************************************************/
 
 /**
- * Cachestat Free
- *
- * Cleanup variables after child threads to stop
- *
- * @param ptr thread data.
- */
-static void ebpf_cachestat_free(ebpf_module_t *em)
-{
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPING;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-
-    freez(cachestat_vector);
-    freez(cachestat_values);
-
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-}
-
-/**
  * Cachestat exit.
  *
  * Cancel child and exit.
@@ -368,7 +347,18 @@ static void ebpf_cachestat_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    ebpf_cachestat_free(em);
+#ifdef LIBBPF_MAJOR_VERSION
+    if (cachestat_bpf_obj)
+        cachestat_bpf__destroy(cachestat_bpf_obj);
+#endif
+
+    if (em->objects) {
+        ebpf_unload_legacy_code(em->objects, em->probe_links);
+    }
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************

@@ -370,27 +370,6 @@ static inline int ebpf_fd_load_and_attach(struct fd_bpf *obj, ebpf_module_t *em)
  *****************************************************************/
 
 /**
- * FD Free
- *
- * Cleanup variables after child threads to stop
- *
- * @param ptr thread data.
- */
-static void ebpf_fd_free(ebpf_module_t *em)
-{
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPING;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-
-    freez(fd_values);
-    freez(fd_vector);
-
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-}
-
-/**
  * FD Exit
  *
  * Cancel child thread and exit.
@@ -400,7 +379,17 @@ static void ebpf_fd_free(ebpf_module_t *em)
 static void ebpf_fd_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    ebpf_fd_free(em);
+
+#ifdef LIBBPF_MAJOR_VERSION
+    if (fd_bpf_obj)
+        fd_bpf__destroy(fd_bpf_obj);
+#endif
+    if (em->objects)
+        ebpf_unload_legacy_code(em->objects, em->probe_links);
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************

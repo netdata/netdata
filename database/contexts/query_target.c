@@ -131,10 +131,10 @@ void query_target_release(QUERY_TARGET *qt) {
 
     qt->id[0] = '\0';
 
-    netdata_spinlock_lock(&query_target_base.used.spinlock);
+    spinlock_lock(&query_target_base.used.spinlock);
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(query_target_base.used.base, qt, internal.prev, internal.next);
     query_target_base.used.count--;
-    netdata_spinlock_unlock(&query_target_base.used.spinlock);
+    spinlock_unlock(&query_target_base.used.spinlock);
 
     qt->internal.used = false;
     thread_qt = NULL;
@@ -143,29 +143,29 @@ void query_target_release(QUERY_TARGET *qt) {
         query_target_destroy(qt);
     }
     else {
-        netdata_spinlock_lock(&query_target_base.available.spinlock);
+        spinlock_lock(&query_target_base.available.spinlock);
         DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(query_target_base.available.base, qt, internal.prev, internal.next);
         query_target_base.available.count++;
-        netdata_spinlock_unlock(&query_target_base.available.spinlock);
+        spinlock_unlock(&query_target_base.available.spinlock);
     }
 }
 
 static QUERY_TARGET *query_target_get(void) {
-    netdata_spinlock_lock(&query_target_base.available.spinlock);
+    spinlock_lock(&query_target_base.available.spinlock);
     QUERY_TARGET *qt = query_target_base.available.base;
     if (qt) {
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(query_target_base.available.base, qt, internal.prev, internal.next);
         query_target_base.available.count--;
     }
-    netdata_spinlock_unlock(&query_target_base.available.spinlock);
+    spinlock_unlock(&query_target_base.available.spinlock);
 
     if(unlikely(!qt))
         qt = callocz(1, sizeof(*qt));
 
-    netdata_spinlock_lock(&query_target_base.used.spinlock);
+    spinlock_lock(&query_target_base.used.spinlock);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(query_target_base.used.base, qt, internal.prev, internal.next);
     query_target_base.used.count++;
-    netdata_spinlock_unlock(&query_target_base.used.spinlock);
+    spinlock_unlock(&query_target_base.used.spinlock);
 
     qt->internal.used = true;
     qt->internal.queries++;

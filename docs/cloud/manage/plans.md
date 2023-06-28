@@ -101,13 +101,13 @@ The plan on your space will determine what type of notifications methods will be
 * **Pro** - Email, Discord and webhook
 * **Business** - Unlimited, this includes Slack, PagerDuty, Opsgenie etc.
 
-For mode details check the documentation under [Alert Notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md#alert-notifications).
+For more details check the documentation under [Alert Notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md#alert-notifications).
 
 ##### Alert notification silencing rules
 
 The plan on your space will determine if you are able to add alert notification silencing rules since this feature will only be available for paid plans: **Pro** or **Business**.
 
-For mode details check the documentation under [Alert Notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md#silencing-alert-notifications).
+For more details check the documentation under [Alert Notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md#silencing-alert-notifications).
 
 ### Related Topics
 

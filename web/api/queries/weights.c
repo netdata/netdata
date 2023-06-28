@@ -874,7 +874,7 @@ static size_t registered_results_to_json_multinode_no_group_by(
                 continue;
 
             buffer_json_add_array_item_object(wb);
-            buffer_json_node_add_v2(wb, dun->host, dun->i, dun->duration_ut);
+            buffer_json_node_add_v2(wb, dun->host, dun->i, dun->duration_ut, true);
             buffer_json_object_close(wb);
         }
         dfe_done(dun);
@@ -936,7 +936,7 @@ static size_t registered_results_to_json_multinode_no_group_by(
 
     buffer_json_object_close(wb); //dictionaries
 
-    buffer_json_agents_array_v2(wb, &qwd->timings, 0);
+    buffer_json_agents_array_v2(wb, &qwd->timings, 0, false);
     buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
     buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
     buffer_json_finalize(wb);
@@ -1067,7 +1067,7 @@ static size_t registered_results_to_json_multinode_group_by(
     dfe_done(aw);
     buffer_json_array_close(wb); // result
 
-    buffer_json_agents_array_v2(wb, &qwd->timings, 0);
+    buffer_json_agents_array_v2(wb, &qwd->timings, 0, false);
     buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
     buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
     buffer_json_finalize(wb);
