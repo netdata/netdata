@@ -235,13 +235,12 @@ Linux metrics:
 
 The eBPF collector enables and runs the following eBPF programs by default:
 
+-   `cachestat`: Netdata's eBPF data collector creates charts about the memory page cache. When the integration with
+    [`apps.plugin`](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md) is enabled, this collector creates charts for the whole host _and_
+    for each application.
 -   `fd` :  This eBPF program creates charts that show information about calls to open files.
 -   `mount`: This eBPF program creates charts that show calls to syscalls mount(2) and umount(2).
 -   `shm`: This eBPF program creates charts that show calls to syscalls shmget(2), shmat(2), shmdt(2) and shmctl(2).
--   `sync`: Monitor calls to syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2).
--   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
-    bandwidth consumed by each.
--   `vfs`: This eBPF program creates charts that show information about VFS (Virtual File System) functions.
 -   `process`: This eBPF program creates charts that show information about process life. When in `return` mode, it also
     creates charts showing errors when these operations are executed.
 -   `hardirq`: This eBPF program creates charts that show information about time spent servicing individual hardware
@@ -254,9 +253,6 @@ The eBPF collector enables and runs the following eBPF programs by default:
 
 You can also enable the following eBPF programs:
 
--   `cachestat`: Netdata's eBPF data collector creates charts about the memory page cache. When the integration with
-    [`apps.plugin`](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md) is enabled, this collector creates charts for the whole host _and_
-    for each application.
 -   `dcstat` : This eBPF program creates charts that show information about file access using directory cache. It appends
     `kprobes` for `lookup_fast()` and `d_lookup()` to identify if files are inside directory cache, outside and files are
     not found.
@@ -264,7 +260,11 @@ You can also enable the following eBPF programs:
 -   `filesystem` : This eBPF program creates charts that show information about some filesystem latency.
 -   `swap` : This eBPF program creates charts that show information about swap access.
 -   `mdflush`: This eBPF program creates charts that show information about
+-   `sync`: Monitor calls to syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2).
+-   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
+    bandwidth consumed by each.
     multi-device software flushes.
+-   `vfs`: This eBPF program creates charts that show information about VFS (Virtual File System) functions.
 
 ### Configuring eBPF threads
 
