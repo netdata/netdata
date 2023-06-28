@@ -1774,7 +1774,7 @@ void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_
     rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to INSERT into v_%p", alert_instances);
-        return;
+        goto fail_only_drop;
     }
 
     // We dont need it
