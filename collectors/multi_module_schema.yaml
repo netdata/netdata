@@ -13,7 +13,7 @@ properties:
           type: "string"
         title:
           type: "string"
-        duplicate_for_virtual_integrations:
+        virtual_integrations:
           type: "object"
           properties:
             list:
@@ -23,7 +23,7 @@ properties:
         overview:
           type: "object"
           properties:
-            how_the_collector_works:
+            data_collection:
               type: "object"
               properties:
                 description:
@@ -31,8 +31,10 @@ properties:
             supported_platforms:
               type: "object"
               properties:
-                description:
-                  type: "string"
+                list:
+                  type: "array"
+                  items:
+                    type: "string"
             multi-instance:
               type: "boolean"
             permissions:
@@ -40,22 +42,7 @@ properties:
               properties:
                 description:
                   type: "string"
-        setup:
-          type: "object"
-          properties:
-            prerequisites:
-              type: "object"
-              properties:
-                list:
-                  type: "array"
-                  items:
-                    type: "object"
-                    properties:
-                      title:
-                        type: "string"
-                      text:
-                        type: "string"
-            behavior:
+            default_behavior:
               type: "object"
               properties:
                 auto_detection:
@@ -73,63 +60,78 @@ properties:
                   properties:
                     description:
                       type: "string"
-        configuration:
+        setup:
           type: "object"
           properties:
-            file:
+            prerequisites:
               type: "object"
               properties:
-                description:
-                  type: "string"
-            options:
-              type: "object"
-              properties:
-                description:
-                  type: "string"
-                folding:
-                  type: "object"
-                  properties:
-                    title:
-                      type: "string"
-                    enabled:
-                      type: "boolean"
                 list:
                   type: "array"
                   items:
                     type: "object"
                     properties:
-                      name:
+                      title:
                         type: "string"
-                      description:
+                      text:
                         type: "string"
-                      default:
-                        type: ["string", "number"]
-                      required:
-                        type: "boolean"
-            examples:
+            configuration:
               type: "object"
               properties:
-                folding:
+                file:
                   type: "object"
                   properties:
-                    title:
+                    description:
                       type: "string"
-                    enabled:
-                      type: "boolean"
-                list:
-                  type: "array"
-                  items:
-                    type: "object"
-                    properties:
-                      name:
-                        type: "string"
-                      description:
-                        type: "string"
-                      data:
+                options:
+                  type: "object"
+                  properties:
+                    description:
+                      type: "string"
+                    folding:
+                      type: "object"
+                      properties:
+                        title:
+                          type: "string"
+                        enabled:
+                          type: "boolean"
+                    list:
+                      type: "array"
+                      items:
                         type: "object"
                         properties:
-                          jobs:
-                            type: "array"
+                          name:
+                            type: "string"
+                          description:
+                            type: "string"
+                          default:
+                            type: ["string", "number"]
+                          required:
+                            type: "boolean"
+                examples:
+                  type: "object"
+                  properties:
+                    folding:
+                      type: "object"
+                      properties:
+                        title:
+                          type: "string"
+                        enabled:
+                          type: "boolean"
+                    list:
+                      type: "array"
+                      items:
+                        type: "object"
+                        properties:
+                          name:
+                            type: "string"
+                          description:
+                            type: "string"
+                          data:
+                            type: "object"
+                            properties:
+                              jobs:
+                                type: "array"
         troubleshooting:
           type: "object"
           properties:

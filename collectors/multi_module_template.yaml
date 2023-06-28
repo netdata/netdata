@@ -3,30 +3,24 @@ title: TBD
 modules:
   - name: Collector name
     title: TBD Monitoring
-    duplicate_for_virtual_integrations:
+    virtual_integrations:
       list:
         - "[TBD](link to TBD)"
         - "[TBD](link to TBD)"
     overview:
-      how_the_collector_works:
+      data_collection:
         # The CI will remove the curly brackets in the link, they are for replacing with the virtual integrations, to replace the link each time
         description: |
           This collector works by... {[TBD](link to TBD)} ...
       supported_platforms:
-        description: |
-          If this collector can't run on some platforms specify them here. Leave empty otherwise.
+        list:
+          - TBD
+          - TBD
       multi-instance: true
       permissions:
         description: |
           if there are any notable permission requirements, eg running as root and so on, specify them here. Leave empty otherwise.
-    setup:
-      prerequisites:
-        list:
-          - title: Prerequisite title for heading
-            text: |
-              - TBD
-              - TBD
-      behavior:
+      default_behavior:
         auto_detection:
           description: |
             TBD
@@ -36,6 +30,13 @@ modules:
         performance_impact:
           description: |
             TBD
+    setup:
+      prerequisites:
+        list:
+          - title: Prerequisite title for heading
+            text: |
+              - TBD
+              - TBD
       configuration:
         file:
           description: |
