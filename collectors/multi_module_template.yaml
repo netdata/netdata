@@ -9,23 +9,23 @@ modules:
         - "[TBD](link to TBD)"
     overview:
       how_the_collector_works:
-            # The CI will remove the curly brackets in the link, they are for replacing with the virtual integrations, to replace the link each time
+        # The CI will remove the curly brackets in the link, they are for replacing with the virtual integrations, to replace the link each time
         description: |
-            This collector works by... {[TBD](link to TBD)} ...
+          This collector works by... {[TBD](link to TBD)} ...
       supported_platforms:
         description: |
-            If this collector can't run on some platforms specify them here. Leave empty otherwise.
+          If this collector can't run on some platforms specify them here. Leave empty otherwise.
       multi-instance: true
       permissions:
         description: |
-            if there are any notable permission requirements, eg running as root and so on, specify them here. Leave empty otherwise.
+          if there are any notable permission requirements, eg running as root and so on, specify them here. Leave empty otherwise.
     setup:
       prerequisites:
         list:
           - title: Prerequisite title for heading
             text: |
-                - TBD
-                - TBD
+              - TBD
+              - TBD
       behavior:
         auto_detection:
           description: |
@@ -61,20 +61,21 @@ modules:
                 A basic example configuration / describe your example
               data:
                 jobs:
-                    - name: example
-                      TBD: TBD
+                  - name: example
+                    TBD: TBD
     troubleshooting:
       problems:
         list:
           - name: possible troubleshooting title
             text: |
-                describe the issue and the troubleshooting process
+              describe the issue and the troubleshooting process
     related_resources:
       integrations:
-        list: [apache, weblog, httpcheck, etc]
-            # This text will be added in the overview section
+        list:
+          [apache, weblog, httpcheck, etc]
+          # This text will be added in the overview section
         overview_text: |
-            give a simple description if there are any other collectors related to this collector. Example -> To get the most out of TBD, you can do XYZ with collectors X Y and Z. Check our related resources for more information.
+          give a simple description if there are any other collectors related to this collector. Example -> To get the most out of TBD, you can do XYZ with collectors X Y and Z. Check our related resources for more information.
         provide:
           description: |
             What info I can provide for other plugins that reference me? this will only be visible in their end, they will scrape this text. Example -> XYZ allows monitoring X Y Z metrics...

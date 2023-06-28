@@ -1,29 +1,29 @@
 type: "object"
 properties:
-  name: { type: "string" }
-  title: { type: "string" }
+  name: {type: "string"}
+  title: {type: "string"}
   duplicate_for_virtual_integrations:
     type: "object"
     properties:
       list:
         type: "array"
-        items: { type: "string" }
+        items: {type: "string"}
   overview:
     type: "object"
     properties:
       how_the_collector_works:
         type: "object"
         properties:
-          description: { type: "string" }
+          description: {type: "string"}
       supported_platforms:
         type: "object"
         properties:
-          description: { type: "string" }
-      multi-instance: { type: "boolean" }
+          description: {type: "string"}
+      multi-instance: {type: "boolean"}
       permissions:
         type: "object"
         properties:
-          description: { type: "string" }
+          description: {type: "string"}
   setup:
     type: "object"
     properties:
@@ -35,63 +35,63 @@ properties:
             items:
               type: "object"
               properties:
-                title: { type: "string" }
-                text: { type: "string" }
+                title: {type: "string"}
+                text: {type: "string"}
       behavior:
         type: "object"
         properties:
           auto_detection:
             type: "object"
             properties:
-              description: { type: "string" }
+              description: {type: "string"}
           limits:
             type: "object"
             properties:
-              description: { type: "string" }
+              description: {type: "string"}
           performance_impact:
             type: "object"
             properties:
-              description: { type: "string" }
+              description: {type: "string"}
   configuration:
     type: "object"
     properties:
       file:
         type: "object"
         properties:
-          description: { type: "string" }
+          description: {type: "string"}
       options:
         type: "object"
         properties:
-          description: { type: "string" }
+          description: {type: "string"}
           folding:
             type: "object"
             properties:
-              title: { type: "string" }
-              enabled: { type: "boolean" }
+              title: {type: "string"}
+              enabled: {type: "boolean"}
           list:
             type: "array"
             items:
               type: "object"
               properties:
-                name: { type: "string" }
-                description: { type: "string" }
-                default: { type: ["string", "number"] }
-                required: { type: "boolean" }
+                name: {type: "string"}
+                description: {type: "string"}
+                default: {type: ["string", "number"]}
+                required: {type: "boolean"}
       examples:
         type: "object"
         properties:
           folding:
             type: "object"
             properties:
-              title: { type: "string" }
-              enabled: { type: "boolean" }
+              title: {type: "string"}
+              enabled: {type: "boolean"}
           list:
             type: "array"
             items:
               type: "object"
               properties:
-                name: { type: "string" }
-                description: { type: "string" }
+                name: {type: "string"}
+                description: {type: "string"}
                 data:
                   type: "object"
                   properties:
@@ -100,8 +100,8 @@ properties:
                       items:
                         type: "object"
                         properties:
-                          name: { type: "string" }
-                          TBD: { type: "string" }
+                          name: {type: "string"}
+                          TBD: {type: "string"}
   troubleshooting:
     type: "object"
     properties:
@@ -113,8 +113,8 @@ properties:
             items:
               type: "object"
               properties:
-                name: { type: "string" }
-                text: { type: "string" }
+                name: {type: "string"}
+                text: {type: "string"}
   related_resources:
     type: "object"
     properties:
@@ -123,49 +123,49 @@ properties:
         properties:
           list:
             type: "array"
-            items: { type: "string" }
-          overview_text: { type: "string" }
+            items: {type: "string"}
+          overview_text: {type: "string"}
           provide:
             type: "object"
             properties:
-              description: { type: "string" }
+              description: {type: "string"}
   alerts:
     type: "array"
     items:
       type: "object"
       properties:
-        name: { type: "string" }
-        link: { type: "string" }
-        metric: { type: "string" }
-        info: { type: "string" }
-        os: { type: "string" }
+        name: {type: "string"}
+        link: {type: "string"}
+        metric: {type: "string"}
+        info: {type: "string"}
+        os: {type: "string"}
   metrics:
     type: "object"
     properties:
-      description: { type: "string" }
+      description: {type: "string"}
       folding:
         type: "object"
         properties:
-          title: { type: "string" }
-          enabled: { type: "boolean" }
+          title: {type: "string"}
+          enabled: {type: "boolean"}
       scopes:
         type: "array"
         items:
           type: "object"
           properties:
-            name: { type: "string" }
-            description: { type: "string" }
+            name: {type: "string"}
+            description: {type: "string"}
             labels:
               type: "array"
-              items: { type: "string" }
+              items: {type: "string"}
             metrics:
               type: "array"
               items:
                 type: "object"
                 properties:
-                  name: { type: "string" }
-                  description: { type: "string" }
-                  unit: { type: "string" }
+                  name: {type: "string"}
+                  description: {type: "string"}
+                  unit: {type: "string"}
                   dimensions:
                     type: "array"
-                    items: { type: "string" }
+                    items: {type: "string"}
