@@ -496,6 +496,7 @@ struct api_v2_contexts_request {
     CONTEXTS_V2_OPTIONS options;
 
     struct {
+        CONTEXTS_V2_ALERT_STATUS status;
         char *alert;
         char *transition;
         uint32_t last;

@@ -60,13 +60,21 @@ static struct {
         , {"config"           , 0    , CONTEXT_V2_OPTION_ALERT_CONFIGURATIONS}
         , {"transitions"      , 0    , CONTEXT_V2_OPTION_ALERT_TRANSITIONS}
         , {"instances"        , 0    , CONTEXT_V2_OPTION_ALERT_INSTANCES}
-        , {"uninitialized"    , 0    , CONTEXT_V2_OPTION_ALERTS_UNINITIALIZED}
-        , {"undefined"        , 0    , CONTEXT_V2_OPTION_ALERTS_UNDEFINED}
-        , {"clear"            , 0    , CONTEXT_V2_OPTION_ALERTS_CLEAR}
-        , {"raised"           , 0    , CONTEXT_V2_OPTION_ALERTS_RAISED}
-        , {"active"           , 0    , CONTEXT_V2_OPTION_ALERTS_RAISED}
-        , {"warning"          , 0    , CONTEXT_V2_OPTION_ALERTS_WARNING}
-        , {"critical"         , 0    , CONTEXT_V2_OPTION_ALERTS_CRITICAL}
+        , {NULL               , 0    , 0}
+};
+
+static struct {
+    const char *name;
+    uint32_t hash;
+    CONTEXTS_V2_ALERT_STATUS value;
+} contexts_v2_alert_status[] = {
+          {"uninitialized"    , 0    , CONTEXT_V2_ALERT_UNINITIALIZED}
+        , {"undefined"        , 0    , CONTEXT_V2_ALERT_UNDEFINED}
+        , {"clear"            , 0    , CONTEXT_V2_ALERT_CLEAR}
+        , {"raised"           , 0    , CONTEXT_V2_ALERT_RAISED}
+        , {"active"           , 0    , CONTEXT_V2_ALERT_RAISED}
+        , {"warning"          , 0    , CONTEXT_V2_ALERT_WARNING}
+        , {"critical"         , 0    , CONTEXT_V2_ALERT_CRITICAL}
         , {NULL               , 0    , 0}
 };
 
@@ -110,6 +118,9 @@ static struct {
 
 void web_client_api_v1_init(void) {
     int i;
+
+    for(i = 0; contexts_v2_alert_status[i].name ; i++)
+        contexts_v2_alert_status[i].hash = simple_hash(contexts_v2_alert_status[i].name);
 
     for(i = 0; api_v1_data_options[i].name ; i++)
         api_v1_data_options[i].hash = simple_hash(api_v1_data_options[i].name);
@@ -235,6 +246,42 @@ inline CONTEXTS_V2_OPTIONS web_client_api_request_v2_context_options(char *o) {
     }
 
     return ret;
+}
+
+inline CONTEXTS_V2_ALERT_STATUS web_client_api_request_v2_alert_status(char *o) {
+    CONTEXTS_V2_ALERT_STATUS ret = 0;
+    char *tok;
+
+    while(o && *o && (tok = strsep_skip_consecutive_separators(&o, ", |"))) {
+        if(!*tok) continue;
+
+        uint32_t hash = simple_hash(tok);
+        int i;
+        for(i = 0; contexts_v2_alert_status[i].name ; i++) {
+            if (unlikely(hash == contexts_v2_alert_status[i].hash && !strcmp(tok, contexts_v2_alert_status[i].name))) {
+                ret |= contexts_v2_alert_status[i].value;
+                break;
+            }
+        }
+    }
+
+    return ret;
+}
+
+void web_client_api_request_v2_contexts_alerts_status_to_buffer_json_array(BUFFER *wb, const char *key, CONTEXTS_V2_ALERT_STATUS options) {
+    buffer_json_member_add_array(wb, key);
+
+    RRDR_OPTIONS used = 0; // to prevent adding duplicates
+    for(int i = 0; contexts_v2_alert_status[i].name ; i++) {
+        if (unlikely((contexts_v2_alert_status[i].value & options) && !(contexts_v2_alert_status[i].value & used))) {
+            const char *name = contexts_v2_alert_status[i].name;
+            used |= contexts_v2_alert_status[i].value;
+
+            buffer_json_add_array_item_string(wb, name);
+        }
+    }
+
+    buffer_json_array_close(wb);
 }
 
 void web_client_api_request_v2_contexts_options_to_buffer_json_array(BUFFER *wb, const char *key, CONTEXTS_V2_OPTIONS options) {

@@ -381,30 +381,30 @@ static bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRD
                 if(ctl->alerts.alarm_id_filter && ctl->alerts.alarm_id_filter != rcl->id)
                     continue;
 
-                size_t m = ctl->request->options & CONTEXTS_V2_OPTIONS_ALERTS_STATES ? 0 : 1;
+                size_t m = ctl->request->alerts.status & CONTEXTS_V2_ALERT_STATUSES ? 0 : 1;
 
                 if (!m) {
-                    if ((ctl->request->options & CONTEXT_V2_OPTION_ALERTS_UNINITIALIZED) &&
+                    if ((ctl->request->alerts.status & CONTEXT_V2_ALERT_UNINITIALIZED) &&
                         rcl->status == RRDCALC_STATUS_UNINITIALIZED)
                         m++;
 
-                    if ((ctl->request->options & CONTEXT_V2_OPTION_ALERTS_UNDEFINED) &&
+                    if ((ctl->request->alerts.status & CONTEXT_V2_ALERT_UNDEFINED) &&
                         rcl->status == RRDCALC_STATUS_UNDEFINED)
                         m++;
 
-                    if ((ctl->request->options & CONTEXT_V2_OPTION_ALERTS_CLEAR) &&
+                    if ((ctl->request->alerts.status & CONTEXT_V2_ALERT_CLEAR) &&
                         rcl->status == RRDCALC_STATUS_CLEAR)
                         m++;
 
-                    if ((ctl->request->options & CONTEXT_V2_OPTION_ALERTS_RAISED) &&
+                    if ((ctl->request->alerts.status & CONTEXT_V2_ALERT_RAISED) &&
                         rcl->status >= RRDCALC_STATUS_RAISED)
                         m++;
 
-                    if ((ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WARNING) &&
+                    if ((ctl->request->alerts.status & CONTEXT_V2_ALERT_WARNING) &&
                         rcl->status == RRDCALC_STATUS_WARNING)
                         m++;
 
-                    if ((ctl->request->options & CONTEXT_V2_OPTION_ALERTS_CRITICAL) &&
+                    if ((ctl->request->alerts.status & CONTEXT_V2_ALERT_CRITICAL) &&
                         rcl->status == RRDCALC_STATUS_CRITICAL)
                         m++;
 
@@ -1223,6 +1223,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
                 if(mode & CONTEXTS_V2_ALERTS) {
                     buffer_json_member_add_object(wb, "alerts");
+                    web_client_api_request_v2_contexts_alerts_status_to_buffer_json_array(wb, "status", req->alerts.status);
                     buffer_json_member_add_string(wb, "alert", req->alerts.alert);
                     buffer_json_member_add_string(wb, "transition", req->alerts.transition);
                     buffer_json_member_add_uint64(wb, "last", req->alerts.last);
@@ -1327,15 +1328,16 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                 buffer_json_add_array_item_object(wb);
                 {
                     buffer_json_member_add_uint64(wb, "ati", t->ati);
-                    buffer_json_member_add_string(wb, "alert", string2str(t->name));
-                    buffer_json_member_add_uint64(wb, "critical", t->critical);
-                    buffer_json_member_add_uint64(wb, "warning", t->warning);
-                    buffer_json_member_add_uint64(wb, "clear", t->clear);
-                    buffer_json_member_add_uint64(wb, "error", t->error);
+                    buffer_json_member_add_string(wb, "nm", string2str(t->name));
 
-                    buffer_json_member_add_uint64(wb, "instances", t->instances);
-                    buffer_json_member_add_uint64(wb, "nodes", dictionary_entries(t->nodes));
-                    buffer_json_member_add_uint64(wb, "configs", dictionary_entries(t->configs));
+                    buffer_json_member_add_uint64(wb, "cr", t->critical);
+                    buffer_json_member_add_uint64(wb, "wr", t->warning);
+                    buffer_json_member_add_uint64(wb, "cl", t->clear);
+                    buffer_json_member_add_uint64(wb, "er", t->error);
+
+                    buffer_json_member_add_uint64(wb, "in", t->instances);
+                    buffer_json_member_add_uint64(wb, "nd", dictionary_entries(t->nodes));
+                    buffer_json_member_add_uint64(wb, "cfg", dictionary_entries(t->configs));
                 }
                 buffer_json_object_close(wb); // alert name
             }
@@ -1357,7 +1359,10 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                             buffer_json_member_add_uint64(wb, "aci", t->aci);
                         }
                         buffer_json_member_add_uint64(wb, "gi", t->global_id);
-                        buffer_json_member_add_string(wb, "nm", string2str(t->name));
+
+                        if(debug)
+                            buffer_json_member_add_string(wb, "nm", string2str(t->name));
+
                         buffer_json_member_add_string(wb, "fami", string2str(t->family));
                         buffer_json_member_add_string(wb, "info", string2str(t->info));
                         buffer_json_member_add_string(wb, "ch", string2str(t->chart_name));
@@ -1402,7 +1407,10 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                         buffer_json_member_add_uint64(wb, "ati", t->ati);
                         buffer_json_member_add_uint64(wb, "aci", t->aci);
                         buffer_json_member_add_string(wb, "cfg", t_dfe.name);
-                        buffer_json_member_add_string(wb, "nm", string2str(rc->name));
+
+                        if(debug)
+                            buffer_json_member_add_string(wb, "nm", string2str(rc->name));
+
                         buffer_json_member_add_string(wb, "ctx", string2str(rc->rrdset->context));
                         buffer_json_member_add_string(wb, "class", string2str(rc->classification));
                         buffer_json_member_add_string(wb, "component", string2str(rc->component));
