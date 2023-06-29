@@ -180,6 +180,10 @@
                       "required": {
                         "type": "boolean",
                         "description": "A boolean value indicating if this options is required or not. Use true / false"
+                      },
+                      "details": {
+                        "type": "string",
+                        "description": "If details need to be provided for this option, add them here."
                       }
                     }
                   }
