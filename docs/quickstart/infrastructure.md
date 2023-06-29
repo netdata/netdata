@@ -41,11 +41,11 @@ SRE team for the user-facing SaaS application, and a second IT team for managing
 don't monitor the same nodes, they can work in separate Spaces and then further organize their nodes into War Rooms.
 
 Next, set up War Rooms. Netdata Cloud creates dashboards and visualizations based on the nodes added to a given War
-Room. You can [organize War Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md#war-room-organization) in any way
+Room. You can [organize War Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#war-room-organization) in any way
 you want, such as by the application type, for end-to-end application monitoring, or as an incident response tool.
 
-Learn more about [Spaces](https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md) and [War
-Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md), including how to manage each, in their respective reference
+Learn more about [Spaces](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-spaces) and [War
+Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-war-rooms), including how to manage each, in their respective reference
 documentation.
 
 ### Invite your team
@@ -55,7 +55,7 @@ inviting others, you can better synchronize with your team or colleagues to unde
 When something goes wrong, you'll be ready to collaboratively troubleshoot complex performance problems from a single
 pane of glass.
 
-To [invite new users](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/invite-your-team.md), click on **Invite Users** in the
+To [invite new users](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#invite-your-team), click on **Invite Users** in the
 Space management Area. Choose which War Rooms to add this user to, then click **Send**.
 
 If your team members have trouble signing in, direct them to the [Netdata Cloud sign
@@ -165,8 +165,8 @@ collect from across your infrastructure with Netdata.
   <Box
     title="Spaces and War Rooms">
     <BoxList>
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md)" title="Spaces" />
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md)" title="War Rooms" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-spaces)" title="Spaces" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-war-rooms)" title="War Rooms" />
     </BoxList>
   </Box>
   <Box
@@ -195,7 +195,7 @@ collect from across your infrastructure with Netdata.
     title="Management and settings">
     <BoxList>
       <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.md)" title="Sign in with email, Google, or GitHub" />
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/invite-your-team.md)" title="Invite your team" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#invite-your-team)" title="Invite your team" />
       <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/themes.md)" title="Choose your Netdata Cloud theme" />
       <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md)" title="Role-Based Access" />
       <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md)" title="Paid Plans" />
@@ -204,8 +204,8 @@ collect from across your infrastructure with Netdata.
 </Grid>
 
 - Spaces and War Rooms
-  - [Spaces](https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md)
-  - [War Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md)
+  - [Spaces](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-spaces)
+  - [War Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-war-rooms)
 - Dashboards
   - [Overview](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md)
   - [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md)
@@ -220,7 +220,7 @@ collect from across your infrastructure with Netdata.
   - [Events Feed](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md)
 - Management and settings
   - [Sign in with email, Google, or GitHub](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.md)
-  - [Invite your team](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/invite-your-team.md)
+  - [Invite your team](hhttps://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#invite-your-team)
   - [Choose your Netdata Cloud theme](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/themes.md)
   - [Role-Based Access](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md)
   - [Paid Plans](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md)
