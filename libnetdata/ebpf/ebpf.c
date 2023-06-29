@@ -1261,7 +1261,7 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_m
         modules->maps_per_core = CONFIG_BOOLEAN_NO;
 
 #ifdef NETDATA_DEV_MODE
-    netdata_log_info("The thread %s was configured with: mode = %s; update every = %d; apps = %s; cgroup = %s; ebpf type format = %s; ebpf co-re tracing = %s; collect pid = %s; maps per core = %s",
+    netdata_log_info("The thread %s was configured with: mode = %s; update every = %d; apps = %s; cgroup = %s; ebpf type format = %s; ebpf co-re tracing = %s; collect pid = %s; maps per core = %s, lifetime=%u",
          modules->thread_name,
          load_mode,
          modules->update_every,
@@ -1270,7 +1270,8 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_m
          type_format,
          core_attach,
          collect_pid,
-         (modules->maps_per_core)?"enabled":"disabled"
+         (modules->maps_per_core)?"enabled":"disabled",
+         modules->life_time
          );
 #endif
 }
