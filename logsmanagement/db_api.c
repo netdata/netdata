@@ -505,9 +505,9 @@ int db_init() {
     char *err_msg = 0;
     uv_fs_t mkdir_req;
     
-    if(unlikely(!main_db_dir || !*main_db_dir || access(main_db_dir, R_OK))){
+    if(unlikely(!main_db_dir || !*main_db_dir)){
         rc = -1;
-        collector_error("main_db_dir is either not set or inaccessible");
+        collector_error("main_db_dir is unset");
         throw_error(NULL, ERR_TYPE_OTHER, rc, __LINE__, __FILE__, __FUNCTION__);
         goto return_error;
     }
