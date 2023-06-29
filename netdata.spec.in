@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 %global contentdir %{_datadir}/netdata
 %global version @PACKAGE_VERSION@
+%global ENABLE_SENTRY %{?_ENABLE_SENTRY:%{_ENABLE_SENTRY}:0}
+%global GLOBAL_ENVIRONMENT %(echo %{?_GLOBAL_ENVIRONMENT:%{_GLOBAL_ENVIRONMENT}}Development)
 
 #TODO: Temporary fix for the build-id error during go.d plugin set up
 %global _missing_build_ids_terminate_build 0
@@ -23,7 +25,9 @@ AutoReqProv: yes
 # Disable eBPF & Sentry for architectures other than x86
 %ifarch x86_64 i386
 %global _have_ebpf 1
+%if %{ENABLE_SENTRY}
 %global _have_sentry 1
+%if %{ENABLE_SENTRY}
 %else
 %global _have_ebpf 0
 %global _have_sentry 0

@@ -326,7 +326,7 @@ static void init_sentry(void) {
     sentry_options_set_auto_session_tracking(options, false);
 
     // TODO: we should get this from CI (SENTRY_ENVIRONMENT)
-    sentry_options_set_environment(options, "development");
+    sentry_options_set_environment(options, GLOBAL_ENVIRONMENT);
 
     // TODO: we should get this from CI (SENTRY_RELEASE)
     sentry_options_set_release(options, PACKAGE_VERSION);

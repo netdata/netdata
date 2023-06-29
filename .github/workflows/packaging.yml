@@ -175,6 +175,20 @@ jobs:
         with:
           fetch-depth: 0 # We need full history for versioning
           submodules: recursive
+      - name: Set extra env vars
+        id: set-extra-env-vars
+        run: |
+          if [[ "${{ github.event_name }}" == 'workflow_dispatch' ]] && [[ "${{ github.repository }}" == 'netdata/netdata' ]]; then
+            echo "GLOBAL_ENVIRONMENT=Production" >> $GITHUB_ENV
+            echo "ENABLE_SENTRY=1" >> $GITHUB_ENV
+          elif [[ "${{ github.event_name }}" = "pull_request" ]] && \
+             [[ "${{ !contains(github.event.pull_request.labels.*.name, 'run-ci/bundle-sentry') }}" = "true" ]]; then
+            echo "GLOBAL_ENVIRONMENT=Development" >> $GITHUB_ENV
+            echo "ENABLE_SENTRY=1"  >> $GITHUB_ENV
+          else
+            echo "GLOBAL_ENVIRONMENT=Development" >> $GITHUB_ENV
+            echo "ENABLE_SENTRY=0"  >> $GITHUB_ENV
+          fi
       - name: Setup QEMU
         id: qemu
         if: matrix.platform != 'linux/amd64' && matrix.platform != 'linux/i386'
@@ -200,6 +214,7 @@ jobs:
         shell: bash
         run: |
           docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e VERSION=${{ needs.version-check.outputs.version }} \
+                     -e ENABLE_SENTRY=${{env.ENABLE_SENTRY}} -e GLOBAL_ENVIRONMENT=${{env.GLOBAL_ENVIRONMENT}} \
                      --platform=${{ matrix.platform }} -v "$PWD":/netdata netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}
       - name: Save Packages
         id: artifacts
@@ -208,6 +223,12 @@ jobs:
         with:
           name: ${{ matrix.distro }}-${{ matrix.version }}-${{ matrix.arch }}-packages
           path: ${{ github.workspace }}/artifacts/*
+      - name: Upload telemetry metadata (Sentry)
+        id: upload-sentry-metadata
+        run: |
+          if [[ "${{ env.ENABLE_SENTRY }}" == '1' ]]; then
+            echo "WIP"
+          fi
       - name: Test Packages
         id: test
         shell: bash
