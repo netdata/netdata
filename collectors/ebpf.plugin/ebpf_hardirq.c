@@ -575,9 +575,9 @@ static void hardirq_collector(ebpf_module_t *em)
     int update_every = em->update_every;
     int counter = update_every - 1;
     //This will be cancelled by its parent
-    int running_time = 0;
-    int life_time = em->lifetime;
-    while (!ebpf_exit_plugin && running_time < life_time) {
+    uint32_t running_time = 0;
+    uint32_t lifetime = em->lifetime;
+    while (!ebpf_exit_plugin && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
 
         if (ebpf_exit_plugin || ++counter != update_every)
