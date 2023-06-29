@@ -434,7 +434,7 @@ if ! echo "${originalCFLAGS}" | grep -q '-D_FORTIFY_SOURCE'; then
         [HAVE_FORTIFY_SOURCE=2]
     )
 
-    if test "x${HAVE_FORTIFY_SOURCE}" = "x2"; then
+    if test "x${HAVE_FORTIFY_SOURCE}" = "x2" && echo "${originalCFLAGS}" | grep -qv '-O0'; then
         AC_CHECK_DECL(
             __builtin_dynamic_object_size,
             [AX_CHECK_COMPILE_FLAG(
