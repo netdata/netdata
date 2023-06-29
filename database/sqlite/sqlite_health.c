@@ -1648,7 +1648,7 @@ uint32_t sql_get_alarm_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *
         return alarm_id;
     }
 
-    rc = sqlite3_bind_blob(res, 4, &config_hash_id, sizeof(config_hash_id), SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, 4, config_hash_id, sizeof(*config_hash_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind config_hash_id parameter for SQL_GET_ALARM_ID.");
         sqlite3_finalize(res);
