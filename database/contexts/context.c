@@ -80,7 +80,7 @@ static void rrdcontext_insert_callback(const DICTIONARY_ITEM *item __maybe_unuse
     }
 
     rrdinstances_create_in_rrdcontext(rc);
-    netdata_mutex_init(&rc->mutex);
+    spinlock_init(&rc->spinlock);
 
     // signal the react callback to do the job
     rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_NEW_OBJECT);
@@ -91,7 +91,6 @@ static void rrdcontext_delete_callback(const DICTIONARY_ITEM *item __maybe_unuse
     RRDCONTEXT *rc = (RRDCONTEXT *)value;
 
     rrdinstances_destroy_from_rrdcontext(rc);
-    netdata_mutex_destroy(&rc->mutex);
     rrdcontext_freez(rc);
 }
 
