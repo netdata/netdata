@@ -50,7 +50,7 @@ struct mrg_statistics {
     size_t writers_conflicts;
 };
 
-MRG *mrg_create(size_t partitions);
+MRG *mrg_create(ssize_t partitions);
 void mrg_destroy(MRG *mrg);
 
 METRIC *mrg_metric_dup(MRG *mrg, METRIC *metric);

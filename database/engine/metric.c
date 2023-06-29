@@ -311,7 +311,7 @@ static inline bool acquired_metric_del(MRG *mrg, METRIC *metric) {
 // ----------------------------------------------------------------------------
 // public API
 
-inline MRG *mrg_create(size_t partitions) {
+inline MRG *mrg_create(ssize_t partitions) {
     if(partitions < 1)
         partitions = get_netdata_cpus();
 
