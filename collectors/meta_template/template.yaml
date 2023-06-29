@@ -5,57 +5,57 @@ virtual_integrations:
   list: []
 overview:
   data_collection:
-    text: ""
+    description: ""
   supported_platforms:
     list: []
   multi-instance: true
   permissions:
-    text: ""
+    description: ""
   default_behavior:
     auto_detection:
-      text: ""
+      description: ""
     limits:
-      text: ""
+      description: ""
     performance_impact:
-      text: ""
+      description: ""
 setup:
   prerequisites:
     list:
       - title: ""
-        text: ""
+        description: ""
   configuration:
     file:
-      text: ""
+      description: ""
     options:
-      text: ""
+      description: ""
       folding:
         title: ""
         enabled: true
       list:
         - name: ""
           default_value: ""
-          text: ""
+          description: ""
           required: false
     examples:
       list:
         - name: ""
           folding: true
-          text: ""
+          description: ""
           configuration_data:
             jobs: []
 troubleshooting:
   problems:
     list:
       - name: ""
-        text: ""
+        description: ""
 related_resources:
   integrations:
     list: []
 info_provided_to_referring_integrations:
-  text: ""
+  description: ""
 alerts: []
 metrics:
-  text: ""
+  description: ""
   folding:
     title: ""
     enabled: false
