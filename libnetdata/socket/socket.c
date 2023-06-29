@@ -812,21 +812,36 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
                 if(errno == EALREADY || errno == EINPROGRESS) {
                     info("Waiting for connection to ip %s port %s to be established", hostBfr, servBfr);
 
-                    fd_set fds;
-                    FD_ZERO(&fds);
-                    FD_SET(0, &fds);
-                    int rc = select (1, NULL, &fds, NULL, timeout);
+                    // Convert 'struct timeval' to milliseconds for poll():
+                    int timeout_milliseconds = timeout->tv_sec * 1000 + timeout->tv_usec / 1000;
 
-                    if(rc > 0 && FD_ISSET(fd, &fds)) {
-                        info("connect() to ip %s port %s completed successfully", hostBfr, servBfr);
+                    struct pollfd fds[1];
+                    fds[0].fd = fd;
+                    fds[0].events = POLLOUT;  // We are looking for the ability to write to the socket
+
+                    int ret = poll(fds, 1, timeout_milliseconds);
+                    if (ret > 0) {
+                        // poll() completed normally. We can check the revents to see what happened
+                        if (fds[0].revents & POLLOUT) {
+                            // connect() completed successfully, socket is writable.
+                            info("connect() to ip %s port %s completed successfully", hostBfr, servBfr);
+                        }
+                        else {
+                            // This means that the socket is in error. We will close it and set fd to -1
+                            error("Failed to connect to '%s', port '%s'.", hostBfr, servBfr);
+                            close(fd);
+                            fd = -1;
+                        }
                     }
-                    else if(rc == -1) {
-                        error("Failed to connect to '%s', port '%s'. select() returned %d", hostBfr, servBfr, rc);
+                    else if (ret == 0) {
+                        // poll() timed out, the connection is not established within the specified timeout.
+                        error("Timed out while connecting to '%s', port '%s'.", hostBfr, servBfr);
                         close(fd);
                         fd = -1;
                     }
                     else {
-                        error("Timed out while connecting to '%s', port '%s'. select() returned %d", hostBfr, servBfr, rc);
+                        // poll() returned an error.
+                        error("Failed to connect to '%s', port '%s'. poll() returned %d", hostBfr, servBfr, ret);
                         close(fd);
                         fd = -1;
                     }
