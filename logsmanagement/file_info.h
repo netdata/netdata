@@ -39,6 +39,12 @@ static const char * const log_src_t_str[] = {LOG_SRCS};
 struct Circ_buff;
 struct Circ_buff_item_ptrs;
 
+typedef enum log_src_state {
+    LOG_SRC_UNINITIALIZED = 0,      /*!< config not initialized */
+    LOG_SRC_READY,                  /*!< config initialized (monitoring may have started or not) */
+    LOG_SRC_EXITING                 /*!< cleanup and destroy stage */
+} LOG_SRC_STATE;
+
 typedef struct flb_serial_config {
     char *bitrate;
     char *min_bytes;
@@ -99,6 +105,7 @@ struct File_info {
     int update_timeout;                             /**< Timeout to update charts after, since last update */
     int use_log_timestamp;                          /**< Use log timestamps instead of collection timestamps, if available **/
     struct Chart_meta *chart_meta;
+    LOG_SRC_STATE state;                            /**< State of log source, used to sync status among threads **/
 
     /* Struct members related to disk database */
     sqlite3 *db;                                    /**< SQLite3 DB connection to DB that contains metadata for this log source **/

@@ -163,7 +163,7 @@ static void db_writer_db_mode_none(void *arg){
     struct File_info *const p_file_info = (struct File_info *) arg;
     Circ_buff_item_t *item;
     
-    while(1){
+    while(__atomic_load_n(&p_file_info->state, __ATOMIC_RELAXED) == LOG_SRC_READY){
         uv_rwlock_rdlock(&p_file_info->circ_buff->buff_realloc_rwlock);
         do{ item = circ_buff_read_item(p_file_info->circ_buff);} while(item);
         circ_buff_read_done(p_file_info->circ_buff);
@@ -291,7 +291,7 @@ static void db_writer_db_mode_full(void *arg){
     }
         
     struct timespec ts_db_write_start, ts_db_write_end, ts_db_rotate_end;
-    while(1){
+    while(__atomic_load_n(&p_file_info->state, __ATOMIC_RELAXED) == LOG_SRC_READY){
         clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts_db_write_start);
 
         uv_rwlock_rdlock(&p_file_info->circ_buff->buff_realloc_rwlock);

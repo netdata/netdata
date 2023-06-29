@@ -108,7 +108,11 @@ static void p_file_info_destroy(struct File_info *p_file_info){
         return;
     }
 
-    collector_info("[%s]: p_file_info_destroy() cleanup", p_file_info->chart_name ? p_file_info->chart_name : "Unknown");
+    char chart_name[100];
+    snprintfz(chart_name, 100, "%s", p_file_info->chart_name ? p_file_info->chart_name : "Unknown");
+    collector_info("[%s]: p_file_info_destroy() cleanup...", chart_name);
+
+    __atomic_store_n(&p_file_info->state, LOG_SRC_EXITING, __ATOMIC_RELAXED);
 
     if(uv_is_active((uv_handle_t *) &p_file_info->flb_tmp_buff_cpy_timer)){
         uv_timer_stop(&p_file_info->flb_tmp_buff_cpy_timer);
@@ -117,22 +121,20 @@ static void p_file_info_destroy(struct File_info *p_file_info){
     }
 
     // TODO: Need to do proper termination of DB threads and allocated memory.
-    // if(p_file_info->db_writer_thread){
-    //     uv_thread_join(p_file_info->db_writer_thread);
-    //     m_assert(0, "db_writer_thread joined");
-    // }   
-    // freez(p_file_info->db_mut);
-    // freez(p_file_info->db_metadata);
-    // freez(p_file_info->db_dir);
-    // freez(p_file_info->db_writer_thread);
+    if(p_file_info->db_writer_thread){
+        uv_thread_join(p_file_info->db_writer_thread);
+        sqlite3_close(p_file_info->db);
+        uv_mutex_destroy(p_file_info->db_mut);
+        freez((void *) p_file_info->db_metadata);
+        freez((void *) p_file_info->db_dir);
+        freez(p_file_info->db_writer_thread);
+        sqlite3_finalize(p_file_info->stmt_retrieve_log_msg_metadata);
+    }
 
     freez((void *) p_file_info->chart_name);
     freez(p_file_info->filename);
     freez((void *) p_file_info->file_basename);
     freez((void *) p_file_info->stream_guid);
-
-    freez((void *) p_file_info->db_dir);
-    freez((void *) p_file_info->db_metadata);
 
     for(int i = 1; i <= BLOB_MAX_FILES; i++){
         uv_fs_t close_req;
@@ -204,6 +206,8 @@ static void p_file_info_destroy(struct File_info *p_file_info){
     }
     
     freez(p_file_info);
+
+    collector_info("[%s]: p_file_info_destroy() cleanup done", chart_name);
 }
 
 /**
@@ -1106,6 +1110,8 @@ static void logs_management_init(uv_loop_t *main_loop,
     p_file_infos_arr->data = reallocz(p_file_infos_arr->data, (++p_file_infos_arr->count) * (sizeof p_file_info));
     p_file_infos_arr->data[p_file_infos_arr->count - 1] = p_file_info;
 
+    __atomic_store_n(&p_file_info->state, LOG_SRC_READY, __ATOMIC_RELAXED);
+
     collector_info("[%s]: initialization completed", p_file_info->chart_name);
 }
 
@@ -1144,9 +1150,7 @@ static void logsmanagement_main_cleanup(void *ptr) {
     freez(thread_data->main_loop);
 
     if(p_file_infos_arr){
-        for(int i = 0; i < p_file_infos_arr->count; i++){
-            p_file_info_destroy(p_file_infos_arr->data[i]);
-        }
+        for(int i = 0; i < p_file_infos_arr->count; i++) p_file_info_destroy(p_file_infos_arr->data[i]);
         freez(p_file_infos_arr);
         p_file_infos_arr = NULL;
     }
