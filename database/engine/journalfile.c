@@ -180,6 +180,7 @@ static void njfv2idx_remove(struct rrdengine_datafile *datafile) {
     rw_spinlock_write_lock(&datafile->ctx->njfv2idx.spinlock);
 
     int rc = JudyLDel(&datafile->ctx->njfv2idx.JudyL, datafile->journalfile->njfv2idx.indexed_as, PJE0);
+    (void)rc;
     internal_fatal(!rc, "DBENGINE: NJFV2IDX cannot remove entry");
 
     datafile->journalfile->njfv2idx.indexed_as = 0;
