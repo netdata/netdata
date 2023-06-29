@@ -989,3 +989,39 @@ shows how the lockdown module impacts `ebpf.plugin` based on the selected option
 
 If you or your distribution compiled the kernel with the last combination, your system cannot load shared libraries
 required to run `ebpf.plugin`.
+
+## Function
+
+The eBPF plugin has a [function](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md) named
+`ebpf_thread` that controls its internal threads and helps to reduce the overhead on host. Using the function you
+can run eBPF plugin with all threads disabled and enable them only when to take a look in specific areas is necessary.
+
+### List threads
+
+To list all threads status you can query directly the endpoint function:
+
+`http://localhost:19999/api/v1/function?function=ebpf_thread`
+
+It is also possible to query a specific thread adding keyword `thread` and thread name:
+
+`http://localhost:19999/api/v1/function?function=ebpf_thread%20thread:mount`
+
+### Enable thread
+
+It is possible to enable a specific thread using the keyword `enable`:
+
+`http://localhost:19999/api/v1/function?function=ebpf_thread%20enable:mount`
+
+this will run thread `mount` during 300 seconds (5 minutes). You can specify a specific period appending the period
+after the thread name:
+
+`http://localhost:19999/api/v1/function?function=ebpf_thread%20enable:mount:600`
+
+in this example thread `mount` will run during 600 seconds (10 minutes).
+
+### Disable thread
+
+It is also possible to stop any thread running using keywork `disable`, for exaample, to disable `cachestat` you can
+request:
+
+`http://localhost:19999/api/v1/function?function=ebpf_thread%20disable:cachestat`
