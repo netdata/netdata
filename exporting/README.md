@@ -126,7 +126,7 @@ You can configure each connector individually using the available [options](#opt
 [prometheus:exporter]
     send names instead of ids = yes
     send configured labels = yes
-    end automatic labels = no
+    send automatic labels = no
     send charts matching = *
     send hosts matching = localhost *
     prefix = netdata
