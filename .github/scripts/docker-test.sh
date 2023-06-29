@@ -1,5 +1,7 @@
 #!/bin/sh
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+
 export DEBIAN_FRONTEND=noninteractive
 
 if [ -z "$(command -v nc 2>/dev/null)" ] && [ -z "$(command -v netcat 2>/dev/null)" ]; then
@@ -20,7 +22,7 @@ docker run -d --name=netdata \
            --security-opt apparmor=unconfined \
            netdata/netdata:test
 
-if ! packaging/runtime-check.sh; then
+if ! "${SCRIPT_DIR}/../../packaging/runtime-check.sh"; then
   docker ps -a
   echo "::group::Netdata container logs"
   docker logs netdata 2>&1

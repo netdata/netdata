@@ -1,5 +1,7 @@
 #!/bin/sh
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+
 install_debian_like() {
   # This is needed to ensure package installs don't prompt for any user input.
   export DEBIAN_FRONTEND=noninteractive
@@ -118,6 +120,6 @@ trap dump_log EXIT
 
 /usr/sbin/netdata -D > ./netdata.log 2>&1 &
 
-packaging/runtime-check.sh || exit 1
+"${SCRIPT_DIR}/../../packaging/runtime-check.sh" || exit 1
 
 trap - EXIT
