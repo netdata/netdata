@@ -61,13 +61,13 @@ inline const char *rrdcalc_status2string(RRDCALC_STATUS status) {
     }
 }
 
-uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id) {
+uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, uuid_t *config_hash_id) {
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
     // re-use old IDs, by looking them up in the alarm log
     ALARM_ENTRY *ae = NULL;
     for(ae = host->health_log.alarms; ae ;ae = ae->next) {
-        if(unlikely(name == ae->name && chart == ae->chart)) {
+        if(unlikely(name == ae->name && chart == ae->chart && !uuid_memcmp(&ae->config_hash_id, config_hash_id))) {
             if(next_event_id) *next_event_id = ae->alarm_event_id + 1;
             break;
         }
@@ -79,7 +79,7 @@ uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint3
         alarm_id = ae->alarm_id;
 
     else {
-        alarm_id = sql_get_alarm_id(host, chart, name, next_event_id);
+        alarm_id = sql_get_alarm_id(host, chart, name, next_event_id, config_hash_id);
 
         if (!alarm_id) {
             if (unlikely(!host->health_log.next_alarm_id))
@@ -531,7 +531,7 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
         ;
     }
 
-    rc->id = rrdcalc_get_unique_id(host, rc->chart, rc->name, &rc->next_event_id);
+    rc->id = rrdcalc_get_unique_id(host, rc->chart, rc->name, &rc->next_event_id, &rc->config_hash_id);
 
     if(rc->calculation) {
         rc->calculation->status = &rc->status;

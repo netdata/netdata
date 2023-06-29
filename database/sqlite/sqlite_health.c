@@ -1612,9 +1612,9 @@ int health_migrate_old_health_log_table(char *table) {
     return 1;
 }
 
-#define SQL_GET_ALARM_ID "select alarm_id, health_log_id from health_log where host_id = @host_id and chart = @chart and name = @name"
+#define SQL_GET_ALARM_ID "select alarm_id, health_log_id from health_log where host_id = @host_id and chart = @chart and name = @name and config_hash_id = @config_hash_id"
 #define SQL_GET_EVENT_ID "select max(alarm_event_id) + 1 from health_log_detail where health_log_id = @health_log_id and alarm_id = @alarm_id"
-uint32_t sql_get_alarm_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id)
+uint32_t sql_get_alarm_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, uuid_t *config_hash_id)
 {
     int rc = 0;
     sqlite3_stmt *res = NULL;
@@ -1644,6 +1644,13 @@ uint32_t sql_get_alarm_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *
     rc = sqlite3_bind_string_or_null(res, name, 3);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind name parameter for SQL_GET_ALARM_ID.");
+        sqlite3_finalize(res);
+        return alarm_id;
+    }
+
+    rc = sqlite3_bind_blob(res, 4, config_hash_id, sizeof(*config_hash_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind config_hash_id parameter for SQL_GET_ALARM_ID.");
         sqlite3_finalize(res);
         return alarm_id;
     }

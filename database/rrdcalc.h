@@ -240,7 +240,7 @@ const char *rrdcalc_status2string(RRDCALC_STATUS status);
 
 void rrdcalc_free_unused_rrdcalc_loaded_from_config(RRDCALC *rc);
 
-uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id);
+uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, uuid_t *config_hash_id);
 void rrdcalc_add_from_rrdcalctemplate(RRDHOST *host, RRDCALCTEMPLATE *rt, RRDSET *st, const char *overwrite_alert_name, const char *overwrite_dimensions);
 int rrdcalc_add_from_config(RRDHOST *host, RRDCALC *rc);
 
