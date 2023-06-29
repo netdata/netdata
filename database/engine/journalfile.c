@@ -215,8 +215,11 @@ static struct journal_v2_header *journalfile_v2_mounted_data_get(struct rrdengin
 
             madvise_dontfork(journalfile->mmap.data, journalfile->mmap.size);
             madvise_dontdump(journalfile->mmap.data, journalfile->mmap.size);
+
+            // let the kernel know that we don't want read-ahead on this file
+            madvise_random(journalfile->mmap.data, journalfile->mmap.size);
+
 //            madvise_willneed(journalfile->mmap.data, journalfile->v2.size_of_directory);
-//            madvise_random(journalfile->mmap.data, journalfile->mmap.size);
 //            madvise_dontneed(journalfile->mmap.data, journalfile->mmap.size);
 
             spinlock_lock(&journalfile->v2.spinlock);
