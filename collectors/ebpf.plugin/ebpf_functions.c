@@ -279,7 +279,7 @@ static void ebpf_function_thread_manipulation(const char *transaction,
             buffer_json_add_array_item_string(wb, EBPF_THREAD_STATUS_RUNNING);
 
             // Time remaining
-            buffer_json_add_array_item_uint64(wb, (wem->life_time - wem->running_time));
+            buffer_json_add_array_item_uint64(wb, (wem->lifetime - wem->running_time));
 
             // action
             buffer_json_add_array_item_string(wb, "Enabled/Disabled");
