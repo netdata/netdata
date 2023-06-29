@@ -107,15 +107,16 @@ public:
     }
 
     void run() {
-        worker_register("PROFILER");
-
         #define WORKER_JOB_CREATE_CHARTS 0
         #define WORKER_JOB_UPDATE_CHARTS 1
-        #define WORKER_JOB_METRIC_SECONDS_TO_BACKFILL 2
+        #define WORKER_JOB_METRIC_DURATION_TO_BACKFILL 2
+        #define WORKER_JOB_METRIC_POINTS_BACKFILLED 3
 
+        worker_register("PROFILER");
         worker_register_job_name(WORKER_JOB_CREATE_CHARTS, "create charts");
         worker_register_job_name(WORKER_JOB_UPDATE_CHARTS, "update charts");
-        worker_register_job_custom_metric(WORKER_JOB_METRIC_SECONDS_TO_BACKFILL, "seconds to backfill", "seconds", WORKER_METRIC_ABSOLUTE);
+        worker_register_job_custom_metric(WORKER_JOB_METRIC_DURATION_TO_BACKFILL, "duration to backfill", "seconds", WORKER_METRIC_ABSOLUTE);
+        worker_register_job_custom_metric(WORKER_JOB_METRIC_POINTS_BACKFILLED, "points backfilled", "points", WORKER_METRIC_ABSOLUTE);
 
         heartbeat_t HB;
         heartbeat_init(&HB);
@@ -133,17 +134,28 @@ public:
             CollectionTV.tv_usec = 0;
         }
 
+        size_t BackfilledPoints = 0;
+        struct timeval NowTV, PrevTV;
+        now_realtime_timeval(&NowTV);
+        PrevTV = NowTV;
+
         while (service_running(SERVICE_COLLECTORS)) {
             worker_is_busy(WORKER_JOB_UPDATE_CHARTS);
 
             update(CollectionTV);
             CollectionTV.tv_sec += UpdateEvery;
 
-            struct timeval NowTV;
             now_realtime_timeval(&NowTV);
 
+            ++BackfilledPoints;
+            if (NowTV.tv_sec > PrevTV.tv_sec) {
+                PrevTV = NowTV;
+                worker_set_metric(WORKER_JOB_METRIC_POINTS_BACKFILLED, BackfilledPoints * NumCharts * NumDimsPerChart);
+                BackfilledPoints = 0;
+            }
+
             size_t RemainingSeconds = (CollectionTV.tv_sec >= NowTV.tv_sec) ? 0 : (NowTV.tv_sec - CollectionTV.tv_sec);
-            worker_set_metric(WORKER_JOB_METRIC_SECONDS_TO_BACKFILL, RemainingSeconds);
+            worker_set_metric(WORKER_JOB_METRIC_DURATION_TO_BACKFILL, RemainingSeconds);
 
             if (CollectionTV.tv_sec >= NowTV.tv_sec) {
                 worker_is_idle();
