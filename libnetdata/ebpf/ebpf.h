@@ -312,7 +312,7 @@ typedef struct ebpf_module {
 
     // period to run
     uint32_t running_time; // internal usage, this is used to reset a value when a new request happens.
-    uint32_t life_time;
+    uint32_t lifetime;
 } ebpf_module_t;
 
 #define EBPF_DEFAULT_LIFETIME 300

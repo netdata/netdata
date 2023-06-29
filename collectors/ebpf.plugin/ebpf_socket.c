@@ -2178,7 +2178,7 @@ void *ebpf_socket_read_hash(void *ptr)
     int maps_per_core = em->maps_per_core;
     // This thread is cancelled from another thread
     int running_time;
-    int life_time = em->life_time;
+    int life_time = em->lifetime;
     for (running_time = 0;!ebpf_exit_plugin && running_time < life_time; running_time++) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_exit_plugin)
@@ -2921,7 +2921,7 @@ static void socket_collector(ebpf_module_t *em)
     int maps_per_core = em->maps_per_core;
     int counter = update_every - 1;
     int running_time = 0;
-    int life_time = em->life_time;
+    int life_time = em->lifetime;
     while (!ebpf_exit_plugin && running_time < life_time) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_exit_plugin || ++counter != update_every)

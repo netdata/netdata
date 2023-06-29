@@ -152,7 +152,7 @@ static void ebpf_function_thread_manipulation(const char *transaction,
                 st->thread = mallocz(sizeof(netdata_thread_t));
                 lem->thread_id = i;
                 lem->enabled = NETDATA_THREAD_EBPF_FUNCTION_RUNNING;
-                lem->life_time = period;
+                lem->lifetime = period;
 
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("Starting thread %s with life time = %d", thread_name, period);
@@ -174,7 +174,7 @@ static void ebpf_function_thread_manipulation(const char *transaction,
 
             pthread_mutex_lock(&ebpf_exit_cleanup);
             if (lem->enabled < NETDATA_THREAD_EBPF_STOPPING && lem->thread->thread) {
-                lem->life_time = 0;
+                lem->lifetime = 0;
                 lem->running_time = lem->update_every;
                 netdata_thread_cancel(*lem->thread->thread);
             }
@@ -225,7 +225,7 @@ static void ebpf_function_thread_manipulation(const char *transaction,
         buffer_json_add_array_item_string(wb, wem->thread_description);
         // Either it is not running or received a disabled signal and it is stopping.
         if (wem->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING ||
-            (!wem->life_time && (int)wem->running_time == wem->update_every)) {
+            (!wem->lifetime && (int)wem->running_time == wem->update_every)) {
             // status
             buffer_json_add_array_item_string(wb, EBPF_THREAD_STATUS_STOPPED);
 
@@ -239,7 +239,7 @@ static void ebpf_function_thread_manipulation(const char *transaction,
             buffer_json_add_array_item_string(wb, EBPF_THREAD_STATUS_RUNNING);
 
             // Time remaining
-            buffer_json_add_array_item_uint64(wb, (wem->life_time - wem->running_time));
+            buffer_json_add_array_item_uint64(wb, (wem->lifetime - wem->running_time));
 
             // action
             buffer_json_add_array_item_string(wb, "Enabled/Disabled");

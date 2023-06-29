@@ -1105,7 +1105,7 @@ static void process_collector(ebpf_module_t *em)
     int counter = update_every - 1;
     int maps_per_core = em->maps_per_core;
     int running_time = 0;
-    int life_time = em->life_time;
+    int life_time = em->lifetime;
     while (!ebpf_exit_plugin && running_time < life_time) {
         usec_t dt = heartbeat_next(&hb, USEC_PER_SEC);
         (void)dt;
