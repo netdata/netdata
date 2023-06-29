@@ -743,25 +743,29 @@ update_binpkg() {
     esac
   fi
 
-  if [ "${INTERACTIVE}" = "0" ]; then
-    interactive_opts="-y"
-    env="DEBIAN_FRONTEND=noninteractive"
-  else
-    interactive_opts=""
-    env=""
-  fi
+  interactive_opts=""
+  env=""
 
   case "${DISTRO_COMPAT_NAME}" in
     debian|ubuntu)
+      if [ "${INTERACTIVE}" = "0" ]; then
+        upgrade_cmd='-o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" --only-upgrade install'
+        interactive_opts="-y"
+        env="DEBIAN_FRONTEND=noninteractive"
+      else
+        upgrade_cmd="--only-upgrade install"
+      fi
       pm_cmd="apt-get"
       repo_subcmd="update"
-      upgrade_cmd="--only-upgrade install"
       pkg_install_opts="${interactive_opts}"
       repo_update_opts="${interactive_opts}"
       pkg_installed_check="dpkg -s"
       INSTALL_TYPE="binpkg-deb"
       ;;
     centos|fedora|ol|amzn)
+      if [ "${INTERACTIVE}" = "0" ]; then
+        interactive_opts="-y"
+      fi
       if command -v dnf > /dev/null; then
         pm_cmd="dnf"
         repo_subcmd="makecache"
@@ -775,10 +779,14 @@ update_binpkg() {
       INSTALL_TYPE="binpkg-rpm"
       ;;
     opensuse)
+      if [ "${INTERACTIVE}" = "0" ]; then
+        upgrade_cmd="--non-interactive update"
+      else
+        upgrade_cmd="update"
+      fi
       pm_cmd="zypper"
       repo_subcmd="--gpg-auto-import-keys refresh"
-      upgrade_cmd="update"
-      pkg_install_opts="${interactive_opts}"
+      pkg_install_opts=""
       repo_update_opts=""
       pkg_installed_check="rpm -q"
       INSTALL_TYPE="binpkg-rpm"
