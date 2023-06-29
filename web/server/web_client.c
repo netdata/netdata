@@ -430,24 +430,24 @@ static bool find_filename_to_serve(const char *filename, char *dst, size_t dst_l
         fallback = 3;
     }
 
-    if (lstat(dst, statbuf) != 0) {
+    if (stat(dst, statbuf) != 0) {
         if(fallback == 1) {
             snprintfz(dst, dst_len, "%s/%s", netdata_configured_web_dir, filename);
-            if (lstat(dst, statbuf) != 0)
+            if (stat(dst, statbuf) != 0)
                 return false;
         }
         else if(fallback == 2) {
             if(filename && *filename)
                 web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH);
             snprintfz(dst, dst_len, "%s/v%d", netdata_configured_web_dir, d_version);
-            if (lstat(dst, statbuf) != 0)
+            if (stat(dst, statbuf) != 0)
                 return false;
         }
         else if(fallback == 3) {
             if(filename && *filename)
                 web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH);
             snprintfz(dst, dst_len, "%s", netdata_configured_web_dir);
-            if (lstat(dst, statbuf) != 0)
+            if (stat(dst, statbuf) != 0)
                 return false;
         }
         else
@@ -461,7 +461,7 @@ static bool find_filename_to_serve(const char *filename, char *dst, size_t dst_l
 
         strncpyz(&dst[len], "/index.html", dst_len - len);
 
-        if (lstat(dst, statbuf) != 0)
+        if (stat(dst, statbuf) != 0)
             return false;
 
         *is_dir = true;
