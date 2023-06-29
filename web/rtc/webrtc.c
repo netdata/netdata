@@ -367,7 +367,7 @@ cleanup:
 // ----------------------------------------------------------------------------
 // webrtc data channel
 
-static void myOpenCallback(int id, void *user_ptr) {
+static void myOpenCallback(int id __maybe_unused, void *user_ptr) {
     webrtc_set_thread_name();
 
     WEBRTC_DC *chan = user_ptr;
@@ -378,7 +378,7 @@ static void myOpenCallback(int id, void *user_ptr) {
     chan->open = true;
 }
 
-static void myClosedCallback(int id, void *user_ptr) {
+static void myClosedCallback(int id __maybe_unused, void *user_ptr) {
     webrtc_set_thread_name();
 
     WEBRTC_DC *chan = user_ptr;
@@ -397,7 +397,7 @@ static void myClosedCallback(int id, void *user_ptr) {
     freez(chan);
 }
 
-static void myErrorCallback(int id, const char *error, void *user_ptr) {
+static void myErrorCallback(int id __maybe_unused, const char *error, void *user_ptr) {
     webrtc_set_thread_name();
 
     WEBRTC_DC *chan = user_ptr;
@@ -406,7 +406,7 @@ static void myErrorCallback(int id, const char *error, void *user_ptr) {
     error("WEBRTC[%d],DC[%d]: ERROR: '%s'", chan->conn->pc, chan->dc, error);
 }
 
-static void myMessageCallback(int id, const char *message, int size, void *user_ptr) {
+static void myMessageCallback(int id __maybe_unused, const char *message, int size, void *user_ptr) {
     webrtc_set_thread_name();
 
     WEBRTC_DC *chan = user_ptr;
@@ -441,7 +441,7 @@ static void myMessageCallback(int id, const char *message, int size, void *user_
 //    }
 //}
 
-static void myDataChannelCallback(int pc, int dc, void *user_ptr) {
+static void myDataChannelCallback(int pc __maybe_unused, int dc, void *user_ptr) {
     webrtc_set_thread_name();
 
     WEBRTC_CONN *conn = user_ptr;

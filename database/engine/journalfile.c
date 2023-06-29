@@ -180,6 +180,7 @@ static void njfv2idx_remove(struct rrdengine_datafile *datafile) {
     rw_spinlock_write_lock(&datafile->ctx->njfv2idx.spinlock);
 
     int rc = JudyLDel(&datafile->ctx->njfv2idx.JudyL, datafile->journalfile->njfv2idx.indexed_as, PJE0);
+    (void)rc;
     internal_fatal(!rc, "DBENGINE: NJFV2IDX cannot remove entry");
 
     datafile->journalfile->njfv2idx.indexed_as = 0;
@@ -214,8 +215,11 @@ static struct journal_v2_header *journalfile_v2_mounted_data_get(struct rrdengin
 
             madvise_dontfork(journalfile->mmap.data, journalfile->mmap.size);
             madvise_dontdump(journalfile->mmap.data, journalfile->mmap.size);
+
+            // let the kernel know that we don't want read-ahead on this file
+            madvise_random(journalfile->mmap.data, journalfile->mmap.size);
+
 //            madvise_willneed(journalfile->mmap.data, journalfile->v2.size_of_directory);
-//            madvise_random(journalfile->mmap.data, journalfile->mmap.size);
 //            madvise_dontneed(journalfile->mmap.data, journalfile->mmap.size);
 
             spinlock_lock(&journalfile->v2.spinlock);

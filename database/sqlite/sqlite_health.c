@@ -1752,6 +1752,7 @@ void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_
     char sql[512];
     sqlite3_stmt *res = NULL;
     int rc;
+    BUFFER *command = NULL;
 
     if (unlikely(!alert_instances))
         return;
@@ -1823,7 +1824,7 @@ void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_
         error_report("Failed to finalize statement for sql_health_alarm_log2json_v3 temp table population");
     }
 
-    BUFFER *command = buffer_create(MAX_HEALTH_SQL_SIZE, NULL);
+    command = buffer_create(MAX_HEALTH_SQL_SIZE, NULL);
 
     buffer_sprintf(command, SQL_SEARCH_ALERT_LOG, alert_instances);
 

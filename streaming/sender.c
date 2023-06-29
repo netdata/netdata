@@ -100,7 +100,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
     if(unlikely(!src || !src_len))
         return;
 
-    netdata_mutex_lock(&s->mutex);
+    sender_lock(s);
 
 //    FILE *fp = fopen("/tmp/stream.txt", "a");
 //    fprintf(fp,
@@ -156,7 +156,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
                           rrdhost_hostname(s->host), s->connected_to);
 
                     deactivate_compression(s);
-                    netdata_mutex_unlock(&s->mutex);
+                    sender_unlock(s);
                     return;
                 }
             }
@@ -189,7 +189,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
         signal_sender = true;
     }
 
-    netdata_mutex_unlock(&s->mutex);
+    sender_unlock(s);
 
     if(signal_sender)
         rrdpush_signal_sender_to_wake_up(s);
@@ -273,7 +273,7 @@ static void rrdpush_sender_cbuffer_recreate_timed(struct sender_state *s, time_t
         return;
 
     if(!have_mutex)
-        netdata_mutex_lock(&s->mutex);
+        sender_lock(s);
 
     rrdpush_sender_last_buffer_recreate_set(s, now_s);
     last_reset_time_s = now_s;
@@ -287,20 +287,20 @@ static void rrdpush_sender_cbuffer_recreate_timed(struct sender_state *s, time_t
     sender_thread_buffer_free();
 
     if(!have_mutex)
-        netdata_mutex_unlock(&s->mutex);
+        sender_unlock(s);
 }
 
 static void rrdpush_sender_cbuffer_flush(RRDHOST *host) {
     rrdpush_sender_set_flush_time(host->sender);
 
-    netdata_mutex_lock(&host->sender->mutex);
+    sender_lock(host->sender);
 
     // flush the output buffer from any data it may have
     cbuffer_flush(host->sender->buffer);
     rrdpush_sender_cbuffer_recreate_timed(host->sender, now_monotonic_sec(), true, true);
     replication_recalculate_buffer_used_ratio_unsafe(host->sender);
 
-    netdata_mutex_unlock(&host->sender->mutex);
+    sender_unlock(host->sender);
 }
 
 static void rrdpush_sender_charts_and_replication_reset(RRDHOST *host) {
@@ -821,7 +821,7 @@ static ssize_t attempt_to_send(struct sender_state *s) {
     struct circular_buffer *cb = s->buffer;
 #endif
 
-    netdata_mutex_lock(&s->mutex);
+    sender_lock(s);
     char *chunk;
     size_t outstanding = cbuffer_next_unsafe(s->buffer, &chunk);
     debug(D_STREAM, "STREAM: Sending data. Buffer r=%zu w=%zu s=%zu, next chunk=%zu", cb->read, cb->write, cb->size, outstanding);
@@ -853,7 +853,7 @@ static ssize_t attempt_to_send(struct sender_state *s) {
         debug(D_STREAM, "STREAM: send() returned 0 -> no error but no transmission");
 
     replication_recalculate_buffer_used_ratio_unsafe(s);
-    netdata_mutex_unlock(&s->mutex);
+    sender_unlock(s);
 
     return ret;
 }
@@ -1093,7 +1093,7 @@ static bool rrdhost_set_sender(RRDHOST *host) {
     if(unlikely(!host->sender)) return false;
 
     bool ret = false;
-    netdata_mutex_lock(&host->sender->mutex);
+    sender_lock(host->sender);
     if(!host->sender->tid) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
         rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
@@ -1103,7 +1103,7 @@ static bool rrdhost_set_sender(RRDHOST *host) {
         host->sender->exit.reason = STREAM_HANDSHAKE_NEVER;
         ret = true;
     }
-    netdata_mutex_unlock(&host->sender->mutex);
+    sender_unlock(host->sender);
 
     rrdpush_reset_destinations_postpone_time(host);
 
@@ -1164,7 +1164,7 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
 
     RRDHOST *host = s->host;
 
-    netdata_mutex_lock(&host->sender->mutex);
+    sender_lock(host->sender);
     info("STREAM %s [send]: sending thread exits %s",
          rrdhost_hostname(host),
          host->sender->exit.reason != STREAM_HANDSHAKE_NEVER ? stream_handshake_error_to_string(host->sender->exit.reason) : "");
@@ -1173,7 +1173,7 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     rrdpush_sender_pipe_close(host, host->sender->rrdpush_sender_pipe, false);
 
     rrdhost_clear_sender___while_having_sender_mutex(host);
-    netdata_mutex_unlock(&host->sender->mutex);
+    sender_unlock(host->sender);
 
     freez(s->pipe_buffer);
     freez(s);
@@ -1343,14 +1343,14 @@ void *rrdpush_sender_thread(void *ptr) {
             continue;
         }
 
-        netdata_mutex_lock(&s->mutex);
+        sender_lock(s);
         size_t outstanding = cbuffer_next_unsafe(s->buffer, NULL);
         size_t available = cbuffer_available_size_unsafe(s->buffer);
         if (unlikely(!outstanding)) {
             rrdpush_sender_pipe_clear_pending_data(s);
             rrdpush_sender_cbuffer_recreate_timed(s, now_s, true, false);
         }
-        netdata_mutex_unlock(&s->mutex);
+        sender_unlock(s);
 
         worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, (NETDATA_DOUBLE)(s->buffer->max_size - available) * 100.0 / (NETDATA_DOUBLE)s->buffer->max_size);
 

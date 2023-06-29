@@ -35,6 +35,7 @@ typedef struct service_thread {
     SERVICE_THREAD_TYPE type;
     SERVICE_TYPE services;
     char name[NETDATA_THREAD_NAME_MAX + 1];
+    bool stop_immediately;
     bool cancelled;
 
     union {
@@ -48,11 +49,9 @@ typedef struct service_thread {
 } SERVICE_THREAD;
 
 struct service_globals {
-    SERVICE_TYPE running;
     SPINLOCK lock;
     Pvoid_t pid_judy;
 } service_globals = {
-        .running = ~0,
         .pid_judy = NULL,
 };
 
@@ -110,20 +109,12 @@ bool service_running(SERVICE_TYPE service) {
     if(unlikely(!sth))
         sth = service_register(SERVICE_THREAD_TYPE_NETDATA, NULL, NULL, NULL, false);
 
-    if(unlikely(netdata_exit))
-        __atomic_store_n(&service_globals.running, 0, __ATOMIC_RELAXED);
-
-    if(unlikely(service == 0))
-        service = sth->services;
-
     sth->services |= service;
 
-    return ((__atomic_load_n(&service_globals.running, __ATOMIC_RELAXED) & service) == service);
+    return !(sth->stop_immediately || netdata_exit);
 }
 
 void service_signal_exit(SERVICE_TYPE service) {
-    __atomic_and_fetch(&service_globals.running, ~(service), __ATOMIC_RELAXED);
-
     spinlock_lock(&service_globals.lock);
 
     Pvoid_t *PValue;
@@ -132,11 +123,14 @@ void service_signal_exit(SERVICE_TYPE service) {
     while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
         SERVICE_THREAD *sth = *PValue;
 
-        if((sth->services & service) && sth->request_quit_callback) {
-            spinlock_unlock(&service_globals.lock);
-            sth->request_quit_callback(sth->data);
-            spinlock_lock(&service_globals.lock);
-            continue;
+        if((sth->services & service)) {
+            sth->stop_immediately = true;
+
+            if(sth->request_quit_callback) {
+                spinlock_unlock(&service_globals.lock);
+                sth->request_quit_callback(sth->data);
+                spinlock_lock(&service_globals.lock);
+            }
         }
     }
 
@@ -358,8 +352,7 @@ void netdata_cleanup_and_exit(int ret) {
     delta_shutdown_time("stop replication, exporters, health and web servers threads");
 
     timeout = !service_wait_exit(
-            SERVICE_REPLICATION
-            | SERVICE_EXPORTERS
+            SERVICE_EXPORTERS
             | SERVICE_HEALTH
             | SERVICE_WEB_SERVER
             | SERVICE_HTTPD
@@ -370,6 +363,12 @@ void netdata_cleanup_and_exit(int ret) {
     timeout = !service_wait_exit(
             SERVICE_COLLECTORS
             | SERVICE_STREAMING
+            , 3 * USEC_PER_SEC);
+
+    delta_shutdown_time("stop replication threads");
+
+    timeout = !service_wait_exit(
+            SERVICE_REPLICATION // replication has to be stopped after STREAMING, because it cleans up ARAL
             , 3 * USEC_PER_SEC);
 
     delta_shutdown_time("disable ML detection and training threads");

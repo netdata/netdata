@@ -282,31 +282,30 @@ static void receiver_set_exit_reason(struct receiver_state *rpt, STREAM_HANDSHAK
         rpt->exit.reason = reason;
 }
 
-static inline bool receiver_should_continue(struct receiver_state *rpt) {
+static inline bool receiver_should_stop(struct receiver_state *rpt) {
     static __thread size_t counter = 0;
 
     if(unlikely(rpt->exit.shutdown)) {
         receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN, false);
-        return false;
+        return true;
     }
-
-    // check every 1000 lines read
-    if((counter++ % 1000) != 0) return true;
 
     if(unlikely(!service_running(SERVICE_STREAMING))) {
         receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_NETDATA_EXIT, false);
-        return false;
+        return true;
     }
 
-    netdata_thread_testcancel();
+    if(unlikely((counter++ % 1000) == 0)) {
+        // check every 1000 lines read
+        netdata_thread_testcancel();
+        rpt->last_msg_t = now_monotonic_sec();
+    }
 
-    rpt->last_msg_t = now_monotonic_sec();
-
-    return true;
+    return false;
 }
 
 static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, int fd, void *ssl) {
-    size_t result;
+    size_t result = 0;
 
     PARSER *parser = NULL;
     {
@@ -346,7 +345,7 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
 
     size_t read_buffer_start = 0;
     char buffer[PLUGINSD_LINE_MAX + 2] = "";
-    while(receiver_should_continue(rpt)) {
+    while(!receiver_should_stop(rpt)) {
 
         if(!receiver_next_line(rpt, buffer, PLUGINSD_LINE_MAX + 2, &read_buffer_start)) {
             bool have_new_data = compressed_connection ? receiver_read_compressed(rpt) : receiver_read_uncompressed(rpt);
