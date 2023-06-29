@@ -5,7 +5,7 @@
 
 // Module name & description
 #define NETDATA_EBPF_MODULE_NAME_FILESYSTEM "filesystem"
-#define NETDATA_EBPF_FS_MODULE_DESC "Monitor filesysttem latency for: btrfs, ext4, nfs, xfs and zfs."
+#define NETDATA_EBPF_FS_MODULE_DESC "Monitor filesystem latency for: btrfs, ext4, nfs, xfs and zfs."
 
 #include "ebpf.h"
 #ifdef LIBBPF_MAJOR_VERSION

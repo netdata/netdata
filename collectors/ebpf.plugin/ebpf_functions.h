@@ -3,8 +3,9 @@
 #ifndef NETDATA_EBPF_FUNCTIONS_H
 #define NETDATA_EBPF_FUNCTIONS_H 1
 
-// configuration file
+// configuration file & description
 #define NETDATA_DIRECTORY_FUNCTIONS_CONFIG_FILE "functions.conf"
+#define NETDATA_EBPF_FUNCTIONS_MODULE_DESC "Show information about current function status."
 
 // function list
 #define EBPF_FUNCTION_THREAD "ebpf_thread"

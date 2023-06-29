@@ -209,10 +209,10 @@ static void ebpf_function_thread_manipulation(const char *transaction,
     buffer_json_member_add_array(wb, "data");
     int i;
     for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
-        ebpf_module_t *wem = &ebpf_modules[i];
         if (show_specific_thread && !(show_specific_thread & 1<<i))
             continue;
 
+        ebpf_module_t *wem = &ebpf_modules[i];
         buffer_json_add_array_item_array(wb);
 
         // IMPORTANT!
@@ -223,7 +223,6 @@ static void ebpf_function_thread_manipulation(const char *transaction,
 
         // description
         buffer_json_add_array_item_string(wb, wem->thread_description);
-
         // Either it is not running or received a disabled signal and it is stopping.
         if (wem->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING ||
             (!wem->life_time && (int)wem->running_time == wem->update_every)) {
@@ -342,10 +341,15 @@ static void ebpf_function_thread_manipulation(const char *transaction,
     buffer_json_member_add_time_t(wb, "expires", expires);
     buffer_json_finalize(wb);
 
+    // Lock necessary to avoid race condition
+    pthread_mutex_lock(&lock);
     fwrite(buffer_tostring(wb), buffer_strlen(wb), 1, stdout);
-    buffer_free(wb);
 
     pluginsd_function_result_end_to_stdout();
+    fflush(stdout);
+    pthread_mutex_unlock(&lock);
+
+    buffer_free(wb);
 }
 
 
