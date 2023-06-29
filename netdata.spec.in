@@ -495,6 +495,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %files
 %doc README.md
 %config(noreplace) %{_sysconfdir}/%{name}/netdata.conf
+%config(noreplace) %{_sysconfdir}/%{name}/netdata-updater.conf
 %attr(0755,root,netdata) %{_sysconfdir}/%{name}/edit-config
 %attr(0644,root,netdata) %{_sysconfdir}/%{name}/.install-type
 %dir %{_sysconfdir}/%{name}/health.d
