@@ -27,7 +27,9 @@ AutoReqProv: yes
 %global _have_ebpf 1
 %if %{ENABLE_SENTRY}
 %global _have_sentry 1
-%if %{ENABLE_SENTRY}
+%else
+%global _have_sentry 0
+%endif
 %else
 %global _have_ebpf 0
 %global _have_sentry 0
