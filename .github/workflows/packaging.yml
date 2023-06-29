@@ -182,7 +182,7 @@ jobs:
             echo "GLOBAL_ENVIRONMENT=Production" >> $GITHUB_ENV
             echo "ENABLE_SENTRY=1" >> $GITHUB_ENV
           elif [[ "${{ github.event_name }}" = "pull_request" ]] && \
-             [[ "${{ !contains(github.event.pull_request.labels.*.name, 'run-ci/bundle-sentry') }}" = "true" ]]; then
+             [[ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/bundle-sentry') }}" = "true" ]]; then
             echo "GLOBAL_ENVIRONMENT=Development" >> $GITHUB_ENV
             echo "ENABLE_SENTRY=1"  >> $GITHUB_ENV
           else
