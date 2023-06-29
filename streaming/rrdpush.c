@@ -687,7 +687,7 @@ void rrdpush_sender_thread_stop(RRDHOST *host, STREAM_HANDSHAKE reason, bool wai
     if (!host->sender)
         return;
 
-    netdata_mutex_lock(&host->sender->mutex);
+    sender_lock(host->sender);
 
     if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN)) {
 
@@ -698,19 +698,18 @@ void rrdpush_sender_thread_stop(RRDHOST *host, STREAM_HANDSHAKE reason, bool wai
         netdata_thread_cancel(host->rrdpush_sender_thread);
     }
 
-    netdata_mutex_unlock(&host->sender->mutex);
+    sender_unlock(host->sender);
 
     if(wait) {
-        netdata_mutex_lock(&host->sender->mutex);
+        sender_lock(host->sender);
         while(host->sender->tid) {
-            netdata_mutex_unlock(&host->sender->mutex);
+            sender_unlock(host->sender);
             sleep_usec(10 * USEC_PER_MS);
-            netdata_mutex_lock(&host->sender->mutex);
+            sender_lock(host->sender);
         }
-        netdata_mutex_unlock(&host->sender->mutex);
+        sender_unlock(host->sender);
     }
 }
-
 
 // ----------------------------------------------------------------------------
 // rrdpush receiver thread
@@ -721,7 +720,7 @@ void log_stream_connection(const char *client_ip, const char *client_port, const
 
 
 static void rrdpush_sender_thread_spawn(RRDHOST *host) {
-    netdata_mutex_lock(&host->sender->mutex);
+    sender_lock(host->sender);
 
     if(!rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN)) {
         char tag[NETDATA_THREAD_TAG_MAX + 1];
@@ -733,7 +732,7 @@ static void rrdpush_sender_thread_spawn(RRDHOST *host) {
             rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
     }
 
-    netdata_mutex_unlock(&host->sender->mutex);
+    sender_unlock(host->sender);
 }
 
 int rrdpush_receiver_permission_denied(struct web_client *w) {

@@ -1124,7 +1124,7 @@ static void rrdhost_streaming_sender_structures_init(RRDHOST *host)
         host->sender->flags &= ~SENDER_FLAG_COMPRESSION;
 #endif
 
-    netdata_mutex_init(&host->sender->mutex);
+    spinlock_init(&host->sender->spinlock);
     replication_init_sender(host->sender);
 }
 
@@ -1828,7 +1828,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
         s->stream.hops = s->ingest.hops + 1;
     }
     else {
-        netdata_mutex_lock(&host->sender->mutex);
+        sender_lock(host->sender);
 
         s->stream.since = host->sender->last_state_since_t;
         s->stream.peers = socket_peers(host->sender->rrdpush_sender_socket);
@@ -1862,7 +1862,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
             s->stream.reason = host->sender->exit.reason;
         }
 
-        netdata_mutex_unlock(&host->sender->mutex);
+        sender_unlock(host->sender);
     }
 
     s->stream.id = host->rrdpush_sender_connection_counter;
