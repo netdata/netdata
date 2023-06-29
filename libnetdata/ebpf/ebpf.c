@@ -1239,7 +1239,7 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_m
                                                            modules->pid_map_size);
 
     modules->life_time = (uint32_t) appconfig_get_number(modules->cfg, EBPF_GLOBAL_SECTION,
-                                                        EBPF_CFG_LIFETIME, EBPF_LIFE_TIME);
+                                                        EBPF_CFG_LIFETIME, EBPF_DEFAULT_LIFETIME);
 
     char *value = ebpf_convert_load_mode_to_string(modules->load & NETDATA_EBPF_LOAD_METHODS);
     char *type_format = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_TYPE_FORMAT, value);

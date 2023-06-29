@@ -126,10 +126,10 @@ static void ebpf_function_thread_manipulation(const char *transaction,
                 strncpyz(thread_name, name, separator - name);
                 period = str2i(++separator);
                 if (period <= 0)
-                    period = EBPF_LIFE_TIME;
+                    period = EBPF_DEFAULT_LIFETIME;
             } else {
                 strncpyz(thread_name, name, strlen(name));
-                period = EBPF_LIFE_TIME;
+                period = EBPF_DEFAULT_LIFETIME;
             }
 
             lem = ebpf_functions_select_module(thread_name);

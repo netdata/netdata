@@ -43,7 +43,7 @@
 #define EBPF_CFG_MAPS_PER_CORE "maps per core"
 
 #define EBPF_CFG_UPDATE_EVERY "update every"
-#define EBPF_CFG_LIFETIME "life time"
+#define EBPF_CFG_LIFETIME "lifetime"
 #define EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT 10
 #define EBPF_CFG_PID_SIZE "pid table size"
 #define EBPF_CFG_APPLICATION "apps"
@@ -315,7 +315,7 @@ typedef struct ebpf_module {
     uint32_t life_time;
 } ebpf_module_t;
 
-#define EBPF_LIFE_TIME 300
+#define EBPF_DEFAULT_LIFETIME 300
 // This will be present until all functions are merged
 #define EBPF_NON_FUNCTION_LIFE_TIME 86400
 
