@@ -127,12 +127,12 @@ override_dh_install:
 
 	# Set the rest of the software in the main package
 	#
+	mkdir -p "$(TEMPTOP)/var/log/netdata"
+	mkdir -p "$(TEMPTOP)/var/cache/netdata"
+	mkdir -p "$(TEMPTOP)/var/run/netdata"
 	cp -rp $(TEMPTOP)/usr $(TOP)
 	cp -rp $(TEMPTOP)/var $(TOP)
 	cp -rp $(TEMPTOP)/etc $(TOP)
-	mkdir -p "$(TOP)/var/log/netdata"
-	mkdir -p "$(TOP)/var/cache/netdata"
-	mkdir -p "$(TOP)/var/run/netdata"
 
 	# Copy the updater script
 	#
