@@ -1,0 +1,387 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "module_name": {
+      "type": "string",
+      "description": "This is the module name of the collector, for example \"apache\""
+    },
+    "title_name": {
+      "type": "string",
+      "description": "This is the module's name in its rendered form, so for \"postgresql\" it would be \"PostgreSQL\""
+    },
+    "plugin_name": {
+      "type": "string",
+      "description": "This is the plugin name of the collector, for example for Apache it would be \"go.d.plugin\"."
+    },
+    "virtual_integrations": {
+      "type": "object",
+      "description": "Give a list of names for the virtual integrations that apply for this file, and give the name in the format [integration](link to integration's site)",
+      "properties": {
+        "list": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "overview": {
+      "type": "object",
+      "properties": {
+        "data_collection": {
+          "type": "object",
+          "description": "Give a description of how this collector works, and provide the link in {[Integration](link to integration's site)} so the CI can handle the link field for the various virtual integrations",
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          }
+        },
+        "supported_platforms": {
+          "type": "object",
+          "description": "Provide a list of supported platforms if this collector is not supported on all, otherwise leave empty",
+          "properties": {
+            "list": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "multi-instance": {
+          "description": "give a boolean value, true / false",
+          "type": "boolean"
+        },
+        "permissions": {
+          "type": "object",
+          "description": "If there are any notable permission requirements, eg running as root and so on, specify them here. Leave empty otherwise.",
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          }
+        },
+        "default_behavior": {
+          "type": "object",
+          "properties": {
+            "auto_detection": {
+              "type": "object",
+              "description": "Does this collector support auto-detection?\nExample: The collector auto-detects apache web servers running on localhost ports 80, 443, and 8080.",
+              "properties": {
+                "text": {
+                  "type": "string"
+                }
+              }
+            },
+            "limits": {
+              "type": "object",
+              "description": "Are there any default limits related to this collector?\nExample: The collector is limited on monitoring up to 1000 database tables",
+              "properties": {
+                "text": {
+                  "type": "string"
+                }
+              }
+            },
+            "performance_impact": {
+              "type": "object",
+              "description": "Is there any impact on the monitored application?\nExample: The collector becomes resource heavy once it monitors more than 10k tables per second.",
+              "properties": {
+                "text": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "setup": {
+      "type": "object",
+      "properties": {
+        "prerequisites": {
+          "type": "object",
+          "description": "Provide a list of prerequisites, example:\nlist:\n  - title: Prerequisite for heading\n    text: |\n      Either explain with text, or use markdown list to list steps",
+          "properties": {
+            "list": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "description": "Title for the prerequisites sub-section"
+                  },
+                  "text": {
+                    "type": "string",
+                    "description": "Description for the prerequisites sub-section, you can use lists or any other markdown-like syntax"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "configuration": {
+          "type": "object",
+          "properties": {
+            "file": {
+              "type": "object",
+              "description": "Specify in a text key which file the user has to edit.",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Example: go.d/apache.conf"
+                }
+              }
+            },
+            "options": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "If there is anything specific about this section that needs to be noted mention it here."
+                },
+                "folding": {
+                  "type": "object",
+                  "description": "Whether or not to collapse the options table. If set to true a title must be also provided",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "description": "Title for the collapsed section.\n Example: Config options"
+                    },
+                    "enabled": {
+                      "type": "boolean",
+                      "description": "boolean value that controls whether to collapse section or not."
+                    }
+                  }
+                },
+                "list": {
+                  "type": "array",
+                  "description": "Each of the list's items represents a row in the available config options table",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "Option name"
+                      },
+                      "text": {
+                        "type": "string",
+                        "description": "Option description"
+                      },
+                      "default_value": {
+                        "type": [
+                          "string",
+                          "number"
+                        ],
+                        "description": "Default value of the option, leave empty if none"
+                      },
+                      "required": {
+                        "type": "boolean",
+                        "description": "A boolean value indicating if this options is required or not. Use true / false"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "examples": {
+              "type": "object",
+              "description": "List of configuration examples",
+              "properties": {
+                "list": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "folding": {
+                        "type": "boolean",
+                        "description": "Whether or not to collapse this example"
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The name of this example"
+                      },
+                      "text": {
+                        "type": "string",
+                        "description": "If needed, provide a description and extra info for the example"
+                      },
+                      "configuration_data": {
+                        "type": "object",
+                        "description": "Add the configuration data in yaml format",
+                        "properties": {
+                          "jobs": {
+                            "type": "array",
+                            "description": "An array of configurations as they would appear in the .conf files"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "troubleshooting": {
+      "type": "object",
+      "properties": {
+        "problems": {
+          "type": "object",
+          "description": "List of possible problems that appear often for this collector, about external configuration or other matters.",
+          "properties": {
+            "list": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Give a title for the section."
+                  },
+                  "text": {
+                    "type": "string",
+                    "description": "Give an explanation and solution."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "related_resources": {
+      "type": "object",
+      "properties": {
+        "integrations": {
+          "type": "object",
+          "description": "A list of integrations that can be used to better monitor this module",
+          "properties": {
+            "list": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "description": "name in format module_name\nExample:\nlist:\n  - apache\n  - weblog"
+              }
+            },
+            "overview_text": {
+              "type": "string",
+              "description": "The text that will be used for refering to this section from the overview section."
+            }
+          }
+        }
+      }
+    },
+    "info_provided_to_referring_integrations": {
+      "type": "object",
+      "description": "Some information that this collector can provide about itself when other integrations mention it. This text will not be rendered in this collector's page.",
+      "properties": {
+        "text": {
+          "type": "string"
+        }
+      }
+    },
+    "alerts": {
+      "type": "array",
+      "description": "This section is autogenerated, only user validation is to ensure the \"os\" field is in line with the OS the collector can run on. If this runs on freebsd but the \"os\" field is \"linux\", just delete the list item.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "link": {
+            "type": "string"
+          },
+          "metric": {
+            "type": "string"
+          },
+          "info": {
+            "type": "string"
+          },
+          "os": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "description": "Autogenerated section,  user input is needed to provide a description for labels if any, and to add the scope's rendered name in each scope.",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "folding": {
+          "type": "object",
+          "description": "Controls whether or not to fold this section, in case the table is very large and we don't need to present it",
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "Title for the collapsed section"
+            },
+            "enabled": {
+              "type": "boolean",
+              "description": "Boolean value, controls whether to collapse or not"
+            }
+          }
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "rendered_name": {
+                "type": "string",
+                "description": "Please fill this in, it should fit:\n\"Metrics per X\" and \"X Level\" where X is the scope name."
+              },
+              "text": {
+                "type": "string",
+                "description": "Description for the scope."
+              },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                }
+              },
+              "metrics": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "unit": {
+                      "type": "string"
+                    },
+                    "dimensions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}}

@@ -1,0 +1,62 @@
+module_name: ""
+title_name: ""
+plugin_name: ""
+virtual_integrations:
+  list: []
+overview:
+  data_collection:
+    text: ""
+  supported_platforms:
+    list: []
+  multi-instance: true
+  permissions:
+    text: ""
+  default_behavior:
+    auto_detection:
+      text: ""
+    limits:
+      text: ""
+    performance_impact:
+      text: ""
+setup:
+  prerequisites:
+    list:
+      - title: ""
+        text: ""
+  configuration:
+    file:
+      text: ""
+    options:
+      text: ""
+      folding:
+        title: ""
+        enabled: true
+      list:
+        - name: ""
+          default_value: ""
+          text: ""
+          required: false
+    examples:
+      list:
+        - name: ""
+          folding: true
+          text: ""
+          configuration_data:
+            jobs: []
+troubleshooting:
+  problems:
+    list:
+      - name: ""
+        text: ""
+related_resources:
+  integrations:
+    list: []
+info_provided_to_referring_integrations:
+  text: ""
+alerts: []
+metrics:
+  text: ""
+  folding:
+    title: ""
+    enabled: false
+  scopes: []
