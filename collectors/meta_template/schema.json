@@ -374,6 +374,9 @@
                     "unit": {
                       "type": "string"
                     },
+                    "chart_type": {
+                      "type": "string"
+                    },
                     "dimensions": {
                       "type": "array",
                       "items": {
