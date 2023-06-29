@@ -627,6 +627,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     static struct format_prometheus_chart_label_callback plabels = {
         .labels_buffer = NULL,
     };
+
+    STRING *prometheus = string_strdupz("prometheus");
     rrdset_foreach_read(st, host) {
 
         if (likely(can_send_rrdset(instance, st, filter))) {
@@ -642,16 +644,18 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
             int as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AS_COLLECTED);
             int homogeneous = 1;
             int prometheus_collector = 0;
+            RRDSET_FLAGS flags = __atomic_load_n(&st->flags, __ATOMIC_RELAXED);
             if (as_collected) {
-                if (rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK))
+                if (flags & RRDSET_FLAG_HOMOGENEOUS_CHECK)
                     rrdset_update_heterogeneous_flag(st);
 
-                if (rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS))
+                if (flags & RRDSET_FLAG_HETEROGENEOUS)
                     homogeneous = 0;
 
-                if (!strcmp(rrdset_module_name(st), "prometheus"))
+                if (st->module_name == prometheus)
                     prometheus_collector = 1;
-            } else {
+            }
+            else {
                 if (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AVERAGE &&
                     !(output_options & PROMETHEUS_OUTPUT_HIDEUNITS))
                     prometheus_units_copy(
@@ -953,11 +957,10 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
         prometheus_exporter_instance->before,
         output_options);
 
-    rrd_rdlock();
-    rrdhost_foreach_read(host)
+    dfe_start_reentrant(rrdhost_root_index, host)
     {
         rrd_stats_api_v1_charts_allmetrics_prometheus(
             prometheus_exporter_instance, host, filter_string, wb, prefix, exporting_options, 1, output_options);
     }
-    rrd_unlock();
+    dfe_done(host);
 }
