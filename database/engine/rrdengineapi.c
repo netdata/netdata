@@ -1085,7 +1085,7 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
     if(cpus < 1)
         cpus = 1;
 
-    info("DBENGINE: populating retention to MRG from %zu journal files of tier %d, using %zu threads...", datafiles, ctx->config.tier, cpus);
+    info("DBENGINE: populating retention to MRG from %zu journal files of tier %d, using %zd threads...", datafiles, ctx->config.tier, cpus);
 
     if(datafiles > 2) {
         struct rrdengine_datafile *datafile;
