@@ -113,7 +113,7 @@ For more details check the documentation under [Alert Notifications](https://git
 
 #### **Related Concepts**
 
-* [Spaces](https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md)
+* [Spaces](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-spaces)
 * [Alert Notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md)
 * [Events feed](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md)
 * [Role-Based Access model](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md)

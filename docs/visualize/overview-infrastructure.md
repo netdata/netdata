@@ -36,8 +36,8 @@ Let's walk through some examples of using the Overview to monitor and troublesho
 ### Filter nodes and pick relevant times
 
 While not exclusive to Overview, you can use two important features, [node
-filtering](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md#node-filter) and the [time &amp; date
-picker](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md#time--date-picker), to widen or narrow your infrastructure
+filtering](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/node-filter.md) and the [time &amp; date
+picker](https://github.com/netdata/netdata/blob/master/docs/dashboard/visualization-date-and-time-controls.md), to widen or narrow your infrastructure
 monitoring focus.
 
 By default, the Overview shows composite charts aggregated from every node in the War Room, but you can change that
@@ -52,7 +52,7 @@ establishing a baseline of infrastructure performance or targeted root cause ana
 For example, use the **Quick Selector** options to pick the 12-hour option first thing in the morning to check your
 infrastructure for any odd behavior overnight. Use the 7-day option to observe trends between various days of the week.
 
-See the [War Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md) docs for more details on both features.
+See the [War Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-war-rooms) docs for more details on both features.
 
 ### Configure composite charts to identify problems
 

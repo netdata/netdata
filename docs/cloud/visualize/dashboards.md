@@ -106,6 +106,6 @@ Because of the visual complexity of individual charts, dashboards require a mini
 ## What's next?
 
 Once you've designed a dashboard or two, make sure
-to [invite your team](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/invite-your-team.md) if
+to [invite your team](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#invite-your-team) if
 you haven't already. You can add these new users to the same War Room to let them see the same dashboards without any
 effort.
