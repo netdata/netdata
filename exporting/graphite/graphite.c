@@ -142,7 +142,7 @@ int format_dimension_collected_graphite_plaintext(struct instance *instance, RRD
         (host->tags) ? rrdhost_tags(host) : "",
         (instance->labels_buffer) ? buffer_tostring(instance->labels_buffer) : "",
         rd->collector.last_collected_value,
-        (unsigned long long) rrddim_collector_last_collected_time_get_tv_sec(rd));
+        (unsigned long long)rd->collector.last_collected_time.tv_sec);
 
     return 0;
 }

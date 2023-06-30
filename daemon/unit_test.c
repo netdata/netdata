@@ -1325,8 +1325,7 @@ int run_test(struct test *test)
         // align the first entry to second boundary
         if(!c) {
             fprintf(stderr, "    > %s: fixing first collection time to be %llu microseconds to second boundary\n", test->name, test->feed[c].microseconds);
-            st->last_collected_time.tv_usec = st->last_updated.tv_usec = test->feed[c].microseconds;
-            rrddim_collector_last_collected_time_set_tv_usec(rd, test->feed[c].microseconds);
+            rd->collector.last_collected_time.tv_usec = st->last_collected_time.tv_usec = st->last_updated.tv_usec = test->feed[c].microseconds;
             // time_start = st->last_collected_time.tv_sec;
         }
     }
@@ -1586,7 +1585,7 @@ int unit_test(long delay, long shift)
 
         // prevent it from deleting the dimensions
         rrddim_foreach_read(rd, st) {
-            rrddim_collector_last_collected_time_set(rd, st->last_collected_time.tv_sec, st->last_collected_time.tv_usec);
+            rd->collector.last_collected_time.tv_sec = st->last_collected_time.tv_sec;
         }
         rrddim_foreach_done(rd);
 
@@ -1832,11 +1831,12 @@ int unit_test_bitmap256(void) {
 #ifdef ENABLE_DBENGINE
 static inline void rrddim_set_by_pointer_fake_time(RRDDIM *rd, collected_number value, time_t now)
 {
-    rrddim_collector_last_collected_time_set(rd, now, 0);
+    rd->collector.last_collected_time.tv_sec = now;
+    rd->collector.last_collected_time.tv_usec = 0;
     rd->collector.collected_value = value;
     rrddim_set_updated(rd);
 
-    rrddim_collector_counter(rd)++;
+    rd->collector.counter++;
 
     collected_number v = (value >= 0) ? value : -value;
     if(unlikely(v > rd->collector.collected_value_max)) rd->collector.collected_value_max = v;
@@ -1911,9 +1911,9 @@ static void test_dbengine_create_charts(RRDHOST *host, RRDSET *st[CHARTS], RRDDI
     // Initialize DB with the very first entries
     for (i = 0 ; i < CHARTS ; ++i) {
         for (j = 0 ; j < DIMS ; ++j) {
-            time_t t = 2 * API_RELATIVE_TIME_MAX - 1;
-            rrddim_collector_last_collected_time_set(rd[i][j], t, 0);
-            st[i]->last_collected_time.tv_sec = st[i]->last_updated.tv_sec = t;
+            rd[i][j]->collector.last_collected_time.tv_sec =
+            st[i]->last_collected_time.tv_sec = st[i]->last_updated.tv_sec = 2 * API_RELATIVE_TIME_MAX - 1;
+            rd[i][j]->collector.last_collected_time.tv_usec =
             st[i]->last_collected_time.tv_usec = st[i]->last_updated.tv_usec = 0;
         }
     }
@@ -1952,9 +1952,9 @@ static time_t test_dbengine_create_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS
         for (j = 0 ; j < DIMS ; ++j) {
             storage_engine_store_change_collection_frequency(rd[i][j]->tiers[0].db_collection_handle, update_every);
 
-            time_t t = time_now;
-            rrddim_collector_last_collected_time_set(rd[i][j], t, 0);
+            rd[i][j]->collector.last_collected_time.tv_sec =
             st[i]->last_collected_time.tv_sec = st[i]->last_updated.tv_sec = time_now;
+            rd[i][j]->collector.last_collected_time.tv_usec =
             st[i]->last_collected_time.tv_usec = st[i]->last_updated.tv_usec = 0;
         }
     }
@@ -2318,9 +2318,9 @@ static void generate_dbengine_chart(void *arg)
     // feed it with the test data
     time_current = time_present - history_seconds;
     for (j = 0 ; j < DSET_DIMS ; ++j) {
-        time_t t = time_current - update_every;
-        rrddim_collector_last_collected_time_set(rd[j], t, 0);
-        st->last_collected_time.tv_sec = st->last_updated.tv_sec = t;
+        rd[j]->collector.last_collected_time.tv_sec =
+        st->last_collected_time.tv_sec = st->last_updated.tv_sec = time_current - update_every;
+        rd[j]->collector.last_collected_time.tv_usec =
         st->last_collected_time.tv_usec = st->last_updated.tv_usec = 0;
     }
     for( ; !thread_info->done && time_current < time_present ; time_current += update_every) {
