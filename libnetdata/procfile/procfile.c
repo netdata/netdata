@@ -410,7 +410,7 @@ procfile *procfile_open(const char *filename, const char *separators, uint32_t f
         return NULL;
     }
 
-    // info("PROCFILE: opened '%s' on fd %d", filename, fd);
+    // netdata_log_info("PROCFILE: opened '%s' on fd %d", filename, fd);
 
     size_t size = (unlikely(procfile_adaptive_initial_allocation)) ? procfile_max_allocation : PROCFILE_INCREMENT_BUFFER;
     procfile *ff = mallocz(sizeof(procfile) + size);
@@ -435,7 +435,7 @@ procfile *procfile_reopen(procfile *ff, const char *filename, const char *separa
     if(unlikely(!ff)) return procfile_open(filename, separators, flags);
 
     if(likely(ff->fd != -1)) {
-        // info("PROCFILE: closing fd %d", ff->fd);
+        // netdata_log_info("PROCFILE: closing fd %d", ff->fd);
         close(ff->fd);
     }
 
@@ -445,7 +445,7 @@ procfile *procfile_reopen(procfile *ff, const char *filename, const char *separa
         return NULL;
     }
 
-    // info("PROCFILE: opened '%s' on fd %d", filename, ff->fd);
+    // netdata_log_info("PROCFILE: opened '%s' on fd %d", filename, ff->fd);
 
     //strncpyz(ff->filename, filename, FILENAME_MAX);
     freez(ff->filename);

@@ -314,7 +314,7 @@ void analytics_alarms_notifications(void)
         sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("alarm-notify.sh dump_methods") + 2));
     sprintf(script, "%s/%s", netdata_configured_primary_plugins_dir, "alarm-notify.sh");
     if (unlikely(access(script, R_OK) != 0)) {
-        info("Alarm notify script %s not found.", script);
+        netdata_log_info("Alarm notify script %s not found.", script);
         freez(script);
         return;
     }
@@ -709,13 +709,13 @@ void get_system_timezone(void)
     // use the TZ variable
     if (tz && *tz && *tz != ':') {
         timezone = tz;
-        info("TIMEZONE: using TZ variable '%s'", timezone);
+        netdata_log_info("TIMEZONE: using TZ variable '%s'", timezone);
     }
 
     // use the contents of /etc/timezone
     if (!timezone && !read_file("/etc/timezone", buffer, FILENAME_MAX)) {
         timezone = buffer;
-        info("TIMEZONE: using the contents of /etc/timezone");
+        netdata_log_info("TIMEZONE: using the contents of /etc/timezone");
     }
 
     // read the link /etc/localtime
@@ -731,7 +731,7 @@ void get_system_timezone(void)
             char *s = strstr(buffer, cmp);
             if (s && s[cmp_len]) {
                 timezone = &s[cmp_len];
-                info("TIMEZONE: using the link of /etc/localtime: '%s'", timezone);
+                netdata_log_info("TIMEZONE: using the link of /etc/localtime: '%s'", timezone);
             }
         } else
             buffer[0] = '\0';
@@ -751,14 +751,14 @@ void get_system_timezone(void)
             else {
                 buffer[FILENAME_MAX] = '\0';
                 timezone = buffer;
-                info("TIMEZONE: using strftime(): '%s'", timezone);
+                netdata_log_info("TIMEZONE: using strftime(): '%s'", timezone);
             }
         }
     }
 
     if (timezone && *timezone) {
         // make sure it does not have illegal characters
-        // info("TIMEZONE: fixing '%s'", timezone);
+        // netdata_log_info("TIMEZONE: fixing '%s'", timezone);
 
         size_t len = strlen(timezone);
         char tmp[len + 1];
@@ -774,7 +774,7 @@ void get_system_timezone(void)
         *d = '\0';
         strncpyz(buffer, tmp, len);
         timezone = buffer;
-        info("TIMEZONE: fixed as '%s'", timezone);
+        netdata_log_info("TIMEZONE: fixed as '%s'", timezone);
     }
 
     if (!timezone || !*timezone)
@@ -955,7 +955,7 @@ void send_statistics(const char *action, const char *action_result, const char *
             sprintf(as_script, "%s/%s", netdata_configured_primary_plugins_dir, "anonymous-statistics.sh");
             if (unlikely(access(as_script, R_OK) != 0)) {
                 netdata_anonymous_statistics_enabled = 0;
-                info("Anonymous statistics script %s not found.", as_script);
+                netdata_log_info("Anonymous statistics script %s not found.", as_script);
                 freez(as_script);
             } else {
                 netdata_anonymous_statistics_enabled = 1;
@@ -1026,7 +1026,7 @@ void send_statistics(const char *action, const char *action_result, const char *
         analytics_data.netdata_config_oom_score,
         analytics_data.netdata_prebuilt_distro);
 
-    info("%s '%s' '%s' '%s'", as_script, action, action_result, action_data);
+    netdata_log_info("%s '%s' '%s' '%s'", as_script, action, action_result, action_data);
 
     FILE *fp_child_input;
     FILE *fp_child_output = netdata_popen(command_to_run, &command_pid, &fp_child_input);

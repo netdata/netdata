@@ -153,7 +153,7 @@ REGISTRY_PERSON *registry_person_allocate(const char *person_guid, time_t when) 
                 break;
             }
             else
-                info("Registry: generated person guid '%s' found in the registry. Retrying...", p->guid);
+                netdata_log_info("Registry: generated person guid '%s' found in the registry. Retrying...", p->guid);
         }
     }
     else
@@ -187,7 +187,7 @@ REGISTRY_PERSON *registry_person_get(const char *person_guid, time_t when) {
         char buf[GUID_LEN + 1];
         // validate it is a GUID
         if(unlikely(regenerate_guid(person_guid, buf) == -1))
-            info("Registry: person guid '%s' is not a valid guid. Ignoring it.", person_guid);
+            netdata_log_info("Registry: person guid '%s' is not a valid guid. Ignoring it.", person_guid);
         else {
             person_guid = buf;
             p = registry_person_find(person_guid);

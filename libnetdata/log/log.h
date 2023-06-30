@@ -118,7 +118,7 @@ typedef struct error_with_limit {
 #define internal_fatal(args...) debug_dummy()
 #endif
 
-#define info(args...)    info_int(0, __FILE__, __FUNCTION__, __LINE__, ##args)
+#define netdata_log_info(args...)    info_int(0, __FILE__, __FUNCTION__, __LINE__, ##args)
 #define collector_info(args...)    info_int(1, __FILE__, __FUNCTION__, __LINE__, ##args)
 #define infoerr(args...) error_int(0, "INFO", __FILE__, __FUNCTION__, __LINE__, ##args)
 #define error(args...)   error_int(0, "ERROR", __FILE__, __FUNCTION__, __LINE__, ##args)

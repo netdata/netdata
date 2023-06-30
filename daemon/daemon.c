@@ -121,7 +121,7 @@ int become_user(const char *username, int pid_fd) {
     gid_t gid = pw->pw_gid;
 
     if (am_i_root)
-        info("I am root, so checking permissions");
+        netdata_log_info("I am root, so checking permissions");
 
     prepare_required_directories(uid, gid);
 
@@ -234,11 +234,11 @@ static void oom_score_adj(void) {
     if(s && *s && (isdigit(*s) || *s == '-' || *s == '+'))
         wanted_score = atoll(s);
     else if(s && !strcmp(s, "keep")) {
-        info("Out-Of-Memory (OOM) kept as-is (running with %d)", (int) old_score);
+        netdata_log_info("Out-Of-Memory (OOM) kept as-is (running with %d)", (int) old_score);
         return;
     }
     else {
-        info("Out-Of-Memory (OOM) score not changed due to non-numeric setting: '%s' (running with %d)", s, (int)old_score);
+        netdata_log_info("Out-Of-Memory (OOM) score not changed due to non-numeric setting: '%s' (running with %d)", s, (int)old_score);
         return;
     }
 
@@ -253,7 +253,7 @@ static void oom_score_adj(void) {
     }
 
     if(old_score == wanted_score) {
-        info("Out-Of-Memory (OOM) score is already set to the wanted value %d", (int)old_score);
+        netdata_log_info("Out-Of-Memory (OOM) score is already set to the wanted value %d", (int)old_score);
         return;
     }
 
@@ -269,7 +269,7 @@ static void oom_score_adj(void) {
             if(read_single_signed_number_file("/proc/self/oom_score_adj", &final_score))
                 error("Adjusted my Out-Of-Memory (OOM) score to %d, but cannot verify it.", (int)wanted_score);
             else if(final_score == wanted_score)
-                info("Adjusted my Out-Of-Memory (OOM) score from %d to %d.", (int)old_score, (int)final_score);
+                netdata_log_info("Adjusted my Out-Of-Memory (OOM) score from %d to %d.", (int)old_score, (int)final_score);
             else
                 error("Adjusted my Out-Of-Memory (OOM) score from %d to %d, but it has been set to %d.", (int)old_score, (int)wanted_score, (int)final_score);
             analytics_report_oom_score(final_score);
@@ -355,19 +355,19 @@ static void sched_getscheduler_report(void) {
                         return;
                     }
                     else {
-                        info("Running with process scheduling policy '%s', priority %d", scheduler_defaults[i].name, param.sched_priority);
+                        netdata_log_info("Running with process scheduling policy '%s', priority %d", scheduler_defaults[i].name, param.sched_priority);
                     }
                 }
                 else if(scheduler_defaults[i].flags & SCHED_FLAG_USE_NICE) {
                     #ifdef HAVE_GETPRIORITY
                     int n = getpriority(PRIO_PROCESS, 0);
-                    info("Running with process scheduling policy '%s', nice level %d", scheduler_defaults[i].name, n);
+                    netdata_log_info("Running with process scheduling policy '%s', nice level %d", scheduler_defaults[i].name, n);
                     #else // !HAVE_GETPRIORITY
-                    info("Running with process scheduling policy '%s'", scheduler_defaults[i].name);
+                    netdata_log_info("Running with process scheduling policy '%s'", scheduler_defaults[i].name);
                     #endif // !HAVE_GETPRIORITY
                 }
                 else {
-                    info("Running with process scheduling policy '%s'", scheduler_defaults[i].name);
+                    netdata_log_info("Running with process scheduling policy '%s'", scheduler_defaults[i].name);
                 }
 
                 return;
@@ -436,7 +436,7 @@ static void sched_setscheduler_set(void) {
             error("Cannot adjust netdata scheduling policy to %s (%d), with priority %d. Falling back to nice.", name, policy, priority);
         }
         else {
-            info("Adjusted netdata scheduling policy to %s (%d), with priority %d.", name, policy, priority);
+            netdata_log_info("Adjusted netdata scheduling policy to %s (%d), with priority %d.", name, policy, priority);
             if(!(flags & SCHED_FLAG_USE_NICE))
                 goto report;
         }

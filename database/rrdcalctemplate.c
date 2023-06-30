@@ -246,7 +246,7 @@ void rrdcalctemplate_add_from_config(RRDHOST *host, RRDCALCTEMPLATE *rt) {
     if(added)
         freez(rt);
     else {
-        info("Health configuration template '%s' already exists for host '%s'.", rrdcalctemplate_name(rt), rrdhost_hostname(host));
+        netdata_log_info("Health configuration template '%s' already exists for host '%s'.", rrdcalctemplate_name(rt), rrdhost_hostname(host));
         rrdcalctemplate_free_unused_rrdcalctemplate_loaded_from_config(rt);
     }
 }

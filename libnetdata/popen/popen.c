@@ -140,7 +140,7 @@ static int popene_internal(volatile pid_t *pidptr, char **env, uint8_t flags, FI
     // create a string to be logged about the command we are running
     char command_to_be_logged[2048];
     convert_argv_to_string(command_to_be_logged, sizeof(command_to_be_logged), spawn_argv);
-    // info("custom_popene() running command: %s", command_to_be_logged);
+    // netdata_log_info("custom_popene() running command: %s", command_to_be_logged);
 
     int ret = 0;     // success by default
     int attr_rc = 1; // failure by default
@@ -406,11 +406,11 @@ int netdata_pclose(FILE *fp_child_input, FILE *fp_child_output, pid_t pid) {
 
             case CLD_KILLED:
                 if(info.si_status == SIGTERM) {
-                    info("child pid %d killed by SIGTERM", info.si_pid);
+                    netdata_log_info("child pid %d killed by SIGTERM", info.si_pid);
                     return(0);
                 }
                 else if(info.si_status == SIGPIPE) {
-                    info("child pid %d killed by SIGPIPE.", info.si_pid);
+                    netdata_log_info("child pid %d killed by SIGPIPE.", info.si_pid);
                     return(0);
                 }
                 else {

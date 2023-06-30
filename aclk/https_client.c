@@ -524,7 +524,7 @@ int https_request(https_req_t *request, https_req_response_t *response) {
             error("Proxy didn't return 200 OK (got %d)", ctx->parse_ctx.http_code);
             goto exit_sock;
         }
-        info("Proxy accepted CONNECT upgrade");
+        netdata_log_info("Proxy accepted CONNECT upgrade");
     }
     ctx->request = request;
 
@@ -584,7 +584,7 @@ int https_request(https_req_t *request, https_req_response_t *response) {
         // only exact data without affixed 0x00
         ((char*)response->payload)[response->payload_size] = 0; // mallocz(response->payload_size + 1);
     }
-    info("HTTPS \"%s\" request to \"%s\" finished with HTTP code: %d", http_req_type_to_str(ctx->request->request_type), ctx->request->host, response->http_code);
+    netdata_log_info("HTTPS \"%s\" request to \"%s\" finished with HTTP code: %d", http_req_type_to_str(ctx->request->request_type), ctx->request->host, response->http_code);
 
     rc = 0;
 

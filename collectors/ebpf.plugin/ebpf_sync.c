@@ -373,7 +373,7 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
                         }
                     }
                 } else {
-                    info("Cannot find syscall %s we are not going to monitor it.", syscall);
+                    netdata_log_info("Cannot find syscall %s we are not going to monitor it.", syscall);
                     w->enabled = false;
                 }
 

@@ -1471,7 +1471,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
 
     if(enable_guest_charts) {
         enable_guest_charts = 0;
-        info("Guest charts aren't supported by FreeBSD");
+        netdata_log_info("Guest charts aren't supported by FreeBSD");
     }
 #else
     pid_incremental_rate(stat, p->minflt,  str2kernel_uint_t(procfile_lineword(ff, 0,  9)));
@@ -4194,28 +4194,28 @@ static void parse_args(int argc, char **argv)
     if(freq > 0) update_every = freq;
 
     if(read_apps_groups_conf(user_config_dir, "groups")) {
-        info("Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'", user_config_dir, stock_config_dir);
+        netdata_log_info("Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'", user_config_dir, stock_config_dir);
 
         if(read_apps_groups_conf(stock_config_dir, "groups")) {
             error("Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.", stock_config_dir);
             exit(1);
         }
         else
-            info("Loaded config file '%s/apps_groups.conf'", stock_config_dir);
+            netdata_log_info("Loaded config file '%s/apps_groups.conf'", stock_config_dir);
     }
     else
-        info("Loaded config file '%s/apps_groups.conf'", user_config_dir);
+        netdata_log_info("Loaded config file '%s/apps_groups.conf'", user_config_dir);
 }
 
 static int am_i_running_as_root() {
     uid_t uid = getuid(), euid = geteuid();
 
     if(uid == 0 || euid == 0) {
-        if(debug_enabled) info("I am running with escalated privileges, uid = %u, euid = %u.", uid, euid);
+        if(debug_enabled) netdata_log_info("I am running with escalated privileges, uid = %u, euid = %u.", uid, euid);
         return 1;
     }
 
-    if(debug_enabled) info("I am not running with escalated privileges, uid = %u, euid = %u.", uid, euid);
+    if(debug_enabled) netdata_log_info("I am not running with escalated privileges, uid = %u, euid = %u.", uid, euid);
     return 0;
 }
 
@@ -4227,7 +4227,7 @@ static int check_capabilities() {
         return 0;
     }
     else if(debug_enabled)
-        info("Received my capabilities from the system.");
+        netdata_log_info("Received my capabilities from the system.");
 
     int ret = 1;
 
@@ -4242,7 +4242,7 @@ static int check_capabilities() {
             ret = 0;
         }
         else if(debug_enabled)
-            info("apps.plugin runs with CAP_DAC_READ_SEARCH.");
+            netdata_log_info("apps.plugin runs with CAP_DAC_READ_SEARCH.");
     }
 
     cfv = CAP_CLEAR;
@@ -4256,7 +4256,7 @@ static int check_capabilities() {
             ret = 0;
         }
         else if(debug_enabled)
-            info("apps.plugin runs with CAP_SYS_PTRACE.");
+            netdata_log_info("apps.plugin runs with CAP_SYS_PTRACE.");
     }
 
     cap_free(caps);
@@ -5311,23 +5311,23 @@ int main(int argc, char **argv) {
 
     user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
     if(user_config_dir == NULL) {
-        // info("NETDATA_CONFIG_DIR is not passed from netdata");
+        // netdata_log_info("NETDATA_CONFIG_DIR is not passed from netdata");
         user_config_dir = CONFIG_DIR;
     }
-    // else info("Found NETDATA_USER_CONFIG_DIR='%s'", user_config_dir);
+    // else netdata_log_info("Found NETDATA_USER_CONFIG_DIR='%s'", user_config_dir);
 
     stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
     if(stock_config_dir == NULL) {
-        // info("NETDATA_CONFIG_DIR is not passed from netdata");
+        // netdata_log_info("NETDATA_CONFIG_DIR is not passed from netdata");
         stock_config_dir = LIBCONFIG_DIR;
     }
-    // else info("Found NETDATA_USER_CONFIG_DIR='%s'", user_config_dir);
+    // else netdata_log_info("Found NETDATA_USER_CONFIG_DIR='%s'", user_config_dir);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {
         struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
         if(setrlimit(RLIMIT_CORE, &rl) != 0)
-            info("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
+            netdata_log_info("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
 #ifdef HAVE_SYS_PRCTL_H
         prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
 #endif
@@ -5367,7 +5367,7 @@ int main(int argc, char **argv) {
 #endif
     }
 
-    info("started on pid %d", getpid());
+    netdata_log_info("started on pid %d", getpid());
 
     snprintfz(all_user_ids.filename, FILENAME_MAX, "%s/etc/passwd", netdata_configured_host_prefix);
     debug_log("passwd file: '%s'", all_user_ids.filename);

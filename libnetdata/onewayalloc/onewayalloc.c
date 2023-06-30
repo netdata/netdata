@@ -195,7 +195,7 @@ void onewayalloc_destroy(ONEWAYALLOC *owa) {
 
     OWA_PAGE *head = (OWA_PAGE *)owa;
 
-    //info("OWA: %zu allocations of %zu total bytes, in %zu pages of %zu total bytes",
+    //netdata_log_info("OWA: %zu allocations of %zu total bytes, in %zu pages of %zu total bytes",
     //     head->stats_mallocs_made, head->stats_mallocs_size,
     //     head->stats_pages, head->stats_pages_size);
 

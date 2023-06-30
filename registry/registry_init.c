@@ -11,7 +11,7 @@ int registry_init(void) {
         registry.enabled = config_get_boolean(CONFIG_SECTION_REGISTRY, "enabled", 0);
     }
     else {
-        info("Registry is disabled - use the central netdata");
+        netdata_log_info("Registry is disabled - use the central netdata");
         config_set_boolean(CONFIG_SECTION_REGISTRY, "enabled", 0);
         registry.enabled = 0;
     }

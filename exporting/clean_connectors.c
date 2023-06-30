@@ -46,7 +46,7 @@ void clean_instance(struct instance *instance)
  */
 void simple_connector_cleanup(struct instance *instance)
 {
-    info("EXPORTING: cleaning up instance %s ...", instance->config.name);
+    netdata_log_info("EXPORTING: cleaning up instance %s ...", instance->config.name);
 
     struct simple_connector_data *simple_connector_data =
         (struct simple_connector_data *)instance->connector_specific_data;
@@ -77,6 +77,6 @@ void simple_connector_cleanup(struct instance *instance)
         (struct simple_connector_config *)instance->config.connector_specific_config;
     freez(simple_connector_config);
 
-    info("EXPORTING: instance %s exited", instance->config.name);
+    netdata_log_info("EXPORTING: instance %s exited", instance->config.name);
     instance->exited = 1;
 }

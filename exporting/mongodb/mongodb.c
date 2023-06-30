@@ -229,7 +229,7 @@ int format_batch_mongodb(struct instance *instance)
  */
 void mongodb_cleanup(struct instance *instance)
 {
-    info("EXPORTING: cleaning up instance %s ...", instance->config.name);
+    netdata_log_info("EXPORTING: cleaning up instance %s ...", instance->config.name);
 
     struct mongodb_specific_data *connector_specific_data =
         (struct mongodb_specific_data *)instance->connector_specific_data;
@@ -261,7 +261,7 @@ void mongodb_cleanup(struct instance *instance)
     freez(connector_specific_config->collection);
     freez(connector_specific_config);
 
-    info("EXPORTING: instance %s exited", instance->config.name);
+    netdata_log_info("EXPORTING: instance %s exited", instance->config.name);
     instance->exited = 1;
 
     return;

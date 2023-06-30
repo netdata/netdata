@@ -379,14 +379,14 @@ void *ebpf_oomkill_thread(void *ptr)
         // we need to disable it.
         pthread_mutex_lock(&ebpf_exit_cleanup);
         if (em->enabled)
-            info("%s apps integration is completely disabled.", NETDATA_DEFAULT_OOM_DISABLED_MSG);
+            netdata_log_info("%s apps integration is completely disabled.", NETDATA_DEFAULT_OOM_DISABLED_MSG);
         pthread_mutex_unlock(&ebpf_exit_cleanup);
 
         goto endoomkill;
     } else if (running_on_kernel < NETDATA_EBPF_KERNEL_4_14) {
         pthread_mutex_lock(&ebpf_exit_cleanup);
         if (em->enabled)
-            info("%s kernel does not have necessary tracepoints.", NETDATA_DEFAULT_OOM_DISABLED_MSG);
+            netdata_log_info("%s kernel does not have necessary tracepoints.", NETDATA_DEFAULT_OOM_DISABLED_MSG);
         pthread_mutex_unlock(&ebpf_exit_cleanup);
 
         goto endoomkill;

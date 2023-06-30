@@ -40,7 +40,7 @@ static void svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
 
     const char *cache_filename = rrddim_cache_filename(rd);
     if(cache_filename) {
-        info("Deleting dimension file '%s'.", cache_filename);
+        netdata_log_info("Deleting dimension file '%s'.", cache_filename);
         if (unlikely(unlink(cache_filename) == -1))
             error("Cannot delete dimension file '%s'", cache_filename);
     }
@@ -91,7 +91,7 @@ static bool svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_dimensio
                     )) {
 
             if(dictionary_acquired_item_references(rd_dfe.item) == 1) {
-                info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rrddim_name(rd), rrddim_id(rd), rrdset_name(st), rrdset_id(st));
+                netdata_log_info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rrddim_name(rd), rrddim_id(rd), rrdset_name(st), rrdset_id(st));
                 svc_rrddim_obsolete_to_archive(rd);
             }
             else
@@ -227,7 +227,7 @@ restart_after_removal:
         if(!rrdhost_should_be_removed(host, protected_host, now))
             continue;
 
-        info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", rrdhost_hostname(host), host->machine_guid);
+        netdata_log_info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", rrdhost_hostname(host), host->machine_guid);
 
         if (rrdhost_option_check(host, RRDHOST_OPTION_DELETE_ORPHAN_HOST)
             /* don't delete multi-host DB host files */

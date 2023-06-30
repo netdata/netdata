@@ -438,5 +438,5 @@ int main(int argc, char **argv) {
     }
 
     httpClose(http);
-    info("CUPS process exiting");
+    netdata_log_info("CUPS process exiting");
 }

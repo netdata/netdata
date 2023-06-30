@@ -53,7 +53,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     if(ctr->memory_mode == RRD_MEMORY_MODE_MAP || ctr->memory_mode == RRD_MEMORY_MODE_SAVE) {
         if(!rrddim_memory_load_or_create_map_save(st, rd, ctr->memory_mode)) {
-            info("Failed to use memory mode %s for chart '%s', dimension '%s', falling back to ram", (ctr->memory_mode == RRD_MEMORY_MODE_MAP)?"map":"save", rrdset_name(st), rrddim_name(rd));
+            netdata_log_info("Failed to use memory mode %s for chart '%s', dimension '%s', falling back to ram", (ctr->memory_mode == RRD_MEMORY_MODE_MAP)?"map":"save", rrdset_name(st), rrddim_name(rd));
             ctr->memory_mode = RRD_MEMORY_MODE_RAM;
         }
     }
@@ -64,7 +64,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
         rd->db.data = netdata_mmap(NULL, entries * sizeof(storage_number), MAP_PRIVATE, 1, false, NULL);
         if(!rd->db.data) {
-            info("Failed to use memory mode ram for chart '%s', dimension '%s', falling back to alloc", rrdset_name(st), rrddim_name(rd));
+            netdata_log_info("Failed to use memory mode ram for chart '%s', dimension '%s', falling back to alloc", rrdset_name(st), rrddim_name(rd));
             ctr->memory_mode = RRD_MEMORY_MODE_ALLOC;
         }
         else {
@@ -133,7 +133,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         if(td && (td->algorithm != rd->algorithm || ABS(td->multiplier) != ABS(rd->multiplier) || ABS(td->divisor) != ABS(rd->divisor))) {
             if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already "
+                netdata_log_info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already "
                      "present (algorithm is '%s' vs '%s', multiplier is %d vs %d, "
                      "divisor is %d vs %d).",
                      rrddim_name(rd),
@@ -536,7 +536,7 @@ inline void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd) {
     debug(D_RRD_CALLS, "rrddim_is_obsolete() for chart %s, dimension %s", rrdset_name(st), rrddim_name(rd));
 
     if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))) {
-        info("Cannot obsolete already archived dimension %s from chart %s", rrddim_name(rd), rrdset_name(st));
+        netdata_log_info("Cannot obsolete already archived dimension %s from chart %s", rrddim_name(rd), rrdset_name(st));
         return;
     }
     rrddim_flag_set(rd, RRDDIM_FLAG_OBSOLETE);
@@ -706,7 +706,7 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
     int reset = 0;
     rd_on_file->magic[sizeof(RRDDIMENSION_MAGIC_V019)] = '\0';
     if(strcmp(rd_on_file->magic, RRDDIMENSION_MAGIC_V019) != 0) {
-        info("Initializing file %s.", fullfilename);
+        netdata_log_info("Initializing file %s.", fullfilename);
         memset(rd_on_file, 0, size);
         reset = 1;
     }
@@ -721,7 +721,7 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
         reset = 1;
     }
     else if(dt_usec(&now, &rd_on_file->last_collected_time) > (rd_on_file->entries * rd_on_file->update_every * USEC_PER_SEC)) {
-        info("File %s is too old (last collected %llu seconds ago, but the database is %ld seconds). Clearing it.", fullfilename, dt_usec(&now, &rd_on_file->last_collected_time) / USEC_PER_SEC, rd_on_file->entries * rd_on_file->update_every);
+        netdata_log_info("File %s is too old (last collected %llu seconds ago, but the database is %ld seconds). Clearing it.", fullfilename, dt_usec(&now, &rd_on_file->last_collected_time) / USEC_PER_SEC, rd_on_file->entries * rd_on_file->update_every);
         memset(rd_on_file, 0, size);
         reset = 1;
     }
@@ -730,15 +730,15 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
         rd->last_collected_value = rd_on_file->last_collected_value;
 
         if(rd_on_file->algorithm != rd->algorithm)
-            info("File %s does not have the expected algorithm (expected %u '%s', found %u '%s'). Previous values may be wrong.",
+            netdata_log_info("File %s does not have the expected algorithm (expected %u '%s', found %u '%s'). Previous values may be wrong.",
                  fullfilename, rd->algorithm, rrd_algorithm_name(rd->algorithm), rd_on_file->algorithm, rrd_algorithm_name(rd_on_file->algorithm));
 
         if(rd_on_file->multiplier != rd->multiplier)
-            info("File %s does not have the expected multiplier (expected %d, found %ld). "
+            netdata_log_info("File %s does not have the expected multiplier (expected %d, found %ld). "
                  "Previous values may be wrong.", fullfilename, rd->multiplier, (long)rd_on_file->multiplier);
 
         if(rd_on_file->divisor != rd->divisor)
-            info("File %s does not have the expected divisor (expected %d, found %ld). "
+            netdata_log_info("File %s does not have the expected divisor (expected %d, found %ld). "
                  "Previous values may be wrong.", fullfilename, rd->divisor, (long)rd_on_file->divisor);
     }
 

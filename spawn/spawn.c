@@ -235,7 +235,7 @@ void spawn_init(void)
     struct completion completion;
     int error;
 
-    info("Initializing spawn client.");
+    netdata_log_info("Initializing spawn client.");
 
     init_spawn_cmd_queue();
 
@@ -268,15 +268,15 @@ void spawn_init(void)
             char cmd[64];
             sprintf(cmd, "echo CONCURRENT_STRESS_TEST %d 1>&2", j * CONCURRENT_SPAWNS + i + 1);
             serial[i] = spawn_enq_cmd(cmd);
-            info("Queued command %s for spawning.", cmd);
+            netdata_log_info("Queued command %s for spawning.", cmd);
         }
         int exit_status;
         time_t exec_run_timestamp;
         for (int i = 0; i < CONCURRENT_SPAWNS; ++i) {
-            info("Started waiting for serial %llu exit status %d run timestamp %llu.", serial[i], exit_status,
+            netdata_log_info("Started waiting for serial %llu exit status %d run timestamp %llu.", serial[i], exit_status,
                  exec_run_timestamp);
             spawn_wait_cmd(serial[i], &exit_status, &exec_run_timestamp);
-            info("Finished waiting for serial %llu exit status %d run timestamp %llu.", serial[i], exit_status,
+            netdata_log_info("Finished waiting for serial %llu exit status %d run timestamp %llu.", serial[i], exit_status,
                  exec_run_timestamp);
         }
     }

@@ -176,7 +176,7 @@ int main(int argc, char **argv)
 
     stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
     if (stock_config_dir == NULL) {
-        // info("NETDATA_CONFIG_DIR is not passed from netdata");
+        // netdata_log_info("NETDATA_CONFIG_DIR is not passed from netdata");
         stock_config_dir = LIBCONFIG_DIR;
     }
 
@@ -235,7 +235,7 @@ int main(int argc, char **argv)
                 enabled++;
         }
         if (!enabled) {
-            info("all modules are disabled, exiting...");
+            netdata_log_info("all modules are disabled, exiting...");
             return 1;
         }
     }

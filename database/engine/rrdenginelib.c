@@ -65,7 +65,7 @@ int open_file_for_io(char *path, int flags, uv_file *file, int direct)
             fatal_assert(req.result >= 0);
             *file = req.result;
 #ifdef __APPLE__
-            info("Disabling OS X caching for file \"%s\".", path);
+            netdata_log_info("Disabling OS X caching for file \"%s\".", path);
             fcntl(fd, F_NOCACHE, 1);
 #endif
             --direct; /* break the loop */
@@ -90,7 +90,7 @@ int is_legacy_child(const char *machine_guid)
         snprintfz(dbengine_file, FILENAME_MAX, "%s/%s/dbengine", netdata_configured_cache_dir, machine_guid);
         int rc = uv_fs_stat(NULL, &stat_req, dbengine_file, NULL);
         if (likely(rc == 0 && ((stat_req.statbuf.st_mode & S_IFMT) == S_IFDIR))) {
-            //info("Found legacy engine folder \"%s\"", dbengine_file);
+            //netdata_log_info("Found legacy engine folder \"%s\"", dbengine_file);
             return 1;
         }
     }
@@ -143,12 +143,12 @@ int compute_multidb_diskspace()
         int rc = count_legacy_children(netdata_configured_cache_dir);
         if (likely(rc >= 0)) {
             computed_multidb_disk_quota_mb = (rc + 1) * default_rrdeng_disk_quota_mb;
-            info("Found %d legacy dbengines, setting multidb diskspace to %dMB", rc, computed_multidb_disk_quota_mb);
+            netdata_log_info("Found %d legacy dbengines, setting multidb diskspace to %dMB", rc, computed_multidb_disk_quota_mb);
 
             fp = fopen(multidb_disk_space_file, "w");
             if (likely(fp)) {
                 fprintf(fp, "%d", computed_multidb_disk_quota_mb);
-                info("Created file '%s' to store the computed value", multidb_disk_space_file);
+                netdata_log_info("Created file '%s' to store the computed value", multidb_disk_space_file);
                 fclose(fp);
             } else
                 error("Failed to store the default multidb disk quota size on '%s'", multidb_disk_space_file);

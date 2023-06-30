@@ -1066,7 +1066,7 @@ int main(int argc, char **argv) {
 
     libxl_ctx_free(ctx);
     xenstat_uninit(xhandle);
-    info("XENSTAT process exiting");
+    netdata_log_info("XENSTAT process exiting");
     
     return 0;
 }

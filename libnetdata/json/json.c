@@ -124,7 +124,7 @@ int json_callback_print(JSON_ENTRY *e)
             buffer_strcat(wb,"NULL");
             break;
     }
-    info("JSON: %s", buffer_tostring(wb));
+    netdata_log_info("JSON: %s", buffer_tostring(wb));
     buffer_free(wb);
     return 0;
 }
@@ -323,7 +323,7 @@ size_t json_walk_array(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_E
     for(i = 0; i < size ; i++) {
         ne.pos = i;
         if (strlen(e->name) > JSON_NAME_LEN  - 24 || strlen(e->fullname) > JSON_FULLNAME_LEN -24) {
-            info("JSON: JSON walk_array ignoring element with name:%s fullname:%s",e->name, e->fullname);
+            netdata_log_info("JSON: JSON walk_array ignoring element with name:%s fullname:%s",e->name, e->fullname);
             continue;
         }
         snprintfz(ne.name, JSON_NAME_LEN, "%s[%lu]", e->name, i);
