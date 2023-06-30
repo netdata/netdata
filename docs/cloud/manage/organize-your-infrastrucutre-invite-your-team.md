@@ -43,7 +43,8 @@ or more. Hover over each icon to see the full name in a tooltip.
 
 To add a new Space click on the green **+** button . Enter the name of the Space and click **Save**.
 
-![Switch between Spaces](/img/cloud/main-page-add-space.png)
+![Switch between Spaces](https://github.com/netdata/netdata/assets/70198089/aa0d7a2f-02ec-4c01-a2d9-1f99642f2496)
+)
 
 ### Manage Spaces
 
