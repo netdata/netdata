@@ -18,7 +18,7 @@ add any given node to a single Space_. This 1:1 relationship between node and Sp
 encompassing Space for your entire team and separate them by War Rooms, or use different Spaces for teams monitoring
 discrete parts of your infrastructure.
 
-If you have been invited to Netdata Cloud by another user by default you will able to see this space. If you are a new
+If you have been invited to Netdata Cloud by another user by default you will able to see that space. If you are a new
 user the first space is already created.
 
 The other consideration for the number of Spaces you use to organize your Netdata Cloud experience is the size and
