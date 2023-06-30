@@ -175,46 +175,42 @@ static inline str2xx_errno str2float(float *out, char *s) {
  */
 static inline char *read_last_line(const char *filename, int max_line_width){
     const int default_max_line_width = 4 * 1024;
-    uv_fs_t stat_req, open_req, read_req;
+    uv_fs_t req;
     int64_t start_pos, end_pos;
-    uv_file file_handle;
+    uv_file file_handle = -1;
     uv_buf_t uvBuf;
-    char *buff;
+    char *buff = NULL;
     int rc, line_pos, found_ln, bytes_read;
 
     if(max_line_width <= 0) max_line_width = default_max_line_width;
 
-    rc = uv_fs_stat(NULL, &stat_req, filename, NULL);
+    rc = uv_fs_stat(NULL, &req, filename, NULL);
+    end_pos = req.statbuf.st_size;
+    uv_fs_req_cleanup(&req);
     if (unlikely(rc)) {
-        error("uv_fs_stat() error for %s: (%d) %s\n", filename, rc, uv_strerror(rc));
+        collector_error("[%s]: uv_fs_stat() error: (%d) %s", filename, rc, uv_strerror(rc));
         m_assert(!rc, "uv_fs_stat() failed during read_last_line()");
-        uv_fs_req_cleanup(&stat_req);
-        return NULL;
+        goto error;
     }
-    end_pos = stat_req.statbuf.st_size;
-    uv_fs_req_cleanup(&stat_req);
-
-    if(end_pos == 0) return NULL;
+    
+    if(end_pos == 0) goto error;
     start_pos = end_pos - max_line_width;
     if(start_pos < 0) start_pos = 0;
 
-    rc = uv_fs_open(NULL, &open_req, filename, O_RDONLY, 0, NULL);
+    rc = uv_fs_open(NULL, &req, filename, O_RDONLY, 0, NULL);
+    uv_fs_req_cleanup(&req);
     if (unlikely(rc < 0)) {
-        error("uv_fs_open() error: %s (%d) %s\n",filename, rc, uv_strerror(rc));
-        uv_fs_req_cleanup(&open_req);
-        return NULL;
-    } 
-    file_handle = open_req.result;  // open_req->result of a uv_fs_t is the file descriptor in case of the uv_fs_open
-    uv_fs_req_cleanup(&open_req);
+        collector_error("[%s]: uv_fs_open() error: (%d) %s",filename, rc, uv_strerror(rc));
+        goto error;
+    } else file_handle = rc;
 
     buff = callocz(1, (size_t) (end_pos - start_pos + 1) * sizeof(char));
     uvBuf = uv_buf_init(buff, (unsigned int) (end_pos - start_pos + 1));
-    rc = uv_fs_read(NULL, &read_req, file_handle, &uvBuf, 1, start_pos, NULL);
-    uv_fs_req_cleanup(&read_req);
+    rc = uv_fs_read(NULL, &req, file_handle, &uvBuf, 1, start_pos, NULL);
+    uv_fs_req_cleanup(&req);
     if (unlikely(rc < 0)){ 
-        error("uv_fs_read() error for %s (%d) %s\n", filename, rc, uv_strerror(rc));
-        freez(buff);
-        return NULL;
+        collector_error("[%s]: uv_fs_read() error: (%d) %s", filename, rc, uv_strerror(rc));
+        goto error;
     }
 
     buff[rc] = '\0';
@@ -224,7 +220,7 @@ static inline char *read_last_line(const char *filename, int max_line_width){
 
     for(int i = bytes_read - 2; i >= 0; i--){
         char ch = buff[i];
-        if (ch == '\n'){
+        if (ch == '\n' || ch == '\r'){
             found_ln = 1;
             line_pos = i;
             break;
@@ -234,14 +230,19 @@ static inline char *read_last_line(const char *filename, int max_line_width){
         char *line = callocz(1, (size_t) (bytes_read - line_pos - 1) * sizeof(char));
         memcpy(line, &buff[line_pos + 1], (size_t) (bytes_read - line_pos - 2));
         freez(buff);
+        uv_fs_close(NULL, &req, file_handle, NULL);
         return line;
     }
+
     if(start_pos == 0){
+        uv_fs_close(NULL, &req, file_handle, NULL);
         return buff;
     }
 
+error:
     // Should not get here - error line too long
-    freez(buff);
+    if(buff) freez(buff);
+    if(file_handle >= 0) uv_fs_close(NULL, &req, file_handle, NULL);
     return NULL;
 }
 
