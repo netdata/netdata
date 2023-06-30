@@ -11,7 +11,7 @@ Netdata is very flexible and can be used to monitor all kinds of infrastructure.
 
 ## Get started
 
-monitoring agent that collects thousands of hardware and software metrics from
+Netdata is a free and open-source (FOSS) monitoring agent that collects thousands of hardware and software metrics from
 any physical or virtual system (we call them _nodes_). These metrics are organized in an easy-to-use and -navigate interface.
 
 Together with [Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md), you can monitor your entire infrastructure in
