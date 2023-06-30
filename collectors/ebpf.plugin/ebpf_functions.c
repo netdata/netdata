@@ -155,7 +155,7 @@ static void ebpf_function_thread_manipulation(const char *transaction,
                 lem->lifetime = period;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("Starting thread %s with life time = %d", thread_name, period);
+                info("Starting thread %s with lifetime = %d", thread_name, period);
 #endif
 
                 netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT,

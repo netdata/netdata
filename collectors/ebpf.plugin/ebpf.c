@@ -1765,11 +1765,11 @@ static void ebpf_update_table_size()
 }
 
 /**
- * Update life time
+ * Update lifetime
  *
  * Update the period of time that specific thread will run
  */
-static void ebpf_update_life_time()
+static void ebpf_update_lifetime()
 {
     int i;
     uint32_t value = (uint32_t) appconfig_get_number(&collector_config, EBPF_GLOBAL_SECTION,
@@ -1857,7 +1857,7 @@ static void read_collector_values(int *disable_cgroups,
 
     ebpf_update_table_size();
 
-    ebpf_update_life_time();
+    ebpf_update_lifetime();
 
     // This is kept to keep compatibility
     uint32_t enabled = appconfig_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, "disable apps",
@@ -2506,13 +2506,13 @@ static inline void ebpf_create_statistic_thread_chart(int update_every)
 }
 
 /**
- * Create life time Thread Chart
+ * Create lifetime Thread Chart
  *
- * Write to standard output current values for threads life time.
+ * Write to standard output current values for threads lifetime.
  *
  * @param update_every time used to update charts
  */
-static inline void ebpf_create_life_time_thread_chart(int update_every)
+static inline void ebpf_create_lifetime_thread_chart(int update_every)
 {
     ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
                          NETDATA_EBPF_LIFE_TIME,
@@ -2664,7 +2664,7 @@ static void ebpf_create_statistic_charts(int update_every)
     ebpf_create_statistic_thread_chart(update_every);
     EBPF_PLUGIN_FUNCTIONS(EBPF_FUNCTION_THREAD, EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
 
-    ebpf_create_life_time_thread_chart(update_every);
+    ebpf_create_lifetime_thread_chart(update_every);
     EBPF_PLUGIN_FUNCTIONS(EBPF_FUNCTION_THREAD, EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
 
     ebpf_create_statistic_load_chart(update_every);
