@@ -26,7 +26,7 @@ static inline int bad_request_multiple_dashboard_versions(struct web_client *w) 
     return HTTP_RESP_BAD_REQUEST;
 }
 
-static inline int web_client_crock_socket(struct web_client *w __maybe_unused) {
+static inline int web_client_cork_socket(struct web_client *w __maybe_unused) {
 #ifdef TCP_CORK
     if(likely(web_client_is_corkable(w) && !w->tcp_cork && w->ofd != -1)) {
         w->tcp_cork = true;
@@ -53,9 +53,10 @@ static inline void web_client_enable_wait_from_ssl(struct web_client *w) {
     }
 }
 
-static inline int web_client_uncrock_socket(struct web_client *w __maybe_unused) {
+static inline int web_client_uncork_socket(struct web_client *w __maybe_unused) {
 #ifdef TCP_CORK
     if(likely(w->tcp_cork && w->ofd != -1)) {
+        w->tcp_cork = false;
         if(unlikely(setsockopt(w->ofd, IPPROTO_TCP, TCP_CORK, (char *) &w->tcp_cork, sizeof(int)) != 0)) {
             error("%llu: failed to disable TCP_CORK on socket.", w->id);
             w->tcp_cork = true;
@@ -153,7 +154,7 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
 }
 
 void web_client_request_done(struct web_client *w) {
-    web_client_uncrock_socket(w);
+    web_client_uncork_socket(w);
 
     debug(D_WEB_CLIENT, "%llu: Resetting client.", w->id);
 
@@ -1265,7 +1266,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
           , buffer_tostring(w->response.header_output)
     );
 
-    web_client_crock_socket(w);
+    web_client_cork_socket(w);
 
     size_t count = 0;
     ssize_t bytes;

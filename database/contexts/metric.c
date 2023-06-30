@@ -33,7 +33,7 @@ inline NETDATA_DOUBLE rrdmetric_acquired_last_stored_value(RRDMETRIC_ACQUIRED *r
     RRDMETRIC *rm = rrdmetric_acquired_value(rma);
 
     if(rm->rrddim)
-        return rm->rrddim->last_stored_value;
+        return rm->rrddim->collector.last_stored_value;
 
     return NAN;
 }

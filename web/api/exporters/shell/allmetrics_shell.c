@@ -41,11 +41,11 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
             // for each dimension
             RRDDIM *rd;
             rrddim_foreach_read(rd, st) {
-                if(rd->collections_counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
+                if(rd->collector.counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
                     char dimension[SHELL_ELEMENT_MAX + 1];
                     shell_name_copy(dimension, rd->name?rrddim_name(rd):rrddim_id(rd), SHELL_ELEMENT_MAX);
 
-                    NETDATA_DOUBLE n = rd->last_stored_value;
+                    NETDATA_DOUBLE n = rd->collector.last_stored_value;
 
                     if(isnan(n) || isinf(n))
                         buffer_sprintf(wb, "NETDATA_%s_%s=\"\"      # %s\n", chart, dimension, rrdset_units(st));
@@ -135,7 +135,7 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
             // for each dimension
             RRDDIM *rd;
             rrddim_foreach_read(rd, st) {
-                if(rd->collections_counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
+                if(rd->collector.counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
                     buffer_sprintf(
                         wb,
                         "%s\n"
@@ -146,10 +146,10 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
                         rrddim_id(rd),
                         rrddim_name(rd));
 
-                    if(isnan(rd->last_stored_value))
+                    if(isnan(rd->collector.last_stored_value))
                         buffer_strcat(wb, "null");
                     else
-                        buffer_sprintf(wb, NETDATA_DOUBLE_FORMAT, rd->last_stored_value);
+                        buffer_sprintf(wb, NETDATA_DOUBLE_FORMAT, rd->collector.last_stored_value);
 
                     buffer_strcat(wb, "\n\t\t\t}");
 

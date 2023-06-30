@@ -362,7 +362,7 @@ static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_sta
             buffer_fast_strcat(wb, "SET \"", 5);
             buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
             buffer_fast_strcat(wb, "\" = ", 4);
-            buffer_print_int64(wb, rd->collected_value);
+            buffer_print_int64(wb, rd->collector.collected_value);
             buffer_fast_strcat(wb, "\n", 1);
         }
         else {
@@ -436,10 +436,10 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET_V2 " '", sizeof(PLUGINSD_KEYWORD_SET_V2) - 1 + 2);
     buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
     buffer_fast_strcat(wb, "' ", 2);
-    buffer_print_int64_encoded(wb, integer_encoding, rd->last_collected_value);
+    buffer_print_int64_encoded(wb, integer_encoding, rd->collector.last_collected_value);
     buffer_fast_strcat(wb, " ", 1);
 
-    if((NETDATA_DOUBLE)rd->last_collected_value == n)
+    if((NETDATA_DOUBLE)rd->collector.last_collected_value == n)
         buffer_fast_strcat(wb, "#", 1);
     else
         buffer_print_netdata_double_encoded(wb, doubles_encoding, n);

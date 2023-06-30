@@ -49,7 +49,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     rd->rrdset = st;
 
     if(rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST))
-        rd->collections_counter = 1;
+        rd->collector.counter = 1;
 
     if(ctr->memory_mode == RRD_MEMORY_MODE_MAP || ctr->memory_mode == RRD_MEMORY_MODE_SAVE) {
         if(!rrddim_memory_load_or_create_map_save(st, rd, ctr->memory_mode)) {
@@ -565,16 +565,16 @@ inline collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_
 collected_number rrddim_timed_set_by_pointer(RRDSET *st __maybe_unused, RRDDIM *rd, struct timeval collected_time, collected_number value) {
     debug(D_RRD_CALLS, "rrddim_set_by_pointer() for chart %s, dimension %s, value " COLLECTED_NUMBER_FORMAT, rrdset_name(st), rrddim_name(rd), value);
 
-    rd->last_collected_time = collected_time;
-    rd->collected_value = value;
+    rd->collector.last_collected_time = collected_time;
+    rd->collector.collected_value = value;
     rrddim_set_updated(rd);
-    rd->collections_counter++;
+    rd->collector.counter++;
 
     collected_number v = (value >= 0) ? value : -value;
-    if (unlikely(v > rd->collected_value_max))
-        rd->collected_value_max = v;
+    if (unlikely(v > rd->collector.collected_value_max))
+        rd->collector.collected_value_max = v;
 
-    return rd->last_collected_value;
+    return rd->collector.last_collected_value;
 }
 
 
@@ -644,9 +644,9 @@ void rrddim_memory_file_update(RRDDIM *rd) {
     if(!rd || !rd->db.rd_on_file) return;
     struct rrddim_map_save_v019 *rd_on_file = rd->db.rd_on_file;
 
-    rd_on_file->last_collected_time.tv_sec = rd->last_collected_time.tv_sec;
-    rd_on_file->last_collected_time.tv_usec = rd->last_collected_time.tv_usec;
-    rd_on_file->last_collected_value = rd->last_collected_value;
+    rd_on_file->last_collected_time.tv_sec = rd->collector.last_collected_time.tv_sec;
+    rd_on_file->last_collected_time.tv_usec = rd->collector.last_collected_time.tv_usec;
+    rd_on_file->last_collected_value = rd->collector.last_collected_value;
 }
 
 void rrddim_memory_file_free(RRDDIM *rd) {
@@ -727,7 +727,7 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
     }
 
     if(!reset) {
-        rd->last_collected_value = rd_on_file->last_collected_value;
+        rd->collector.last_collected_value = rd_on_file->last_collected_value;
 
         if(rd_on_file->algorithm != rd->algorithm)
             netdata_log_info("File %s does not have the expected algorithm (expected %u '%s', found %u '%s'). Previous values may be wrong.",
