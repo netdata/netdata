@@ -12,6 +12,7 @@ netdata_ebpf_test_functions() {
     fi
 
     grep "${2}" /tmp/ebpf_netdata_test_functions.txt >/dev/null
+    TEST=$?
     if [ $TEST -ne 0 ]; then
         rm /tmp/ebpf_netdata_test_functions.txt
         echo "Cannot find ${2} in the output."
