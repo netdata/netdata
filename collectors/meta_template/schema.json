@@ -56,9 +56,17 @@
         },
         "supported_platforms": {
           "type": "object",
-          "description": "Provide a list of supported platforms if this collector is not supported on all, otherwise leave empty",
+          "description": "Supported OS/platforms. By default, all platforms supported by Netdata are considered supported. See https://learn.netdata.cloud/docs/installing/platform-support-policy#currently-supported-platforms.",
           "properties": {
-            "list": {
+            "include": {
+              "description": "Only supported OS/platforms. Platforms supported by Netdata will be ignored, only those listed are considered supported.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "exclude": {
+              "description": "Unsupported OS/platforms. The result set is all platforms supported by Netdata except for those excluded.",
               "type": "array",
               "items": {
                 "type": "string"
