@@ -643,11 +643,11 @@ void ebpf_filesystem_cleanup_ebpf_data()
             efp->hopen.title = NULL;
 
             freez(efp->hadditional.name);
-            efp->hopen.name = NULL;
+            efp->hadditional.name = NULL;
             freez(efp->hadditional.title);
-            efp->hopen.title = NULL;
+            efp->hadditional.title = NULL;
             freez(efp->hadditional.ctx);
-            efp->hopen.ctx = NULL;
+            efp->hadditional.ctx = NULL;
         }
     }
 }
