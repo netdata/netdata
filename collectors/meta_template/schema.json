@@ -28,12 +28,12 @@
           "description": "An overview of the collected metrics and a detailed description of the data collection method.",
           "properties": {
             "metrics_description": {
-              "description": "Brief description of what metrics are collected. A suggested approach here is to talk about the areas covered (e.g. health, performance, errors) and the metric scopes.",
-              "type": "string"
+              "type": "string",
+              "description": "Brief description of what metrics are collected. A suggested approach here is to talk about the areas covered (e.g. health, performance, errors) and the metric scopes."
             },
             "method_description": {
-              "description": "Description of how metrics are collected (e.g. HTTP requests, establish a TCP connection and send a command, a specific binary execution). A suggested approach here is to provide a detailed description of how the collector gathers metrics: how many connections are established, exact requests/commands executed, exact endpoints used.",
-              "type": "string"
+              "type": "string",
+              "description": "Description of how metrics are collected (e.g. HTTP requests, establish a TCP connection and send a command, a specific binary execution). A suggested approach here is to provide a detailed description of how the collector gathers metrics: how many connections are established, exact requests/commands executed, exact endpoints used."
             }
           }
         },
@@ -42,15 +42,15 @@
           "description": "Supported OS/platforms. By default, all platforms supported by Netdata are considered supported. See https://learn.netdata.cloud/docs/installing/platform-support-policy#currently-supported-platforms.",
           "properties": {
             "include": {
-              "description": "Only supported OS/platforms. Platforms supported by Netdata will be ignored, only those listed are considered supported.",
               "type": "array",
+              "description": "Only supported OS/platforms. Platforms supported by Netdata will be ignored, only those listed are considered supported.",
               "items": {
                 "type": "string"
               }
             },
             "exclude": {
-              "description": "Unsupported OS/platforms. The result set is all platforms supported by Netdata except for those excluded.",
               "type": "array",
+              "description": "Unsupported OS/platforms. The result set is all platforms supported by Netdata except for those excluded.",
               "items": {
                 "type": "string"
               }
@@ -58,8 +58,8 @@
           }
         },
         "multi-instance": {
-          "description": "Whether this collector supports collecting metrics from multiple (for example, local and remote) instances.",
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Whether this collector supports collecting metrics from multiple (for example, local and remote) instances."
         },
         "additional_permissions": {
           "type": "object",
@@ -72,7 +72,7 @@
         },
         "default_behavior": {
           "type": "object",
-          "description": "",
+          "description": "Descriptions of how the data collector works with the default configuration.",
           "properties": {
             "auto_detection": {
               "type": "object",
@@ -107,23 +107,25 @@
     },
     "setup": {
       "type": "object",
+      "description": "Complete information that is needed to enable and configure the data collector.",
       "properties": {
         "prerequisites": {
           "type": "object",
-          "description": "Provide a list of prerequisites, example:\nlist:\n  - title: Prerequisite for heading\n    text: |\n      Either explain with text, or use markdown list to list steps",
+          "description": "Actions the user must take to make the collector work, if any. It includes both configuring Netdata (e.g. if the collector is disabled by default) and configuring the monitored instance (e.g. enabling Apache mod_stats).",
           "properties": {
             "list": {
               "type": "array",
+              "description": "List of prerequisites.",
               "items": {
                 "type": "object",
                 "properties": {
                   "title": {
                     "type": "string",
-                    "description": "Title for the prerequisites sub-section"
+                    "description": "Title should reflect the description, be short and in the form of a command (e.g. Create netdata user, Enable build-in web server)."
                   },
                   "description": {
                     "type": "string",
-                    "description": "Description for the prerequisites sub-section, you can use lists or any other markdown-like syntax"
+                    "description": "Steps to follow to meet this prerequisite."
                   }
                 }
               }
@@ -131,20 +133,26 @@
           }
         },
         "configuration": {
+          "description": "Information on how to configure the collector and available configuration options.",
           "type": "object",
           "properties": {
             "file": {
               "type": "object",
-              "description": "Specify in a text key which file the user has to edit.",
+              "description": "Configuration file.",
               "properties": {
-                "description": {
+                "name": {
                   "type": "string",
-                  "description": "Example: go.d/apache.conf"
+                  "description": "Configuration file name."
+                },
+                "section_name": {
+                  "type": "string",
+                  "description": "The name of the section in the configuration file. Only for data collectors whose configuration is in netdata.conf (e.g. proc.plugin modules)."
                 }
               }
             },
             "options": {
               "type": "object",
+              "description": "All information about the available configuration options.",
               "properties": {
                 "description": {
                   "type": "string",
@@ -155,32 +163,32 @@
                 },
                 "list": {
                   "type": "array",
-                  "description": "Each of the list's items represents a row in the available config options table",
+                  "description": "List of configuration options.",
                   "items": {
                     "type": "object",
                     "properties": {
                       "name": {
                         "type": "string",
-                        "description": "Option name"
+                        "description": "Option name."
                       },
                       "description": {
                         "type": "string",
-                        "description": "Option description"
+                        "description": "Option description. Must be short. Use 'detailed_description' for a long description."
+                      },
+                      "detailed_description": {
+                        "type": "string",
+                        "description": "Option detailed description. Use it to describe in details complex options."
                       },
                       "default_value": {
                         "type": [
                           "string",
                           "number"
                         ],
-                        "description": "Default value of the option, leave empty if none"
+                        "description": "Default value. Leave empty if none."
                       },
                       "required": {
                         "type": "boolean",
-                        "description": "A boolean value indicating if this options is required or not. Use true / false"
-                      },
-                      "details": {
-                        "type": "string",
-                        "description": "If details need to be provided for this option, add them here."
+                        "description": "Indicates whether this option is required or not. The collector will not work if the required option is not set."
                       }
                     }
                   }
