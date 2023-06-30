@@ -1198,7 +1198,8 @@ UNIT_STATIC void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
              * TODO: Error handling in case the second part is not timezone?? */
 
             m_assert(*second_part == ' ', "Invalid TIME second_part");
-            m_assert(*++second_part == '+', "Invalid TIME second_part");
+            ++second_part;
+            m_assert(*second_part == '+' || *second_part == '-', "Invalid TIME second_part");
 
             char *second_part_end = ++second_part;
             while(  *second_part_end != ']' && 
