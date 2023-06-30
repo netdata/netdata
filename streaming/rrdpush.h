@@ -350,6 +350,19 @@ typedef struct stream_node_instance {
 } STREAM_NODE_INSTANCE;
 */
 
+struct buffered_reader {
+    ssize_t read_len;
+    ssize_t pos;
+    char read_buffer[PLUGINSD_LINE_MAX + 1];
+};
+
+char *buffered_reader_next_line(struct buffered_reader *reader, char *dst, size_t dst_size);
+static inline void buffered_reader_init(struct buffered_reader *reader) {
+    reader->read_buffer[0] = '\0';
+    reader->read_len = 0;
+    reader->pos = 0;
+}
+
 struct receiver_state {
     RRDHOST *host;
     pid_t tid;
@@ -371,8 +384,8 @@ struct receiver_state {
     struct rrdhost_system_info *system_info;
     STREAM_CAPABILITIES capabilities;
     time_t last_msg_t;
-    char read_buffer[PLUGINSD_LINE_MAX + 1];
-    int read_len;
+
+    struct buffered_reader reader;
 
     uint16_t hops;
 

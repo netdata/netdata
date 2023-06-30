@@ -1844,76 +1844,59 @@ static inline PARSER_RC streaming_claimed_id(char **words, size_t num_words, PAR
 
 // ----------------------------------------------------------------------------
 
-typedef enum {
-    PARSER_FGETS_RESULT_OK,
-    PARSER_FGETS_RESULT_TIMEOUT,
-    PARSER_FGETS_RESULT_ERROR,
-    PARSER_FGETS_RESULT_EOF,
-} PARSER_FGETS_RESULT;
+static inline bool buffered_reader_read(struct buffered_reader *reader, int fd) {
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(reader->read_buffer[reader->read_len] != '\0')
+        fatal("%s(): read_buffer does not start with zero", __FUNCTION__ );
+#endif
 
-static inline PARSER_FGETS_RESULT parser_fgets(char *s, int size, FILE *stream) {
+    ssize_t bytes_read = read(fd, reader->read_buffer + reader->read_len, sizeof(reader->read_buffer) - reader->read_len - 1);
+    if(unlikely(bytes_read <= 0))
+        return false;
+
+    reader->read_len += bytes_read;
+    reader->read_buffer[reader->read_len] = '\0';
+
+    return true;
+}
+
+static inline bool buffered_reader_read_timeout(struct buffered_reader *reader, int fd, int timeout_ms) {
     errno = 0;
-
     struct pollfd fds[1];
-    int timeout_msecs = 2 * 60 * MSEC_PER_SEC;
 
-    fds[0].fd = fileno(stream);
+    fds[0].fd = fd;
     fds[0].events = POLLIN;
 
-    int ret = poll(fds, 1, timeout_msecs);
+    int ret = poll(fds, 1, timeout_ms);
 
     if (ret > 0) {
         /* There is data to read */
-        if (fds[0].revents & POLLIN) {
-            char *tmp = fgets(s, size, stream);
+        if (fds[0].revents & POLLIN)
+            return buffered_reader_read(reader, fd);
 
-            if(unlikely(!tmp)) {
-                if (feof(stream)) {
-                    error("PARSER: read failed: end of file.");
-                    return PARSER_FGETS_RESULT_EOF;
-                }
-
-                else if (ferror(stream)) {
-                    error("PARSER: read failed: input error.");
-                    return PARSER_FGETS_RESULT_ERROR;
-                }
-
-                error("PARSER: read failed: unknown error.");
-                return PARSER_FGETS_RESULT_ERROR;
-            }
-
-            return PARSER_FGETS_RESULT_OK;
-        }
         else if(fds[0].revents & POLLERR) {
             error("PARSER: read failed: POLLERR.");
-            return PARSER_FGETS_RESULT_ERROR;
+            return false;
         }
         else if(fds[0].revents & POLLHUP) {
             error("PARSER: read failed: POLLHUP.");
-            return PARSER_FGETS_RESULT_ERROR;
+            return false;
         }
         else if(fds[0].revents & POLLNVAL) {
             error("PARSER: read failed: POLLNVAL.");
-            return PARSER_FGETS_RESULT_ERROR;
+            return false;
         }
 
         error("PARSER: poll() returned positive number, but POLLIN|POLLERR|POLLHUP|POLLNVAL are not set.");
-        return PARSER_FGETS_RESULT_ERROR;
+        return false;
     }
     else if (ret == 0) {
         error("PARSER: timeout while waiting for data.");
-        return PARSER_FGETS_RESULT_TIMEOUT;
+        return false;
     }
 
     error("PARSER: poll() failed with code %d.", ret);
-    return PARSER_FGETS_RESULT_ERROR;
-}
-
-static int parser_next(PARSER *parser, char *buffer, size_t buffer_size) {
-    if(likely(parser_fgets(buffer, (int)buffer_size, (FILE *)parser->fp_input) == PARSER_FGETS_RESULT_OK))
-        return 0;
-
-    return 1;
+    return false;
 }
 
 void pluginsd_process_thread_cleanup(void *ptr) {
@@ -1974,10 +1957,14 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     // so, parser needs to be allocated before pushing it
     netdata_thread_cleanup_push(pluginsd_process_thread_cleanup, parser);
 
-    char buffer[PLUGINSD_LINE_MAX + 1];
-
-    while (likely(!parser_next(parser, buffer, PLUGINSD_LINE_MAX))) {
-        if (unlikely(!service_running(SERVICE_COLLECTORS) || parser_action(parser,  buffer)))
+    buffered_reader_init(&parser->reader);
+    char buffer[PLUGINSD_LINE_MAX + 2];
+    while(likely(service_running(SERVICE_COLLECTORS))) {
+        if (unlikely(!buffered_reader_next_line(&parser->reader, buffer, PLUGINSD_LINE_MAX + 2))) {
+            if(unlikely(!buffered_reader_read_timeout(&parser->reader, fileno((FILE *)parser->fp_input), 2 * 60 * MSEC_PER_SEC)))
+                break;
+        }
+        else if(unlikely(parser_action(parser,  buffer)))
             break;
     }
 

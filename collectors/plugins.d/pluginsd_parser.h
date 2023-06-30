@@ -95,6 +95,8 @@ typedef struct parser {
 
     PARSER_USER_OBJECT user;        // User defined structure to hold extra state between calls
 
+    struct buffered_reader reader;
+
     struct {
         const char *end_keyword;
         BUFFER *response;
