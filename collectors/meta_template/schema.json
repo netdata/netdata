@@ -42,9 +42,14 @@
       "properties": {
         "data_collection": {
           "type": "object",
-          "description": "Give a description of how this collector works, and provide the link in {[Integration](link to integration's site)} so the CI can handle the link field for the various virtual integrations",
+          "description": "An overview of the collected metrics and a detailed description of the data collection method.",
           "properties": {
-            "description": {
+            "metrics_description": {
+              "description": "Brief description of what metrics are collected. A suggested approach here is to talk about the areas covered (e.g. health, performance, errors) and the metric scopes.",
+              "type": "string"
+            },
+            "method_description": {
+              "description": "Description of how metrics are collected (e.g. HTTP requests, establish a TCP connection and send a command, a specific binary execution). A suggested approach here is to provide a detailed description of how the collector gathers metrics: how many connections are established, exact requests/commands executed, exact endpoints used.",
               "type": "string"
             }
           }
