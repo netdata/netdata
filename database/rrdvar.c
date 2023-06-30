@@ -272,7 +272,7 @@ void rrdvar_store_for_chart(RRDHOST *host, RRDSET *st) {
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rrddim_last_stored_value(rd), RRDVAR_FLAG_NONE);
+        rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->collector.last_stored_value, RRDVAR_FLAG_NONE);
         rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->collector.last_collected_value, RRDVAR_FLAG_NONE);
         rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->collector.last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
     }

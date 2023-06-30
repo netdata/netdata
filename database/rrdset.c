@@ -1453,7 +1453,7 @@ static inline size_t rrdset_done_interpolate(
                     rrddim_push_metrics_v2(rsb, rd, next_store_ut, new_value, dim_storage_flags);
 
                 rrddim_store_metric(rd, next_store_ut, new_value, dim_storage_flags);
-                rrddim_last_stored_value(rd) = new_value;
+                rd->collector.last_stored_value = new_value;
             }
             else {
                 (void) ml_dimension_is_anomalous(rd, current_time_s, 0, false);
@@ -1464,7 +1464,7 @@ static inline size_t rrdset_done_interpolate(
                     rrddim_push_metrics_v2(rsb, rd, next_store_ut, NAN, SN_FLAG_NONE);
 
                 rrddim_store_metric(rd, next_store_ut, NAN, SN_FLAG_NONE);
-                rrddim_last_stored_value(rd) = NAN;
+                rd->collector.last_stored_value = NAN;
             }
 
             stored_entries++;

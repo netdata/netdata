@@ -400,14 +400,14 @@ struct rrddim {
 
         NETDATA_DOUBLE calculated_value;                // the current calculated value, after applying the algorithm - resets to zero after being used
         NETDATA_DOUBLE last_calculated_value;           // the last calculated value processed
+
+        NETDATA_DOUBLE last_stored_value;               // the last value as stored in the database (after interpolation)
     } collector;
 
     // ------------------------------------------------------------------------
 
     struct rrddim_tier tiers[];                     // our tiers of databases
 };
-
-#define rrddim_last_stored_value(rd) (rd)->tiers[0].virtual_point.sum
 
 size_t rrddim_size(void);
 

@@ -1349,7 +1349,7 @@ static inline PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, si
 
     rd->collector.last_collected_value = last_collected_value_str ? str2ll_encoded(last_collected_value_str) : 0;
     rd->collector.last_calculated_value = last_calculated_value_str ? str2ndd_encoded(last_calculated_value_str, NULL) : 0;
-    rrddim_last_stored_value(rd) = last_stored_value_str ? str2ndd_encoded(last_stored_value_str, NULL) : 0.0;
+    rd->collector.last_stored_value = last_stored_value_str ? str2ndd_encoded(last_stored_value_str, NULL) : 0.0;
 
     return PARSER_RC_OK;
 }
@@ -1721,9 +1721,9 @@ static inline PARSER_RC pluginsd_set_v2(char **words, size_t num_words, PARSER *
     rd->collector.last_collected_time.tv_sec = parser->user.v2.end_time;
     rd->collector.last_collected_time.tv_usec = 0;
     rd->collector.last_collected_value = collected_value;
+    rd->collector.last_stored_value = value;
     rd->collector.last_calculated_value = value;
     rd->collector.counter++;
-    rrddim_last_stored_value(rd) = value;
     rrddim_set_updated(rd);
 
     timing_step(TIMING_STEP_SET2_STORE);

@@ -229,7 +229,7 @@ static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st, STRE
         buffer_fast_strcat(wb, " ", 1);
         buffer_print_netdata_double_encoded(wb, encoding, rd->collector.last_calculated_value);
         buffer_fast_strcat(wb, " ", 1);
-        buffer_print_netdata_double_encoded(wb, encoding, rrddim_last_stored_value(rd));
+        buffer_print_netdata_double_encoded(wb, encoding, rd->collector.last_stored_value);
         buffer_fast_strcat(wb, "\n", 1);
     }
     rrddim_foreach_done(rd);
