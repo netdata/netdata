@@ -329,7 +329,7 @@ typedef struct storage_collect_handle {
 // Storage tier data for every dimension
 
 struct rrddim_tier {
-    STORAGE_POINT virtual_point;
+    STORAGE_POINT virtual_point;                    // keep this first for cache line optimization in rrddim
     STORAGE_ENGINE_BACKEND backend;
     uint32_t tier_grouping;
     time_t next_point_end_time_s;
@@ -397,9 +397,6 @@ struct rrddim {
         struct timeval last_collected_time;             // when was this dimension last updated
                                                         // this is actual date time we updated the last_collected_value
                                                         // THIS IS DIFFERENT FROM THE SAME MEMBER OF RRDSET
-
-        NETDATA_DOUBLE calculated_value;                // the current calculated value, after applying the algorithm - resets to zero after being used
-        NETDATA_DOUBLE last_calculated_value;           // the last calculated value processed
     } collector;
 
     // ------------------------------------------------------------------------
@@ -407,7 +404,34 @@ struct rrddim {
     struct rrddim_tier tiers[];                     // our tiers of databases
 };
 
-#define rrddim_last_stored_value(rd) (rd)->tiers[0].virtual_point.sum
+// the number of times we added values to this rrddim
+#define rrddim_collector_counter(rd) (rd)->collector.counter
+
+// the last value we stored on this rrddim
+#define rrddim_collector_last_stored_value(rd) (rd)->tiers[0].virtual_point.sum
+
+// the current calculated value, after applying the algorithm - resets to zero after being used
+#define rrddim_collector_calculated_value(rd) (rd)->tiers[0].virtual_point.min
+
+// the last calculated value processed
+#define rrddim_collector_last_calculated_value(rd) (rd)->tiers[0].virtual_point.max
+
+#define rrddim_collector_last_collected_time_get_ut(rd) (usec_t)((rd)->collector.last_collected_time.tv_sec * USEC_PER_SEC + (rd)->collector.last_collected_time.tv_usec)
+#define rrddim_collector_last_collected_time_get_ms(rd) timeval_msec(&((rd)->collector.last_collected_time))
+#define rrddim_collector_last_collected_time_get_tv_sec(rd) (time_t)((rd)->collector.last_collected_time.tv_sec)
+#define rrddim_collector_last_collected_time_get_tv_usec(rd) (time_t)((rd)->collector.last_collected_time.tv_usec)
+
+#define rrddim_collector_last_collected_time_set_ut(rd, ut) do { \
+    (rd)->collector.last_collected_time.tv_sec = (time_t)((ut) / USEC_PER_SEC); \
+    (rd)->collector.last_collected_time.tv_usec = (ut) % USEC_PER_SEC; \
+} while(0)
+#define rrddim_collector_last_collected_time_set(rd, sec, usec) do { \
+    (rd)->collector.last_collected_time.tv_sec = sec; \
+    (rd)->collector.last_collected_time.tv_usec = usec; \
+} while(0)
+#define rrddim_collector_last_collected_time_set_tv_usec(rd, usec) do { \
+    (rd)->collector.last_collected_time.tv_usec = usec; \
+} while(0)
 
 size_t rrddim_size(void);
 

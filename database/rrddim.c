@@ -48,38 +48,45 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rd->rrdset = st;
 
-    if(rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST))
-        rd->collector.counter = 1;
+    switch(ctr->memory_mode) {
+        case RRD_MEMORY_MODE_DBENGINE:
+            break;
 
-    if(ctr->memory_mode == RRD_MEMORY_MODE_MAP || ctr->memory_mode == RRD_MEMORY_MODE_SAVE) {
-        if(!rrddim_memory_load_or_create_map_save(st, rd, ctr->memory_mode)) {
+        case RRD_MEMORY_MODE_MAP:
+        case RRD_MEMORY_MODE_SAVE:
+            if(rrddim_memory_load_or_create_map_save(st, rd, ctr->memory_mode))
+                break;
+
             info("Failed to use memory mode %s for chart '%s', dimension '%s', falling back to ram", (ctr->memory_mode == RRD_MEMORY_MODE_MAP)?"map":"save", rrdset_name(st), rrddim_name(rd));
             ctr->memory_mode = RRD_MEMORY_MODE_RAM;
-        }
-    }
+            // fall through
 
-    if(ctr->memory_mode == RRD_MEMORY_MODE_RAM) {
-        size_t entries = st->db.entries;
-        if(!entries) entries = 5;
+        case RRD_MEMORY_MODE_RAM: {
+                size_t entries = st->db.entries;
+                if (!entries) entries = 5;
 
-        rd->db.data = netdata_mmap(NULL, entries * sizeof(storage_number), MAP_PRIVATE, 1, false, NULL);
-        if(!rd->db.data) {
+                rd->db.data = netdata_mmap(NULL, entries * sizeof(storage_number), MAP_PRIVATE, 1, false, NULL);
+                if (rd->db.data) {
+                    rd->db.memsize = entries * sizeof(storage_number);
+                    __atomic_add_fetch(&rrddim_db_memory_size, rd->db.memsize, __ATOMIC_RELAXED);
+                    break;
+                }
+            }
+
             info("Failed to use memory mode ram for chart '%s', dimension '%s', falling back to alloc", rrdset_name(st), rrddim_name(rd));
             ctr->memory_mode = RRD_MEMORY_MODE_ALLOC;
-        }
-        else {
-            rd->db.memsize = entries * sizeof(storage_number);
-            __atomic_add_fetch(&rrddim_db_memory_size, rd->db.memsize, __ATOMIC_RELAXED);
-        }
-    }
+            // fall through
 
-    if(ctr->memory_mode == RRD_MEMORY_MODE_ALLOC || ctr->memory_mode == RRD_MEMORY_MODE_NONE) {
-        size_t entries = st->db.entries;
-        if(entries < 5) entries = 5;
+        case RRD_MEMORY_MODE_ALLOC:
+        case RRD_MEMORY_MODE_NONE: {
+                size_t entries = st->db.entries;
+                if(entries < 5) entries = 5;
 
-        rd->db.data = rrddim_alloc_db(entries);
-        rd->db.memsize = entries * sizeof(storage_number);
-        __atomic_add_fetch(&rrddim_db_memory_size, rd->db.memsize, __ATOMIC_RELAXED);
+                rd->db.data = rrddim_alloc_db(entries);
+                rd->db.memsize = entries * sizeof(storage_number);
+                __atomic_add_fetch(&rrddim_db_memory_size, rd->db.memsize, __ATOMIC_RELAXED);
+            }
+            break;
     }
 
     rd->rrd_memory_mode = ctr->memory_mode;
@@ -158,6 +165,9 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
     ml_dimension_new(rd);
+
+    if(!rrddim_collector_counter(rd) && rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST))
+        rrddim_collector_counter(rd) = 1;
 
     ctr->react_action = RRDDIM_REACT_NEW;
 
@@ -565,10 +575,10 @@ inline collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_
 collected_number rrddim_timed_set_by_pointer(RRDSET *st __maybe_unused, RRDDIM *rd, struct timeval collected_time, collected_number value) {
     debug(D_RRD_CALLS, "rrddim_set_by_pointer() for chart %s, dimension %s, value " COLLECTED_NUMBER_FORMAT, rrdset_name(st), rrddim_name(rd), value);
 
-    rd->collector.last_collected_time = collected_time;
+    rrddim_collector_last_collected_time_set(rd, collected_time.tv_sec, collected_time.tv_usec);
     rd->collector.collected_value = value;
     rrddim_set_updated(rd);
-    rd->collector.counter++;
+    rrddim_collector_counter(rd)++;
 
     collected_number v = (value >= 0) ? value : -value;
     if (unlikely(v > rd->collector.collected_value_max))
@@ -644,8 +654,8 @@ void rrddim_memory_file_update(RRDDIM *rd) {
     if(!rd || !rd->db.rd_on_file) return;
     struct rrddim_map_save_v019 *rd_on_file = rd->db.rd_on_file;
 
-    rd_on_file->last_collected_time.tv_sec = rd->collector.last_collected_time.tv_sec;
-    rd_on_file->last_collected_time.tv_usec = rd->collector.last_collected_time.tv_usec;
+    rd_on_file->last_collected_time.tv_sec = rrddim_collector_last_collected_time_get_tv_sec(rd);
+    rd_on_file->last_collected_time.tv_usec = rrddim_collector_last_collected_time_get_tv_usec(rd);
     rd_on_file->last_collected_value = rd->collector.last_collected_value;
 }
 

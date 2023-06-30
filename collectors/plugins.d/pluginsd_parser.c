@@ -1307,9 +1307,8 @@ static inline PARSER_RC pluginsd_replay_set(char **words, size_t num_words, PARS
             }
 
             rrddim_store_metric(rd, parser->user.replay.end_time_ut, value, flags);
-            rd->collector.last_collected_time.tv_sec = parser->user.replay.end_time;
-            rd->collector.last_collected_time.tv_usec = 0;
-            rd->collector.counter++;
+            rrddim_collector_last_collected_time_set(rd, parser->user.replay.end_time, 0);
+            rrddim_collector_counter(rd)++;
         }
         else {
             error_limit_static_global_var(erl, 1, 0);
@@ -1340,16 +1339,13 @@ static inline PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, si
     RRDDIM *rd = pluginsd_acquire_dimension(host, st, dimension, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE);
     if(!rd) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
-    usec_t dim_last_collected_ut = (usec_t)rd->collector.last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->collector.last_collected_time.tv_usec;
+    usec_t dim_last_collected_ut = rrddim_collector_last_collected_time_get_ut(rd);
     usec_t last_collected_ut = last_collected_ut_str ? str2ull_encoded(last_collected_ut_str) : 0;
-    if(last_collected_ut > dim_last_collected_ut) {
-        rd->collector.last_collected_time.tv_sec = (time_t)(last_collected_ut / USEC_PER_SEC);
-        rd->collector.last_collected_time.tv_usec = (last_collected_ut % USEC_PER_SEC);
-    }
+    if(last_collected_ut > dim_last_collected_ut) rrddim_collector_last_collected_time_set_ut(rd, last_collected_ut);
 
     rd->collector.last_collected_value = last_collected_value_str ? str2ll_encoded(last_collected_value_str) : 0;
-    rd->collector.last_calculated_value = last_calculated_value_str ? str2ndd_encoded(last_calculated_value_str, NULL) : 0;
-    rrddim_last_stored_value(rd) = last_stored_value_str ? str2ndd_encoded(last_stored_value_str, NULL) : 0.0;
+    rrddim_collector_last_calculated_value(rd) = last_calculated_value_str ? str2ndd_encoded(last_calculated_value_str, NULL) : 0;
+    rrddim_collector_last_stored_value(rd) = last_stored_value_str ? str2ndd_encoded(last_stored_value_str, NULL) : 0.0;
 
     return PARSER_RC_OK;
 }
@@ -1718,12 +1714,11 @@ static inline PARSER_RC pluginsd_set_v2(char **words, size_t num_words, PARSER *
     // store it
 
     rrddim_store_metric(rd, parser->user.v2.end_time * USEC_PER_SEC, value, flags);
-    rd->collector.last_collected_time.tv_sec = parser->user.v2.end_time;
-    rd->collector.last_collected_time.tv_usec = 0;
+    rrddim_collector_last_collected_time_set(rd, parser->user.v2.end_time, 0);
     rd->collector.last_collected_value = collected_value;
-    rd->collector.last_calculated_value = value;
-    rd->collector.counter++;
-    rrddim_last_stored_value(rd) = value;
+    rrddim_collector_last_calculated_value(rd) = value;
+    rrddim_collector_counter(rd)++;
+    rrddim_collector_last_stored_value(rd) = value;
     rrddim_set_updated(rd);
 
     timing_step(TIMING_STEP_SET2_STORE);
@@ -1778,7 +1773,7 @@ static inline PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        rd->collector.calculated_value = 0;
+                rrddim_collector_calculated_value(rd) = 0;
         rd->collector.collected_value = 0;
         rrddim_clear_updated(rd);
     }

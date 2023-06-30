@@ -234,7 +234,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
     struct prometheus_remote_write_specific_data *connector_specific_data =
         (struct prometheus_remote_write_specific_data *)simple_connector_data->connector_specific_data;
 
-    if (rd->collector.counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
+    if (rrddim_collector_counter(rd) && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
         char name[PROMETHEUS_LABELS_MAX + 1];
         char dimension[PROMETHEUS_ELEMENT_MAX + 1];
         char *suffix = "";
@@ -243,14 +243,14 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
         if (as_collected) {
             // we need as-collected / raw data
 
-            if (unlikely(rd->collector.last_collected_time.tv_sec < instance->after)) {
+            if (unlikely(rrddim_collector_last_collected_time_get_tv_sec(rd) < instance->after)) {
                 debug(
                     D_EXPORTING,
                     "EXPORTING: not sending dimension '%s' of chart '%s' from host '%s', "
                     "its last data collection (%lu) is not within our timeframe (%lu to %lu)",
                     rrddim_id(rd), rrdset_id(rd->rrdset),
                     (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
-                    (unsigned long)rd->collector.last_collected_time.tv_sec,
+                    (unsigned long)rrddim_collector_last_collected_time_get_tv_sec(rd),
                     (unsigned long)instance->after,
                     (unsigned long)instance->before);
                 return 0;
@@ -275,7 +275,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                         connector_specific_data->write_request,
                         name, chart, family, dimension,
                     (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
-                        rd->collector.last_collected_value, timeval_msec(&rd->collector.last_collected_time));
+                        rd->collector.last_collected_value, rrddim_collector_last_collected_time_get_ms(rd));
             } else {
                 // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
                 // we create a metric per dimension
@@ -292,7 +292,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                         connector_specific_data->write_request,
                         name, chart, family, NULL,
                     (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
-                        rd->collector.last_collected_value, timeval_msec(&rd->collector.last_collected_time));
+                        rd->collector.last_collected_value, rrddim_collector_last_collected_time_get_ms(rd));
             }
         } else {
             // we need average or sum of the data

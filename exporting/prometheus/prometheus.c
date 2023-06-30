@@ -546,7 +546,7 @@ static void generate_as_collected_prom_metric(BUFFER *wb,
         buffer_sprintf(wb, COLLECTED_NUMBER_FORMAT, p->rd->collector.last_collected_value);
 
     if (p->output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
-        buffer_sprintf(wb, " %llu\n", timeval_msec(&p->rd->collector.last_collected_time));
+        buffer_sprintf(wb, " %llu\n", rrddim_collector_last_collected_time_get_ms(p->rd));
     else
         buffer_sprintf(wb, "\n");
 }
@@ -675,7 +675,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
             // for each dimension
             RRDDIM *rd;
             rrddim_foreach_read(rd, st) {
-                if (rd->collector.counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
+                if (rrddim_collector_counter(rd) && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
                     char dimension[PROMETHEUS_ELEMENT_MAX + 1];
                     char *suffix = "";
 
@@ -694,7 +694,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                         p.st = st;
                         p.rd = rd;
 
-                        if (unlikely(rd->collector.last_collected_time.tv_sec < instance->after))
+                        if (unlikely(rrddim_collector_last_collected_time_get_tv_sec(rd) < instance->after))
                             continue;
 
                         p.type = "gauge";
