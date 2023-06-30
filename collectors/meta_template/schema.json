@@ -61,9 +61,9 @@
           "description": "Whether this collector supports collecting metrics from multiple (for example, local and remote) instances.",
           "type": "boolean"
         },
-        "permissions": {
+        "additional_permissions": {
           "type": "object",
-          "description": "If there are any notable permission requirements, eg running as root and so on, specify them here. Leave empty otherwise.",
+          "description": "Information about additional permissions other than those required by the Netdata process (e.g. setuid, specific Linux capabilities).",
           "properties": {
             "description": {
               "type": "string"
