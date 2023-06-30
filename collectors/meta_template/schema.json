@@ -72,10 +72,11 @@
         },
         "default_behavior": {
           "type": "object",
+          "description": "",
           "properties": {
             "auto_detection": {
               "type": "object",
-              "description": "Does this collector support auto-detection?\nExample: The collector auto-detects apache web servers running on localhost ports 80, 443, and 8080.",
+              "description": "Information about detecting (discovering) monitored instances with default configuration. Example: tries to connect to Apache running on localhost on ports 80, 443 and 8080.",
               "properties": {
                 "description": {
                   "type": "string"
@@ -84,7 +85,7 @@
             },
             "limits": {
               "type": "object",
-              "description": "Are there any default limits related to this collector?\nExample: The collector is limited on monitoring up to 1000 database tables",
+              "description": "Information about limiting data collection, taking into account the default values of any configuration settings that restrict data collection (including filtering metrics).",
               "properties": {
                 "description": {
                   "type": "string"
@@ -93,7 +94,7 @@
             },
             "performance_impact": {
               "type": "object",
-              "description": "Is there any impact on the monitored application?\nExample: The collector becomes resource heavy once it monitors more than 10k tables per second.",
+              "description": "Information about the known impact on the performance of the monitored application or system.",
               "properties": {
                 "description": {
                   "type": "string"
