@@ -24,7 +24,7 @@ user the first space is already created.
 The other consideration for the number of Spaces you use to organize your Netdata Cloud experience is the size and
 complexity of your organization.
 
-For small team and infrastructures we recommend sticking to a single Space so that you can keep all your nodes and their
+For smaller teams and infrastructures, we recommend sticking to a single Space so that you can keep all your nodes and their
 respective metrics in one place. You can then use
 multiple [War Rooms](#netdata-cloud-war-rooms)
 to further organize your infrastructure monitoring.
@@ -41,14 +41,14 @@ Click on any of the boxes to switch between available Spaces.
 Netdata Cloud abbreviates each Space to the first letter of the name, or the first two letters if the name is two words
 or more. Hover over each icon to see the full name in a tooltip.
 
-To add a new Space click on the green **+** button . Enter the name of the Space and click **Save**.
+To add a new Space click on the green **+** button. Enter the name of the Space and click **Save**.
 
 ![Switch between Spaces](https://github.com/netdata/netdata/assets/70198089/aa0d7a2f-02ec-4c01-a2d9-1f99642f2496)
 )
 
 ### Manage Spaces
 
-Manage your spaces by selecting in a particular space and clicking in the small gear icon in the lower left corner. This
+Manage your spaces by selecting a particular space and clicking on the small gear icon in the lower left corner. This
 will open a side tab in which you can:
 
 1. _Configure this Space*_, in the first tab (**Space**) you can change the name, description or/and some privilege
@@ -112,7 +112,7 @@ We recommend a few strategies for organizing your War Rooms.
 
 ### Add War Rooms
 
-To add new War Rooms to any Space, click on the green plus icon **+** next the **War Rooms** heading on the left (Space's) sidebar.
+To add new War Rooms to any Space, click on the green plus icon **+** next to the **War Rooms** heading on the left (Space's) sidebar.
 
 In the panel, give the War Room a name and description, and choose whether it's public or private.
 Anyone in your Space can join public War Rooms, but can only join private War Rooms with an invitation.
@@ -154,7 +154,7 @@ the [Space](#netdata-cloud-spaces) management area.
 ![image](https://user-images.githubusercontent.com/70198089/227887469-e46bad55-ef5d-441a-83a5-dcc2af038678.png)
 
 
-You will be prompted to enter the email addresses for the users you want to invite to your Space. You can enter any number of email addresses, separated by a comma, to send multiple invitations at once.
+You will be prompted to enter the email addresses of the users you want to invite to your Space. You can enter any number of email addresses, separated by a comma, to send multiple invitations at once.
 
 Next, choose the War Rooms you want to invite these users to. Once logged in, these users are not restricted only to
 these War Rooms. They can be invited to others, or join any that are public.
