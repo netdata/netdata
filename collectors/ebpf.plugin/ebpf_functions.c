@@ -16,7 +16,7 @@
  */
 ebpf_module_t *ebpf_functions_select_module(const char *thread_name) {
     int i;
-    for (i = 0; ebpf_modules[i].thread_name; i++) {
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
         if (strcmp(ebpf_modules[i].thread_name, thread_name) == 0) {
             return &ebpf_modules[i];
         }
