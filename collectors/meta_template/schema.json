@@ -156,7 +156,7 @@
               "properties": {
                 "description": {
                   "type": "string",
-                  "description": "If there is anything specific about this section that needs to be noted mention it here."
+                  "description": "Optional common information about options."
                 },
                 "folding": {
                   "$ref": "#/$defs/_folding"
@@ -188,7 +188,7 @@
                       },
                       "required": {
                         "type": "boolean",
-                        "description": "Indicates whether this option is required or not. The collector will not work if the required option is not set."
+                        "description": "Indicates whether this option is required or not. The option is required if the collector does not work, if it is not set."
                       }
                     }
                   }
@@ -197,10 +197,11 @@
             },
             "examples": {
               "type": "object",
-              "description": "List of configuration examples",
+              "description": "Configuration examples. The more examples the better!",
               "properties": {
                 "list": {
                   "type": "array",
+                  "description": "List of configuration examples.",
                   "items": {
                     "type": "object",
                     "properties": {
@@ -209,21 +210,15 @@
                       },
                       "name": {
                         "type": "string",
-                        "description": "The name of this example"
+                        "description": "Example name."
                       },
                       "description": {
                         "type": "string",
-                        "description": "If needed, provide a description and extra info for the example"
+                        "description": "Example description."
                       },
-                      "configuration_data": {
-                        "type": "object",
-                        "description": "Add the configuration data in yaml format",
-                        "properties": {
-                          "jobs": {
-                            "type": "array",
-                            "description": "An array of configurations as they would appear in the .conf files"
-                          }
-                        }
+                      "config": {
+                        "type": "string",
+                        "description": "Example configuration."
                       }
                     }
                   }
@@ -236,23 +231,25 @@
     },
     "troubleshooting": {
       "type": "object",
+      "description": "Information needed to troubleshoot issues with this collector.",
       "properties": {
         "problems": {
           "type": "object",
-          "description": "List of possible problems that appear often for this collector, about external configuration or other matters.",
+          "description": "Common problems that users face again and again... and their solutions.",
           "properties": {
             "list": {
               "type": "array",
+              "description": "List of common problems.",
               "items": {
                 "type": "object",
                 "properties": {
                   "name": {
                     "type": "string",
-                    "description": "Give a title for the section."
+                    "description": "Problem name."
                   },
                   "description": {
                     "type": "string",
-                    "description": "Give an explanation and solution."
+                    "description": "Explanation of the problem and its solution."
                   }
                 }
               }
@@ -263,21 +260,22 @@
     },
     "related_resources": {
       "type": "object",
+      "description": "TODO",
       "properties": {
         "integrations": {
           "type": "object",
-          "description": "A list of integrations that can be used to better monitor this module",
+          "description": "TODO",
           "properties": {
             "list": {
               "type": "array",
               "items": {
                 "type": "string",
-                "description": "name in format module_name\nExample:\nlist:\n  - apache\n  - weblog"
+                "description": "TODO"
               }
             },
             "overview_text": {
               "type": "string",
-              "description": "The text that will be used for refering to this section from the overview section."
+              "description": "TODO"
             }
           }
         }
@@ -285,16 +283,17 @@
     },
     "info_provided_to_referring_integrations": {
       "type": "object",
-      "description": "Some information that this collector can provide about itself when other integrations mention it. This text will not be rendered in this collector's page.",
+      "description": "Information that this collector can provide about itself when other integrations mention it. This text will not be appear on this collector's page.",
       "properties": {
         "description": {
-          "type": "string"
+          "type": "string",
+          "description": "TODO"
         }
       }
     },
     "alerts": {
       "type": "array",
-      "description": "This section is autogenerated, only user validation is to ensure the \"os\" field is in line with the OS the collector can run on. If this runs on freebsd but the \"os\" field is \"linux\", just delete the list item.",
+      "description": "TODO",
       "items": {
         "type": "object",
         "properties": {
@@ -305,7 +304,8 @@
             "type": "string"
           },
           "metric": {
-            "type": "string"
+            "type": "string",
+            "description": "TODO"
           },
           "info": {
             "type": "string"
@@ -318,32 +318,31 @@
     },
     "metrics": {
       "type": "object",
-      "description": "Autogenerated section,  user input is needed to provide a description for labels if any, and to add the scope's rendered name in each scope.",
+      "description": "TODO",
       "properties": {
         "description": {
-          "type": "string"
+          "type": "string",
+          "description": "TODO"
         },
         "folding": {
           "$ref": "#/$defs/_folding"
         },
         "scopes": {
           "type": "array",
+          "description": "TODO",
           "items": {
             "type": "object",
             "properties": {
               "name": {
                 "type": "string"
               },
-              "rendered_name": {
-                "type": "string",
-                "description": "Please fill this in, it should fit:\n\"Metrics per X\" and \"X Level\" where X is the scope name."
-              },
               "description": {
                 "type": "string",
-                "description": "Description for the scope."
+                "description": "TODO"
               },
               "labels": {
                 "type": "array",
+                "description": "TODO",
                 "items": {
                   "type": "object",
                   "properties": {
@@ -358,6 +357,7 @@
               },
               "metrics": {
                 "type": "array",
+                "description": "TODO",
                 "items": {
                   "type": "object",
                   "properties": {
