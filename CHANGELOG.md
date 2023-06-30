@@ -6,8 +6,13 @@
 
 **Merged pull requests:**
 
+- use stat\(\) instead of lstat\(\) [\#15287](https://github.com/netdata/netdata/pull/15287) ([ktsaou](https://github.com/ktsaou))
+- Only try to enable \_FORTIFY\_SOURCE if the user has not disabled optimizations [\#15284](https://github.com/netdata/netdata/pull/15284) ([Ferroin](https://github.com/Ferroin))
+- Fixed mistype for 'send automatic labels' Prometheus option [\#15282](https://github.com/netdata/netdata/pull/15282) ([k0ste](https://github.com/k0ste))
+- Optimizations part 2 [\#15280](https://github.com/netdata/netdata/pull/15280) ([ktsaou](https://github.com/ktsaou))
 - Revert "Optimizations Part 2" [\#15279](https://github.com/netdata/netdata/pull/15279) ([ktsaou](https://github.com/ktsaou))
 - exporting: change priority to synchronous when calculating value [\#15276](https://github.com/netdata/netdata/pull/15276) ([ilyam8](https://github.com/ilyam8))
+- Misc alert fixes [\#15274](https://github.com/netdata/netdata/pull/15274) ([MrZammler](https://github.com/MrZammler))
 - Small readme improvements [\#15270](https://github.com/netdata/netdata/pull/15270) ([andrewm4894](https://github.com/andrewm4894))
 - Optimizations Part 2 [\#15267](https://github.com/netdata/netdata/pull/15267) ([ktsaou](https://github.com/ktsaou))
 - fix tc.plugin charts labels [\#15262](https://github.com/netdata/netdata/pull/15262) ([ilyam8](https://github.com/ilyam8))
@@ -48,6 +53,7 @@
 - Fix issues in sync thread \(eBPF plugin\) [\#15174](https://github.com/netdata/netdata/pull/15174) ([thiagoftsm](https://github.com/thiagoftsm))
 - /api/v2/nodes and streaming function [\#15168](https://github.com/netdata/netdata/pull/15168) ([ktsaou](https://github.com/ktsaou))
 - Use a single health log table [\#15157](https://github.com/netdata/netdata/pull/15157) ([MrZammler](https://github.com/MrZammler))
+- Add configuration file for netdata-updater.sh. [\#15149](https://github.com/netdata/netdata/pull/15149) ([Ferroin](https://github.com/Ferroin))
 - Redirect to index.html when a file is not found by web server [\#15143](https://github.com/netdata/netdata/pull/15143) ([MrZammler](https://github.com/MrZammler))
 - Add hardening options to CFLAGS by default if they are available. [\#15087](https://github.com/netdata/netdata/pull/15087) ([Ferroin](https://github.com/Ferroin))
 - Consistently start the agent as root and rely on it to drop privileges properly. [\#14890](https://github.com/netdata/netdata/pull/14890) ([Ferroin](https://github.com/Ferroin))
@@ -397,11 +403,6 @@
 - rename glossary [\#14622](https://github.com/netdata/netdata/pull/14622) ([cakrit](https://github.com/cakrit))
 - Reorg learn 0227 [\#14621](https://github.com/netdata/netdata/pull/14621) ([cakrit](https://github.com/cakrit))
 - Assorted improvements to OpenRC support. [\#14620](https://github.com/netdata/netdata/pull/14620) ([Ferroin](https://github.com/Ferroin))
-- bump go.d.plugin v0.51.2 [\#14618](https://github.com/netdata/netdata/pull/14618) ([ilyam8](https://github.com/ilyam8))
-- fix python version check to work for 3.10 and above [\#14616](https://github.com/netdata/netdata/pull/14616) ([andrewm4894](https://github.com/andrewm4894))
-- fix relative link to anonymous statistics [\#14614](https://github.com/netdata/netdata/pull/14614) ([cakrit](https://github.com/cakrit))
-- fix proxy links in netdata security [\#14613](https://github.com/netdata/netdata/pull/14613) ([cakrit](https://github.com/cakrit))
-- fix links from removed docs [\#14612](https://github.com/netdata/netdata/pull/14612) ([cakrit](https://github.com/cakrit))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
