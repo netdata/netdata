@@ -14,7 +14,72 @@
 
 #define SEVERAL_LOG_RECORDS "\
 127.0.0.1 - - [30/Jun/2022:16:43:51 +0300] \"GET / HTTP/1.0\" 200 11192 \"-\" \"ApacheBench/2.3\"\n\
-192.168.2.1 - - [30/Jun/2022:16:43:51 +0300] \"PUT / HTTP/1.0\" 400 11192 \"-\" \"ApacheBench/2.3\"\n"
+192.168.2.1 - - [30/Jun/2022:16:43:51 +0300] \"PUT / HTTP/1.0\" 400 11192 \"-\" \"ApacheBench/2.3\"\n\
+255.91.204.202 - mann1475 [30/Jun/2023:21:05:09 +0000] \"POST /vertical/turn-key/engineer/e-enable HTTP/1.0\" 401 11411\n\
+91.126.60.234 - ritchie4302 [30/Jun/2023:21:05:09 +0000] \"PATCH /empower/interfaces/deploy HTTP/2.0\" 404 29063\n\
+120.134.242.160 - runte5364 [30/Jun/2023:21:05:09 +0000] \"GET /visualize/enterprise/optimize/embrace HTTP/1.0\" 400 10637\n\
+61.134.57.25 - - [30/Jun/2023:21:05:09 +0000] \"HEAD /metrics/optimize/bandwidth HTTP/1.1\" 200 26713\n\
+18.90.118.50 - - [30/Jun/2023:21:05:09 +0000] \"PATCH /methodologies/extend HTTP/2.0\" 205 15708\n\
+21.174.251.223 - zulauf8852 [30/Jun/2023:21:05:09 +0000] \"POST /proactive HTTP/2.0\" 100 9456\n\
+20.217.190.46 - - [30/Jun/2023:21:05:09 +0000] \"GET /mesh/frictionless HTTP/1.1\" 301 3153\n\
+130.43.250.80 - hintz5738 [30/Jun/2023:21:05:09 +0000] \"PATCH /e-markets/supply-chains/mindshare HTTP/2.0\" 401 13039\n\
+222.36.95.121 - pouros3514 [30/Jun/2023:21:05:09 +0000] \"DELETE /e-commerce/scale/customized/best-of-breed HTTP/1.0\" 406 8304\n\
+133.117.9.29 - hoeger7673 [30/Jun/2023:21:05:09 +0000] \"PUT /extensible/maximize/visualize/bricks-and-clicks HTTP/1.0\" 403 17067\n\
+65.145.39.136 - heathcote3368 [30/Jun/2023:21:05:09 +0000] \"DELETE /technologies/iterate/viral HTTP/1.1\" 501 29982\n\
+153.132.199.122 - murray8217 [30/Jun/2023:21:05:09 +0000] \"PUT /orchestrate/visionary/visualize HTTP/1.1\" 500 12705\n\
+140.149.178.196 - hickle8613 [30/Jun/2023:21:05:09 +0000] \"PATCH /drive/front-end/infomediaries/maximize HTTP/1.1\" 406 20179\n\
+237.31.189.207 - - [30/Jun/2023:21:05:09 +0000] \"GET /bleeding-edge/recontextualize HTTP/1.1\" 406 24815\n\
+210.217.232.107 - - [30/Jun/2023:21:05:09 +0000] \"POST /redefine/next-generation/relationships/intuitive HTTP/2.0\" 205 14028\n\
+121.2.189.119 - marvin5528 [30/Jun/2023:21:05:09 +0000] \"PUT /sexy/innovative HTTP/2.0\" 204 10689\n\
+120.13.121.164 - jakubowski1027 [30/Jun/2023:21:05:09 +0000] \"PUT /sexy/initiatives/morph/eyeballs HTTP/1.0\" 502 22287\n\
+28.229.107.175 - wilderman8830 [30/Jun/2023:21:05:09 +0000] \"PATCH /visionary/best-of-breed HTTP/1.1\" 503 6010\n\
+210.147.186.50 - - [30/Jun/2023:21:05:09 +0000] \"PUT /paradigms HTTP/2.0\" 501 18054\n\
+185.157.236.127 - - [30/Jun/2023:21:05:09 +0000] \"GET /maximize HTTP/1.0\" 400 13650\n\
+236.90.19.165 - - [30/Jun/2023:21:23:34 +0000] \"GET /next-generation/user-centric/24%2f365 HTTP/1.0\" 400 5212\n\
+233.182.111.100 - torphy3512 [30/Jun/2023:21:23:34 +0000] \"PUT /seamless/incentivize HTTP/1.0\" 304 27750\n\
+80.185.129.193 - - [30/Jun/2023:21:23:34 +0000] \"HEAD /strategic HTTP/1.1\" 502 6146\n\
+182.145.92.52 - - [30/Jun/2023:21:23:34 +0000] \"PUT /dot-com/grow/networks HTTP/1.0\" 301 1763\n\
+46.14.122.16 - - [30/Jun/2023:21:23:34 +0000] \"HEAD /deliverables HTTP/1.0\" 301 7608\n\
+162.111.143.158 - bruen3883 [30/Jun/2023:21:23:34 +0000] \"POST /extensible HTTP/2.0\" 403 22752\n\
+201.13.111.255 - hilpert8768 [30/Jun/2023:21:23:34 +0000] \"PATCH /applications/engage/frictionless/content HTTP/1.0\" 406 24866\n\
+76.90.243.15 - - [30/Jun/2023:21:23:34 +0000] \"PATCH /24%2f7/seamless/target/enable HTTP/1.1\" 503 8176\n\
+187.79.114.48 - - [30/Jun/2023:21:23:34 +0000] \"GET /synergistic HTTP/1.0\" 503 14251\n\
+59.52.178.62 - kirlin3704 [30/Jun/2023:21:23:34 +0000] \"POST /web-readiness/grow/evolve HTTP/1.0\" 501 13305\n\
+27.46.78.167 - - [30/Jun/2023:21:23:34 +0000] \"PATCH /interfaces/schemas HTTP/2.0\" 100 4860\n\
+191.9.15.43 - goodwin7310 [30/Jun/2023:21:23:34 +0000] \"POST /engage/innovate/web-readiness/roi HTTP/2.0\" 404 4225\n\
+195.153.126.148 - klein8350 [30/Jun/2023:21:23:34 +0000] \"DELETE /killer/synthesize HTTP/1.0\" 204 15134\n\
+162.207.64.184 - mayert4426 [30/Jun/2023:21:23:34 +0000] \"HEAD /intuitive/vertical/incentivize HTTP/1.0\" 204 23666\n\
+185.96.7.205 - - [30/Jun/2023:21:23:34 +0000] \"DELETE /communities/deliver/user-centric HTTP/1.0\" 416 18210\n\
+187.180.105.55 - - [30/Jun/2023:21:23:34 +0000] \"POST /customized HTTP/2.0\" 200 1396\n\
+216.82.243.54 - kunze7200 [30/Jun/2023:21:23:34 +0000] \"PUT /e-tailers/evolve/leverage/engage HTTP/2.0\" 504 1665\n\
+170.128.69.228 - - [30/Jun/2023:21:23:34 +0000] \"DELETE /matrix/open-source/proactive HTTP/1.0\" 301 18326\n\
+253.200.84.66 - steuber5220 [30/Jun/2023:21:23:34 +0000] \"POST /benchmark/experiences HTTP/1.1\" 504 18944\n\
+28.240.40.161 - - [30/Jun/2023:21:23:34 +0000] \"PATCH /initiatives HTTP/1.0\" 500 6500\n\
+134.163.236.75 - - [30/Jun/2023:21:23:34 +0000] \"HEAD /platforms/recontextualize HTTP/1.0\" 203 22188\n\
+241.64.230.66 - - [30/Jun/2023:21:23:34 +0000] \"GET /cutting-edge/methodologies/b2c/cross-media HTTP/1.1\" 403 20698\n\
+210.216.183.157 - okuneva6218 [30/Jun/2023:21:23:34 +0000] \"POST /generate/incentivize HTTP/2.0\" 403 25900\n\
+164.219.134.242 - - [30/Jun/2023:21:23:34 +0000] \"HEAD /efficient/killer/whiteboard HTTP/2.0\" 501 22081\n\
+173.156.54.99 - harvey6165 [30/Jun/2023:21:23:34 +0000] \"HEAD /dynamic/cutting-edge/sexy/user-centric HTTP/2.0\" 200 2995\n\
+215.242.74.14 - - [30/Jun/2023:21:23:34 +0000] \"PUT /roi HTTP/1.0\" 204 9674\n\
+133.77.49.187 - lockman3141 [30/Jun/2023:21:23:34 +0000] \"PUT /mindshare/transition HTTP/2.0\" 503 2726\n\
+159.77.190.255 - - [30/Jun/2023:21:23:34 +0000] \"DELETE /world-class/bricks-and-clicks HTTP/1.1\" 501 21712\n\
+65.6.237.113 - - [30/Jun/2023:21:23:34 +0000] \"PATCH /e-enable HTTP/2.0\" 405 11865\n\
+194.76.211.16 - champlin6280 [30/Jun/2023:21:23:34 +0000] \"PUT /applications/redefine/eyeballs/mindshare HTTP/1.0\" 302 27679\n\
+96.206.219.202 - - [30/Jun/2023:21:23:34 +0000] \"PUT /solutions/mindshare/vortals/transition HTTP/1.0\" 403 7385\n\
+255.80.116.201 - hintz8162 [30/Jun/2023:21:23:34 +0000] \"POST /frictionless/e-commerce HTTP/1.0\" 302 9235\n\
+89.66.165.183 - smith2655 [30/Jun/2023:21:23:34 +0000] \"HEAD /markets/synergize HTTP/2.0\" 501 28055\n\
+39.210.168.14 - - [30/Jun/2023:21:23:34 +0000] \"GET /integrate/killer/end-to-end/infrastructures HTTP/1.0\" 302 11311\n\
+173.99.112.210 - - [30/Jun/2023:21:23:34 +0000] \"GET /interfaces HTTP/2.0\" 503 1471\n\
+108.4.157.6 - morissette1161 [30/Jun/2023:21:23:34 +0000] \"POST /mesh/convergence HTTP/1.1\" 403 18708\n\
+174.160.107.162 - - [30/Jun/2023:21:23:34 +0000] \"POST /vortals/monetize/utilize/synergistic HTTP/1.1\" 302 13252\n\
+188.8.105.56 - beatty6880 [30/Jun/2023:21:23:34 +0000] \"POST /web+services/innovate/generate/leverage HTTP/1.1\" 301 29856\n\
+115.179.64.255 - - [30/Jun/2023:21:23:34 +0000] \"PATCH /transform/transparent/b2c/holistic HTTP/1.1\" 406 10208\n\
+48.104.215.32 - - [30/Jun/2023:21:23:34 +0000] \"DELETE /drive/clicks-and-mortar HTTP/1.0\" 501 13752\n\
+75.212.115.12 - pfannerstill5140 [30/Jun/2023:21:23:34 +0000] \"PATCH /leading-edge/mesh/methodologies HTTP/1.0\" 503 4946\n\
+52.75.2.117 - osinski2030 [30/Jun/2023:21:23:34 +0000] \"PUT /incentivize/recontextualize HTTP/1.1\" 301 8785\n\
+82.39.169.93 - streich5722 [30/Jun/2023:21:23:34 +0000] \"GET /action-items/leading-edge/reinvent/maximize HTTP/1.1\" 500 1228\n\
+131.128.33.109 - turcotte6735 [30/Jun/2023:21:23:34 +0000] \"PUT /distributed/strategize HTTP/1.1\" 401 16471\n\
+"
 
 static int test_compression_decompression() {
     int errors = 0;
