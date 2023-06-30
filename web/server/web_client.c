@@ -56,6 +56,7 @@ static inline void web_client_enable_wait_from_ssl(struct web_client *w) {
 static inline int web_client_uncrock_socket(struct web_client *w __maybe_unused) {
 #ifdef TCP_CORK
     if(likely(w->tcp_cork && w->ofd != -1)) {
+        w->tcp_cork = false;
         if(unlikely(setsockopt(w->ofd, IPPROTO_TCP, TCP_CORK, (char *) &w->tcp_cork, sizeof(int)) != 0)) {
             error("%llu: failed to disable TCP_CORK on socket.", w->id);
             w->tcp_cork = true;
