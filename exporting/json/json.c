@@ -200,9 +200,9 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
         rrdset_units(st),
         rrddim_id(rd),
         rrddim_name(rd),
-        rd->last_collected_value,
+        rd->collector.last_collected_value,
 
-        (unsigned long long)rd->last_collected_time.tv_sec);
+        (unsigned long long)rd->collector.last_collected_time.tv_sec);
 
     if (instance->config.type != EXPORTING_CONNECTOR_TYPE_JSON_HTTP) {
         buffer_strcat(instance->buffer, "\n");

@@ -222,14 +222,14 @@ static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st, STRE
                            sizeof(PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE) - 1 + 2);
         buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
         buffer_fast_strcat(wb, "' ", 2);
-        buffer_print_uint64_encoded(wb, encoding, (usec_t) rd->last_collected_time.tv_sec * USEC_PER_SEC +
-                                    (usec_t) rd->last_collected_time.tv_usec);
+        buffer_print_uint64_encoded(wb, encoding, (usec_t) rd->collector.last_collected_time.tv_sec * USEC_PER_SEC +
+                                    (usec_t) rd->collector.last_collected_time.tv_usec);
         buffer_fast_strcat(wb, " ", 1);
-        buffer_print_int64_encoded(wb, encoding, rd->last_collected_value);
+        buffer_print_int64_encoded(wb, encoding, rd->collector.last_collected_value);
         buffer_fast_strcat(wb, " ", 1);
-        buffer_print_netdata_double_encoded(wb, encoding, rd->last_calculated_value);
+        buffer_print_netdata_double_encoded(wb, encoding, rd->collector.last_calculated_value);
         buffer_fast_strcat(wb, " ", 1);
-        buffer_print_netdata_double_encoded(wb, encoding, rd->last_stored_value);
+        buffer_print_netdata_double_encoded(wb, encoding, rd->collector.last_stored_value);
         buffer_fast_strcat(wb, "\n", 1);
     }
     rrddim_foreach_done(rd);
