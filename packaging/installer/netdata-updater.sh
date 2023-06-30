@@ -749,11 +749,11 @@ update_binpkg() {
   case "${DISTRO_COMPAT_NAME}" in
     debian|ubuntu)
       if [ "${INTERACTIVE}" = "0" ]; then
-        upgrade_cmd='-o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" --only-upgrade install'
+        upgrade_subcmd="-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold --only-upgrade install"
         interactive_opts="-y"
         env="DEBIAN_FRONTEND=noninteractive"
       else
-        upgrade_cmd="--only-upgrade install"
+        upgrade_subcmd="--only-upgrade install"
       fi
       pm_cmd="apt-get"
       repo_subcmd="update"
@@ -772,7 +772,7 @@ update_binpkg() {
       else
         pm_cmd="yum"
       fi
-      upgrade_cmd="upgrade"
+      upgrade_subcmd="upgrade"
       pkg_install_opts="${interactive_opts}"
       repo_update_opts="${interactive_opts}"
       pkg_installed_check="rpm -q"
@@ -780,9 +780,9 @@ update_binpkg() {
       ;;
     opensuse)
       if [ "${INTERACTIVE}" = "0" ]; then
-        upgrade_cmd="--non-interactive update"
+        upgrade_subcmd="--non-interactive update"
       else
-        upgrade_cmd="update"
+        upgrade_subcmd="update"
       fi
       pm_cmd="zypper"
       repo_subcmd="--gpg-auto-import-keys refresh"
@@ -805,7 +805,7 @@ update_binpkg() {
   for repopkg in netdata-repo netdata-repo-edge; do
     if ${pkg_installed_check} ${repopkg} > /dev/null 2>&1; then
       # shellcheck disable=SC2086
-      env ${env} ${pm_cmd} ${upgrade_cmd} ${pkg_install_opts} ${repopkg} >&3 2>&3 || fatal "Failed to update Netdata repository config." U000D
+      env ${env} ${pm_cmd} ${upgrade_subcmd} ${pkg_install_opts} ${repopkg} >&3 2>&3 || fatal "Failed to update Netdata repository config." U000D
       # shellcheck disable=SC2086
       if [ -n "${repo_subcmd}" ]; then
         env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts} >&3 2>&3 || fatal "Failed to update repository metadata." U000E
@@ -814,7 +814,7 @@ update_binpkg() {
   done
 
   # shellcheck disable=SC2086
-  env ${env} ${pm_cmd} ${upgrade_cmd} ${pkg_install_opts} netdata >&3 2>&3 || fatal "Failed to update Netdata package." U000F
+  env ${env} ${pm_cmd} ${upgrade_subcmd} ${pkg_install_opts} netdata >&3 2>&3 || fatal "Failed to update Netdata package." U000F
   [ -n "${logfile}" ] && rm "${logfile}" && logfile=
   return 0
 }
