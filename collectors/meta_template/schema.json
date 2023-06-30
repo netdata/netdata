@@ -1,18 +1,19 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
+  "title": "Netdata collector single module meta",
   "properties": {
-    "module_name": {
-      "type": "string",
-      "description": "This is the module name of the collector, for example \"apache\""
-    },
-    "title_name": {
-      "type": "string",
-      "description": "This is the module's name in its rendered form, so for \"postgresql\" it would be \"PostgreSQL\""
-    },
     "plugin_name": {
       "type": "string",
-      "description": "This is the plugin name of the collector, for example for Apache it would be \"go.d.plugin\"."
+      "description": "Plugin name (e.g. apps.plugin, proc.plugin, go.d.plugin). It must match the name of the binary in the plugins.d directory."
+    },
+    "module_name": {
+      "type": "string",
+      "description": "Module name (e.g. apache, /proc/stat, httpcheck). It usually has the same name as the module configuration file (external plugin) or the section name in netdata.conf (internal plugin)."
+    },
+    "monitored_instance": {
+      "type": "string",
+      "description": "Metric source name (e.g. VerneMQ, Network interfaces, Files and directories). Use official spelling for applications."
     },
     "virtual_integrations": {
       "type": "object",
@@ -352,11 +353,14 @@
               "labels": {
                 "type": "array",
                 "items": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "description": {
-                    "type": "string"
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    }
                   }
                 }
               },
