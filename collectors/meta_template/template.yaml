@@ -1,13 +1,18 @@
-module_name: ""
-title_name: ""
 plugin_name: ""
-virtual_integrations:
-  list: []
+module_name: ""
+monitored_instance:
+  name: ""
+  link: ""
+alternative_monitored_instances:
+  - name: ""
+    link: ""
 overview:
   data_collection:
-    description: ""
+    metrics_description: ""
+    method_description: ""
   supported_platforms:
-    list: []
+    include: []
+    exclude: []
   multi-instance: true
   permissions:
     description: ""

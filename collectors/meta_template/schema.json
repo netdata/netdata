@@ -12,29 +12,12 @@
       "description": "Module name (e.g. apache, /proc/stat, httpcheck). It usually has the same name as the module configuration file (external plugin) or the section name in netdata.conf (internal plugin)."
     },
     "monitored_instance": {
-      "type": "object",
-      "description": "Information about the monitored instance (metrics source).",
-      "properties": {
-        "name": {
-          "description": "Metrics source name (e.g. VerneMQ, Network interfaces, Files and directories). Use official spelling for applications.",
-          "type": "string"
-        },
-        "link": {
-          "description": "Link to the monitored instance official website if any.",
-          "type": "string"
-        }
-      }
+      "$ref": "#/$defs/_monitored_instance"
     },
-    "virtual_integrations": {
-      "type": "object",
-      "description": "Give a list of names for the virtual integrations that apply for this file, and give the name in the format [integration](link to integration's site)",
-      "properties": {
-        "list": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
+    "alternative_monitored_instances": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/_monitored_instance"
       }
     },
     "overview": {
@@ -75,7 +58,7 @@
           }
         },
         "multi-instance": {
-          "description": "give a boolean value, true / false",
+          "description": "Whether this collector supports collecting metrics from multiple (for example, local and remote) instances.",
           "type": "boolean"
         },
         "permissions": {
@@ -420,6 +403,22 @@
               }
             }
           }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "_monitored_instance": {
+      "type": "object",
+      "description": "Information about the monitored instance (metrics source).",
+      "properties": {
+        "name": {
+          "description": "Metrics source name (e.g. VerneMQ, Network interfaces, Files and directories). Use official spelling for applications.",
+          "type": "string"
+        },
+        "link": {
+          "description": "Link to the monitored instance official website if any.",
+          "type": "string"
         }
       }
     }
