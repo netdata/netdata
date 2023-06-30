@@ -131,7 +131,7 @@ static inline bool receiver_read_compressed(struct receiver_state *r) {
             r->reader.read_buffer[r->reader.read_len] = '\0';
         }
         else
-            internal_fatal(true, "The line to read is too big! Already have %d bytes in read_buffer.", r->reader.read_len);
+            internal_fatal(true, "The line to read is too big! Already have %zd bytes in read_buffer.", r->reader.read_len);
 
         return true;
     }
@@ -141,7 +141,7 @@ static inline bool receiver_read_compressed(struct receiver_state *r) {
 
     if(unlikely(r->reader.read_len + r->decompressor.signature_size > sizeof(r->reader.read_buffer) - 1)) {
         internal_error(true, "The last incomplete line does not leave enough room for the next compression header! "
-                             "Already have %d bytes in read_buffer.", r->reader.read_len);
+                             "Already have %zd bytes in read_buffer.", r->reader.read_len);
         return false;
     }
 
