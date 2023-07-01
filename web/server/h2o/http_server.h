@@ -3,7 +3,7 @@
 #ifndef HTTP_SERVER_H
 #define HTTP_SERVER_H
 
-void *httpd_main(void * ptr);
+void *h2o_main(void * ptr);
 
 int httpd_is_enabled();
 

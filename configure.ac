@@ -208,10 +208,10 @@ AC_ARG_ENABLE(
     [aclk_ssl_debug="no"]
 )
 AC_ARG_ENABLE(
-    [httpd],
-    [AS_HELP_STRING([--disable-httpd], [Disable webserver (h2o based) @<:@default autodetect@:>@])],
+    [h2o],
+    [AS_HELP_STRING([--disable-h2o], [Disable H2O webserver @<:@default autodetect@:>@])],
     ,
-    [enable_httpd="detect"]
+    [enable_h2o="detect"]
 )
 
 # -----------------------------------------------------------------------------
@@ -864,36 +864,36 @@ AC_MSG_RESULT([${with_libcap}])
 AM_CONDITIONAL([ENABLE_CAPABILITY], [test "${with_libcap}" = "yes"])
 
 # -----------------------------------------------------------------------------
-# HTTPD and h2o related
+# H2O related
 
-can_build_httpd="no"
-if test "${enable_httpd}" != "no"; then
-    can_build_httpd="yes"
-    AC_MSG_CHECKING([can build HTTPD])
+can_build_h2o="no"
+if test "${enable_h2o}" != "no"; then
+    can_build_h2o="yes"
+    AC_MSG_CHECKING([can build H2O])
     if test -z "${UV_LIBS}"; then
-        can_build_httpd="no"
+        can_build_h2o="no"
     fi
     if test -n "${SSL_LIBS}"; then
         OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
         OPTIONAL_SSL_LIBS="${SSL_LIBS}"
     else
-        can_build_httpd="no"
+        can_build_h2o="no"
     fi
     if test "${with_zlib}" != "yes"; then
-        can_build_httpd="no"
+        can_build_h2o="no"
     fi
-    AC_MSG_RESULT([${can_build_httpd}])
+    AC_MSG_RESULT([${can_build_h2o}])
 
-    if test "${can_build_httpd}" = "no" -a "${enable_httpd}" = "yes"; then
-        AC_MSG_ERROR([HTTPD was requested but it cannot be built])
+    if test "${can_build_h2o}" = "no" -a "${enable_h2o}" = "yes"; then
+        AC_MSG_ERROR([H2O was requested but it cannot be built])
     fi
 
-    if test "${can_build_httpd}" = "yes"; then
-        AC_DEFINE([ENABLE_HTTPD], [1], [HTTPD (h2o based web server)])
-        HTTPD_CFLAGS="-I\$(abs_top_srcdir)/httpd/h2o/include -I\$(abs_top_srcdir)/httpd/h2o/deps/picotls/include -I\$(abs_top_srcdir)/httpd/h2o/deps/quicly/include -DH2O_USE_LIBUV=0"
+    if test "${can_build_h2o}" = "yes"; then
+        AC_DEFINE([ENABLE_H2O], [1], [H2O web server])
+        H2O_CFLAGS="-I\$(abs_top_srcdir)/web/server/h2o/libh2o/include -I\$(abs_top_srcdir)/web/server/h2o/libh2o/deps/picotls/include -I\$(abs_top_srcdir)/web/server/h2o/libh2o/deps/quicly/include -DH2O_USE_LIBUV=0"
     fi
 fi
-AM_CONDITIONAL([ENABLE_HTTPD], [test "${can_build_httpd}" = "yes"])
+AM_CONDITIONAL([ENABLE_H2O], [test "${can_build_h2o}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # ACLK
@@ -1800,7 +1800,7 @@ CFLAGS="${originalCFLAGS} ${OPTIONAL_LTO_CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${O
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
     ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PUBSUB_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} \
     ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_YAML_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${JUDY_CFLAGS} \
-    ${OPTIONAL_ACLK_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_OS_DEP_CFLAGS} ${HTTPD_CFLAGS} ${HARDENING_CFLAGS}"
+    ${OPTIONAL_ACLK_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_OS_DEP_CFLAGS} ${H2O_CFLAGS} ${HARDENING_CFLAGS}"
 
 CXXFLAGS="${CFLAGS} ${OPTIONAL_KINESIS_CXXFLAGS} ${CPP_STD_FLAG}"
 

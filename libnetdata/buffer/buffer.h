@@ -6,7 +6,7 @@
 #include "../string/utf8.h"
 #include "../libnetdata.h"
 
-#ifdef ENABLE_HTTPD
+#ifdef ENABLE_H2O
 #include "h2o/memory.h"
 #endif
 
@@ -133,7 +133,7 @@ void buffer_char_replace(BUFFER *wb, char from, char to);
 
 void buffer_print_sn_flags(BUFFER *wb, SN_FLAGS flags, bool send_anomaly_bit);
 
-#ifdef ENABLE_HTTPD
+#ifdef ENABLE_H2O
 h2o_iovec_t buffer_to_h2o_iovec(BUFFER *wb);
 #endif
 

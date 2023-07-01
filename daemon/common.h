@@ -42,8 +42,8 @@
 #include "web/server/web_server.h"
 
 // the new h2o based netdata webserver
-#ifdef ENABLE_HTTPD
-#include "httpd/http_server.h"
+#ifdef ENABLE_H2O
+#include "web/server/h2o/http_server.h"
 #endif
 
 // streaming metrics between netdata servers

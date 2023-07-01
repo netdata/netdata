@@ -523,7 +523,7 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #ifdef HAVE_LIBDATACHANNEL
     bitmap256_set_bit(&BUILD_INFO, BIB_WEBRTC, true);
 #endif
-#ifdef ENABLE_HTTPD
+#ifdef ENABLE_H2O
     bitmap256_set_bit(&BUILD_INFO, BIB_HTTPD_H2O, true);
 #endif
 #ifdef ENABLE_HTTPS

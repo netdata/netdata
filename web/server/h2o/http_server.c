@@ -284,7 +284,7 @@ static int hdl_netdata_conf(h2o_handler_t *self, h2o_req_t *req)
 
 #define POLL_INTERVAL 100
 
-void *httpd_main(void *ptr) {
+void *h2o_main(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
     h2o_pathconf_t *pathconf;
