@@ -173,12 +173,11 @@ const web_log_line_field_t parse_config_expected[][15] = {
     /* [8]  */ {VHOST_WITH_PORT, REQ_CLIENT, CUSTOM, CUSTOM, TIME, TIME, REQ      , RESP_CODE, RESP_SIZE, -1     ,     -1, -1, -1, -1, -1}, /* Apache csvVhostCommon 1 */
     /* [9]  */ {VHOST_WITH_PORT, REQ_CLIENT, CUSTOM, CUSTOM, TIME, TIME, REQ      , RESP_CODE, RESP_SIZE, -1     ,     -1, -1, -1, -1, -1}, /* Apache csvVhostCommon 2 */
     /* [10] */ {REQ_CLIENT     , CUSTOM    , CUSTOM, TIME  , TIME, REQ,  RESP_CODE, RESP_SIZE, CUSTOM   , CUSTOM ,     -1, -1, -1, -1, -1}, /* Nginx csvCombined */
-}; 
-int *parse_config_expected_num_fields = NULL;
-const char parse_config_delim = ' ';
+};
+static const char parse_config_delim = ' ';
+static int *parse_config_expected_num_fields = NULL;
 
-static int test_auto_detect_web_log_parser_config() {
-    int errors = 0;
+static void setup_parse_config_expected_num_fields() {
     fprintf(stderr, "%s():\n", __FUNCTION__);
 
     for(int i = 0; i < (int) (sizeof(parse_configs_to_test) / sizeof(parse_configs_to_test[0])); i++){
@@ -188,6 +187,13 @@ static int test_auto_detect_web_log_parser_config() {
             parse_config_expected_num_fields[i]++;
         }
     }
+
+    fprintf(stderr, "OK\n");
+}
+
+static int test_auto_detect_web_log_parser_config() {
+    int errors = 0;
+    fprintf(stderr, "%s():\n", __FUNCTION__);
 
     for(int i = 0; i < (int) (sizeof(parse_configs_to_test) / sizeof(parse_configs_to_test[0])); i++){
         size_t line_sz = strlen(parse_configs_to_test[i]) + 1;
@@ -262,14 +268,6 @@ static int test_parse_web_log_line(){
    
     wblp_conf->delimiter = parse_config_delim;
     wblp_conf->verify_parsed_logs = 1;
-
-    for(int i = 0; i < (int) (sizeof(parse_configs_to_test) / sizeof(parse_configs_to_test[0])); i++){
-        parse_config_expected_num_fields = reallocz(parse_config_expected_num_fields, (i + 1) * sizeof(int));
-        parse_config_expected_num_fields[i] = 0;
-        for(int j = 0; (int) parse_config_expected[i][j] != -1; j++){
-            parse_config_expected_num_fields[i]++;
-        }
-    }
 
     for(int i = 0; i < (int) (sizeof(parse_configs_to_test) / sizeof(parse_configs_to_test[0])); i++){
         wblp_conf->num_fields = parse_config_expected_num_fields[i];
@@ -471,6 +469,8 @@ int test_logs_management(int argc, char *argv[]){
     fprintf(stderr, "======================================================\n");
     fprintf(stderr, "------------------------------------------------------\n");
     errors += test_compression_decompression();
+    fprintf(stderr, "------------------------------------------------------\n");
+    setup_parse_config_expected_num_fields();
     fprintf(stderr, "------------------------------------------------------\n");
     errors += test_auto_detect_web_log_parser_config();
     fprintf(stderr, "------------------------------------------------------\n");
