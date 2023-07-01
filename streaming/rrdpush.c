@@ -40,7 +40,7 @@ struct config stream_config = {
 
 unsigned int default_rrdpush_enabled = 0;
 #ifdef ENABLE_LZ4
-unsigned int default_compression_enabled = 1;
+unsigned int default_rrdpush_compression_enabled = 1;
 #endif
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
@@ -143,8 +143,8 @@ int rrdpush_init() {
     rrdhost_free_orphan_time_s    = config_get_number(CONFIG_SECTION_DB, "cleanup orphan hosts after secs", rrdhost_free_orphan_time_s);
 
 #ifdef ENABLE_LZ4
-    default_compression_enabled = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM,
-        "enable compression", default_compression_enabled);
+    default_rrdpush_compression_enabled = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM,
+                                                                              "enable compression", default_rrdpush_compression_enabled);
 #endif
 
     if(default_rrdpush_enabled && (!default_rrdpush_destination || !*default_rrdpush_destination || !default_rrdpush_api_key || !*default_rrdpush_api_key)) {

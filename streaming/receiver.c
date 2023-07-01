@@ -610,7 +610,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
     rpt->config.rrdpush_replication_step = appconfig_get_number(&stream_config, rpt->machine_guid, "seconds per replication step", rpt->config.rrdpush_replication_step);
 
 #ifdef  ENABLE_LZ4
-    rpt->config.rrdpush_compression = default_compression_enabled;
+    rpt->config.rrdpush_compression = default_rrdpush_compression_enabled;
     rpt->config.rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->key, "enable compression", rpt->config.rrdpush_compression);
     rpt->config.rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->machine_guid, "enable compression", rpt->config.rrdpush_compression);
 #endif  //ENABLE_LZ4

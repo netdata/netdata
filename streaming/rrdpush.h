@@ -441,7 +441,7 @@ struct rrdpush_destinations {
 
 extern unsigned int default_rrdpush_enabled;
 #ifdef ENABLE_LZ4
-extern unsigned int default_compression_enabled;
+extern unsigned int default_rrdpush_compression_enabled;
 #endif
 extern char *default_rrdpush_destination;
 extern char *default_rrdpush_api_key;

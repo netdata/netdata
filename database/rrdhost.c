@@ -1118,7 +1118,7 @@ static void rrdhost_streaming_sender_structures_init(RRDHOST *host)
     host->sender->rrdpush_sender_socket  = -1;
 
 #ifdef ENABLE_LZ4
-    if(default_compression_enabled)
+    if(default_rrdpush_compression_enabled)
         host->sender->flags |= SENDER_FLAG_COMPRESSION;
     else
         host->sender->flags &= ~SENDER_FLAG_COMPRESSION;
