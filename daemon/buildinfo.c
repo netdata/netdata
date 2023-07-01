@@ -6,9 +6,8 @@
 #include "buildinfo.h"
 
 typedef enum __attribute__((packed)) {
-    BIB_COMPILED_FOR = 0,
+    BIB_OPERATING_SYSTEM = 0,
     BIB_FEATURE_CLOUD,
-    BIB_FEATURE_CLOUD_DISABLED,
     BIB_FEATURE_HEALTH,
     BIB_FEATURE_STREAMING,
     BIB_FEATURE_REPLICATION,
@@ -98,11 +97,11 @@ static struct {
     const char *value;
 } BUILD_INFO_NAMES[] = {
         {
-                .bit = BIB_COMPILED_FOR,
+                .bit = BIB_OPERATING_SYSTEM,
                 .category = BIC_FEATURE,
                 .analytics = NULL,
-                .print = "Compiled For",
-                .print_json = "compiled-for",
+                .print = "O/S Support",
+                .print_json = "os",
                 .value = "unknown",
         },
         {
@@ -111,14 +110,6 @@ static struct {
                 .analytics = "Netdata Cloud",
                 .print = "Netdata Cloud",
                 .print_json = "cloud",
-                .value = NULL,
-        },
-        {
-                .bit = BIB_FEATURE_CLOUD_DISABLED,
-                .category = BIC_FEATURE,
-                .analytics = NULL,
-                .print = NULL,
-                .print_json = "cloud-disabled",
                 .value = NULL,
         },
         {
@@ -662,21 +653,21 @@ static void build_info_set_value(BUILD_INFO_BIT bit, const char *value) {
 
 __attribute__((constructor)) void initialize_build_info(void) {
 #ifdef COMPILED_FOR_LINUX
-    bitmap256_set_bit(&BUILD_INFO, BIB_COMPILED_FOR, true);
-    build_info_set_value(BIB_COMPILED_FOR, "Linux");
+    bitmap256_set_bit(&BUILD_INFO, BIB_OPERATING_SYSTEM, true);
+    build_info_set_value(BIB_OPERATING_SYSTEM, "Linux");
     bitmap256_set_bit(&BUILD_INFO, BIB_PLUGIN_LINUX_CGROUPS, true);
     bitmap256_set_bit(&BUILD_INFO, BIB_PLUGIN_LINUX_PROC, true);
     bitmap256_set_bit(&BUILD_INFO, BIB_PLUGIN_LINUX_DISKSPACE, true);
     bitmap256_set_bit(&BUILD_INFO, BIB_PLUGIN_LINUX_TC, true);
 #endif
 #ifdef COMPILED_FOR_FREEBSD
-    bitmap256_set_bit(&BUILD_INFO, BIB_COMPILED_FOR, true);
-    build_info_set_value(BIB_COMPILED_FOR, "FreeBSD");
+    bitmap256_set_bit(&BUILD_INFO, BIB_OPERATING_SYSTEM, true);
+    build_info_set_value(BIB_OPERATING_SYSTEM, "FreeBSD");
     bitmap256_set_bit(&BUILD_INFO, BIB_PLUGIN_FREEBSD, true);
 #endif
 #ifdef COMPILED_FOR_MACOS
-    bitmap256_set_bit(&BUILD_INFO, BIB_COMPILED_FOR, true);
-    build_info_set_value(BIB_COMPILED_FOR, "MacOS");
+    bitmap256_set_bit(&BUILD_INFO, BIB_OPERATING_SYSTEM, true);
+    build_info_set_value(BIB_OPERATING_SYSTEM, "MacOS");
     bitmap256_set_bit(&BUILD_INFO, BIB_PLUGIN_MACOS, true);
 #endif
 
@@ -684,11 +675,11 @@ __attribute__((constructor)) void initialize_build_info(void) {
     bitmap256_set_bit(&BUILD_INFO, BIB_FEATURE_CLOUD, true);
     bitmap256_set_bit(&BUILD_INFO, BIB_CONNECTIVITY_ACLK, true);
 #else
-    bitmap256_set_bit(&BUILD_INFO, BIB_CLOUD_DISABLED, true);
+    bitmap256_set_bit(&BUILD_INFO, BIB_FEATURE_CLOUD, false);
 #ifdef DISABLE_CLOUD
-    build_info_set_value(BIB_CLOUD_DISABLED, "disabled by user");
+    build_info_set_value(BIB_FEATURE_CLOUD, "disabled");
 #else
-    build_info_set_value(BIB_CLOUD_DISABLED, "not available");
+    build_info_set_value(BIB_FEATURE_CLOUD, "unavailable");
 #endif
 #endif
 
@@ -896,12 +887,9 @@ static void print_build_info_category_to_console(BUILD_INFO_CATEGORY category, c
     printf("%s:\n", title);
     for(size_t i = 0; BUILD_INFO_NAMES[i].category != BIC_TERMINATOR ;i++) {
         if(BUILD_INFO_NAMES[i].category == category && BUILD_INFO_NAMES[i].print) {
-            const char *v, *k = BUILD_INFO_NAMES[i].print;
-            if(BUILD_INFO_NAMES[i].value)
-                v = BUILD_INFO_NAMES[i].value;
-            else
-                v = bitmap256_get_bit(&BUILD_INFO, BUILD_INFO_NAMES[i].bit) ? "YES" : "NO";
-
+            const char *v = bitmap256_get_bit(&BUILD_INFO, BUILD_INFO_NAMES[i].bit) ? "YES" : "NO";
+            const char *k = BUILD_INFO_NAMES[i].print;
+            const char *d = BUILD_INFO_NAMES[i].value;
 
             int padding_length = 60 - strlen(k) - 1;
             if (padding_length < 0) padding_length = 0;
@@ -910,7 +898,10 @@ static void print_build_info_category_to_console(BUILD_INFO_CATEGORY category, c
             memset(padding, '_', padding_length);
             padding[padding_length] = '\0';
 
-            printf("    %s %s : %s\n", k, padding, v);
+            printf("    %s %s : %s%s%s%s\n", k, padding, v,
+                   d?" (":"",
+                   d?d:"",
+                   d?")":"");
         }
     }
 }
