@@ -31,7 +31,6 @@ typedef enum __attribute__((packed)) {
     BIB_LIB_LZ4,
     BIB_LIB_ZLIB,
     BIB_LIB_PROTOBUF,
-    BIB_LIB_PROTOBUF_SOURCE,
     BIB_LIB_OPENSSL,
     BIB_LIB_LIBDATACHANNEL,
     BIB_LIB_JSONC,
@@ -297,14 +296,6 @@ static struct {
                 .print = "protobuf",
                 .print_json = "protobuf",
                 .value = NULL,
-        },
-        {
-                .bit = BIB_LIB_PROTOBUF_SOURCE,
-                .category = BIC_LIBS,
-                .analytics = NULL,
-                .print = "protobuf-source",
-                .print_json = "protobuf-source",
-                .value = "none",
         },
         {
                 .bit = BIB_LIB_OPENSSL,
@@ -751,9 +742,9 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #ifdef HAVE_PROTOBUF
     bitmap256_set_bit(&BUILD_INFO, BIB_LIB_PROTOBUF, true);
 #ifdef BUNDLED_PROTOBUF
-    build_info_set_value(BIB_LIB_PROTOBUF_SOURCE, "bundled");
+    build_info_set_value(BIB_LIB_PROTOBUF, "bundled");
 #else
-    build_info_set_value(BIB_PROTOBUF_SOURCE, "system");
+    build_info_set_value(BIB_PROTOBUF, "system");
 #endif
 #endif
 
