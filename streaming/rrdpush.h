@@ -50,11 +50,11 @@ typedef enum {
     // needed for negotiating errors between parent and child
 } STREAM_CAPABILITIES;
 
-#ifdef  ENABLE_COMPRESSION
+#ifdef  ENABLE_LZ4
 #define STREAM_HAS_COMPRESSION STREAM_CAP_COMPRESSION
 #else
 #define STREAM_HAS_COMPRESSION 0
-#endif  // ENABLE_COMPRESSION
+#endif  // ENABLE_LZ4
 
 STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender);
 
@@ -118,7 +118,7 @@ typedef struct {
     char *kernel_version;
 } stream_encoded_t;
 
-#ifdef ENABLE_COMPRESSION
+#ifdef ENABLE_LZ4
 // signature MUST end with a newline
 #define RRDPUSH_COMPRESSION_SIGNATURE ((uint32_t)('z' | 0x80) | (0x80 << 8) | (0x80 << 16) | ('\n' << 24))
 #define RRDPUSH_COMPRESSION_SIGNATURE_MASK ((uint32_t)0xff | (0x80 << 8) | (0x80 << 16) | (0xff << 24))
@@ -262,7 +262,7 @@ struct sender_state {
 
     uint16_t hops;
 
-#ifdef ENABLE_COMPRESSION
+#ifdef ENABLE_LZ4
     struct compressor_state compressor;
 #endif
 
@@ -416,7 +416,7 @@ struct receiver_state {
 
     time_t replication_first_time_t;
 
-#ifdef ENABLE_COMPRESSION
+#ifdef ENABLE_LZ4
     struct decompressor_state decompressor;
 #endif
 /*
@@ -440,7 +440,7 @@ struct rrdpush_destinations {
 };
 
 extern unsigned int default_rrdpush_enabled;
-#ifdef ENABLE_COMPRESSION
+#ifdef ENABLE_LZ4
 extern unsigned int default_compression_enabled;
 #endif
 extern char *default_rrdpush_destination;
@@ -500,7 +500,7 @@ int connect_to_one_of_destinations(
 
 void rrdpush_signal_sender_to_wake_up(struct sender_state *s);
 
-#ifdef ENABLE_COMPRESSION
+#ifdef ENABLE_LZ4
 struct compressor_state *create_compressor();
 #endif
 

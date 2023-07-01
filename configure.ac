@@ -160,10 +160,10 @@ AC_ARG_ENABLE(
     [enable_https="detect"]
 )
 AC_ARG_ENABLE(
-    [compression],
-    [AS_HELP_STRING([--enable-compression], [Enable LZ4 compression support @<:@default autodetect@:>@])],
+    [lz4],
+    [AS_HELP_STRING([--enable-lz4], [Enable LZ4 support @<:@default autodetect@:>@])],
     ,
-    [enable_compression="detect"]
+    [enable_lz4="detect"]
 )
 AC_ARG_ENABLE(
     [dbengine],
@@ -528,7 +528,7 @@ OPTIONAL_UV_LIBS="${UV_LIBS}"
 
 
 # -----------------------------------------------------------------------------
-# lz4 Extremely Fast Compression algorithm
+# lz4
 
 AC_CHECK_LIB(
     [lz4],
@@ -670,8 +670,8 @@ fi
 AC_MSG_RESULT([${enable_https}])
 AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
 
-AC_MSG_CHECKING([if netdata compression should be used])
-if test "${enable_compression}" != "no"; then
+AC_MSG_CHECKING([if lz4 should be used])
+if test "${enable_lz4}" != "no"; then
     if test "${LZ4_LIBS_FAST}"; then
         LIBS_BKP="${LIBS}"
         LIBS="${LZ4_LIBS_FAST}"
@@ -680,26 +680,26 @@ if test "${enable_compression}" != "no"; then
             [
                 LZ4_stream_t* stream = LZ4_initStream(NULL, 0);
             ],
-            [ enable_compression="yes"],
-            [ enable_compression="no" ]
+            [ enable_lz4="yes"],
+            [ enable_lz4="no" ]
         )
         LIBS="${LIBS_BKP}"
-        if test "${enable_compression}" == "yes"; then
+        if test "${enable_lz4}" == "yes"; then
             OPTIONAL_LZ4_LIBS="${LZ4_LIBS_FAST}"
-            AC_DEFINE([ENABLE_COMPRESSION], [1], [netdata compression usability])
+            AC_DEFINE([ENABLE_LZ4], [1], [lz4 usability])
         fi
     else
-        if test "${enable_compression}" == "yes"; then
-            AC_MSG_ERROR([liblz4 with version >= 1.9.0 required to enable_compression. Try installing the required version of 'liblz4-dev' or 'liblz4-devel'.])
-            enable_compression="no"
+        if test "${enable_lz4}" == "yes"; then
+            AC_MSG_ERROR([liblz4 with version >= 1.9.0 required to enable lz4. Try installing the required version of 'liblz4-dev' or 'liblz4-devel'.])
+            enable_lz4="no"
         fi
-        enable_compression="no"
+        enable_lz4="no"
     fi
 else
-    enable_compression="no"
+    enable_lz4="no"
 fi
-AC_MSG_RESULT([${enable_compression}])
-AM_CONDITIONAL([ENABLE_COMPRESSION], [test "${enable_compression}" = "yes"])
+AC_MSG_RESULT([${enable_lz4}])
+AM_CONDITIONAL([ENABLE_LZ4], [test "${enable_lz4}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # JSON-C

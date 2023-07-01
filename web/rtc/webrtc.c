@@ -322,7 +322,7 @@ static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, siz
                        chan->conn->pc, chan->dc, w->response.code, response_size);
     }
 
-#if defined(ENABLE_COMPRESSION)
+#if defined(ENABLE_LZ4)
     int max_compressed_size = LZ4_compressBound((int)response_size);
     char *compressed = mallocz(max_compressed_size);
 

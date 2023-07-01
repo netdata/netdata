@@ -548,7 +548,7 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #ifdef ENABLE_ML
     bitmap256_set_bit(&BUILD_INFO, BIB_ML, true);
 #endif
-#ifdef ENABLE_COMPRESSION
+#ifdef ENABLE_LZ4
     bitmap256_set_bit(&BUILD_INFO, BIB_LZ4, true);
 #endif
 
