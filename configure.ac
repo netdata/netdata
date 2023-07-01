@@ -154,10 +154,10 @@ AC_ARG_ENABLE(
     [enable_lto="no"]
 )
 AC_ARG_ENABLE(
-    [https],
-    [AS_HELP_STRING([--enable-https], [Enable SSL support @<:@default autodetect@:>@])],
+    [openssl],
+    [AS_HELP_STRING([--enable-openssl], [Enable OpenSSL support @<:@default autodetect@:>@])],
     ,
-    [enable_https="detect"]
+    [enable_openssl="detect"]
 )
 AC_ARG_ENABLE(
     [lz4],
@@ -617,7 +617,8 @@ AC_CHECK_LIB(
 OPTIONAL_YAML_LIBS="${YAML_LIBS}"
 
 # -----------------------------------------------------------------------------
-# DB engine and HTTPS
+# DB engine and OpenSSL
+
 test "${enable_dbengine}" = "yes" -a -z "${LZ4_LIBS}" && \
     AC_MSG_ERROR([liblz4 required but not found. Try installing 'liblz4-dev' or 'lz4-devel'.])
 
@@ -638,8 +639,8 @@ AC_SUBST([LIBJUDY_CFLAGS])
 
 JUDY_CFLAGS="-I \$(abs_top_srcdir)/libnetdata/libjudy/src"
 
-test "${enable_https}" = "yes" -a -z "${SSL_LIBS}" && \
-    AC_MSG_ERROR([OpenSSL required for HTTPS but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
+test "${enable_openssl}" = "yes" -a -z "${SSL_LIBS}" && \
+    AC_MSG_ERROR([OpenSSL required but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
 
 test "${enable_dbengine}" = "yes" -a -z "${SSL_LIBS}" && \
     AC_MSG_ERROR([OpenSSL required for DBENGINE but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
@@ -658,17 +659,17 @@ fi
 AC_MSG_RESULT([${enable_dbengine}])
 AM_CONDITIONAL([ENABLE_DBENGINE], [test "${enable_dbengine}" = "yes"])
 
-AC_MSG_CHECKING([if netdata https should be used])
-if test "${enable_https}" != "no" -a "${SSL_LIBS}"; then
-    enable_https="yes"
-    AC_DEFINE([ENABLE_HTTPS], [1], [netdata HTTPS usability])
+AC_MSG_CHECKING([if openssl should be used])
+if test "${enable_openssl}" != "no" -a "${SSL_LIBS}"; then
+    enable_openssl="yes"
+    AC_DEFINE([ENABLE_OPENSSL], [1], [openssl usability])
     OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
     OPTIONAL_SSL_LIBS="${SSL_LIBS}"
 else
-    enable_https="no"
+    enable_openssl="no"
 fi
-AC_MSG_RESULT([${enable_https}])
-AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
+AC_MSG_RESULT([${enable_openssl}])
+AM_CONDITIONAL([ENABLE_OPENSSL], [test "${enable_openssl}" = "yes"])
 
 AC_MSG_CHECKING([if lz4 should be used])
 if test "${enable_lz4}" != "no"; then

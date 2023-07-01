@@ -19,6 +19,7 @@ typedef enum __attribute__((packed)) {
     BIB_ACLK,
     BIB_CLOUD,
     BIB_CLOUD_DISABLED,
+    BIB_RRDPUSH_COMPRESSION,
     BIB_LZ4,
     BIB_ZLIB,
     BIB_PROTOBUF,
@@ -30,6 +31,7 @@ typedef enum __attribute__((packed)) {
     BIB_LIBCRYPTO,
     BIB_LIBM,
     BIB_SETNS,
+    BIB_OPENSSL,
     BIB_TRACE_ALLOCATIONS,
     BIB_TLS_HOST_VERIFY,
     BIB_ML,
@@ -200,11 +202,27 @@ static struct {
                 .value = NULL,
         },
         {
-                .bit = BIB_LZ4,
+                .bit = BIB_RRDPUSH_COMPRESSION,
                 .category = BIC_FEATURE,
                 .analytics = "Stream Compression",
-                .print = "Stream Compression (LZ4)",
+                .print = "Stream Compression",
                 .print_json = "stream-compression",
+                .value = "none",
+        },
+        {
+                .bit = BIB_LZ4,
+                .category = BIC_LIBS,
+                .analytics = NULL,
+                .print = "LZ4",
+                .print_json = "lz4",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_OPENSSL,
+                .category = BIC_LIBS,
+                .analytics = NULL,
+                .print = "OpenSSL",
+                .print_json = "openssl",
                 .value = NULL,
         },
         {
@@ -550,6 +568,17 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #endif
 #ifdef ENABLE_LZ4
     bitmap256_set_bit(&BUILD_INFO, BIB_LZ4, true);
+#endif
+
+#ifdef ENABLE_RRDPUSH_COMPRESSION
+    bitmap256_set_bit(&BUILD_INFO, BIB_RRDPUSH_COMPRESSION, true);
+#ifdef ENABLE_LZ4
+    build_info_set_value(BIB_RRDPUSH_COMPRESSION, "lz4");
+#endif
+#endif
+
+#ifdef ENABLE_OPENSSL
+    bitmap256_set_bit(&BUILD_INFO, BIB_OPENSSL, true);
 #endif
 
 #ifdef HAVE_PROTOBUF

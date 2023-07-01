@@ -1,6 +1,6 @@
 #include "rrdpush.h"
 
-#ifdef ENABLE_LZ4
+#ifdef ENABLE_RRDPUSH_COMPRESSION
 #include "lz4.h"
 
 #define STREAM_COMPRESSION_MSG "STREAM_COMPRESSION"

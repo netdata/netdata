@@ -11,6 +11,18 @@ extern "C" {
 #include <config.h>
 #endif
 
+#ifdef ENABLE_LZ4
+#define ENABLE_RRDPUSH_COMPRESSION 1
+#endif
+
+#ifdef ENABLE_OPENSSL
+#define ENABLE_HTTPS 1
+#endif
+
+#ifdef ENABLE_LIBDATACHANNEL
+#define ENABLE_WEBRTC 1
+#endif
+
 #define JUDYHS_INDEX_SIZE_ESTIMATE(key_bytes) (((key_bytes) + sizeof(Word_t) - 1) / sizeof(Word_t) * 4)
 
 #if defined(NETDATA_DEV_MODE) && !defined(NETDATA_INTERNAL_CHECKS)
