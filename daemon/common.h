@@ -118,7 +118,8 @@ extern time_t netdata_start_time;
 long get_netdata_cpus(void);
 
 typedef enum __attribute__((packed)) {
-    CLOUD_STATUS_DISABLED = 0,
+    CLOUD_STATUS_UNAVAILABLE = 0,
+    CLOUD_STATUS_DISABLED,
     CLOUD_STATUS_BANNED,
     CLOUD_STATUS_OFFLINE,
     CLOUD_STATUS_ONLINE,

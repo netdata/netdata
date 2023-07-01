@@ -918,7 +918,9 @@ void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time
     buffer_json_member_add_uint64(wb, "ai", 0);
 
     if(info) {
-        buffer_json_member_add_string(wb, "v", string2str(localhost->program_version));
+        buffer_json_member_add_object(wb, "netdata");
+        buffer_json_member_add_string(wb, "version", string2str(localhost->program_version));
+        buffer_json_object_close(wb); // netdata
 
         buffer_json_member_add_object(wb, "cloud");
         {

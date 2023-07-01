@@ -67,6 +67,9 @@ long get_netdata_cpus(void) {
 const char *cloud_status_to_string(CLOUD_STATUS status) {
     switch(status) {
         default:
+        case CLOUD_STATUS_UNAVAILABLE:
+            return "unavailable";
+
         case CLOUD_STATUS_DISABLED:
             return "disabled";
 
@@ -94,7 +97,7 @@ CLOUD_STATUS cloud_status(void) {
 
     return CLOUD_STATUS_DISABLED;
 #else
-    return CLOUD_STATUS_DISABLED;
+    return CLOUD_STATUS_UNAVAILABLE;
 #endif
 }
 
