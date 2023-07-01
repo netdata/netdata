@@ -373,8 +373,23 @@ darwin*)
 esac
 
 AM_CONDITIONAL([FREEBSD], [test "${build_target}" = "freebsd"])
+if test "${build_target}" = "freebsd"
+then
+    AC_DEFINE([COMPILED_FOR_FREEBSD], [1], [Compiled for FreeBSD])
+fi
+
 AM_CONDITIONAL([MACOS], [test "${build_target}" = "macos"])
+if test "${build_target}" = "macos"
+then
+    AC_DEFINE([COMPILED_FOR_MACOS], [1], [Compiled for MacOS])
+fi
+
 AM_CONDITIONAL([LINUX], [test "${build_target}" = "linux"])
+if test "${build_target}" = "linux"
+then
+    AC_DEFINE([COMPILED_FOR_LINUX], [1], [Compiled for Linux])
+fi
+
 AC_MSG_RESULT([Host OS: ${build_target}])
 
 # -----------------------------------------------------------------------------
@@ -1887,6 +1902,7 @@ AC_SUBST([TEST_LIBS])
 
 # -----------------------------------------------------------------------------
 # save configure options for build info
+
 AC_DEFINE_UNQUOTED(
     [CONFIGURE_COMMAND],
     ["$ac_configure_args"],

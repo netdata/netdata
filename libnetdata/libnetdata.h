@@ -19,9 +19,12 @@ extern "C" {
 #define ENABLE_HTTPS 1
 #endif
 
-#ifdef ENABLE_LIBDATACHANNEL
+#ifdef HAVE_LIBDATACHANNEL
 #define ENABLE_WEBRTC 1
 #endif
+
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
 
 #define JUDYHS_INDEX_SIZE_ESTIMATE(key_bytes) (((key_bytes) + sizeof(Word_t) - 1) / sizeof(Word_t) * 4)
 
